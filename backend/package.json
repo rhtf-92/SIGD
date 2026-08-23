@@ -1,0 +1,29 @@
+{
+  "name": "sigd-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Estructura base del backend académico del SIGD del Instituto Suiza.",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=24.19.0 <25"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}
