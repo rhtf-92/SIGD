@@ -747,10 +747,504 @@ Operación rechazada
 
 Esto evita registrar relaciones con unidades inexistentes o información inconsistente.
 
-
 ## 7. Asignación de usuarios a áreas
 
+### 7.1 Objetivo de la asignación
+
+**PROPUESTO**
+
+El módulo deberá permitir relacionar a los usuarios internos con las áreas en las que desarrollan actividades, sin duplicar la información de identidad administrada por otros módulos del SIGD.
+
+La asignación deberá indicar qué usuario pertenece a qué área y, cuando sea necesario, durante qué periodo dicha relación se encuentra vigente.
+
+Conceptualmente:
+
+```text
+Usuario interno
+      ↓
+Asignación
+      ↓
+Área
+```
+
+La información personal y de autenticación del usuario no deberá duplicarse dentro del módulo organizacional.
+
+---
+
+### 7.2 Relación con usuarios internos
+
+**CONFIRMADO**
+
+El plan del proyecto establece que la asignación de usuarios internos deberá coordinarse con el Grupo 4 y que el Grupo 3 no deberá duplicar las tablas de identidad.
+
+Por ello, este módulo deberá trabajar conceptualmente con una referencia al usuario existente en el módulo correspondiente.
+
+**EJEMPLO**
+
+```text
+Usuario interno: ID 25
+Área asignada: Área de ejemplo
+Inicio de vigencia: 01/08/2026
+Fin de vigencia: vigente
+```
+
+Los datos anteriores son ficticios.
+
+---
+
+### 7.3 Asignación de un usuario a un área
+
+**PROPUESTO**
+
+Antes de registrar una asignación, el backend debería verificar:
+
+* Que el usuario exista.
+* Que el usuario se encuentre activo.
+* Que el área exista.
+* Que el área se encuentre activa.
+* Que la fecha de inicio sea válida.
+* Que no exista una asignación incompatible con las reglas institucionales.
+* Que el usuario que realiza la operación tenga autorización.
+
+**Entrada conceptual:**
+
+```text
+Usuario
+Área
+Fecha de inicio
+Fecha de fin, si corresponde
+```
+
+**Resultado esperado:**
+
+Si las validaciones son correctas, la asignación queda registrada como vigente durante el periodo correspondiente.
+
+---
+
+### 7.4 Usuario asignado a varias áreas
+
+**PENDIENTE**
+
+Todavía debe confirmarse si un usuario interno puede pertenecer simultáneamente a más de un área.
+
+Existen al menos dos posibilidades:
+
+**Alternativa A**
+
+```text
+Usuario A
+    ↓
+Área 1
+```
+
+El usuario solo puede tener una asignación activa.
+
+**Alternativa B**
+
+```text
+Usuario A
+    ├── Área 1
+    ├── Área 2
+    └── Área 3
+```
+
+El usuario puede tener varias asignaciones activas al mismo tiempo.
+
+Esta decisión deberá ser confirmada antes de establecer restricciones definitivas en el modelo de datos.
+
+---
+
+### 7.5 Vigencia de la asignación
+
+**PROPUESTO**
+
+Una asignación podría registrar un periodo de vigencia para conservar información histórica.
+
+**EJEMPLO**
+
+```text
+Usuario A
+Área: Área de ejemplo
+Desde: 01/01/2026
+Hasta: 31/07/2026
+```
+
+Posteriormente:
+
+```text
+Usuario A
+Área: Otra área de ejemplo
+Desde: 01/08/2026
+Hasta: vigente
+```
+
+Esto permitiría conocer en qué área se encontraba asignado un usuario en una fecha determinada.
+
+**PENDIENTE**
+
+Confirmar si todas las asignaciones requieren fecha de inicio y fin o solamente aquellas que necesiten conservar historial.
+
+---
+
+### 7.6 Cambio de área de un usuario
+
+**PROPUESTO**
+
+Cuando un usuario deje de pertenecer a un área y pase a otra, no debería eliminarse necesariamente la asignación anterior si esta información es necesaria para trazabilidad.
+
+**EJEMPLO**
+
+Situación inicial:
+
+```text
+Usuario A
+Área A
+01/01/2026 - 31/07/2026
+```
+
+Nueva situación:
+
+```text
+Usuario A
+Área B
+01/08/2026 - vigente
+```
+
+El cambio podría implicar:
+
+* Finalizar la vigencia de la asignación anterior.
+* Registrar la nueva asignación.
+* Mantener el historial.
+* Revisar los roles o permisos cuyo alcance dependa del área anterior.
+
+**PENDIENTE**
+
+Confirmar qué debe ocurrir con los permisos y trámites del usuario cuando cambia de área.
+
+---
+
+### 7.7 Caso excepcional: usuario inexistente
+
+**PROPUESTO**
+
+No deberá registrarse una asignación para un usuario que no exista en el sistema.
+
+**EJEMPLO**
+
+```text
+Solicitud:
+Asignar Usuario 999 al Área A
+
+Validación:
+Usuario 999 no existe
+
+Resultado:
+Operación rechazada
+```
+
+---
+
+### 7.8 Caso excepcional: usuario inactivo
+
+**PROPUESTO**
+
+Si un usuario se encuentra inactivo, el sistema debería impedir nuevas asignaciones organizacionales o acciones que dependan de una asignación vigente.
+
+**EJEMPLO**
+
+```text
+Usuario A
+Estado: INACTIVO
+
+Intento:
+Asignarlo al Área B
+
+Resultado:
+Operación rechazada
+```
+
+**PENDIENTE**
+
+Confirmar qué debe ocurrir con las asignaciones existentes cuando un usuario pasa a estado inactivo.
+
+---
+
+### 7.9 Caso excepcional: asignación vencida
+
+**PROPUESTO**
+
+Cuando una asignación tenga una fecha de fin anterior a la fecha de la operación, dicha asignación no debería considerarse vigente.
+
+**EJEMPLO**
+
+```text
+Asignación:
+Usuario A → Área B
+
+Vigencia:
+01/01/2026 - 31/07/2026
+
+Fecha de operación:
+27/08/2026
+
+Resultado:
+La asignación ya no se considera vigente.
+```
+
+El backend deberá evaluar la vigencia cuando una autorización dependa de la pertenencia del usuario a un área.
+
+---
+
 ## 8. Designación de responsables
+
+### 8.1 Objetivo de la responsabilidad
+
+**PROPUESTO**
+
+El módulo deberá permitir identificar qué usuario interno posee la responsabilidad de un área durante determinado periodo.
+
+La responsabilidad deberá mantenerse separada de los conceptos de cargo, rol y permiso.
+
+Conceptualmente:
+
+```text
+Usuario interno
+      ↓
+Responsabilidad
+      ↓
+Área
+```
+
+---
+
+### 8.2 Designación de un responsable
+
+**PROPUESTO**
+
+Para designar un responsable, el backend podría validar:
+
+* Que el usuario exista.
+* Que el usuario se encuentre activo.
+* Que el área exista.
+* Que el área se encuentre activa.
+* Que el periodo de vigencia sea válido.
+* Que no exista un conflicto con otra responsabilidad vigente.
+* Que el usuario que realiza la designación tenga autorización.
+
+**Entrada conceptual:**
+
+```text
+Usuario
+Área
+Fecha de inicio
+Fecha de fin, si corresponde
+Tipo de responsabilidad, si posteriormente se requiere
+```
+
+**Resultado esperado:**
+
+Si las validaciones son correctas, la responsabilidad queda registrada para el periodo correspondiente.
+
+---
+
+### 8.3 Relación entre asignación y responsabilidad
+
+**PROPUESTO**
+
+Podría requerirse que un usuario se encuentre asignado a un área antes de poder ser designado como responsable de dicha área.
+
+**EJEMPLO**
+
+```text
+Usuario A
+    ↓
+Asignado al Área B
+    ↓
+Puede ser evaluado para responsabilidad del Área B
+```
+
+Sin embargo, esta regla todavía no debe considerarse oficial.
+
+**PENDIENTE**
+
+Confirmar si un responsable necesariamente debe pertenecer al área de la cual es responsable.
+
+---
+
+### 8.4 Vigencia de la responsabilidad
+
+**PROPUESTO**
+
+La responsabilidad podría registrar fecha de inicio y fecha de fin para conservar historial.
+
+**EJEMPLO**
+
+```text
+Área A
+
+Responsable:
+Usuario A
+01/01/2026 - 31/07/2026
+
+Responsable:
+Usuario B
+01/08/2026 - vigente
+```
+
+Esto permitiría determinar quién era responsable del área en una fecha específica.
+
+---
+
+### 8.5 Cambio de responsable
+
+**PROPUESTO**
+
+Cuando se designe un nuevo responsable, el registro anterior no debería eliminarse si se requiere conservar historial.
+
+Un posible flujo sería:
+
+```text
+Responsable anterior vigente
+        ↓
+Finalizar su vigencia
+        ↓
+Registrar nuevo responsable
+        ↓
+Conservar ambos registros históricos
+```
+
+**PENDIENTE**
+
+Confirmar si el cambio de responsable requiere algún proceso de aprobación y quién tiene autorización para realizarlo.
+
+---
+
+### 8.6 Responsable principal, alterno o temporal
+
+**PENDIENTE**
+
+Todavía debe confirmarse si una misma área puede tener:
+
+* Un único responsable principal.
+* Más de un responsable simultáneo.
+* Responsables alternos.
+* Responsables temporales.
+* Responsables encargados por reemplazo.
+
+Estas reglas afectan directamente la validación de duplicados y la vigencia de las responsabilidades.
+
+---
+
+### 8.7 Caso excepcional: responsable duplicado
+
+**PROPUESTO**
+
+Si la institución determina que solo puede existir un responsable principal vigente por área, el sistema deberá impedir que se registren dos responsables principales con vigencias superpuestas.
+
+**EJEMPLO**
+
+Situación existente:
+
+```text
+Área A
+Responsable: Usuario A
+01/08/2026 - vigente
+```
+
+Nueva solicitud:
+
+```text
+Área A
+Responsable: Usuario B
+01/08/2026 - vigente
+```
+
+Si solo se permite un responsable principal:
+
+```text
+Resultado:
+Operación rechazada por conflicto de vigencia.
+```
+
+Esta regla dependerá de la decisión institucional.
+
+---
+
+### 8.8 Responsable temporal
+
+**PROPUESTO**
+
+Si la institución permite responsables temporales, la designación deberá tener una vigencia claramente definida.
+
+**EJEMPLO**
+
+```text
+Usuario B
+Responsable temporal del Área A
+
+Desde: 10/08/2026
+Hasta: 20/08/2026
+```
+
+Al finalizar la vigencia, el sistema deberá dejar de considerar esa responsabilidad como activa.
+
+---
+
+### 8.9 Área sin responsable
+
+**PENDIENTE**
+
+Debe definirse qué debe ocurrir cuando un área no tenga ningún responsable vigente.
+
+Entre las situaciones que deben consultarse se encuentran:
+
+* Si el área puede continuar recibiendo trámites.
+* Si puede realizar derivaciones.
+* Si debe mostrarse una advertencia.
+* Si debe impedirse determinadas operaciones.
+* Si debe existir obligatoriamente un responsable antes de activar el área.
+
+Estas opciones no representan reglas oficiales.
+
+---
+
+### 8.10 Responsable inactivo
+
+**PROPUESTO**
+
+Si el usuario responsable pasa a estado inactivo, el sistema debería evitar que su responsabilidad continúe siendo utilizada para autorizar nuevas operaciones.
+
+**PENDIENTE**
+
+Debe confirmarse si la responsabilidad se finaliza automáticamente, si debe designarse un reemplazo o si se requiere una acción administrativa previa.
+
+---
+
+### 8.11 Flujo conceptual de cambio de responsable
+
+**PROPUESTO**
+
+```text
+Solicitud de cambio
+        ↓
+Verificar área
+        ↓
+Verificar nuevo usuario
+        ↓
+Verificar estado del usuario
+        ↓
+Verificar reglas de responsabilidad
+        ↓
+Validar vigencias
+        ↓
+Finalizar responsabilidad anterior, si corresponde
+        ↓
+Registrar nueva responsabilidad
+        ↓
+Conservar historial
+```
+
+Este flujo deberá adaptarse posteriormente según las reglas institucionales aprobadas.
 
 ## 9. Roles y permisos
 
