@@ -1744,7 +1744,744 @@ Estas preguntas deberán resolverse antes de considerar definitiva cualquier mat
 
 ## 11. Flujos normales
 
+Los siguientes flujos describen de manera funcional cómo podrían ejecutarse algunas operaciones del módulo. No representan endpoints definitivos ni decisiones institucionales oficiales.
+
+---
+
+### 11.1 Flujo normal: registrar un área
+
+**PROPUESTO**
+
+**Entrada:**
+
+```text
+Datos del área
+Área superior, si corresponde
+Estado inicial
+Usuario que realiza la operación
+```
+
+**Validaciones:**
+
+1. Verificar que el usuario esté autenticado.
+2. Verificar que tenga autorización para registrar áreas.
+3. Verificar que los datos obligatorios estén completos.
+4. Verificar que no exista un duplicado incompatible con las reglas aprobadas.
+5. Si se indica un área superior, comprobar que exista.
+6. Verificar que la relación jerárquica sea válida.
+
+**Resultado esperado:**
+
+```text
+Área registrada correctamente.
+```
+
+**Responsable de la operación:**
+
+**PENDIENTE**
+
+Debe confirmarse qué rol o usuario institucional estará autorizado para registrar áreas.
+
+---
+
+### 11.2 Flujo normal: consultar un área
+
+**PROPUESTO**
+
+**Entrada:**
+
+```text
+Identificador del área
+Usuario que realiza la consulta
+```
+
+**Validaciones:**
+
+1. Verificar que el usuario esté autenticado.
+2. Verificar que el área exista.
+3. Verificar si la consulta requiere un permiso específico.
+4. Si existe alcance por área, comprobar que el usuario tenga autorización sobre dicha unidad.
+
+**Resultado esperado:**
+
+Mostrar la información organizacional permitida para el usuario.
+
+**Responsable:**
+
+Dependerá del rol y de las reglas de acceso aprobadas.
+
+---
+
+### 11.3 Flujo normal: actualizar un área
+
+**PROPUESTO**
+
+**Entrada:**
+
+```text
+Área a modificar
+Datos nuevos
+Usuario que realiza la modificación
+```
+
+**Validaciones:**
+
+1. Verificar que el área exista.
+2. Verificar que el usuario esté autorizado.
+3. Verificar que los nuevos datos sean válidos.
+4. Si cambia la dependencia jerárquica, comprobar que no se genere un ciclo.
+5. Verificar que la modificación no incumpla reglas institucionales.
+
+**Resultado esperado:**
+
+```text
+Información del área actualizada.
+```
+
+**PENDIENTE**
+
+Debe confirmarse qué atributos se podrán modificar y cuáles deberán conservar historial.
+
+---
+
+### 11.4 Flujo normal: asignar un usuario a un área
+
+**PROPUESTO**
+
+**Entrada:**
+
+```text
+Usuario interno
+Área
+Fecha de inicio
+Fecha de fin, si corresponde
+Usuario que realiza la asignación
+```
+
+**Validaciones:**
+
+1. Verificar que el usuario interno exista.
+2. Verificar que se encuentre activo.
+3. Verificar que el área exista.
+4. Verificar que el área esté activa.
+5. Verificar que las fechas sean válidas.
+6. Verificar que no exista una asignación incompatible.
+7. Verificar que quien realiza la operación tenga autorización.
+
+**Resultado esperado:**
+
+```text
+Asignación registrada con su periodo de vigencia.
+```
+
+**Responsable:**
+
+**PENDIENTE**
+
+Debe confirmarse qué actor estará autorizado para realizar asignaciones organizacionales.
+
+---
+
+### 11.5 Flujo normal: designar responsable de un área
+
+**PROPUESTO**
+
+**Entrada:**
+
+```text
+Usuario
+Área
+Fecha de inicio
+Fecha de fin, si corresponde
+Usuario que realiza la designación
+```
+
+**Validaciones:**
+
+1. Verificar que el área exista.
+2. Verificar que el área esté activa.
+3. Verificar que el usuario exista.
+4. Verificar que el usuario esté activo.
+5. Verificar las condiciones de vigencia.
+6. Verificar si existe conflicto con otro responsable.
+7. Verificar que quien realiza la designación tenga autorización.
+
+**Resultado esperado:**
+
+```text
+Responsabilidad registrada correctamente.
+```
+
+Si existe un responsable anterior y las reglas lo requieren:
+
+```text
+Finalizar vigencia anterior
+        ↓
+Registrar nuevo responsable
+        ↓
+Conservar historial
+```
+
+**PENDIENTE**
+
+Debe confirmarse si un responsable tiene que pertenecer previamente al área.
+
+---
+
+### 11.6 Flujo normal: asignar un rol
+
+**PROPUESTO**
+
+**Entrada:**
+
+```text
+Usuario
+Rol
+Área, si existe alcance organizacional
+Vigencia, si corresponde
+Usuario que realiza la asignación
+```
+
+**Validaciones:**
+
+1. Verificar que el usuario exista.
+2. Verificar que el usuario se encuentre activo.
+3. Verificar que el rol exista.
+4. Verificar que el rol pueda ser asignado.
+5. Verificar que no exista una asignación duplicada incompatible.
+6. Si existe alcance por área, verificar que el área sea válida.
+7. Verificar que el usuario que realiza la operación tenga autorización.
+
+**Resultado esperado:**
+
+```text
+Rol asignado correctamente.
+```
+
+**PENDIENTE**
+
+Debe confirmarse quién podrá asignar y retirar roles.
+
+---
+
+### 11.7 Flujo normal: verificar autorización antes de ejecutar una acción
+
+**PROPUESTO**
+
+**Entrada:**
+
+```text
+Usuario autenticado
+Acción solicitada
+Recurso involucrado
+Área relacionada, si corresponde
+```
+
+**Flujo:**
+
+```text
+Usuario solicita una operación
+        ↓
+Backend identifica al usuario
+        ↓
+Comprueba que esté activo
+        ↓
+Comprueba asignaciones vigentes
+        ↓
+Obtiene roles vigentes
+        ↓
+Obtiene permisos correspondientes
+        ↓
+Comprueba alcance del permiso
+        ↓
+¿Está autorizado?
+      ↙        ↘
+    Sí          No
+    ↓            ↓
+Ejecutar       Rechazar
+operación      operación
+```
+
+**Resultado esperado:**
+
+La operación solamente se ejecuta cuando todas las condiciones de autorización necesarias se cumplen.
+
+---
+
+### 11.8 Flujo normal: desactivar un área
+
+**PROPUESTO**
+
+**Entrada:**
+
+```text
+Área
+Usuario que solicita la desactivación
+```
+
+**Validaciones:**
+
+1. Verificar que el área exista.
+2. Verificar que actualmente esté activa.
+3. Verificar que el usuario tenga autorización.
+4. Verificar si existen áreas dependientes activas.
+5. Verificar si existen trámites pendientes relacionados.
+6. Verificar si existen responsables o asignaciones vigentes.
+
+**Resultado esperado:**
+
+El área cambia a estado inactivo cuando las reglas institucionales permiten la operación.
+
+**PENDIENTE**
+
+Debe confirmarse qué condiciones impiden desactivar un área.
+
+---
+
 ## 12. Flujos excepcionales
+
+Los siguientes casos representan situaciones que el backend deberá detectar para evitar inconsistencias o accesos no autorizados.
+
+---
+
+### 12.1 Área inexistente
+
+**PROPUESTO**
+
+**Entrada:**
+
+```text
+Operación sobre Área 999
+```
+
+**Validación:**
+
+El backend busca el área y determina que no existe.
+
+**Resultado:**
+
+```text
+Operación rechazada.
+Motivo: área inexistente.
+```
+
+Esto evita crear relaciones con registros que no existen.
+
+---
+
+### 12.2 Área inactiva
+
+**PROPUESTO**
+
+**EJEMPLO**
+
+```text
+Área A
+Estado: INACTIVA
+
+Solicitud:
+Asignar Usuario B al Área A
+```
+
+**Validación:**
+
+El backend detecta que el área no está activa.
+
+**Resultado:**
+
+```text
+Operación rechazada.
+```
+
+**PENDIENTE**
+
+Debe confirmarse cuáles operaciones estarán prohibidas sobre áreas inactivas.
+
+---
+
+### 12.3 Ciclo jerárquico
+
+**PROPUESTO**
+
+Situación existente:
+
+```text
+Área A
+   ↓
+Área B
+   ↓
+Área C
+```
+
+Nueva solicitud:
+
+```text
+Hacer que Área A dependa de Área C.
+```
+
+Esto produciría:
+
+```text
+Área A → Área B → Área C → Área A
+```
+
+**Validación:**
+
+El sistema detecta que la nueva relación convertiría a un área en dependiente directa o indirecta de sí misma.
+
+**Resultado:**
+
+```text
+Operación rechazada.
+Motivo: ciclo jerárquico.
+```
+
+---
+
+### 12.4 Usuario inexistente
+
+**PROPUESTO**
+
+**Entrada:**
+
+```text
+Usuario 999
+Área A
+```
+
+**Validación:**
+
+El usuario no existe en el módulo de identidad correspondiente.
+
+**Resultado:**
+
+```text
+Asignación rechazada.
+```
+
+El módulo organizacional no deberá crear usuarios por su cuenta para resolver esta situación.
+
+---
+
+### 12.5 Usuario inactivo
+
+**PROPUESTO**
+
+**EJEMPLO**
+
+```text
+Usuario A
+Estado: INACTIVO
+
+Solicitud:
+Asignar nuevo rol
+```
+
+**Validación:**
+
+El backend detecta que el usuario está inactivo.
+
+**Resultado:**
+
+```text
+Operación rechazada.
+```
+
+**PENDIENTE**
+
+Debe confirmarse qué ocurre con roles y asignaciones ya existentes cuando un usuario pasa a estado inactivo.
+
+---
+
+### 12.6 Asignación vencida
+
+**PROPUESTO**
+
+**EJEMPLO**
+
+```text
+Usuario A → Área B
+
+Vigencia:
+01/01/2026 - 31/07/2026
+
+Fecha de operación:
+27/08/2026
+```
+
+**Validación:**
+
+La fecha actual se encuentra fuera del periodo vigente.
+
+**Resultado:**
+
+```text
+La asignación no se utiliza para autorizar la operación.
+```
+
+---
+
+### 12.7 Responsable duplicado
+
+**PROPUESTO**
+
+Este caso depende de que la institución determine que solo puede existir un responsable principal vigente por área.
+
+**EJEMPLO**
+
+Existe:
+
+```text
+Área A
+Responsable: Usuario A
+Estado: vigente
+```
+
+Se intenta registrar:
+
+```text
+Área A
+Responsable: Usuario B
+Estado: vigente
+```
+
+**Validación:**
+
+Se detecta superposición entre responsabilidades principales.
+
+**Resultado:**
+
+```text
+Operación rechazada por conflicto de vigencia.
+```
+
+**PENDIENTE**
+
+Confirmar si efectivamente existe la restricción de un único responsable principal.
+
+---
+
+### 12.8 Rol duplicado
+
+**PROPUESTO**
+
+**EJEMPLO**
+
+```text
+Usuario A
+Rol A
+Estado: vigente
+```
+
+Se intenta registrar nuevamente la misma asignación sin ninguna diferencia de vigencia o alcance.
+
+**Resultado:**
+
+```text
+Operación rechazada como duplicada.
+```
+
+La definición exacta de duplicado dependerá del modelo aprobado.
+
+---
+
+### 12.9 Rol vencido
+
+**PROPUESTO**
+
+**EJEMPLO**
+
+```text
+Usuario A
+Rol A
+
+Vigencia:
+01/07/2026 - 31/07/2026
+
+Fecha de operación:
+27/08/2026
+```
+
+**Validación:**
+
+El backend detecta que la asignación del rol ya terminó.
+
+**Resultado:**
+
+```text
+Los permisos provenientes de ese rol no autorizan la operación.
+```
+
+---
+
+### 12.10 Permiso insuficiente
+
+**PROPUESTO**
+
+**EJEMPLO**
+
+```text
+Usuario A
+
+Permiso disponible:
+tramite.ver
+
+Operación solicitada:
+tramite.cerrar
+```
+
+**Validación:**
+
+El permiso requerido no está presente.
+
+**Resultado:**
+
+```text
+ACCESO DENEGADO
+```
+
+El sistema no deberá conceder el permiso faltante por defecto.
+
+---
+
+### 12.11 Permiso correcto pero alcance incorrecto
+
+**PROPUESTO**
+
+**EJEMPLO**
+
+```text
+Usuario A
+
+Permiso:
+tramite.derivar
+
+Alcance:
+Área A
+```
+
+El usuario intenta derivar un trámite correspondiente al Área B.
+
+**Validación:**
+
+El permiso existe, pero su alcance no incluye el recurso solicitado.
+
+**Resultado:**
+
+```text
+ACCESO DENEGADO
+```
+
+Esto demuestra que no siempre es suficiente comprobar solamente el nombre del permiso.
+
+---
+
+### 12.12 Área superior inactiva
+
+**PROPUESTO**
+
+**EJEMPLO**
+
+```text
+Área A
+Estado: INACTIVA
+
+Área B
+Depende de Área A
+Estado: ACTIVA
+```
+
+**PENDIENTE**
+
+Debe determinarse institucionalmente si esta situación será permitida.
+
+Entre las posibles reglas a validar se encuentran:
+
+* Permitir la relación temporalmente.
+* Obligar a cambiar la dependencia del Área B.
+* Impedir que Área A sea desactivada mientras tenga áreas activas dependientes.
+
+No se adopta ninguna de estas opciones como definitiva.
+
+---
+
+### 12.13 Área sin responsable
+
+**PENDIENTE**
+
+**EJEMPLO**
+
+```text
+Área A
+Estado: ACTIVA
+Responsable vigente: ninguno
+```
+
+Debe confirmarse si:
+
+* El área puede seguir recibiendo trámites.
+* Puede derivar documentos.
+* El sistema debe mostrar una advertencia.
+* Determinadas operaciones deben bloquearse.
+* Debe designarse obligatoriamente un responsable.
+
+---
+
+### 12.14 Intento de autorización solo desde el frontend
+
+**PROPUESTO**
+
+Un usuario podría intentar ejecutar directamente una operación protegida aunque el frontend no muestre el botón correspondiente.
+
+**EJEMPLO**
+
+```text
+Frontend:
+Botón "Cerrar trámite" oculto
+
+Usuario:
+Intenta llamar directamente al backend
+
+Backend:
+Verifica permisos
+        ↓
+Usuario no autorizado
+        ↓
+Operación rechazada
+```
+
+**Resultado:**
+
+La seguridad se mantiene porque la autorización se comprueba en el backend.
+
+---
+
+### 12.15 Resumen del tratamiento de excepciones
+
+De manera general, una operación sensible deberá seguir este criterio:
+
+```text
+Entrada recibida
+      ↓
+Validar existencia
+      ↓
+Validar estados
+      ↓
+Validar vigencias
+      ↓
+Validar relaciones
+      ↓
+Validar autorización
+      ↓
+¿Todo es válido?
+   ↙          ↘
+ Sí            No
+ ↓              ↓
+Ejecutar      Rechazar
+```
+
+El backend deberá rechazar las operaciones que incumplan las reglas aprobadas y no deberá asumir permisos, relaciones o estados que no hayan sido confirmados.
+
 
 ## 13. Control de acceso basado en roles (RBAC)
 
