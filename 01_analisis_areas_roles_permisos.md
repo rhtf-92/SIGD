@@ -6,7 +6,7 @@
 
 El módulo de organización y autorización del Sistema Integral de Gestión Documentaria (SIGD) tendrá como objetivo representar de manera flexible la estructura organizacional de la institución y establecer reglas para controlar las acciones que pueden realizar los usuarios internos dentro del sistema.
 
-El módulo deberá permitir identificar las áreas u oficinas registradas, sus relaciones jerárquicas, los usuarios internos asignados a ellas, los responsables vigentes, los roles del sistema y los permisos asociados a cada rol.
+El módulo deberá permitir identificar las áreas, oficinas o unidades organizacionales registradas, sus relaciones jerárquicas, los usuarios internos asignados a ellas, los responsables vigentes, los roles del sistema y los permisos asociados.
 
 Además, el backend deberá verificar que las operaciones sensibles sean ejecutadas únicamente por usuarios autorizados. La autorización no deberá depender solamente de que una opción o botón se encuentre visible u oculto en el frontend.
 
@@ -23,17 +23,17 @@ El análisis funcional comprenderá las necesidades relacionadas con la estructu
 Se consideran inicialmente las siguientes funciones:
 
 * Registrar áreas, oficinas o unidades organizacionales.
-* Consultar la información de un área.
-* Actualizar información de las áreas registradas.
+* Consultar información de las unidades registradas.
+* Actualizar información organizacional.
 * Activar o desactivar áreas.
-* Representar relaciones jerárquicas entre un área superior y sus áreas dependientes.
+* Representar relaciones jerárquicas entre una unidad superior y sus unidades dependientes.
 * Asignar usuarios internos a una o varias áreas, dependiendo de la regla que posteriormente confirme la institución.
 * Designar responsables de áreas.
-* Registrar la vigencia de las asignaciones y responsabilidades cuando sea necesario conservar historial.
-* Administrar conceptualmente roles y permisos del sistema.
-* Determinar si un permiso tiene alcance global o está limitado a un área.
+* Registrar la vigencia de asignaciones y responsabilidades cuando sea necesario conservar historial.
+* Administrar conceptualmente roles y permisos.
+* Determinar si un permiso tiene alcance global o limitado a un área.
 * Validar en el backend si un usuario cuenta con autorización antes de ejecutar una operación.
-* Considerar situaciones excepcionales como áreas inexistentes, áreas inactivas, jerarquías circulares, usuarios inactivos, responsables duplicados, roles vencidos y accesos denegados.
+* Considerar situaciones excepcionales como áreas inexistentes, áreas inactivas, ciclos jerárquicos, usuarios inactivos, asignaciones vencidas, responsables duplicados, roles vencidos y accesos denegados.
 
 **PENDIENTE**
 
@@ -43,13 +43,23 @@ Todavía debe confirmarse con el profesor y la institución:
 * Los nombres y tipos oficiales de las unidades organizacionales.
 * La cantidad de niveles jerárquicos existentes.
 * Los cargos institucionales.
-* Los nombres definitivos de los roles del sistema.
+* Los nombres definitivos de los roles.
 * La matriz oficial de permisos.
 * Si un usuario puede pertenecer simultáneamente a varias áreas.
 * Si los permisos serán globales o estarán limitados por área, tipo de documento o etapa del trámite.
 * Las reglas definitivas para responsables principales, alternos o temporales.
 
-Este análisis no incluye la creación definitiva de tablas, claves, índices ni scripts SQL, debido a que esas actividades serán realizadas posteriormente a partir del análisis funcional aprobado.
+Este análisis no incluye la creación definitiva de tablas, claves, índices, endpoints ni scripts SQL, debido a que dichas actividades serán realizadas posteriormente a partir del análisis funcional aprobado.
+
+### 2.1 Integración funcional con la gestión de trámites
+
+**CONFIRMADO**
+
+El módulo organizacional y de autorización deberá integrarse conceptualmente con las operaciones de recepción, derivación, revisión y atención de trámites.
+
+La participación en estas operaciones deberá considerar el estado del área y la autorización del usuario, de modo que áreas inactivas o usuarios sin autorización no participen en operaciones sensibles cuando las reglas aprobadas así lo determinen.
+
+La forma técnica definitiva de esta integración dependerá de los contratos que posteriormente se acuerden entre los módulos del SIGD.
 
 ---
 
@@ -61,7 +71,7 @@ Debido a que los cargos, funciones y responsables oficiales todavía no han sido
 
 **EJEMPLO**
 
-Persona registrada en el sistema que pertenece a la institución y que puede tener una asignación a una o varias áreas.
+Persona registrada en el sistema que pertenece a la institución y que puede tener una asignación a un área o, si la institución lo autoriza, a varias áreas simultáneamente.
 
 Las acciones que pueda realizar dependerán de sus roles, permisos, estado y vigencia de sus asignaciones.
 
@@ -87,7 +97,7 @@ Las acciones específicas que podrá realizar todavía están pendientes de vali
 
 **EJEMPLO**
 
-Actor utilizado de manera provisional para representar a un usuario que pudiera tener autorización para administrar elementos como áreas, asignaciones, roles o permisos.
+Actor utilizado de manera provisional para representar a un usuario que pudiera tener autorización para administrar elementos como áreas, asignaciones, responsables, roles o permisos.
 
 La existencia de este actor, su denominación oficial y sus permisos reales deberán ser confirmados antes de considerarlos definitivos.
 
@@ -95,7 +105,7 @@ La existencia de este actor, su denominación oficial y sus permisos reales debe
 
 **PROPUESTO**
 
-El backend será responsable de comprobar las reglas de autorización antes de ejecutar las operaciones protegidas.
+El backend será responsable de comprobar las reglas de autorización antes de ejecutar operaciones protegidas.
 
 Entre sus validaciones podrían encontrarse:
 
@@ -111,25 +121,31 @@ Entre sus validaciones podrían encontrarse:
 
 Las reglas concretas deberán ajustarse posteriormente según las decisiones oficiales del proyecto.
 
-## 4. Conceptos principales
+---
 
-Para evitar confusiones durante el diseño posterior de la base de datos, se diferencian los conceptos de área, oficina, cargo, rol, permiso y responsable. Aunque algunos de ellos pueden estar relacionados entre sí, no representan la misma información.
+# 4. Conceptos principales
 
-### 4.1 Área
+Para evitar confusiones durante el diseño posterior de la base de datos, se diferencian los conceptos de área, oficina, cargo, rol, permiso y responsable.
+
+Aunque algunos de ellos pueden relacionarse, no representan la misma información.
+
+## 4.1 Área
 
 **PROPUESTO**
 
-Un área representa una unidad perteneciente a la estructura organizacional de la institución. Puede contener usuarios internos y podría depender jerárquicamente de otra unidad superior.
+Un área representa una unidad perteneciente a la estructura organizacional de la institución.
+
+Puede contener usuarios internos y podría depender jerárquicamente de otra unidad superior.
 
 Una característica observable de un área es que representa una parte de la organización y no una autorización técnica del sistema.
 
 **EJEMPLO**
 
-Para fines explicativos podría existir un área ficticia denominada:
+```text
+Área Administrativa
+```
 
-`Área Administrativa`
-
-Este nombre no representa un área oficial del instituto.
+Este nombre es ficticio y no representa un área oficial del instituto.
 
 También podría existir una relación jerárquica como:
 
@@ -138,48 +154,46 @@ También podría existir una relación jerárquica como:
     └── Área Dependiente
 ```
 
-La estructura y denominación oficial de las áreas deberá obtenerse del organigrama institucional.
-
 **PENDIENTE**
 
-Confirmar qué áreas existen oficialmente, qué niveles jerárquicos utilizan y qué datos deben almacenarse de cada una.
+Confirmar qué áreas existen oficialmente, qué niveles jerárquicos utilizan y qué información deberá registrarse de cada una.
 
 ---
 
-### 4.2 Oficina
+## 4.2 Oficina
 
 **PROPUESTO**
 
-Una oficina puede entenderse preliminarmente como una unidad organizacional dentro de la estructura institucional. Dependiendo del organigrama oficial, podría encontrarse al mismo nivel que un área o depender de una unidad superior.
+Una oficina puede entenderse preliminarmente como una unidad organizacional dentro de la estructura institucional.
+
+Dependiendo del organigrama oficial, podría encontrarse al mismo nivel que un área o depender de una unidad superior.
 
 No se asumirá que todas las oficinas necesariamente dependen de un área hasta que esta estructura sea confirmada.
 
 **EJEMPLO**
-
-Una estructura ficticia podría representarse de la siguiente forma:
 
 ```text
 Área Administrativa
     └── Oficina de Archivo
 ```
 
-Este ejemplo se utiliza únicamente para explicar una posible relación jerárquica.
+Este ejemplo únicamente representa una posible relación jerárquica.
 
 **PENDIENTE**
 
-Confirmar con la institución si existe una diferencia formal entre área, oficina, unidad, dirección u otras denominaciones organizacionales.
+Confirmar si existe una diferencia formal entre área, oficina, unidad, dirección u otras denominaciones institucionales.
 
 ---
 
-### 4.3 Cargo
+## 4.3 Cargo
 
 **PROPUESTO**
 
-El cargo representa el puesto o función institucional que ocupa una persona dentro de la organización.
+El cargo representa el puesto institucional que ocupa una persona dentro de la organización.
 
-Un cargo no debe confundirse con un rol del sistema ni con un permiso técnico.
+El cargo no debe confundirse con un rol del sistema ni con un permiso técnico.
 
-Por ejemplo, una persona podría ocupar un determinado cargo institucional, pero las acciones que pueda realizar dentro del SIGD dependerán de los roles y permisos que le hayan sido autorizados.
+La relación exacta entre cargo y función institucional se encuentra pendiente de confirmación.
 
 **EJEMPLO**
 
@@ -188,28 +202,29 @@ Usuario: Usuario A
 Cargo: Jefe de Oficina
 ```
 
-El nombre anterior se utiliza únicamente como ejemplo y no representa un cargo oficial.
+El nombre utilizado es ficticio.
 
-Una diferencia observable es:
+Una diferencia conceptual es:
 
 ```text
-Cargo → indica qué puesto ocupa una persona en la institución.
-Rol   → determina un conjunto de autorizaciones dentro del sistema.
+Cargo → indica el puesto institucional de una persona.
+
+Rol → representa una agrupación de autorizaciones dentro del sistema.
 ```
 
 **PENDIENTE**
 
-Confirmar los cargos oficiales mediante los documentos institucionales correspondientes.
+Confirmar los cargos oficiales y la diferencia institucional entre cargo y función.
 
 ---
 
-### 4.4 Rol
+## 4.4 Rol
 
 **PROPUESTO**
 
 Un rol representa una agrupación de permisos utilizada por el sistema para facilitar el control de acceso.
 
-En lugar de asignar manualmente todas las autorizaciones a cada usuario, el sistema podría asociar determinados permisos a un rol y posteriormente asignar ese rol a los usuarios que corresponda.
+En lugar de asignar manualmente todas las autorizaciones a cada usuario, el sistema podría asociar determinados permisos a un rol y posteriormente asignar dicho rol a los usuarios correspondientes.
 
 Conceptualmente:
 
@@ -223,22 +238,20 @@ Permisos
 
 **EJEMPLO**
 
-Podría existir de manera ficticia:
-
 ```text
 Rol: Operador de trámite
 ```
 
-asociado a permisos como:
+Podría contener permisos ficticios como:
 
 ```text
 tramite.ver
 tramite.recibir
 ```
 
-Los nombres anteriores son solamente ejemplos y no forman parte de una matriz institucional aprobada.
+Los nombres anteriores no forman parte de una matriz institucional aprobada.
 
-Un rol no representa necesariamente el cargo laboral de la persona.
+Un rol tampoco representa necesariamente el cargo laboral de una persona.
 
 Por ejemplo:
 
@@ -251,11 +264,11 @@ Son conceptos diferentes aunque puedan relacionarse.
 
 **PENDIENTE**
 
-Confirmar cuáles serán los roles oficiales del SIGD y si estos tendrán alcance global o limitado a determinadas áreas.
+Confirmar cuáles serán los roles oficiales y si estos tendrán alcance global o limitado a determinadas áreas.
 
 ---
 
-### 4.5 Permiso
+## 4.5 Permiso
 
 **PROPUESTO**
 
@@ -265,8 +278,6 @@ Los permisos deberán ser evaluados por el backend antes de permitir operaciones
 
 **EJEMPLO**
 
-Algunos permisos ficticios para explicar el concepto podrían ser:
-
 ```text
 tramite.ver
 tramite.recibir
@@ -275,7 +286,7 @@ tramite.observar
 tramite.cerrar
 ```
 
-Estos nombres no representan permisos oficiales del SIGD.
+Estos nombres son únicamente ejemplos técnicos.
 
 Una diferencia observable entre rol y permiso es:
 
@@ -293,7 +304,7 @@ Rol de ejemplo
     └── tramite.derivar
 ```
 
-La existencia de un permiso deberá seguir el principio de mínimo privilegio, por lo que una acción no confirmada no debería concederse automáticamente.
+Los permisos deberán seguir el principio de mínimo privilegio.
 
 **PENDIENTE**
 
@@ -301,13 +312,13 @@ Confirmar qué acciones necesitan autorización y cuál será la matriz instituc
 
 ---
 
-### 4.6 Responsable
+## 4.6 Responsable
 
 **PROPUESTO**
 
-Un responsable representa a un usuario interno al que se le asigna formalmente una responsabilidad sobre determinada área durante un periodo de tiempo.
+Un responsable representa a un usuario interno al que se le asigna formalmente responsabilidad sobre determinada área durante un periodo de tiempo.
 
-La responsabilidad debe distinguirse del cargo y del rol del sistema.
+La responsabilidad debe distinguirse del cargo, del rol y del permiso.
 
 Conceptualmente una misma persona podría tener:
 
@@ -315,10 +326,10 @@ Conceptualmente una misma persona podría tener:
 Usuario: Usuario A
 
 Cargo:
-Puesto que ocupa dentro de la institución.
+Puesto institucional que ocupa.
 
 Rol:
-Conjunto de permisos que posee dentro del SIGD.
+Conjunto de permisos del sistema.
 
 Responsabilidad:
 Área sobre la cual tiene una responsabilidad asignada.
@@ -333,7 +344,7 @@ Responsable desde: 01/08/2026
 Responsable hasta: vigente
 ```
 
-Si posteriormente cambia el responsable, podría ser necesario conservar el historial:
+Si posteriormente cambia el responsable, podría conservarse historial:
 
 ```text
 Usuario A
@@ -353,41 +364,45 @@ Debe confirmarse:
 * Si puede existir más de un responsable simultáneamente.
 * Si existirán responsables principales y alternos.
 * Si pueden existir responsables temporales.
-* Si los cambios de responsable deben conservar historial.
-* Qué debe ocurrir cuando un área queda temporalmente sin responsable.
+* Si los cambios deben conservar historial.
+* Qué debe ocurrir cuando un área queda sin responsable.
 
 ---
 
-### 4.7 Resumen de diferencias
+## 4.7 Resumen de diferencias
 
-| Concepto    | ¿Qué representa?                                               | ¿Es una autorización técnica? |
-| ----------- | -------------------------------------------------------------- | ----------------------------- |
-| Área        | Unidad de la estructura organizacional                         | No                            |
-| Oficina     | Unidad organizacional cuya relación exacta debe confirmarse    | No                            |
-| Cargo       | Puesto institucional de una persona                            | No                            |
-| Rol         | Agrupación de permisos del sistema                             | Indirectamente                |
-| Permiso     | Acción específica autorizada dentro del sistema                | Sí                            |
-| Responsable | Usuario con responsabilidad sobre un área durante una vigencia | No necesariamente             |
+| Concepto    | ¿Qué representa?                                               | ¿Es autorización técnica? |
+| ----------- | -------------------------------------------------------------- | ------------------------- |
+| Área        | Unidad de la estructura organizacional                         | No                        |
+| Oficina     | Unidad organizacional cuya relación exacta debe confirmarse    | No                        |
+| Cargo       | Puesto institucional de una persona                            | No                        |
+| Rol         | Agrupación de permisos                                         | Indirectamente            |
+| Permiso     | Autorización para una acción específica                        | Sí                        |
+| Responsable | Usuario con responsabilidad sobre un área durante una vigencia | No                        |
 
-Por lo tanto, estos conceptos deberán mantenerse separados durante el análisis y el posterior diseño del modelo de datos.
+Por lo tanto, estos conceptos deberán mantenerse separados durante el análisis y durante el posterior diseño del modelo de datos.
 
-## 5. Operaciones del módulo
+---
 
-El módulo deberá contemplar operaciones relacionadas con la administración de la estructura organizacional. En esta etapa se describen de manera funcional y no como endpoints o implementaciones definitivas.
+# 5. Operaciones del módulo
 
-### 5.1 Crear un área
+El módulo deberá contemplar operaciones relacionadas con la administración de la estructura organizacional.
+
+En esta etapa se describen de manera funcional y no como endpoints o implementaciones definitivas.
+
+## 5.1 Crear un área
 
 **PROPUESTO**
 
 El sistema podría permitir registrar una nueva área, oficina o unidad organizacional.
 
-Antes de realizar el registro, el backend debería validar como mínimo:
+Antes del registro, el backend debería validar:
 
 * Que los datos obligatorios hayan sido proporcionados.
-* Que no exista un registro duplicado según las reglas que posteriormente se definan.
-* Que el área superior exista, si se está indicando una dependencia jerárquica.
-* Que el área superior se encuentre activa, cuando dicha condición sea necesaria.
+* Que no exista un duplicado según las reglas que posteriormente se definan.
+* Que el área superior exista, si se indica una dependencia.
 * Que la relación jerárquica propuesta sea válida.
+* Que el usuario tenga autorización.
 
 **Entrada conceptual:**
 
@@ -402,23 +417,23 @@ Estado inicial
 
 Si las validaciones son correctas, el área queda registrada.
 
-Si alguna validación falla, la operación debe ser rechazada y el sistema debe informar el motivo.
+Si alguna validación falla, la operación debe ser rechazada indicando el motivo.
 
 **PENDIENTE**
 
-Confirmar qué datos serán obligatorios y quiénes estarán autorizados para crear áreas.
+Confirmar qué datos serán obligatorios y quién estará autorizado para crear áreas.
 
 ---
 
-### 5.2 Consultar un área
+## 5.2 Consultar un área
 
 **PROPUESTO**
 
 El sistema podría permitir consultar información de un área registrada.
 
-La consulta podría mostrar, dependiendo del diseño aprobado:
+La consulta podría mostrar:
 
-* Información general del área.
+* Información general.
 * Estado actual.
 * Área superior.
 * Áreas dependientes.
@@ -426,29 +441,25 @@ La consulta podría mostrar, dependiendo del diseño aprobado:
 * Responsable vigente.
 * Información de vigencia relacionada.
 
-La información específica dependerá del modelo de datos posteriormente aprobado.
-
 **PENDIENTE**
 
-Confirmar qué usuarios podrán consultar información organizacional y si existirán restricciones según el área.
+Confirmar qué usuarios podrán consultar esta información y si existirán restricciones por área.
 
 ---
 
-### 5.3 Actualizar un área
+## 5.3 Actualizar un área
 
 **PROPUESTO**
 
-El sistema podría permitir modificar determinados datos de un área existente.
+El sistema podría permitir modificar determinados datos de un área.
 
-Antes de guardar cambios, el backend deberá comprobar:
+Antes de guardar cambios, el backend debería verificar:
 
 * Que el área exista.
-* Que el usuario tenga autorización para modificarla.
+* Que el usuario tenga autorización.
 * Que los nuevos datos sean válidos.
-* Que un cambio de dependencia no produzca un ciclo jerárquico.
-* Que el cambio no contradiga otras reglas institucionales vigentes.
-
-Los cambios que puedan afectar la estructura organizacional deberán ser tratados con especial cuidado.
+* Que un cambio de dependencia no genere un ciclo.
+* Que la modificación no contradiga reglas institucionales.
 
 **PENDIENTE**
 
@@ -456,66 +467,60 @@ Confirmar qué atributos podrán modificarse y cuáles deberán conservar histor
 
 ---
 
-### 5.4 Activar un área
+## 5.4 Activar un área
 
 **PROPUESTO**
 
-Una unidad previamente inactiva podría volver a activarse cuando exista autorización para ello.
+Una unidad previamente inactiva podría volver a activarse cuando exista autorización.
 
 El backend debería verificar:
 
 * Que el área exista.
 * Que actualmente se encuentre inactiva.
-* Que el usuario que realiza la operación tenga autorización.
-* Que su área superior, si corresponde, permita una relación organizacional válida.
-
-**Resultado esperado:**
-
-El área vuelve a estar disponible para las operaciones permitidas por las reglas institucionales.
+* Que el usuario tenga autorización.
+* Que la relación con su unidad superior sea válida.
 
 ---
 
-### 5.5 Desactivar un área
+## 5.5 Desactivar un área
 
 **PROPUESTO**
 
-La desactivación permitirá indicar que un área ya no se encuentra disponible para determinadas operaciones sin necesariamente eliminar su información histórica.
+La desactivación permitirá indicar que un área ya no está disponible para determinadas operaciones sin eliminar necesariamente su información histórica.
 
 Una posible regla sería impedir que un área inactiva:
 
-* Reciba nuevas asignaciones de usuarios.
+* Reciba nuevas asignaciones.
 * Reciba nuevos responsables.
-* Participe en nuevas derivaciones de trámites.
+* Participe en nuevas derivaciones.
 * Sea utilizada como destino de determinadas operaciones.
-
-Sin embargo, la información histórica debería mantenerse cuando sea necesaria para la trazabilidad.
 
 **PENDIENTE**
 
-Debe confirmarse qué debe ocurrir con:
+Debe confirmarse qué ocurre con:
 
-* Los usuarios que continúan asignados al área.
-* El responsable vigente.
-* Los trámites pendientes.
-* Los roles con alcance limitado a esa área.
-* Las áreas dependientes de una unidad que queda inactiva.
+* Usuarios asignados.
+* Responsable vigente.
+* Trámites pendientes.
+* Roles cuyo alcance depende del área.
+* Áreas dependientes.
 
 ---
 
-### 5.6 Validación de autorización
+## 5.6 Validación de autorización
 
 **PROPUESTO**
 
-Antes de ejecutar una operación protegida, el backend deberá verificar si el usuario está autorizado.
+Antes de ejecutar una operación protegida, el backend deberá comprobar si el usuario está autorizado.
 
-El flujo conceptual sería:
+Conceptualmente:
 
 ```text
-Usuario solicita una operación
+Usuario solicita operación
         ↓
 Backend identifica al usuario
         ↓
-Verifica estado del usuario
+Verifica estado
         ↓
 Verifica asignaciones vigentes
         ↓
@@ -523,46 +528,24 @@ Verifica roles vigentes
         ↓
 Verifica permisos
         ↓
-Verifica alcance del permiso
+Verifica alcance
         ↓
-Permite o rechaza la operación
+Permite o rechaza
 ```
 
-Ocultar una opción en el frontend no será suficiente para garantizar la seguridad. La autorización deberá comprobarse en el backend.
+Ocultar una opción en el frontend no será suficiente como medida de seguridad.
 
 ---
 
-### 5.7 Acceso denegado
+# 6. Jerarquía de áreas
+
+## 6.1 Objetivo de la jerarquía
 
 **PROPUESTO**
 
-Si un usuario intenta realizar una acción sin contar con autorización, el sistema deberá rechazar la operación.
+La estructura organizacional deberá permitir representar relaciones entre unidades superiores y dependientes.
 
-**EJEMPLO**
-
-```text
-Usuario A
-    ↓
-intenta cerrar un trámite
-    ↓
-no posee permiso para cerrar trámites
-    ↓
-operación rechazada
-```
-
-El sistema no deberá conceder permisos por defecto cuando una acción no haya sido autorizada.
-
----
-
-## 6. Jerarquía de áreas
-
-### 6.1 Objetivo de la jerarquía
-
-**PROPUESTO**
-
-La estructura organizacional deberá permitir representar relaciones entre unidades superiores y unidades dependientes.
-
-La jerarquía deberá ser flexible para admitir varios niveles sin crear una estructura distinta para cada nivel institucional.
+La jerarquía deberá admitir varios niveles sin crear una estructura distinta para cada nivel institucional.
 
 **EJEMPLO**
 
@@ -571,31 +554,28 @@ Unidad Superior
     ├── Unidad A
     │     ├── Unidad A.1
     │     └── Unidad A.2
-    │
     └── Unidad B
           └── Unidad B.1
 ```
 
-Los nombres anteriores son ficticios y únicamente representan una posible estructura jerárquica.
+Los nombres son ficticios.
 
 **PENDIENTE**
 
 Confirmar:
 
-* Cuántos niveles organizacionales existen.
-* Qué nombres oficiales reciben estos niveles.
-* Si todas las unidades deben depender de otra unidad.
-* Si pueden existir varias unidades principales sin dependencia superior.
+* Cuántos niveles existen.
+* Qué nombres oficiales reciben.
+* Si todas las unidades deben depender de otra.
+* Si pueden existir varias unidades principales.
 
 ---
 
-### 6.2 Área superior y área dependiente
+## 6.2 Área superior y área dependiente
 
 **PROPUESTO**
 
-Una unidad podría tener una relación con otra unidad que actúe como su superior jerárquico.
-
-Conceptualmente:
+Una unidad podría relacionarse con otra que actúe como su superior jerárquico.
 
 ```text
 Área superior
@@ -603,70 +583,56 @@ Conceptualmente:
 Área dependiente
 ```
 
-Una misma área superior podría tener varias áreas dependientes.
-
-**EJEMPLO**
-
-```text
-Área A
-    ├── Área B
-    ├── Área C
-    └── Área D
-```
-
-La relación anterior es solo ilustrativa.
+Una misma unidad superior podría tener varias unidades dependientes.
 
 ---
 
-### 6.3 Cambio de dependencia
+## 6.3 Cambio de dependencia
 
 **PROPUESTO**
 
-Una unidad podría cambiar de dependencia jerárquica cuando exista una modificación en la estructura organizacional.
+Una unidad podría cambiar de dependencia cuando exista una modificación en la estructura institucional.
 
 **EJEMPLO**
 
-Situación inicial:
+Antes:
 
 ```text
 Área A
     └── Área C
 ```
 
-Después de un cambio:
+Después:
 
 ```text
 Área B
     └── Área C
 ```
 
-En este caso, Área C deja de depender de Área A y pasa a depender de Área B.
+Antes de aceptar el cambio, el backend debería verificar:
 
-Antes de realizar este cambio, el backend debería verificar:
-
-* Que el área exista.
-* Que la nueva área superior exista.
+* Que ambas áreas existan.
 * Que la nueva relación no produzca un ciclo.
-* Que las áreas involucradas tengan un estado compatible con la operación.
+* Que los estados sean compatibles.
 * Que el usuario tenga autorización.
 
 **PENDIENTE**
 
-Confirmar si los cambios de dependencia deben conservar historial y qué efecto tendrán sobre trámites, usuarios y responsabilidades anteriores.
+Confirmar si los cambios de dependencia deben conservar historial y qué efecto tendrán sobre trámites, usuarios y responsabilidades.
 
 ---
 
-### 6.4 Prevención de ciclos jerárquicos
+## 6.4 Prevención de ciclos jerárquicos
 
 **PROPUESTO**
 
-El sistema deberá impedir relaciones circulares entre áreas.
+El sistema deberá impedir relaciones circulares.
 
 Un ciclo ocurre cuando una unidad termina dependiendo directa o indirectamente de sí misma.
 
 **EJEMPLO**
 
-Supongamos que existe:
+Si existe:
 
 ```text
 Área A
@@ -676,7 +642,7 @@ Supongamos que existe:
 Área C
 ```
 
-No debería permitirse configurar:
+no debería permitirse:
 
 ```text
 Área C
@@ -684,23 +650,21 @@ No debería permitirse configurar:
 Área A
 ```
 
-porque el resultado sería:
+porque se produciría:
 
 ```text
 Área A → Área B → Área C → Área A
 ```
 
-La estructura quedaría en un ciclo infinito y dejaría de representar correctamente una jerarquía.
-
-Por lo tanto, antes de aceptar un cambio de dependencia deberá comprobarse que la nueva relación no convierta a un descendiente en superior de uno de sus propios antecesores.
+El backend deberá detectar este caso y rechazar la operación.
 
 ---
 
-### 6.5 Área inactiva dentro de la jerarquía
+## 6.5 Área inactiva dentro de la jerarquía
 
 **PROPUESTO**
 
-Cuando un área quede inactiva, el sistema deberá evaluar qué ocurre con sus relaciones jerárquicas.
+Cuando una unidad quede inactiva deberá evaluarse qué ocurre con sus áreas dependientes.
 
 **EJEMPLO**
 
@@ -710,52 +674,27 @@ Cuando un área quede inactiva, el sistema deberá evaluar qué ocurre con sus r
           └── Área C
 ```
 
-Si Área B queda inactiva, debe definirse qué sucederá con Área C.
-
-Algunas posibles decisiones que deberán validarse son:
-
-* Mantener Área C dependiendo de Área B aunque esta se encuentre inactiva.
-* Cambiar Área C a otra unidad superior.
-* Impedir la desactivación de Área B mientras tenga áreas activas dependientes.
-
-Estas alternativas son solamente posibilidades técnicas y no deben considerarse reglas oficiales.
+Si Área B queda inactiva, deberá definirse qué sucede con Área C.
 
 **PENDIENTE**
 
-Confirmar con el profesor y la institución qué comportamiento debe adoptarse cuando una unidad que tiene áreas dependientes queda inactiva.
+Debe confirmarse si:
+
+* Puede permanecer dependiendo de un área inactiva.
+* Debe cambiar de dependencia.
+* Debe impedirse la desactivación mientras existan áreas dependientes activas.
+
+Los casos excepcionales relacionados con áreas inexistentes, áreas inactivas y ciclos se desarrollan de manera consolidada en la sección 12.
 
 ---
 
-### 6.6 Caso excepcional: área inexistente
+# 7. Asignación de usuarios a áreas
+
+## 7.1 Objetivo de la asignación
 
 **PROPUESTO**
 
-Toda operación que haga referencia a un área deberá verificar previamente que esta exista.
-
-**EJEMPLO**
-
-```text
-Solicitud:
-Asignar usuario al Área 500
-
-Validación:
-Área 500 no existe
-
-Resultado:
-Operación rechazada
-```
-
-Esto evita registrar relaciones con unidades inexistentes o información inconsistente.
-
-## 7. Asignación de usuarios a áreas
-
-### 7.1 Objetivo de la asignación
-
-**PROPUESTO**
-
-El módulo deberá permitir relacionar a los usuarios internos con las áreas en las que desarrollan actividades, sin duplicar la información de identidad administrada por otros módulos del SIGD.
-
-La asignación deberá indicar qué usuario pertenece a qué área y, cuando sea necesario, durante qué periodo dicha relación se encuentra vigente.
+El módulo deberá permitir relacionar a los usuarios internos con las áreas en las que desarrollan sus actividades, sin duplicar la información de identidad administrada por otros módulos.
 
 Conceptualmente:
 
@@ -767,43 +706,41 @@ Asignación
 Área
 ```
 
-La información personal y de autenticación del usuario no deberá duplicarse dentro del módulo organizacional.
-
 ---
 
-### 7.2 Relación con usuarios internos
+## 7.2 Relación con usuarios internos
 
 **CONFIRMADO**
 
 El plan del proyecto establece que la asignación de usuarios internos deberá coordinarse con el Grupo 4 y que el Grupo 3 no deberá duplicar las tablas de identidad.
 
-Por ello, este módulo deberá trabajar conceptualmente con una referencia al usuario existente en el módulo correspondiente.
+Por ello, el módulo deberá trabajar conceptualmente con una referencia al usuario existente en el módulo correspondiente.
 
 **EJEMPLO**
 
 ```text
 Usuario interno: ID 25
 Área asignada: Área de ejemplo
-Inicio de vigencia: 01/08/2026
-Fin de vigencia: vigente
+Inicio: 01/08/2026
+Fin: vigente
 ```
 
-Los datos anteriores son ficticios.
+Los datos son ficticios.
 
 ---
 
-### 7.3 Asignación de un usuario a un área
+## 7.3 Asignación de un usuario
 
 **PROPUESTO**
 
 Antes de registrar una asignación, el backend debería verificar:
 
 * Que el usuario exista.
-* Que el usuario se encuentre activo.
+* Que esté activo.
 * Que el área exista.
-* Que el área se encuentre activa.
-* Que la fecha de inicio sea válida.
-* Que no exista una asignación incompatible con las reglas institucionales.
+* Que el área esté activa.
+* Que las fechas sean válidas.
+* Que no exista una asignación incompatible.
 * Que el usuario que realiza la operación tenga autorización.
 
 **Entrada conceptual:**
@@ -815,21 +752,15 @@ Fecha de inicio
 Fecha de fin, si corresponde
 ```
 
-**Resultado esperado:**
-
-Si las validaciones son correctas, la asignación queda registrada como vigente durante el periodo correspondiente.
-
 ---
 
-### 7.4 Usuario asignado a varias áreas
+## 7.4 Usuario asignado a varias áreas
 
 **PENDIENTE**
 
-Todavía debe confirmarse si un usuario interno puede pertenecer simultáneamente a más de un área.
+Debe confirmarse si un usuario puede pertenecer simultáneamente a varias áreas.
 
-Existen al menos dos posibilidades:
-
-**Alternativa A**
+Posibilidad A:
 
 ```text
 Usuario A
@@ -837,9 +768,7 @@ Usuario A
 Área 1
 ```
 
-El usuario solo puede tener una asignación activa.
-
-**Alternativa B**
+Posibilidad B:
 
 ```text
 Usuario A
@@ -848,162 +777,67 @@ Usuario A
     └── Área 3
 ```
 
-El usuario puede tener varias asignaciones activas al mismo tiempo.
-
-Esta decisión deberá ser confirmada antes de establecer restricciones definitivas en el modelo de datos.
+Esta decisión afectará el modelo de datos y sus restricciones.
 
 ---
 
-### 7.5 Vigencia de la asignación
+## 7.5 Vigencia de la asignación
 
 **PROPUESTO**
 
-Una asignación podría registrar un periodo de vigencia para conservar información histórica.
+Una asignación podría registrar un periodo de vigencia para conservar trazabilidad.
 
 **EJEMPLO**
-
-```text
-Usuario A
-Área: Área de ejemplo
-Desde: 01/01/2026
-Hasta: 31/07/2026
-```
-
-Posteriormente:
-
-```text
-Usuario A
-Área: Otra área de ejemplo
-Desde: 01/08/2026
-Hasta: vigente
-```
-
-Esto permitiría conocer en qué área se encontraba asignado un usuario en una fecha determinada.
-
-**PENDIENTE**
-
-Confirmar si todas las asignaciones requieren fecha de inicio y fin o solamente aquellas que necesiten conservar historial.
-
----
-
-### 7.6 Cambio de área de un usuario
-
-**PROPUESTO**
-
-Cuando un usuario deje de pertenecer a un área y pase a otra, no debería eliminarse necesariamente la asignación anterior si esta información es necesaria para trazabilidad.
-
-**EJEMPLO**
-
-Situación inicial:
 
 ```text
 Usuario A
 Área A
 01/01/2026 - 31/07/2026
-```
 
-Nueva situación:
-
-```text
 Usuario A
 Área B
 01/08/2026 - vigente
 ```
 
-El cambio podría implicar:
-
-* Finalizar la vigencia de la asignación anterior.
-* Registrar la nueva asignación.
-* Mantener el historial.
-* Revisar los roles o permisos cuyo alcance dependa del área anterior.
+Esto permitiría conocer en qué área se encontraba asignado un usuario en determinada fecha.
 
 **PENDIENTE**
 
-Confirmar qué debe ocurrir con los permisos y trámites del usuario cuando cambia de área.
+Confirmar si todas las asignaciones requieren fecha de inicio y fin.
 
 ---
 
-### 7.7 Caso excepcional: usuario inexistente
+## 7.6 Cambio de área
 
 **PROPUESTO**
 
-No deberá registrarse una asignación para un usuario que no exista en el sistema.
+Cuando un usuario cambie de área, la asignación anterior no debería eliminarse necesariamente si se requiere trazabilidad.
 
-**EJEMPLO**
-
-```text
-Solicitud:
-Asignar Usuario 999 al Área A
-
-Validación:
-Usuario 999 no existe
-
-Resultado:
-Operación rechazada
-```
-
----
-
-### 7.8 Caso excepcional: usuario inactivo
-
-**PROPUESTO**
-
-Si un usuario se encuentra inactivo, el sistema debería impedir nuevas asignaciones organizacionales o acciones que dependan de una asignación vigente.
-
-**EJEMPLO**
+Un posible proceso sería:
 
 ```text
-Usuario A
-Estado: INACTIVO
-
-Intento:
-Asignarlo al Área B
-
-Resultado:
-Operación rechazada
+Finalizar asignación anterior
+        ↓
+Registrar nueva asignación
+        ↓
+Conservar historial
 ```
 
 **PENDIENTE**
 
-Confirmar qué debe ocurrir con las asignaciones existentes cuando un usuario pasa a estado inactivo.
+Confirmar qué debe ocurrir con sus permisos y trámites cuando cambia de área.
+
+Los casos de usuario inexistente, usuario inactivo y asignación vencida se desarrollan en la sección 12.
 
 ---
 
-### 7.9 Caso excepcional: asignación vencida
+# 8. Designación de responsables
+
+## 8.1 Objetivo
 
 **PROPUESTO**
 
-Cuando una asignación tenga una fecha de fin anterior a la fecha de la operación, dicha asignación no debería considerarse vigente.
-
-**EJEMPLO**
-
-```text
-Asignación:
-Usuario A → Área B
-
-Vigencia:
-01/01/2026 - 31/07/2026
-
-Fecha de operación:
-27/08/2026
-
-Resultado:
-La asignación ya no se considera vigente.
-```
-
-El backend deberá evaluar la vigencia cuando una autorización dependa de la pertenencia del usuario a un área.
-
----
-
-## 8. Designación de responsables
-
-### 8.1 Objetivo de la responsabilidad
-
-**PROPUESTO**
-
-El módulo deberá permitir identificar qué usuario interno posee la responsabilidad de un área durante determinado periodo.
-
-La responsabilidad deberá mantenerse separada de los conceptos de cargo, rol y permiso.
+El módulo deberá permitir identificar qué usuario interno posee responsabilidad sobre determinada área durante un periodo.
 
 Conceptualmente:
 
@@ -1015,21 +849,23 @@ Responsabilidad
 Área
 ```
 
+La responsabilidad deberá mantenerse separada del cargo, rol y permiso.
+
 ---
 
-### 8.2 Designación de un responsable
+## 8.2 Designación de un responsable
 
 **PROPUESTO**
 
-Para designar un responsable, el backend podría validar:
+Antes de realizar una designación, el backend podría verificar:
 
 * Que el usuario exista.
-* Que el usuario se encuentre activo.
+* Que esté activo.
 * Que el área exista.
-* Que el área se encuentre activa.
-* Que el periodo de vigencia sea válido.
-* Que no exista un conflicto con otra responsabilidad vigente.
-* Que el usuario que realiza la designación tenga autorización.
+* Que el área esté activa.
+* Que la vigencia sea válida.
+* Que no exista un conflicto con otra responsabilidad.
+* Que quien realiza la operación tenga autorización.
 
 **Entrada conceptual:**
 
@@ -1038,223 +874,120 @@ Usuario
 Área
 Fecha de inicio
 Fecha de fin, si corresponde
-Tipo de responsabilidad, si posteriormente se requiere
+Tipo de responsabilidad, si corresponde
 ```
-
-**Resultado esperado:**
-
-Si las validaciones son correctas, la responsabilidad queda registrada para el periodo correspondiente.
 
 ---
 
-### 8.3 Relación entre asignación y responsabilidad
+## 8.3 Relación entre asignación y responsabilidad
 
 **PROPUESTO**
 
-Podría requerirse que un usuario se encuentre asignado a un área antes de poder ser designado como responsable de dicha área.
-
-**EJEMPLO**
-
-```text
-Usuario A
-    ↓
-Asignado al Área B
-    ↓
-Puede ser evaluado para responsabilidad del Área B
-```
-
-Sin embargo, esta regla todavía no debe considerarse oficial.
+Podría requerirse que un usuario esté asignado a un área antes de ser designado como responsable de ella.
 
 **PENDIENTE**
 
-Confirmar si un responsable necesariamente debe pertenecer al área de la cual es responsable.
+Esta regla deberá ser confirmada institucionalmente.
 
 ---
 
-### 8.4 Vigencia de la responsabilidad
+## 8.4 Vigencia e historial
 
 **PROPUESTO**
 
-La responsabilidad podría registrar fecha de inicio y fecha de fin para conservar historial.
+La responsabilidad podría registrar fecha de inicio y fecha de fin.
 
 **EJEMPLO**
 
 ```text
 Área A
 
-Responsable:
 Usuario A
 01/01/2026 - 31/07/2026
 
-Responsable:
 Usuario B
 01/08/2026 - vigente
 ```
 
-Esto permitiría determinar quién era responsable del área en una fecha específica.
+Esto permitiría determinar quién era responsable en una fecha específica.
 
 ---
 
-### 8.5 Cambio de responsable
+## 8.5 Cambio de responsable
 
 **PROPUESTO**
 
-Cuando se designe un nuevo responsable, el registro anterior no debería eliminarse si se requiere conservar historial.
-
-Un posible flujo sería:
+Cuando se designe un nuevo responsable, el registro anterior podría conservarse como historial.
 
 ```text
-Responsable anterior vigente
+Responsable anterior
         ↓
-Finalizar su vigencia
+Finalizar vigencia
         ↓
 Registrar nuevo responsable
-        ↓
-Conservar ambos registros históricos
-```
-
-**PENDIENTE**
-
-Confirmar si el cambio de responsable requiere algún proceso de aprobación y quién tiene autorización para realizarlo.
-
----
-
-### 8.6 Responsable principal, alterno o temporal
-
-**PENDIENTE**
-
-Todavía debe confirmarse si una misma área puede tener:
-
-* Un único responsable principal.
-* Más de un responsable simultáneo.
-* Responsables alternos.
-* Responsables temporales.
-* Responsables encargados por reemplazo.
-
-Estas reglas afectan directamente la validación de duplicados y la vigencia de las responsabilidades.
-
----
-
-### 8.7 Caso excepcional: responsable duplicado
-
-**PROPUESTO**
-
-Si la institución determina que solo puede existir un responsable principal vigente por área, el sistema deberá impedir que se registren dos responsables principales con vigencias superpuestas.
-
-**EJEMPLO**
-
-Situación existente:
-
-```text
-Área A
-Responsable: Usuario A
-01/08/2026 - vigente
-```
-
-Nueva solicitud:
-
-```text
-Área A
-Responsable: Usuario B
-01/08/2026 - vigente
-```
-
-Si solo se permite un responsable principal:
-
-```text
-Resultado:
-Operación rechazada por conflicto de vigencia.
-```
-
-Esta regla dependerá de la decisión institucional.
-
----
-
-### 8.8 Responsable temporal
-
-**PROPUESTO**
-
-Si la institución permite responsables temporales, la designación deberá tener una vigencia claramente definida.
-
-**EJEMPLO**
-
-```text
-Usuario B
-Responsable temporal del Área A
-
-Desde: 10/08/2026
-Hasta: 20/08/2026
-```
-
-Al finalizar la vigencia, el sistema deberá dejar de considerar esa responsabilidad como activa.
-
----
-
-### 8.9 Área sin responsable
-
-**PENDIENTE**
-
-Debe definirse qué debe ocurrir cuando un área no tenga ningún responsable vigente.
-
-Entre las situaciones que deben consultarse se encuentran:
-
-* Si el área puede continuar recibiendo trámites.
-* Si puede realizar derivaciones.
-* Si debe mostrarse una advertencia.
-* Si debe impedirse determinadas operaciones.
-* Si debe existir obligatoriamente un responsable antes de activar el área.
-
-Estas opciones no representan reglas oficiales.
-
----
-
-### 8.10 Responsable inactivo
-
-**PROPUESTO**
-
-Si el usuario responsable pasa a estado inactivo, el sistema debería evitar que su responsabilidad continúe siendo utilizada para autorizar nuevas operaciones.
-
-**PENDIENTE**
-
-Debe confirmarse si la responsabilidad se finaliza automáticamente, si debe designarse un reemplazo o si se requiere una acción administrativa previa.
-
----
-
-### 8.11 Flujo conceptual de cambio de responsable
-
-**PROPUESTO**
-
-```text
-Solicitud de cambio
-        ↓
-Verificar área
-        ↓
-Verificar nuevo usuario
-        ↓
-Verificar estado del usuario
-        ↓
-Verificar reglas de responsabilidad
-        ↓
-Validar vigencias
-        ↓
-Finalizar responsabilidad anterior, si corresponde
-        ↓
-Registrar nueva responsabilidad
         ↓
 Conservar historial
 ```
 
-Este flujo deberá adaptarse posteriormente según las reglas institucionales aprobadas.
+**PENDIENTE**
 
-## 9. Roles y permisos
+Confirmar si el cambio requiere aprobación y quién estará autorizado para realizarlo.
 
-### 9.1 Objetivo del control de acceso
+---
+
+## 8.6 Responsable principal, alterno o temporal
+
+**PENDIENTE**
+
+Debe confirmarse si una misma área puede tener:
+
+* Un responsable principal.
+* Más de un responsable simultáneo.
+* Responsables alternos.
+* Responsables temporales.
+* Responsables por reemplazo.
+
+---
+
+## 8.7 Responsable inactivo
 
 **PROPUESTO**
 
-El módulo deberá permitir controlar qué acciones puede realizar cada usuario dentro del SIGD mediante roles y permisos.
+Si un usuario responsable pasa a estado inactivo, el sistema debería dejar de considerar dicha responsabilidad como vigente para las decisiones funcionales que dependan de la existencia de un responsable.
 
-Los permisos no deberán concederse automáticamente a todos los usuarios. Cada operación protegida deberá comprobarse de acuerdo con las autorizaciones que correspondan.
+Las autorizaciones técnicas del usuario deberán continuar evaluándose mediante sus roles, permisos y demás reglas de acceso aplicables.
+
+**PENDIENTE**
+
+Debe confirmarse si la responsabilidad se finaliza automáticamente, si debe designarse un reemplazo o si se requiere una acción administrativa.
+
+---
+
+## 8.8 Área sin responsable
+
+**PENDIENTE**
+
+Debe definirse qué ocurre cuando un área activa no tiene responsable vigente.
+
+Entre las preguntas se encuentran:
+
+* ¿Puede continuar recibiendo trámites?
+* ¿Puede realizar derivaciones?
+* ¿Debe mostrarse una advertencia?
+* ¿Deben bloquearse determinadas operaciones?
+* ¿Debe existir obligatoriamente un responsable antes de activar el área?
+
+Los casos de responsable duplicado y vigencias conflictivas se desarrollan en la sección 12.
+
+---
+
+# 9. Roles y permisos
+
+## 9.1 Objetivo del control de acceso
+
+**PROPUESTO**
+
+El módulo deberá controlar qué acciones puede realizar cada usuario mediante roles y permisos.
 
 Conceptualmente:
 
@@ -1268,22 +1001,18 @@ Permisos
 Operación permitida o denegada
 ```
 
-El control de autorización deberá realizarse en el backend y no depender únicamente de elementos visibles u ocultos en el frontend.
-
 ---
 
-### 9.2 Rol del sistema
+## 9.2 Rol del sistema
 
 **PROPUESTO**
 
 Un rol representa una agrupación de permisos que puede asignarse a uno o varios usuarios.
 
-El uso de roles permite evitar la asignación manual de las mismas autorizaciones repetidamente a cada usuario.
-
 **EJEMPLO**
 
 ```text
-Rol de ejemplo: Rol A
+Rol: Rol A
 
 Permisos:
 - tramite.ver
@@ -1291,26 +1020,26 @@ Permisos:
 - tramite.derivar
 ```
 
-El nombre del rol y los permisos anteriores son ficticios y se utilizan solamente para explicar el funcionamiento.
+Los nombres son ficticios.
 
 **PENDIENTE**
 
-Debe confirmarse:
+Confirmar:
 
-* Cuáles serán los roles oficiales del SIGD.
-* Quién estará autorizado para crear roles.
-* Quién podrá modificar un rol.
-* Quién podrá asignar o retirar roles a los usuarios.
-* Si los roles tendrán vigencia.
-* Si un usuario podrá tener varios roles simultáneamente.
+* Roles oficiales.
+* Quién puede crearlos.
+* Quién puede modificarlos.
+* Quién puede asignarlos.
+* Si tendrán vigencia.
+* Si un usuario podrá tener varios roles.
 
 ---
 
-### 9.3 Permiso del sistema
+## 9.3 Permiso del sistema
 
 **PROPUESTO**
 
-Un permiso representa una autorización específica para realizar una determinada acción dentro del sistema.
+Un permiso representa autorización para ejecutar una acción específica.
 
 **EJEMPLO**
 
@@ -1324,19 +1053,15 @@ tramite.atender
 tramite.cerrar
 ```
 
-Los identificadores anteriores son únicamente ejemplos técnicos y no representan los nombres definitivos de los permisos del SIGD.
-
-La lista oficial deberá definirse después de confirmar qué operaciones existen realmente en cada etapa del trámite.
+Estos identificadores son únicamente ejemplos.
 
 ---
 
-### 9.4 Relación entre roles y permisos
+## 9.4 Relación entre roles y permisos
 
 **PROPUESTO**
 
-Un rol podría contener varios permisos y un mismo permiso podría pertenecer a diferentes roles.
-
-Conceptualmente:
+Un rol podría contener varios permisos y un mismo permiso podría relacionarse con distintos roles.
 
 ```text
 Rol A
@@ -1349,113 +1074,59 @@ Rol B
     └── Permiso 4
 ```
 
-Esto permitiría reutilizar permisos sin duplicar su definición.
-
-La implementación técnica de esta relación corresponderá posteriormente al modelo de datos aprobado.
+La implementación técnica de esta relación corresponderá al modelo de datos.
 
 ---
 
-### 9.5 Asignación de roles a usuarios
+## 9.5 Asignación de roles
 
 **PROPUESTO**
 
-Un usuario interno podría recibir uno o varios roles según las reglas que posteriormente se definan.
+Antes de asignar un rol, el backend debería verificar:
 
-Antes de realizar una asignación de rol, el backend debería verificar:
-
-* Que el usuario exista.
-* Que el usuario se encuentre activo.
+* Que el usuario exista y esté activo.
 * Que el rol exista.
-* Que el rol se encuentre activo, si los roles manejan estado.
+* Que el rol esté activo, si maneja estado.
 * Que la asignación sea válida.
-* Que el usuario que realiza la operación tenga autorización.
-* Que no exista una asignación duplicada incompatible con las reglas aprobadas.
+* Que no exista un duplicado incompatible.
+* Que quien realiza la asignación tenga autorización.
 
 **PENDIENTE**
 
-Debe confirmarse si:
+Confirmar:
 
-* Un usuario puede tener más de un rol.
-* Los roles son permanentes o temporales.
-* Un rol puede asignarse únicamente dentro de determinada área.
-* Existen roles incompatibles entre sí.
+* Si un usuario puede tener varios roles.
+* Si los roles tendrán vigencia.
+* Si pueden limitarse por área.
+* Si existen roles incompatibles.
 
 ---
 
-### 9.6 Vigencia de un rol
+## 9.6 Vigencia
 
 **PROPUESTO**
 
-Cuando sea necesario, una asignación de rol podría incluir un periodo de vigencia.
+Una asignación de rol podría incluir un periodo de vigencia.
 
 **EJEMPLO**
 
 ```text
 Usuario A
-Rol: Rol de ejemplo
+Rol A
 
 Desde: 01/08/2026
 Hasta: 31/08/2026
 ```
 
-Después del final de la vigencia, los permisos provenientes de ese rol no deberían utilizarse para autorizar nuevas operaciones.
+Al finalizar la vigencia, los permisos procedentes de esa asignación no deberían utilizarse para autorizar nuevas operaciones.
 
 ---
 
-### 9.7 Caso excepcional: rol vencido
+## 9.7 Alcance global
 
 **PROPUESTO**
 
-Si la fecha de vigencia de una asignación de rol ya terminó, el backend deberá tratarla como no vigente.
-
-**EJEMPLO**
-
-```text
-Rol asignado:
-01/07/2026 - 31/07/2026
-
-Fecha de operación:
-27/08/2026
-
-Resultado:
-El rol no se considera vigente.
-```
-
-Por lo tanto, sus permisos no deberían autorizar la operación solicitada.
-
----
-
-### 9.8 Caso excepcional: rol duplicado
-
-**PROPUESTO**
-
-El sistema deberá evitar asignaciones duplicadas que no tengan sentido funcional.
-
-**EJEMPLO**
-
-Si el Usuario A ya tiene el Rol A vigente:
-
-```text
-Usuario A
-    ↓
-Rol A
-```
-
-no debería registrarse nuevamente exactamente la misma asignación sin una justificación válida.
-
-**PENDIENTE**
-
-Las reglas exactas para detectar duplicados dependerán de si los roles tienen vigencia, alcance por área u otras condiciones.
-
----
-
-### 9.9 Alcance global de un permiso
-
-**PROPUESTO**
-
-Algunos permisos podrían permitir actuar sobre información de todo el sistema.
-
-Este tipo de autorización tendría un alcance global.
+Algunos permisos podrían tener alcance global.
 
 **EJEMPLO**
 
@@ -1467,17 +1138,15 @@ Alcance:
 GLOBAL
 ```
 
-En este ejemplo, el permiso permitiría consultar trámites independientemente del área.
-
-Esta posibilidad deberá ser validada antes de implementarse.
+La existencia de este tipo de permisos deberá ser validada.
 
 ---
 
-### 9.10 Alcance limitado a un área
+## 9.8 Alcance limitado a un área
 
 **PROPUESTO**
 
-Algunos permisos podrían estar restringidos al área a la que pertenece o para la cual se encuentra autorizado el usuario.
+Otros permisos podrían estar limitados a determinada área.
 
 **EJEMPLO**
 
@@ -1491,114 +1160,59 @@ Alcance:
 Área B
 ```
 
-En este caso conceptual, el usuario podría consultar información correspondiente al Área B, pero no necesariamente a otras áreas.
+En ese caso el usuario no necesariamente estaría autorizado para consultar información de otras áreas.
 
 **PENDIENTE**
 
-Debe confirmarse si los permisos podrán limitarse por:
+Confirmar si el alcance podrá depender de:
 
 * Área.
 * Tipo de documento.
 * Etapa del trámite.
 * Unidad organizacional.
-* Algún otro criterio institucional.
+* Otros criterios.
 
 ---
 
-### 9.11 Verificación de permisos en el backend
+## 9.9 Verificación de permisos
 
 **PROPUESTO**
 
-Antes de ejecutar una operación protegida, el backend deberá evaluar la autorización del usuario.
+El backend deberá evaluar tanto la existencia del permiso como su alcance.
 
-Un flujo preliminar podría ser:
+Conceptualmente:
 
 ```text
 Usuario solicita operación
         ↓
 Verificar identidad
         ↓
-Verificar estado del usuario
-        ↓
-Verificar asignación organizacional
+Verificar estado
         ↓
 Obtener roles vigentes
         ↓
-Obtener permisos asociados
+Obtener permisos
         ↓
 Verificar alcance
         ↓
-¿Tiene autorización?
-     ↙         ↘
-   Sí           No
-   ↓             ↓
-Permitir       Rechazar
-operación      operación
+Permitir o rechazar
 ```
 
-Este flujo es conceptual y no representa todavía un endpoint ni una implementación técnica definitiva.
+Los casos de rol duplicado, rol vencido, permiso insuficiente y alcance incorrecto se desarrollan en la sección 12.
 
 ---
 
-### 9.12 Acceso denegado
+# 10. Matriz funcional de roles y permisos
+
+## 10.1 Objetivo
 
 **PROPUESTO**
 
-Cuando un usuario no posea el permiso necesario o el permiso no tenga el alcance requerido, la operación deberá ser rechazada.
+La matriz funcional permite visualizar qué acciones podrían asociarse a determinados roles.
 
-**EJEMPLO**
+La siguiente matriz es únicamente demostrativa y no representa decisiones oficiales.
 
-```text
-Usuario A
-    ↓
-intenta derivar un trámite
-    ↓
-no posee permiso para derivar
-    ↓
-ACCESO DENEGADO
-```
-
-El hecho de que el usuario pueda conocer o intentar acceder directamente a una ruta del backend no deberá permitirle evitar la validación de autorización.
-
----
-
-### 9.13 Permisos y principio de mínimo privilegio
-
-**PROPUESTO**
-
-El diseño deberá seguir el principio de conceder únicamente las autorizaciones necesarias para que cada usuario pueda cumplir sus funciones.
-
-Por lo tanto, una acción que no haya sido autorizada no deberá concederse automáticamente.
-
-**EJEMPLO**
-
-Si un usuario solamente necesita consultar información:
-
-```text
-Permitido:
-tramite.ver
-
-No concedido automáticamente:
-tramite.derivar
-tramite.cerrar
-administrar roles
-```
-
-La explicación teórica y las fuentes sobre el principio de mínimo privilegio se desarrollarán posteriormente en la sección correspondiente de este análisis.
-
----
-
-## 10. Matriz funcional de roles y permisos
-
-### 10.1 Objetivo de la matriz
-
-**PROPUESTO**
-
-La matriz funcional permite visualizar de manera sencilla qué acciones podrían estar asociadas a determinados roles.
-
-La siguiente matriz es únicamente demostrativa. No representa los roles ni permisos oficiales de la institución.
-
-### 10.2 Matriz de ejemplo
+## 10.2 Matriz de ejemplo
 
 **EJEMPLO — PENDIENTE DE VALIDACIÓN INSTITUCIONAL**
 
@@ -1619,138 +1233,75 @@ La siguiente matriz es únicamente demostrativa. No representa los roles ni perm
 | Asignar roles            |              No |            No |                    Sí |
 | Administrar permisos     |              No |            No |             Pendiente |
 
-Los nombres “Rol de consulta”, “Rol operativo” y “Rol de administración” son ficticios y se utilizan solamente para demostrar cómo podría construirse una matriz de autorización.
-
-Las celdas tampoco representan decisiones oficiales.
+Los nombres de los roles y las autorizaciones de la matriz son ficticios.
 
 ---
 
-### 10.3 Interpretación de la matriz
+## 10.3 Interpretación
 
 **EJEMPLO**
 
-En la matriz anterior:
+* El Rol de consulta tendría únicamente operaciones de lectura.
+* El Rol operativo podría participar en determinadas etapas del trámite.
+* El Rol de administración podría gestionar elementos organizacionales y de autorización.
 
-* El Rol de consulta solamente tendría acceso a operaciones de lectura.
-* El Rol operativo podría participar en determinadas actividades del trámite.
-* El Rol de administración podría realizar tareas relacionadas con la configuración organizacional y la autorización.
-
-Esto no significa que esos roles deban existir realmente en la institución.
-
-La matriz definitiva deberá construirse después de identificar:
-
-* Los actores oficiales.
-* Los roles institucionalmente aprobados.
-* Las operaciones reales del SIGD.
-* Los responsables autorizados.
-* El alcance de cada permiso.
+Esto no implica que dichos roles existan realmente.
 
 ---
 
-### 10.4 Regla de denegación por defecto
+## 10.4 Denegación por defecto
 
 **PROPUESTO**
 
-Si una acción no se encuentra expresamente autorizada para un rol, no deberá asumirse automáticamente que está permitida.
-
-Conceptualmente:
+Si una acción no se encuentra expresamente autorizada, no deberá asumirse que está permitida.
 
 ```text
 Permiso confirmado
-       ↓
-      Sí
-       ↓
-Operación potencialmente autorizada
+        ↓
+Puede continuar la evaluación
 ```
 
 Mientras que:
 
 ```text
 Permiso no confirmado
-       ↓
-      No
-       ↓
+        ↓
 No conceder por defecto
 ```
 
-Esta regla reduce el riesgo de otorgar más privilegios de los necesarios.
-
 ---
 
-### 10.5 Matriz con alcance por área
+## 10.5 Alcance por área
 
 **PROPUESTO**
 
-Cuando un permiso dependa del área, no será suficiente con comprobar únicamente la existencia del permiso.
-
-**EJEMPLO**
-
-```text
-Usuario A
-Rol: Rol operativo
-
-Permiso:
-tramite.derivar
-
-Área autorizada:
-Área A
-```
-
-Si intenta realizar la misma acción sobre un trámite perteneciente al Área B, el backend deberá evaluar si el alcance del permiso lo permite.
-
-Conceptualmente:
+Cuando un permiso dependa de un área, no será suficiente comprobar solamente que el permiso exista.
 
 ```text
 ¿Tiene permiso?
        ↓
       Sí
        ↓
-¿El permiso aplica al área?
-      ↙    ↘
-    Sí      No
-    ↓        ↓
+¿Aplica al área?
+    ↙      ↘
+   Sí       No
+   ↓         ↓
 Permitir   Denegar
 ```
 
 **PENDIENTE**
 
-Confirmar con el profesor si el control por área será requerido en el SIGD.
+Confirmar si el control por área será requerido.
 
 ---
 
-### 10.6 Preguntas derivadas de la matriz
+# 11. Flujos normales
 
-**PENDIENTE**
+Los siguientes flujos describen de manera funcional algunas operaciones del módulo.
 
-Para convertir esta matriz de ejemplo en una propuesta más precisa deberá confirmarse:
+No representan endpoints definitivos.
 
-* ¿Cuáles son los roles oficiales del sistema?
-* ¿Qué acciones puede realizar cada rol?
-* ¿Quién puede recibir trámites?
-* ¿Quién puede adjuntar documentos?
-* ¿Quién puede derivar trámites?
-* ¿Quién puede observarlos?
-* ¿Quién puede atenderlos?
-* ¿Quién puede cerrarlos?
-* ¿Quién podrá firmar cuando una operación requiera firma?
-* ¿Quién puede crear, actualizar, activar o desactivar áreas?
-* ¿Quién puede asignar responsables?
-* ¿Quién puede administrar roles?
-* ¿Quién puede aprobar cambios de permisos?
-* ¿Los permisos serán globales o tendrán alcance por área?
-* ¿Un usuario puede tener varios roles simultáneamente?
-
-Estas preguntas deberán resolverse antes de considerar definitiva cualquier matriz de autorización.
-
-## 11. Flujos normales
-
-Los siguientes flujos describen de manera funcional cómo podrían ejecutarse algunas operaciones del módulo. No representan endpoints definitivos ni decisiones institucionales oficiales.
-
----
-
-### 11.1 Flujo normal: registrar un área
-
-**PROPUESTO**
+## 11.1 Registrar un área
 
 **Entrada:**
 
@@ -1763,128 +1314,74 @@ Usuario que realiza la operación
 
 **Validaciones:**
 
-1. Verificar que el usuario esté autenticado.
-2. Verificar que tenga autorización para registrar áreas.
-3. Verificar que los datos obligatorios estén completos.
-4. Verificar que no exista un duplicado incompatible con las reglas aprobadas.
-5. Si se indica un área superior, comprobar que exista.
-6. Verificar que la relación jerárquica sea válida.
+1. Usuario autenticado.
+2. Usuario autorizado.
+3. Datos obligatorios completos.
+4. Área superior válida, cuando corresponda.
+5. Jerarquía válida.
+6. Ausencia de duplicados incompatibles.
 
-**Resultado esperado:**
+**Resultado:**
 
 ```text
 Área registrada correctamente.
 ```
 
-**Responsable de la operación:**
-
 **PENDIENTE**
 
-Debe confirmarse qué rol o usuario institucional estará autorizado para registrar áreas.
+Confirmar qué actor puede registrar áreas.
 
 ---
 
-### 11.2 Flujo normal: consultar un área
-
-**PROPUESTO**
+## 11.2 Consultar un área
 
 **Entrada:**
 
 ```text
 Identificador del área
-Usuario que realiza la consulta
+Usuario
 ```
 
 **Validaciones:**
 
-1. Verificar que el usuario esté autenticado.
-2. Verificar que el área exista.
-3. Verificar si la consulta requiere un permiso específico.
-4. Si existe alcance por área, comprobar que el usuario tenga autorización sobre dicha unidad.
+1. Usuario autenticado.
+2. Área existente.
+3. Permiso de consulta.
+4. Alcance válido, si corresponde.
 
-**Resultado esperado:**
+**Resultado:**
 
-Mostrar la información organizacional permitida para el usuario.
-
-**Responsable:**
-
-Dependerá del rol y de las reglas de acceso aprobadas.
+Mostrar únicamente la información autorizada.
 
 ---
 
-### 11.3 Flujo normal: actualizar un área
-
-**PROPUESTO**
+## 11.3 Actualizar un área
 
 **Entrada:**
 
 ```text
-Área a modificar
-Datos nuevos
-Usuario que realiza la modificación
-```
-
-**Validaciones:**
-
-1. Verificar que el área exista.
-2. Verificar que el usuario esté autorizado.
-3. Verificar que los nuevos datos sean válidos.
-4. Si cambia la dependencia jerárquica, comprobar que no se genere un ciclo.
-5. Verificar que la modificación no incumpla reglas institucionales.
-
-**Resultado esperado:**
-
-```text
-Información del área actualizada.
-```
-
-**PENDIENTE**
-
-Debe confirmarse qué atributos se podrán modificar y cuáles deberán conservar historial.
-
----
-
-### 11.4 Flujo normal: asignar un usuario a un área
-
-**PROPUESTO**
-
-**Entrada:**
-
-```text
-Usuario interno
 Área
-Fecha de inicio
-Fecha de fin, si corresponde
-Usuario que realiza la asignación
+Datos nuevos
+Usuario
 ```
 
 **Validaciones:**
 
-1. Verificar que el usuario interno exista.
-2. Verificar que se encuentre activo.
-3. Verificar que el área exista.
-4. Verificar que el área esté activa.
-5. Verificar que las fechas sean válidas.
-6. Verificar que no exista una asignación incompatible.
-7. Verificar que quien realiza la operación tenga autorización.
+1. Área existente.
+2. Usuario autorizado.
+3. Datos válidos.
+4. Ausencia de ciclos si cambia la dependencia.
+5. Cumplimiento de reglas institucionales.
 
-**Resultado esperado:**
+**Resultado:**
 
 ```text
-Asignación registrada con su periodo de vigencia.
+Área actualizada.
 ```
-
-**Responsable:**
-
-**PENDIENTE**
-
-Debe confirmarse qué actor estará autorizado para realizar asignaciones organizacionales.
 
 ---
 
-### 11.5 Flujo normal: designar responsable de un área
-
-**PROPUESTO**
+## 11.4 Asignar un usuario a un área
 
 **Entrada:**
 
@@ -1893,185 +1390,174 @@ Usuario
 Área
 Fecha de inicio
 Fecha de fin, si corresponde
-Usuario que realiza la designación
 ```
 
 **Validaciones:**
 
-1. Verificar que el área exista.
-2. Verificar que el área esté activa.
-3. Verificar que el usuario exista.
-4. Verificar que el usuario esté activo.
-5. Verificar las condiciones de vigencia.
-6. Verificar si existe conflicto con otro responsable.
-7. Verificar que quien realiza la designación tenga autorización.
+1. Usuario existente.
+2. Usuario activo.
+3. Área existente.
+4. Área activa.
+5. Fechas válidas.
+6. Ausencia de conflictos.
+7. Operador autorizado.
 
-**Resultado esperado:**
+**Resultado:**
 
 ```text
-Responsabilidad registrada correctamente.
+Asignación registrada.
 ```
 
-Si existe un responsable anterior y las reglas lo requieren:
+---
+
+## 11.5 Designar un responsable
+
+**Entrada:**
 
 ```text
-Finalizar vigencia anterior
+Usuario
+Área
+Fecha de inicio
+Fecha de fin, si corresponde
+```
+
+**Validaciones:**
+
+1. Área existente y activa.
+2. Usuario existente y activo.
+3. Vigencia válida.
+4. Ausencia de conflicto con otro responsable.
+5. Operador autorizado.
+
+**Resultado:**
+
+```text
+Responsabilidad registrada.
+```
+
+Cuando corresponda:
+
+```text
+Finalizar responsabilidad anterior
         ↓
-Registrar nuevo responsable
+Registrar nueva
         ↓
 Conservar historial
 ```
 
-**PENDIENTE**
-
-Debe confirmarse si un responsable tiene que pertenecer previamente al área.
-
 ---
 
-### 11.6 Flujo normal: asignar un rol
-
-**PROPUESTO**
+## 11.6 Asignar un rol
 
 **Entrada:**
 
 ```text
 Usuario
 Rol
-Área, si existe alcance organizacional
+Área, si corresponde
 Vigencia, si corresponde
-Usuario que realiza la asignación
 ```
 
 **Validaciones:**
 
-1. Verificar que el usuario exista.
-2. Verificar que el usuario se encuentre activo.
-3. Verificar que el rol exista.
-4. Verificar que el rol pueda ser asignado.
-5. Verificar que no exista una asignación duplicada incompatible.
-6. Si existe alcance por área, verificar que el área sea válida.
-7. Verificar que el usuario que realiza la operación tenga autorización.
+1. Usuario existente y activo.
+2. Rol existente.
+3. Asignación válida.
+4. Ausencia de duplicados incompatibles.
+5. Área válida, si existe alcance.
+6. Operador autorizado.
 
-**Resultado esperado:**
+**Resultado:**
 
 ```text
-Rol asignado correctamente.
+Rol asignado.
 ```
-
-**PENDIENTE**
-
-Debe confirmarse quién podrá asignar y retirar roles.
 
 ---
 
-### 11.7 Flujo normal: verificar autorización antes de ejecutar una acción
-
-**PROPUESTO**
+## 11.7 Verificar autorización
 
 **Entrada:**
 
 ```text
 Usuario autenticado
 Acción solicitada
-Recurso involucrado
-Área relacionada, si corresponde
+Recurso
+Área, si corresponde
 ```
 
 **Flujo:**
 
 ```text
-Usuario solicita una operación
+Usuario solicita operación
         ↓
-Backend identifica al usuario
+Identificar usuario
         ↓
-Comprueba que esté activo
+Verificar estado
         ↓
-Comprueba asignaciones vigentes
+Verificar asignaciones vigentes
         ↓
-Obtiene roles vigentes
+Obtener roles vigentes
         ↓
-Obtiene permisos correspondientes
+Obtener permisos
         ↓
-Comprueba alcance del permiso
+Verificar alcance
         ↓
 ¿Está autorizado?
       ↙        ↘
     Sí          No
     ↓            ↓
 Ejecutar       Rechazar
-operación      operación
 ```
-
-**Resultado esperado:**
-
-La operación solamente se ejecuta cuando todas las condiciones de autorización necesarias se cumplen.
 
 ---
 
-### 11.8 Flujo normal: desactivar un área
-
-**PROPUESTO**
+## 11.8 Desactivar un área
 
 **Entrada:**
 
 ```text
 Área
-Usuario que solicita la desactivación
+Usuario
 ```
 
 **Validaciones:**
 
-1. Verificar que el área exista.
-2. Verificar que actualmente esté activa.
-3. Verificar que el usuario tenga autorización.
-4. Verificar si existen áreas dependientes activas.
-5. Verificar si existen trámites pendientes relacionados.
-6. Verificar si existen responsables o asignaciones vigentes.
-
-**Resultado esperado:**
-
-El área cambia a estado inactivo cuando las reglas institucionales permiten la operación.
-
-**PENDIENTE**
-
-Debe confirmarse qué condiciones impiden desactivar un área.
-
----
-
-## 12. Flujos excepcionales
-
-Los siguientes casos representan situaciones que el backend deberá detectar para evitar inconsistencias o accesos no autorizados.
-
----
-
-### 12.1 Área inexistente
-
-**PROPUESTO**
-
-**Entrada:**
-
-```text
-Operación sobre Área 999
-```
-
-**Validación:**
-
-El backend busca el área y determina que no existe.
+1. Área existente.
+2. Área actualmente activa.
+3. Usuario autorizado.
+4. Revisar áreas dependientes.
+5. Revisar trámites pendientes.
+6. Revisar responsabilidades y asignaciones vigentes.
 
 **Resultado:**
 
-```text
-Operación rechazada.
-Motivo: área inexistente.
-```
-
-Esto evita crear relaciones con registros que no existen.
+El área cambia a estado inactivo cuando las reglas institucionales lo permitan.
 
 ---
 
-### 12.2 Área inactiva
+# 12. Flujos excepcionales
 
-**PROPUESTO**
+Los siguientes casos representan situaciones que el backend deberá detectar para evitar inconsistencias o accesos no autorizados.
+
+## 12.1 Área inexistente
+
+**EJEMPLO**
+
+```text
+Solicitud:
+Operar sobre Área 999
+
+Validación:
+Área 999 no existe
+
+Resultado:
+Operación rechazada.
+```
+
+---
+
+## 12.2 Área inactiva
 
 **EJEMPLO**
 
@@ -2080,12 +1566,8 @@ Esto evita crear relaciones con registros que no existen.
 Estado: INACTIVA
 
 Solicitud:
-Asignar Usuario B al Área A
+Asignar Usuario B
 ```
-
-**Validación:**
-
-El backend detecta que el área no está activa.
 
 **Resultado:**
 
@@ -2095,13 +1577,13 @@ Operación rechazada.
 
 **PENDIENTE**
 
-Debe confirmarse cuáles operaciones estarán prohibidas sobre áreas inactivas.
+Confirmar qué operaciones estarán prohibidas sobre áreas inactivas.
 
 ---
 
-### 12.3 Ciclo jerárquico
+## 12.3 Ciclo jerárquico
 
-**PROPUESTO**
+**EJEMPLO**
 
 Situación existente:
 
@@ -2113,59 +1595,42 @@ Situación existente:
 Área C
 ```
 
-Nueva solicitud:
+Solicitud:
 
 ```text
 Hacer que Área A dependa de Área C.
 ```
 
-Esto produciría:
+Resultado que se produciría:
 
 ```text
 Área A → Área B → Área C → Área A
 ```
 
-**Validación:**
-
-El sistema detecta que la nueva relación convertiría a un área en dependiente directa o indirecta de sí misma.
-
-**Resultado:**
-
-```text
-Operación rechazada.
-Motivo: ciclo jerárquico.
-```
+El backend deberá rechazar la operación.
 
 ---
 
-### 12.4 Usuario inexistente
+## 12.4 Usuario inexistente
 
-**PROPUESTO**
-
-**Entrada:**
+**EJEMPLO**
 
 ```text
 Usuario 999
 Área A
 ```
 
-**Validación:**
-
-El usuario no existe en el módulo de identidad correspondiente.
-
-**Resultado:**
+Si el usuario no existe en el módulo correspondiente:
 
 ```text
 Asignación rechazada.
 ```
 
-El módulo organizacional no deberá crear usuarios por su cuenta para resolver esta situación.
+El módulo organizacional no deberá crear un usuario nuevo para resolver esta situación.
 
 ---
 
-### 12.5 Usuario inactivo
-
-**PROPUESTO**
+## 12.5 Usuario inactivo
 
 **EJEMPLO**
 
@@ -2177,10 +1642,6 @@ Solicitud:
 Asignar nuevo rol
 ```
 
-**Validación:**
-
-El backend detecta que el usuario está inactivo.
-
 **Resultado:**
 
 ```text
@@ -2189,13 +1650,11 @@ Operación rechazada.
 
 **PENDIENTE**
 
-Debe confirmarse qué ocurre con roles y asignaciones ya existentes cuando un usuario pasa a estado inactivo.
+Confirmar qué ocurre con roles y asignaciones ya existentes.
 
 ---
 
-### 12.6 Asignación vencida
-
-**PROPUESTO**
+## 12.6 Asignación vencida
 
 **EJEMPLO**
 
@@ -2209,45 +1668,33 @@ Fecha de operación:
 27/08/2026
 ```
 
-**Validación:**
-
-La fecha actual se encuentra fuera del periodo vigente.
-
 **Resultado:**
 
 ```text
-La asignación no se utiliza para autorizar la operación.
+La asignación no se considera vigente.
 ```
 
 ---
 
-### 12.7 Responsable duplicado
+## 12.7 Responsable duplicado
 
 **PROPUESTO**
 
-Este caso depende de que la institución determine que solo puede existir un responsable principal vigente por área.
-
-**EJEMPLO**
-
-Existe:
+Si la institución establece que solo puede existir un responsable principal vigente por área:
 
 ```text
 Área A
-Responsable: Usuario A
-Estado: vigente
+Responsable vigente: Usuario A
 ```
 
-Se intenta registrar:
+y se intenta registrar:
 
 ```text
 Área A
-Responsable: Usuario B
-Estado: vigente
+Responsable vigente: Usuario B
 ```
 
-**Validación:**
-
-Se detecta superposición entre responsabilidades principales.
+el sistema deberá detectar el conflicto.
 
 **Resultado:**
 
@@ -2257,13 +1704,11 @@ Operación rechazada por conflicto de vigencia.
 
 **PENDIENTE**
 
-Confirmar si efectivamente existe la restricción de un único responsable principal.
+Confirmar si existe esta restricción.
 
 ---
 
-### 12.8 Rol duplicado
-
-**PROPUESTO**
+## 12.8 Rol duplicado
 
 **EJEMPLO**
 
@@ -2273,21 +1718,15 @@ Rol A
 Estado: vigente
 ```
 
-Se intenta registrar nuevamente la misma asignación sin ninguna diferencia de vigencia o alcance.
-
-**Resultado:**
+Si se intenta registrar exactamente la misma asignación sin diferencia de vigencia o alcance:
 
 ```text
 Operación rechazada como duplicada.
 ```
 
-La definición exacta de duplicado dependerá del modelo aprobado.
-
 ---
 
-### 12.9 Rol vencido
-
-**PROPUESTO**
+## 12.9 Rol vencido
 
 **EJEMPLO**
 
@@ -2302,37 +1741,27 @@ Fecha de operación:
 27/08/2026
 ```
 
-**Validación:**
-
-El backend detecta que la asignación del rol ya terminó.
-
 **Resultado:**
 
 ```text
-Los permisos provenientes de ese rol no autorizan la operación.
+El rol no autoriza la operación.
 ```
 
 ---
 
-### 12.10 Permiso insuficiente
-
-**PROPUESTO**
+## 12.10 Permiso insuficiente
 
 **EJEMPLO**
 
 ```text
 Usuario A
 
-Permiso disponible:
+Permiso:
 tramite.ver
 
 Operación solicitada:
 tramite.cerrar
 ```
-
-**Validación:**
-
-El permiso requerido no está presente.
 
 **Resultado:**
 
@@ -2340,13 +1769,9 @@ El permiso requerido no está presente.
 ACCESO DENEGADO
 ```
 
-El sistema no deberá conceder el permiso faltante por defecto.
-
 ---
 
-### 12.11 Permiso correcto pero alcance incorrecto
-
-**PROPUESTO**
+## 12.11 Permiso correcto con alcance incorrecto
 
 **EJEMPLO**
 
@@ -2360,11 +1785,7 @@ Alcance:
 Área A
 ```
 
-El usuario intenta derivar un trámite correspondiente al Área B.
-
-**Validación:**
-
-El permiso existe, pero su alcance no incluye el recurso solicitado.
+El usuario intenta operar sobre Área B.
 
 **Resultado:**
 
@@ -2372,13 +1793,11 @@ El permiso existe, pero su alcance no incluye el recurso solicitado.
 ACCESO DENEGADO
 ```
 
-Esto demuestra que no siempre es suficiente comprobar solamente el nombre del permiso.
+Esto demuestra que no siempre es suficiente comprobar solamente el permiso.
 
 ---
 
-### 12.12 Área superior inactiva
-
-**PROPUESTO**
+## 12.12 Área superior inactiva
 
 **EJEMPLO**
 
@@ -2393,21 +1812,15 @@ Estado: ACTIVA
 
 **PENDIENTE**
 
-Debe determinarse institucionalmente si esta situación será permitida.
+Debe confirmarse si:
 
-Entre las posibles reglas a validar se encuentran:
-
-* Permitir la relación temporalmente.
-* Obligar a cambiar la dependencia del Área B.
-* Impedir que Área A sea desactivada mientras tenga áreas activas dependientes.
-
-No se adopta ninguna de estas opciones como definitiva.
+* Esta situación puede mantenerse.
+* Área B debe cambiar de dependencia.
+* Debe impedirse desactivar Área A mientras tenga dependientes activos.
 
 ---
 
-### 12.13 Área sin responsable
-
-**PENDIENTE**
+## 12.13 Área sin responsable
 
 **EJEMPLO**
 
@@ -2417,21 +1830,22 @@ Estado: ACTIVA
 Responsable vigente: ninguno
 ```
 
-Debe confirmarse si:
+**PENDIENTE**
 
-* El área puede seguir recibiendo trámites.
+Confirmar si:
+
+* Puede continuar recibiendo trámites.
 * Puede derivar documentos.
-* El sistema debe mostrar una advertencia.
-* Determinadas operaciones deben bloquearse.
-* Debe designarse obligatoriamente un responsable.
+* Debe mostrarse una advertencia.
+* Deben bloquearse determinadas operaciones.
 
 ---
 
-### 12.14 Intento de autorización solo desde el frontend
+## 12.14 Intento de saltar el frontend
 
 **PROPUESTO**
 
-Un usuario podría intentar ejecutar directamente una operación protegida aunque el frontend no muestre el botón correspondiente.
+Ocultar una opción en el frontend no es suficiente para impedir una operación.
 
 **EJEMPLO**
 
@@ -2450,49 +1864,43 @@ Usuario no autorizado
 Operación rechazada
 ```
 
-**Resultado:**
+---
 
-La seguridad se mantiene porque la autorización se comprueba en el backend.
+## 12.15 Criterio general
+
+Una operación sensible deberá evaluar:
+
+```text
+Entrada
+   ↓
+Existencia
+   ↓
+Estados
+   ↓
+Vigencias
+   ↓
+Relaciones
+   ↓
+Autorización
+   ↓
+¿Todo es válido?
+ ↙           ↘
+Sí            No
+↓              ↓
+Ejecutar     Rechazar
+```
 
 ---
 
-### 12.15 Resumen del tratamiento de excepciones
+# 13. Control de acceso basado en roles (RBAC)
 
-De manera general, una operación sensible deberá seguir este criterio:
-
-```text
-Entrada recibida
-      ↓
-Validar existencia
-      ↓
-Validar estados
-      ↓
-Validar vigencias
-      ↓
-Validar relaciones
-      ↓
-Validar autorización
-      ↓
-¿Todo es válido?
-   ↙          ↘
- Sí            No
- ↓              ↓
-Ejecutar      Rechazar
-```
-
-El backend deberá rechazar las operaciones que incumplan las reglas aprobadas y no deberá asumir permisos, relaciones o estados que no hayan sido confirmados.
-
-## 13. Control de acceso basado en roles (RBAC)
-
-### 13.1 Definición
+## 13.1 Definición
 
 **PROPUESTO — BASADO EN INVESTIGACIÓN**
 
 RBAC, por sus siglas en inglés *Role-Based Access Control*, es un modelo de control de acceso en el que las autorizaciones se organizan mediante roles.
 
-En lugar de otorgar directamente a cada usuario todas las acciones que puede realizar, los permisos se asocian a roles y posteriormente los usuarios son asociados a los roles que correspondan.
-
-Conceptualmente:
+En lugar de asignar directamente cada permiso a cada usuario, los permisos se asocian a roles y posteriormente los usuarios reciben los roles que les correspondan.
 
 ```text
 Usuario
@@ -2504,126 +1912,74 @@ Permisos
 Acciones autorizadas
 ```
 
-De esta manera, varios usuarios que cumplen funciones semejantes pueden utilizar un mismo conjunto de permisos sin que sea necesario definir individualmente todas sus autorizaciones.
-
 ---
 
-### 13.2 Aplicación conceptual al SIGD
+## 13.2 Aplicación conceptual al SIGD
 
 **PROPUESTO**
 
-Para el SIGD, RBAC podría utilizarse para controlar operaciones sensibles relacionadas con:
+RBAC podría utilizarse para controlar acciones relacionadas con:
 
-* Consulta de trámites.
-* Recepción de trámites.
-* Adjuntar información.
+* Consulta.
+* Recepción.
+* Adjuntos.
 * Derivación.
 * Observación.
 * Atención.
 * Cierre.
 * Administración de áreas.
-* Asignación de responsables.
-* Administración de roles y permisos.
+* Responsables.
+* Roles.
+* Permisos.
 
-Los nombres anteriores representan acciones de análisis y todavía deben ser confirmados institucionalmente.
-
-**EJEMPLO**
-
-```text
-Usuario A
-    ↓
-Rol operativo
-    ↓
-tramite.ver
-tramite.recibir
-tramite.derivar
-```
-
-Si posteriormente otro usuario necesita realizar las mismas funciones, podría recibir el mismo rol en lugar de configurar cada permiso nuevamente.
+Todas estas acciones deberán validarse institucionalmente.
 
 ---
 
-### 13.3 Ventaja administrativa de RBAC
+## 13.3 Beneficio administrativo
 
 **PROPUESTO — BASADO EN INVESTIGACIÓN**
 
-El uso de roles facilita la administración de autorizaciones porque permite manejar conjuntos de permisos mediante roles relativamente estables.
+Los roles permiten administrar grupos de permisos en lugar de configurar cada permiso individualmente para cada usuario.
 
-Conceptualmente, si cambia la función de un usuario:
-
-```text
-Usuario A
-   ↓
-Rol anterior
-```
-
-podría pasar a:
+Por ejemplo:
 
 ```text
 Usuario A
    ↓
-Nuevo rol
+Rol operativo
+   ↓
+Conjunto de permisos
 ```
 
-sin tener que redefinir manualmente todas sus autorizaciones una por una.
-
-Esto también puede facilitar la revisión de permisos cuando existen muchos usuarios.
+Si otro usuario requiere las mismas autorizaciones, podría recibir el mismo rol.
 
 ---
 
-### 13.4 RBAC no reemplaza todas las reglas de autorización
+## 13.4 RBAC no reemplaza las demás validaciones
 
 **PROPUESTO**
 
-Tener un rol no necesariamente será suficiente para autorizar todas las operaciones.
+Tener un rol no será necesariamente suficiente para ejecutar una operación.
 
-En el SIGD también podría ser necesario verificar:
+También podrían evaluarse:
 
 * Estado del usuario.
 * Estado del área.
 * Vigencia de la asignación.
 * Vigencia del rol.
-* Área relacionada con la operación.
 * Alcance del permiso.
+* Área relacionada.
 * Estado del trámite.
 * Otras reglas institucionales.
 
-**EJEMPLO**
-
-```text
-Usuario A
-    ↓
-Tiene permiso tramite.derivar
-    ↓
-Permiso limitado al Área A
-    ↓
-Intenta actuar sobre Área B
-    ↓
-ACCESO DENEGADO
-```
-
-Por lo tanto, RBAC deberá complementarse con las demás validaciones funcionales que se aprueben.
-
 ---
 
-### 13.5 Verificación en el backend
+## 13.5 Verificación en backend
 
 **PROPUESTO — BASADO EN INVESTIGACIÓN**
 
-Las comprobaciones de autorización deberán realizarse en el backend.
-
-El frontend puede ocultar botones o elementos de la interfaz para mejorar la experiencia del usuario, pero esta acción no constituye por sí sola una medida suficiente de seguridad.
-
-Conceptualmente:
-
-```text
-Frontend
-Oculta opción no autorizada
-        ↓
-Mejora interfaz
-```
-
-pero además:
+El frontend puede ocultar botones para mejorar la experiencia del usuario, pero la decisión de autorización deberá realizarse en el backend.
 
 ```text
 Solicitud llega al backend
@@ -2633,27 +1989,25 @@ Backend verifica autorización
 Permite o rechaza
 ```
 
-Esto evita que un usuario pueda saltarse la autorización intentando invocar directamente una operación protegida.
-
 ---
 
-## 14. Principio de mínimo privilegio
+# 14. Principio de mínimo privilegio
 
-### 14.1 Definición
+## 14.1 Definición
 
 **PROPUESTO — BASADO EN INVESTIGACIÓN**
 
-El principio de mínimo privilegio establece que un usuario, proceso o componente del sistema debe recibir únicamente los permisos y recursos mínimos necesarios para cumplir las funciones que le corresponden.
+El principio de mínimo privilegio establece que un usuario, proceso o componente debe recibir únicamente los permisos y recursos mínimos necesarios para realizar sus funciones.
 
-Aplicado al SIGD, esto significa que un usuario no debería recibir permisos adicionales simplemente por comodidad.
+Aplicado al SIGD, un usuario no debería recibir permisos adicionales simplemente por comodidad.
 
 ---
 
-### 14.2 Ejemplo aplicado al SIGD
+## 14.2 Ejemplo
 
 **EJEMPLO**
 
-Si un usuario únicamente necesita consultar trámites:
+Si un usuario únicamente necesita consultar:
 
 ```text
 Necesario:
@@ -2670,74 +2024,40 @@ administrar_roles
 administrar_permisos
 ```
 
-Los permisos adicionales solamente deberían concederse cuando exista una necesidad y una autorización válida.
-
 ---
 
-### 14.3 Denegación por defecto
+## 14.3 Denegación por defecto
 
 **PROPUESTO — BASADO EN INVESTIGACIÓN**
 
-Como aplicación del principio de mínimo privilegio, una acción que no se encuentre autorizada deberá considerarse denegada por defecto.
-
-Conceptualmente:
+Una acción que no se encuentre autorizada deberá considerarse denegada por defecto.
 
 ```text
 ¿Existe autorización válida?
         ↓
        Sí
         ↓
-Continuar con las demás validaciones
+Continuar evaluación
 ```
 
-Mientras que:
+Si no existe:
 
 ```text
-¿Existe autorización válida?
-        ↓
-       No
-        ↓
 ACCESO DENEGADO
 ```
 
-No deberá utilizarse un criterio del tipo:
+No deberá utilizarse el criterio:
 
 ```text
 "No sabemos si puede hacerlo,
 por lo tanto lo permitimos."
 ```
 
-La regla propuesta será:
-
-```text
-"No está autorizado,
-por lo tanto no se concede."
-```
-
-hasta que exista una decisión aprobada.
-
 ---
 
-### 14.4 Beneficio para el SIGD
+## 14.4 Relación entre RBAC y mínimo privilegio
 
-**PROPUESTO**
-
-Aplicar mínimo privilegio puede reducir el riesgo de que usuarios realicen operaciones que no corresponden a sus funciones.
-
-También facilita identificar de manera más clara:
-
-* Qué permisos necesita cada rol.
-* Qué permisos son innecesarios.
-* Quién puede ejecutar operaciones sensibles.
-* Qué accesos deben revisarse cuando cambia la función de un usuario.
-
----
-
-### 14.5 Relación entre RBAC y mínimo privilegio
-
-**PROPUESTO**
-
-RBAC y mínimo privilegio son conceptos relacionados, pero no equivalentes.
+RBAC y mínimo privilegio son conceptos relacionados, pero diferentes.
 
 ```text
 RBAC
@@ -2745,73 +2065,66 @@ RBAC
 Organiza permisos mediante roles
 ```
 
-mientras que:
+Mientras que:
 
 ```text
 Mínimo privilegio
 ↓
-Busca conceder únicamente
+Busca conceder solamente
 los permisos necesarios
 ```
 
 Un sistema podría utilizar roles y aun así otorgar privilegios excesivos si los roles contienen más permisos de los necesarios.
 
-Por ello, los roles propuestos para el SIGD deberán revisarse aplicando también el principio de mínimo privilegio.
-
 ---
 
-## 15. Decisiones y supuestos
+# 15. Decisiones y supuestos
 
-Para evitar presentar como oficiales reglas que todavía no han sido confirmadas, las decisiones del análisis se clasifican utilizando las categorías definidas por el plan de trabajo.
-
-### 15.1 Elementos confirmados
+## 15.1 Elementos confirmados
 
 **CONFIRMADO**
 
 Según el plan de trabajo del Grupo 3:
 
-* El módulo deberá representar áreas o unidades organizacionales.
-* Debe contemplarse una jerarquía flexible entre unidades.
-* Área, cargo, rol, permiso y responsabilidad son conceptos diferentes.
-* El Grupo 3 no deberá duplicar las tablas de identidad de los usuarios internos.
+* El módulo debe representar áreas o unidades organizacionales.
+* Debe contemplarse una jerarquía flexible.
+* Área, cargo, rol, permiso y responsabilidad son conceptos distintos.
+* El Grupo 3 no deberá duplicar las tablas de identidad.
 * La integración con usuarios internos deberá coordinarse con el Grupo 4.
-* Deben analizarse responsables y cambios de vigencia.
+* Deben analizarse responsables y vigencias.
 * Debe contemplarse un esquema de roles y permisos.
-* La autorización real deberá verificarse en el backend.
+* La autorización deberá verificarse en el backend.
 * Ocultar botones en el frontend no constituye seguridad suficiente.
 * Los permisos deberán seguir el principio de mínimo privilegio.
-* Los ejemplos utilizados no deben presentarse como información institucional oficial.
-* El organigrama y otras reglas institucionales todavía están pendientes.
+* Los ejemplos no deberán presentarse como información oficial.
+* El organigrama y otras reglas institucionales se encuentran pendientes.
 
 ---
 
-### 15.2 Propuestas técnicas del análisis
+## 15.2 Propuestas técnicas
 
 **PROPUESTO**
 
-Durante este análisis se plantearon las siguientes propuestas:
+Durante este análisis se plantearon:
 
-* Conservar historial de asignaciones cuando sea necesario.
-* Conservar historial de responsables.
-* Evaluar vigencias antes de autorizar operaciones.
-* Impedir ciclos en la jerarquía organizacional.
-* Evitar asignaciones duplicadas incompatibles.
-* Validar áreas y usuarios antes de crear relaciones.
-* Rechazar operaciones sobre entidades inexistentes.
+* Conservar historial cuando sea necesario.
+* Evaluar vigencias.
+* Impedir ciclos jerárquicos.
+* Evitar duplicados incompatibles.
+* Validar entidades antes de relacionarlas.
+* Rechazar operaciones sobre registros inexistentes.
 * Utilizar roles como agrupaciones de permisos.
-* Evaluar el alcance del permiso cuando dependa de un área.
+* Evaluar alcance por área cuando corresponda.
 * Denegar por defecto las acciones no autorizadas.
-* Validar la autorización desde el backend.
-
-Estas propuestas deberán ser revisadas por el grupo y ajustadas cuando exista información institucional definitiva.
+* Realizar la autorización en el backend.
 
 ---
 
-### 15.3 Supuestos utilizados solamente para explicar
+## 15.3 Ejemplos utilizados
 
 **EJEMPLO**
 
-Se utilizaron durante el documento nombres como:
+Durante el documento se utilizaron nombres ficticios como:
 
 ```text
 Área A
@@ -2825,7 +2138,7 @@ Rol de consulta
 Rol de administración
 ```
 
-También se utilizaron permisos como:
+También permisos ficticios como:
 
 ```text
 tramite.ver
@@ -2834,197 +2147,202 @@ tramite.derivar
 tramite.cerrar
 ```
 
-Ninguno de estos nombres debe interpretarse como una denominación oficial del instituto.
+Ninguno representa información oficial.
 
 ---
 
-### 15.4 Información pendiente
+## 15.4 Información pendiente
 
 **PENDIENTE**
 
-El análisis no puede definir todavía:
+Todavía no pueden definirse definitivamente:
 
-* Organigrama definitivo.
-* Áreas oficiales.
-* Oficinas oficiales.
-* Cantidad exacta de niveles jerárquicos.
-* Cargos oficiales.
-* Roles definitivos.
-* Permisos definitivos.
-* Responsables oficiales.
-* Reglas definitivas de vigencia.
-* Alcance definitivo de los permisos.
-* Reglas finales sobre responsables principales, alternos o temporales.
-
-Estas decisiones requieren información del profesor o de la institución.
+* Organigrama.
+* Áreas.
+* Oficinas.
+* Niveles jerárquicos.
+* Cargos.
+* Funciones.
+* Roles.
+* Permisos.
+* Responsables.
+* Reglas de vigencia.
+* Alcance de permisos.
+* Responsables principales, alternos o temporales.
 
 ---
 
-## 16. Preguntas pendientes para el profesor
+# 16. Preguntas pendientes para el profesor
 
-Las siguientes preguntas deberán resolverse antes de considerar definitivo el diseño organizacional y de autorización.
+## 16.1 Estructura organizacional
 
-### 16.1 Estructura organizacional
-
-1. ¿Cuál es el organigrama oficial de la institución?
-2. ¿Qué áreas, oficinas o unidades deben registrarse en el SIGD?
+1. ¿Cuál es el organigrama oficial?
+2. ¿Qué áreas, oficinas o unidades deben registrarse?
 3. ¿Cuántos niveles jerárquicos existen?
-4. ¿Qué denominaciones oficiales se utilizan: dirección, área, oficina, unidad u otras?
-5. ¿Puede existir una unidad organizacional sin área superior?
-6. ¿Qué debe ocurrir cuando un área cambia de dependencia?
-7. ¿Debe conservarse historial de los cambios de dependencia?
+4. ¿Qué denominaciones oficiales se utilizan?
+5. ¿Puede existir una unidad sin superior?
+6. ¿Qué ocurre cuando un área cambia de dependencia?
+7. ¿Debe conservarse historial de esos cambios?
 
 ---
 
-### 16.2 Usuarios y áreas
+## 16.2 Usuarios y áreas
 
-8. ¿Un usuario interno puede pertenecer a varias áreas simultáneamente?
-9. ¿Las asignaciones a áreas tendrán fecha de inicio y fecha de fin?
-10. ¿Debe conservarse el historial cuando un usuario cambia de área?
-11. ¿Qué debe ocurrir con sus trámites y permisos cuando cambia de área?
-12. ¿Qué debe ocurrir con las asignaciones cuando un usuario queda inactivo?
+8. ¿Un usuario puede pertenecer a varias áreas simultáneamente?
+9. ¿Las asignaciones tendrán fecha de inicio y fin?
+10. ¿Debe conservarse historial cuando un usuario cambia de área?
+11. ¿Qué ocurre con sus trámites y permisos cuando cambia?
+12. ¿Qué ocurre cuando un usuario queda inactivo?
 
 ---
 
-### 16.3 Cargos y responsabilidades
+## 16.3 Cargos y responsabilidades
 
-13. ¿Qué diferencia institucional existe entre cargo, función, responsable y rol del sistema?
-14. ¿Cada área debe tener obligatoriamente un responsable?
-15. ¿Puede existir más de un responsable al mismo tiempo?
+13. ¿Qué diferencia institucional existe entre cargo, función, responsable y rol?
+14. ¿Cada área debe tener un responsable?
+15. ¿Puede existir más de un responsable simultáneo?
 16. ¿Existirán responsables principales y alternos?
 17. ¿Puede existir un responsable temporal?
-18. ¿El responsable debe pertenecer al área correspondiente?
-19. ¿Debe conservarse historial de responsables?
-20. ¿Qué debe ocurrir cuando un responsable queda inactivo?
-21. ¿Qué ocurre cuando un área activa queda sin responsable?
+18. ¿El responsable debe pertenecer al área?
+19. ¿Debe conservarse historial?
+20. ¿Qué ocurre cuando el responsable queda inactivo?
+21. ¿Qué ocurre cuando un área queda sin responsable?
 
 ---
 
-### 16.4 Roles y permisos
+## 16.4 Roles y permisos
 
-22. ¿Cuáles serán los roles oficiales del SIGD?
-23. ¿Un usuario puede poseer varios roles simultáneamente?
+22. ¿Cuáles serán los roles oficiales?
+23. ¿Un usuario puede poseer varios roles?
 24. ¿Los roles tendrán vigencia?
 25. ¿Los roles serán globales o estarán asociados a un área?
-26. ¿Qué permisos concretos existen para recibir, adjuntar, derivar, observar, firmar, atender y cerrar un trámite?
+26. ¿Qué permisos concretos existen para recibir, adjuntar, derivar, observar, firmar, atender y cerrar?
 27. ¿Quién puede crear áreas?
-28. ¿Quién puede modificar áreas?
-29. ¿Quién puede activar o desactivar áreas?
-30. ¿Quién puede asignar usuarios a áreas?
+28. ¿Quién puede modificarlas?
+29. ¿Quién puede activarlas o desactivarlas?
+30. ¿Quién puede asignar usuarios?
 31. ¿Quién puede designar responsables?
 32. ¿Quién puede crear o modificar roles?
-33. ¿Quién puede asignar roles a usuarios?
+33. ¿Quién puede asignar roles?
 34. ¿Quién puede aprobar o modificar permisos?
 
 ---
 
-### 16.5 Alcance de los permisos
+## 16.5 Alcance de permisos
 
 35. ¿Los permisos pueden tener alcance global?
-36. ¿Los permisos pueden limitarse a un área?
-37. ¿Pueden limitarse según el tipo de documento?
-38. ¿Pueden limitarse según la etapa del trámite?
-39. ¿Existe herencia de permisos entre áreas o entre roles?
-40. Si existe herencia, ¿qué reglas deben utilizarse para evitar privilegios excesivos?
+36. ¿Pueden limitarse por área?
+37. ¿Pueden limitarse por tipo de documento?
+38. ¿Pueden limitarse por etapa del trámite?
+39. ¿Existe herencia de permisos entre áreas o roles?
+40. Si existe herencia, ¿cómo se evitarán privilegios excesivos?
 
 ---
 
-### 16.6 Áreas inactivas y trámites
+## 16.6 Áreas inactivas y trámites
 
-41. ¿Qué debe ocurrir con los trámites pendientes cuando un área queda inactiva?
-42. ¿Un área inactiva puede conservar áreas dependientes activas?
-43. ¿Puede un área inactiva recibir nuevas derivaciones?
-44. ¿Qué debe ocurrir con sus responsables vigentes?
-45. ¿Qué debe ocurrir con los usuarios asignados a dicha área?
+41. ¿Qué ocurre con trámites pendientes cuando un área queda inactiva?
+42. ¿Un área inactiva puede tener áreas dependientes activas?
+43. ¿Puede recibir nuevas derivaciones?
+44. ¿Qué ocurre con sus responsables vigentes?
+45. ¿Qué ocurre con sus usuarios asignados?
 
-Las respuestas deberán registrarse posteriormente utilizando la categoría **CONFIRMADO** cuando hayan sido expresamente aprobadas.
+Las respuestas deberán registrarse posteriormente como **CONFIRMADO** cuando hayan sido aprobadas.
 
 ---
 
-## 17. Fuentes consultadas
+# 17. Fuentes consultadas
 
-Las siguientes fuentes técnicas fueron utilizadas únicamente para comprender y explicar los conceptos de control de acceso, RBAC, autorización y mínimo privilegio. Estas fuentes no definen la estructura organizacional ni los roles oficiales de la institución.
+Las siguientes fuentes se utilizan únicamente para comprender los conceptos técnicos de RBAC, autorización y mínimo privilegio.
 
-### 17.1 National Institute of Standards and Technology (NIST)
+No definen la estructura institucional ni los roles oficiales.
 
-**Fuente:** NIST — *Role-Based Access Control (RBAC): Features and Motivations*.
+## 17.1 National Institute of Standards and Technology (NIST)
+
+**Fuente:** *Role-Based Access Control (RBAC): Features and Motivations*.
 
 **Autores:** David F. Ferraiolo, Janet A. Cugini y David R. Kuhn.
 
-**Uso en este análisis:**
+**Uso:**
 
-Se utilizó como referencia para comprender que en RBAC los permisos se asocian a roles y los usuarios se relacionan con los roles apropiados, facilitando la administración de autorizaciones.
-
-**Consulta:** agosto de 2026.
-
----
-
-### 17.2 NIST Computer Security Resource Center (CSRC)
-
-**Fuente:** NIST CSRC Glossary — *Role-Based Access Control (RBAC)*.
-
-**Uso en este análisis:**
-
-Se utilizó para complementar la definición de RBAC y comprender la relación entre usuarios, roles y autorizaciones.
+Referencia para comprender la relación entre usuarios, roles y permisos dentro de un modelo RBAC.
 
 **Consulta:** agosto de 2026.
 
 ---
 
-### 17.3 NIST Computer Security Resource Center (CSRC)
+## 17.2 NIST Computer Security Resource Center
 
-**Fuente:** NIST CSRC Glossary — *Least Privilege*.
+**Fuente:** *Role-Based Access Control (RBAC) — CSRC Glossary*.
 
-**Uso en este análisis:**
+**Uso:**
 
-Se utilizó para comprender el principio de mínimo privilegio, según el cual una entidad debe disponer únicamente de las autorizaciones y recursos mínimos necesarios para realizar sus funciones.
+Referencia complementaria para la definición de RBAC y la organización de autorizaciones mediante roles.
 
 **Consulta:** agosto de 2026.
 
 ---
 
-### 17.4 OWASP Foundation
+## 17.3 NIST Computer Security Resource Center
 
-**Fuente:** OWASP Cheat Sheet Series — *Authorization Cheat Sheet*.
+**Fuente:** *Least Privilege — CSRC Glossary*.
 
-**Uso en este análisis:**
+**Uso:**
 
-Se utilizó como referencia complementaria para las recomendaciones de autorización, especialmente:
+Referencia para comprender el principio de mínimo privilegio, según el cual una entidad debe poseer solamente las autorizaciones mínimas necesarias.
+
+**Consulta:** agosto de 2026.
+
+---
+
+## 17.4 OWASP Foundation
+
+**Fuente:** *Authorization Cheat Sheet — OWASP Cheat Sheet Series*.
+
+**Uso:**
+
+Referencia complementaria para:
 
 * Aplicar mínimo privilegio.
 * Denegar accesos por defecto.
-* Comprobar permisos en las solicitudes.
-* Evitar asumir que una operación está autorizada únicamente porque el frontend la permite o muestra.
+* Comprobar permisos durante las solicitudes.
+* No depender solamente de controles del frontend.
 
 **Consulta:** agosto de 2026.
 
 ---
 
-### 17.5 Documento interno del proyecto
+## 17.5 Documento interno del proyecto
 
 **Fuente:** *SIGD | Plan de trabajo backend Grupo 3 · OrganiCore*.
 
 **Fecha:** 27 de agosto de 2026.
 
-**Uso en este análisis:**
+**Uso:**
 
-Se utilizó como fuente principal para:
+Fuente principal para:
 
 * Definir el alcance del trabajo de Leonardo.
-* Identificar los conceptos que deben analizarse.
-* Reconocer las decisiones pendientes.
-* Preparar los flujos normales y excepcionales.
-* Identificar las preguntas que deberán realizarse al profesor.
-* Mantener separados los conceptos de área, cargo, rol, permiso y responsable.
+* Identificar conceptos organizacionales.
+* Preparar flujos normales y excepcionales.
+* Identificar decisiones pendientes.
+* Diferenciar área, cargo, rol, permiso y responsable.
+* Preparar preguntas para el profesor.
 
 ---
 
-## 18. Conclusión del análisis funcional
+# 18. Conclusión del análisis funcional
 
-El análisis realizado permite establecer una base funcional preliminar para que posteriormente pueda diseñarse el modelo de datos del módulo organizacional y de autorización del SIGD.
+El análisis realizado establece una base funcional preliminar para que posteriormente pueda diseñarse el modelo de datos del módulo organizacional y de autorización del SIGD.
 
-Se identificaron los principales conceptos relacionados con áreas, jerarquías, usuarios internos, responsables, roles, permisos y vigencias. También se documentaron operaciones normales, situaciones excepcionales y reglas preliminares de autorización.
+Se identificaron los principales conceptos relacionados con áreas, jerarquías, usuarios internos, responsables, roles, permisos y vigencias.
 
-El análisis mantiene separadas las decisiones confirmadas, las propuestas técnicas, los ejemplos ficticios y la información pendiente. De esta manera, el modelo podrá adaptarse cuando el profesor o la institución proporcionen el organigrama y las reglas oficiales sin presentar supuestos como información definitiva.
+También se documentaron operaciones normales, situaciones excepcionales y reglas preliminares de autorización.
 
-El siguiente paso del flujo de trabajo será someter este análisis a revisión del sublíder del grupo. Las observaciones relacionadas con este archivo deberán ser corregidas primero por su autor en la rama `B_LEONARDO` antes de que la versión aprobada sea integrada al modelo de datos.
+El análisis mantiene separadas las decisiones confirmadas, las propuestas técnicas, los ejemplos ficticios y la información pendiente.
+
+De esta manera, el diseño podrá adaptarse cuando el profesor o la institución proporcionen el organigrama y las reglas oficiales sin presentar supuestos como información definitiva.
+
+El siguiente paso del flujo de trabajo será someter este análisis a revisión del sublíder del grupo.
+
+Si existen observaciones, deberán ser corregidas primero por el autor en la rama `B_LEONARDO`, mediante nuevos commits, antes de que la versión aprobada sea integrada en `B_POOL`.
