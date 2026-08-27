@@ -371,10 +371,382 @@ Debe confirmarse:
 
 Por lo tanto, estos conceptos deberán mantenerse separados durante el análisis y el posterior diseño del modelo de datos.
 
-
 ## 5. Operaciones del módulo
 
+El módulo deberá contemplar operaciones relacionadas con la administración de la estructura organizacional. En esta etapa se describen de manera funcional y no como endpoints o implementaciones definitivas.
+
+### 5.1 Crear un área
+
+**PROPUESTO**
+
+El sistema podría permitir registrar una nueva área, oficina o unidad organizacional.
+
+Antes de realizar el registro, el backend debería validar como mínimo:
+
+* Que los datos obligatorios hayan sido proporcionados.
+* Que no exista un registro duplicado según las reglas que posteriormente se definan.
+* Que el área superior exista, si se está indicando una dependencia jerárquica.
+* Que el área superior se encuentre activa, cuando dicha condición sea necesaria.
+* Que la relación jerárquica propuesta sea válida.
+
+**Entrada conceptual:**
+
+```text
+Nombre o denominación
+Tipo de unidad, si corresponde
+Área superior, si corresponde
+Estado inicial
+```
+
+**Resultado esperado:**
+
+Si las validaciones son correctas, el área queda registrada.
+
+Si alguna validación falla, la operación debe ser rechazada y el sistema debe informar el motivo.
+
+**PENDIENTE**
+
+Confirmar qué datos serán obligatorios y quiénes estarán autorizados para crear áreas.
+
+---
+
+### 5.2 Consultar un área
+
+**PROPUESTO**
+
+El sistema podría permitir consultar información de un área registrada.
+
+La consulta podría mostrar, dependiendo del diseño aprobado:
+
+* Información general del área.
+* Estado actual.
+* Área superior.
+* Áreas dependientes.
+* Usuarios asignados.
+* Responsable vigente.
+* Información de vigencia relacionada.
+
+La información específica dependerá del modelo de datos posteriormente aprobado.
+
+**PENDIENTE**
+
+Confirmar qué usuarios podrán consultar información organizacional y si existirán restricciones según el área.
+
+---
+
+### 5.3 Actualizar un área
+
+**PROPUESTO**
+
+El sistema podría permitir modificar determinados datos de un área existente.
+
+Antes de guardar cambios, el backend deberá comprobar:
+
+* Que el área exista.
+* Que el usuario tenga autorización para modificarla.
+* Que los nuevos datos sean válidos.
+* Que un cambio de dependencia no produzca un ciclo jerárquico.
+* Que el cambio no contradiga otras reglas institucionales vigentes.
+
+Los cambios que puedan afectar la estructura organizacional deberán ser tratados con especial cuidado.
+
+**PENDIENTE**
+
+Confirmar qué atributos podrán modificarse y cuáles deberán conservar historial.
+
+---
+
+### 5.4 Activar un área
+
+**PROPUESTO**
+
+Una unidad previamente inactiva podría volver a activarse cuando exista autorización para ello.
+
+El backend debería verificar:
+
+* Que el área exista.
+* Que actualmente se encuentre inactiva.
+* Que el usuario que realiza la operación tenga autorización.
+* Que su área superior, si corresponde, permita una relación organizacional válida.
+
+**Resultado esperado:**
+
+El área vuelve a estar disponible para las operaciones permitidas por las reglas institucionales.
+
+---
+
+### 5.5 Desactivar un área
+
+**PROPUESTO**
+
+La desactivación permitirá indicar que un área ya no se encuentra disponible para determinadas operaciones sin necesariamente eliminar su información histórica.
+
+Una posible regla sería impedir que un área inactiva:
+
+* Reciba nuevas asignaciones de usuarios.
+* Reciba nuevos responsables.
+* Participe en nuevas derivaciones de trámites.
+* Sea utilizada como destino de determinadas operaciones.
+
+Sin embargo, la información histórica debería mantenerse cuando sea necesaria para la trazabilidad.
+
+**PENDIENTE**
+
+Debe confirmarse qué debe ocurrir con:
+
+* Los usuarios que continúan asignados al área.
+* El responsable vigente.
+* Los trámites pendientes.
+* Los roles con alcance limitado a esa área.
+* Las áreas dependientes de una unidad que queda inactiva.
+
+---
+
+### 5.6 Validación de autorización
+
+**PROPUESTO**
+
+Antes de ejecutar una operación protegida, el backend deberá verificar si el usuario está autorizado.
+
+El flujo conceptual sería:
+
+```text
+Usuario solicita una operación
+        ↓
+Backend identifica al usuario
+        ↓
+Verifica estado del usuario
+        ↓
+Verifica asignaciones vigentes
+        ↓
+Verifica roles vigentes
+        ↓
+Verifica permisos
+        ↓
+Verifica alcance del permiso
+        ↓
+Permite o rechaza la operación
+```
+
+Ocultar una opción en el frontend no será suficiente para garantizar la seguridad. La autorización deberá comprobarse en el backend.
+
+---
+
+### 5.7 Acceso denegado
+
+**PROPUESTO**
+
+Si un usuario intenta realizar una acción sin contar con autorización, el sistema deberá rechazar la operación.
+
+**EJEMPLO**
+
+```text
+Usuario A
+    ↓
+intenta cerrar un trámite
+    ↓
+no posee permiso para cerrar trámites
+    ↓
+operación rechazada
+```
+
+El sistema no deberá conceder permisos por defecto cuando una acción no haya sido autorizada.
+
+---
+
 ## 6. Jerarquía de áreas
+
+### 6.1 Objetivo de la jerarquía
+
+**PROPUESTO**
+
+La estructura organizacional deberá permitir representar relaciones entre unidades superiores y unidades dependientes.
+
+La jerarquía deberá ser flexible para admitir varios niveles sin crear una estructura distinta para cada nivel institucional.
+
+**EJEMPLO**
+
+```text
+Unidad Superior
+    ├── Unidad A
+    │     ├── Unidad A.1
+    │     └── Unidad A.2
+    │
+    └── Unidad B
+          └── Unidad B.1
+```
+
+Los nombres anteriores son ficticios y únicamente representan una posible estructura jerárquica.
+
+**PENDIENTE**
+
+Confirmar:
+
+* Cuántos niveles organizacionales existen.
+* Qué nombres oficiales reciben estos niveles.
+* Si todas las unidades deben depender de otra unidad.
+* Si pueden existir varias unidades principales sin dependencia superior.
+
+---
+
+### 6.2 Área superior y área dependiente
+
+**PROPUESTO**
+
+Una unidad podría tener una relación con otra unidad que actúe como su superior jerárquico.
+
+Conceptualmente:
+
+```text
+Área superior
+      ↓
+Área dependiente
+```
+
+Una misma área superior podría tener varias áreas dependientes.
+
+**EJEMPLO**
+
+```text
+Área A
+    ├── Área B
+    ├── Área C
+    └── Área D
+```
+
+La relación anterior es solo ilustrativa.
+
+---
+
+### 6.3 Cambio de dependencia
+
+**PROPUESTO**
+
+Una unidad podría cambiar de dependencia jerárquica cuando exista una modificación en la estructura organizacional.
+
+**EJEMPLO**
+
+Situación inicial:
+
+```text
+Área A
+    └── Área C
+```
+
+Después de un cambio:
+
+```text
+Área B
+    └── Área C
+```
+
+En este caso, Área C deja de depender de Área A y pasa a depender de Área B.
+
+Antes de realizar este cambio, el backend debería verificar:
+
+* Que el área exista.
+* Que la nueva área superior exista.
+* Que la nueva relación no produzca un ciclo.
+* Que las áreas involucradas tengan un estado compatible con la operación.
+* Que el usuario tenga autorización.
+
+**PENDIENTE**
+
+Confirmar si los cambios de dependencia deben conservar historial y qué efecto tendrán sobre trámites, usuarios y responsabilidades anteriores.
+
+---
+
+### 6.4 Prevención de ciclos jerárquicos
+
+**PROPUESTO**
+
+El sistema deberá impedir relaciones circulares entre áreas.
+
+Un ciclo ocurre cuando una unidad termina dependiendo directa o indirectamente de sí misma.
+
+**EJEMPLO**
+
+Supongamos que existe:
+
+```text
+Área A
+    ↓
+Área B
+    ↓
+Área C
+```
+
+No debería permitirse configurar:
+
+```text
+Área C
+    ↓
+Área A
+```
+
+porque el resultado sería:
+
+```text
+Área A → Área B → Área C → Área A
+```
+
+La estructura quedaría en un ciclo infinito y dejaría de representar correctamente una jerarquía.
+
+Por lo tanto, antes de aceptar un cambio de dependencia deberá comprobarse que la nueva relación no convierta a un descendiente en superior de uno de sus propios antecesores.
+
+---
+
+### 6.5 Área inactiva dentro de la jerarquía
+
+**PROPUESTO**
+
+Cuando un área quede inactiva, el sistema deberá evaluar qué ocurre con sus relaciones jerárquicas.
+
+**EJEMPLO**
+
+```text
+Área A
+    └── Área B
+          └── Área C
+```
+
+Si Área B queda inactiva, debe definirse qué sucederá con Área C.
+
+Algunas posibles decisiones que deberán validarse son:
+
+* Mantener Área C dependiendo de Área B aunque esta se encuentre inactiva.
+* Cambiar Área C a otra unidad superior.
+* Impedir la desactivación de Área B mientras tenga áreas activas dependientes.
+
+Estas alternativas son solamente posibilidades técnicas y no deben considerarse reglas oficiales.
+
+**PENDIENTE**
+
+Confirmar con el profesor y la institución qué comportamiento debe adoptarse cuando una unidad que tiene áreas dependientes queda inactiva.
+
+---
+
+### 6.6 Caso excepcional: área inexistente
+
+**PROPUESTO**
+
+Toda operación que haga referencia a un área deberá verificar previamente que esta exista.
+
+**EJEMPLO**
+
+```text
+Solicitud:
+Asignar usuario al Área 500
+
+Validación:
+Área 500 no existe
+
+Resultado:
+Operación rechazada
+```
+
+Esto evita registrar relaciones con unidades inexistentes o información inconsistente.
+
 
 ## 7. Asignación de usuarios a áreas
 
