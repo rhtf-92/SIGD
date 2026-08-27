@@ -2482,13 +2482,549 @@ Ejecutar      Rechazar
 
 El backend deberá rechazar las operaciones que incumplan las reglas aprobadas y no deberá asumir permisos, relaciones o estados que no hayan sido confirmados.
 
-
 ## 13. Control de acceso basado en roles (RBAC)
+
+### 13.1 Definición
+
+**PROPUESTO — BASADO EN INVESTIGACIÓN**
+
+RBAC, por sus siglas en inglés *Role-Based Access Control*, es un modelo de control de acceso en el que las autorizaciones se organizan mediante roles.
+
+En lugar de otorgar directamente a cada usuario todas las acciones que puede realizar, los permisos se asocian a roles y posteriormente los usuarios son asociados a los roles que correspondan.
+
+Conceptualmente:
+
+```text
+Usuario
+   ↓
+Rol
+   ↓
+Permisos
+   ↓
+Acciones autorizadas
+```
+
+De esta manera, varios usuarios que cumplen funciones semejantes pueden utilizar un mismo conjunto de permisos sin que sea necesario definir individualmente todas sus autorizaciones.
+
+---
+
+### 13.2 Aplicación conceptual al SIGD
+
+**PROPUESTO**
+
+Para el SIGD, RBAC podría utilizarse para controlar operaciones sensibles relacionadas con:
+
+* Consulta de trámites.
+* Recepción de trámites.
+* Adjuntar información.
+* Derivación.
+* Observación.
+* Atención.
+* Cierre.
+* Administración de áreas.
+* Asignación de responsables.
+* Administración de roles y permisos.
+
+Los nombres anteriores representan acciones de análisis y todavía deben ser confirmados institucionalmente.
+
+**EJEMPLO**
+
+```text
+Usuario A
+    ↓
+Rol operativo
+    ↓
+tramite.ver
+tramite.recibir
+tramite.derivar
+```
+
+Si posteriormente otro usuario necesita realizar las mismas funciones, podría recibir el mismo rol en lugar de configurar cada permiso nuevamente.
+
+---
+
+### 13.3 Ventaja administrativa de RBAC
+
+**PROPUESTO — BASADO EN INVESTIGACIÓN**
+
+El uso de roles facilita la administración de autorizaciones porque permite manejar conjuntos de permisos mediante roles relativamente estables.
+
+Conceptualmente, si cambia la función de un usuario:
+
+```text
+Usuario A
+   ↓
+Rol anterior
+```
+
+podría pasar a:
+
+```text
+Usuario A
+   ↓
+Nuevo rol
+```
+
+sin tener que redefinir manualmente todas sus autorizaciones una por una.
+
+Esto también puede facilitar la revisión de permisos cuando existen muchos usuarios.
+
+---
+
+### 13.4 RBAC no reemplaza todas las reglas de autorización
+
+**PROPUESTO**
+
+Tener un rol no necesariamente será suficiente para autorizar todas las operaciones.
+
+En el SIGD también podría ser necesario verificar:
+
+* Estado del usuario.
+* Estado del área.
+* Vigencia de la asignación.
+* Vigencia del rol.
+* Área relacionada con la operación.
+* Alcance del permiso.
+* Estado del trámite.
+* Otras reglas institucionales.
+
+**EJEMPLO**
+
+```text
+Usuario A
+    ↓
+Tiene permiso tramite.derivar
+    ↓
+Permiso limitado al Área A
+    ↓
+Intenta actuar sobre Área B
+    ↓
+ACCESO DENEGADO
+```
+
+Por lo tanto, RBAC deberá complementarse con las demás validaciones funcionales que se aprueben.
+
+---
+
+### 13.5 Verificación en el backend
+
+**PROPUESTO — BASADO EN INVESTIGACIÓN**
+
+Las comprobaciones de autorización deberán realizarse en el backend.
+
+El frontend puede ocultar botones o elementos de la interfaz para mejorar la experiencia del usuario, pero esta acción no constituye por sí sola una medida suficiente de seguridad.
+
+Conceptualmente:
+
+```text
+Frontend
+Oculta opción no autorizada
+        ↓
+Mejora interfaz
+```
+
+pero además:
+
+```text
+Solicitud llega al backend
+        ↓
+Backend verifica autorización
+        ↓
+Permite o rechaza
+```
+
+Esto evita que un usuario pueda saltarse la autorización intentando invocar directamente una operación protegida.
+
+---
 
 ## 14. Principio de mínimo privilegio
 
+### 14.1 Definición
+
+**PROPUESTO — BASADO EN INVESTIGACIÓN**
+
+El principio de mínimo privilegio establece que un usuario, proceso o componente del sistema debe recibir únicamente los permisos y recursos mínimos necesarios para cumplir las funciones que le corresponden.
+
+Aplicado al SIGD, esto significa que un usuario no debería recibir permisos adicionales simplemente por comodidad.
+
+---
+
+### 14.2 Ejemplo aplicado al SIGD
+
+**EJEMPLO**
+
+Si un usuario únicamente necesita consultar trámites:
+
+```text
+Necesario:
+tramite.ver
+```
+
+no debería recibir automáticamente:
+
+```text
+tramite.derivar
+tramite.cerrar
+administrar_areas
+administrar_roles
+administrar_permisos
+```
+
+Los permisos adicionales solamente deberían concederse cuando exista una necesidad y una autorización válida.
+
+---
+
+### 14.3 Denegación por defecto
+
+**PROPUESTO — BASADO EN INVESTIGACIÓN**
+
+Como aplicación del principio de mínimo privilegio, una acción que no se encuentre autorizada deberá considerarse denegada por defecto.
+
+Conceptualmente:
+
+```text
+¿Existe autorización válida?
+        ↓
+       Sí
+        ↓
+Continuar con las demás validaciones
+```
+
+Mientras que:
+
+```text
+¿Existe autorización válida?
+        ↓
+       No
+        ↓
+ACCESO DENEGADO
+```
+
+No deberá utilizarse un criterio del tipo:
+
+```text
+"No sabemos si puede hacerlo,
+por lo tanto lo permitimos."
+```
+
+La regla propuesta será:
+
+```text
+"No está autorizado,
+por lo tanto no se concede."
+```
+
+hasta que exista una decisión aprobada.
+
+---
+
+### 14.4 Beneficio para el SIGD
+
+**PROPUESTO**
+
+Aplicar mínimo privilegio puede reducir el riesgo de que usuarios realicen operaciones que no corresponden a sus funciones.
+
+También facilita identificar de manera más clara:
+
+* Qué permisos necesita cada rol.
+* Qué permisos son innecesarios.
+* Quién puede ejecutar operaciones sensibles.
+* Qué accesos deben revisarse cuando cambia la función de un usuario.
+
+---
+
+### 14.5 Relación entre RBAC y mínimo privilegio
+
+**PROPUESTO**
+
+RBAC y mínimo privilegio son conceptos relacionados, pero no equivalentes.
+
+```text
+RBAC
+↓
+Organiza permisos mediante roles
+```
+
+mientras que:
+
+```text
+Mínimo privilegio
+↓
+Busca conceder únicamente
+los permisos necesarios
+```
+
+Un sistema podría utilizar roles y aun así otorgar privilegios excesivos si los roles contienen más permisos de los necesarios.
+
+Por ello, los roles propuestos para el SIGD deberán revisarse aplicando también el principio de mínimo privilegio.
+
+---
+
 ## 15. Decisiones y supuestos
+
+Para evitar presentar como oficiales reglas que todavía no han sido confirmadas, las decisiones del análisis se clasifican utilizando las categorías definidas por el plan de trabajo.
+
+### 15.1 Elementos confirmados
+
+**CONFIRMADO**
+
+Según el plan de trabajo del Grupo 3:
+
+* El módulo deberá representar áreas o unidades organizacionales.
+* Debe contemplarse una jerarquía flexible entre unidades.
+* Área, cargo, rol, permiso y responsabilidad son conceptos diferentes.
+* El Grupo 3 no deberá duplicar las tablas de identidad de los usuarios internos.
+* La integración con usuarios internos deberá coordinarse con el Grupo 4.
+* Deben analizarse responsables y cambios de vigencia.
+* Debe contemplarse un esquema de roles y permisos.
+* La autorización real deberá verificarse en el backend.
+* Ocultar botones en el frontend no constituye seguridad suficiente.
+* Los permisos deberán seguir el principio de mínimo privilegio.
+* Los ejemplos utilizados no deben presentarse como información institucional oficial.
+* El organigrama y otras reglas institucionales todavía están pendientes.
+
+---
+
+### 15.2 Propuestas técnicas del análisis
+
+**PROPUESTO**
+
+Durante este análisis se plantearon las siguientes propuestas:
+
+* Conservar historial de asignaciones cuando sea necesario.
+* Conservar historial de responsables.
+* Evaluar vigencias antes de autorizar operaciones.
+* Impedir ciclos en la jerarquía organizacional.
+* Evitar asignaciones duplicadas incompatibles.
+* Validar áreas y usuarios antes de crear relaciones.
+* Rechazar operaciones sobre entidades inexistentes.
+* Utilizar roles como agrupaciones de permisos.
+* Evaluar el alcance del permiso cuando dependa de un área.
+* Denegar por defecto las acciones no autorizadas.
+* Validar la autorización desde el backend.
+
+Estas propuestas deberán ser revisadas por el grupo y ajustadas cuando exista información institucional definitiva.
+
+---
+
+### 15.3 Supuestos utilizados solamente para explicar
+
+**EJEMPLO**
+
+Se utilizaron durante el documento nombres como:
+
+```text
+Área A
+Área B
+Área Administrativa
+Oficina de Archivo
+Usuario A
+Usuario B
+Rol operativo
+Rol de consulta
+Rol de administración
+```
+
+También se utilizaron permisos como:
+
+```text
+tramite.ver
+tramite.recibir
+tramite.derivar
+tramite.cerrar
+```
+
+Ninguno de estos nombres debe interpretarse como una denominación oficial del instituto.
+
+---
+
+### 15.4 Información pendiente
+
+**PENDIENTE**
+
+El análisis no puede definir todavía:
+
+* Organigrama definitivo.
+* Áreas oficiales.
+* Oficinas oficiales.
+* Cantidad exacta de niveles jerárquicos.
+* Cargos oficiales.
+* Roles definitivos.
+* Permisos definitivos.
+* Responsables oficiales.
+* Reglas definitivas de vigencia.
+* Alcance definitivo de los permisos.
+* Reglas finales sobre responsables principales, alternos o temporales.
+
+Estas decisiones requieren información del profesor o de la institución.
+
+---
 
 ## 16. Preguntas pendientes para el profesor
 
+Las siguientes preguntas deberán resolverse antes de considerar definitivo el diseño organizacional y de autorización.
+
+### 16.1 Estructura organizacional
+
+1. ¿Cuál es el organigrama oficial de la institución?
+2. ¿Qué áreas, oficinas o unidades deben registrarse en el SIGD?
+3. ¿Cuántos niveles jerárquicos existen?
+4. ¿Qué denominaciones oficiales se utilizan: dirección, área, oficina, unidad u otras?
+5. ¿Puede existir una unidad organizacional sin área superior?
+6. ¿Qué debe ocurrir cuando un área cambia de dependencia?
+7. ¿Debe conservarse historial de los cambios de dependencia?
+
+---
+
+### 16.2 Usuarios y áreas
+
+8. ¿Un usuario interno puede pertenecer a varias áreas simultáneamente?
+9. ¿Las asignaciones a áreas tendrán fecha de inicio y fecha de fin?
+10. ¿Debe conservarse el historial cuando un usuario cambia de área?
+11. ¿Qué debe ocurrir con sus trámites y permisos cuando cambia de área?
+12. ¿Qué debe ocurrir con las asignaciones cuando un usuario queda inactivo?
+
+---
+
+### 16.3 Cargos y responsabilidades
+
+13. ¿Qué diferencia institucional existe entre cargo, función, responsable y rol del sistema?
+14. ¿Cada área debe tener obligatoriamente un responsable?
+15. ¿Puede existir más de un responsable al mismo tiempo?
+16. ¿Existirán responsables principales y alternos?
+17. ¿Puede existir un responsable temporal?
+18. ¿El responsable debe pertenecer al área correspondiente?
+19. ¿Debe conservarse historial de responsables?
+20. ¿Qué debe ocurrir cuando un responsable queda inactivo?
+21. ¿Qué ocurre cuando un área activa queda sin responsable?
+
+---
+
+### 16.4 Roles y permisos
+
+22. ¿Cuáles serán los roles oficiales del SIGD?
+23. ¿Un usuario puede poseer varios roles simultáneamente?
+24. ¿Los roles tendrán vigencia?
+25. ¿Los roles serán globales o estarán asociados a un área?
+26. ¿Qué permisos concretos existen para recibir, adjuntar, derivar, observar, firmar, atender y cerrar un trámite?
+27. ¿Quién puede crear áreas?
+28. ¿Quién puede modificar áreas?
+29. ¿Quién puede activar o desactivar áreas?
+30. ¿Quién puede asignar usuarios a áreas?
+31. ¿Quién puede designar responsables?
+32. ¿Quién puede crear o modificar roles?
+33. ¿Quién puede asignar roles a usuarios?
+34. ¿Quién puede aprobar o modificar permisos?
+
+---
+
+### 16.5 Alcance de los permisos
+
+35. ¿Los permisos pueden tener alcance global?
+36. ¿Los permisos pueden limitarse a un área?
+37. ¿Pueden limitarse según el tipo de documento?
+38. ¿Pueden limitarse según la etapa del trámite?
+39. ¿Existe herencia de permisos entre áreas o entre roles?
+40. Si existe herencia, ¿qué reglas deben utilizarse para evitar privilegios excesivos?
+
+---
+
+### 16.6 Áreas inactivas y trámites
+
+41. ¿Qué debe ocurrir con los trámites pendientes cuando un área queda inactiva?
+42. ¿Un área inactiva puede conservar áreas dependientes activas?
+43. ¿Puede un área inactiva recibir nuevas derivaciones?
+44. ¿Qué debe ocurrir con sus responsables vigentes?
+45. ¿Qué debe ocurrir con los usuarios asignados a dicha área?
+
+Las respuestas deberán registrarse posteriormente utilizando la categoría **CONFIRMADO** cuando hayan sido expresamente aprobadas.
+
+---
+
 ## 17. Fuentes consultadas
+
+Las siguientes fuentes técnicas fueron utilizadas únicamente para comprender y explicar los conceptos de control de acceso, RBAC, autorización y mínimo privilegio. Estas fuentes no definen la estructura organizacional ni los roles oficiales de la institución.
+
+### 17.1 National Institute of Standards and Technology (NIST)
+
+**Fuente:** NIST — *Role-Based Access Control (RBAC): Features and Motivations*.
+
+**Autores:** David F. Ferraiolo, Janet A. Cugini y David R. Kuhn.
+
+**Uso en este análisis:**
+
+Se utilizó como referencia para comprender que en RBAC los permisos se asocian a roles y los usuarios se relacionan con los roles apropiados, facilitando la administración de autorizaciones.
+
+**Consulta:** agosto de 2026.
+
+---
+
+### 17.2 NIST Computer Security Resource Center (CSRC)
+
+**Fuente:** NIST CSRC Glossary — *Role-Based Access Control (RBAC)*.
+
+**Uso en este análisis:**
+
+Se utilizó para complementar la definición de RBAC y comprender la relación entre usuarios, roles y autorizaciones.
+
+**Consulta:** agosto de 2026.
+
+---
+
+### 17.3 NIST Computer Security Resource Center (CSRC)
+
+**Fuente:** NIST CSRC Glossary — *Least Privilege*.
+
+**Uso en este análisis:**
+
+Se utilizó para comprender el principio de mínimo privilegio, según el cual una entidad debe disponer únicamente de las autorizaciones y recursos mínimos necesarios para realizar sus funciones.
+
+**Consulta:** agosto de 2026.
+
+---
+
+### 17.4 OWASP Foundation
+
+**Fuente:** OWASP Cheat Sheet Series — *Authorization Cheat Sheet*.
+
+**Uso en este análisis:**
+
+Se utilizó como referencia complementaria para las recomendaciones de autorización, especialmente:
+
+* Aplicar mínimo privilegio.
+* Denegar accesos por defecto.
+* Comprobar permisos en las solicitudes.
+* Evitar asumir que una operación está autorizada únicamente porque el frontend la permite o muestra.
+
+**Consulta:** agosto de 2026.
+
+---
+
+### 17.5 Documento interno del proyecto
+
+**Fuente:** *SIGD | Plan de trabajo backend Grupo 3 · OrganiCore*.
+
+**Fecha:** 27 de agosto de 2026.
+
+**Uso en este análisis:**
+
+Se utilizó como fuente principal para:
+
+* Definir el alcance del trabajo de Leonardo.
+* Identificar los conceptos que deben analizarse.
+* Reconocer las decisiones pendientes.
+* Preparar los flujos normales y excepcionales.
+* Identificar las preguntas que deberán realizarse al profesor.
+* Mantener separados los conceptos de área, cargo, rol, permiso y responsable.
+
+---
+
+## 18. Conclusión del análisis funcional
+
+El análisis realizado permite establecer una base funcional preliminar para que posteriormente pueda diseñarse el modelo de datos del módulo organizacional y de autorización del SIGD.
+
+Se identificaron los principales conceptos relacionados con áreas, jerarquías, usuarios internos, responsables, roles, permisos y vigencias. También se documentaron operaciones normales, situaciones excepcionales y reglas preliminares de autorización.
+
+El análisis mantiene separadas las decisiones confirmadas, las propuestas técnicas, los ejemplos ficticios y la información pendiente. De esta manera, el modelo podrá adaptarse cuando el profesor o la institución proporcionen el organigrama y las reglas oficiales sin presentar supuestos como información definitiva.
+
+El siguiente paso del flujo de trabajo será someter este análisis a revisión del sublíder del grupo. Las observaciones relacionadas con este archivo deberán ser corregidas primero por su autor en la rama `B_LEONARDO` antes de que la versión aprobada sea integrada al modelo de datos.
