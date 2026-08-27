@@ -22,44 +22,46 @@ El análisis funcional comprenderá las necesidades relacionadas con la estructu
 
 Se consideran inicialmente las siguientes funciones:
 
-* Registrar áreas, oficinas o unidades organizacionales.
-* Consultar información de las unidades registradas.
-* Actualizar información organizacional.
-* Activar o desactivar áreas.
-* Representar relaciones jerárquicas entre una unidad superior y sus unidades dependientes.
-* Asignar usuarios internos a una o varias áreas, dependiendo de la regla que posteriormente confirme la institución.
-* Designar responsables de áreas.
-* Registrar la vigencia de asignaciones y responsabilidades cuando sea necesario conservar historial.
-* Administrar conceptualmente roles y permisos.
-* Determinar si un permiso tiene alcance global o limitado a un área.
-* Validar en el backend si un usuario cuenta con autorización antes de ejecutar una operación.
-* Considerar situaciones excepcionales como áreas inexistentes, áreas inactivas, ciclos jerárquicos, usuarios inactivos, asignaciones vencidas, responsables duplicados, roles vencidos y accesos denegados.
+- Registrar áreas, oficinas o unidades organizacionales.
+- Consultar información de las unidades registradas.
+- Actualizar información organizacional.
+- Activar o desactivar áreas.
+- Representar relaciones jerárquicas entre una unidad superior y sus unidades dependientes.
+- Asignar usuarios internos a una o varias áreas, dependiendo de la regla que posteriormente confirme la institución.
+- Designar responsables de áreas.
+- Registrar la vigencia de asignaciones y responsabilidades cuando sea necesario conservar historial.
+- Administrar conceptualmente roles y permisos.
+- Determinar si un permiso tiene alcance global o limitado a un área.
+- Validar en el backend si un usuario cuenta con autorización antes de ejecutar una operación.
+- Considerar situaciones excepcionales como áreas inexistentes, áreas inactivas, ciclos jerárquicos, usuarios inactivos, asignaciones vencidas, responsables duplicados, roles vencidos y accesos denegados.
 
 **PENDIENTE**
 
 Todavía debe confirmarse con el profesor y la institución:
 
-* El organigrama oficial.
-* Los nombres y tipos oficiales de las unidades organizacionales.
-* La cantidad de niveles jerárquicos existentes.
-* Los cargos institucionales.
-* Los nombres definitivos de los roles.
-* La matriz oficial de permisos.
-* Si un usuario puede pertenecer simultáneamente a varias áreas.
-* Si los permisos serán globales o estarán limitados por área, tipo de documento o etapa del trámite.
-* Las reglas definitivas para responsables principales, alternos o temporales.
+- El organigrama oficial.
+- Los nombres y tipos oficiales de las unidades organizacionales.
+- La cantidad de niveles jerárquicos existentes.
+- Los cargos institucionales.
+- Los nombres definitivos de los roles.
+- La matriz oficial de permisos.
+- Si un usuario puede pertenecer simultáneamente a varias áreas.
+- Si los permisos serán globales o estarán limitados por área, tipo de documento o etapa del trámite.
+- Las reglas definitivas para responsables principales, alternos o temporales.
 
 Este análisis no incluye la creación definitiva de tablas, claves, índices, endpoints ni scripts SQL, debido a que dichas actividades serán realizadas posteriormente a partir del análisis funcional aprobado.
 
 ### 2.1 Integración funcional con la gestión de trámites
 
-**CONFIRMADO**
+**PENDIENTE**
 
-El módulo organizacional y de autorización deberá integrarse conceptualmente con las operaciones de recepción, derivación, revisión y atención de trámites.
+El plan interno del Grupo 3 contempla que el módulo organizacional y de autorización se integre conceptualmente con operaciones relacionadas con la recepción, derivación, revisión y atención de trámites.
 
-La participación en estas operaciones deberá considerar el estado del área y la autorización del usuario, de modo que áreas inactivas o usuarios sin autorización no participen en operaciones sensibles cuando las reglas aprobadas así lo determinen.
+También plantea que la participación en estas operaciones considere el estado del área y la autorización del usuario.
 
-La forma técnica definitiva de esta integración dependerá de los contratos que posteriormente se acuerden entre los módulos del SIGD.
+Sin embargo, esta orientación se mantiene como pendiente de validación hasta confirmar con el profesor o con información institucional oficial que corresponde al funcionamiento definitivo del SIGD.
+
+La forma técnica de esta integración dependerá además de los contratos que posteriormente se acuerden entre los módulos del proyecto.
 
 ---
 
@@ -109,15 +111,15 @@ El backend será responsable de comprobar las reglas de autorización antes de e
 
 Entre sus validaciones podrían encontrarse:
 
-* Verificar que el usuario exista.
-* Verificar que el usuario se encuentre activo.
-* Verificar que el área exista.
-* Verificar que el área se encuentre activa.
-* Comprobar que una asignación se encuentre vigente.
-* Comprobar los roles vigentes del usuario.
-* Comprobar los permisos asociados.
-* Verificar el alcance del permiso cuando dependa de un área.
-* Rechazar la operación cuando el usuario no tenga autorización.
+- Verificar que el usuario exista.
+- Verificar que el usuario se encuentre activo.
+- Verificar que el área exista.
+- Verificar que el área se encuentre activa.
+- Comprobar que una asignación se encuentre vigente.
+- Comprobar los roles vigentes del usuario.
+- Comprobar los permisos asociados.
+- Verificar el alcance del permiso cuando dependa de un área.
+- Rechazar la operación cuando el usuario no tenga autorización.
 
 Las reglas concretas deberán ajustarse posteriormente según las decisiones oficiales del proyecto.
 
@@ -222,9 +224,9 @@ Confirmar los cargos oficiales y la diferencia institucional entre cargo y funci
 
 **PROPUESTO**
 
-Un rol representa una agrupación de permisos utilizada por el sistema para facilitar el control de acceso.
+Un rol representa una agrupación de permisos utilizada por el sistema para facilitar la administración del control de acceso.
 
-En lugar de asignar manualmente todas las autorizaciones a cada usuario, el sistema podría asociar determinados permisos a un rol y posteriormente asignar dicho rol a los usuarios correspondientes.
+En lugar de asignar individualmente todas las autorizaciones a cada usuario, el sistema podría asociar un conjunto de permisos a un rol y posteriormente asignar dicho rol a los usuarios que correspondan.
 
 Conceptualmente:
 
@@ -233,23 +235,18 @@ Usuario
    ↓
 Rol
    ↓
-Permisos
+Conjunto de permisos
 ```
 
 **EJEMPLO**
+
+Para explicar el concepto podría utilizarse un nombre ficticio como:
 
 ```text
 Rol: Operador de trámite
 ```
 
-Podría contener permisos ficticios como:
-
-```text
-tramite.ver
-tramite.recibir
-```
-
-Los nombres anteriores no forman parte de una matriz institucional aprobada.
+Este nombre se utiliza únicamente con fines demostrativos y no representa un rol oficial del SIGD.
 
 Un rol tampoco representa necesariamente el cargo laboral de una persona.
 
@@ -260,11 +257,13 @@ Cargo institucional: Jefe de Oficina
 Rol del sistema: Operador de trámite
 ```
 
-Son conceptos diferentes aunque puedan relacionarse.
+El cargo representa el puesto institucional de la persona, mientras que el rol organiza las autorizaciones que puede utilizar dentro del sistema.
+
+Los ejemplos concretos de permisos se desarrollan en la sección 4.5 y posteriormente en la sección 9, evitando repetirlos en esta definición.
 
 **PENDIENTE**
 
-Confirmar cuáles serán los roles oficiales y si estos tendrán alcance global o limitado a determinadas áreas.
+Confirmar cuáles serán los roles oficiales del SIGD, si un usuario podrá tener varios roles y si estos tendrán alcance global o limitado a determinadas áreas.
 
 ---
 
@@ -360,25 +359,25 @@ Las fechas y usuarios anteriores son ficticios.
 
 Debe confirmarse:
 
-* Si cada área tendrá obligatoriamente un responsable.
-* Si puede existir más de un responsable simultáneamente.
-* Si existirán responsables principales y alternos.
-* Si pueden existir responsables temporales.
-* Si los cambios deben conservar historial.
-* Qué debe ocurrir cuando un área queda sin responsable.
+- Si cada área tendrá obligatoriamente un responsable.
+- Si puede existir más de un responsable simultáneamente.
+- Si existirán responsables principales y alternos.
+- Si pueden existir responsables temporales.
+- Si los cambios deben conservar historial.
+- Qué debe ocurrir cuando un área queda sin responsable.
 
 ---
 
 ## 4.7 Resumen de diferencias
 
-| Concepto    | ¿Qué representa?                                               | ¿Es autorización técnica? |
-| ----------- | -------------------------------------------------------------- | ------------------------- |
-| Área        | Unidad de la estructura organizacional                         | No                        |
-| Oficina     | Unidad organizacional cuya relación exacta debe confirmarse    | No                        |
-| Cargo       | Puesto institucional de una persona                            | No                        |
-| Rol         | Agrupación de permisos                                         | Indirectamente            |
-| Permiso     | Autorización para una acción específica                        | Sí                        |
-| Responsable | Usuario con responsabilidad sobre un área durante una vigencia | No                        |
+| Concepto | ¿Qué representa? | ¿Es autorización técnica? |
+|---|---|---|
+| Área | Unidad de la estructura organizacional | No |
+| Oficina | Unidad organizacional cuya relación exacta debe confirmarse | No |
+| Cargo | Puesto institucional de una persona | No |
+| Rol | Agrupación de permisos | Indirectamente |
+| Permiso | Autorización para una acción específica | Sí |
+| Responsable | Usuario con responsabilidad sobre un área durante una vigencia | No |
 
 Por lo tanto, estos conceptos deberán mantenerse separados durante el análisis y durante el posterior diseño del modelo de datos.
 
@@ -398,11 +397,11 @@ El sistema podría permitir registrar una nueva área, oficina o unidad organiza
 
 Antes del registro, el backend debería validar:
 
-* Que los datos obligatorios hayan sido proporcionados.
-* Que no exista un duplicado según las reglas que posteriormente se definan.
-* Que el área superior exista, si se indica una dependencia.
-* Que la relación jerárquica propuesta sea válida.
-* Que el usuario tenga autorización.
+- Que los datos obligatorios hayan sido proporcionados.
+- Que no exista un duplicado según las reglas que posteriormente se definan.
+- Que el área superior exista, si se indica una dependencia.
+- Que la relación jerárquica propuesta sea válida.
+- Que el usuario tenga autorización.
 
 **Entrada conceptual:**
 
@@ -433,13 +432,13 @@ El sistema podría permitir consultar información de un área registrada.
 
 La consulta podría mostrar:
 
-* Información general.
-* Estado actual.
-* Área superior.
-* Áreas dependientes.
-* Usuarios asignados.
-* Responsable vigente.
-* Información de vigencia relacionada.
+- Información general.
+- Estado actual.
+- Área superior.
+- Áreas dependientes.
+- Usuarios asignados.
+- Responsable vigente.
+- Información de vigencia relacionada.
 
 **PENDIENTE**
 
@@ -455,11 +454,11 @@ El sistema podría permitir modificar determinados datos de un área.
 
 Antes de guardar cambios, el backend debería verificar:
 
-* Que el área exista.
-* Que el usuario tenga autorización.
-* Que los nuevos datos sean válidos.
-* Que un cambio de dependencia no genere un ciclo.
-* Que la modificación no contradiga reglas institucionales.
+- Que el área exista.
+- Que el usuario tenga autorización.
+- Que los nuevos datos sean válidos.
+- Que un cambio de dependencia no genere un ciclo.
+- Que la modificación no contradiga reglas institucionales.
 
 **PENDIENTE**
 
@@ -475,10 +474,10 @@ Una unidad previamente inactiva podría volver a activarse cuando exista autoriz
 
 El backend debería verificar:
 
-* Que el área exista.
-* Que actualmente se encuentre inactiva.
-* Que el usuario tenga autorización.
-* Que la relación con su unidad superior sea válida.
+- Que el área exista.
+- Que actualmente se encuentre inactiva.
+- Que el usuario tenga autorización.
+- Que la relación con su unidad superior sea válida.
 
 ---
 
@@ -490,20 +489,20 @@ La desactivación permitirá indicar que un área ya no está disponible para de
 
 Una posible regla sería impedir que un área inactiva:
 
-* Reciba nuevas asignaciones.
-* Reciba nuevos responsables.
-* Participe en nuevas derivaciones.
-* Sea utilizada como destino de determinadas operaciones.
+- Reciba nuevas asignaciones.
+- Reciba nuevos responsables.
+- Participe en nuevas derivaciones.
+- Sea utilizada como destino de determinadas operaciones.
 
 **PENDIENTE**
 
 Debe confirmarse qué ocurre con:
 
-* Usuarios asignados.
-* Responsable vigente.
-* Trámites pendientes.
-* Roles cuyo alcance depende del área.
-* Áreas dependientes.
+- Usuarios asignados.
+- Responsable vigente.
+- Trámites pendientes.
+- Roles cuyo alcance depende del área.
+- Áreas dependientes.
 
 ---
 
@@ -564,10 +563,10 @@ Los nombres son ficticios.
 
 Confirmar:
 
-* Cuántos niveles existen.
-* Qué nombres oficiales reciben.
-* Si todas las unidades deben depender de otra.
-* Si pueden existir varias unidades principales.
+- Cuántos niveles existen.
+- Qué nombres oficiales reciben.
+- Si todas las unidades deben depender de otra.
+- Si pueden existir varias unidades principales.
 
 ---
 
@@ -611,10 +610,10 @@ Después:
 
 Antes de aceptar el cambio, el backend debería verificar:
 
-* Que ambas áreas existan.
-* Que la nueva relación no produzca un ciclo.
-* Que los estados sean compatibles.
-* Que el usuario tenga autorización.
+- Que ambas áreas existan.
+- Que la nueva relación no produzca un ciclo.
+- Que los estados sean compatibles.
+- Que el usuario tenga autorización.
 
 **PENDIENTE**
 
@@ -680,9 +679,9 @@ Si Área B queda inactiva, deberá definirse qué sucede con Área C.
 
 Debe confirmarse si:
 
-* Puede permanecer dependiendo de un área inactiva.
-* Debe cambiar de dependencia.
-* Debe impedirse la desactivación mientras existan áreas dependientes activas.
+- Puede permanecer dependiendo de un área inactiva.
+- Debe cambiar de dependencia.
+- Debe impedirse la desactivación mientras existan áreas dependientes activas.
 
 Los casos excepcionales relacionados con áreas inexistentes, áreas inactivas y ciclos se desarrollan de manera consolidada en la sección 12.
 
@@ -710,11 +709,13 @@ Asignación
 
 ## 7.2 Relación con usuarios internos
 
-**CONFIRMADO**
+**PENDIENTE**
 
-El plan del proyecto establece que la asignación de usuarios internos deberá coordinarse con el Grupo 4 y que el Grupo 3 no deberá duplicar las tablas de identidad.
+El plan interno del Grupo 3 indica que la asignación de usuarios internos deberá coordinarse con el Grupo 4 y que no deberían duplicarse las tablas de identidad administradas por dicho módulo.
 
-Por ello, el módulo deberá trabajar conceptualmente con una referencia al usuario existente en el módulo correspondiente.
+Para este análisis se considera, de manera preliminar, que el módulo organizacional trabajaría con una referencia al usuario existente en el módulo correspondiente, evitando almacenar nuevamente su información de identidad.
+
+Esta directriz deberá confirmarse con el profesor o con la arquitectura general aprobada del SIGD antes de considerarse una regla definitiva.
 
 **EJEMPLO**
 
@@ -725,7 +726,7 @@ Inicio: 01/08/2026
 Fin: vigente
 ```
 
-Los datos son ficticios.
+Los datos son ficticios y solamente demuestran la relación conceptual.
 
 ---
 
@@ -735,13 +736,13 @@ Los datos son ficticios.
 
 Antes de registrar una asignación, el backend debería verificar:
 
-* Que el usuario exista.
-* Que esté activo.
-* Que el área exista.
-* Que el área esté activa.
-* Que las fechas sean válidas.
-* Que no exista una asignación incompatible.
-* Que el usuario que realiza la operación tenga autorización.
+- Que el usuario exista.
+- Que esté activo.
+- Que el área exista.
+- Que el área esté activa.
+- Que las fechas sean válidas.
+- Que no exista una asignación incompatible.
+- Que el usuario que realiza la operación tenga autorización.
 
 **Entrada conceptual:**
 
@@ -859,13 +860,13 @@ La responsabilidad deberá mantenerse separada del cargo, rol y permiso.
 
 Antes de realizar una designación, el backend podría verificar:
 
-* Que el usuario exista.
-* Que esté activo.
-* Que el área exista.
-* Que el área esté activa.
-* Que la vigencia sea válida.
-* Que no exista un conflicto con otra responsabilidad.
-* Que quien realiza la operación tenga autorización.
+- Que el usuario exista.
+- Que esté activo.
+- Que el área exista.
+- Que el área esté activa.
+- Que la vigencia sea válida.
+- Que no exista un conflicto con otra responsabilidad.
+- Que quien realiza la operación tenga autorización.
 
 **Entrada conceptual:**
 
@@ -941,11 +942,11 @@ Confirmar si el cambio requiere aprobación y quién estará autorizado para rea
 
 Debe confirmarse si una misma área puede tener:
 
-* Un responsable principal.
-* Más de un responsable simultáneo.
-* Responsables alternos.
-* Responsables temporales.
-* Responsables por reemplazo.
+- Un responsable principal.
+- Más de un responsable simultáneo.
+- Responsables alternos.
+- Responsables temporales.
+- Responsables por reemplazo.
 
 ---
 
@@ -971,11 +972,11 @@ Debe definirse qué ocurre cuando un área activa no tiene responsable vigente.
 
 Entre las preguntas se encuentran:
 
-* ¿Puede continuar recibiendo trámites?
-* ¿Puede realizar derivaciones?
-* ¿Debe mostrarse una advertencia?
-* ¿Deben bloquearse determinadas operaciones?
-* ¿Debe existir obligatoriamente un responsable antes de activar el área?
+- ¿Puede continuar recibiendo trámites?
+- ¿Puede realizar derivaciones?
+- ¿Debe mostrarse una advertencia?
+- ¿Deben bloquearse determinadas operaciones?
+- ¿Debe existir obligatoriamente un responsable antes de activar el área?
 
 Los casos de responsable duplicado y vigencias conflictivas se desarrollan en la sección 12.
 
@@ -1026,12 +1027,12 @@ Los nombres son ficticios.
 
 Confirmar:
 
-* Roles oficiales.
-* Quién puede crearlos.
-* Quién puede modificarlos.
-* Quién puede asignarlos.
-* Si tendrán vigencia.
-* Si un usuario podrá tener varios roles.
+- Roles oficiales.
+- Quién puede crearlos.
+- Quién puede modificarlos.
+- Quién puede asignarlos.
+- Si tendrán vigencia.
+- Si un usuario podrá tener varios roles.
 
 ---
 
@@ -1084,21 +1085,21 @@ La implementación técnica de esta relación corresponderá al modelo de datos.
 
 Antes de asignar un rol, el backend debería verificar:
 
-* Que el usuario exista y esté activo.
-* Que el rol exista.
-* Que el rol esté activo, si maneja estado.
-* Que la asignación sea válida.
-* Que no exista un duplicado incompatible.
-* Que quien realiza la asignación tenga autorización.
+- Que el usuario exista y esté activo.
+- Que el rol exista.
+- Que el rol esté activo, si maneja estado.
+- Que la asignación sea válida.
+- Que no exista un duplicado incompatible.
+- Que quien realiza la asignación tenga autorización.
 
 **PENDIENTE**
 
 Confirmar:
 
-* Si un usuario puede tener varios roles.
-* Si los roles tendrán vigencia.
-* Si pueden limitarse por área.
-* Si existen roles incompatibles.
+- Si un usuario puede tener varios roles.
+- Si los roles tendrán vigencia.
+- Si pueden limitarse por área.
+- Si existen roles incompatibles.
 
 ---
 
@@ -1166,11 +1167,11 @@ En ese caso el usuario no necesariamente estaría autorizado para consultar info
 
 Confirmar si el alcance podrá depender de:
 
-* Área.
-* Tipo de documento.
-* Etapa del trámite.
-* Unidad organizacional.
-* Otros criterios.
+- Área.
+- Tipo de documento.
+- Etapa del trámite.
+- Unidad organizacional.
+- Otros criterios.
 
 ---
 
@@ -1216,22 +1217,22 @@ La siguiente matriz es únicamente demostrativa y no representa decisiones ofici
 
 **EJEMPLO — PENDIENTE DE VALIDACIÓN INSTITUCIONAL**
 
-| Acción                   | Rol de consulta | Rol operativo | Rol de administración |
-| ------------------------ | --------------: | ------------: | --------------------: |
-| Consultar trámite        |              Sí |            Sí |                    Sí |
-| Recibir trámite          |              No |            Sí |                    Sí |
-| Adjuntar información     |              No |            Sí |                    Sí |
-| Derivar trámite          |              No |            Sí |                    Sí |
-| Observar trámite         |              No |            Sí |                    Sí |
-| Atender trámite          |              No |            Sí |                    Sí |
-| Cerrar trámite           |              No |     Pendiente |                    Sí |
-| Crear áreas              |              No |            No |                    Sí |
-| Actualizar áreas         |              No |            No |                    Sí |
-| Activar/desactivar áreas |              No |            No |                    Sí |
-| Asignar usuarios a áreas |              No |            No |                    Sí |
-| Designar responsables    |              No |            No |                    Sí |
-| Asignar roles            |              No |            No |                    Sí |
-| Administrar permisos     |              No |            No |             Pendiente |
+| Acción | Rol de consulta | Rol operativo | Rol de administración |
+|---|---:|---:|---:|
+| Consultar trámite | Sí | Sí | Sí |
+| Recibir trámite | No | Sí | Sí |
+| Adjuntar información | No | Sí | Sí |
+| Derivar trámite | No | Sí | Sí |
+| Observar trámite | No | Sí | Sí |
+| Atender trámite | No | Sí | Sí |
+| Cerrar trámite | No | Pendiente | Sí |
+| Crear áreas | No | No | Sí |
+| Actualizar áreas | No | No | Sí |
+| Activar/desactivar áreas | No | No | Sí |
+| Asignar usuarios a áreas | No | No | Sí |
+| Designar responsables | No | No | Sí |
+| Asignar roles | No | No | Sí |
+| Administrar permisos | No | No | Pendiente |
 
 Los nombres de los roles y las autorizaciones de la matriz son ficticios.
 
@@ -1241,9 +1242,9 @@ Los nombres de los roles y las autorizaciones de la matriz son ficticios.
 
 **EJEMPLO**
 
-* El Rol de consulta tendría únicamente operaciones de lectura.
-* El Rol operativo podría participar en determinadas etapas del trámite.
-* El Rol de administración podría gestionar elementos organizacionales y de autorización.
+- El Rol de consulta tendría únicamente operaciones de lectura.
+- El Rol operativo podría participar en determinadas etapas del trámite.
+- El Rol de administración podría gestionar elementos organizacionales y de autorización.
 
 Esto no implica que dichos roles existan realmente.
 
@@ -1814,9 +1815,9 @@ Estado: ACTIVA
 
 Debe confirmarse si:
 
-* Esta situación puede mantenerse.
-* Área B debe cambiar de dependencia.
-* Debe impedirse desactivar Área A mientras tenga dependientes activos.
+- Esta situación puede mantenerse.
+- Área B debe cambiar de dependencia.
+- Debe impedirse desactivar Área A mientras tenga dependientes activos.
 
 ---
 
@@ -1834,10 +1835,10 @@ Responsable vigente: ninguno
 
 Confirmar si:
 
-* Puede continuar recibiendo trámites.
-* Puede derivar documentos.
-* Debe mostrarse una advertencia.
-* Deben bloquearse determinadas operaciones.
+- Puede continuar recibiendo trámites.
+- Puede derivar documentos.
+- Debe mostrarse una advertencia.
+- Deben bloquearse determinadas operaciones.
 
 ---
 
@@ -1920,17 +1921,17 @@ Acciones autorizadas
 
 RBAC podría utilizarse para controlar acciones relacionadas con:
 
-* Consulta.
-* Recepción.
-* Adjuntos.
-* Derivación.
-* Observación.
-* Atención.
-* Cierre.
-* Administración de áreas.
-* Responsables.
-* Roles.
-* Permisos.
+- Consulta.
+- Recepción.
+- Adjuntos.
+- Derivación.
+- Observación.
+- Atención.
+- Cierre.
+- Administración de áreas.
+- Responsables.
+- Roles.
+- Permisos.
 
 Todas estas acciones deberán validarse institucionalmente.
 
@@ -1964,14 +1965,14 @@ Tener un rol no será necesariamente suficiente para ejecutar una operación.
 
 También podrían evaluarse:
 
-* Estado del usuario.
-* Estado del área.
-* Vigencia de la asignación.
-* Vigencia del rol.
-* Alcance del permiso.
-* Área relacionada.
-* Estado del trámite.
-* Otras reglas institucionales.
+- Estado del usuario.
+- Estado del área.
+- Vigencia de la asignación.
+- Vigencia del rol.
+- Alcance del permiso.
+- Área relacionada.
+- Estado del trámite.
+- Otras reglas institucionales.
 
 ---
 
@@ -2080,24 +2081,28 @@ Un sistema podría utilizar roles y aun así otorgar privilegios excesivos si lo
 
 # 15. Decisiones y supuestos
 
-## 15.1 Elementos confirmados
+## 15.1 Lineamientos del plan pendientes de validación
 
-**CONFIRMADO**
+**PENDIENTE**
 
-Según el plan de trabajo del Grupo 3:
+El plan interno de trabajo del Grupo 3 contiene los siguientes lineamientos para orientar el análisis:
 
-* El módulo debe representar áreas o unidades organizacionales.
-* Debe contemplarse una jerarquía flexible.
-* Área, cargo, rol, permiso y responsabilidad son conceptos distintos.
-* El Grupo 3 no deberá duplicar las tablas de identidad.
-* La integración con usuarios internos deberá coordinarse con el Grupo 4.
-* Deben analizarse responsables y vigencias.
-* Debe contemplarse un esquema de roles y permisos.
-* La autorización deberá verificarse en el backend.
-* Ocultar botones en el frontend no constituye seguridad suficiente.
-* Los permisos deberán seguir el principio de mínimo privilegio.
-* Los ejemplos no deberán presentarse como información oficial.
-* El organigrama y otras reglas institucionales se encuentran pendientes.
+- Analizar cómo representar áreas, oficinas o unidades organizacionales.
+- Contemplar una jerarquía flexible entre unidades.
+- Diferenciar área, cargo, rol, permiso y responsabilidad.
+- Coordinar la relación con usuarios internos evitando duplicar información de identidad.
+- Analizar responsables y cambios de vigencia.
+- Analizar un esquema basado en roles y permisos.
+- Considerar posibles alcances globales o limitados por área.
+- Considerar la autorización de operaciones sensibles desde el backend.
+- Evitar depender únicamente de controles visibles en el frontend.
+- Aplicar el principio de mínimo privilegio como criterio de seguridad.
+- Utilizar ejemplos ficticios sin presentarlos como información institucional oficial.
+- Mantener pendientes el organigrama, los nombres definitivos de roles, la matriz institucional de permisos y otras reglas todavía no proporcionadas.
+
+Estos puntos aparecen en el plan de trabajo utilizado por el grupo; sin embargo, no se clasifican en este análisis como **CONFIRMADO** hasta comprobar que corresponden a una indicación expresa del profesor o a información institucional verificada.
+
+Cuando alguno de estos elementos sea validado formalmente, podrá cambiarse su categoría de **PENDIENTE** a **CONFIRMADO**, registrando la fuente correspondiente.
 
 ---
 
@@ -2107,16 +2112,16 @@ Según el plan de trabajo del Grupo 3:
 
 Durante este análisis se plantearon:
 
-* Conservar historial cuando sea necesario.
-* Evaluar vigencias.
-* Impedir ciclos jerárquicos.
-* Evitar duplicados incompatibles.
-* Validar entidades antes de relacionarlas.
-* Rechazar operaciones sobre registros inexistentes.
-* Utilizar roles como agrupaciones de permisos.
-* Evaluar alcance por área cuando corresponda.
-* Denegar por defecto las acciones no autorizadas.
-* Realizar la autorización en el backend.
+- Conservar historial cuando sea necesario.
+- Evaluar vigencias.
+- Impedir ciclos jerárquicos.
+- Evitar duplicados incompatibles.
+- Validar entidades antes de relacionarlas.
+- Rechazar operaciones sobre registros inexistentes.
+- Utilizar roles como agrupaciones de permisos.
+- Evaluar alcance por área cuando corresponda.
+- Denegar por defecto las acciones no autorizadas.
+- Realizar la autorización en el backend.
 
 ---
 
@@ -2157,18 +2162,18 @@ Ninguno representa información oficial.
 
 Todavía no pueden definirse definitivamente:
 
-* Organigrama.
-* Áreas.
-* Oficinas.
-* Niveles jerárquicos.
-* Cargos.
-* Funciones.
-* Roles.
-* Permisos.
-* Responsables.
-* Reglas de vigencia.
-* Alcance de permisos.
-* Responsables principales, alternos o temporales.
+- Organigrama.
+- Áreas.
+- Oficinas.
+- Niveles jerárquicos.
+- Cargos.
+- Funciones.
+- Roles.
+- Permisos.
+- Responsables.
+- Reglas de vigencia.
+- Alcance de permisos.
+- Responsables principales, alternos o temporales.
 
 ---
 
@@ -2247,7 +2252,7 @@ Todavía no pueden definirse definitivamente:
 44. ¿Qué ocurre con sus responsables vigentes?
 45. ¿Qué ocurre con sus usuarios asignados?
 
-Las respuestas deberán registrarse posteriormente como **CONFIRMADO** cuando hayan sido aprobadas.
+Las respuestas deberán registrarse posteriormente utilizando la categoría **CONFIRMADO** cuando hayan sido expresamente aprobadas por el profesor o respaldadas por información institucional verificada.
 
 ---
 
@@ -2303,10 +2308,10 @@ Referencia para comprender el principio de mínimo privilegio, según el cual un
 
 Referencia complementaria para:
 
-* Aplicar mínimo privilegio.
-* Denegar accesos por defecto.
-* Comprobar permisos durante las solicitudes.
-* No depender solamente de controles del frontend.
+- Aplicar mínimo privilegio.
+- Denegar accesos por defecto.
+- Comprobar permisos durante las solicitudes.
+- No depender solamente de controles del frontend.
 
 **Consulta:** agosto de 2026.
 
@@ -2322,12 +2327,14 @@ Referencia complementaria para:
 
 Fuente principal para:
 
-* Definir el alcance del trabajo de Leonardo.
-* Identificar conceptos organizacionales.
-* Preparar flujos normales y excepcionales.
-* Identificar decisiones pendientes.
-* Diferenciar área, cargo, rol, permiso y responsable.
-* Preparar preguntas para el profesor.
+- Definir el alcance preliminar del trabajo de Leonardo.
+- Identificar conceptos organizacionales que deben analizarse.
+- Preparar flujos normales y excepcionales.
+- Identificar decisiones pendientes.
+- Diferenciar área, cargo, rol, permiso y responsable.
+- Preparar preguntas para el profesor.
+
+Los lineamientos provenientes de este documento interno no se consideran automáticamente **CONFIRMADOS** en este análisis. Para utilizar dicha categoría deberán estar respaldados por una indicación expresa del profesor o por información institucional verificada.
 
 ---
 
@@ -2339,10 +2346,10 @@ Se identificaron los principales conceptos relacionados con áreas, jerarquías,
 
 También se documentaron operaciones normales, situaciones excepcionales y reglas preliminares de autorización.
 
-El análisis mantiene separadas las decisiones confirmadas, las propuestas técnicas, los ejemplos ficticios y la información pendiente.
+El análisis mantiene separados los lineamientos provenientes del plan interno, las propuestas técnicas, los ejemplos ficticios y la información pendiente de validación.
 
-De esta manera, el diseño podrá adaptarse cuando el profesor o la institución proporcionen el organigrama y las reglas oficiales sin presentar supuestos como información definitiva.
+De esta manera, el diseño podrá adaptarse cuando el profesor o la institución proporcionen el organigrama y las reglas oficiales, evitando presentar supuestos o lineamientos preliminares como información institucional confirmada.
 
 El siguiente paso del flujo de trabajo será someter este análisis a revisión del sublíder del grupo.
 
-Si existen observaciones, deberán ser corregidas primero por el autor en la rama `B_LEONARDO`, mediante nuevos commits, antes de que la versión aprobada sea integrada en `B_POOL`.
+Si existen nuevas observaciones, deberán ser corregidas primero por el autor en la rama `B_LEONARDO`, mediante nuevos commits, antes de que la versión aprobada sea integrada en `B_POOL`.
