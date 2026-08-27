@@ -1248,7 +1248,499 @@ Este flujo deberá adaptarse posteriormente según las reglas institucionales ap
 
 ## 9. Roles y permisos
 
+### 9.1 Objetivo del control de acceso
+
+**PROPUESTO**
+
+El módulo deberá permitir controlar qué acciones puede realizar cada usuario dentro del SIGD mediante roles y permisos.
+
+Los permisos no deberán concederse automáticamente a todos los usuarios. Cada operación protegida deberá comprobarse de acuerdo con las autorizaciones que correspondan.
+
+Conceptualmente:
+
+```text
+Usuario
+   ↓
+Rol
+   ↓
+Permisos
+   ↓
+Operación permitida o denegada
+```
+
+El control de autorización deberá realizarse en el backend y no depender únicamente de elementos visibles u ocultos en el frontend.
+
+---
+
+### 9.2 Rol del sistema
+
+**PROPUESTO**
+
+Un rol representa una agrupación de permisos que puede asignarse a uno o varios usuarios.
+
+El uso de roles permite evitar la asignación manual de las mismas autorizaciones repetidamente a cada usuario.
+
+**EJEMPLO**
+
+```text
+Rol de ejemplo: Rol A
+
+Permisos:
+- tramite.ver
+- tramite.recibir
+- tramite.derivar
+```
+
+El nombre del rol y los permisos anteriores son ficticios y se utilizan solamente para explicar el funcionamiento.
+
+**PENDIENTE**
+
+Debe confirmarse:
+
+* Cuáles serán los roles oficiales del SIGD.
+* Quién estará autorizado para crear roles.
+* Quién podrá modificar un rol.
+* Quién podrá asignar o retirar roles a los usuarios.
+* Si los roles tendrán vigencia.
+* Si un usuario podrá tener varios roles simultáneamente.
+
+---
+
+### 9.3 Permiso del sistema
+
+**PROPUESTO**
+
+Un permiso representa una autorización específica para realizar una determinada acción dentro del sistema.
+
+**EJEMPLO**
+
+```text
+tramite.ver
+tramite.recibir
+tramite.adjuntar
+tramite.derivar
+tramite.observar
+tramite.atender
+tramite.cerrar
+```
+
+Los identificadores anteriores son únicamente ejemplos técnicos y no representan los nombres definitivos de los permisos del SIGD.
+
+La lista oficial deberá definirse después de confirmar qué operaciones existen realmente en cada etapa del trámite.
+
+---
+
+### 9.4 Relación entre roles y permisos
+
+**PROPUESTO**
+
+Un rol podría contener varios permisos y un mismo permiso podría pertenecer a diferentes roles.
+
+Conceptualmente:
+
+```text
+Rol A
+    ├── Permiso 1
+    ├── Permiso 2
+    └── Permiso 3
+
+Rol B
+    ├── Permiso 1
+    └── Permiso 4
+```
+
+Esto permitiría reutilizar permisos sin duplicar su definición.
+
+La implementación técnica de esta relación corresponderá posteriormente al modelo de datos aprobado.
+
+---
+
+### 9.5 Asignación de roles a usuarios
+
+**PROPUESTO**
+
+Un usuario interno podría recibir uno o varios roles según las reglas que posteriormente se definan.
+
+Antes de realizar una asignación de rol, el backend debería verificar:
+
+* Que el usuario exista.
+* Que el usuario se encuentre activo.
+* Que el rol exista.
+* Que el rol se encuentre activo, si los roles manejan estado.
+* Que la asignación sea válida.
+* Que el usuario que realiza la operación tenga autorización.
+* Que no exista una asignación duplicada incompatible con las reglas aprobadas.
+
+**PENDIENTE**
+
+Debe confirmarse si:
+
+* Un usuario puede tener más de un rol.
+* Los roles son permanentes o temporales.
+* Un rol puede asignarse únicamente dentro de determinada área.
+* Existen roles incompatibles entre sí.
+
+---
+
+### 9.6 Vigencia de un rol
+
+**PROPUESTO**
+
+Cuando sea necesario, una asignación de rol podría incluir un periodo de vigencia.
+
+**EJEMPLO**
+
+```text
+Usuario A
+Rol: Rol de ejemplo
+
+Desde: 01/08/2026
+Hasta: 31/08/2026
+```
+
+Después del final de la vigencia, los permisos provenientes de ese rol no deberían utilizarse para autorizar nuevas operaciones.
+
+---
+
+### 9.7 Caso excepcional: rol vencido
+
+**PROPUESTO**
+
+Si la fecha de vigencia de una asignación de rol ya terminó, el backend deberá tratarla como no vigente.
+
+**EJEMPLO**
+
+```text
+Rol asignado:
+01/07/2026 - 31/07/2026
+
+Fecha de operación:
+27/08/2026
+
+Resultado:
+El rol no se considera vigente.
+```
+
+Por lo tanto, sus permisos no deberían autorizar la operación solicitada.
+
+---
+
+### 9.8 Caso excepcional: rol duplicado
+
+**PROPUESTO**
+
+El sistema deberá evitar asignaciones duplicadas que no tengan sentido funcional.
+
+**EJEMPLO**
+
+Si el Usuario A ya tiene el Rol A vigente:
+
+```text
+Usuario A
+    ↓
+Rol A
+```
+
+no debería registrarse nuevamente exactamente la misma asignación sin una justificación válida.
+
+**PENDIENTE**
+
+Las reglas exactas para detectar duplicados dependerán de si los roles tienen vigencia, alcance por área u otras condiciones.
+
+---
+
+### 9.9 Alcance global de un permiso
+
+**PROPUESTO**
+
+Algunos permisos podrían permitir actuar sobre información de todo el sistema.
+
+Este tipo de autorización tendría un alcance global.
+
+**EJEMPLO**
+
+```text
+Permiso:
+tramite.ver
+
+Alcance:
+GLOBAL
+```
+
+En este ejemplo, el permiso permitiría consultar trámites independientemente del área.
+
+Esta posibilidad deberá ser validada antes de implementarse.
+
+---
+
+### 9.10 Alcance limitado a un área
+
+**PROPUESTO**
+
+Algunos permisos podrían estar restringidos al área a la que pertenece o para la cual se encuentra autorizado el usuario.
+
+**EJEMPLO**
+
+```text
+Usuario A
+
+Permiso:
+tramite.ver
+
+Alcance:
+Área B
+```
+
+En este caso conceptual, el usuario podría consultar información correspondiente al Área B, pero no necesariamente a otras áreas.
+
+**PENDIENTE**
+
+Debe confirmarse si los permisos podrán limitarse por:
+
+* Área.
+* Tipo de documento.
+* Etapa del trámite.
+* Unidad organizacional.
+* Algún otro criterio institucional.
+
+---
+
+### 9.11 Verificación de permisos en el backend
+
+**PROPUESTO**
+
+Antes de ejecutar una operación protegida, el backend deberá evaluar la autorización del usuario.
+
+Un flujo preliminar podría ser:
+
+```text
+Usuario solicita operación
+        ↓
+Verificar identidad
+        ↓
+Verificar estado del usuario
+        ↓
+Verificar asignación organizacional
+        ↓
+Obtener roles vigentes
+        ↓
+Obtener permisos asociados
+        ↓
+Verificar alcance
+        ↓
+¿Tiene autorización?
+     ↙         ↘
+   Sí           No
+   ↓             ↓
+Permitir       Rechazar
+operación      operación
+```
+
+Este flujo es conceptual y no representa todavía un endpoint ni una implementación técnica definitiva.
+
+---
+
+### 9.12 Acceso denegado
+
+**PROPUESTO**
+
+Cuando un usuario no posea el permiso necesario o el permiso no tenga el alcance requerido, la operación deberá ser rechazada.
+
+**EJEMPLO**
+
+```text
+Usuario A
+    ↓
+intenta derivar un trámite
+    ↓
+no posee permiso para derivar
+    ↓
+ACCESO DENEGADO
+```
+
+El hecho de que el usuario pueda conocer o intentar acceder directamente a una ruta del backend no deberá permitirle evitar la validación de autorización.
+
+---
+
+### 9.13 Permisos y principio de mínimo privilegio
+
+**PROPUESTO**
+
+El diseño deberá seguir el principio de conceder únicamente las autorizaciones necesarias para que cada usuario pueda cumplir sus funciones.
+
+Por lo tanto, una acción que no haya sido autorizada no deberá concederse automáticamente.
+
+**EJEMPLO**
+
+Si un usuario solamente necesita consultar información:
+
+```text
+Permitido:
+tramite.ver
+
+No concedido automáticamente:
+tramite.derivar
+tramite.cerrar
+administrar roles
+```
+
+La explicación teórica y las fuentes sobre el principio de mínimo privilegio se desarrollarán posteriormente en la sección correspondiente de este análisis.
+
+---
+
 ## 10. Matriz funcional de roles y permisos
+
+### 10.1 Objetivo de la matriz
+
+**PROPUESTO**
+
+La matriz funcional permite visualizar de manera sencilla qué acciones podrían estar asociadas a determinados roles.
+
+La siguiente matriz es únicamente demostrativa. No representa los roles ni permisos oficiales de la institución.
+
+### 10.2 Matriz de ejemplo
+
+**EJEMPLO — PENDIENTE DE VALIDACIÓN INSTITUCIONAL**
+
+| Acción                   | Rol de consulta | Rol operativo | Rol de administración |
+| ------------------------ | --------------: | ------------: | --------------------: |
+| Consultar trámite        |              Sí |            Sí |                    Sí |
+| Recibir trámite          |              No |            Sí |                    Sí |
+| Adjuntar información     |              No |            Sí |                    Sí |
+| Derivar trámite          |              No |            Sí |                    Sí |
+| Observar trámite         |              No |            Sí |                    Sí |
+| Atender trámite          |              No |            Sí |                    Sí |
+| Cerrar trámite           |              No |     Pendiente |                    Sí |
+| Crear áreas              |              No |            No |                    Sí |
+| Actualizar áreas         |              No |            No |                    Sí |
+| Activar/desactivar áreas |              No |            No |                    Sí |
+| Asignar usuarios a áreas |              No |            No |                    Sí |
+| Designar responsables    |              No |            No |                    Sí |
+| Asignar roles            |              No |            No |                    Sí |
+| Administrar permisos     |              No |            No |             Pendiente |
+
+Los nombres “Rol de consulta”, “Rol operativo” y “Rol de administración” son ficticios y se utilizan solamente para demostrar cómo podría construirse una matriz de autorización.
+
+Las celdas tampoco representan decisiones oficiales.
+
+---
+
+### 10.3 Interpretación de la matriz
+
+**EJEMPLO**
+
+En la matriz anterior:
+
+* El Rol de consulta solamente tendría acceso a operaciones de lectura.
+* El Rol operativo podría participar en determinadas actividades del trámite.
+* El Rol de administración podría realizar tareas relacionadas con la configuración organizacional y la autorización.
+
+Esto no significa que esos roles deban existir realmente en la institución.
+
+La matriz definitiva deberá construirse después de identificar:
+
+* Los actores oficiales.
+* Los roles institucionalmente aprobados.
+* Las operaciones reales del SIGD.
+* Los responsables autorizados.
+* El alcance de cada permiso.
+
+---
+
+### 10.4 Regla de denegación por defecto
+
+**PROPUESTO**
+
+Si una acción no se encuentra expresamente autorizada para un rol, no deberá asumirse automáticamente que está permitida.
+
+Conceptualmente:
+
+```text
+Permiso confirmado
+       ↓
+      Sí
+       ↓
+Operación potencialmente autorizada
+```
+
+Mientras que:
+
+```text
+Permiso no confirmado
+       ↓
+      No
+       ↓
+No conceder por defecto
+```
+
+Esta regla reduce el riesgo de otorgar más privilegios de los necesarios.
+
+---
+
+### 10.5 Matriz con alcance por área
+
+**PROPUESTO**
+
+Cuando un permiso dependa del área, no será suficiente con comprobar únicamente la existencia del permiso.
+
+**EJEMPLO**
+
+```text
+Usuario A
+Rol: Rol operativo
+
+Permiso:
+tramite.derivar
+
+Área autorizada:
+Área A
+```
+
+Si intenta realizar la misma acción sobre un trámite perteneciente al Área B, el backend deberá evaluar si el alcance del permiso lo permite.
+
+Conceptualmente:
+
+```text
+¿Tiene permiso?
+       ↓
+      Sí
+       ↓
+¿El permiso aplica al área?
+      ↙    ↘
+    Sí      No
+    ↓        ↓
+Permitir   Denegar
+```
+
+**PENDIENTE**
+
+Confirmar con el profesor si el control por área será requerido en el SIGD.
+
+---
+
+### 10.6 Preguntas derivadas de la matriz
+
+**PENDIENTE**
+
+Para convertir esta matriz de ejemplo en una propuesta más precisa deberá confirmarse:
+
+* ¿Cuáles son los roles oficiales del sistema?
+* ¿Qué acciones puede realizar cada rol?
+* ¿Quién puede recibir trámites?
+* ¿Quién puede adjuntar documentos?
+* ¿Quién puede derivar trámites?
+* ¿Quién puede observarlos?
+* ¿Quién puede atenderlos?
+* ¿Quién puede cerrarlos?
+* ¿Quién podrá firmar cuando una operación requiera firma?
+* ¿Quién puede crear, actualizar, activar o desactivar áreas?
+* ¿Quién puede asignar responsables?
+* ¿Quién puede administrar roles?
+* ¿Quién puede aprobar cambios de permisos?
+* ¿Los permisos serán globales o tendrán alcance por área?
+* ¿Un usuario puede tener varios roles simultáneamente?
+
+Estas preguntas deberán resolverse antes de considerar definitiva cualquier matriz de autorización.
 
 ## 11. Flujos normales
 
