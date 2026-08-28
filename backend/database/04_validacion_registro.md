@@ -1,17 +1,22 @@
-# Validación de Registro y Pruebas (Fase 5)
+### 2. Entidad: expediente
 
-## 1. Orden de Ejecución
-1. Conexión a la base de datos limpia de PostgreSQL 18.6.
-2. Ejecución secuencial de `03_tramite_expediente_registro.sql`.
+| Campo | Tipo | Clave | Nulo | Default | Descripción | Estado |
+|---|---|---|---|---|---|---|
+| `id_expediente` | BIGINT | PK | No | autogen | ID técnico interno | PROPUESTO |
+| `codigo_expediente` | VARCHAR(20) | | No | | Código visible de expediente | PENDIENTE |
+| `fk_tramite` | BIGINT | FK | No | | Trámite asociado | PROPUESTO |
+| `creado_en` | TIMESTAMPTZ | | No | now() | Fecha de creación | PROPUESTO |
 
-## 2. Pruebas de Restricción y Concurrencia
-- **Generación de ID Seguro:** Uso de `GENERATED ALWAYS AS IDENTITY` para prevenir colisiones en llamadas concurrentes.
-- **Unicidad:** Validación de códigos duplicados (`codigo_expediente`, `numero_registro`).
-- **Anulación Conservando Registro:** Los registros anulados mantienen `anulado = true` sin borrar el historial.
+---
 
-```sql
--- Consulta de verificación general
-SELECT e.codigo_expediente, a.numero_registro, t.estado, t.anulado 
-FROM tramite t
-JOIN expediente e ON t.id_expediente = e.id_expediente
-LEFT JOIN asiento_registro a ON t.id_asiento = a.id_asiento;
+### 3. Entidad: asiento_registro
+
+| Campo | Tipo | Clave | Nulo | Default | Descripción | Estado |
+|---|---|---|---|---|---|---|
+| `id_asiento` | BIGINT | PK | No | autogen | ID técnico interno | PROPUESTO |
+| `numero_registro` | BIGINT | UNIQUE | No | secuencia segura | Correlativo visible | PENDIENTE |
+| `fecha_ingreso` | TIMESTAMPTZ | | No | now() | Fecha de ingreso | PROPUESTO |
+| `canal_ingreso` | VARCHAR(30) | | Sí | | Mesa de partes, web, etc. | PROPUESTO |
+| `asunto` | TEXT | | Sí | | Asunto del asiento | PROPUESTO |
+| `fk_expediente` | BIGINT | FK | No | | Expediente asociado | PROPUESTO |
+| `fk_remitente` | BIGINT | FK | No | | Remitente | PROPUESTO |
