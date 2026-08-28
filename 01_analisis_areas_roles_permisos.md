@@ -239,20 +239,9 @@ Debe confirmarse con el profesor:
 8. Quién administrará áreas, responsables, roles y permisos.
 
 No se utilizará la categoría **CONFIRMADO** hasta contar con una indicación expresa del profesor o información institucional verificada.
-
 ---
 
-## 10. Fuentes
-
-- NIST — *Role-Based Access Control (RBAC): Features and Motivations*.
-- NIST CSRC — *Role-Based Access Control*.
-- NIST CSRC — *Least Privilege*.
-- OWASP — *Authorization Cheat Sheet*.
-- *SIGD | Plan de trabajo backend Grupo 3 · OrganiCore*.
-
----
-
-## 11. Conclusión
+## 10. Conclusión
 
 El módulo utilizará una estructura única de áreas, permitirá múltiples roles por usuario, controlará el alcance de los permisos, conservará los registros mediante inactivación lógica y permitirá responsables interinos con vigencia.
 
