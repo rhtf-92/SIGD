@@ -28,12 +28,10 @@ pendientes de validación institucional.
 > Diagrama elaborado en Diagrams.net/DrawSQL. Conservar aquí el enlace o ruta al
 > archivo editable (`.drawio`, `.drawsql`, etc.) y una captura/imagen.
 
-**Archivo editable:** (ruta o enlace)
-**Imagen del diagrama:** (insertar imagen)
+**Archivo editable:** https://drive.google.com/file/d/1yqBMqSWnYsDR2i0lF1vfXubf5bbWIphV/view?usp=drive_link
+**Imagen del diagrama:** https://drive.google.com/uc?export=view&id=1n0hUWtJvuAf7bARQFl9vFQpsYdYUhhJu
 
-```
-[ En esta sección pega el modelo visual o la descripción legible del diagrama ]
-```
+![Modelo E-R SIGD · Grupo 2 (TramiCore)](https://drive.google.com/uc?export=view&id=1n0hUWtJvuAf7bARQFl9vFQpsYdYUhhJu)
 
 ---
 
