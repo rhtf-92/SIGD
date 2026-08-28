@@ -40,7 +40,12 @@ CREATE INDEX idx_areas_parent_id
 CREATE TABLE cargos (
     id BIGSERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL UNIQUE,
-    estado BOOLEAN NOT NULL DEFAULT TRUE
+    rol_id BIGINT,
+    estado BOOLEAN NOT NULL DEFAULT TRUE,
+
+    CONSTRAINT fk_cargos_rol
+        FOREIGN KEY (rol_id)
+        REFERENCES roles(id)
 );
 
 
@@ -140,7 +145,58 @@ CREATE INDEX idx_roles_permisos_permiso
     ON roles_permisos(permiso_id);
 
 
+-- ======================================================
+-- 7. TABLA: USUARIOS_ROLES
+-- Relación muchos a muchos entre usuarios y roles
+-- ======================================================
+
+CREATE TABLE usuarios_roles (
+    usuario_id BIGINT NOT NULL,
+    rol_id BIGINT NOT NULL,
+    fecha_asignacion DATE NOT NULL DEFAULT CURRENT_DATE,
+    fecha_fin DATE,
+
+    CONSTRAINT pk_usuarios_roles
+        PRIMARY KEY (usuario_id, rol_id),
+
+    CONSTRAINT fk_usuarios_roles_rol
+        FOREIGN KEY (rol_id)
+        REFERENCES roles(id),
+
+    CONSTRAINT chk_usuarios_roles_fechas
+        CHECK (
+            fecha_fin IS NULL
+            OR fecha_fin >= fecha_asignacion
+        )
+);
+
+-- Índice para búsquedas de roles por usuario
+CREATE INDEX idx_usuarios_roles_usuario
+    ON usuarios_roles(usuario_id);
+
+-- Índice para búsquedas de usuarios por rol
+CREATE INDEX idx_usuarios_roles_rol
+    ON usuarios_roles(rol_id);
+
+
 /*
+=========================================================
+DEPENDENCIAS EXTERNAS Y CONFIGURACIÓN PENDIENTE
+=========================================================
+
+La siguiente sentencia debe ejecutarse una vez que
+se integre con la tabla users del módulo de usuarios:
+
+ALTER TABLE responsables
+ADD CONSTRAINT fk_responsables_usuario
+    FOREIGN KEY (usuario_id)
+    REFERENCES users(id);
+
+ALTER TABLE usuarios_roles
+ADD CONSTRAINT fk_usuarios_roles_usuario
+    FOREIGN KEY (usuario_id)
+    REFERENCES users(id);
+
 =========================================================
 NOTAS TÉCNICAS
 =========================================================
@@ -160,15 +216,23 @@ NOTAS TÉCNICAS
 3. roles_permisos representa la relación N:M entre roles
    y permisos mediante identificadores.
 
-4. No se almacenan permisos como listas separadas
+4. usuarios_roles es la relación N:M entre usuarios y roles.
+   Permite asignar múltiples roles a un usuario y
+   múltiples usuarios a un rol.
+
+5. cargos puede opcionalmente vincularse a un rol por defecto
+   mediante cargos.rol_id.
+
+6. No se almacenan permisos como listas separadas
    por comas.
 
-5. responsables mantiene historial mediante
+7. responsables mantiene historial mediante
    fecha_inicio y fecha_fin.
 
-6. usuario_id depende de la tabla externa users(id).
+8. usuario_id y usuarios_roles.usuario_id dependen de
+   la tabla externa users(id) que pertenece a otro módulo.
 
-7. Este script es PROVISIONAL y no contiene datos
+9. Este script es PROVISIONAL y no contiene datos
    personales, credenciales ni contraseñas reales.
 =========================================================
 */

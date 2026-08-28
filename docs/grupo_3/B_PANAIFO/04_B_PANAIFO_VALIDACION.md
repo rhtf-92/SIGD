@@ -31,12 +31,12 @@ WHERE r.codigo = 'ROLE_CONSULTA';
 
 **Resultado esperado:**
 ```
-ROLE_CONSULTA | area:consultar
+ROLE_CONSULTA | area.consultar
 ```
 
 ### Caso DENEGADO - ROLE_CONSULTA no puede crear áreas
 
-ROLE_CONSULTA solamente tiene permiso `area:consultar`. No tiene permiso `area:crear`.
+ROLE_CONSULTA solamente tiene permiso `area.consultar`. No tiene permiso `area.crear`.
 
 **Resultado esperado:** DENEGADO
 
@@ -91,7 +91,7 @@ GROUP BY r.id, r.codigo;
 
 **Resultado esperado:**
 ```
-ROLE_ADMIN | 6 | area:consultar, area:crear, area:editar, area:eliminar, permiso:gestionar, usuario:consultar
+ROLE_ADMIN | 6 | area.consultar, area.crear, area.editar, area.eliminar, permiso.gestionar, usuario.consultar
 ```
 
 Los permisos se relacionan mediante identificadores (rol_id, permiso_id) en roles_permisos, no mediante texto duplicado.

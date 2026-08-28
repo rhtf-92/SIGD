@@ -30,12 +30,12 @@ VALUES
 -- CARGOS
 -- ======================================================
 
-INSERT INTO cargos (nombre, estado)
+INSERT INTO cargos (nombre, rol_id, estado)
 VALUES
-('Director de Prueba', TRUE),
-('Jefe de Oficina de Prueba', TRUE),
-('Especialista de Prueba', TRUE),
-('Analista de Prueba', TRUE);
+('Director de Prueba', 1, TRUE),
+('Jefe de Oficina de Prueba', 2, TRUE),
+('Especialista de Prueba', 2, TRUE),
+('Analista de Prueba', 3, TRUE);
 
 
 -- ======================================================
@@ -55,12 +55,12 @@ VALUES
 
 INSERT INTO permisos (codigo, descripcion)
 VALUES
-('area:crear', 'Crear un área'),
-('area:consultar', 'Consultar áreas'),
-('area:editar', 'Editar información de un área'),
-('area:eliminar', 'Eliminar un área'),
-('usuario:consultar', 'Consultar información de usuarios'),
-('permiso:gestionar', 'Gestionar permisos');
+('area.crear', 'Crear un área'),
+('area.consultar', 'Consultar áreas'),
+('area.editar', 'Editar información de un área'),
+('area.eliminar', 'Eliminar un área'),
+('usuario.consultar', 'Consultar información de usuarios'),
+('permiso.gestionar', 'Gestionar permisos');
 
 
 -- ======================================================
@@ -87,3 +87,28 @@ VALUES
 INSERT INTO roles_permisos (rol_id, permiso_id)
 VALUES
 (3, 2);
+
+
+-- ======================================================
+-- RELACIÓN USUARIOS - ROLES
+-- ======================================================
+
+/*
+NOTA: usuario_id representa IDs ficticios.
+Estos IDs deben existir en la tabla users cuando se integre.
+*/
+
+-- Usuario 1001 asignado a ROLE_ADMIN
+INSERT INTO usuarios_roles (usuario_id, rol_id, fecha_asignacion, fecha_fin)
+VALUES
+(1001, 1, '2026-01-15', NULL);
+
+-- Usuario 1002 asignado a ROLE_OPERADOR
+INSERT INTO usuarios_roles (usuario_id, rol_id, fecha_asignacion, fecha_fin)
+VALUES
+(1002, 2, '2026-03-01', NULL);
+
+-- Usuario 1003 asignado a ROLE_CONSULTA
+INSERT INTO usuarios_roles (usuario_id, rol_id, fecha_asignacion, fecha_fin)
+VALUES
+(1003, 3, '2026-06-01', NULL);

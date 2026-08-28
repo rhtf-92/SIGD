@@ -3,6 +3,95 @@
 
 ---
 
+## 0. Cambios Críticos Implementados (Mejoras Post-Revisión)
+
+### A. Relación Usuario-Rol (CRÍTICO)
+
+**Problema original:** No existía forma de asignar roles a usuarios.
+
+**Solución implementada:** Tabla `usuarios_roles` (relación N:M)
+
+```sql
+CREATE TABLE usuarios_roles (
+    usuario_id BIGINT NOT NULL,
+    rol_id BIGINT NOT NULL,
+    fecha_asignacion DATE NOT NULL DEFAULT CURRENT_DATE,
+    fecha_fin DATE,
+    PRIMARY KEY (usuario_id, rol_id)
+);
+```
+
+**Ahora el flujo es:**
+```
+Usuario → (tiene) → Rol(es) → (tiene) → Permiso(s)
+```
+
+**Ejemplo:**
+- Usuario 1001 asignado a ROLE_ADMIN → accede a todos los permisos de administrador
+- Usuario 1002 asignado a ROLE_OPERADOR → accede solo a permisos de operador
+
+### B. Relación Cargo-Rol
+
+**Problema original:** `cargos` era independiente de `roles`.
+
+**Solución implementada:** Añadido campo `cargos.rol_id` para vincular un cargo con un rol predeterminado.
+
+```sql
+ALTER TABLE cargos ADD COLUMN rol_id BIGINT 
+    REFERENCES roles(id);
+```
+
+**Ahora:**
+- Cuando se asigna un usuario a un cargo en un área, opcionalmente el sistema puede asignarle el rol predeterminado del cargo.
+- Permite flexibilidad: un usuario puede tener roles adicionales más allá del cargo.
+
+**Ejemplo en datos:**
+- Cargo "Director de Prueba" → rol_id = 1 (ROLE_ADMIN)
+- Cargo "Analista de Prueba" → rol_id = 3 (ROLE_CONSULTA)
+
+### C. Integración con Tabla `users` (Externa)
+
+**Problema original:** No había FK hacia `users` porque la tabla no pertenece a B_PANAIFO.
+
+**Solución implementada:** Script preparado con comando `ALTER TABLE` listo en comentarios:
+
+```sql
+/*
+La siguiente sentencia debe ejecutarse una vez que
+se integre con la tabla users del módulo de usuarios:
+*/
+
+ALTER TABLE responsables
+ADD CONSTRAINT fk_responsables_usuario
+    FOREIGN KEY (usuario_id)
+    REFERENCES users(id);
+
+ALTER TABLE usuarios_roles
+ADD CONSTRAINT fk_usuarios_roles_usuario
+    FOREIGN KEY (usuario_id)
+    REFERENCES users(id);
+```
+
+**Nota:** Esto asegura que cuando `users` esté disponible, la integración sea inmediata.
+
+### D. Nomenclatura de Permisos Estandarizada
+
+**Cambio:** De notación de dos puntos a puntos.
+
+**Antes:**
+```
+area:crear, area:consultar, usuario:consultar
+```
+
+**Ahora:**
+```
+area.crear, area.consultar, usuario.consultar, permiso.gestionar
+```
+
+**Ventaja:** Alineación con estándares de nomenclatura en sistemas de trámite documentario y facilitadores de parsing en la lógica de autorización.
+
+---
+
 ## 1. Estructura de Áreas Jerárquicas
 
 ### Concepto
@@ -165,19 +254,32 @@ roles (1) ──→ roles_permisos ←── (M) permisos
 **Ejemplo:**
 
 ```
-ROLE_ADMIN tiene: area:crear, area:consultar, area:editar, area:eliminar
-ROLE_OPERADOR tiene: area:consultar, area:editar
-ROLE_CONSULTA tiene: area:consultar
+ROLE_ADMIN tiene: area.crear, area.consultar, area.editar, area.eliminar
+ROLE_OPERADOR tiene: area.consultar, area.editar
+ROLE_CONSULTA tiene: area.consultar
 ```
 
 En `roles_permisos`:
 
 ```
-(rol_id=1, permiso_id=1)  → ROLE_ADMIN puede area:crear
-(rol_id=1, permiso_id=2)  → ROLE_ADMIN puede area:consultar
-(rol_id=2, permiso_id=2)  → ROLE_OPERADOR puede area:consultar
-(rol_id=3, permiso_id=2)  → ROLE_CONSULTA puede area:consultar
+(rol_id=1, permiso_id=1)  → ROLE_ADMIN puede area.crear
+(rol_id=1, permiso_id=2)  → ROLE_ADMIN puede area.consultar
+(rol_id=2, permiso_id=2)  → ROLE_OPERADOR puede area.consultar
+(rol_id=3, permiso_id=2)  → ROLE_CONSULTA puede area.consultar
 ```
+
+**Nueva relación N:M: usuarios_roles**
+
+La tabla `usuarios_roles` crea la relación entre usuarios y roles:
+
+```
+usuarios (1) ──→ usuarios_roles ←── (M) roles
+```
+
+Esto permite:
+- Asignar múltiples roles a un usuario
+- Asignar un mismo rol a múltiples usuarios
+- Mantener histórico de asignaciones con fecha_asignacion y fecha_fin
 
 ---
 
@@ -193,6 +295,8 @@ En `roles_permisos`:
 | responsables | idx_responsables_cargo | Filtrar responsables por cargo |
 | responsables | idx_responsables_vigencia | Consultas de vigencia (fecha_inicio, fecha_fin) |
 | roles_permisos | idx_roles_permisos_permiso | Búsquedas de permisos por permiso |
+| usuarios_roles | idx_usuarios_roles_usuario | Búsquedas de roles por usuario |
+| usuarios_roles | idx_usuarios_roles_rol | Búsquedas de usuarios por rol |
 
 ### Justificación
 
@@ -216,24 +320,31 @@ Pero la tabla `users` **no pertenece al módulo B_PANAIFO**. Viene de otro compo
 
 ### Decisión actual
 
-**La FK de `usuario_id` → `users(id)` no está creada en este script.**
+**La FK de `usuario_id` → `users(id)` no está creada en los scripts iniciales.**
 
 Razón: La tabla `users` no fue incluida en el modelo proporcionado por B_POOL.
 
+**PERO:** Se proporcionan comandos `ALTER TABLE` listos para ejecutar cuando `users` esté disponible (ver sección 0).
+
 ### Acción requerida
 
-Cuando la tabla `users` esté disponible y aprobada, agregar:
+Cuando la tabla `users` esté disponible y aprobada, ejecutar:
 
 ```sql
 ALTER TABLE responsables
 ADD CONSTRAINT fk_responsables_usuario
     FOREIGN KEY (usuario_id)
     REFERENCES users(id);
+
+ALTER TABLE usuarios_roles
+ADD CONSTRAINT fk_usuarios_roles_usuario
+    FOREIGN KEY (usuario_id)
+    REFERENCES users(id);
 ```
 
 ### Nota para documentación
 
-**Dependencia externa:** `responsables.usuario_id` referencia `users(id)`, tabla perteneciente a otro componente/módulo del sistema. La creación definitiva de esta FK depende de que la tabla `users` y su clave primaria estén disponibles y aprobadas.
+**Dependencia externa:** `responsables.usuario_id` y `usuarios_roles.usuario_id` referencian `users(id)`, tabla perteneciente a otro componente/módulo del sistema. La creación definitiva de estas FKs depende de que la tabla `users` y su clave primaria estén disponibles y aprobadas.
 
 ---
 
@@ -244,19 +355,22 @@ ADD CONSTRAINT fk_responsables_usuario
 - **areas.sigla**: Cada área debe tener una sigla única (ej: "DGP", "OSP")
 - **cargos.nombre**: Cada cargo debe tener nombre único
 - **roles.codigo**: Cada rol debe tener código único (ej: "ROLE_ADMIN")
-- **permisos.codigo**: Cada permiso debe tener código único (ej: "area:crear")
+- **permisos.codigo**: Cada permiso debe tener código único (ej: "area.crear")
 
 ### FOREIGN KEYS
 
 - **areas.parent_id** → areas(id): Asegura que el área padre existe
+- **cargos.rol_id** → roles(id): Vincula cargo con rol predeterminado (opcional)
 - **responsables.area_id** → areas(id): Asegura que el área existe
 - **responsables.cargo_id** → cargos(id): Asegura que el cargo existe
+- **usuarios_roles.rol_id** → roles(id): Asegura que el rol existe
 - **roles_permisos.rol_id** → roles(id): Asegura que el rol existe
 - **roles_permisos.permiso_id** → permisos(id): Asegura que el permiso existe
 
 ### CHECK
 
 - **responsables.chk_responsables_fechas**: Valida que fecha_fin >= fecha_inicio (o sea NULL)
+- **usuarios_roles.chk_usuarios_roles_fechas**: Valida que fecha_fin >= fecha_asignacion (o sea NULL)
 
 ---
 
@@ -312,15 +426,20 @@ Actualmente no existe CASCADE DELETE. Borrar un área requiere:
 
 ## 10. Características del BORRADOR
 
-Este script es **PROVISIONAL**:
+Este script es **PROVISIONAL** con **mejoras post-revisión**:
 
-- ✅ Tablas, PK, FK, UNIQUE, CHECK e índices funcionales
-- ✅ Datos ficticios para demostración
-- ✅ Consultas de verificación y validación
-- ⏳ Pendiente: Integración real con módulo `users`
-- ⏳ Pendiente: Implementación de auditoría
-- ⏳ Pendiente: Lógica de prevención de ciclos
-- ⏳ Pendiente: Validaciones complejas en triggers
+✅ Tablas, PK, FK, UNIQUE, CHECK e índices funcionales
+✅ Relación Usuario-Rol implementada (usuarios_roles N:M)
+✅ Relación Cargo-Rol implementada (cargos.rol_id)
+✅ Nomenclatura de permisos estandarizada (punto en lugar de dos puntos)
+✅ Script preparado para integración con tabla `users` externa
+✅ Datos ficticios para demostración
+✅ Consultas de verificación y validación
+✅ Matriz de casos permitidos y denegados
+⏳ Pendiente: Integración real con módulo `users`
+⏳ Pendiente: Implementación de auditoría
+⏳ Pendiente: Lógica de prevención de ciclos
+⏳ Pendiente: Validaciones complejas en triggers
 
 ---
 
