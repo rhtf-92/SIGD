@@ -324,7 +324,7 @@ Una excepción ocurre cuando una acción no puede continuar de la forma esperada
 Las acciones y estados de esta matriz permanecen sujetos a validación. “Movimiento” es el registro histórico generado y no necesariamente una acción del usuario. La matriz no es una máquina de estados definitiva ni un modelo de base de datos.
 
 | Acción propuesta | Responsable propuesto | Precondición | Resultado funcional | Siguiente estado propuesto | Información histórica conservada | Validación |
-| --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- |
 | Recepción | Personal encargado de recepción o usuario del área destinataria. | Referencia del trámite disponible. | Confirmación de recepción inicial o en destino. | **Recibido** PROPUESTO. | Actor, fecha, hora, área, acción, estado anterior y resultado. | Responsable y mecanismo PENDIENTES. |
 | Inicio de revisión | Usuario interno o responsable del área. | Trámite recibido. | Inicio de evaluación de información, requisitos y adjuntos. | **En revisión** PROPUESTO. | Actor, fecha, hora, área, acción y referencias consultadas. | Criterios y plazos PENDIENTES. |
 | Observación | Usuario que revisa o atiende. | Problema, requisito faltante o información por corregir identificada. | Observación registrada con motivo. | **Observado** PROPUESTO. | Actor, fecha, hora, área, acción, motivo, estado anterior y resultado. | Reglas de observación PENDIENTES. |
