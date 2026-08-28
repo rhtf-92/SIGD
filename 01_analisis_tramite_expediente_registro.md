@@ -1,174 +1,182 @@
 # Análisis Funcional: Trámite, Expediente y Libro de Registro (SIGD)
-**Grupo 2:** TramiCore  
-**Autor:** Leysglin Riquelmer Fachin Rojas (Rama: `B_RIQUELMER`)  
 **Proyecto:** Sistema Integral de Gestión Documentaria (SIGD)  
-**Versión:** 2.0 (Fase 1 - Revisión y cumplimiento de criterios de aceptación)
+**Grupo de Trabajo:** Grupo 2 – “TramiCore”  
+**Responsable del Análisis:** Leysglin Riquelmer Fachin Rojas (Rama: `B_RIQUELMER`)  
+**Sublíder / Integrador:** Elmer Ramírez (`B_RAMIREZ`)  
+**Versión:** 2.0 (Fase 1 – Cumplimiento integral del Plan de Trabajo)
 
 ---
 
-## 1. Objetivo del Módulo
-Definir y estandarizar funcionalmente el núcleo documental del SIGD, estableciendo con precisión las diferencias conceptuales entre trámite, expediente, documento y asiento de registro, identificando los actores participantes, describiendo sus flujos operativos paso a paso y proponiendo identificadores y reglas de negocio preparados para integrarse con los módulos de seguimiento, áreas y catálogo documental.
+## 1. Objetivo y Alcance del Módulo
+
+### 1.1 Objetivo
+Definir el núcleo documental del SIGD, diferenciando conceptualmente trámite, expediente, documento y asiento del libro de registro. Asimismo, establecer la separación entre identificadores técnicos internos y códigos visibles, definir los actores, detallar los flujos operativos paso a paso y formular las preguntas para la validación oficial con la institución.
+
+### 1.2 Alcance
+Comprende desde la presentación de la solicitud por Mesa de Partes hasta el asentado en el Libro de Registro, la conformación del expediente, la actualización controlada, la atención por las áreas y la entrega de eventos al módulo de trazabilidad (Grupo 1). No abarca la implementación final de endpoints ni migraciones definitivas.
 
 ---
 
 ## 2. Diferenciación Conceptual con Ejemplos Propios
 
-* **Trámite `[PROPUESTO]`:** Es la intención, gestión o solicitud administrativa formal que un administrado o trabajador inicia con una finalidad determinada.  
-  * *`[EJEMPLO]`*: Un estudiante solicita la emisión de un "Certificado Oficial de Estudios" o un docente solicita "Licencia con goce de haber".
-* **Expediente `[PROPUESTO]`:** Es el contenedor lógico, acumulativo y cronológico que reúne todas las actuaciones, escritos, informes y resoluciones vinculadas a un mismo trámite. Permanece vivo mientras dure la gestión.  
-  * *`[EJEMPLO]`*: La carpeta virtual identificada con código `EXP-2026-000104` que contiene la solicitud original, el comprobante de pago, el informe de notas emitido por secretaría y la resolución final de entrega.
-* **Documento Presentado `[PROPUESTO]`:** Es la unidad física o digital de sustento (escrito, oficio, solicitud en PDF, boleta, foto) que se adjunta y folia dentro del expediente.  
-  * *`[EJEMPLO]`*: El archivo digital `FUT_Solicitud_Firmada.pdf` de 2 folios o el recibo de caja escaneado `Pago_Banco_0451.pdf`.
-* **Asiento del Libro de Registro `[PROPUESTO]`:** Es la constancia oficial, fechada, numerada de manera lineal e inmutable en el Libro General de Registros que acredita formalmente un evento ocurrido (ingreso inicial, derivación, respuesta o cierre).  
+* **Trámite `[PROPUESTO]`:** Gestión, petición o requerimiento formal que un solicitante promueve para obtener un pronunciamiento institucional.  
+  * *`[EJEMPLO]`*: Un alumno solicita la expedición de su "Certificado Oficial de Estudios" o un docente tramita una "Licencia con goce de haber".
+* **Expediente `[PROPUESTO]`:** Unidad documental lógica, acumulativa y secuencial que agrupa todos los escritos, proveídos, informes técnicos y resoluciones vinculadas a un mismo trámite a lo largo de su ciclo de vida.  
+  * *`[EJEMPLO]`*: La carpeta digital con código `EXP-2026-000104`, que reúne el Formulario Único de Trámite (FUT), el comprobante de pago de caja, el informe de notas emitido por Secretaría y la resolución de entrega.
+* **Documento Presentado `[PROPUESTO]`:** Escrito o archivo individual (físico o digital en PDF) que sustenta, acredita o responde a una actuación dentro del expediente.  
+  * *`[EJEMPLO]`*: El archivo escaneado `FUT_solicitud_firmada.pdf` de 2 folios o el archivo digitalizado `recibo_caja_0891.pdf`.
+* **Asiento del Libro de Registro `[PROPUESTO]`:** Constancia oficial, cronológica, lineal e inmutable asentada en el Libro General de Registros que acredita formalmente el ingreso, egreso o pase de un documento.  
   * *`[EJEMPLO]`*: Asiento Nº `00004521`, registrado el `28/08/2026 09:15:02`, que certifica que el expediente `EXP-2026-000104` ingresó por Mesa de Partes Virtual y fue derivado a Secretaría Académica.
 
 ---
 
-## 3. Actores del Sistema y Roles Definidos
+## 3. Identificadores Técnicos Internos vs. Códigos Visibles
+
+Para evitar que los cambios institucionales rompan la base de datos, se establece la separación estricta entre identificadores de máquina y códigos de visualización:
+
+* **Identificadores Técnicos Internos `[PROPUESTO]`:**
+  * Son claves primarias (`id` autoincremental / `BIGSERIAL` o `UUID`) administradas internamente por PostgreSQL.
+  * Nunca se exponen al usuario final ni se usan como referencia de búsqueda en ventanilla.
+  * Garantizan la integridad referencial y las relaciones entre tablas.
+* **Códigos Visibles y de Negocio `[PROPUESTO]`:**
+  * **Código de Expediente / Trámite:** Formato preliminar `EXP-[AÑO]-[CORRELATIVO 6 DÍGITOS]` (ej. `EXP-2026-000001`) `[EJEMPLO]`.
+  * **Número de Asiento del Libro de Registro:** Correlativo global continuo del libro (ej. `REG-2026-00004521`) `[EJEMPLO]`.
+  * *Condición técnica:* No se generan mediante `SELECT MAX(...) + 1` para evitar colisiones en concurrencia; se gestionan mediante secuencias atómicas de base de datos (`SEQUENCE`).
+
+---
+
+## 4. Actores del Sistema y Roles Definidos
 
 * **Administrado / Solicitante (Externo o Interno) `[PROPUESTO]`:**
-  * *Rol:* Inicia el trámite a través de Mesa de Partes (presencial o virtual), provee datos de contacto, adjunta requisitos obligatorios y realiza el seguimiento de su solicitud.
+  * *Responsabilidad:* Presenta la solicitud por Mesa de Partes física o virtual, adjunta requisitos, registra datos de contacto y consulta el estado de su trámite.
 * **Operador de Mesa de Partes `[PROPUESTO]`:**
-  * *Rol:* Valida formalmente los requisitos documentales presentados, genera el registro de ingreso, abre el expediente, asienta el primer número del Libro de Registro y entrega el cargo de recepción.
+  * *Responsabilidad:* Valida formalmente los requisitos y folios, apertura el expediente en el sistema, asienta el ingreso en el Libro de Registro y emite el cargo oficial al solicitante.
 * **Especialista / Funcionario de Área Resolutora `[PROPUESTO]`:**
-  * *Rol:* Recepciona el expediente derivado a su unidad, evalúa el fondo del requerimiento, redacta documentos internos (memorándums, informes técnicos), adjunta respuestas y solicita derivaciones o subsanaciones.
-* **Jefe de Área / Autoridad Resolutiva `[PROPUESTO]`:**
-  * *Rol:* Emite el acto administrativo o documento resolutivo final que atiende la solicitud, autoriza reasignaciones y dispone el cierre o la reapertura formal de un expediente.
+  * *Responsabilidad:* Revisa el fondo del requerimiento, genera documentos de respuesta (informes, oficios), solicita subsanaciones o deriva el expediente a otra oficina.
+* **Jefe de Área / Autoridad Institucional `[PROPUESTO]`:**
+  * *Responsabilidad:* Suscribe el acto resolutivo final, autoriza reasignaciones y dispone el cierre o la reapertura formal del expediente.
 * **Administrador del Sistema SIGD `[PROPUESTO]`:**
-  * *Rol:* Administra las tablas maestras, supervisa la integridad de las secuencias del Libro de Registro, audita los accesos y autoriza anulaciones lógicas excepcionales con justificación administrativa.
+  * *Responsabilidad:* Configura periodos de numeración, supervisa la inmutabilidad de los asientos y ejecuta anulaciones lógicas excepcionales bajo estricta auditoría.
 
 ---
 
-## 4. Datos de Entrada, Remitente y Destinatario
+## 5. Datos de Entrada, Remitente y Destinatario
 
-### 4.1 Datos del Remitente `[CONFIRMADO]`
+### 5.1 Datos del Remitente `[CONFIRMADO]`
 * **Tipo de Persona:** Natural o Jurídica `[PROPUESTO]`.
-* **Tipo y Número de Identificación:** DNI, CE o RUC `[PROPUESTO]`.
-* **Nombres y Apellidos / Razón Social:** Denominación legal verificable `[PROPUESTO]`.
-* **Datos de Notificación:** Correo electrónico, teléfono celular y domicilio real/fiscal `[PROPUESTO]`.
-* *Regla de integración:* No se duplican datos personales; se referencia al identificador único provisto por el módulo de usuarios (Grupo 4) `[CONFIRMADO]`.
+* **Tipo y Número de Identificación:** DNI, Carné de Extranjería o RUC `[PROPUESTO]`.
+* **Nombres y Apellidos / Razón Social:** Nombre legal acreditado `[PROPUESTO]`.
+* **Datos de Contacto:** Correo electrónico, celular y dirección fiscal o domiciliaria `[PROPUESTO]`.
+* *Regla de integración:* Se vincula por clave foránea al módulo de usuarios del Grupo 4 sin duplicar datos personales en las tablas del trámite.
 
-### 4.2 Datos del Destinatario `[CONFIRMADO]`
-* **Unidad Orgánica / Dependencia:** Área inicial a la que compete atender el trámite (ej. Dirección General, Secretaría Académica, Administración) `[PROPUESTO]`.
-* **Funcionario Responsable (Opcional en Mesa de Partes):** Cargo o usuario específico asignado dentro del área destinataria `[PENDIENTE]`.
-* *Regla de integración:* Referencia al catálogo organizacional gestionado por el Grupo 3 `[CONFIRMADO]`.
+### 5.2 Datos del Destinatario `[CONFIRMADO]`
+* **Unidad Orgánica / Dependencia:** Oficina a la que se remite el trámite (ej. Dirección General, Secretaría Académica, Logística) `[PROPUESTO]`.
+* **Funcionario Destino:** Usuario asignado dentro del área receptora `[PENDIENTE]`.
+* *Regla de integración:* Se vincula mediante el catálogo de áreas del Grupo 3.
 
-### 4.3 Datos del Cuerpo del Registro / Documento `[CONFIRMADO]`
-* **Tipo de Documento de Origen:** Solicitud (FUT), Oficio, Carta, Memorándum, Informe `[PROPUESTO]`.
-* **Número/Identificador de Origen:** Ej. `OFICIO-045-2026-GRA` `[EJEMPLO]`.
-* **Folios Declarados:** Cantidad física de hojas o páginas `[PROPUESTO]`.
-* **Asunto / Sumilla:** Descripción puntual de lo solicitado (máximo 500 caracteres) `[PROPUESTO]`.
-* **Canal de Ingreso:** `MESA_VIRTUAL` o `MESA_PRESENCIAL` `[PROPUESTO]`.
-* **Archivos Adjuntos:** Documentos escaneados en formato PDF `[PROPUESTO]`.
+### 5.3 Datos del Cuerpo del Registro `[CONFIRMADO]`
+* **Tipo de Documento:** Solicitud (FUT), Oficio, Memorándum, Carta `[PROPUESTO]`.
+* **Número de Documento de Origen:** Código visible del documento presentado (ej. `OF-015-2026-MINEDU`) `[EJEMPLO]`.
+* **Asunto / Sumilla:** Resumen del requerimiento (máximo 500 caracteres) `[PROPUESTO]`.
+* **Folios Declarados:** Número total de páginas sustentatorias `[PROPUESTO]`.
+* **Canal de Ingreso:** `MESA_PRESENCIAL` o `MESA_VIRTUAL` `[PROPUESTO]`.
+* **Documentos Digitalizados:** Archivos adjuntos en formato PDF/A `[PROPUESTO]`.
 
 ---
 
-## 5. Flujos Operativos Detallados Paso a Paso
+## 6. Flujos Operativos Detallados Paso a Paso
 
-### 5.1 Flujo Normal: Desde la Presentación hasta el Registro Inicial
-1. **Paso 1: Presentación:** El Administrado completa el formulario virtual o presenta en ventanilla física su solicitud con sus requisitos adjuntos.
-   * *Entrada:* Datos del remitente, asunto, tipo de documento y archivos adjuntos.
+### 6.1 Flujo Normal: Presentación y Registro Inicial
+1. **Presentación de Documentación:**
+   * *Entrada:* Datos del remitente, asunto, dependencia destino, folios y archivo PDF.
    * *Responsable:* Administrado / Operador de Mesa de Partes.
-2. **Paso 2: Validación Formal de Requisitos:** Mesa de Partes valida que la documentación esté completa según la directiva o TUPA institucional.
-   * *Validación:* Verificar que el remitente esté identificado, el asunto sea claro y existan documentos adjuntos en PDF legibles.
+2. **Validación Formal de Requisitos:**
+   * *Validación:* Comprobación de legibilidad del documento, acreditación del remitente y cumplimiento de requisitos TUPA.
    * *Responsable:* Operador de Mesa de Partes.
-3. **Paso 3: Apertura del Expediente:** El sistema genera el contenedor del trámite con su código identificador visible único en estado `REGISTRADO`.
-   * *Procesamiento:* Creación de la tupla del expediente con marcas temporales de servidor.
-   * *Resultado:* Código de expediente generado (ej. `EXP-2026-000001`).
+3. **Creación del Expediente:**
+   * *Procesamiento:* El sistema crea el contenedor con estado `REGISTRADO` y genera su código visible (ej. `EXP-2026-000001`).
    * *Responsable:* Sistema SIGD.
-4. **Paso 4: Asentado en el Libro de Registro:** El sistema emite automáticamente el siguiente número consecutivo global del Libro de Registro.
-   * *Procesamiento:* Registro atómico inmutable que asocia remitente, destinatario, fecha, hora, tipo de trámite y expediente originado.
-   * *Resultado:* Asiento del Libro emitido (ej. Asiento General Nº `00001205`).
+4. **Asentado en el Libro General de Registros:**
+   * *Procesamiento:* Generación automática e inmutable del asiento correlativo global (ej. Asiento Nº `00001205`), sellando fecha, hora, remitente, destino y usuario operador.
    * *Responsable:* Sistema SIGD.
-5. **Paso 5: Emisión de Cargo de Recepción:** Se emite el comprobante de registro con código, fecha y sello de tiempo para el administrado.
-   * *Resultado:* Comprobante imprimible/descargable con código de seguimiento.
+5. **Emisión de Cargo:**
+   * *Resultado:* Emisión de comprobante digital o físico con sello de recepción y código de verificación.
    * *Responsable:* Mesa de Partes.
-6. **Paso 6: Derivación Inicial:** El expediente pasa a estado `EN_TRAMITE` y se envía a la bandeja del Área Destinataria.
-   * *Responsable:* Operador de Mesa de Partes.
+6. **Derivación Inicial y Trazabilidad:**
+   * *Procesamiento:* El expediente cambia a estado `EN_TRAMITE`, se envía a la bandeja del área destino y se despacha el evento al módulo de trazabilidad (Grupo 1).
+   * *Responsable:* Mesa de Partes / Sistema.
 
-### 5.2 Flujos Excepcionales Paso a Paso
+### 6.2 Flujos Excepcionales Paso a Paso
 
 * **Excepción 1: Requisitos Incompletos o Defectuosos `[PROPUESTO]`**
-  * *Condición:* Faltan requisitos obligatorios o el archivo PDF es ilegible.
-  * *Paso 1:* Mesa de partes declara el trámite en estado `OBSERVADO`.
-  * *Paso 2:* Se asienta en el historial la observación detallada y se notifica al remitente.
-  * *Paso 3:* Se otorga un plazo perentorio de subsanación (ej. 48 horas / 2 días hábiles según Ley 27444).
-  * *Paso 4:* Si subsana dentro del plazo, el expediente pasa a `REGISTRADO`. Si no subsana, pasa a `ARCHIVADO` por abandono.
-
-* **Excepción 2: Devolución por Incompetencia del Área Destino `[PROPUESTO]`**
-  * *Condición:* El área receptora recibe un expediente que corresponde a otra oficina funcional.
-  * *Paso 1:* El funcionario receptor registra la devolución indicando motivo y base reglamentaria.
-  * *Paso 2:* El expediente retorna a Mesa de Partes y se asienta el evento en el historial sin alterar los asientos anteriores.
-  * *Paso 3:* Mesa de Partes reasigna el expediente a la unidad orgánica correcta.
-
+  * *Condición:* Documentación ilegible o ausencia de requisitos obligatorios.
+  * *Acción:* Mesa de Partes cambia el estado a `OBSERVADO`, registra la observación formal y notifica al administrado otorgando un plazo legal de 48 horas (2 días hábiles) para subsanar. Si no subsana dentro del plazo, el expediente pasa a estado `ARCHIVADO` por abandono.
+* **Excepción 2: Destino Inválido o Devolución por Incompetencia `[PROPUESTO]`**
+  * *Condición:* El área receptora determina que la atención no corresponde a su competencia reglamentaria.
+  * *Acción:* El funcionario registra la devolución justificando la causal. El expediente retorna a Mesa de Partes mediante un nuevo asiento de retorno, sin alterar los asientos previos, y se reasigna al área competente.
 * **Excepción 3: Intento de Numeración Repetida / Concurrencia Simultánea `[PROPUESTO]`**
   * *Condición:* Dos operadores intentan asentar un registro en el mismo milisegundo.
-  * *Acción del sistema:* Se prohíbe el uso de `MAX() + 1`. El sistema utiliza una secuencia transaccional atómica de PostgreSQL (`SERIAL` / `SEQUENCE` o bloqueo a nivel de fila) para asegurar que cada asiento reciba un correlativo único, lineal e ininterrumpido.
-
+  * *Acción:* Se descarta el cálculo por `MAX() + 1`. Se implementan secuencias nativas de base de datos (`SEQUENCE` transaccional en PostgreSQL) con nivel de aislamiento de transacciones para garantizar la correlatividad lineal sin saltos ni duplicados.
 * **Excepción 4: Detección de Trámite Duplicado `[PROPUESTO]`**
-  * *Condición:* Ingreso de una solicitud con el mismo número de documento de origen, mismo remitente y mismo asunto dentro del mismo ejercicio fiscal.
-  * *Acción del sistema:* El sistema emite una advertencia de posible duplicidad al operador antes de confirmar el registro, exigiendo justificación para continuar o cancelando el registro.
-
-* **Excepción 5: Expediente sin Documentos Adjuntos `[PROPUESTO]`**
-  * *Condición:* Falla de carga de archivos en red o formulario enviado sin adjuntos (`count == 0`).
-  * *Acción del sistema:* Restricción a nivel de base de datos (`CHECK` o trigger) que cancela la transacción (`ROLLBACK`). No se permite la apertura de expedientes vacíos sin al menos un documento probatorio inicial.
-
-* **Excepción 6: Anulación de Registro `[PROPUESTO]`**
-  * *Condición:* Error material grave comprobado, registro por duplicidad involuntaria o vicio formal.
-  * *Acción del sistema:* El asiento original **nunca se elimina físicamente** de la base de datos (inmutabilidad). El expediente pasa al estado `ANULADO`, el asiento se marca como inactivo (`is_active = false`) y se asienta un nuevo evento de anulación con fecha, usuario y resolución autoritativa.
-
+  * *Condición:* Ingreso de una solicitud con idéntico remitente, tipo de documento y número de documento dentro del mismo año fiscal.
+  * *Acción:* El sistema emite una advertencia de duplicidad bloqueante en pantalla. El operador debe validar si se trata de una reiteración o si debe rechazar el nuevo registro para anexarlo como documento al expediente preexistente.
+* **Excepción 5: Expediente sin Documentos Adjuntos Requeridos `[PROPUESTO]`**
+  * *Condición:* El formulario se envía sin cargar el PDF de sustento.
+  * *Acción:* Validación a nivel de base de datos y backend que aborta la operación (`ROLLBACK`). No se autoriza la apertura de expedientes vacíos sin al menos un documento probatorio vinculado.
+* **Excepción 6: Registro Anulado `[PROPUESTO]`**
+  * *Condición:* Error material crítico comprobado, registro fraudulento o mandato judicial.
+  * *Acción:* Se aplica borrado lógico (`soft-delete`: `is_active = false`). El asiento original permanece inmutable en el Libro de Registro para fines de auditoría, el expediente pasa al estado `ANULADO` y se asienta el evento de anulación con la resolución autoritativa y el usuario responsable.
 * **Excepción 7: Desistimiento Voluntario `[PROPUESTO]`**
-  * *Condición:* El administrado presenta un escrito formal desistiendo de su solicitud antes del acto resolutivo final.
-  * *Acción del sistema:* Se incorpora el escrito de desistimiento como nuevo documento del expediente y este pasa al estado `CERRADO` por desistimiento.
-
+  * *Condición:* El solicitante presenta su desistimiento expreso antes de la resolución final.
+  * *Acción:* Se adjunta el desistimiento como documento del expediente y se actualiza el estado a `CERRADO` por desistimiento.
 * **Excepción 8: Reapertura Excepcional `[PROPUESTO]`**
-  * *Condición:* Presentación de recurso administrativo (reconsideración, apelación) o nulidad de oficio sobre un expediente en estado `CERRADO`.
-  * *Acción del sistema:* Requiere autorización de la jefatura o administrador. El expediente cambia a estado `REABIERTO`, conservando intacto todo su historial previo.
+  * *Condición:* Presentación de recurso de reconsideración o apelación fundada contra un trámite cerrado.
+  * *Acción:* Previa autorización de la autoridad institucional, el expediente cambia a estado `REABIERTO`, conservando todo su historial documental intacto.
 
 ---
 
-## 6. Matriz Funcional Propuesta
+## 7. Matriz Funcional Propuesta
 
-| Operación / Función | Entradas | Procesamiento y Validaciones | Salidas | Estado Resultante | Responsable |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Registrar Trámite** | Remitente, asunto, destino, folios, PDF. | Valida requisitos, asigna código único y crea asiento global. | Expediente creado, Asiento generado, Cargo. | `REGISTRADO` | Mesa de Partes |
-| **Consultar Expediente** | Código de expediente o DNI/RUC. | Verifica permisos; retorna vistas de metadatos y cronología. | Ficha del expediente, lista de documentos e historial. | *(Sin cambio)* | Público / Funcionarios |
-| **Corregir / Subsanar** | Doc. de subsanación o corrección. | Valida que esté en estado `OBSERVADO` o error material justificado. | Asiento de subsanación, documentos anexados. | `EN_TRAMITE` | Administrado / Mesa de Partes |
-| **Derivar Expediente** | Cód. expediente, área destino, proveído. | Verifica tenencia actual y disponibilidad del área receptora. | Notificación al área, Asiento de pase. | `EN_TRAMITE` | Especialista / Mesa de Partes |
-| **Cerrar Expediente** | Documento final de atención/resolución. | Valida conclusión del requerimiento y bloqueo de nuevos pases. | Notificación de cierre al administrado, Asiento. | `CERRADO` | Jefe de Área Resolutora |
-| **Reabrir Expediente** | Motivo legal, recurso de impugnación. | Valida estado `CERRADO` y autorización de jefatura. | Asiento de reapertura con registro de auditoría. | `REABIERTO` | Jefe de Área / Administrador |
-| **Anular Registro** | Cód. expediente, justificación formal. | Borrado lógico (`is_active=false`), preserva histórico. | Asiento de anulación, expediente invalidado. | `ANULADO` | Administrador del Sistema |
-| **Entregar a Trazabilidad** | Evento generado por cualquier operación. | Envía identificadores y sello de tiempo al bus del Grupo 1. | Confirmación de recepción en el módulo de seguimiento. | *(Según evento)* | Módulo Core / Sistema |
+| Operación / Función `[PROPUESTO]` | Entradas (Inputs) | Procesamiento y Reglas de Negocio | Salidas (Outputs) | Estado Resultante | Responsable |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Registrar Trámite** | Remitente, destinatario, asunto, folios, PDF. | Valida requisitos, asigna ID técnico, genera código visible y crea asiento global. | Expediente creado, Asiento emitido, Cargo de recepción. | `REGISTRADO` | Mesa de Partes |
+| **Consultar Expediente** | Código visible o Documento de Identidad. | Filtra por permisos de usuario y expone metadatos y cronología de asientos. | Ficha del expediente, lista de documentos e historial. | *(Sin cambio)* | Público / Funcionarios |
+| **Corregir / Subsanar** | Escrito de subsanación o corrección material. | Válido únicamente en estado `OBSERVADO` o error material justificado. No destruye el historial. | Asiento de subsanación, documentos anexados. | `EN_TRAMITE` | Administrado / Mesa de Partes |
+| **Derivar Expediente** | Cód. expediente, área destino, proveído. | Verifica que el área sea la tenedora activa; genera nuevo asiento de movimiento. | Notificación de envío a la bandeja receptora, Asiento de derivación. | `EN_TRAMITE` | Especialista / Mesa de Partes |
+| **Cerrar Expediente** | Documento resolutivo final, constancia de notificación. | Valida la resolución de los requerimientos y bloquea nuevos trámites ordinarios. | Expediente concluido, Asiento de cierre. | `CERRADO` | Jefe de Área Resolutora |
+| **Reabrir Expediente** | Solicitud de reapertura justificada, recurso legal. | Requiere validación de estado `CERRADO` y permiso de jefatura o administrador. | Expediente reactivado, Asiento de reapertura. | `REABIERTO` | Jefe de Área / Administrador |
+| **Anular Registro** | Código de expediente, motivo formal de anulación. | Borrado lógico (`is_active = false`), mantiene auditoría en el libro. | Expediente invalidado, Asiento de anulación registrado. | `ANULADO` | Administrador del Sistema |
+| **Entregar a Trazabilidad** | Eventos originados por cualquier operación. | Dispara la carga de datos estructurados hacia el bus de seguimiento del Grupo 1. | Confirmación de recepción en el módulo de seguimiento. | *(Según evento)* | Sistema SIGD (Core) |
 
 ---
 
-## 7. Registro de Decisiones Tomadas y Propuestas
+## 8. Registro de Decisiones Tomadas y Propuestas
 
-| Código | Decisión | Categoría | Justificación Técnica o Normativa |
+| Código | Decisión Adoptada | Categoría | Justificación Técnica o Normativa |
 | :--- | :--- | :--- | :--- |
-| **DEC-01** | Separación de Trámite, Expediente, Documento y Asiento. | `[PROPUESTO]` | Evita la sobrecarga de datos en una sola tabla y permite escalabilidad según buenas prácticas del MGD. |
-| **DEC-02** | Asientos con correlativo global ininterrumpido. | `[PROPUESTO]` | El Libro de Registros debe ser una auditoría general del sistema y no reiniciarse por expediente particular. |
-| **DEC-03** | Generación de números mediante secuencias de base de datos (`SEQUENCE`). | `[PROPUESTO]` | Previene colisiones de concurrencia y bloqueos generados por consultas del tipo `MAX() + 1`. |
-| **DEC-04** | Preservación de registros mediante borrado lógico (`soft-delete`). | `[PROPUESTO]` | Exigencia legal y de auditoría: los expedientes anulados deben ser auditables y no eliminarse del disco. |
-| **DEC-05** | No duplicación de datos de personas ni dependencias. | `[CONFIRMADO]` | Integración modular: el Grupo 2 consume identificadores de los Grupos 4 (usuarios) y 3 (áreas). |
-| **DEC-06** | Formato de código visible `EXP-[AÑO]-[CORRELATIVO 6 DÍGITOS]`. | `[EJEMPLO]` | Formato de trabajo provisional sujeto a la estructura que defina la institución. |
-| **DEC-07** | Periodicidad del reinicio de correlativo del Libro de Registros. | `[PENDIENTE]` | Debe validarse con el profesor si el libro se cierra cada 31 de diciembre o es continuo histórico. |
-| **DEC-08** | Adopción obligatoria de firma digital criptográfica (X.509). | `[PENDIENTE]` | Por definir si se requerirá certificado digital o bastará con firma escaneada / hash del PDF. |
+| **DEC-01** | Separación conceptual de Trámite, Expediente, Documento y Asiento. | `[PROPUESTO]` | Previene la sobrecarga de datos en una sola entidad y asegura escalabilidad bajo el Modelo de Gestión Documental (MGD). |
+| **DEC-02** | Asientos con numeración correlativa global única. | `[PROPUESTO]` | El Libro de Registro certifica el flujo general de toda la entidad y no debe reiniciarse por cada expediente individual. |
+| **DEC-03** | Generación de correlativos mediante secuencias nativas de PostgreSQL (`SEQUENCE`). | `[PROPUESTO]` | Elimina problemas de colisión por concurrencia provocados por consultas manuales del tipo `MAX + 1`. |
+| **DEC-04** | Preservación de registros mediante borrado lógico (`soft-delete`). | `[PROPUESTO]` | Garantiza auditoría e inmutabilidad legal exigida por la normativa administrativa pública. |
+| **DEC-05** | No duplicación de entidades de personas ni unidades orgánicas. | `[CONFIRMADO]` | Arquitectura modular: consumo de identificadores de los Grupos 4 (usuarios) y 3 (áreas). |
+| **DEC-06** | Estructura visible preliminar `EXP-[AÑO]-[CORRELATIVO 6 DÍGITOS]`. | `[EJEMPLO]` | Formato de trabajo representativo sujeto a la directiva oficial que determine la institución. |
+| **DEC-07** | Periodicidad del reinicio de correlativo del Libro de Registros. | `[PENDIENTE]` | Debe validarse con el profesor si el correlativo se reinicia el 1 de enero o si es histórico continuo. |
+| **DEC-08** | Implementación obligatoria de firma digital criptográfica (X.509). | `[PENDIENTE]` | Pendiente definir si el sistema exigirá certificado digital o validará mediante firma escaneada y hash de verificación. |
 
 ---
 
-## 8. Investigación de Buenas Prácticas de Gestión Documental
+## 9. Investigación de Buenas Prácticas de Gestión Documental
 
 * **Ley Nº 27444 – Texto Único Ordenado de la Ley del Procedimiento Administrativo General (LPAG):**  
-  * *Explicación con palabras propias:* Esta norma establece los principios de **celeridad, eficacia e inmutabilidad** de los actos públicos. Dispone que toda entidad debe registrar el ingreso de documentos en el orden riguroso de su recepción, otorgar un cargo con fecha y hora exacta al administrado, y prohíbe exigir documentos que la propia institución ya posea. En cuanto a las subsanaciones, establece que si una solicitud no cumple con los requisitos formales, no se debe rechazar de inmediato, sino otorgar un plazo (habitualmente 48 horas o 2 días hábiles) para que el solicitante corrija la omisión antes de declarar el abandono.
+  * *Explicación con palabras propias:* Esta norma rige el funcionamiento administrativo del Estado. Establece los principios de **celeridad, legalidad y debido procedimiento**, exigiendo que toda recepción documental sea registrada en estricto orden de llegada y que se entregue un cargo con fecha y hora cierta al administrado. Además, dispone que si una solicitud carece de requisitos formales, la institución no puede rechazarla de plano; debe admitirla provisionalmente y conceder un plazo improrrogable (generalmente de 48 horas / 2 días hábiles) para que el administrado subsane la omisión antes de declarar el abandono.
 * **Modelo de Gestión Documental (MGD) – Presidencia del Consejo de Ministros (PCM / SGTD):**  
-  * *Explicación con palabras propias:* El MGD es el estándar técnico peruano para la transformación digital de archivos. Exige que el ciclo de vida documental se divida con claridad entre la **recepción (Mesa de Partes)**, la **trazabilidad (expedientes con foliación digital)** y el **despacho/archivo**. Establece que cada expediente debe funcionar como una unidad indivisible con trazabilidad permanente, donde ningún documento pueda ser retirado o alterado una vez registrado, garantizando la autenticidad y el no repudio institucional.
+  * *Explicación con palabras propias:* Es el marco normativo peruano que define la digitalización documental pública. Exige dividir el ciclo documental en **recepción, emisión, despacho, seguimiento y archivo**, manteniendo expedientes electrónicos íntegros, foliados digitalmente e inalterables. Señala que los asientos registrales no pueden modificarse una vez generados, debiendo implementarse pistas de auditoría que garanticen autenticidad e integridad.
 * **Directivas Institucionales de Trámite Documentario:**  
-  * *Explicación con palabras propias:* Las directivas internas regulan la apertura de libros de registro únicos por cada año calendario, fijan los roles y responsabilidades de quienes pueden despachar o archivar, y determinan que las correcciones ante errores materiales se realicen mediante nuevos asientos o notas de rectificación (asientos de alcance), prohibiendo estrictamente el borrado o alteración de registros existentes.
+  * *Explicación con palabras propias:* Son las normas internas de cada institución que regulan la apertura anual de los Libros de Registros. Fijan las atribuciones para autorizar cierres o reasignaciones de expedientes y dictaminan que toda corrección por error material deba asentarse mediante notas marginales o nuevos asientos rectificatorios, quedando prohibido eliminar físicamente registros del sistema.
 
 ---
 
-## 9. Preguntas Oficiales para Definición Institucional (§10 del Plan)
+## 10. Preguntas Oficiales para Definición Institucional (§10 del Plan)
 
 1. ¿Qué diferencia oficial existe entre trámite, expediente, documento presentado y asiento del libro de registro? `[PENDIENTE]`
 2. ¿Un trámite crea siempre un expediente y un único número de registro, o pueden existir otras cardinalidades? `[PENDIENTE]`
@@ -178,11 +186,3 @@ Definir y estandarizar funcionalmente el núcleo documental del SIGD, establecie
 6. ¿Qué estados oficiales existen y qué operaciones se permiten después del cierre, anulación o archivamiento? `[PENDIENTE]`
 7. ¿Cómo se corrige un asiento equivocado sin perder el historial ni reutilizar su número? `[PENDIENTE]`
 8. ¿Qué información pasa a trazabilidad y qué debe ocurrir si faltan documentos o requisitos del trámite? `[PENDIENTE]`
-
----
-
-## 10. Evidencia Individual de Autoría y Explicación Técnica (§9 del Plan)
-* **Rama de trabajo:** `B_RIQUELMER`
-* **Archivo elaborado:** `01_analisis_tramite_expediente_registro.md`
-* **Explicación breve del trabajo realizado:** Se elaboró el análisis funcional completo de la Fase 1 estructurando los conceptos clave, definiendo los actores con sus responsabilidades, detallando los flujos normales y excepcionales paso a paso con sus validaciones, creando la matriz funcional de operaciones y fundamentando las decisiones mediante las categorías del plan y las fuentes normativas de gestión documental.
-* **Verificación:** Se verificó la consistencia de las reglas mediante Git, asegurando que los identificadores técnicos no dependan de `MAX + 1` y que el flujo esté listo para el modelado de datos de Ramírez y la implementación SQL de Sandy.
