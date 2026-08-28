@@ -26,3 +26,9 @@ Para no perder la trazabilidad de los documentos firmados o aprobados en el tiem
 ### 2.4 Control de Acceso Granular (Tablas `roles`, `permisos`, `roles_permisos`)
 * Se define una matriz de permisos atómicos (ej. `tramite:crear`, `expediente:aprobar`).
 * La relación N:M entre roles y permisos permite ajustar perfiles sin alterar la estructura del código base.
+
+
+## 3. Diagrama Entidad-Relación (ER) - Preliminar / En Revisión
+
+> **Nota:** El siguiente diagrama representa una propuesta preliminar del modelo de datos sujeta a validación y ajustes finales durante las pruebas de integración.
+![Diagrama Entidad-Relación](./diagrama_er_organizacion.png)
