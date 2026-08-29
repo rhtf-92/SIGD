@@ -1,33 +1,62 @@
-# Justificación del Modelo de Datos - Módulo de Organización y Permisos
+# Modelo de Datos Relacional - Módulo de Organización y Permisos
 
-## 1. Arquitectura General
-El modelo de datos para el módulo de Organización, Roles y Permisos está optimizado para el motor PostgreSQL, garantizando el cumplimiento de la estructura institucional de forma flexible y con soporte integral para el control de acceso basado en roles (RBAC)[cite: 2].
+## 1. Descripción del Modelo
+El módulo de Organización y Permisos gestiona la estructura jerárquica de la entidad (áreas), los cargos administrativos, la autenticación de usuarios y la asignación de accesos granular mediante un modelo RBAC (Role-Based Access Control).
 
-## 2. Decisiones de Diseño
+## 2. Definición de Entidades
 
-### 2.1 Jerarquía Orgánica (Tabla `areas`)
-Para representar el organigrama institucional completo (Gerencias, Direcciones, Oficinas y Sub-áreas) sin limitar los niveles de profundidad[cite: 2, 3]:
-* Se implementó un modelo **autorreferenciado** mediante la clave foránea `parent_id`[cite: 2].
-* Las unidades principales poseen `parent_id` en `NULL`[cite: 2].
-* Esto simplifica la navegación del árbol organizacional usando consultas recursivas (CTE)[cite: 2].
+### `areas`
+Almacena las unidades orgánicas de la entidad. Permite jerarquía autorreferenciada (`parent_id`).
+* `id` (PK, BIGSERIAL)
+* `nombre` (VARCHAR 150, NOT NULL)
+* `sigla` (VARCHAR 20, NOT NULL, UNIQUE)
+* `parent_id` (FK, BIGINT, Nullable) $\rightarrow$ `areas.id`
+* `estado` (BOOLEAN, DEFAULT true)
 
-### 2.2 Desacoplamiento entre Cargo y Rol
-Se mantiene una estricta separación entre el **Cargo** (ámbito nominal/contractual) y el **Rol** (perfil dentro del sistema)[cite: 2]:
-* **`cargos`**: Registra la función administrativa (ej. *Especialista en Archivo*, *Director*)[cite: 2].
-* **`roles`**: Define las facultades en el software (ej. *Operador de Trámite*, *Administrador*)[cite: 2].
-* *Sustento*: Permite gestionar interinatos o suplencias otorgando permisos de sistema sin alterar la contratación laboral del usuario[cite: 2].
+### `cargos`
+Catálogo de funciones operativas o administrativas.
+* `id` (PK, BIGSERIAL)
+* `nombre` (VARCHAR 100, NOT NULL, UNIQUE)
+* `estado` (BOOLEAN, DEFAULT true)
 
-### 2.3 Historial de Responsabilidades (Tabla `responsables`)
-Para garantizar la trazabilidad de firmas, vistos buenos y aprobaciones en expedientes a lo largo del tiempo[cite: 2]:
-* Se maneja un registro histórico en la tabla `responsables` con campos de vigencia (`fecha_inicio`, `fecha_fin`)[cite: 1, 2].
-* Permite diferenciar entre responsables titulares e interinos mediante la bandera `es_titular`[cite: 1].
+### `roles`
+Perfiles de acceso dentro del sistema.
+* `id` (PK, BIGSERIAL)
+* `codigo` (VARCHAR 50, NOT NULL, UNIQUE)
+* `nombre` (VARCHAR 100, NOT NULL)
 
-### 2.4 Matriz Granular de Seguridad (`roles`, `permisos`, `roles_permisos`)
-* Descompone las acciones en permisos atómicos (`codigo`)[cite: 1, 2].
-* La relación N:M desacopla la lógica del backend, haciendo posible redefinir perfiles mediante configuración de base de datos sin alterar código fuente[cite: 2].
+### `permisos`
+Acciones o recursos del sistema expuestos para autorización.
+* `id` (PK, BIGSERIAL)
+* `codigo` (VARCHAR 100, NOT NULL, UNIQUE)
+* `descripcion` (TEXT)
 
-## 3. Diagrama Entidad-Relación (ER)
+### `users`
+Cuentas de usuario registradas en la plataforma.
+* `id` (PK, BIGSERIAL)
+* `username` (VARCHAR 50, NOT NULL, UNIQUE)
+* `email` (VARCHAR 100, NOT NULL, UNIQUE)
+* `password_hash` (VARCHAR 255, NOT NULL)
+* `rol_id` (FK, BIGINT, NOT NULL) $\rightarrow$ `roles.id`
+* `estado` (BOOLEAN, DEFAULT true)
 
-El siguiente diagrama refleja la estructura de entidades y sus relaciones para el módulo[cite: 2]:
+### `responsables`
+Histórico de jefaturas y encargaturas de usuarios en las áreas.
+* `id` (PK, BIGSERIAL)
+* `area_id` (FK, BIGINT, NOT NULL) $\rightarrow$ `areas.id`
+* `usuario_id` (FK, BIGINT, NOT NULL) $\rightarrow$ `users.id`
+* `cargo_id` (FK, BIGINT, NOT NULL) $\rightarrow$ `cargos.id`
+* `fecha_inicio` (DATE, NOT NULL)
+* `fecha_fin` (DATE, Nullable)
+* `es_titular` (BOOLEAN, DEFAULT true)
 
-![Diagrama Entidad-Relación](./diagrama_er_organizacion.png)[cite: 2]
+### `roles_permisos`
+Tabla pivote para la relación N:M entre roles y permisos.
+* `rol_id` (PK, FK, BIGINT, NOT NULL) $\rightarrow$ `roles.id`
+* `permiso_id` (PK, FK, BIGINT, NOT NULL) $\rightarrow$ `permisos.id`
+
+## 3. Relaciones del Modelo
+* **`areas` $\rightarrow$ `areas` (1:N):** Una área padre puede contener múltiples subáreas (`parent_id`).
+* **`roles` $\rightarrow$ `users` (1:N):** Cada usuario posee asignado un único rol operativo (`rol_id`).
+* **`roles` $\leftrightarrow$ `permisos` (N:M):** Un rol agrupa múltiples permisos y un permiso puede estar asignado a varios roles (`roles_permisos`).
+* **`responsables` (N:M):** Asocia `areas`, `users` y `cargos` preservando la trazabilidad histórica de vigencia (`fecha_inicio`, `fecha_fin`).
