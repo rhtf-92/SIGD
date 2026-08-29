@@ -1,34 +1,33 @@
 # Justificación del Modelo de Datos - Módulo de Organización y Permisos
 
 ## 1. Arquitectura General
-El modelo de datos para el módulo de Organización, Roles y Permisos se diseñó para PostgreSQL 18.6 con el objetivo de representar la estructura institucional de forma flexible y mantener un control de acceso basado en roles (RBAC).
+El modelo de datos para el módulo de Organización, Roles y Permisos está optimizado para el motor PostgreSQL, garantizando el cumplimiento de la estructura institucional de forma flexible y con soporte integral para el control de acceso basado en roles (RBAC)[cite: 2].
 
 ## 2. Decisiones de Diseño
 
 ### 2.1 Jerarquía Orgánica (Tabla `areas`)
-Para representar el organigrama sin importar cuántos niveles jerárquicos existan (Gerencias, Subgerencias, Oficinas, Áreas), se implementó un modelo **autorreferenciado**:
-* La columna `parent_id` apunta a la clave primaria `id` de la misma tabla `areas`.
-* Un valor `NULL` en `parent_id` representa una unidad de máxima jerarquía.
-* Esta estructura evita la creación de tablas adicionales por cada nivel organizacional y facilita consultas recursivas mediante CTEs (`WITH RECURSIVE`).
+Para representar el organigrama institucional completo (Gerencias, Direcciones, Oficinas y Sub-áreas) sin limitar los niveles de profundidad[cite: 2, 3]:
+* Se implementó un modelo **autorreferenciado** mediante la clave foránea `parent_id`[cite: 2].
+* Las unidades principales poseen `parent_id` en `NULL`[cite: 2].
+* Esto simplifica la navegación del árbol organizacional usando consultas recursivas (CTE)[cite: 2].
 
 ### 2.2 Desacoplamiento entre Cargo y Rol
-Se mantuvieron separadas las entidades **Cargo** (puesto laboral administrativo) y **Rol** (perfil de acceso en el sistema):
-* **`cargos`**: Representa la función nominal dentro de la institución (ej. *Especialista en Archivo*, *Director General*).
-* **`roles`**: Agrupa permisos operativos del software (ej. *Operador de Trámite*, *Administrador de Sistema*).
-* *Motivo*: Una persona puede tener un cargo administrativo alto pero requerir permisos operativos específicos en el sistema, o un rol temporal por suplencia sin cambiar su contrato/cargo oficial.
+Se mantiene una estricta separación entre el **Cargo** (ámbito nominal/contractual) y el **Rol** (perfil dentro del sistema)[cite: 2]:
+* **`cargos`**: Registra la función administrativa (ej. *Especialista en Archivo*, *Director*)[cite: 2].
+* **`roles`**: Define las facultades en el software (ej. *Operador de Trámite*, *Administrador*)[cite: 2].
+* *Sustento*: Permite gestionar interinatos o suplencias otorgando permisos de sistema sin alterar la contratación laboral del usuario[cite: 2].
 
 ### 2.3 Historial de Responsabilidades (Tabla `responsables`)
-Para no perder la trazabilidad de los documentos firmados o aprobados en el tiempo:
-* No se asigna el jefe de área directamente como un atributo estático en la tabla `areas`.
-* Se creó la tabla de unión `responsables` con campos de vigencia (`fecha_inicio` y `fecha_fin`).
-* Cuando una persona deja de ser jefe de área, se actualiza su `fecha_fin` y se inserta un nuevo registro para el reemplazo. Esto preserva el historial de autorías para auditorías.
+Para garantizar la trazabilidad de firmas, vistos buenos y aprobaciones en expedientes a lo largo del tiempo[cite: 2]:
+* Se maneja un registro histórico en la tabla `responsables` con campos de vigencia (`fecha_inicio`, `fecha_fin`)[cite: 1, 2].
+* Permite diferenciar entre responsables titulares e interinos mediante la bandera `es_titular`[cite: 1].
 
-### 2.4 Control de Acceso Granular (Tablas `roles`, `permisos`, `roles_permisos`)
-* Se define una matriz de permisos atómicos (ej. `tramite:crear`, `expediente:aprobar`).
-* La relación N:M entre roles y permisos permite ajustar perfiles sin alterar la estructura del código base.
+### 2.4 Matriz Granular de Seguridad (`roles`, `permisos`, `roles_permisos`)
+* Descompone las acciones en permisos atómicos (`codigo`)[cite: 1, 2].
+* La relación N:M desacopla la lógica del backend, haciendo posible redefinir perfiles mediante configuración de base de datos sin alterar código fuente[cite: 2].
 
+## 3. Diagrama Entidad-Relación (ER)
 
-## 3. Diagrama Entidad-Relación (ER) - Preliminar / En Revisión
+El siguiente diagrama refleja la estructura de entidades y sus relaciones para el módulo[cite: 2]:
 
-> **Nota:** El siguiente diagrama representa una propuesta preliminar del modelo de datos sujeta a validación y ajustes finales durante las pruebas de integración.
-![Diagrama Entidad-Relación](./diagrama_er_organizacion.png)
+![Diagrama Entidad-Relación](./diagrama_er_organizacion.png)[cite: 2]
