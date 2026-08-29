@@ -4,11 +4,22 @@ B_PANAIFO - DATOS DE PRUEBA
 Módulo de Organización, Roles y Permisos
 
 TODOS LOS DATOS SON FICTICIOS Y NO OFICIALES
+
+ORDEN DE EJECUCIÓN CORRECTO:
+1. ÁREAS (sin dependencias)
+2. ROLES (sin dependencias, pero CARGOS depende de ella)
+3. CARGOS (depende de ROLES)
+4. PERMISOS (sin dependencias)
+5. ROLES_PERMISOS (depende de ROLES y PERMISOS)
+6. USUARIOS_ROLES (depende de ROLES)
+
+IMPORTANTE: Respetar este orden para evitar violaciones
+de integridad referencial.
 =========================================================
 */
 
 -- ======================================================
--- ÁREAS
+-- 1. ÁREAS
 -- ======================================================
 
 INSERT INTO areas (nombre, sigla, parent_id, estado)
@@ -27,7 +38,20 @@ VALUES
 
 
 -- ======================================================
--- CARGOS
+-- 2. ROLES
+-- REORDENADO: Se inserta ANTES de CARGOS (que depende de ella)
+-- ======================================================
+
+INSERT INTO roles (codigo, nombre)
+VALUES
+('ROLE_ADMIN', 'Administrador de Prueba'),
+('ROLE_OPERADOR', 'Operador de Prueba'),
+('ROLE_CONSULTA', 'Consulta de Prueba');
+
+
+-- ======================================================
+-- 3. CARGOS
+-- REORDENADO: Se inserta DESPUÉS de ROLES
 -- ======================================================
 
 INSERT INTO cargos (nombre, rol_id, estado)
@@ -39,18 +63,7 @@ VALUES
 
 
 -- ======================================================
--- ROLES
--- ======================================================
-
-INSERT INTO roles (codigo, nombre)
-VALUES
-('ROLE_ADMIN', 'Administrador de Prueba'),
-('ROLE_OPERADOR', 'Operador de Prueba'),
-('ROLE_CONSULTA', 'Consulta de Prueba');
-
-
--- ======================================================
--- PERMISOS
+-- 4. PERMISOS
 -- ======================================================
 
 INSERT INTO permisos (codigo, descripcion)
@@ -64,7 +77,7 @@ VALUES
 
 
 -- ======================================================
--- RELACIÓN ROLES - PERMISOS
+-- 5. RELACIÓN ROLES - PERMISOS
 -- ======================================================
 
 -- Administrador
@@ -90,7 +103,7 @@ VALUES
 
 
 -- ======================================================
--- RELACIÓN USUARIOS - ROLES
+-- 6. RELACIÓN USUARIOS - ROLES
 -- ======================================================
 
 /*
