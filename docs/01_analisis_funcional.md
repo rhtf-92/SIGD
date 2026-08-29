@@ -1,56 +1,97 @@
+# 01. Análisis Funcional A: Objetivo, Actores y Flujo Normal
 
-
-**Autor:** Valentín (`B_VALENTIN`)
+**Sistema:** Sistema Integral de Gestión Documentaria (SIGD)
+**Módulo:** Módulo de Gestión Documental y Expedientes - DocuCore
+**Autor:** Azareño
+**Rama Git:** `B_AZAREÑO`
+**Entregable:** `docs/analisis-funcional/01_analisis_objetivo_actores_flujo.md`
+**Destinatario:** Cristian (Modelado de Datos - `B_CHRISTIAN`)
+**Fecha:** 29 de agosto de 2026
+**Versión:** 1.1 — corregida para concordancia con `02_reglas_requisitos_adjuntos.md` (Valentín)
 
 ---
 
-## 1. El Objetivo Principal (¿Qué estamos haciendo?)
+## 1. Objetivo del Módulo
 
-"Estamos definiendo la especificación técnica de DocuCore, el módulo encargado de gestionar todos los requisitos y archivos adjuntos de los trámites. El objetivo es que Cristian pueda diseñar la base de datos de forma exacta, sin asumir reglas y dejando todo preparado para auditoría completa y subsanaciones."
+DocuCore es el módulo del SIGD encargado de **configurar y capturar trámites documentarios**: define qué tipos de documento existen, qué formulario corresponde a cada uno, y recibe los datos que la persona ingresa al solicitarlo.
 
-## 2. Los 3 Pilares del Modelo (¿Cómo se organiza?)
+El problema que resuelve es evitar que cada nuevo tipo de trámite requiera programar un formulario desde cero. En lugar de eso, un administrador configura el tipo de documento, sus campos y sus requisitos, y el sistema genera el formulario automáticamente. Esto le da flexibilidad al SIGD para crecer sin depender de desarrollo a medida cada vez que la institución necesita un trámite nuevo.
 
-1. **Catálogo (`REQUISITO`):** Las reglas base que configura el sistema (pesos máximos, formatos permitidos, si es obligatorio u opcional, si requiere fecha de vencimiento y si permite subida múltiple).
+Respecto a documentos y formularios, DocuCore cumple tres funciones:
+1. **Configuración:** permite definir tipos de documento y sus formularios asociados.
+2. **Captura:** presenta el formulario correcto al usuario y recoge los datos ingresados.
+3. **Preparación del trámite:** entrega la información validada para que el expediente pueda crearse (a cargo del módulo de expedientes/requisitos, definido por Valentín).
 
-2. **Instancia por Trámite (`EXPEDIENTE_REQUISITO`):** La regla aplicada a la persona que tramita. Aquí controlamos el estado global del requisito (`PENDIENTE`, `OBSERVADO`, `SUBSANADO`, `APROBADO`), quién lo evaluó y cuándo.
+---
 
-3. **Archivos Físicos (`ARCHIVO_ADJUNTO`):** El documento real subido. Maneja las versiones (v1, v2), la ruta física en el almacenamiento, la deduplicación de espacio y el borrado lógico. *(nota — MEJ-02)* Este estado es independiente del estado del Requisito: uno describe el archivo puntual, el otro el trámite completo. La relación entre ambos se detalla en la sección 4.
+## 2. Alcance
 
-## 3. Las 3 Reglas de Negocio Clave (Lo más importante para Backend)
+Este análisis cubre el objetivo del módulo, sus actores y el flujo normal de uso — es decir, el camino esperado cuando todo ocurre sin errores.
 
-*(fusionado — MEJ-01: se combinaron "Separación de Estados" y "Trazabilidad de Subsanación", que describían el mismo ciclo con distinto nivel de detalle)*
+**No cubre:**
+- Reglas de requisitos, archivos adjuntos ni casos excepcionales (ver `02_reglas_requisitos_adjuntos.md`, de Valentín).
+- El modelo de datos ni el diccionario de datos (ver entregables de Cristian).
+- La implementación técnica en base de datos (ver entregables de Piero).
 
-- **Ciclo de Vida y Trazabilidad del Adjunto:** El Requisito mide si el trámite se puede aprobar; el Adjunto mide la condición de cada archivo individual — son dos niveles distintos. Cuando el evaluador rechaza un archivo, el v1 queda en `OBSERVADO`. Cuando el usuario sube el reemplazo, el sistema no borra nada: el v1 pasa a `REEMPLAZADO` (queda congelado como historial), el v2 nace en `CARGADO`, y ambos quedan enlazados explícitamente (`id_adjunto_anterior`) para no perder el rastro de versiones.
+---
 
-- **Seguridad y Espacio (Storage):**
-  - **Nombre Único:** Estándar sin ambigüedades en la nube: `TRM_[EXP]_EXPREQ_[ID]_V[VER]_[TIMESTAMP].[EXT]`, incluyendo siempre la extensión real del archivo.
-  - **Deduplicación:** Si un usuario sube el mismo archivo en dos requisitos distintos, el sistema detecta el hash repetido y **pide confirmación** antes de reutilizar el archivo físico existente — nunca es automático ni silencioso. Si el duplicado ocurre **dentro del mismo requisito**, la subida se bloquea directamente, sin pedir confirmación.
-  - **Validación Real (Magic Bytes):** No confiamos en la extensión `.pdf` del nombre; el backend lee la cabecera del archivo para evitar virus o archivos falsos.
+## 3. Actores
 
-- **Manejo de Borrados y Concurrencia:** Los archivos nunca se borran físicamente; se usa borrado lógico (`ELIMINADO`). Para el conflicto entre `403` y `409` cuando el evaluador interviene mientras el usuario sube un archivo, ya hay un orden de precedencia definido: primero se revisa si el expediente sigue editable (`403` si no); solo si seguía editable, se revisa si cambió de estado durante la subida (`409` en ese caso). Decisión registrada en `07_decisiones_y_preguntas_pendientes.md`.
-
-## 4. Sincronización entre el Estado del Requisito y el Estado del Adjunto
-*(nuevo — MEJ-02)*
-
-Ambas entidades usan el valor `OBSERVADO`, pero describen cosas distintas. Esta tabla deja explícita la relación entre los dos niveles, para que Cristian pueda definir los triggers/restricciones correctos:
-
-| Evento en `ARCHIVO_ADJUNTO` | Efecto automático en `EXPEDIENTE_REQUISITO` |
+| Actor | Responsabilidad |
 |---|---|
-| El evaluador marca un archivo activo como `OBSERVADO` | El requisito pasa a `OBSERVADO` (basta con que 1 archivo activo esté observado — RN-REQ-005) |
-| El usuario sube el reemplazo y este queda `CARGADO` (v2) | El requisito pasa a `SUBSANADO` — **no** salta directo a `APROBADO`; requiere revisión del evaluador |
-| El evaluador revisa el v2 y lo marca `APROBADO` | El requisito pasa a `APROBADO` (si todos sus archivos activos ya están aprobados) |
-| El evaluador vuelve a rechazar el v2 | El requisito regresa a `OBSERVADO`, reiniciando el ciclo |
+| **Administrador de Trámites** | Crea tipos de documento y configura sus formularios (campos, orden, tipo de dato). Es quien define qué existe en el catálogo. |
+| **Solicitante** | Selecciona un tipo de documento, llena el formulario correspondiente y envía el trámite. |
+| **Evaluador** | Revisa la información y los requisitos enviados por el solicitante, y decide si el trámite avanza o queda observado. Este documento solo reconoce al actor y su vínculo con los datos capturados por el formulario; el detalle de sus decisiones (estados, reglas de aprobación/observación) pertenece al análisis de Valentín. |
+| **Consultante** | Rol de solo lectura — puede revisar información de trámites ya existentes sin participar en su creación ni evaluación (ej. un área de estadísticas o auditoría interna). |
 
-En resumen: el estado del Requisito **se deriva** del estado de sus archivos activos — el evaluador nunca cambia el estado del Requisito directamente, lo hace indirectamente al evaluar cada Adjunto.
+⚠️ Los nombres exactos de estos roles (¿"Administrador" o "Configurador"?, ¿"Solicitante" o "Ciudadano"?) son propuestas de trabajo, no una nomenclatura oficial confirmada — ver Sección 7.
 
-## 5. ¿Por qué este documento es un buen punto de partida (y qué falta)?
+---
 
-"Resolvimos 17 puntos críticos de inconsistencia: vacíos en la máquina de estados, el manejo de requisitos opcionales, la trazabilidad de versiones y evaluadores, y el tope de almacenamiento por expediente. *(el detalle completo queda como anexo de trazabilidad, aparte de esta presentación de 3 minutos)*. Con esto, Cristian tiene una base sólida para empezar a modelar.
+## 4. Catálogo Preliminar de Documentos
 
-Aún quedan pendientes algunos puntos que **no bloquean el arranque, pero sí hay que resolver pronto**:
-- Tres preguntas institucionales: validación de contenido de archivos `.ZIP`, firmas digitales PKI, y el plazo (SLA) de subsanación antes de rechazo automático.
-- El proceso de limpieza automática de archivos huérfanos — ya reincorporado en la especificación técnica, pendiente solo de confirmación final.
-- Un caso de borde: qué pasa con el archivo subido para un requisito condicional si el usuario cambia su respuesta y el requisito deja de aplicar.
-- La entidad `TRAMITE_PLANTILLA`, ya con nota de procedencia, pero pendiente de confirmar sus campos definitivos.
+Ejemplos preliminares de tipos de documento que el módulo debería poder representar:
 
-Ninguno de estos impide que Cristian empiece hoy, pero sí conviene dejarlos como tareas asignadas con fecha, para no perderlos de vista."
+- Solicitud.
+- Certificado de estudios.
+- Memorándum.
+
+⚠️ **Esto es un catálogo de EJEMPLO**, no la lista oficial. Se eligieron por ser variados en estructura (uno simple, uno con datos académicos, uno interno), no porque representen necesariamente los trámites reales del SIGD. La lista oficial debe confirmarse con el profesor (ver Sección 7).
+
+> **Nota de coordinación:** el documento de Valentín (`02_reglas_requisitos_adjuntos.md`) usa ejemplos de otro dominio (Licencia de Funcionamiento, Licencia Ambiental, Mesa de Partes). Ambos catálogos son ilustrativos y no se contradicen a nivel de modelo — pero como grupo conviene resolver con el profesor a qué tipo de institución corresponde el SIGD, para unificar los ejemplos en la entrega final.
+
+> **Nota de coordinación (entidad `TRAMITE_PLANTILLA`):** el guion técnico de Valentín menciona una entidad pendiente `TRAMITE_PLANTILLA`, con nota de que proviene del "Módulo de Configuración de Trámites" — que es justamente el dominio que cubre este documento. Hipótesis de trabajo: `TRAMITE_PLANTILLA` **es la misma entidad** que aquí se describe como "tipo de documento" (la configuración del trámite: campos, formulario, requisitos asociados). Esto debe confirmarse con Cristian antes del modelado para no duplicar la entidad con dos nombres distintos — ver pregunta 5 en la Sección 7.
+
+---
+
+## 5. Flujo Normal
+
+1. **Selección del tipo de documento:** el solicitante elige, de la lista de tipos de documento configurados, cuál trámite desea iniciar.
+2. **Presentación del formulario:** el sistema recupera la configuración de ese tipo de documento y arma el formulario correspondiente (campos, orden, obligatoriedad de cada campo).
+3. **Ingreso de datos:** el solicitante llena los campos del formulario.
+4. **Verificación inicial:** el sistema valida que los campos obligatorios estén completos y que el formato de cada dato sea el esperado (ej. una fecha es una fecha, no texto libre).
+5. **Preparación del trámite:** si la verificación es correcta, el sistema empaqueta los datos capturados y los entrega al módulo de expedientes para que se cree el trámite formal.
+
+**Entrada del sistema:** el tipo de documento seleccionado y los valores ingresados en cada campo del formulario.
+**Salida del sistema:** un conjunto de datos validado, listo para convertirse en expediente — o, si la verificación falla, un aviso indicando qué campo debe corregirse (el detalle de mensajes de error y casos excepcionales pertenece al análisis de Valentín).
+
+> **Nota de coordinación con el flujo de Valentín:** el trámite que resulta de este flujo nace en estado `BORRADOR` — todavía no tiene código oficial de expediente. La radicación final (asignación del código `EXP-XXXX` y paso a `EN_REVISION`) ocurre recién cuando se cargan los requisitos y adjuntos obligatorios, según el flujo definido por Valentín. Este documento solo cubre hasta la creación del trámite en `BORRADOR`; lo que pasa después es responsabilidad de `02_reglas_requisitos_adjuntos.md`.
+
+---
+
+## 6. Fuentes Consultadas
+
+- Documentación de patrones de formularios dinámicos/configurables (form builders) — para fundamentar por qué separar "tipo de documento" de "definición de campos" en vez de crear una tabla por cada trámite.
+- Buenas prácticas de UX para formularios largos (agrupación de campos, validación en tiempo real) — para justificar por qué la verificación ocurre antes de enviar el trámite y no solo al final.
+
+*(Fuentes específicas —enlaces y autores— pendientes de anexar; el criterio de selección y lo aprendido puede explicarse oralmente en la sustentación, según lo solicitado.)*
+
+---
+
+## 7. Preguntas Pendientes
+
+1. ¿Cuál es la lista oficial de tipos de documento que maneja la institución? (Define si el catálogo final se parece más a los ejemplos de este documento o a los de Valentín — ver nota en Sección 4).
+2. ¿Los roles "Administrador de Trámites", "Solicitante", "Evaluador" y "Consultante" corresponden a los roles reales del SIGD, o la institución ya tiene una nomenclatura definida?
+3. ¿Un mismo formulario puede reutilizarse entre distintos tipos de documento, o cada tipo de documento tiene siempre su propio formulario exclusivo?
+4. ¿Quién tiene permiso para crear o modificar tipos de documento — es un rol único o puede variar según el área de la institución?
+5. ¿La entidad `TRAMITE_PLANTILLA` (mencionada en la especificación de Valentín) es la misma entidad que "tipo de documento" descrita en este análisis, o son dos conceptos distintos que Cristian debe modelar por separado? (Confirmar con Cristian antes del modelado — ver nota en Sección 4).
