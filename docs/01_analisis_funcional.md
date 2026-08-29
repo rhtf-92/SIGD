@@ -77,18 +77,9 @@ Ejemplos preliminares de tipos de documento que el módulo debería poder repres
 
 > **Nota de coordinación con el flujo de Valentín:** el trámite que resulta de este flujo nace en estado `BORRADOR` — todavía no tiene código oficial de expediente. La radicación final (asignación del código `EXP-XXXX` y paso a `EN_REVISION`) ocurre recién cuando se cargan los requisitos y adjuntos obligatorios, según el flujo definido por Valentín. Este documento solo cubre hasta la creación del trámite en `BORRADOR`; lo que pasa después es responsabilidad de `02_reglas_requisitos_adjuntos.md`.
 
----
 
-## 6. Fuentes Consultadas
 
-- Documentación de patrones de formularios dinámicos/configurables (form builders) — para fundamentar por qué separar "tipo de documento" de "definición de campos" en vez de crear una tabla por cada trámite.
-- Buenas prácticas de UX para formularios largos (agrupación de campos, validación en tiempo real) — para justificar por qué la verificación ocurre antes de enviar el trámite y no solo al final.
-
-*(Fuentes específicas —enlaces y autores— pendientes de anexar; el criterio de selección y lo aprendido puede explicarse oralmente en la sustentación, según lo solicitado.)*
-
----
-
-## 7. Preguntas Pendientes
+## 6. Preguntas Pendientes
 
 1. ¿Cuál es la lista oficial de tipos de documento que maneja la institución? (Define si el catálogo final se parece más a los ejemplos de este documento o a los de Valentín — ver nota en Sección 4).
 2. ¿Los roles "Administrador de Trámites", "Solicitante", "Evaluador" y "Consultante" corresponden a los roles reales del SIGD, o la institución ya tiene una nomenclatura definida?
