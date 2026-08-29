@@ -22,24 +22,26 @@ CREATE SEQUENCE seq_asiento_numero_registro
 -- 3. TABLA TRAMITE
 CREATE TABLE tramite (
     id_tramite BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    codigo_tramite VARCHAR(20) NOT NULL UNIQUE, -- Ajustado según diccionario: VARCHAR(20) NOT NULL
+    codigo_tramite VARCHAR(20) NOT NULL UNIQUE,
     asunto VARCHAR(500) NOT NULL,
     estado VARCHAR(30) NOT NULL DEFAULT 'REGISTRADO',
-    fk_remitente BIGINT NOT NULL,    -- Nota: Llave foránea lógica hacia Usuarios (Grupo 4). No se define FK física por dependencia de módulo externo.
-    fk_destinatario BIGINT NULL,     -- Nota: Llave foránea lógica hacia Áreas (Grupo 3). No se define FK física por dependencia de módulo externo.
+    fk_remitente BIGINT NOT NULL,    -- Nota: Llave foránea lógica hacia Usuarios (Grupo 4).
+    fk_destinatario BIGINT NULL,     -- Nota: Llave foránea lógica hacia Áreas (Grupo 3).
     creado_en TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
+    -- Estados permitidos (sujetos a confirmación normativa institucional)
     CONSTRAINT chk_tramite_estado CHECK (
         estado IN ('REGISTRADO', 'EN_TRAMITE', 'OBSERVADO', 'CERRADO', 'ANULADO', 'REABIERTO')
     )
 );
 
 -- 4. TABLA EXPEDIENTE
+-- Nota de Cardinalidad: Se omite UNIQUE en fk_tramite para permitir acumulaciones/expedientes múltiples por ciclo o reaperturas según requerimiento de negocio.
 CREATE TABLE expediente (
     id_expediente BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     codigo_expediente VARCHAR(50) NOT NULL UNIQUE,
-    fk_tramite BIGINT NOT NULL UNIQUE,
+    fk_tramite BIGINT NOT NULL,
     creado_en TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT fk_expediente_tramite FOREIGN KEY (fk_tramite) 
@@ -49,7 +51,7 @@ CREATE TABLE expediente (
 -- 5. TABLA ASIENTO_REGISTRO
 CREATE TABLE asiento_registro (
     id_asiento BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    numero_registro BIGINT NOT NULL UNIQUE DEFAULT nextval('seq_asiento_numero_registro'), -- El formato visual con ceros (ej. 00000001) se gestionará en el backend/app mediante LPAD()
+    numero_registro BIGINT NOT NULL UNIQUE DEFAULT nextval('seq_asiento_numero_registro'), -- Formato visual (ej. 00000001) gestionado en app con LPAD()
     fecha_ingreso TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     canal_ingreso VARCHAR(30) NOT NULL DEFAULT 'MESA_PRESENCIAL',
     asunto VARCHAR(500) NOT NULL,
@@ -57,18 +59,17 @@ CREATE TABLE asiento_registro (
     fk_remitente BIGINT NOT NULL,    -- Nota: Dependencia con Usuario (Grupo 4)
     fk_destinatario BIGINT NULL,     -- Nota: Dependencia con Unidad Orgánica (Grupo 3)
     anulado BOOLEAN NOT NULL DEFAULT FALSE,
-    motivo_anulacion TEXT NULL,
+    motivo_anulacion TEXT NULL,     -- Conservación histórica de justificación de anulación
     
     CONSTRAINT chk_asiento_canal CHECK (canal_ingreso IN ('MESA_PRESENCIAL', 'MESA_VIRTUAL')),
     CONSTRAINT fk_asiento_expediente FOREIGN KEY (fk_expediente) 
         REFERENCES expediente (id_expediente) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
--- Índices de búsqueda y optimización
+-- ÍNDICES OPTIMIZADOS (Se eliminan índices redundantes sobre columnas UNIQUE/PK ya indexadas por PostgreSQL)
 CREATE INDEX idx_tramite_remitente ON tramite(fk_remitente);
 CREATE INDEX idx_expediente_tramite ON expediente(fk_tramite);
 CREATE INDEX idx_asiento_expediente ON asiento_registro(fk_expediente);
-CREATE INDEX idx_asiento_numero_registro ON asiento_registro(numero_registro);
 
 
 -- =============================================================================
