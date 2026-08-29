@@ -1,6 +1,6 @@
 # Análisis Funcional: Trámite, Expediente y Libro de Registro (SIGD)
 **Proyecto:** Sistema Integral de Gestión Documentaria (SIGD)  
-**Grupo de Trabajo:** Grupo 2 – “TramiCore”  
+**Grupo de Trabajo:** Documentos de Trabajo Grupo 2 – “TramiCore”  
 **Responsable del Análisis:** Leysglin Riquelmer Fachin Rojas (Rama: `B_RIQUELMER`)  
 **Sublíder / Integrador:** Elmer Ramírez (`B_RAMIREZ`)  
 **Versión:** 2.1 (Fase 1 – Cumplimiento estricto de rotulado y criterios de aceptación)

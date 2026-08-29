@@ -1,4 +1,4 @@
-# 02 · Diccionario de datos — Gestión Documental (SIGD)
+# 02 · Diccionario de datos — Documentos de Trabajo Grupo 2
 
 Autor: Ramírez (B_RAMIREZ)
 Estado: Borrador / propuesta sujeta a validación institucional

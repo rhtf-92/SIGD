@@ -1,4 +1,4 @@
-# SIGD · Grupo 2 "TramiCore" — Casos de Prueba y Validaciones de Registro
+# Documentos de Trabajo Grupo 2 — Casos de Prueba y Validaciones de Registro
 
 Este documento detalla los casos reales de prueba y scripts de validación ejecutados sobre PostgreSQL para asegurar la integridad referencial, restricciones y reglas de negocio del módulo de Trámite, Expediente y Asiento de Registro.
 

@@ -1,5 +1,6 @@
 
 -- =============================================================================
+-- Documentos de Trabajo Grupo 2
 -- SIGD - Grupo 2 "TramiCore"
 -- [BORRADOR - Sujeto a cambios] Script SQL de Registro y Expedientación
 -- Alineado con el modelo de B_RAMIREZ e integraciones con Grupo 3 y 4

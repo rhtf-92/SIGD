@@ -1,4 +1,4 @@
-# 05 · Decisiones y preguntas pendientes — Gestión Documental (SIGD)
+# 05 · Decisiones y preguntas pendientes — Documentos de Trabajo Grupo 2
 
 Autor: Ramírez (B_RAMIREZ)
 Estado: Borrador — se actualiza a lo largo del flujo
