@@ -1,37 +1,90 @@
-# SIGD · Grupo 2 "TramiCore" — Validación y Reglas del Módulo de Registro
+# SIGD · Grupo 2 "TramiCore" — Casos de Prueba y Validaciones de Registro
 
-## 1. Actores y Roles Definidos
-* **Administrado / Solicitante (Externo o Interno):** Registra solicitudes por Mesa de Partes (presencial o virtual), aporta datos de contacto, adjunta requisitos y realiza seguimiento.
-* **Operador de Mesa de Partes:** Valida requisitos y folios, apertura el expediente, asienta el ingreso en el Libro de Registro y emite el cargo oficial.
-* **Especialista / Funcionario de Área Resolutora:** Revisa el fondo, emite informes/oficios, solicita subsanaciones o deriva el expediente.
-* **Jefe de Área / Autoridad Institucional:** Suscribe el acto resolutivo final, autoriza reasignaciones y dispone el cierre o reapertura.
-* **Administrador del Sistema SIGD:** Configura periodos de numeración, audita inmutabilidad y ejecuta anulaciones lógicas justificadas.
+Este documento detalla los casos reales de prueba y scripts de validación ejecutados sobre PostgreSQL para asegurar la integridad referencial, restricciones y reglas de negocio del módulo de Trámite, Expediente y Asiento de Registro.
 
 ---
 
-## 2. Identificadores Técnicos vs. Códigos Visibles
-* **IDs Técnicos Internos (PK):** Administrados por PostgreSQL (`BIGSERIAL`). Nunca se exponen al usuario final ni se usan como códigos de ventanilla.
-* **Códigos Visibles de Negocio:** Formato legible como `EXP-2026-000001`. Generados estrictamente mediante secuencias transaccionales atómicas (`SEQUENCE`), prohibiendo el uso de `MAX() + 1` para evitar concurrencia.
+## 1. Consulta de Verificación General
+Valida la vinculación completa entre Trámites, Expedientes y Asientos de Registro en el Libro General.
+
+```sql
+SELECT 
+    t.id_tramite,
+    t.codigo_tramite,
+    e.codigo_expediente,
+    a.numero_registro AS asiento_global,
+    a.canal_ingreso,
+    t.asunto,
+    t.estado,
+    a.anulado AS es_borrado_logico
+FROM tramite t
+JOIN expediente e ON e.fk_tramite = t.id_tramite
+JOIN asiento_registro a ON a.fk_expediente = e.id_expediente
+ORDER BY a.numero_registro ASC;
+```
 
 ---
 
-## 3. Matriz Funcional Propuesta
+## 2. Prueba de Duplicidad de Código de Expediente
+**Objetivo:** Verificar que la restricción `UNIQUE` impida la creación de dos expedientes con el mismo código visible de negocio.
 
-| Operación / Función | Entradas | Procesamiento / Reglas | Salidas | Estado Resultante | Responsable |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Registrar Trámite** | Remitente, destinatario, asunto, folios, PDF. | Valida requisitos, asigna ID, genera código visible y crea asiento global. | Expediente creado, Asiento emitido, Cargo. | `REGISTRADO` | Mesa de Partes |
-| **Consultar Expediente** | Código visible o DNI/RUC. | Filtra por permisos y expone cronología de asientos. | Ficha de expediente y trazabilidad. | *(Sin cambio)* | Público / Funcionarios |
-| **Corregir / Subsanar** | Escrito de subsanación. | Válido únicamente en estado `OBSERVADO`. No destruye historial. | Asiento de subsanación, documentos anexados. | `EN_TRAMITE` | Administrado / Mesa de Partes |
-| **Derivar Expediente** | Cód. expediente, área destino, proveído. | Verifica tenencia activa y genera nuevo asiento de movimiento. | Notificación a receptora, Asiento derivación. | `EN_TRAMITE` | Especialista / Mesa de Partes |
-| **Cerrar Expediente** | Documento resolutivo final, notificación. | Valida resolución y bloquea nuevos trámites ordinarios. | Expediente concluido, Asiento de cierre. | `CERRADO` | Jefe de Área Resolutora |
-| **Reabrir Expediente** | Solicitud justificada, recurso legal. | Requiere validación de estado `CERRADO` y permiso de jefatura. | Expediente reactivado, Asiento reapertura. | `REABIERTO` | Jefe de Área / Admin |
-| **Anular Registro** | Código de expediente, justificación formal. | Borrado lógico (`anulado = true`), mantiene auditoría. | Expediente invalidado, Asiento de anulación. | `ANULADO` | Administrador del Sistema |
+```sql
+-- Debe fallar por violación de restricción UNIQUE (codigo_expediente)
+INSERT INTO expediente (codigo_expediente, fk_tramite) 
+VALUES ('EXP-2026-000001', 3);
+```
+* **Resultado Esperado:** `ERROR: duplicate key value violates unique constraint "expediente_codigo_expediente_key"`
 
 ---
 
-## 4. Respuestas a Preguntas Pendientes (Definición Institucional)
-1. **Diferencia entre trámite, expediente y asiento:** El *Trámite* representa la solicitud del ciudadano; el *Expediente* es el contenedor digital documentario; el *Asiento* es el registro inmutable de auditoría en el Libro General.
-2. **Cardinalidad:** Un Trámite genera exactamente un Expediente (1:1), y un Expediente registra de 1 a N Asientos en su ciclo de vida.
-3. **Formatos de Código:** El código de trámite/expediente sigue la estructura `EXP-[AÑO]-[CORRELATIVO 6 DÍGITOS]` (ej. `EXP-2026-000001`).
-4. **Numeración de Registro:** El correlativo de asiento de registro es una secuencia global, ininterrumpida e inalterable generada por el sistema (`SEQUENCE`).
-5. **Borrado y Corrección:** No existe borrado físico. Las correcciones generan un nuevo asiento de subsanación y las anulaciones aplican borrado lógico (`anulado = true`) conservando el historial.
+## 3. Prueba de Unicidad de `numero_registro` (Secuencia Autogenerada)
+**Objetivo:** Validar que el Libro de Registro genera correlativos atómicos únicos mediante la secuencia `seq_asiento_numero_registro` sin permitir duplicación manual.
+
+```sql
+-- Debe fallar al intentar forzar un número de registro ya asignado por la secuencia (ej. 10001)
+INSERT INTO asiento_registro (numero_registro, canal_ingreso, asunto, fk_expediente, fk_remitente, fk_destinatario)
+VALUES (10001, 'MESA_PRESENCIAL', 'Intento de forzar numero de registro', 3, 101, 301);
+```
+* **Resultado Esperado:** `ERROR: duplicate key value violates unique constraint "asiento_registro_numero_registro_key"`
+
+---
+
+## 4. Prueba de Clave Inexistente (FK Rota / Integridad Referencial)
+**Objetivo:** Comprobar que no se pueda registrar un expediente o asiento enlazado a un trámite o expediente que no exista.
+
+```sql
+-- Debe fallar porque no existe el tramite id = 9999
+INSERT INTO expediente (codigo_expediente, fk_tramite) 
+VALUES ('EXP-2026-999999', 9999);
+```
+* **Resultado Esperado:** `ERROR: insert or update on table "expediente" violates foreign key constraint "fk_expediente_tramite"`
+
+---
+
+## 5. Prueba de Estado Inválido (Restricción CHECK)
+**Objetivo:** Confirmar que no se puedan ingresar estados no permitidos por la directiva institucional.
+
+```sql
+-- Debe fallar porque 'APROBADO_DIRECTO' no existe en el CHECK constraint
+INSERT INTO tramite (codigo_tramite, asunto, estado, fk_remitente) 
+VALUES ('TRM-2026-9999', 'Prueba estado no valido', 'APROBADO_DIRECTO', 101);
+```
+* **Resultado Esperado:** `ERROR: new row for relation "tramite" violates check constraint "chk_tramite_estado"`
+
+---
+
+## 6. Prueba de Anulación Conservando el Registro (Borrado Lógico)
+**Objetivo:** Validar que un asiento anulado se marque como `anulado = true` y mantenga la inmutabilidad y trazabilidad sin aplicar comandos `DELETE`.
+
+```sql
+-- Ejecución de borrado lógico
+UPDATE asiento_registro 
+SET anulado = TRUE, motivo_anulacion = 'Anulado por duplicidad en recepción física'
+WHERE id_asiento = 1;
+
+-- Verificación de conservación de historial en auditoría
+SELECT id_asiento, numero_registro, asunto, anulado, motivo_anulacion 
+FROM asiento_registro 
+WHERE id_asiento = 1;
+```
+* **Resultado Esperado:** El registro permanece intacto en la base de datos con `anulado = true` y su motivo registrado, demostrando inmutabilidad del Libro de Registros.
