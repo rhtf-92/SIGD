@@ -22,32 +22,16 @@
 BEGIN;
 
 -- ============================================================================
--- SECCIÓN 1: LIMPIEZA PREVIA (DDL DOWN / IDEMPOTENCIA DE CREACIÓN)
+-- SECCIÓN 1: PRECONDICIONES DE INSTALACIÓN
 -- ============================================================================
 
-DROP TRIGGER IF EXISTS trg_inmutabilidad_movimiento ON movimiento_tramite;
-DROP TRIGGER IF EXISTS trg_actualizar_estado_actual ON movimiento_tramite;
-DROP TRIGGER IF EXISTS trg_validar_detalle_derivacion ON derivacion_tramite;
-DROP TRIGGER IF EXISTS trg_validar_detalle_recepcion ON recepcion_tramite;
-DROP TRIGGER IF EXISTS trg_validar_detalle_observacion ON observacion_tramite;
-DROP TRIGGER IF EXISTS trg_validar_detalle_atencion ON atencion_tramite;
+-- PRECONDICION: este archivo requiere un esquema vacio. No contiene desmontaje
+-- automatico ni DROP ... CASCADE. Toda limpieza debe ejecutarse fuera de este
+-- archivo, por un operador, despues de comprobar expresamente que la conexion
+-- corresponde a una base desechable de pruebas.
 
-DROP FUNCTION IF EXISTS fn_impedir_mutacion_movimiento();
-DROP FUNCTION IF EXISTS fn_proyectar_estado_actual();
-DROP FUNCTION IF EXISTS fn_validar_compatibilidad_detalle();
-
-DROP TABLE IF EXISTS estado_actual_tramite CASCADE;
-DROP TABLE IF EXISTS movimiento_documento CASCADE;
-DROP TABLE IF EXISTS relacion_movimiento CASCADE;
-DROP TABLE IF EXISTS tipo_relacion_movimiento CASCADE;
-DROP TABLE IF EXISTS atencion_tramite CASCADE;
-DROP TABLE IF EXISTS observacion_tramite CASCADE;
-DROP TABLE IF EXISTS recepcion_tramite CASCADE;
-DROP TABLE IF EXISTS derivacion_tramite CASCADE;
-DROP TABLE IF EXISTS transicion_estado_tramite CASCADE;
-DROP TABLE IF EXISTS movimiento_tramite CASCADE;
-DROP TABLE IF EXISTS estado_tramite CASCADE;
-DROP TABLE IF EXISTS accion_tramite CASCADE;
+-- Necesaria para excluir vigencias solapadas sin agregar atributos al modelo.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 -- ============================================================================
 -- SECCIÓN 2: CREACIÓN DE TABLAS Y RESTRICCIONES (12 ENTIDADES / 69 ATRIBUTOS)
@@ -90,8 +74,14 @@ CREATE TABLE transicion_estado_tramite (
     activo                       BOOLEAN NOT NULL DEFAULT TRUE,
     vigente_desde                TIMESTAMPTZ,
     vigente_hasta                TIMESTAMPTZ,
-    CONSTRAINT uk_transicion_regla UNIQUE NULLS NOT DISTINCT (estado_anterior_id, accion_tramite_id, estado_resultante_id),
-    CONSTRAINT ck_transicion_vigencia CHECK (vigente_hasta IS NULL OR vigente_desde IS NULL OR vigente_hasta >= vigente_desde)
+    CONSTRAINT ck_transicion_vigencia CHECK (vigente_hasta IS NULL OR vigente_desde IS NULL OR vigente_hasta > vigente_desde),
+    CONSTRAINT ex_transicion_regla_vigencia EXCLUDE USING gist (
+        (COALESCE(estado_anterior_id, 0::BIGINT)) WITH =,
+        accion_tramite_id WITH =,
+        estado_resultante_id WITH =,
+        (tstzrange(COALESCE(vigente_desde, '-infinity'::TIMESTAMPTZ),
+                   COALESCE(vigente_hasta, 'infinity'::TIMESTAMPTZ), '[)')) WITH &&
+    )
 );
 
 -- 4. movimiento_tramite (Entidad Principal - 12 atributos)
@@ -110,6 +100,7 @@ CREATE TABLE movimiento_tramite (
     clave_idempotencia          VARCHAR(128),
     CONSTRAINT uk_movimiento_expediente_secuencia UNIQUE (expediente_id, secuencia),
     CONSTRAINT uk_movimiento_idempotencia UNIQUE (expediente_id, clave_idempotencia),
+    CONSTRAINT uk_movimiento_proyeccion UNIQUE (expediente_id, movimiento_id, estado_resultante_id, secuencia),
     CONSTRAINT ck_movimiento_secuencia_positiva CHECK (secuencia > 0)
 );
 
@@ -178,11 +169,15 @@ CREATE TABLE movimiento_documento (
 -- 12. estado_actual_tramite (Proyección opcional derivada - 6 atributos)
 CREATE TABLE estado_actual_tramite (
     expediente_id       VARCHAR(64) PRIMARY KEY, -- REF externa Grupo 2
-    movimiento_actual_id BIGINT NOT NULL REFERENCES movimiento_tramite(movimiento_id) ON DELETE RESTRICT,
+    movimiento_actual_id BIGINT NOT NULL,
     estado_actual_id    BIGINT NOT NULL REFERENCES estado_tramite(estado_tramite_id) ON DELETE RESTRICT,
     secuencia_actual    INTEGER NOT NULL,
     actualizado_en      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     version_proyeccion  INTEGER NOT NULL DEFAULT 1,
+    CONSTRAINT fk_estado_actual_movimiento_coherente
+        FOREIGN KEY (expediente_id, movimiento_actual_id, estado_actual_id, secuencia_actual)
+        REFERENCES movimiento_tramite (expediente_id, movimiento_id, estado_resultante_id, secuencia)
+        ON DELETE RESTRICT,
     CONSTRAINT ck_estado_actual_secuencia CHECK (secuencia_actual > 0),
     CONSTRAINT ck_estado_actual_version CHECK (version_proyeccion > 0)
 );
@@ -208,12 +203,12 @@ CREATE INDEX idx_movimiento_doc_documento ON movimiento_documento(documento_id);
 
 -- 4.1 Inmutabilidad del historial
 CREATE OR REPLACE FUNCTION fn_impedir_mutacion_movimiento()
-RETURNS TRIGGER AS 
+RETURNS TRIGGER AS $$
 BEGIN
     RAISE EXCEPTION 'Operación no permitida: Los registros de movimiento_tramite son inmutables por principio de trazabilidad histórica.'
         USING ERRCODE = 'restrict_violation';
 END;
- LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_inmutabilidad_movimiento
     BEFORE UPDATE OR DELETE ON movimiento_tramite
@@ -222,7 +217,7 @@ CREATE TRIGGER trg_inmutabilidad_movimiento
 
 -- 4.2 Proyección atómica del estado actual
 CREATE OR REPLACE FUNCTION fn_proyectar_estado_actual()
-RETURNS TRIGGER AS 
+RETURNS TRIGGER AS $$
 BEGIN
     INSERT INTO estado_actual_tramite (
         expediente_id,
@@ -246,11 +241,11 @@ BEGIN
         secuencia_actual    = EXCLUDED.secuencia_actual,
         actualizado_en      = EXCLUDED.actualizado_en,
         version_proyeccion  = estado_actual_tramite.version_proyeccion + 1
-    WHERE EXCLUDED.secuencia_actual >= estado_actual_tramite.secuencia_actual;
+    WHERE EXCLUDED.secuencia_actual > estado_actual_tramite.secuencia_actual;
 
     RETURN NEW;
 END;
- LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_actualizar_estado_actual
     AFTER INSERT ON movimiento_tramite
@@ -259,14 +254,27 @@ CREATE TRIGGER trg_actualizar_estado_actual
 
 -- 4.3 Validación de compatibilidad entre acción y detalle especializado
 CREATE OR REPLACE FUNCTION fn_validar_compatibilidad_detalle()
-RETURNS TRIGGER AS 
+RETURNS TRIGGER AS $$
 DECLARE
     v_codigo_accion VARCHAR(50);
+    v_expediente_id VARCHAR(64);
+    v_secuencia INTEGER;
+    v_estado_anterior VARCHAR(50);
+    v_derivacion_expediente VARCHAR(64);
+    v_derivacion_secuencia INTEGER;
+    v_derivacion_accion VARCHAR(50);
+    v_area_destino VARCHAR(64);
 BEGIN
-    SELECT a.codigo INTO v_codigo_accion
+    SELECT a.codigo, m.expediente_id, m.secuencia, ea.codigo
+      INTO v_codigo_accion, v_expediente_id, v_secuencia, v_estado_anterior
     FROM movimiento_tramite m
     JOIN accion_tramite a ON a.accion_tramite_id = m.accion_tramite_id
+    LEFT JOIN estado_tramite ea ON ea.estado_tramite_id = m.estado_anterior_id
     WHERE m.movimiento_id = NEW.movimiento_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'El movimiento % no existe', NEW.movimiento_id;
+    END IF;
 
     IF TG_TABLE_NAME = 'derivacion_tramite' AND v_codigo_accion NOT IN ('DERIVACION', 'DEVOLUCION') THEN
         RAISE EXCEPTION 'Incompatibilidad: detalle derivacion_tramite solo aplica a acciones DERIVACION o DEVOLUCION (acción actual: %)', v_codigo_accion;
@@ -278,9 +286,38 @@ BEGIN
         RAISE EXCEPTION 'Incompatibilidad: detalle atencion_tramite solo aplica a acción ATENCION (acción actual: %)', v_codigo_accion;
     END IF;
 
+    IF TG_TABLE_NAME = 'recepcion_tramite' THEN
+        IF v_estado_anterior = 'PENDIENTE_RECEPCION' AND NEW.derivacion_movimiento_id IS NULL THEN
+            RAISE EXCEPTION 'Una recepcion posterior a derivacion debe indicar derivacion_movimiento_id';
+        END IF;
+
+        IF NEW.derivacion_movimiento_id IS NOT NULL THEN
+            SELECT dm.expediente_id, dm.secuencia, da.codigo, d.area_destino_id
+              INTO v_derivacion_expediente, v_derivacion_secuencia,
+                   v_derivacion_accion, v_area_destino
+            FROM movimiento_tramite dm
+            JOIN accion_tramite da ON da.accion_tramite_id = dm.accion_tramite_id
+            JOIN derivacion_tramite d ON d.movimiento_id = dm.movimiento_id
+            WHERE dm.movimiento_id = NEW.derivacion_movimiento_id;
+
+            IF NOT FOUND OR v_derivacion_accion NOT IN ('DERIVACION', 'DEVOLUCION') THEN
+                RAISE EXCEPTION 'La recepcion debe vincular una derivacion o devolucion valida';
+            END IF;
+            IF v_derivacion_expediente <> v_expediente_id THEN
+                RAISE EXCEPTION 'La recepcion y la derivacion deben pertenecer al mismo expediente';
+            END IF;
+            IF v_derivacion_secuencia >= v_secuencia THEN
+                RAISE EXCEPTION 'La derivacion vinculada debe ser anterior a la recepcion';
+            END IF;
+            IF NEW.area_receptora_id IS NULL OR NEW.area_receptora_id <> v_area_destino THEN
+                RAISE EXCEPTION 'El area receptora debe coincidir con el destino de la derivacion';
+            END IF;
+        END IF;
+    END IF;
+
     RETURN NEW;
 END;
- LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_validar_detalle_derivacion
     BEFORE INSERT OR UPDATE ON derivacion_tramite
@@ -297,6 +334,191 @@ CREATE TRIGGER trg_validar_detalle_observacion
 CREATE TRIGGER trg_validar_detalle_atencion
     BEFORE INSERT OR UPDATE ON atencion_tramite
     FOR EACH ROW EXECUTE FUNCTION fn_validar_compatibilidad_detalle();
+
+-- 4.4 Coherencia secuencial, transicion aplicable y cierre posterior a atencion
+CREATE OR REPLACE FUNCTION fn_validar_movimiento()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_ultima_secuencia INTEGER;
+    v_ultimo_estado BIGINT;
+    v_accion_codigo VARCHAR(50);
+    v_transicion_valida BOOLEAN;
+    v_tiene_atencion BOOLEAN;
+BEGIN
+    PERFORM pg_advisory_xact_lock(hashtextextended(NEW.expediente_id, 0));
+
+    SELECT secuencia, estado_resultante_id
+      INTO v_ultima_secuencia, v_ultimo_estado
+    FROM movimiento_tramite
+    WHERE expediente_id = NEW.expediente_id
+    ORDER BY secuencia DESC
+    LIMIT 1;
+
+    IF v_ultima_secuencia IS NULL THEN
+        IF NEW.secuencia <> 1 OR NEW.estado_anterior_id IS NOT NULL THEN
+            RAISE EXCEPTION 'El primer movimiento debe tener secuencia 1 y estado anterior nulo';
+        END IF;
+    ELSE
+        IF NEW.secuencia <> v_ultima_secuencia + 1 THEN
+            RAISE EXCEPTION 'Conflicto de secuencia: se esperaba %, se recibio %',
+                v_ultima_secuencia + 1, NEW.secuencia;
+        END IF;
+        IF NEW.estado_anterior_id IS DISTINCT FROM v_ultimo_estado THEN
+            RAISE EXCEPTION 'El estado anterior no coincide con el ultimo estado del expediente';
+        END IF;
+    END IF;
+
+    SELECT codigo INTO v_accion_codigo
+    FROM accion_tramite
+    WHERE accion_tramite_id = NEW.accion_tramite_id;
+
+    IF NEW.transicion_estado_tramite_id IS NOT NULL THEN
+        SELECT TRUE INTO v_transicion_valida
+        FROM transicion_estado_tramite t
+        WHERE t.transicion_estado_tramite_id = NEW.transicion_estado_tramite_id
+          AND t.estado_anterior_id IS NOT DISTINCT FROM NEW.estado_anterior_id
+          AND t.accion_tramite_id = NEW.accion_tramite_id
+          AND t.estado_resultante_id = NEW.estado_resultante_id
+          AND t.activo
+          AND (t.vigente_desde IS NULL OR NEW.fecha_hora >= t.vigente_desde)
+          AND (t.vigente_hasta IS NULL OR NEW.fecha_hora < t.vigente_hasta);
+
+        IF NOT COALESCE(v_transicion_valida, FALSE) THEN
+            RAISE EXCEPTION 'La transicion indicada no es compatible, activa o vigente';
+        END IF;
+    END IF;
+
+    IF v_accion_codigo = 'CIERRE' THEN
+        SELECT EXISTS (
+            SELECT 1
+            FROM movimiento_tramite m
+            JOIN accion_tramite a ON a.accion_tramite_id = m.accion_tramite_id
+            JOIN atencion_tramite atn ON atn.movimiento_id = m.movimiento_id
+            WHERE m.expediente_id = NEW.expediente_id
+              AND m.secuencia < NEW.secuencia
+              AND a.codigo = 'ATENCION'
+        ) INTO v_tiene_atencion;
+
+        IF NOT v_tiene_atencion THEN
+            RAISE EXCEPTION 'No se puede cerrar un expediente sin una atencion valida anterior';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_movimiento
+    BEFORE INSERT ON movimiento_tramite
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_movimiento();
+
+-- 4.5 Relaciones: mismo expediente, orden temporal y semantica propuesta
+CREATE OR REPLACE FUNCTION fn_validar_relacion_movimiento()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_origen_expediente VARCHAR(64);
+    v_destino_expediente VARCHAR(64);
+    v_origen_secuencia INTEGER;
+    v_destino_secuencia INTEGER;
+    v_origen_accion VARCHAR(50);
+    v_destino_accion VARCHAR(50);
+    v_tipo VARCHAR(50);
+BEGIN
+    SELECT m.expediente_id, m.secuencia, a.codigo
+      INTO v_origen_expediente, v_origen_secuencia, v_origen_accion
+    FROM movimiento_tramite m
+    JOIN accion_tramite a ON a.accion_tramite_id = m.accion_tramite_id
+    WHERE m.movimiento_id = NEW.movimiento_origen_id;
+
+    SELECT m.expediente_id, m.secuencia, a.codigo
+      INTO v_destino_expediente, v_destino_secuencia, v_destino_accion
+    FROM movimiento_tramite m
+    JOIN accion_tramite a ON a.accion_tramite_id = m.accion_tramite_id
+    WHERE m.movimiento_id = NEW.movimiento_destino_id;
+
+    SELECT codigo INTO v_tipo
+    FROM tipo_relacion_movimiento
+    WHERE tipo_relacion_movimiento_id = NEW.tipo_relacion_movimiento_id
+      AND activo;
+
+    IF v_tipo IS NULL THEN
+        RAISE EXCEPTION 'El tipo de relacion debe existir y estar activo';
+    END IF;
+    IF NEW.movimiento_origen_id = NEW.movimiento_destino_id THEN
+        RAISE EXCEPTION 'Un movimiento no puede relacionarse consigo mismo'
+            USING ERRCODE = 'check_violation';
+    END IF;
+    IF v_origen_expediente <> v_destino_expediente THEN
+        RAISE EXCEPTION 'Los movimientos relacionados deben pertenecer al mismo expediente';
+    END IF;
+    IF v_origen_secuencia <= v_destino_secuencia THEN
+        RAISE EXCEPTION 'El movimiento que relaciona debe ser posterior al movimiento relacionado';
+    END IF;
+    IF v_tipo = 'RECTIFICA' AND v_origen_accion <> 'RECTIFICACION' THEN
+        RAISE EXCEPTION 'Una relacion RECTIFICA debe originarse en una RECTIFICACION';
+    END IF;
+    IF v_tipo = 'REABRE'
+       AND (v_origen_accion <> 'REAPERTURA' OR v_destino_accion <> 'CIERRE') THEN
+        RAISE EXCEPTION 'Una relacion REABRE debe vincular una REAPERTURA con un CIERRE anterior';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_relacion_movimiento
+    BEFORE INSERT OR UPDATE ON relacion_movimiento
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_relacion_movimiento();
+
+CREATE OR REPLACE FUNCTION fn_impedir_mutacion_relacion()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'Las relaciones entre movimientos historicos son inmutables'
+        USING ERRCODE = 'restrict_violation';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_inmutabilidad_relacion
+    BEFORE UPDATE OR DELETE ON relacion_movimiento
+    FOR EACH ROW EXECUTE FUNCTION fn_impedir_mutacion_relacion();
+
+-- 4.6 Reapertura y rectificacion requieren una relacion al confirmar.
+CREATE OR REPLACE FUNCTION fn_validar_relacion_obligatoria()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_accion VARCHAR(50);
+    v_tipo_requerido VARCHAR(50);
+BEGIN
+    SELECT codigo INTO v_accion
+    FROM accion_tramite
+    WHERE accion_tramite_id = NEW.accion_tramite_id;
+
+    v_tipo_requerido := CASE v_accion
+        WHEN 'REAPERTURA' THEN 'REABRE'
+        WHEN 'RECTIFICACION' THEN 'RECTIFICA'
+        ELSE NULL
+    END;
+
+    IF v_tipo_requerido IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM relacion_movimiento r
+        JOIN tipo_relacion_movimiento tr
+          ON tr.tipo_relacion_movimiento_id = r.tipo_relacion_movimiento_id
+        WHERE r.movimiento_origen_id = NEW.movimiento_id
+          AND tr.codigo = v_tipo_requerido
+    ) THEN
+        RAISE EXCEPTION 'El movimiento % requiere una relacion %',
+            NEW.movimiento_id, v_tipo_requerido;
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER trg_validar_relacion_obligatoria
+    AFTER INSERT ON movimiento_tramite
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_relacion_obligatoria();
 
 -- ============================================================================
 -- SECCIÓN 5: CARGA DE CATÁLOGOS Y TRANSICIONES (EJEMPLOS PROPUESTOS)
