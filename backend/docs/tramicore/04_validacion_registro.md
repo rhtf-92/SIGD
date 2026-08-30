@@ -14,6 +14,8 @@ Este documento detalla los casos reales de prueba y scripts de validación ejecu
 | Script de carga | `03_tramite_expediente_registro.sql` (ejecutado con `-v ON_ERROR_STOP=1`) |
 | Script de casos de prueba | `tramicore_validacion.sql` |
 
+> **Nota sobre versión objetivo:** Las pruebas se ejecutaron en **PostgreSQL 18.3**. El sistema tiene como versión objetivo **PostgreSQL 18.6** (según los planes de trabajo del proyecto); queda **pendiente** repetir la validación final en dicha versión antes de la entrega.
+
 **Comando de ejecución del script de carga:**
 
 ```bat

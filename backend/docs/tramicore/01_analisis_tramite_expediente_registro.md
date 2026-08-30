@@ -60,19 +60,19 @@ Comprende desde la presentación de la solicitud en Mesa de Partes hasta el asen
 
 ## 5. Datos de Entrada, Remitente y Destinatario
 
-### 5.1 Datos del Remitente `[CONFIRMADO]`
+### 5.1 Datos del Remitente `[PROPUESTO]`
 * **Tipo de Persona:** Natural o Jurídica `[PROPUESTO]`.
 * **Tipo y Número de Identificación:** DNI, Carné de Extranjería o RUC `[PROPUESTO]`.
 * **Nombres y Apellidos / Razón Social:** Nombre legal acreditable `[PROPUESTO]`.
 * **Datos de Contacto:** Correo electrónico, teléfono celular y domicilio fiscal o real `[PROPUESTO]`.
 * *Regla de integración:* Se vincula mediante clave foránea al módulo de personas/administrados del Grupo 4 sin duplicar datos personales en las tablas de trámite. El solicitante externo puede ser registrado de forma asistida por Mesa de Partes sin exigir credenciales (ver §5.4).
 
-### 5.2 Datos del Destinatario `[CONFIRMADO]`
+### 5.2 Datos del Destinatario `[PROPUESTO]`
 * **Unidad Orgánica / Dependencia:** Área de destino competente (ej. Dirección General, Secretaría Académica, Logística) `[PROPUESTO]`.
 * **Funcionario Destino:** Usuario asignado dentro del área destinataria `[PENDIENTE]`.
 * *Regla de integración:* Se vincula mediante referencia al catálogo organizacional del Grupo 3.
 
-### 5.3 Datos del Cuerpo del Registro `[CONFIRMADO]`
+### 5.3 Datos del Cuerpo del Registro `[PROPUESTO]`
 * **Tipo de Documento de Origen:** Solicitud (FUT), Oficio, Memorándum, Carta `[PROPUESTO]`.
 * **Número de Documento de Origen:** Código visible del documento presentado (ej. `OF-015-2026-MINEDU`) `[EJEMPLO]`.
 * **Asunto / Sumilla:** Resumen del requerimiento solicitado (máximo 500 caracteres) `[PROPUESTO]`.
