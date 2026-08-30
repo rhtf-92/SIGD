@@ -34,7 +34,20 @@ CREATE INDEX idx_areas_parent_id
 
 
 -- ======================================================
--- 2. TABLA: CARGOS
+-- 2. TABLA: ROLES
+-- REORDENADO: Ahora se crea ANTES de CARGOS (que depende de ella)
+-- ======================================================
+
+CREATE TABLE roles (
+    id BIGSERIAL PRIMARY KEY,
+    codigo VARCHAR(50) NOT NULL UNIQUE,
+    nombre VARCHAR(100) NOT NULL
+);
+
+
+-- ======================================================
+-- 3. TABLA: CARGOS
+-- REORDENADO: Ahora se crea DESPUÉS de ROLES
 -- ======================================================
 
 CREATE TABLE cargos (
@@ -50,7 +63,7 @@ CREATE TABLE cargos (
 
 
 -- ======================================================
--- 3. TABLA: RESPONSABLES
+-- 4. TABLA: RESPONSABLES
 -- ======================================================
 
 /*
@@ -95,17 +108,6 @@ CREATE INDEX idx_responsables_cargo
 
 CREATE INDEX idx_responsables_vigencia
     ON responsables(fecha_inicio, fecha_fin);
-
-
--- ======================================================
--- 4. TABLA: ROLES
--- ======================================================
-
-CREATE TABLE roles (
-    id BIGSERIAL PRIMARY KEY,
-    codigo VARCHAR(50) NOT NULL UNIQUE,
-    nombre VARCHAR(100) NOT NULL
-);
 
 
 -- ======================================================
