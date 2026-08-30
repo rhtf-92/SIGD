@@ -2,6 +2,17 @@
 -- SIGD / DocuCore - Esquema de documentos, formularios y expedientes
 -- Motor objetivo: PostgreSQL 18.6
 -- Fecha: 2026-08-29
+-- Version: 3 (corrige alineacion con 03_modelo_datos.md v2.0)
+--
+-- Cambios de esta version:
+--   1) USUARIO ya no es tabla propia de DocuCore (pertenece al modulo central
+--      de identidad del SIGD). Se elimina la tabla y todas las FK hacia ella;
+--      los identificadores de usuario quedan como BIGINT sin REFERENCES.
+--      La validacion de existencia del ID la hace la aplicacion.
+--   2) FORMULARIO recupera el versionado (se revierte el CAM-01 anterior).
+--      EXPEDIENTE ahora referencia id_formulario (version exacta usada) en
+--      vez de id_tipo_documento, para no verse afectado si el formulario
+--      cambia despues de creado el expediente.
 --
 -- Este script implementa el modelo funcional suministrado. Los archivos se
 -- almacenan fuera de la base de datos; aqui solo se guarda su metadato y ruta.
@@ -13,11 +24,6 @@ BEGIN;
 CREATE SCHEMA IF NOT EXISTS docucore;
 SET search_path TO docucore, public;
 
-DO $$
-BEGIN
-    CREATE TYPE rol_usuario AS ENUM ('ADMINISTRADOR', 'SOLICITANTE', 'EVALUADOR', 'CONSULTANTE');
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
 DO $$
 BEGIN
     CREATE TYPE tipo_dato_campo AS ENUM ('TEXTO', 'NUMERO', 'FECHA', 'SELECCION');
@@ -44,19 +50,14 @@ BEGIN
     CREATE TYPE estado_adjunto AS ENUM ('CARGADO', 'OBSERVADO', 'APROBADO', 'REEMPLAZADO', 'ELIMINADO');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
--- Migracion segura para instalaciones creadas con una version anterior.
 ALTER TYPE estado_adjunto ADD VALUE IF NOT EXISTS 'ELIMINADO';
 
-CREATE TABLE IF NOT EXISTS usuario (
-    id_usuario              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nombre_completo         VARCHAR(200) NOT NULL,
-    correo                  VARCHAR(150) NOT NULL,
-    rol                     rol_usuario NOT NULL,
-    activo                  BOOLEAN NOT NULL DEFAULT TRUE,
-    fecha_creacion          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_usuario_correo UNIQUE (correo),
-    CONSTRAINT ck_usuario_correo_no_vacio CHECK (btrim(correo) <> '')
-);
+-- ----------------------------------------------------------------------------
+-- CORRECCION 1: USUARIO es una entidad externa (modulo de identidad del SIGD).
+-- Se elimina la tabla propia; CASCADE tambien elimina las FK que otras tablas
+-- tenian hacia ella, dejando esas columnas como BIGINT simple.
+-- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS usuario CASCADE;
 
 CREATE TABLE IF NOT EXISTS tipo_documento (
     id_tipo_documento       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -64,36 +65,50 @@ CREATE TABLE IF NOT EXISTS tipo_documento (
     nombre                  VARCHAR(150) NOT NULL,
     descripcion             TEXT,
     activo                  BOOLEAN NOT NULL DEFAULT TRUE,
-    id_usuario_creador      BIGINT NOT NULL REFERENCES usuario(id_usuario),
+    -- Referencia externa al modulo de identidad del SIGD. Sin FK: la
+    -- aplicacion valida la existencia del usuario antes de insertar.
+    id_usuario_creador      BIGINT NOT NULL,
     fecha_creacion          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_tipo_documento_codigo UNIQUE (codigo),
     CONSTRAINT ck_tipo_documento_codigo_no_vacio CHECK (btrim(codigo) <> ''),
     CONSTRAINT ck_tipo_documento_nombre_no_vacio CHECK (btrim(nombre) <> '')
 );
+-- Migracion: si la tabla ya existia con FK hacia usuario, CASCADE ya la quito;
+-- esta linea cubre instalaciones donde el nombre de constraint difiera.
+ALTER TABLE tipo_documento DROP CONSTRAINT IF EXISTS tipo_documento_id_usuario_creador_fkey;
 
+-- ----------------------------------------------------------------------------
+-- CORRECCION 2: FORMULARIO recupera el versionado.
+-- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS formulario (
     id_formulario           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_tipo_documento       BIGINT NOT NULL REFERENCES tipo_documento(id_tipo_documento),
+    version                 SMALLINT NOT NULL DEFAULT 1,
     activo                  BOOLEAN NOT NULL DEFAULT TRUE,
-    fecha_creacion          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_formulario_tipo_documento UNIQUE (id_tipo_documento)
+    fecha_creacion          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- CAM-01 resuelto: se conserva la relacion 1:1 definida en el modelo aprobado.
--- Estas sentencias permiten actualizar una instalacion que uso la version previa.
-ALTER TABLE formulario DROP CONSTRAINT IF EXISTS uq_formulario_tipo_version;
-ALTER TABLE formulario DROP COLUMN IF EXISTS version;
-DROP INDEX IF EXISTS uq_formulario_activo_por_tipo;
+-- Migracion desde la version anterior (1:1 estricto, sin columna version).
+ALTER TABLE formulario DROP CONSTRAINT IF EXISTS uq_formulario_tipo_documento;
+ALTER TABLE formulario ADD COLUMN IF NOT EXISTS version SMALLINT NOT NULL DEFAULT 1;
+
 DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint
          WHERE conrelid = 'docucore.formulario'::regclass
-           AND conname = 'uq_formulario_tipo_documento'
+           AND conname = 'uq_formulario_tipo_version'
     ) THEN
-        ALTER TABLE formulario ADD CONSTRAINT uq_formulario_tipo_documento UNIQUE (id_tipo_documento);
+        ALTER TABLE formulario ADD CONSTRAINT uq_formulario_tipo_version UNIQUE (id_tipo_documento, version);
     END IF;
 END $$;
+
+ALTER TABLE formulario ADD CONSTRAINT ck_formulario_version_positiva CHECK (version > 0);
+
+-- Solo puede haber una version activa del formulario para cada tipo documental.
+DROP INDEX IF EXISTS uq_formulario_activo_por_tipo;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_formulario_activo_por_tipo
+    ON formulario (id_tipo_documento) WHERE activo;
 
 CREATE TABLE IF NOT EXISTS campo_formulario (
     id_campo                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -113,11 +128,17 @@ CREATE TABLE IF NOT EXISTS campo_formulario (
     )
 );
 
+-- ----------------------------------------------------------------------------
+-- EXPEDIENTE ahora referencia id_formulario (version exacta usada) en vez de
+-- id_tipo_documento. El tipo de documento sigue siendo consultable de forma
+-- indirecta: expediente -> formulario -> tipo_documento.
+-- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS expediente (
     id_expediente           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     codigo_oficial          VARCHAR(30),
-    id_tipo_documento       BIGINT NOT NULL REFERENCES tipo_documento(id_tipo_documento),
-    id_usuario_solicitante  BIGINT NOT NULL REFERENCES usuario(id_usuario),
+    id_formulario           BIGINT NOT NULL REFERENCES formulario(id_formulario),
+    -- Referencia externa al modulo de identidad del SIGD. Sin FK.
+    id_usuario_solicitante  BIGINT NOT NULL,
     estado                  estado_expediente NOT NULL DEFAULT 'BORRADOR',
     fecha_creacion          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     fecha_radicacion        TIMESTAMPTZ,
@@ -127,6 +148,32 @@ CREATE TABLE IF NOT EXISTS expediente (
         OR (estado <> 'BORRADOR' AND codigo_oficial IS NOT NULL AND fecha_radicacion IS NOT NULL)
     )
 );
+
+-- Migracion desde la version anterior (referenciaba id_tipo_documento).
+ALTER TABLE expediente DROP CONSTRAINT IF EXISTS expediente_id_tipo_documento_fkey;
+ALTER TABLE expediente DROP CONSTRAINT IF EXISTS expediente_id_usuario_solicitante_fkey;
+ALTER TABLE expediente ADD COLUMN IF NOT EXISTS id_formulario BIGINT;
+-- Backfill best-effort usando la version activa del tipo de documento previo.
+UPDATE expediente e
+   SET id_formulario = f.id_formulario
+  FROM formulario f
+ WHERE e.id_formulario IS NULL
+   AND e.id_tipo_documento IS NOT NULL
+   AND f.id_tipo_documento = e.id_tipo_documento
+   AND f.activo;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conrelid = 'docucore.expediente'::regclass
+           AND conname = 'expediente_id_formulario_fkey'
+    ) THEN
+        ALTER TABLE expediente ADD CONSTRAINT expediente_id_formulario_fkey
+            FOREIGN KEY (id_formulario) REFERENCES formulario(id_formulario);
+    END IF;
+END $$;
+ALTER TABLE expediente ALTER COLUMN id_formulario SET NOT NULL;
+ALTER TABLE expediente DROP COLUMN IF EXISTS id_tipo_documento;
 
 CREATE TABLE IF NOT EXISTS valor_campo (
     id_valor_campo          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -184,7 +231,8 @@ CREATE TABLE IF NOT EXISTS expediente_requisito (
     id_expediente           BIGINT NOT NULL REFERENCES expediente(id_expediente),
     id_tipo_documento_requisito BIGINT NOT NULL REFERENCES tipo_documento_requisito(id_tipo_documento_requisito),
     estado                  estado_expediente_requisito NOT NULL DEFAULT 'PENDIENTE',
-    id_evaluador            BIGINT REFERENCES usuario(id_usuario),
+    -- Referencia externa al modulo de identidad del SIGD. Sin FK.
+    id_evaluador            BIGINT,
     fecha_evaluacion        TIMESTAMPTZ,
     fecha_activacion        TIMESTAMPTZ,
     CONSTRAINT uq_expediente_requisito UNIQUE (id_expediente, id_tipo_documento_requisito),
@@ -193,6 +241,7 @@ CREATE TABLE IF NOT EXISTS expediente_requisito (
         OR (id_evaluador IS NOT NULL AND fecha_evaluacion IS NOT NULL)
     )
 );
+ALTER TABLE expediente_requisito DROP CONSTRAINT IF EXISTS expediente_requisito_id_evaluador_fkey;
 
 CREATE TABLE IF NOT EXISTS archivo_adjunto (
     id_adjunto              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -219,19 +268,17 @@ CREATE TABLE IF NOT EXISTS archivo_adjunto (
     CONSTRAINT ck_adjunto_version_positiva CHECK (version_num > 0),
     CONSTRAINT ck_adjunto_no_autorreferencia CHECK (id_adjunto_anterior IS NULL OR id_adjunto_anterior <> id_adjunto)
 );
-
--- BUG-01: version_num identifica una cadena de reemplazos, no todos los
--- archivos de un requisito. Un requisito multiple puede tener varias v1.
 ALTER TABLE archivo_adjunto DROP CONSTRAINT IF EXISTS uq_adjunto_requisito_version;
 
-CREATE INDEX IF NOT EXISTS ix_expediente_tipo ON expediente(id_tipo_documento);
+DROP INDEX IF EXISTS ix_expediente_tipo;
+CREATE INDEX IF NOT EXISTS ix_expediente_formulario ON expediente(id_formulario);
 CREATE INDEX IF NOT EXISTS ix_expediente_solicitante ON expediente(id_usuario_solicitante);
 CREATE INDEX IF NOT EXISTS ix_expediente_requisito_expediente ON expediente_requisito(id_expediente);
 CREATE INDEX IF NOT EXISTS ix_adjunto_requisito_estado ON archivo_adjunto(id_expediente_requisito, estado_adjunto);
 CREATE INDEX IF NOT EXISTS ix_adjunto_hash ON archivo_adjunto(hash_sha256);
 
--- Verifica que un campo usado para condicion pertenezca al formulario del mismo
--- tipo documental configurado. Evita condiciones cruzadas entre tramites.
+-- Verifica que un campo usado para condicion pertenezca a la version ACTIVA
+-- del formulario del mismo tipo documental configurado.
 CREATE OR REPLACE FUNCTION fn_validar_campo_condicionante()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -240,13 +287,15 @@ BEGIN
         JOIN formulario f ON f.id_formulario = cf.id_formulario
         WHERE cf.id_campo = NEW.id_campo_condicionante
           AND f.id_tipo_documento = NEW.id_tipo_documento
+          AND f.activo
     ) THEN
-        RAISE EXCEPTION 'El campo condicionante debe pertenecer a un formulario del tipo de documento %', NEW.id_tipo_documento;
+        RAISE EXCEPTION 'El campo condicionante debe pertenecer a la version activa del formulario del tipo de documento %', NEW.id_tipo_documento;
     END IF;
     RETURN NEW;
 END $$;
 
--- Impide guardar valores de campos que no correspondan al tipo del expediente.
+-- Impide guardar valores de campos que no pertenezcan a la version exacta de
+-- formulario que el expediente referencia (id_formulario).
 CREATE OR REPLACE FUNCTION fn_validar_valor_campo()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 DECLARE
@@ -257,16 +306,14 @@ BEGIN
     SELECT cf.tipo_dato, cf.opciones
       INTO v_tipo, v_opciones
       FROM expediente e
-      JOIN campo_formulario cf ON cf.id_campo = NEW.id_campo
-      JOIN formulario f ON f.id_formulario = cf.id_formulario
+      JOIN campo_formulario cf ON cf.id_formulario = e.id_formulario
      WHERE e.id_expediente = NEW.id_expediente
-       AND f.id_tipo_documento = e.id_tipo_documento;
+       AND cf.id_campo = NEW.id_campo;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'El campo % no pertenece al tipo documental del expediente %', NEW.id_campo, NEW.id_expediente;
+        RAISE EXCEPTION 'El campo % no pertenece a la version de formulario del expediente %', NEW.id_campo, NEW.id_expediente;
     END IF;
 
-    -- BUG-04: valida el formato real antes de persistir el valor capturado.
     IF v_tipo = 'NUMERO' AND NEW.valor !~ '^[+-]?([0-9]+([.][0-9]+)?|[.][0-9]+)$' THEN
         RAISE EXCEPTION 'El campo % solo admite un numero valido', NEW.id_campo;
     ELSIF v_tipo = 'FECHA' THEN
@@ -300,8 +347,6 @@ DECLARE
     v_estado_anterior estado_adjunto;
     v_version_anterior SMALLINT;
 BEGIN
-    -- Los metadatos no se revalidan al aprobar/observar: esos cambios se
-    -- realizan durante la evaluacion, cuando el expediente ya esta radicado.
     IF TG_OP = 'UPDATE' THEN
         IF OLD.estado_adjunto = 'APROBADO' AND NEW IS DISTINCT FROM OLD THEN
             RAISE EXCEPTION 'Un adjunto aprobado es inmutable';
@@ -369,7 +414,6 @@ CREATE OR REPLACE FUNCTION fn_proteger_eliminacion_adjunto()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
-        -- BUG-03: el historial documental no admite eliminacion fisica.
         RAISE EXCEPTION 'No se permite DELETE en archivo_adjunto; use fn_eliminar_logicamente_adjunto(%)', OLD.id_adjunto;
     ELSIF OLD.estado_adjunto = 'APROBADO' AND NEW IS DISTINCT FROM OLD THEN
         RAISE EXCEPTION 'Un adjunto aprobado es inmutable';
@@ -377,7 +421,6 @@ BEGIN
     RETURN NEW;
 END $$;
 
--- Operacion controlada para el borrado logico. Un aprobado se mantiene intacto.
 CREATE OR REPLACE FUNCTION fn_eliminar_logicamente_adjunto(p_id_adjunto BIGINT)
 RETURNS VOID LANGUAGE plpgsql AS $$
 BEGIN
@@ -415,8 +458,6 @@ BEGIN
      WHERE id_expediente_requisito = p_id_expediente_requisito
      RETURNING id_expediente INTO v_id_expediente;
 
-    -- BUG-02: una observacion habilita la subsanacion. Una vez resueltos todos
-    -- los requisitos obligatorios o condicionales activos, vuelve a revision.
     IF v_estado = 'OBSERVADO' THEN
         UPDATE expediente
            SET estado = 'SUBSANACION'
