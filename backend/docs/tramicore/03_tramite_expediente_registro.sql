@@ -4,6 +4,7 @@
 -- SIGD - Grupo 2 "TramiCore"
 -- [BORRADOR - Sujeto a cambios] Script SQL de Registro y Expedientación
 -- Alineado con el modelo de B_RAMIREZ e integraciones con Grupo 3 y 4
+-- Ejecutado y verificado en PostgreSQL 18.3 (2026-08-30). Salidas en 04_validacion_registro.md
 -- =============================================================================
 
 BEGIN;
@@ -15,10 +16,13 @@ DROP TABLE IF EXISTS tramite CASCADE;
 DROP SEQUENCE IF EXISTS seq_asiento_numero_registro CASCADE;
 
 -- 2. SECUENCIA EXPLÍCITA PARA NUMERO_REGISTRO EN EL LIBRO GENERAL
-CREATE SEQUENCE seq_asiento_numero_registro 
-    START WITH 10001 
-    INCREMENT BY 1 
+CREATE SEQUENCE seq_asiento_numero_registro
+    START WITH 10001
+    INCREMENT BY 1
     NO MAXVALUE;
+-- Nota: las secuencias de PostgreSQL garantizan unicidad y monotonicidad, pero
+-- NO garantizan ausencia de huecos: si una transacción consume nextval() y luego
+-- se revierte (ROLLBACK), el valor se pierde. Esto es aceptable para el Libro.
 
 -- 3. TABLA TRAMITE
 CREATE TABLE tramite (
@@ -26,11 +30,11 @@ CREATE TABLE tramite (
     codigo_tramite VARCHAR(20) NOT NULL UNIQUE, -- Ajustado según diccionario: VARCHAR(20) NOT NULL
     asunto VARCHAR(500) NOT NULL,
     estado VARCHAR(30) NOT NULL DEFAULT 'REGISTRADO',
-    fk_remitente BIGINT NOT NULL,    -- Nota: Llave foránea lógica hacia Usuarios (Grupo 4). No se define FK física por dependencia de módulo externo.
+    fk_remitente BIGINT NOT NULL,    -- Nota: Llave foránea lógica hacia Personas/Usuarios (Grupo 4). Cubre usuarios registrados y solicitantes externos registrados de forma asistida sin credenciales.
     fk_destinatario BIGINT NULL,     -- Nota: Llave foránea lógica hacia Áreas (Grupo 3). No se define FK física por dependencia de módulo externo.
-    creado_en TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    actualizado_en TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    actualizado_en TIMESTAMPTZ DEFAULT NOW(),
+
     CONSTRAINT chk_tramite_estado CHECK (
         estado IN ('REGISTRADO', 'EN_TRAMITE', 'OBSERVADO', 'CERRADO', 'ANULADO', 'REABIERTO')
     )
@@ -41,9 +45,9 @@ CREATE TABLE expediente (
     id_expediente BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     codigo_expediente VARCHAR(50) NOT NULL UNIQUE,
     fk_tramite BIGINT NOT NULL UNIQUE,
-    creado_en TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT fk_expediente_tramite FOREIGN KEY (fk_tramite) 
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_expediente_tramite FOREIGN KEY (fk_tramite)
         REFERENCES tramite (id_tramite) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -51,7 +55,7 @@ CREATE TABLE expediente (
 CREATE TABLE asiento_registro (
     id_asiento BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     numero_registro BIGINT NOT NULL UNIQUE DEFAULT nextval('seq_asiento_numero_registro'), -- El formato visual con ceros (ej. 00000001) se gestionará en el backend/app mediante LPAD()
-    fecha_ingreso TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    fecha_ingreso TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     canal_ingreso VARCHAR(30) NOT NULL DEFAULT 'MESA_PRESENCIAL',
     asunto VARCHAR(500) NOT NULL,
     fk_expediente BIGINT NOT NULL,
@@ -59,9 +63,9 @@ CREATE TABLE asiento_registro (
     fk_destinatario BIGINT NULL,     -- Nota: Dependencia con Unidad Orgánica (Grupo 3)
     anulado BOOLEAN NOT NULL DEFAULT FALSE,
     motivo_anulacion TEXT NULL,
-    
+
     CONSTRAINT chk_asiento_canal CHECK (canal_ingreso IN ('MESA_PRESENCIAL', 'MESA_VIRTUAL')),
-    CONSTRAINT fk_asiento_expediente FOREIGN KEY (fk_expediente) 
+    CONSTRAINT fk_asiento_expediente FOREIGN KEY (fk_expediente)
         REFERENCES expediente (id_expediente) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
