@@ -56,4 +56,4 @@
 ## 5. Preguntas para el Profesor
 1. ¿La validación con RENIEC/PIDE será obligatoria en tiempo real desde la primera fase?
 2. ¿Los usuarios internos ingresarán con correo institucional o con un usuario propio del sistema?
-3. ¿Quién aprueba las cuentas de empresas (RUC): el sistema automáticamente o Mesa de Partes?
+3. ¿Quién aprueba las cuentas de empresas (RUC): el sistema automáticamente o Mesa de Partes?ñ
