@@ -1,0 +1,188 @@
+<mxfile host="app.diagrams.net" modified="2026-08-29T00:00:00.000Z" agent="Claude" version="24.0.0" type="device">
+  <diagram name="SIGD - DocuCore" id="sigd-docucore">
+    <mxGraphModel dx="1800" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- TITLE -->
+        <mxCell id="title1" value="DIAGRAMA DEL MODELO DE DATOS - SIGD (MODULO DOCUCORE)" style="text;html=1;align=center;verticalAlign=middle;fontSize=26;fontStyle=1;fontColor=#1A1A66;" vertex="1" parent="1">
+          <mxGeometry x="350" y="10" width="900" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="title2" value="Basado en analisis funcional de Azareno (v1.1) y reglas de Valentin (v2.0)" style="text;html=1;align=center;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="350" y="45" width="900" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- INFO BOX -->
+        <mxCell id="infobox" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1A1A66;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="10" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="infotext" value="&lt;div style=&quot;text-align:left;font-family:monospace;font-size:11px;&quot;&gt;&lt;b&gt;Sistema:&lt;/b&gt; SIGD - Sistema Integral de Gestion Documentaria&lt;br&gt;&lt;b&gt;Modulo:&lt;/b&gt; DocuCore&lt;br&gt;&lt;b&gt;Autor:&lt;/b&gt; Cristian&lt;br&gt;&lt;b&gt;Rama Git:&lt;/b&gt; B_CHRISTIAN&lt;br&gt;&lt;b&gt;Fecha:&lt;/b&gt; 29 de agosto de 2026&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="10" width="320" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- USUARIO -->
+        <mxCell id="usuario" value="USUARIO" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#EDE7F6;strokeColor=#5E35B1;strokeWidth=2;startSize=30;fontColor=#4527A0;align=center;" vertex="1" parent="1">
+          <mxGeometry x="20" y="110" width="290" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="usuario_f" value="PK  id_usuario            BIGINT&#10;    nombre_completo    VARCHAR(200)&#10;    correo             VARCHAR(150) UNIQUE&#10;    rol                ENUM(ADMINISTRADOR,&#10;                       SOLICITANTE, EVALUADOR,&#10;                       CONSULTANTE)&#10;    activo             BOOLEAN DEFAULT TRUE&#10;    fecha_creacion     DATETIME DEFAULT now()" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=11;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="usuario">
+          <mxGeometry width="290" height="250" as="geometry" />
+        </mxCell>
+
+        <!-- TIPO_DOCUMENTO -->
+        <mxCell id="tipodoc" value="TIPO_DOCUMENTO" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#D6EAF8;strokeColor=#1F618D;strokeWidth=2;startSize=30;fontColor=#154360;align=center;" vertex="1" parent="1">
+          <mxGeometry x="440" y="110" width="310" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="tipodoc_f" value="PK  id_tipo_documento     BIGINT&#10;    codigo             VARCHAR(30) UNIQUE&#10;    nombre             VARCHAR(150)&#10;    descripcion        TEXT&#10;    activo             BOOLEAN DEFAULT TRUE&#10;FK  id_usuario_creador    BIGINT&#10;    fecha_creacion     DATETIME DEFAULT now()" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=11;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="tipodoc">
+          <mxGeometry width="310" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- FORMULARIO -->
+        <mxCell id="formulario" value="FORMULARIO" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#D5F5E3;strokeColor=#1E8449;strokeWidth=2;startSize=30;fontColor=#145A32;align=center;" vertex="1" parent="1">
+          <mxGeometry x="850" y="110" width="290" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="formulario_f" value="PK  id_formulario         BIGINT&#10;FK  id_tipo_documento     BIGINT UNIQUE&#10;    version            SMALLINT DEFAULT 1&#10;    activo             BOOLEAN DEFAULT TRUE&#10;    fecha_creacion     DATETIME DEFAULT now()" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=11;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="formulario">
+          <mxGeometry width="290" height="150" as="geometry" />
+        </mxCell>
+
+        <!-- CAMPO_FORMULARIO -->
+        <mxCell id="campoform" value="CAMPO_FORMULARIO" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#FDEBD0;strokeColor=#B9770E;strokeWidth=2;startSize=30;fontColor=#7E5109;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="110" width="320" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="campoform_f" value="PK  id_campo               BIGINT&#10;FK  id_formulario          BIGINT&#10;    nombre_campo        VARCHAR(150)&#10;    tipo_dato           ENUM(TEXTO, NUMERO,&#10;                        FECHA, SELECCION)&#10;    obligatorio         BOOLEAN&#10;    orden               SMALLINT&#10;    opciones            TEXT (solo si SELECCION)" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=11;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="campoform">
+          <mxGeometry width="320" height="200" as="geometry" />
+        </mxCell>
+
+        <!-- EXPEDIENTE -->
+        <mxCell id="expediente" value="EXPEDIENTE" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#FADBD8;strokeColor=#C0392B;strokeWidth=2;startSize=30;fontColor=#78281F;align=center;" vertex="1" parent="1">
+          <mxGeometry x="440" y="390" width="340" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="expediente_f" value="PK  id_expediente          BIGINT&#10;    codigo_oficial      VARCHAR(30) UNIQUE NULL&#10;FK  id_tipo_documento      BIGINT&#10;FK  id_usuario_solicitante BIGINT&#10;    estado              ENUM(BORRADOR,&#10;                        EN_REVISION, OBSERVADO,&#10;                        APROBADO,&#10;                        RECHAZADO_POR_CADUCIDAD)&#10;    fecha_creacion      DATETIME DEFAULT now()&#10;    fecha_radicacion    DATETIME NULL" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=11;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="expediente">
+          <mxGeometry width="340" height="200" as="geometry" />
+        </mxCell>
+
+        <!-- VALOR_CAMPO -->
+        <mxCell id="valorcampo" value="VALOR_CAMPO" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#FDEBD0;strokeColor=#B9770E;strokeWidth=2;startSize=30;fontColor=#7E5109;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="415" width="320" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="valorcampo_f" value="PK  id_valor               BIGINT&#10;FK  id_expediente          BIGINT&#10;FK  id_campo                BIGINT&#10;    valor_texto          TEXT&#10;    valor_numero         DECIMAL&#10;    valor_fecha          DATE" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=11;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="valorcampo">
+          <mxGeometry width="320" height="150" as="geometry" />
+        </mxCell>
+
+        <!-- REQUISITO -->
+        <mxCell id="requisito" value="REQUISITO" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#D1F2EB;strokeColor=#117A65;strokeWidth=2;startSize=30;fontColor=#0B5345;align=center;" vertex="1" parent="1">
+          <mxGeometry x="20" y="650" width="270" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="requisito_f" value="PK  id_requisito           BIGINT&#10;    nombre               VARCHAR(150)&#10;    descripcion          TEXT&#10;    tipo_archivo         ENUM(PDF, IMAGEN,&#10;                         DOC, OTRO)&#10;    peso_max_mb          DECIMAL&#10;    activo               BOOLEAN DEFAULT TRUE" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=11;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="requisito">
+          <mxGeometry width="270" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- TIPO_DOCUMENTO_REQUISITO -->
+        <mxCell id="tdrequisito" value="TIPO_DOCUMENTO_REQUISITO" style="swimlane;html=1;fontSize=13;fontStyle=1;fillColor=#D1F2EB;strokeColor=#117A65;strokeWidth=2;startSize=30;fontColor=#0B5345;align=center;" vertex="1" parent="1">
+          <mxGeometry x="340" y="650" width="310" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="tdrequisito_f" value="PK  id_td_requisito         BIGINT&#10;FK  id_tipo_documento       BIGINT&#10;FK  id_requisito             BIGINT&#10;    obligatorio           BOOLEAN&#10;    condicion_activacion  TEXT NULL&#10;    permite_multiples     BOOLEAN DEFAULT FALSE&#10;    orden                 SMALLINT&#10;UK  id_tipo_documento, id_requisito" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="tdrequisito">
+          <mxGeometry width="310" height="190" as="geometry" />
+        </mxCell>
+
+        <!-- EXPEDIENTE_REQUISITO -->
+        <mxCell id="exprequisito" value="EXPEDIENTE_REQUISITO" style="swimlane;html=1;fontSize=13;fontStyle=1;fillColor=#FDEBD0;strokeColor=#CA6F1E;strokeWidth=2;startSize=30;fontColor=#7E5109;align=center;" vertex="1" parent="1">
+          <mxGeometry x="740" y="630" width="310" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="exprequisito_f" value="PK  id_exp_req              BIGINT&#10;FK  id_expediente            BIGINT&#10;FK  id_td_requisito          BIGINT&#10;    estado                ENUM(PENDIENTE,&#10;                          OBSERVADO, SUBSANADO,&#10;                          APROBADO)&#10;    observacion           TEXT NULL&#10;    fecha_creacion        DATETIME DEFAULT now()&#10;    fecha_actualizacion   DATETIME DEFAULT now()&#10;FK  id_usuario_evaluador     BIGINT" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="exprequisito">
+          <mxGeometry width="310" height="210" as="geometry" />
+        </mxCell>
+
+        <!-- ARCHIVO_ADJUNTO -->
+        <mxCell id="archivo" value="ARCHIVO_ADJUNTO" style="swimlane;html=1;fontSize=13;fontStyle=1;fillColor=#EDE7F6;strokeColor=#5E35B1;strokeWidth=2;startSize=30;fontColor=#4527A0;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="630" width="330" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="archivo_f" value="PK  id_adjunto               BIGINT&#10;FK  id_exp_req                BIGINT&#10;    nombre_archivo          VARCHAR(255)&#10;    ruta_storage             TEXT&#10;    hash_sha256              VARCHAR(64)&#10;    peso_mb                  DECIMAL&#10;    version_num              SMALLINT DEFAULT 1&#10;FK  id_adjunto_anterior      BIGINT NULL&#10;    fecha_subida             DATETIME DEFAULT now()&#10;FK  subido_por               BIGINT" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="archivo">
+          <mxGeometry width="330" height="210" as="geometry" />
+        </mxCell>
+
+        <!-- LEYENDA -->
+        <mxCell id="leyenda" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1A1A66;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="900" width="260" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="leyenda_t" value="LEYENDA" style="text;html=1;align=center;fontStyle=1;fontSize=14;fontColor=#1A1A66;" vertex="1" parent="1">
+          <mxGeometry x="20" y="905" width="260" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leyenda_body" value="&lt;div style=&quot;font-family:monospace;font-size:11px;text-align:left;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; = Clave primaria&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; = Clave foranea&lt;br&gt;&lt;b&gt;1&lt;/b&gt; = Uno&lt;br&gt;&lt;b&gt;N&lt;/b&gt; = Muchos&lt;br&gt;&lt;b&gt;0..1&lt;/b&gt; = Cero o uno (opcional)&lt;br&gt;&lt;b&gt;--&amp;gt;&lt;/b&gt; = Relacion&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="20" y="930" width="260" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- NOTAS -->
+        <mxCell id="notas" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1A1A66;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="300" y="900" width="720" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="notas_t" value="NOTAS DEL MODELO" style="text;html=1;align=center;fontStyle=1;fontSize=14;fontColor=#1A1A66;" vertex="1" parent="1">
+          <mxGeometry x="300" y="905" width="720" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="notas_body" value="&lt;div style=&quot;font-size:12px;text-align:left;&quot;&gt;&amp;#8226; El estado del requisito (EXPEDIENTE_REQUISITO.estado) se deriva de los ARCHIVOS_ADJUNTOS.&lt;br&gt;&amp;#8226; Las reglas de negocio (peso maximo, conteo de archivos, propagacion de estado, etc.) se implementaran en triggers o en la capa de aplicacion.&lt;br&gt;&amp;#8226; Los campos marcados (ruta_storage, hash_sha256, version_num, id_adjunto_anterior) son propuestas tecnicas pendientes de confirmacion institucional.&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=5;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="300" y="930" width="700" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- ESTADOS -->
+        <mxCell id="estados" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1A1A66;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="900" width="540" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="estados_t" value="ESTADOS PRINCIPALES" style="text;html=1;align=center;fontStyle=1;fontSize=14;fontColor=#1A1A66;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="905" width="540" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="estados_body1" value="&lt;div style=&quot;font-size:12px;text-align:left;&quot;&gt;&lt;b style=&quot;color:#C0392B&quot;&gt;EXPEDIENTE.estado:&lt;/b&gt;&lt;br&gt;&amp;#8226; BORRADOR&lt;br&gt;&amp;#8226; EN_REVISION&lt;br&gt;&amp;#8226; OBSERVADO&lt;br&gt;&amp;#8226; APROBADO&lt;br&gt;&amp;#8226; RECHAZADO_POR_CADUCIDAD&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=5;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="930" width="260" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="estados_body2" value="&lt;div style=&quot;font-size:12px;text-align:left;&quot;&gt;&lt;b style=&quot;color:#CA6F1E&quot;&gt;EXPEDIENTE_REQUISITO.estado:&lt;/b&gt;&lt;br&gt;&amp;#8226; PENDIENTE&lt;br&gt;&amp;#8226; OBSERVADO&lt;br&gt;&amp;#8226; SUBSANADO&lt;br&gt;&amp;#8226; APROBADO&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=5;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="930" width="260" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- EDGES / RELATIONSHIPS -->
+        <mxCell id="e1" value="1        crea        N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="usuario" target="tipodoc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="solicita" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;exitX=0.5;exitY=1;entryX=0;entryY=0.5;" edge="1" parent="1" source="usuario" target="expediente">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="evalua" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;exitX=0.3;exitY=1;entryX=0;entryY=0.5;" edge="1" parent="1" source="usuario" target="exprequisito">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="1     tiene     1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;startArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="tipodoc" target="formulario">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="1     contiene     N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="formulario" target="campoform">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="1 se usa en N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="tipodoc" target="expediente">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="1          tiene respuestas          N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="expediente" target="valorcampo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="1 tiene valores N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="campoform" target="valorcampo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="N     genera" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="expediente" target="exprequisito">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="N  se relaciona con  N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;startArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="requisito" target="tdrequisito">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="N  se aplica en  N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;startArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="tdrequisito" target="exprequisito">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="1     tiene     N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="exprequisito" target="archivo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="es version de   0..1 / N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=10;fontStyle=1;exitX=1;exitY=0.3;entryX=1;entryY=0.7;" edge="1" parent="1" source="archivo" target="archivo">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1510" y="720" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
