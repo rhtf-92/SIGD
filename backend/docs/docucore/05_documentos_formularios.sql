@@ -103,6 +103,7 @@ BEGIN
     END IF;
 END $$;
 
+ALTER TABLE formulario DROP CONSTRAINT IF EXISTS ck_formulario_version_positiva;
 ALTER TABLE formulario ADD CONSTRAINT ck_formulario_version_positiva CHECK (version > 0);
 
 -- Solo puede haber una version activa del formulario para cada tipo documental.
