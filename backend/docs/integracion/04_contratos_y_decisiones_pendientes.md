@@ -1,9 +1,7 @@
 # 04_contratos_y_decisiones_pendientes.md
 
-- **Responsable previsto:** B_AREVALO
-- **Rama prevista:** B_AREVALO
 - **Grupo:** Grupo 6 — Coordinación de Integración
-- **Estado:** BORRADOR — PENDIENTE DE REVISIÓN DEL RESPONSABLE
+- **Estado:** BORRADOR — PENDIENTE DE VALIDACIÓN DEL PROYECTO
 - **Alcance:** Matriz conceptual de dependencias inter-módulos, contratos de errores y trazabilidad, registro de riesgos y coordinación de respuestas con los grupos productores (Grupos 1 al 5).
 - **Dependencias:** Coordinación y respuesta de los grupos propietarios (Grupos 1 al 5), del líder del Grupo 6, del profesor y de la institución.
 - **Fecha de revisión:** 29 de agosto de 2026
@@ -22,7 +20,7 @@ Este documento no reemplaza una validación institucional ni la decisión de cad
 - Contratos conceptuales de errores y de trazabilidad entre módulos.
 - Listado de riesgos de interconexión propuestos, con impacto y evidencia esperada de cierre.
 - Checklist de revisión de los documentos 01, 02 y 03 del Grupo 6 y registro de observaciones.
-- Registro de preguntas para Geric, el profesor y la institución.
+- Registro de preguntas para los grupos propietarios, el profesor y la institución.
 
 **Fuera de alcance:**
 - Definir unilateralmente endpoints, formatos exactos o SLAs (es potestad de cada grupo productor).
@@ -55,13 +53,13 @@ Complementa la matriz anterior con un contrato sobre cómo se comunicarán los e
 
 | ID | Aspecto del error | Propuesta | Nivel | Responsable |
 | :--- | :--- | :--- | :--- | :--- |
-| CE-01 | Identificador de la respuesta de error | Se propone que cada respuesta incluya un `code` alfanumérico interno estable | PROPUESTA | Grupo 6, coordinado con B_REATEGUI |
-| CE-02 | Mensaje legible | Se propone un `message` descriptivo sin fuga de datos internos | PROPUESTA | Grupo 6, coordinado con B_REATEGUI |
-| CE-03 | Categoría del error | Se propone clasificar como Validation, Authorization, Conflict, NotFound o Internal | PROPUESTA | Grupo 6, coordinado con B_REATEGUI |
-| CE-04 | Detalles técnicos | Se propone un arreglo opcional de detalles, sin stack traces ni SQL | PROPUESTA | Grupo 6, coordinado con B_REATEGUI |
-| CE-05 | Reintentabilidad | Se propone un booleano `retryable` para señalar si la operación puede reintentarse | PROPUESTA | Grupo 6, coordinado con B_REATEGUI |
-| CE-06 | Trazabilidad | Se propone propagar y devolver un `correlationId` para trazar el error internamente | PROPUESTA | Grupo 6, coordinado con B_REATEGUI |
-| CE-07 | Estándar vs. formato propio | PENDIENTE decidir si se adopta RFC 9457 (Problem Details) o la estructura personalizada propuesta | PENDIENTE | B_REATEGUI y Grupo 6 |
+| CE-01 | Identificador de la respuesta de error | Se propone que cada respuesta incluya un `code` alfanumérico interno estable | PROPUESTA | Grupo 6, coordinado con el grupo productor de errores |
+| CE-02 | Mensaje legible | Se propone un `message` descriptivo sin fuga de datos internos | PROPUESTA | Grupo 6, coordinado con el grupo productor de errores |
+| CE-03 | Categoría del error | Se propone clasificar como Validation, Authorization, Conflict, NotFound o Internal | PROPUESTA | Grupo 6, coordinado con el grupo productor de errores |
+| CE-04 | Detalles técnicos | Se propone un arreglo opcional de detalles, sin stack traces ni SQL | PROPUESTA | Grupo 6, coordinado con el grupo productor de errores |
+| CE-05 | Reintentabilidad | Se propone un booleano `retryable` para señalar si la operación puede reintentarse | PROPUESTA | Grupo 6, coordinado con el grupo productor de errores |
+| CE-06 | Trazabilidad | Se propone propagar y devolver un `correlationId` para trazar el error internamente | PROPUESTA | Grupo 6, coordinado con el grupo productor de errores |
+| CE-07 | Estándar vs. formato propio | PENDIENTE decidir si se adopta RFC 9457 (Problem Details) o la estructura personalizada propuesta | PENDIENTE | Grupo 6 y los grupos productores |
 
 ## 6. Contrato conceptual de trazabilidad (PROPUESTA)
 
@@ -71,34 +69,33 @@ Define la información mínima de trazabilidad que el Grupo 1 debería poder aso
 | :--- | :--- | :--- | :--- | :--- |
 | CTZ-01 | Identificador de correlación | Se propone un `correlationId` que viaje de extremo a extremo y permita enlazar la operación con sus errores y logs | PROPUESTA | Grupo 6, coordinado con todos los grupos |
 | CTZ-02 | Referencias externas estables | Se propone que RutaDoc conserve solo identificadores externos sin duplicar entidades | PROPUESTA | Grupo 6, coordinado con G2–G5 |
-| CTZ-03 | Trazas internas ligadas al identificador | Se propone registrar trazas técnicas internamente asociadas al `correlationId`, sin exponerlas al cliente | PROPUESTA | Grupo 6, coordinado con B_REATEGUI |
+| CTZ-03 | Trazas internas ligadas al identificador | Se propone registrar trazas técnicas internamente asociadas al `correlationId`, sin exponerlas al cliente | PROPUESTA | Grupo 6, coordinado con el grupo productor de errores |
 | CTZ-04 | Tratamiento histórico | PENDIENTE definir cómo se mantienen referencias a entidades dadas de baja o inactivas en el historial | PENDIENTE | Grupos propietarios y Grupo 6 |
 
 ## 7. Matriz de riesgos con impacto y evidencia de cierre
 
 | ID Riesgo | Contrato Afectado | Riesgo Detectado | Impacto | Evidencia esperada de cierre | Responsable de coordinar | Estado |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `RI-INT-001` | `CT-G4-G1-001` | Referencia a un usuario inexistente o inactivo | RutaDoc podría vincular movimientos a actores inválidos, degradando la trazabilidad y la atribución | Confirmación escrita de G4 sobre el mecanismo de validación de usuarios y ejemplo de respuesta para un usuario inactivo | B_AREVALO / Líder G4 | ABIERTO |
-| `RI-INT-002` | `CT-G5-G1-001` | Límite máximo de tamaño de archivo (pregunta separada del ID) | Descargas o referencias a documentos que superen el límite podrían fallar o degradar el rendimiento de G1 | Definición documentada del límite por G5 y un caso de prueba ficticio que lo verifique | B_AREVALO / Líder G5 | ABIERTO |
-| `RI-INT-003` | `CT-G2-G1-001` | Expediente inexistente o no vigente | Movimientos asociados a expedientes que ya no existen o están cerrados | Confirmación escrita de G2 sobre vigencia y respuesta ante referencias no vigentes | B_AREVALO / Líder G2 | ABIERTO |
-| `RI-INT-004` | `CT-G3-G1-001` | Área o permiso no vigente al momento de la operación | Derivaciones hacia áreas inválidas o acciones sin permiso | Definición de G3 sobre vigencia de áreas/permisos y respuesta propuesta | B_AREVALO / Líder G3 | ABIERTO |
+| `RI-INT-001` | `CT-G4-G1-001` | Referencia a un usuario inexistente o inactivo | RutaDoc podría vincular movimientos a actores inválidos, degradando la trazabilidad y la atribución | Confirmación escrita de G4 sobre el mecanismo de validación de usuarios y ejemplo de respuesta para un usuario inactivo | Líder G4 | ABIERTO |
+| `RI-INT-002` | `CT-G5-G1-001` | Límite máximo de tamaño de archivo (pregunta separada del ID) | Descargas o referencias a documentos que superen el límite podrían fallar o degradar el rendimiento de G1 | Definición documentada del límite por G5 y un caso de prueba ficticio que lo verifique | Líder G5 | ABIERTO |
+| `RI-INT-003` | `CT-G2-G1-001` | Expediente inexistente o no vigente | Movimientos asociados a expedientes que ya no existen o están cerrados | Confirmación escrita de G2 sobre vigencia y respuesta ante referencias no vigentes | Líder G2 | ABIERTO |
+| `RI-INT-004` | `CT-G3-G1-001` | Área o permiso no vigente al momento de la operación | Derivaciones hacia áreas inválidas o acciones sin permiso | Definición de G3 sobre vigencia de áreas/permisos y respuesta propuesta | Líder G3 | ABIERTO |
 
 ## 8. Checklist de revisión de los documentos 01, 02, 03 y 04
 
-Estado de disponibilidad, procedencia y aporte individual de cada documento del Grupo 6 en `backend/docs/integracion/`:
+Estado de disponibilidad de cada documento del Grupo 6 en `backend/docs/integracion/`:
 
-| Documento | Disponibilidad | Procedencia | Aporte individual |
-| --- | --- | --- | --- |
-| `01_convenciones_api_backend.md` | Disponible | Material base de coordinación | Sin evidencia en `B_DUQUE` |
-| `02_catalogo_errores_backend.md` | Disponible | Material base de coordinación | Sin evidencia en `B_REATEGUI` |
-| `03_plan_pruebas_integracion.md` | Disponible | Material base de coordinación | Sin evidencia en `B_ZEVALLOS` |
-| `04_contratos_y_decisiones_pendientes.md` | Disponible | Elaborado y revisado en `B_AREVALO` | Aporte verificable de Arevalo |
+| Documento | Estado | Observación |
+|---|---|---|
+| `01_convenciones_api_backend.md` | Disponible | Pendiente de validación del proyecto |
+| `02_catalogo_errores_backend.md` | Disponible | Pendiente de validación del proyecto |
+| `03_plan_pruebas_integracion.md` | Disponible | Pendiente de validación del proyecto |
+| `04_contratos_y_decisiones_pendientes.md` | Disponible | Pendiente de validación institucional |
 
 Ítems de revisión aplicados a los documentos 01, 02 y 03:
 
 | Ítem de revisión | Aplica a | Estado | Observación |
 | :--- | :--- | :--- | :--- |
-| El documento indica responsable y rama | 01, 02, 03 | VERIFICADO | Los borradores indican B_DUQUE, B_REATEGUI y B_ZEVALLOS como responsables originalmente asignados |
 | El contenido coincide con el nombre del archivo | 01, 02, 03 | VERIFICADO | Reubicados en `backend/docs/integracion/` con su nombre definitivo |
 | No se definen endpoints ni formatos como confirmados | 01, 02, 03 | EN REVISIÓN | Las propuestas se marcan como PROPUESTA o PENDIENTE |
 | No contiene credenciales, secretos ni datos personales reales | 01, 02, 03 | VERIFICADO | No se detectaron secretos ni datos personales reales |
@@ -109,9 +106,9 @@ Estado de disponibilidad, procedencia y aporte individual de cada documento del 
 
 | ID | Documento | Observación | Estado | Fecha |
 | :--- | :--- | :--- | :--- | :--- |
-| OB-01 | 01, 02, 03 | Los documentos 01–03 fueron recuperados como material base de coordinación y no representan aportes individuales de las ramas originalmente asignadas | RESUELTA en este documento | 2026-08-29 |
+| OB-01 | 01, 02, 03 | Los documentos 01–03 quedan definidos como material base de coordinación del proyecto, sujeto a revisión y validación | RESUELTA en este documento | 2026-08-29 |
 | OB-02 | 04 | El antiguo `backend/src/docs/verify.ps1` estaba mal nombrado; su contenido fue consolidado en el documento 04 actual y el archivo no debe restaurarse | RESUELTA en este documento | 2026-08-29 |
-| OB-03 | 04 | Faltaba checklist, registro de observaciones, impacto/evidencia de riesgos y preguntas para Geric, profesor e institución | RESUELTA en este documento | 2026-08-29 |
+| OB-03 | 04 | Faltaba checklist, registro de observaciones, impacto/evidencia de riesgos y preguntas para los grupos propietarios, el profesor y la institución | RESUELTA en este documento | 2026-08-29 |
 | OB-04 | 04 | Faltaban contratos explícitos de errores y trazabilidad | RESUELTA en este documento | 2026-08-29 |
 
 ## 10. Decisiones y estado
@@ -119,13 +116,13 @@ Estado de disponibilidad, procedencia y aporte individual de cada documento del 
 | Decisión | Estado | Fuente o evidencia de la decisión |
 | :--- | :--- | :--- |
 | Endpoints físicos y validaciones exactas de G1 a G5 | PENDIENTE | Ninguna |
-| Adopción de RFC 9457 vs. formato propio de errores | PENDIENTE | Coordinación con B_REATEGUI |
+| Adopción de RFC 9457 vs. formato propio de errores | PENDIENTE | Coordinación con los grupos productores |
 | Mecanismo de validación de usuarios sin duplicar datos | PENDIENTE | Coordinación con G4 |
 | Forma de consumo de áreas y permisos | PENDIENTE | Coordinación con G3 |
 
 ## 11. Preguntas pendientes
 
-### 11.1 Para Geric (líder del Grupo 1 — RutaDoc)
+### 11.1 Para el grupo propietario de RutaDoc (Grupo 1)
 
 1. ¿Qué nivel de detalle de referencias externas espera RutaDoc recibir de los grupos productores?
 2. ¿RutaDoc consultará solo metadatos o también archivos binarios desde los módulos productores?
@@ -157,7 +154,7 @@ Estado de disponibilidad, procedencia y aporte individual de cada documento del 
 
 ## 13. Fuentes técnicas consultadas
 
-- Estructura de decisiones de RutaDoc (referencia de estilo): `backend/docs/rutadoc/05_decisiones_y_preguntas_pendientes.md` en `origin/B_GERIC`.
+- Estructura de decisiones de RutaDoc (referencia de estilo): `backend/docs/rutadoc/05_decisiones_y_preguntas_pendientes.md`.
 - RFC 9110 (HTTP Semantics): https://www.rfc-editor.org/rfc/rfc9110.html
 - RFC 9457 (Problem Details for HTTP APIs): https://www.rfc-editor.org/info/rfc9457/
 - Express 5 Error Handling: https://expressjs.com/en/5x/guide/error-handling/
@@ -173,5 +170,5 @@ Estado de disponibilidad, procedencia y aporte individual de cada documento del 
 
 | Versión | Fecha | Responsable | Cambio | Estado |
 | :--- | :--- | :--- | :--- | :--- |
-| 0.1 | 2026-08-29 | Arevalo | Creación del documento en la ruta oficial `backend/docs/integracion`, consolidando la matriz de contratos y riesgos y añadiendo contrato de errores, trazabilidad, checklist, observaciones y preguntas pendientes | **BORRADOR — PENDIENTE DE VALIDACIÓN** |
-| 0.2 | 2026-08-29 | Arevalo | Recuperación de los documentos 01–03 como material base de coordinación en `backend/docs/integracion/`, actualización del checklist y del registro de observaciones para reflejar su procedencia y la ausencia de aportes individuales verificables en las ramas originalmente asignadas | **BORRADOR — PENDIENTE DE VALIDACIÓN** |
+| 0.1 | 2026-08-29 | Grupo 6 | Creación del documento en la ruta oficial `backend/docs/integracion`, consolidando la matriz de contratos y riesgos y añadiendo contrato de errores, trazabilidad, checklist, observaciones y preguntas pendientes | **BORRADOR — PENDIENTE DE VALIDACIÓN** |
+| 0.2 | 2026-08-29 | Grupo 6 | Recuperación de los documentos 01–03 como material base de coordinación en `backend/docs/integracion/`, actualización del checklist y del registro de observaciones | **BORRADOR — PENDIENTE DE VALIDACIÓN** |

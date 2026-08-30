@@ -1,10 +1,8 @@
 # 03_plan_pruebas_integracion.md
 
-> **Procedencia:** Material base preparado por la coordinación del backend y entregado para facilitar la integración del Grupo 6. Este documento no constituye evidencia de autoría individual del responsable originalmente asignado.
+> **Estado documental:** Documento base de coordinación preparado para la integración del backend. Su contenido permanece sujeto a revisión y validación del proyecto.
 
-- **Responsable previsto:** B_ZEBALLOS
-- **Rama prevista:** B_ZEBALLOS
-- **Estado:** BORRADOR PENDIENTE DE REVISIÓN DEL RESPONSABLE
+- **Estado:** BORRADOR PENDIENTE DE VALIDACIÓN DEL PROYECTO
 - **Alcance:** Estrategia propuesta de pruebas inter-módulos, matriz de casos y criterios de severidad.
 - **Dependencias:** Revisión y aprobación del líder y los equipos afectados.
 - **Fecha de revisión:** 29 de agosto de 2026
