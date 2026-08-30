@@ -1,5 +1,3 @@
-# Informe de Mejoras Menores — Guion DocuCore v1.4
-
 **Revisor:** Cristian (B_CHRISTIAN)
 **Documento revisado:** "Guion Corregido: DocuCore - Explicación Rápida (3 min)" — Versión 1.4
 **Autor del guion:** Valentín (B_VALENTIN)
