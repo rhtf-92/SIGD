@@ -1,5 +1,3 @@
-# Guion Corregido: DocuCore - Explicación Rápida (3 min)
-
 ## 1. El Objetivo Principal (¿Qué estamos haciendo?)
 
 "Estamos definiendo la especificación técnica de DocuCore, el módulo encargado de gestionar todos los requisitos y archivos adjuntos de los trámites. El objetivo es que Cristian pueda diseñar la base de datos de forma exacta, sin asumir reglas y dejando todo preparado para auditoría completa y subsanaciones."
