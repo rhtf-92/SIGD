@@ -197,12 +197,22 @@ Comprende desde la presentación de la solicitud en Mesa de Partes hasta el asen
 
 ## 10. Investigación de Buenas Prácticas de Gestión Documental
 
-* **Ley Nº 27444 – Texto Único Ordenado de la Ley del Procedimiento Administrativo General (LPAG):**
-  * *Explicación con palabras propias:* Esta norma rige el funcionamiento administrativo del Estado. Establece los principios de **celeridad, legalidad y debido procedimiento**, exigiendo que toda recepción documental sea registrada en estricto orden de llegada y que se entregue un cargo con fecha y hora cierta al administrado. Dispone que si una solicitud carece de requisitos formales, la institución no puede rechazarla de plano; debe conceder un plazo (habitualmente 48 horas / 2 días hábiles) para que el administrado subsane la omisión antes de declarar el abandono.
-* **Modelo de Gestión Documental (MGD) – Presidencia del Consejo de Ministros (PCM / SGTD):**
+### 10.1 Ley Nº 27444 – LPAG
+* **Fuente exacta:** Ley Nº 27444, Ley del Procedimiento Administrativo General (publicada el 11/04/2001). **Texto Único Ordenado vigente:** aprobado por **Decreto Supremo Nº 006-2026-JUS**, publicado en el Diario Oficial El Peruano el **30/04/2026**, que compila y sistematiza las modificaciones a la Ley (entre ellas el DL Nº 1452, el DL Nº 1497 y el DL Nº 1561) y **deroga** el TUO anterior (DS Nº 004-2019-JUS).
+  * *Enlace oficial:* https://www.gob.pe/institucion/minjus/normas-legales/8169463-006-2026-jus
+  * *Explicación con palabras propias:* Esta norma rige el funcionamiento administrativo del Estado. Sus principios (Título Preliminar: **legalidad 1.1, debido procedimiento 1.2 y celeridad 1.9**) exigen que toda recepción documental sea registrada en estricto orden de llegada y que se entregue un cargo con fecha y hora cierta al administrado. Dispone que si una solicitud carece de requisitos formales, la institución no puede rechazarla de plano; debe conceder un plazo (habitualmente 48 horas / 2 días hábiles) para que el administrado subsane la omisión antes de declarar el abandono. Estas reglas sustentan los flujos de las secciones 4 a 8 y la numeración global del Libro de Registro.
+### 10.2 Modelo de Gestión Documental (MGD) – Presidencia del Consejo de Ministros (PCM / SEGDI)
+* *Fuente exacta:* **Modelo de Gestión Documental**, aprobado por **Resolución de Secretaría de Gobierno Digital Nº 001-2017-PCM/SEGDI**, publicada en El Peruano el **09/08/2017**, en el marco del Decreto Legislativo Nº 1310 (artículo 8: interconexión de los sistemas de trámite documentario). Su artículo 4 fue modificado por la **R.S. Nº 003-2018-PCM/SEGDI** (21/09/2018), que designa al Comité de Gobierno Digital como Responsable Directivo de su implementación.
+  * *Enlace oficial:* https://www.gob.pe/institucion/pcm/normas-legales/292301-001-2017-pcm-segdi
   * *Explicación con palabras propias:* Es el marco normativo peruano que define la digitalización documental pública. Exige dividir el ciclo documental en **recepción, emisión, despacho, seguimiento y archivo**, manteniendo expedientes electrónicos íntegros, foliados digitalmente e inalterables. Señala que los asientos registrales no pueden modificarse una vez generados, debiendo implementarse pistas de auditoría que garanticen autenticidad e integridad.
-* **Directivas Institucionales de Trámite Documentario:**
-  * *Explicación con palabras propias:* Son las normas internas de cada institución que regulan la apertura anual de los Libros de Registros. Fijan las atribuciones para autorizar cierres o reasignaciones de expedientes y dictaminan que toda corrección por error material deba asentarse mediante notas marginales o nuevos asientos rectificatorios, quedando prohibido eliminar físicamente registros del sistema.
+
+### 10.3 Directivas Institucionales de Trámite Documentario
+  * *Situación de la fuente:* Este análisis aún no identifica la entidad anfitriona del SIGD (ver §11 y el plan de trabajo del Grupo 2), por lo que **no corresponde fijar todavía el número exacto de la directiva interna**. Su identificación queda como actividad pendiente de coordinación con la institución; no se citará un documento institucional sin su denominación y fecha verificadas.
+  * *Anclas normativas verificables que la sustentan mientras tanto:*
+    * Artículo 8 del **Decreto Legislativo Nº 1310**: interconexión de los sistemas de trámite documentario de las entidades de la Administración Pública (base normativa del MGD).
+    * Artículo 38 del **TUO de la Ley Nº 27444** (DS Nº 006-2026-JUS): aprobación y difusión del TUPA, instrumento que fija requisitos, plazos y tasas de cada procedimiento atendido por Mesa de Partes.
+    * **Reglamento de Organización y Funciones (ROF)** de la entidad: regula qué unidad orgánica emite la directiva de trámite documentario y aprueba la apertura anual de los Libros de Registros.
+  * *Explicación con palabras propias:* Las directivas internas regulan la apertura anual de los Libros de Registros, fijan las atribuciones para autorizar cierres o reasignaciones de expedientes y dictaminan que toda corrección por error material deba asentarse mediante notas marginales o nuevos asientos rectificatorios, quedando prohibido eliminar físicamente registros del sistema. Hasta que la entidad sea definida, estas reglas se respaldan en las anclas normativas indicadas arriba.
 
 ---
 
