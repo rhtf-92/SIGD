@@ -1,0 +1,211 @@
+.register-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 48px 16px;
+  font-family: system-ui, -apple-system, sans-serif;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+}
+
+/* Capa oscura semitransparente sobre la foto, para que el fondo no compita
+   visualmente con el formulario (igual que hace el Poder Judicial) */
+.register-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: rgba(10, 15, 30, 0.55);
+  z-index: 0;
+}
+
+.register-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 560px;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 40px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.register-logo {
+  display: block;
+  max-width: 90px;
+  margin: 0 auto 16px auto;
+}
+
+.register-card {
+  width: 100%;
+  max-width: 560px;
+  background: #ffffff;
+  border: 1px solid #e2e4e7;
+  border-radius: 8px;
+  padding: 40px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.register-header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.register-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 8px 0;
+}
+
+.register-header p {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.register-section-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #4b5563;
+  margin: 24px 0 12px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.register-section-label:first-of-type {
+  margin-top: 0;
+}
+
+.register-field {
+  margin-bottom: 16px;
+}
+
+.register-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.register-field input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.register-field input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.register-field input.input-error {
+  border-color: #dc2626;
+}
+
+.register-field .error-message {
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.register-submit {
+  width: 100%;
+  padding: 12px;
+  margin-top: 24px;
+  background-color: #1a1a2e;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.register-submit:hover {
+  background-color: #2d2d4a;
+}
+
+.register-submit:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.register-success {
+  text-align: center;
+  padding: 24px;
+  color: #059669;
+  font-weight: 500;
+}
+
+.register-field select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  box-sizing: border-box;
+  background-color: white;
+}
+
+.register-field select:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+}
+
+.register-field select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  box-sizing: border-box;
+  background-color: white;
+}
+
+.register-field select:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+}
+
+.register-row {
+  display: flex;
+  gap: 16px;
+}
+
+.register-row .register-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.register-declaracion {
+  margin: 20px 0;
+  padding: 12px;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.register-declaracion label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.register-declaracion input[type='checkbox'] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
