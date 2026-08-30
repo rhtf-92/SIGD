@@ -1,0 +1,139 @@
+*
+  SIGD - DocuCore | Documentos y formularios configurables
+  Motor: PostgreSQL 14+
+  Alcance: catálogo, formulario dinámico, expediente borrador y respuestas.
+*/
+
+BEGIN;
+
+CREATE TYPE rol_usuario AS ENUM ('ADMINISTRADOR', 'SOLICITANTE', 'EVALUADOR', 'CONSULTANTE');
+CREATE TYPE tipo_dato_formulario AS ENUM ('TEXTO', 'NUMERO', 'FECHA', 'SELECCION');
+CREATE TYPE estado_expediente AS ENUM
+    ('BORRADOR', 'EN_REVISION', 'OBSERVADO', 'APROBADO', 'RECHAZADO_POR_CADUCIDAD');
+
+CREATE TABLE usuario (
+    id_usuario BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre_completo VARCHAR(200) NOT NULL CHECK (btrim(nombre_completo) <> ''),
+    correo VARCHAR(150) NOT NULL UNIQUE CHECK (btrim(correo) <> ''),
+    rol rol_usuario NOT NULL,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE tipo_documento (
+    id_tipo_documento BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    codigo VARCHAR(30) NOT NULL UNIQUE CHECK (btrim(codigo) <> ''),
+    nombre VARCHAR(150) NOT NULL CHECK (btrim(nombre) <> ''),
+    descripcion TEXT,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    id_usuario_creador BIGINT NOT NULL REFERENCES usuario(id_usuario),
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE formulario (
+    id_formulario BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id_tipo_documento BIGINT NOT NULL UNIQUE REFERENCES tipo_documento(id_tipo_documento),
+    version SMALLINT NOT NULL DEFAULT 1 CHECK (version > 0),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE campo_formulario (
+    id_campo BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id_formulario BIGINT NOT NULL REFERENCES formulario(id_formulario) ON DELETE CASCADE,
+    nombre_campo VARCHAR(150) NOT NULL CHECK (btrim(nombre_campo) <> ''),
+    tipo_dato tipo_dato_formulario NOT NULL,
+    obligatorio BOOLEAN NOT NULL DEFAULT TRUE,
+    orden SMALLINT NOT NULL CHECK (orden > 0),
+    -- Para SELECCION se usa un arreglo JSON, por ejemplo: ["NATURAL", "JURIDICA"].
+    opciones JSONB,
+    CONSTRAINT uq_campo_nombre UNIQUE (id_formulario, nombre_campo),
+    CONSTRAINT uq_campo_orden UNIQUE (id_formulario, orden),
+    CONSTRAINT ck_opciones_por_tipo CHECK (
+        (tipo_dato = 'SELECCION' AND opciones IS NOT NULL AND jsonb_typeof(opciones) = 'array'
+            AND jsonb_array_length(opciones) > 0)
+        OR (tipo_dato <> 'SELECCION' AND opciones IS NULL)
+    )
+);
+
+CREATE TABLE expediente (
+    id_expediente BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    codigo_oficial VARCHAR(30) UNIQUE,
+    id_tipo_documento BIGINT NOT NULL REFERENCES tipo_documento(id_tipo_documento),
+    id_usuario_solicitante BIGINT NOT NULL REFERENCES usuario(id_usuario),
+    estado estado_expediente NOT NULL DEFAULT 'BORRADOR',
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_radicacion TIMESTAMPTZ,
+    CONSTRAINT ck_radicacion_consistente CHECK (
+        (estado = 'BORRADOR' AND codigo_oficial IS NULL AND fecha_radicacion IS NULL)
+        OR (estado <> 'BORRADOR' AND codigo_oficial IS NOT NULL AND fecha_radicacion IS NOT NULL)
+    )
+);
+
+CREATE TABLE valor_campo (
+    id_valor_campo BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id_expediente BIGINT NOT NULL REFERENCES expediente(id_expediente) ON DELETE CASCADE,
+    id_campo BIGINT NOT NULL REFERENCES campo_formulario(id_campo),
+    valor TEXT NOT NULL CHECK (btrim(valor) <> ''),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_respuesta_por_campo UNIQUE (id_expediente, id_campo)
+);
+
+CREATE INDEX ix_campo_formulario_orden ON campo_formulario (id_formulario, orden);
+CREATE INDEX ix_expediente_solicitante ON expediente (id_usuario_solicitante);
+CREATE INDEX ix_valor_campo_expediente ON valor_campo (id_expediente);
+
+-- Garantiza que el campo respondido pertenece al formulario del tipo de
+-- documento que originó el expediente.
+CREATE OR REPLACE FUNCTION fn_validar_campo_y_valor()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+    v_tipo tipo_dato_formulario;
+    v_opciones JSONB;
+BEGIN
+    SELECT c.tipo_dato, c.opciones
+      INTO v_tipo, v_opciones
+      FROM expediente e
+      JOIN formulario f ON f.id_tipo_documento = e.id_tipo_documento
+      JOIN campo_formulario c ON c.id_formulario = f.id_formulario
+     WHERE e.id_expediente = NEW.id_expediente
+       AND c.id_campo = NEW.id_campo;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'El campo % no pertenece al formulario del expediente %.',
+            NEW.id_campo, NEW.id_expediente;
+    END IF;
+
+    IF v_tipo = 'NUMERO' AND NEW.valor !~ '^[+-]?[0-9]+([.,][0-9]+)?$' THEN
+        RAISE EXCEPTION 'El campo % requiere un número válido.', NEW.id_campo;
+    END IF;
+
+    IF v_tipo = 'FECHA' AND NEW.valor !~ '^\\d{4}-\\d{2}-\\d{2}$' THEN
+        RAISE EXCEPTION 'El campo % requiere fecha en formato AAAA-MM-DD.', NEW.id_campo;
+    END IF;
+
+    IF v_tipo = 'SELECCION' AND NOT (v_opciones ? NEW.valor) THEN
+        RAISE EXCEPTION 'El valor % no es una opción permitida para el campo %.',
+            NEW.valor, NEW.id_campo;
+    END IF;
+
+    NEW.fecha_actualizacion := CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_validar_campo_y_valor
+BEFORE INSERT OR UPDATE OF id_expediente, id_campo, valor ON valor_campo
+FOR EACH ROW EXECUTE FUNCTION fn_validar_campo_y_valor();
+
+-- Consulta de control: muestra campos obligatorios aún no respondidos.
+CREATE VIEW vw_campos_obligatorios_pendientes AS
+SELECT e.id_expediente, c.id_campo, c.nombre_campo
+FROM expediente e
+JOIN formulario f ON f.id_tipo_documento = e.id_tipo_documento
+JOIN campo_formulario c ON c.id_formulario = f.id_formulario AND c.obligatorio = TRUE
+LEFT JOIN valor_campo vc ON vc.id_expediente = e.id_expediente AND vc.id_campo = c.id_campo
+WHERE vc.id_valor_campo IS NULL;
+
+COMMIT;
+
