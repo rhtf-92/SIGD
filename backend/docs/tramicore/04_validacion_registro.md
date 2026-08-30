@@ -187,4 +187,4 @@ UPDATE 1
 (1 fila)
 ```
 
-El registro permanece intacto en la base de datos con `anulado = true` y su motivo registrado, demostrando inmutabilidad del Libro de Registros.
+El asiento no se elimina y su número no se reutiliza; únicamente se actualizaron los campos de control de anulación (`anulado = true`, `motivo_anulacion`), tal como evidencia la consulta anterior.

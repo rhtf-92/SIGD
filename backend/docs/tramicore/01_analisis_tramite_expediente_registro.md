@@ -25,7 +25,7 @@ Comprende desde la presentación de la solicitud en Mesa de Partes hasta el asen
   * *`[EJEMPLO]`*: La carpeta digital identificada provisionalmente con el código `EXP-2026-000104`, que reúne el FUT, el comprobante de pago, el informe de notas y la resolución de entrega.
 * **Documento Presentado `[PROPUESTO]`:** Unidad física o digital de sustento (solicitud, oficio, informe en PDF, comprobante) que acredita o fundamenta una actuación dentro del expediente.
   * *`[EJEMPLO]`*: El archivo digitalizado `FUT_solicitud_firmada.pdf` de 2 folios o el comprobante de caja `recibo_pago_0891.pdf`.
-* **Asiento del Libro de Registro `[PROPUESTO]`:** Constancia oficial, fechada, numerada de forma secuencial e inmutable en el Libro General de Registros que acredita formalmente un evento ocurrido.
+* **Asiento del Libro de Registro `[PROPUESTO]`:** Constancia oficial, fechada y numerada de forma secuencial en el Libro General de Registros que acredita formalmente un evento ocurrido. Una vez generado, el asiento **no se elimina y su número no se reutiliza**; solo pueden actualizarse sus campos de control de anulación.
   * *`[EJEMPLO]`*: Asiento Nº `00004521`, asentado el `28/08/2026 09:15:02`, que certifica que el expediente `EXP-2026-000104` ingresó por Mesa de Partes Virtual y se derivó a Secretaría Académica.
 
 ---
@@ -109,7 +109,7 @@ Comprende desde la presentación de la solicitud en Mesa de Partes hasta el asen
 
 ### 6.4 Tratamiento de Anulaciones y Preservación de Historial
 * **Mecanismo de Anulación `[PROPUESTO]`:** Ante anulaciones autorizadas, los registros nunca se eliminan físicamente de la base de datos (`NO DELETE`). La anulación se aplica **sobre el propio asiento** mediante la bandera `anulado = true` más el campo `motivo_anulacion`, sin reutilizar ni reasignar su `numero_registro`.
-* **Registro de Auditoría `[PROPUESTO]`:** El asiento original permanece inmutable en contenido y número en el Libro de Registros; la anulación **no genera un asiento nuevo**, se refleja en la bandera y motivo del asiento afectado, y el evento se entrega al módulo de trazabilidad (Grupo 1) para auditoría pública.
+* **Registro de Auditoría `[PROPUESTO]`:** El asiento original no se elimina y su número no se reutiliza; únicamente se actualizan sus campos de control de anulación (`anulado`, `motivo_anulacion`). La anulación **no genera un asiento nuevo** y el evento se entrega al módulo de trazabilidad (Grupo 1) para auditoría pública.
 
 ---
 
@@ -154,7 +154,7 @@ Comprende desde la presentación de la solicitud en Mesa de Partes hasta el asen
   * *Acción:* Validación que aborta la operación (`ROLLBACK`). No se autoriza la creación de expedientes vacíos.
 * **Excepción 6: Registro Anulado `[PROPUESTO]`**
   * *Condición:* Error material comprobado o registro fraudulento.
-  * *Acción:* Se marca el asiento como `anulado = true` con su `motivo_anulacion`, sin `DELETE` ni reutilización del número. El asiento original permanece inmutable, el expediente pasa al estado `ANULADO` y el evento de anulación queda registrado en trazabilidad (Grupo 1).
+  * *Acción:* Se marca el asiento como `anulado = true` con su `motivo_anulacion`, sin `DELETE` ni reutilización del número. El asiento original no se elimina y solo se actualizan sus campos de control de anulación; el expediente pasa al estado `ANULADO` y el evento de anulación queda registrado en trazabilidad (Grupo 1).
 * **Excepción 7: Desistimiento Voluntario `[PROPUESTO]`**
   * *Condición:* El solicitante desiste formalmente antes de la resolución final.
   * *Acción:* Se anexa el documento de desistimiento y el expediente cambia al estado `CERRADO`.

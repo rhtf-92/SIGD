@@ -93,7 +93,7 @@ pendientes de validación institucional.
 ## 5. Reglas de anulación
 
 - La anulación es un **borrado lógico**: `anulado = true` + `motivo_anulacion` sobre el asiento.
-- `NO DELETE`; no se reutiliza el `numero_registro` original, que permanece inmutable.
+- `NO DELETE`; el `numero_registro` original no se reutiliza y únicamente se actualizan los campos de control de anulación (`anulado`, `motivo_anulacion`).
 - El expediente pasa a estado `ANULADO` y el evento se entrega a trazabilidad (Grupo 1).
 
 ---

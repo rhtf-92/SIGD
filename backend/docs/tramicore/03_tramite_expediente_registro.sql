@@ -10,6 +10,9 @@
 BEGIN;
 
 -- 1. LIMPIEZA / PREPARACIÓN DE ENTORNO
+-- ADVERTENCIA: los DROP TABLE ... CASCADE (y DROP SEQUENCE) de este bloque son
+-- únicamente para una base de datos aislada de pruebas. En un entorno real de
+-- producción NO deben ejecutarse, ya que eliminarían datos e historial.
 DROP TABLE IF EXISTS asiento_registro CASCADE;
 DROP TABLE IF EXISTS expediente CASCADE;
 DROP TABLE IF EXISTS tramite CASCADE;
