@@ -1,5 +1,10 @@
-import AppRouter from "./routes/AppRouter";
+import FormularioRegistro from "./components/FormularioRegistro";
+import MainLayout from "./layouts/MainLayout";
 
 export default function App() {
-  return <AppRouter />;
+  return (
+    <MainLayout>
+      <FormularioRegistro />
+    </MainLayout>
+  );
 }
