@@ -83,14 +83,23 @@ Define la información mínima de trazabilidad que el Grupo 1 debería poder aso
 | `RI-INT-003` | `CT-G2-G1-001` | Expediente inexistente o no vigente | Movimientos asociados a expedientes que ya no existen o están cerrados | Confirmación escrita de G2 sobre vigencia y respuesta ante referencias no vigentes | B_AREVALO / Líder G2 | ABIERTO |
 | `RI-INT-004` | `CT-G3-G1-001` | Área o permiso no vigente al momento de la operación | Derivaciones hacia áreas inválidas o acciones sin permiso | Definición de G3 sobre vigencia de áreas/permisos y respuesta propuesta | B_AREVALO / Líder G3 | ABIERTO |
 
-## 8. Checklist de revisión de los documentos 01, 02 y 03
+## 8. Checklist de revisión de los documentos 01, 02, 03 y 04
 
-El Grupo 6 debe verificar que los documentos de convenciones (01), catálogo de errores (02) y plan de pruebas (03) sean revisables y completos. Este checklist registra el estado real de cada revisión.
+Estado de disponibilidad, procedencia y aporte individual de cada documento del Grupo 6 en `backend/docs/integracion/`:
+
+| Documento | Disponibilidad | Procedencia | Aporte individual |
+| --- | --- | --- | --- |
+| `01_convenciones_api_backend.md` | Disponible | Material base de coordinación | Sin evidencia en `B_DUQUE` |
+| `02_catalogo_errores_backend.md` | Disponible | Material base de coordinación | Sin evidencia en `B_REATEGUI` |
+| `03_plan_pruebas_integracion.md` | Disponible | Material base de coordinación | Sin evidencia en `B_ZEVALLOS` |
+| `04_contratos_y_decisiones_pendientes.md` | Disponible | Elaborado y revisado en `B_AREVALO` | Aporte verificable de Arevalo |
+
+Ítems de revisión aplicados a los documentos 01, 02 y 03:
 
 | Ítem de revisión | Aplica a | Estado | Observación |
 | :--- | :--- | :--- | :--- |
-| El documento indica responsable y rama | 01, 02, 03 | PENDIENTE | Los borradores indican B_DUQUE, B_REATEGUI y B_ZEVALLOS respectivamente |
-| El contenido coincide con el nombre del archivo | 01, 02, 03 | PENDIENTE | En la rama B_AREVALO los archivos 01–03 aparecen desplazados y con contenido cruzado; deben publicarse en sus ramas correctas |
+| El documento indica responsable y rama | 01, 02, 03 | VERIFICADO | Los borradores indican B_DUQUE, B_REATEGUI y B_ZEVALLOS como responsables originalmente asignados |
+| El contenido coincide con el nombre del archivo | 01, 02, 03 | VERIFICADO | Reubicados en `backend/docs/integracion/` con su nombre definitivo |
 | No se definen endpoints ni formatos como confirmados | 01, 02, 03 | EN REVISIÓN | Las propuestas se marcan como PROPUESTA o PENDIENTE |
 | No contiene credenciales, secretos ni datos personales reales | 01, 02, 03 | VERIFICADO | No se detectaron secretos ni datos personales reales |
 | Las referencias a RFC y estándares son verificables | 01, 02 | VERIFICADO | RFC 9110 y RFC 9457 identificables |
@@ -100,8 +109,8 @@ El Grupo 6 debe verificar que los documentos de convenciones (01), catálogo de 
 
 | ID | Documento | Observación | Estado | Fecha |
 | :--- | :--- | :--- | :--- | :--- |
-| OB-01 | 01, 02, 03 | Los archivos están desplazados de su destino oficial y con nombres cruzados dentro de la rama B_AREVALO | ABIERTA — pendiente de que cada responsable publique en su rama | 2026-08-29 |
-| OB-02 | 04 | El contenido de contratos estaba en `backend/src/docs/verify.ps1` (extensión y ruta incorrectas) | RESUELTA en este documento | 2026-08-29 |
+| OB-01 | 01, 02, 03 | Los documentos 01–03 fueron recuperados como material base de coordinación y no representan aportes individuales de las ramas originalmente asignadas | RESUELTA en este documento | 2026-08-29 |
+| OB-02 | 04 | El antiguo `backend/src/docs/verify.ps1` estaba mal nombrado; su contenido fue consolidado en el documento 04 actual y el archivo no debe restaurarse | RESUELTA en este documento | 2026-08-29 |
 | OB-03 | 04 | Faltaba checklist, registro de observaciones, impacto/evidencia de riesgos y preguntas para Geric, profesor e institución | RESUELTA en este documento | 2026-08-29 |
 | OB-04 | 04 | Faltaban contratos explícitos de errores y trazabilidad | RESUELTA en este documento | 2026-08-29 |
 
@@ -165,3 +174,4 @@ El Grupo 6 debe verificar que los documentos de convenciones (01), catálogo de 
 | Versión | Fecha | Responsable | Cambio | Estado |
 | :--- | :--- | :--- | :--- | :--- |
 | 0.1 | 2026-08-29 | Arevalo | Creación del documento en la ruta oficial `backend/docs/integracion`, consolidando la matriz de contratos y riesgos y añadiendo contrato de errores, trazabilidad, checklist, observaciones y preguntas pendientes | **BORRADOR — PENDIENTE DE VALIDACIÓN** |
+| 0.2 | 2026-08-29 | Arevalo | Recuperación de los documentos 01–03 como material base de coordinación en `backend/docs/integracion/`, actualización del checklist y del registro de observaciones para reflejar su procedencia y la ausencia de aportes individuales verificables en las ramas originalmente asignadas | **BORRADOR — PENDIENTE DE VALIDACIÓN** |
