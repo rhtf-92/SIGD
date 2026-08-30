@@ -246,3 +246,11 @@ No se utilizará la categoría **CONFIRMADO** hasta contar con una indicación e
 El módulo utilizará una estructura única de áreas, permitirá múltiples roles por usuario, controlará el alcance de los permisos, conservará los registros mediante inactivación lógica y permitirá responsables interinos con vigencia.
 
 Estas decisiones se consideran **PROPUESTO** hasta su validación institucional.
+
+---
+
+## 11. Fuentes y Referencias
+
+1. **Documentación Oficial y Manuales Organizacionales de Culper:** Estructura orgánica, organigrama institucional y manual de perfiles de puesto utilizados para la definición de áreas y responsabilidades.
+2. **Especificaciones Funcionales del Sistema Culper:** Requisitos de negocio para la gestión de usuarios, asignación de cargos, trazabilidad e historial de responsables.
+3. **Estándar de Control de Acceso (RBAC / NIST SP 800-162):** Criterios técnicos de seguridad para el diseño de roles, permisos y mínimos privilegios en la arquitectura del sistema.
