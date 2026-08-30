@@ -1,0 +1,112 @@
+%% Diagrama lógico PROPUESTO de RutaDoc. No representa nombres institucionales ni tipos PostgreSQL definitivos.
+erDiagram
+    ACCION_TRAMITE ||--o{ MOVIMIENTO_TRAMITE : "clasifica"
+    ESTADO_TRAMITE o|--o{ MOVIMIENTO_TRAMITE : "estado anterior"
+    ESTADO_TRAMITE ||--o{ MOVIMIENTO_TRAMITE : "estado resultante"
+    TRANSICION_ESTADO_TRAMITE o|--o{ MOVIMIENTO_TRAMITE : "transición aplicada"
+
+    ESTADO_TRAMITE o|--o{ TRANSICION_ESTADO_TRAMITE : "estado anterior"
+    ACCION_TRAMITE ||--o{ TRANSICION_ESTADO_TRAMITE : "acción permitida"
+    ESTADO_TRAMITE ||--o{ TRANSICION_ESTADO_TRAMITE : "estado resultante"
+
+    MOVIMIENTO_TRAMITE ||--o| DERIVACION_TRAMITE : "detalle compatible"
+    MOVIMIENTO_TRAMITE ||--o| RECEPCION_TRAMITE : "detalle compatible"
+    MOVIMIENTO_TRAMITE ||--o| OBSERVACION_TRAMITE : "detalle compatible"
+    MOVIMIENTO_TRAMITE ||--o| ATENCION_TRAMITE : "detalle compatible"
+
+    DERIVACION_TRAMITE o|--o| RECEPCION_TRAMITE : "confirmación PENDIENTE"
+    MOVIMIENTO_TRAMITE ||--o{ RELACION_MOVIMIENTO : "movimiento origen"
+    MOVIMIENTO_TRAMITE ||--o{ RELACION_MOVIMIENTO : "movimiento destino"
+    TIPO_RELACION_MOVIMIENTO ||--o{ RELACION_MOVIMIENTO : "clasifica"
+
+    MOVIMIENTO_TRAMITE ||--o{ MOVIMIENTO_DOCUMENTO : "vincula"
+    MOVIMIENTO_TRAMITE ||--o| ESTADO_ACTUAL_TRAMITE : "proyección opcional"
+    ESTADO_TRAMITE ||--o{ ESTADO_ACTUAL_TRAMITE : "estado proyectado"
+
+    MOVIMIENTO_TRAMITE {
+        id movimiento_id PK "Identificador propio"
+        ref expediente_id UK "Referencia al Grupo 2; UK con secuencia"
+        number secuencia UK "Orden lógico por expediente"
+        id accion_tramite_id FK "Acción aplicada"
+        id transicion_estado_tramite_id FK "Opcional"
+        id estado_anterior_id FK "Opcional en el inicio"
+        id estado_resultante_id FK "Estado producido"
+        ref usuario_actor_id "Condicional; Grupo 4; no es el solicitante"
+        ref area_contexto_id "Referencia opcional al Grupo 3"
+        datetime fecha_hora "Momento de la actuación"
+    }
+
+    ACCION_TRAMITE {
+        id accion_tramite_id PK "Identificador propio"
+        code codigo UK "Código lógico estable"
+        text nombre "Nombre PROPUESTO"
+    }
+
+    ESTADO_TRAMITE {
+        id estado_tramite_id PK "Identificador propio"
+        code codigo UK "Código lógico estable"
+        text nombre "Nombre PROPUESTO"
+    }
+
+    TRANSICION_ESTADO_TRAMITE {
+        id transicion_estado_tramite_id PK "Identificador propio"
+        id estado_anterior_id FK "Opcional en transición inicial"
+        id accion_tramite_id FK "Acción permitida"
+        id estado_resultante_id FK "Estado producido"
+        datetime vigente_desde "Vigencia conceptual"
+        datetime vigente_hasta "Vigencia conceptual opcional"
+    }
+
+    DERIVACION_TRAMITE {
+        id movimiento_id PK, FK "Movimiento propietario"
+        ref area_origen_id "Referencia al Grupo 3"
+        ref area_destino_id "Referencia al Grupo 3"
+        text motivo "Justificación funcional"
+    }
+
+    RECEPCION_TRAMITE {
+        id movimiento_id PK, FK "Movimiento propietario"
+        id derivacion_movimiento_id FK "Derivación confirmada; opcional"
+        ref area_receptora_id "Referencia al Grupo 3"
+        text observacion_recepcion "Opcional"
+    }
+
+    OBSERVACION_TRAMITE {
+        id movimiento_id PK, FK "Movimiento propietario"
+        text motivo "Motivo obligatorio"
+        text detalle "Detalle opcional"
+    }
+
+    ATENCION_TRAMITE {
+        id movimiento_id PK, FK "Movimiento propietario"
+        text resultado_resumen "Resultado conceptual"
+    }
+
+    RELACION_MOVIMIENTO {
+        id relacion_movimiento_id PK "Identificador propio"
+        id movimiento_origen_id FK "Función origen; no es área"
+        id movimiento_destino_id FK "Función destino; no es área"
+        id tipo_relacion_movimiento_id FK "Tipo de vínculo"
+        datetime registrado_en "Momento del vínculo"
+    }
+
+    TIPO_RELACION_MOVIMIENTO {
+        id tipo_relacion_movimiento_id PK "Identificador propio"
+        code codigo UK "Código lógico estable"
+        text nombre "Nombre PROPUESTO"
+    }
+
+    MOVIMIENTO_DOCUMENTO {
+        id movimiento_id FK, UK "Movimiento relacionado"
+        ref documento_id UK "Referencia al Grupo 5"
+        ref version_documento_id UK "Referencia opcional al Grupo 5"
+        code finalidad UK "Finalidad PROPUESTA"
+    }
+
+    ESTADO_ACTUAL_TRAMITE {
+        ref expediente_id UK "Referencia al Grupo 2; proyección opcional"
+        id movimiento_actual_id FK "Último movimiento válido"
+        id estado_actual_id FK "Estado derivado"
+        number secuencia_actual "Secuencia derivada"
+        number version_proyeccion "Control conceptual"
+    }
