@@ -80,3 +80,15 @@ Plantear un formato estandarizado para reportar errores en las APIs de Express, 
 
 ## Fuentes o decisiones pendientes de comprobar
 - Viabilidad de que el frontend estandarice la lectura del arreglo `details` y del campo `retryable`.
+
+## Criterios de aceptación
+
+Criterios verificables derivados de las propuestas de este documento:
+
+- Formato común de error en las respuestas que reporten un fallo.
+- Correspondencia coherente entre la categoría del error y el estado HTTP asociado.
+- Presencia del identificador de correlación (`correlationId`) para trazar el error internamente.
+- Mensajes comprensibles sin exponer información sensible.
+- Detalles controlados y útiles, sin stack traces ni SQL.
+- Tratamiento uniforme de errores equivalentes entre módulos.
+- Validación del proyecto antes de oficializar categorías y códigos.

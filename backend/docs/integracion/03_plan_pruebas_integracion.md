@@ -63,3 +63,29 @@ Sugerir un estándar formal para probar los contratos entre módulos. De aprobar
 
 ## Fuentes o decisiones pendientes de comprobar
 - Disponibilidad de bibliotecas para simular respuestas HTTP (ej. nock en Node.js).
+
+## Registro de ejecución y seguimiento
+
+El resultado esperado de cada caso permanece definido en la matriz de casos de prueba presentada arriba; esta sección no lo reemplaza. La tabla siguiente se completará durante la ejecución de las pruebas, cuando el resultado real pueda contrastarse con el esperado.
+
+Una evidencia podrá ser un registro, captura, log, respuesta controlada o referencia verificable que respalde el resultado obtenido. Las pruebas que fallen deberán registrar su defecto o incidencia y repetirse después de la corrección. Los datos utilizados serán ficticios y controlados.
+
+Ningún valor pendiente representa una prueba aprobada; el estado APROBADO solo se registrará cuando el resultado real coincida con el esperado y exista evidencia verificable.
+
+Estados permitidos para las ejecuciones:
+
+```text
+NO EJECUTADO
+EN EJECUCIÓN
+APROBADO
+FALLIDO
+BLOQUEADO
+```
+
+| ID del caso | Estado de ejecución | Resultado obtenido | Evidencia | Defecto o incidencia | Estado del defecto | Repetición de la prueba | Resultado de la repetición | Observaciones |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `TC-INT-01` | NO EJECUTADO | PENDIENTE | PENDIENTE | NO REGISTRADO | NO APLICA | NO APLICA | NO APLICA | Pendiente de ejecución en la fase correspondiente |
+| `TC-INT-02` | NO EJECUTADO | PENDIENTE | PENDIENTE | NO REGISTRADO | NO APLICA | NO APLICA | NO APLICA | Pendiente de ejecución en la fase correspondiente |
+| `TC-INT-03` | NO EJECUTADO | PENDIENTE | PENDIENTE | NO REGISTRADO | NO APLICA | NO APLICA | NO APLICA | Pendiente de ejecución en la fase correspondiente |
+| `TC-INT-04` | NO EJECUTADO | PENDIENTE | PENDIENTE | NO REGISTRADO | NO APLICA | NO APLICA | NO APLICA | Pendiente de ejecución en la fase correspondiente |
+| `TC-INT-05` | NO EJECUTADO | PENDIENTE | PENDIENTE | NO REGISTRADO | NO APLICA | NO APLICA | NO APLICA | Pendiente de ejecución en la fase correspondiente |

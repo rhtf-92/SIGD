@@ -71,3 +71,15 @@ X-Correlation-ID: 123e4567-e89b-12d3-a456-426614174000
 ## Fuentes o decisiones pendientes de comprobar
 - Límite máximo de paginación adecuado para la memoria de Node/Express.
 - Costo de rendimiento al aplicar un mapeo global `camelCase` <-> `snake_case`.
+
+## Criterios de aceptación
+
+Criterios verificables derivados de las propuestas de este documento:
+
+- Consistencia de nombres y rutas según la nomenclatura propuesta (`kebab-case` en URIs, `camelCase` en JSON, `snake_case` en BD).
+- Estructura JSON uniforme en las cargas de requests y responses.
+- Uso coherente de identificadores y fechas conforme a las alternativas y formatos propuestos, validados por el proyecto.
+- Paginación uniforme mediante `page` y `limit` cuando corresponda.
+- Propagación del identificador de correlación (`correlationId` / `X-Correlation-ID`) en las respuestas.
+- Documentación explícita de excepciones y decisiones pendientes.
+- Validación del proyecto antes de considerar oficiales las propuestas.
