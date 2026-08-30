@@ -1,0 +1,53 @@
+Table areas {
+  id bigserial [pk, increment]
+  nombre varchar(150) [not null]
+  sigla varchar(20) [not null, unique]
+  parent_id bigint [ref: > areas.id]
+  estado boolean [not null, default: true]
+}
+
+Table cargos {
+  id bigserial [pk, increment]
+  nombre varchar(100) [not null, unique]
+  estado boolean [not null, default: true]
+}
+
+Table users {
+  id bigserial [pk, increment]
+  username varchar(50) [not null, unique]
+  email varchar(100) [not null, unique]
+  password_hash varchar(255) [not null]
+  rol_id bigint [ref: > roles.id, not null]
+  estado boolean [not null, default: true]
+}
+
+Table roles {
+  id bigserial [pk, increment]
+  codigo varchar(50) [not null, unique]
+  nombre varchar(100) [not null]
+}
+
+Table permisos {
+  id bigserial [pk, increment]
+  codigo varchar(100) [not null, unique]
+  descripcion text
+}
+
+Table responsables {
+  id bigserial [pk, increment]
+  area_id bigint [ref: > areas.id, not null]
+  usuario_id bigint [ref: > users.id, not null]
+  cargo_id bigint [ref: > cargos.id, not null]
+  fecha_inicio date [not null]
+  fecha_fin date
+  es_titular boolean [not null, default: true]
+}
+
+Table roles_permisos {
+  rol_id bigint [ref: > roles.id, not null]
+  permiso_id bigint [ref: > permisos.id, not null]
+
+  indexes {
+    (rol_id, permiso_id) [pk]
+  }
+}
