@@ -1,8 +1,9 @@
 Registro de formulario
 Lider: Patricia
+
 Integrantes: Patricia, Noelia, Lucy, Anllely 
 
-Mesa de Partes y Registro Documentario
+Mesa de Partes y Registro Documentario 
 
 1. ¿Qué es este sistema y para qué sirve?
 Es una herramienta digital diseñada para recibir, registrar y organizar todos los documentos y solicitudes que llegan a la institución, ya sea que una persona los entregue en ventanilla física o los envíe por internet a través de la página web.
