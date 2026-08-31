@@ -1,8 +1,13 @@
 # Backend del SIGD
 
-Este directorio contiene la estructura preliminar del backend del Sistema Integral de Gestión Documentaria (SIGD) del Instituto Suiza. El proyecto tiene un propósito académico y servirá como base para organizar, desarrollar y validar posteriormente las capacidades de gestión documentaria requeridas por la institución.
+## Documentación Técnica y Arquitectura
 
-## Arquitectura MVC adaptada a una API
+Para consultar la documentación completa de análisis, modelos de datos, esquemas SQL y planes de trabajo de los 6 grupos del backend, consulte:
+
+- 📑 [Portal Maestro de Documentación Técnica](docs/README.md)
+- 📄 [Plan de Mejora Integral a Nivel Backend](docs/Plan_de_mejora_nivel_backend_SIGD.md)
+
+## Arquitectura del Backend
 
 El patrón Modelo-Vista-Controlador (MVC) separa las responsabilidades de una aplicación para facilitar su mantenimiento y evolución. En el SIGD, esta separación se adapta a una API: los modelos representan los datos del dominio; los controladores reciben las solicitudes HTTP y coordinan las respuestas; y la Vista no forma parte de este backend. El frontend actuará como Vista y será integrado posteriormente mediante el consumo de la API.
 
