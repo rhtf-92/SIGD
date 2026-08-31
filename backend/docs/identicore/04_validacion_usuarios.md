@@ -22,23 +22,13 @@ integridad y **sin** utilizar el documento de identidad como clave primaria téc
 
 ---
 
-## 2. Preparación (Comandos Ejecutados)
+## 2. Estado de ejecución técnica
 
-Creación de la base temporal y carga del script en una base limpia:
+**NO VERIFICADA EN ESTE ENTORNO.**
 
-```sql
-CREATE DATABASE identicore_test;
-\c identicore_test
-\i backend/docs/identicore/03_usuarios.sql
-```
+Se documentaron el entorno objetivo, los comandos, los casos de prueba y los resultados esperados. La ejecución real sobre PostgreSQL 18.6 queda pendiente para la siguiente ronda de validación técnica y correcciones.
 
-Verificación del esquema resultante:
-
-```sql
-\dt
-\d personas
-\d perfil_usuario
-```
+Los resultados descritos en este documento son resultados esperados y no constituyen evidencia de ejecución.
 
 ---
 
@@ -47,8 +37,9 @@ Verificación del esquema resultante:
 ### Caso 1: Creación limpia desde una base vacía
 * **Comando:** `\i backend/docs/identicore/03_usuarios.sql`
 * **Resultado esperado:** Las 6 tablas se crean respetando el orden de dependencias de las FK (`tipos_documento` → `personas` → `cuenta_usuario`/`persona_documento_historial` → `perfil_usuario` → `auditoria_usuarios`) sin errores.
-* **Resultado obtenido:** ✅ Conforme. Las tablas se crearon sin errores de dependencia.
-* **Casos correctos:** 6 tablas creadas.
+* **Resultado obtenido:** NO EJECUTADO
+* **Estado:** PENDIENTE DE VALIDACIÓN TÉCNICA
+* **Casos correctos (esperados):** 6 tablas creadas.
 
 ### Caso 2: Restricción de unicidad en documentos
 * **Comando:**
@@ -56,23 +47,28 @@ Verificación del esquema resultante:
   INSERT INTO personas (tipo_documento_id, numero_documento, nombres, apellido_paterno) VALUES (1,'00000001','Duplicado','Test');
   ```
 * **Resultado esperado:** La restricción `uq_persona_documento` bloquea la identidad duplicada.
-* **Resultado obtenido:** ✅ Conforme. La restricción `uk_persona_documento`/`uq_persona_documento` rechazó la inserción duplicada.
-* **Casos correctos:** inserción única permitida; **casos rechazados:** inserción duplicada rechazada por `UNIQUE`.
+* **Resultado obtenido:** NO EJECUTADO
+* **Estado:** PENDIENTE DE VALIDACIÓN TÉCNICA
+* **Casos correctos (esperados):** inserción única permitida; **casos rechazados (esperados):** inserción duplicada rechazada por `UNIQUE`.
 
 ### Caso 3: Independencia de la clave primaria técnica
 * **Comando:** `\d personas`
 * **Resultado esperado:** `personas.id` es `BIGSERIAL` (PK); el `numero_documento` no es PK.
-* **Resultado obtenido:** ✅ Conforme. `numero_documento` solo participa en la restricción `UNIQUE` compuesta propuesta, no como PK.
+* **Resultado obtenido:** NO EJECUTADO
+* **Estado:** PENDIENTE DE VALIDACIÓN TÉCNICA
 
 ### Caso 4: Manejo seguro de credenciales
 * **Comando:** `\d cuenta_usuario`
 * **Resultado esperado:** `password_hash` como único campo de credencial; sin columnas de texto plano.
-* **Resultado obtenido:** ✅ Conforme. `cuenta_usuario` almacena solo `password_hash`.
+* **Resultado obtenido:** NO EJECUTADO
+* **Estado:** PENDIENTE DE VALIDACIÓN TÉCNICA
 
 ### Caso 5: Conservación histórica (no eliminación en cascada)
 * **Comando:** revisión de DDL de FK.
 * **Resultado esperado:** las FK usan `ON DELETE RESTRICT` (no `CASCADE`) para no borrar historial, cuentas, perfiles ni auditoría de forma accidental.
-* **Resultado obtenido:** ✅ Conforme. No existen `ON DELETE CASCADE` destructivos; las bajas operan por `estado` (baja lógica). Pendiente de confirmación institucional (ver `05_decisiones_y_preguntas_pendientes.md`).
+* **Resultado obtenido:** NO EJECUTADO
+* **Estado:** PENDIENTE DE VALIDACIÓN TÉCNICA
+* Pendiente de confirmación institucional (ver `05_decisiones_y_preguntas_pendientes.md`).
 
 ---
 
@@ -80,14 +76,15 @@ Verificación del esquema resultante:
 
 | Caso | Descripción | Resultado esperado | Resultado obtenido |
 | :--- | :--- | :--- | :--- |
-| 1 | Creación limpia | Éxito sin errores | ✅ Conforme |
-| 2 | Unicidad de documento | Bloquea duplicados | ✅ Conforme (rechaza duplicado) |
-| 3 | Documento no PK técnica | PK = BIGSERIAL interno | ✅ Conforme |
-| 4 | Credenciales por hash | Solo `password_hash` | ✅ Conforme |
-| 5 | Conservación histórica | Sin `CASCADE` destructivo | ✅ Conforme |
+| 1 | Creación limpia | Éxito sin errores | NO EJECUTADO |
+| 2 | Unicidad de documento | Bloquea duplicados | NO EJECUTADO |
+| 3 | Documento no PK técnica | PK = BIGSERIAL interno | NO EJECUTADO |
+| 4 | Credenciales por hash | Solo `password_hash` | NO EJECUTADO |
+| 5 | Conservación histórica | Sin `CASCADE` destructivo | NO EJECUTADO |
 
-**Casos correctos:** 5/5.
-**Casos rechazados (esperados, controlados):** inserción duplicada de documento (Caso 2) — rechazada por `UNIQUE`, comportamiento correcto.
+**Estado general:** PENDIENTE DE VALIDACIÓN TÉCNICA.
+**Casos correctos (esperados):** 5/5 de forma esperada, pendientes de ejecución real.
+**Casos rechazados (esperados, controlados):** inserción duplicada de documento (Caso 2) — rechazo esperado por `UNIQUE`, pendiente de confirmación en ejecución real.
 
 ---
 
