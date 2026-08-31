@@ -135,27 +135,4 @@ flowchart TB
 
 ---
 
-## 3. SCRIPTS PARA AUDITORÍA DE TRANSPARENCIA
 
-Cualquier docente puede replicar la exactitud de este filtrado ejecutando el siguiente comando en PowerShell desde la raíz del proyecto para ver las líneas puramente documentales y estructurales (MD/SQL) que escribieron los alumnos, aislando el "ruido":
-
-```powershell
-# Extrae únicamente las líneas de SQL y Markdown escritas por integrante
-$backendAuthors = @( "salasormenogericaldair01-cell", "cliderlex-sketch", "svrjhass-design", "ReyNorD23", "riquelmerfachin", "sandymargarita08-cloud", "Carranzapereyrapoolangelo-alt", "leonardo", "TangeHidalgoGeiner", "Sergio-Serruche", "tanialorenatapullimanavarro", "AgustinJhair", "rodriguezcarichristianjhoel-byte", "cristiamsaul2", "Valentino-lopez", "Piero", "PieroBartraMontalvo", "arevalovillacortar-alt", "ADERRTX", "angel", "Renato Henyer Tarazona Flores", "REDBLACK-OL" )
-
-$results = foreach ($a in $backendAuthors) {
-    $stats = git log --all --no-merges --author="$a" --numstat
-    $md = 0; $sql = 0; $junk = 0
-    foreach ($line in $stats) {
-        if ($line -match "^(\d+|-)\s+(\d+|-)\s+(.+)$") {
-            $add = if ($matches[1] -eq "-") { 0 } else { [int]$matches[1] }
-            $file = $matches[3]
-            if ($file -match "\.(svg|png|jpg|jpeg|pdf|lock|json|html|js)$" -or $file -match "node_modules") { $junk += $add }
-            elseif ($file -match "\.md$") { $md += $add }
-            elseif ($file -match "\.sql$") { $sql += $add }
-        }
-    }
-    [PSCustomObject]@{ Author = $a; LineasMD = $md; LineasSQL = $sql; LineasBasura_Binarios = $junk }
-}
-$results | Sort-Object LineasMD -Descending | Format-Table -AutoSize
-```
