@@ -77,7 +77,7 @@ flowchart TB
   * *Peritaje:* 3,658 líneas Markdown genuinas. Análisis funcional impecable y sumamente detallado de áreas y roles RBAC.
 * 🟢 **Pool Angelo** (`angel` / `Carranzapereyrapoolangelo-alt`) | Rol: Sublíder y Modelador | **Nota: 16/20**  
   * *Peritaje:* Lideró la carga técnica (más de 3,300 líneas MD y 536 SQL). Extraordinario nivel de consolidación.
-* 🟢 **Geiner Panaifo** (`TangeHidalgoGeiner`) | Rol: Implementador SQL | **Nota: 16/20**  
+* 🟢 **Geiner Tange** (`TangeHidalgoGeiner`) | Rol: Implementador SQL | **Nota: 16/20**  
   * *Peritaje:* Entregó código DDL limpio y casos de prueba perfectamente alineados.
 
 ---
@@ -93,9 +93,9 @@ flowchart TB
 ---
 
 ### 🥈 GRUPO 4 — IdentiCore (Usuarios y Personas)
-* 🟢 **Jair** (`AgustinJhair`) | Rol: Implementador SQL | **Nota: 16/20**  
+* 🟢 **Jhair Panaifo** (`AgustinJhair`) | Rol: Implementador SQL | **Nota: 16/20**  
   * *Peritaje:* 2,446 líneas MD y 536 SQL. Ante el bajo rendimiento de su grupo, asumió roles extras y rescató la entrega del equipo.
-* 🔴 **Segundo** (`Sergio-Serruche`) | Rol: Sublíder y Modelador | **Nota: 10/20**  
+* 🔴 **Sergio Serruche** (`Sergio-Serruche`) | Rol: Sublíder y Modelador | **Nota: 10/20**  
   * *Peritaje:* **Desviación del Alcance.** Entregó archivos Word (`.docx`) y código React frontend, sin aportar al modelado SQL backend asignado.
 * 🔴 **Tania Tapullima** (`tanialorenatapullimanavarro`) | Rol: Analista Funcional | **Nota: 13/20**  
   * *Peritaje:* Muy deficiente. Apenas 60 líneas de texto sin flujos funcionales completos.
@@ -106,7 +106,7 @@ flowchart TB
 **Evaluación General:** Un grupo equilibrado y confiable.
 * 🟢 **Elmer Ramírez** (`ReyNorD23`) | Rol: Sublíder y Modelador | **Nota: 15/20**  
 * 🟢 **Leysglin Riquelmer** (`riquelmerfachin`) | Rol: Analista Funcional | **Nota: 13/20**  
-* 🟢 **Sandy** (`sandymargarita08-cloud`) | Rol: Implementadora SQL | **Nota: 13/20**  
+* 🟢 **Sandy Garcia** (`sandymargarita08-cloud`) | Rol: Implementadora SQL | **Nota: 13/20**  
   * *Peritaje Conjunto:* Cumplieron estrictamente con lo solicitado, entregando el análisis y la estructura SQL del CUT con buena calidad.
 
 ---
@@ -114,10 +114,10 @@ flowchart TB
 ### 🥉 GRUPO 5 — DocuCore (Documentos y Formularios)
 * 🟢 **Christian Jhoel** (`rodriguezcarichristianjhoel-byte`) | Rol: Sublíder y Modelador | **Nota: 16/20**  
   * *Peritaje:* Elevada coordinación y consolidación técnica en 22 commits.
-* 🟢 **Piero** (`Piero` / `PieroBartraMontalvo`) | Rol: Implementador SQL | **Nota: 14/20**  
+* 🟢 **Piero Bartra** (`Piero` / `PieroBartraMontalvo`) | Rol: Implementador SQL | **Nota: 14/20**  
   * *Peritaje:* Implementación SQL sólida (470 líneas probadas).
-* 🟢 **Valentín** (`Valentino-lopez`) | Rol: Analista Funcional B | **Nota: 15/20**  
-* 🔴 **Cristhiam Azareño** (`cristiamsaul2`) | Rol: Analista Funcional A | **Nota: 10/20**  
+* 🟢 **Valentín López** (`Valentino-lopez`) | Rol: Analista Funcional B | **Nota: 15/20**  
+* 🔴 **Brayan Azañero** (`cristiamsaul2`) | Rol: Analista Funcional A | **Nota: 10/20**  
   * *Peritaje:* Su análisis funcional en texto fue ínfimo (93 líneas). Infló su rama con miles de líneas de binarios (imágenes).
 
 ---
