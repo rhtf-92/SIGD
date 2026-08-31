@@ -4,7 +4,7 @@
 Para la construcción de la interfaz visual y la lógica del cliente se contemplan las siguientes tecnologías:
 * **HTML5:** Construcción de la estructura de las páginas.
 * **CSS3:** Diseño visual, colores, diseño responsive, animaciones y modo oscuro[cite: 1, 2].
-* **JavaScript:** Gestión de filtros, búsquedas, actualización de fecha/hora, notificaciones, temas y exportación[cite: 1, 2].
+* **TypeScript:** Gestión de filtros, búsquedas, actualización de fecha/hora, notificaciones, temas y exportación[cite: 1, 2].
 * **Bootstrap:** Diseño responsive, componentes, botones, formularios, tablas y sistemas de rejilla (grid)[cite: 1, 2].
 * **React + Vite:** Alternativa recomendada para proyectos basados en Node.js[cite: 1, 2].
 
