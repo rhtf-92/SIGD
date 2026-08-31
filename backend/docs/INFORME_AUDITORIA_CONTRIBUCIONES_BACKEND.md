@@ -95,9 +95,9 @@ flowchart TB
 ### 🥈 GRUPO 4 — IdentiCore (Usuarios y Personas)
 * 🟢 **Jhair Panaifo** (`AgustinJhair`) | Rol: Implementador SQL | **Nota: 16/20**  
   * *Peritaje:* 2,446 líneas MD y 536 SQL. Ante el bajo rendimiento de su grupo, asumió roles extras y rescató la entrega del equipo.
-* 🔴 **Sergio Serruche** (`Sergio-Serruche`) | Rol: Sublíder y Modelador | **Nota: 10/20**  
-  * *Peritaje:* **Desviación del Alcance.** Entregó archivos Word (`.docx`) y código React frontend, sin aportar al modelado SQL backend asignado.
-* 🔴 **Tania Tapullima** (`tanialorenatapullimanavarro`) | Rol: Analista Funcional | **Nota: 13/20**  
+* 🔴 **Jhair Valdivieso** (`??`) | Rol: Sublíder y Modelador | **Nota: 00/20**  
+  * *Peritaje:* **Abandono.** Tras un cruce pericial estricto con los correos de Git, no existe ningún commit que certifique autoría o participación en el repositorio de este integrante.
+* 🟢 **Tania Tapullima** (`tanialorenatapullimanavarro`) | Rol: Analista Funcional | **Nota: 13/20**  
   * *Peritaje:* Muy deficiente. Apenas 60 líneas de texto sin flujos funcionales completos.
 
 ---
@@ -126,7 +126,7 @@ flowchart TB
 **Evaluación General:** Crítica. Dos miembros arrastraron al equipo ante el nulo aporte técnico de los demás.
 * 🟢 **Ricardo Arévalo** (`arevalovillacortar-alt`) | Rol: Integrador y Líder | **Nota: 17/20**  
   * *Peritaje:* Redactó y coordinó efectivamente las integraciones (713 líneas MD).
-* 🟢 **Zevallos** (`REDBLACK-OL`) | Rol: QA / Pruebas | **Nota: 13/20**  
+* 🔴 **Zevallos** (`REDBLACK-OL`) | Rol: QA / Pruebas | **Nota: 10/20**  
   * *Peritaje:* Desarrolló los planes de pruebas y validaciones (433 líneas MD).
 * 🔴 **Duque** (`ADERRTX`) | Rol: Especialista API (Catálogo de Errores) | **Nota: 00/20**  
   * *Peritaje:* **Inaceptable.** Tenía como responsabilidad redactar el RFC 7807, pero únicamente renombró 32 archivos `.jpeg` de logos institucionales. Aporte backend: cero.
