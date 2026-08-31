@@ -179,3 +179,21 @@ Trazabilidad de las operaciones sobre personas, cuentas y perfiles (registro, ac
 | CoreLink | G6 | Compone los contratos inter-módulo; valida referencias a usuarios sin duplicar sus datos. |
 
 > **Postura de integración (PROPUESTO):** IdentiCore expone identificadores internos estables (nunca el documento visible) para que los demás módulos tracen operaciones. Esto evita duplicar datos personales y mantiene la trazabilidad.
+
+---
+
+## 8. Artefactos del Módulo IdentiCore
+
+Este modelo lógico es la **fuente de verdad** del esquema; el diccionario de datos y el borrador SQL deben reflejar exactamente los mismos nombres, tipos, relaciones y reglas.
+
+| Artefacto | Ruta |
+| :--- | :--- |
+| Análisis funcional | `backend/docs/identicore/01_analisis_usuarios_internos_externos.md` |
+| Diccionario de datos | `backend/docs/identicore/02_diccionario_datos_usuarios.md` |
+| Diagrama E-R (editable) | `backend/docs/identicore/02_modelo_datos_usuarios_diagrama.drawio` |
+| Diagrama E-R (vista previa) | `backend/docs/identicore/02_modelo_datos_usuarios_diagrama.png` |
+| Borrador SQL | `backend/docs/identicore/03_usuarios.sql` |
+| Validación técnica | `backend/docs/identicore/04_validacion_usuarios.md` |
+| Decisiones y pendientes | `backend/docs/identicore/05_decisiones_y_preguntas_pendientes.md` |
+
+> **Alineación:** los campos `tipo_documento_id`, `numero_documento`, `email_login`, `intentos_fallidos`, `bloqueado_hasta`, vigencias del perfil, atributos del historial documental y atributos de auditoría usan **un único** nombre y tipo en los tres artefactos (modelo, diccionario y SQL).

@@ -46,6 +46,16 @@
 * **Justificación:** preserva la trazabilidad sin fuga de datos personales y sin duplicar entidades.
 * **Nivel:** PROPUESTO (coordinar con Grupo 6).
 
+### 1.8 Conservación histórica frente a eliminación física (ON DELETE)
+* **Decisión:** en el borrador SQL las claves foráneas usan `ON DELETE RESTRICT` (no `CASCADE`); la desactivación de personas, cuentas, perfiles e historial se prevé mediante baja lógica por `estado`.
+* **Justificación:** evitar que el historial documental, las cuentas, los perfiles y la auditoría se eliminen accidentalmente en cascada.
+* **Nivel:** PROPUESTO — **PENDIENTE** de confirmar si la institución exige o prohíbe la eliminación física de registros. Documentado en `03_usuarios.sql` y `04_validacion_usuarios.md`.
+
+### 1.9 Estado del vínculo institucional (no fijado)
+* **Decisión:** el `estado_vinculo` **no** se fija como `CONFIRMADO` como decisión institucional. La validación del vínculo (interno/externo) se trata como **PROPUESTA/PENDIENTE** hasta que el profesor o la institución la confirme.
+* **Justificación:** no declarar oficial un vínculo que todavía no fue validado.
+* **Nivel:** PENDIENTE — la columna equivalente en el modelo es `estado` + vigencias (`fecha_vigencia_inicio`/`fecha_vigencia_fin`); el estado `CONFIRMADO` se descarta por ahora.
+
 ---
 
 ## 2. Supuestos del Grupo
@@ -56,7 +66,7 @@
 | SU-02 | Un usuario externo puede intervenir **sin** cuenta (como remitente/solicitante) cuando la institución lo permita. | SUPUESTO / PENDIENTE |
 | SU-03 | Las áreas, cargos, roles y permisos permanecen en OrganiCore y serán referenciados, no duplicados. | SUPUESTO / PENDIENTE |
 | SU-04 | Los datos de prueba serán ficticios y no incluirán DNI, nombres, correos ni contraseñas reales. | CONFIRMADO |
-| SU-05 | PostgreSQL 18.6 es la referencia del equipo para el borrador SQL (responsable: Jair, B_JAIR). | CONFIRMADO |
+| SU-05 | PostgreSQL 18.6 es la referencia del equipo para el borrador SQL. | CONFIRMADO |
 
 ---
 
@@ -93,6 +103,8 @@
 | Cardinalidad persona–cuenta 1:N | Propuesto | PENDIENTE |
 | Hash de contraseña | Aplicado | CONFIRMADO |
 | Integración por identificadores internos | Propuesto; coordinar con Grupo 6 | PENDIENTE |
+| Conservación histórica (ON DELETE RESTRICT) | Propuesto; sin CASCADE destructivo | PENDIENTE |
+| Estado del vínculo institucional | No fijado (sin `CONFIRMADO`) | PENDIENTE |
 
 ---
 
@@ -101,6 +113,7 @@
 | Versión | Fecha | Responsable | Cambio | Estado |
 | :--- | :--- | :--- | :--- | :--- |
 | 0.1 | 2026-08-30 | Segundo (B_SEGUNDO) | Creación del modelo de datos, diccionario y registro de decisiones de IdentiCore sobre la base del plan de trabajo del grupo | **BORRADOR — PENDIENTE DE VALIDACIÓN** |
+| 0.2 | 2026-08-30 | Segundo (B_SEGUNDO) | Renombrado de carpeta a `backend/docs/identicore/`; alineación de SQL, modelo y diccionario; documentación de conservación histórica y estado del vínculo como pendientes; validación técnica completada (responsable real: B_SEGUNDO) | **BORRADOR — PENDIENTE DE VALIDACIÓN** |
 
 ---
 

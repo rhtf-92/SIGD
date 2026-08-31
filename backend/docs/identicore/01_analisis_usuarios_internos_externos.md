@@ -1,7 +1,7 @@
 # 01. Análisis Funcional: Administración de Usuarios - SIGD
 
-**Analista Funcional:** Tapullima  
-**Rama:** `B_TAPULLIMA`  
+**Analista Funcional:** Tapullima
+**Rama:** `B_TAPULLIMA`
 **Estado:** Propuesta Preliminar (Insumo para Modelo de Datos)
 
 ---
@@ -56,4 +56,4 @@
 ## 5. Preguntas para el Profesor
 1. ¿La validación con RENIEC/PIDE será obligatoria en tiempo real desde la primera fase?
 2. ¿Los usuarios internos ingresarán con correo institucional o con un usuario propio del sistema?
-3. ¿Quién aprueba las cuentas de empresas (RUC): el sistema automáticamente o Mesa de Partes?ñ
+3. ¿Quién aprueba las cuentas de empresas (RUC): el sistema automáticamente o Mesa de Partes?
