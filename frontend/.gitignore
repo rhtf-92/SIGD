@@ -3,4 +3,5 @@ dist/
 .env
 coverage/
 *.log
-grupos_docs/*.docx
+*.local
+.DS_Store

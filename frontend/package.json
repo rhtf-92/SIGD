@@ -1,0 +1,33 @@
+{
+  "name": "sigd-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Estructura base del frontend académico del SIGD del Instituto Suiza.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=24.19.0 <25"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.83.0",
+    "axios": "^1.11.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^7.8.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.9",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "tailwindcss": "^4.1.11",
+    "typescript": "~5.9.2",
+    "vite": "^6.3.5"
+  }
+}
