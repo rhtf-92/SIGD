@@ -135,3 +135,31 @@ ABAC agrega condiciones de contexto antes de autorizar la acción, por ejemplo:
 | Firmar como encargado | Permitido | Encargatura vencida | Denegado |
 
 El rol técnico por sí solo no debe otorgar facultades institucionales o legales.
+
+## 7. Encargaturas y suplencias temporales
+
+**Clasificación:** `PROPUESTO`
+
+Una encargatura permite que un usuario suplente asuma temporalmente determinadas facultades de un titular.
+
+Debe registrar:
+
+- usuario titular;
+- usuario suplente;
+- periodo de vigencia;
+- tipo de delegación;
+- resolución que autoriza la encargatura.
+
+### Flujo funcional
+
+1. Se registra la ausencia temporal del titular.
+2. Se designa un suplente mediante una resolución.
+3. Se establece el periodo de vigencia.
+4. Durante ese periodo, el suplente puede ejercer únicamente las facultades delegadas.
+5. Al vencer el periodo, la autorización deja de ser válida automáticamente.
+
+### Validaciones
+
+- No permitir una encargatura fuera de su periodo de vigencia.
+- No permitir que el suplente ejerza facultades no delegadas.
+- La encargatura debe tener sustento en una resolución.
