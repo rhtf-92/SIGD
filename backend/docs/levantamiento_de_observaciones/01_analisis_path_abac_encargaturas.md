@@ -110,3 +110,28 @@ Ejemplo:
 /1/
 /1/4/
 /1/4/12/
+
+## 6. RBAC y ABAC
+
+**Clasificación:** `PROPUESTO`
+
+RBAC controla qué acciones técnicas puede realizar un usuario según su rol.
+
+ABAC agrega condiciones de contexto antes de autorizar la acción, por ejemplo:
+
+- área del usuario;
+- cargo institucional;
+- facultad de despacho;
+- vigencia de una encargatura.
+
+### Matriz funcional
+
+| Caso | Rol técnico | Condición contextual | Resultado |
+|---|---|---|---|
+| Consultar documentos | Permitido | Usuario pertenece al área | Permitido |
+| Firmar documento | Permitido | Tiene facultad de despacho vigente | Permitido |
+| Firmar documento | Permitido | No tiene facultad de despacho | Denegado |
+| Firmar como encargado | Permitido | Encargatura vigente | Permitido |
+| Firmar como encargado | Permitido | Encargatura vencida | Denegado |
+
+El rol técnico por sí solo no debe otorgar facultades institucionales o legales.
