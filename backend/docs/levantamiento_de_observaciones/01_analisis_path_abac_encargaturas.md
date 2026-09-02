@@ -97,3 +97,16 @@ Una encargatura representa la asignación temporal de determinadas funciones o f
 La encargatura deberá tener una fecha de inicio y una fecha de finalización.
 
 **Clasificación:** `PROPUESTO`
+
+## 5. Materialized Path
+
+**Clasificación:** `PROPUESTO`
+
+Se propone representar la jerarquía de áreas usando `parent_id` y una columna `path`.
+
+Ejemplo:
+
+```text
+/1/
+/1/4/
+/1/4/12/
