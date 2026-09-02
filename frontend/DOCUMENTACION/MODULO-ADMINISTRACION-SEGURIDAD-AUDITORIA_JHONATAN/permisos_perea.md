@@ -32,22 +32,4 @@ Este componente gestiona el modelo de control de acceso basado en roles (RBAC) d
   * Restringir el acceso a rutas protegidas mediante JWT en el Frontend.
 * **RF-04: Registro Inmutable**
   * Enviar cada cambio en la asignación de permisos al log de auditoría.
-
----
-
-### 4. Estructura de Datos (TypeScript Interface)
-
-```typescript
-export interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: Permission[];
-  status: 'ACTIVE' | 'INACTIVE';
-}
-
-export interface Permission {
-  id: string;
-  module: string;
-  action: 'READ' | 'CREATE' | 'UPDATE' | 'DELETE';
-}
+    
