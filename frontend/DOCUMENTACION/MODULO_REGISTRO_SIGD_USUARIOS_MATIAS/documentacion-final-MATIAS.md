@@ -1,94 +1,107 @@
-# Documento de Consolidación
-## Formulario de Registro de Usuario Externo — Equipo Frontend
+# Análisis del Módulo de Registro de Usuario Externo
+
+## Equipo Frontend — Proyecto SIGD
 
 **Sistema Integral de Gestión Documentaria (SIGD)**
 Instituto de Educación Superior Tecnológico Público "Suiza" — Pucallpa
 
 ---
 
-## 1. Introducción
+## 1. Introducción y contexto
 
-Este documento consolida las propuestas de trabajo elaboradas por el sub-equipo asignado al desarrollo del Formulario de Registro de Usuario dentro del proyecto SIGD, conformado por Matías Zumaeta (líder del sub-equipo), Sergio y Vazques. Se presenta como entregable formal para revisión del líder del equipo Frontend (Christiam) y, posteriormente, del docente responsable de la unidad didáctica Taller de Software.
+Este documento presenta el análisis realizado por el sub-equipo conformado por Matías Zumaeta (líder del sub-equipo), Sergio y Vazques (Angel Jesús), en torno al módulo de **Registro de Usuario Externo** del proyecto SIGD.
 
-El objetivo de este documento es dejar constancia clara de lo que se implementó, lo que aportó cada integrante, y los puntos que requieren definición antes de continuar con el desarrollo.
+El propósito de este análisis es identificar los requerimientos funcionales, investigar referentes existentes en sistemas del Estado peruano, y proponer un diseño de solución justificado, antes de iniciar cualquier etapa de programación. Se presenta como entregable formal para revisión del líder del equipo Frontend (Christiam) y del docente responsable.
 
-## 2. Objetivo de la tarea
+## 2. Definición del problema
 
-Según las indicaciones brindadas por el docente, la tarea consiste en diseñar e implementar una interfaz de registro dirigida a usuarios externos (ciudadanos sin credenciales previas en el sistema) que deseen crear una cuenta para dar seguimiento a sus trámites documentarios ante el Instituto Suiza. El diseño debe tomar como referencia los estándares de usabilidad de portales del Estado peruano, como el Poder Judicial.
+Según las indicaciones registradas en las sesiones de coordinación del docente, el Instituto Suiza requiere que ciudadanos sin credenciales previas en el sistema (postulantes, apoderados, público en general) puedan:
 
-## 3. Aportes por integrante
+1. Iniciar un trámite documentario sin necesidad de una cuenta previa, o
+2. Registrarse para obtener credenciales y dar seguimiento a sus trámites en el tiempo.
 
-| Integrante | Aporte | Observación |
+El reto de diseño consiste en definir qué información es estrictamente necesaria solicitar a este tipo de usuario, y cómo estructurarla para que sea consistente con las buenas prácticas de sistemas documentarios del sector público peruano.
+
+## 3. Metodología de análisis
+
+El análisis se elaboró a partir de tres fuentes:
+
+1. **Indicaciones directas del docente**, registradas en sesiones de coordinación, donde se sugirió explícitamente tomar como referencia el portal del Poder Judicial del Perú.
+2. **Investigación de sistemas gubernamentales existentes**, específicamente el módulo de datos de domicilio del Sistema de Información de Apoyo a la Gestión de la Institución Educativa (SIAGIE) del Ministerio de Educación, por ser un sistema público de uso masivo con una estructura de datos de ubicación validada institucionalmente.
+3. **Comparación de las propuestas individuales** elaboradas por los tres integrantes del sub-equipo.
+
+## 4. Análisis de referentes externos
+
+### 4.1 Estructura de domicilio en SIAGIE (MINEDU)
+
+La investigación de la documentación pública de SIAGIE confirma que el sistema estructura los datos de domicilio mediante **selección en cascada**:
+
+Esta estructura evita que el usuario escriba libremente el nombre de su ubicación (lo cual genera inconsistencias como errores de tipeo o variantes de un mismo nombre), y en su lugar lo obliga a elegir de una lista controlada. Esto es relevante para el diseño del SIGD porque:
+
+- Reduce errores de calidad de datos en la base de datos del backend.
+- Es coherente con el estándar ya validado por una entidad pública peruana de escala nacional.
+
+### 4.2 Referencia al Poder Judicial del Perú
+
+El docente indicó explícitamente guiarse de sistemas de ingreso de trámites de organismos del Estado, mencionando como ejemplo el Poder Judicial. Del análisis de portales de este tipo se identifican patrones comunes:
+
+- Formularios con secciones claramente separadas (datos personales, contacto, domicilio).
+- Uso de una identidad visual institucional (logo, colores, cabecera) que genera confianza en el usuario.
+- Declaración jurada o aceptación de veracidad de los datos como paso obligatorio antes de completar el registro, dado el carácter oficial de la información.
+
+## 5. Análisis comparativo de las propuestas del sub-equipo
+
+Cada integrante analizó el requerimiento de forma independiente. La siguiente tabla compara los tres enfoques:
+
+| Criterio | Propuesta de Matías / Sergio | Propuesta de Vazques |
 |---|---|---|
-| **Matías Zumaeta (líder)** | Implementación base funcional en React + TypeScript + Vite. Formulario con datos personales, contacto y domicilio con listas dependientes (provincia/distrito de Ucayali). Identidad visual con fachada institucional y logo del Instituto Suiza. | Base sobre la que se consolidó la versión final del equipo. |
-| **Sergio** | Implementación paralela con arquitectura equivalente. Sumó los campos DNI y fecha de nacimiento, checkbox de declaración jurada, y alineación de campos en fila. Identificó una referencia sin reemplazar al "Poder Judicial" en la cabecera de su prototipo. | Sus mejoras (DNI, fecha de nacimiento, declaración jurada) fueron integradas a la versión final. |
-| **Vazques (Angel Jesús)** | Propuesta documentada de una interfaz de administración de usuarios internos: gestión de roles y permisos (Administrador, Mesa de Partes, Operador, Auditor), datos laborales, credenciales de acceso, listado con búsqueda/filtros y control de estado de cuentas. | El alcance corresponde a un panel administrativo interno, distinto al registro externo de ciudadanos solicitado en el encargo original. Se solicitó aclaración (ver sección 5). |
+| **Tipo de usuario objetivo** | Ciudadano externo sin cuenta previa | Usuario interno del sistema (personal del instituto) |
+| **Alcance funcional** | Registro simple para trámites | Panel de administración completo con roles y permisos |
+| **Campos propuestos** | Datos personales, DNI, fecha de nacimiento, contacto, domicilio en cascada, declaración jurada | Datos personales, DNI, fecha de nacimiento, domicilio, datos laborales (área, cargo), credenciales de acceso, rol asignado |
+| **Gestión de acceso** | No requiere contraseña (registro público) | Requiere usuario, contraseña y rol (Administrador, Mesa de Partes, Operador, Auditor) |
+| **Funcionalidades adicionales** | Ninguna (formulario único) | Listado con búsqueda/filtros, activación/desactivación de cuentas |
 
-## 4. Especificación técnica de la versión consolidada
+### 5.1 Evaluación de ambos enfoques
 
-La versión final integra la implementación base de Matías con las mejoras propuestas por Sergio.
+**A favor del enfoque de registro externo (Matías/Sergio):**
+- Coincide directamente con la descripción textual del encargo registrada en las sesiones del docente ("un usuario externo que no tiene el acceso... lo haga directamente desde acá").
+- Es un requerimiento más acotado, apto para una primera entrega.
 
-| Sección | Campos |
-|---|---|
-| Datos personales | Nombres, apellidos, DNI (8 dígitos), fecha de nacimiento |
-| Datos de contacto | Correo electrónico, teléfono (9 dígitos) |
-| Domicilio | Departamento (Ucayali, fijo), provincia y distrito (listas dependientes), dirección exacta, referencia (opcional) |
-| Declaración jurada | Confirmación obligatoria de veracidad de los datos ingresados |
+**A favor del enfoque de panel administrativo (Vazques):**
+- Es un requerimiento real y necesario para el sistema completo, ya que en algún momento el SIGD deberá gestionar también a los usuarios internos (secretarias, jefes de área) mencionados en el mapeo de la estructura jerárquica del instituto.
+- Está bien fundamentado en términos de seguridad (roles, permisos, ocultamiento de contraseñas).
 
-### 4.1 Stack tecnológico
+**Conclusión del análisis:** ambos enfoques responden a necesidades reales del sistema, pero corresponden a **módulos distintos**. No se trata de una propuesta correcta y una incorrecta, sino de dos funcionalidades independientes que probablemente deban desarrollarse en etapas distintas del proyecto.
 
-- React + TypeScript + Vite
-- Estructura modular por carpetas: `api`, `assets`, `components`, `config`, `data`, `hooks`, `layouts`, `pages`, `routes`, `types`, `utils`
-- Enrutamiento con `react-router-dom`
+## 6. Propuesta de diseño recomendada
 
-### 4.2 Identidad visual
+En base al análisis anterior, se recomienda que el módulo de **Registro de Usuario Externo** contemple la siguiente estructura de datos:
 
-- Fondo con fotografía institucional (fachada del Instituto Suiza)
-- Logo/insignia oficial del Instituto Suiza en la cabecera
-- Diseño minimalista con tarjeta central, bordes redondeados y sombra suave
+| Sección | Campos propuestos | Justificación |
+|---|---|---|
+| Datos personales | Nombres, apellidos, DNI (8 dígitos), fecha de nacimiento | Identificación única del ciudadano, necesaria para cualquier trámite oficial |
+| Datos de contacto | Correo electrónico, teléfono (9 dígitos) | Canal de notificación sobre el estado del trámite |
+| Domicilio | Departamento, provincia y distrito (selección en cascada, según modelo SIAGIE), dirección exacta, referencia | Consistencia de datos geográficos y trazabilidad del ciudadano |
+| Declaración jurada | Aceptación obligatoria de veracidad de los datos | Respaldo legal del trámite, siguiendo el estándar de portales gubernamentales |
 
-### 4.3 Validaciones implementadas
+Se recomienda, además, limitar el catálogo de provincias y distritos a la región Ucayali en una primera etapa, dado que corresponde al ámbito geográfico real del Instituto Suiza, evaluando la ampliación a nivel nacional según se defina con el equipo de Backend.
 
-- Campos obligatorios: nombres, apellidos, DNI, fecha de nacimiento, correo, teléfono, provincia, distrito, dirección
-- DNI: exactamente 8 dígitos numéricos
-- Teléfono: exactamente 9 dígitos numéricos
-- Correo electrónico: formato válido
-- Declaración jurada: aceptación obligatoria mediante checkbox
-- Los mensajes de error se muestran directamente debajo del campo correspondiente
+## 7. Punto pendiente de definición
 
-### 4.4 Estado del envío de datos
+Se solicita al líder del equipo Frontend y/o al docente confirmar si el panel de administración de usuarios internos (propuesta de Vazques) corresponde a:
 
-Actualmente el formulario valida los datos y genera la estructura del objeto a enviar (visualizado mediante consola del navegador), a la espera de que el equipo de Backend defina el endpoint correspondiente (`POST /api/usuarios-externos`). Al completar el envío se muestra una confirmación visual de éxito, en lugar de una alerta del navegador.
+- **a)** una funcionalidad adicional a desarrollarse en una etapa posterior del proyecto, como módulo independiente, o
+- **b)** un requerimiento que deba integrarse desde ya en el diseño del registro externo.
 
-## 5. Punto pendiente de definición
+## 8. Conclusiones y siguientes pasos
 
-La propuesta elaborada por Vazques describe una interfaz de administración de usuarios internos del sistema (con gestión de roles, permisos, credenciales de acceso y datos laborales). Este alcance difiere del registro externo de ciudadanos descrito en el encargo original.
+El análisis realizado permite concluir que:
 
-Se solicita al líder del equipo Frontend y/o al docente confirmar si:
+1. Existe un requerimiento claro y bien definido de registro externo, respaldado por referentes gubernamentales reales (SIAGIE, Poder Judicial).
+2. Existe un segundo requerimiento (gestión de usuarios internos) identificado por el equipo, que debe ser confirmado y priorizado por el docente antes de avanzar.
+3. Una vez aprobado el enfoque, el sub-equipo procederá a la etapa de diseño funcional detallado y, posteriormente, a la implementación técnica.
 
-- **a)** el panel de administración de usuarios internos corresponde a una funcionalidad adicional a desarrollarse en una etapa posterior del proyecto, o
-- **b)** hubo una interpretación distinta del encargo que deba corregirse antes de continuar.
-
-Mientras se recibe esta confirmación, el sub-equipo continuará el desarrollo sobre la base del registro externo, por ser la interpretación que coincide con las indicaciones registradas en las sesiones de coordinación del docente.
-
-## 6. Estado general
-
-### 6.1 Implementado
-
-- [x] Arquitectura frontend funcional
-- [x] Identidad visual institucional aplicada
-- [x] Formulario completo con validaciones
-- [x] Listas dependientes de provincia y distrito (región Ucayali)
-- [x] Confirmación visual de registro exitoso
-
-### 6.2 Pendiente
-
-- [ ] Definición del alcance del panel de administración de usuarios (ver sección 5)
-- [ ] Integración con el endpoint real del backend
-- [ ] Persistencia de datos y autenticación de usuarios
-- [ ] Revisión final de diseño responsive en dispositivos móviles
-
-## 7. Equipo responsable
+## 9. Equipo responsable
 
 - **Líder del sub-equipo:** Matías Zumaeta
 - **Integrantes:** Sergio, Vazques (Angel Jesús)
