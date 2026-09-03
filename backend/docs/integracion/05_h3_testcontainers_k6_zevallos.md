@@ -1,106 +1,225 @@
-# Hito H3: Suite de Testcontainers y Scripts de Carga k6
-
-**Proyecto:** Sistema Integral de Gestión Documentaria (SIGD) — IESTP "Suiza"  
-**Grupo:** Grupo 6 "CoreLink" · Integración, Calidad y Pruebas del Backend  
-**Responsable:** Zevallos (`B_ZEVALLOS`) — Especialista en QA y Pruebas Automatizadas  
-**Ubicación:** `backend/docs/integracion/03_h3_testcontainers_k6_zevallos.md`  
-**Fecha:** 30 de agosto de 2026  
-**Estado:** `COMPLETADO`  
-
+SUITE DE PRUEBAS DE INTEGRACIÓN CON TESTCONTAINERS Y PRUEBAS DE CARGA CON k6
+Grupo 6 "CoreLink" · Integración, Calidad y Pruebas del Backend — SIGD
+Proyecto: Sistema Integral de Gestión Documentaria (SIGD)
+Institución: IESTP "Suiza" (Pucallpa, Ucayali, Perú) — PE DSI
+Área: Backend — CoreLink
+Responsable del entregable: Zevallos · `B_ZEVALLOS`
+Documento: `03_suite_pruebas_testcontainers_k6.md`
+Fecha: 3 de septiembre de 2026
+Versión: 1.0 (Fase 2 — Levantamiento de Observaciones)
 ---
-
-## 1. Arquitectura de la Suite de Pruebas de Integración (Testcontainers)
-
-La estrategia de aseguramiento de calidad automatizada para el backend del SIGD elimina el uso de dobles de prueba (mocks) en la capa de datos. En su lugar, se implementa una infraestructura de pruebas de integración basada en contenedores efímeros.
-
-### 1.1 Ciclo de Vida del Contenedor de Base de Datos
-* **Aislamiento Total:** Antes de iniciar la suite de pruebas, el entorno automatizado levanta un contenedor Docker independiente ejecutando PostgreSQL 18 en su versión Alpine.
-* **Aprovisionamiento Automático:** Una vez levantado el contenedor, se ejecutan automáticamente las migraciones DDL correspondientes a los 6 esquemas del sistema (`sigd_identi`, `sigd_tramite`, `sigd_docu`, `sigd_organi`, `sigd_ruta` y `sigd_audit`).
-* **Limpieza Entre Escenarios:** Al finalizar cada caso de prueba individual, se aplica un procedimiento de vaciado de tablas con cascada (`TRUNCATE ... CASCADE`) para garantizar que las pruebas sean 100% independientes y no exista contaminación de datos entre ejecuciones.
-* **Destrucción Efímera:** Finalizada la ejecución global de la suite, el contenedor Docker se destruye automáticamente, liberando los recursos del sistema.
-
+1. Propósito y Problema que Resuelve
+Definir la infraestructura de aseguramiento de calidad automatizado del backend del SIGD eliminando el uso de mocks en la capa de datos. En lugar de bases de datos locales compartidas o simulaciones, se levanta una infraestructura de pruebas de integración basada en contenedores efímeros mediante Testcontainers (PostgreSQL 18 en Docker), y se definen pruebas de carga y rendimiento con k6 para validar la aptitud del sistema antes del paso a producción.
+El objetivo es garantizar que las pruebas sean 100% reproducibles y autónomas, sin depender de datos precargados manualmente, y que el rendimiento cumpla umbrales de aceptación objetivos.
 ---
-
-## 2. Matriz de 10 Casos de Prueba de Integración E2E Intermodulares
-
-La siguiente matriz especifica los escenarios de prueba de extremo a extremo (E2E) diseñados para verificar la integración entre los distintos módulos, la propagación de contexto con AsyncLocalStorage, el manejo de excepciones RFC 7807 y la generación de auditoría.
-
-* **E2E-01: Radicación Exitosa en Mesa de Partes**
-  * **Módulo:** Mesa de Partes
-  * **Descripción:** Envío de una solicitud con datos válidos de un ciudadano.
-  * **Resultado Esperado:** Retorno de código de éxito HTTP 201 Created y confirmación de persistencia del expediente en la base de datos con un identificador de correlación asignado.
-  * **Taxonomía:** `CONFIRMADO`
-
-* **E2E-02: Validación de Entradas de Usuario (Zod a RFC 7807)**
-  * **Módulo:** Mesa de Partes / Middleware
-  * **Descripción:** Envío de una estructura JSON con campos faltantes o con formato incorrecto (ej. DNI inválido o folios negativos).
-  * **Resultado Esperado:** Retorno de estado HTTP 400 Bad Request estructurado estrictamente bajo el estándar RFC 7807, detallando cada campo inválido en una lista de parámetros.
-  * **Taxonomía:** `CONFIRMADO`
-
-* **E2E-03: Mapeo de Colisión de Llave Única (PostgreSQL 23505 a HTTP 409)**
-  * **Módulo:** Identicore / Middleware
-  * **Descripción:** Intento de registro de un usuario utilizando un correo electrónico o DNI previamente registrado.
-  * **Resultado Esperado:** Captura de la excepción nativa de PostgreSQL por el interceptor global y mapeo automático a respuesta HTTP 409 Conflict.
-  * **Taxonomía:** `CONFIRMADO`
-
-* **E2E-04: Mapeo de Violación de Llave Foránea (PostgreSQL 23503 a HTTP 400/404)**
-  * **Módulo:** Tramicore / Middleware
-  * **Descripción:** Intentar asignar o derivar un trámite hacia un área organizacional que no existe en el esquema de organización.
-  * **Resultado Esperado:** Intercepción del error de integridad referencial de la base de datos y respuesta JSON de error indicando la invalidez del recurso referenciado.
-  * **Taxonomía:** `CONFIRMADO`
-
-* **E2E-05: Flujo Completo de Derivación Intermodular**
-  * **Módulo:** Tramicore / Organicore
-  * **Descripción:** Transición de estado de un expediente desde la Mesa de Partes hacia la jefatura correspondiente.
-  * **Resultado Esperado:** Retorno de estado HTTP 200 OK y actualización correcta del estado de ubicación física y digital del documento.
-  * **Taxonomía:** `CONFIRMADO`
-
-* **E2E-06: Verificación de Auditoría Forense Transparente (AsyncLocalStorage)**
-  * **Módulo:** Observabilidad / AsyncLocalStorage
-  * **Descripción:** Ejecución de una operación de mutación (creación o actualización de datos) verificando la captación de metadatos.
-  * **Resultado Esperado:** Comprobación directa en la tabla de bitácora de auditoría (`sigd_audit.bitacora_auditoria`) de que el identificador de usuario, la dirección IP de origen y el identificador de correlación fueron capturados automáticamente sin pasar explícitamente esos parámetros en el código de negocio.
-  * **Taxonomía:** `CONFIRMADO`
-
-* **E2E-07: Inserción Transaccional en Tabla Outbox**
-  * **Módulo:** Observabilidad / Patrón Outbox
-  * **Descripción:** Radicación de un expediente verificando la atomicidad de la transacción.
-  * **Resultado Esperado:** Registro en la misma transacción de base de datos de la entidad del expediente y del evento correspondiente dentro de la tabla de eventos salientes (`sigd_audit.evento_outbox`) para su posterior procesamiento asíncrono.
-  * **Taxonomía:** `CONFIRMADO`
-
-* **E2E-08: Protección de Endpoints (Falta de Autenticación)**
-  * **Módulo:** Seguridad / Middleware
-  * **Descripción:** Realizar una petición a una ruta protegida sin adjuntar el token de autenticación.
-  * **Resultado Esperado:** Rechazo inmediato en el nivel HTTP 401 Unauthorized en formato RFC 7807, bloqueando cualquier consulta hacia la base de datos.
-  * **Taxonomía:** `CONFIRMADO`
-
-* **E2E-09: Restricción de Autorización y Roles**
-  * **Módulo:** Seguridad / Middleware
-  * **Descripción:** Un usuario con rol de operador intenta ejecutar una acción reservada para el rol de administrador.
-  * **Resultado Esperado:** Respuesta HTTP 403 Forbidden indicando que la credencial no posee los privilegios requeridos para la operación.
-  * **Taxonomía:** `CONFIRMADO`
-
-* **E2E-10: Enmascaramiento de Errores No Controlados**
-  * **Módulo:** Middleware de Errores
-  * **Descripción:** Inducción deliberada de una falla crítica no anticipada en el servidor (ej. pérdida momentánea de conexión interna).
-  * **Resultado Esperado:** Retorno de error HTTP 500 Internal Server Error estandarizado bajo RFC 7807, con ocultamiento total del detalle de la pila de llamadas (stack trace) para proteger la seguridad del sistema en entornos de producción.
-  * **Taxonomía:** `CONFIRMADO`
-
+2. Alcance y Elementos Fuera de Alcance
+Dentro del alcance
+Configuración del entorno de testing con Testcontainers (PostgreSQL 18 en Docker).
+Ejecución automática de las migraciones DDL de los 6 esquemas.
+Matriz de 10 casos de prueba de integración E2E intermodulares.
+Scripts de prueba de carga con k6 y umbrales de aceptación (Thresholds).
+Fuera de alcance
+Middleware de errores RFC 7807 (entregable 01 de Azareño).
+Arquitectura de auditoría y AsyncLocalStorage (entregable 02 de Reátegui).
+Contratos intermodulares y matriz Productor-Consumidor (entregable 04 de Ricardo).
 ---
+3. Definiciones y Convención de Esquemas
+Los esquemas lógicos usan la nomenclatura consolidada del Plan de Mejora Backend SIGD:
+Esquema	Módulo / Subdominio
+`sigd_auth`	IdentiCore (Personas, Cuentas)
+`sigd_org`	OrganiCore (Áreas, Roles)
+`sigd_doc`	DocuCore (Tipos Documentales, Adjuntos)
+`sigd_tra`	TramiCore (Trámite, Expediente)
+`sigd_rut`	RutaDoc (Trazabilidad, Movimientos)
+`sigd_audit`	CoreLink (Bitácora, Outbox)
+> Nota: Esta nomenclatura reemplaza cualquier variante anterior (`sigd_identi`, `sigd_tramite`, `sigd_docu`, `sigd_organi`, `sigd_ruta`) para alinearse con el estándar corporativo.
+Término	Definición
+Testcontainers	Librería que permite levantar contenedores Docker efímeros dentro de la suite de pruebas.
+E2E	End-to-End: prueba que atraviesa la integración real de varios módulos.
+k6	Herramienta open source de pruebas de carga y rendimiento (Grafana).
+Umbral (Threshold)	Condición de aprobación/fallo de una métrica en k6.
+---
+4. Arquitectura de la Suite de Pruebas (Testcontainers)
+La estrategia elimina los dobles de prueba en la capa de datos: cada ejecución levanta una base de datos real y aislada.
+4.1 Ciclo de Vida del Contenedor de Base de Datos
+Aislamiento total: Antes de la suite, el entorno levanta un contenedor Docker independiente con PostgreSQL 18 (Alpine).
+Aprovisionamiento automático: Al levantar el contenedor se ejecutan las migraciones DDL de los 6 esquemas (`sigd_auth`, `sigd_org`, `sigd_doc`, `sigd_tra`, `sigd_rut`, `sigd_audit`).
+Limpieza entre escenarios: Al finalizar cada caso se aplica `TRUNCATE ... CASCADE` para garantizar independencia y ausencia de contaminación de datos.
+Destrucción efímera: Al terminar la ejecución global, el contenedor se destruye automáticamente y libera los recursos.
+4.2 Configuración de Testcontainers + Vitest/Supertest
+```typescript
+// test/setup.testcontainers.ts
+import { GenericContainer, StartedTestContainer } from "testcontainers";
+import { readFileSync } from "node:fs";
 
-## 3. Especificación de Pruebas de Carga y Rendimiento con k6
+let postgres: StartedTestContainer;
+export const pgConfig = { host: "", port: 0, user: "postgres", password: "test", database: "sigd" };
 
-Las pruebas de carga están orientadas a evaluar el comportamiento del servidor backend bajo condiciones de uso simultáneo intensivo, asegurando que la arquitectura responda adecuadamente antes de su pase a producción.
+// Migraciones DDL de los 6 esquemas
+const DDL_FILES = [
+    "sql/sigd_auth.sql",
+    "sql/sigd_org.sql",
+    "sql/sigd_doc.sql",
+    "sql/sigd_tra.sql",
+    "sql/sigd_rut.sql",
+    "sql/sigd_audit.sql",
+];
 
-### 3.1 Criterios de Aceptación y Umbrales (Thresholds)
-* **Latencia Percentil 95 (P95):** El 95% de todas las solicitudes HTTP servidas por el sistema deben responder en un tiempo inferior a **200 milisegundos** (`http_req_duration: ['p(95)<200']`).
-* **Tasa de Errores Máxima Permitida:** El porcentaje de peticiones fallidas (códigos HTTP 5xx o caídas de conexión) debe mantenerse por debajo del **0.1%** del total de solicitudes ejecutadas (`http_req_failed: ['rate<0.001']`).
+export async function startTestDatabase(): Promise<void> {
+    postgres = await new GenericContainer("postgres:18-alpine")
+        .withEnvironment({ POSTGRES_USER: pgConfig.user, POSTGRES_PASSWORD: pgConfig.password, POSTGRES_DB: pgConfig.database })
+        .withExposedPorts(5432)
+        .start();
 
-### 3.2 Escenarios de Simulación de Carga
-* **Escenario 1: Radicación Masiva en Mesa de Partes (100 Usuarios Virtuales Simultáneos)**
-  * **Objetivo:** Simular horas pico de recepción de trámites en la institución.
-  * **Perfil de Carga:** Rampa de subida progresiva en 30 segundos hasta alcanzar 100 usuarios virtuales, mantenimiento de la carga pico durante 1 minuto y rampa de descenso gradual de 30 segundos.
-  * **Acción Realizada:** Envío coordinado de solicitudes de registro de trámites generando identificadores únicos y datos dinámicos.
+    pgConfig.host = postgres.getHost();
+    pgConfig.port = postgres.getMappedPort(5432);
+    await runMigrations();
+}
 
-* **Escenario 2: Operación Simultánea de Derivación (50 Usuarios Virtuales)**
-  * **Objetivo:** Simular a los operadores de las distintas áreas administrativas derivando y respondiendo expedientes al mismo tiempo.
-  * **Perfil de Carga:** Mantener de forma constante 50 usuarios virtuales realizando consultas y actualizaciones durante 1 minuto y mediO.
+async function runMigrations(): Promise<void> {
+    const { Client } = await import("pg");
+    const client = new Client(pgConfig);
+    await client.connect();
+    for (const file of DDL_FILES) {
+        await client.query(readFileSync(file, "utf8"));
+    }
+    await client.end();
+}
+
+export async function cleanDatabase(): Promise<void> {
+    const { Client } = await import("pg");
+    const client = new Client(pgConfig);
+    await client.connect();
+    await client.query(
+        "TRUNCATE sigd_audit.evento_outbox, sigd_audit.bitacora_auditoria, sigd_rut.movimiento_tramite, sigd_tra.asiento_registro, sigd_tra.expediente, sigd_tra.tramite CASCADE",
+    );
+    await client.end();
+}
+
+export async function stopTestDatabase(): Promise<void> {
+    await postgres.stop();
+}
+```
+```typescript
+// test/global-setup.ts (Vitest)
+import { startTestDatabase } from "./setup.testcontainers";
+
+export default async function setup(): Promise<void> {
+    await startTestDatabase();
+}
+```
+---
+5. Matriz de 10 Casos de Prueba de Integración E2E Intermodulares
+Cada caso verifica la integración entre módulos, la propagación de contexto con `AsyncLocalStorage`, el manejo de excepciones RFC 7807 y la generación de auditoría.
+ID	Módulo	Descripción	Resultado Esperado	Taxonomía
+E2E-01	Mesa de Partes	Envío de solicitud con datos válidos de un ciudadano.	HTTP `201 Created` y persistencia del expediente con `correlation_id` asignado.	CONFIRMADO
+E2E-02	Mesa de Partes / Middleware	Envío de JSON con campos faltantes o formato incorrecto (ej. DNI inválido, folios negativos).	HTTP `400` estructurado bajo RFC 7807 con lista de `invalid_params`.	CONFIRMADO
+E2E-03	IdentiCore / Middleware	Registro de usuario con correo o DNI ya existente.	Captura de excepción PostgreSQL `23505` y mapeo a HTTP `409 Conflict`.	CONFIRMADO
+E2E-04	TramiCore / Middleware	Asignar/derivar trámite hacia un área que no existe.	Intercepción de violación `23503` y respuesta JSON indicando recurso inválido (`400/404`).	CONFIRMADO
+E2E-05	TramiCore / OrganiCore	Transición de estado desde Mesa de Partes hacia la jefatura.	HTTP `200 OK` y actualización correcta de la ubicación del documento.	CONFIRMADO
+E2E-06	Observabilidad / AsyncLocalStorage	Ejecutar una mutación verificando la captura de metadatos.	En `sigd_audit.bitacora_auditoria` constan `usuario_id`, `ip_origen` y `correlation_id` capturados automáticamente sin pasarlos en el código de negocio.	CONFIRMADO
+E2E-07	Observabilidad / Outbox	Radicar un expediente verificando atomicidad.	En la misma transacción se registran el expediente y el evento en `sigd_audit.evento_outbox` para su procesamiento asíncrono.	CONFIRMADO
+E2E-08	Seguridad / Middleware	Petición a ruta protegida sin token de autenticación.	HTTP `401 Unauthorized` en RFC 7807, bloqueando el acceso a la base de datos.	CONFIRMADO
+E2E-09	Seguridad / Middleware	Usuario con rol de operador intenta una acción de administrador.	HTTP `403 Forbidden` indicando privilegios insuficientes.	CONFIRMADO
+E2E-10	Middleware de Errores	Inducción deliberada de una falla crítica (ej. pérdida de conexión).	HTTP `500` estandarizado bajo RFC 7807 con ocultamiento total del stack trace.	CONFIRMADO
+5.1 Ejemplo de caso de prueba ejecutable (E2E-02)
+```typescript
+// test/e2e/validacion-zod.test.ts
+import { describe, it, expect, beforeAll, afterEach, afterAll } from "vitest";
+import request from "supertest";
+import { app } from "../../src/app";
+import { startTestDatabase, cleanDatabase, stopTestDatabase } from "../setup.testcontainers";
+
+beforeAll(startTestDatabase);
+afterEach(cleanDatabase);
+afterAll(stopTestDatabase);
+
+describe("E2E-02 · Validación de entrada (Zod → RFC 7807)", () => {
+    it("devuelve 400 con invalid_params cuando faltan campos", async () => {
+        const res = await request(app).post("/api/expedientes").send({ numero_documento: "" });
+        expect(res.status).toBe(400);
+        expect(res.body).toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+        expect(Array.isArray(res.body.invalid_params)).toBe(true);
+        expect(res.body.correlation_id).toBeDefined();
+    });
+});
+```
+---
+6. Especificación de Pruebas de Carga y Rendimiento con k6
+Las pruebas de carga evalúan el comportamiento del backend bajo uso simultáneo intensivo antes del pase a producción.
+6.1 Criterios de Aceptación (Thresholds)
+Métrica	Umbral	Expresión k6
+Latencia P95	< 200 ms	`http_req_duration: ['p(95)<200']`
+Tasa de errores	< 0.1%	`http_req_failed: ['rate<0.001']`
+6.2 Escenarios de Simulación de Carga
+Escenario 1: Radicación Masiva en Mesa de Partes (100 VU simultáneos)
+Rampa de subida progresiva en 30 s hasta 100 usuarios virtuales.
+Mantenimiento de la carga pico durante 1 minuto.
+Rampa de descenso gradual de 30 s.
+Acción: enviar solicitudes de registro de trámites con identificadores únicos y datos dinámicos.
+Escenario 2: Operación Simultánea de Derivación (50 VU)
+50 usuarios virtuales constantes consultando y actualizando (derivación de expedientes) durante 1 minuto y medio.
+6.3 Script k6 completo
+```javascript
+// load/load-test.js
+import http from "k6/http";
+import { check, sleep } from "k6";
+
+export const options = {
+    scenarios: {
+        radicacion: {
+            executor: "ramping-vus",
+            startVUs: 0,
+            stages: [
+                { duration: "30s", target: 100 }, // subida a 100 VU
+                { duration: "1m", target: 100 },  // pico sostenido
+                { duration: "30s", target: 0 },   // descenso
+            ],
+        },
+        derivacion: {
+            executor: "constant-vus",
+            vus: 50,           // operadores constantes
+            duration: "1m30s", // 1 minuto y medio
+        },
+    },
+    thresholds: {
+        http_req_duration: ["p(95)<200"], // P95 < 200ms
+        http_req_failed: ["rate<0.001"],  // tasa de errores < 0.1%
+    },
+};
+
+const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
+
+export default function () {
+    const payload = {
+        numero_documento: `DNI-${__VU}-${Date.now()}`,
+        tipo_tramite: "SOLICITUD",
+        asunto: "Prueba de carga",
+    };
+    const res = http.post(`${BASE_URL}/api/expedientes`, JSON.stringify(payload), {
+        headers: { "Content-Type": "application/json" },
+    });
+    check(res, { "status es 201": (r) => r.status === 201 });
+    sleep(1);
+}
+```
+---
+7. Reproducibilidad y Autonomía
+Toda prueba de integración es 100% reproducible y autónoma, sin datos precargados manualmente.
+Cada escenario limpia el estado mediante `TRUNCATE ... CASCADE`, evitando contaminación entre ejecuciones.
+El script k6 genera datos dinámicos (`__VU`, timestamps) para evitar colisiones y dependencias de estado.
+---
+8. Criterios de Validación Cumplidos
+#	Criterio	Cumple
+1	La suite de pruebas de integración utiliza Testcontainers para levantar PostgreSQL efímero en Docker.	✅
+2	Se ejecutan automáticamente las migraciones DDL de los 6 esquemas.	✅
+3	Se definen 10 casos de prueba E2E intermodulares.	✅
+4	Se definen scripts de prueba de carga con k6 con umbrales (P95 < 200ms y errores < 0.1%).	✅
+5	Las pruebas son 100% reproducibles y autónomas.	✅
+---
+9. Dependencias y Decisiones
+Dependencia (Azareño): Los casos E2E-02, 03, 04, 08, 09 y 10 validan la especificación RFC 7807 del entregable 01.
+Dependencia (Reátegui): Los casos E2E-06 y 07 validan la bitácora y el outbox del entregable 02.
+Taxonomía: `CONFIRMADO` — requisitos de la suite y umbrales del plan; `PROPUESTO` — detalles de configuración del runner; `EJEMPLO` — datos y urls de prueba.
+---
+Documento elaborado por Zevallos (`B_ZEVALLOS`) como entregable de Fase 2 — Levantamiento de Observaciones del Grupo 6 CoreLink.
