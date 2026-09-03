@@ -1,11 +1,13 @@
 ---
-Autora: Liz / responsable de B_JACOBO
+Autora: Liz/Jacobo
+Rama responsable: B_JACOBO
 Entregable: H1
-Estado: Borrador pendiente de revisión incremental final por Geric
+Estado: Borrador pendiente de revisión final por Geric
 Fase: 2
-Versión documental: 4.0
-Commit base de revisión: 9fe0735 (y revisión incremental sobre f78041e)
-Rama: B_JACOBO
+Versión del entregable: 2.0
+Revisión del borrador: 4
+Commit base original verificado: 9fe0735
+Historial de revisiones: 9fe0735, f78041e y f0317de
 ---
 > Este documento constituye un entregable documental en revisión. No representa aprobación institucional, contrato intermodular definitivo ni implementación técnica.
 
@@ -66,22 +68,22 @@ La delegación de la máquina de estados hacia la Capa de Dominio exige la sigui
 
 | Estado de origen | Acción | Precondiciones | Datos requeridos | Validaciones del dominio | Estado resultante | Evento de dominio | Resultado del rechazo | Clasificación | Evidencia |
 | ---------------- | ------ | -------------- | ---------------- | ------------------------ | ----------------- | ----------------- | --------------------- | ------------- | --------- |
-| REGISTRADO | Derivar inicialmente | Expediente existe | Referencia externa al área destino | El área destino existe y está activa (PROPUESTO) | PENDIENTE_RECEPCION | `ExpedienteDerivado` | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| REGISTRADO | Identificar error | Expediente existe | Motivo de error | El error corresponde a una categoría tipificada (PROPUESTO) | OBSERVADO | `ExpedienteObservado` | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| OBSERVADO | Subsanar error | Dentro de plazo (PROPUESTO) | Doc. subsanado | Se aportaron los documentos requeridos en la observación (PROPUESTO) | SUBSANADO | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| OBSERVADO | Vencer plazo | Plazo expirado (PROPUESTO) | Fecha límite | Fecha actual es mayor a la fecha límite establecida (PROPUESTO) | RECHAZADO | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| SUBSANADO | Enviar a revisión | Docs completos (PROPUESTO) | Referencia externa al área destino | El área destino existe y está activa (PROPUESTO) | PENDIENTE_RECEPCION | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| PENDIENTE_RECEPCION | Confirmar llegada | Trámite en bandeja | Referencia externa al actor | El actor forma parte del área de recepción (PROPUESTO) | RECIBIDO | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| RECIBIDO | Iniciar revisión | Pertenece a área | Detalle de inicio | Capacidad de revisión (PROPUESTO) | EN_REVISION | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| EN_REVISION | Derivar (informe) | Revisión completa (PROPUESTO) | Referencia externa al área destino | El destino existe y el motivo no está vacío (PROPUESTO) | DERIVADO | `ExpedienteDerivado` | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399`, `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:57` |
-| EN_REVISION | Devolver | Causa justificada (PROPUESTO) | Referencia externa al área destino | El área destino coincide con el remitente anterior (PROPUESTO) | DEVUELTO | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| EN_REVISION | Atender | Competencia confirmada (PROPUESTO) | PENDIENTE | PENDIENTE (criterios de competencia pendientes) | EN_ATENCION | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| DERIVADO | Enviar a bandeja | PENDIENTE | PENDIENTE | PENDIENTE (Regla de envío a bandeja) | PENDIENTE_RECEPCION | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| DEVUELTO | Retornar origen | PENDIENTE | PENDIENTE | PENDIENTE (Regla de envío a bandeja) | RECIBIDO | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| EN_ATENCION | Finalizar | Preparación lista | Referencia documental externa (PENDIENTE DE CONTRATO/COORDINACIÓN CON GRUPO 5) | Resolución generada (PROPUESTO) | ATENDIDO | `ExpedienteAtendido` | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| ATENDIDO | Cerrar formalmente | Respuesta enviada (PROPUESTO) | Motivo cierre | Reglas de cierre | CERRADO | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| CERRADO | Solicitar reapertura | Autorización superior (PROPUESTO) | Motivo reapertura (PROPUESTO) | Permisos de reapertura (PROPUESTO) | REABIERTO | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| REABIERTO | Retomar evaluación | PENDIENTE | PENDIENTE | PENDIENTE (Justificación de reapertura) | EN_REVISION | Evento específico PENDIENTE | Rechazo antes de commit | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| REGISTRADO | Derivar inicialmente | Expediente existe (PROPUESTO) | Referencia externa al área destino | El área destino existe y está activa (PROPUESTO) | PENDIENTE_RECEPCION | `ExpedienteDerivado` | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| REGISTRADO | Identificar error | Expediente existe (PROPUESTO) | Motivo de error | El error corresponde a una categoría tipificada (PROPUESTO) | OBSERVADO | `ExpedienteObservado` | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| OBSERVADO | Subsanar error | Dentro de plazo (PROPUESTO) | Doc. subsanado | Se aportaron los documentos requeridos en la observación (PROPUESTO) | SUBSANADO | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| OBSERVADO | Vencer plazo | Plazo expirado (PROPUESTO) | Fecha límite | Fecha actual es mayor a la fecha límite establecida (PROPUESTO) | RECHAZADO | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| SUBSANADO | Enviar a revisión | Docs completos (PROPUESTO) | Referencia externa al área destino | El área destino existe y está activa (PROPUESTO) | PENDIENTE_RECEPCION | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| PENDIENTE_RECEPCION | Confirmar llegada | Trámite en bandeja (PROPUESTO) | Referencia externa al actor | El actor forma parte del área de recepción (PROPUESTO) | RECIBIDO | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| RECIBIDO | Iniciar revisión | Pertenece al área (PROPUESTO) | Detalle de inicio | Capacidad de revisión (PROPUESTO) | EN_REVISION | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| EN_REVISION | Derivar (informe) | Revisión completa (PROPUESTO) | Referencia externa al área destino | El destino existe y el motivo no está vacío (PROPUESTO) | DERIVADO | `ExpedienteDerivado` | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399`, `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:57` |
+| EN_REVISION | Devolver | Causa justificada (PROPUESTO) | Referencia externa al área destino | El área destino coincide con el remitente anterior (PROPUESTO) | DEVUELTO | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| EN_REVISION | Atender | Competencia confirmada (PROPUESTO) | PENDIENTE | PENDIENTE (criterios de competencia pendientes) | EN_ATENCION | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| DERIVADO | Enviar a bandeja | PENDIENTE | PENDIENTE | PENDIENTE (Regla de envío a bandeja) | PENDIENTE_RECEPCION | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| DEVUELTO | Retornar origen | PENDIENTE | PENDIENTE | PENDIENTE (Regla de envío a bandeja) | RECIBIDO | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| EN_ATENCION | Finalizar | Preparación lista (PROPUESTO) | Referencia documental externa (PENDIENTE DE CONTRATO/COORDINACIÓN CON GRUPO 5) | Resolución generada (PROPUESTO) | ATENDIDO | `ExpedienteAtendido` | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| ATENDIDO | Cerrar formalmente | Respuesta enviada (PROPUESTO) | Motivo cierre | Reglas de cierre (PROPUESTO) | CERRADO | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| CERRADO | Solicitar reapertura | Autorización superior (PROPUESTO) | Motivo reapertura (PROPUESTO) | Permisos de reapertura (PROPUESTO) | REABIERTO | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| REABIERTO | Retomar evaluación | PENDIENTE | PENDIENTE | PENDIENTE (Justificación de reapertura) | EN_REVISION | Evento específico PENDIENTE | PENDIENTE: definir causa, tipo de rechazo y respuesta de dominio | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
 
 *(Evidencia Base Adicional: `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:165`; Rol de Jacobo y State Pattern: `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:49`; State Pattern desacoplado de triggers y estandarización Outbox: `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:99-100`).*
 
@@ -99,20 +101,20 @@ La delegación de la máquina de estados hacia la Capa de Dominio exige la sigui
 
 ## 6. Validaciones Previas a la Persistencia
 
-| Validación | Naturaleza | Clasificación | Evidencia u Origen |
-| :--- | :--- | :--- | :--- |
-| Expediente existente | Integridad externa (TramiCore) | CUBIERTO DOCUMENTALMENTE / implementación PENDIENTE DE CONTRATO | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:88` |
-| Estado actual esperado | Dominio (State Pattern) | CONFIRMADO (mecanismo), catálogo PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| Acción permitida | Dominio (State Pattern) | CONFIRMADO (mecanismo), catálogo PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
-| Actor identificado | Autorización externa | CUBIERTO DOCUMENTALMENTE / implementación PENDIENTE DE CONTRATO | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:90` |
-| Existencia, vigencia, autenticación y autorización del actor | Autorización externa (Auth/IdentiCore) | PENDIENTE DE CONTRATO | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:90` |
-| Áreas requeridas (Origen/Destino) | Integridad externa (OrganiCore) | CUBIERTO DOCUMENTALMENTE / implementación PENDIENTE DE CONTRATO | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:89` |
-| Detalle compatible | Dominio | PROPUESTO | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:57-58` |
-| Presencia o nomenclatura del campo de secuencia | Integridad de persistencia | CONFIRMADO | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:484` |
-| Unicidad y correlatividad por expediente | Integridad de persistencia | PENDIENTE | Falta de evidencia directa (es una propuesta de diseño) |
-| Relaciones con movs. anteriores | Dominio | PENDIENTE | No existe evidencia directa explícita |
-| Concurrencia | Integridad de persistencia | CUBIERTO DOCUMENTALMENTE / implementación PENDIENTE | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:58` |
-| Idempotencia | Prevención duplicados en App | PROPUESTO | No existe evidencia directa explícita |
+| Validación | Naturaleza | Cobertura documental | Estado técnico | Evidencia u Origen |
+| :--- | :--- | :--- | :--- | :--- |
+| Expediente existente | Integridad externa (TramiCore) | CUBIERTO DOCUMENTALMENTE | PENDIENTE DE CONTRATO | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:88` |
+| Estado actual esperado | Dominio (State Pattern) | CONFIRMADO (mecanismo) | PENDIENTE (catálogo) | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| Acción permitida | Dominio (State Pattern) | CONFIRMADO (mecanismo) | PENDIENTE (catálogo) | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` |
+| Actor identificado | Autorización externa | CUBIERTO DOCUMENTALMENTE | PENDIENTE DE CONTRATO | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:90` |
+| Existencia, vigencia, autenticación y autorización del actor | Autorización externa (Auth/IdentiCore) | PENDIENTE | PENDIENTE DE CONTRATO | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:90` |
+| Áreas requeridas (Origen/Destino) | Integridad externa (OrganiCore) | CUBIERTO DOCUMENTALMENTE | PENDIENTE DE CONTRATO | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:89` |
+| Detalle compatible | Dominio | PROPUESTO | PROPUESTO | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:57-58` |
+| Concepto de orden o secuencia | Integridad de persistencia | PROPUESTO por el Blueprint | PENDIENTE | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:484` |
+| Nombre, tipo, asignación concurrente, locking, unicidad y garantía física | Integridad de persistencia | PENDIENTE | PENDIENTE | Falta de evidencia directa |
+| Relaciones con movs. anteriores | Dominio | PENDIENTE | PENDIENTE | No existe evidencia directa explícita |
+| Concurrencia | Integridad de persistencia | CUBIERTO DOCUMENTALMENTE | PENDIENTE | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:58` |
+| Idempotencia | Prevención duplicados en App | PROPUESTO | PENDIENTE | No existe evidencia directa explícita |
 
 ## 7. Proyección de Estado Actual
 * **v1:** Actualización delegada a triggers masivos.
@@ -129,6 +131,11 @@ Se delimitan los aspectos técnicos del Outbox para RutaDoc:
 * **Nombres físicos exactos del evento:** PENDIENTE DE ACLARACIÓN (Plan y Blueprint difieren; no hay estándar canónico confirmado por CoreLink).
 * **Campos conceptuales mínimos:** EJEMPLO NO CONTRACTUAL.
 * **Consumidores:** PENDIENTE DE CONTRATO.
+* **Asincronía y atomicidad:**
+  1. Inmutabilidad del historial.
+  2. Atomicidad conceptual (el historial y el evento se registran transaccionalmente).
+  3. Registro Outbox sujeto al contrato del Grupo 6.
+  4. Despacho y consumo asíncronos posteriores.
 * **Infraestructura y publicación:** PENDIENTE DE CONTRATO CON GRUPO 6 (ownership, esquema físico, infraestructura, worker, colas, reintentos, publicación, formato final del payload, campos obligatorios, contrato).
 
 > **ADVERTENCIA:** Todos los JSON presentados a continuación (incluyendo nombres de campos, estructura, UUID, `correlation_id`, `idempotency_key`, timestamps, nombres físicos, metadatos, tipos, y estructuras de contexto/datos específicos) son un **EJEMPLO NO CONTRACTUAL**. El contrato definitivo depende de coordinación intermodular.
@@ -200,15 +207,15 @@ Se delimitan los aspectos técnicos del Outbox para RutaDoc:
 ```
 
 ## 9. Concurrencia e Idempotencia (Casos de Prueba Documentales)
-Diferenciación conceptual (`PENDIENTE` hasta validar contratos):
-* **`correlation_id`**: Usado exclusivamente para la trazabilidad entre operaciones y eventos.
-* **`idempotency_key`**: Usado para la prevención de procesamiento duplicado.
+Diferenciación conceptual (semántica PROPUESTA):
+* **`correlation_id`** e **`idempotency_key`**: Usados conceptualmente para trazabilidad y prevención de duplicados.
+* **PENDIENTES**: nombre definitivo, tipo, generador, propietario, alcance, unicidad, persistencia, contrato físico, implementación y pruebas.
 
 ### Diseño Documental de Concurrencia
 
-| ID | Escenario | Precondiciones | Operación A | Operación B | Riesgo | Resultado esperado con ruta única | Alternativa con rutas paralelas | Clasificación | Evidencia |
-| -- | --------- | -------------- | ----------- | ----------- | ------ | --------------------------------- | ------------------------------- | ------------- | --------- |
-| 1 | Dos derivaciones simultáneas del mismo expediente hacia áreas diferentes. | Expediente activo y con origen válido | Derivar a Área X | Derivar a Área Y | Estado inconsistente o doble enrutamiento no autorizado | Se aprueba solo una ruta; la otra se rechaza o reintenta por estado obsoleto | Ambas se aceptan bajo reglas funcionales concurrentes | CUBIERTO DOCUMENTALMENTE / implementación PENDIENTE | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:58` |
+| ID | Escenario | Precondiciones | Operación A | Operación B | Riesgo | Resultado esperado con ruta única | Alternativa con rutas paralelas | Cobertura documental | Estado técnico | Evidencia |
+| -- | --------- | -------------- | ----------- | ----------- | ------ | --------------------------------- | ------------------------------- | -------------------- | -------------- | --------- |
+| 1 | Dos derivaciones simultáneas del mismo expediente hacia áreas diferentes. | Expediente activo y con origen válido (PROPUESTO) | Derivar a Área X | Derivar a Área Y | Estado inconsistente o doble enrutamiento no autorizado | Se aprueba solo una ruta; la otra se rechaza o reintenta por estado obsoleto | Ambas se aceptan bajo reglas funcionales concurrentes | CUBIERTO DOCUMENTALMENTE | PENDIENTE | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:58` |
 
 *(Nota: Este es exclusivamente el diseño documental conceptual. NO están confirmados todavía: política final, locking, comportamiento concurrente, reintentos, paralelismo permitido, implementación PostgreSQL, ni resultado de pruebas).*
 
@@ -227,8 +234,8 @@ Diferenciación conceptual (`PENDIENTE` hasta validar contratos):
 * Estructuras conceptuales de JSON para eventos Outbox (EJEMPLO NO CONTRACTUAL).
 
 ### Preguntas para el profesor (Revisión de Arquitectura)
-1. **Catálogo de estados:** ¿Debe primar la lista de 10 estados descritos textualmente en el plan o los 13 visibles explícitamente en el diagrama del Blueprint?
-2. **Catálogo de transiciones:** ¿Cómo conciliamos las 13 transiciones para modelar del plan frente a las 16 (19 flechas) del Blueprint?
+1. **Catálogo de estados:** ¿Debe primar la lista de 10 estados descritos textualmente en el plan o los 13 estados inferidos no contractualmente mediante conteo de nodos del diagrama del Blueprint?
+2. **Catálogo de transiciones:** ¿Cómo conciliamos las 13 transiciones textuales para modelar del plan frente a las 16 aristas estado→estado inferidas no contractualmente; 19 flechas totales si se incluyen la inicial y las terminales?
 3. **Convención de identificadores:** ¿Cuál será el estándar canónico final físico para evitar ambigüedades en las FKs?
 4. **Autoridad de la proyección:** ¿Quién realizará físicamente la actualización de proyecciones para evitar conflictos entre triggers e inserciones manuales en TS?
 5. **Derivaciones paralelas:** ¿Se permitirá funcionalmente derivar un expediente a múltiples áreas simultáneamente?
@@ -243,4 +250,4 @@ Diferenciación conceptual (`PENDIENTE` hasta validar contratos):
 | **Blueprint** | Incorporación del State Pattern | Sección 4 | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:165` | CUBIERTO DOCUMENTALMENTE |
 | **Blueprint** | Diagrama de transiciones y estados | Sección 3 y 4 | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md:369-399` | CUBIERTO DOCUMENTALMENTE |
 | **Portal Maestro** | Ubicación del artefacto v1 | Sección 2 y 3 | `backend/docs/README.md:60` | CUBIERTO DOCUMENTALMENTE |
-| **Plan específico de RutaDoc** | Integración asíncrona Outbox e historial | Sección 7 y 8 | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:30` | CUBIERTO DOCUMENTALMENTE |
+| **Plan específico de RutaDoc** | Persistencia transaccional del historial y despacho/consumo asíncrono mediante Outbox | Sección 7 y 8 | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md:30` | CUBIERTO DOCUMENTALMENTE |
