@@ -1,0 +1,95 @@
+Especificación del Middleware RFC 7807 y AsyncLocalStorage
+
+Especificación técnica del Middleware Global de Manejo de Errores RFC 7807/RFC 9457 y 
+arquitectura de contexto con AsyncLocalStorage para el Sistema Integral de Gestión Documentaria (SIGD).
+
+Definir y documentar la solución técnica para el manejo centralizado de errores, la trazabilidad
+de las solicitudes y la obtención automática del contexto del usuario dentro del backend del Sistema Integral de Gestión Documentaria (SIGD).
+El objetivo es que todos los módulos del backend utilicen un mismo mecanismo para responder ante errores y
+registrar información de las operaciones realizadas, evitando implementaciones diferentes en cada módulo.
+
+
+Al finalizar los cuatro días se espera contar con:
+
+Especificación del Middleware Global de Errores RFC 7807/RFC 9457.
+Jerarquía de excepciones de dominio en TypeScript.
+Matriz de mapeo de errores PostgreSQL → códigos HTTP.
+Ejemplos de respuestas JSON estandarizadas.
+Diseño de RequestContext mediante AsyncLocalStorage.
+Definición de los datos de trazabilidad: correlation_id, usuario_id, ip_origen y user_agent.
+Definición de la integración con el sistema de auditoría.
+Documento técnico final revisado por Duque y Reátegui.
+Criterios de validación
+
+El H1 se considerará completado cuando:
+
+Todos los errores del backend tengan una estructura de respuesta uniforme.
+
+No se expongan Stack Traces, contraseñas, tokens ni información interna de PostgreSQL en producción.
+Los errores de PostgreSQL y Zod estén correctamente identificados y mapeados.
+Cada solicitud pueda ser identificada mediante un correlation_id.
+El contexto pueda ser consultado desde cualquier capa de la aplicación sin modificar innecesariamente las firmas de los métodos.
+La información necesaria para la auditoría pueda obtenerse automáticamente.
+La documentación quede lista para que el equipo pueda continuar con la implementación e integración.
+
+| 1 |Definir jerarquía de errores**        |Establecer las clases `AppError`, `DomainError`, `NotFoundError`,`ConflictError`, `UnauthorizedError` y `ValidationError`.|
+| 2 | **Integrar AsyncLocalStorage**       | Definir cómo se obtiene y conserva el contexto de la solicitud para asociar el `correlation_id` con el error generado.    |
+| 3 | **Definir formato RFC 7807/RFC 9457**| Establecer los campos `type`, `title`, `status`, `detail`, `instance`, `code`, `correlation_id` e `invalid_params`.       |
+| 4 | **Diseñar Middleware Global**        | Definir el Middleware encargado de interceptar las excepciones generadas por los controladores, servicios y repositorios. |
+| 5 | **Capturar errores PostgreSQL**      | Identificar códigos como `23505`, `23503` y `P0001` y establecer su correspondiente respuesta HTTP.                       |
+| 6 | **Capturar errores Zod**             | Convertir los errores de validación de Zod en una respuesta estructurada, incluyendo los campos que no cumplen las reglas.|
+| 7 | **Documentar ejemplos**              | Elaborar ejemplos de respuestas para errores de PostgreSQL, Zod y errores propios del dominio.                            |
+| 8 | **Validar la especificación**        | Comprobar que los errores sean capturados correctamente y que las respuestas cumplan con el formato establecido.          |
+
+ANTE UN REGISTRO DUPLICADO EN PostgreSQL:
+
+</> JSON
+
+{
+  "type": "https://sigd.edu.pe/errors/conflict",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "El documento ya se encuentra registrado.",
+  "instance": "/api/documentos",
+  "code": "DOCUMENT_ALREADY_EXISTS",
+  "correlation_id": "8f4c2a10-7b21-4d55",
+  "invalid_params": []
+}
+
+El codigo error de registro duplicado JSON: Sirven para mostrar cómo el Middleware devuelve los errores 
+al usuario usando RFC 7807 / RFC 9457.
+Sirve para: indicar que el usuario intentó registrar algo que ya existe, así PostgreSQL informa qué
+ocurrió → Middleware interpreta el error → RFC 7807/RFC 9457 define cómo comunicarlo.
+
+ANTE UNA VALIDACION DE Zod:
+
+</> JSON
+
+{
+  "type": "https://sigd.edu.pe/errors/validation",
+  "title": "Validation Error",
+  "status": 400,
+  "detail": "Los datos enviados no son válidos.",
+  "instance": "/api/documentos",
+  "code": "VALIDATION_ERROR",
+  "correlation_id": "8f4c2a10-7b21-4d55",
+  "invalid_params": [
+    {
+      "name": "numero_documento",
+      "reason": "El campo es obligatorio."
+    }
+  ]
+}
+
+Sirve para: indicar que los datos enviados por el usuario no cumplen las reglas de validación:
+
+Ejemplo:
+
+Nombre vacío.
+DNI con formato incorrecto.
+Correo inválido.
+Campo obligatorio faltante.
+
+El Middleware Global permite centralizar el manejo de errores de PostgreSQL y Zod, convirtiéndolos en respuestas
+estandarizadas mediante RFC 7807/RFC 9457. Esto mejora la seguridad, la trazabilidad y la comunicación entre el
+backend y los usuarios del sistema.
