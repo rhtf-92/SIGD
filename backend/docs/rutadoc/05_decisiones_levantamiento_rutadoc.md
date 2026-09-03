@@ -65,7 +65,7 @@ Cada registro incluye identificador, estado, contexto, alternativas, decisión o
 | Estado | **PROPUESTO** |
 | Contexto | El v1 propone rectificar sin reescribir el movimiento original. |
 | Alternativas | Modificar el hecho original; nuevo movimiento sin vínculo; nuevo movimiento relacionado. |
-| Decisión o pregunta | Representar preliminarmente una rectificación mediante un nuevo movimiento relacionado. Su semántica, causales y autorización oficial siguen **PENDIENTES** del análisis de Jacobo/Liz y de validación institucional. |
+| Decisión o pregunta | Representar preliminarmente una rectificación mediante un nuevo movimiento relacionado. H1 no cierra esta regla; su semántica, causales y autorización oficial siguen **PENDIENTES** de validación institucional. |
 | Responsable | Geric documenta la propuesta; Jacobo/Liz aporta el análisis funcional. |
 | Impacto | Preserva evidencia, pero condiciona relaciones, dominio y permisos. |
 | Evidencia | `backend/docs/rutadoc/02_modelo_datos_trazabilidad.md`, secciones 5.9 y 10; `backend/docs/rutadoc/05_decisiones_y_preguntas_pendientes.md`, secciones 3 y 6. |
@@ -75,12 +75,12 @@ Cada registro incluye identificador, estado, contexto, alternativas, decisión o
 | Campo | Registro |
 | --- | --- |
 | Estado | **PENDIENTE** |
-| Contexto | El v1 enumera 10 estados de **EJEMPLO** y 13 acciones de **EJEMPLO**. El plan específico es la única fuente revisada que localiza una cifra objetivo: 10 estados y 13 transiciones. Acción y transición no son equivalentes. Una afirmación preliminar distinta fue descartada porque no apareció en ninguna fuente revisada. |
-| Alternativas | Usar provisionalmente el conteo textual del plan específico; o solicitar su corrección si el análisis funcional demuestra otro conteo. No existe una segunda cifra respaldada que pueda tratarse como alternativa de diseño. |
-| Decisión o pregunta | ¿Cuáles son los nombres y correspondencias de los 10 estados y las 13 transiciones? No se fija catálogo, seed, enum ni restricción definitiva hasta recibir y revisar el análisis de Jacobo/Liz. |
-| Responsable | Jacobo/Liz prepara el análisis; Geric consolida; validación institucional pendiente. |
+| Contexto | El v1 enumera 10 estados de **EJEMPLO** y 13 acciones de **EJEMPLO**; acción y transición no son equivalentes. El plan específico contiene la única cifra textual explícita: 10 estados y 13 transiciones. H1 obtiene 13 estados y 16 aristas estado→estado como **INFERENCIA NO CONTRACTUAL** reproducible mediante conteo del diagrama del Blueprint; al añadir una flecha inicial y dos terminales resultan 19 flechas totales. |
+| Alternativas | Usar provisionalmente la cifra textual 10/13; considerar el conteo inferido 13/16 únicamente como evidencia para aclaración; o solicitar validación institucional de una matriz reconciliada. La inferencia no constituye catálogo oficial, contractual ni aprobado. |
+| Decisión o pregunta | H1 fue recibido, revisado e integrado; la reconciliación entre las fuentes permanece **PENDIENTE DE ACLARACIÓN**. No trasladar automáticamente 13/16 a seeds, enums, `CHECK`, tablas, DDL o TypeScript. Los nombres y correspondencias institucionales continúan pendientes. |
+| Responsable | Jacobo/Liz entregó H1; Geric lo revisó e integró; reconciliación institucional pendiente. |
 | Impacto | Afecta estados, acciones, transiciones, pruebas, API y migraciones. |
-| Evidencia | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md`, sección 2, punto 1 “Desacoplamiento de la Máquina de Estados”; `backend/docs/rutadoc/02_diccionario_datos_trazabilidad.md`, secciones 7.1 y 7.2. No se encontró otra cifra en los documentos revisados. |
+| Evidencia | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md`, sección 2, punto 1 “Desacoplamiento de la Máquina de Estados”; `backend/docs/rutadoc/02_diccionario_datos_trazabilidad.md`, secciones 7.1 y 7.2; H1 integrado `backend/docs/rutadoc/01_analisis_dominio_transiciones_rutadoc.md`, commit `8934c54`, merge `ade5e03`, PR `#71`. |
 
 ### RUT-DEC-005 — Límites y esquema de RutaDoc
 
@@ -198,7 +198,7 @@ Cada registro incluye identificador, estado, contexto, alternativas, decisión o
 | Contexto | El plan rector propone `sigd_audit`/CoreLink como ubicación arquitectónica de Outbox, pero no existe todavía contrato intergrupal confirmado. |
 | Alternativas | RutaDoc crea su Outbox; tabla compartida sin dueño; CoreLink propietario con contrato de escritura/publicación. |
 | Decisión o pregunta | Confirmar ownership, payload, versionado, correlación, idempotencia, estados, permisos y escritura transaccional. RutaDoc solo modela su relación conceptual como productor y no fija campos concretos. |
-| Responsable | Grupo 6 confirma el contrato; Jacobo/Liz define la propuesta funcional de eventos; Geric consolida la dependencia y revisa su integración. |
+| Responsable | Grupo 6 confirma el contrato; Jacobo/Liz entregó en H1 la propuesta funcional no contractual de eventos; Geric consolida la dependencia y revisa su integración. |
 | Impacto | Atomicidad, integración, reintentos, auditoría y despliegue. |
 | Evidencia | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md`, sección 5.2, relaciona `MOVIMIENTO_TRAMITE` con `EVENTO_OUTBOX`, y sección 5.8 presenta `sigd_audit` (CoreLink) con `evento_outbox` como arquitectura propuesta; plan específico, sección 7, mantiene pendiente el contrato de payload. |
 
@@ -257,7 +257,7 @@ Cada registro incluye identificador, estado, contexto, alternativas, decisión o
 | Estado | **CONFIRMADO** |
 | Contexto | Los tres documentos son borradores previos a entregas y contratos. |
 | Alternativas | Declarar actividad terminada por existencia de archivos; mantener estado de borrador trazable. |
-| Decisión o pregunta | No se marca ninguna actividad como terminada. La consolidación requiere revisión de Geric, entregables de Jacobo/Liz y Jhasy, contratos externos y evidencia de validación. |
+| Decisión o pregunta | H1 fue recibido, revisado, aprobado documentalmente para integración e integrado mediante PR `#71`. Esto no aprueba un catálogo institucional ni acredita implementación. H3 de Jhasy, los contratos externos, la reconciliación funcional y las pruebas permanecen **PENDIENTES**. |
 | Responsable | Geric. |
 | Impacto | Evita presentar diseño documental como implementación verificada. |
 | Evidencia | Instrucción expresa de Geric; plan específico, sección 8 “Lista de verificación para la entrega del levantamiento de observaciones”, cuyos criterios permanecen sin marcar. |
@@ -266,7 +266,7 @@ Cada registro incluye identificador, estado, contexto, alternativas, decisión o
 
 ### 3.1 Jacobo/Liz
 
-- **PENDIENTE:** entregar el análisis actualizado de flujo, acciones, estados y transiciones.
+- **CONFIRMADO:** H1 documental entregado e integrado mediante commit `8934c54`, merge `ade5e03` y PR `#71`; sus dieciséis filas son candidatos documentales, no catálogo institucional definitivo.
 - **PENDIENTE:** definir nombres y correspondencia de los 10 estados y 13 transiciones indicados por el plan específico, distinguiéndolos de las 13 acciones de ejemplo del v1.
 - **PENDIENTE:** definir si recepción manual, devolución, cierre, reapertura y rutas paralelas son reglas o ejemplos.
 
@@ -288,7 +288,36 @@ Cada registro incluye identificador, estado, contexto, alternativas, decisión o
 | Grupo 5 | Documento y versión contemplados en v1, sin nombres ni tipos contractuales fijados. | Confirmar si el vínculo continúa en Fase 2, sus identificadores, versiones y acceso histórico. |
 | Grupo 6 | Ownership de `sigd_audit.evento_outbox` y payload. | Escritura atómica, versión, correlación, idempotencia, publicación y reintentos. |
 
-## 4. Evidencias que faltan para cerrar decisiones
+## 4. Traspaso controlado a H3 — Jhasy
+
+“Listo para prototipo” significa que existe base documental suficiente para experimentar y producir evidencia en un entorno desechable; no significa aprobación para producción, contrato definitivo ni actividad terminada.
+
+### 4.1 LISTO PARA PROTOTIPO
+
+- Esquema local `sigd_rut` y tablas exclusivamente propiedad de RutaDoc.
+- PK y FK locales, sujetas a validación física y sin extender contratos a otros dominios.
+- Particiones experimentales 2026–2027 y prueba de un expediente que cruce ambos años.
+- Defensa de inmutabilidad del historial.
+- Instalación y rollback reproducibles en un entorno desechable.
+- Evaluación de B-Tree y BRIN mediante mediciones y planes de ejecución.
+
+### 4.2 REQUIERE EVALUACIÓN EN H3
+
+- Secuencia por expediente e idempotencia global.
+- Advisory lock existente y sus alternativas.
+- Mecanismo único de actualización de la proyección oficial.
+- Permanencia de las entidades marcadas como revisables.
+- Triggers mínimos justificables mediante invariantes y pruebas.
+
+### 4.3 NO FIJAR TODAVÍA
+
+- Seeds definitivos de estados y transiciones.
+- FK externas o tipos externos contractuales.
+- Contrato físico Outbox o payload definitivo.
+- Política de rutas paralelas.
+- Reglas institucionales no confirmadas, incluidas recepción, devolución, cierre, reapertura y rectificación.
+
+## 5. Evidencias que faltan para cerrar decisiones
 
 1. PR o commit identificable de cada entregable de Fase 2.
 2. Matriz reconciliada y revisada, no solo conteos.

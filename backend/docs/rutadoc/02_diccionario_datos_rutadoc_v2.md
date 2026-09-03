@@ -52,7 +52,7 @@ Propiedad: RutaDoc. Clasificación: historial interno y datos técnicos. Partici
 | `id_expediente` | `UUID` | NOT NULL | Grupo 2 / EXTERNA | Agrupa el historial del expediente. | **PENDIENTE DE CONTRATO**; sin FK. |
 | `secuencia` | `BIGINT` | NOT NULL | RutaDoc / INTERNA | Orden monotónico por expediente. | **PROPUESTO**; asignación concurrente **PENDIENTE**. |
 | `accion_tramite_id` | `UUID` | NOT NULL | RutaDoc / INTERNA | Acción que clasifica el hecho. | FK local **PROPUESTA**. |
-| `transicion_estado_tramite_id` | `UUID` | NULL | RutaDoc / INTERNA | Regla de transición aplicada. | Nulabilidad **PENDIENTE** de Jacobo/Liz. |
+| `transicion_estado_tramite_id` | `UUID` | NULL | RutaDoc / INTERNA | Regla de transición aplicada. | H1 aporta candidatos no contractuales; nulabilidad y persistencia definitivas **PENDIENTES** de reconciliación funcional y diseño físico. |
 | `estado_anterior_id` | `UUID` | NULL | RutaDoc / INTERNA | Estado previo. | Nulo solo para inicio si se confirma. |
 | `estado_resultante_id` | `UUID` | NOT NULL | RutaDoc / INTERNA | Estado producido. | FK local **PROPUESTA**. |
 | `id_usuario_actor` | `UUID` | NULL | Grupo 4 / EXTERNA | Actor que ejecuta el movimiento. | **PENDIENTE DE CONTRATO** y excepciones de eventos externos. |
@@ -77,7 +77,7 @@ Restricciones e índices:
 
 ### 3.2 `sigd_rut.accion_tramite`
 
-Propiedad: RutaDoc. Catálogo **PROPUESTO**; valores **PENDIENTES** de Jacobo/Liz.
+Propiedad: RutaDoc. Catálogo **PROPUESTO**; H1 aporta candidatos no contractuales y los valores institucionales permanecen **PENDIENTES** de reconciliación.
 
 | Columna | Tipo | Nulabilidad | Propósito | Regla |
 | --- | --- | --- | --- | --- |
@@ -97,7 +97,7 @@ Propiedad: RutaDoc. No se incorpora una lista definitiva de estados.
 | --- | --- | --- | --- | --- |
 | `estado_tramite_id` | `UUID` | NOT NULL | Identidad interna. | PK **PROPUESTA**. |
 | `codigo` | `VARCHAR(50)` | NOT NULL | Código estable. | UNIQUE **PROPUESTA**. |
-| `nombre` | `VARCHAR(100)` | NOT NULL | Denominación visible. | **PENDIENTE** de Jacobo/Liz. |
+| `nombre` | `VARCHAR(100)` | NOT NULL | Denominación visible. | H1 aporta nombres candidatos no contractuales; nombre institucional, tipo y restricción definitivos **PENDIENTES**. |
 | `descripcion` | `TEXT` | NOT NULL | Semántica funcional. | **PENDIENTE**. |
 | `es_terminal` | `BOOLEAN` | NOT NULL | Indica terminalidad. | DEFAULT `FALSE` **PROPUESTO**; reglas **PENDIENTES**. |
 | `activo` | `BOOLEAN` | NOT NULL | Admisión futura. | DEFAULT `TRUE` **PROPUESTO**. |
@@ -106,7 +106,7 @@ Propiedad: RutaDoc. No se incorpora una lista definitiva de estados.
 
 ### 3.4 `sigd_rut.transicion_estado_tramite`
 
-Propiedad propuesta: RutaDoc. Entidad **REVISABLE** ante el traslado de reglas al dominio TypeScript. Contenido de la matriz: **PENDIENTE** del análisis de Jacobo/Liz.
+Propiedad propuesta: RutaDoc. Entidad **REVISABLE** ante el traslado de reglas al dominio TypeScript. La matriz H1 está disponible con dieciséis filas candidatas; su persistencia, correspondencia y contenido institucional permanecen **PENDIENTES** de reconciliación y diseño físico.
 
 | Columna | Tipo | Nulabilidad | Propósito | Regla |
 | --- | --- | --- | --- | --- |
@@ -285,7 +285,7 @@ No se oculta la limitación: la unicidad global de `movimiento_id`, secuencia e 
 
 ## 8. Evidencia pendiente para aprobar este diccionario
 
-- entrega de la matriz y análisis v2 de Jacobo/Liz;
+- H1 recibido e integrado; catálogo, correspondencia institucional y persistencia de la matriz todavía **PENDIENTES**;
 - decisión de Jhasy sobre PK, particiones, bloqueos, triggers e idempotencia;
 - DDL separado y pruebas de instalación, rollback, integridad y concurrencia;
 - prueba de secuencia e idempotencia con un expediente que cruce las particiones 2026 y 2027;

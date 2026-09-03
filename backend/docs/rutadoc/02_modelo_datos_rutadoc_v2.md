@@ -27,7 +27,7 @@ Este documento prepara el modelo de datos v2 de RutaDoc sin implementar DDL ni c
 | `backend/docs/README.md` | Portal, reglas documentales y rutas de planes. | **CONFIRMADO** como índice documental. |
 | `backend/docs/levantamiento_de_observaciones/01_plan_levantamiento_observaciones_grupo_1_rutadoc.md` | Actividades, responsables y entregables de RutaDoc. | **CONFIRMADO** como plan específico. |
 | Archivos v1 de `backend/docs/rutadoc/` | Línea base funcional, modelo, diccionario, SQL provisional, pruebas y decisiones. | **CONFIRMADO** como evidencia histórica; no se sobrescriben. |
-| Análisis de Jacobo/Liz para Fase 2 | Propuesta funcional de estados, acciones, transiciones, reglas y flujo actualizado. | **PENDIENTE** de entrega y revisión; los nombres definitivos no se anticipan. |
+| H1 de Jacobo/Liz para Fase 2 | Propuesta funcional de estados, acciones, transiciones, reglas y flujo actualizado. | **CONFIRMADO** como entregado, revisado e integrado en `B_GERIC` mediante PR `#71`, commit H1 `8934c54` y merge `ade5e03`. Sus dieciséis filas son candidatos documentales; la reconciliación y el catálogo institucional permanecen **PENDIENTES**. |
 | Implementación y pruebas de Jhasy | Verificación física del diseño. | **PENDIENTE**; no se implementan aquí. |
 
 ## 3. Límites del dominio RutaDoc
@@ -90,7 +90,7 @@ Este documento prepara el modelo de datos v2 de RutaDoc sin implementar DDL ni c
 | `id_expediente UUID` | Referencia a TramiCore. | **PENDIENTE DE CONTRATO**. |
 | `secuencia BIGINT` | Orden inequívoco por expediente. | **PROPUESTO**; asignación concurrente **PENDIENTE** de Jhasy. |
 | `accion_tramite_id UUID` | Acción local. | **PROPUESTO**. |
-| `transicion_estado_tramite_id UUID` | Regla aplicada. | **PENDIENTE** de la matriz de Jacobo/Liz. |
+| `transicion_estado_tramite_id UUID` | Regla aplicada. | Matriz H1 recibida; persistencia y conservación de `transicion_estado_tramite` **PENDIENTES** de reconciliación y decisión de diseño. |
 | `estado_anterior_id UUID` | Estado previo; nulo solo en inicio admitido. | **PENDIENTE** de la matriz. |
 | `estado_resultante_id UUID` | Estado producido. | **PROPUESTO**; valores **PENDIENTES**. |
 | `id_usuario_actor UUID` | Actor externo de IdentiCore. | **PENDIENTE DE CONTRATO**. |
@@ -138,7 +138,7 @@ Invariantes propuestos:
 
 **PROPUESTO:** una rectificación se representa creando un nuevo movimiento relacionado, sin alterar el original.
 
-**PENDIENTE:** la semántica, las causales y la autorización oficial de rectificación deben proceder del análisis de Jacobo/Liz y de validación institucional.
+**PENDIENTE:** H1 no cierra la rectificación; su semántica, causales y autorización oficial requieren validación institucional.
 
 **PROPUESTO:** defensa en capas:
 
@@ -201,7 +201,7 @@ No se implementa TypeScript en este avance. La correspondencia esperada es:
 
 **PROPUESTO:** un caso de uso RutaDoc produce una intención de evento en la misma transacción cuando el contrato lo permita. No se fijan aquí campos ni estructura del payload.
 
-**PENDIENTE DE CONTRATO:** ownership definitivo, nombres, obligatoriedad, esquema JSON, versionado, correlación, idempotencia, estados de publicación y procedimiento de escritura. Jacobo/Liz define la propuesta funcional de eventos y el Grupo 6 confirma el contrato. RutaDoc no define la tabla ni presupone una FK hacia ella.
+**PENDIENTE DE CONTRATO:** ownership definitivo, nombres, obligatoriedad, esquema JSON, versionado, correlación, idempotencia, estados de publicación y procedimiento de escritura. H1 aporta la propuesta funcional no contractual de eventos; el Grupo 6 confirma el contrato. RutaDoc no define la tabla ni presupone una FK hacia ella.
 
 ## 12. Matriz de diferencias v1–v2
 
@@ -213,7 +213,7 @@ No se implementa TypeScript en este avance. La correspondencia esperada es:
 | Partición | No existe. | Rango anual 2026–2027 por `fecha_hora`. | **PROPUESTO**. |
 | PK del movimiento | `movimiento_id BIGINT`. | Identidad UUID y candidata a clave física compatible con partición. | **PENDIENTE** de validación física. |
 | Estado actual | Trigger de actualización en v1. | Servicio o trigger mínimo, ambos dentro de la misma transacción. | Mecanismo **PENDIENTE**. |
-| Estados/transiciones | 10 estados de ejemplo y 13 acciones; SQL prueba una matriz provisional. | No se fija catálogo hasta recibir análisis Jacobo/Liz. | **PENDIENTE**. |
+| Estados/transiciones | 10 estados de ejemplo y 13 acciones; SQL prueba una matriz provisional. | H1 aporta dieciséis filas candidatas derivadas de una inferencia no contractual del Blueprint; no se fija catálogo institucional. | **PENDIENTE** de reconciliación. |
 | Concurrencia | Advisory lock por hash de expediente. | Evaluación real y alternativas en decisiones. | **PENDIENTE** de pruebas de Jhasy. |
 | Índices | B-Tree básicos. | B-Tree por acceso y BRIN temporal condicionado a evidencia. | **PROPUESTO**. |
 | Idempotencia/correlación | Clave textual de idempotencia; sin correlación. | Invariancias y tipos todavía por definir. | **PENDIENTE**. |
@@ -224,7 +224,7 @@ No se implementa TypeScript en este avance. La correspondencia esperada es:
 | Elemento | Estado | Riesgo y tratamiento |
 | --- | --- | --- |
 | Liz y Jacobo son la misma integrante. | **CONFIRMADO** como aclaración organizativa proporcionada por Geric el 2026-09-02; no es un hecho demostrado por Git. | Se conserva la autoría histórica; la aclaración se registra en decisiones. |
-| Matriz de estados y transiciones. | **PENDIENTE** de Jacobo/Liz. | No generar seeds, `CHECK` ni enums definitivos. |
+| Matriz de estados y transiciones. | H1 **CONFIRMADO** como recibido e integrado; valores y catálogo definitivo **PENDIENTES**. | No generar seeds, `CHECK` ni enums definitivos. |
 | DDL, restricciones, índices y pruebas físicas. | **PENDIENTE** de Jhasy. | Este modelo no se considera implementado. |
 | Contratos UUID de Grupos 2, 3 y 4. | **PENDIENTE DE CONTRATO**. | No declarar FK físicas externas. |
 | Ownership de Outbox y payload de Grupo 6. | **PENDIENTE DE CONTRATO**. | `sigd_audit`/CoreLink es arquitectura propuesta; RutaDoc no crea la tabla. |
@@ -235,4 +235,4 @@ No se implementa TypeScript en este avance. La correspondencia esperada es:
 
 ## 14. Criterio de consolidación
 
-Este borrador no acredita actividad terminada. Podrá consolidarse cuando existan: análisis v2 de Jacobo/Liz; decisión y pruebas físicas de Jhasy; contratos de los grupos propietarios; trazabilidad de cambios frente a v1; y evidencia de pruebas de integridad, concurrencia, particionado, rendimiento y recuperación.
+Este borrador no acredita actividad terminada. H1 fue recibido, revisado e integrado, pero la consolidación técnica requiere todavía: reconciliación institucional de estados y transiciones; decisión y pruebas físicas de Jhasy; contratos de los grupos propietarios; decisión final sobre entidades revisables; trazabilidad de cambios frente a v1; y evidencia de pruebas de integridad, concurrencia, particionado, rendimiento y recuperación.
