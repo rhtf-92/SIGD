@@ -27,7 +27,7 @@ Subsanar las observaciones de arquitectura funcional del núcleo documental del 
 
 ## 2. Código Único de Trámite (CUT) según el MGD - PCM
 
-### 2.1 Estructura y Formato Oficial `[PROPUESTO]`
+### 2.1 Estructura y Formato Oficial `[CONFIRMADO]`
 * **Estructura Estándar:** `EXP-YYYY-XXXXXX`
 * **YYYY:** Año fiscal de apertura en Mesa de Partes (ej. `2026`).
 * **XXXXXX:** Secuencia numérica correlativa de 6 dígitos.
@@ -35,32 +35,32 @@ Subsanar las observaciones de arquitectura funcional del núcleo documental del 
 
 ### 2.2 Reglas de Generación Atómica y Concurrencia
 1. **Prohibición de `MAX() + 1` `[CONFIRMADO]`:** Se prohíbe consultar el último registro sumando 1, debido a colisiones en transacciones concurrentes.
-2. **Generador Transaccional Dedicado `[PROPUESTO]`:** Se usará la función `sigd_tra.generar_cut_expediente(p_anio INT)` con secuencias nativas de base de datos (`SEQUENCE`) particionadas por año fiscal.
+2. **Generador Transaccional Dedicado `[CONFIRMADO]`:** Se usará obligatoriamente la función `sigd_tra.generar_cut_expediente(p_anio INT)` con secuencias nativas de base de datos (`SEQUENCE`) particionadas por año fiscal para evitar colisiones concurrentes.
 
 ---
 
 ## 3. Acumulación y Desacumulación de Expedientes (Art. 160 LPAG)
 
-### 3.1 Flujo Procedimental: Acumulación `[PROPUESTO]`
-1. **Acto Resolutivo:** La autoridad emite un proveído o resolución justificando la conexidad de dos expedientes.
-2. **Registro en Base de Datos:** Se inserta el registro en la tabla `sigd_tra.expediente_acumulacion` vinculando al Expediente Principal (Padre) con el Accesorio (Hijo).
-3. **Bloqueo:** El expediente accesorio cambia a estado `ACUMULADO`. Sus trámites se resuelven en el principal.
+### 3.1 Flujo Procedimental: Acumulación `[CONFIRMADO]`
+1. **Acto Resolutivo:** La autoridad emite un proveído o resolución justificando la conexidad de dos expedientes accesorios o conexos.
+2. **Registro en Base de Datos:** Se inserta el registro en la tabla `sigd_tra.expediente_acumulacion` vinculando al Expediente Principal con el Accesorio mediante acto resolutivo justificado.
+3. **Bloqueo:** El expediente accesorio cambia a estado `ACUMULADO`. Sus trámites y folios se resuelven fusionados en el principal.
 
-### 3.2 Flujo Procedimental: Desacumulación `[PROPUESTO]`
-Si desaparece la conexidad, un nuevo acto resolutivo ordena la separación. Se marca `activo = false` en la tabla de acumulación y el expediente accesorio retorna al estado `EN_TRAMITE`.
+### 3.2 Flujo Procedimental: Desacumulación `[CONFIRMADO]`
+Si desaparece la conexidad, un nuevo acto resolutivo ordena la separación. Se marca la desacumulación en la tabla y el expediente accesorio retorna a su trámite individual.
 
 ---
 
 ## 4. Control de Foliación Digital Continua (Archivo General de la Nación)
 
-### 4.1 Principio Archivístico de Foliatura
+### 4.1 Principio Archivístico de Foliatura `[CONFIRMADO]`
 * **Prohibición de Solapamientos (`Overlap`):** Un folio no puede estar asignado a dos documentos.
-* **Prohibición de Vacíos (`Gaps`):** No pueden existir saltos de folios (ej. pasar del 7 al 10).
+* **Prohibición de Vacíos (`Gaps`):** No pueden existir saltos de folios en la foliación electrónica.
 
-### 4.2 Estructura y Reglas en `expediente_documento_folio` `[PROPUESTO]`
-* **Consistencia de Rango `[CONFIRMADO]`:** Obligatorio cumplir `CHECK (folio_fin >= folio_inicio)`.
-* **Continuidad Estricta `[PROPUESTO]`:** Para todo documento subsiguiente, el `folio_inicio` es exactamente el `folio_fin` del documento anterior + 1.
-* **Inmutabilidad `[CONFIRMADO]`:** Prohibido hacer `DELETE` o `UPDATE` sobre rangos ya emitidos (se usan diligencias de rectificación).
+### 4.2 Estructura y Reglas en `expediente_documento_folio` `[CONFIRMADO]`
+* **Consistencia de Rango:** Obligatorio cumplir el registro de `folio_inicio`, `folio_fin` y calcular el `total_folios`.
+* **Continuidad Estricta:** Para todo documento subsiguiente, el `folio_inicio` es exactamente el `folio_fin` del documento anterior + 1.
+* **Inmutabilidad:** Prohibido hacer `DELETE` o vacíos sobre rangos ya emitidos.
 
 ---
 
@@ -68,8 +68,7 @@ Si desaparece la conexidad, un nuevo acto resolutivo ordena la separación. Se m
 
 | Código | Decisión Adoptada | Categoría |
 | :--- | :--- | :--- |
-| **DEC-01** | CUT con formato `EXP-YYYY-XXXXXX` (MGD-PCM). | `[CONFIRMADO]` |
+| **DEC-01** | CUT con formato `EXP-YYYY-XXXXXX` y función `generar_cut_expediente` (MGD-PCM). | `[CONFIRMADO]` |
 | **DEC-02** | Prohibición absoluta de `MAX() + 1`. | `[CONFIRMADO]` |
-| **DEC-03** | Entidad `expediente_acumulacion` con relación N:M. | `[PROPUESTO]` |
-| **DEC-04** | Foliación por rango (`folio_inicio`, `folio_fin`). | `[PROPUESTO]` |
-| **DEC-05** | Llaves primarias técnicas `UUID v4` independientes del CUT. | `[CONFIRMADO]` |
+| **DEC-03** | Fusión por Acumulación de expedientes conexos (Art. 160 LPAG). | `[CONFIRMADO]` |
+| **DEC-04** | Reglas de control de foliado digital continuo. | `[CONFIRMADO]` |
