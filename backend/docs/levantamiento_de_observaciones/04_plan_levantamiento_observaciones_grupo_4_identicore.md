@@ -8,6 +8,7 @@
 **Integrantes:** Segundo (`B_SEGUNDO`), Tapullima (`B_TAPULLIMA`), Jair (`B_JAIR`)  
 **Fecha:** 30 de agosto de 2026  
 **Versión:** 2.0 (Fase 2 — Modelo Polimórfico, Seguridad Argon2id y Casilla Digital)  
+**Estado:** **EN PROCESO DE SUBSANACIÓN**  
 **Ubicación:** `backend/docs/levantamiento_de_observaciones/04_plan_levantamiento_observaciones_grupo_4_identicore.md`
 
 ---
@@ -89,9 +90,23 @@ Subsanar las observaciones arquitecturales identificadas en el diagnóstico seni
 
 ## 7. Dependencias y Contratos con Otros Grupos
 
-- **Grupo 2 (TramiCore):** IdentiCore provee `id_persona` para asignar al solicitante del trámite o titular del expediente.
-- **Grupo 1 (RutaDoc):** IdentiCore provee `id_usuario` para registrar al funcionario que ejecuta el movimiento de derivación/atención.
-- **Grupo 3 (OrganiCore):** IdentiCore vincula `id_usuario` a las asignaciones de cargo y roles institucionales.
+Las siguientes definiciones se dejan deliberadamente pendientes. IdentiCore no debe inventar tablas, claves, roles ni reglas que sean propiedad de otro grupo. La implementación podrá avanzar con identificadores internos provisionales, pero el contrato final queda bloqueado hasta recibir la definición del grupo propietario.
+
+| Dependencia | Información que IdentiCore necesita | Estado | Condición para cerrar |
+| :--- | :--- | :---: | :--- |
+| **Grupo 2 - TramiCore** | Tipo y nombre final del identificador de solicitante/titular (`id_persona`), tratamiento del externo sin cuenta y reglas para representante de persona jurídica. | **PENDIENTE** | Contrato de integración aprobado por TramiCore e IdentiCore. |
+| **Grupo 1 - RutaDoc** | Identificador del actor (`id_cuenta_usuario` o equivalente), tratamiento de actores históricos e inactivos y referencia de usuario de ventanilla. | **PENDIENTE** | Matriz productor-consumidor aprobada por RutaDoc e IdentiCore. |
+| **Grupo 3 - OrganiCore** | Claves y catálogos definitivos de área, cargo, rol, vínculo institucional y vigencia del Usuario Interno. | **PENDIENTE** | Modelo de OrganiCore publicado y contrato de FKs o referencias acordado. |
+| **Grupo 6 - CoreLink** | Formato de eventos de auditoría, `correlation_id`, errores de API, propagación de identidad y requisitos de trazabilidad. | **PENDIENTE** | Contrato API/auditoría aprobado por CoreLink e IdentiCore. |
+| **Institución / profesor** | Tipos de documento admitidos, duración de bloqueo, TTL de tokens, texto legal, conservación y autorización de datos públicos. | **PENDIENTE** | Validación institucional documentada. |
+
+### 7.1 Reglas mientras las dependencias estén pendientes
+
+- Se pueden documentar entidades y contratos como `PROPUESTO`, pero no declararlos `CONFIRMADO`.
+- No se crearán tablas duplicadas de áreas, cargos, roles, permisos ni trazabilidad en `sigd_auth`.
+- No se fijarán tipos de FK intermodulares hasta que el grupo propietario publique sus claves definitivas.
+- Los entregables de modelo, DDL y pruebas que dependan de estas decisiones conservarán el estado `PENDIENTE` hasta la revisión conjunta.
+- Una representación legal vencida o revocada no debe habilitar trámites nuevos, aunque la regla de integración del trámite quede pendiente del contrato con TramiCore.
 
 ---
 
@@ -99,15 +114,16 @@ Subsanar las observaciones arquitecturales identificadas en el diagnóstico seni
 
 | Estado | Criterio de Verificación Técnico y Metodológico | Responsable | Evidencia Requerida |
 | :---: | :--- | :---: | :--- |
-| ☐ | El modelo separa limpiamente Personas Naturales de Personas Jurídicas e implementa `representacion_legal`. | Tapullima / Jair | `01_analisis...md` y `02_modelo...md` |
-| ☐ | Se implementan validaciones de formato estricto para DNI (8 dígitos) y RUC (11 dígitos válidos). | Segundo | Restricciones `CHECK` en `03_esquema...sql` |
-| ☐ | El esquema define el algoritmo de credenciales como **Argon2id** y modela `sesion_usuario` con Refresh Tokens. | Segundo | Diccionario y DDL SQL |
-| ☐ | Se modela la entidad `consentimiento_datos` para registrar la aceptación de términos bajo la Ley N° 29733. | Tapullima / Jair | `02_modelo_datos...md` y DDL SQL |
-| ☐ | Se documentan reglas de ofuscación de datos personales sensibles para consultas públicas en ventanilla/web. | Tapullima | Matriz de privacidad en `01_analisis...md` |
-| ☐ | Diagrama ER actualizado en Draw.io y exportado a imagen PNG. | Jair | Archivos `.drawio` y `.png` |
-| ☐ | Decisiones técnicas fundamentadas en el log de decisiones de IdentiCore. | Segundo | `05_decisiones_levantamiento_identicore.md` |
-| ☐ | Commits individuales verificables en `B_TAPULLIMA`, `B_JAIR` y `B_SEGUNDO`. | Todos | Historial de Git |
-| ☐ | Sublíder integró formalmente mediante Pull Request hacia `B_GERIC`. | Segundo | PR en GitHub |
+| **EN PROCESO** | El análisis funcional documenta personas naturales/jurídicas, representación, consentimiento y privacidad. | Tapullima | `01_analisis_identidad_personas_seguridad.md` |
+| **PENDIENTE** | El modelo separa limpiamente Personas Naturales de Personas Jurídicas e implementa `representacion_legal`. | Jair | `02_modelo_datos_identicore_v2.md` |
+| **PENDIENTE** | Se implementan validaciones estrictas de DNI, RUC y checksum Módulo 11. | Segundo | `03_esquema_sigd_auth_v2.sql` |
+| **PENDIENTE** | El esquema usa Argon2id y modela `sesion_usuario` con refresh tokens rotativos. | Segundo | Diccionario y DDL v2.0 |
+| **PENDIENTE** | Se modela `consentimiento_datos` con historial de revocación inmutable. | Jair / Segundo | Modelo y DDL v2.0 |
+| **EN PROCESO** | Se documentan las reglas de ofuscación para consultas públicas. | Tapullima | Matriz de privacidad del análisis funcional |
+| **PENDIENTE** | Diagrama ER actualizado en Draw.io y exportado a PNG. | Jair | Archivos `.drawio` y `.png` |
+| **PENDIENTE** | Decisiones técnicas fundamentadas en el log de IdentiCore. | Segundo | `05_decisiones_levantamiento_identicore.md` |
+| **PENDIENTE** | Commits individuales verificables en las tres ramas personales. | Todos | Historial de Git |
+| **PENDIENTE** | Sublíder integra mediante Pull Request hacia `B_GERIC`. | Segundo | PR aprobado |
 
 ---
 
