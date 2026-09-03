@@ -103,4 +103,4 @@ Las pruebas de carga están orientadas a evaluar el comportamiento del servidor 
 
 * **Escenario 2: Operación Simultánea de Derivación (50 Usuarios Virtuales)**
   * **Objetivo:** Simular a los operadores de las distintas áreas administrativas derivando y respondiendo expedientes al mismo tiempo.
-  * **Perfil de Carga:** Mantener de forma constante 50 usuarios virtuales realizando consultas y actualizaciones durante 1 minuto y medio.
+  * **Perfil de Carga:** Mantener de forma constante 50 usuarios virtuales realizando consultas y actualizaciones durante 1 minuto y mediO.
