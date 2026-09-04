@@ -12,15 +12,16 @@
 
 ## 1. Objetivo
 
-Documentar funcionalmente las mejoras requeridas para el módulo OrganiCore del SIGD relacionadas con:
+Documentar funcionalmente las mejoras de la Fase 2 del módulo OrganiCore relacionadas con:
 
-- La representación de la jerarquía organizacional mediante Materialized Path.
-- La separación entre cargos institucionales, roles del sistema y facultades de despacho.
-- El control de autorización combinando RBAC y reglas contextuales ABAC.
-- La gestión de encargaturas y suplencias temporales.
-- La prevención de ciclos dentro de la jerarquía de áreas.
+- la representación de la jerarquía organizacional mediante Materialized Path;
+- la separación entre cargos institucionales, roles del sistema y facultades de despacho;
+- el control de autorización combinando RBAC y reglas contextuales ABAC;
+- el control de acceso según el contexto de área;
+- la gestión de encargaturas y suplencias temporales;
+- la prevención de ciclos dentro de la jerarquía de áreas.
 
-El presente análisis no define el organigrama institucional definitivo ni establece cargos o permisos oficiales. Las reglas que aún requieran validación institucional se identificarán como `PENDIENTE`.
+Este documento no define como oficial el organigrama, los cargos ni los permisos institucionales.
 
 ---
 
@@ -30,14 +31,16 @@ Este documento analiza funcionalmente:
 
 1. La estructura jerárquica de áreas.
 2. El uso combinado de `parent_id` y `path`.
-3. Las operaciones que pueden modificar la jerarquía.
-4. La prevención de relaciones jerárquicas circulares.
-5. La diferencia entre cargo, rol y facultad de despacho.
-6. La autorización basada en RBAC y ABAC.
-7. La delegación temporal de facultades mediante encargaturas.
-8. Los principales flujos normales y excepcionales.
+3. El cálculo de rutas jerárquicas.
+4. La consulta de áreas descendientes.
+5. El cambio de dependencia de un área.
+6. La prevención de ciclos jerárquicos.
+7. La diferencia entre cargo, rol y facultad de despacho.
+8. La autorización mediante RBAC y ABAC.
+9. El control de acceso por contexto de área.
+10. La delegación temporal de facultades mediante encargaturas.
 
-No corresponde a este documento implementar tablas, triggers ni restricciones SQL.
+No corresponde a este documento implementar tablas, triggers, diagramas ER ni restricciones SQL.
 
 ---
 
@@ -45,9 +48,9 @@ No corresponde a este documento implementar tablas, triggers ni restricciones SQ
 
 | Categoría | Significado |
 |---|---|
-| `CONFIRMADO` | Información validada por una fuente institucional o indicación oficial. |
-| `PROPUESTO` | Solución técnica o funcional planteada por el equipo. |
-| `PENDIENTE` | Información que necesita validación posterior. |
+| `CONFIRMADO` | Información institucional o requisito oficialmente validado. |
+| `PROPUESTO` | Solución funcional o técnica planteada para el SIGD. |
+| `PENDIENTE` | Información que requiere validación posterior. |
 | `EJEMPLO` | Caso ficticio utilizado únicamente para explicar el funcionamiento. |
 
 ---
@@ -56,17 +59,17 @@ No corresponde a este documento implementar tablas, triggers ni restricciones SQ
 
 ### 4.1 Área
 
-Un área representa una unidad dentro de la estructura organizacional de la institución.
+Un área representa una unidad dentro de la estructura organizacional.
 
-Un área puede depender jerárquicamente de otra área y puede tener cero o más áreas subordinadas.
+Puede depender de un área superior y tener una o varias áreas subordinadas.
 
 **Clasificación:** `PROPUESTO`
 
 ### 4.2 Cargo institucional
 
-Un cargo representa el puesto o función institucional que una persona desempeña dentro de la organización.
+Un cargo representa el puesto institucional que desempeña una persona dentro de la organización.
 
-Ejemplos únicamente ilustrativos:
+Ejemplos:
 
 - Director General.
 - Jefe de Unidad.
@@ -76,21 +79,23 @@ Ejemplos únicamente ilustrativos:
 
 ### 4.3 Rol de sistema
 
-Un rol de sistema agrupa permisos técnicos que permiten a un usuario realizar determinadas operaciones dentro del SIGD.
+Un rol de sistema agrupa permisos técnicos que permiten realizar determinadas operaciones dentro del SIGD.
 
-El rol no representa necesariamente el cargo institucional de la persona.
+El rol de sistema no representa necesariamente el cargo institucional del usuario.
 
 **Clasificación:** `PROPUESTO`
 
 ### 4.4 Facultad de despacho
 
-La facultad de despacho representa la atribución contextual que permite a determinado cargo realizar acciones como firmar documentos o efectuar una derivación autorizada.
+La facultad de despacho representa la atribución que permite a determinado cargo ejecutar acciones institucionales como firmar documentos, emitir actos o realizar derivaciones autorizadas.
+
+La facultad de despacho deberá mantenerse separada del rol técnico del sistema.
 
 **Clasificación:** `PROPUESTO`
 
 ### 4.5 Encargatura
 
-Una encargatura representa la asignación temporal de determinadas funciones o facultades de un titular a un usuario suplente durante un periodo definido.
+Una encargatura representa la asignación temporal de determinadas funciones o facultades de un titular hacia un usuario suplente durante un periodo definido.
 
 **Clasificación:** `PROPUESTO`
 
@@ -100,7 +105,10 @@ Una encargatura representa la asignación temporal de determinadas funciones o f
 
 **Clasificación:** `PROPUESTO`
 
-Se propone representar la jerarquía de áreas usando `parent_id` y una columna `path`.
+Se propone representar la jerarquía de áreas utilizando conjuntamente:
+
+- `parent_id`: identifica el área superior directa.
+- `path`: almacena la ruta jerárquica completa.
 
 Ejemplo:
 
