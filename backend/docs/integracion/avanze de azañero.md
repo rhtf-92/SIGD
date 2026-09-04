@@ -312,19 +312,6 @@ El `RequestContext` proporciona `correlation_id`, `usuario_id`, `ip_origen` y `u
     { "name": "correo", "reason": "Formato de correo inválido." }
   ]
 }
-```
-
----
-
-## 10. Criterios de Validación Cumplidos
-
-| # | Criterio | Cumple |
-| :---: | :--- | :---: |
-| 1 | La jerarquía de errores y el Middleware capturan excepciones de Postgres/Zod y serializan a **RFC 7807 / RFC 9457**. |  
-| 2 | El diseño de `AsyncLocalStorage` permite propagar `correlation_id` e identidad de usuario sin acoplar parámetros. | 
-| 3 | No se exponen Stack Traces, contraseñas, tokens ni información interna de PostgreSQL en producción.|
-| 4 | Cada solicitud puede ser identificada mediante un correlation_id (UUIDv4). |
-| 5 | La documentación queda lista para que el equipo continúe con la implementación e integración. |
 
 
 
