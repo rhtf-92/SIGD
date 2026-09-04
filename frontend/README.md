@@ -1,65 +1,53 @@
-# Módulo de Gestión de Expedientes (SGD)
+# Frontend del SIGD
 
-Sistema web moderno, interactivo y responsivo para la gestión y trámite documentario institucional.
+Este directorio contiene la estructura preliminar del frontend del Sistema Integral de Gestión Documentaria (SIGD) del Instituto Suiza. El proyecto tiene un propósito académico y servirá como base para construir la interfaz de usuario que consumirá la API del backend una vez definidas las capacidades de gestión documentaria requeridas por la institución.
 
----
+## Arquitectura basada en componentes
 
-## 🚀 Características Principales
+React organiza la interfaz en componentes reutilizables e independientes. En el SIGD, esta organización se complementa con una separación de responsabilidades: las páginas representan las pantallas de la aplicación; las rutas centralizan la navegación y permitirán proteger el acceso a pantallas privadas; los servicios concentrarán el consumo de la API; y TanStack Query administrará el estado asíncrono con almacenamiento en caché.
 
-1. **Pantalla Principal de Trabajo (Bandeja del Área / Oficina)**:
-   - Selector dinámico de área/oficina (*Mesa de Partes, Gerencia de Desarrollo Urbano, Subgerencia de Obras Privadas, Asesoría Jurídica, Secretaría General, Administración Tributaria, Catastro, etc.*).
-   - Tarjetas de resumen KPI en tiempo real: Total Expedientes, En Plazo, Próximos a Vencer ($\le 3$ días) y Vencidos.
+Esta estructura no define todavía los módulos ni los flujos de la aplicación y no implementa funcionalidades de negocio.
 
-2. **Pestañas de Estado de Flujo con Contadores Dinámicos**:
-   - 🟡 **Pendientes**: Expedientes ingresados pendientes de atención.
-   - 🔵 **En Proceso**: Expedientes en evaluación o elaboración de informes.
-   - 🟠 **Observados**: Expedientes con observaciones técnicas o legales.
-   - 🟣 **Derivados**: Expedientes remitidos a otras áreas de la institución.
-   - 🟢 **Notificados**: Trámites resueltos con notificación formal al administrado.
-   - ⚫ **Archivados**: Expedientes concluidos y transferidos al Archivo Central.
-   - ⚪ **Todos**: Vista integral de todos los estados.
-   - *Los contadores de las pestañas se recalculan automáticamente según el área activa y las acciones ejecutadas.*
+## Tecnologías previstas
 
-3. **Buscador y Filtros Avanzados**:
-   - Búsqueda por formato estricto y flexible de expediente: `EXP-YYYY-XXXXXX` (ej. `EXP-2026-000124`).
-   - Búsqueda por datos del solicitante (DNI de 8 dígitos, RUC de 11 dígitos, Nombres o Razón Social).
-   - Filtro por rango de fechas (`Fecha Desde` - `Fecha Hasta`) con accesos rápidos (*Hoy*, *7 días*, *Este Mes*, *Quitar*).
-   - Filtros adicionales por **Prioridad** (*Normal*, *Urgente*, *Muy Urgente*) y **Tipo de Documento** (*Solicitud*, *Oficio*, *Carta*, *Informe*).
-   - Botón de limpieza de filtros y contador dinámico de resultados.
+| N.° | Tecnología | Versión objetivo | Uso dentro del SIGD |
+|-----|------------|------------------|----------------------|
+| 1 | React | 19.x | Biblioteca principal basada en componentes para la interfaz de usuario. |
+| 2 | TypeScript | 5.x | Lenguaje principal del frontend con tipado estático. |
+| 3 | Vite | 6.x | Herramienta de construcción, empaquetado y servidor de desarrollo rápido. |
+| 4 | Tailwind CSS | 4.x | Framework de estilos por clases de utilidad para el diseño adaptable. |
+| 5 | React Router DOM | 7.x | Gestión de enrutamiento, navegación entre pantallas y protección de rutas. |
+| 6 | Axios | 1.x | Cliente HTTP para realizar peticiones y consumir la API del backend. |
+| 7 | TanStack Query | 5.x | Gestión de estado asíncrono, almacenamiento en caché y sincronización de datos. |
 
-4. **Tabla Responsiva y Acciones Rápidas**:
-   - 👁️ **Ver Detalle**: Modal con pestañas de *Resumen General*, *Trazabilidad / Línea de Tiempo* (recorrido histórico entre oficinas), *Documentos Adjuntos* y *Observaciones*.
-   - 🔄 **Derivar**: Modal para derivar expediente a otra área con selección automática de especialistas y registro de proveído.
-   - ⚠️ **Observar**: Modal para registrar causales de observación técnica/legal, fundamentación y plazo de subsanación.
-   - ✉️ **Notificar**: Registro de cédula de notificación y medio (casilla electrónica o correo).
-   - 📁 **Archivar**: Cierre de trámite con registro de ubicación física en archivo.
-   - 📋 **Copiar Código**: Copia rápida al portapapeles con feedback visual.
-   - 📊 **Exportar CSV & Imprimir**: Descarga de reportes en CSV y vista optimizada para impresión.
+## Estructura
 
----
+- `index.html`: documento HTML único que sirve de punto de montaje de la aplicación.
+- `vite.config.ts`: configuración de Vite con los plugins de React y Tailwind CSS, y el alias `@` hacia `src`.
+- `src/main.tsx`: punto de entrada; monta la aplicación y provee los contextos de React Router y TanStack Query.
+- `src/App.tsx`: componente raíz que compone la estructura general.
+- `src/api`: cliente HTTP de Axios configurado para comunicarse con el backend.
+- `src/assets`: recursos estáticos importables (imágenes, fuentes).
+- `src/components`: componentes reutilizables de interfaz compartidos entre pantallas.
+- `src/config`: lectura y validación de las variables de entorno de la aplicación.
+- `src/hooks`: hooks personalizados de React, incluidos los de consumo de datos con TanStack Query.
+- `src/layouts`: estructuras de página compartidas (encabezado, navegación, pie).
+- `src/pages`: pantallas de la aplicación asociadas a una ruta.
+- `src/routes`: definición centralizada de rutas y futura protección de acceso.
+- `src/types`: tipos e interfaces compartidos de TypeScript.
+- `src/utils`: utilidades técnicas reutilizables.
+- `public`: archivos estáticos servidos tal cual (favicon).
 
-## 📁 Estructura del Proyecto
+## Alcance actual
 
-```
-trabajo cristiam/
-├── index.html              # Vista principal: Header, KPIs, pestañas de flujo, filtros y tabla
-├── css/
-│   └── styles.css          # Estilos personalizados (glassmorphism, animaciones, badges SLA, print)
-├── js/
-│   ├── data.js             # Base de datos simulada con persistencia en LocalStorage
-│   ├── modals.js           # Lógica de modales (Detalle, Derivar, Observar, Notificar, Archivar, Nuevo)
-│   └── app.js              # Controlador principal (filtros reactivos, contadores y renderizado)
-└── README.md               # Documentación del proyecto
-```
+Esta etapa contiene solamente una base técnica extensible: la pantalla inicial de muestra, los proveedores de enrutamiento y de estado asíncrono configurados, y un cliente HTTP sin endpoints. No incluye módulos de negocio, autenticación ni protección de rutas.
 
----
+La definición de áreas, roles, permisos, módulos y flujos documentarios depende todavía del levantamiento institucional. No se asumirán estas definiciones antes de contar con información validada.
 
-## 💻 Instrucciones de Uso
+La estructura es preliminar y puede modificarse después de la revisión y validación del profesor responsable del proyecto.
 
-1. Abre directamente el archivo `index.html` en cualquier navegador moderno (Google Chrome, Microsoft Edge, Firefox).
-2. Para probar las funciones:
-   - Filtra por cualquiera de las pestañas superiores y observa cómo se actualiza la tabla.
-   - Selecciona un área específica en la barra superior para ver los expedientes asignados a esa oficina.
-   - Realiza búsquedas usando el código `EXP-2026-000124` o el DNI `45892134` o el RUC `20601234567`.
-   - Haz clic en el botón de ojo (👁️) para ver la trazabilidad completa y los documentos del expediente.
-   - Haz clic en derivar (🔄) u observar (⚠️) para cambiar el flujo y ver la actualización reactiva en tiempo real.
+## Configuración local futura
+
+El archivo `.env.example` documenta variables de entorno de ejemplo sin credenciales reales. Cuando se habilite el entorno de desarrollo, deberá copiarse como `.env` y adaptarse localmente; `VITE_API_BASE_URL` debe apuntar a la URL base de la API del backend.
+
+Las dependencias están declaradas en `package.json`, pero no se instalan como parte de esta primera etapa. Para habilitar el entorno de desarrollo será necesario ejecutar `npm install` y luego utilizar `npm run dev`.
