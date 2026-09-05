@@ -19,3 +19,20 @@ __pycache__/
 Thumbs.db
 *.tmp
 *.bak
+
+# Root audit, testing & agent tracking artifacts
+colaboradores.md
+ORIGINAL_REQUEST.md
+PROJECT.md
+TEST_INFRA.md
+TEST_READY.md
+
+# Backend audit & master improvement plans
+backend/docs/INFORME_AUDITORIA_CONTRIBUCIONES_BACKEND.md
+backend/docs/Plan_de_mejora_nivel_backend_SIGD.md
+
+# Frontend audit & master plan documents
+frontend/docs/INFORME_AUDITORIA_DOCUMENTACION_FRONTEND.md
+frontend/docs/PLAN_DE_TRABAJO_GENERAL_FRONTEND_SIGD.md
+frontend/docs/PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md
+
