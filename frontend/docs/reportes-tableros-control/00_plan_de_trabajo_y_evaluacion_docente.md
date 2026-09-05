@@ -12,11 +12,11 @@
 - **Unidad Didáctica:** `Taller de Programación Web / Proyecto Integrador SIGD`
 - **Docente Titular / Product Owner:** `Ing. Renato Henyer Tarazona Flores`
 - **Scrum Master & Arquitecto Principal:** `Christiam Saúl`
-- **Sub-equipo Asignado (M6):**
-  - **Líder de Sub-equipo:** `Clider Lex Urquia` (Git: `cliderlex-sketch`)
-  - **Especialista de Métricas & Datos:** `Jennifer Gatica Saavedra` (Git: `gaticasaavedrajennifer844-jpg`)
-  - **Diseñador UX / Accesibilidad (WCAG AA):** `Christian Jhoel Rodríguez Cari (Jhuel)` (Git: `christianjhoelrodriguezcari-hue`)
-  - **Desarrollador Frontend (Exportador PDF/Excel):** `Lloner Vargas Huayunga` (Git: `lloner-araujo` / `vargashuayunga92-11`)
+- **Sub-equipo Asignado (M06 / Grupo 6):**
+  - **Líder de Sub-equipo:** `Clider Lex Urquia López` (Git: `cliderlex-sketch` / Rama: `F_URQUIA`)
+  - **Especialista de Métricas & Datos:** `Jennifer Gatica Saavedra` (Git: `gaticasaavedrajennifer844-jpg` / Rama: `F_GATICA`)
+  - **Diseñador UX / Accesibilidad (WCAG AA):** `Barbarán Gonzales` (Rama: `F_BARBARAN`)
+  - **Desarrollador Frontend (Exportador PDF/Excel):** `Lloner Vargas Huayunga` (Git: `lloner-araujo` / Rama: `F_VARGAS`)
 - **Carga de Trabajo Asignada:** `29 Story Points (SP)` distribuidos en 5 entregables atómicos
 - **Ubicación Canónica:** `frontend/docs/reportes-tableros-control/00_plan_de_trabajo_y_evaluacion_docente.md`
 - **Documento Maestro Institucional:** [PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md](../PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
@@ -109,12 +109,12 @@ Matriz de entregables para la calificación del sub-equipo del Módulo 6 (29 Sto
 
 | Código | Nombre del Entregable | Estudiantes Responsables | Artefactos Concretos en Repositorio | Criterios de Aceptación Objetivos (DoD) | Evidencia Demostrable | Peso % | SP |
 |:---:|---|---|---|---|---|:---:|:---:|
-| `ENT-M06-01` | **Tablero Directivo Ejecutivo Multi-Breakpoint (<5s)** | Christian Jhuel (R/A)<br>Clider Urquia (R) | `src/pages/reportes/DashboardEjecutivoPage.tsx`<br>`src/components/reportes/ExecutiveKpiCard.tsx`<br>`src/components/reportes/KpiMetricGrid.tsx`<br>`src/hooks/useDashboardMetrics.ts`<br>`src/types/dashboardEjecutivo.ts` | 1. Vista directiva con tiempo de carga total en red $\le 5$ segundos.<br>2. 3 breakpoints responsivos (Móvil, Tablet, Desktop).<br>3. Tarjetas KPI con deltas temporales ($\Delta\%$) y micro-gráficos sparkline.<br>4. Estados de skeleton loading fluidos. | Dashboard renderizado con métricas de performance en consola; layout adaptable probado. | 25% | 8 |
-| `ENT-M06-02` | **Motor de Cálculo de KPIs del MGD con Modelado Matemático** | Jennifer Gatica (R/A) | `src/services/kpiCalculator.service.ts`<br>`src/components/reportes/KpiFormulaExplanationCard.tsx`<br>`src/types/kpiCalculations.ts` | 1. Implementación exacta de las 4 fórmulas: VTEP, TPR, TRO y TEO.<br>2. Control estricto de división por cero devolviendo `0.00%` o valor neutro.<br>3. Cálculo de horas hábiles excluyendo sábados, domingos y feriados.<br>4. Tipado estricto sin tipo `any`. | Servicio tipado con pruebas unitarias que verifican precisión a 2 decimales; explicaciones matemáticas en UI. | 25% | 8 |
-| `ENT-M06-03` | **Mapa de Calor y Análisis Visual de Cuellos de Botella** | Christian Jhuel (R/A)<br>Lloner Vargas (R) | `src/components/reportes/BottleNeckHeatmap.tsx`<br>`src/components/reportes/AreaRetentionChart.tsx`<br>`src/hooks/useAreaBottlenecks.ts` | 1. Visualización matricial de áreas que retienen expedientes $\ge 5$ días.<br>2. Código de colores accesible (verde/ámbar/rojo) complementado con iconografía.<br>3. Navegación por teclado y etiquetas `aria-label` en celdas.<br>4. Tooltip con detalle de expedientes en riesgo por dependencia. | Mapa de calor interactivo y accesible; navegación fluida por teclado (Tab y flechas). | 20% | 5 |
-| `ENT-M06-04` | **Exportador Estructurado de Reportes en PDF y Excel** | Clider Urquia (R/A)<br>Lloner Vargas (R) | `src/components/reportes/ReportExportModal.tsx`<br>`src/utils/excelReportExporter.ts`<br>`src/utils/pdfReportExporter.ts`<br>`src/types/reportExportConfig.ts` | 1. Generación de hojas Excel `.xlsx` con soporte UTF-8 sin desconfiguración de caracteres especiales.<br>2. Reporte PDF institucional en formato A4 con membrete oficial del IESTP "Suiza".<br>3. Inclusión de filtros aplicados, fecha de emisión y hash de integridad. | Descarga probada en navegador de archivo `.xlsx` y archivo `.pdf` con formato institucional. | 15% | 5 |
-| `ENT-M06-05` | **Suite de Pruebas de Precisión Numérica y Accesibilidad** | Jennifer Gatica (R/A)<br>Sub-equipo M6 (R) | `src/tests/m6/kpiCalculator.test.ts`<br>`src/tests/m6/dashboardA11y.test.tsx` | 1. Pruebas unitarias de las 4 fórmulas matemáticas con casos de borde (0 trámites, denominadores nulos).<br>2. Verificación de accesibilidad con cero violaciones de contraste cromático (< 4.5:1).<br>3. Cobertura en Vitest $\ge 80\%$. | Reporte de Vitest con 100% de aserciones aprobadas y reporte de accesibilidad limpio. | 15% | 3 |
-| **TOTAL** | **MÓDULO 6 CONSOLIDADO** | **Sub-equipo M6** | **Conjunto de Artefactos de M6** | **Cumplimiento Integral de Criterios DoD y MGD-PCM** | **Demostración en Vivo + Ficha Docente** | **100%** | **29 SP** |
+| `ENT-M06-01` | **Tablero Directivo Ejecutivo Multi-Breakpoint (<5s)** | Clider Lex Urquia López (R/A)<br>Barbarán Gonzales (R) | `src/pages/reportes/DashboardEjecutivoPage.tsx`<br>`src/components/reportes/ExecutiveKpiCard.tsx`<br>`src/components/reportes/KpiMetricGrid.tsx`<br>`src/hooks/useDashboardMetrics.ts`<br>`src/types/dashboardEjecutivo.ts` | 1. Vista directiva con tiempo de carga total en red $\le 5$ segundos.<br>2. 3 breakpoints responsivos (Móvil, Tablet, Desktop).<br>3. Tarjetas KPI con deltas temporales ($\Delta\%$) y micro-gráficos sparkline.<br>4. Estados de skeleton loading fluidos. | Dashboard renderizado con métricas de performance en consola; layout adaptable probado. | 25% | 8 |
+| `ENT-M06-02` | **Motor de Cálculo de KPIs del MGD con Modelado Matemático** | Jennifer Gatica Saavedra (R/A) | `src/services/kpiCalculator.service.ts`<br>`src/components/reportes/KpiFormulaExplanationCard.tsx`<br>`src/types/kpiCalculations.ts` | 1. Implementación exacta de las 4 fórmulas: VTEP, TPR, TRO y TEO.<br>2. Control estricto de división por cero devolviendo `0.00%` o valor neutro.<br>3. Cálculo de horas hábiles excluyendo sábados, domingos y feriados.<br>4. Tipado estricto sin tipo `any`. | Servicio tipado con pruebas unitarias que verifican precisión a 2 decimales; explicaciones matemáticas en UI. | 25% | 8 |
+| `ENT-M06-03` | **Mapa de Calor y Análisis Visual de Cuellos de Botella** | Barbarán Gonzales (R/A)<br>Lloner Vargas Huayunga (R) | `src/components/reportes/BottleNeckHeatmap.tsx`<br>`src/components/reportes/AreaRetentionChart.tsx`<br>`src/hooks/useAreaBottlenecks.ts` | 1. Visualización matricial de áreas que retienen expedientes $\ge 5$ días.<br>2. Código de colores accesible (verde/ámbar/rojo) complementado con iconografía.<br>3. Navegación por teclado y etiquetas `aria-label` en celdas.<br>4. Tooltip con detalle de expedientes en riesgo por dependencia. | Mapa de calor interactivo y accesible; navegación fluida por teclado (Tab y flechas). | 20% | 5 |
+| `ENT-M06-04` | **Exportador Estructurado de Reportes en PDF y Excel** | Clider Lex Urquia López (R/A)<br>Lloner Vargas Huayunga (R) | `src/components/reportes/ReportExportModal.tsx`<br>`src/utils/excelReportExporter.ts`<br>`src/utils/pdfReportExporter.ts`<br>`src/types/reportExportConfig.ts` | 1. Generación de hojas Excel `.xlsx` con soporte UTF-8 sin desconfiguración de caracteres especiales.<br>2. Reporte PDF institucional en formato A4 con membrete oficial del IESTP "Suiza".<br>3. Inclusión de filtros aplicados, fecha de emisión y hash de integridad. | Descarga probada en navegador de archivo `.xlsx` y archivo `.pdf` con formato institucional. | 15% | 5 |
+| `ENT-M06-05` | **Suite de Pruebas de Precisión Numérica y Accesibilidad** | Jennifer Gatica Saavedra (R/A)<br>Sub-equipo Grupo 6 (R) | `src/tests/m6/kpiCalculator.test.ts`<br>`src/tests/m6/dashboardA11y.test.tsx` | 1. Pruebas unitarias de las 4 fórmulas matemáticas con casos de borde (0 trámites, denominadores nulos).<br>2. Verificación de accesibilidad con cero violaciones de contraste cromático (< 4.5:1).<br>3. Cobertura en Vitest $\ge 80\%$. | Reporte de Vitest con 100% de aserciones aprobadas y reporte de accesibilidad limpio. | 15% | 3 |
+| **TOTAL** | **MÓDULO 6 CONSOLIDADO** | **Sub-equipo Grupo 6 (Urquia, Vargas, Gatica, Barbarán)** | **Conjunto de Artefactos de M6** | **Cumplimiento Integral de Criterios DoD y MGD-PCM** | **Demostración en Vivo + Ficha Docente** | **100%** | **29 SP** |
 
 ---
 
@@ -151,10 +151,10 @@ Matriz de entregables para la calificación del sub-equipo del Módulo 6 (29 Sto
 
 1. DATOS DEL ESTUDIANTE Y ENTREGABLES
    - Estudiante Evaluado: _________________________________________________________________________
-   - Rol en Sub-equipo: [ ] Líder / Dashboard (Clider Urquia)
-                        [ ] Especialista Métricas / Fórmulas (Jennifer Gatica)
-                        [ ] Diseñador UX / Accesibilidad (Christian Jhuel)
-                        [ ] Desarrollador Exportador (Lloner Vargas)
+   - Rol en Sub-equipo: [ ] Líder / Dashboard (Clider Lex Urquia López)
+                        [ ] Especialista Métricas / Fórmulas (Jennifer Gatica Saavedra)
+                        [ ] Diseñador UX / Accesibilidad (Barbarán Gonzales)
+                        [ ] Desarrollador Exportador (Lloner Vargas Huayunga)
    - Entregable(s) a Calificar: [ ] ENT-M06-01  [ ] ENT-M06-02  [ ] ENT-M06-03  [ ] ENT-M06-04  [ ] ENT-M06-05
    - Total Story Points Evaluados: _________ SP   |   Fecha de Sustentación: _____ / _____ / 2026
 

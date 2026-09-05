@@ -6,7 +6,7 @@
 | **Módulo** | registro-documentario / Arquitectura Técnica e Integración de Almacenamiento Desacoplado |
 | **Versión** | 1.0.0-PROD |
 | **Fecha de Aprobación** | 2026-09-05 |
-| **Autores Reconocidos** | Carito Curto, Patricia Marina (Patty), Christiam Saúl |
+| **Autores Reconocidos** | Patricia Marina (Patty), Noelia Alva, Lucy Panduro Ramos, Anllely Melgarejo |
 | **Estado de Homologación** | Aprobado — Alineado a LPAG Ley N° 27444 y React 19 |
 
 ---

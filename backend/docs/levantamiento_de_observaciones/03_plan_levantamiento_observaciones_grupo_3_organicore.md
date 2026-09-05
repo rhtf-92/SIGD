@@ -5,7 +5,7 @@
 **Institución:** IESTP "Suiza" (Pucallpa, Ucayali, Perú) — PE DSI  
 **Área:** Backend  
 **Líder General:** Geric · `B_GERIC` | **Sublíder:** Pool · `B_POOL`  
-**Integrantes:** Pool (`B_POOL`), Leonardo (`B_LEONARDO`), Panaifo (`B_PANAIFO`)  
+**Integrantes:** Pool (`B_POOL`), Leonardo (`B_LEONARDO`), Panaifo (`B_PANAIFO`), Héctor (`B_HECTOR`)  
 **Fecha:** 30 de agosto de 2026  
 **Versión:** 2.0 (Fase 2 — Jerarquía Materialized Path, ABAC y Encargaturas)  
 **Ubicación:** `backend/docs/levantamiento_de_observaciones/03_plan_levantamiento_observaciones_grupo_3_organicore.md`

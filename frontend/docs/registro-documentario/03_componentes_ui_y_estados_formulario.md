@@ -6,7 +6,7 @@
 | **Módulo** | registro-documentario / Componentes de Interfaz de Usuario y Máquina de Estados React 19 |
 | **Versión** | 1.0.0-PROD |
 | **Fecha de Aprobación** | 2026-09-05 |
-| **Autores Reconocidos** | Lucy Panduro Ramos, Patricia Marina (Patty), Carito Curto, Anllely Melgarejo |
+| **Autores Reconocidos** | Lucy Panduro Ramos, Patricia Marina (Patty), Noelia Alva, Anllely Melgarejo |
 | **Estado de Homologación** | Aprobado — Alineado a LPAG Ley N° 27444 y React 19 |
 
 ---

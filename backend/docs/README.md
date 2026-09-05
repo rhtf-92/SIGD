@@ -33,7 +33,7 @@ Todos los módulos del backend han sido auditados contra las listas de verificac
 | :--- | :--- | :---: | :---: |
 | **Grupo 1 — RutaDoc**<br>*(Trazabilidad, Recepción, Derivación, Atención)* | Geric (`B_GERIC`), Jacobo (`B_JACOBO`), Jhasy (`B_JHASY`) | **11 / 11** (100%) | ✅ **CONFORME** |
 | **Grupo 2 — TramiCore**<br>*(Trámite, Expediente, Libro de Registro)* | Ramírez (`B_RAMIREZ`), Riquelmer (`B_RIQUELMER`), Sandy (`B_SANDY`) | **10 / 10** (100%) | ✅ **CONFORME** |
-| **Grupo 3 — OrganiCore**<br>*(Áreas, Jerarquías, Roles, Permisos RBAC)* | Pool (`B_POOL`), Leonardo (`B_LEONARDO`), Panaifo (`B_PANAIFO`) | **10 / 10** (100%) | ✅ **CONFORME** |
+| **Grupo 3 — OrganiCore**<br>*(Áreas, Jerarquías, Roles, Permisos RBAC)* | Pool (`B_POOL`), Leonardo (`B_LEONARDO`), Panaifo (`B_PANAIFO`), Héctor (`B_HECTOR`) | **10 / 10** (100%) | ✅ **CONFORME** |
 | **Grupo 4 — IdentiCore**<br>*(Personas, Cuentas, Usuarios Internos/Externos)* | Segundo (`B_SEGUNDO`), Tapullima (`B_TAPULLIMA`), Jair (`B_JAIR`) | **10 / 10** (100%) | ✅ **CONFORME** |
 | **Grupo 5 — DocuCore**<br>*(Catálogo TUPA, Requisitos, Formularios)* | Cristian (`B_CHRISTIAN`), Azareño (`B_AZAREÑO`), Valentín (`B_VALENTIN`), Piero (`B_PIERO`) | **14 / 14** (100%) | ✅ **CONFORME** |
 | **Grupo 6 — CoreLink**<br>*(Integración, Catálogo Errores, Pruebas E2E)* | Ricardo (`B_AREVALO`), Duque (`B_DUQUE`), Reátegui (`B_REATEGUI`), Zevallos (`B_ZEVALLOS`) | **7 / 7** (100%) | ✅ **CONFORME** |
@@ -145,7 +145,7 @@ Cada grupo cuenta con un plan de trabajo detallado que rigió su organización, 
 
 * 📋 [Plan de Trabajo Grupo 1 — RutaDoc](planes_trabajo/01_plan_trabajo_grupo_1_rutadoc.md) *(Geric, Jacobo, Jhasy)*
 * 📋 [Plan de Trabajo Grupo 2 — TramiCore](planes_trabajo/02_plan_trabajo_grupo_2_tramicore.md) *(Ramírez, Riquelmer, Sandy)*
-* 📋 [Plan de Trabajo Grupo 3 — OrganiCore](planes_trabajo/03_plan_trabajo_grupo_3_organicore.md) *(Pool, Leonardo, Panaifo)*
+* 📋 [Plan de Trabajo Grupo 3 — OrganiCore](planes_trabajo/03_plan_trabajo_grupo_3_organicore.md) *(Pool, Leonardo, Panaifo, Héctor)*
 * 📋 [Plan de Trabajo Grupo 4 — IdentiCore](planes_trabajo/04_plan_trabajo_grupo_4_identicore.md) *(Segundo, Tapullima, Jair)*
 * 📋 [Plan de Trabajo Grupo 5 — DocuCore](planes_trabajo/05_plan_trabajo_grupo_5_docucore.md) *(Cristian, Azareño, Valentín, Piero)*
 * 📋 [Plan de Trabajo Grupo 6 — CoreLink](planes_trabajo/06_plan_trabajo_grupo_6_corelink.md) *(Ricardo, Duque, Reátegui, Zevallos)*

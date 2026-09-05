@@ -11,14 +11,11 @@
 - **Ciclo Académico:** `2026-2` | **Programa:** `Desarrollo de Sistemas de Información (DSI)`
 - **Unidad Didáctica:** `Taller de Programación Web / Proyecto Integrador SIGD`
 - **Docente Titular / Product Owner:** `Ing. Renato Henyer Tarazona Flores`
-- **Scrum Master & Arquitecto Principal:** `Christiam Saúl`
-- **Sub-equipo Asignado (M2):**
-  - **Líder de Sub-equipo:** `Patricia Marina (Patty)` (Git: `patricia-marina` / `patriciamarina287`)
-  - **Especialista de Arquitectura (JSON Schema / S3):** `Carito Curto` (Git: `cakcy3-web`)
-  - **Desarrolladora UI Kit (Magic Bytes / Cripto):** `Lucy Panduro Ramos` (Git: `panduroramoslucy-ops`)
-  - **Desarrolladora Frontend (Wizard MPV):** `Anllely Melgarejo V.` (Git: `Anllely-melgarejo`)
-  - **Desarrolladora Frontend (Requisitos TUPA):** `Noelia Alva` (Git: `noelia-alva`)
-  - **Desarrolladora Frontend (Padrón y Cargo):** `Angy Mendoza` (Git: `angy-mendoza`)
+- **Sub-equipo Asignado (Grupo 1):**
+  - **Líder de Grupo:** `Patricia Marina (Patty)` (Git: `patricia-marina` / `patriciamarina287` / `F_PATRICIA`)
+  - **Desarrolladora UI Kit (Magic Bytes / Cripto / S3):** `Lucy Panduro Ramos` (Git: `panduroramoslucy-ops` / `F_PANDURO`)
+  - **Desarrolladora Frontend (Wizard MPV de 4 Pasos):** `Anllely Melgarejo V.` (Git: `Anllely-melgarejo` / `F_ANLLELY`)
+  - **Desarrolladora Frontend (Requisitos TUPA y Horario LPAG):** `Noelia Alva` (Git: `noelia-alva` / `F_NOELIA`)
 - **Carga de Trabajo Asignada:** `34 Story Points (SP)` distribuidos en 6 entregables atómicos
 - **Ubicación Canónica:** `frontend/docs/registro-documentario/00_plan_de_trabajo_y_evaluacion_docente.md`
 - **Documento Maestro Institucional:** [PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md](../PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
@@ -106,17 +103,17 @@ El Módulo 2 se integra con los microservicios de almacenamiento y tramitación 
 
 ## 3. TABLA DE ENTREGABLES ATÓMICOS DE EVALUACIÓN DOCENTE
 
-Matriz de entregables para la calificación del sub-equipo del Módulo 2 (34 Story Points):
+Matriz de entregables para la calificación del Grupo 1 (34 Story Points):
 
 | Código | Nombre del Entregable | Estudiantes Responsables | Artefactos Concretos en Repositorio | Criterios de Aceptación Objetivos (DoD) | Evidencia Demostrable | Peso % | SP |
 |:---:|---|---|---|---|---|:---:|:---:|
 | `ENT-M02-01` | **Asistente Wizard de Tramitación de 4 Pasos** | Anllely Melgarejo (R/A)<br>Patricia Marina (R) | `src/components/tramite/TramiteWizard.tsx`<br>`src/components/tramite/WizardStepBar.tsx`<br>`src/hooks/useTramiteWizard.ts`<br>`src/types/tramiteWizard.ts` | 1. Flujo secuencial de 4 pasos con validación bloqueante antes de avanzar.<br>2. Persistencia reactiva del borrador en memoria ante cambios de paso.<br>3. Barra de progreso accesible con indicadores semánticos WCAG 2.1 AA.<br>4. Botones Anterior, Siguiente y Finalizar con gestión de estados de carga. | Wizard operativo en navegador; transición fluida sin pérdida de estado; feedback de error por paso. | 20% | 5 |
-| `ENT-M02-02` | **Motor Dinámico de Formularios JSON Schema (Draft 2020-12)** | Carito Curto (R/A)<br>Patricia Marina (C) | `src/components/tramite/DynamicSchemaForm.tsx`<br>`src/utils/schemaFormParser.ts`<br>`src/types/jsonSchema.ts` | 1. Intérprete que renderiza controles UI a partir de esquema JSON descargado de API.<br>2. Soporte para textos, números, selects, fechas y combos anidados.<br>3. Integración con React Hook Form sin uso de `any`.<br>4. Emisión de datos estructurados para columna PostgreSQL `JSONB`. | Formulario que cambia instantáneamente al alternar tipo de trámite TUPA en la UI. | 20% | 8 |
-| `ENT-M02-03` | **Carga Desacoplada MinIO/S3 con Magic Bytes y SHA-256** | Lucy Panduro Ramos (R/A)<br>Carito Curto (R) | `src/components/common/FileUploadDropzone.tsx`<br>`src/hooks/usePresignedUpload.ts`<br>`src/utils/magicBytesValidator.ts`<br>`src/utils/cryptoSha256.ts` | 1. Validación estricta de Magic Bytes `%PDF` (`0x25, 0x50, 0x44, 0x46`) en los primeros 4 bytes del buffer.<br>2. Cómputo local de hash SHA-256 con Web Crypto API.<br>3. Solicitud de URL prefirmada PUT y carga directa a MinIO con barra de progreso.<br>4. Cancelación controlada de subida vía `AbortController`. | Rechazo inmediato al subir archivo `.exe` o `.docx` renombrado a `.pdf`; log con hash SHA-256 verificado. | 25% | 8 |
+| `ENT-M02-02` | **Motor Dinámico de Formularios JSON Schema (Draft 2020-12)** | Patricia Marina (R/A)<br>Lucy Panduro Ramos (C) | `src/components/tramite/DynamicSchemaForm.tsx`<br>`src/utils/schemaFormParser.ts`<br>`src/types/jsonSchema.ts` | 1. Intérprete que renderiza controles UI a partir de esquema JSON descargado de API.<br>2. Soporte para textos, números, selects, fechas y combos anidados.<br>3. Integración con React Hook Form sin uso de `any`.<br>4. Emisión de datos estructurados para columna PostgreSQL `JSONB`. | Formulario que cambia instantáneamente al alternar tipo de trámite TUPA en la UI. | 20% | 8 |
+| `ENT-M02-03` | **Carga Desacoplada MinIO/S3 con Magic Bytes y SHA-256** | Lucy Panduro Ramos (R/A)<br>Patricia Marina (R) | `src/components/common/FileUploadDropzone.tsx`<br>`src/hooks/usePresignedUpload.ts`<br>`src/utils/magicBytesValidator.ts`<br>`src/utils/cryptoSha256.ts` | 1. Validación estricta de Magic Bytes `%PDF` (`0x25, 0x50, 0x44, 0x46`) en los primeros 4 bytes del buffer.<br>2. Cómputo local de hash SHA-256 con Web Crypto API.<br>3. Solicitud de URL prefirmada PUT y carga directa a MinIO con barra de progreso.<br>4. Cancelación controlada de subida vía `AbortController`. | Rechazo inmediato al subir archivo `.exe` o `.docx` renombrado a `.pdf`; log con hash SHA-256 verificado. | 25% | 8 |
 | `ENT-M02-04` | **Mesa de Partes Virtual con Control de Horario de Corte 16:30 hrs LPAG** | Noelia Alva (R/A)<br>Patricia Marina (R) | `src/pages/tramite/MesaPartesVirtualPage.tsx`<br>`src/components/tramite/HorarioCorteNotice.tsx`<br>`src/hooks/useHorarioCorte.ts` | 1. Verificación automática de la hora oficial peruana (`America/Lima`).<br>2. Si hora $\ge$ 16:30 hrs o día inhábil, despliegue obligatorio de banner ámbar de notificación legal.<br>3. Cálculo exacto de proyección de fecha legal a las 08:00 hrs del día hábil inmediato siguiente (Art. 138 Ley 27444).<br>4. Inclusión de ambos timestamps en la radicación. | Simulación en vivo de hora > 16:30 mostrando el aviso legal; verificación de fecha hábil siguiente. | 15% | 5 |
-| `ENT-M02-05` | **Ventanilla Presencial y Generación de Cargo CUT con QR** | Angy Mendoza (R/A)<br>Patricia Marina (R) | `src/pages/tramite/VentanillaPresencialPage.tsx`<br>`src/components/tramite/CargoDigitalModal.tsx`<br>`src/components/common/QrCodeView.tsx`<br>`src/types/cargoOficial.ts` | 1. Formulario de atención rápida para operador en ventanilla.<br>2. Generación y visualización del CUT (`EXP-YYYY-XXXXXX`).<br>3. Modal de cargo oficial con código QR dinámico de 200x200px legible por smartphone.<br>4. Estilos de impresión térmica `@media print` para tickets de 80mm/58mm. | Impresión de ticket térmico probada en diálogo de navegador; escaneo de QR funcional hacia URL institucional. | 10% | 5 |
+| `ENT-M02-05` | **Ventanilla Presencial y Generación de Cargo CUT con QR** | Noelia Alva (R/A)<br>Anllely Melgarejo (R) | `src/pages/tramite/VentanillaPresencialPage.tsx`<br>`src/components/tramite/CargoDigitalModal.tsx`<br>`src/components/common/QrCodeView.tsx`<br>`src/types/cargoOficial.ts` | 1. Formulario de atención rápida para operador en ventanilla.<br>2. Generación y visualización del CUT (`EXP-YYYY-XXXXXX`).<br>3. Modal de cargo oficial con código QR dinámico de 200x200px legible por smartphone.<br>4. Estilos de impresión térmica `@media print` para tickets de 80mm/58mm. | Impresión de ticket térmico probada en diálogo de navegador; escaneo de QR funcional hacia URL institucional. | 10% | 5 |
 | `ENT-M02-06` | **Suite de Pruebas Automatizadas de Carga y Horario LPAG M2** | Lucy Panduro Ramos (R/A)<br>Anllely Melgarejo (R) | `src/tests/m2/magicBytesValidator.test.ts`<br>`src/tests/m2/horarioCorte.test.ts`<br>`src/tests/m2/tramiteWizard.test.tsx` | 1. Pruebas unitarias de Magic Bytes: buffer legítimo `%PDF` aprobado, buffers falsos rechazados.<br>2. Pruebas unitarias de corte LPAG: 16:29 hrs (mismo día) vs 16:30 hrs (día hábil siguiente).<br>3. Pruebas de integración del wizard de 4 pasos con Vitest.<br>4. Cobertura $\ge 80\%$ sin advertencias. | Ejecución limpia de `npm test` con reporte de cobertura al 100% en verde. | 10% | 3 |
-| **TOTAL** | **MÓDULO 2 CONSOLIDADO** | **Sub-equipo M2** | **Conjunto de Artefactos de M2** | **Cumplimiento Integral de Criterios DoD y Ley 27444** | **Demostración en Vivo + Ficha Docente** | **100%** | **34 SP** |
+| **TOTAL** | **MÓDULO 1 (GRUPO 1) CONSOLIDADO** | **Grupo 1 Frontend** | **Conjunto de Artefactos de Grupo 1** | **Cumplimiento Integral de Criterios DoD y Ley 27444** | **Demostración en Vivo + Ficha Docente** | **100%** | **34 SP** |
 
 ---
 
@@ -153,9 +150,8 @@ Matriz de entregables para la calificación del sub-equipo del Módulo 2 (34 Sto
 
 1. DATOS DE LA ESTUDIANTE Y ENTREGABLES
    - Estudiante Evaluada: _________________________________________________________________________
-   - Rol en Sub-equipo: [ ] Líder (Patricia Marina)   [ ] Arq. JSON Schema / S3 (Carito Curto)
-                        [ ] UI Kit / Magic Bytes (Lucy Panduro)  [ ] Wizard MPV (Anllely Melgarejo)
-                        [ ] TUPA (Noelia Alva)        [ ] Ventanilla / Cargo (Angy Mendoza)
+   - Rol en Grupo 1:    [ ] Líder (Patricia Marina)   [ ] UI Kit / Magic Bytes (Lucy Panduro)
+                         [ ] Wizard MPV (Anllely Melgarejo)   [ ] TUPA y Corte LPAG (Noelia Alva)
    - Entregable(s) a Calificar: [ ] ENT-M02-01  [ ] ENT-M02-02  [ ] ENT-M02-03  [ ] ENT-M02-04  [ ] ENT-M02-05  [ ] ENT-M02-06
    - Total Story Points Evaluados: _________ SP   |   Fecha de Sustentación: _____ / _____ / 2026
 

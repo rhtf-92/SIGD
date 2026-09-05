@@ -6,7 +6,7 @@
 | **Módulo** | registro-usuarios-casilla / Selector de Ubigeo en Cascada Ucayali SIAGIE-MINEDU |
 | **Versión** | 1.0.0-PROD |
 | **Fecha de Aprobación** | 2026-09-05 |
-| **Autores Reconocidos** | Matías Zumaeta, Sergio Serruche Panduro, Christiam Saúl |
+| **Autores Reconocidos** | Matías Zumaeta, Sergio Serruche Panduro, Ángel Jesús Vásquez, Carito Curto |
 | **Estado de Homologación** | Aprobado — Alineado a LPAG Ley N° 27444 y React 19 |
 
 ---

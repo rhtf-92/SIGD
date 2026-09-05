@@ -4,7 +4,7 @@
 | **Módulo** | administracion-seguridad-auditoria / Administración, Seguridad y Auditoría |
 | **Versión** | 1.0.0-PROD |
 | **Fecha de Aprobación** | 2026-09-05 |
-| **Autores Reconocidos** | Jhonatan Nijar Gonzales De Souza, Angel Vásquez |
+| **Autores Reconocidos** | Jhonatan Nijar Gonzales de Souza, Carlos Perea ("Gato"), Leonel Rivera Maxin ("Maxin"), Cristian Macedo |
 | **Estado de Homologación** | Aprobado — Alineado a LPAG Ley N° 27444 y React 19 |
 
 # 06. Calendario Laboral, Jornada Hábil y Cómputo de Plazos LPAG

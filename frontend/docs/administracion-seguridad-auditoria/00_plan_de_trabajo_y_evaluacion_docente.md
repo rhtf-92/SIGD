@@ -11,12 +11,11 @@
 - **Ciclo Académico:** `2026-2` | **Programa:** `Desarrollo de Sistemas de Información (DSI)`
 - **Unidad Didáctica:** `Taller de Programación Web / Proyecto Integrador SIGD`
 - **Docente Titular / Product Owner:** `Ing. Renato Henyer Tarazona Flores`
-- **Scrum Master & Arquitecto Principal:** `Christiam Saúl`
-- **Sub-equipo Asignado (M5):**
-  - **Líder de Sub-equipo:** `Jhonatan Nijar Gonzales de Souza` (Git: `JHONATAN` / `jhonatan`)
-  - **Especialista de Seguridad RBAC:** `Carlos Perea ("Gato")` (Git: `soychivo` / `caps6954`)
-  - **Desarrollador Auditoría Forense:** `Leonel Rivera ("Maxin")` (Git: `maxirivera`)
-  - **Desarrollador Directorio y Seguridad:** `Angel Jesús Vásquez Godoy` (Git: `angel-vasquez` / `angel`)
+- **Sub-equipo Asignado (Grupo 4):**
+  - **Líder de Grupo:** `Jhonatan Nijar Gonzales de Souza` (Git: `JHONATAN` / `jhonatan` / `F_GONZALES`)
+  - **Especialista de Seguridad RBAC:** `Carlos Perea ("Gato")` (Git: `soychivo` / `caps6954` / `F_PEREA`)
+  - **Desarrollador Auditoría Forense:** `Leonel Rivera Maxin ("Maxin")` (Git: `maxirivera` / `F_RIVERA`)
+  - **Desarrollador Frontend / Seguridad:** `Cristian Macedo` (Git: `cristiamsaul2` / `F_CRISTIAM`)
 - **Carga de Trabajo Asignada:** `28 Story Points (SP)` distribuidos en 6 entregables atómicos
 - **Ubicación Canónica:** `frontend/docs/administracion-seguridad-auditoria/00_plan_de_trabajo_y_evaluacion_docente.md`
 - **Documento Maestro Institucional:** [PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md](../PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
@@ -101,17 +100,17 @@ El Módulo 5 se comunica con los microservicios administrativos a través de las
 
 ## 3. TABLA DE ENTREGABLES ATÓMICOS DE EVALUACIÓN DOCENTE
 
-Matriz de entregables para la calificación del sub-equipo del Módulo 5 (28 Story Points):
+Matriz de entregables para la calificación del Grupo 4 (28 Story Points):
 
 | Código | Nombre del Entregable | Estudiantes Responsables | Artefactos Concretos en Repositorio | Criterios de Aceptación Objetivos (DoD) | Evidencia Demostrable | Peso % | SP |
 |:---:|---|---|---|---|---|:---:|:---:|
 | `ENT-M05-01` | **Panel Central de Administración y Navegación Institucional** | Jhonatan Gonzales (R/A) | `src/pages/administracion/AdministracionPage.tsx` (existente)<br>`src/components/administracion/AdminBreadcrumbs.tsx`<br>`src/components/administracion/AdminPageHeader.tsx` (existente)<br>`src/routes/AdminRoutes.tsx` | 1. Panel central con 6 tarjetas de acceso rápido operativas.<br>2. Breadcrumbs reactivos en todas las subvistas.<br>3. Botón de retorno contextual en el encabezado.<br>4. Enrutamiento integrado en `AppRouter.tsx` con guardianes de seguridad. | Vista central operativa; navegación fluida entre las 6 secciones sin errores de consola. | 15% | 3 |
-| `ENT-M05-02` | **Gestión del Directorio de Usuarios y Asignación de Plazas** | Angel Vásquez (R)<br>Jhonatan Gonzales (R/A) | `src/pages/administracion/UsuariosPage.tsx` (existente)<br>`src/components/administracion/UserEditModal.tsx`<br>`src/hooks/useUsuariosAdmin.ts`<br>`src/types/usuarioAdmin.ts` | 1. Tabla de usuarios con búsqueda en tiempo real y filtro por estado.<br>2. Modal de administración para editar área, plaza y rol.<br>3. Conmutador reactivo de estado (Activa / Inactiva / Bloqueada).<br>4. Desacoplamiento de lógica en hook `useUsuariosAdmin.ts`. | Pantalla de usuarios completamente integrada; modal de edición funcional. | 20% | 5 |
+| `ENT-M05-02` | **Gestión del Directorio de Usuarios y Asignación de Plazas** | Cristian Macedo (R)<br>Jhonatan Gonzales (R/A) | `src/pages/administracion/UsuariosPage.tsx` (existente)<br>`src/components/administracion/UserEditModal.tsx`<br>`src/hooks/useUsuariosAdmin.ts`<br>`src/types/usuarioAdmin.ts` | 1. Tabla de usuarios con búsqueda en tiempo real y filtro por estado.<br>2. Modal de administración para editar área, plaza y rol.<br>3. Conmutador reactivo de estado (Activa / Inactiva / Bloqueada).<br>4. Desacoplamiento de lógica en hook `useUsuariosAdmin.ts`. | Pantalla de usuarios completamente integrada; modal de edición funcional. | 20% | 5 |
 | `ENT-M05-03` | **Matriz de Control de Acceso Granular RBAC (5 Roles Canónicos)** | Carlos Perea (R/A)<br>Jhonatan Gonzales (C) | `src/pages/administracion/RolesPermisosPage.tsx` (existente)<br>`src/components/administracion/RolePermissionMatrix.tsx`<br>`src/types/rbacRoles.ts`<br>`src/hooks/useRbacConfig.ts` | 1. Alineación estricta a los 5 roles canónicos: `SUPER_ADMIN`, `DIRECTOR`, `DOCENTE`, `MESA_PARTES`, `ESTUDIANTE`.<br>2. Matriz de permisos interactiva por módulo y acción.<br>3. Persistencia de cambios y advertencia de impacto en seguridad.<br>4. Tipado estricto sin comodín `any`. | Pantalla de roles interactiva; matriz de checkboxes mutable y tipada en TypeScript 5.9. | 20% | 5 |
 | `ENT-M05-04` | **Visor Forense de Logs Inmutables y Exportación CSV** | Leonel Rivera (R/A)<br>Jhonatan Gonzales (C) | `src/pages/administracion/AuditoriaPage.tsx` (existente)<br>`src/components/administracion/AuditDetailDrawer.tsx`<br>`src/hooks/useAuditLogs.ts`<br>`src/types/auditoriaForense.ts` | 1. Interfaz de solo lectura para la bitácora WORM.<br>2. Filtros por módulo, resultado y trazabilidad por `X-Correlation-ID`.<br>3. Visualizador de diferencias JSON (datos anteriores vs nuevos).<br>4. Exportador a archivo CSV (`auditoria-sigd.csv`) mediante Blob en memoria. | Pantalla de auditoría con descarga directa de archivo CSV funcional y visor de diffs. | 15% | 5 |
-| `ENT-M05-05` | **Mantenimiento de Tablas Maestras y Organigrama Materialized Path** | Jhonatan Gonzales (R/A) | `src/pages/administracion/TablasMaestrasPage.tsx` (existente)<br>`src/components/administracion/OrganigramaTreeView.tsx`<br>`src/hooks/useTablasMaestras.ts`<br>`src/types/tablasMaestras.ts` | 1. Pestañas para Sedes, Áreas y Tipos Documentales.<br>2. Alta y edición de registros con borrado lógico (inactivación).<br>3. Soporte visual del organigrama jerárquico bajo formato Materialized Path (`01.03.02`). | Mantenimiento operativo con visualización en árbol de la estructura organizacional. | 15% | 5 |
-| `ENT-M05-06` | **Calendario Laboral LPAG (Ajuste 16:30 hrs) y Políticas de Seguridad** | Jhonatan Gonzales (R/A)<br>Carlos Perea (R) | `src/pages/administracion/CalendarioLaboralPage.tsx` (existente)<br>`src/pages/administracion/SeguridadPage.tsx` (existente)<br>`src/hooks/useCalendarioLaboral.ts`<br>`src/hooks/useSeguridadPolicies.ts` | 1. Corrección obligatoria del horario de fin de 17:00 a las **16:30 hrs** (Ley N° 27444).<br>2. Parametrización de feriados regionales de Ucayali.<br>3. Políticas de acceso: 5 intentos fallidos máximos y timeout de sesión.<br>4. Desbloqueo supervisado de cuentas bloqueadas con justificación. | Horario 16:30 hrs reflejado en la UI; panel de políticas y desbloqueo de cuenta operativo. | 15% | 5 |
-| **TOTAL** | **MÓDULO 5 CONSOLIDADO** | **Sub-equipo M5** | **Conjunto de Artefactos de M5** | **Cumplimiento Integral de Criterios DoD y Ley 27444** | **Demostración en Vivo + Ficha Docente** | **100%** | **28 SP** |
+| `ENT-M05-05` | **Mantenimiento de Tablas Maestras y Organigrama Materialized Path** | Jhonatan Gonzales (R/A)<br>Cristian Macedo (R) | `src/pages/administracion/TablasMaestrasPage.tsx` (existente)<br>`src/components/administracion/OrganigramaTreeView.tsx`<br>`src/hooks/useTablasMaestras.ts`<br>`src/types/tablasMaestras.ts` | 1. Pestañas para Sedes, Áreas y Tipos Documentales.<br>2. Alta y edición de registros con borrado lógico (inactivación).<br>3. Soporte visual del organigrama jerárquico bajo formato Materialized Path (`01.03.02`). | Mantenimiento operativo con visualización en árbol de la estructura organizacional. | 15% | 5 |
+| `ENT-M05-06` | **Calendario Laboral LPAG (Ajuste 16:30 hrs) y Políticas de Seguridad** | Jhonatan Gonzales (R/A)<br>Carlos Perea & Cristian Macedo (R) | `src/pages/administracion/CalendarioLaboralPage.tsx` (existente)<br>`src/pages/administracion/SeguridadPage.tsx` (existente)<br>`src/hooks/useCalendarioLaboral.ts`<br>`src/hooks/useSeguridadPolicies.ts` | 1. Corrección obligatoria del horario de fin de 17:00 a las **16:30 hrs** (Ley N° 27444).<br>2. Parametrización de feriados regionales de Ucayali.<br>3. Políticas de acceso: 5 intentos fallidos máximos y timeout de sesión.<br>4. Desbloqueo supervisado de cuentas bloqueadas con justificación. | Horario 16:30 hrs reflejado en la UI; panel de políticas y desbloqueo de cuenta operativo. | 15% | 5 |
+| **TOTAL** | **MÓDULO 4 (GRUPO 4) CONSOLIDADO** | **Grupo 4 Frontend** | **Conjunto de Artefactos de Grupo 4** | **Cumplimiento Integral de Criterios DoD y Ley 27444** | **Demostración en Vivo + Ficha Docente** | **100%** | **28 SP** |
 
 ---
 
@@ -148,10 +147,10 @@ Matriz de entregables para la calificación del sub-equipo del Módulo 5 (28 Sto
 
 1. DATOS DEL ESTUDIANTE Y ENTREGABLES
    - Estudiante Evaluado: _________________________________________________________________________
-   - Rol en Sub-equipo: [ ] Líder / Hub / Maestras (Jhonatan Gonzales)
-                        [ ] Especialista RBAC (Carlos Perea)
-                        [ ] Auditoría WORM / CSV (Leonel Rivera)
-                        [ ] Directorio / Seguridad (Angel Vásquez)
+   - Rol en Grupo 4:    [ ] Líder / Hub / Maestras (Jhonatan Gonzales)
+                         [ ] Especialista RBAC (Carlos Perea)
+                         [ ] Auditoría WORM / CSV (Leonel Rivera)
+                         [ ] Directorio / Seguridad (Cristian Macedo)
    - Entregable(s) a Calificar: [ ] ENT-M05-01  [ ] ENT-M05-02  [ ] ENT-M05-03  [ ] ENT-M05-04  [ ] ENT-M05-05  [ ] ENT-M05-06
    - Total Story Points Evaluados: _________ SP   |   Fecha de Sustentación: _____ / _____ / 2026
 

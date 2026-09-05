@@ -4,7 +4,7 @@
 | **Módulo** | administracion-seguridad-auditoria / Administración, Seguridad y Auditoría |
 | **Versión** | 1.0.0-PROD |
 | **Fecha de Aprobación** | 2026-09-05 |
-| **Autores Reconocidos** | Leonel Rivera, Jhonatan Nijar Gonzales De Souza |
+| **Autores Reconocidos** | Leonel Rivera Maxin ("Maxin"), Jhonatan Nijar Gonzales de Souza, Carlos Perea ("Gato"), Cristian Macedo |
 | **Estado de Homologación** | Aprobado — Alineado a LPAG Ley N° 27444 y React 19 |
 
 # 04. Pistas de Auditoría Inmutable y Trazabilidad Forense

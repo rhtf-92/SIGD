@@ -4,7 +4,7 @@
 | **Módulo** | administracion-seguridad-auditoria / Administración, Seguridad y Auditoría |
 | **Versión** | 1.0.0-PROD |
 | **Fecha de Aprobación** | 2026-09-05 |
-| **Autores Reconocidos** | Jhonatan Nijar Gonzales De Souza, Angel Vásquez ("Gato"), Leonel Rivera ("Maxin"), Carlos Perea |
+| **Autores Reconocidos** | Jhonatan Nijar Gonzales de Souza, Carlos Perea ("Gato"), Leonel Rivera Maxin ("Maxin"), Cristian Macedo |
 | **Estado de Homologación** | Aprobado — Alineado a LPAG Ley N° 27444 y React 19 |
 
 # 01. Descripción General del Hub de Administración, Seguridad y Auditoría

@@ -4,7 +4,7 @@
 | **Módulo** | reportes-tableros-control / Reportes y Tableros de Control |
 | **Versión** | 1.0.0-PROD |
 | **Fecha de Aprobación** | 2026-09-05 |
-| **Autores Reconocidos** | Gatica, Clider Urquia |
+| **Autores Reconocidos** | Clider Lex Urquia López, Lloner Vargas Huayunga, Jennifer Gatica Saavedra, Barbarán Gonzales |
 | **Estado de Homologación** | Aprobado — Alineado a LPAG Ley N° 27444 y React 19 |
 
 # 02. Catálogo Oficial de Indicadores Clave de Rendimiento (KPIs)

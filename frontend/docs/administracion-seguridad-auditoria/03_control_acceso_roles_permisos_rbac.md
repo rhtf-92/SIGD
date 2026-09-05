@@ -4,7 +4,7 @@
 | **Módulo** | administracion-seguridad-auditoria / Administración, Seguridad y Auditoría |
 | **Versión** | 1.0.0-PROD |
 | **Fecha de Aprobación** | 2026-09-05 |
-| **Autores Reconocidos** | Carlos Perea, Jhonatan Nijar Gonzales De Souza |
+| **Autores Reconocidos** | Carlos Perea ("Gato"), Jhonatan Nijar Gonzales de Souza, Leonel Rivera Maxin ("Maxin"), Cristian Macedo |
 | **Estado de Homologación** | Aprobado — Alineado a LPAG Ley N° 27444 y React 19 |
 
 # 03. Control de Acceso Basado en Roles (RBAC) y Matriz de Permisos

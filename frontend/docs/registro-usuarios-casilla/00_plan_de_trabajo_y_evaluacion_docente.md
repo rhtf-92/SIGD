@@ -11,12 +11,11 @@
 - **Ciclo Académico:** `2026-2` | **Programa:** `Desarrollo de Sistemas de Información (DSI)`
 - **Unidad Didáctica:** `Taller de Programación Web / Proyecto Integrador SIGD`
 - **Docente Titular / Product Owner:** `Ing. Renato Henyer Tarazona Flores`
-- **Scrum Master & Arquitecto Principal:** `Christiam Saúl`
-- **Sub-equipo Asignado (M1):**
-  - **Líder de Sub-equipo:** `Matías Tiziano Zumaeta Alva` (Git: `matias-zumaeta` / `Matias-Spike`)
-  - **Desarrollador Frontend:** `Sergio Adrián Serruche Panduro` (Git: `sergio-serruche` / `Sergio-Serruche`)
-  - **Especialista de Integración:** `Angel Jesús Vásquez Godoy` (Git: `angel-vasquez` / `angel`)
-  - **Soporte de Arquitectura:** `Christiam Saúl` (Git: `christiam-saul` / `cristiamsaul2`)
+- **Sub-equipo Asignado (Grupo 2):**
+  - **Líder de Grupo:** `Matías Tiziano Zumaeta Alva` (Git: `matias-zumaeta` / `Matias-Spike` / `F_MATIAS`)
+  - **Desarrollador Frontend (Casilla y 2FA):** `Sergio Adrián Serruche Panduro` (Git: `sergio-serruche` / `Sergio-Serruche` / `F_SERGIO`)
+  - **Especialista de Integración (Ubigeo y SIAGIE):** `Ángel Jesús Vásquez Godoy` (Git: `angel-vasquez` / `angel` / `F_JESUS`)
+  - **Especialista Arq. (JSON Schema / S3 / Validación):** `Carito Curto (Angy Curto)` (Git: `cakcy3-web` / `F_CURTO`)
 - **Carga de Trabajo Asignada:** `26 Story Points (SP)` distribuidos en 5 entregables atómicos
 - **Ubicación Canónica:** `frontend/docs/registro-usuarios-casilla/00_plan_de_trabajo_y_evaluacion_docente.md`
 - **Documento Maestro Institucional:** [PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md](../PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
@@ -104,16 +103,16 @@ El Módulo 1 interactúa de manera síncrona con el backend mediante las siguien
 
 ## 3. TABLA DE ENTREGABLES ATÓMICOS DE EVALUACIÓN DOCENTE
 
-A continuación se detalla la matriz de entregables que el docente evaluará para el Módulo 1, con asignación nominal a los estudiantes, artefactos en código, criterios de aceptación (*Definition of Done*) y ponderación porcentual:
+A continuación se detalla la matriz de entregables que el docente evaluará para el Grupo 2 (26 Story Points):
 
 | Código | Nombre del Entregable | Estudiantes Responsables | Artefactos Concretos en Repositorio | Criterios de Aceptación Objetivos (DoD) | Evidencia Demostrable | Peso % | SP |
 |:---:|---|---|---|---|---|:---:|:---:|
 | `ENT-M01-01` | **Formulario Polimórfico de Registro Ciudadano y Empresa** | Matías Zumaeta (R/A)<br>Sergio Serruche (R) | `src/pages/registro/RegistroCiudadanoPage.tsx`<br>`src/components/registro/PersonaNaturalForm.tsx`<br>`src/components/registro/PersonaJuridicaForm.tsx`<br>`src/schemas/registroCiudadano.schema.ts`<br>`src/types/registroCiudadano.ts` | 1. Conmutador reactivo entre Persona Natural y Jurídica sin recarga.<br>2. Validación estricta con Zod: DNI 8 dígitos, CE 9-12 caracteres, RUC 11 dígitos iniciando en 10 o 20 con algoritmo Módulo 11.<br>3. Restricción de edad $\ge 16$ años calculada dinámicamente.<br>4. Tipado estricto sin tipo `any` ni advertencias en `tsc`. | Formulario 100% interactivo en navegador; validación de errores inline en tiempo real; esquema Zod tipado. | 25% | 8 |
-| `ENT-M01-02` | **Selector en Cascada de Ubigeo Ucayali con Caché Local** | Matías Zumaeta (R/A)<br>Christiam Saúl (C) | `src/components/common/UbigeoSelector.tsx`<br>`src/hooks/useUbigeoCascade.ts`<br>`src/data/ucayali.ts` | 1. Carga encadenada de Departamento (25 Ucayali) $\rightarrow$ Provincia $\rightarrow$ Distrito.<br>2. Cobertura exacta de las 4 provincias y 17 distritos de Ucayali.<br>3. Reseteo automático de distrito al alternar provincia.<br>4. Persistencia en memoria/caché local evitando llamadas redundantes.<br>5. Accesible por teclado bajo WCAG 2.1 AA. | Selector plenamente operativo en UI; hook con respuesta síncrona instantánea; datos alineados con INEI. | 20% | 5 |
+| `ENT-M01-02` | **Selector en Cascada de Ubigeo Ucayali con Caché Local** | Ángel Jesús Vásquez (R/A)<br>Matías Zumaeta (C) | `src/components/common/UbigeoSelector.tsx`<br>`src/hooks/useUbigeoCascade.ts`<br>`src/data/ucayali.ts` | 1. Carga encadenada de Departamento (25 Ucayali) $\rightarrow$ Provincia $\rightarrow$ Distrito.<br>2. Cobertura exacta de las 4 provincias y 17 distritos de Ucayali.<br>3. Reseteo automático de distrito al alternar provincia.<br>4. Persistencia en memoria/caché local evitando llamadas redundantes.<br>5. Accesible por teclado bajo WCAG 2.1 AA. | Selector plenamente operativo en UI; hook con respuesta síncrona instantánea; datos alineados con INEI. | 20% | 5 |
 | `ENT-M01-03` | **Bandeja de Casilla Electrónica Ciudadana y Acuse Legal** | Sergio Serruche (R/A)<br>Matías Zumaeta (C) | `src/pages/casilla/CasillaElectronicaPage.tsx`<br>`src/components/casilla/NotificacionList.tsx`<br>`src/components/casilla/NotificacionDetailModal.tsx`<br>`src/hooks/useCasilla.ts`<br>`src/types/casilla.ts` | 1. Visualización paginada de notificaciones oficiales dirigidas al administrado.<br>2. Indicadores de estado visuales (No Leído, Leído, Notificado).<br>3. Apertura modal que despliega acto administrativo y genera acuse digital con timestamp ISO-8601 y hash SHA-256.<br>4. Filtro por tipo de notificación y fecha. | Bandeja funcional con listado reactivo; simulación de apertura y generación de acuse con fecha cierta. | 25% | 5 |
-| `ENT-M01-04` | **Consentimiento Informado Ley N° 29733 y Declaración Jurada** | Sergio Serruche (R/A)<br>Angel Vásquez (R) | `src/components/registro/ConsentimientoLey29733Modal.tsx`<br>`src/components/registro/DeclaracionJuradaCheckbox.tsx`<br>`src/schemas/consentimiento.schema.ts` | 1. Checkbox interactivo con cláusula de la ANPDP (Ley N° 29733).<br>2. Modal informativo accesible con el detalle de políticas de tratamiento de datos y domicilio digital.<br>3. Bloqueo estricto del botón de envío mientras el checkbox permanezca desmarcado.<br>4. Inclusión de `{ consentimientoLey29733: true, version: "1.0", fechaAceptacion }` en payload. | Interfaz bloqueante demostrada; modal responsive con texto legal oficial del IESTP "Suiza". | 15% | 3 |
-| `ENT-M01-05` | **Suite de Pruebas Automatizadas de Validación M1** | Matías Zumaeta (R/A)<br>Sergio Serruche (R) | `src/tests/m1/registroCiudadano.test.tsx`<br>`src/tests/m1/ubigeoCascade.test.ts`<br>`src/tests/m1/casillaElectronica.test.tsx` | 1. Cobertura mínima de pruebas unitarias $\ge 80\%$ ejecutadas en Vitest.<br>2. Aserciones para casos de borde: DNI alfanumérico rechazado, RUC inválido en Módulo 11 rechazado, menor de 16 años rechazado, bloqueo sin consentimiento.<br>3. Prueba de renderizado de los 17 distritos de Ucayali. | Suite ejecutable mediante `npm test` con reporte 100% aprobado y cero fallas. | 15% | 5 |
-| **TOTAL** | **MÓDULO 1 CONSOLIDADO** | **Sub-equipo M1** | **Conjunto de Artefactos de M1** | **Cumplimiento Integral de DoD y Estándares DSI** | **Demostración en Vivo + Ficha Docente** | **100%** | **26 SP** |
+| `ENT-M01-04` | **Consentimiento Informado Ley N° 29733 y Declaración Jurada** | Carito Curto (R/A)<br>Sergio Serruche (R) | `src/components/registro/ConsentimientoLey29733Modal.tsx`<br>`src/components/registro/DeclaracionJuradaCheckbox.tsx`<br>`src/schemas/consentimiento.schema.ts` | 1. Checkbox interactivo con cláusula de la ANPDP (Ley N° 29733).<br>2. Modal informativo accesible con el detalle de políticas de tratamiento de datos y domicilio digital.<br>3. Bloqueo estricto del botón de envío mientras el checkbox permanezca desmarcado.<br>4. Inclusión de `{ consentimientoLey29733: true, version: "1.0", fechaAceptacion }` en payload. | Interfaz bloqueante demostrada; modal responsive con texto legal oficial del IESTP "Suiza". | 15% | 3 |
+| `ENT-M01-05` | **Suite de Pruebas Automatizadas de Validación M1** | Matías Zumaeta (R/A)<br>Carito Curto & Ángel Jesús Vásquez (R) | `src/tests/m1/registroCiudadano.test.tsx`<br>`src/tests/m1/ubigeoCascade.test.ts`<br>`src/tests/m1/casillaElectronica.test.tsx` | 1. Cobertura mínima de pruebas unitarias $\ge 80\%$ ejecutadas en Vitest.<br>2. Aserciones para casos de borde: DNI alfanumérico rechazado, RUC inválido en Módulo 11 rechazado, menor de 16 años rechazado, bloqueo sin consentimiento.<br>3. Prueba de renderizado de los 17 distritos de Ucayali. | Suite ejecutable mediante `npm test` con reporte 100% aprobado y cero fallas. | 15% | 5 |
+| **TOTAL** | **MÓDULO 2 (GRUPO 2) CONSOLIDADO** | **Grupo 2 Frontend** | **Conjunto de Artefactos de Grupo 2** | **Cumplimiento Integral de DoD y Estándares DSI** | **Demostración en Vivo + Ficha Docente** | **100%** | **26 SP** |
 
 ---
 
@@ -152,7 +151,8 @@ La evaluación del Módulo 1 se realiza bajo las 4 dimensiones estándar pondera
 
 1. DATOS DEL ESTUDIANTE Y ENTREGABLES
    - Estudiante Evaluado: _________________________________________________________________________
-   - Rol en Sub-equipo: [ ] Líder (Matías Zumaeta)  [ ] Desarrollador (Sergio Serruche)  [ ] Soporte (Angel Vásquez)
+   - Rol en Grupo 2:    [ ] Líder (Matías Zumaeta)  [ ] Casilla / 2FA (Sergio Serruche)
+                         [ ] Ubigeo (Ángel Jesús Vásquez) [ ] Arq. JSON Schema / S3 (Carito Curto)
    - Entregable(s) a Calificar: [ ] ENT-M01-01  [ ] ENT-M01-02  [ ] ENT-M01-03  [ ] ENT-M01-04  [ ] ENT-M01-05
    - Total Story Points Evaluados: _________ SP   |   Fecha de Sustentación: _____ / _____ / 2026
 

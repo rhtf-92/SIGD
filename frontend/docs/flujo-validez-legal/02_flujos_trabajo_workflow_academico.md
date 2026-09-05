@@ -4,7 +4,7 @@
 | **Módulo** | flujo-validez-legal / Flujo Interno de Trabajo y Validez Legal |
 | **Versión** | 1.0.0-PROD |
 | **Fecha de Aprobación** | 2026-09-05 |
-| **Autores Reconocidos** | Geric, Jacobo, Jhasy |
+| **Autores Reconocidos** | Adriano David Espinoza Ramírez, Isaí, Mayra |
 | **Estado de Homologación** | Aprobado — Alineado a LPAG Ley N° 27444 y React 19 |
 
 # 02. Flujos de Trabajo (Workflow Académico-Administrativo)

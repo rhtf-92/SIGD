@@ -6,7 +6,7 @@
 | **Módulo** | gestion-expedientes / Modelo de Datos TypeScript 5.9 y Trazabilidad Inmutable |
 | **Versión** | 1.0.0-PROD |
 | **Fecha de Aprobación** | 2026-09-05 |
-| **Autores Reconocidos** | Isack Vargas, Christiam Saúl |
+| **Autores Reconocidos** | Isack Vargas, Willfredo Soria, Piero Bartra Montalvo |
 | **Estado de Homologación** | Aprobado — Alineado a LPAG Ley N° 27444 y React 19 |
 
 ---
