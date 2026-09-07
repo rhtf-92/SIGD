@@ -10,7 +10,7 @@ Líder general: Geric · B_GERIC
 
 Sublíder: Pool · B_POOL
 
-Integrantes: Pool, Leonardo y Panaifo
+Integrantes: Pool, Leonardo, Panaifo y Héctor
 
 Fecha: 27 de agosto de 2026
 
@@ -64,6 +64,7 @@ Cada decisión deberá marcarse con una de estas categorías:
 | Pool | B_POOL | Sublíder y modelador | Modelo de datos, coordinación, revisión e integración. |
 | Leonardo | B_LEONARDO | Analista funcional | Áreas, jerarquías, roles, responsables, permisos y preguntas. |
 | Panaifo | B_PANAIFO | Implementador SQL | SQL provisional, matriz de permisos, pruebas y evidencia técnica. |
+| Héctor | B_HECTOR | Validador y QA | Casos de prueba de permisos, integridad referencial y verificación SQL. |
 
 5. Responsabilidades individuales
 
@@ -207,9 +208,31 @@ Panaifo elaborará el SQL después de que Pool apruebe el análisis y el modelo.
 
 - El SQL está marcado como borrador y no fija decisiones institucionales pendientes.
 
+Héctor (B_HECTOR)
+
+Responsabilidad asignada: Validador de esquemas, integridad referencial y casos de prueba QA
+
+Héctor asume la verificación cruzada de restricciones de integridad referencial, pruebas de carga de datos semilla y diseño de casos de prueba negativos para permisos denegados, jerarquías recursivas y prevención de ciclos en el organigrama.
+
+### Actividades
+- Diseñar la batería de pruebas automatizadas para comprobar que un usuario sin rol no acceda a recursos restringidos.
+- Verificar que las eliminaciones lógicas (`activo = FALSE`) preserven la integridad histórica de auditoría.
+- Probar scripts de inserción y consultar planes de ejecución (`EXPLAIN ANALYZE`) para índices de jerarquía.
+- Documentar las observaciones y validar los resultados con Pool y Panaifo.
+
+### Productos individuales
+- Documento de validación técnica y casos de prueba de autorización (`B_HECTOR`).
+- Scripts SQL de pruebas de esfuerzo e integridad referencial.
+- Evidencia de ejecución limpia sin violaciones de integridad.
+
+### Criterios de aceptación
+- Casos de prueba cubren 100% de los roles y permisos propuestos.
+- Cero falsos positivos en denegación de permisos de backend.
+- Commits descriptivos publicados en la rama `B_HECTOR`.
+
 6. Flujo de trabajo obligatorio
 
-> Principio de evidencia individual: una tarea solo se considera entregada cuando el archivo asignado, sus correcciones y sus commits están publicados en la rama personal del responsable. Enviar el archivo por chat o mostrarlo únicamente en B_POOL no sustituye esa evidencia. El profesor podrá revisar B_LEONARDO, B_POOL y B_PANAIFO para reconocer el aporte real de cada integrante.
+> Principio de evidencia individual: una tarea solo se considera entregada cuando el archivo asignado, sus correcciones y sus commits están publicados en la rama personal del responsable. Enviar el archivo por chat o mostrarlo únicamente en B_POOL no sustituye esa evidencia. El profesor podrá revisar B_LEONARDO, B_POOL, B_PANAIFO y B_HECTOR para reconocer el aporte real de cada integrante.
 
 El trabajo seguirá este orden cronológico. Ninguna fase dependiente debe comenzar hasta que la evidencia anterior esté publicada y revisada:
 
