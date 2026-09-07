@@ -9,14 +9,6 @@
 **Fecha:** 3 de septiembre de 2026
 **Versión:** 1.1 (Fase 2 — Levantamiento de Observaciones · Revisión de documentación)
 
-> [!NOTE]
-> Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
-> código listo para correr; es el **log de decisiones (ADR)** del Grupo 6 durante la Fase 2.
-> Consolida las decisiones técnicas tomadas, su estado según la taxonomía oficial y el registro de
-> revisión del sublíder sobre los entregables 01 a 04 del grupo.
-
----
-
 ## 1. Propósito y Problema que Resuelve
 
 Dejar **registro explícito y trazable** de cada decisión técnica del Grupo 6 en el Levantamiento de
@@ -164,9 +156,3 @@ trabajo del autor; se solicita corrección al responsable cuando corresponde.
     entregable permanece en su rama.
   - Este log se actualiza de forma continua durante la Fase 2 y queda como evidencia histórica del
     Grupo 6.
-
----
-
-*Documento elaborado por Ricardo (`B_AREVALO`) como entregable de Fase 2 — Levantamiento de
-Observaciones del Grupo 6 CoreLink. Revisión 1.1: convertido a especificación de documentación pura,
-sin código ejecutable, para registrar las decisiones y la revisión del subgrupo.*

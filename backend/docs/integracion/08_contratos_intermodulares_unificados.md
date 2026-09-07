@@ -9,15 +9,6 @@
 **Fecha:** 3 de septiembre de 2026
 **Versión:** 1.1 (Fase 2 — Levantamiento de Observaciones · Revisión de documentación)
 
-> [!NOTE]
-> Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
-> código listo para correr; consolida los contratos entre los 6 módulos del backend SIGD, la matriz
-> **Productor-Consumidor** de interfaces y eventos Outbox, y el catálogo de tipos compartidos
-> (`shared/types`) que los equipos deben acordar e implementar. Todo contenido marcado como
-> `PROPUESTO` o `PENDIENTE` requiere validación antes de ser tratado como definitivo.
-
----
-
 ## 1. Propósito y Problema que Resuelve
 
 Coordinar las **dependencias entre módulos** del backend SIGD de forma explícita y documentada, de
@@ -272,9 +263,3 @@ Contrato del dato más consumido por los módulos:
   - `PROPUESTO`: contrato de tipo documental (C-04), movimientos (C-05) y eventos E-02/E-03.
   - `PENDIENTE`: movimiento inicial (C-06), admisibilidad documental (E-04), finalización (E-05) y
     detalle del `numero` de expediente.
-
----
-
-*Documento elaborado por Ricardo (`B_AREVALO`) como entregable de Fase 2 — Levantamiento de
-Observaciones del Grupo 6 CoreLink. Revisión 1.1: convertido a especificación de documentación pura,
-sin código ejecutable, para consolidar los contratos que los 6 módulos deben acordar e implementar.*

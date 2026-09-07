@@ -9,13 +9,7 @@
 **Fecha:** 3 de septiembre de 2026
 **Versión:** 1.1 (Fase 2 — Levantamiento de Observaciones · Revisión de documentación)
 
-> [!NOTE]
-> Este documento es una **especificación de referencia**. No contiene scripts ejecutables ni código
-> listo para correr; describe de forma completa y detallada la estrategia de aseguramiento de calidad,
-> los casos de prueba de integración (E2E), el ciclo de vida del entorno de pruebas y los escenarios y
-> umbrales de carga que el encargado de Calidad debe implementar y validar antes del paso a producción.
 
----
 
 ## 1. Propósito y Problema que Resuelve
 
@@ -396,7 +390,3 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
   configuración del runner (imagen, tamaños de lote); `EJEMPLO` — datos y URLs de prueba.
 
 ---
-
-*Documento elaborado por Zevallos (`B_ZEVALLOS`) como entregable de Fase 2 — Levantamiento de
-Observaciones del Grupo 6 CoreLink. Revisión 1.1: convertido a especificación de documentación pura,
-sin código ejecutable, para guiar al equipo de Calidad en la implementación de la suite.*

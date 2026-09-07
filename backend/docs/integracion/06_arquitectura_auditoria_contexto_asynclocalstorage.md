@@ -9,14 +9,6 @@
 **Fecha:** 3 de septiembre de 2026
 **Versión:** 1.1 (Fase 2 — Levantamiento de Observaciones · Revisión de documentación)
 
-> [!NOTE]
-> Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
-> código listo para correr; describe de forma completa y detallada las estructuras de datos, las
-> reglas de inmutabilidad, la máquina de estados de eventos y el flujo del worker que los equipos
-> deben implementar para garantizar la observabilidad y auditoría forense del backend SIGD.
-
----
-
 ## 1. Propósito y Problema que Resuelve
 
 Definir la arquitectura de **observabilidad y auditoría forense** del SIGD. El problema que resuelve
@@ -344,9 +336,3 @@ sequenceDiagram
   - `evento_outbox` no se limpia automáticamente; la retención es una decisión operativa posterior.
 - **Taxonomía:** `CONFIRMADO` — patrón Transactional Outbox y esquema base; `PROPUESTO` — índices y
   tamaño de columna `user_agent`; `EJEMPLO` — payloads mostrados.
-
----
-
-*Documento elaborado por Reátegui (`B_REATEGUI`) como entregable de Fase 2 — Levantamiento de
-Observaciones del Grupo 6 CoreLink. Revisión 1.1: convertido a especificación de documentación pura,
-sin código ejecutable, para guiar a los equipos de implementación.*
