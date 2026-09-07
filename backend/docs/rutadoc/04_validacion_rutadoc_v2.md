@@ -5,14 +5,18 @@
 | Proyecto | SIGD — Sistema Integral de Gestión Documentaria |
 | Grupo | Grupo 1 — RutaDoc |
 | Responsable | Jhasy |
-| Rama | `B_JHASY` |
+| Rama de entrega | `B_JHASY` |
 | Fase | 2 |
 | Entregable | H4 |
 | Versión documental | Borrador incremental v0.1 |
 | Estado | **Borrador de validación, no aprobado** |
 | PostgreSQL | 18.6 |
-| Commit base | `8fb09da2f1300f5ae75f206938502bcb1e0b06f9` |
-| Estado del DDL | H3 v0.1 experimental; todavía untracked y sin commit |
+| Base histórica de elaboración | `8fb09da2f1300f5ae75f206938502bcb1e0b06f9`; posteriormente el historial fue reescrito; no es la base vigente. |
+| Base vigente de versionado | `64a041680fb360103621a83c3750149b3224dbfc`; recuperación oficial de H1/H2. |
+| Commit inicial de H3/H4 | `f3985b99da06c2ab3a0de4fa8e6a0710cb3df0e1` |
+| PR actual | #78, `B_JHASY` hacia `B_GERIC`, pendiente de revisión e integración. |
+| Estado del DDL | H3 v0.1 experimental, versionado; no aprobado como diseño definitivo. |
+| Estado histórico previo al primer commit | H3/H4 estaban untracked y sin commit. |
 | Fecha real de ejecución | 5 de septiembre de 2026 (2026-09-05); fuente: confirmación de Jhasy |
 | Datos utilizados | Exclusivamente **EJEMPLO NO CONTRACTUAL**, sin catálogo institucional ni datos personales reales |
 | Procedencia de resultados | Ejecución manual reportada por Jhasy; revisión documental del DDL y del archivo temporal, sin nueva ejecución PostgreSQL |
@@ -49,7 +53,11 @@ Identificación de los artefactos examinados:
 | F5 — DDL | `7ce831d18abd079ef398abcc3aa59de6144bd7220545288511e0fb99456eec4f` |
 | F8 — pruebas temporales | `e0a0f810fb030c6b7dbeed955b3a43352c9075b26b54689838f78dacd5d6510c` |
 
-Los hashes identifican los bytes de los scripts; no reemplazan la evidencia de ejecución. El hash F8 identifica el artefacto utilizado en la ejecución original. No se asume que su ruta privada de Windows esté disponible para Geric o el profesor: toda reproducción futura debe utilizar el Anexo A incorporado a este documento para versionado, sin depender del temporal. No se sobrescriben H1, H2 ni los artefactos v1.
+Los hashes identifican los bytes de los scripts; no reemplazan la evidencia de ejecución. El hash F8 identifica el artefacto utilizado en la ejecución original. No se asume que su ruta privada de Windows esté disponible para Geric o el profesor: toda reproducción futura debe utilizar el Anexo A versionado en este documento, sin depender del temporal. No se sobrescriben H1, H2 ni los artefactos v1.
+
+El hash F5 y las líneas 49 y 217 citadas en la evidencia corresponden al DDL histórico del commit inicial `f3985b99da06c2ab3a0de4fa8e6a0710cb3df0e1`. La actualización posterior de comentarios y metadatos cambia los bytes y la numeración del archivo actual, sin modificar su estructura SQL ni agregar resultados de ejecución. Los hashes históricos se conservan como identificación del artefacto probado.
+
+El PR #76 fue un antecedente histórico de integración de H1/H2 en la base de elaboración; posteriormente el historial fue reescrito. H1/H2 fueron recuperados oficialmente mediante `64a041680fb360103621a83c3750149b3224dbfc`, base vigente de versionado. El PR actual de H3/H4 es #78, de `B_JHASY` hacia `B_GERIC`, pendiente de revisión e integración.
 
 ## 3. Entorno real
 
@@ -225,6 +233,8 @@ Cada fila resume INSERT permitido y dos pruebas independientes de rechazo (UPDAT
 
 El acceso directo a cada partición también rechazó UPDATE/DELETE. F8 contrasta el SQLSTATE, el mensaje RutaDoc y el contexto de la función; las operaciones se dirigen a filas existentes y no modifican las claves en el intento de UPDATE.
 
+El plan rector cita `trg_inmutabilidad_movimiento`; H3 implementa realmente `tr_movimiento_append_only`. Cumplen una finalidad funcional relacionada de protección del historial, pero no son el mismo identificador. La evidencia de H4 corresponde al trigger implementado en H3; esta aclaración no modifica ni renombra ningún trigger.
+
 Esta defensa no constituye protección frente a un administrador capaz de deshabilitar triggers, ejecutar DDL o TRUNCATE. Tampoco valida permisos de un rol de aplicación: se utilizó `postgres`. Esos controles quedan pendientes.
 
 ## 14. Mutabilidad de catálogos y proyección
@@ -311,11 +321,11 @@ Geric conserva la responsabilidad de consolidar y revisar decisiones; los grupos
 
 ## 19. Criterio de avance
 
-La evidencia permite presentar un **borrador H4 incremental para revisión** de instalación y comportamiento mínimo del prototipo. Se mantiene trazabilidad a los hashes, al commit base y a las pruebas concretas.
+La evidencia permite presentar un **borrador H4 incremental para revisión** de instalación y comportamiento mínimo del prototipo. Se mantiene trazabilidad a los hashes históricos, a la base histórica de elaboración, a la base vigente de versionado y a las pruebas concretas.
 
 Antes de ampliar el alcance o plantear aprobación deben completarse la revisión de Geric, las decisiones funcionales/físicas y las pruebas pendientes que correspondan. La fecha real de ejecución, 5 de septiembre de 2026, fue confirmada por Jhasy. El Anexo A permite reproducir las pruebas mínimas sin el artefacto temporal local. La falta de logs completos y de algunos códigos de instalación se registra como límite documental, sin inventar resultados.
 
-H3 permanece untracked y sin commit; este H4 se prepara también sin versionar. Los requisitos de publicación y revisión del plan no están satisfechos por la mera creación de estos archivos. Este criterio no autoriza add, commit, push, integración ni despliegue.
+**Estado histórico previo al primer commit:** H3 permanecía untracked y sin commit; H4 se preparaba también sin versionar. Ambos quedaron versionados inicialmente en `f3985b99da06c2ab3a0de4fa8e6a0710cb3df0e1`, sobre la base vigente `64a041680fb360103621a83c3750149b3224dbfc`. La rama de entrega es `B_JHASY` y el PR actual #78 hacia `B_GERIC` está pendiente de revisión e integración. El versionado y la publicación no equivalen a aprobación del diseño definitivo, cierre de H3/H4 ni autorización de integración o despliegue.
 
 ## 20. Conclusión provisional
 
@@ -329,7 +339,7 @@ Las ejecuciones documentadas corresponden al 5 de septiembre de 2026, según con
 
 ## Anexo A — Procedimiento reproducible de validación mínima
 
-Este anexo conserva el procedimiento y la suite dentro de H4 para su futura revisión/versionado. Solo requiere este documento, el DDL H3 del repositorio y PostgreSQL 18; no requiere F8 ni acceso a una ruta privada de Windows. Incorporar el procedimiento no constituye una nueva ejecución: los resultados históricos siguen siendo los de las secciones 5–15.
+Este anexo conserva el procedimiento y la suite versionados dentro de H4 para revisión y reproducción. Solo requiere este documento, el DDL H3 del repositorio y PostgreSQL 18; no requiere F8 ni acceso a una ruta privada de Windows. Incorporar el procedimiento no constituye una nueva ejecución: los resultados históricos siguen siendo los de las secciones 5–15.
 
 ### A. Precondiciones y alcance seguro
 

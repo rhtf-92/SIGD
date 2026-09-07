@@ -2,7 +2,13 @@
 -- Responsable H3: Jhasy | Rama: B_JHASY | PostgreSQL objetivo: versión 18
 -- Versión documental: Borrador técnico v0.1
 -- BORRADOR TÉCNICO v0.1 — PROTOTIPO EXPERIMENTAL NO APROBADO
--- Commit base: 8fb09da2f1300f5ae75f206938502bcb1e0b06f9
+-- Base histórica de elaboración: 8fb09da2f1300f5ae75f206938502bcb1e0b06f9.
+-- Posteriormente el historial fue reescrito; no es la base vigente.
+-- Base vigente de versionado y recuperación oficial de H1/H2:
+-- 64a041680fb360103621a83c3750149b3224dbfc.
+-- Commit inicial de H3/H4: f3985b99da06c2ab3a0de4fa8e6a0710cb3df0e1.
+-- Rama de entrega: B_JHASY. PR actual: #78, B_JHASY hacia B_GERIC,
+-- pendiente de revisión e integración.
 -- Estado: experimental; no aprobado, no listo para producción; H3 no terminado.
 -- Fuentes H1/H2 (rutas relativas a backend/docs/):
 --   rutadoc/01_analisis_dominio_transiciones_rutadoc.md
@@ -14,7 +20,8 @@
 -- Antecedentes: todos los documentos v1 de rutadoc/, incluido el SQL v1;
 -- se conservan intactos y no se asume aprobado su diseño físico.
 -- Trazabilidad: H1 8934c54 / integración ade5e03; H2 407d2a6 / 913324d;
--- integración H1/H2 mediante PR #76 en el commit base indicado.
+-- PR #76: antecedente histórico de integración H1/H2 en la base histórica
+-- de elaboración; el PR actual de H3/H4 es #78.
 --
 -- PENDIENTES: contratos G2 (expediente/CUT), G3 (áreas), G4 (actor/usuario),
 -- G5 (documentos/versiones/adjuntos), G6 (Outbox, payload, ownership, despacho);
@@ -336,6 +343,9 @@ COMMENT ON COLUMN sigd_rut.estado_actual_tramite.version_proyeccion IS
 -- con escrituras activas y política de sustitución antes de ejecutarla.
 
 -- 5. Defensa mínima append-only, reutilizable y sin reglas institucionales.
+-- El plan rector cita trg_inmutabilidad_movimiento; H3 implementa realmente
+-- tr_movimiento_append_only. Tienen una finalidad funcional relacionada,
+-- pero no son el mismo identificador; esta aclaración no renombra el trigger.
 -- PostgreSQL 18 clona los triggers de fila del padre en sus particiones,
 -- incluidas las que se creen/adjunten después. Verificarlo en H4 también
 -- accediendo directamente a cada partición; no duplicar triggers manualmente.
