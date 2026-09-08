@@ -3,8 +3,8 @@
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
  * ENTREGABLE: ENT-M02-01 — Asistente Wizard de Tramitación de 4 Pasos
  * ARCHIVO: src/components/tramite/steps/Step1Identificacion.tsx
- * AUTORA: Anllely Melgarejo V. (F_ANLLELY)
- * REVISIÓN: Patricia Marina (R)
+ * RESPONSABLE: Anllely Melgarejo V. (F_ANLLELY)
+ * COLABORADORAS: Lucy Panduro Ramos, Noelia Alva (Grupo 1)
  * 
  * DESCRIPCIÓN:
  * Subcomponente modular para el Paso 1: Identificación del Solicitante.

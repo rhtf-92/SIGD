@@ -16,7 +16,7 @@ export default function HomePage() {
           to="/tramite"
           className="rounded-lg bg-[#006EC7] px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 transition"
         >
-          Probar Wizard de Tramitación (ENT-M02-01) →
+          Mesa de Partes Virtual / Wizard de Tramitación →
         </Link>
         <Link
           to="/administracion"

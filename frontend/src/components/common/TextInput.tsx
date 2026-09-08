@@ -2,8 +2,8 @@
  * ==============================================================================
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
  * ARCHIVO: src/components/common/TextInput.tsx
- * AUTORA: Anllely Melgarejo V. (F_ANLLELY)
- * REVISIÓN: Patricia Marina (R)
+ * RESPONSABLE: Anllely Melgarejo V. (F_ANLLELY)
+ * COLABORADORAS: Lucy Panduro Ramos, Noelia Alva (Grupo 1)
  * 
  * DESCRIPCIÓN:
  * Componente atómico de entrada de texto accesible (WCAG 2.1 AA).

@@ -1,10 +1,10 @@
 /**
  * ==============================================================================
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
- * ENTREGABLE: ENT-M02-01 — Asistente Wizard de Tramitación de 4 Pasos
- * ARCHIVO: src/pages/tramite/TramiteTestPage.tsx
- * AUTORA: Anllely Melgarejo V. (F_ANLLELY)
- * REVISIÓN: Patricia Marina (R)
+ * ENTREGABLES: ENT-M02-01 (Asistente Wizard) & ENT-M02-02 (Motor JSON Schema)
+ * ARCHIVO: src/pages/tramite/TramitePage.tsx
+ * RESPONSABLE: Anllely Melgarejo V. (F_ANLLELY)
+ * COLABORADORAS: Lucy Panduro Ramos, Noelia Alva (Grupo 1)
  * 
  * DESCRIPCIÓN:
  * Vista oficial de la Mesa de Partes Virtual que alberga el Asistente Wizard de 4 Pasos.
@@ -20,7 +20,7 @@ import { useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
 import TramiteWizard from "../../components/tramite/TramiteWizard";
 
-export default function TramiteTestPage() {
+export default function TramitePage() {
   const [ultimoCut, setUltimoCut] = useState<string | null>(null);
 
   return (
@@ -58,7 +58,7 @@ export default function TramiteTestPage() {
 
         {/* NOTIFICACIÓN DE EXPEDIENTE RADICADO EN ESTA SESIÓN */}
         {ultimoCut && (
-          <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 flex items-center justify-between shadow-xs">
+          <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 flex items-center justify-between shadow-xs animate-fadeIn">
             <div className="flex items-center gap-2">
               <svg className="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

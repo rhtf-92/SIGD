@@ -3,8 +3,8 @@
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
  * ENTREGABLE: ENT-M02-02 — Motor Dinámico de Formularios JSON Schema (Draft 2020-12)
  * ARCHIVO: src/utils/schemaFormParser.ts
- * AUTORA: Anllely Melgarejo V. (F_ANLLELY)
- * REVISIÓN: Patricia Marina (R/A) - Lucy Panduro Ramos (C)
+ * RESPONSABLE: Anllely Melgarejo V. (F_ANLLELY)
+ * COLABORADORAS: Lucy Panduro Ramos, Noelia Alva (Grupo 1)
  * 
  * DESCRIPCIÓN:
  * Intérprete desacoplado para transformar esquemas formales JSON Schema
@@ -198,6 +198,11 @@ export function parseJsonSchema(
 
   return parsedFields;
 }
+
+/**
+ * Alias de compatibilidad semántica para parseJsonSchema.
+ */
+export const parseSchemaToFields = parseJsonSchema;
 
 // =============================================================================
 // 4. EXTRACTOR DE VALORES POR DEFECTO PARA REACT HOOK FORM

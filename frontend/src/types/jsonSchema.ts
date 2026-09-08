@@ -3,8 +3,8 @@
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
  * ENTREGABLE: ENT-M02-02 — Motor Dinámico de Formularios JSON Schema (Draft 2020-12)
  * ARCHIVO: src/types/jsonSchema.ts
- * AUTORA: Anllely Melgarejo V. (F_ANLLELY)
- * REVISIÓN: Patricia Marina (R/A) - Lucy Panduro Ramos (C)
+ * RESPONSABLE: Anllely Melgarejo V. (F_ANLLELY)
+ * COLABORADORAS: Lucy Panduro Ramos, Noelia Alva (Grupo 1)
  * 
  * DESCRIPCIÓN:
  * Definiciones de tipos estrictas para el motor de interpretación y renderizado

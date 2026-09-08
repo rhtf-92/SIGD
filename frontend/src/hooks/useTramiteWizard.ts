@@ -3,8 +3,8 @@
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
  * ENTREGABLE: ENT-M02-01 — Asistente Wizard de Tramitación de 4 Pasos
  * ARCHIVO: src/hooks/useTramiteWizard.ts
- * AUTORA: Anllely Melgarejo V. (F_ANLLELY)
- * REVISIÓN: Patricia Marina (R)
+ * RESPONSABLE: Anllely Melgarejo V. (F_ANLLELY)
+ * COLABORADORAS: Lucy Panduro Ramos, Noelia Alva (Grupo 1)
  * 
  * DESCRIPCIÓN:
  * Custom hook reactivo para gobernar el flujo del Wizard de 4 pasos.
@@ -25,6 +25,11 @@ import {
   INITIAL_TRAMITE_WIZARD_DATA,
   WIZARD_STEPS,
 } from "../types/tramiteWizard";
+import {
+  parseJsonSchema,
+  validateFieldValue,
+  mockTupaSchema,
+} from "../utils/schemaFormParser";
 
 const DEFAULT_STORAGE_KEY = "sigd_tramite_wizard_borrador_v1";
 
@@ -178,8 +183,21 @@ function validatePaso2(data: TramiteWizardFormData): StepValidationResult {
  */
 function validatePaso3(data: TramiteWizardFormData): StepValidationResult {
   const errors: Record<string, string[]> = {};
-  const { documentoPrincipal } = data;
+  const { documentoPrincipal, datosFormulario } = data;
 
+  // 1. Validación de campos del Formulario Dinámico JSON Schema
+  const schemaFields = parseJsonSchema(mockTupaSchema);
+  for (const field of schemaFields) {
+    if (field.required) {
+      const val = datosFormulario[field.name];
+      const errorMsg = validateFieldValue(field, val);
+      if (errorMsg) {
+        errors[field.name] = [errorMsg];
+      }
+    }
+  }
+
+  // 2. Validación de documento probatorio principal en PDF/A
   if (!documentoPrincipal) {
     errors.documentoPrincipal = [
       "Es obligatorio adjuntar el documento principal firmado en formato PDF/A.",

@@ -3,8 +3,8 @@
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
  * ENTREGABLE: ENT-M02-01 — Asistente Wizard de Tramitación de 4 Pasos
  * ARCHIVO: src/types/tramiteWizard.ts
- * AUTORA: Anllely Melgarejo V. (F_ANLLELY)
- * REVISIÓN: Patricia Marina (R)
+ * RESPONSABLE: Anllely Melgarejo V. (F_ANLLELY)
+ * COLABORADORAS: Lucy Panduro Ramos, Noelia Alva (Grupo 1)
  * 
  * DESCRIPCIÓN:
  * Definiciones canónicas de tipos, interfaces, enums y contratos de datos
@@ -163,6 +163,10 @@ export interface TramiteSeleccionado {
   prioridad: PrioridadTramite;
   /** Fundamentación de urgencia si la prioridad no es NORMAL */
   justificacionPrioridad?: string;
+  /** Costo administrativo oficial del trámite en Soles (PEN) */
+  costoSoles?: number;
+  /** Plazo máximo legal de resolución en días hábiles (LPAG Ley 27444) */
+  diasPlazoLegal?: number;
 }
 
 // =============================================================================
