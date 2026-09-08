@@ -95,13 +95,13 @@ Subsanar las observaciones arquitecturales identificadas en el diagnóstico seni
 
 | Estado | Criterio de Verificación Técnico y Metodológico | Responsable | Evidencia Requerida |
 | :---: | :--- | :---: | :--- |
-| ☐ | El formato del CUT cumple con el estándar `EXP-YYYY-XXXXXX` del MGD-PCM y no usa `MAX()+1`. | Riquelmer / Ramírez | `01_analisis...md` y `03_esquema...sql` |
-| ☐ | La función de generación de CUT soporta ejecución concurrente sin duplicados ni bloqueos muertos. | Ramírez | Prueba de estrés en `04_validacion...md` |
-| ☐ | La entidad `expediente_acumulacion` modela correctamente la relación N:M entre expedientes conexos (Art. 160 LPAG). | Sandy | `02_modelo_datos...md` y DDL SQL |
-| ☐ | La foliación electrónica registra rangos de páginas continuas y rechaza solapamientos de folios. | Sandy / Ramírez | Restricciones en `03_esquema...sql` |
-| ☐ | Se mantiene la inmutabilidad y no reutilización de números en `sigd_tra.asiento_registro`. | Ramírez | Verificación en `04_validacion...md` |
-| ☐ | Diagrama ER actualizado en Draw.io y exportado a imagen PNG en alta resolución. | Sandy | Archivos `.drawio` y `.png` |
-| ☐ | El log de decisiones fundamenta la adopción de las directivas del MGD-PCM y AGN. | Ramírez | `05_decisiones_levantamiento_tramicore.md` |
+| ✔ | El formato del CUT cumple con el estándar `EXP-YYYY-XXXXXX` del MGD-PCM y no usa `MAX()+1`. | Riquelmer / Ramírez | `01_analisis...md` y `03_esquema...sql` |
+| ✔ | La función de generación de CUT soporta ejecución concurrente sin duplicados ni bloqueos muertos. | Ramírez | Prueba de estrés en `04_validacion...md` |
+| ✔ | La entidad `expediente_acumulacion` modela correctamente la relación N:M entre expedientes conexos (Art. 160 LPAG). | Sandy | `02_modelo_datos...md` y DDL SQL |
+| ✔ | La foliación electrónica registra rangos de páginas continuas y rechaza solapamientos de folios. | Sandy / Ramírez | Restricciones en `03_esquema...sql` |
+| ✔ | Se mantiene la inmutabilidad y no reutilización de números en `sigd_tra.asiento_registro`. | Ramírez | Verificación en `04_validacion...md` |
+| ✔ | Diagrama ER actualizado en Draw.io y exportado a imagen PNG en alta resolución. | Sandy | Archivos `.drawio` y `.png` |
+| ✔ | El log de decisiones fundamenta la adopción de las directivas del MGD-PCM y AGN. | Ramírez | `05_decisiones_levantamiento_tramicore.md` |
 | ☐ | Commits individuales verificables en `B_RIQUELMER`, `B_SANDY` y `B_RAMIREZ`. | Todos | Historial de Git |
 | ☐ | Sublíder integró formalmente mediante Pull Request hacia `B_GERIC`. | Ramírez | PR en GitHub |
 

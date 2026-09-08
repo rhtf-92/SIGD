@@ -92,8 +92,8 @@
 | 2026-08-30 | Elmer Ramírez | Observación de MAX()+1 resuelta con `nextval()` de secuencia | RESUELTO |
 | 2026-08-30 | Elmer Ramírez | Observación de ausencia de acumulación resuelta con `expediente_acumulacion` | RESUELTO |
 | 2026-08-30 | Elmer Ramírez | Observación de ausencia de foliatura digital resuelta con `expediente_documento_folio` | RESUELTO |
-| 2026-08-30 | Elmer Ramírez | Entregable de Sandy (modelo lógico v2.0, diccionario y diagramas) integrado | EN PROCESO |
-| 2026-08-30 | Elmer Ramírez | Pruebas de estrés de 500 CUTs concurrentes pendientes de ejecución final | PENDIENTE |
+| 2026-09-08 | Elmer Ramírez | Entregable de Sandy (modelo lógico v2.0, diccionario y diagramas) integrado | RESUELTO |
+| 2026-09-08 | Elmer Ramírez | Pruebas de estrés de 500 CUTs concurrentes ejecutadas (500/500 únicos) | RESUELTO |
 
 ---
 
