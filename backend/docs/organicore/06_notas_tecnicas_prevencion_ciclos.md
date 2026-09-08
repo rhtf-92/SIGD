@@ -1,461 +1,325 @@
 # Notas Técnicas y Prevención de Ciclos
-## Módulo de Organización, Roles y Permisos
+## Módulo OrganiCore v2 — Esquema `sigd_org`
 
 - Responsable: Geiner Panaifo
 - Rama: `B_PANAIFO`
 - Grupo: Grupo 3 — OrganiCore
-- Versión: 1.0 (Estandarizado)
-- Fecha: 2026-08-29
+- Versión: 2.0 (Alineada a Fase 2 / `sigd_org`)
+- Fecha: 2026-09-08
 
 ---
 
-## 0. Cambios Críticos Implementados (Mejoras Post-Revisión)
+## 0. Alineación con Fase 2 / `sigd_org`
 
-### A. Relación Usuario-Rol (CRÍTICO)
+Esta documentación sustituye las notas técnicas del borrador de Fase 1
+(antes `05_B_PANAIFO_NOTAS_TECNICAS.md`). Toda la parte técnica y SQL de
+Panaifo queda alineada con el esquema oficial consolidado **`sigd_org`**.
 
-**Problema original:** No existía forma de asignar roles a usuarios.
+### Cambios estructurales aplicados
 
-**Solución implementada:** Tabla `usuarios_roles` (relación N:M)
+| Fase 1 (BORRADOR / LEGACY) | Fase 2 (Oficial `sigd_org`) |
+| :--- | :--- |
+| Esquema `public` | Esquema `sigd_org` |
+| `id BIGSERIAL` / `BIGINT` | `area_id UUID ... DEFAULT gen_random_uuid()` |
+| `areas`, `cargos`, `responsables` | `sigd_org.area`, `sigd_org.cargo`, `sigd_org.asignacion_personal` |
+| Sin ruta jerárquica | `path VARCHAR(255)` (Materialized Path) + `nivel_organizacional` |
+| Prevención de ciclos pendiente | `sigd_org.fn_area_set_path` (SQLSTATE `23514`) |
+| `WITH RECURSIVE` para descendientes | `LIKE path || '%'` con `idx_area_path_pattern` |
+| Contrato con identidad por número entero | `cuenta_id UUID` (contrato con `sigd_auth.cuenta_usuario`) |
+
+### Estado de los scripts SQL
+
+- **LEGACY (no usar):** `03_organizacion_roles_permisos.sql`,
+  `03_datos_prueba_organizacion.sql`, `03_verificacion_organizacion.sql`.
+- **OFICIALES:** `03_esquema_sigd_org_v2.sql` (DDL) y
+  `05_validacion_organicore_v2.sql` (suite de QA automatizada).
+  La ejecución y criterios de aceptación se documentan en
+  `04_validacion_organicore_v2.md`.
+
+---
+
+## 1. Esquema `sigd_org` e identidades UUID
+
+Las claves pasan de `BIGSERIAL`/`BIGINT` (Fase 1) a `UUID` generados con
+`pgcrypto` (`gen_random_uuid()`). Todo el módulo vive en el esquema
+`public` → `sigd_org`.
 
 ```sql
-CREATE TABLE usuarios_roles (
-    usuario_id BIGINT NOT NULL,
-    rol_id BIGINT NOT NULL,
-    fecha_asignacion DATE NOT NULL DEFAULT CURRENT_DATE,
-    fecha_fin DATE,
-    PRIMARY KEY (usuario_id, rol_id)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+CREATE SCHEMA IF NOT EXISTS sigd_org;
+
+CREATE TABLE IF NOT EXISTS sigd_org.area (
+    area_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nombre VARCHAR(150) NOT NULL,
+    sigla VARCHAR(20) NOT NULL UNIQUE,
+    parent_id UUID REFERENCES sigd_org.area(area_id) ON DELETE RESTRICT,
+    path VARCHAR(255) NOT NULL,
+    nivel_organizacional INTEGER NOT NULL DEFAULT 1,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_area_nivel CHECK (nivel_organizacional > 0),
+    CONSTRAINT ck_area_path_format CHECK (path LIKE '/%/')
 );
 ```
 
-**Ahora el flujo es:**
-```
-Usuario → (tiene) → Rol(es) → (tiene) → Permiso(s)
-```
+Notas:
 
-**Ejemplo:**
-- Usuario 1001 asignado a ROLE_ADMIN → accede a todos los permisos de administrador
-- Usuario 1002 asignado a ROLE_OPERADOR → accede solo a permisos de operador
-
-### B. Relación Cargo-Rol
-
-**Problema original:** `cargos` era independiente de `roles`.
-
-**Solución implementada:** Añadido campo `cargos.rol_id` para vincular un cargo con un rol predeterminado.
-
-```sql
-ALTER TABLE cargos ADD COLUMN rol_id BIGINT 
-    REFERENCES roles(id);
-```
-
-**Ahora:**
-- Cuando se asigna un usuario a un cargo en un área, opcionalmente el sistema puede asignarle el rol predeterminado del cargo.
-- Permite flexibilidad: un usuario puede tener roles adicionales más allá del cargo.
-
-**Ejemplo en datos:**
-- Cargo "Director de Prueba" → rol_id = 1 (ROLE_ADMIN)
-- Cargo "Analista de Prueba" → rol_id = 3 (ROLE_CONSULTA)
-
-### C. Integración con Tabla `users` (Externa)
-
-**Problema original:** No había FK hacia `users` porque la tabla no pertenece a B_PANAIFO.
-
-**Solución implementada:** Script preparado con comando `ALTER TABLE` listo en comentarios:
-
-```sql
-/*
-La siguiente sentencia debe ejecutarse una vez que
-se integre con la tabla users del módulo de usuarios:
-*/
-
-ALTER TABLE responsables
-ADD CONSTRAINT fk_responsables_usuario
-    FOREIGN KEY (usuario_id)
-    REFERENCES users(id);
-
-ALTER TABLE usuarios_roles
-ADD CONSTRAINT fk_usuarios_roles_usuario
-    FOREIGN KEY (usuario_id)
-    REFERENCES users(id);
-```
-
-**Nota:** Esto asegura que cuando `users` esté disponible, la integración sea inmediata.
-
-### D. Nomenclatura de Permisos Estandarizada
-
-**Cambio:** De notación de dos puntos a puntos.
-
-**Antes:**
-```
-area:crear, area:consultar, usuario:consultar
-```
-
-**Ahora:**
-```
-area.crear, area.consultar, usuario.consultar, permiso.gestionar
-```
-
-**Ventaja:** Alineación con estándares de nomenclatura en sistemas de trámite documentario y facilitadores de parsing en la lógica de autorización.
+- `parent_id` usa `ON DELETE RESTRICT`: no se elimina físicamente un área que
+  tenga hijos, se administra mediante `activo` (soft-delete, ver
+  `07_politica_eliminaciones_logicas.md`).
+- `cuenta_id` en `asignacion_personal`, `encargatura_despacho` y
+  `usuario_rol` es `UUID` y representa el contrato con
+  `sigd_auth.cuenta_usuario`. La FK física se añade en la migración de
+  integración cuando ambos módulos compartan el mismo tipo de identidad.
 
 ---
 
-## 1. Estructura de Áreas Jerárquicas
+## 2. Materialized Path (decisión definitiva)
 
-### Concepto
+La jerarquía de áreas usa de forma definitiva el patrón **Materialized Path**
+en lugar de consultas recursivas. Cada fila almacena la ruta absoluta desde la
+raíz y su profundidad:
 
-La tabla `areas` utiliza el patrón de **autorreferencia** para representar una estructura jerárquica ilimitada:
+- `path`: prefijo absoluto de UUID con separador `/` y **incluye el propio
+  nodo**, terminando siempre en `/`. Formato: `/raiz/hijo/nieto/`.
+- `nivel_organizacional`: profundidad (raíz = 1, hijo = 2, nieto = 3, ...).
+- `idx_area_path_pattern` (B-Tree con `varchar_pattern_ops`) permite usar
+  `LIKE` con prefijos parametrizados sin degradar a escaneo completo.
 
 ```sql
-parent_id BIGINT REFERENCES areas(id)
+CREATE INDEX IF NOT EXISTS idx_area_path_pattern
+    ON sigd_org.area (path varchar_pattern_ops);
 ```
 
-### Ejemplo de jerarquía
+### Consulta de descendientes sin `WITH RECURSIVE`
 
+**Se elimina la aproximación de la Fase 1 con `WITH RECURSIVE`.** Con el
+prefijo materializado, descendientes y subárboles se obtienen en una sola
+consulta indexable:
+
+```sql
+SELECT area_id, sigla, path, nivel_organizacional
+FROM sigd_org.area
+WHERE path LIKE (SELECT path FROM sigd_org.area WHERE area_id = :raiz_id) || '%'
+ORDER BY path;
 ```
-Dirección General (id=1, parent_id=NULL)
-   │
-   ├── Oficina de Administración (id=2, parent_id=1)
-   ├── Oficina de Sistemas (id=3, parent_id=1)
-   └── Oficina de Archivo (id=4, parent_id=1)
-          │
-          └── Área de Desarrollo (id=5, parent_id=3)
-```
 
-### Ventajas
-
-- Permite jerarquías de **profundidad ilimitada**
-- Flexibilidad para reorganizaciones
-- Una sola tabla, sin necesidad de crear múltiples niveles predefinidos
-
-### Limitaciones
-
-- Las consultas de jerarquía completa requieren **CTEs recursivas** o funciones especiales
-- PostgreSQL no impide ciclos indirectos a nivel de restricción
+Ancestros: se recorre el propio `path` dividiéndolo por `/` (conocido por el
+cliente sin cruzar la jerarquía). No se necesita ningún CTE recursivo.
 
 ---
 
-## 2. Prevención de Ciclos en la Jerarquía
+## 3. Trigger `fn_area_set_path`
 
-### Problema
-
-La restricción de clave foránea garantiza que `parent_id` apunte a un área existente, pero **no puede evitar ciclos indirectos**:
-
-```
-Ciclo indirecto no detectado:
-A → B → C → A
-```
-
-### Soluciones propuestas
-
-#### Opción 1: Función de validación en la aplicación
-
-```python
-def has_cycle(area_id, parent_id, db):
-    """Verifica si establecer parent_id crearía un ciclo"""
-    visited = set()
-    current = parent_id
-    while current is not None:
-        if current == area_id:
-            return True  # Ciclo detectado
-        visited.add(current)
-        parent = db.get_parent(current)
-        if parent in visited:
-            return True  # Ciclo detectado
-        current = parent
-    return False
-```
-
-#### Opción 2: Trigger de PostgreSQL
+El trigger `trg_area_set_path` (antes del `INSERT` o del cambio de
+`parent_id`) calcula `path` y `nivel_organizacional` en la base de datos,
+centralizando la definición de la jerarquía:
 
 ```sql
-CREATE OR REPLACE FUNCTION check_area_cycle()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION sigd_org.fn_area_set_path()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    parent_path VARCHAR(255);
+    parent_level INTEGER;
 BEGIN
-    -- Lógica recursiva para detectar ciclos
-    -- ...
+    IF NEW.parent_id IS NULL THEN
+        NEW.path := '/' || NEW.area_id::text || '/';
+        NEW.nivel_organizacional := 1;
+    ELSE
+        IF NEW.parent_id = NEW.area_id THEN
+            RAISE EXCEPTION 'Un área no puede ser hija de sí misma'
+                USING ERRCODE = '23514';
+        END IF;
+
+        SELECT a.path, a.nivel_organizacional
+          INTO parent_path, parent_level
+          FROM sigd_org.area AS a
+         WHERE a.area_id = NEW.parent_id
+         FOR SHARE;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'El área padre % no existe', NEW.parent_id
+                USING ERRCODE = '23503';
+        END IF;
+
+        IF TG_OP = 'UPDATE'
+           AND NEW.parent_id IS DISTINCT FROM OLD.parent_id
+           AND parent_path LIKE OLD.path || '%' THEN
+            RAISE EXCEPTION
+                'Movimiento inválido: el área % no puede depender de su descendiente %',
+                NEW.area_id, NEW.parent_id
+                USING ERRCODE = '23514';
+        END IF;
+
+        NEW.path := parent_path || NEW.area_id::text || '/';
+        NEW.nivel_organizacional := parent_level + 1;
+    END IF;
+
+    NEW.actualizado_en := now();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-CREATE TRIGGER trg_check_area_cycle
-    BEFORE INSERT OR UPDATE ON areas
-    FOR EACH ROW
-    EXECUTE FUNCTION check_area_cycle();
+CREATE TRIGGER trg_area_set_path
+BEFORE INSERT OR UPDATE OF parent_id ON sigd_org.area
+FOR EACH ROW
+EXECUTE FUNCTION sigd_org.fn_area_set_path();
 ```
 
-#### Opción 3: Consulta recursiva en validación
+Qué hace en cada operación:
+
+1. **Raíz** (`parent_id IS NULL`): fija `path = '/<area_id>/'` y nivel 1.
+2. **Hijo**: lee la ruta y el nivel del padre (`SELECT ... FOR SHARE`,
+   evitando condiciones de carrera con reposicionamientos simultáneos) y
+   construye `path = parent_path || '<area_id>/'`, `nivel = parent_level + 1`.
+3. **Validaciones íntegras**: ver sección 4.
+
+---
+
+## 4. Prevención de ciclos: directos e indirectos (SQLSTATE `23514`)
+
+La clave foránea de `parent_id` garantiza que un área exista en su momento,
+pero **no puede impedir ciclos**. Un `CHECK`/`EXCLUDE` tampoco: dependen solo
+de los valores de la propia fila, y un ciclo depende del estado de otras filas.
+La prevención se cierra a nivel de base de datos con el trigger
+`fn_area_set_path`, independientemente de la aplicación.
+
+### 4.1 Ciclo directo
+
+Un área no puede ser hija de sí misma:
 
 ```sql
-WITH RECURSIVE area_hierarchy AS (
-    SELECT id, parent_id FROM areas WHERE id = $1
-    UNION ALL
-    SELECT a.id, a.parent_id
-    FROM areas a
-    INNER JOIN area_hierarchy ah ON a.id = ah.parent_id
-)
-SELECT COUNT(*) FROM area_hierarchy WHERE id = $2;
+IF NEW.parent_id = NEW.area_id THEN
+    RAISE EXCEPTION 'Un área no puede ser hija de sí misma'
+        USING ERRCODE = '23514';
+END IF;
 ```
 
-### Decisión actual
+### 4.2 Ciclo indirecto (reposicionamiento)
 
-**Prevención de ciclos: La tabla `areas` no implementa validación de ciclos a nivel de base de datos.** Una prevención completa requiere lógica adicional mediante trigger, función o validación en la aplicación.
-
----
-
-## 3. Estados y Vigencias
-
-### Tabla: `areas`
-
-- **estado**: `BOOLEAN` (TRUE = activo, FALSE = inactivo)
-- Permite marcar áreas como inactivas sin eliminarlas
-
-### Tabla: `responsables`
-
-- **fecha_inicio**: Inicio de responsabilidad (obligatorio)
-- **fecha_fin**: Fin de responsabilidad (NULL = vigente)
-- **es_titular**: Indica si el responsable es titular o suplente
-
-#### Ejemplo de historial
-
-```
-Área: Sistemas
-│
-├── Usuario: 1001, Cargo: Director, Inicio: 01/01/2026, Fin: NULL
-│   (Responsable actual)
-│
-├── Usuario: 1002, Cargo: Director, Inicio: 01/06/2025, Fin: 31/12/2025
-│   (Responsable histórico)
-```
-
-#### Restricción CHECK
+Al mover un área (UPDATE de `parent_id`), se comprueba si el nuevo padre es
+**ella misma o uno de sus descendientes**. Si el `path` del nuevo padre
+comienza con el `path` de la fila que se mueve, el nuevo padre está dentro de
+su propio subárbol, y moverse bajo él formaría el ciclo `A → ... → A`:
 
 ```sql
-CONSTRAINT chk_responsables_fechas
-    CHECK (
-        fecha_fin IS NULL
-        OR fecha_fin >= fecha_inicio
-    )
+IF TG_OP = 'UPDATE'
+   AND NEW.parent_id IS DISTINCT FROM OLD.parent_id
+   AND parent_path LIKE OLD.path || '%' THEN
+    RAISE EXCEPTION 'Movimiento inválido: el área % no puede depender de su descendiente %', ...
+        USING ERRCODE = '23514';
+END IF;
 ```
 
-Garantiza que `fecha_fin` no sea anterior a `fecha_inicio`.
+Justificación lógica: si `parent_path LIKE OLD.path || '%'`, el nuevo padre
+es un descendiente del área movida, luego `área → padre → … → área` es un
+ciclo. En un `INSERT` el área no tiene descendientes todavía, por lo que solo
+aplica la comprobación en `UPDATE`.
 
----
+### 4.3 Uso del código `23514`
 
-## 4. Relación Muchos a Muchos (N:M)
-
-### Diseño: roles_permisos
-
-```
-roles (1) ──→ roles_permisos ←── (M) permisos
-                    │
-         (rol_id, permiso_id)
-```
-
-**Ventajas:**
-
-- Permite que un rol tenga múltiples permisos
-- Permite que un permiso sea asignado a múltiples roles
-- Evita datos duplicados (sin listas separadas por comas)
-- Fácil mantenimiento y escalabilidad
-
-**Ejemplo:**
-
-```
-ROLE_ADMIN tiene: area.crear, area.consultar, area.editar, area.eliminar
-ROLE_OPERADOR tiene: area.consultar, area.editar
-ROLE_CONSULTA tiene: area.consultar
-```
-
-En `roles_permisos`:
-
-```
-(rol_id=1, permiso_id=1)  → ROLE_ADMIN puede area.crear
-(rol_id=1, permiso_id=2)  → ROLE_ADMIN puede area.consultar
-(rol_id=2, permiso_id=2)  → ROLE_OPERADOR puede area.consultar
-(rol_id=3, permiso_id=2)  → ROLE_CONSULTA puede area.consultar
-```
-
-**Nueva relación N:M: usuarios_roles**
-
-La tabla `usuarios_roles` crea la relación entre usuarios y roles:
-
-```
-usuarios (1) ──→ usuarios_roles ←── (M) roles
-```
-
-Esto permite:
-- Asignar múltiples roles a un usuario
-- Asignar un mismo rol a múltiples usuarios
-- Mantener histórico de asignaciones con fecha_asignacion y fecha_fin
-
----
-
-## 5. Índices para Optimización
-
-### Índices creados
-
-| Tabla | Índice | Propósito |
-|-------|--------|-----------|
-| areas | idx_areas_parent_id | Consultas de jerarquía |
-| responsables | idx_responsables_area | Filtrar responsables por área |
-| responsables | idx_responsables_usuario | Filtrar responsables por usuario |
-| responsables | idx_responsables_cargo | Filtrar responsables por cargo |
-| responsables | idx_responsables_vigencia | Consultas de vigencia (fecha_inicio, fecha_fin) |
-| roles_permisos | idx_roles_permisos_permiso | Búsquedas de permisos por permiso |
-| usuarios_roles | idx_usuarios_roles_usuario | Búsquedas de roles por usuario |
-| usuarios_roles | idx_usuarios_roles_rol | Búsquedas de usuarios por rol |
-
-### Justificación
-
-- Mejoran el rendimiento de consultas frecuentes
-- Reducen tiempos de escaneo de tablas
-- Especialmente importantes en `responsables` por las consultas de vigencia
-
----
-
-## 6. Dependencia Externa: usuarios (users)
-
-### Problema
-
-La tabla `responsables` incluye:
+PostgreSQL asigna `23514` (`check_violation`) a las restricciones `CHECK`;
+aquí se **reutiliza deliberadamente** como código de error estable para la
+aplicación y la suite de QA. El cliente y los casos de prueba pueden distinguir
+el rechazo de ciclos sin depender del texto del mensaje:
 
 ```sql
-usuario_id BIGINT NOT NULL
+EXCEPTION WHEN SQLSTATE '23514' THEN
+    NULL; -- esperado: el ciclo fue rechazado
 ```
 
-Pero la tabla `users` **no pertenece al módulo B_PANAIFO**. Viene de otro componente/módulo del sistema.
+La suite oficial `05_validacion_organicore_v2.sql` cubre ambos escenarios
+(«Ciclo directo» e «Ciclo indirecto») y verifica que ambas sentencias fallen
+con `SQLSTATE '23514'`. Cuando el área madre no existe, el trigger emite
+`23503` (`foreign_key_violation`).
 
-### Decisión actual
+---
 
-**La FK de `usuario_id` → `users(id)` no está creada en los scripts iniciales.**
+## 5. Propagación de cambios de ruta (movimiento de subárboles)
 
-Razón: La tabla `users` no fue incluida en el modelo proporcionado por B_POOL.
-
-**PERO:** Se proporcionan comandos `ALTER TABLE` listos para ejecutar cuando `users` esté disponible (ver sección 0).
-
-### Acción requerida
-
-Cuando la tabla `users` esté disponible y aprobada, ejecutar:
+Cuando se reposiciona un área con hijos, su `path` cambia pero los de sus
+descendientes quedarían desactualizados. El trigger posterior
+`fn_area_propagate_path` re-dispara el cálculo sobre los hijos directos; cada
+hijo vuelve a propagar a los suyos, y así la onda llega a todo el subárbol:
 
 ```sql
-ALTER TABLE responsables
-ADD CONSTRAINT fk_responsables_usuario
-    FOREIGN KEY (usuario_id)
-    REFERENCES users(id);
+CREATE OR REPLACE FUNCTION sigd_org.fn_area_propagate_path()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE sigd_org.area
+       SET parent_id = parent_id
+     WHERE parent_id = NEW.area_id;
+    RETURN NEW;
+END;
+$$;
 
-ALTER TABLE usuarios_roles
-ADD CONSTRAINT fk_usuarios_roles_usuario
-    FOREIGN KEY (usuario_id)
-    REFERENCES users(id);
+CREATE TRIGGER trg_area_propagate_path
+AFTER UPDATE OF parent_id ON sigd_org.area
+FOR EACH ROW
+WHEN (OLD.path IS DISTINCT FROM NEW.path)
+EXECUTE FUNCTION sigd_org.fn_area_propagate_path();
 ```
 
-### Nota para documentación
-
-**Dependencia externa:** `responsables.usuario_id` y `usuarios_roles.usuario_id` referencian `users(id)`, tabla perteneciente a otro componente/módulo del sistema. La creación definitiva de estas FKs depende de que la tabla `users` y su clave primaria estén disponibles y aprobadas.
-
----
-
-## 7. Restricciones de Integridad
-
-### UNIQUE
-
-- **areas.sigla**: Cada área debe tener una sigla única (ej: "DGP", "OSP")
-- **cargos.nombre**: Cada cargo debe tener nombre único
-- **roles.codigo**: Cada rol debe tener código único (ej: "ROLE_ADMIN")
-- **permisos.codigo**: Cada permiso debe tener código único (ej: "area.crear")
-
-### FOREIGN KEYS
-
-- **areas.parent_id** → areas(id): Asegura que el área padre existe
-- **cargos.rol_id** → roles(id): Vincula cargo con rol predeterminado (opcional)
-- **responsables.area_id** → areas(id): Asegura que el área existe
-- **responsables.cargo_id** → cargos(id): Asegura que el cargo existe
-- **usuarios_roles.rol_id** → roles(id): Asegura que el rol existe
-- **roles_permisos.rol_id** → roles(id): Asegura que el rol existe
-- **roles_permisos.permiso_id** → permisos(id): Asegura que el permiso existe
-
-### CHECK
-
-- **responsables.chk_responsables_fechas**: Valida que fecha_fin >= fecha_inicio (o sea NULL)
-- **usuarios_roles.chk_usuarios_roles_fechas**: Valida que fecha_fin >= fecha_asignacion (o sea NULL)
+El truco `SET parent_id = parent_id` no cambia el parentesco, pero dispara de
+nuevo `trg_area_set_path` sobre cada hijo directo, recomputando `path` y
+`nivel_organizacional` en cadena. La suite valida la propagación con el caso
+«mover un subárbol completo».
 
 ---
 
-## 8. Datos Ficticios y Pruebas
+## 6. Índices para la jerarquía
 
-### Nota importante
-
-**TODOS LOS DATOS SON FICTICIOS Y NO OFICIALES.**
-
-- No se incluyen datos personales reales
-- No se incluyen credenciales ni contraseñas
-- Los IDs utilizados son solo para demostración
-
-### Orden de ejecución recomendado
-
-1. **03_organizacion_roles_permisos.sql**: Crear tablas
-2. **03_datos_prueba_organizacion.sql**: Insertar datos ficticios
-3. **03_verificacion_organizacion.sql**: Ejecutar consultas de verificación
-4. **04_validacion_organizacion.md**: Revisar matriz de validación
+| Índice | Propósito |
+| :--- | :--- |
+| `idx_area_parent_id` | Consultas por padre (hijos directos) y reposicionamientos |
+| `idx_area_path_pattern` | Consultas `LIKE` de subárbol sobre `path` (`varchar_pattern_ops`) |
 
 ---
 
-## 9. Limitaciones y Consideraciones
+## 7. Vigencia de encargaturas (recordatorio técnico)
 
-### Ciclos en la jerarquía
+- `periodo_vigencia TSTZRANGE` con restricción de exclusión GiST
+  (`ex_encargatura_cargo_periodo`): impide que el mismo cargo tenga dos
+  encargaturas vigentes solapadas.
+- La autorización se evalúa con `usuario_tiene_facultad_despacho()` mediante
+  `periodo_vigencia @> momento`: fuera del rango se rechaza sin necesidad de
+  jobs de desactivación.
 
-Como se mencionó en la sección 2, no hay prevención de ciclos a nivel de BD.
+---
 
-### Histórico de cambios
+## 8. Criterios de aceptación y validación
 
-No existe auditoría automática. Para implementarla:
+| Caso | Evidencia | Resultado esperado |
+| :--- | :--- | :--- |
+| Path materializado | `area.path` + `idx_area_path_pattern` + `LIKE` | Descendientes sin `WITH RECURSIVE` |
+| Ciclo directo | Trigger `fn_area_set_path` → `23514` | UPDATE rechazado |
+| Ciclo indirecto | Trigger `fn_area_set_path` → `23514` | UPDATE rechazado |
+| Propagación de subárbol | `fn_area_propagate_path` | Paths de nietos actualizados |
+| Solapamiento de encargaturas | `EXCLUDE ... USING GIST` | INSERT rechazado (`exclusion_violation`) |
+| Expiración de facultad | `usuario_tiene_facultad_despacho()` | `false` fuera del rango |
 
-```sql
-CREATE TABLE areas_audit (
-    id BIGSERIAL PRIMARY KEY,
-    area_id BIGINT,
-    accion VARCHAR(50),
-    datos_anteriores JSONB,
-    datos_nuevos JSONB,
-    fecha_cambio TIMESTAMP DEFAULT NOW()
-);
+Ejecutar:
+
+```bash
+psql -v ON_ERROR_STOP=1 -f 03_esquema_sigd_org_v2.sql sigd_qa
+psql -v ON_ERROR_STOP=1 -f 05_validacion_organicore_v2.sql sigd_qa
 ```
 
-### Eliminación de áreas
-
-Actualmente no existe CASCADE DELETE. Borrar un área requiere:
-
-1. Reasignar responsables
-2. Reasignar áreas hijas o cambiar parent_id
-3. Luego sí eliminar el área
-
----
-
-## 10. Características del BORRADOR
-
-Este script es **PROVISIONAL** con **mejoras post-revisión**:
-
-✅ Tablas, PK, FK, UNIQUE, CHECK e índices funcionales
-✅ Relación Usuario-Rol implementada (usuarios_roles N:M)
-✅ Relación Cargo-Rol implementada (cargos.rol_id)
-✅ Nomenclatura de permisos estandarizada (punto en lugar de dos puntos)
-✅ Script preparado para integración con tabla `users` externa
-✅ Datos ficticios para demostración
-✅ Consultas de verificación y validación
-✅ Matriz de casos permitidos y denegados
-⏳ Pendiente: Integración real con módulo `users`
-⏳ Pendiente: Implementación de auditoría
-⏳ Pendiente: Lógica de prevención de ciclos
-⏳ Pendiente: Validaciones complejas en triggers
+La suite muestra `OK: OrganiCore v2 supero la suite automatizada` si todos los
+casos pasan (detalles en `04_validacion_organicore_v2.md`).
 
 ---
 
 ## Referencias
 
-- **Modelo base**: B_POOL (diccionario y propuesta de tablas)
-- **Base de datos**: PostgreSQL 18.6
-- **Estándar**: SQL ISO/IEC 9075
-
----
-
-**Fecha de elaboración:** 2026-08-28  
-**Versión:** 1.0 (BORRADOR)
+- **Esquema oficial:** `03_esquema_sigd_org_v2.sql` (DDL `sigd_org`, UUID, path).
+- **Validación:** `05_validacion_organicore_v2.sql` · `04_validacion_organicore_v2.md`.
+- **Observación de Fase 2:** `docs/levantamiento_de_observaciones/03_plan_levantamiento_observaciones_grupo_3_organicore.md`.
+- **Base de datos:** PostgreSQL 18+ · **Estándar:** SQL ISO/IEC 9075.

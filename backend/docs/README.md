@@ -88,16 +88,15 @@ Responsable de representar áreas institucionales, jerarquías recursivas, cargo
 * 📐 **Modelo de Datos Lógico:** [`organicore/02_modelo_datos_organizacion.md`](organicore/02_modelo_datos_organizacion.md)
 * 📖 **Diccionario de Datos:** [`organicore/02_diccionario_datos_organizacion.md`](organicore/02_diccionario_datos_organizacion.md)
 * 📊 **Diagramas del Modelo ER:** [Fuente DBML (`.dbml`)](organicore/diagrama_er_organizacion.dbml) · [Vista previa (`.png`)](organicore/diagrama_er_organizacion.png)
-* 💾 **Scripts SQL y Paquete Técnico:**
-  * [Plan de Trabajo Técnico](organicore/00_plan_trabajo_tecnico_organizacion.md)
-  * [Script SQL DDL Físico](organicore/03_organizacion_roles_permisos.sql)
-  * [Datos de Prueba](organicore/03_datos_prueba_organizacion.sql)
-  * [Script de Verificación](organicore/03_verificacion_organizacion.sql)
+* 💾 **Scripts SQL y Paquete Técnico (OFICIAL · Fase 2 / `sigd_org`):**
+  * [Esquema DDL `sigd_org` v2](organicore/03_esquema_sigd_org_v2.sql) *(UUID, Materialized Path, `fn_area_set_path`, SQLSTATE 23514)*
+  * [Validación Automatizada v2](organicore/05_validacion_organicore_v2.sql) *(suite QA: path, ciclos, encargaturas, facultades)*
   * [Notas Técnicas de Prevención de Ciclos](organicore/06_notas_tecnicas_prevencion_ciclos.md)
   * [Política de Eliminaciones Lógicas](organicore/07_politica_eliminaciones_logicas.md)
-  * [Plan de Ejecución Controlado](organicore/08_plan_ejecucion_controlado.md)
+  * [Plan de Ejecución Controlado — BORRADOR](organicore/08_plan_ejecucion_controlado.md) *(referencia de ejecución; usar scripts v2)*
   * [Resumen Ejecutivo](organicore/09_resumen_ejecutivo_organizacion.md)
-* 🧪 **Validación y Pruebas:** [`organicore/04_validacion_organizacion.md`](organicore/04_validacion_organizacion.md)
+  * *(LEGACY / deprecados, no usar en Fase 2):* [`03_organizacion_roles_permisos.sql`](organicore/03_organizacion_roles_permisos.sql) · [`03_datos_prueba_organizacion.sql`](organicore/03_datos_prueba_organizacion.sql) · [`03_verificacion_organizacion.sql`](organicore/03_verificacion_organizacion.sql)
+* 🧪 **Validación y Pruebas:** [`organicore/04_validacion_organicore_v2.md`](organicore/04_validacion_organicore_v2.md) *(criterios Fase 2)* · [`organicore/04_validacion_organizacion.md`](organicore/04_validacion_organizacion.md) *(LEGACY Fase 1)*
 * 📌 **Registro de Decisiones y Pendientes:** [`organicore/05_decisiones_y_preguntas_pendientes.md`](organicore/05_decisiones_y_preguntas_pendientes.md)
 
 ---
@@ -190,7 +189,8 @@ Todos los scripts DDL están optimizados para **PostgreSQL 18.6** y deben ejecut
 # Ejemplo de ejecución y validación por módulo en ambiente de prueba local:
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f rutadoc/03_trazabilidad_movimientos.sql
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f tramicore/03_tramite_expediente_registro.sql
-psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f organicore/03_organizacion_roles_permisos.sql
+psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f organicore/03_esquema_sigd_org_v2.sql
+psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f organicore/05_validacion_organicore_v2.sql
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f identicore/03_usuarios.sql
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f docucore/05_documentos_formularios.sql
 ```

@@ -1,9 +1,20 @@
 /*
 =========================================================
-Grupo 3 — OrganiCore · Datos de Prueba (DML)
+[LEGACY / DEPRECADO] Grupo 3 — OrganiCore · Datos de Prueba (DML) (Fase 1)
 Módulo de Organización, Roles y Permisos
 Responsable: Geiner Panaifo (B_PANAIFO) · Integración: Pool (B_POOL)
 Motor: PostgreSQL 18.6
+Estado: LEGACY — NO EJECUTAR EN FASE 2
+
+ESTE SCRIPT QUEDA COMO LEGACY por no estar alineado con Fase 2.
+Fue sustituido por la suite OFICIAL de QA:
+    docs/organicore/05_validacion_organicore_v2.sql
+(documento de referencia: docs/organicore/04_validacion_organicore_v2.md)
+
+Diferencias con la suite oficial (sigd_org):
+    - Inserta sobre tablas public (areas, cargos, ...) en lugar de sigd_org.
+    - Usa IDs tipo bigint en lugar de UUID.
+    - Sin datos de jerarquía Materialized Path (path ni nivel_organizacional).
 
 TODOS LOS DATOS SON FICTICIOS Y NO OFICIALES
 
