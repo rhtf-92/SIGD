@@ -8,6 +8,7 @@ import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosPage from "../pages/administracion/UsuariosPage";
+import MesaPartesVirtualPage from "../pages/tramite/MesaPartesVirtualPage";
 
 export default function AppRouter() {
   return (
@@ -29,6 +30,7 @@ export default function AppRouter() {
         element={<CalendarioLaboralPage />}
       />
       <Route path="/administracion/seguridad" element={<SeguridadPage />} />
+      <Route path="/tramite/mesa-partes-virtual" element={<MesaPartesVirtualPage />} />
     </Routes>
   );
 }
