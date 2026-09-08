@@ -100,6 +100,20 @@ const juridicalDocumentSchema = z
             "DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos",
         }
       ),
+    nombres: z
+      .string()
+      .regex(/^[A-Za-zÁÉÍÓÚáéíóúñÑ\s]{2,80}$/, {
+        message: "Nombres deben tener 2-80 caracteres alfabéticos con tildes y espacios",
+      }),
+    apellidos: z
+      .string()
+      .regex(/^[A-Za-zÁÉÍÓÚáéíóúñÑ\s]{2,80}$/, {
+        message: "Apellidos deben tener 2-80 caracteres alfabéticos con tildes y espacios",
+      }),
+    cargo: z
+      .string()
+      .min(2, "Cargo debe tener mínimo 2 caracteres")
+      .max(100, "Cargo debe tener máximo 100 caracteres"),
   });
 
 /* Schema persona jurídica */
