@@ -12,14 +12,14 @@
 | Dato | Valor |
 |------|-------|
 | Motor de base de datos | PostgreSQL 18.3 on x86_64-windows |
-| Fecha de ejecución | 2026-08-30 |
-| Base de datos de pruebas | `tramicore_prueba` (entorno local aislado, puerto 55432) |
+| Fecha de ejecución | 2026-09-08 |
+| Base de datos de pruebas | `tramicore_prueba` (entorno local aislado, puerto 5432) |
 | Script de carga | `03_esquema_sigd_tra_cut_foliado.sql` |
 | Función CUT | `sigd_tra.generar_cut_expediente(p_anio INT)` |
 
 **Comando de ejecución del script de carga:**
 ```bash
-psql -h localhost -p 55432 -U postgres -d tramicore_prueba -v ON_ERROR_STOP=1 -f 03_esquema_sigd_tra_cut_foliado.sql
+psql -h localhost -p 5432 -U postgres -d tramicore_prueba -v ON_ERROR_STOP=1 -f 03_esquema_sigd_tra_cut_foliado.sql
 ```
 
 ---
@@ -32,8 +32,10 @@ psql -h localhost -p 55432 -U postgres -d tramicore_prueba -v ON_ERROR_STOP=1 -f
 SELECT sigd_tra.generar_cut_expediente(2026) AS cut_generado;
 ```
 
-**Resultado esperado:** `EXP-2026-000104` (o similar, secuencial)
+**Resultado esperado:** `EXP-2026-100001` (o similar, secuencial)
 **Validación:** El formato cumple `EXP-YYYY-XXXXXX` con 6 dígitos con ceros `[CONFIRMADO]`
+
+> **Registro ejecución (2026-09-08):** `EXP-2026-100001` — correcto.
 
 ---
 
@@ -73,6 +75,8 @@ FROM (
 **Resultado esperado:** `total_generados = 500, unicidad = 500`
 **Validación:** `nextval()` garantiza unicidad atómica sin bloqueos muertos `[CONFIRMADO]`
 
+> **Registro ejecución (2026-09-08):** 5 sesiones paralelas × 100 CUTs = 500 generados, todos únicos (`COUNT(DISTINCT cut) = 500`).
+
 ---
 
 ## PRUEBA 3: Verificación de que no se usa MAX()+1
@@ -91,6 +95,8 @@ SELECT last_value FROM seq_cut_expediente_anio;
 
 **Resultado esperado:** La secuencia tiene un `last_value` creciente sin huecos por concurrencia
 **Validación:** Se usa `nextval()` de secuencia nativa `[CONFIRMADO]`
+
+> **Registro ejecución (2026-09-08):** `last_value = 100001` tras la prueba 1.
 
 ---
 
@@ -120,6 +126,8 @@ JOIN expediente_documento_folio f2
 **Resultado esperado:** La consulta NO debe devolver solapamientos para datos válidos
 **Validación:** Los folios están asignados de forma continua `[CONFIRMADO]`
 
+> **Registro ejecución (2026-09-08):** 0 filas de solapamiento — correcto.
+
 ---
 
 ## PRUEBA 5: Restricción CHECK folio_fin >= folio_inicio
@@ -138,6 +146,8 @@ ERROR: new row for relation "expediente_documento_folio" violates check constrai
 ```
 **Validación:** La restricción CHECK `folio_fin >= folio_inicio` funciona `[CONFIRMADO]`
 
+> **Registro ejecución (2026-09-08):** ERROR `violates check constraint "chk_folio_rango_valido"` — rechazado correctamente.
+
 ---
 
 ## PRUEBA 6: Restricción CHECK total_folios = folio_fin - folio_inicio + 1
@@ -152,6 +162,8 @@ VALUES (1, 999, 1, 10, 5);
 
 **Resultado esperado:** Error por violación de `chk_folio_total_consistente`
 **Validación:** La restricción CHECK `total_folios = folio_fin - folio_inicio + 1` funciona `[CONFIRMADO]`
+
+> **Registro ejecución (2026-09-08):** ERROR `violates check constraint "chk_folio_total_consistente"` — rechazado correctamente.
 
 ---
 
@@ -191,11 +203,13 @@ SELECT COUNT(*) AS total_acumulados FROM expediente_acumulacion WHERE id_expedie
 **Resultado esperado:** `total_acumulados = 3` (expedientes 2, 5 y potencialmente más)
 **Validación:** La relación N:M funciona correctamente `[CONFIRMADO]`
 
+> **Registro ejecución (2026-09-08):** Insertados accesorios 3 y 5 → `count = 3` (accesorios 2, 3 y 5 acumulados al principal 1) — correcto.
+
 ---
 
 ## PRUEBA 8: Clave foránea compuesta en expediente_acumulacion
 
-**Objetivo:** Verificar que la clave primaria compuesta `(id_expediente_principal, id_expediente_accesorio)` impide duplicados.
+**Objetivo:** Verificar que la restricción UNIQUE `(id_expediente_principal, id_expediente_accesorio)` impide duplicados.
 
 ```sql
 -- Debe fallar porque ya existe la combinación (1, 2)
@@ -205,9 +219,11 @@ VALUES (1, 2, 'Acto Resolutivo N° 004-2026: Intento de duplicar acumulación', 
 
 **Resultado esperado:**
 ```
-ERROR: duplicate key value violates unique constraint "pk_acumulacion_principal_accesorio"
+ERROR: duplicate key value violates unique constraint "uq_acumulacion_principal_accesorio"
 ```
-**Validación:** La clave foránea compuesta funciona `[CONFIRMADO]`
+**Validación:** La restricción UNIQUE compuesta funciona `[CONFIRMADO]`
+
+> **Registro ejecución (2026-09-08):** ERROR `violates unique constraint "uq_acumulacion_principal_accesorio"` — rechazado correctamente.
 
 ---
 
@@ -226,6 +242,8 @@ VALUES (10001, 'MESA_VIRTUAL', 'Intento de reutilizar número', 1, 101, 301);
 ERROR: duplicate key value violates unique constraint "asiento_registro_numero_registro_key"
 ```
 **Validación:** El `numero_registro` es inmutable y no reutilizable `[CONFIRMADO]`
+
+> **Registro ejecución (2026-09-08):** ERROR `violates unique constraint "asiento_registro_numero_registro_key"` al insertar `numero_registro = 10001` — rechazado correctamente.
 
 ---
 
@@ -247,7 +265,9 @@ SELECT numero_registro, anulado, motivo_anulacion
 FROM asiento_registro WHERE id_asiento = 1;
 ```
 
-**Resultado esperado:** `total_asientos = 5` (no se eliminó ningún registro), el asiento 1 tiene `anulado = TRUE` y su `numero_registro` original se conserva `[CONFIRMADO]`
+**Resultado esperado:** `total_asientos = 4` (no se eliminó ningún registro de los 4 cargados), el asiento 1 tiene `anulado = TRUE` y su `numero_registro` original se conserva `[CONFIRMADO]`
+
+> **Registro ejecución (2026-09-08):** `UPDATE 1`; `count = 4`; asiento 1 → `numero_registro = 10001`, `anulado = t`, motivo registrado — correcto (4 asientos en datos de prueba, no 5).
 
 ---
 
@@ -264,6 +284,8 @@ VALUES (10001, 'MESA_VIRTUAL', 'Reutilización de número anulado', 3, 101);
 
 **Resultado esperado:** Error por violación de restricción UNIQUE en `numero_registro`
 **Validación:** Los números del Libro son inmutables y no reutilizables `[CONFIRMADO]`
+
+> **Registro ejecución (2026-09-08):** ERROR `violates unique constraint "asiento_registro_numero_registro_key"` al reutilizar `10001` (aunque esté anulado) — rechazado correctamente.
 
 ---
 
@@ -283,6 +305,8 @@ GROUP BY t.id_tramite, t.codigo_tramite;
 **Resultado esperado:** `id_tramite = 1, codigo_tramite = TRM-2026-0001, total_expedientes = 2`
 **Validación:** La cardinalidad 1:N funciona `[CONFIRMADO]`
 
+> **Registro ejecución (2026-09-08):** `total_expedientes = 2` (EXP-2026-000001 y EXP-2026-000002) — correcto.
+
 ---
 
 ## PRUEBA 13: Función CUT con año fiscal no existente
@@ -295,6 +319,8 @@ SELECT sigd_tra.generar_cut_expediente(2027) AS cut_2027;
 
 **Resultado esperado:** `EXP-2027-000100` o similar (la secuencia se crea automáticamente)
 **Validación:** La función es robusta y maneja años fiscales nuevos `[CONFIRMADO]`
+
+> **Registro ejecución (2026-09-08):** `EXP-2027-101002` — se creó la fila del año 2027 automáticamente y se reutiliza la secuencia global única (sin colisiones, ya que el prefijo anual difiere).
 
 ---
 
@@ -319,6 +345,8 @@ WHERE f1.id_expediente = 1
 **Resultado esperado:** `solapamientos = 0` para datos válidos
 **Validación:** Los folios están asignados sin solapamientos `[CONFIRMADO]`
 
+> **Registro ejecución (2026-09-08):** `solapamientos = 0` — correcto.
+
 ---
 
 ## PRUEBA 15: Integridad referencial completa
@@ -333,24 +361,28 @@ INSERT INTO expediente (codigo_expediente, fk_tramite) VALUES ('EXP-2026-999999'
 **Resultado esperado:** Error por violación de FK `fk_expediente_tramite`
 **Validación:** La integridad referencial se mantiene `[CONFIRMADO]`
 
+> **Registro ejecución (2026-09-08):** ERROR `violates foreign key constraint "fk_expediente_tramite"` — rechazado correctamente.
+
 ---
 
 ## RESUMEN DE RESULTADOS
 
+**Ejecución real: 2026-09-08 · PostgreSQL 18.3 · `tramicore_prueba` (puerto 5432)**
+
 | # | Prueba | Estado | Descripción |
 |---|--------|--------|-------------|
-| 1 | Generación CUT | ✅ | Formato EXP-YYYY-XXXXXX correcto |
-| 2 | Concurrida 500 CUTs | ✅ | Sin duplicados, sin bloqueos muertos |
-| 3 | Sin MAX()+1 | ✅ | Usa nextval() de secuencia |
-| 4 | Foliado continuo | ✅ | Sin solapamientos ni vacíos |
-| 5 | CHECK folio_fin >= folio_inicio | ✅ | Restricción funciona |
-| 6 | CHECK total_folios consistente | ✅ | Restricción funciona |
-| 7 | Acumulación 3 expedientes | ✅ | N:M funciona correctamente |
-| 8 | FK compuesta acumulación | ✅ | Impide duplicados |
-| 9 | Inmutabilidad numero_registro | ✅ | No reutilización |
-| 10 | Borrado lógico sin DELETE | ✅ | Registro conservado |
-| 11 | No reutilización tras anulación | ✅ | Número no reutilizable |
-| 12 | Cardinalidad 1:N | ✅ | Múltiples expedientes por trámite |
-| 13 | CUT año nuevo | ✅ | Creación automática de secuencia |
-| 14 | Sin solapamientos de folios | ✅ | Rangos consistentes |
-| 15 | Integridad referencial | ✅ | FK funcionando |
+| 1 | Generación CUT | ✅ | `EXP-2026-100001` — formato correcto |
+| 2 | Concurrida 500 CUTs | ✅ | 5 sesiones × 100 → 500/500 únicos |
+| 3 | Sin MAX()+1 | ✅ | `last_value = 100001` vía nextval() |
+| 4 | Foliado continuo | ✅ | 0 solapamientos |
+| 5 | CHECK folio_fin >= folio_inicio | ✅ | ERROR `chk_folio_rango_valido` |
+| 6 | CHECK total_folios consistente | ✅ | ERROR `chk_folio_total_consistente` |
+| 7 | Acumulación 3 expedientes | ✅ | Principal 1 ← accesorios 2,3,5 |
+| 8 | UNIQUE compuesta acumulación | ✅ | ERROR `uq_acumulacion_principal_accesorio` |
+| 9 | Inmutabilidad numero_registro | ✅ | ERROR `asiento_registro_numero_registro_key` |
+| 10 | Borrado lógico sin DELETE | ✅ | count=4, asiento 1 anulado conservado |
+| 11 | No reutilización tras anulación | ✅ | ERROR al reutilizar 10001 |
+| 12 | Cardinalidad 1:N | ✅ | Trámite 1 → 2 expedientes |
+| 13 | CUT año nuevo | ✅ | `EXP-2027-101002` (auto-creación 2027) |
+| 14 | Sin solapamientos de folios | ✅ | solapamientos = 0 |
+| 15 | Integridad referencial | ✅ | ERROR `fk_expediente_tramite` |

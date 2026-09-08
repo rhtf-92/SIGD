@@ -9,18 +9,24 @@
 BEGIN;
 
 -- =============================================================================
+-- 0. ESQUEMA DE TRABAJO
+-- =============================================================================
+CREATE SCHEMA IF NOT EXISTS sigd_tra;
+SET search_path TO sigd_tra, public;
+
+-- =============================================================================
 -- 1. LIMPIEZA / PREPARACIÓN DE ENTORNO
 -- ADVERTENCIA: estos DROP TABLE ... CASCADE son únicamente para una base de
 -- datos aislada de pruebas. En un entorno real de producción NO deben ejecutarse.
 -- =============================================================================
-DROP TABLE IF EXISTS expediente_documento_folio CASCADE;
-DROP TABLE IF EXISTS expediente_acumulacion CASCADE;
-DROP TABLE IF EXISTS secuencia_anual_cut CASCADE;
-DROP TABLE IF EXISTS asiento_registro CASCADE;
-DROP TABLE IF EXISTS expediente CASCADE;
-DROP TABLE IF EXISTS tramite CASCADE;
-DROP SEQUENCE IF EXISTS seq_asiento_numero_registro CASCADE;
-DROP SEQUENCE IF EXISTS seq_cut_expediente_anio CASCADE;
+DROP TABLE IF EXISTS sigd_tra.expediente_documento_folio CASCADE;
+DROP TABLE IF EXISTS sigd_tra.expediente_acumulacion CASCADE;
+DROP TABLE IF EXISTS sigd_tra.secuencia_anual_cut CASCADE;
+DROP TABLE IF EXISTS sigd_tra.asiento_registro CASCADE;
+DROP TABLE IF EXISTS sigd_tra.expediente CASCADE;
+DROP TABLE IF EXISTS sigd_tra.tramite CASCADE;
+DROP SEQUENCE IF EXISTS sigd_tra.seq_asiento_numero_registro CASCADE;
+DROP SEQUENCE IF EXISTS sigd_tra.seq_cut_expediente_anio CASCADE;
 
 -- =============================================================================
 -- 2. SECUENCIAS
@@ -97,7 +103,7 @@ CREATE TABLE expediente_acumulacion (
     acto_resolutivo_desacumulacion TEXT NULL,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT pk_acumulacion_principal_accesorio PRIMARY KEY (id_expediente_principal, id_expediente_accesorio),
+    CONSTRAINT uq_acumulacion_principal_accesorio UNIQUE (id_expediente_principal, id_expediente_accesorio),
     CONSTRAINT fk_exp_acum_principal FOREIGN KEY (id_expediente_principal)
         REFERENCES expediente (id_expediente) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_exp_acum_accesorio FOREIGN KEY (id_expediente_accesorio)
