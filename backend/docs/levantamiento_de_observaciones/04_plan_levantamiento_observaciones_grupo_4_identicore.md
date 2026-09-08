@@ -100,9 +100,9 @@ Subsanar las observaciones arquitecturales identificadas en el diagnóstico seni
 | Estado | Criterio de Verificación Técnico y Metodológico | Responsable | Evidencia Requerida |
 | :---: | :--- | :---: | :--- |
 | ☐ | El modelo separa limpiamente Personas Naturales de Personas Jurídicas e implementa `representacion_legal`. | Tapullima / Jair | `01_analisis...md` y `02_modelo...md` |
-| ☐ | Se implementan validaciones de formato estricto para DNI (8 dígitos) y RUC (11 dígitos válidos). | Segundo | Restricciones `CHECK` en `03_esquema...sql` |
-| ☐ | El esquema define el algoritmo de credenciales como **Argon2id** y modela `sesion_usuario` con Refresh Tokens. | Segundo | Diccionario y DDL SQL |
-| ☐ | Se modela la entidad `consentimiento_datos` para registrar la aceptación de términos bajo la Ley N° 29733. | Tapullima / Jair | `02_modelo_datos...md` y DDL SQL |
+| ☑ | Se implementan validaciones de formato estricto para DNI (8 dígitos) y RUC (11 dígitos válidos). | Segundo | `03_esquema_sigd_auth_v2.sql` — Restricciones `CHECK chk_persona_natural_dni_format` y `chk_persona_juridica_ruc_format` |
+| ☑ | El esquema define el algoritmo de credenciales como **Argon2id** (memory: 64MB, iterations: 3, parallelism: 4) y modela `sesion_usuario` con Refresh Tokens, control de reuso y auditoría IP/User-Agent. | Segundo | `03_esquema_sigd_auth_v2.sql` y `04_validacion_identicore_v2.md` |
+| ☑ | Se modela la entidad `consentimiento_datos` para registrar la aceptación de términos bajo la Ley N° 29733 (fecha, IP, versión TOS, notificaciones electrónicas). | Segundo | `03_esquema_sigd_auth_v2.sql` y `04_validacion_identicore_v2.md` |
 | ☐ | Se documentan reglas de ofuscación de datos personales sensibles para consultas públicas en ventanilla/web. | Tapullima | Matriz de privacidad en `01_analisis...md` |
 | ☐ | Diagrama ER actualizado en Draw.io y exportado a imagen PNG. | Jair | Archivos `.drawio` y `.png` |
 | ☐ | Decisiones técnicas fundamentadas en el log de decisiones de IdentiCore. | Segundo | `05_decisiones_levantamiento_identicore.md` |
