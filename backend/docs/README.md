@@ -33,7 +33,7 @@ Todos los módulos del backend han sido auditados contra las listas de verificac
 | :--- | :--- | :---: | :---: |
 | **Grupo 1 — RutaDoc**<br>*(Trazabilidad, Recepción, Derivación, Atención)* | Geric (`B_GERIC`), Jacobo (`B_JACOBO`), Jhasy (`B_JHASY`) | **11 / 11** (100%) | ✅ **CONFORME** |
 | **Grupo 2 — TramiCore**<br>*(Trámite, Expediente, Libro de Registro)* | Ramírez (`B_RAMIREZ`), Riquelmer (`B_RIQUELMER`), Sandy (`B_SANDY`) | **10 / 10** (100%) | ✅ **CONFORME** |
-| **Grupo 3 — OrganiCore**<br>*(Áreas, Jerarquías, Roles, Permisos RBAC)* | Pool (`B_POOL`), Leonardo (`B_LEONARDO`), Panaifo (`B_PANAIFO`) | **10 / 10** (100%) | ✅ **CONFORME** |
+| **Grupo 3 — OrganiCore**<br>*(Áreas, Jerarquías, Roles, Permisos RBAC)* | Pool (`B_POOL`), Leonardo (`B_LEONARDO`), Panaifo (`B_PANAIFO`), Héctor (`B_HECTOR`) | **10 / 10** (100%) | ✅ **CONFORME** |
 | **Grupo 4 — IdentiCore**<br>*(Personas, Cuentas, Usuarios Internos/Externos)* | Segundo (`B_SEGUNDO`), Tapullima (`B_TAPULLIMA`), Jair (`B_JAIR`) | **10 / 10** (100%) | ✅ **CONFORME** |
 | **Grupo 5 — DocuCore**<br>*(Catálogo TUPA, Requisitos, Formularios)* | Cristian (`B_CHRISTIAN`), Azareño (`B_AZAREÑO`), Valentín (`B_VALENTIN`), Piero (`B_PIERO`) | **14 / 14** (100%) | ✅ **CONFORME** |
 | **Grupo 6 — CoreLink**<br>*(Integración, Catálogo Errores, Pruebas E2E)* | Ricardo (`B_AREVALO`), Duque (`B_DUQUE`), Reátegui (`B_REATEGUI`), Zevallos (`B_ZEVALLOS`) | **7 / 7** (100%) | ✅ **CONFORME** |
@@ -84,20 +84,20 @@ Responsable de la diferenciación conceptual entre Trámite, Expediente y Asient
 ### Grupo 3 — OrganiCore · Estructura Orgánica, Roles y Permisos
 Responsable de representar áreas institucionales, jerarquías recursivas, cargos, responsabilidades temporales y control de acceso basado en roles (RBAC).
 
-* 📘 **Análisis Funcional:** [`organicore/B_LEONARDO/01_analisis_areas_roles_permisos.md`](organicore/B_LEONARDO/01_analisis_areas_roles_permisos.md)
+* 📘 **Análisis Funcional:** [`organicore/01_analisis_areas_roles_permisos.md`](organicore/01_analisis_areas_roles_permisos.md)
 * 📐 **Modelo de Datos Lógico:** [`organicore/02_modelo_datos_organizacion.md`](organicore/02_modelo_datos_organizacion.md)
 * 📖 **Diccionario de Datos:** [`organicore/02_diccionario_datos_organizacion.md`](organicore/02_diccionario_datos_organizacion.md)
 * 📊 **Diagramas del Modelo ER:** [Fuente DBML (`.dbml`)](organicore/diagrama_er_organizacion.dbml) · [Vista previa (`.png`)](organicore/diagrama_er_organizacion.png)
 * 💾 **Scripts SQL y Paquete Técnico:**
-  * [Plan de Trabajo Técnico](organicore/B_PANAIFO/00_PLAN_DE_TRABAJO.md)
-  * [Borrador SQL DDL](organicore/B_PANAIFO/01_B_PANAIFO_BORRADOR_SQL.sql)
-  * [Datos de Prueba](organicore/B_PANAIFO/02_B_PANAIFO_DATOS_PRUEBA.sql)
-  * [Script de Verificación](organicore/B_PANAIFO/03_B_PANAIFO_VERIFICACION.sql)
-  * [Notas Técnicas de Prevención de Ciclos](organicore/B_PANAIFO/05_B_PANAIFO_NOTAS_TECNICAS.md)
-  * [Plan de Ejecución](organicore/B_PANAIFO/06_PLAN_EJECUCION.md)
-  * [Política de Eliminaciones Lógicas](organicore/B_PANAIFO/07_POLITICA_ELIMINACIONES.md)
-  * [Resumen Ejecutivo](organicore/B_PANAIFO/99_RESUMEN_EJECUTIVO.md)
-* 🧪 **Validación y Pruebas:** [`organicore/B_PANAIFO/04_B_PANAIFO_VALIDACION.md`](organicore/B_PANAIFO/04_B_PANAIFO_VALIDACION.md)
+  * [Plan de Trabajo Técnico](organicore/00_plan_trabajo_tecnico_organizacion.md)
+  * [Script SQL DDL Físico](organicore/03_organizacion_roles_permisos.sql)
+  * [Datos de Prueba](organicore/03_datos_prueba_organizacion.sql)
+  * [Script de Verificación](organicore/03_verificacion_organizacion.sql)
+  * [Notas Técnicas de Prevención de Ciclos](organicore/06_notas_tecnicas_prevencion_ciclos.md)
+  * [Política de Eliminaciones Lógicas](organicore/07_politica_eliminaciones_logicas.md)
+  * [Plan de Ejecución Controlado](organicore/08_plan_ejecucion_controlado.md)
+  * [Resumen Ejecutivo](organicore/09_resumen_ejecutivo_organizacion.md)
+* 🧪 **Validación y Pruebas:** [`organicore/04_validacion_organizacion.md`](organicore/04_validacion_organizacion.md)
 * 📌 **Registro de Decisiones y Pendientes:** [`organicore/05_decisiones_y_preguntas_pendientes.md`](organicore/05_decisiones_y_preguntas_pendientes.md)
 
 ---
@@ -145,7 +145,7 @@ Cada grupo cuenta con un plan de trabajo detallado que rigió su organización, 
 
 * 📋 [Plan de Trabajo Grupo 1 — RutaDoc](planes_trabajo/01_plan_trabajo_grupo_1_rutadoc.md) *(Geric, Jacobo, Jhasy)*
 * 📋 [Plan de Trabajo Grupo 2 — TramiCore](planes_trabajo/02_plan_trabajo_grupo_2_tramicore.md) *(Ramírez, Riquelmer, Sandy)*
-* 📋 [Plan de Trabajo Grupo 3 — OrganiCore](planes_trabajo/03_plan_trabajo_grupo_3_organicore.md) *(Pool, Leonardo, Panaifo)*
+* 📋 [Plan de Trabajo Grupo 3 — OrganiCore](planes_trabajo/03_plan_trabajo_grupo_3_organicore.md) *(Pool, Leonardo, Panaifo, Héctor)*
 * 📋 [Plan de Trabajo Grupo 4 — IdentiCore](planes_trabajo/04_plan_trabajo_grupo_4_identicore.md) *(Segundo, Tapullima, Jair)*
 * 📋 [Plan de Trabajo Grupo 5 — DocuCore](planes_trabajo/05_plan_trabajo_grupo_5_docucore.md) *(Cristian, Azareño, Valentín, Piero)*
 * 📋 [Plan de Trabajo Grupo 6 — CoreLink](planes_trabajo/06_plan_trabajo_grupo_6_corelink.md) *(Ricardo, Duque, Reátegui, Zevallos)*
@@ -190,7 +190,7 @@ Todos los scripts DDL están optimizados para **PostgreSQL 18.6** y deben ejecut
 # Ejemplo de ejecución y validación por módulo en ambiente de prueba local:
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f rutadoc/03_trazabilidad_movimientos.sql
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f tramicore/03_tramite_expediente_registro.sql
-psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f organicore/B_PANAIFO/01_B_PANAIFO_BORRADOR_SQL.sql
+psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f organicore/03_organizacion_roles_permisos.sql
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f identicore/03_usuarios.sql
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f docucore/05_documentos_formularios.sql
 ```
