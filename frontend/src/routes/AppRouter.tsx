@@ -8,11 +8,14 @@ import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosPage from "../pages/administracion/UsuariosPage";
+import MesaPartesVirtualPage from "../pages/tramite/MesaPartesVirtualPage";
+import TramitePage from "../pages/tramite/TramitePage";
 
 export default function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/tramite" element={<TramitePage />} />
       <Route path="/administracion" element={<AdministracionPage />} />
       <Route path="/administracion/usuarios" element={<UsuariosPage />} />
       <Route
@@ -29,6 +32,7 @@ export default function AppRouter() {
         element={<CalendarioLaboralPage />}
       />
       <Route path="/administracion/seguridad" element={<SeguridadPage />} />
+      <Route path="/tramite/mesa-partes-virtual" element={<MesaPartesVirtualPage />} />
     </Routes>
   );
 }
