@@ -6,7 +6,9 @@
 **Motivo:** Cumplir la observación del liderazgo sobre el **PR #79** (todos los commits provienen de la
 cuenta `B_AREVALO`, sin trazabilidad de Duque, Reátegui y Zevallos) y el requisito de que cada
 sublíder declare la **autoría** y el **estado contractual** de su entregable. Complementa la sección
-10 del entregable 04 y la sección 6.1 del entregable 05.
+10 del entregable 04 y la sección 6.1 del entregable 05. **Revisión v1.3:** tras la cancelación del
+PR #79, registra también la **discrepancia de autoría del entregable 01** (plan Fase 1 → Duque, plan
+Fase 2 → Azareño) y el **estado de cada corrección exigida** por el liderazgo (sección 3).
 
 > [!NOTE]
 > Este documento es la **plantilla oficial y el registro vivo** del grupo para reportar al liderazgo:
@@ -22,15 +24,30 @@ sublíder declare la **autoría** y el **estado contractual** de su entregable. 
 | 1 | `01_especificacion_middleware_rfc7807.md` | Azareño (`B_AZAREÑO`) | <commit/PR pendiente> | Especificación de la respuesta de error RFC 7807/9457 y la jerarquía de excepciones (7 clases) que no exponen rastros internos. | Azareño declara elaborar el contenido y acepta que el commit se publique desde la cuenta `B_AREVALO` por su sublíder. | CONFIRMADO
 | 2 | `02_arquitectura_auditoria_contexto_asynclocalstorage.md` | Reátegui (`B_REATEGUI`) | <commit/PR pendiente> | Arquitectura del contexto por solicitud (AsyncLocalStorage) y del patrón Transactional Outbox, con bitácora `sigd_audit.bitacora_auditoria` (incluye `fecha_hora`) y `evento_outbox` versionado (envelope v1.2, §§6.7–6.8). | Reátegui declara elaborar el contenido y acepta que el commit se publique desde la cuenta `B_AREVALO` por su sublíder. | CONFIRMADO
 | 3 | `03_suite_pruebas_testcontainers_k6.md` | Zevallos (`B_ZEVALLOS`) | <commit/PR pendiente> | Suite de 10 casos E2E (Testcontainers) y 2 escenarios de carga k6 sobre los entregables 01, 02, 04 y el esquema `06_sigd_audit_esquema_ddl.sql`. | Zevallos declara elaborar el contenido y acepta que el commit se publique desde la cuenta `B_AREVALO` por su sublíder. | CONFIRMADO
-| 4 | `04_contratos_intermodulares_unificados.md` (v1.2) | Ricardo (`B_AREVALO`) | <commit/PR pendiente> | Matriz de contratos C-01…C-08 y eventos E-01…E-07, término del contrato RutaDoc §6.2 (14 requisitos), idempotencia §6.3, registros de autoría y aprobación §10. | Elaborado por el sublíder; incluye la síntesis de las observaciones de los tres integrantes. | Ver sección 2.
-| 5 | `05_decisiones_levantamiento_corelink.md` (v1.2) | Ricardo (`B_AREVALO`) | <commit/PR pendiente> | Log de decisiones D-01…D-19 y registro de revisión del sublíder y del liderazgo (PR #79), riesgos R-01…R-08. | Elaborado por el sublíder consolidando aportes del grupo. | Ver sección 2.
-| 6 | `06_sigd_audit_esquema_ddl.sql` | Ricardo (`B_AREVALO`) | <commit/PR pendiente> | DDL canónico del esquema `sigd_audit` (`bitacora_auditoria` con `fecha_hora`, `evento_outbox`, 6 índices, rol `sigd_app` de solo INSERT/SELECT, REVOKE UPDATE/DELETE). | Aprobado por Reátegui y Zevallos (fuente de verdad de las migraciones E2E). | CONFIRMADO
+| 4 | `04_contratos_intermodulares_unificados.md` (v1.3) | Ricardo (`B_AREVALO`) | <commit/PR pendiente> | Matriz de contratos C-01…C-08 y eventos E-01…E-07, término del contrato RutaDoc §6.2 (14 requisitos), idempotencia §6.3, registros de autoría y aprobación §10. | Elaborado por el sublíder; incluye la síntesis de las observaciones de los tres integrantes. | Ver sección 2.
+| 5 | `05_decisiones_levantamiento_corelink.md` (v1.3) | Ricardo (`B_AREVALO`) | <commit/PR pendiente> | Log de decisiones D-01…D-23 y registro de revisión del sublíder y del liderazgo, riesgos R-01…R-10. | Elaborado por el sublíder consolidando aportes del grupo. | Ver sección 2.
+| 6 | `06_sigd_audit_esquema_ddl.sql` (v1.3) | Ricardo (`B_AREVALO`) | <commit/PR pendiente> | DDL canónico del esquema `sigd_audit` (`bitacora_auditoria` con `fecha_hora`, `evento_outbox`, 6 índices, roles `sigd_app`/`sigd_worker` separados, `correlation_id` **sin default**, FK `usuario_id` SUSPENDIDA por contrato IdentiCore). | Aprobado por Reátegui y Zevallos (fuente de verdad de las migraciones E2E). | CONFIRMADO
+
+### 1.2. Discrepancia de autoría del entregable 01 (plan Fase 1 vs plan Fase 2)
+
+> Los dos planes oficiales se contradicen y la decisión corresponde al liderazgo:
+>
+> - **Plan de Fase 1** (`planes_trabajo/06_plan_trabajo_grupo_6_corelink.md`): integrantes = Ricardo,
+>   **Duque**, Reátegui y Zevallos; Duque es responsable de **convenciones de API** (origen del
+>   middleware/especificación de errores).
+> - **Plan de Fase 2** (`levantamiento_de_observaciones/06_plan_levantamiento_observaciones_grupo_6_corelink.md`):
+>   integrantes = Ricardo, **Azareño**, Reátegui y Zevallos; Azareño es responsable de la
+>   **especificación del middleware RFC 7807** (D-01, D-02, D-04, D-14).
+>
+> **Atribución vigente en los documentos (versión Fase 2):** Azareño. Pendiente de decisión del
+> liderazgo sobre cuál plan prevalece antes de cerrar la autoría y el registro de rama/commit.
 | 7 | `implementacion/` (proyecto Node/TS) | Ricardo (`B_AREVALO`) | <commit/PR pendiente> | Código de referencia: errores, middleware RFC 7807, mapeadores PG/Zod, repositorios de auditoría/outbox, OutboxWorker, app Express 5, E2E Testcontainers, k6, README con trazabilidad. | Elaborado por el sublíder con la supervisión de los autores de los entregables 01–03. | Ver contrato de datos (válido solo con la aprobación de CoreLink). |
 
 ### 1.1. Declaración del sublíder
 
 > Confirmo que las tablas de la sección 1 contienen la **declaración de autoría de cada integrante**
-> pendiente de firma, que se adjuntará al PR #79 junto con la ruta, rama y commit de cada archivo.
+> pendiente de firma, que se adjuntará al próximo PR autorizado junto con la ruta, rama y commit de
+> cada archivo.
 
 **Firma Ricardo (`B_AREVALO`):** \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ — **Fecha:** \_\_/\_\_/2026
 **Firma Azareño (`B_AZAREÑO`):** \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ — **Fecha:** \_\_/\_\_/2026
@@ -51,18 +68,40 @@ revisado, rama/commit, definición aceptada y el estado contractual resultante.
 | C-06 / C-07 / C-08 (CoreLink → módulos) | CoreLink | Según módulo | Ricardo: PENDIENTE | PENDIENTE | PROPUESTO |
 
 Fechas y evidencias de cada aprobación (captura de chat/confirmación por correo) se adjuntarán al
-PR #79 conforme se reciban.
+próximo PR autorizado conforme se reciban.
 
-## 3. Checklist de cierre para el PR #79
+## 3. Correcciones del liderazgo tras la cancelación del PR #79
+
+Registro vivo de cada corrección exigida, responsable y estado. Sustituye al listado informal del
+comentario de revisión; las correcciones aplicadas constan en los entregables v1.3.
+
+| # | Corrección exigida | Responsable | Dónde quedó registrada | Estado |
+| :---: | :--- | :--- | :--- | :---: |
+| 1 | Retirar/posponer la FK a `sigd_auth.cuenta_usuario(id)` sin contrato con IdentiCore (`id_usuario` pendiente). | Reátegui / Ricardo | DDL 06 v1.3; 02 §5.2/§5.3; D-22 | APLICADA (PENDIENTE de contrato) |
+| 2 | `correlation_id` no debe generarse en BD sino propagarse desde AsyncLocalStorage. | Reátegui | DDL 06 v1.3; 02 §5.2/§5.3; D-21 | APLICADA |
+| 3 | Worker Outbox ejecutable y permisos separados aplicación vs worker. | Reátegui | DDL 06 v1.3 (roles `sigd_app`/`sigd_worker`); 02 §6.8 | APLICADA (worker pendiente de ejecutar) |
+| 4 | Atomicidad, cero pérdida, inmutabilidad y entrega como `PROPUESTO` hasta prueba. | Ricardo | 02 §9/§10; 05 D-05/D-06/D-20; 04 C-08 | APLICADA |
+| 5 | Evidencia ejecutable: Testcontainers, Vitest, Supertest, 10 E2E, k6 (P95, error rate). | Zevallos | Runbook 08 + `implementacion/` | PENDIENTE (sin Docker) |
+| 6 | Aprobación bilateral de contratos y eventos. | Ricardo | 07 §2; 04 §10.2 | PENDIENTE |
+| 7 | Decisiones con alternativa, justificación, impacto y evidencia. | Ricardo | 05 §4.3 | APLICADA |
+| 8 | D-12 con estado único. | Ricardo | 05 D-12 | APLICADA |
+| 9 | Discrepancia de autoría del entregable 01 (Duque vs Azareño). | Ricardo / liderazgo | 07 §1.2; 04 §10.1 | PENDIENTE de decisión |
+| 10 | Reconciliar `B_AREVALO` con `origin/B_GERIC` (4 commits de base). | Ricardo | 05 §8 (checklist 6) | PENDIENTE (repo git) |
+| 11 | No reabrir PR hasta autorización del profesor. | Todos | 05 §6.2/§8 | CONTROL |
+
+## 4. Checklist de cierre (cuando el profesor autorice)
 
 - [ ] Completar commit/PR de cada fila de la sección 1 con la rama correspondiente.
 - [ ] Obtener la firma (o confirmación por chat/correo) de Azareño, Reátegui y Zevallos (§1.1).
 - [ ] Recibir la aprobación bilateral del contrato RutaDoc de los sublíderes involucrados (§2) y
       actualizar 04 §10.2 / 05 §6.2.
-- [ ] Adjuntar esta plantilla y las evidencias como anexos del PR #79.
+- [ ] Ejecutar la evidencia E2E/k6 en máquina con Docker (runbook 08) y adjuntar reportes.
+- [ ] Reconciliar `B_AREVALO` con `origin/B_GERIC` antes de reabrir el PR.
+- [ ] Adjuntar esta plantilla y las evidencias como anexos del PR autorizado.
 - [ ] Actualizar este documento en cuanto cambie cualquier estado.
 
 ---
 
-*Registro elaborado por Ricardo (`B_AREVALO`) para la revisión del liderazgo del PR #79. Alineado
-con los entregables 04 (§10) y 05 (§6.1).*
+*Registro elaborado por Ricardo (`B_AREVALO`) para la revisión del liderazgo del PR #79 (cancelado).
+Alineado con los entregables 04 (§10), 05 (§6.1/§6.2) y el runbook 08. Revisión v1.3: incorpora la
+discrepancia de autoría del entregable 01 y el registro de correcciones de la revisión.*

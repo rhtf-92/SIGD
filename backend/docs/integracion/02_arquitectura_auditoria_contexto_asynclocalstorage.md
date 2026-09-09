@@ -7,7 +7,7 @@
 **Responsable del entregable:** Reátegui · `B_REATEGUI`
 **Documento:** `02_arquitectura_auditoria_contexto_asynclocalstorage.md`
 **Fecha:** 8 de septiembre de 2026
-**Versión:** 1.2 (Revisión del Liderazgo — PR #79 · Versionado, serialización y despacho de eventos)
+**Versión:** 1.3 (Revisión del Liderazgo — PR #79 cancelado · correcciones pre-merge)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
@@ -20,6 +20,14 @@
 > identificadores (`id_expediente`, `id_movimiento`, `id_evento`) y las **responsabilidades del
 > despachador**. El contrato formal de los eventos de RutaDoc (`ExpedienteDerivado`,
 > `ExpedienteAtendido`, `ExpedienteObservado`) se define en el entregable 04, sección 6.2.
+>
+> **Revisión v1.3 (Liderazgo — PR #79 cancelado):** (1) `correlation_id` de la bitácora queda **sin
+> valor por defecto**: debe propagarse siempre desde AsyncLocalStorage y la BD no genera un UUID
+> distinto del contexto (DDL 06); (2) la FK `usuario_id -> sigd_auth.cuenta_usuario(id)` queda
+> **SUSPENDIDA** (PENDIENTE) hasta que IdentiCore apruebe la columna `id_usuario`; (3) se separan los
+> roles `sigd_app` (escribe bitácora y encola eventos) y `sigd_worker` (solo SELECT/UPDATE del outbox);
+> (4) las garantías de **inmutabilidad, cero pérdida y atomicidad** quedan en estado `PROPUESTO`
+> hasta que existan pruebas E2E ejecutables (ver entregable 03 y evidencia).
 
 ---
 
@@ -41,7 +49,8 @@ viajaría de punta a punta, y las notificaciones/eventos se perderían ante caí
 ### 1.1. Propuesta de valor
 - Auditoría **inmutable** (append-only): imposible modificar o borrar el historial forense.
 - Trazabilidad total: con el `correlation_id` es posible reconstruir toda la cadena de una solicitud.
-- **Cero pérdida de eventos**: se elimina la fragilidad de envíos directos ante fallas de red.
+- **Cero pérdida de eventos**: se elimina la fragilidad de envíos directos ante fallas de red. *Estado
+  `PROPUESTO` hasta validarlo con las pruebas E2E del entregable 03.*
 - Registro de datos antes/después en formato `JSONB` para cualquier auditoría de cambios.
 
 ---
@@ -137,8 +146,8 @@ forma documental:
 | Columna | Tipo | Restricción / Default | Descripción |
 | :--- | :--- | :--- | :--- |
 | `id_auditoria` | UUID | `NOT NULL`, PK, default `gen_random_uuid()` | Identificador interno del registro de auditoría. |
-| `correlation_id` | UUID | `NOT NULL`, default `gen_random_uuid()` | Identificador único de la solicitud completa (debe venir del contexto). |
-| `usuario_id` | UUID | NULL | Identidad del usuario que ejecutó la operación. FK → `sigd_auth.cuenta_usuario(id)`. |
+| `correlation_id` | UUID | `NOT NULL`, sin default (v1.3) | Identificador único de la solicitud; **proviene siempre del contexto AsyncLocalStorage**. La BD no lo genera. |
+| `usuario_id` | UUID | NULL | Identidad del usuario que ejecutó la operación. FK → `sigd_auth.cuenta_usuario(id_usuario)` **SUSPENDIDA (PENDIENTE)** por contrato con IdentiCore. |
 | `ip_origen` | INET | NULL | Dirección IP del cliente (tipo de red nativo de PostgreSQL). |
 | `user_agent` | VARCHAR(512) | NULL | Cliente que originó la solicitud. |
 | `esquema` | VARCHAR(64) | `NOT NULL` | Esquema afectado (p. ej. `sigd_tra`, `sigd_doc`). |
@@ -151,17 +160,24 @@ forma documental:
 ### 5.3. Reglas y restricciones obligatorias
 
 - `operacion` solo admite `INSERT`, `UPDATE` y `DELETE` (control a nivel de base de datos).
-- `id_auditoria` y `correlation_id` son generados en la BD como UUID; el `correlation_id` de la
-  bitácora debe **coincidir** con el del contexto de la solicitud.
+- `id_auditoria` se genera en la BD (`gen_random_uuid()`); el `correlation_id` **NO tiene valor por
+  defecto** — la aplicación lo obtiene del contexto AsyncLocalStorage y lo escribe en cada inserción,
+  garantizando que la bitácora nunca registre un UUID distinto al de la solicitud.
 - `correlation_id` debe estar indexado para permitir reconstruir la cadena completa de una solicitud.
-- La FK de `usuario_id` hacia `sigd_auth.cuenta_usuario(id)` garantiza integridad referencial de la
-  identidad (el esquema `sigd_auth` es responsabilidad del módulo IdentiCore).
+- La FK de `usuario_id` hacia `sigd_auth.cuenta_usuario` está **SUSPENDIDA**: IdentiCore/RutaDoc
+  mantienen pendiente la columna `id_usuario` (no `id`). Se activará mediante `ALTER TABLE` cuando se
+  firme el contrato bilateral (registro en el entregable 07). La columna queda `NULL` para operaciones
+  de sistema (D-10).
 
 ### 5.4. Política de inmutabilidad
 
 - La bitácora es de **solo escritura**: los registros no deben editarse ni eliminarse.
 - A nivel de roles de base de datos debe revocarse `UPDATE` y `DELETE` a la cuenta de aplicación,
   dejando únicamente `INSERT` y `SELECT`.
+- **Separación de roles (v1.3, DDL 06):**
+  - `sigd_app` — la API escribe la bitácora (`INSERT`) y **encola** eventos (`INSERT` en el outbox).
+  - `sigd_worker` — el despachador solo lee y actualiza `evento_outbox` (`SELECT`, `UPDATE`); no escribe
+    la bitácora ni la aplicación modifica el outbox ya insertado.
 - Ningún caso de uso de negocio debe poder manipular la bitácora directamente; solo a través del
   repositorio de auditoría.
 
@@ -344,24 +360,30 @@ sequenceDiagram
 
 1. [ ] **Crear el esquema `sigd_audit`** (DDL) con las tablas `bitacora_auditoria` y `evento_outbox`
        según las secciones 5 y 6.
-2. [ ] **Configurar los defaults `gen_random_uuid()`** (requiere la extensión adecuada en PostgreSQL).
+2. [ ] **Configurar los defaults `gen_random_uuid()`** solo para `id_auditoria` e `id_evento`
+       (requiere la extensión adecuada en PostgreSQL). El `correlation_id` **no** lleva default (v1.3).
 3. [ ] **Crear los índices** de las secciones 5.5 y 6.6.
 4. [ ] **Aplicar la política de inmutabilidad:** revocar `UPDATE`/`DELETE` sobre la bitácora al rol de
        aplicación.
-5. [ ] **Implementar el repositorio de auditoría** que consuma el contexto de la sección 4 y persista
+5. [ ] **Separar roles (v1.3):** `sigd_app` (bitácora `INSERT`/`SELECT`; outbox `INSERT`/`SELECT`) y
+       `sigd_worker` (outbox `SELECT`/`UPDATE` únicamente).
+6. [ ] **No crear la FK de `usuario_id`** hasta el contrato aprobado con IdentiCore (columna
+       `id_usuario`); registrarlo en el entregable 07.
+7. [ ] **Implementar el repositorio de auditoría** que consuma el contexto de la sección 4 y persista
        en la bitácora dentro de la transacción de negocio.
-6. [ ] **Implementar el repositorio outbox** que inserte el evento en la misma transacción (nunca en
+8. [ ] **Implementar el repositorio outbox** que inserte el evento en la misma transacción (nunca en
        transacción separada).
-7. [ ] **Implementar el worker outbox** con lote, `FOR UPDATE SKIP LOCKED`, backoff exponencial y
+9. [ ] **Implementar el worker outbox** con lote, `FOR UPDATE SKIP LOCKED`, backoff exponencial y
        dead-letter. Consumir el contexto `undefined` de forma tolerante (eventos de sistema).
-8. [ ] **Garantizar idempotencia** en el consumidor externo con la `clave_idempotencia` compuesta
-       `(tipo_evento, id_expediente, id_movimiento)` y el descarte de la sección 6.7.
-9. [ ] **Validar el esquema** con la suite del entregable 03 (casos E2E-06 y E2E-07).
-10. [ ] **Implementar el envelope normalizado** (6.7): `schema_version`, `id_evento`,
-       `id_expediente`, `id_movimiento`, `ocurrido_en`, `correlation_id`, `clave_idempotencia`.
-11. [ ] **Consolidar el contrato de eventos RutaDoc** (04 §6.2) para los tres eventos
-       (`ExpedienteDerivado`, `ExpedienteAtendido`, `ExpedienteObservado`) y registrar su aprobación
-       bilateral.
+10. [ ] **Garantizar idempotencia** en el consumidor externo con la `clave_idempotencia` compuesta
+        `(tipo_evento, id_expediente, id_movimiento)` y el descarte de la sección 6.7.
+11. [ ] **Validar el esquema** con la suite del entregable 03 (casos E2E-06 y E2E-07) y registrar logs,
+        timestamps, exit codes y métricas (entregable 08).
+12. [ ] **Implementar el envelope normalizado** (6.7): `schema_version`, `id_evento`,
+        `id_expediente`, `id_movimiento`, `ocurrido_en`, `correlation_id`, `clave_idempotencia`.
+13. [ ] **Consolidar el contrato de eventos RutaDoc** (04 §6.2) para los tres eventos
+        (`ExpedienteDerivado`, `ExpedienteAtendido`, `ExpedienteObservado`) y registrar su aprobación
+        bilateral.
 
 ---
 
@@ -373,11 +395,14 @@ sequenceDiagram
 | 2 | La bitácora se integra con el contexto (`correlation_id`, `usuario_id`, `ip_origen`, `user_agent`) de forma transparente. | ✅ |
 | 3 | `evento_outbox` implementa el patrón Transactional Outbox con escritura atómica. | ✅ |
 | 4 | El worker especifica lote, `FOR UPDATE SKIP LOCKED`, confirmación previa a `PROCESADO`, backoff exponencial y dead-letter. | ✅ |
-| 5 | Se garantiza cero pérdida de notificaciones ante fallas de los servicios externos. | ✅ |
+| 5 | Se plantea cero pérdida de notificaciones ante fallas de los servicios externos. | 🟡 (PROPUESTO — validar con E2E, entregable 03/08) |
 | 6 | El `payload` define versionado (`schema_version`), serialización JSON `snake_case` y clave de idempotencia compuesta (v1.2). | ✅ |
 | 7 | El despachador define responsabilidades: confirmación previa a `PROCESADO`, reintentos con backoff, DLQ y no reencolado. | ✅ |
 | 8 | Los identificadores de negocio se normalizan a `id_<agregado>` (`id_expediente`, `id_movimiento`). | ✅ |
-| 9 | La documentación queda lista para que los equipos implementen sin ambigüedad. | ✅ |
+| 9 | `correlation_id` no tiene valor por defecto y proviene siempre del contexto AsyncLocalStorage (v1.3). | ✅ |
+| 10 | La FK `usuario_id -> sigd_auth` queda SUSPENDIDA (PENDIENTE) hasta el contrato con IdentiCore (`id_usuario`). | ✅ |
+| 11 | Los roles `sigd_app` y `sigd_worker` separan escritura de bitácora/encolado del despacho del outbox (v1.3). | ✅ |
+| 12 | La documentación queda lista para que los equipos implementen sin ambigüedad. | ✅ |
 
 ---
 
@@ -399,13 +424,20 @@ sequenceDiagram
     versionado del `payload` (§6.7), las responsabilidades del despachador (§6.8) y la normalización
     de identificadores a `id_<agregado>`. El contrato de los eventos de RutaDoc (E-02, E-05, E-06 y
     E-07) se define y se cierra en el entregable 04 §6.2.
-- **Taxonomía:** `CONFIRMADO` — patrón Transactional Outbox y esquema base; `PROPUESTO` — índices y
-  tamaño de columna `user_agent`; `EJEMPLO` — payloads mostrados.
+  - **Revisión v1.3 (PR #79 cancelado):** `correlation_id` sin default (solo desde contexto), FK de
+    `usuario_id` SUSPENDIDA hasta contrato con IdentiCore, roles `sigd_app`/`sigd_worker` separados, y
+    garantías de atomicidad, cero pérdida e inmutabilidad en estado `PROPUESTO` hasta su validación
+    con pruebas E2E ejecutables.
+- **Taxonomía:** `CONFIRMADO` — patrón Transactional Outbox y esquema base; `PROPUESTO` — índices,
+  tamaño de columna `user_agent` y garantías de atomicidad/cero pérdida/inmutabilidad hasta su
+  validación; `EJEMPLO` — payloads mostrados.
 
 ---
 
 *Documento elaborado por Reátegui (`B_REATEGUI`) como entregable de Fase 2 — Levantamiento de
 Observaciones del Grupo 6 CoreLink. Revisión 1.2: atiende las observaciones del liderazgo sobre el
 PR #79 (fecha_hora en la bitácora, versionado/serialización del payload, idempotencia, nomenclatura
-de identificadores y responsabilidades del despachador). La autoría nominal de este entregable
-requiere confirmación escrita de Reátegui (entregable 04 §10.1).*
+de identificadores y responsabilidades del despachador). Revisión 1.3: corrige la revisión del
+liderazgo tras la cancelación del PR #79 (correlation_id sin default, FK de IdentiCore SUSPENDIDA,
+roles sigd_app/sigd_worker, garantías a PROPUESTO hasta pruebas E2E). La autoría nominal de este
+entregable requiere confirmación escrita de Reátegui (entregable 04 §10.1).*

@@ -7,9 +7,13 @@
 -- Área     : Backend — CoreLink
 -- Autor    : Reátegui · B_REATEGUI (basado en el entregable 02)
 -- Archivo  : integracion/06_sigd_audit_esquema_ddl.sql
--- Versión  : 1.2 (Revisión del Liderazgo — PR #79 · alineado al entregable 02 v1.2)
--- Cambios v1.2: bitacora_auditoria.fecha_hora incluida y documentada
--- (consistente con la estructura y el índice idx_bitacora_fecha del entregable 02).
+-- Versión  : 1.3 (Revisión del Liderazgo — PR #79 cancelado · correcciones pre-merge)
+-- Cambios v1.3:
+--   * correlation_id SIN DEFAULT en bitacora_auditoria: debe propagarse desde
+--     AsyncLocalStorage; la BD no debe generar un UUID distinto al del contexto.
+--   * FK usuario_id -> sigd_auth SUSPENDIDA (PENDIENTE): se referencia como columna
+--     id_usuario hasta que exista contrato aprobado con IdentiCore (IdentiCore/RutaDoc).
+--   * Separación de permisos: rol sigd_app (aplicación) y rol sigd_worker (worker outbox).
 --
 -- Contenido:
 --   1. Esquema `sigd_audit` (CREATE SCHEMA)
@@ -21,9 +25,11 @@
 -- Compatibilidad: PostgreSQL 18 (usa gen_random_uuid(), INET, JSONB).
 -- Ejecutar con:  psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f integracion/06_sigd_audit_esquema_ddl.sql
 --
--- Dependencia: la FK `usuario_id` referencia `sigd_auth.cuenta_usuario(id)`,
--- por lo que el esquema `sigd_auth` (IdentiCore) debe existir previamente
+-- Dependencia: el esquema `sigd_auth` (IdentiCore) debe existir previamente
 -- (orden de migraciones de la suite Testcontainers del entregable 03).
+-- La FK a `usuario_id` está SUSPENDIDA (PENDIENTE): IdentiCore/RutaDoc mantienen
+-- pendiente la columna `id_usuario` (no `id`); se activará solo con un contrato
+-- aprobado entre CoreLink e IdentiCore.
 -- =============================================================================
 
 -- 1. ESQUEMA
@@ -42,7 +48,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS sigd_audit.bitacora_auditoria (
     id_auditoria   UUID          NOT NULL DEFAULT gen_random_uuid()
                                  CONSTRAINT pk_bitacora_auditoria PRIMARY KEY,
-    correlation_id UUID          NOT NULL DEFAULT gen_random_uuid(),
+    correlation_id UUID          NOT NULL,
     usuario_id     UUID          NULL,
     ip_origen      INET          NULL,
     user_agent     VARCHAR(512)  NULL,
@@ -53,19 +59,17 @@ CREATE TABLE IF NOT EXISTS sigd_audit.bitacora_auditoria (
                                  CHECK (operacion IN ('INSERT', 'UPDATE', 'DELETE')),
     datos_antes    JSONB         NULL,
     datos_despues  JSONB         NOT NULL,
-    fecha_hora     TIMESTAMPTZ   NOT NULL DEFAULT now(),
-    -- Integridad referencial de la identidad (esquema sigd_auth / IdentiCore)
-    CONSTRAINT fk_bitacora_usuario
-        FOREIGN KEY (usuario_id)
-        REFERENCES sigd_auth.cuenta_usuario (id)
+    fecha_hora     TIMESTAMPTZ   NOT NULL DEFAULT now()
+    -- FK usuario_id -> sigd_auth.cuenta_usuario(id_usuario): SUSPENDIDA (PENDIENTE).
+    -- Se creará junto a un contrato aprobado con IdentiCore; ver 07_evidencia.
 ) WITH (fillfactor = 100);
 
 COMMENT ON TABLE  sigd_audit.bitacora_auditoria IS
     'Bitácora forense inmutable (append-only). Solo INSERT y SELECT para la cuenta de aplicación.';
 COMMENT ON COLUMN sigd_audit.bitacora_auditoria.correlation_id IS
-    'UUIDv4 de la solicitud; debe coincidir con el contexto AsyncLocalStorage (entregable 01).';
+    'UUIDv4 de la solicitud. SIN valor por defecto: debe propagarse SIEMPRE desde el contexto AsyncLocalStorage (entregable 01); la BD no genera un UUID distinto.';
 COMMENT ON COLUMN sigd_audit.bitacora_auditoria.usuario_id IS
-    'Identidad autenticada que ejecutó la mutación. NULL para operaciones de sistema (D-10).';
+    'Identidad autenticada que ejecutó la mutación. NULL para operaciones de sistema (D-10). FK hacia sigd_auth SÓLO cuando exista contrato aprobado con IdentiCore (columna id_usuario).';
 COMMENT ON COLUMN sigd_audit.bitacora_auditoria.datos_antes IS
     'Estado previo de la fila (NULL para INSERT).';
 COMMENT ON COLUMN sigd_audit.bitacora_auditoria.datos_despues IS
@@ -126,22 +130,32 @@ CREATE INDEX IF NOT EXISTS idx_outbox_estado_fecha
 -- -----------------------------------------------------------------------------
 -- La bitácora es de SOLO ESCRITURA: la cuenta de aplicación debe tener
 -- únicamente INSERT y SELECT; se revocan UPDATE y DELETE.
--- El bloque crea el rol de aplicación si no existe para que el script sea
--- reproducible; ajustar el nombre si el proyecto usa otro rol (p. ej. sigd_app).
+-- Separación de roles (v1.3):
+--   * sigd_app:      la API escribe la bitácora y ENCOLA eventos (INSERT outbox).
+--   * sigd_worker:   despacha eventos: SELECT + UPDATE del outbox únicamente.
+-- La aplicación NO actualiza el outbox y el worker NO escribe la bitácora.
 -- -----------------------------------------------------------------------------
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigd_app') THEN
         CREATE ROLE sigd_app;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sigd_worker') THEN
+        CREATE ROLE sigd_worker;
+    END IF;
 END
 $$;
 
 GRANT USAGE  ON SCHEMA           sigd_audit TO sigd_app;
 GRANT SELECT, INSERT ON sigd_audit.bitacora_auditoria TO sigd_app;
-GRANT SELECT, INSERT, UPDATE ON sigd_audit.evento_outbox TO sigd_app;
+GRANT SELECT, INSERT ON sigd_audit.evento_outbox TO sigd_app;
+
+GRANT USAGE  ON SCHEMA           sigd_audit TO sigd_worker;
+GRANT SELECT, UPDATE ON sigd_audit.evento_outbox TO sigd_worker;
 
 REVOKE UPDATE, DELETE ON sigd_audit.bitacora_auditoria FROM sigd_app;
+REVOKE UPDATE, DELETE ON sigd_audit.bitacora_auditoria FROM sigd_worker;
+REVOKE DELETE ON sigd_audit.evento_outbox FROM sigd_worker;
 
 -- Verificación de cierre (opcional):
 -- SELECT count(*) FROM pg_indexes WHERE schemaname = 'sigd_audit';

@@ -7,7 +7,7 @@
 **Responsable del entregable:** Ricardo · `B_AREVALO`
 **Documento:** `04_contratos_intermodulares_unificados.md`
 **Fecha:** 8 de septiembre de 2026
-**Versión:** 1.2 (Revisión del Liderazgo — PR #79 · Cierre del contrato con RutaDoc)
+**Versión:** 1.3 (Revisión del Liderazgo — PR #79 cancelado · correcciones pre-merge)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
@@ -22,6 +22,12 @@
 > (`id_expediente`, `id_movimiento`, `id_evento`), se define la estrategia de idempotencia y se
 > reclasifican a `PROPUESTO`/`PENDIENTE` los contratos que aún dependen de aprobación de los grupos
 > propietarios. El contrato formal con RutaDoc se especifica en la sección 6.2.
+>
+> **Revisión v1.3 (PR #79 cancelado):** C-08 pasa a `PROPUESTO` (su garantía de registro **atómico**
+> de bitácora + evento requiere pruebas E2E ejecutables); la FK `usuario_id -> sigd_auth` queda
+> SUSPENDIDA hasta contrato con IdentiCore (`id_usuario`, no `id`); se registra la discrepancia de
+> autoría del entregable 01 entre el plan de Fase 1 (Duque) y el de Fase 2 (Azareño), pendiente de
+> decisión del liderazgo (§10.1).
 
 ---
 
@@ -111,13 +117,13 @@ sin evidencia de aprobación del grupo propietario.
 | # | Productor | Consumidor(es) | Recurso / Dato / Servicio | Validación esperada | Estado | Aprobación requerida |
 | :---: | :--- | :--- | :--- | :--- | :---: | :--- |
 | C-01 | TramiCore (Mesa de Partes) | RutaDoc, Documentadores | Expediente radicado: `numero`, fecha, tipo documental, área destino. | Unicidad del número; tipo documental debe existir en `sigd_doc`. | PROPUESTO | TramiCore |
-| C-02 | IdentiCore | Todos los módulos | Identidad del solicitante: `id_persona` / `id_cuenta`, datos básicos. | Los `usuario_id` referenciados deben existir en `sigd_auth.cuenta_usuario`. | PROPUESTO | IdentiCore |
+| C-02 | IdentiCore | Todos los módulos | Identidad del solicitante: `id_persona` / `id_cuenta`, datos básicos. | Los `usuario_id` referenciados deben existir en `sigd_auth.cuenta_usuario`. La FK de CoreLink está SUSPENDIDA: IdentiCore mantiene pendiente la columna `id_usuario` (v1.3). | PROPUESTO | IdentiCore |
 | C-03 | OrganiCore | TramiCore, RutaDoc | Área destino/jefatura y rol del operador. | El área debe existir y estar vigente; validación de permisos en derivación. | PROPUESTO | OrganiCore |
 | C-04 | DocuCore | TramiCore | Tipo documental y requisitos asociados para radicación. | El tipo documental debe ser válido para el trámite seleccionado. | PENDIENTE | DocuCore |
 | C-05 | RutaDoc | TramiCore, OrganiCore | Movimiento/derivación/atención/observación del expediente y estado actual. | La transición debe estar permitida por la máquina de estados de RutaDoc. | PENDIENTE | RutaDoc |
 | C-06 | TramiCore | RutaDoc | Creación del expediente dispara `movimiento` inicial. | Toda radicación debe generar al menos un movimiento inicial. | PENDIENTE | TramiCore / RutaDoc |
 | C-07 | CoreLink | Todos los módulos | `correlation_id` y formato de error RFC 7807/9457. | Respuestas de error conforme al entregable 01; nunca exponer rastros. | CONFIRMADO | CoreLink (propio) |
-| C-08 | CoreLink | Todos los módulos | Bitácora de auditoría y cola Outbox. | Toda mutación registra y todo evento se persiste de forma atómica (entregable 02). | CONFIRMADO | CoreLink (propio) |
+| C-08 | CoreLink | Todos los módulos | Bitácora de auditoría y cola Outbox. | Toda mutación registra y todo evento se persiste de forma atómica (entregable 02). La garantía de **registro atómico** queda `PROPUESTO` hasta validarla con las pruebas E2E (03/08). | PROPUESTO | CoreLink (propio) |
 
 ### 5.1. Reglas que rigen los contratos de API
 
@@ -354,7 +360,15 @@ Para cerrar cada contrato cruzado se requiere que **cada sublíder** envíe al r
 | **Explicación de autoría (cuando falten commits)** | Declaración de quién elaboró realmente cada parte si los commits no lo reflejan. |
 | **Confirmación del estado contractual** | Confirmación de `CONFIRMADO` / `PROPUESTO` / `PENDIENTE` por el grupo propietario. |
 
-### 10.1. Registro de autoría de los entregables del Grupo 6 (v1.2)
+### 10.1. Registro de autoría de los entregables del Grupo 6 (v1.2, nota v1.3)
+
+> ⚠️ **Nota v1.3 — discrepancia de autoría del entregable 01:** el plan de **Fase 1**
+> (`planes_trabajo/06_plan_trabajo_grupo_6_corelink.md`) asigna las convenciones de API a **Duque
+> (`B_DUQUE`)**, mientras el plan de **Fase 2** (`levantamiento_de_observaciones/06_plan_...`) asigna
+> la especificación del middleware RFC 7807 a **Azareño (`B_AZAREÑO`)**. Este registro mantiene la
+> atribución de Fase 2 (cabecera del documento 01 y D-01/D-02/D-04/D-14), y queda **pendiente de
+> decisión del liderazgo** cuál plan prevalece antes de cerrar la autoría. Se anexa la causal en el
+> entregable 07 §1.2.
 
 | Entregable | Autor declarado en el documento | Rama | Commit / PR | Explicación de autoría (si solo hay commits en `B_AREVALO`) | Estado contractual |
 | :--- | :--- | :--- | :--- | :--- | :---: |
@@ -383,8 +397,9 @@ Para cerrar cada contrato cruzado se requiere que **cada sublíder** envíe al r
 | C-05 / E-02 · E-05 · E-06 · E-07 (RutaDoc) | **RutaDoc** | — | PENDIENTE |
 | C-06 | TramiCore / RutaDoc | — | PENDIENTE |
 
-> El liderazgo requiere presentar la **evidencia de aprobación bilateral** de cada contrato en el
-> mismo PR #79; mientras no exista, el estado del contrato será `PENDIENTE`.
+> El liderazgo requiere presentar la **evidencia de aprobación bilateral** de cada contrato; mientras
+> no exista, el estado del contrato será `PENDIENTE`. Dicha evidencia se integrará en el PR cuando el
+> profesor lo autorice (el PR #79 fue cancelado).
 
 ---
 
@@ -432,7 +447,9 @@ Para cerrar cada contrato cruzado se requiere que **cada sublíder** envíe al r
 - **Dependencia (Zevallos):** los contratos C-01, C-03 y los eventos E-01, E-02, E-06 y E-07 se
   verifican en los casos E2E del entregable 03.
 - **Decisiones registradas:**
-  - `CONFIRMADO` (propios de CoreLink): C-07, C-08 y la política de `usuario_id` nullable (R-05).
+  - `CONFIRMADO` (propios de CoreLink): C-07 y la política de `usuario_id` nullable (R-05).
+  - `PROPUESTO` (propio de CoreLink): C-08 — su garantía de **registro atómico** (bitácora + evento)
+    requiere validación con pruebas E2E ejecutables (v1.3).
   - `PROPUESTO`: identidad vía `sigd_auth` (C-02), área vía `sigd_org` (C-03), `ExpedienteContract`
     (7.5) y evento E-01.
   - `PENDIENTE`: contratos de movimientos/estados de RutaDoc (C-05, C-06) y eventos
@@ -440,10 +457,14 @@ Para cerrar cada contrato cruzado se requiere que **cada sublíder** envíe al r
   - **v1.2:** se normalizan los identificadores a `id_<agregado>`, se incorporan
     `ExpedienteAtendido`/`ExpedienteObservado`, se define la clave de idempotencia compuesta y se
     exige evidencia de autoría y aprobación bilateral para marcar `CONFIRMADO`.
+  - **v1.3:** C-08 a `PROPUESTO`; FK `usuario_id -> sigd_auth` SUSPENDIDA (IdentiCore usa `id_usuario`);
+    discrepancia de autoría del entregable 01 (Duque vs Azareño) registrada y pendiente del liderazgo.
 
 ---
 
 *Documento elaborado por Ricardo (`B_AREVALO`) como entregable de Fase 2 — Levantamiento de
 Observaciones del Grupo 6 CoreLink. Revisión 1.2: atiende las observaciones del liderazgo sobre el
 PR #79 (eventos RutaDoc, nomenclatura de identificadores, idempotencia, estado contractual y
-evidencia de autoría/aprobación bilateral).*
+evidencia de autoría/aprobación bilateral). Revisión 1.3: corrige la revisión del liderazgo tras la
+cancelación del PR #79 (C-08 a `PROPUESTO` por garantía atómica pendiente de pruebas, FK de
+IdentiCore SUSPENDIDA y discrepancia de autoría del entregable 01 registrada).*
