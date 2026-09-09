@@ -7,7 +7,7 @@
 **Líder General:** Geric · `B_GERIC` | **Sublíder:** Elmer Ramírez · `B_RAMIREZ`  
 **Integrantes:** Elmer Ramírez (`B_RAMIREZ`), Leysglin Riquelmer (`B_RIQUELMER`), Sandy (`B_SANDY`)  
 **Fecha:** 30 de agosto de 2026  
-**Versión:** 2.0 (Fase 2 — Estandarización MGD, CUT y Foliado Digital)  
+**Versión:** 2.1 (Fase 2 — Estandarización MGD, CUT y Foliado Digital) corregida el 2026-09-08 según auditoría del líder (casillas de verificación revertidas a ☐; aclarado UUID PENDIENTE y FK simples)
 **Ubicación:** `backend/docs/levantamiento_de_observaciones/02_plan_levantamiento_observaciones_grupo_2_tramicore.md`
 
 ---
@@ -34,7 +34,7 @@ Subsanar las observaciones arquitecturales identificadas en el diagnóstico seni
 ## 3. Límites y Criterios de Validación
 
 - Los números del Libro General de Registros (`asiento_registro`) son estrictamente inmutables, correlativos y no reutilizables.
-- El CUT generado es el identificador visible público, mientras que las relaciones internas de BD utilizan llaves primarias técnicas UUID (`id_expediente`).
+- El CUT generado es el identificador visible público, mientras que las relaciones internas de BD usan llaves primarias técnicas (hoy `BIGINT GENERATED ALWAYS AS IDENTITY`; la migración a `UUID` está **PENDIENTE** de contrato bilateral con RutaDoc — ver `DEC-UUID` en `05_decisiones_levantamiento_tramicore.md`).
 - Toda decisión técnica se etiquetará según la taxonomía oficial: `CONFIRMADO`, `PROPUESTO`, `PENDIENTE` o `EJEMPLO`.
 
 ---
@@ -65,8 +65,8 @@ Subsanar las observaciones arquitecturales identificadas en el diagnóstico seni
 - Implementar `03_esquema_sigd_tra_cut_foliado.sql` en PostgreSQL 18 con:
   - Función atómica `generar_cut_expediente(anio)`.
   - Tabla de control de folios con restricción `CHECK (folio_fin >= folio_inicio)`.
-  - Tabla de acumulación de expedientes con clave foránea compuesta.
-- Ejecutar la suite `04_validacion_tramicore_v2.md` con 10 pruebas de estrés (generación concurrente de 500 CUTs, validación de foliado continuo y acumulación de 3 expedientes).
+  - Tabla de acumulación de expedientes con dos FK simples e índice único parcial `uq_acumulacion_vigente` (abstención de FK compuesta).
+- Ejecutar la validación `04_validacion_tramicore_v2.md` mediante el lanzador reproducible `07_lanzador_pruebas_tramicore.ps1` (21 pruebas deterministas + concurrencia real de 500 CUTs); validación de foliado continuo y acumulación de expedientes.
 - Redactar `05_decisiones_levantamiento_tramicore.md` y consolidar en `B_RAMIREZ`.
 
 ---
@@ -95,13 +95,13 @@ Subsanar las observaciones arquitecturales identificadas en el diagnóstico seni
 
 | Estado | Criterio de Verificación Técnico y Metodológico | Responsable | Evidencia Requerida |
 | :---: | :--- | :---: | :--- |
-| ✔ | El formato del CUT cumple con el estándar `EXP-YYYY-XXXXXX` del MGD-PCM y no usa `MAX()+1`. | Riquelmer / Ramírez | `01_analisis...md` y `03_esquema...sql` |
-| ✔ | La función de generación de CUT soporta ejecución concurrente sin duplicados ni bloqueos muertos. | Ramírez | Prueba de estrés en `04_validacion...md` |
-| ✔ | La entidad `expediente_acumulacion` modela correctamente la relación N:M entre expedientes conexos (Art. 160 LPAG). | Sandy | `02_modelo_datos...md` y DDL SQL |
-| ✔ | La foliación electrónica registra rangos de páginas continuas y rechaza solapamientos de folios. | Sandy / Ramírez | Restricciones en `03_esquema...sql` |
-| ✔ | Se mantiene la inmutabilidad y no reutilización de números en `sigd_tra.asiento_registro`. | Ramírez | Verificación en `04_validacion...md` |
-| ✔ | Diagrama ER actualizado en Draw.io y exportado a imagen PNG en alta resolución. | Sandy | Archivos `.drawio` y `.png` |
-| ✔ | El log de decisiones fundamenta la adopción de las directivas del MGD-PCM y AGN. | Ramírez | `05_decisiones_levantamiento_tramicore.md` |
+| ☐ | El formato del CUT cumple con el estándar `EXP-YYYY-XXXXXX` del MGD-PCM y no usa `MAX()+1`. | Riquelmer / Ramírez | `01_analisis...md` y `03_esquema...sql` |
+| ☐ | La función de generación de CUT soporta ejecución concurrente sin duplicados ni bloqueos muertos. | Ramírez | Lanzador `07_lanzador_pruebas_tramicore.ps1` y `04_validacion...md` |
+| ☐ | La entidad `expediente_acumulacion` modela correctamente la relación N:M entre expedientes conexos (Art. 160 LPAG). | Sandy | `02_modelo_datos...md` y DDL SQL |
+| ☐ | La foliación electrónica registra rangos de páginas continuas y rechaza solapamientos de folios. | Sandy / Ramírez | Restricciones en `03_esquema...sql` |
+| ☐ | Se mantiene la inmutabilidad y no reutilización de números en `sigd_tra.asiento_registro`. | Ramírez | Verificación en `04_validacion...md` |
+| ☐ | Diagrama ER actualizado en Draw.io y exportado a imagen PNG en alta resolución. | Sandy | Archivos `.drawio` y `.png` |
+| ☐ | El log de decisiones fundamenta la adopción de las directivas del MGD-PCM y AGN. | Ramírez | `05_decisiones_levantamiento_tramicore.md` |
 | ☐ | Commits individuales verificables en `B_RIQUELMER`, `B_SANDY` y `B_RAMIREZ`. | Todos | Historial de Git |
 | ☐ | Sublíder integró formalmente mediante Pull Request hacia `B_GERIC`. | Ramírez | PR en GitHub |
 

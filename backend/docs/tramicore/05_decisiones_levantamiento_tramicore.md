@@ -23,20 +23,20 @@
 
 | # | Decisión | Categoría | Justificación |
 |---|----------|-----------|---------------|
-| DEC-01 | CUT con formato `EXP-YYYY-XXXXXX` y función `generar_cut_expediente` | CONFIRMADO | Exigido por la R.S. N° 001-2017-PCM/SEGDI para interoperabilidad del MGD |
-| DEC-02 | Prohibición absoluta de `MAX()+1` | CONFIRMADO | La R.S. N° 001-2017-PCM/SEGDI exige generación atómica segura ante concurrencia |
-| DEC-03 | Uso de secuencias nativas de PostgreSQL (`nextval()`) para CUT | CONFIRMADO | Garantiza unicidad atómica sin riesgo de colisiones concurrentes |
+| DEC-01 | CUT con formato `EXP-YYYY-XXXXXX` y función `generar_cut_expediente` | PROPUESTO | La R.S. N° 001-2017-PCM/SEGDI exige un CUT interoperable para el MGD; el formato exacto está PENDIENTE de confirmación oficial (P01/P02) |
+| DEC-02 | Prohibición absoluta de `MAX()+1` para el CUT | CONFIRMADO | La R.S. N° 001-2017-PCM/SEGDI exige generación atómica segura ante concurrencia |
+| DEC-03 | Correlativo CUT por AÑO FISCAL sobre `secuencia_anual_cut` (`INSERT ... ON CONFLICT` + `SELECT ... FOR UPDATE`) | PROPUESTO | Implementado y validado bajo concurrencia real (07_lanzador_pruebas_tramicore.ps1); el reinicio anual depende de la confirmación institucional (P03) |
 | DEC-04 | La función `generar_cut_expediente` se ejecuta en el esquema `sigd_tra` | PROPUESTO | Alineación con el esquema del módulo de tramitación |
 
 ### 2.2 Directivas TUO Ley N° 27444 (Art. 160 LPAG)
 
 | # | Decisión | Categoría | Justificación |
 |---|----------|-----------|---------------|
-| DEC-05 | Entidad `expediente_acumulacion` con FK compuesta | CONFIRMADO | Art. 160 LPAG establece la acumulación de procedimientos conexos |
+| DEC-05 | Entidad `expediente_acumulacion` con identidad propia (`id_acumulacion`) y DOS FK simples | PROPUESTO | Art. 160 LPAG establece la acumulación de procedimientos conexos; el diseño del par (no FK compuesta) es decisión técnica del grupo |
 | DEC-06 | Acumulación requiere acto resolutivo justificado | CONFIRMADO | La acumulación debe estar fundamentada en un proveído o resolución |
-| DEC-07 | El expediente accesorio cambia a estado `ACUMULADO` | CONFIRMADO | El accesorio pierde autonomía y se fusiona al principal |
+| DEC-07 | El expediente accesorio cambia a `estado_expediente = 'ACUMULADO'` | PROPUESTO | Refleja la fusión jurídica del accesorio; la taxonomía oficial de estados del expediente sigue PENDIENTE (P08) |
 | DEC-08 | Desacumulación requiere nuevo acto resolutivo | CONFIRMADO | Si desaparece la conexidad, se ordena separación mediante nuevo acto |
-| DEC-09 | Clave foránea compuesta `(id_expediente_principal, id_expediente_accesorio)` | CONFIRMADO | Modela correctamente la relación N:M entre expedientes conexos |
+| DEC-09 | Unicidad del par ACTIVO mediante índice único parcial `uq_acumulacion_vigente` (permite re-acumulación tras desacumular) | PROPUESTO | Corrige la decisión anterior de "FK compuesta": el par no es clave; el índice parcial preserva el historial |
 
 ### 2.3 Directivas AGN (R.J. N° 073-2023-AGN/J)
 
@@ -53,9 +53,10 @@
 
 | # | Decisión | Categoría | Justificación |
 |---|----------|-----------|---------------|
-| DEC-16 | Relación trámite→expediente es 1:N (no 1:1) | CONFIRMADO | Subsanación de observación arquitectónica: un trámite genera múltiples expedientes |
-| DEC-17 | `fk_tramite` en `expediente` pierde restricción UNIQUE | CONFIRMADO | Permite la flexibilidad requerida por el Art. 160 y el MGD |
-| DEC-18 | El CUT es el identificador visible público | CONFIRMADO | Las relaciones internas de BD usan llaves primarias técnicas UUID |
+| DEC-16 | Relación trámite→expediente es 1:N (no 1:1) | PROPUESTO | Subsanación de observación arquitectónica: un trámite puede generar múltiples expedientes (ej. una solicitud y sus ampliatorios) |
+| DEC-17 | `fk_tramite` en `expediente` pierde restricción UNIQUE | PROPUESTO | Permite la flexibilidad requerida por el Art. 160 y el MGD |
+| DEC-18 | El CUT es el identificador visible público | CONFIRMADO | El formato `EXP-YYYY-XXXXXX` se mantiene como identificador de negocio |
+| DEC-UUID | Claves internas: hoy `BIGINT GENERATED ALWAYS AS IDENTITY`; migración a `UUID` | PENDIENTE | Corrige la afirmación anterior de llaves UUID: aún no implementado. Requiere contrato bilateral con RutaDoc (Sandy/Geric) antes de decidir la migración (ver sección 4) |
 
 ### 2.5 Inmutabilidad del Libro General de Registros
 
@@ -93,7 +94,8 @@
 | 2026-08-30 | Elmer Ramírez | Observación de ausencia de acumulación resuelta con `expediente_acumulacion` | RESUELTO |
 | 2026-08-30 | Elmer Ramírez | Observación de ausencia de foliatura digital resuelta con `expediente_documento_folio` | RESUELTO |
 | 2026-09-08 | Elmer Ramírez | Entregable de Sandy (modelo lógico v2.0, diccionario y diagramas) integrado | RESUELTO |
-| 2026-09-08 | Elmer Ramírez | Pruebas de estrés de 500 CUTs concurrentes ejecutadas (500/500 únicos) | RESUELTO |
+| 2026-09-08 | Elmer Ramírez | Pruebas de concurrencia reproducibles mediante `07_lanzador_pruebas_tramicore.ps1` (500/500 CUTs únicos, carrera año 2028, sin deadlocks) | RESUELTO |
+| 2026-09-08 | Elmer Ramírez | Corrección H4: clasificaciones CONFIRMADO→PROPUESTO/PENDIENTE en DEC-01/03/05/07/09/16/17/18, DEC-UUID documentado como PENDIENTE, reescritura de DDL/demo/laboratorio con codificación UTF-8 limpia | RESUELTO |
 
 ---
 
@@ -103,3 +105,4 @@
 |---------|-------|---------|-------------|
 | 1.0 | 2026-08-30 | Documento inicial con decisiones de la Fase 2 | Elmer Ramírez |
 | 2.0 | 2026-08-30 | Consolidación completa con fundamentación MGD-PCM, LPAG y AGN | Elmer Ramírez |
+| 2.1 | 2026-09-08 | Correcciones H4 post-auditoría: reclasificación de decisiones, DEC-UUID, alineación con DDL (secuencia anual, dos FK simples, índice parcial), evidencia reproducible | Elmer Ramírez |
