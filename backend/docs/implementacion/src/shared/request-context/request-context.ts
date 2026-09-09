@@ -48,4 +48,3 @@ export function crearContexto(input: NuevoContexto = {}): RequestContext {
     user_agent: input.user_agent ?? '',
   };
 }
-
