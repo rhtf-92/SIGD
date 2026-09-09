@@ -96,6 +96,16 @@ npm run load:derivacion
 Ver `../integracion/08_runbook_evidencia_pruebas.md` para instrucciones paso a paso
 sobre cómo generar y conservar evidencia (logs, timestamps, exit codes, P95, tasa de errores).
 
+Evidencia ejecutada (Sección 5 / ronda P2–P12):
+
+- `evidencia/e2e-20260909-123500/` — suite E2E con `TEST_DATABASE_URL`: **12/12 archivos · 22/22
+  casos · EXIT_CODE=0** (`e2e.log` + `resumen.txt`).
+- `evidencia/k6-20260909-145820/` — carga k6 v2.2.0: radicación **P95 150.96 ms** y derivación
+  **P95 144.64 ms** (< 200 ms), **0 % errores**, checks 100 %, EXIT_CODE=0 (logs + summaries + resumen).
+
+> La suite se ejecutó sin Docker (PostgreSQL 16 local). Con Docker disponible use Testcontainers o la
+> base efímera del runbook; los umbrales de aceptación son los mismos.
+
 ---
 
 ## 7. Cómo cubre la observación del profesor

@@ -7,7 +7,7 @@
 **Responsable del entregable:** Ricardo · `B_AREVALO`
 **Documento:** `05_decisiones_levantamiento_corelink.md`
 **Fecha:** 8 de septiembre de 2026
-**Versión:** 1.4 (Revisión del Liderazgo — segunda ronda: atribuciones y separación de migraciones)
+**Versión:** 1.5 (Revisión del Liderazgo — segunda ronda: atribuciones, separación de migraciones y evidencias E2E/k6)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
@@ -24,6 +24,12 @@
 > **Revisión v1.4 (segunda ronda del liderazgo):** (1) se corrige la atribución de D-01, D-02, D-04 y
 > D-14 a **Duque**; (2) se documenta la separación de migraciones en la suite (DDL real de `sigd_audit`
 > + stubs provisionales de los 5 esquemas, sin cargar los DDL oficiales de los demás grupos).
+>
+> **Revisión v1.5 (evidencia ejecutada):** D-06 (atomicidad y cero pérdida) y D-20 (entrega
+> al-menos-una-vez) pasan a `CONFIRMADO` con los casos E2E-07 y E2E-12 ejecutados; C-08 también queda
+> `CONFIRMADO` (04). D-05 (inmutabilidad) permanece `PROPUESTO`: la garantía no se ejercita en el
+> prototipo porque la suite corre como dueño del esquema y el `REVOKE` por rol no aplica; requiere una
+> prueba de permisos del rol `sigd_app` en el UAT. El riesgo R-10 pasa a `CERRADO` (evidencia E2E y k6).
 
 ---
 
@@ -85,8 +91,8 @@ sigue la taxonomía oficial.
 | D-02 | 03/09/2026 | Evitar respuestas HTTP dispersas en cada módulo. | Todo módulo **lanza** la jerarquía `AppError` al detectar un error; solo el middleware global serializa a HTTP. | CONFIRMADO | Duque |
 | D-03 | 03/09/2026 | Propagar contexto sin ensuciar firmas de métodos. | Usar **una única instancia de AsyncLocalStorage** compartida vía `shared`; cada solicitud crea su almacén. | CONFIRMADO | Reátegui |
 | D-04 | 03/09/2026 | Correlacionar solicitudes de punta a punta. | `correlation_id` es **UUIDv4**; se acepta del header `x-correlation-id` o se genera; siempre se devuelve en la respuesta. | CONFIRMADO | Duque |
-| D-05 | 03/09/2026 (v1.3) | Auditoría inmutable y reconstrucción de estados. | Bitácora **append-only** (`sigd_audit.bitacora_auditoria`) con `datos_antes/datos_despues` en `JSONB`; revocar `UPDATE/DELETE` al rol de aplicación. La garantía de **inmutabilidad real** es `PROPUESTO` hasta validarla con las pruebas E2E (03) y los permisos del DDL 06. | PROPUESTO | Reátegui |
-| D-06 | 03/09/2026 (v1.3) | Evitar pérdida de notificaciones ante caídas externas. | Patrón **Transactional Outbox** en `sigd_audit.evento_outbox`; el worker usa lote y `FOR UPDATE SKIP LOCKED`, confirma antes de marcar `PROCESADO`, con backoff exponencial y DLQ. Las garantías de **atomicidad, cero pérdida y entrega** son `PROPUESTO` hasta existir worker ejecutable y pruebas E2E que lo demuestren. | PROPUESTO | Reátegui |
+| D-05 | 03/09/2026 (v1.3) | Auditoría inmutable y reconstrucción de estados. | Bitácora **append-only** (`sigd_audit.bitacora_auditoria`) con `datos_antes/datos_despues` en `JSONB`; revocar `UPDATE/DELETE` al rol de aplicación. La garantía de **inmutabilidad real** es `PROPUESTO` (v1.5): no se ejercita en el prototipo porque la suite corre como dueño del esquema; requiere prueba de permisos del rol `sigd_app` en el UAT. | PROPUESTO | Reátegui |
+| D-06 | 03/09/2026 (v1.3/1.5) | Evitar pérdida de notificaciones ante caídas externas. | Patrón **Transactional Outbox** en `sigd_audit.evento_outbox`; el worker usa lote y `FOR UPDATE SKIP LOCKED`, confirma antes de marcar `PROCESADO`, con backoff exponencial y DLQ. **v1.5:** las garantías de **atomicidad y cero pérdida** pasan a `CONFIRMADO` con el caso E2E-07 ejecutado (persistencia conjunta y rollback completo ante falla inducida). | CONFIRMADO | Reátegui |
 | D-07 | 03/09/2026 | Pruebas de integración reproducibles y sin mocks de datos. | Entorno efímero con **Testcontainers (PostgreSQL 18 Alpine)** + migraciones de los 6 esquemas y `TRUNCATE ... CASCADE` entre escenarios. | CONFIRMADO | Zevallos |
 | D-08 | 03/09/2026 | Aptitud de rendimiento antes de producción. | Umbrales k6: **P95 < 200 ms** y **tasa de errores < 0.1 %**; escenarios de radicación (100 VU) y derivación (50 VU). | CONFIRMADO | Zevallos |
 | D-09 | 03/09/2026 | Unificar los nombres de esquemas entre los 6 DDL. | Nomenclatura consolidada `sigd_auth`, `sigd_org`, `sigd_doc`, `sigd_tra`, `sigd_rut`, `sigd_audit`, reemplazando variantes anteriores. | CONFIRMADO | Ricardo |
@@ -100,7 +106,7 @@ sigue la taxonomía oficial.
 | D-17 | 08/09/2026 | Estrategia de idempotencia no resuelta. | Clave de idempotencia compuesta `tipo_evento:id_expediente:id_movimiento`; el consumidor implementa índice único `(tipo_evento, clave_idempotencia)` y descarta duplicados (04 §6.3). | CONFIRMADO (propio) | Ricardo |
 | D-18 | 08/09/2026 | Contratos cruzados marcados `CONFIRMADO` sin aprobación de los grupos propietarios. | Ningún contrato cruzado se marca `CONFIRMADO` sin evidencia bilateral; los pendientes quedan `PROPUESTO`/`PENDIENTE` hasta la aprobación documentada (04 §10.2). | CONFIRMADO (propio) | Ricardo |
 | D-19 | 08/09/2026 | Los commits de PR #79 provienen únicamente de la cuenta `B_AREVALO`. | Exigir declaración de autoría (ruta, rama, commit/PR, definición, confirmación de estado) de Duque, Reátegui y Zevallos; incorporar registro de evidencia (07). | PENDIENTE | Todos |
-| D-20 | 08/09/2026 | Semántica de entrega del outbox y duplicados. | El worker entrega **al-menos-una-vez** con `FOR UPDATE SKIP LOCKED`; la idempotencia la garantiza el consumidor con la `clave_idempotencia`. **No se promete entrega exactamente-una-vez** (requiere coordinador transaccional externo); queda `PROPUESTO` hasta validarla con pruebas. | PROPUESTO | Reátegui |
+| D-20 | 08/09/2026 (v1.5) | Semántica de entrega del outbox y duplicados. | El worker entrega **al-menos-una-vez** con `FOR UPDATE SKIP LOCKED`; la idempotencia la garantiza el consumidor con la `clave_idempotencia`. **No se promete entrega exactamente-una-vez** (requiere coordinador transaccional externo). **v1.5:** pasa a `CONFIRMADO` con el caso E2E-12 ejecutado (dos workers concurrentes despachan cada evento una sola vez; reserva transaccional; reintentos → `FALLIDO`). | CONFIRMADO | Reátegui |
 | D-21 | 08/09/2026 | `correlation_id` con `DEFAULT gen_random_uuid()` podía diferir del contexto. | `correlation_id` de la bitácora **sin valor por defecto** (v1.3 del DDL 06): se propaga siempre desde AsyncLocalStorage; la BD no genera un UUID distinto; inserción sin contexto falla de forma explícita. | CONFIRMADO (propio) | Reátegui |
 | D-22 | 08/09/2026 | FK a `sigd_auth.cuenta_usuario(id)` sin contrato aprobado. | FK `usuario_id` **SUSPENDIDA (PENDIENTE)**: IdentiCore/RutaDoc mantienen la columna `id_usuario`; se activa solo con contrato bilateral aprobado (07). La decisión de suspender está confirmada; su activación, pendiente. | CONFIRMADO (propio) | Ricardo |
 | D-23 | 08/09/2026 | La aplicación podía actualizar el outbox y no existía rol de worker. | Separar roles (DDL 06 v1.3): `sigd_app` (bitácora y encolado) y `sigd_worker` (solo SELECT/UPDATE del outbox). La aplicación no modifica eventos ya insertados. | CONFIRMADO (propio) | Reátegui |
@@ -124,10 +130,10 @@ decisiones sin fundamento documentado:
 | D-02 | Serializar errores en cada controlador. | Un solo punto de serialización evita dispersión y filtraciones. | Todo módulo debe lanzar `AppError`; el middleware es el único serializador. | Doc 01 §7; E2E-10. |
 | D-03 | Pasar contexto por parámetros. | AsyncLocalStorage evita contaminar firmas de casos de uso y repositorios. | `RequestContext` shared e instancia por solicitud. | Doc 02 §4; E2E-06. |
 | D-04 | Generar un `correlation_id` nuevo por capa. | Un solo UUID por solicitud permite reconstruir la cadena completa. | Header `x-correlation-id` opcional; respuesta siempre lo incluye. | Doc 02 §4; rastreo del envelope §6.7. |
-| D-05 | Bitácora editable con `datos_despues` final. | Append-only preserva el historial forense (antes/después). | Revocación `UPDATE/DELETE`; garantía a validar con E2E (v1.3). | DDL 06; E2E inmutabilidad (03). |
-| D-06 | Envío directo a servicios externos. | Outbox en la misma transacción evita pérdidas ante caídas. | Worker con lote, `SKIP LOCKED`, backoff y DLQ; garantía a validar (v1.3). | DDL 06; caso E2E-07. |
-| D-07 | Base de datos compartida de desarrollo. | Testcontainers aísla y reproduce el entorno real sin mocks. | Migraciones de los 6 esquemas + `TRUNCATE ... CASCADE`. | Doc 03; ejecución con Docker (08). |
-| D-08 | Sin umbrales de rendimiento. | Umbrales objetivos (P95, tasa de error) evitan aprobaciones subjetivas. | k6 con escenarios de radicación y derivación. | Doc 03; reporte k6 (08). |
+| D-05 | Bitácora editable con `datos_despues` final. | Append-only preserva el historial forense (antes/después). | Revocación `UPDATE/DELETE`; garantía a validar (v1.3). | DDL 06; prueba de permisos `sigd_app` en UAT (v1.5). |
+| D-06 | Envío directo a servicios externos. | Outbox en la misma transacción evita pérdidas ante caídas. | Worker con lote, `SKIP LOCKED`, backoff y DLQ; garantía validada (v1.5). | DDL 06; E2E-07 ejecutado (12/12). |
+| D-07 | Base de datos compartida de desarrollo. | Testcontainers aísla y reproduce el entorno real sin mocks. | Migraciones de los 6 esquemas + `TRUNCATE ... CASCADE`. | Doc 03; ejecución real del entorno (08). |
+| D-08 | Sin umbrales de rendimiento. | Umbrales objetivos (P95, tasa de error) evitan aprobaciones subjetivas. | k6 con escenarios de radicación y derivación. | Doc 03; reporte k6 ejecutado (08). |
 | D-09 | Nombres de esquemas por módulo. | Nomenclatura consolidada `sigd_*` única para migraciones. | Unificación de los 6 DDL. | Migraciones y búsqueda grep. |
 | D-10 | `usuario_id` obligatorio. | Existen mutaciones de sistema legítimas sin sesión. | Columna nullable; NULL documentado, no inconsistencia. | Doc 02 §5.2. |
 | D-11 | Tamaños/índices fijos por ahora. | Confirmar al implementar manteniendo semántica. | `VARCHAR(512)` y 6 índices propuestos. | Doc 02 §5.5/§6.6. |
@@ -139,7 +145,7 @@ decisiones sin fundamento documentado:
 | D-17 | Idempotencia en el productor. | Clave compuesta `tipo_evento:id_expediente:id_movimiento` en consumidor. | Índice único y descarte de duplicados. | Doc 04 §6.3. |
 | D-18 | Marcar `CONFIRMADO` cruzado. | Ningún contrato cruzado se confirma sin evidencia bilateral. | Reclasificación a `PROPUESTO`/`PENDIENTE`. | Doc 04 §10.2; 07. |
 | D-19 | Confiar solo en commits de `B_AREVALO`. | Autoría verificable por integrante en sus ramas. | Declaraciones de autoría con ruta/rama/commit. | Doc 07. |
-| D-20 | Prometer entrega exactamente-una-vez. | Al-menos-una-vez + idempotencia del consumidor es realista sin coordinador. | Semántica honesta; `PROPUESTO` hasta validar. | E2E de duplicados (03). |
+| D-20 | Prometer entrega exactamente-una-vez. | Al-menos-una-vez + idempotencia del consumidor es realista sin coordinador. | Semántica honesta; validada con worker ejecutable (v1.5). | E2E-12 ejecutado (SKIP LOCKED, no-doble-despacho, FALLIDO). |
 | D-21 | Default `gen_random_uuid()` en `correlation_id`. | La BD sin default evita divergencia con el contexto. | Bitácora con UUID del contexto; inserción sin contexto falla. | DDL 06 v1.3; E2E-06. |
 | D-22 | FK física hacia `cuenta_usuario(id)`. | Suspendida hasta contrato con IdentiCore (`id_usuario`). | Columna nullable; integridad verificada por aplicación. | 07 (contrato IdentiCore). |
 | D-23 | Un solo rol para app y worker. | Separar escritura de bitácora/encolado del despacho. | `sigd_app` vs `sigd_worker` en DDL 06. | DDL 06 v1.3. |
@@ -150,8 +156,8 @@ decisiones sin fundamento documentado:
 
 | Estado | Decisión(es) | Interpretación |
 | :--- | :--- | :--- |
-| **CONFIRMADO** | D-01…D-04, D-07…D-10, D-14, D-15, D-17, D-18, D-21, D-22, D-23 | Acordado por el equipo y coherente con el plan de mejora; base para implementar (incluidos nomenclatura `id_<agregado>`, idempotencia, gobernanza de estado contractual y las correcciones v1.3). |
-| **PROPUESTO** | D-05, D-06, D-11, D-12, D-13, D-20 | Propuesta técnica elaborada que requiere validación al implementar o por el grupo propietario. D-05/D-06/D-20 requieren pruebas E2E ejecutables (garantías con evidencia). |
+| **CONFIRMADO** | D-01…D-04, D-06…D-10, D-14, D-15, D-17, D-18, D-20, D-21, D-22, D-23 | Acordado por el equipo y coherente con el plan de mejora; base para implementar (incluidos nomenclatura `id_<agregado>`, idempotencia, gobernanza de estado contractual y las correcciones v1.3). **v1.5:** D-06 y D-20 se confirman con la evidencia E2E ejecutada (E2E-07/E2E-12). |
+| **PROPUESTO** | D-05, D-11, D-12, D-13 | Propuesta técnica elaborada que requiere validación al implementar o por el grupo propietario. D-05 (inmutabilidad) requiere la prueba de permisos del rol `sigd_app` en el UAT (v1.5). |
 | **PENDIENTE** | D-16 (RutaDoc), D-19 (autoría); contenido parcial de D-12 (C-06, E-04, E-05, número de expediente) y activación de D-22 (contrato IdentiCore) | Requiere confirmación de otro grupo, de las autoridades o la evidencia de autoría de los integrantes. |
 | **EJEMPLO** | Payloads y URLs de los documentos 01 a 04 | Dato ficticio de demostración; no representa datos reales de alumnos ni instituciones. |
 
@@ -182,7 +188,7 @@ trabajo del autor; se solicita corrección al responsable cuando corresponde.
 | `correlation_id` con `DEFAULT gen_random_uuid()` podía divergir del valor del contexto. | Sin default en la BD; se propaga siempre desde AsyncLocalStorage (D-21; DDL 06 v1.3). | APLICADA |
 | FK física a `sigd_auth.cuenta_usuario(id)` sin contrato aprobado con IdentiCore. | FK SUSPENDIDA hasta contrato bilateral; IdentiCore/RutaDoc usan `id_usuario` (D-22). | APLICADA |
 | Permisos que no separaban aplicación del worker Outbox. | Roles `sigd_app` y `sigd_worker` separados (D-23; DDL 06 v1.3). | APLICADA |
-| Garantías (inmutabilidad, cero pérdida, atomicidad, entrega) marcadas `CONFIRMADO` sin prueba ejecutable. | D-05, D-06 y D-20 a `PROPUESTO` hasta evidencia E2E (03/08). | APLICADA |
+| Garantías (inmutabilidad, cero pérdida, atomicidad, entrega) marcadas `CONFIRMADO` sin prueba ejecutable. | D-05, D-06 y D-20 a `PROPUESTO` hasta evidencia E2E (03/08). | APLICADA — **v1.5:** D-06 y D-20 pasan a `CONFIRMADO` con E2E-07/E2E-12; D-05 permanece `PROPUESTO` (inmutabilidad no ejercitada en el prototipo). |
 | D-12 con estado combinado (`PROPUESTO`/`PENDIENTE`). | Estado único `PROPUESTO` con parciales pendientes listados (v1.3). | APLICADA |
 | Decisiones sin alternativa, justificación, impacto ni evidencia. | Sección 4.3 de detalle ADR completa (D-01…D-23). | APLICADA |
 
@@ -209,7 +215,7 @@ trabajo del autor; se solicita corrección al responsable cuando corresponde.
 | R-07 | RutaDoc opera sin eventos de atención/observación. | RutaDoc no recibe retorno del ciclo expediente. | RutaDoc / Ricardo | Aprobación bilateral de E-06 y E-07 (04 §10.2). | PENDIENTE |
 | R-08 | Autoría de Reátegui, Zevallos y Duque no verificable en los commits del PR #79. | Trazabilidad del trabajo en equipo exigida por el liderazgo. | Duque / Reátegui / Zevallos | Declaraciones de autoría con rama y commit (07). | PENDIENTE |
 | R-09 | FK `usuario_id` suspendida sin contrato IdentiCore. | Sin integridad referencial de identidad mientras no se active. | Ricardo | Contrato bilateral aprobado y excepción (`ALTER TABLE`) registrada (07). | PENDIENTE |
-| R-10 | Evidencia E2E/k6 sin ejecutar (sin Docker). | Garantías y umbrales no demostrados; bloquea `CONFIRMADO`. | Zevallos / Ricardo | **E2E ejecutado** con `TEST_DATABASE_URL` (12/12, 22/22, `implementacion/evidencia/e2e-20260909-123500/`); k6 pendiente de servidor en ejecución. | PENDIENTE |
+| R-10 | Evidencia E2E/k6 sin ejecutar (sin Docker). | Garantías y umbrales no demostrados; bloquea `CONFIRMADO`. | Zevallos / Ricardo | **E2E ejecutado** con `TEST_DATABASE_URL` (12/12 archivos · 22/22 casos · EXIT_CODE=0) y **carga k6 ejecutada** contra la API local (P95 150.96 / 144.64 ms < 200 ms · 0 % errores · EXIT_CODE=0). Artefactos en `implementacion/evidencia/e2e-20260909-123500/` y `implementacion/evidencia/k6-20260909-145820/`. | CERRADO |
 
 ---
 
@@ -219,7 +225,10 @@ trabajo del autor; se solicita corrección al responsable cuando corresponde.
 2. [ ] Difundir los entregables 01 a 08 a los equipos de los 6 módulos.
 3. [ ] Recoger la aprobación bilateral del contrato RutaDoc (04 §6.2/§10.2) de TramiCore, DocuCore y RutaDoc.
 4. [ ] Recoger las declaraciones de autoría de Duque, Reátegui y Zevallos (07) con rama y commit.
-5. [ ] Ejecutar la evidencia E2E/k6 en máquina con Docker (runbook 08) y adjuntar reportes (logs, timestamps, exit codes, P95, error rate).
+5. [x] Ejecutar la evidencia E2E/k6 y adjuntar reportes (logs, timestamps, exit codes, P95, error
+       rate). **Ejecutado:** E2E 12/12 · 22/22 con `TEST_DATABASE_URL` y k6 2/2 dentro de umbrales —
+       `implementacion/evidencia/e2e-20260909-123500/` y `implementacion/evidencia/k6-20260909-145820/`
+       (runbook 08).
 6. [ ] Reconciliar `B_AREVALO` con `origin/B_GERIC` (4 commits de base) sin perder las correcciones v1.3.
 7. [ ] **No reabrir el PR hasta que el profesor lo autorice** tras cancelar el PR #79.
 8. [ ] Registrar la revisión final de Geric (`B_GERIC`) en la sección 6.2.
@@ -261,4 +270,8 @@ Observaciones del Grupo 6 CoreLink. Revisión 1.2: atiende las observaciones del
 PR #79 con las decisiones D-15 a D-19 (nomenclatura `id_<agregado>`, eventos RutaDoc, idempotencia,
 estado contractual por aprobación bilateral y trazabilidad de autoría en los commits). Revisión 1.3:
 corrige la revisión del liderazgo tras la cancelación del PR #79 (garantías a `PROPUESTO` hasta
-pruebas E2E, D-12 con estado único, detalle ADR en §4.3 y decisiones D-20 a D-23).*
+pruebas E2E, D-12 con estado único, detalle ADR en §4.3 y decisiones D-20 a D-23). Revisión 1.4:
+atribuciones a Duque y separación de migraciones en la suite (P3/P10). Revisión 1.5: D-06 (atomicidad
+y cero pérdida) y D-20 (entrega al-menos-una-vez) pasan a `CONFIRMADO` con la evidencia E2E ejecutada;
+D-05 (inmutabilidad) se acota a `PROPUESTO` pendiente de la prueba de permisos `sigd_app` en UAT; el
+riesgo R-10 queda `CERRADO` con la carga k6 ejecutada (P95 < 200 ms, 0 % errores).*

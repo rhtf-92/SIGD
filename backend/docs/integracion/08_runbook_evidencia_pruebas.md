@@ -6,8 +6,10 @@
 **Fecha:** 8 de septiembre de 2026
 **Motivo:** El liderazgo requiere **artefactos ejecutables** (no solo documentación): configuración
 Testcontainers, Vitest, Supertest, 10 casos E2E, script k6 con `check()` y `thresholds`, logs con
-timestamps, exit codes y resultados **P95** y **tasa de errores**. Esta guía se ejecuta en una
-máquina con **Docker**; mientras no exista, la evidencia permanece `PENDIENTE` (05 R-10).
+timestamps, exit codes y resultados **P95** y **tasa de errores**. Esta guía se ejecuta preferentemente
+en una máquina con **Docker** (PostgreSQL aislado) o con un PostgreSQL existente vía
+`TEST_DATABASE_URL`; la **evidencia ya fue ejecutada** (v1.2): suite E2E completa y carga k6 dentro de
+umbrales — ver §7 y el bloque final de evidencia.
 
 ---
 
@@ -106,17 +108,21 @@ npm run dev
 
 ### 5.2. Ejecutar los escenarios y exportar resúmenes
 
+Se crea una carpeta con marca de tiempo y se guardan logs y summaries:
+
 ```powershell
+$ev = Join-Path "evidencia" ("k6-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+New-Item -ItemType Directory -Force -Path $ev | Out-Null
 $env:BASE_URL = "http://localhost:3000"
 
 # Opción A: k6 instalado localmente
-k6 run --summary-export evidencia/k6-radicacion-summary.json k6/escenario-1-radicacion.js 2>&1 |
-  Tee-Object -FilePath evidencia/k6-radicacion.log
-"EXIT_CODE=$LASTEXITCODE" | Add-Content evidencia/k6-radicacion.log
+k6 run --summary-export (Join-Path $ev "k6-radicacion-summary.json") k6/escenario-1-radicacion.js 2>&1 |
+  Tee-Object -FilePath (Join-Path $ev "k6-radicacion.log")
+"EXIT_CODE=$LASTEXITCODE" | Add-Content (Join-Path $ev "k6-radicacion.log")
 
-k6 run --summary-export evidencia/k6-derivacion-summary.json k6/escenario-2-derivacion.js 2>&1 |
-  Tee-Object -FilePath evidencia/k6-derivacion.log
-"EXIT_CODE=$LASTEXITCODE" | Add-Content evidencia/k6-derivacion.log
+k6 run --summary-export (Join-Path $ev "k6-derivacion-summary.json") k6/escenario-2-derivacion.js 2>&1 |
+  Tee-Object -FilePath (Join-Path $ev "k6-derivacion.log")
+"EXIT_CODE=$LASTEXITCODE" | Add-Content (Join-Path $ev "k6-derivacion.log")
 ```
 
 **Opción B (sin instalar k6):** usar la imagen oficial
@@ -137,30 +143,45 @@ docker run --rm -i -e BASE_URL=http://host.docker.internal:3000 -v "${PWD}/k6:/k
 ## 6. Paso 3 — Consolidar la evidencia y adjuntarla
 
 1. Copiar la carpeta `evidencia/` al repositorio (contenido final):
-   - `e2e-*.log` y `resumen.txt` (E1–E4).
-   - `k6-radicacion.log` + `k6-radicacion-summary.json` (E5–E6).
-   - `k6-derivacion.log` + `k6-derivacion-summary.json` (E5–E6).
+   - `e2e-20260909-123500/` → `e2e.log` y `resumen.txt` (E1–E4).
+   - `k6-20260909-145820/` → `k6-radicacion.log` + `k6-radicacion-summary.json` y
+     `k6-derivacion.log` + `k6-derivacion-summary.json` (E5–E6) + `resumen.txt`.
 2. Actualizar el **entregable 07 §3 (corrección 5)** a `APLICADA` y anotar el enlace a los artefactos.
-3. Actualizar en el **entregable 05**: riesgo R-10 → `CERRADO`; D-05, D-06, D-20 y C-08 pasan a
-   `CONFIRMADO` **solo** cuando la evidencia demuestre inmutabilidad, atomicidad, cero pérdida y la
-   semántica de entrega.
+   (v1.2 ya aplicada: la evidencia E2E/k6 está cargada en `implementacion/evidencia/`.)
+3. Actualizar en el **entregable 05**: riesgo R-10 → `CERRADO` (v1.2 ya aplicado); D-06, D-20 y C-08
+   pasan a `CONFIRMADO` **solo** cuando la evidencia demuestre atomicidad, cero pérdida y la semántica
+   de entrega (v1.5: demostrado con E2E-07/E2E-12); D-05 (inmutabilidad) permanece `PROPUESTO` hasta
+   la prueba de permisos del rol `sigd_app` en el UAT.
 
 ## 7. Criterios de aceptación de la evidencia
 
 | # | Criterio | Cumple |
 | :---: | :--- | :---: |
-| 1 | Los 12 archivos / 22 casos E2E pasan (Testcontainers o `TEST_DATABASE_URL`) con exit code 0 y logs con timestamp. | DI |
-| 2 | k6 ejecuta los 2 escenarios con `check()` y `thresholds` definidos. | DI |
-| 3 | P95 < 200 ms y tasa de errores < 0.1 % en ambos escenarios. | DI |
-| 4 | Los artefactos se adjuntan y referencian en 07 §3 y 05 R-10. | DI |
+| 1 | Los 12 archivos / 22 casos E2E pasan (Testcontainers o `TEST_DATABASE_URL`) con exit code 0 y logs con timestamp. | ✅ |
+| 2 | k6 ejecuta los 2 escenarios con `check()` y `thresholds` definidos. | ✅ |
+| 3 | P95 < 200 ms y tasa de errores < 0.1 % en ambos escenarios. | ✅ |
+| 4 | Los artefactos se adjuntan y referencian en 07 §3 y 05 R-10. | ✅ |
 
-DI = disponible en la máquina con Docker; se completa al ejecutar.
+✅ = evidencia ejecutada y adjuntada en `implementacion/evidencia/` (E2E 12/12 · 22/22 EXIT 0; k6
+radicación P95 150.96 ms y derivación P95 144.64 ms, 0 % errores, EXIT 0). La ejecución de referencia
+usó un PostgreSQL 16 local (`TEST_DATABASE_URL`) y la API compilada en `localhost:3000`; Docker
+permanece como alternativa de mayor fidelidad para el UAT.
 
 ---
 
 *Documento elaborado por Ricardo (`B_AREVALO`) con base en los entregables 03 (Zevallos) y 05.
 Revisión 1.1: incorpora la alternativa `TEST_DATABASE_URL` (sin Docker) y la suite completa de
-12 archivos / 22 casos E2E.*
+12 archivos / 22 casos E2E. Revisión 1.2: consolida la evidencia ejecutada (E2E + k6) y declara los
+criterios de aceptación cumplidos.*
 
 > **Evidencia E2E ejecutada:** `implementacion/evidencia/e2e-20260909-123500/` (PASS 12/12 · 22/22 ·
-> EXIT_CODE=0) — ronda de correcciones P2–P11 del prototipo.
+> EXIT_CODE=0) — ronda de correcciones P2–P11 del prototipo. Ejecutada con `TEST_DATABASE_URL`
+> (`postgres://postgres:postgres@localhost:5432/sigd_prueba`), psql 16, el DDL real de `sigd_audit` y
+> los fixtures PROVISIONALES de los 5 esquemas.
+>
+> **Evidencia de carga k6 ejecutada:** `implementacion/evidencia/k6-20260909-145820/` (k6 v2.2.0
+> local, API compilada en `localhost:3000`, PostgreSQL 16 local). Escenario 1 — Radicación: 94 525
+> peticiones, P95 = **150.96 ms** (< 200 ms ✅), errores **0.00 %** (< 0.1 % ✅), checks 100 %,
+> EXIT_CODE=0. Escenario 2 — Derivación: 55 254 peticiones, P95 = **144.64 ms** (< 200 ms ✅), errores
+> **0.00 %** (< 0.1 % ✅), checks 100 % (área 201 · expediente 201 · derivación 200), EXIT_CODE=0.
+> Resumen consolidado y limitaciones en `resumen.txt` del mismo directorio.

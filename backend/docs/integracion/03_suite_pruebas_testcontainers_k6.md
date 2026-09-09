@@ -7,7 +7,8 @@
 **Responsable del entregable:** Zevallos · `B_ZEVALLOS`
 **Documento:** `03_suite_pruebas_testcontainers_k6.md`
 **Fecha:** 8 de septiembre de 2026
-**Versión:** 1.2 (Revisión del Liderazgo — PR #79 · Alineación con el envelope v1.2 y el contrato RutaDoc)
+**Versión:** 1.3 (Revisión del Liderazgo — PR #79 · Alineación con el envelope v1.2 y el contrato
+RutaDoc · evidencia E2E/k6 ejecutada)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene scripts ejecutables ni código
@@ -157,20 +158,23 @@ Cada caso verifica la **integración entre módulos**, la **propagación de cont
 
 | ID | Módulo | Descripción | Resultado Esperado | Taxonomía |
 | :--- | :--- | :--- | :--- | :---: |
-| **E2E-01** | Mesa de Partes | Envío de solicitud con datos válidos de un ciudadano. | HTTP `201 Created` y persistencia del expediente con `correlation_id` asignado. | PROPUESTO |
-| **E2E-02** | Mesa de Partes / Middleware | Envío de JSON con campos faltantes o formato incorrecto (p. ej. DNI inválido, folios negativos). | HTTP `400` estructurado bajo RFC 7807 con lista de `invalid_params`. | PROPUESTO |
-| **E2E-03** | IdentiCore / Middleware | Registro de usuario con correo o DNI ya existente. | Captura de excepción PostgreSQL `23505` y mapeo a HTTP `409 Conflict`. | PROPUESTO |
-| **E2E-04** | TramiCore / Middleware | Asignar/derivar trámite hacia un área que no existe. | Intercepción de violación `23503` y respuesta JSON indicando recurso inválido (`400/404`). | PROPUESTO |
-| **E2E-05** | TramiCore / OrganiCore | Transición de estado desde Mesa de Partes hacia la jefatura. | HTTP `200 OK` y actualización correcta de la ubicación del documento. | PROPUESTO |
-| **E2E-06** | Observabilidad / Contexto | Ejecutar una mutación verificando la captura de metadatos. | En `sigd_audit.bitacora_auditoria` constan `usuario_id`, `ip_origen` y `correlation_id` capturados automáticamente sin pasarlos en el código de negocio. | PROPUESTO |
-| **E2E-07** | Observabilidad / Outbox | Radicar un expediente verificando atomicidad. | En la misma transacción se registran el expediente y el evento en `sigd_audit.evento_outbox` para su procesamiento asíncrono. | PROPUESTO |
-| **E2E-08** | Seguridad / Middleware | Petición a ruta protegida sin token de autenticación. | HTTP `401 Unauthorized` en RFC 7807, bloqueando el acceso a la base de datos. | PROPUESTO |
-| **E2E-09** | Seguridad / Middleware | Usuario con rol de operador intenta una acción de administrador. | HTTP `403 Forbidden` indicando privilegios insuficientes. | PROPUESTO |
-| **E2E-10** | Middleware de Errores | Inducción deliberada de una falla crítica (p. ej. pérdida de conexión). | HTTP `500` estandarizado bajo RFC 7807 con ocultamiento total del *stack trace*. | PROPUESTO |
+| **E2E-01** | Mesa de Partes | Envío de solicitud con datos válidos de un ciudadano. | HTTP `201 Created` y persistencia del expediente con `correlation_id` asignado. | CONFIRMADO |
+| **E2E-02** | Mesa de Partes / Middleware | Envío de JSON con campos faltantes o formato incorrecto (p. ej. DNI inválido, folios negativos). | HTTP `400` estructurado bajo RFC 7807 con lista de `invalid_params`. | CONFIRMADO |
+| **E2E-03** | IdentiCore / Middleware | Registro de usuario con correo o DNI ya existente. | Captura de excepción PostgreSQL `23505` y mapeo a HTTP `409 Conflict`. | CONFIRMADO |
+| **E2E-04** | TramiCore / Middleware | Asignar/derivar trámite hacia un área que no existe. | Intercepción de violación `23503` y respuesta JSON indicando recurso inválido (`400/404`). | CONFIRMADO |
+| **E2E-05** | TramiCore / OrganiCore | Transición de estado desde Mesa de Partes hacia la jefatura. | HTTP `200 OK` y actualización correcta de la ubicación del documento. | CONFIRMADO |
+| **E2E-06** | Observabilidad / Contexto | Ejecutar una mutación verificando la captura de metadatos. | En `sigd_audit.bitacora_auditoria` constan `usuario_id`, `ip_origen` y `correlation_id` capturados automáticamente sin pasarlos en el código de negocio. | CONFIRMADO |
+| **E2E-07** | Observabilidad / Outbox | Radicar un expediente verificando atomicidad. | En la misma transacción se registran el expediente y el evento en `sigd_audit.evento_outbox` para su procesamiento asíncrono. | CONFIRMADO |
+| **E2E-08** | Seguridad / Middleware | Petición a ruta protegida sin token de autenticación. | HTTP `401 Unauthorized` en RFC 7807, bloqueando el acceso a la base de datos. | CONFIRMADO |
+| **E2E-09** | Seguridad / Middleware | Usuario con rol de operador intenta una acción de administrador. | HTTP `403 Forbidden` indicando privilegios insuficientes. | CONFIRMADO |
+| **E2E-10** | Middleware de Errores | Inducción deliberada de una falla crítica (p. ej. pérdida de conexión). | HTTP `500` estandarizado bajo RFC 7807 con ocultamiento total del *stack trace*. | CONFIRMADO |
 
-> **Nota (v1.4):** estos casos están `PROPUESTO` (requisito de la suite, R-10). Pasan a `CONFIRMADO`
-> solo cuando exista evidencia ejecutable (runbook 08) de la suite corriendo en `implementacion/`
-> (Testcontainers o `TEST_DATABASE_URL`).
+> **Nota (v1.3):** estos casos estaban `PROPUESTO` (requisito de la suite, R-10). Pasan a `CONFIRMADO`
+> con la **evidencia ejecutable** de `implementacion/` (runbook 08): suite E2E corriendo con
+> `TEST_DATABASE_URL` (12/12 archivos · 22/22 casos · EXIT_CODE=0, `evidencia/e2e-20260909-123500/`)
+> y carga k6 dentro de umbrales (P95 < 200 ms · 0 % errores, `evidencia/k6-20260909-145820/`). La
+> suite de 12 archivos implementa los casos E2E-01…E2E-10 del plan (incluye atomicidad E2E-07,
+> captura de contexto y concurrencia del worker).
 
 ### 5.1. Especificación detallada de cada caso
 
@@ -414,4 +418,5 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
 *Documento elaborado por Zevallos (`B_ZEVALLOS`) como entregable de Fase 2 — Levantamiento de
 Observaciones del Grupo 6 CoreLink. Revisión 1.2: alinea la suite con la v1.2 del entregable 02
 (envelope normalizado e idempotencia) y con el contrato de eventos RutaDoc del entregable 04 §6.2
-para el cierre del PR #79.*
+para el cierre del PR #79. Revisión 1.3: los 10 casos pasan a `CONFIRMADO` con la evidencia ejecutable
+E2E (12/12) y de carga k6 (P95 < 200 ms, 0 % errores) registrada en `implementacion/evidencia/`.*

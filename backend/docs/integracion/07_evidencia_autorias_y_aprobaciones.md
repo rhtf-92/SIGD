@@ -10,7 +10,9 @@ sublíder declare la **autoría** y el **estado contractual** de su entregable. 
 PR #79, registra también la **discrepancia de autoría del entregable 01** (plan Fase 1 → Duque, plan
 Fase 2 → Azareño), el **estado de cada corrección exigida** por el liderazgo (sección 3), la
 demostración de estado contractual (`PENDIENTE` mientras no haya commit/PR y firma) y la propuesta
-formal de eventos RutaDoc (entregable 09).
+formal de eventos RutaDoc (entregable 09). **Revisión v1.5:** consolida el cierre de las correcciones
+3 y 5 de la sección 3 con la evidencia ejecutable completa (worker ejecutado en E2E-12 y carga k6
+dentro de umbrales, P95 < 200 ms, 0 % errores).
 
 > [!NOTE]
 > Este documento es la **plantilla oficial y el registro vivo** del grupo para reportar al liderazgo:
@@ -86,9 +88,9 @@ comentario de revisión; las correcciones aplicadas constan en los entregables v
 | :---: | :--- | :--- | :--- | :---: |
 | 1 | Retirar/posponer la FK a `sigd_auth.cuenta_usuario(id)` sin contrato con IdentiCore (`id_usuario` pendiente). | Reátegui / Ricardo | DDL 06 v1.3; 02 §5.2/§5.3; D-22 | APLICADA (PENDIENTE de contrato) |
 | 2 | `correlation_id` no debe generarse en BD sino propagarse desde AsyncLocalStorage. | Reátegui | DDL 06 v1.3; 02 §5.2/§5.3; D-21 | APLICADA |
-| 3 | Worker Outbox ejecutable y permisos separados aplicación vs worker. | Reátegui | DDL 06 v1.3 (roles `sigd_app`/`sigd_worker`); 02 §6.8 | APLICADA (worker pendiente de ejecutar) |
-| 4 | Atomicidad, cero pérdida, inmutabilidad y entrega como `PROPUESTO` hasta prueba. | Ricardo | 02 §9/§10; 05 D-05/D-06/D-20; 04 C-08 | APLICADA |
-| 5 | Evidencia ejecutable: Vitest, Supertest, 12 E2E, k6 (P95, error rate). | Zevallos | Runbook 08 + `implementacion/evidencia/e2e-20260909-123500/` | APLICADA (E2E 12/12 con `TEST_DATABASE_URL`; k6 pendiente de servidor) |
+| 3 | Worker Outbox ejecutable y permisos separados aplicación vs worker. | Reátegui | DDL 06 v1.3 (roles `sigd_app`/`sigd_worker`); 02 §6.8 | APLICADA — worker ejecutado en E2E-12 (concurrencia, `SKIP LOCKED`, no-doble-despacho, reintentos → `FALLIDO`) |
+| 4 | Atomicidad, cero pérdida, inmutabilidad y entrega como `PROPUESTO` hasta prueba. | Ricardo | 02 §9/§10; 05 D-05/D-06/D-20; 04 C-08 | APLICADA — v1.5: D-06/D-20/C-08 → `CONFIRMADO` (E2E-07/E2E-12); D-05 sigue `PROPUESTO` (inmutabilidad no ejercitada en el prototipo) |
+| 5 | Evidencia ejecutable: Vitest, Supertest, 12 E2E, k6 (P95, error rate). | Zevallos | Runbook 08 + `implementacion/evidencia/e2e-20260909-123500/` | APLICADA — E2E 12/12 · 22/22 EXIT 0 (con `TEST_DATABASE_URL`) y carga k6 2/2 EXIT 0 (P95 150.96/144.64 ms, 0 % errores) — `implementacion/evidencia/k6-20260909-145820/` |
 | 6 | Aprobación bilateral de contratos y eventos. | Ricardo | 07 §2; 04 §10.2 | PENDIENTE |
 | 7 | Decisiones con alternativa, justificación, impacto y evidencia. | Ricardo | 05 §4.3 | APLICADA |
 | 8 | D-12 con estado único. | Ricardo | 05 D-12 | APLICADA |
@@ -102,7 +104,10 @@ comentario de revisión; las correcciones aplicadas constan en los entregables v
 - [ ] Obtener la firma (o confirmación por chat/correo) de Duque, Reátegui y Zevallos (§1.1).
 - [ ] Recibir la aprobación bilateral del contrato RutaDoc de los sublíderes involucrados (§2) y
       actualizar 04 §10.2 / 05 §6.2.
-- [ ] Ejecutar la evidencia E2E/k6 en máquina con Docker (runbook 08) y adjuntar reportes.
+- [x] Ejecutar la evidencia E2E/k6 y adjuntar reportes. **Ejecutado** (runbook 08): E2E 12/12 · 22/22
+      con `TEST_DATABASE_URL` y carga k6 2/2 dentro de umbrales — `implementacion/evidencia/e2e-20260909-123500/`
+      y `implementacion/evidencia/k6-20260909-145820/`. La suite se ejecutó sin Docker (PostgreSQL 16
+      local); en el UAT conviene repetir la carga en infraestructura separada manteniendo umbrales.
 - [ ] Reconciliar `B_AREVALO` con `origin/B_GERIC` antes de reabrir el PR.
 - [ ] Adjuntar esta plantilla y las evidencias como anexos del PR autorizado.
 - [ ] Actualizar este documento en cuanto cambie cualquier estado.
@@ -112,4 +117,6 @@ comentario de revisión; las correcciones aplicadas constan en los entregables v
 *Registro elaborado por Ricardo (`B_AREVALO`) para la revisión del liderazgo del PR #79 (cancelado).
 Alineado con los entregables 04 (§10), 05 (§6.1/§6.2), 09 (propuesta RutaDoc) y el runbook 08.
 Revisión v1.4: incorpora la discrepancia de autoría del entregable 01, el registro de correcciones de
-la revisión, la taxonomía `PENDIENTE` de autorías sin evidencia y la propuesta contractual 09.*
+la revisión, la taxonomía `PENDIENTE` de autorías sin evidencia y la propuesta contractual 09.
+Revisión v1.5: consolida el cierre de la corrección 3 (worker ejecutado en E2E-12) y de la corrección
+5 (evidencia E2E 12/12 + carga k6 2/2 dentro de umbrales).*

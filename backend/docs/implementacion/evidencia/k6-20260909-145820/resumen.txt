@@ -1,0 +1,53 @@
+EVIDENCIA DE CARGA (k6 v2.2.0)
+================================
+Fecha de ejecución : 2026-09-09 14:45-14:58 (UTC-05:00)
+Servidor           : SIGD CoreLink (compilado, dist/src/server.js) en http://localhost:3000
+Base de datos      : PostgreSQL 16 local  sigd_prueba (TEST_DATABASE_URL/DATABASE_URL)
+Ejecutor           : k6 v2.2.0 (descargado de GitHub releases, ejecutable local)
+Umbrales           : http_req_duration p(95) < 200ms ; http_req_failed rate < 0.1%
+
+RESULTADOS
+----------
+Escenario 1 — Radicación (k6/escenario-1-radicacion.js)
+  Perfil        : rampa 0→100 VU (30s), meseta 100 VU (60s), rampa →0 (30s); total 2m
+  Peticiones    : 94,525   (787.68 req/s)
+  P95           : 150.96 ms   -> CUMPLE (< 200 ms)
+  Errores       : 0.00% de 94,525   -> CUMPLE (< 0.1%)
+  Checks        : 100.00% acierto (94,525/94,525)  [HTTP 201]
+  Latencias     : avg 94.99ms  med 103.11ms  p90 133.65ms  max 866.69ms
+  Datos         : 40 MB recibidos / 40 MB enviados
+  EXIT_CODE     : 0
+
+Escenario 2 — Derivación (k6/escenario-2-derivacion.js)
+  Perfil        : 50 VU constante durante 1m30s
+  Iteraciones   : 18,418   (204.43 iter/s)
+  Peticiones    : 55,254   (613.28 req/s)  [área 201 + expediente 201 + derivación 200]
+  P95           : 144.64 ms   -> CUMPLE (< 200 ms)
+  Errores       : 0.00% de 55,254   -> CUMPLE (< 0.1%)
+  Checks        : 100.00% acierto (55,254/55,254)  [área 201, expediente 201, derivación 200]
+  Latencias     : avg 80.98ms  med 73.5ms  p90 114.22ms  max 3.36s
+  Datos         : 20 MB recibidos / 16 MB enviados
+  EXIT_CODE     : 0
+
+CONCLUSIÓN
+----------
+  Ambos escenarios cumplen los umbrales contractuales: p(95) < 200 ms y tasa de
+  error < 0.1%. La nomenclatura id_<agregado> se usó en los payloads enviados.
+  No se requiere AUTH_TOKEN (autenticación no exigida en el contrato actual);
+  el helper `headers()` inyecta `Authorization: Bearer <token>` si se define la
+  variable de entorno AUTH_TOKEN.
+
+  Limitación: ejecución local en la misma máquina que la base de datos (PostgreSQL
+  16 en localhost, sin contenedores Docker). Los tiempos absolutos incluyen la
+  propagación del contexto AsyncLocalStorage y la escritura transaccional outbox +
+  bitácora. Para el UAT se recomienda repetir en infraestructura de referencia
+  (servidor y base separados) manteniendo los mismos perfiles y umbrales.
+
+ARTEFACTOS
+----------
+  k6-radicacion.log / k6-derivacion.log      : salida completa (sin códigos ANSI)
+  k6-radicacion-summary.json                 : métricas resumidas (escenario 1)
+  k6-derivacion-summary.json                 : métricas resumidas (escenario 2)
+  resumen.txt                                : este resumen
+Comando de reproducción
+  npm install -g ... o k6 binario; BASE_URL=http://localhost:3000 k6 run k6/escenario-1-radicacion.js

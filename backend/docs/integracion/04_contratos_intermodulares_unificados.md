@@ -7,7 +7,7 @@
 **Responsable del entregable:** Ricardo · `B_AREVALO`
 **Documento:** `04_contratos_intermodulares_unificados.md`
 **Fecha:** 8 de septiembre de 2026
-**Versión:** 1.3 (Revisión del Liderazgo — PR #79 cancelado · correcciones pre-merge)
+**Versión:** 1.5 (Revisión del Liderazgo — PR #79 cancelado · correcciones pre-merge · C-08 con evidencia)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
@@ -28,6 +28,11 @@
 > SUSPENDIDA hasta contrato con IdentiCore (`id_usuario`, no `id`); se registra la discrepancia de
 > autoría del entregable 01 entre el plan de Fase 1 (Duque) y el de Fase 2 (Azareño), **resuelta** en
 > favor del plan Fase 1 (07 §1.2): la atribución vigente es **Duque** (§10.1).
+>
+> **Revisión v1.5:** C-08 vuelve a `CONFIRMADO` — su garantía de **registro atómico** (bitácora +
+> evento outbox en la misma transacción) queda demostrada por el caso E2E-07 ejecutado (persistencia
+> conjunta y rollback completo ante falla inducida, sin contaminación de expediente/outbox/bitácora);
+> evidencia en `implementacion/evidencia/` (E2E 12/12 · 22/22; carga k6 con P95 < 200 ms y 0 % errores).
 
 ---
 
@@ -123,7 +128,7 @@ sin evidencia de aprobación del grupo propietario.
 | C-05 | RutaDoc | TramiCore, OrganiCore | Movimiento/derivación/atención/observación del expediente y estado actual. | La transición debe estar permitida por la máquina de estados de RutaDoc. | PENDIENTE | RutaDoc |
 | C-06 | TramiCore | RutaDoc | Creación del expediente dispara `movimiento` inicial. | Toda radicación debe generar al menos un movimiento inicial. | PENDIENTE | TramiCore / RutaDoc |
 | C-07 | CoreLink | Todos los módulos | `correlation_id` y formato de error RFC 7807/9457. | Respuestas de error conforme al entregable 01; nunca exponer rastros. | CONFIRMADO | CoreLink (propio) |
-| C-08 | CoreLink | Todos los módulos | Bitácora de auditoría y cola Outbox. | Toda mutación registra y todo evento se persiste de forma atómica (entregable 02). La garantía de **registro atómico** queda `PROPUESTO` hasta validarla con las pruebas E2E (03/08). | PROPUESTO | CoreLink (propio) |
+| C-08 | CoreLink | Todos los módulos | Bitácora de auditoría y cola Outbox. | Toda mutación registra y todo evento se persiste de forma atómica (entregable 02). Garantía de **registro atómico** demostrada por E2E-07 (persistencia conjunta + rollback completo ante falla inducida); evidencia en `implementacion/evidencia/`. | CONFIRMADO | CoreLink (propio) |
 
 ### 5.1. Reglas que rigen los contratos de API
 
@@ -446,9 +451,9 @@ Para cerrar cada contrato cruzado se requiere que **cada sublíder** envíe al r
 - **Dependencia (Zevallos):** los contratos C-01, C-03 y los eventos E-01, E-02, E-06 y E-07 se
   verifican en los casos E2E del entregable 03.
 - **Decisiones registradas:**
-  - `CONFIRMADO` (propios de CoreLink): C-07 y la política de `usuario_id` nullable (R-05).
-  - `PROPUESTO` (propio de CoreLink): C-08 — su garantía de **registro atómico** (bitácora + evento)
-    requiere validación con pruebas E2E ejecutables (v1.3).
+  - `CONFIRMADO` (propios de CoreLink): C-07, C-08 y la política de `usuario_id` nullable (R-05).
+  - C-08: su garantía de **registro atómico** (bitácora + evento) quedó validada con la evidencia
+    E2E ejecutada (v1.5; E2E-07: persistencia conjunta y rollback completo).
   - `PROPUESTO`: identidad vía `sigd_auth` (C-02), área vía `sigd_org` (C-03), `ExpedienteContract`
     (7.5) y evento E-01.
   - `PENDIENTE`: contratos de movimientos/estados de RutaDoc (C-05, C-06) y eventos
@@ -461,6 +466,8 @@ Para cerrar cada contrato cruzado se requiere que **cada sublíder** envíe al r
   - **v1.4:** contrato formal de RutaDoc materializado como propuesta autocontenida en el entregable
     `09_propuesta_contractual_rutadoc.md`; `ExpedienteContract` 7.5 y reintentos del outbox alineados
     con D-15/DDL 06 v1.5 (`proxima_reintento_en`, estado `EN_PROCESO`).
+  - **v1.5:** C-08 a `CONFIRMADO` con la evidencia de registro atómico (E2E-07) y, en general, con la
+    suite E2E 12/12 · 22/22 y la carga k6 dentro de umbrales (`implementacion/evidencia/`).
 
 ---
 
@@ -469,4 +476,6 @@ Observaciones del Grupo 6 CoreLink. Revisión 1.2: atiende las observaciones del
 PR #79 (eventos RutaDoc, nomenclatura de identificadores, idempotencia, estado contractual y
 evidencia de autoría/aprobación bilateral). Revisión 1.3: corrige la revisión del liderazgo tras la
 cancelación del PR #79 (C-08 a `PROPUESTO` por garantía atómica pendiente de pruebas, FK de
-IdentiCore SUSPENDIDA y discrepancia de autoría del entregable 01 registrada).*
+IdentiCore SUSPENDIDA y discrepancia de autoría del entregable 01 registrada). Revisión 1.5: C-08
+vuelve a `CONFIRMADO` con la evidencia E2E ejecutada (12/12 · 22/22) y la carga k6 dentro de umbrales
+(P95 < 200 ms, 0 % errores) — `implementacion/evidencia/`.*
