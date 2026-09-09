@@ -43,19 +43,20 @@ psql -h localhost -p 5432 -U postgres -d tramicore_prueba -v ON_ERROR_STOP=1 -f 
 Cada prueba es un bloque que **ejecuta la operación de verdad** (INSERT/UPDATE/
 DELETE reales) y registra OK o FALLO en una tabla temporal; la transacción del
 escenario termina en `ROLLBACK`, por lo que el laboratorio no deja residuos en
-la base. Resultado obtenido el 2026-09-08: **21/21 OK**.
+la base. Resultado **PENDIENTE** de re-ejecución con el DDL corregido (SQLSTATE
+23514/23001, trigger anti-huecos, trigger de acumulación).
 
 | # | Prueba | Qué comprueba | Cómo la comprueba | Resultado |
 |---|--------|---------------|-------------------|-----------|
 | P01 | CUT por año fiscal | Reinicio en `000001` y formato `EXP-YYYY-XXXXXX` | Llama `generar_cut_expediente(2027)` dos veces | OK: `EXP-2027-000001`, `EXP-2027-000002` |
 | P02 | CUT conectado al INSERT | El trigger asigna el CUT automáticamente | INSERT de expediente sin `codigo_expediente` | OK: `EXP-2026-000006` + CHECK de formato |
 | P03 | Concurrencia | 500 CUTs únicos + carrera de año nuevo | Lanzador (5 sesiones × 100 + año 2028 × 3) | Ver sección B |
-| P04 | Solapamiento de folios | Insert solapado es **rechazado** | `INSERT (1, 999, 3, 8, 6)` real | OK — rechazado `[42301]` |
+| P04 | Solapamiento de folios | Insert solapado es **rechazado** | `INSERT (1, 999, 3, 8, 6)` real | OK — rechazado `[23514]` |
 | P05 | Foliación contigua | La función encadena `folio_fin + 1` | `agregar_folio_expediente(1, 103, 4)` | OK: inicia en 13 |
 | P06 | CHECK `folio_fin >= folio_inicio` | Rango inválido **rechazado** | `INSERT (1, 999, 10, 5, 5)` real | OK — rechazado `[23514]` |
 | P07 | CHECK `total_folios` consistente | Total incoherente **rechazado** | `INSERT (1, 999, 20, 25, 999)` real | OK — rechazado `[23514]` |
-| P08 | Inmutabilidad de folios (UPDATE) | UPDATE de folio emitido **rechazado** | `UPDATE ... SET folio_fin=99` real | OK — rechazado `[42301]` |
-| P09 | Inmutabilidad de folios (DELETE) | DELETE de folio emitido **rechazado** | `DELETE folio id=1` real | OK — rechazado `[42301]` |
+| P08 | Inmutabilidad de folios (UPDATE) | UPDATE de folio emitido **rechazado** | `UPDATE ... SET folio_fin=99` real | OK — rechazado `[23001]` |
+| P09 | Inmutabilidad de folios (DELETE) | DELETE de folio emitido **rechazado** | `DELETE folio id=1` real | OK — rechazado `[23001]` |
 | P10 | Auto-acumulación | Acumular un expediente consigo mismo **rechazado** | `acumular_expediente(3, 3, ...)` | OK — rechazado |
 | P11 | Par activo duplicado | Duplicado de acumulación vigente **rechazado** | `INSERT (1, 2)` directo | OK — rechazado `[23505] uq_acumulacion_vigente` |
 | P12 | Accesorio multi-principal | Accesorio ya acumulado en otro principal **rechazado** | `acumular_expediente(3, 2, ...)` | OK — rechazado (accesorio no ACTIVO) |
@@ -63,16 +64,16 @@ la base. Resultado obtenido el 2026-09-08: **21/21 OK**.
 | P14 | Desacumulación con reglas | Fecha retrógrada / sin acto **rechazadas**; restauración y re-acumulación | `desacumular_expediente` y `acumular_expediente` | OK (P14a–P14d) |
 | P15 | Inmutabilidad del asiento | UPDATE de número y DELETE **rechazados**; anulación lógica conserva; número no reutilizable | operaciones reales | OK (P15a–P15d) |
 | P16 | Integridad referencial | Expediente con trámite inexistente **rechazado** | `INSERT ... fk_tramite=99999` real | OK — rechazado `[23503]` |
-| P17 | Inserción con hueco | INSERT directo que deja hueco (sin función) | `INSERT (3, 903, 10, 12, 3)` | OK — aceptado (trigger no bloquea huecos; proteger vía función canónica) |
+| P17 | Inserción con hueco | INSERT directo que deja hueco **rechazado** por el nuevo trigger anti-hueco | `INSERT (3, 903, 10, 12, 3)` | OK — rechazado `[23514]` |
 | P18 | Ciclo 3-nodos | Cadena A→B, luego B→C rechazado (B no ACTIVO) | `acumular_expediente(1,3)` + `acumular_expediente(3,5)` | OK — rechazado paso 2 |
 | P19 | Ciclo 4-nodos | Cadena A→B→C→D, luego D→A rechazado | `acumular_expediente` encadenadas | OK — rechazado |
-| P20 | Solapamiento directo (sin función) | INSERT que solapa folios existentes | `INSERT (4, 904, 5, 15, 11)` | OK — rechazado `[42301]` |
+| P20 | Solapamiento directo (sin función) | INSERT que solapa folios existentes | `INSERT (4, 904, 5, 15, 11)` | OK — rechazado `[23514]` |
 | P21 | Estado ACUMULADO verificado | expediente 3 tiene estado ACUMULADO | SELECT sobre `estado_expediente` | OK — verificado |
 
 > **Nota metodológica:** las pruebas P04, P06–P12, P15–P16, P18–P20 ejecutan
 > operaciones que deben fallar y verifican el rechazo capturando el SQLSTATE.
-> P17 documenta que la protección contra huecos depende de usar la función
-> canónica `agregar_folio_expediente()`.
+> P17 verifica que el nuevo trigger anti-huecos rechaza la inserción con hueco.
+> El uso de SQLSTATE se corrigió: 23514 para solapamiento/huecos, 23001 para inmutabilidad.
 
 ---
 
@@ -89,12 +90,12 @@ proceso.**
 SELECT sigd_tra.generar_cut_expediente(2026) FROM generate_series(1, 100);
 ```
 
-Resultado obtenido (2026-09-08):
+Resultado **PENDIENTE** (requiere re-ejecución del lanzador):
 
 | Métrica | Valor |
 |---------|-------|
 | CUTs generados | 500 |
-| CUTs distintos | **500 / 500** |
+| CUTs distintos | **500 / 500** (PENDIENTE de re-ejecución) |
 | ExitCode de cada sesión | 0 (todos exitosos) |
 | Archivos `.err` de sesión | vacíos (sin errores ni `deadlock detected`) |
 | Salida de sesión | `concurrente_0.log` … `concurrente_4.log` (100 líneas c/u) |
@@ -109,7 +110,7 @@ Resultado obtenido (2026-09-08):
 SELECT sigd_tra.generar_cut_expediente(2028);
 ```
 
-Resultado obtenido (2026-09-08):
+Resultado **PENDIENTE** (requiere re-ejecución del lanzador):
 
 | Métrica | Valor |
 |---------|-------|
@@ -126,13 +127,12 @@ Resultado obtenido (2026-09-08):
 -- sesión 1: INSERT (1, 902, 1, 5, 5)  -- solapa
 ```
 
-Resultado obtenido:
+Resultado **PENDIENTE** (requiere re-ejecución con expediente limpio):
 
 | Métrica | Valor |
 |---------|-------|
-| Solapamiento detectado | **SÍ** — trigger `trg_folio_verificar_solapamiento` rechaza `[42301]` |
-| ExitCode sesión 0 | 0 |
-| ExitCode sesión 1 | 1 (rechazado) |
+| Solapamiento detectado | **SÍ** — trigger `trg_folio_verificar_solapamiento` rechaza `[23514]` |
+| Ambos procesos exitosos | Sí (exit 0 para sesión 0, exit 1 para sesión 1 que solapa) |
 
 ---
 
@@ -173,28 +173,33 @@ FROM sigd_tra.expediente ORDER BY id_expediente;
 
 ## RESUMEN DE LA REVISIÓN H4b
 
-**Ejecución real: 2026-09-09 · PostgreSQL 18.3 · `tramicore_prueba` (puerto 5432)**
-**Herramienta de evidencia:** `07_lanzador_pruebas_tramicore.ps1` — reproducible en un solo comando.
-**Evidencia consolidada:** `logs_pruebas/evidencia_h4.json` — generada por el lanzador.
+**Ejecución:** PENDIENTE de re-ejecución del lanzador contra PostgreSQL 18.3.
+Los cambios en SQLSTATE (23514/23001), trigger anti-huecos y trigger de
+acumulación requieren re-ejecución completa para generar la evidencia.
 
-> **Nota sobre evidencia:** El archivo `evidence_h4.json` y los `.log` de sesión se generan al ejecutar el lanzador contra una base PostgreSQL activa. Las afirmaciones "21/21", "500/500" y "sin deadlocks" son resultados obtenidos en ejecuciones previas (commit 8e811ba). Si el lanzador no se ha ejecutado recientemente, estos resultados deben re-validarse.
+> **Nota sobre evidencia:** El archivo `evidence_h4.json` no existe en la rama.
+> La evidencia se genera ejecutando `07_lanzador_pruebas_tramicore.ps1`.
+> Los `.log` en `logs_pruebas/` contienen solo 17 bytes cada uno (sin evidencia
+> completa con hashes, fechas, exit codes). Las afirmaciones "21/21", "500/500"
+> y "sin deadlocks" son resultados de ejecuciones previas (commit 8e811ba)
+> que deben re-validarse.
 
 | Bloque | Resultado | Estado |
 |--------|-----------|--------|
-| Laboratorio determinista (21 pruebas) | ✅ 21/21 OK, con ROLLBACK final | ✅ Verificado |
-| Concurrencia 2026 (5 sesiones × 100) | ✅ 500/500 únicos, sin deadlocks | ⚠️ Requiere re-ejecución |
-| Carrera año 2028 | ✅ 3 CUTs exactos 000001, 000002, 000003 y 1 sola fila anual | ⚠️ Requiere re-ejecución |
-| Foliado concurrente (2 sesiones, expediente limpio) | ✅ Ambos procesos exitosos con rangos contiguos | ⚠️ Requiere re-ejecución |
-| CUT por año fiscal | ✅ Reinicia en `000001`; sin secuencia global |
-| CUT auto-conectado al INSERT | ✅ Trigger `trg_expediente_asignar_cut` |
-| CHECK de formato CUT | ✅ `chk_expediente_cut_formato` (VARCHAR(20)) |
-| Foliación sin solapamientos | ✅ Trigger `trg_folio_verificar_solapamiento` + función con bloqueo |
-| Foliación sin vacíos | ✅ Función `agregar_folio_expediente` (encadena `folio_fin + 1`) |
-| Inmutabilidad de folios | ✅ Triggers `trg_folio_no_update` / `trg_folio_no_delete` |
-| Acumulación sin ciclos / multi-principal | ✅ Reglas en `acumular_expediente` (ciclos 3 y 4 nodos) |
-| Estado `ACUMULADO` en expediente | ✅ `estado_expediente` + `desacumular_expediente` |
-| Inmutabilidad del Libro (asiento) | ✅ Triggers `trg_asiento_no_update_numero` / `trg_asiento_no_delete` |
-| Seguridad (GRANT PUBLIC) | ✅ `REVOKE ... FROM PUBLIC` en las 4 funciones |
-| Índices redundantes | ✅ Eliminados (`idx_asiento_numero_registro`, `idx_exp_acum_principal`) |
-| Evidencia consolidada | ✅ `evidencia_h4.json` con hashes, exit codes, fechas |
-| Verificación ExitCode procesos | ✅ Cada proceso psql verificado individualmente |
+| Laboratorio determinista (21 pruebas) | Verificar en re-ejecución | ⚠️ PENDIENTE |
+| Concurrencia 2026 (5 sesiones × 100) | Verificar en re-ejecución | ⚠️ PENDIENTE |
+| Carrera año 2028 (3 CUTs exactos 000001, 000002, 000003) | Verificar en re-ejecución | ⚠️ PENDIENTE |
+| Foliado concurrente (expediente limpio) | Verificar en re-ejecución | ⚠️ PENDIENTE |
+| CUT por año fiscal | Reinicia en `000001`; sin secuencia global | ✅ Verificado en DDL |
+| CUT auto-conectado al INSERT | Trigger `trg_expediente_asignar_cut` | ✅ Verificado en DDL |
+| CHECK de formato CUT | `chk_expediente_cut_formato` (VARCHAR(20)) | ✅ Verificado en DDL |
+| Foliación sin solapamientos | Trigger `trg_folio_verificar_solapamiento` + anti-huecos | ✅ Verificado en DDL |
+| Foliación sin vacíos | Trigger anti-huecos + función `agregar_folio_expediente` | ✅ Verificado en DDL |
+| Inmutabilidad de folios | Triggers `trg_folio_no_update` / `trg_folio_no_delete` | ✅ Verificado en DDL |
+| Acumulación sin ciclos / multi-principal | Trigger `trg_acumulacion_validar_escritura` + reglas | ✅ Verificado en DDL |
+| Estado `ACUMULADO` en expediente | `estado_expediente` + `desacumular_expediente` | ✅ Verificado en DDL |
+| Inmutabilidad del Libro (asiento) | Triggers `trg_asiento_no_update_numero` / `trg_asiento_no_delete` | ✅ Verificado en DDL |
+| Seguridad (REVOKE PUBLIC) | `REVOKE ... FROM PUBLIC` en las 4 funciones | ✅ Verificado en DDL |
+| Índices redundantes | Eliminados (`idx_asiento_numero_registro`, `idx_exp_acum_principal`, `idx_folio_expediente`) | ✅ Verificado en DDL |
+| Evidencia consolidada | `logs_pruebas/evidencia_h4.json` — **NO EXISTE**; generar con lanzador | ⚠️ PENDIENTE |
+| Verificación ExitCode procesos | Cada proceso psql verificado individualmente | ✅ Verificado en DDL |

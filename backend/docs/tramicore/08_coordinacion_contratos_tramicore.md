@@ -13,14 +13,14 @@ que deben cerrarse ANTES del PR hacia `B_GERIC`.
 
 | Bloque | Estado | Evidencia |
 |--------|--------|-----------|
-| DDL corregido (CUT anual, acumulación, foliado, inmutabilidad) | ✅ Ejecutado en PostgreSQL 18.3 | `03_esquema_sigd_tra_cut_foliado.sql` |
-| Laboratorio determinista | ⚠️ 21/21 OK (requiere re-ejecución) | `06_pruebas_laboratorio_tramicore.sql` |
-| Concurrencia real | ⚠️ 500/500 CUTs únicos (requiere re-ejecución) | `07_lanzador_pruebas_tramicore.ps1` → `logs_pruebas/` |
-| Carrera de año nuevo (2028) | ⚠️ 3 CUTs exactos 000001, 000002, 000003 (requiere re-ejecución) | mismo lanzador |
+| DDL corregido (CUT anual, acumulación, foliado, inmutabilidad) | ✅ En DDL | `03_esquema_sigd_tra_cut_foliado.sql` |
+| Laboratorio determinista | ⚠️ PENDIENTE re-ejecución | `06_pruebas_laboratorio_tramicore.sql` |
+| Concurrencia real | ⚠️ PENDIENTE re-ejecución | `07_lanzador_pruebas_tramicore.ps1` → `logs_pruebas/` |
+| Carrera de año nuevo (2028) | ⚠️ PENDIENTE re-ejecución | mismo lanzador |
 | Validación documentada | ✅ Reproducible en un solo comando | `04_validacion_tramicore_v2.md` |
 | Decisiones reclasificadas | ✅ PROPUESTO/PENDIENTE según evidencia | `05_decisiones_levantamiento_tramicore.md` (v2.1) |
 | Alineación con B_GERIC | ✅ Merge de `origin/B_GERIC` aplicado (sin conflictos) | B_RAMIREZ en `d9f372c` |
-| Evidencia `evidence_h4.json` | ⚠️ No existe en rama; requiere ejecución del lanzador | `logs_pruebas/evidencia_h4.json` |
+| Evidencia `evidence_h4.json` | ⚠️ **NO EXISTE**; requiere ejecución del lanzador | `logs_pruebas/evidencia_h4.json` |
 
 > Nota de infraestructura: las ramas `B_RIQUELMER` y `B_SANDY` fueron forzadas al punto
 > `71c3a15` (main) en el remoto. Sus entregables históricos siguen integrados en
