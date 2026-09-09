@@ -34,7 +34,7 @@ IdentiCore administra:
 ### 2.2 Exclusiones de esta fase
 
 - No se realizarán consultas activas con costo a RENIEC PIDE, SUNAT ni SUNARP.
-- Se usarán adaptadores simulados (Mock Services) para validar estructura, formato y checksum de DNI/RUC.
+- Se usarán adaptadores simulados (Mock Services) como requisito de validación de estructura, formato y checksum de DNI/RUC; su ejecución y evidencia quedan **PENDIENTES**.
 - La aprobación institucional de roles, permisos, plazos operativos y textos legales queda sujeta a validación del IESTP "Suiza".
 
 ## 3. Clasificación oficial y unificada de usuarios
@@ -72,7 +72,7 @@ La siguiente clasificación es la única nomenclatura oficial del módulo. No de
 | `sesion_usuario` | Ciclo de vida de sesiones y refresh tokens rotativos. | Familia de token, expiración y revocación |
 | `consentimiento_datos` | Evidencia versionada de aceptación o revocación. | Persona, finalidad, versión y fecha UTC |
 
-### 4.2 Regla de herencia exclusiva 1:1
+### 4.2 Regla de herencia exclusiva y unicidad de representación
 
 La herencia se implementará mediante tablas relacionadas, no mediante herencia física de PostgreSQL.
 
@@ -83,7 +83,7 @@ La herencia se implementará mediante tablas relacionadas, no mediante herencia 
 - La consistencia entre el discriminador y el subtipo se validará con restricciones y triggers diferibles o una función transaccional de alta, de modo que no pueda quedar una persona sin subtipo ni con dos subtipos al finalizar la transacción.
 - No se permitirá cambiar `tipo_persona` si el cambio deja datos de subtipo incompatibles.
 
-**Estado:** `CONFIRMADO`.  
+**Estado:** `PROPUESTO` / `PENDIENTE`.
 **Implementación detallada del DDL:** `PROPUESTO`, a cargo de `B_SEGUNDO`.
 
 ### 4.3 Identificadores y unicidad
@@ -118,8 +118,9 @@ La validación deberá comprobar el dígito verificador mediante Módulo 11:
 
 El RUC con prefijo `20` representa a una persona jurídica en este modelo. Las personas naturales se identificarán mediante DNI, CE o Pasaporte; no se registrará un RUC de persona natural como identificador del subtipo sin una decisión institucional y de modelo posterior.
 
-**Estado:** `CONFIRMADO` para formato y checksum.  
+**Estado:** `CONFIRMADO` para el formato propuesto; checksum en adaptadores simulados: `REQUISITO / PENDIENTE DE IMPLEMENTACIÓN Y EVIDENCIA`.
 **Fuente externa RENIEC/SUNAT:** `PENDIENTE`.
+
 
 ### 5.3 Correos electrónicos
 
@@ -143,7 +144,7 @@ No se aceptarán personas jurídicas como apoderados ni personas naturales como 
 Cada representación debe registrar:
 
 - `fecha_inicio_vigencia`, obligatoria.
-- `fecha_fin_vigencia`, opcional; si existe, debe ser posterior o igual a la fecha de inicio.
+- `fecha_fin_vigencia` (`vigencia_fin`), opcional; si es `NULL`, representa una vigencia indefinida o no determinada según el modelo actual; si existe, debe ser posterior o igual a la fecha de inicio.
 - Tipo o alcance del poder.
 - Número de partida, asiento o documento de SUNARP, cuando exista.
 - Estado de validación de la representación.
@@ -151,7 +152,9 @@ Cada representación debe registrar:
 
 ### 6.3 Prohibición de solapamiento
 
-No se permitirán vigencias superpuestas para el mismo par `id_persona_natural` + `id_persona_juridica` y el mismo poder o alcance.
+La relación debe garantizar unicidad por la dupla `id_persona_natural` + `id_persona_juridica` para el mismo poder o alcance, sin afirmar una relación global 1:1. Una persona natural puede representar a múltiples personas jurídicas y una persona jurídica puede tener múltiples representantes, siempre que las vigencias y alcances aplicables no se superpongan.
+
+No se permitirán vigencias superpuestas para la misma dupla y el mismo poder o alcance.
 
 La restricción se implementará en PostgreSQL mediante una restricción `EXCLUDE` sobre un rango de fechas, o mediante un trigger transaccional equivalente cuando la fecha final sea abierta. Las vigencias abiertas se considerarán activas hasta que sean cerradas o revocadas.
 
@@ -177,6 +180,8 @@ La restricción se implementará en PostgreSQL mediante una restricción `EXCLUD
 - Ninguna contraseña, hash de refresh token ni credencial equivalente aparecerá en logs, respuestas HTTP o mensajes de error.
 - El acceso debe responder de forma uniforme cuando el usuario no exista, la contraseña sea incorrecta o la cuenta esté inactiva, evitando enumeración de cuentas.
 
+**Estado:** `REQUISITO / PROPUESTA / PENDIENTE DE IMPLEMENTACIÓN` para Argon2id efectivo, protección de credenciales y ausencia de tokens en logs, respuestas HTTP o mensajes de error.
+
 ### 7.2 Bloqueo temporal
 
 - Cinco intentos fallidos consecutivos provocan el estado `BLOQUEADA_TEMPORAL`.
@@ -187,7 +192,7 @@ La restricción se implementará en PostgreSQL mediante una restricción `EXCLUD
 - Cumplido el plazo, la cuenta podrá volver a `ACTIVA` mediante una transición controlada, sin borrar el historial de intentos.
 - El desbloqueo administrativo y los cambios de estado deben quedar auditados.
 
-**Estado:** `CONFIRMADO` para cinco intentos y estados.  
+**Estado:** `PENDIENTE — lógica de aplicación` para cinco intentos y estados.
 **Duración exacta del bloqueo:** `PENDIENTE` de aprobación.
 
 ### 7.3 Sesiones y refresh tokens
@@ -203,7 +208,7 @@ La restricción se implementará en PostgreSQL mediante una restricción `EXCLUD
 - La revocación manual, el cierre de sesión y el cambio de contraseña deben invalidar las sesiones según la política institucional aprobada.
 - Los access tokens JWT se firmarán asimétricamente con RS256; las claves privadas se gestionarán fuera del código fuente y los secretos no se incluirán en el repositorio.
 
-**Estado:** `CONFIRMADO` para rotación, hash y detección de reuso.  
+**Estado:** `PENDIENTE / lógica de aplicación` para rotación, hash y detección de reuso.
 **TTL exacto de access/refresh token y gestión de claves:** `PENDIENTE` de aprobación técnica.
 
 ## 8. Casilla electrónica y Ley N.° 29733
@@ -234,7 +239,7 @@ La revocación debe registrarse como un nuevo evento histórico inmutable, vincu
 
 La revocación debe registrar fecha, hora, origen y versión vigente de los términos. Desde su efectividad, el sistema no debe enviar nuevas notificaciones digitales basadas en ese consentimiento, salvo la conservación y atención de obligaciones legales que correspondan.
 
-**Estado:** `CONFIRMADO` para campos, estados y conservación histórica.  
+**Estado:** `PENDIENTE` para evidencia e historial de revocación inmutable.
 **Texto legal definitivo, plazos de conservación y responsable del tratamiento:** `PENDIENTE` de validación institucional.
 
 ## 9. Ofuscación de datos sensibles en APIs públicas
@@ -257,7 +262,7 @@ Reglas adicionales:
 - Las consultas de administración y auditoría deben aplicar autorización explícita para mostrar valores completos.
 - La publicación del RUC jurídico sin ofuscación no autoriza a exponer otros datos personales asociados.
 
-**Estado:** `CONFIRMADO` para reglas de transformación.  
+**Estado:** `PROPUESTO / PENDIENTE DE IMPLEMENTACIÓN` para reglas de transformación.
 **Catálogo definitivo de endpoints públicos y perfiles autorizados:** `PENDIENTE`.
 
 ## 10. Contratos con otros módulos

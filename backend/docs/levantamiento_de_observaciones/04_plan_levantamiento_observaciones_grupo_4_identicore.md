@@ -38,7 +38,7 @@ Subsanar las observaciones arquitecturales identificadas en el diagnóstico seni
 
 ## 3. Límites y Criterios de Validación
 
-- No se realizarán consultas activas a servicios con costo (Reniec PIDE / SUNAT) en esta etapa; se implementarán adaptadores simulados (*Mock Services*) que validen la estructura y checksum de DNI/RUC.
+- No se realizarán consultas activas a servicios con costo (Reniec PIDE / SUNAT) en esta etapa; los adaptadores simulados (*Mock Services*) para validar estructura, formato y checksum de DNI/RUC son un requisito pendiente de implementación y evidencia de ejecución.
 - Ninguna contraseña o refresh token en texto plano podrá figurar en logs, respuestas de API o base de datos.
 - Toda decisión técnica se etiquetará según la taxonomía oficial: `CONFIRMADO`, `PROPUESTO`, `PENDIENTE` o `EJEMPLO`.
 
@@ -116,9 +116,9 @@ Las siguientes definiciones se dejan deliberadamente pendientes. IdentiCore no d
 | :---: | :--- | :---: | :--- |
 | **H1 CERRADO** | El análisis funcional documenta personas naturales/jurídicas, representación, consentimiento y privacidad. | Tapullima | `01_analisis_identidad_personas_seguridad.md` |
 | **PENDIENTE** | El modelo separa limpiamente Personas Naturales de Personas Jurídicas e implementa `representacion_legal`. | Jair | `02_modelo_datos_identicore_v2.md` |
-| **COMPLETADO** | Se implementan validaciones de formato estricto para DNI (8 dígitos) y RUC (11 dígitos válidos). | Segundo | `03_esquema_sigd_auth_v2.sql` - restricciones `CHECK chk_persona_natural_dni_format` y `chk_persona_juridica_ruc_format` |
-| **COMPLETADO** | El esquema usa Argon2id y modela `sesion_usuario` con refresh tokens rotativos, control de reuso y auditoría IP/User-Agent. | Segundo | `03_esquema_sigd_auth_v2.sql` y `04_validacion_identicore_v2.md` |
-| **COMPLETADO** | Se modela `consentimiento_datos` con historial de revocación inmutable bajo la Ley N.° 29733. | Jair / Segundo | Modelo, DDL y validación v2.0 |
+| **PROPUESTA / PENDIENTE** | Se requieren validaciones de formato estricto para DNI (8 dígitos) y RUC (11 dígitos válidos). | Segundo | `03_esquema_sigd_auth_v2.sql` - restricciones `CHECK chk_persona_natural_dni_format` y `chk_persona_ruc_format` |
+| **PENDIENTE / LÓGICA DE APLICACIÓN** | Se requiere Argon2id efectivo y gestión de `sesion_usuario` con refresh tokens rotativos, control de reuso y auditoría IP/User-Agent. | Segundo | `03_esquema_sigd_auth_v2.sql` y `04_validacion_identicore_v2.md` |
+| **PENDIENTE** | Se requiere modelar `consentimiento_datos` con historial de revocación inmutable bajo la Ley N.° 29733. | Jair / Segundo | Modelo, DDL y validación v2.0 |
 | **H1 CERRADO** | Se documentan las reglas de ofuscación para consultas públicas. | Tapullima | Matriz de privacidad del análisis funcional |
 | **PENDIENTE** | Diagrama ER actualizado en Draw.io y exportado a PNG. | Jair | Archivos `.drawio` y `.png` |
 | **PENDIENTE** | Decisiones técnicas fundamentadas en el log de IdentiCore. | Segundo | `05_decisiones_levantamiento_identicore.md` |

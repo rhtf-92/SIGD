@@ -34,7 +34,7 @@ Todos los módulos del backend han sido auditados contra las listas de verificac
 | **Grupo 1 — RutaDoc**<br>*(Trazabilidad, Recepción, Derivación, Atención)* | Geric (`B_GERIC`), Jacobo (`B_JACOBO`), Jhasy (`B_JHASY`) | **11 / 11** (100%) | ✅ **CONFORME** |
 | **Grupo 2 — TramiCore**<br>*(Trámite, Expediente, Libro de Registro)* | Ramírez (`B_RAMIREZ`), Riquelmer (`B_RIQUELMER`), Sandy (`B_SANDY`) | **10 / 10** (100%) | ✅ **CONFORME** |
 | **Grupo 3 — OrganiCore**<br>*(Áreas, Jerarquías, Roles, Permisos RBAC)* | Pool (`B_POOL`), Leonardo (`B_LEONARDO`), Panaifo (`B_PANAIFO`), Héctor (`B_HECTOR`) | **10 / 10** (100%) | ✅ **CONFORME** |
-| **Grupo 4 — IdentiCore**<br>*(Personas, Cuentas, Usuarios Internos/Externos)* | Segundo (`B_SEGUNDO`), Tapullima (`B_TAPULLIMA`), Jair (`B_JAIR`) | **10 / 10** (100%) | ✅ **CONFORME** |
+| **Grupo 4 — IdentiCore**<br>*(Personas, Cuentas, Usuarios Internos/Externos)* | Segundo (`B_SEGUNDO`), Tapullima (`B_TAPULLIMA`), Jair (`B_JAIR`) | **Pendiente de validación H4** | ⚠️ **OBSERVADO / PENDIENTE DE VALIDACIÓN** |
 | **Grupo 5 — DocuCore**<br>*(Catálogo TUPA, Requisitos, Formularios)* | Cristian (`B_CHRISTIAN`), Azareño (`B_AZAREÑO`), Valentín (`B_VALENTIN`), Piero (`B_PIERO`) | **14 / 14** (100%) | ✅ **CONFORME** |
 | **Grupo 6 — CoreLink**<br>*(Integración, Catálogo Errores, Pruebas E2E)* | Ricardo (`B_AREVALO`), Duque (`B_DUQUE`), Reátegui (`B_REATEGUI`), Zevallos (`B_ZEVALLOS`) | **7 / 7** (100%) | ✅ **CONFORME** |
 | **TOTAL CONSOLIDADO** | **Equipo Completo de Desarrollo Backend** | **Requiere actualización por módulo** | ⚠️ **NO CONCLUIDO** |
@@ -105,7 +105,7 @@ Responsable de representar áreas institucionales, jerarquías recursivas, cargo
 ### Grupo 4 — IdentiCore · Usuarios Internos y Externos
 Responsable del desacoplamiento entre Persona Natural/Jurídica, Cuenta de Usuario y clasificación de solicitantes internos, externos registrados y externos en ventanilla.
 
-* 📘 **Análisis Funcional:** [`identicore/01_analisis_usuarios_internos_externos.md`](identicore/01_analisis_usuarios_internos_externos.md)
+* 📘 **Análisis Funcional:** [`levantamiento_de_observaciones/01_analisis_usuarios_internos_externos.md`](levantamiento_de_observaciones/01_analisis_usuarios_internos_externos.md)
 * 📐 **Modelo de Datos Lógico:** [`identicore/02_modelo_datos_usuarios.md`](identicore/02_modelo_datos_usuarios.md)
 * 📖 **Diccionario de Datos:** [`identicore/02_diccionario_datos_usuarios.md`](identicore/02_diccionario_datos_usuarios.md)
 * 📊 **Diagramas del Modelo ER:** [Editable Draw.io (`.drawio`)](identicore/02_modelo_datos_usuarios_diagrama.drawio) · [Vista previa (`.png`)](identicore/02_modelo_datos_usuarios_diagrama.png)
