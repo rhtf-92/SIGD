@@ -69,7 +69,7 @@
 |-------|------|-------|------|---------|-------------|--------|
 | id_folio | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno | CONFIRMADO |
 | id_expediente | BIGINT | FK | No | — | Expediente al que pertenece | CONFIRMADO |
-| id_documento | BIGINT | FK | No | — | Documento dentro del expediente (Grupo 5) | CONFIRMADO |
+| id_documento | BIGINT | FK | No | — | Documento dentro del expediente (Grupo 5) | PENDIENTE |
 | folio_inicio | INT | | No | — | Primer folio asignado al documento | CONFIRMADO |
 | folio_fin | INT | | No | — | Último folio asignado al documento | CONFIRMADO |
 | total_folios | INT | | No | — | Calculado: `folio_fin - folio_inicio + 1` | CONFIRMADO |

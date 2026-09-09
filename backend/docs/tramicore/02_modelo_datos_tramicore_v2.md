@@ -155,10 +155,8 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 | expediente | N:M | expediente (acumulación) | Art. 160 LPAG | CONFIRMADO |
 | expediente | 1 ─── n | expediente_documento_folio | 1:N | CONFIRMADO |
 | expediente | 1 ─── 1 | secuencia_anual_cut | N:1 (por año) | CONFIRMADO |
-| persona | 1 ─── n | tramite | G2/Grupo 4 | PROPUESTO |
-| persona | 1 ─── n | asiento_registro | G2/Grupo 4 | PROPUESTO |
-| usuario/área | 1 ─── n | tramite | G3 | PROPUESTO |
-| usuario/área | 1 ─── n | asiento_registro | G3 | PROPUESTO |
+| usuario/área | 1 ─── n | tramite | G3 · remitente/destinatario | PROPUESTO |
+| usuario/área | 1 ─── n | asiento_registro | G3 · remitente/destinatario | PROPUESTO |
 
 ---
 
@@ -195,10 +193,10 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 
 ## 8. Contratos de integración
 
-- **Grupo 4 — Personas/remitente:** referencia a `usuario` sin repetir datos personales `[CONFIRMADO]`
-- **Grupo 3 — Áreas/destinatario:** referencia a `area`, marcada como PROPUESTO `[CONFIRMADO]`
-- **Grupo 5 — Documentos/adjuntos:** referencia a `documento`, asignación de foliatura en `expediente_documento_folio` `[CONFIRMADO]`
-- **Grupo 1 — Trazabilidad:** emite evento de creación de expediente con `id_expediente` (BIGINT, migración a UUID PENDIENTE) y CUT `[CONFIRMADO]`
+- **Grupo 4 — Personas/remitente:** referencia a `usuario` sin repetir datos personales `[PENDIENTE]`
+- **Grupo 3 — Áreas/destinatario:** referencia a `area`, marcada como PROPUESTO `[PENDIENTE]`
+- **Grupo 5 — Documentos/adjuntos:** referencia a `documento`, asignación de foliatura en `expediente_documento_folio` `[PENDIENTE]`
+- **Grupo 1 — Trazabilidad:** emite evento de creación de expediente con `id_expediente` (BIGINT, migración a UUID PENDIENTE) y CUT `[PENDIENTE]`
 
 ---
 

@@ -406,12 +406,10 @@ END;
 $$;
 
 -- =============================================================================
--- P17 · Foliado: inserción directa con hueco detectada
+-- P17 · Foliado: inserción directa con hueco RECHAZADO por el trigger
 -- Inserta un folio dejando un hueco entre el último folio existente y el nuevo.
--- El trigger anti-solapamiento no bloquea huecos (solo solapamientos), pero
--- la función canónica sí los previene. Esta prueba verifica que el INSERT
--- directo con hueco SÍ es aceptado por el trigger (no hay trigger anti-hueco),
--- documentando que la protección contra huecos depende de usar la función.
+-- El trigger anti-solapamiento AHORA también bloquea huecos, documentando
+-- que la protección contra huecos aplica a TODAS las vías de escritura.
 -- =============================================================================
 DO $$
 BEGIN
@@ -421,12 +419,12 @@ BEGIN
         INSERT INTO sigd_tra.expediente_documento_folio
             (id_expediente, id_documento, folio_inicio, folio_fin, total_folios)
         VALUES (3, 903, 10, 12, 3);
-        -- Si llega aquí, el INSERT directo fue aceptado (sin trigger anti-hueco).
+        -- Si llega aquí, el INSERT directo fue aceptado (no debería pasar con el nuevo trigger).
         PERFORM sigd_tra._registrar_resultado(
-            'P17', TRUE, 'INSERT directo con hueco aceptado (sin trigger anti-hueco); proteger vía función canónica');
+            'P17', FALSE, 'INSERT directo con hueco aceptado (DEBERÍA ser rechazado por el trigger anti-hueco)');
     EXCEPTION WHEN OTHERS THEN
         PERFORM sigd_tra._registrar_resultado(
-            'P17', TRUE, 'INSERT con hueco rechazado: [' || SQLSTATE || '] ' || SQLERRM);
+            'P17', TRUE, 'INSERT con hueco rechazado por trigger anti-hueco: [' || SQLSTATE || '] ' || SQLERRM);
     END;
 END;
 $$;

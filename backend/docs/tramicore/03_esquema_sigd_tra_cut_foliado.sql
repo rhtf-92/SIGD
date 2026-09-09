@@ -5,7 +5,11 @@
 --            y Directiva AGN (R.J. N° 073-2023-AGN/J)
 -- Ejecutado y verificado en PostgreSQL 18.3+
 --
--- CORRECCIONES POST-AUDITORÍA (2026-09-08):
+-- CORRECCIONES POST-AUDITORÍA (2026-09-09):
+--   * SQLSTATE corregido: 42301 → 23514 (solapamiento/huecos) y 23001 (inmutabilidad).
+--   * Índice redundante idx_folio_expediente eliminado (idx_folio_expediente_rango lo cubre).
+--   * Trigger trg_acumulacion_validar_escritura añadido para prevenir INSERTs directos.
+--   * Trigger anti-huecos añadido a fn_folio_verificar_solapamiento.
 --   * CUT por año fiscal sobre secuencia_anual_cut con FOR UPDATE (sin secuencia
 --     global) eliminando la carrera en la inicialización de año nuevo.
 --   * CHECK de formato EXP-YYYY-XXXXXX y columna codigo_expediente VARCHAR(20).
@@ -317,6 +321,48 @@ ALTER FUNCTION sigd_tra.acumular_expediente(BIGINT, BIGINT, TEXT) OWNER TO CURRE
 REVOKE EXECUTE ON FUNCTION sigd_tra.acumular_expediente(BIGINT, BIGINT, TEXT) FROM PUBLIC;
 
 -- =============================================================================
+-- 8b. TRIGGER: prevenir inserción directa en expediente_acumulacion
+-- Garantiza que toda vía de escritura autorizada pase por la función
+-- canónica acumular_expediente() o desacumular_expediente().
+-- Las inserciones directas que eludan las reglas son rechazadas.
+-- =============================================================================
+CREATE OR REPLACE FUNCTION sigd_tra.fn_acumulacion_validar_escritura()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = sigd_tra, public
+AS $$
+DECLARE
+    v_estado_principal VARCHAR(20);
+    v_estado_accesorio VARCHAR(20);
+BEGIN
+    -- Verificar que ambos expedientes existen y están ACTIVOS
+    SELECT estado_expediente INTO v_estado_principal
+    FROM sigd_tra.expediente WHERE id_expediente = NEW.id_expediente_principal;
+    SELECT estado_expediente INTO v_estado_accesorio
+    FROM sigd_tra.expediente WHERE id_expediente = NEW.id_expediente_accesorio;
+
+    IF v_estado_principal IS NULL OR v_estado_accesorio IS NULL THEN
+        RAISE EXCEPTION 'Ambos expedientes deben existir y estar ACTIVOS para acumulación';
+    END IF;
+    IF v_estado_principal <> 'ACTIVO' OR v_estado_accesorio <> 'ACTIVO' THEN
+        RAISE EXCEPTION 'Solo expedientes ACTIVOS pueden participar en acumulación';
+    END IF;
+    IF NEW.id_expediente_principal = NEW.id_expediente_accesorio THEN
+        RAISE EXCEPTION 'Un expediente no puede acumularse a sí mismo';
+    END IF;
+    IF NEW.acto_resolutivo IS NULL OR btrim(NEW.acto_resolutivo) = '' THEN
+        RAISE EXCEPTION 'La acumulación exige un acto resolutivo justificado';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_acumulacion_validar_escritura
+    BEFORE INSERT ON sigd_tra.expediente_acumulacion
+    FOR EACH ROW
+    EXECUTE FUNCTION sigd_tra.fn_acumulacion_validar_escritura();
+
+-- =============================================================================
 -- 9. FUNCIÓN: desacumular_expediente(...)
 -- Reglas (PROPUESTO):
 --   * Exige un NUEVO acto resolutivo y fecha de desacumulación no anterior al
@@ -454,6 +500,8 @@ REVOKE EXECUTE ON FUNCTION sigd_tra.agregar_folio_expediente(BIGINT, BIGINT, INT
 -- =============================================================================
 
 -- Red de seguridad anti-solapamiento para INSERTs directos fuera de la función.
+-- Usa SQLSTATE 23514 (integrity constraint violation) para ser consistente
+-- con los CHECK constraints del esquema.
 CREATE OR REPLACE FUNCTION sigd_tra.fn_folio_verificar_solapamiento()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -469,8 +517,22 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'Solapamiento de folios en expediente % (rango %-% en conflicto)',
             NEW.id_expediente, NEW.folio_inicio, NEW.folio_fin
-            USING ERRCODE = '42301',
+            USING ERRCODE = '23514',
                   HINT = 'Use sigd_tra.agregar_folio_expediente() para foliación continua.';
+    END IF;
+    -- Prevenir huecos: verificar que el rango comienza inmediatamente después del último folio
+    IF EXISTS (
+        SELECT 1
+        FROM sigd_tra.expediente_documento_folio x
+        WHERE x.id_expediente = NEW.id_expediente
+          AND x.folio_fin >= NEW.folio_inicio - 1
+          AND x.folio_fin < NEW.folio_inicio
+    ) THEN
+        RAISE EXCEPTION 'Hueco detectado en expediente %: el folio % debe comenzar inmediatamente después de %',
+            NEW.id_expediente, NEW.folio_inicio,
+            (SELECT folio_fin FROM sigd_tra.expediente_documento_folio WHERE id_expediente = NEW.id_expediente AND folio_fin < NEW.folio_inicio ORDER BY folio_fin DESC LIMIT 1)
+            USING ERRCODE = '23514',
+                  HINT = 'Use sigd_tra.agregar_folio_expediente() para foliación continua sin huecos.';
     END IF;
     RETURN NEW;
 END;
@@ -482,6 +544,7 @@ CREATE TRIGGER trg_folio_verificar_solapamiento
     EXECUTE FUNCTION sigd_tra.fn_folio_verificar_solapamiento();
 
 -- Inmutabilidad de folios emitidos: ni UPDATE ni DELETE físico.
+-- Usa SQLSTATE 23001 (integrity constraint violation).
 CREATE OR REPLACE FUNCTION sigd_tra.fn_folio_inmutable()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -490,7 +553,7 @@ AS $$
 BEGIN
     RAISE EXCEPTION 'Los folios emitidos son inmutables: no se permite % sobre expediente_documento_folio (id_folio=%)',
         TG_OP, OLD.id_folio
-        USING ERRCODE = '42301',
+        USING ERRCODE = '23001',
               HINT = 'La foliatura no se corrige por UPDATE/DELETE; revierta mediante un nuevo documento.';
 END;
 $$;
@@ -530,6 +593,7 @@ CREATE TABLE asiento_registro (
 --   * No se permite DELETE físico (solo anulación lógica con anulado = true).
 --   * numero_registro es inmutable: un UPDATE que lo modifique es rechazado.
 -- =============================================================================
+-- Usa SQLSTATE 23001 (integrity constraint violation).
 CREATE OR REPLACE FUNCTION sigd_tra.fn_asiento_inmutable()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -538,12 +602,12 @@ AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
         RAISE EXCEPTION 'No se permite eliminar físicamente asientos del Libro; anúlelos con anulado = true'
-            USING ERRCODE = '42301',
+            USING ERRCODE = '23001',
                   HINT = 'Consulte 05_decisiones... DEC-19/DEC-20/DEC-21 (artículos 153-156 TUO Ley 27444).';
     END IF;
     IF TG_OP = 'UPDATE' AND OLD.numero_registro IS DISTINCT FROM NEW.numero_registro THEN
         RAISE EXCEPTION 'numero_registro es inmutable: no se permite modificar %', OLD.numero_registro
-            USING ERRCODE = '42301',
+            USING ERRCODE = '23001',
                   HINT = 'Los números del Libro no se reutilizan ni se modifican.';
     END IF;
     RETURN NEW;
@@ -568,8 +632,9 @@ CREATE INDEX idx_expediente_tramite ON expediente(fk_tramite);
 -- NO existe índice propio para id_expediente_principal: el índice único parcial
 -- uq_acumulacion_vigente ya cubre búsquedas por principal.
 CREATE INDEX idx_expediente_acum_accesorio ON expediente_acumulacion(id_expediente_accesorio);
-CREATE INDEX idx_folio_expediente ON expediente_documento_folio(id_expediente);
--- NO se crea índice sobre numero_registro: UNIQUE ya genera su índice.
+-- idx_folio_expediente_rango cubre (id_expediente, folio_inicio, folio_fin)
+-- lo hace innecesario para búsquedas por id_expediente.
+-- idx_folio_expediente (sobre solo id_expediente) es REDUNDANTE y se elimina.
 CREATE INDEX idx_asiento_anulado ON asiento_registro(anulado) WHERE anulado = TRUE;
 
 COMMIT;

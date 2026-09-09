@@ -14,12 +14,13 @@ que deben cerrarse ANTES del PR hacia `B_GERIC`.
 | Bloque | Estado | Evidencia |
 |--------|--------|-----------|
 | DDL corregido (CUT anual, acumulación, foliado, inmutabilidad) | ✅ Ejecutado en PostgreSQL 18.3 | `03_esquema_sigd_tra_cut_foliado.sql` |
-| Laboratorio determinista | ✅ 21/21 OK con ROLLBACK final | `06_pruebas_laboratorio_tramicore.sql` |
-| Concurrencia real | ✅ 500/500 CUTs únicos, sin deadlocks | `07_lanzador_pruebas_tramicore.ps1` → `logs_pruebas/` |
-| Carrera de año nuevo (2028) | ✅ 3 CUTs únicos, 1 sola fila anual | mismo lanzador |
+| Laboratorio determinista | ⚠️ 21/21 OK (requiere re-ejecución) | `06_pruebas_laboratorio_tramicore.sql` |
+| Concurrencia real | ⚠️ 500/500 CUTs únicos (requiere re-ejecución) | `07_lanzador_pruebas_tramicore.ps1` → `logs_pruebas/` |
+| Carrera de año nuevo (2028) | ⚠️ 3 CUTs exactos 000001, 000002, 000003 (requiere re-ejecución) | mismo lanzador |
 | Validación documentada | ✅ Reproducible en un solo comando | `04_validacion_tramicore_v2.md` |
 | Decisiones reclasificadas | ✅ PROPUESTO/PENDIENTE según evidencia | `05_decisiones_levantamiento_tramicore.md` (v2.1) |
 | Alineación con B_GERIC | ✅ Merge de `origin/B_GERIC` aplicado (sin conflictos) | B_RAMIREZ en `d9f372c` |
+| Evidencia `evidence_h4.json` | ⚠️ No existe en rama; requiere ejecución del lanzador | `logs_pruebas/evidencia_h4.json` |
 
 > Nota de infraestructura: las ramas `B_RIQUELMER` y `B_SANDY` fueron forzadas al punto
 > `71c3a15` (main) en el remoto. Sus entregables históricos siguen integrados en
@@ -67,6 +68,7 @@ Los entregables de modelo (`02_modelo_datos_tramicore_v2.md`, `02_diccionario_da
 | Acumulación | `id_acumulacion` PK + DOS FK simples + índice único parcial `uq_acumulacion_vigente` | Corregir cualquier mención de "FK compuesta" o clave natural del par |
 | CUT | Por AÑO fiscal (`secuencia_anual_cut`), no secuencia global | Actualizar diccionario/plan de `secuencia_anual_cut` |
 | Claves internas | `BIGINT GENERATED ALWAYS AS IDENTITY` (UUID PENDIENTE, DEC-UUID) | NO cambiar a UUID unilateralmente: requiere contrato con RutaDoc (sección 5) |
+| G3/G4/G5 como CONFIRMADO | Referencias externas sin contratos aprobados | Marcadas como PENDIENTE, no CONFIRMADO |
 
 ---
 
@@ -99,5 +101,10 @@ Pendiente común con RutaDoc antes de cerrar el diseño físico:
 | 7 | Restaurar documentos históricos a carpeta `historico/` | Elmer | ✅ RESTAURADO (H4b) |
 | 8 | Agregar pruebas de ciclos 3/4+ nodos y foliado concurrente | Elmer | ✅ AGREGADO (H4b) |
 | 9 | Verificar ExitCode de procesos concurrentes en lanzador | Elmer | ✅ CORREGIDO (H4b) |
-| 10 | Generar evidencia consolidada `evidencia_h4.json` | Elmer | ✅ AGREGADO (H4b) |
-| 11 | PR final de B_RAMIREZ hacia B_GERIC (la rama ya está alineada con origin/B_GERIC) | Elmer | PENDIENTE (tras nueva revisión) |
+| 10 | Generar evidencia consolidada `evidencia_h4.json` | Elmer | ⚠️ REQUIERE RE-EJECUCIÓN DEL LANZADOR |
+| 11 | Restaurar documentos históricos a carpeta `historico/` sin mojibake | Elmer | ✅ CORREGIDO (2026-09-09) |
+| 12 | G3/G4/G5 como PENDIENTE sin contratos aprobados | Elmer | ✅ CORREGIDO (2026-09-09) |
+| 13 | SQLSTATE corregido (42301 → 23514/23001) e índice redundante eliminado | Elmer | ✅ CORREGIDO (2026-09-09) |
+| 14 | Trigger anti-huecos y trigger de validación en acumulación | Elmer | ✅ AGREGADO (2026-09-09) |
+| 15 | Lanzador: exactamente 21 pruebas y comparación exacta 000001, 000002, 000003 | Elmer | ✅ CORREGIDO (2026-09-09) |
+| 16 | PR final de B_RAMIREZ hacia B_GERIC (la rama ya está alineada con origin/B_GERIC) | Elmer | PENDIENTE (tras nueva revisión) |

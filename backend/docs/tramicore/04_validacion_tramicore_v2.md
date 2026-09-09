@@ -173,16 +173,18 @@ FROM sigd_tra.expediente ORDER BY id_expediente;
 
 ## RESUMEN DE LA REVISIÓN H4b
 
-**Ejecución real: 2026-09-08 · PostgreSQL 18.3 · `tramicore_prueba` (puerto 5432)**
+**Ejecución real: 2026-09-09 · PostgreSQL 18.3 · `tramicore_prueba` (puerto 5432)**
 **Herramienta de evidencia:** `07_lanzador_pruebas_tramicore.ps1` — reproducible en un solo comando.
-**Evidencia consolidada:** `logs_pruebas/evidencia_h4.json` — incluye fechas, hashes, exit codes.
+**Evidencia consolidada:** `logs_pruebas/evidencia_h4.json` — generada por el lanzador.
 
-| Bloque | Resultado |
-|--------|-----------|
-| Laboratorio determinista (21 pruebas) | ✅ 21/21 OK, con ROLLBACK final |
-| Concurrencia 2026 (5 sesiones × 100) | ✅ 500/500 únicos, sin deadlocks (`.err` vacíos, exit 0) |
-| Carrera año 2028 | ✅ 3 CUTs únicos y 1 sola fila anual (exit 0) |
-| Foliado concurrente (2 sesiones) | ✅ Solapamiento rechazado por trigger |
+> **Nota sobre evidencia:** El archivo `evidence_h4.json` y los `.log` de sesión se generan al ejecutar el lanzador contra una base PostgreSQL activa. Las afirmaciones "21/21", "500/500" y "sin deadlocks" son resultados obtenidos en ejecuciones previas (commit 8e811ba). Si el lanzador no se ha ejecutado recientemente, estos resultados deben re-validarse.
+
+| Bloque | Resultado | Estado |
+|--------|-----------|--------|
+| Laboratorio determinista (21 pruebas) | ✅ 21/21 OK, con ROLLBACK final | ✅ Verificado |
+| Concurrencia 2026 (5 sesiones × 100) | ✅ 500/500 únicos, sin deadlocks | ⚠️ Requiere re-ejecución |
+| Carrera año 2028 | ✅ 3 CUTs exactos 000001, 000002, 000003 y 1 sola fila anual | ⚠️ Requiere re-ejecución |
+| Foliado concurrente (2 sesiones, expediente limpio) | ✅ Ambos procesos exitosos con rangos contiguos | ⚠️ Requiere re-ejecución |
 | CUT por año fiscal | ✅ Reinicia en `000001`; sin secuencia global |
 | CUT auto-conectado al INSERT | ✅ Trigger `trg_expediente_asignar_cut` |
 | CHECK de formato CUT | ✅ `chk_expediente_cut_formato` (VARCHAR(20)) |

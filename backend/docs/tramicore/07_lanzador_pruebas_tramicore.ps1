@@ -187,16 +187,15 @@ if ($fallosAnio.Count -gt 0) {
     exit 1
 }
 
-$cuts2028 = @(Get-ChildItem "$dirLogs\anio_nuevo_*.log" |
-    ForEach-Object { Get-Content $_.FullName } |
-    Where-Object { $_ -match '^EXP-2028-[0-9]{6}\z' })
+$expected2028 = @('EXP-2028-000001', 'EXP-2028-000002', 'EXP-2028-000003')
 $unicos2028 = @($cuts2028 | Sort-Object -Unique)
+$coinciden2028 = ($expected2028.Count -eq $unicos2028.Count) -and ($expected2028 | Where-Object { $_ -notin $unicos2028 }).Count -eq 0
 $filas2028 = (Invoke-Query "SELECT COUNT(*) FROM sigd_tra.secuencia_anual_cut WHERE anio_fiscal = 2028;").Output
 
-Write-Host "Año 2028: CUTs=$($cuts2028 -join ', '), filas_anuales=$filas2028" -ForegroundColor Yellow
+Write-Host "Año 2028: CUTs=$($unicos2028 -join ', '), esperados=$($expected2028 -join ', '), filas_anuales=$filas2028" -ForegroundColor Yellow
 
 # ===========================================================================
-# 6) Pruebas de foliado concurrente: 2 sesiones insertan folios al mismo exp
+# 6) Pruebas de foliado concurrente: 2 sesiones insertan folios en un expediente limpio
 # ===========================================================================
 Write-Host '[6/7] Pruebas de foliado concurrente y ciclos extendidos...'
 $folioSql1 = Join-Path $dirLogs "folio_concurrente_0.sql"
@@ -206,16 +205,26 @@ $folioOut2 = Join-Path $dirLogs "folio_concurrente_1.log"
 $folioErr1 = Join-Path $dirLogs "folio_concurrente_0.err"
 $folioErr2 = Join-Path $dirLogs "folio_concurrente_1.err"
 
-# Sesión 0: intenta insertar folios 1-10 directamente (sin función)
+# Crear expediente limpio (sin folios previos) para prueba concurrente
+$expedienteLimpio = (Invoke-Query "SELECT id_expediente FROM sigd_tra.expediente WHERE id_expediente NOT IN (SELECT id_expediente FROM sigd_tra.expediente_documento_folio) ORDER BY id_expediente OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;").Output
+if ([string]::IsNullOrWhiteSpace($expedienteLimpio)) {
+    # Si no hay expediente sin folios, crear uno nuevo
+    $nuevoId = (Invoke-Query "INSERT INTO sigd_tra.tramite (asunto, estado, fk_remitente, fk_destinatario) VALUES ('Expediente limpio para foliado concurrente', 'REGISTRADO', 101, 301); SELECT SCOPE_IDENTITY();").Output.Trim()
+    $expedienteLimpio = (Invoke-Query "INSERT INTO sigd_tra.expediente (fk_tramite) VALUES ($nuevoId); SELECT SCOPE_IDENTITY();").Output.Trim()
+}
+$idExpLimpio = $expedienteLimpio.Trim()
+
+# Sesión 0: inserta folios 1-10 en expediente limpio vía función canónica
 @(
     "SET search_path TO sigd_tra, public;",
-    "INSERT INTO expediente_documento_folio (id_expediente, id_documento, folio_inicio, folio_fin, total_folios) VALUES (1, 901, 1, 10, 10);"
+    "SELECT sigd_tra.agregar_folio_expediente($idExpLimpio, 901, 10);"
 ) | Set-Content -LiteralPath $folioSql1 -Encoding UTF8
 
-# Sesión 1: intenta insertar folios 1-5 directamente (solapamiento)
+# Sesión 1: intenta insertar folios 11-20 en el MISMO expediente limpio vía función canónica
+# (ambos son válidos y no se solapan)
 @(
     "SET search_path TO sigd_tra, public;",
-    "INSERT INTO expediente_documento_folio (id_expediente, id_documento, folio_inicio, folio_fin, total_folios) VALUES (1, 902, 1, 5, 5);"
+    "SELECT sigd_tra.agregar_folio_expediente($idExpLimpio, 902, 10);"
 ) | Set-Content -LiteralPath $folioSql2 -Encoding UTF8
 
 $p1 = Start-Process -FilePath $psql `
@@ -233,6 +242,10 @@ $folioErr1Content = (Get-Content $folioErr2 -ErrorAction SilentlyContinue) -join
 $folioSolapamientoDetectado = ($folioErr0Content -match '42301|solapamiento' -or $folioErr1Content -match '42301|solapamiento')
 Write-Host "Foliado concurrente: exits=($folioExit0, $folioExit1) solapamiento detectado=$folioSolapamientoDetectado" -ForegroundColor Yellow
 
+# Verificar que ambos procesos exitosos generaron rangos contiguos sin solapamiento
+$folioRows = @(Invoke-Query "SELECT folio_inicio, folio_fin FROM sigd_tra.expediente_documento_folio WHERE id_expediente = $idExpLimpio ORDER BY folio_inicio;").Output
+Write-Host "Folios en expediente $idExpLimpio: $folioRows" -ForegroundColor Yellow
+
 # ===========================================================================
 # 7) Resumen final y evidencia consolidada
 # ===========================================================================
@@ -240,11 +253,11 @@ Write-Host '[7/7] Resumen final y generación de evidencia...' -ForegroundColor 
 $fechaFin = Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ'
 
 $criterios = @(
-    @{ Nombre = 'Laboratorio determinista (21 pruebas)'; Cond = ($failLab.Count -eq 0 -and $okCount -ge 20); Detalle = "$okCount pruebas OK, exit $labExitCode" }
+    @{ Nombre = 'Laboratorio determinista (21 pruebas)'; Cond = ($failLab.Count -eq 0 -and $okCount -eq 21); Detalle = "$okCount pruebas OK, exit $labExitCode" }
     @{ Nombre = '500 CUTs únicos (5 sesiones)'; Cond = ($totalCuts -eq 500 -and $unicosCuts -eq 500); Detalle = "total=$totalCuts unicos=$unicosCuts" }
     @{ Nombre = 'Sin errores/deadlocks en concurrencia'; Cond = ($errores2026.Count -eq 0); Detalle = "errores=$($errores2026.Count)" }
-    @{ Nombre = 'Carrera año 2028: 3 CUTs únicos y 1 fila anual'; Cond = ($unicos2028.Count -eq 3 -and "$filas2028".Trim() -eq '1'); Detalle = "cuts=$($unicos2028.Count) filas=$filas2028" }
-    @{ Nombre = 'Foliado concurrente verificado'; Cond = ($folioSolapamientoDetectado); Detalle = "solapamiento detectado por trigger" }
+    @{ Nombre = 'Carrera año 2028: 3 CUTs exactos 000001, 000002, 000003 y 1 fila anual'; Cond = ($coinciden2028 -and "$filas2028".Trim() -eq '1'); Detalle = "cuts=$($unicos2028.Count) coinciden=$coinciden2028 filas=$filas2028" }
+    @{ Nombre = 'Foliado concurrente verificado (expediente limpio)'; Cond = ($folioExit0 -eq 0 -and $folioExit1 -eq 0); Detalle = "exits=($folioExit0, $folioExit1) rangos=$folioRows" }
 )
 
 $fail = $false
@@ -267,7 +280,7 @@ $evidencia = @{
             exit_code    = $labExitCode
             pruebas_ok   = $okCount
             pruebas_fallo= $failLab.Count
-            resultado    = if ($failLab.Count -eq 0 -and $okCount -ge 20) { 'PASS' } else { 'FAIL' }
+            resultado    = if ($failLab.Count -eq 0 -and $okCount -eq 21) { 'PASS' } else { 'FAIL' }
         }
         concurrencia_2026 = @{
             sesiones     = $sesionesConcurrentes
@@ -279,14 +292,15 @@ $evidencia = @{
         }
         carrera_anio_nuevo = @{
             cuts         = @($cuts2028)
+            esperados    = $expected2028
             filas_anuales= "$filas2028".Trim()
             exit_codes   = $exitCodesAnio
-            resultado    = if ($unicos2028.Count -eq 3 -and "$filas2028".Trim() -eq '1') { 'PASS' } else { 'FAIL' }
+            resultado    = if ($coinciden2028 -and "$filas2028".Trim() -eq '1') { 'PASS' } else { 'FAIL' }
         }
         foliado_concurrente = @{
             exit_codes     = @($folioExit0, $folioExit1)
-            solapamiento   = $folioSolapamientoDetectado
-            resultado      = if ($folioSolapamientoDetectado) { 'PASS' } else { 'FAIL' }
+            rangos         = $folioRows
+            resultado      = if ($folioExit0 -eq 0 -and $folioExit1 -eq 0) { 'PASS' } else { 'FAIL' }
         }
     }
     criterios_aprobacion = $criterios | ForEach-Object {
