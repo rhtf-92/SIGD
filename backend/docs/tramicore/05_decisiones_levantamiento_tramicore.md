@@ -94,7 +94,7 @@
 | 2026-08-30 | Elmer Ramírez | Observación de ausencia de acumulación resuelta con `expediente_acumulacion` | RESUELTO |
 | 2026-08-30 | Elmer Ramírez | Observación de ausencia de foliatura digital resuelta con `expediente_documento_folio` | RESUELTO |
 | 2026-09-08 | Elmer Ramírez | Entregable de Sandy (modelo lógico v2.0, diccionario y diagramas) integrado | RESUELTO |
-| 2026-09-08 | Elmer Ramírez | Pruebas de concurrencia reproducibles mediante `07_lanzador_pruebas_tramicore.ps1` (500/500 CUTs únicos, carrera año 2028, sin deadlocks) | RESUELTO |
+| 2026-09-08 | Elmer Ramírez | Pruebas de concurrencia reproducibles mediante `07_lanzador_pruebas_tramicore.ps1` — PENDIENTE re-ejecución con DDL corregido (SQLSTATE 23514/23001, trigger anti-huecos, trigger acumulación) | EN PROCESO |
 | 2026-09-08 | Elmer Ramírez | Corrección H4: clasificaciones CONFIRMADO→PROPUESTO/PENDIENTE en DEC-01/03/05/07/09/16/17/18, DEC-UUID documentado como PENDIENTE, reescritura de DDL/demo/laboratorio con codificación UTF-8 limpia | RESUELTO |
 
 ---

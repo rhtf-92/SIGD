@@ -24,11 +24,7 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 
 **Archivo editable:** `backend/docs/tramicore/02_modelo_datos_gestion_documental_diagrama.drawio`
 **Imagen exportada:** `backend/docs/tramicore/02_modelo_datos_gestion_documental_diagrama.png`
-
-**Leyenda:**
-- Línea azul sólida → Grupo 2 (PROPUESTO/CONFIRMADO)
-- Línea gris punteada → PENDIENTE / referencia de otro grupo
-- PK → clave primaria · FK → clave foránea · UQ → único
+> ⚠️ **PNG desactualizado:** Tras los cambios en el Draw.io (leyenda G3/G4/G5 como PENDIENTE, referencias sin contrato), el PNG debe regenerarse con Draw.io (Archivo → Exportar como PNG).
 
 ---
 
