@@ -10,6 +10,11 @@
 --   * Índice redundante idx_folio_expediente eliminado (idx_folio_expediente_rango lo cubre).
 --   * Trigger trg_acumulacion_validar_escritura añadido para prevenir INSERTs directos.
 --   * Trigger anti-huecos añadido a fn_folio_verificar_solapamiento.
+--   * CORRECCIÓN 2026-09-09 (reejecución): la condición anti-huecos inicial
+--     (x.folio_fin >= NEW.folio_inicio - 1 AND x.folio_fin < NEW.folio_inicio)
+--     rechazaba por error el folio contiguo precedente (folio_fin = folio_inicio - 1).
+--     Se reemplaza por la regla de contigüidad estricta
+--     NEW.folio_inicio = COALESCE(MAX(folio_fin), 0) + 1.
 --   * CUT por año fiscal sobre secuencia_anual_cut con FOR UPDATE (sin secuencia
 --     global) eliminando la carrera en la inicialización de año nuevo.
 --   * CHECK de formato EXP-YYYY-XXXXXX y columna codigo_expediente VARCHAR(20).
@@ -520,17 +525,20 @@ BEGIN
             USING ERRCODE = '23514',
                   HINT = 'Use sigd_tra.agregar_folio_expediente() para foliación continua.';
     END IF;
-    -- Prevenir huecos: verificar que el rango comienza inmediatamente después del último folio
-    IF EXISTS (
-        SELECT 1
-        FROM sigd_tra.expediente_documento_folio x
-        WHERE x.id_expediente = NEW.id_expediente
-          AND x.folio_fin >= NEW.folio_inicio - 1
-          AND x.folio_fin < NEW.folio_inicio
-    ) THEN
-        RAISE EXCEPTION 'Hueco detectado en expediente %: el folio % debe comenzar inmediatamente después de %',
+    -- Prevenir huecos: el rango debe comenzar exactamente en MAX(folio_fin)+1 del
+    -- expediente (contigüidad estricta). Corrige un falso positivo de la condición
+    -- previa (x.folio_fin >= NEW.folio_inicio - 1 AND x.folio_fin < NEW.folio_inicio),
+    -- que rechazaba el folio contiguo precedente (folio_fin = folio_inicio - 1) como
+    -- si fuera un hueco. x.folio_fin < NEW.folio_inicio por sí solo tampoco sirve:
+    -- incluye al folio contiguo. La regla correcta es MAX(folio_fin) + 1 = folio_inicio.
+    IF NEW.folio_inicio <> COALESCE((
+        SELECT MAX(folio_fin) + 1
+        FROM sigd_tra.expediente_documento_folio
+        WHERE id_expediente = NEW.id_expediente
+    ), 1) THEN
+        RAISE EXCEPTION 'Hueco detectado en expediente %: el folio % debe comenzar en %',
             NEW.id_expediente, NEW.folio_inicio,
-            (SELECT folio_fin FROM sigd_tra.expediente_documento_folio WHERE id_expediente = NEW.id_expediente AND folio_fin < NEW.folio_inicio ORDER BY folio_fin DESC LIMIT 1)
+            (SELECT COALESCE(MAX(folio_fin) + 1, 1) FROM sigd_tra.expediente_documento_folio WHERE id_expediente = NEW.id_expediente)
             USING ERRCODE = '23514',
                   HINT = 'Use sigd_tra.agregar_folio_expediente() para foliación continua sin huecos.';
     END IF;
