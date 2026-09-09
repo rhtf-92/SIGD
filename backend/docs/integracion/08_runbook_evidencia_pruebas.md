@@ -33,7 +33,7 @@ máquina con **Docker**; mientras no exista, la evidencia permanece `PENDIENTE` 
 
 ## 3. Paso 0 — Preparar el entorno
 
-Desde la carpeta `integracion/implementacion`:
+Desde la carpeta `backend/docs/implementacion`:
 
 ```powershell
 # 1) Instalar dependencias (una sola vez)
@@ -82,7 +82,7 @@ docker run -d --name sigd-pg-k6 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=sig
 
 # Aplicar el esquema de CoreLink
 docker exec -i sigd-pg-k6 psql -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 `
-  < ..\06_sigd_audit_esquema_ddl.sql
+  < ../integracion/06_sigd_audit_esquema_ddl.sql
 ```
 
 En otra terminal, iniciar la API (en `implementacion/`):

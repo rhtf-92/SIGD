@@ -9,7 +9,7 @@
 CREATE SCHEMA IF NOT EXISTS sigd_auth;
 
 CREATE TABLE IF NOT EXISTS sigd_auth.cuenta_usuario (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    usuario_id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
 
 -- =============================================================================

@@ -7,7 +7,11 @@
 -- Área     : Backend — CoreLink
 -- Autor    : Reátegui · B_REATEGUI (basado en el entregable 02)
 -- Archivo  : integracion/06_sigd_audit_esquema_ddl.sql
--- Versión  : 1.3 (Revisión del Liderazgo — PR #79 cancelado · correcciones pre-merge)
+-- Versión  : 1.4 (Correcciones pre-merge — observaciones del liderazgo P1-P14)
+-- Cambios v1.4:
+--   * Estado EN_PROCESO agregado al CHECK de evento_outbox: el worker outbox
+--     reserva eventos con FOR UPDATE SKIP LOCKED y transiciona PENDIENTE→EN_PROCESO
+--     dentro de la misma transacción antes de despachar.
 -- Cambios v1.3:
 --   * correlation_id SIN DEFAULT en bitacora_auditoria: debe propagarse desde
 --     AsyncLocalStorage; la BD no debe generar un UUID distinto al del contexto.
@@ -89,7 +93,7 @@ CREATE TABLE IF NOT EXISTS sigd_audit.evento_outbox (
     payload        JSONB         NOT NULL,
     estado         VARCHAR(16)   NOT NULL DEFAULT 'PENDIENTE'
                                  CONSTRAINT chk_outbox_estado
-                                 CHECK (estado IN ('PENDIENTE', 'PROCESADO', 'FALLIDO')),
+                                 CHECK (estado IN ('PENDIENTE', 'EN_PROCESO', 'PROCESADO', 'FALLIDO')),
     intentos       SMALLINT      NOT NULL DEFAULT 0
                                  CONSTRAINT chk_outbox_intentos CHECK (intentos >= 0),
     creado_en      TIMESTAMPTZ   NOT NULL DEFAULT now(),
@@ -99,7 +103,7 @@ CREATE TABLE IF NOT EXISTS sigd_audit.evento_outbox (
 COMMENT ON TABLE  sigd_audit.evento_outbox IS
     'Transactional Outbox: eventos persistidos atómicamente con la mutación y despachados por el worker.';
 COMMENT ON COLUMN sigd_audit.evento_outbox.estado IS
-    'PENDIENTE -> PROCESADO (éxito) o FALLIDO (dead-letter tras agotar reintentos). Solo el worker lo modifica.';
+    'PENDIENTE → EN_PROCESO (reserva del worker con FOR UPDATE SKIP LOCKED) → PROCESADO (éxito) o FALLIDO (dead-letter tras agotar reintentos).';
 COMMENT ON COLUMN sigd_audit.evento_outbox.payload IS
     'Cuerpo autocontenido del evento más claves de idempotencia (ver matriz del entregable 04).';
 

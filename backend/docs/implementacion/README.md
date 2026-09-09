@@ -18,17 +18,17 @@ o el esquema de base de datos de la tarea del grupo"*.
 
 | Carpeta / archivo | Implementa | Especificación |
 | :--- | :--- | :--- |
-| `src/shared/domain/errors/` | Jerarquía `AppError`, `DomainError` (422), `NotFoundError` (404), `ConflictError` (409), `UnauthorizedError` (401), `ForbiddenError` (403), `ValidationError` (400) | `01_especificacion_middleware_rfc7807.md` §4 |
-| `src/shared/request-context/` | `AsyncLocalStorage` (una sola instancia), `crearContexto`, `setUsuarioId` | `01` §8 y `02_arquitectura_auditoria...md` §4 |
-| `src/middleware/context-middleware.ts` | Creación del contexto por solicitud y header `x-correlation-id` con validación UUID | `01` §8.2 |
-| `src/middleware/error-middleware.ts` | Serializador global RFC 7807/9457 (último eslabón, firma de 4 args) | `01` §5 y §7 |
-| `src/errors/` | Matriz determinista PostgreSQL (`23505`, `23503`, `23502`, `P0001`) y mapeo Zod → `invalid_params` | `01` §6 |
-| `src/shared/types/` | `CorrelationContext`, `ApiErrorResponse`, `Paginacion*`, `EventoOutboxContract`, `EventoEnvelope` (v1.2), `ExpedienteContract` (**PROVISIONAL** — pendiente de aprobación bilateral con RutaDoc) | `04_contratos_intermodulares_unificados.md` §7, §6.2 |
-| `src/audit/` | Repos de auditoría y outbox (misma transacción) + `OutboxWorker` con `FOR UPDATE SKIP LOCKED`, reserva `EN_PROCESO` y backoff exponencial | `02` §5, §6 |
-| `tests/fixtures/` | Fixtures de los **6 esquemas** (sigd_auth, sigd_org, sigd_tra, sigd_rut, docucore, sigd_audit) — **PROVISIONALES** | `03_suite_pruebas_testcontainers_k6.md` |
-| `tests/` | Setup/teardown Testcontainers (ciclo correcto setup→teardown), limpieza entre escenarios, 12 casos E2E (incluye atomicidad y concurrencia), prueba unitaria del mapeador | `03_suite_pruebas_testcontainers_k6.md` §4 y §5 |
-| `k6/` | Escenario 1 (Radicación 100 VU) y Escenario 2 (Derivación 50 VU) con umbrales | `03` §6 |
-| `src/referencia/` | Endpoints **fixture** de referencia para ejercitar el pipeline (Mesa de Partes) — **Atribución: Duque (B_DUQUE)** | `03` §5 (Módulo TramiCore/RutaDoc) |
+| `src/shared/domain/errors/` | Jerarquía `AppError`, `DomainError` (422), `NotFoundError` (404), `ConflictError` (409), `UnauthorizedError` (401), `ForbiddenError` (403), `ValidationError` (400) | `../integracion/01_especificacion_middleware_rfc7807.md` §4 |
+| `src/shared/request-context/` | `AsyncLocalStorage` (una sola instancia), `crearContexto`, `setUsuarioId` | `../integracion/01_especificacion_middleware_rfc7807.md` §8 y `../integracion/02_arquitectura_auditoria_contexto_asynclocalstorage.md` §4 |
+| `src/middleware/context-middleware.ts` | Creación del contexto por solicitud y header `x-correlation-id` con validación UUID | `../integracion/01_especificacion_middleware_rfc7807.md` §8.2 |
+| `src/middleware/error-middleware.ts` | Serializador global RFC 7807/9457 (último eslabón, firma de 4 args) | `../integracion/01_especificacion_middleware_rfc7807.md` §5 y §7 |
+| `src/errors/` | Matriz determinista PostgreSQL (`23505`, `23503`, `23502`, `P0001`) y mapeo Zod → `invalid_params` | `../integracion/01_especificacion_middleware_rfc7807.md` §6 |
+| `src/shared/types/` | `CorrelationContext`, `ApiErrorResponse`, `Paginacion*`, `EventoOutboxContract`, `EventoEnvelope` (v1.2), `ExpedienteContract` (**PROVISIONAL** — pendiente de aprobación bilateral con RutaDoc) | `../integracion/04_contratos_intermodulares_unificados.md` §7, §6.2 |
+| `src/audit/` | Repos de auditoría y outbox (misma transacción) + `OutboxWorker` con `FOR UPDATE SKIP LOCKED`, reserva `EN_PROCESO` y backoff exponencial | `../integracion/02_arquitectura_auditoria_contexto_asynclocalstorage.md` §5, §6 |
+| `tests/fixtures/` | Fixtures de los **6 esquemas** (sigd_auth, sigd_org, sigd_tra, sigd_rut, docucore, sigd_audit) — **PROVISIONALES** | `../integracion/03_suite_pruebas_testcontainers_k6.md` |
+| `tests/` | Setup/teardown Testcontainers (ciclo correcto setup→teardown), limpieza entre escenarios, 12 casos E2E (incluye atomicidad y concurrencia), prueba unitaria del mapeador | `../integracion/03_suite_pruebas_testcontainers_k6.md` §4 y §5 |
+| `k6/` | Escenario 1 (Radicación 100 VU) y Escenario 2 (Derivación 50 VU) con umbrales | `../integracion/03_suite_pruebas_testcontainers_k6.md` §6 |
+| `src/referencia/` | Endpoints **fixture** de referencia para ejercitar el pipeline (Mesa de Partes) — **Atribución: Duque (B_DUQUE)** | `../integracion/03_suite_pruebas_testcontainers_k6.md` §5 |
 
 ---
 
@@ -72,9 +72,14 @@ npm run load:radicacion      # ≈ 2 min, umbrales P95<200ms y errores<0.1%
 npm run load:derivacion
 ```
 
+## 6. Evidencia de pruebas
+
+Ver `../integracion/08_runbook_evidencia_pruebas.md` para instrucciones paso a paso
+sobre cómo generar y conservar evidencia (logs, timestamps, exit codes, P95, tasa de errores).
+
 ---
 
-## 6. Cómo cubre la observación del profesor
+## 7. Cómo cubre la observación del profesor
 
 | Verificador | Evidencia |
 | :--- | :--- |
@@ -87,7 +92,7 @@ npm run load:derivacion
 
 ---
 
-## 7. Atribución
+## 8. Atribución
 
 | Componente | Responsable |
 | :--- | :--- |
@@ -97,3 +102,15 @@ npm run load:derivacion
 | Fixture de referencia (endpoints) | Duque (B_DUQUE) |
 | Pruebas E2E y k6 | Arevalo (B_AREVALO) |
 | Contratos intermodulares | Pendiente de aprobación bilateral con RutaDoc |
+
+### 8.1. Participación de colaboradores
+
+- **Duque (B_DUQUE):** Implementó el middleware Express 5 (context-middleware.ts, error-middleware.ts)
+  y los endpoints de referencia (expediente.router.ts). Verificar en commits de la rama B_DUQUE.
+- **Reátegui (B_REATEGUI):** Elaboró el esquema DDL de sigd_audit (06_sigd_audit_esquema_ddl.sql).
+  Verificar en commits de la rama B_REATEGUI.
+- **Zevallos (B_ZEVALLOS):** Elaboró la especificación de pruebas E2E y k6
+  (03_suite_pruebas_testcontainers_k6.md). El runbook de evidencia fue elaborado por Arevalo
+  con base en los entregables de Zevallos.
+- **Arevalo (B_AREVALO):** Integró las contribuciones de los demás miembros en esta carpeta,
+  implementó AsyncLocalStorage, repositorios de auditoría, OutboxWorker y la suite de pruebas.

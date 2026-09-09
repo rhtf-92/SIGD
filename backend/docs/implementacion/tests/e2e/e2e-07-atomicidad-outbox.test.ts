@@ -45,48 +45,52 @@ describe('E2E-07 · Atomicidad expediente + evento outbox', () => {
     expect(evento.rows[0].payload.expediente_id).toBe(respuesta.body.expediente_id);
   });
 
-  it('no persiste ni expediente ni outbox cuando falla la inserción del outbox', async () => {
+  it('rollback completo: falla la inserción del outbox y no persiste ni expediente', async () => {
     const pool = obtenerPool();
     const numeroUnico = `EXP-ROLLBACK-${Date.now()}`;
-    const correlation = correlationIdFijo();
 
-    const countAntesExpediente = await pool.query(
-      'SELECT count(*)::int AS total FROM sigd_tra.expediente',
-    );
-    const countAntesOutbox = await pool.query(
-      "SELECT count(*)::int AS total FROM sigd_audit.evento_outbox WHERE agregado = 'expediente'",
+    await pool.query(
+      `ALTER TABLE sigd_audit.evento_outbox
+         DROP COLUMN payload`,
     );
 
     try {
-      await pool.query('BEGIN');
+      const countAntesExp = (
+        await pool.query('SELECT count(*)::int AS total FROM sigd_tra.expediente')
+      ).rows[0].total;
+      const countAntesOut = (
+        await pool.query("SELECT count(*)::int AS total FROM sigd_audit.evento_outbox WHERE agregado = 'expediente'")
+      ).rows[0].total;
 
+      const respuesta = await obtenerAgente()
+        .post('/api/expedientes')
+        .set('x-correlation-id', correlationIdFijo())
+        .send({
+          numero: numeroUnico,
+          dni_solicitante: '12345678',
+          numero_documento: 'DOC-ROLLBACK-1',
+          folios: 3,
+          tipo_documental_id: '550e8400-e29b-41d4-a716-446655440001',
+          solicitante_id: '550e8400-e29b-41d4-a716-446655440002',
+          area_destino_id: '550e8400-e29b-41d4-a716-446655440003',
+        });
+
+      expect(respuesta.status).toBeGreaterThanOrEqual(400);
+
+      const countDespuesExp = (
+        await pool.query('SELECT count(*)::int AS total FROM sigd_tra.expediente')
+      ).rows[0].total;
+      const countDespuesOut = (
+        await pool.query("SELECT count(*)::int AS total FROM sigd_audit.evento_outbox WHERE agregado = 'expediente'")
+      ).rows[0].total;
+
+      expect(countDespuesExp).toBe(countAntesExp);
+      expect(countDespuesOut).toBe(countAntesOut);
+    } finally {
       await pool.query(
-        `INSERT INTO sigd_tra.expediente
-           (numero, dni_solicitante, tipo_documental_id, solicitante_id, area_destino_id, fecha_radicacion)
-         VALUES ($1, '12345678', gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), now())`,
-        [numeroUnico],
+        `ALTER TABLE sigd_audit.evento_outbox
+           ADD COLUMN payload JSONB NOT NULL DEFAULT '{}'::jsonb`,
       );
-
-      await pool.query(
-        `INSERT INTO sigd_audit.evento_outbox
-           (correlation_id, agregado, tipo_evento, payload, estado)
-         VALUES ($1, 'expediente', 'TramiteRegistrado', '{}'::jsonb, 'PENDIENTE')`,
-        [correlation],
-      );
-
-      await pool.query('ROLLBACK');
-    } catch {
-      try { await pool.query('ROLLBACK'); } catch { /* ya revirtió */ }
     }
-
-    const countDespuesExpediente = await pool.query(
-      'SELECT count(*)::int AS total FROM sigd_tra.expediente',
-    );
-    const countDespuesOutbox = await pool.query(
-      "SELECT count(*)::int AS total FROM sigd_audit.evento_outbox WHERE agregado = 'expediente'",
-    );
-
-    expect(countDespuesExpediente.rows[0].total).toBe(countAntesExpediente.rows[0].total);
-    expect(countDespuesOutbox.rows[0].total).toBe(countAntesOutbox.rows[0].total);
   });
 });

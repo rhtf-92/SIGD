@@ -3,6 +3,14 @@ import type { InvalidParam } from '../domain/errors/index.js';
 /**
  * Contratos PROVISIONALES — pendientes de aprobación bilateral con RutaDoc.
  * Los nombres de campos pueden cambiar cuando se firme el contrato definitivo.
+ *
+ * Convención de nomenclatura provisional (D-15):
+ *   - Entidades de negocio: entidade_id (expediente_id, area_id, usuario_id)
+ *   - Auditoría:           id_entidad  (id_auditoria, id_evento)
+ *   - Tabla docucore:      id_tipo_documento, id_formulario (basado en DDL original)
+ *
+ * Los contratos externos aún NO están aprobados. Esta convención se mantendrá
+ * hasta que se firme el contrato bilateral con RutaDoc/IdentiCore/OrganiCore.
  */
 
 export interface CorrelationContext {
