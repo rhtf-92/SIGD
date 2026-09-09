@@ -1,0 +1,86 @@
+﻿{
+    "base_datos":  "tramicore_prueba",
+    "resultado_global":  "PASS",
+    "postgresql":  "PostgreSQL 18.3 on x86_64-windows, compiled by msvc-19.44.35225, 64-bit",
+    "ddl_hash":  "B570585ACEBC634D4DEBC643EFD51355F36AE1A13768EC730A30EBF6D0716133",
+    "bloques":  {
+                    "carrera_anio_nuevo":  {
+                                               "resultado":  "PASS",
+                                               "filas_anuales":  "1",
+                                               "exit_codes":  [
+                                                                  "9476=0",
+                                                                  "32688=0",
+                                                                  "32932=0"
+                                                              ],
+                                               "cuts":  [
+                                                            "EXP-2028-000001",
+                                                            "EXP-2028-000002",
+                                                            "EXP-2028-000003"
+                                                        ],
+                                               "esperados":  [
+                                                                 "EXP-2028-000001",
+                                                                 "EXP-2028-000002",
+                                                                 "EXP-2028-000003"
+                                                             ]
+                                           },
+                    "laboratorio":  {
+                                        "pruebas_fallo":  0,
+                                        "pruebas_ok":  26,
+                                        "resultado":  "PASS",
+                                        "exit_code":  0
+                                    },
+                    "concurrencia_2026":  {
+                                              "exit_codes":  [
+                                                                 "7280=0",
+                                                                 "8496=0",
+                                                                 "16736=0",
+                                                                 "25156=0",
+                                                                 "30704=0"
+                                                             ],
+                                              "cuts_unicos":  500,
+                                              "cuts_total":  500,
+                                              "sesiones":  5,
+                                              "resultado":  "PASS",
+                                              "errores":  0
+                                          },
+                    "foliado_concurrente":  {
+                                                "resultado":  "PASS",
+                                                "rangos":  "1|10",
+                                                "exit_codes":  [
+                                                                   0,
+                                                                   3
+                                                               ],
+                                                "solapamiento_detectado":  true
+                                            }
+                },
+    "fecha_inicio":  "2026-09-09T15:41:55Z",
+    "criterios_aprobacion":  [
+                                 {
+                                     "detalle":  "26 pruebas OK, exit 0",
+                                     "nombre":  "Laboratorio determinista (26 pruebas)",
+                                     "pass":  true
+                                 },
+                                 {
+                                     "detalle":  "total=500 unicos=500",
+                                     "nombre":  "500 CUTs únicos (5 sesiones)",
+                                     "pass":  true
+                                 },
+                                 {
+                                     "detalle":  "errores=0",
+                                     "nombre":  "Sin errores/deadlocks en concurrencia",
+                                     "pass":  true
+                                 },
+                                 {
+                                     "detalle":  "cuts=3 coinciden=True filas=1",
+                                     "nombre":  "Carrera año 2028: 3 CUTs exactos 000001, 000002, 000003 y 1 fila anual",
+                                     "pass":  true
+                                 },
+                                 {
+                                     "detalle":  "popula=0 solapado=3 detectado=True rangos=1|10",
+                                     "nombre":  "Foliado: solapamiento rechazado (prueba negativa real)",
+                                     "pass":  true
+                                 }
+                             ],
+    "fecha_fin":  "2026-09-09T15:41:57Z",
+    "proyecto":  "SIGD - TramiCore H4"
+}
