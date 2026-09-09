@@ -26,6 +26,17 @@ que deben cerrarse ANTES del PR hacia `B_GERIC`.
 > `B_RAMIREZ` (merge del PR #74), por lo que el PR final de TramiCore se realizará desde
 > `B_RAMIREZ`. Si deben reanudar trabajo sobre sus ramas, deberán re-exportar/copiar desde
 > `B_RAMIREZ`.
+>
+> **Incorporación del trabajo H2 de Sandy:** Sandy trabajó en el modelo de datos original
+> (`02_modelo_datos_gestion_documental.md`, `02_diccionario_datos_gestion_documental.md`,
+> `03_tramite_expediente_registro.sql`) en la rama `B_SANDY`. Estos entregables fueron
+> integrados al PR #74 (merge de `B_RIQUELMER` → `B_RAMIREZ`), que consolidó el trabajo
+> previo de ambos colaboradores. Posteriormente, en el commit `08860ff` (Fase 2 completa),
+> los archivos v1 de Sandy fueron reemplazados por las versiones v2 que incorporan CUT,
+> acumulación y foliado. Los archivos originales de Sandy se conservan en
+> `backend/docs/tramicore/historico/` como respaldo. Los commits de Sandy no aparecen
+> en la historia de `B_RAMIREZ` porque su rama fue forzada al punto de main tras la
+> integración; el trabajo está presente a través del merge del PR #74.
 
 ---
 
@@ -80,8 +91,13 @@ Pendiente común con RutaDoc antes de cerrar el diseño físico:
 |---|--------|-------------|--------|
 | 0 | Crear el registro de coordinación y contratos (este documento) | Elmer | ✅ DOCUMENTADO |
 | 1 | Revisar y corregir `01_analisis` citando la fuente normativa del CUT | Riquelmer | PENDIENTE |
-| 2 | Alinear modelo/diccionario/diagrama con el DDL corregido | Sandy | PENDIENTE |
-| 3 | Cerrar contrato del tipo de clave (UUID o BIGINT) con RutaDoc/Geric | Geric + Elmer | PENDIENTE |
+| 2 | Alinear modelo/diccionario/diagrama con el DDL corregido | Sandy (Elmer integró en H4b) | ✅ CORREGIDO (H4b) |
+| 3 | Cerrar contrato del tipo de clave (UUID o BIGINT) con RutaDoc/Geric | Geric + Elmer | PENDIENTE (DEC-UUID) |
 | 4 | Confirmar al profesor las preguntas abiertas P01–P10 | Elmer (recopila) | PENDIENTE |
-| 5 | Documentar conflictos de autoría (commits en `B_SANDY` y `B_RIQUELMER` tras el force-push) | Elmer | PENDIENTE |
-| 6 | PR final de B_RAMIREZ hacia B_GERIC (la rama ya está alineada con origin/B_GERIC) | Elmer | PENDIENTE |
+| 5 | Documentar conflictos de autoría (commits en `B_SANDY` y `B_RIQUELMER` tras el force-push) | Elmer | ✅ DOCUMENTADO (este archivo) |
+| 6 | Corregir whitespace (6 errores trailing spaces) | Elmer | ✅ CORREGIDO (H4b) |
+| 7 | Restaurar documentos históricos a carpeta `historico/` | Elmer | ✅ RESTAURADO (H4b) |
+| 8 | Agregar pruebas de ciclos 3/4+ nodos y foliado concurrente | Elmer | ✅ AGREGADO (H4b) |
+| 9 | Verificar ExitCode de procesos concurrentes en lanzador | Elmer | ✅ CORREGIDO (H4b) |
+| 10 | Generar evidencia consolidada `evidencia_h4.json` | Elmer | ✅ AGREGADO (H4b) |
+| 11 | PR final de B_RAMIREZ hacia B_GERIC (la rama ya está alineada con origin/B_GERIC) | Elmer | PENDIENTE (tras nueva revisión) |

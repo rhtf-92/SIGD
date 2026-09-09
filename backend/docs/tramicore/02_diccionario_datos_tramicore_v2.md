@@ -13,7 +13,7 @@
 | Campo | Tipo | Clave | Nulo | Default | Descripción | Estado |
 |-------|------|-------|------|---------|-------------|--------|
 | id_tramite | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno | CONFIRMADO |
-| codigo_tramite | VARCHAR(20) | UQ | No | — | Código visible de trámite | PENDIENTE |
+| codigo_tramite | VARCHAR(30) | | Sí | NULL | Código visible de trámite (formato institucional PENDIENTE, sin UNIQUE) | PENDIENTE |
 | asunto | VARCHAR(500) | | No | — | Descripción del trámite | CONFIRMADO |
 | estado | VARCHAR(30) | | No | 'REGISTRADO' | Estado del trámite (CHECK) | CONFIRMADO |
 | fk_remitente | BIGINT | FK | No | — | Usuario registrado (Grupo 4) o solicitante externo identificado sin cuenta | CONFIRMADO |
@@ -31,9 +31,10 @@
 
 | Campo | Tipo | Clave | Nulo | Default | Descripción | Estado |
 |-------|------|-------|------|---------|-------------|--------|
-| id_expediente | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno (UUID lógico) | CONFIRMADO |
-| codigo_expediente | VARCHAR(50) | UQ | No | — | Código visible del expediente | CONFIRMADO |
+| id_expediente | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno (UUID PENDIENTE contrato con RutaDoc, ver DEC-UUID) | CONFIRMADO |
+| codigo_expediente | VARCHAR(20) | UQ | No | — | CUT visible formato EXP-YYYY-XXXXXX | CONFIRMADO |
 | fk_tramite | BIGINT | FK | No | — | Trámite asociado (1..N:1 sin UNIQUE) | CONFIRMADO |
+| estado_expediente | VARCHAR(20) | | No | 'ACTIVO' | Estado: ACTIVO/ACUMULADO/ANULADO (PROPUESTO, taxonomía oficial PENDIENTE) | PROPUESTO |
 | creado_en | TIMESTAMPTZ | | No | NOW() | Fecha de creación | CONFIRMADO |
 
 **Cambio v2:** `fk_tramite` pierde restricción UNIQUE → un trámite puede generar múltiples expedientes `[CONFIRMADO]`
@@ -45,8 +46,8 @@
 | Campo | Tipo | Clave | Nulo | Default | Descripción | Estado |
 |-------|------|-------|------|---------|-------------|--------|
 | id_acumulacion | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno | CONFIRMADO |
-| id_expediente_principal | BIGINT | PK,FK | No | — | Expediente principal (Art. 160 LPAG) | CONFIRMADO |
-| id_expediente_accesorio | BIGINT | PK,FK | No | — | Expediente accesorio a fusionar | CONFIRMADO |
+| id_expediente_principal | BIGINT | FK | No | — | Expediente principal (Art. 160 LPAG) | CONFIRMADO |
+| id_expediente_accesorio | BIGINT | FK | No | — | Expediente accesorio a fusionar | CONFIRMADO |
 | fecha_acumulacion | TIMESTAMPTZ | | No | NOW() | Fecha de la fusión jurídica | CONFIRMADO |
 | acto_resolutivo | TEXT | | No | — | Justificación del acto resolutivo | CONFIRMADO |
 | estado_acumulacion | VARCHAR(20) | | No | 'ACUMULADO' | `ACUMULADO` / `DESACUMULADO` | CONFIRMADO |
@@ -54,8 +55,11 @@
 | acto_resolutivo_desacumulacion | TEXT | | Sí | NULL | Justificación de desacumulación | PROPUESTO |
 | creado_en | TIMESTAMPTZ | | No | NOW() | Marca de creación | CONFIRMADO |
 
-**Restricción de clave compuesta:** `(id_expediente_principal, id_expediente_accesorio)` `[CONFIRMADO]`
-**CHECK:** `id_expediente_principal <> id_expediente_accesorio` `[CONFIRMADO]`
+**Restricciones:**
+- Clave primaria: `id_acumulacion` (BIGINT IDENTITY)
+- Dos FK independientes: `id_expediente_principal` y `id_expediente_accesorio` → `expediente(id_expediente)`
+- Índice único parcial: `uq_acumulacion_vigente` solo para acumulaciones vigentes `[CONFIRMADO]`
+- **CHECK:** `id_expediente_principal <> id_expediente_accesorio` `[CONFIRMADO]`
 
 ---
 

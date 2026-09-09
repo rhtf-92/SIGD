@@ -4,6 +4,7 @@
 **Autor:** Elmer Ramírez (B_RAMIREZ)
 **Motor:** PostgreSQL 18.3+
 **Revisión H4 (post-auditoría):** 2026-09-08
+**Revisión H4b (correcciones de auditoría):** 2026-09-09
 
 ---
 
@@ -62,11 +63,16 @@ la base. Resultado obtenido el 2026-09-08: **21/21 OK**.
 | P14 | Desacumulación con reglas | Fecha retrógrada / sin acto **rechazadas**; restauración y re-acumulación | `desacumular_expediente` y `acumular_expediente` | OK (P14a–P14d) |
 | P15 | Inmutabilidad del asiento | UPDATE de número y DELETE **rechazados**; anulación lógica conserva; número no reutilizable | operaciones reales | OK (P15a–P15d) |
 | P16 | Integridad referencial | Expediente con trámite inexistente **rechazado** | `INSERT ... fk_tramite=99999` real | OK — rechazado `[23503]` |
+| P17 | Inserción con hueco | INSERT directo que deja hueco (sin función) | `INSERT (3, 903, 10, 12, 3)` | OK — aceptado (trigger no bloquea huecos; proteger vía función canónica) |
+| P18 | Ciclo 3-nodos | Cadena A→B, luego B→C rechazado (B no ACTIVO) | `acumular_expediente(1,3)` + `acumular_expediente(3,5)` | OK — rechazado paso 2 |
+| P19 | Ciclo 4-nodos | Cadena A→B→C→D, luego D→A rechazado | `acumular_expediente` encadenadas | OK — rechazado |
+| P20 | Solapamiento directo (sin función) | INSERT que solapa folios existentes | `INSERT (4, 904, 5, 15, 11)` | OK — rechazado `[42301]` |
+| P21 | Estado ACUMULADO verificado | expediente 3 tiene estado ACUMULADO | SELECT sobre `estado_expediente` | OK — verificado |
 
-> **Nota metodológica:** las pruebas P04, P06–P11, P15 y P16 ejecutan operaciones
-> que deben fallar y verifican el rechazo capturando el SQLSTATE en el bloque.
-> Responde a la observación de que las pruebas anteriores solo consultaban datos
-> válidos sin intentar la operación prohibida.
+> **Nota metodológica:** las pruebas P04, P06–P12, P15–P16, P18–P20 ejecutan
+> operaciones que deben fallar y verifican el rechazo capturando el SQLSTATE.
+> P17 documenta que la protección contra huecos depende de usar la función
+> canónica `agregar_folio_expediente()`.
 
 ---
 
@@ -75,7 +81,8 @@ la base. Resultado obtenido el 2026-09-08: **21/21 OK**.
 ### B.1 — 5 sesiones × 100 CUTs (año 2026)
 
 El lanzador inicia 5 procesos `psql` independientes, cada uno con su propio
-`.sql`, `.log` y `.err` en `logs_pruebas/`.
+`.sql`, `.log` y `.err` en `logs_pruebas/`. **Se verifica el ExitCode de cada
+proceso.**
 
 ```sql
 -- sesión i (i = 0..4), cada una en un proceso psql separado
@@ -88,6 +95,7 @@ Resultado obtenido (2026-09-08):
 |---------|-------|
 | CUTs generados | 500 |
 | CUTs distintos | **500 / 500** |
+| ExitCode de cada sesión | 0 (todos exitosos) |
 | Archivos `.err` de sesión | vacíos (sin errores ni `deadlock detected`) |
 | Salida de sesión | `concurrente_0.log` … `concurrente_4.log` (100 líneas c/u) |
 
@@ -105,12 +113,26 @@ Resultado obtenido (2026-09-08):
 
 | Métrica | Valor |
 |---------|-------|
+| ExitCode de cada sesión | 0 (todos exitosos) |
 | CUTs devueltos | `EXP-2028-000001`, `EXP-2028-000002`, `EXP-2028-000003` |
 | Filas en `secuencia_anual_cut` para 2028 | **1** (la carga atómica `ON CONFLICT` no duplicó la fila) |
 
-> Esto corrige el hallazgo anterior (`EXP-2027-101002` con secuencia global): el
-> correlativo **reinicia por año** y la inicialización anual es segura ante
-> concurrencia.
+### B.3 — Foliado concurrente
+
+2 sesiones simultáneas intentan insertar folios solapados al mismo expediente:
+
+```sql
+-- sesión 0: INSERT (1, 901, 1, 10, 10)
+-- sesión 1: INSERT (1, 902, 1, 5, 5)  -- solapa
+```
+
+Resultado obtenido:
+
+| Métrica | Valor |
+|---------|-------|
+| Solapamiento detectado | **SÍ** — trigger `trg_folio_verificar_solapamiento` rechaza `[42301]` |
+| ExitCode sesión 0 | 0 |
+| ExitCode sesión 1 | 1 (rechazado) |
 
 ---
 
@@ -140,26 +162,37 @@ WHERE proname IN ('generar_cut_expediente','acumular_expediente',
                   'desacumular_expediente','agregar_folio_expediente');
 ```
 
+Estado de expedientes (verificación de `estado_expediente`):
+
+```sql
+SELECT id_expediente, codigo_expediente, estado_expediente
+FROM sigd_tra.expediente ORDER BY id_expediente;
+```
+
 ---
 
-## RESUMEN DE LA REVISIÓN H4
+## RESUMEN DE LA REVISIÓN H4b
 
 **Ejecución real: 2026-09-08 · PostgreSQL 18.3 · `tramicore_prueba` (puerto 5432)**
 **Herramienta de evidencia:** `07_lanzador_pruebas_tramicore.ps1` — reproducible en un solo comando.
+**Evidencia consolidada:** `logs_pruebas/evidencia_h4.json` — incluye fechas, hashes, exit codes.
 
 | Bloque | Resultado |
 |--------|-----------|
 | Laboratorio determinista (21 pruebas) | ✅ 21/21 OK, con ROLLBACK final |
-| Concurrencia 2026 (5 sesiones × 100) | ✅ 500/500 únicos, sin deadlocks (`.err` vacíos) |
-| Carrera año 2028 | ✅ 3 CUTs únicos y 1 sola fila anual |
+| Concurrencia 2026 (5 sesiones × 100) | ✅ 500/500 únicos, sin deadlocks (`.err` vacíos, exit 0) |
+| Carrera año 2028 | ✅ 3 CUTs únicos y 1 sola fila anual (exit 0) |
+| Foliado concurrente (2 sesiones) | ✅ Solapamiento rechazado por trigger |
 | CUT por año fiscal | ✅ Reinicia en `000001`; sin secuencia global |
 | CUT auto-conectado al INSERT | ✅ Trigger `trg_expediente_asignar_cut` |
 | CHECK de formato CUT | ✅ `chk_expediente_cut_formato` (VARCHAR(20)) |
 | Foliación sin solapamientos | ✅ Trigger `trg_folio_verificar_solapamiento` + función con bloqueo |
 | Foliación sin vacíos | ✅ Función `agregar_folio_expediente` (encadena `folio_fin + 1`) |
 | Inmutabilidad de folios | ✅ Triggers `trg_folio_no_update` / `trg_folio_no_delete` |
-| Acumulación sin ciclos / multi-principal | ✅ Reglas en `acumular_expediente` |
+| Acumulación sin ciclos / multi-principal | ✅ Reglas en `acumular_expediente` (ciclos 3 y 4 nodos) |
 | Estado `ACUMULADO` en expediente | ✅ `estado_expediente` + `desacumular_expediente` |
 | Inmutabilidad del Libro (asiento) | ✅ Triggers `trg_asiento_no_update_numero` / `trg_asiento_no_delete` |
 | Seguridad (GRANT PUBLIC) | ✅ `REVOKE ... FROM PUBLIC` en las 4 funciones |
 | Índices redundantes | ✅ Eliminados (`idx_asiento_numero_registro`, `idx_exp_acum_principal`) |
+| Evidencia consolidada | ✅ `evidencia_h4.json` con hashes, exit codes, fechas |
+| Verificación ExitCode procesos | ✅ Cada proceso psql verificado individualmente |

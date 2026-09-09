@@ -39,7 +39,7 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 | Campo | Tipo | Clave | Nulo | Default | Descripción | Estado |
 |-------|------|-------|------|---------|-------------|--------|
 | id_tramite | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno | CONFIRMADO |
-| codigo_tramite | VARCHAR(20) | UQ | No | — | Código visible de trámite | PROPUESTO |
+| codigo_tramite | VARCHAR(30) | | Sí | NULL | Código visible de trámite (formato institucional PENDIENTE) | PENDIENTE |
 | asunto | VARCHAR(500) | | No | — | Descripción del trámite | CONFIRMADO |
 | estado | VARCHAR(30) | | No | 'REGISTRADO' | Estado del trámite (CHECK) | CONFIRMADO |
 | fk_remitente | BIGINT | FK | No | — | Usuario/Grupo 4 o solicitante externo | CONFIRMADO |
@@ -55,9 +55,10 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 
 | Campo | Tipo | Clave | Nulo | Default | Descripción | Estado |
 |-------|------|-------|------|---------|-------------|--------|
-| id_expediente | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno (UUID lógico) | CONFIRMADO |
-| codigo_expediente | VARCHAR(50) | UQ | No | — | Código visible del expediente | CONFIRMADO |
+| id_expediente | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno (UUID PENDIENTE contrato con RutaDoc, ver DEC-UUID) | CONFIRMADO |
+| codigo_expediente | VARCHAR(20) | UQ | No | — | CUT visible formato EXP-YYYY-XXXXXX | CONFIRMADO |
 | fk_tramite | BIGINT | FK | No | — | Trámite asociado (**sin UNIQUE → 1:N**) | CONFIRMADO |
+| estado_expediente | VARCHAR(20) | | No | 'ACTIVO' | Estado del expediente (ACTIVO/ACUMULADO/ANULADO) | PROPUESTO |
 | creado_en | TIMESTAMPTZ | | No | NOW() | Fecha de creación | CONFIRMADO |
 
 **Cambio clave respecto a v1:** `fk_tramite` **pierde** la restricción `UNIQUE`, permitiendo que **un trámite genere múltiples expedientes** `[CONFIRMADO]`. Esto posibilita la separación flexible entre trámite y expediente.
@@ -69,8 +70,8 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 | Campo | Tipo | Clave | Nulo | Default | Descripción | Estado |
 |-------|------|-------|------|---------|-------------|--------|
 | id_acumulacion | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno | CONFIRMADO |
-| id_expediente_principal | BIGINT | PK,FK | No | — | Expediente principal (Art. 160 LPAG) | CONFIRMADO |
-| id_expediente_accesorio | BIGINT | PK,FK | No | — | Expediente accesorio a fusionar | CONFIRMADO |
+| id_expediente_principal | BIGINT | FK | No | — | Expediente principal (Art. 160 LPAG) | CONFIRMADO |
+| id_expediente_accesorio | BIGINT | FK | No | — | Expediente accesorio a fusionar | CONFIRMADO |
 | fecha_acumulacion | TIMESTAMPTZ | | No | NOW() | Fecha de la fusión jurídica | CONFIRMADO |
 | acto_resolutivo | TEXT | | No | — | Justificación del acto resolutivo | CONFIRMADO |
 | estado_acumulacion | VARCHAR(20) | | No | 'ACUMULADO' | `ACUMULADO` / `DESACUMULADO` | CONFIRMADO |
@@ -79,7 +80,9 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 | creado_en | TIMESTAMPTZ | | No | NOW() | Marca de creación | CONFIRMADO |
 
 **Restricciones:**
-- Clave foránea compuesta: `(id_expediente_principal, id_expediente_accesorio)`
+- Clave primaria: `id_acumulacion` (BIGINT IDENTITY)
+- Dos FK independientes: `id_expediente_principal` y `id_expediente_accesorio` → `expediente(id_expediente)`
+- Índice único parcial: `uq_acumulacion_vigente (id_expediente_principal, id_expediente_accesorio) WHERE estado_acumulacion = 'ACUMULADO'` — solo vigentes
 - `CHECK (id_expediente_principal <> id_expediente_accesorio)` — no puede acumularse a sí mismo
 - El expediente accesorio cambia a estado `ACUMULADO` y sus trámites y folios se fusionan en el principal `[CONFIRMADO]`
 - Desacumulación requiere nuevo acto resolutivo `[CONFIRMADO]`
@@ -181,10 +184,10 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 
 | Identificador | Tipo | Inmutable | Observación |
 |---------------|------|-----------|-------------|
-| id_tramite (técnico) | BIGINT INTENTITY | Sí | Generado por PostgreSQL |
-| id_expediente (técnico) | BIGINT GENERATED ALWAYS AS IDENTITY | Sí | Clave técnica interna |
-| codigo_tramite (visible) | VARCHAR(20) | PENDIENTE | Formato por validar |
-| codigo_expediente (visible) | VARCHAR(50) | PENDIENTE | Formato CUT o similar |
+| id_tramite (técnico) | BIGINT GENERATED ALWAYS AS IDENTITY | Sí | Generado por PostgreSQL |
+| id_expediente (técnico) | BIGINT GENERATED ALWAYS AS IDENTITY | Sí | Clave técnica interna. Migración a UUID PENDIENTE de contrato con RutaDoc (DEC-UUID) |
+| codigo_tramite (visible) | VARCHAR(30) NULL | PENDIENTE | Formato institucional PENDIENTE, sin UNIQUE |
+| codigo_expediente (visible) | VARCHAR(20) | Sí | CUT formato `EXP-YYYY-XXXXXX`, CHECK en DDL |
 | numero_registro (visible) | BIGINT | Sí | Inmutable, correlativo del Libro |
 | CUT (visible) | VARCHAR(20) | Sí | Formato `EXP-YYYY-XXXXXX` |
 
@@ -195,7 +198,7 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 - **Grupo 4 — Personas/remitente:** referencia a `usuario` sin repetir datos personales `[CONFIRMADO]`
 - **Grupo 3 — Áreas/destinatario:** referencia a `area`, marcada como PROPUESTO `[CONFIRMADO]`
 - **Grupo 5 — Documentos/adjuntos:** referencia a `documento`, asignación de foliatura en `expediente_documento_folio` `[CONFIRMADO]`
-- **Grupo 1 — Trazabilidad:** emite evento de creación de expediente con `id_expediente` (UUID) y CUT `[CONFIRMADO]`
+- **Grupo 1 — Trazabilidad:** emite evento de creación de expediente con `id_expediente` (BIGINT, migración a UUID PENDIENTE) y CUT `[CONFIRMADO]`
 
 ---
 

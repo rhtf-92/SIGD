@@ -1,11 +1,11 @@
 # Análisis Funcional: Código Único de Trámite (CUT), Acumulación de Expedientes y Foliado Digital Progresivo
 
-**Proyecto:** Sistema Integral de Gestión Documentaria (SIGD)  
-**Institución:** IESTP "Suiza" (Pucallpa, Ucayali, Perú) — PE DSI  
-**Grupo de Trabajo:** Grupo 2 – “TramiCore”  
-**Responsable del Análisis:** Leysglin Riquelmer Fachin Rojas (Rama: `B_RIQUELMER`)  
-**Sublíder / Integrador:** Elmer Ramírez (`B_RAMIREZ`)  
-**Fase:** Fase 2 — Levantamiento de Observaciones (Estandarización MGD, CUT y Foliado Digital)  
+**Proyecto:** Sistema Integral de Gestión Documentaria (SIGD)
+**Institución:** IESTP "Suiza" (Pucallpa, Ucayali, Perú) — PE DSI
+**Grupo de Trabajo:** Grupo 2 – "TramiCore"
+**Responsable del Análisis:** Leysglin Riquelmer Fachin Rojas (Rama: `B_RIQUELMER`)
+**Sublíder / Integrador:** Elmer Ramírez (`B_RAMIREZ`)
+**Fase:** Fase 2 — Levantamiento de Observaciones (Estandarización MGD, CUT y Foliado Digital)
 
 ---
 

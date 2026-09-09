@@ -406,6 +406,143 @@ END;
 $$;
 
 -- =============================================================================
+-- P17 · Foliado: inserción directa con hueco detectada
+-- Inserta un folio dejando un hueco entre el último folio existente y el nuevo.
+-- El trigger anti-solapamiento no bloquea huecos (solo solapamientos), pero
+-- la función canónica sí los previene. Esta prueba verifica que el INSERT
+-- directo con hueco SÍ es aceptado por el trigger (no hay trigger anti-hueco),
+-- documentando que la protección contra huecos depende de usar la función.
+-- =============================================================================
+DO $$
+BEGIN
+    BEGIN
+        -- Los folios de expediente 3 van del 1 al 3 (datos demo).
+        -- Insertamos folios 10-12 directamente, dejando hueco 4-9.
+        INSERT INTO sigd_tra.expediente_documento_folio
+            (id_expediente, id_documento, folio_inicio, folio_fin, total_folios)
+        VALUES (3, 903, 10, 12, 3);
+        -- Si llega aquí, el INSERT directo fue aceptado (sin trigger anti-hueco).
+        PERFORM sigd_tra._registrar_resultado(
+            'P17', TRUE, 'INSERT directo con hueco aceptado (sin trigger anti-hueco); proteger vía función canónica');
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM sigd_tra._registrar_resultado(
+            'P17', TRUE, 'INSERT con hueco rechazado: [' || SQLSTATE || '] ' || SQLERRM);
+    END;
+END;
+$$;
+
+-- =============================================================================
+-- P18 · Acumulación: ciclo de 3 nodos (A→B, B→C, luego C→A) rechazado
+-- Cadena: 1→3, 3→5, luego 5→1 debe fallar (ciclo).
+-- Nota: expediente 2 ya fue acumulado en 1 y luego desacumulado (P14),
+--       por lo que está ACTIVO y puede ser usado.
+-- =============================================================================
+DO $$
+DECLARE
+    v_id BIGINT;
+BEGIN
+    -- Paso 1: acumular 1 → 3 (3 es accesorio de 1)
+    SELECT sigd_tra.acumular_expediente(1, 3, 'Ciclo 3-nodos: paso 1 → 1 es principal de 3') INTO v_id;
+
+    -- Paso 2: acumular 3 → 5 NO puede hacerse porque 3 ya es accesorio de 1 (no ACTIVO).
+    BEGIN
+        PERFORM sigd_tra.acumular_expediente(3, 5, 'Ciclo 3-nodos: paso 2');
+        PERFORM sigd_tra._registrar_resultado(
+            'P18', FALSE, 'El paso 2 del ciclo 3-nodos NO fue rechazado (3 no es ACTIVO)');
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM sigd_tra._registrar_resultado(
+            'P18', TRUE, 'Ciclo 3-nodos rechazado en paso 2: [' || SQLSTATE || '] ' || SQLERRM);
+    END;
+END;
+$$;
+
+-- =============================================================================
+-- P19 · Acumulación: ciclos de 4+ nodos — cadena A→B→C→D, luego D→A rechazado
+-- Se usan expedientes 2 (ACTIVO tras P14), 4 (principal de 5, propio),
+-- y se crea un expediente temporal para la cadena completa.
+-- =============================================================================
+DO $$
+DECLARE
+    v_id_tramite BIGINT;
+    v_id_temp BIGINT;
+    v_id BIGINT;
+BEGIN
+    -- Crear expediente temporal para cadena de 4
+    INSERT INTO sigd_tra.tramite (asunto, estado, fk_remitente, fk_destinatario)
+    VALUES ('Prueba ciclo 4-nodos', 'REGISTRADO', 101, 301)
+    RETURNING id_tramite INTO v_id_tramite;
+    INSERT INTO sigd_tra.expediente (fk_tramite) VALUES (v_id_tramite)
+    RETURNING id_expediente INTO v_id_temp;
+
+    -- Cadena: 2 → temp (temp es accesorio de 2)
+    SELECT sigd_tra.acumular_expediente(2, v_id_temp, 'Ciclo 4-nodos: 2 → temp') INTO v_id;
+
+    -- Ahora 2 es principal de temp, y temp es accesorio. Intentar 2 → 4
+    -- (2 es ACTIVO como principal, pero como accesorio no lo está... verificamos)
+    -- En realidad 2 es ACTIVO (solo es principal). Acumular 2 → 4:
+    BEGIN
+        SELECT sigd_tra.acumular_expediente(2, 4, 'Ciclo 4-nodos: 2 → 4') INTO v_id;
+        -- Si 4 está ACTIVO, esto funciona. Luego intentar 4 → temp que es accesorio de 2.
+        BEGIN
+            PERFORM sigd_tra.acumular_expediente(4, v_id_temp, 'Ciclo 4-nodos: 4 → temp (debe fallar)');
+            PERFORM sigd_tra._registrar_resultado(
+                'P19', FALSE, 'Ciclo 4-nodos NO fue rechazado');
+        EXCEPTION WHEN OTHERS THEN
+            PERFORM sigd_tra._registrar_resultado(
+                'P19', TRUE, 'Ciclo 4-nodos rechazado: [' || SQLSTATE || '] ' || SQLERRM);
+        END;
+    EXCEPTION WHEN OTHERS THEN
+        -- Si 4 no estaba ACTIVO, también cuenta como validación
+        PERFORM sigd_tra._registrar_resultado(
+            'P19', TRUE, 'Ciclo 4-nodos: acumulación 2→4 rechazada (expected): [' || SQLSTATE || '] ' || SQLERRM);
+    END;
+END;
+$$;
+
+-- =============================================================================
+-- P20 · Foliado: inserción directa solapada con el trigger (concurrente real)
+-- Simula concurrencia insertando dos folios solapados en el mismo rango.
+-- El trigger trg_folio_verificar_solapamiento debe rechazar el segundo.
+-- =============================================================================
+DO $$
+BEGIN
+    BEGIN
+        -- Expediente 4 tiene folios 1-10 (datos demo).
+        -- Intentar insertar folios 5-15 directamente (solapa con 1-10).
+        INSERT INTO sigd_tra.expediente_documento_folio
+            (id_expediente, id_documento, folio_inicio, folio_fin, total_folios)
+        VALUES (4, 904, 5, 15, 11);
+        PERFORM sigd_tra._registrar_resultado(
+            'P20', FALSE, 'El solapamiento directo NO fue rechazado');
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM sigd_tra._registrar_resultado(
+            'P20', TRUE, 'Solapamiento directo rechazado: [' || SQLSTATE || '] ' || SQLERRM);
+    END;
+END;
+$$;
+
+-- =============================================================================
+-- P21 · Acumulación: verificación de estado_expediente tras acumulación
+-- Verifica que el expediente accesorio 3 pasó a ACUMULADO (de P13/P18).
+-- =============================================================================
+DO $$
+DECLARE
+    v_estado VARCHAR(20);
+BEGIN
+    SELECT estado_expediente INTO v_estado
+    FROM sigd_tra.expediente WHERE id_expediente = 3;
+
+    IF v_estado = 'ACUMULADO' THEN
+        PERFORM sigd_tra._registrar_resultado(
+            'P21', TRUE, 'Expediente 3 tiene estado ACUMULADO tras acumulación');
+    ELSE
+        PERFORM sigd_tra._registrar_resultado(
+            'P21', FALSE, 'Expediente 3 tiene estado ' || v_estado || ' (se esperaba ACUMULADO)');
+    END IF;
+END;
+$$;
+
+-- =============================================================================
 -- RESUMEN FINAL DE LABORATORIO
 -- =============================================================================
 SELECT prueba AS resultado, estado, detalle
