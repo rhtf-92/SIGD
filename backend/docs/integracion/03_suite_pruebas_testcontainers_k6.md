@@ -52,7 +52,7 @@ datos precargados manualmente, y que el rendimiento cumpla umbrales de aceptaci�
 - Especificación de pruebas de carga con **k6**, escenarios y umbrales de aceptación (*Thresholds*).
 
 ### Fuera de alcance
-- Middleware de errores RFC 7807 (entregable 01 — Azareño).
+- Middleware de errores RFC 7807 (entregable 01 — Duque).
 - Arquitectura de auditoría y AsyncLocalStorage (entregable 02 — Reátegui).
 - Contratos intermodulares y matriz Productor-Consumidor (entregable 04 — Ricardo).
 
@@ -157,16 +157,20 @@ Cada caso verifica la **integración entre módulos**, la **propagación de cont
 
 | ID | Módulo | Descripción | Resultado Esperado | Taxonomía |
 | :--- | :--- | :--- | :--- | :---: |
-| **E2E-01** | Mesa de Partes | Envío de solicitud con datos válidos de un ciudadano. | HTTP `201 Created` y persistencia del expediente con `correlation_id` asignado. | CONFIRMADO |
-| **E2E-02** | Mesa de Partes / Middleware | Envío de JSON con campos faltantes o formato incorrecto (p. ej. DNI inválido, folios negativos). | HTTP `400` estructurado bajo RFC 7807 con lista de `invalid_params`. | CONFIRMADO |
-| **E2E-03** | IdentiCore / Middleware | Registro de usuario con correo o DNI ya existente. | Captura de excepción PostgreSQL `23505` y mapeo a HTTP `409 Conflict`. | CONFIRMADO |
-| **E2E-04** | TramiCore / Middleware | Asignar/derivar trámite hacia un área que no existe. | Intercepción de violación `23503` y respuesta JSON indicando recurso inválido (`400/404`). | CONFIRMADO |
-| **E2E-05** | TramiCore / OrganiCore | Transición de estado desde Mesa de Partes hacia la jefatura. | HTTP `200 OK` y actualización correcta de la ubicación del documento. | CONFIRMADO |
-| **E2E-06** | Observabilidad / Contexto | Ejecutar una mutación verificando la captura de metadatos. | En `sigd_audit.bitacora_auditoria` constan `usuario_id`, `ip_origen` y `correlation_id` capturados automáticamente sin pasarlos en el código de negocio. | CONFIRMADO |
-| **E2E-07** | Observabilidad / Outbox | Radicar un expediente verificando atomicidad. | En la misma transacción se registran el expediente y el evento en `sigd_audit.evento_outbox` para su procesamiento asíncrono. | CONFIRMADO |
-| **E2E-08** | Seguridad / Middleware | Petición a ruta protegida sin token de autenticación. | HTTP `401 Unauthorized` en RFC 7807, bloqueando el acceso a la base de datos. | CONFIRMADO |
-| **E2E-09** | Seguridad / Middleware | Usuario con rol de operador intenta una acción de administrador. | HTTP `403 Forbidden` indicando privilegios insuficientes. | CONFIRMADO |
-| **E2E-10** | Middleware de Errores | Inducción deliberada de una falla crítica (p. ej. pérdida de conexión). | HTTP `500` estandarizado bajo RFC 7807 con ocultamiento total del *stack trace*. | CONFIRMADO |
+| **E2E-01** | Mesa de Partes | Envío de solicitud con datos válidos de un ciudadano. | HTTP `201 Created` y persistencia del expediente con `correlation_id` asignado. | PROPUESTO |
+| **E2E-02** | Mesa de Partes / Middleware | Envío de JSON con campos faltantes o formato incorrecto (p. ej. DNI inválido, folios negativos). | HTTP `400` estructurado bajo RFC 7807 con lista de `invalid_params`. | PROPUESTO |
+| **E2E-03** | IdentiCore / Middleware | Registro de usuario con correo o DNI ya existente. | Captura de excepción PostgreSQL `23505` y mapeo a HTTP `409 Conflict`. | PROPUESTO |
+| **E2E-04** | TramiCore / Middleware | Asignar/derivar trámite hacia un área que no existe. | Intercepción de violación `23503` y respuesta JSON indicando recurso inválido (`400/404`). | PROPUESTO |
+| **E2E-05** | TramiCore / OrganiCore | Transición de estado desde Mesa de Partes hacia la jefatura. | HTTP `200 OK` y actualización correcta de la ubicación del documento. | PROPUESTO |
+| **E2E-06** | Observabilidad / Contexto | Ejecutar una mutación verificando la captura de metadatos. | En `sigd_audit.bitacora_auditoria` constan `usuario_id`, `ip_origen` y `correlation_id` capturados automáticamente sin pasarlos en el código de negocio. | PROPUESTO |
+| **E2E-07** | Observabilidad / Outbox | Radicar un expediente verificando atomicidad. | En la misma transacción se registran el expediente y el evento en `sigd_audit.evento_outbox` para su procesamiento asíncrono. | PROPUESTO |
+| **E2E-08** | Seguridad / Middleware | Petición a ruta protegida sin token de autenticación. | HTTP `401 Unauthorized` en RFC 7807, bloqueando el acceso a la base de datos. | PROPUESTO |
+| **E2E-09** | Seguridad / Middleware | Usuario con rol de operador intenta una acción de administrador. | HTTP `403 Forbidden` indicando privilegios insuficientes. | PROPUESTO |
+| **E2E-10** | Middleware de Errores | Inducción deliberada de una falla crítica (p. ej. pérdida de conexión). | HTTP `500` estandarizado bajo RFC 7807 con ocultamiento total del *stack trace*. | PROPUESTO |
+
+> **Nota (v1.4):** estos casos están `PROPUESTO` (requisito de la suite, R-10). Pasan a `CONFIRMADO`
+> solo cuando exista evidencia ejecutable (runbook 08) de la suite corriendo en `implementacion/`
+> (Testcontainers o `TEST_DATABASE_URL`).
 
 ### 5.1. Especificación detallada de cada caso
 
@@ -367,7 +371,7 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
        carga constante 50 VU) y los umbrales de la sección 6.1.
 7. [ ] **Configurar la URL base** del ambiente bajo prueba por variable de entorno.
 8. [ ] **Ejecutar local y en CI** y adjuntar el informe de carga (P95 y tasa de errores) al entregable.
-9. [ ] **Sincronizar dependencias:** coordinar con Azareño (entregable 01), Reátegui (entregable 02)
+9. [ ] **Sincronizar dependencias:** coordinar con Duque (entregable 01), Reátegui (entregable 02)
        y Ricardo (entregable 04) los códigos esperados en las respuestas, los nombres de tablas de la
        sección 4.4 y el envelope de los eventos (schema_version, id_expediente, clave_idempotencia).
 10. [ ] **Validar el envelope de los eventos** en los casos que tocan RutaDoc (E-01, E-02, E-06, E-07)
@@ -391,8 +395,8 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
 
 ## 10. Dependencias y Decisiones
 
-- **Dependencia (Azareño):** los casos E2E-02, 03, 04, 08, 09 y 10 validan la especificación RFC 7807
-  del entregable 01 (responsable: Azareño).
+- **Dependencia (Duque):** los casos E2E-02, 03, 04, 08, 09 y 10 validan la especificación RFC 7807
+  del entregable 01 (responsable: Duque).
 - **Dependencia (Reátegui):** los casos E2E-06 y E2E-07 validan la bitácora y el outbox del entregable
   02 (responsable: Reátegui).
 - **Decisiones registradas:**

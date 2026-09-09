@@ -15,9 +15,9 @@ const esquemaRadicacion = z.object({
   dni_solicitante: z.string().regex(/^\d{8}$/, 'Formato de DNI inválido.'),
   numero_documento: z.string().min(1, 'El campo es obligatorio.'),
   folios: z.number().int().min(0, 'Los folios no pueden ser negativos.'),
-  tipo_documental_id: z.string().uuid(),
-  solicitante_id: z.string().uuid(),
-  area_destino_id: z.string().uuid(),
+  id_tipo_documental: z.string().uuid(),
+  id_solicitante: z.string().uuid(),
+  id_area_destino: z.string().uuid(),
 });
 
 export function crearRouterReferencia(pool: Pool): Router {
@@ -57,11 +57,11 @@ export function crearRouterReferencia(pool: Pool): Router {
     const datos = esquema.parse(req.body);
     const cliente = await pool.connect();
     try {
-      const creada = await cliente.query<{ area_id: string }>(
-        `INSERT INTO sigd_org.area (nombre, vigente) VALUES ($1, true) RETURNING area_id`,
+      const creada = await cliente.query<{ id_area: string }>(
+        `INSERT INTO sigd_org.area (nombre, vigente) VALUES ($1, true) RETURNING id_area`,
         [datos.nombre],
       );
-      res.status(201).json({ area_id: creada.rows[0].area_id });
+      res.status(201).json({ id_area: creada.rows[0].id_area });
     } finally {
       cliente.release();
     }
@@ -72,20 +72,20 @@ export function crearRouterReferencia(pool: Pool): Router {
     const cliente = await pool.connect();
     try {
       await cliente.query('BEGIN');
-      const insertado = await cliente.query<{ expediente_id: string; numero: string }>(
+      const insertado = await cliente.query<{ id_expediente: string; numero: string }>(
         `INSERT INTO sigd_tra.expediente
-           (numero, dni_solicitante, tipo_documental_id, solicitante_id, area_destino_id, fecha_radicacion)
+           (numero, dni_solicitante, id_tipo_documental, id_solicitante, id_area_destino, fecha_radicacion)
          VALUES ($1, $2, $3, $4, $5, now())
-         RETURNING expediente_id, numero`,
+         RETURNING id_expediente, numero`,
         [
           datos.numero,
           datos.dni_solicitante,
-          datos.tipo_documental_id,
-          datos.solicitante_id,
-          datos.area_destino_id,
+          datos.id_tipo_documental,
+          datos.id_solicitante,
+          datos.id_area_destino,
         ],
       );
-      const expedienteId = insertado.rows[0].expediente_id;
+      const idExpediente = insertado.rows[0].id_expediente;
 
       await registrarMutacion(cliente, {
         esquema: 'sigd_tra',
@@ -93,7 +93,7 @@ export function crearRouterReferencia(pool: Pool): Router {
         operacion: 'INSERT',
         datos_despues: {
           numero: datos.numero,
-          tipo_documental_id: datos.tipo_documental_id,
+          id_tipo_documental: datos.id_tipo_documental,
         },
       });
 
@@ -101,18 +101,18 @@ export function crearRouterReferencia(pool: Pool): Router {
         agregado: 'expediente',
         tipo_evento: 'TramiteRegistrado',
         payload: {
-          expediente_id: expedienteId,
+          id_expediente: idExpediente,
           numero: datos.numero,
-          tipo_documental_id: datos.tipo_documental_id,
-          solicitante_id: datos.solicitante_id,
-          area_destino_id: datos.area_destino_id,
+          id_tipo_documental: datos.id_tipo_documental,
+          id_solicitante: datos.id_solicitante,
+          id_area_destino: datos.id_area_destino,
           correlation_id: getRequestContext()?.correlation_id,
         },
       });
 
       await cliente.query('COMMIT');
       res.status(201).json({
-        expediente_id: expedienteId,
+        id_expediente: idExpediente,
         numero: insertado.rows[0].numero,
         correlation_id: getRequestContext()?.correlation_id,
       });
@@ -126,36 +126,36 @@ export function crearRouterReferencia(pool: Pool): Router {
 
   router.post('/expedientes/derivar', async (req, res) => {
     const esquema = z.object({
-      expediente_id: z.string().uuid(),
-      area_destino_id: z.string().uuid(),
+      id_expediente: z.string().uuid(),
+      id_area_destino: z.string().uuid(),
     });
     const datos = esquema.parse(req.body);
     const cliente = await pool.connect();
     try {
       await cliente.query('BEGIN');
       const area = await cliente.query(
-        `SELECT area_id FROM sigd_org.area WHERE area_id = $1 AND vigente = true`,
-        [datos.area_destino_id],
+        `SELECT id_area FROM sigd_org.area WHERE id_area = $1 AND vigente = true`,
+        [datos.id_area_destino],
       );
       if (!area.rowCount || area.rowCount === 0) {
         throw new NotFoundError({ detail: 'El área de destino no existe.' });
       }
 
       await cliente.query(
-        `INSERT INTO sigd_rut.movimiento_tramite (expediente_id, area_destino_id, fecha_movimiento)
+        `INSERT INTO sigd_rut.movimiento_tramite (id_expediente, id_area_destino, fecha_movimiento)
          VALUES ($1, $2, now())`,
-        [datos.expediente_id, datos.area_destino_id],
+        [datos.id_expediente, datos.id_area_destino],
       );
 
       await registrarMutacion(cliente, {
         esquema: 'sigd_rut',
         tabla: 'movimiento_tramite',
         operacion: 'INSERT',
-        datos_despues: { expediente_id: datos.expediente_id, area_destino_id: datos.area_destino_id },
+        datos_despues: { id_expediente: datos.id_expediente, id_area_destino: datos.id_area_destino },
       });
 
       await cliente.query('COMMIT');
-      res.status(200).json({ ok: true, expediente_id: datos.expediente_id });
+      res.status(200).json({ ok: true, id_expediente: datos.id_expediente });
     } catch (error) {
       await cliente.query('ROLLBACK');
       throw error;

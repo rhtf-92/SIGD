@@ -33,17 +33,12 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       await container.stop();
     };
   } catch (error) {
-    const localUrl = 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
-    console.warn(
-      '[MIGRACION] Docker/Testcontainers no disponible. Usando PostgreSQL local.',
-      error instanceof Error ? error.message : String(error),
+    throw new Error(
+      '[MIGRACION] No se pudo preparar PostgreSQL. Define TEST_DATABASE_URL explícitamente ' +
+        '(por ejemplo postgres://postgres:postgres@localhost:5432/sigd_prueba) o asegura Docker ' +
+        'disponible para Testcontainers. La suite NO cae silenciosamente a un PostgreSQL local fijo. ' +
+        `Detalle: ${error instanceof Error ? error.message : String(error)}`,
     );
-    console.log(`[MIGRACION] Conectando a: ${localUrl}`);
-    process.env.TEST_DATABASE_URL = localUrl;
-
-    await ejecutarMigraciones(localUrl);
-
-    return async () => {};
   }
 }
 
@@ -70,18 +65,23 @@ async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
   try {
     await cliente.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
 
-    if (existsSync(ddl)) {
-      console.log(`[MIGRACION] Aplicando DDL de auditoría: ${ddl}`);
-      await aplicarSql(cliente, ddl);
-    } else {
-      console.warn(
-        `[MIGRACION] DDL de auditoría no encontrado en ${ddl}. ` +
-        'Las pruebas de auditoría/Outbox usarán el stub del fixture.',
+    if (!existsSync(ddl)) {
+      throw new Error(
+        `[MIGRACION] DDL real de auditoría no encontrado en ${ddl}. ` +
+          'La suite requiere el esquema sigd_audit real; NO se sustituye por un stub del fixture.',
       );
     }
 
+    console.log(`[MIGRACION] Aplicando DDL real de auditoría (${ON_ERROR_STOP}): ${ddl}`);
+    await aplicarSql(cliente, ddl);
+
+    console.log(
+      `[MIGRACION] Aplicando FIXTURES PROVISIONALES (5 esquemas de módulos; sigd_audit NO está aquí): ${fixture}`,
+    );
     await aplicarSql(cliente, fixture);
-    console.log('[MIGRACION] Fixtures de los 6 esquemas aplicados correctamente.');
+    console.log(
+      '[MIGRACION] Entorno preparado: sigd_audit del DDL real de integracion/ + stubs provisionales de los 5 módulos.',
+    );
   } finally {
     await cliente.end();
   }

@@ -22,9 +22,9 @@ describe('E2E-07 · Atomicidad expediente + evento outbox', () => {
         dni_solicitante: '12345678',
         numero_documento: 'DOC-ATM-1',
         folios: 5,
-        tipo_documental_id: '550e8400-e29b-41d4-a716-446655440001',
-        solicitante_id: '550e8400-e29b-41d4-a716-446655440002',
-        area_destino_id: '550e8400-e29b-41d4-a716-446655440003',
+        id_tipo_documental: '550e8400-e29b-41d4-a716-446655440001',
+        id_solicitante: '550e8400-e29b-41d4-a716-446655440002',
+        id_area_destino: '550e8400-e29b-41d4-a716-446655440003',
       });
 
     expect(respuesta.status).toBe(201);
@@ -42,16 +42,29 @@ describe('E2E-07 · Atomicidad expediente + evento outbox', () => {
     expect(evento.rows[0].estado).toBe('PENDIENTE');
     expect(evento.rows[0].tipo_evento).toBe('TramiteRegistrado');
     expect(evento.rows[0].payload.correlation_id).toBe(correlation);
-    expect(evento.rows[0].payload.expediente_id).toBe(respuesta.body.expediente_id);
+    expect(evento.rows[0].payload.id_expediente).toBe(respuesta.body.id_expediente);
   });
 
-  it('rollback completo: falla la inserción del outbox y no persiste ni expediente', async () => {
+  it('rollback completo sin alterar el esquema: falla inducida con trigger temporal y no persiste expediente, outbox ni bitácora', async () => {
     const pool = obtenerPool();
     const numeroUnico = `EXP-ROLLBACK-${Date.now()}`;
 
     await pool.query(
-      `ALTER TABLE sigd_audit.evento_outbox
-         DROP COLUMN payload`,
+      `CREATE OR REPLACE FUNCTION sigd_audit.e2e07_falla_inducida()
+       RETURNS TRIGGER AS $$
+       BEGIN
+         RAISE EXCEPTION 'falla inducida E2E-07: el evento no debe persistir'
+           USING ERRCODE = 'P0001';
+       END;
+       $$ LANGUAGE plpgsql`,
+    );
+    await pool.query(
+      `DROP TRIGGER IF EXISTS e2e07_trg_falla ON sigd_audit.evento_outbox`,
+    );
+    await pool.query(
+      `CREATE TRIGGER e2e07_trg_falla
+       BEFORE INSERT ON sigd_audit.evento_outbox
+       FOR EACH ROW EXECUTE FUNCTION sigd_audit.e2e07_falla_inducida()`,
     );
 
     try {
@@ -60,6 +73,11 @@ describe('E2E-07 · Atomicidad expediente + evento outbox', () => {
       ).rows[0].total;
       const countAntesOut = (
         await pool.query("SELECT count(*)::int AS total FROM sigd_audit.evento_outbox WHERE agregado = 'expediente'")
+      ).rows[0].total;
+      const countAntesBit = (
+        await pool.query(
+          "SELECT count(*)::int AS total FROM sigd_audit.bitacora_auditoria WHERE esquema = 'sigd_tra' AND tabla = 'expediente'",
+        )
       ).rows[0].total;
 
       const respuesta = await obtenerAgente()
@@ -70,9 +88,9 @@ describe('E2E-07 · Atomicidad expediente + evento outbox', () => {
           dni_solicitante: '12345678',
           numero_documento: 'DOC-ROLLBACK-1',
           folios: 3,
-          tipo_documental_id: '550e8400-e29b-41d4-a716-446655440001',
-          solicitante_id: '550e8400-e29b-41d4-a716-446655440002',
-          area_destino_id: '550e8400-e29b-41d4-a716-446655440003',
+          id_tipo_documental: '550e8400-e29b-41d4-a716-446655440001',
+          id_solicitante: '550e8400-e29b-41d4-a716-446655440002',
+          id_area_destino: '550e8400-e29b-41d4-a716-446655440003',
         });
 
       expect(respuesta.status).toBeGreaterThanOrEqual(400);
@@ -83,14 +101,18 @@ describe('E2E-07 · Atomicidad expediente + evento outbox', () => {
       const countDespuesOut = (
         await pool.query("SELECT count(*)::int AS total FROM sigd_audit.evento_outbox WHERE agregado = 'expediente'")
       ).rows[0].total;
+      const countDespuesBit = (
+        await pool.query(
+          "SELECT count(*)::int AS total FROM sigd_audit.bitacora_auditoria WHERE esquema = 'sigd_tra' AND tabla = 'expediente'",
+        )
+      ).rows[0].total;
 
       expect(countDespuesExp).toBe(countAntesExp);
       expect(countDespuesOut).toBe(countAntesOut);
+      expect(countDespuesBit).toBe(countAntesBit);
     } finally {
-      await pool.query(
-        `ALTER TABLE sigd_audit.evento_outbox
-           ADD COLUMN payload JSONB NOT NULL DEFAULT '{}'::jsonb`,
-      );
+      await pool.query(`DROP TRIGGER IF EXISTS e2e07_trg_falla ON sigd_audit.evento_outbox`);
+      await pool.query(`DROP FUNCTION IF EXISTS sigd_audit.e2e07_falla_inducida()`);
     }
   });
 });

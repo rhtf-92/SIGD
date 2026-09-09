@@ -15,8 +15,8 @@ máquina con **Docker**; mientras no exista, la evidencia permanece `PENDIENTE` 
 
 | # | Evidencia | Origen | Formato de salida |
 | :---: | :--- | :--- | :--- |
-| E1 | Config Testcontainers (PostgreSQL 18 Alpine) y Vitest | `vitest.config.ts`, `tests/setup/global-setup.ts` | `npm run test:e2e` |
-| E2 | 10 casos E2E con Supertest | `tests/e2e/e2e-01…10.test.ts` | Reporte Vitest (duration, tests passed/failed) |
+| E1 | Config Testcontainers (PostgreSQL 18 Alpine) **o** PostgreSQL existente vía `TEST_DATABASE_URL` + Vitest | `vitest.config.ts`, `tests/setup/global-setup.ts` | `npm run test:e2e` |
+| E2 | 12 archivos de casos E2E con Supertest (22 casos) | `tests/e2e/e2e-01…12.test.ts` | Reporte Vitest (duration, tests passed/failed) |
 | E3 | Timestamps y logs de cada ejecución | `tests/setup/global-setup.ts` + captura de consola | Log con hora ([HH:mm:ss]) y fecha |
 | E4 | Exit code de cada etapa | Código de retorno de cada comando | `0 = exitoso`, `1 = fallo` |
 | E5 | Script k6 con `check()` y `thresholds` | `k6/escenario-1-radicacion.js`, `k6/escenario-2-derivacion.js` | Salida k6 |
@@ -28,8 +28,11 @@ máquina con **Docker**; mientras no exista, la evidencia permanece `PENDIENTE` 
 - Docker Engine en la máquina que ejecuta las pruebas (Linux o Windows con WSL2).
 - k6: binario local (`k6 --version`) **o** imagen `grafana/k6` (alternativa en §5.2).
 
-> La suite E2E levanta PostgreSQL 18 (Alpine) con Testcontainers y aplica el DDL
-> `06_sigd_audit_esquema_ddl.sql`; no requiere una base local configurada.
+> La suite E2E aplica el DDL `06_sigd_audit_esquema_ddl.sql` + los fixtures PROVISIONALES del
+> prototipo. Se ejecuta con **Testcontainers (PostgreSQL 18 Alpine)** o, en máquinas sin Docker, con un
+> PostgreSQL existente definido explícitamente: `TEST_DATABASE_URL=postgres://...` (el global-setup
+> **falla con error instructivo** si no hay ninguna de las dos opciones; nunca usa un fallback local
+> silencioso).
 
 ## 3. Paso 0 — Preparar el entorno
 
@@ -49,7 +52,7 @@ npm run test:unit
 
 Registrar el exit code de cada uno; deben terminar en `0`.
 
-## 4. Paso 1 — Ejecutar los 10 E2E con Testcontainers
+## 4. Paso 1 — Ejecutar la suite E2E (12 archivos / 22 casos)
 
 Se crea una carpeta de evidencia con marca de tiempo y se captura la salida completa:
 
@@ -57,16 +60,21 @@ Se crea una carpeta de evidencia con marca de tiempo y se captura la salida comp
 $ev = Join-Path "evidencia" ("e2e-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 New-Item -ItemType Directory -Force -Path $ev | Out-Null
 
-# Ejecutar la suite E2E volcando a log con timestamps
+# Opción A: Testcontainers (requiere Docker)
 npm run test:e2e 2>&1 | Tee-Object -FilePath (Join-Path $ev "e2e.log")
+
+# Opción B: PostgreSQL existente sin Docker (define TEST_DATABASE_URL explícitamente)
+$env:TEST_DATABASE_URL = "postgres://postgres:postgres@localhost:5432/sigd_prueba"
+npm run test:e2e 2>&1 | Tee-Object -FilePath (Join-Path $ev "e2e.log")
+
 $code = $LASTEXITCODE
 "EXIT_CODE=$code" | Add-Content -Path (Join-Path $ev "e2e.log")
 
 # Guardar métricas en resumen corto para el reporte
-if ($code -eq 0) { "PASS: 10/10 E2E" } else { "FAIL: revisar e2e.log" } | Out-File (Join-Path $ev "resumen.txt")
+if ($code -eq 0) { "PASS: 12/12 archivos, 22/22 casos E2E" } else { "FAIL: revisar e2e.log" } | Out-File (Join-Path $ev "resumen.txt")
 ```
 
-**Contenido esperado del log:** los 10 casos (`e2e-01` a `e2e-10`) con nombre, duración, timestamps
+**Contenido esperado del log:** los 12 archivos (`e2e-01` a `e2e-12`) con nombre, duración, timestamps
 de Vitest y el `EXIT_CODE`. Al adjuntarse al PR se cumple E1–E4.
 
 ## 5. Paso 2 — Carga con k6 (radicación y derivación)
@@ -141,7 +149,7 @@ docker run --rm -i -e BASE_URL=http://host.docker.internal:3000 -v "${PWD}/k6:/k
 
 | # | Criterio | Cumple |
 | :---: | :--- | :---: |
-| 1 | Los 10 casos E2E pasan en Testcontainers con exit code 0 y logs con timestamp. | DI |
+| 1 | Los 12 archivos / 22 casos E2E pasan (Testcontainers o `TEST_DATABASE_URL`) con exit code 0 y logs con timestamp. | DI |
 | 2 | k6 ejecuta los 2 escenarios con `check()` y `thresholds` definidos. | DI |
 | 3 | P95 < 200 ms y tasa de errores < 0.1 % en ambos escenarios. | DI |
 | 4 | Los artefactos se adjuntan y referencian en 07 §3 y 05 R-10. | DI |
@@ -151,4 +159,8 @@ DI = disponible en la máquina con Docker; se completa al ejecutar.
 ---
 
 *Documento elaborado por Ricardo (`B_AREVALO`) con base en los entregables 03 (Zevallos) y 05.
-Revisión 1.0: primera versión del runbook de evidencia tras la cancelación del PR #79.*
+Revisión 1.1: incorpora la alternativa `TEST_DATABASE_URL` (sin Docker) y la suite completa de
+12 archivos / 22 casos E2E.*
+
+> **Evidencia E2E ejecutada:** `implementacion/evidencia/e2e-20260909-123500/` (PASS 12/12 · 22/22 ·
+> EXIT_CODE=0) — ronda de correcciones P2–P11 del prototipo.

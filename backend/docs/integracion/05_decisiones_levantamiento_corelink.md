@@ -7,7 +7,7 @@
 **Responsable del entregable:** Ricardo · `B_AREVALO`
 **Documento:** `05_decisiones_levantamiento_corelink.md`
 **Fecha:** 8 de septiembre de 2026
-**Versión:** 1.3 (Revisión del Liderazgo — PR #79 cancelado · correcciones pre-merge)
+**Versión:** 1.4 (Revisión del Liderazgo — segunda ronda: atribuciones y separación de migraciones)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
@@ -20,6 +20,10 @@
 > único** `PROPUESTO`; (3) se agrega el **detalle de decisiones** (alternativa, justificación, impacto
 > y evidencia) en §4.3; (4) se registran D-20 a D-23 (entrega al-menos-una-vez, `correlation_id` sin
 > default, FK de IdentiCore SUSPENDIDA y roles `sigd_app`/`sigd_worker`).
+>
+> **Revisión v1.4 (segunda ronda del liderazgo):** (1) se corrige la atribución de D-01, D-02, D-04 y
+> D-14 a **Duque**; (2) se documenta la separación de migraciones en la suite (DDL real de `sigd_audit`
+> + stubs provisionales de los 5 esquemas, sin cargar los DDL oficiales de los demás grupos).
 
 ---
 
@@ -77,10 +81,10 @@ sigue la taxonomía oficial.
 
 | # | Fecha | Contexto | Decisión | Estado | Responsable |
 | :---: | :--- | :--- | :--- | :---: | :--- |
-| D-01 | 03/09/2026 | Necesidad de un estándar de errores internacional y vigente. | Adoptar **RFC 9457** manteniendo compatibilidad con RFC 7807, con los 8 campos especificados. | CONFIRMADO | Azareño |
-| D-02 | 03/09/2026 | Evitar respuestas HTTP dispersas en cada módulo. | Todo módulo **lanza** la jerarquía `AppError` al detectar un error; solo el middleware global serializa a HTTP. | CONFIRMADO | Azareño |
+| D-01 | 03/09/2026 | Necesidad de un estándar de errores internacional y vigente. | Adoptar **RFC 9457** manteniendo compatibilidad con RFC 7807, con los 8 campos especificados. | CONFIRMADO | Duque |
+| D-02 | 03/09/2026 | Evitar respuestas HTTP dispersas en cada módulo. | Todo módulo **lanza** la jerarquía `AppError` al detectar un error; solo el middleware global serializa a HTTP. | CONFIRMADO | Duque |
 | D-03 | 03/09/2026 | Propagar contexto sin ensuciar firmas de métodos. | Usar **una única instancia de AsyncLocalStorage** compartida vía `shared`; cada solicitud crea su almacén. | CONFIRMADO | Reátegui |
-| D-04 | 03/09/2026 | Correlacionar solicitudes de punta a punta. | `correlation_id` es **UUIDv4**; se acepta del header `x-correlation-id` o se genera; siempre se devuelve en la respuesta. | CONFIRMADO | Azareño |
+| D-04 | 03/09/2026 | Correlacionar solicitudes de punta a punta. | `correlation_id` es **UUIDv4**; se acepta del header `x-correlation-id` o se genera; siempre se devuelve en la respuesta. | CONFIRMADO | Duque |
 | D-05 | 03/09/2026 (v1.3) | Auditoría inmutable y reconstrucción de estados. | Bitácora **append-only** (`sigd_audit.bitacora_auditoria`) con `datos_antes/datos_despues` en `JSONB`; revocar `UPDATE/DELETE` al rol de aplicación. La garantía de **inmutabilidad real** es `PROPUESTO` hasta validarla con las pruebas E2E (03) y los permisos del DDL 06. | PROPUESTO | Reátegui |
 | D-06 | 03/09/2026 (v1.3) | Evitar pérdida de notificaciones ante caídas externas. | Patrón **Transactional Outbox** en `sigd_audit.evento_outbox`; el worker usa lote y `FOR UPDATE SKIP LOCKED`, confirma antes de marcar `PROCESADO`, con backoff exponencial y DLQ. Las garantías de **atomicidad, cero pérdida y entrega** son `PROPUESTO` hasta existir worker ejecutable y pruebas E2E que lo demuestren. | PROPUESTO | Reátegui |
 | D-07 | 03/09/2026 | Pruebas de integración reproducibles y sin mocks de datos. | Entorno efímero con **Testcontainers (PostgreSQL 18 Alpine)** + migraciones de los 6 esquemas y `TRUNCATE ... CASCADE` entre escenarios. | CONFIRMADO | Zevallos |
@@ -90,7 +94,7 @@ sigue la taxonomía oficial.
 | D-11 | 03/09/2026 | Tamaño de `user_agent` y nombres de índices. | Propuesta de `VARCHAR(512)` y de índices específicos; sujetos a confirmación al implementar. | PROPUESTO | Reátegui |
 | D-12 | 03/09/2026 (v1.3) | Contratos entre módulos y eventos. | Matrices Productor-Consumidor C-01 a C-08 y eventos E-01 a E-07 (v1.2). **Estado único (v1.3):** `PROPUESTO`. Los contratos propios de CoreLink (C-07) están `CONFIRMADO`; los cruzados quedan `PROPUESTO`/`PENDIENTE` hasta la aprobación bilateral (04 §10.2). Elementos aún pendientes: C-06, E-04, E-05 y el número de expediente. | PROPUESTO | Ricardo |
 | D-13 | 03/09/2026 | Límites de paginación y ordenamiento común. | Definir `pagina`/`por_pagina`/`total`/`datos` en `shared/types`; tamaño mínimo/máximo de página aún por confirmar. | PROPUESTO | Ricardo |
-| D-14 | 03/09/2026 | Cumplimiento del estándar con ejemplo de falla crítica. | Respuesta `500 INTERNAL_ERROR` genérica; el detalle completo solo a logs internos con el `correlation_id`. | CONFIRMADO | Azareño |
+| D-14 | 03/09/2026 | Cumplimiento del estándar con ejemplo de falla crítica. | Respuesta `500 INTERNAL_ERROR` genérica; el detalle completo solo a logs internos con el `correlation_id`. | CONFIRMADO | Duque |
 | D-15 | 08/09/2026 | Se alternaba `id_expediente` con `expediente_id` en contratos y eventos. | Nomenclatura normalizada **`id_<agregado>`** en todos los contratos de datos y eventos (`id_expediente`, `id_movimiento`, `id_cuenta`, `id_area_*`). | CONFIRMADO (propio) | Ricardo |
 | D-16 | 08/09/2026 | Faltaban `ExpedienteAtendido` y `ExpedienteObservado` para RutaDoc. | Incorporar los tres eventos de RutaDoc (`ExpedienteDerivado`, `ExpedienteAtendido`, `ExpedienteObservado`) con contrato formal (04 §6.2). | PENDIENTE (aprobación RutaDoc) | Ricardo |
 | D-17 | 08/09/2026 | Estrategia de idempotencia no resuelta. | Clave de idempotencia compuesta `tipo_evento:id_expediente:id_movimiento`; el consumidor implementa índice único `(tipo_evento, clave_idempotencia)` y descarta duplicados (04 §6.3). | CONFIRMADO (propio) | Ricardo |
@@ -100,6 +104,14 @@ sigue la taxonomía oficial.
 | D-21 | 08/09/2026 | `correlation_id` con `DEFAULT gen_random_uuid()` podía diferir del contexto. | `correlation_id` de la bitácora **sin valor por defecto** (v1.3 del DDL 06): se propaga siempre desde AsyncLocalStorage; la BD no genera un UUID distinto; inserción sin contexto falla de forma explícita. | CONFIRMADO (propio) | Reátegui |
 | D-22 | 08/09/2026 | FK a `sigd_auth.cuenta_usuario(id)` sin contrato aprobado. | FK `usuario_id` **SUSPENDIDA (PENDIENTE)**: IdentiCore/RutaDoc mantienen la columna `id_usuario`; se activa solo con contrato bilateral aprobado (07). La decisión de suspender está confirmada; su activación, pendiente. | CONFIRMADO (propio) | Ricardo |
 | D-23 | 08/09/2026 | La aplicación podía actualizar el outbox y no existía rol de worker. | Separar roles (DDL 06 v1.3): `sigd_app` (bitácora y encolado) y `sigd_worker` (solo SELECT/UPDATE del outbox). La aplicación no modifica eventos ya insertados. | CONFIRMADO (propio) | Reátegui |
+
+> Atribución (Revisión 1.3): las decisiones D-01, D-02, D-04 y D-14, ligadas al entregable 01
+> (RFC 7807/9457, jerarquía de errores y correlación), se atribuyen a **Duque**, según la corrección
+> de autoría registrada en `07_evidencia_autorias_y_aprobaciones.md` §1.
+> **Separación de migraciones (P3):** la decisión D-07 (entorno efímero + "migraciones de los
+> 6 esquemas") se implementa cargando el **DDL real de `sigd_audit`** y **stubs PROVISIONALES** de los
+> 5 esquemas de módulos; los DDL oficiales de identicore/organicore/tramicore/rutadoc/docucore no se
+> cargan en el prototipo (incompatibles entre sí y propiedad de sus ramas).
 
 ### 4.3. Detalle de decisiones: alternativa, justificación, impacto y evidencia (v1.3)
 
@@ -152,7 +164,7 @@ trabajo del autor; se solicita corrección al responsable cuando corresponde.
 
 | Entregable | Autor | Resultado de la revisión | Observaciones / Correcciones | Estado |
 | :--- | :--- | :--- | :--- | :---: |
-| `01_especificacion_middleware_rfc7807.md` | Azareño | Aprobado con correcciones menores | Convertir a documentación pura; verificar que la jerarquía `AppError` cubre PostgreSQL/Zod y no expone rastros. | CORREGIDO |
+| `01_especificacion_middleware_rfc7807.md` | Duque (corrección de autoría, 07 §1.2) | Aprobado con correcciones menores | Convertir a documentación pura; verificar que la jerarquía `AppError` cubre PostgreSQL/Zod y no expone rastros. | CORREGIDO |
 | `02_arquitectura_auditoria_contexto_asynclocalstorage.md` | Reátegui | Aprobado con correcciones menores | Convertir a documentación pura; corregir numeración de secciones; confirmar tamaño `user_agent` (D-11). | CORREGIDO |
 | `03_suite_pruebas_testcontainers_k6.md` | Zevallos | Aprobado con correcciones menores | Convertir a documentación pura; declarar explícitamente las tablas del `TRUNCATE` y los pasos de evaluación k6. | CORREGIDO |
 | `04_contratos_intermodulares_unificados.md` | Ricardo | Elaborado por el sublíder | Revisión v1.2 (PR #79): contratos RutaDoc, nomenclatura `id_*`, idempotencia y aprobación bilateral. | CORREGIDO (v1.2) |
@@ -191,13 +203,13 @@ trabajo del autor; se solicita corrección al responsable cuando corresponde.
 | R-01 | Nombre de esquemas `sigd_*` no unificado en los 6 DDL. | Fallas de migración y E2E. | Todos / Zevallos | Migraciones en la suite (entregable 03). | EN GESTIÓN |
 | R-02 | Contrato del `numero` de expediente sin confirmar. | C-01 inconsistente para RutaDoc. | TramiCore / Ricardo | Confirmación del `ExpedienteContract`. | PENDIENTE |
 | R-03 | Consumidores de Outbox sin idempotencia. | Duplicados de notificación. | Cada consumidor / Ricardo | Revisión de E-01 a E-07. | EN GESTIÓN |
-| R-04 | Módulos sin RFC 7807. | Contrato de error roto. | Todos / Azareño | E2E-02/03/08/09/10. | EN GESTIÓN |
+| R-04 | Módulos sin RFC 7807. | Contrato de error roto. | Todos / Duque | E2E-02/03/08/09/10. | EN GESTIÓN |
 | R-05 | Confirmar límites de paginación. | Contrato `Paginacion*` incompleto. | Ricardo | Acuerdo entre módulos (D-13). | PENDIENTE |
 | R-06 | Reutilizar `expediente_id` en contratos de CoreLink. | Rompe el contrato normalizado `id_*`. | Ricardo / todos | Grep de contratos y eventos en 04 §7. | EN GESTIÓN |
 | R-07 | RutaDoc opera sin eventos de atención/observación. | RutaDoc no recibe retorno del ciclo expediente. | RutaDoc / Ricardo | Aprobación bilateral de E-06 y E-07 (04 §10.2). | PENDIENTE |
 | R-08 | Autoría de Reátegui, Zevallos y Duque no verificable en los commits del PR #79. | Trazabilidad del trabajo en equipo exigida por el liderazgo. | Duque / Reátegui / Zevallos | Declaraciones de autoría con rama y commit (07). | PENDIENTE |
 | R-09 | FK `usuario_id` suspendida sin contrato IdentiCore. | Sin integridad referencial de identidad mientras no se active. | Ricardo | Contrato bilateral aprobado y excepción (`ALTER TABLE`) registrada (07). | PENDIENTE |
-| R-10 | Evidencia E2E/k6 sin ejecutar (sin Docker). | Garantías y umbrales no demostrados; bloquea `CONFIRMADO`. | Zevallos / Ricardo | Runbook y reportes del entregable 08 ejecutados en máquina con Docker/CI. | PENDIENTE |
+| R-10 | Evidencia E2E/k6 sin ejecutar (sin Docker). | Garantías y umbrales no demostrados; bloquea `CONFIRMADO`. | Zevallos / Ricardo | **E2E ejecutado** con `TEST_DATABASE_URL` (12/12, 22/22, `implementacion/evidencia/e2e-20260909-123500/`); k6 pendiente de servidor en ejecución. | PENDIENTE |
 
 ---
 
@@ -234,7 +246,7 @@ trabajo del autor; se solicita corrección al responsable cuando corresponde.
 
 ## 10. Dependencias y Decisiones
 
-- **Dependencias:** consolida las decisiones de los entregables 01 (Azareño), 02 (Reátegui), 03
+- **Dependencias:** consolida las decisiones de los entregables 01 (Duque), 02 (Reátegui), 03
   (Zevallos) y 04 (Ricardo). Cualquier cambio de decisión en uno de ellos debe reflejarse aquí.
 - **Decisiones registradas:**
   - La revisión del sublíder se limita a observaciones y solicitudes de corrección; la autoría de cada

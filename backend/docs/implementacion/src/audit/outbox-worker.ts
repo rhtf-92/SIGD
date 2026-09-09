@@ -75,6 +75,7 @@ export class OutboxWorker {
         `SELECT id_evento, correlation_id, agregado, tipo_evento, payload, intentos
            FROM sigd_audit.evento_outbox
           WHERE estado = 'PENDIENTE'
+            AND (proxima_reintento_en IS NULL OR proxima_reintento_en <= now())
           ORDER BY creado_en
           LIMIT $1
             FOR UPDATE SKIP LOCKED`,
@@ -119,16 +120,19 @@ export class OutboxWorker {
           if (nuevosIntentos >= this.maxIntentos) {
             await cliente.query(
               `UPDATE sigd_audit.evento_outbox
-                  SET intentos = $2, estado = 'FALLIDO'
+                  SET intentos = $2, estado = 'FALLIDO', proxima_reintento_en = NULL
                 WHERE id_evento = $1`,
               [evento.id_evento, nuevosIntentos],
             );
           } else {
+            const retrasoMs = this.backoffBaseMs * 2 ** (nuevosIntentos - 1);
             await cliente.query(
               `UPDATE sigd_audit.evento_outbox
-                  SET intentos = $2, estado = 'PENDIENTE'
+                  SET intentos = $2,
+                      estado = 'PENDIENTE',
+                      proxima_reintento_en = now() + ($3 * interval '1 millisecond')
                 WHERE id_evento = $1`,
-              [evento.id_evento, nuevosIntentos],
+              [evento.id_evento, nuevosIntentos, retrasoMs],
             );
           }
         }

@@ -4,10 +4,10 @@
 **Proyecto:** Sistema Integral de Gestión Documentaria (SIGD)
 **Institución:** IESTP "Suiza" (Pucallpa, Ucayali, Perú) — PE DSI
 **Área:** Backend — CoreLink
-**Responsable del entregable:** Azareño · `B_AZAREÑO`
+**Responsable del entregable:** Duque · `B_DUQUE`
 **Documento:** `01_especificacion_middleware_rfc7807.md`
 **Fecha:** 3 de septiembre de 2026
-**Versión:** 1.1 (Fase 2 — Levantamiento de Observaciones · Revisión de documentación)
+**Versión:** 1.2 (Fase 2 — Levantamiento de Observaciones · corrección de autoría)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni código
@@ -386,6 +386,8 @@ Para que los demás grupos avancen de forma consistente, se recomienda ejecutar 
 
 ---
 
-*Documento elaborado por Azareño (`B_AZAREÑO`) como entregable de Fase 2 — Levantamiento de
+*Documento elaborado por Duque (`B_DUQUE`) como entregable de Fase 2 — Levantamiento de
 Observaciones del Grupo 6 CoreLink. Revisión 1.1: convertido a especificación de documentación pura,
-sin código ejecutable, para guiar a los equipos de implementación.*
+sin código ejecutable, para guiar a los equipos de implementación.
+Corrección de autoría (Revisión 1.2): la titularidad del entregable 01 se atribuye a Duque; ver
+`07_evidencia_autorias_y_aprobaciones.md` §1.*

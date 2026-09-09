@@ -4,10 +4,12 @@ import type { InvalidParam } from '../domain/errors/index.js';
  * Contratos PROVISIONALES — pendientes de aprobación bilateral con RutaDoc.
  * Los nombres de campos pueden cambiar cuando se firme el contrato definitivo.
  *
- * Convención de nomenclatura provisional (D-15):
- *   - Entidades de negocio: entidade_id (expediente_id, area_id, usuario_id)
- *   - Auditoría:           id_entidad  (id_auditoria, id_evento)
- *   - Tabla docucore:      id_tipo_documento, id_formulario (basado en DDL original)
+ * Convención de nomenclatura (D-15, CONFIRMADO — entregable 05):
+ *   - Entidades de negocio: id_<agregado>
+ *     (id_expediente, id_movimiento, id_area_*, id_usuario_*, id_cuenta)
+ *   - Auditoría / Outbox:   id_evento, id_auditoria
+ *   - Tabla docucore:       id_tipo_documento, id_formulario (basado en DDL original)
+ *   - Contexto/correlación: usuario_id (CorrelationContext y bitácora, entregable 04 §7.1)
  *
  * Los contratos externos aún NO están aprobados. Esta convención se mantendrá
  * hasta que se firme el contrato bilateral con RutaDoc/IdentiCore/OrganiCore.
@@ -53,13 +55,14 @@ export interface EventoOutboxContract {
   intentos: number;
   creado_en: string;
   procesado_en: string | null;
+  proxima_reintento_en: string | null;
 }
 
 export interface EventoEnvelope {
   schema_version: number;
   tipo_evento: string;
   id_evento: string;
-  expediente_id: string;
+  id_expediente: string;
   id_movimiento?: string;
   ocurrido_en: string;
   correlation_id: string;
@@ -68,11 +71,11 @@ export interface EventoEnvelope {
 }
 
 export interface ExpedienteContract {
-  expediente_id: string;
+  id_expediente: string;
   numero: string;
-  tipo_documental_id: string;
-  solicitante_id: string;
-  area_destino_id: string;
+  id_tipo_documental: string;
+  id_solicitante: string;
+  id_area_destino: string;
   fecha_radicacion: string;
 }
 
@@ -89,20 +92,20 @@ export interface EventoRutaDoc<Datos extends Record<string, unknown>> {
 }
 
 export interface DatosExpedienteDerivado {
-  area_origen_id: string;
-  area_destino_id: string;
+  id_area_origen: string;
+  id_area_destino: string;
   motivo: string;
 }
 
 export interface DatosExpedienteAtendido {
-  area_atencion_id: string;
-  usuario_atencion_id: string;
+  id_area_atencion: string;
+  id_usuario_atencion: string;
   resultado: 'ATENDIDO';
 }
 
 export interface DatosExpedienteObservado {
-  area_atencion_id: string;
-  usuario_atencion_id: string;
+  id_area_atencion: string;
+  id_usuario_atencion: string;
   resultado: 'OBSERVADO';
   detalle_observacion: string;
   plazo_subsanacion_dias?: number;

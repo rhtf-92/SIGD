@@ -17,15 +17,15 @@ describe('E2E-01 · Radicación exitosa en Mesa de Partes', () => {
     const respuesta = await obtenerAgente().post('/api/expedientes').send(payload);
 
     expect(respuesta.status).toBe(201);
-    expect(respuesta.body.expediente_id).toBeDefined();
+    expect(respuesta.body.id_expediente).toBeDefined();
     expect(respuesta.body.correlation_id).toBeTruthy();
     expect(respuesta.headers['x-correlation-id']).toBeDefined();
 
     const persistido = await obtenerPool().query(
-      'SELECT expediente_id FROM sigd_tra.expediente WHERE numero = $1',
+      'SELECT id_expediente FROM sigd_tra.expediente WHERE numero = $1',
       [payload.numero],
     );
     expect(persistido.rowCount).toBe(1);
-    expect(persistido.rows[0].expediente_id).toBe(respuesta.body.expediente_id);
+    expect(persistido.rows[0].id_expediente).toBe(respuesta.body.id_expediente);
   });
 });

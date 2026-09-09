@@ -65,7 +65,7 @@ viajaría de punta a punta, y las notificaciones/eventos se perderían ante caí
 - Reglas de integración del contexto con la bitácora de auditoría.
 
 ### Fuera de alcance
-- Middleware de errores RFC 7807 (entregable 01 — Azareño).
+- Middleware de errores RFC 7807 (entregable 01 — Duque).
 - Pruebas de integración Testcontainers / k6 (entregable 03 — Zevallos).
 - Contratos intermodulares y matriz Productor-Consumidor (entregable 04 — Ricardo).
 
@@ -89,7 +89,7 @@ viajaría de punta a punta, y las notificaciones/eventos se perderían ante caí
 ### 4.1. Contrato del contexto
 
 El contexto de solicitud es **la fuente de verdad de trazabilidad** definida en el entregable 01
-(Azareño). Este documento lo **reutiliza** como insumo para la auditoría. Sus portadores son:
+(Duque). Este documento lo **reutiliza** como insumo para la auditoría. Sus portadores son:
 
 | Campo | Tipo | Descripción |
 | :--- | :--- | :--- |
@@ -408,7 +408,7 @@ sequenceDiagram
 
 ## 10. Dependencias y Decisiones
 
-- **Dependencia (Azareño):** el `RequestContext` se complementa con la especificación del middleware
+- **Dependencia (Duque):** el `RequestContext` se complementa con la especificación del middleware
   RFC 7807 (`01_especificacion_middleware_rfc7807.md`), que lo usa para poblar `correlation_id` en las
   respuestas de error. Este documento **consume** ese contrato para la auditoría.
 - **Dependencia (Zevallos):** la reproducibilidad de las migraciones y el comportamiento de outbox y

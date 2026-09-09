@@ -22,14 +22,14 @@ describe('E2E-04 · Derivación a área inexistente', () => {
     const areaInexistente = randomUUID();
     const respuesta = await obtenerAgente()
       .post('/api/expedientes/derivar')
-      .send({ expediente_id: radicado.body.expediente_id, area_destino_id: areaInexistente });
+      .send({ id_expediente: radicado.body.id_expediente, id_area_destino: areaInexistente });
 
     expect([400, 404]).toContain(respuesta.status);
     expect(respuesta.body.code).toBeDefined();
 
     const movimientos = await obtenerPool().query(
-      'SELECT id FROM sigd_rut.movimiento_tramite WHERE expediente_id = $1',
-      [radicado.body.expediente_id],
+      'SELECT id_movimiento FROM sigd_rut.movimiento_tramite WHERE id_expediente = $1',
+      [radicado.body.id_expediente],
     );
     expect(movimientos.rowCount).toBe(0);
   });

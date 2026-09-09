@@ -1,7 +1,17 @@
--- Fixtures de la suite E2E (entregable 03).
--- Cubre los 6 esquemas del SIGD para garantizar reproducibilidad.
--- Estos fixtures son PROVISIONALES: los contratos externos aún no están aprobados.
--- Si ya existen tablas reales (migraciones), CREATE IF NOT EXISTS las respeta.
+-- Fixtures PROVISIONALES de la suite E2E (entregable 03).
+-- Cubren SOLO los 5 esquemas de módulos que el prototipo ejercita mediante stubs:
+--   sigd_auth, sigd_org, sigd_tra, sigd_rut y docucore.
+-- El esquema sigd_audit NO se crea aquí: proviene EXCLUSIVAMENTE del DDL real
+-- integracion/06_sigd_audit_esquema_ddl.sql (el global-setup falla si no lo carga).
+--
+-- IMPORTANTE (separación fixtures vs migraciones reales):
+--   - Estos stubs NO representan las migraciones oficiales de cada grupo.
+--   - Las migraciones reales viven en identicore/, organicore/, tramicore/,
+--     rutadoc/ y docucore/ y son PROPIEDAD de sus ramas (B_SEGUNDO, B_PANAIFO,
+--     B_RAMIREZ, B_JHASY, B_CHRISTIAN). El prototipo NO las carga.
+--   - Los identificadores usan la convención id_<agregado> (D-15, CONFIRMADO):
+--     id_usuario, id_area, id_expediente, id_movimiento, id_tipo_documental,
+--     id_solicitante, id_area_destino.
 
 -- =============================================================================
 -- 1. sigd_auth (IdentiCore — Grupo 4)
@@ -9,7 +19,7 @@
 CREATE SCHEMA IF NOT EXISTS sigd_auth;
 
 CREATE TABLE IF NOT EXISTS sigd_auth.cuenta_usuario (
-    usuario_id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    id_usuario UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
 
 -- =============================================================================
@@ -18,7 +28,7 @@ CREATE TABLE IF NOT EXISTS sigd_auth.cuenta_usuario (
 CREATE SCHEMA IF NOT EXISTS sigd_org;
 
 CREATE TABLE IF NOT EXISTS sigd_org.area (
-    area_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_area UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nombre  TEXT NOT NULL,
     vigente BOOLEAN NOT NULL DEFAULT true
 );
@@ -29,13 +39,13 @@ CREATE TABLE IF NOT EXISTS sigd_org.area (
 CREATE SCHEMA IF NOT EXISTS sigd_tra;
 
 CREATE TABLE IF NOT EXISTS sigd_tra.expediente (
-    expediente_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    numero             TEXT NOT NULL UNIQUE,
-    dni_solicitante    CHAR(8),
-    tipo_documental_id UUID NOT NULL,
-    solicitante_id     UUID NOT NULL,
-    area_destino_id    UUID NOT NULL,
-    fecha_radicacion   TIMESTAMPTZ NOT NULL DEFAULT now()
+    id_expediente       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    numero              TEXT NOT NULL UNIQUE,
+    dni_solicitante     CHAR(8),
+    id_tipo_documental  UUID NOT NULL,
+    id_solicitante      UUID NOT NULL,
+    id_area_destino     UUID NOT NULL,
+    fecha_radicacion    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- =============================================================================
@@ -44,9 +54,9 @@ CREATE TABLE IF NOT EXISTS sigd_tra.expediente (
 CREATE SCHEMA IF NOT EXISTS sigd_rut;
 
 CREATE TABLE IF NOT EXISTS sigd_rut.movimiento_tramite (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    expediente_id   UUID NOT NULL REFERENCES sigd_tra.expediente (expediente_id),
-    area_destino_id UUID NOT NULL,
+    id_movimiento   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_expediente   UUID NOT NULL REFERENCES sigd_tra.expediente (id_expediente),
+    id_area_destino UUID NOT NULL,
     fecha_movimiento TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -71,40 +81,3 @@ CREATE TABLE IF NOT EXISTS docucore.formulario (
     activo            BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_creacion    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
--- =============================================================================
--- 6. sigd_audit (Integración — Grupo 6)
---    El DDL completo viene de integracion/06_sigd_audit_esquema_ddl.sql.
---    Este stub crea las tablas mínimas para que los tests E2E funcionen
---    si el DDL completo no se carga.
--- =============================================================================
-CREATE SCHEMA IF NOT EXISTS sigd_audit;
-
-CREATE TABLE IF NOT EXISTS sigd_audit.bitacora_auditoria (
-    id_auditoria   UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-    correlation_id UUID NOT NULL,
-    usuario_id     UUID NULL,
-    ip_origen      INET NULL,
-    user_agent     VARCHAR(512) NULL,
-    esquema        VARCHAR(64) NOT NULL,
-    tabla          VARCHAR(64) NOT NULL,
-    operacion      VARCHAR(16) NOT NULL CHECK (operacion IN ('INSERT', 'UPDATE', 'DELETE')),
-    datos_antes    JSONB NULL,
-    datos_despues  JSONB NOT NULL,
-    fecha_hora     TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS sigd_audit.evento_outbox (
-    id_evento      UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-    correlation_id UUID NOT NULL,
-    agregado       VARCHAR(64) NOT NULL,
-    tipo_evento    VARCHAR(64) NOT NULL,
-    payload        JSONB NOT NULL,
-    estado         VARCHAR(16) NOT NULL DEFAULT 'PENDIENTE' CHECK (estado IN ('PENDIENTE', 'EN_PROCESO', 'PROCESADO', 'FALLIDO')),
-    intentos       SMALLINT NOT NULL DEFAULT 0 CHECK (intentos >= 0),
-    creado_en      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    procesado_en   TIMESTAMPTZ NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_outbox_estado_fecha
-    ON sigd_audit.evento_outbox (estado, creado_en);

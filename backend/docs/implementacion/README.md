@@ -25,19 +25,26 @@ o el esquema de base de datos de la tarea del grupo"*.
 | `src/errors/` | Matriz determinista PostgreSQL (`23505`, `23503`, `23502`, `P0001`) y mapeo Zod → `invalid_params` | `../integracion/01_especificacion_middleware_rfc7807.md` §6 |
 | `src/shared/types/` | `CorrelationContext`, `ApiErrorResponse`, `Paginacion*`, `EventoOutboxContract`, `EventoEnvelope` (v1.2), `ExpedienteContract` (**PROVISIONAL** — pendiente de aprobación bilateral con RutaDoc) | `../integracion/04_contratos_intermodulares_unificados.md` §7, §6.2 |
 | `src/audit/` | Repos de auditoría y outbox (misma transacción) + `OutboxWorker` con `FOR UPDATE SKIP LOCKED`, reserva `EN_PROCESO` y backoff exponencial | `../integracion/02_arquitectura_auditoria_contexto_asynclocalstorage.md` §5, §6 |
-| `tests/fixtures/` | Fixtures de los **6 esquemas** (sigd_auth, sigd_org, sigd_tra, sigd_rut, docucore, sigd_audit) — **PROVISIONALES** | `../integracion/03_suite_pruebas_testcontainers_k6.md` |
+| `tests/fixtures/` | Fixtures **PROVISIONALES** de los **5 esquemas de módulos** (sigd_auth, sigd_org, sigd_tra, sigd_rut, docucore). `sigd_audit` NO está aquí: se carga exclusivamente el DDL real de `../integracion/06_sigd_audit_esquema_ddl.sql` | `../integracion/03_suite_pruebas_testcontainers_k6.md` |
 | `tests/` | Setup/teardown Testcontainers (ciclo correcto setup→teardown), limpieza entre escenarios, 12 casos E2E (incluye atomicidad y concurrencia), prueba unitaria del mapeador | `../integracion/03_suite_pruebas_testcontainers_k6.md` §4 y §5 |
 | `k6/` | Escenario 1 (Radicación 100 VU) y Escenario 2 (Derivación 50 VU) con umbrales | `../integracion/03_suite_pruebas_testcontainers_k6.md` §6 |
 | `src/referencia/` | Endpoints **fixture** de referencia para ejercitar el pipeline (Mesa de Partes) — **Atribución: Duque (B_DUQUE)** | `../integracion/03_suite_pruebas_testcontainers_k6.md` §5 |
+
+> **Nomenclatura:** todos los identificadores del prototipo siguen D-15 (CONFIRMADO):
+> `id_<agregado>` (`id_expediente`, `id_movimiento`, `id_area_destino`, `id_usuario`…).
+> **Separación de migraciones:** el prototipo NO carga las migraciones oficiales de
+> los otros grupos (`identicore/`, `organicore/`, `tramicore/`, `rutadoc/`, `docucore/`);
+> son propiedad de sus ramas. Solo ejercita stubs PROVISIONALES + el DDL real de audit.
 
 ---
 
 ## 2. Requisitos
 
 - Node.js ≥ 20
-- Docker Engine (para `npm run test:e2e`)
+- PostgreSQL 16+ (para el DDL de `sigd_audit`)
+- Docker Engine (**opcional**: solo si se usa Testcontainers para `npm run test:e2e`;
+  sin Docker se puede apuntar la suite a un PostgreSQL existente con `TEST_DATABASE_URL`)
 - k6 (para `npm run load:*`) — [grafana/k6](https://grafana.com/docs/k6/latest/)
-- PostgreSQL 18 (para el DDL de `sigd_audit`)
 
 ## 3. Instalación y verificación
 
@@ -46,15 +53,26 @@ npm install
 npm run typecheck      # compilación TypeScript (tsc --noEmit)
 npm run build          # build de producción
 npm run test:unit      # prueba unitaria del mapeador de errores (sin Docker)
-npm run test:e2e       # 12 casos E2E con Testcontainers (PostgreSQL efímero)
+
+# E2E con PostgreSQL efímero (Testcontainers)
+npm run test:e2e
+# — o contra un PostgreSQL existente sin Docker (fail-fast, sin fallback silencioso):
+$env:TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5432/sigd_prueba"
+npm run test:e2e
 ```
+
+> La suite falla con error instructivo si no hay `TEST_DATABASE_URL` ni Docker
+> disponible. Nunca cae silenciosamente a un PostgreSQL local fijo.
+> Se aplican el DDL real de `sigd_audit` (obligatorio) y los fixtures PROVISIONALES.
 
 ## 4. Ejecución de la aplicación de referencia
 
 ```bash
-# 1. Crear esquemas base (incluye el DDL de sigd_audit)
+# 1. Crear esquemas base: DDL real de sigd_audit + fixtures PROVISIONALES de los 5 módulos
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 \
      -f ../integracion/06_sigd_audit_esquema_ddl.sql
+psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 \
+     -f tests/fixtures/01_schema_fixtures_test.sql
 
 # 2. Levantar la API (pipeline: contexto → caso de uso → auditoría/outbox → errores)
 cp .env.example .env   # ajustar DATABASE_URL
@@ -68,6 +86,7 @@ npm run worker:outbox
 
 ```bash
 export BASE_URL=http://localhost:3000
+export AUTH_TOKEN=<token>            # opcional: si la API exige Authorization: Bearer
 npm run load:radicacion      # ≈ 2 min, umbrales P95<200ms y errores<0.1%
 npm run load:derivacion
 ```
