@@ -6,8 +6,22 @@
 **Área:** Backend — CoreLink
 **Responsable del entregable:** Reátegui · `B_REATEGUI`
 **Documento:** `02_arquitectura_auditoria_contexto_asynclocalstorage.md`
-**Fecha:** 3 de septiembre de 2026
-**Versión:** 1.1 (Fase 2 — Levantamiento de Observaciones · Revisión de documentación)
+**Fecha:** 8 de septiembre de 2026
+**Versión:** 1.2 (Revisión del Liderazgo — PR #79 · Versionado, serialización y despacho de eventos)
+
+> [!NOTE]
+> Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
+> código listo para correr; describe de forma completa y detallada las estructuras de datos, las
+> reglas de inmutabilidad, la máquina de estados de eventos y el flujo del worker que los equipos
+> deben implementar para garantizar la observabilidad y auditoría forense del backend SIGD.
+>
+> **Revisión v1.2 (Liderazgo — PR #79):** se completa el contrato del `evento_outbox` con el
+> **versionado y la serialización** del `payload`, la **clave de idempotencia**, la normalización de
+> identificadores (`id_expediente`, `id_movimiento`, `id_evento`) y las **responsabilidades del
+> despachador**. El contrato formal de los eventos de RutaDoc (`ExpedienteDerivado`,
+> `ExpedienteAtendido`, `ExpedienteObservado`) se define en el entregable 04, sección 6.2.
+
+---
 
 ## 1. Propósito y Problema que Resuelve
 
@@ -132,6 +146,7 @@ forma documental:
 | `operacion` | VARCHAR(16) | `NOT NULL`, CHECK en (`INSERT`, `UPDATE`, `DELETE`) | Tipo de mutación registrada. |
 | `datos_antes` | JSONB | NULL | Estado previo de la fila (NULL para `INSERT`). |
 | `datos_despues` | JSONB | `NOT NULL` | Estado posterior de la fila (para `DELETE` puede ser el estado previo a eliminación). |
+| `fecha_hora` | TIMESTAMPTZ | `NOT NULL`, default `now()` | Momento en que ocurrió la mutación (alimenta `idx_bitacora_fecha`). |
 
 ### 5.3. Reglas y restricciones obligatorias
 
@@ -247,6 +262,43 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | `idx_outbox_estado_fecha` | `(estado, creado_en)` | Barrido eficiente del worker por orden de creación y estado. |
 
+### 6.7. Contrato de versionado, serialización y nomenclatura del `payload` (v1.2)
+
+Los eventos de dominio se publican en `payload JSONB` siguiendo un **envelope normalizado** (las
+definiciones exactas por evento — incluidos los tres de RutaDoc — constan en el entregable 04 §6.2):
+
+| Campo del envelope | Tipo | Descripción |
+| :--- | :--- | :--- |
+| `schema_version` | entero | Versión de la estructura del payload (inicia en `1`). Un cambio rompiente la incrementa y exige revalidación del consumidor. |
+| `tipo_evento` | string | Nombre del evento de dominio (p. ej. `ExpedienteDerivado`). Cada producto es propietario de su `tipo_evento`. |
+| `id_evento` | UUID | Identificador del registro en `sigd_audit.evento_outbox`. |
+| `id_expediente` | UUID | Expediente afectado (identificador normalizado `id_<agregado>`). |
+| `id_movimiento` | UUID | Movimiento que originó el evento (aplica a operaciones de RutaDoc). |
+| `ocurrido_en` | ISO-8601 UTC | Fecha y hora del hecho de negocio (adicional a `creado_en` del outbox). |
+| `correlation_id` | UUIDv4 | Correlación de la solicitud completa. |
+| `clave_idempotencia` | string | `tipo_evento:id_expediente:id_movimiento` (compuesta), para que el consumidor descarte duplicados. |
+| `datos` | JSONB | Bloque específico de negocio del evento (autocontenido). |
+
+**Reglas de serialización:**
+- Serialización única: **JSON UTF-8 en `snake_case`**, almacenado en `payload JSONB`.
+- Los identificadores de negocio usan `id_<agregado>` (`id_expediente`, `id_movimiento`, `id_cuenta`,
+  `id_area_*`, `id_usuario_*`). No se alterna con `expediente_id` (corrige inconsistencia de la v1.1).
+- El `payload` es **autocontenido**: el consumidor puede procesarlo sin consultar al productor.
+- Todo evento debe incluir su `clave_idempotencia` para que el consumidor implemente el descarte de
+  duplicados (entregable 04 §6.3).
+
+### 6.8. Responsabilidades del despachador (worker outbox)
+
+| Responsabilidad | Regla |
+| :--- | :--- |
+| **Solo el worker modifica el ciclo de vida** | Casos de uso: solo `INSERT` con estado `PENDIENTE`. Estado, `intentos` y `procesado_en` son exclusivos del worker (§6.3). |
+| **Lote y concurrencia** | Leer lotes `PENDIENTE` (≈100) con `FOR UPDATE SKIP LOCKED`; dos instancias no procesan el mismo evento. |
+| **Confirmación previa a `PROCESADO`** | Marcar `PROCESADO` y fijar `procesado_en` **solo tras la confirmación** del destino; jamás antes. |
+| **Falla transitoria** | Incrementar `intentos`, permanecer `PENDIENTE` y reintentar con **backoff exponencial**. |
+| **Falla persistente** | Tras el máximo de intentos, pasar a `FALLIDO` y derivar a **Dead Letter Queue** para revisión manual. |
+| **Sin reencolado** | No reencolar `PROCESADO`; la idempotencia del consumidor (clave de la sección 6.7) cubre los reintentos. |
+| **No decide duplicados** | El worker entrega y confirma; la detección de duplicados es exclusiva del consumidor. |
+
 ---
 
 ## 7. Flujo de Auditoría y Notificación de Extremo a Extremo
@@ -302,8 +354,14 @@ sequenceDiagram
        transacción separada).
 7. [ ] **Implementar el worker outbox** con lote, `FOR UPDATE SKIP LOCKED`, backoff exponencial y
        dead-letter. Consumir el contexto `undefined` de forma tolerante (eventos de sistema).
-8. [ ] **Garantizar idempotencia** en el consumidor externo (correlation_id + clave de negocio).
+8. [ ] **Garantizar idempotencia** en el consumidor externo con la `clave_idempotencia` compuesta
+       `(tipo_evento, id_expediente, id_movimiento)` y el descarte de la sección 6.7.
 9. [ ] **Validar el esquema** con la suite del entregable 03 (casos E2E-06 y E2E-07).
+10. [ ] **Implementar el envelope normalizado** (6.7): `schema_version`, `id_evento`,
+       `id_expediente`, `id_movimiento`, `ocurrido_en`, `correlation_id`, `clave_idempotencia`.
+11. [ ] **Consolidar el contrato de eventos RutaDoc** (04 §6.2) para los tres eventos
+       (`ExpedienteDerivado`, `ExpedienteAtendido`, `ExpedienteObservado`) y registrar su aprobación
+       bilateral.
 
 ---
 
@@ -316,7 +374,10 @@ sequenceDiagram
 | 3 | `evento_outbox` implementa el patrón Transactional Outbox con escritura atómica. | ✅ |
 | 4 | El worker especifica lote, `FOR UPDATE SKIP LOCKED`, confirmación previa a `PROCESADO`, backoff exponencial y dead-letter. | ✅ |
 | 5 | Se garantiza cero pérdida de notificaciones ante fallas de los servicios externos. | ✅ |
-| 6 | La documentación queda lista para que los equipos implementen sin ambigüedad. | ✅ |
+| 6 | El `payload` define versionado (`schema_version`), serialización JSON `snake_case` y clave de idempotencia compuesta (v1.2). | ✅ |
+| 7 | El despachador define responsabilidades: confirmación previa a `PROCESADO`, reintentos con backoff, DLQ y no reencolado. | ✅ |
+| 8 | Los identificadores de negocio se normalizan a `id_<agregado>` (`id_expediente`, `id_movimiento`). | ✅ |
+| 9 | La documentación queda lista para que los equipos implementen sin ambigüedad. | ✅ |
 
 ---
 
@@ -334,5 +395,17 @@ sequenceDiagram
   - `usuario_id` es **nullable** porque existen operaciones legítimas sin sesión de usuario
     (registros de sistema, migraciones, integraciones máquina-a-máquina).
   - `evento_outbox` no se limpia automáticamente; la retención es una decisión operativa posterior.
+  - **Revisión v1.2 (Liderazgo — PR #79):** se agrega `fecha_hora` a la bitácora, el envelope
+    versionado del `payload` (§6.7), las responsabilidades del despachador (§6.8) y la normalización
+    de identificadores a `id_<agregado>`. El contrato de los eventos de RutaDoc (E-02, E-05, E-06 y
+    E-07) se define y se cierra en el entregable 04 §6.2.
 - **Taxonomía:** `CONFIRMADO` — patrón Transactional Outbox y esquema base; `PROPUESTO` — índices y
   tamaño de columna `user_agent`; `EJEMPLO` — payloads mostrados.
+
+---
+
+*Documento elaborado por Reátegui (`B_REATEGUI`) como entregable de Fase 2 — Levantamiento de
+Observaciones del Grupo 6 CoreLink. Revisión 1.2: atiende las observaciones del liderazgo sobre el
+PR #79 (fecha_hora en la bitácora, versionado/serialización del payload, idempotencia, nomenclatura
+de identificadores y responsabilidades del despachador). La autoría nominal de este entregable
+requiere confirmación escrita de Reátegui (entregable 04 §10.1).*

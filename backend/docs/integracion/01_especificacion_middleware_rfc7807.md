@@ -9,6 +9,14 @@
 **Fecha:** 3 de septiembre de 2026
 **Versión:** 1.1 (Fase 2 — Levantamiento de Observaciones · Revisión de documentación)
 
+> [!NOTE]
+> Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni código
+> listo para correr; describe de forma completa y detallada el diseño, los contratos, las reglas y las
+> decisiones que los equipos de implementación deben seguir para construir el manejo centralizado de
+> errores y la trazabilidad de solicitudes del backend SIGD.
+
+---
+
 ## 1. Propósito y Problema que Resuelve
 
 Definir y documentar la solución técnica para el **manejo centralizado de errores**, la **trazabilidad
@@ -375,3 +383,9 @@ Para que los demás grupos avancen de forma consistente, se recomienda ejecutar 
   - El `correlation_id` es la llave maestra de trazabilidad; no se permite que un módulo lo reemplace.
 - **Taxonomía:** `CONFIRMADO` — requisitos del estándar RFC 7807/9457; `PROPUESTO` — códigos internos
   y tamaños de columna de ejemplo; `EJEMPLO` — payloads de respuesta mostrados.
+
+---
+
+*Documento elaborado por Azareño (`B_AZAREÑO`) como entregable de Fase 2 — Levantamiento de
+Observaciones del Grupo 6 CoreLink. Revisión 1.1: convertido a especificación de documentación pura,
+sin código ejecutable, para guiar a los equipos de implementación.*

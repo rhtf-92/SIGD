@@ -6,10 +6,22 @@
 **Área:** Backend — CoreLink
 **Responsable del entregable:** Zevallos · `B_ZEVALLOS`
 **Documento:** `03_suite_pruebas_testcontainers_k6.md`
-**Fecha:** 3 de septiembre de 2026
-**Versión:** 1.1 (Fase 2 — Levantamiento de Observaciones · Revisión de documentación)
+**Fecha:** 8 de septiembre de 2026
+**Versión:** 1.2 (Revisión del Liderazgo — PR #79 · Alineación con el envelope v1.2 y el contrato RutaDoc)
 
+> [!NOTE]
+> Este documento es una **especificación de referencia**. No contiene scripts ejecutables ni código
+> listo para correr; describe de forma completa y detallada la estrategia de aseguramiento de calidad,
+> los casos de prueba de integración (E2E), el ciclo de vida del entorno de pruebas y los escenarios y
+> umbrales de carga que el encargado de Calidad debe implementar y validar antes del paso a producción.
+>
+> **Revisión v1.2 (Liderazgo — PR #79):** los casos E2E-06 y E2E-07 deben validar el **envelope
+> normalizado** del entregable 02 v1.2 (`schema_version`, `id_expediente`, `id_movimiento`,
+> `ocurrido_en`, `correlation_id`, `clave_idempotencia`) y el esquema `06_sigd_audit_esquema_ddl.sql`
+> (bitácora con `fecha_hora`). El contrato de los eventos de RutaDoc (E-01, E-02, E-06, E-07) se
+> define en el entregable 04 §6.2 y su aprobación bilateral es requisito para el cierre del PR.
 
+---
 
 ## 1. Propósito y Problema que Resuelve
 
@@ -355,8 +367,11 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
        carga constante 50 VU) y los umbrales de la sección 6.1.
 7. [ ] **Configurar la URL base** del ambiente bajo prueba por variable de entorno.
 8. [ ] **Ejecutar local y en CI** y adjuntar el informe de carga (P95 y tasa de errores) al entregable.
-9. [ ] **Sincronizar dependencias:** coordinar con Azareño (entregable 01) y Reátegui (entregable 02)
-       los códigos esperados en las respuestas y los nombres de tablas de la sección 4.4.
+9. [ ] **Sincronizar dependencias:** coordinar con Azareño (entregable 01), Reátegui (entregable 02)
+       y Ricardo (entregable 04) los códigos esperados en las respuestas, los nombres de tablas de la
+       sección 4.4 y el envelope de los eventos (schema_version, id_expediente, clave_idempotencia).
+10. [ ] **Validar el envelope de los eventos** en los casos que tocan RutaDoc (E-01, E-02, E-06, E-07)
+       contra el contrato formal del entregable 04 §6.2, junto con la prueba unitaria del mapeador.
 
 ---
 
@@ -370,6 +385,7 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
 | 4 | Se especifican las pruebas de carga con **k6** con umbrales (P95 < 200 ms y errores < 0.1 %). | ✅ |
 | 5 | Las pruebas son 100 % reproducibles y autónomas (sin datos precargados manualmente). | ✅ |
 | 6 | La documentación queda lista para que el equipo de calidad implemente la suite. | ✅ |
+| 7 | Los casos E2E-06/E2E-07 y de RutaDoc validan el envelope v1.2 y el esquema DDL con `fecha_hora` (revisión PR #79). | ✅ |
 
 ---
 
@@ -390,3 +406,8 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
   configuración del runner (imagen, tamaños de lote); `EJEMPLO` — datos y URLs de prueba.
 
 ---
+
+*Documento elaborado por Zevallos (`B_ZEVALLOS`) como entregable de Fase 2 — Levantamiento de
+Observaciones del Grupo 6 CoreLink. Revisión 1.2: alinea la suite con la v1.2 del entregable 02
+(envelope normalizado e idempotencia) y con el contrato de eventos RutaDoc del entregable 04 §6.2
+para el cierre del PR #79.*
