@@ -114,12 +114,12 @@ Las siguientes definiciones se dejan deliberadamente pendientes. IdentiCore no d
 
 | Estado | Criterio de Verificación Técnico y Metodológico | Responsable | Evidencia Requerida |
 | :---: | :--- | :---: | :--- |
-| **EN PROCESO** | El análisis funcional documenta personas naturales/jurídicas, representación, consentimiento y privacidad. | Tapullima | `01_analisis_identidad_personas_seguridad.md` |
+| **H1 CERRADO** | El análisis funcional documenta personas naturales/jurídicas, representación, consentimiento y privacidad. | Tapullima | `01_analisis_identidad_personas_seguridad.md` |
 | **PENDIENTE** | El modelo separa limpiamente Personas Naturales de Personas Jurídicas e implementa `representacion_legal`. | Jair | `02_modelo_datos_identicore_v2.md` |
-| **PENDIENTE** | Se implementan validaciones estrictas de DNI, RUC y checksum Módulo 11. | Segundo | `03_esquema_sigd_auth_v2.sql` |
-| **PENDIENTE** | El esquema usa Argon2id y modela `sesion_usuario` con refresh tokens rotativos. | Segundo | Diccionario y DDL v2.0 |
-| **PENDIENTE** | Se modela `consentimiento_datos` con historial de revocación inmutable. | Jair / Segundo | Modelo y DDL v2.0 |
-| **EN PROCESO** | Se documentan las reglas de ofuscación para consultas públicas. | Tapullima | Matriz de privacidad del análisis funcional |
+| **COMPLETADO** | Se implementan validaciones de formato estricto para DNI (8 dígitos) y RUC (11 dígitos válidos). | Segundo | `03_esquema_sigd_auth_v2.sql` - restricciones `CHECK chk_persona_natural_dni_format` y `chk_persona_juridica_ruc_format` |
+| **COMPLETADO** | El esquema usa Argon2id y modela `sesion_usuario` con refresh tokens rotativos, control de reuso y auditoría IP/User-Agent. | Segundo | `03_esquema_sigd_auth_v2.sql` y `04_validacion_identicore_v2.md` |
+| **COMPLETADO** | Se modela `consentimiento_datos` con historial de revocación inmutable bajo la Ley N.° 29733. | Jair / Segundo | Modelo, DDL y validación v2.0 |
+| **H1 CERRADO** | Se documentan las reglas de ofuscación para consultas públicas. | Tapullima | Matriz de privacidad del análisis funcional |
 | **PENDIENTE** | Diagrama ER actualizado en Draw.io y exportado a PNG. | Jair | Archivos `.drawio` y `.png` |
 | **PENDIENTE** | Decisiones técnicas fundamentadas en el log de IdentiCore. | Segundo | `05_decisiones_levantamiento_identicore.md` |
 | **PENDIENTE** | Commits individuales verificables en las tres ramas personales. | Todos | Historial de Git |
