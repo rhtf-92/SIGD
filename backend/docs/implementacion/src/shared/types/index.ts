@@ -1,5 +1,10 @@
 import type { InvalidParam } from '../domain/errors/index.js';
 
+/**
+ * Contratos PROVISIONALES — pendientes de aprobación bilateral con RutaDoc.
+ * Los nombres de campos pueden cambiar cuando se firme el contrato definitivo.
+ */
+
 export interface CorrelationContext {
   correlation_id: string;
   usuario_id: string | null;
@@ -36,7 +41,7 @@ export interface EventoOutboxContract {
   agregado: string;
   tipo_evento: string;
   payload: EventoEnvelope;
-  estado: 'PENDIENTE' | 'PROCESADO' | 'FALLIDO';
+  estado: 'PENDIENTE' | 'EN_PROCESO' | 'PROCESADO' | 'FALLIDO';
   intentos: number;
   creado_en: string;
   procesado_en: string | null;
@@ -46,7 +51,7 @@ export interface EventoEnvelope {
   schema_version: number;
   tipo_evento: string;
   id_evento: string;
-  id_expediente: string;
+  expediente_id: string;
   id_movimiento?: string;
   ocurrido_en: string;
   correlation_id: string;
@@ -55,7 +60,7 @@ export interface EventoEnvelope {
 }
 
 export interface ExpedienteContract {
-  id_expediente: string;
+  expediente_id: string;
   numero: string;
   tipo_documental_id: string;
   solicitante_id: string;
@@ -76,25 +81,25 @@ export interface EventoRutaDoc<Datos extends Record<string, unknown>> {
 }
 
 export interface DatosExpedienteDerivado {
-  id_area_origen: string;
-  id_area_destino: string;
+  area_origen_id: string;
+  area_destino_id: string;
   motivo: string;
 }
 
 export interface DatosExpedienteAtendido {
-  id_area_atencion: string;
-  id_usuario_atencion: string;
+  area_atencion_id: string;
+  usuario_atencion_id: string;
   resultado: 'ATENDIDO';
 }
 
 export interface DatosExpedienteObservado {
-  id_area_atencion: string;
-  id_usuario_atencion: string;
+  area_atencion_id: string;
+  usuario_atencion_id: string;
   resultado: 'OBSERVADO';
   detalle_observacion: string;
   plazo_subsanacion_dias?: number;
 }
 
-export type EstadoOutbox = 'PENDIENTE' | 'PROCESADO' | 'FALLIDO';
+export type EstadoOutbox = 'PENDIENTE' | 'EN_PROCESO' | 'PROCESADO' | 'FALLIDO';
 
 export type OperacionBitacora = 'INSERT' | 'UPDATE' | 'DELETE';

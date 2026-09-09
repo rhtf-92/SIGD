@@ -6,7 +6,7 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 
 const ON_ERROR_STOP = 'ON_ERROR_STOP=1';
 
-export default async function globalSetup(): Promise<void> {
+export default async function globalSetup(): Promise<() => Promise<void>> {
   const imagen = process.env.TESTCONTAINERS_IMAGE ?? 'postgres:18-alpine';
   const container = await new PostgreSqlContainer(imagen)
     .withDatabase('sigd_prueba')
@@ -16,22 +16,26 @@ export default async function globalSetup(): Promise<void> {
 
   const databaseUrl = `postgres://postgres:postgres@${container.getHost()}:${container.getPort()}/sigd_prueba`;
   process.env.TEST_DATABASE_URL = databaseUrl;
-  (globalThis as Record<string, unknown>).__SIGD_CONTAINER__ = container;
 
   await ejecutarMigraciones(databaseUrl);
+
+  return async () => {
+    await container.stop();
+  };
 }
 
 function directorioSetup(): string {
   return path.dirname(fileURLToPath(import.meta.url));
 }
 
+function raizImplementacion(): string {
+  return path.resolve(directorioSetup(), '../..');
+}
+
 async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
-  const raizProyecto = path.resolve(directorioSetup(), '../..');
-  const archivoDdlAudit = path.resolve(raizProyecto, '../06_sigd_audit_esquema_ddl.sql');
-  const dirMigraciones = process.env.MIGRATIONS_DIR
-    ? path.resolve(raizProyecto, process.env.MIGRATIONS_DIR)
-    : path.join(raizProyecto, 'migraciones');
-  const fixture = path.join(raizProyecto, 'tests', 'fixtures', '01_schema_fixtures_test.sql');
+  const raizImpl = raizImplementacion();
+  const archivoDdlAudit = path.resolve(raizImpl, '../integracion/06_sigd_audit_esquema_ddl.sql');
+  const fixture = path.join(raizImpl, 'tests', 'fixtures', '01_schema_fixtures_test.sql');
 
   const cliente = new Client({ connectionString: databaseUrl });
   await cliente.connect();
@@ -39,17 +43,11 @@ async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
     await cliente.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
 
     await aplicarSql(cliente, fixture);
+
     if (existsSync(archivoDdlAudit)) {
       await aplicarSql(cliente, archivoDdlAudit);
-    }
-
-    if (existsSync(dirMigraciones)) {
-      const archivos = readdirSync(dirMigraciones)
-        .filter((f) => f.endsWith('.sql'))
-        .sort();
-      for (const archivo of archivos) {
-        await aplicarSql(cliente, path.join(dirMigraciones, archivo));
-      }
+    } else {
+      console.warn(`[MIGRACION] DDL de auditoría no encontrado en ${archivoDdlAudit}. Las pruebas de auditoría/Outbox pueden fallar.`);
     }
   } finally {
     await cliente.end();

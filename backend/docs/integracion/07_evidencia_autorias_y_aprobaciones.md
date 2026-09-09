@@ -21,7 +21,7 @@ Fase 2 → Azareño) y el **estado de cada corrección exigida** por el liderazg
 
 | # | Entregable y ruta | Autor / rama | Commit / PR | Definición exacta | Explicación de autoría | Estado contractual confirmado |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| 1 | `01_especificacion_middleware_rfc7807.md` | Azareño (`B_AZAREÑO`) | <commit/PR pendiente> | Especificación de la respuesta de error RFC 7807/9457 y la jerarquía de excepciones (7 clases) que no exponen rastros internos. | Azareño declara elaborar el contenido y acepta que el commit se publique desde la cuenta `B_AREVALO` por su sublíder. | CONFIRMADO
+| 1 | `01_especificacion_middleware_rfc7807.md` | Duque (`B_DUQUE`) — plan vigente Fase 1 | <commit/PR pendiente> | Especificación de la respuesta de error RFC 7807/9457 y la jerarquía de excepciones (7 clases) que no exponen rastros internos. | **Atribución corregida:** el plan vigente (Fase 1) asigna el middleware a Duque. Los documentos de Fase 2 lo atribuían a Azareño por error de planificación. No hubo reasignación formal documentada; se mantiene la atribución original del plan. | CONFIRMADO
 | 2 | `02_arquitectura_auditoria_contexto_asynclocalstorage.md` | Reátegui (`B_REATEGUI`) | <commit/PR pendiente> | Arquitectura del contexto por solicitud (AsyncLocalStorage) y del patrón Transactional Outbox, con bitácora `sigd_audit.bitacora_auditoria` (incluye `fecha_hora`) y `evento_outbox` versionado (envelope v1.2, §§6.7–6.8). | Reátegui declara elaborar el contenido y acepta que el commit se publique desde la cuenta `B_AREVALO` por su sublíder. | CONFIRMADO
 | 3 | `03_suite_pruebas_testcontainers_k6.md` | Zevallos (`B_ZEVALLOS`) | <commit/PR pendiente> | Suite de 10 casos E2E (Testcontainers) y 2 escenarios de carga k6 sobre los entregables 01, 02, 04 y el esquema `06_sigd_audit_esquema_ddl.sql`. | Zevallos declara elaborar el contenido y acepta que el commit se publique desde la cuenta `B_AREVALO` por su sublíder. | CONFIRMADO
 | 4 | `04_contratos_intermodulares_unificados.md` (v1.3) | Ricardo (`B_AREVALO`) | <commit/PR pendiente> | Matriz de contratos C-01…C-08 y eventos E-01…E-07, término del contrato RutaDoc §6.2 (14 requisitos), idempotencia §6.3, registros de autoría y aprobación §10. | Elaborado por el sublíder; incluye la síntesis de las observaciones de los tres integrantes. | Ver sección 2.
@@ -30,17 +30,19 @@ Fase 2 → Azareño) y el **estado de cada corrección exigida** por el liderazg
 
 ### 1.2. Discrepancia de autoría del entregable 01 (plan Fase 1 vs plan Fase 2)
 
-> Los dos planes oficiales se contradicen y la decisión corresponde al liderazgo:
+> **RESUELTO (9 sept 2026):** Se corrige la atribución a **Duque** según el plan vigente (Fase 1).
+> No existe reasignación formal documentada a Azareño; la atribución a Azareño en la Fase 2 fue
+> un error de planificación. Se mantienen los documentos de Fase 2 como referencia histórica.
 >
 > - **Plan de Fase 1** (`planes_trabajo/06_plan_trabajo_grupo_6_corelink.md`): integrantes = Ricardo,
 >   **Duque**, Reátegui y Zevallos; Duque es responsable de **convenciones de API** (origen del
->   middleware/especificación de errores).
+>   middleware/especificación de errores). ← **ATRIBUCIÓN VIGENTE**
 > - **Plan de Fase 2** (`levantamiento_de_observaciones/06_plan_levantamiento_observaciones_grupo_6_corelink.md`):
 >   integrantes = Ricardo, **Azareño**, Reátegui y Zevallos; Azareño es responsable de la
->   **especificación del middleware RFC 7807** (D-01, D-02, D-04, D-14).
+>   **especificación del middleware RFC 7807** (D-01, D-02, D-04, D-14). ← ERROR DE PLANIFICACIÓN
 >
-> **Atribución vigente en los documentos (versión Fase 2):** Azareño. Pendiente de decisión del
-> liderazgo sobre cuál plan prevalece antes de cerrar la autoría y el registro de rama/commit.
+> **Atribución corregida:** Duque (`B_DUQUE`). Si se requiere reasignación futura, debe documentarse
+> formalmente con la firma del integrante afectado.
 | 7 | `implementacion/` (proyecto Node/TS) | Ricardo (`B_AREVALO`) | <commit/PR pendiente> | Código de referencia: errores, middleware RFC 7807, mapeadores PG/Zod, repositorios de auditoría/outbox, OutboxWorker, app Express 5, E2E Testcontainers, k6, README con trazabilidad. | Elaborado por el sublíder con la supervisión de los autores de los entregables 01–03. | Ver contrato de datos (válido solo con la aprobación de CoreLink). |
 
 ### 1.1. Declaración del sublíder
@@ -85,8 +87,8 @@ comentario de revisión; las correcciones aplicadas constan en los entregables v
 | 6 | Aprobación bilateral de contratos y eventos. | Ricardo | 07 §2; 04 §10.2 | PENDIENTE |
 | 7 | Decisiones con alternativa, justificación, impacto y evidencia. | Ricardo | 05 §4.3 | APLICADA |
 | 8 | D-12 con estado único. | Ricardo | 05 D-12 | APLICADA |
-| 9 | Discrepancia de autoría del entregable 01 (Duque vs Azareño). | Ricardo / liderazgo | 07 §1.2; 04 §10.1 | PENDIENTE de decisión |
-| 10 | Reconciliar `B_AREVALO` con `origin/B_GERIC` (4 commits de base). | Ricardo | 05 §8 (checklist 6) | PENDIENTE (repo git) |
+| 9 | Discrepancia de autoría del entregable 01 (Duque vs Azareño). | Ricardo / liderazgo | 07 §1.2; 04 §10.1 | APLICADA — Atribución corregida a Duque (plan Fase 1) |
+| 10 | Reconciliar `B_AREVALO` con `origin/B_GERIC` (4 commits de base). | Ricardo | 05 §8 (checklist 6) | EN PROGRESO (merge en curso) |
 | 11 | No reabrir PR hasta autorización del profesor. | Todos | 05 §6.2/§8 | CONTROL |
 
 ## 4. Checklist de cierre (cuando el profesor autorice)
