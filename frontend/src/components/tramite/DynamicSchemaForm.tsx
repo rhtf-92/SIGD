@@ -389,7 +389,7 @@ export const DynamicSchemaForm: React.FC<DynamicSchemaFormProps> = ({
                         : "border-slate-300 hover:border-slate-400 focus:border-[#006EC7] focus:ring-[#006EC7]/25"
                     }`}
                     {...register(field.name, {
-                      validate: (val) => validateFieldValue(field, val) ?? true,
+                      validate: (val: unknown) => validateFieldValue(field, val) ?? true,
                     })}
                   >
                     <option value="" disabled className="text-slate-400">
@@ -573,7 +573,7 @@ export const DynamicSchemaForm: React.FC<DynamicSchemaFormProps> = ({
                       : "border-slate-300 hover:border-slate-400 focus:border-[#006EC7] focus:ring-[#006EC7]/25"
                   }`}
                   {...register(field.name, {
-                    validate: (val) => validateFieldValue(field, val) ?? true,
+                    validate: (val: unknown) => validateFieldValue(field, val) ?? true,
                   })}
                 />
 
