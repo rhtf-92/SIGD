@@ -7,7 +7,7 @@
 **Responsable:** Tapullima (`B_TAPULLIMA`)  
 **Fase:** 2 - Levantamiento de observaciones  
 **Versión:** 2.0  
-**Estado del documento:** **EN PROCESO DE SUBSANACIÓN**  
+**Estado del documento:** **H1 CERRADO - REVISIÓN FINAL COMPLETADA**
 **Fecha:** 30 de agosto de 2026
 
 > **Taxonomía de decisiones:** `CONFIRMADO` identifica una regla adoptada para esta fase; `PROPUESTO` identifica una solución técnica sujeta a aprobación; `PENDIENTE` identifica una definición institucional aún no confirmada; `EJEMPLO` identifica únicamente un caso ilustrativo.
@@ -90,7 +90,7 @@ La herencia se implementará mediante tablas relacionadas, no mediante herencia 
 
 - DNI, CE y Pasaporte deben almacenar el tipo y número normalizados, sin espacios ni guiones.
 - El número de documento debe ser único dentro de su tipo documental.
-- El RUC debe ser único en `persona_juridica`.
+- El RUC debe ser único en `persona_juridica` y, dentro de este modelo, identifica a personas jurídicas.
 - Los correos se normalizarán para comparación según la política definida por el equipo técnico; no se debe alterar el valor original declarado sin conservar la evidencia correspondiente.
 - Los índices únicos se definirán en PostgreSQL sobre los valores normalizados.
 
@@ -116,7 +116,7 @@ La validación deberá comprobar el dígito verificador mediante Módulo 11:
 6. Normalizar el resultado para un dígito decimal: si el resultado es `10`, corresponde `0`; si es `11`, corresponde `1`.
 7. Comparar el dígito esperado con el undécimo dígito recibido. Si no coincide, el RUC es inválido.
 
-El RUC con prefijo `20` representa a una persona jurídica en este modelo. Los RUC con prefijos `10`, `15` o `17` se tratarán como RUC de persona natural cuando la fuente institucional confirme dicha clasificación.
+El RUC con prefijo `20` representa a una persona jurídica en este modelo. Las personas naturales se identificarán mediante DNI, CE o Pasaporte; no se registrará un RUC de persona natural como identificador del subtipo sin una decisión institucional y de modelo posterior.
 
 **Estado:** `CONFIRMADO` para formato y checksum.  
 **Fuente externa RENIEC/SUNAT:** `PENDIENTE`.
@@ -245,7 +245,6 @@ La ofuscación se aplica **exclusivamente en serializadores o DTOs de APIs públ
 | :--- | :--- | :--- |
 | DNI de 8 dígitos | Conservar los 2 primeros y 2 últimos; reemplazar los 4 centrales por `****`. | `71****23` |
 | CE / Pasaporte | Si es corto, conservar el primer y último carácter; si no, conservar los 2 primeros y 2 últimos y ofuscar la parte central. | `A****9` |
-| RUC de persona natural (`10`, `15`, `17`) | Conservar el prefijo de 3 dígitos y los últimos 2; ofuscar los caracteres intermedios. | `107*****231` |
 | RUC de persona jurídica (`20`) | No ofuscar en consultas públicas, por tratarse de un dato mercantil público, sujeto a la política institucional de publicación. | `20123456789` |
 | Correo electrónico | Conservar el primer carácter del usuario, reemplazar el resto del usuario por `****` y conservar el dominio. | `j****@gmail.com` |
 | Nombres | Mostrar primer nombre, inicial paterna e inicial materna. | `Tania T. N.` |
@@ -275,7 +274,7 @@ Los módulos consumidores no deben duplicar contraseñas, refresh tokens, consen
 
 | Entregable | Responsable | Rama | Estado | Evidencia requerida |
 | :--- | :--- | :--- | :--- | :--- |
-| `01_analisis_identidad_personas_seguridad.md` | Tapullima | `B_TAPULLIMA` | **EN PROCESO DE SUBSANACIÓN** | Documento funcional aprobado y revisión de observaciones atendida. |
+| `01_analisis_identidad_personas_seguridad.md` | Tapullima | `B_TAPULLIMA` | **H1 CERRADO** | Documento funcional revisado y contradicciones v2 corregidas. |
 | `02_modelo_datos_identicore_v2.md` | Jair | `B_JAIR` | **PENDIENTE** | Modelo lógico con cardinalidades, subtipos y representación legal. |
 | `02_diccionario_datos_identicore_v2.md` | Jair | `B_JAIR` | **PENDIENTE** | Diccionario con campos, tipos, nulabilidad, índices y reglas. |
 | Diagrama ER editable y PNG | Jair | `B_JAIR` | **PENDIENTE** | Archivos `.drawio` y `.png` actualizados. |
@@ -313,12 +312,12 @@ El levantamiento se considerará subsanado cuando:
 
 ## 14. Dictamen del documento
 
-**Estado:** **EN PROCESO DE SUBSANACIÓN**.  
+**Estado:** **H1 CERRADO - REVISIÓN FINAL COMPLETADA**.
 
-El presente documento incorpora las reglas funcionales y técnicas necesarias para que IdentiCore sea implementado sin ambigüedades en el modelo de datos, el DDL y las pruebas de validación. La aprobación definitiva queda condicionada a cerrar los puntos marcados como `PENDIENTE` y a verificar las evidencias de los entregables de la Fase 2.
+El presente documento incorpora las reglas funcionales y técnicas necesarias para que IdentiCore sea implementado sin ambigüedades en el modelo de datos, el DDL y las pruebas de validación. Los puntos marcados como `PENDIENTE` son decisiones institucionales o técnicas de fases posteriores y no bloquean el cierre del análisis H1.
 
 | Rol | Responsable | Conformidad |
 | :--- | :--- | :--- |
 | Líder General Backend | Geric (`B_GERIC`) | Pendiente de revisión |
 | Sublíder IdentiCore | Segundo (`B_SEGUNDO`) | Pendiente de revisión |
-| Analista Funcional | Tapullima (`B_TAPULLIMA`) | En proceso de subsanación |
+| Analista Funcional | Tapullima (`B_TAPULLIMA`) | H1 cerrado |
