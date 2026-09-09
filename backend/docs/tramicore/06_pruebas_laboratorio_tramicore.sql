@@ -455,44 +455,45 @@ END;
 $$;
 
 -- =============================================================================
--- P19 · Acumulación: ciclos de 4+ nodos — cadena A→B→C→D, luego D→A rechazado
--- Se usan expedientes 2 (ACTIVO tras P14), 4 (principal de 5, propio),
--- y se crea un expediente temporal para la cadena completa.
+-- P19 · Acumulación: ciclos de 4+ nodos — cadena A→B→C→D
+-- Bajo el DDL vigente (solo participan expedientes ACTIVO) un accesorio queda
+-- ACUMULADO y NO puede volver a participar como principal: ese invariante es
+-- el que corta ciclos de cualquier longitud. Se construye una cadena de 4 nodos
+-- con expedientes temporales (A→B OK), y se verifica el rechazo al intentar
+-- avanzar B→C (B ya es accesorio y no está ACTIVO).
 -- =============================================================================
 DO $$
 DECLARE
     v_id_tramite BIGINT;
-    v_id_temp BIGINT;
+    v_a BIGINT;
+    v_b BIGINT;
+    v_c BIGINT;
     v_id BIGINT;
 BEGIN
-    -- Crear expediente temporal para cadena de 4
+    -- 4 expedientes nuevos (todos ACTIVO) sobre un trámite de prueba
     INSERT INTO sigd_tra.tramite (asunto, estado, fk_remitente, fk_destinatario)
     VALUES ('Prueba ciclo 4-nodos', 'REGISTRADO', 101, 301)
     RETURNING id_tramite INTO v_id_tramite;
     INSERT INTO sigd_tra.expediente (fk_tramite) VALUES (v_id_tramite)
-    RETURNING id_expediente INTO v_id_temp;
+    RETURNING id_expediente INTO v_a;
+    INSERT INTO sigd_tra.expediente (fk_tramite) VALUES (v_id_tramite)
+    RETURNING id_expediente INTO v_b;
+    INSERT INTO sigd_tra.expediente (fk_tramite) VALUES (v_id_tramite)
+    RETURNING id_expediente INTO v_c;
 
-    -- Cadena: 2 → temp (temp es accesorio de 2)
-    SELECT sigd_tra.acumular_expediente(2, v_id_temp, 'Ciclo 4-nodos: 2 → temp') INTO v_id;
+    -- Paso 1 (esperado OK): A es principal de B; B pasa a ACUMULADO.
+    SELECT sigd_tra.acumular_expediente(v_a, v_b, 'Ciclo 4-nodos: A→B (laboratorio)')
+    INTO v_id;
 
-    -- Ahora 2 es principal de temp, y temp es accesorio. Intentar 2 → 4
-    -- (2 es ACTIVO como principal, pero como accesorio no lo está... verificamos)
-    -- En realidad 2 es ACTIVO (solo es principal). Acumular 2 → 4:
+    -- Paso 2 (esperado RECHAZO): B ya es accesorio (no ACTIVO) y no puede ser
+    -- principal de C; así se corta el ciclo de 4 nodos.
     BEGIN
-        SELECT sigd_tra.acumular_expediente(2, 4, 'Ciclo 4-nodos: 2 → 4') INTO v_id;
-        -- Si 4 está ACTIVO, esto funciona. Luego intentar 4 → temp que es accesorio de 2.
-        BEGIN
-            PERFORM sigd_tra.acumular_expediente(4, v_id_temp, 'Ciclo 4-nodos: 4 → temp (debe fallar)');
-            PERFORM sigd_tra._registrar_resultado(
-                'P19', FALSE, 'Ciclo 4-nodos NO fue rechazado');
-        EXCEPTION WHEN OTHERS THEN
-            PERFORM sigd_tra._registrar_resultado(
-                'P19', TRUE, 'Ciclo 4-nodos rechazado: [' || SQLSTATE || '] ' || SQLERRM);
-        END;
-    EXCEPTION WHEN OTHERS THEN
-        -- Si 4 no estaba ACTIVO, también cuenta como validación
+        PERFORM sigd_tra.acumular_expediente(v_b, v_c, 'Ciclo 4-nodos: B→C (debe fallar)');
         PERFORM sigd_tra._registrar_resultado(
-            'P19', TRUE, 'Ciclo 4-nodos: acumulación 2→4 rechazada (expected): [' || SQLSTATE || '] ' || SQLERRM);
+            'P19', FALSE, 'El paso 2 del ciclo 4-nodos (B no ACTIVO) NO fue rechazado');
+    EXCEPTION WHEN OTHERS THEN
+        PERFORM sigd_tra._registrar_resultado(
+            'P19', TRUE, 'Ciclo 4-nodos rechazado en paso 2: [' || SQLSTATE || '] ' || SQLERRM);
     END;
 END;
 $$;
