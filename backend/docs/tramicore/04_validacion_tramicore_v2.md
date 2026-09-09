@@ -43,8 +43,7 @@ psql -h localhost -p 5432 -U postgres -d tramicore_prueba -v ON_ERROR_STOP=1 -f 
 Cada prueba es un bloque que **ejecuta la operación de verdad** (INSERT/UPDATE/
 DELETE reales) y registra OK o FALLO en una tabla temporal; la transacción del
 escenario termina en `ROLLBACK`, por lo que el laboratorio no deja residuos en
-la base. Resultado **PENDIENTE** de re-ejecución con el DDL corregido (SQLSTATE
-23514/23001, trigger anti-huecos, trigger de acumulación).
+la base. **Ejecutado 2026-09-09**: 26/26 OK (exit 0) — ver `logs_pruebas/evidencia_h4.json`.
 
 | # | Prueba | Qué comprueba | Cómo la comprueba | Resultado |
 |---|--------|---------------|-------------------|-----------|
@@ -66,7 +65,7 @@ la base. Resultado **PENDIENTE** de re-ejecución con el DDL corregido (SQLSTATE
 | P16 | Integridad referencial | Expediente con trámite inexistente **rechazado** | `INSERT ... fk_tramite=99999` real | OK — rechazado `[23503]` |
 | P17 | Inserción con hueco | INSERT directo que deja hueco **rechazado** por el nuevo trigger anti-hueco | `INSERT (3, 903, 10, 12, 3)` | OK — rechazado `[23514]` |
 | P18 | Ciclo 3-nodos | Cadena A→B, luego B→C rechazado (B no ACTIVO) | `acumular_expediente(1,3)` + `acumular_expediente(3,5)` | OK — rechazado paso 2 |
-| P19 | Ciclo 4-nodos | Cadena A→B→C→D, luego D→A rechazado | `acumular_expediente` encadenadas | OK — rechazado |
+| P19 | Ciclo 4-nodos | Cadena A→B→C→D impostada: A→B OK; B→C rechazado porque B quedó ACUMULADO (no ACTIVO) | expedientes temporales: `acumular_expediente(A,B)` + `acumular_expediente(B,C)` | OK — rechazado paso 2 |
 | P20 | Solapamiento directo (sin función) | INSERT que solapa folios existentes | `INSERT (4, 904, 5, 15, 11)` | OK — rechazado `[23514]` |
 | P21 | Estado ACUMULADO verificado | expediente 3 tiene estado ACUMULADO | SELECT sobre `estado_expediente` | OK — verificado |
 
@@ -90,13 +89,13 @@ proceso.**
 SELECT sigd_tra.generar_cut_expediente(2026) FROM generate_series(1, 100);
 ```
 
-Resultado **PENDIENTE** (requiere re-ejecución del lanzador):
+**Ejecutado 2026-09-09** (evidencia `evidencia_h4.json`):
 
 | Métrica | Valor |
 |---------|-------|
 | CUTs generados | 500 |
-| CUTs distintos | **500 / 500** (PENDIENTE de re-ejecución) |
-| ExitCode de cada sesión | 0 (todos exitosos) |
+| CUTs distintos | **500 / 500** |
+| ExitCode de cada sesión | 0 (todos exitosos; PIDs en evidencia) |
 | Archivos `.err` de sesión | vacíos (sin errores ni `deadlock detected`) |
 | Salida de sesión | `concurrente_0.log` … `concurrente_4.log` (100 líneas c/u) |
 
@@ -110,7 +109,9 @@ Resultado **PENDIENTE** (requiere re-ejecución del lanzador):
 SELECT sigd_tra.generar_cut_expediente(2028);
 ```
 
-Resultado **PENDIENTE** (requiere re-ejecución del lanzador):
+**Ejecutado 2026-09-09:** las 3 sesiones devolvieron exactamente
+`EXP-2028-000001`, `EXP-2028-000002`, `EXP-2028-000003` (exit 0 cada una) y
+`secuencia_anual_cut` quedó con **1 fila** para 2028.
 
 | Métrica | Valor |
 |---------|-------|
@@ -118,21 +119,36 @@ Resultado **PENDIENTE** (requiere re-ejecución del lanzador):
 | CUTs devueltos | `EXP-2028-000001`, `EXP-2028-000002`, `EXP-2028-000003` |
 | Filas en `secuencia_anual_cut` para 2028 | **1** (la carga atómica `ON CONFLICT` no duplicó la fila) |
 
-### B.3 — Foliado concurrente
+### B.3 — Foliado: prueba negativa real de solapamiento
 
-2 sesiones simultáneas intentan insertar folios solapados al mismo expediente:
+**Corrección H4b:** la versión anterior del lanzador probaba con rangos
+contiguos (0 solapados), lo que no ejercitaba el rechazo. Se reemplazó por una
+**prueba negativa determinista** sobre un expediente limpio:
 
 ```sql
--- sesión 0: INSERT (1, 901, 1, 10, 10)
--- sesión 1: INSERT (1, 902, 1, 5, 5)  -- solapa
+-- sesión 0 (exit 0 esperado): folia el expediente vía función canónica
+SELECT sigd_tra.agregar_folio_expediente(<id_limpio>, 901, 10);   -- folios 1-10
+-- sesión 1 (exit != 0 esperado): INSERT directo que SOLAPA 1-5 sobre los 1-10
+INSERT INTO sigd_tra.expediente_documento_folio (id_expediente, id_documento,
+    folio_inicio, folio_fin, total_folios) VALUES (<id_limpio>, 902, 1, 5, 5);
 ```
 
-Resultado **PENDIENTE** (requiere re-ejecución con expediente limpio):
+La ejecución es secuencial determinista (la sesión 0 termina antes de iniciar
+la 1) y usa `ON_ERROR_STOP=1`: sin él, psql continuaría y devolvería exit 0
+pese al error, enmascarando el rechazo (bug de la versión anterior).
+
+**Ejecutado 2026-09-09** (evidencia `evidencia_h4.json`):
 
 | Métrica | Valor |
 |---------|-------|
-| Solapamiento detectado | **SÍ** — trigger `trg_folio_verificar_solapamiento` rechaza `[23514]` |
-| Ambos procesos exitosos | Sí (exit 0 para sesión 0, exit 1 para sesión 1 que solapa) |
+| Población canónica (sesión 0) | exit **0** — folios `1|10` confirmados |
+| Solapamiento rechazado (sesión 1) | exit **3** — stderr `[23514]`/Solapamiento |
+| Folios finales en el expediente | solo `1|10` (el rango 1-5 no quedó registrado) |
+| Solapamiento detectado | **SÍ** — trigger `trg_folio_verificar_solapamiento` |
+
+> Nota: `agregar_folio_expediente` (sesión 0) dispara también el trigger; el
+> trigger anti-huecos se corrigió en la re-ejecución para no rechazar el folio
+> contiguo precedente (ver `03_esquema_...sql`, bloque CORRECCIÓN 2026-09-09).
 
 ---
 
@@ -171,25 +187,25 @@ FROM sigd_tra.expediente ORDER BY id_expediente;
 
 ---
 
-## RESUMEN DE LA REVISIÓN H4b
+## RESUMEN DE LA REVISIÓN H4b (re-ejecución 2026-09-09)
 
-**Ejecución:** PENDIENTE de re-ejecución del lanzador contra PostgreSQL 18.3.
-Los cambios en SQLSTATE (23514/23001), trigger anti-huecos y trigger de
-acumulación requieren re-ejecución completa para generar la evidencia.
+**Ejecución:** lanzador re-ejecutado contra PostgreSQL 18.3 con el DDL
+corregido (SQLSTATE 23514/23001, trigger anti-huecos sin falso positivo,
+prueba negativa de foliado y P19 reescrito). Resultado global **PASS**.
+Evidencia en `logs_pruebas/evidencia_h4.json` (fechas, ddl_hash, exit codes y
+resultados por bloque) más logs de sesión `concurrente_*.log`,
+`anio_nuevo_*.log` y `folio_*.log/.err`.
 
-> **Nota sobre evidencia:** El archivo `evidence_h4.json` no existe en la rama.
-> La evidencia se genera ejecutando `07_lanzador_pruebas_tramicore.ps1`.
-> Los `.log` en `logs_pruebas/` contienen solo 17 bytes cada uno (sin evidencia
-> completa con hashes, fechas, exit codes). Las afirmaciones "21/21", "500/500"
-> y "sin deadlocks" son resultados de ejecuciones previas (commit 8e811ba)
-> que deben re-validarse.
+> **Recuento:** el laboratorio cubre **26 pruebas** (P01, P02, P04–P21 con
+> P14a–d y P15a–d). La concurrencia (P03) la ejecuta el lanzador en B.1/B.2 y
+> se evalúa aparte; el lanzador exige **26** pruebas OK en el laboratorio.
 
 | Bloque | Resultado | Estado |
 |--------|-----------|--------|
-| Laboratorio determinista (21 pruebas) | Verificar en re-ejecución | ⚠️ PENDIENTE |
-| Concurrencia 2026 (5 sesiones × 100) | Verificar en re-ejecución | ⚠️ PENDIENTE |
-| Carrera año 2028 (3 CUTs exactos 000001, 000002, 000003) | Verificar en re-ejecución | ⚠️ PENDIENTE |
-| Foliado concurrente (expediente limpio) | Verificar en re-ejecución | ⚠️ PENDIENTE |
+| Laboratorio determinista (26 pruebas) | 26/26 OK (exit 0) | ✅ EJECUTADO |
+| Concurrencia 2026 (5 sesiones × 100) | 500/500 únicos, exit 0, 0 errores | ✅ EJECUTADO |
+| Carrera año 2028 (3 CUTs exactos 000001, 000002, 000003) | OK — 1 fila anual | ✅ EJECUTADO |
+| Foliado: solapamiento rechazado (prueba negativa) | Población exit 0; rechazo exit 3 `[23514]` | ✅ EJECUTADO |
 | CUT por año fiscal | Reinicia en `000001`; sin secuencia global | ✅ Verificado en DDL |
 | CUT auto-conectado al INSERT | Trigger `trg_expediente_asignar_cut` | ✅ Verificado en DDL |
 | CHECK de formato CUT | `chk_expediente_cut_formato` (VARCHAR(20)) | ✅ Verificado en DDL |
@@ -201,5 +217,7 @@ acumulación requieren re-ejecución completa para generar la evidencia.
 | Inmutabilidad del Libro (asiento) | Triggers `trg_asiento_no_update_numero` / `trg_asiento_no_delete` | ✅ Verificado en DDL |
 | Seguridad (REVOKE PUBLIC) | `REVOKE ... FROM PUBLIC` en las 4 funciones | ✅ Verificado en DDL |
 | Índices redundantes | Eliminados (`idx_asiento_numero_registro`, `idx_exp_acum_principal`, `idx_folio_expediente`) | ✅ Verificado en DDL |
-| Evidencia consolidada | `logs_pruebas/evidencia_h4.json` — **NO EXISTE**; generar con lanzador | ⚠️ PENDIENTE |
+| Evidencia consolidada | `logs_pruebas/evidencia_h4.json` — generada en la re-ejecución | ✅ EJECUTADO |
 | Verificación ExitCode procesos | Cada proceso psql verificado individualmente | ✅ Verificado en DDL |
+
+DDL hash de la re-ejecución: `B570585ACEBC634D4DEBC643EFD51355F36AE1A13768EC730A30EBF6D0716133`.

@@ -31,7 +31,7 @@
 
 | Campo | Tipo | Clave | Nulo | Default | Descripción | Estado |
 |-------|------|-------|------|---------|-------------|--------|
-| id_expediente | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno (UUID PENDIENTE contrato con RutaDoc, ver DEC-UUID) | CONFIRMADO |
+| id_expediente | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno (tipo de clave PENDIENTE de contrato con RutaDoc, ver DEC-UUID) | PENDIENTE |
 | codigo_expediente | VARCHAR(20) | UQ | No | — | CUT visible formato EXP-YYYY-XXXXXX | CONFIRMADO |
 | fk_tramite | BIGINT | FK | No | — | Trámite asociado (1..N:1 sin UNIQUE) | CONFIRMADO |
 | estado_expediente | VARCHAR(20) | | No | 'ACTIVO' | Estado: ACTIVO/ACUMULADO/ANULADO (PROPUESTO, taxonomía oficial PENDIENTE) | PROPUESTO |

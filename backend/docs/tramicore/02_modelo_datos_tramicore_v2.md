@@ -51,7 +51,7 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 
 | Campo | Tipo | Clave | Nulo | Default | Descripción | Estado |
 |-------|------|-------|------|---------|-------------|--------|
-| id_expediente | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno (UUID PENDIENTE contrato con RutaDoc, ver DEC-UUID) | CONFIRMADO |
+| id_expediente | BIGINT | PK | No | GENERATED ALWAYS AS IDENTITY | ID técnico interno (tipo de clave PENDIENTE de contrato con RutaDoc, ver DEC-UUID) | PENDIENTE |
 | codigo_expediente | VARCHAR(20) | UQ | No | — | CUT visible formato EXP-YYYY-XXXXXX | CONFIRMADO |
 | fk_tramite | BIGINT | FK | No | — | Trámite asociado (**sin UNIQUE → 1:N**) | CONFIRMADO |
 | estado_expediente | VARCHAR(20) | | No | 'ACTIVO' | Estado del expediente (ACTIVO/ACUMULADO/ANULADO) | PROPUESTO |
@@ -170,7 +170,7 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 
 - La anulación es un **borrado lógico**: `anulado = true` + `motivo_anulacion` sobre el asiento `[CONFIRMADO]`
 - `NO DELETE`, no se reutiliza el `numero_registro` original `[CONFIRMADO]`
-- El expediente pasa a estado `ANULADO` y el evento se entrega a trazabilidad (Grupo 1) `[CONFIRMADO]`
+- El expediente pasa a estado `ANULADO` y el evento se entrega a trazabilidad (Grupo 1) `[PENDIENTE]` (contrato de eventos CoreLink con RutaDoc no aprobado)
 
 ---
 
