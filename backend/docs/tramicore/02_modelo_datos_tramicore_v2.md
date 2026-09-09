@@ -24,7 +24,7 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 
 **Archivo editable:** `backend/docs/tramicore/02_modelo_datos_gestion_documental_diagrama.drawio`
 **Imagen exportada:** `backend/docs/tramicore/02_modelo_datos_gestion_documental_diagrama.png`
-> ⚠️ **PNG desactualizado:** Tras los cambios en el Draw.io (leyenda G3/G4/G5 como PENDIENTE, referencias sin contrato), el PNG debe regenerarse con Draw.io (Archivo → Exportar como PNG).
+> PNG regenerado el 2026-09-09 desde el Draw.io v2.0 (leyenda G3/G4/G5 como PENDIENTE, referencias sin contrato). Re-exportación CLI drawio 31.4.4.
 
 ---
 
