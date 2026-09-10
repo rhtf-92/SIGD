@@ -195,36 +195,36 @@ Cada registro incluye identificador, estado, contexto, alternativas, decisión o
 | Campo | Registro |
 | --- | --- |
 | Estado | **PENDIENTE** |
-| Contexto | El plan rector propone `sigd_audit`/CoreLink como ubicación arquitectónica de Outbox, pero no existe todavía contrato intergrupal confirmado. |
+| Contexto | El plan rector propone `sigd_audit`/CoreLink como ubicación arquitectónica de Outbox. CoreLink ya documenta un prototipo y una propuesta contractual para RutaDoc, pero la clasifica como **PENDIENTE** y sin implementación de los tres eventos; no existe todavía aprobación bilateral. |
 | Alternativas | RutaDoc crea su Outbox; tabla compartida sin dueño; CoreLink propietario con contrato de escritura/publicación. |
-| Decisión o pregunta | Confirmar ownership, payload, versionado, correlación, idempotencia, estados, permisos y escritura transaccional. RutaDoc solo modela su relación conceptual como productor y no fija campos concretos. |
+| Decisión o pregunta | Mantener como **PROPUESTO** el prototipo de `sigd_audit.evento_outbox`, el envelope versión 1, `correlation_id`, la clave de idempotencia y los estados de despacho. CoreLink propone a RutaDoc como productor de `ExpedienteDerivado`, `ExpedienteAtendido` y `ExpedienteObservado`; ownership definitivo, payload, publicación y responsabilidades permanecen **PENDIENTES** de aprobación bilateral. La evidencia E2E disponible corresponde a PostgreSQL 16 local y declara pendiente PostgreSQL 18 mediante Testcontainers. |
 | Responsable | Grupo 6 confirma el contrato; Jacobo/Liz entregó en H1 la propuesta funcional no contractual de eventos; Geric consolida la dependencia y revisa su integración. |
 | Impacto | Atomicidad, integración, reintentos, auditoría y despliegue. |
-| Evidencia | `backend/docs/Plan_de_mejora_nivel_backend_SIGD.md`, sección 5.2, relaciona `MOVIMIENTO_TRAMITE` con `EVENTO_OUTBOX`, y sección 5.8 presenta `sigd_audit` (CoreLink) con `evento_outbox` como arquitectura propuesta; plan específico, sección 7, mantiene pendiente el contrato de payload. |
+| Evidencia | Plan rector, secciones 5.2 y 5.8; plan específico, sección 7; `backend/docs/integracion/09_propuesta_contractual_rutadoc.md`, secciones 1–6 y nota final (estado pendiente, eventos, envelope y responsabilidades); `backend/docs/implementacion/evidencia/e2e-20260909-204737/resumen.txt`, líneas 4–12 (PostgreSQL 16 local y validación PostgreSQL 18/Testcontainers pendiente). |
 
 ### RUT-DEC-013 — Contratos de Grupos 2, 3 y 4
 
 | Campo | Registro |
 | --- | --- |
 | Estado | **PENDIENTE** |
-| Contexto | RutaDoc necesita expediente, áreas y actor, pero no es propietario de esas tablas. |
+| Contexto | RutaDoc necesita expediente, áreas y actor, pero no es propietario de esas tablas. Los artefactos integrados ya permiten comparar las propuestas físicas, sin que su integración equivalga a aceptación contractual. |
 | Alternativas | Duplicar datos; declarar FK anticipadas; conservar UUID sin FK hasta contrato. |
-| Decisión o pregunta | Grupo 2 debe confirmar `sigd_tra.expediente`, `id_expediente UUID` y el tratamiento del CUT; Grupo 3, `sigd_org.area` e `id_area`; Grupo 4, `sigd_auth.cuenta_usuario` e `id_usuario`. Hasta entonces no se declaran FK físicas externas ni se decide si el CUT se consulta, referencia o conserva. |
+| Decisión o pregunta | **G2:** está **CONFIRMADA** la existencia documental y SQL del mecanismo CUT propuesto `EXP-YYYY-XXXXXX`, respaldado por `secuencia_anual_cut`, `ON CONFLICT` y bloqueo `FOR UPDATE`; el formato normativo y el tipo de `id_expediente` permanecen **PENDIENTES**. TramiCore implementa `BIGINT` y declara pendiente la decisión UUID/BIGINT con RutaDoc. **G3:** está **CONFIRMADO** que sus artefactos proponen e implementan localmente `sigd_org.area.id_area UUID`; su consumo por RutaDoc queda **PENDIENTE DE ACEPTACIÓN BILATERAL**. **G4:** RutaDoc solicita `cuenta_usuario.id_usuario`, pero el DDL integrado define la PK como `cuenta_usuario.id BIGINT` y usa `usuario_id BIGINT` en tablas consumidoras; la incompatibilidad permanece **PENDIENTE**. Su H4 declara pruebas de BD no ejecutadas. No se declaran FK físicas externas en RutaDoc mientras estas diferencias no se resuelvan. |
 | Responsable | Grupos 2, 3 y 4 confirman; Geric consolida; Jhasy implementa después. |
 | Impacto | Integridad referencial, disponibilidad, históricos y autorización. |
-| Evidencia | Plan específico, sección 7 “Dependencias con Otros Grupos”; precisión contractual proporcionada por Geric el 2026-09-02. |
+| Evidencia | Plan específico, sección 7 (UUID/CUT, `id_area` e `id_usuario`); `backend/docs/tramicore/08_coordinacion_contratos_tramicore.md`, secciones 1, 3 y 5 (mecanismo CUT y DEC-UUID pendiente); `backend/docs/organicore/02_diccionario_datos_sigd_org.md`, secciones de `area`, `asignacion_personal` y `encargatura` (`id_area UUID`); `backend/docs/organicore/03_esquema_sigd_org_v2.sql`, definición de `sigd_org.area`; `backend/docs/identicore/02_diccionario_datos_identicore_v2.md`, secciones 2.6–2.9; `backend/docs/identicore/03_esquema_sigd_auth_v2.sql`, definiciones de `cuenta_usuario`, `sesion_usuario` y `consentimiento_datos`; `backend/docs/identicore/04_validacion_identicore_v2.md`, secciones de estado de ejecución. |
 
 ### RUT-DEC-014 — Dependencia documental del Grupo 5
 
 | Campo | Registro |
 | --- | --- |
 | Estado | **PENDIENTE** |
-| Contexto | v1 contiene `movimiento_documento` y referencias a documento/versión del Grupo 5; la lista contractual explícita de esta Fase 2 menciona Grupos 2, 3, 4 y 6. |
+| Contexto | v1 contiene `movimiento_documento` y referencias a documento/versión del Grupo 5. Los artefactos DocuCore integrados describen documento, adjunto, versión y almacenamiento, pero la lista contractual explícita de la sección 7 de esta Fase 2 menciona solamente Grupos 2, 3, 4 y 6. |
 | Alternativas | Eliminar el vínculo; inventar contrato; conservarlo sin tipo/FK y solicitar aclaración. |
-| Decisión o pregunta | Se conserva conceptualmente para no perder alcance histórico, pero no se fija tabla, esquema, identificador ni FK. ¿Debe formar parte del contrato formal de esta Fase 2? |
+| Decisión o pregunta | Conservarla como dependencia documental histórica adicional, sin agregarla silenciosamente a la lista contractual oficial de la sección 7. Los identificadores, el vínculo con movimientos, la versión y la disponibilidad histórica permanecen **PENDIENTES**; no se fija FK. |
 | Responsable | Geric solicita aclaración; Grupo 5 confirma si corresponde. |
 | Impacto | Atención, evidencia documental, diccionario y API. |
-| Evidencia | Modelo v1, secciones 5.11 y 12; diccionario v1, secciones 4.11 y 8; plan específico, sección 7. |
+| Evidencia | Modelo v1, secciones 5.11 y 12; diccionario v1, secciones 4.11 y 8; plan específico, sección 7; `backend/docs/docucore/04_diccionario_datos_docucore_v2.md`, secciones de documentos, versiones y adjuntos; `backend/docs/docucore/07_decisiones_y_preguntas_pendientes.md`, secciones 3–5. |
 
 ### RUT-DEC-015 — Idempotencia, correlación y auditoría
 
@@ -236,7 +236,7 @@ Cada registro incluye identificador, estado, contexto, alternativas, decisión o
 | Decisión o pregunta | Definir tipo, origen, alcance, propagación, nulabilidad y garantía global de `clave_idempotencia`; no se fija UUID ni UNIQUE física. `correlation_id UUID` permanece como candidato sujeto al contrato CoreLink. La idempotencia es una invariancia, no un índice de rendimiento. |
 | Responsable | Geric propone; Jhasy valida persistencia; Grupo 6 confirma contrato. |
 | Impacto | Reintentos, diagnóstico, duplicados e integración. |
-| Evidencia | SQL v1, sección 2, tabla `movimiento_tramite`; plan rector, secciones 5.2 y 5.8; contrato del Grupo 6 todavía ausente. |
+| Evidencia | SQL v1, sección 2, tabla `movimiento_tramite`; plan rector, secciones 5.2 y 5.8; propuesta no contractual de CoreLink en `backend/docs/integracion/09_propuesta_contractual_rutadoc.md`, secciones 2–5. |
 
 ### RUT-DEC-016 — Relación dominio TypeScript–persistencia
 
@@ -257,7 +257,7 @@ Cada registro incluye identificador, estado, contexto, alternativas, decisión o
 | Estado | **CONFIRMADO** |
 | Contexto | Los tres documentos son borradores previos a entregas y contratos. |
 | Alternativas | Declarar actividad terminada por existencia de archivos; mantener estado de borrador trazable. |
-| Decisión o pregunta | H1 fue recibido, revisado, aprobado documentalmente para integración e integrado mediante PR `#71`. Esto no aprueba un catálogo institucional ni acredita implementación. H3 de Jhasy, los contratos externos, la reconciliación funcional y las pruebas permanecen **PENDIENTES**. |
+| Decisión o pregunta | H1 fue recibido, revisado, aprobado documentalmente para integración e integrado mediante PR `#71`. H3 y H4 de Jhasy están integrados como artefactos de diseño y validación; esto no acredita por sí solo cumplimiento técnico completo. El catálogo institucional, los contratos externos, la reconciliación funcional y las pruebas pendientes continúan sin cierre. |
 | Responsable | Geric. |
 | Impacto | Evita presentar diseño documental como implementación verificada. |
 | Evidencia | Instrucción expresa de Geric; plan específico, sección 8 “Lista de verificación para la entrega del levantamiento de observaciones”, cuyos criterios permanecen sin marcar. |
@@ -282,11 +282,11 @@ Cada registro incluye identificador, estado, contexto, alternativas, decisión o
 
 | Grupo | Contrato pendiente | Preguntas mínimas |
 | --- | --- | --- |
-| Grupo 2 | `sigd_tra.expediente`, `id_expediente UUID`, CUT. | Existencia, vigencia, consulta histórica y tratamiento del CUT sin decidir anticipadamente si se consulta, referencia o conserva. |
-| Grupo 3 | `sigd_org.area`, `id_area`. | Vigencia, áreas inactivas, autorización y jerarquía. |
-| Grupo 4 | `sigd_auth.cuenta_usuario`, `id_usuario`. | Actor inactivo, eventos de sistema y acceso histórico. |
-| Grupo 5 | Documento y versión contemplados en v1, sin nombres ni tipos contractuales fijados. | Confirmar si el vínculo continúa en Fase 2, sus identificadores, versiones y acceso histórico. |
-| Grupo 6 | Ownership de `sigd_audit.evento_outbox` y payload. | Escritura atómica, versión, correlación, idempotencia, publicación y reintentos. |
+| Grupo 2 | CUT con mecanismo disponible; `id_expediente` **PENDIENTE** por diferencia BIGINT/UUID. | Aprobación bilateral del tipo, formato normativo CUT, vigencia, consulta histórica y tratamiento del CUT. |
+| Grupo 3 | `sigd_org.area.id_area UUID` **PROPUESTO** e implementado localmente. | Aceptación bilateral por RutaDoc; vigencia, áreas inactivas, autorización y jerarquía. |
+| Grupo 4 | `cuenta_usuario.id BIGINT` y referencias `usuario_id BIGINT`, incompatibles nominalmente con `id_usuario` solicitado. | Resolver nombre/tipo contractual, actor inactivo, eventos de sistema y acceso histórico; ejecutar y revisar H4. |
+| Grupo 5 | Dependencia documental histórica adicional; documentos, versiones y adjuntos presentes. | Sin incorporarlo a la lista contractual oficial: confirmar identificadores, vínculo, versiones y disponibilidad histórica. |
+| Grupo 6 | Prototipo Outbox y propuesta versión 1 para los tres eventos; contrato bilateral **PENDIENTE**. | Ownership, payload, publicación, correlación, idempotencia y reintentos; validar en PostgreSQL 18/Testcontainers. |
 
 ## 4. Traspaso controlado a H3 — Jhasy
 
