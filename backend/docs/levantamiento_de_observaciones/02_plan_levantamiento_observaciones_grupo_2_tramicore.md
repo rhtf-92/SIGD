@@ -66,7 +66,7 @@ Subsanar las observaciones arquitecturales identificadas en el diagnóstico seni
   - Función atómica `generar_cut_expediente(anio)`.
   - Tabla de control de folios con restricción `CHECK (folio_fin >= folio_inicio)`.
   - Tabla de acumulación de expedientes con dos FK simples e índice único parcial `uq_acumulacion_vigente` (abstención de FK compuesta).
-- Ejecutar la validación `04_validacion_tramicore_v2.md` mediante el lanzador reproducible `07_lanzador_pruebas_tramicore.ps1` (26 pruebas deterministas -conteo corregido desde 21- + concurrencia real de 500 CUTs); validación de foliado continuo y acumulación de expedientes.
+- Ejecutar la validación `04_validacion_tramicore_v2.md` mediante el lanzador reproducible `07_lanzador_pruebas_tramicore.ps1` (21 pruebas deterministas + concurrencia real de 500 CUTs); validación de foliado continuo y acumulación de expedientes.
 - Redactar `05_decisiones_levantamiento_tramicore.md` y consolidar en `B_RAMIREZ`.
 
 ---
@@ -85,7 +85,7 @@ Subsanar las observaciones arquitecturales identificadas en el diagnóstico seni
 
 ## 7. Dependencias y Contratos con Otros Grupos
 
-- **Grupo 1 (RutaDoc):** TramiCore emite el evento de creación de expediente con su `id_expediente` y CUT para el primer movimiento `REGISTRADO`. El tipo de clave (`BIGINT` hoy; UUID **PENDIENTE**, DEC-UUID) debe acordarse bilateralmente antes de implementar el contrato de eventos; `id_expediente` queda explícitamente **PENDIENTE** en modelo y diccionario.
+- **Grupo 1 (RutaDoc):** TramiCore emite el evento de creación de expediente con su `id_expediente` (UUID) y CUT para el primer movimiento `REGISTRADO`.
 - **Grupo 4 (IdentiCore):** TramiCore recibe `id_persona` / `id_usuario` para asociar el administrado titular del expediente.
 - **Grupo 5 (DocuCore):** TramiCore recibe los documentos adjuntos y sus hashes SHA-256 para asignarles foliatura oficial en `expediente_documento_folio`.
 
