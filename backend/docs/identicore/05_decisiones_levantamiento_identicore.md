@@ -12,37 +12,37 @@
 ### 1.1 Modelo Polimórfico de Identidad
 - **Decisión:** Implementar modelo con entidad base `persona` y extensiones `persona_natural`/`persona_juridica`.
 - **Justificación:** Permite separar claramente datos comunes (email, teléfono, dirección) de específicos (DNI/RUC, nombres/apellidos, razón social).
-- **Nivel:** CONFIRMADO
-- **Evidencia:** `03_esquema_sigd_auth_v2.sql` (tablas `persona`, `persona_natural`, `persona_juridica`, `representacion_legal`)
+- **Nivel:** PROPUESTO
+- **Evidencia:** `03_esquema_sigd_auth_v2.sql` (tablas `persona`, `persona_natural`, `persona_juridica`, `representacion_legal`). El SQL actual NO garantiza especialización exclusiva 1:1 (una persona puede quedar sin extensión o con dos); la garantía total/exclusiva requiere lógica transaccional PENDIENTE de decisión del grupo.
 
 ### 1.2 Almacenamiento de Credenciales Compatible con Argon2id
 - **Decisión:** Definir campo `password_hash` en tabla `cuenta_usuario` para almacenar hashes de contraseñas con parámetros Argon2id (memory: 64MB, iterations: 3, parallelism: 4).
 - **Justificación:** Argon2id es ganador de la Password Hashing Competition (PHC) y recomendado por NIST para protección contra ataques de fuerza bruta y side-channel. La estructura de la base de datos permite el almacenamiento de hashes Argon2id.
-- **Nivel:** DOCUMENTADO
+- **Nivel:** PROPUESTO
 - **Evidencia:** `03_esquema_sigd_auth_v2.sql` (campo `password_hash` en `cuenta_usuario`) y `04_validacion_identicore_v2.md` (Caso 2.4). Los parámetros Argon2id están documentados pero no existen procedimientos o triggers que los apliquen.
 
 ### 1.3 Gestión de Sesiones con Refresh Tokens (Almacenamiento)
 - **Decisión:** Implementar tabla `sesion_usuario` para almacenar refresh tokens con control de expiración y auditoría de IP/User-Agent.
 - **Justificación:** Permite el registro de sesiones activas y facilita la trazabilidad de accesos. La rotación, revocación y detección de reuso de tokens no están implementadas en la capa de base de datos.
-- **Nivel:** DOCUMENTADO
+- **Nivel:** PROPUESTO
 - **Evidencia:** `03_esquema_sigd_auth_v2.sql` (tabla `sesion_usuario`) y `04_validacion_identicore_v2.md` (Caso 2.4). Solo se verifica longitud del token y existencia de campos de auditoría.
 
 ### 1.4 Cumplimiento de Ley N° 29733 (Protección de Datos)
 - **Decisión:** Implementar tabla `consentimiento_datos` para registrar fecha, IP, versión de TOS y aceptación explícita de notificaciones digitales y ofuscación pública.
 - **Justificación:** Ley N° 29733 requiere consentimiento libre, informado, expreso e inequívoco para tratamiento de datos personales. La tabla y sus restricciones existen y están implementadas. El cumplimiento jurídico completo requiere validación adicional por el área legal.
-- **Nivel:** CONFIRMADO
+- **Nivel:** PROPUESTO
 - **Evidencia:** `03_esquema_sigd_auth_v2.sql` (tabla `consentimiento_datos`) y `04_validacion_identicore_v2.md` (Caso 2.5). La existencia de la tabla y sus restricciones está verificada; el cumplimiento integral de Ley N° 29733 requiere validación por el área legal.
 
 ### 1.5 Restricciones de Formato de Documentos
 - **Decisión:** Aplicar CHECK constraints para validar formato de DNI (8 dígitos) y RUC (11 dígitos iniciando en 10, 15, 17, 20).
 - **Justificación:** Previene entrada de datos inválidos en la capa de base de datos, reduciendo carga de validación en aplicación. La validación de RUC verifica longitud y prefijos permitidos, pero NO incluye validación del dígito verificador oficial.
 - **Nivel:** CONFIRMADO
-- **Evidencia:** `03_esquema_sigd_auth_v2.sql` (restricciones `chk_persona_natural_dni_format` y `chk_persona_juridica_ruc_format`)
+- **Evidencia:** `03_esquema_sigd_auth_v2.sql` (restricciones `chk_persona_natural_dni_format` y `chk_persona_ruc_format`)
 
 ### 1.6 Mecanismo de Bloqueo de Cuenta
 - **Decisión:** Definir campos `intentos_fallidos` (SMALLINT) y `bloqueado_hasta` (TIMESTAMPTZ) en tabla `cuenta_usuario` para implementar bloqueo temporal de cuenta.
 - **Justificación:** Proporciona la estructura necesaria para bloquear cuentas automáticamente tras 5 intentos fallidos. La lógica de negocio (5 intentos → 15 min bloqueo) se implementa en la capa de aplicación, no en la base de datos.
-- **Nivel:** DOCUMENTADO
+- **Nivel:** PROPUESTO
 - **Evidencia:** `03_esquema_sigd_auth_v2.sql` (columnas `intentos_fallidos`, `bloqueado_hasta`) y `04_validacion_identicore_v2.md` (Caso 2.6). La lógica de negocio (5 intentos → 15 min bloqueo) se implementa en la capa de aplicación, no en la base de datos.
 
 ### 1.7 Política de Ofuscación de Datos Personales
@@ -52,7 +52,7 @@
   - RUC: `20123****` (primeros 4 y últimos 4 dígitos)
   - Email: `j****@gmail.com` (primer carácter + dominio)
 - **Justificación:** Protege privacidad en consultas públicas manteniendo trazabilidad interna completa.
-- **Nivel:** DOCUMENTADO
+- **Nivel:** PROPUESTO
 - **Evidencia:** `01_analisis_identidad_personas_seguridad.md` (Matriz de Privacidad). La ofuscación en endpoints públicos está documentada pero no implementada en capa de aplicación.
 
 ### 1.8 Conservación Histórica y Baja Lógica
@@ -83,7 +83,7 @@ IdentiCore depende de OrganiCore para las siguientes entidades referenciadas con
 - IdentiCore requiere acordar identificadores/códigos oficiales que serán referenciados desde `perfil_usuario.area_id`, `perfil_usuario.cargo_id` y `perfil_usuario.rol_id`
 - Los vínculos conceptuales (`area_id`, `cargo_id`, `rol_id`) en `perfil_usuario` dependen de estas tablas de OrganiCore
 
-**Evidencia:** Las FK referenciales conceptuales están definidas en `perfil_usuario` (`fk_perfil_usuario_area`, `fk_perfil_usuario_cargo`, `fk_perfil_usuario_rol`), pero las tablas referenciadas (`areas`, `cargos`, `roles`) no existen en IdentiCore.
+**Evidencia:** En `perfil_usuario` solo existen columnas conceptuales `area_id`, `cargo_id`, `rol_id` (BIGINT, sin constraints FK físicos). Las tablas `areas`, `cargos`, `roles` no existen en IdentiCore. Estado: PENDIENTE de contrato con OrganiCore.
 
 ### Grupo 6 — CoreLink
 IdentiCore depende de CoreLink para:
@@ -103,6 +103,9 @@ NO existe evidencia directa de dependencia técnica con TramiCore en los archivo
 
 ### Otros Grupos
 Las referencias conceptuales a otros módulos (RutaDoc, DocuCore) existen pero dependen de acuerdos futuros más detallados que no están documentados actualmente.
+
+### Pendiente de decisión — UUID (modelo/diccionario Jair) vs BIGSERIAL (SQL Segundo)
+El modelo `02_modelo_datos_identicore_v2.md` y el diccionario `02_diccionario_datos_identicore_v2.md` usan `UUID`, mientras `03_esquema_sigd_auth_v2.sql` implementa `BIGSERIAL`. No se convierte unilateralmente. Estado: PENDIENTE DE DECISIÓN CON JAIR/GRUPO. El SQL vigente es la referencia de implementación; el modelo queda como referencia conceptual pendiente de alineación.
 
 **Próximos pasos para dependencias:**
 1. Reunir con Grupo 3 para definir esquemas de `areas`, `cargos` y `roles`
@@ -153,7 +156,7 @@ Las referencias conceptuales a otros módulos (RutaDoc, DocuCore) existen pero d
 | Almacenamiento compatible con Argon2id | 🟡 DOCUMENTADO | Campo `password_hash` con especificación Argon2id; generación y validación en capa de aplicación |
 | Tabla `sesion_usuario` con almacenamiento de tokens | 🟡 DOCUMENTADO | Incluye IP/User-Agent, control expiración; rotación y detección de reuso pendientes |
 | CHECK DNI (8 dígitos) | ✅ COMPLETADO | Restricción `chk_persona_natural_dni_format` |
-| CHECK RUC (11 dígitos, inicia 10/15/17/20) | ✅ COMPLETADO | Restricción `chk_persona_juridica_ruc_format`; NO valida dígito verificador oficial |
+| CHECK RUC (11 dígitos, inicia 10/15/17/20) | ✅ COMPLETADO | Restricción `chk_persona_ruc_format`; NO valida dígito verificador oficial |
 | Entidad `consentimiento_datos` (Ley 29733) | ✅ COMPLETADO | Estructura con restricciones implementada; cumplimiento jurídico requiere validación legal |
 | Campos para bloqueo de cuenta | 🟡 DOCUMENTADO | Campos `intentos_fallidos`, `bloqueado_hasta`; lógica de negocio en capa de aplicación |
 | Ofuscación de datos sensibles | 🟡 DOCUMENTADO | En `01_analisis...md` (pendiente implementación en API) |

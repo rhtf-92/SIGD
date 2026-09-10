@@ -96,6 +96,12 @@ CREATE TABLE sigd_auth.persona_juridica (
     CONSTRAINT uq_persona_juridica_razon UNIQUE (razon_social)
 );
 
+-- NOTA DE ALCANCE POLIMÓRFICO: las tablas `persona_natural`/`persona_juridica`
+-- referencian a `persona` vía FK N:1. El SQL actual NO impide que una persona
+-- quede sin extensión ni con dos extensiones, ni garantiza especialización
+-- total/exclusiva 1:1. Esa garantía requiere lógica transaccional de alta
+-- (función/trigger diferible) PENDIENTE de decisión e implementación en aplicación.
+
 -- 5. Representación Legal: Vincula persona natural a persona jurídica
 CREATE TABLE sigd_auth.representacion_legal (
     id                    BIGSERIAL PRIMARY KEY,
@@ -117,6 +123,11 @@ CREATE TABLE sigd_auth.representacion_legal (
     CONSTRAINT chk_rep_legal_vigencia
         CHECK (vigencia_fin IS NULL OR vigencia_fin >= vigencia_inicio)
 );
+
+-- NOTA DE ALCANCE: `uq_rep_legal_natural_juridica` impide duplicar la dupla
+-- (natural, jurídica) incluso con vigencias cerradas, pero NO implementa
+-- prevención de solapamiento por rango/alcance (requeriría EXCLUDE/trigger).
+-- La vigencia se valida solo como coherencia temporal básica.
 
 -- 6. Documentos Históricos
 CREATE TABLE sigd_auth.persona_documento_historial (
@@ -195,6 +206,10 @@ CREATE TABLE sigd_auth.consentimiento_datos (
         CHECK (version_termsoservicio IN ('v1.0', 'v1.1', 'v2.0'))
 );
 
+-- NOTA DE ALCANCE LEY 29733: esta tabla registra estructura, versión e
+-- IP/fecha del consentimiento. NO garantiza por sí sola cumplimiento jurídico
+-- integral ni inmutabilidad del historial (sin trigger read-only PENDIENTE).
+
 -- 10. Perfil Institucional
 CREATE TABLE sigd_auth.perfil_usuario (
     id                    BIGSERIAL PRIMARY KEY,
@@ -227,6 +242,11 @@ CREATE TABLE sigd_auth.perfil_usuario (
             (condicion_registro = 'SIN_CUENTA' AND cuenta_usuario_id IS NULL)
         )
 );
+
+-- NOTA DE ALCANCE BAJA LÓGICA: `estado BOOLEAN` (TRUE/FALSE) es la baja lógica
+-- implementada en SQL. Los estados funcionales `ACTIVA`/`BLOQUEADA_TEMPORAL`/
+-- `INACTIVA` del análisis son estados de aplicación y se derivan de
+-- `estado` + `intentos_fallidos`/`bloqueado_hasta`; no existen como VARCHAR en BD.
 
 -- 11. Auditoría de Cambios
 CREATE TABLE sigd_auth.auditoria_usuarios (
