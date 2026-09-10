@@ -27,17 +27,17 @@ Este espacio organiza, clasifica y versiona la totalidad de los artefactos de an
 
 ## 1. MATRIZ GLOBAL DE CONFORMIDAD DE ENTREGABLES
 
-Todos los módulos del backend fueron auditados contra las listas de verificación de sus planes. **Grupo 2 — TramiCore se encuentra en re-auditoría** (correcciones H4 en curso); el resto de módulos alcanzó conformidad técnica y metodológica:
+Todos los módulos del backend fueron revisados conforme a sus respectivos planes de trabajo. La consolidación continúa EN PROCESO porque existen observaciones técnicas, pruebas pendientes y contratos intermodulares aún no aprobados.
 
 | Módulo / Subdominio | Responsables Principales | Criterios Cumplidos | Estado de Auditoría |
 | :--- | :--- | :---: | :---: |
 | **Grupo 1 — RutaDoc**<br>*(Trazabilidad, Recepción, Derivación, Atención)* | Geric (`B_GERIC`), Jacobo (`B_JACOBO`), Jhasy (`B_JHASY`) | **11 / 11** (100%) | ✅ **CONFORME** |
 | **Grupo 2 — TramiCore**<br>*(Trámite, Expediente, Libro de Registro)* | Ramírez (`B_RAMIREZ`), Riquelmer (`B_RIQUELMER`), Sandy (`B_SANDY`) | **0 / 9** (re-auditoría H4 en curso) | 🔄 **EN REVISIÓN** |
 | **Grupo 3 — OrganiCore**<br>*(Áreas, Jerarquías, Roles, Permisos RBAC)* | Pool (`B_POOL`), Leonardo (`B_LEONARDO`), Panaifo (`B_PANAIFO`), Héctor (`B_HECTOR`) | **10 / 10** (100%) | ✅ **CONFORME** |
-| **Grupo 4 — IdentiCore**<br>*(Personas, Cuentas, Usuarios Internos/Externos)* | Segundo (`B_SEGUNDO`), Tapullima (`B_TAPULLIMA`), Jair (`B_JAIR`) | **10 / 10** (100%) | ✅ **CONFORME** |
+| **Grupo 4 — IdentiCore**<br>*(Personas, Cuentas, Usuarios Internos/Externos)* | Segundo (`B_SEGUNDO`), Tapullima (`B_TAPULLIMA`), Jair (`B_JAIR`) | **Pendiente de validación H4 (H1-H3 documentados, H4 no ejecutada)** | ⚠️ **OBSERVADO / PENDIENTE DE VALIDACIÓN** |
 | **Grupo 5 — DocuCore**<br>*(Catálogo TUPA, Requisitos, Formularios)* | Cristian (`B_CHRISTIAN`), Azareño (`B_AZAREÑO`), Valentín (`B_VALENTIN`), Piero (`B_PIERO`) | **14 / 14** (100%) | ✅ **CONFORME** |
 | **Grupo 6 — CoreLink**<br>*(Integración, Catálogo Errores, Pruebas E2E)* | Ricardo (`B_AREVALO`), Duque (`B_DUQUE`), Reátegui (`B_REATEGUI`), Zevallos (`B_ZEVALLOS`) | **7 / 7** (100%) | ✅ **CONFORME** |
-| **TOTAL CONSOLIDADO** | **Equipo Completo de Desarrollo Backend** | **52 / 61** (pendiente re-auditoría TramiCore) | ⏳ **EN PROCESO** |
+| **TOTAL CONSOLIDADO** | **Equipo Completo de Desarrollo Backend** | **52 / 61** (pendiente de revisión final) | ⏳ **EN PROCESO** |
 
 ---
 
