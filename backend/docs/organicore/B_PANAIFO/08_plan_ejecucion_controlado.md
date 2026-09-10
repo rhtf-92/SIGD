@@ -45,6 +45,7 @@ El despliegue se considera correcto cuando:
 1. `03_esquema_sigd_org_v2.sql`: creación del esquema, tablas, restricciones e índices.
 2. `04_validacion_organicore_v2.md`: matriz de validación y criterios de aceptación.
 3. `05_validacion_organicore_v2.sql`: consultas y pruebas ejecutables de validación.
+4. `10_plan_respaldo_contingencia_sigd_org_v2.md`: procedimientos de respaldo (backup) y prueba de restauración de los artefactos del esquema `sigd_org` v2. *(B_HECTOR)*
 
 ## 5. Cierre de la Fase 2
 
@@ -56,3 +57,45 @@ Después de ejecutar el despliegue y revisar los resultados:
 4. Marcar la Fase 2 como cerrada y aprobada.
 
 No se incluyen procedimientos manuales antiguos ni scripts del modelo provisional `b_panaifo_test`.
+
+## 6. Respaldo y contingencia
+
+Documentado para el esquema `sigd_org` v2 conforme a la tarea de `B_HECTOR`. El detalle completo, la política de retención y el plan de contingencia están en [`10_plan_respaldo_contingencia_sigd_org_v2.md`](../10_plan_respaldo_contingencia_sigd_org_v2.md).
+
+### 6.1 Respaldo
+
+Ejecutar un respaldo lógico diario de la base `sigd_qa` en formato custom. Debe realizarse después de cada despliegue y de forma automática diaria:
+
+```bash
+FECHA=$(date +%Y%m%d)
+pg_dump -w -h localhost -p 5432 -U postgres -d sigd_qa -Fc \
+  -f "backup/sigd_org_v2_${FECHA}.dump"
+```
+
+Verificar el respaldo sin restaurar y registrar su suma de verificación:
+
+```bash
+pg_restore -l backup/sigd_org_v2_${FECHA}.dump | grep -i "sigd_org" | head -30
+sha256sum backup/sigd_org_v2_${FECHA}.dump > backup/sigd_org_v2_${FECHA}.dump.sha256
+```
+
+### 6.2 Prueba de restauración
+
+Tras cada despliegue y como mínimo mensual, restaurar el respaldo en una base temporal y validar con la suite oficial:
+
+```bash
+FECHA=$(date +%Y%m%d)
+dropdb --if-exists sigd_restore_test
+createdb sigd_restore_test
+pg_restore -w -h localhost -p 5432 -U postgres -d sigd_restore_test \
+  backup/sigd_org_v2_${FECHA}.dump
+psql -d sigd_restore_test -v ON_ERROR_STOP=1 -f 05_validacion_organicore_v2.sql
+```
+
+### 6.3 Criterios de aceptación
+
+- `pg_restore` restaura sin errores en `sigd_restore_test`.
+- `05_validacion_organicore_v2.sql` termina con `OK` y sin excepciones.
+- Existen las 9 tablas, 1 función, 1 trigger y 2 restricciones de exclusión GiST.
+- No se modifica la base operativa `sigd_qa`.
+- El resultado queda registrado en la bitácora de `10_plan_respaldo_contingencia_sigd_org_v2.md`.

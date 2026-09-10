@@ -97,6 +97,7 @@ Responsable de representar áreas institucionales, jerarquías recursivas, cargo
   * [Política de Eliminaciones Lógicas](organicore/07_politica_eliminaciones_logicas.md)
   * [Plan de Ejecución Controlado](organicore/08_plan_ejecucion_controlado.md)
   * [Resumen Ejecutivo](organicore/09_resumen_ejecutivo_organizacion.md)
+  * [Plan de Respaldo y Contingencia del Esquema sigd_org v2](organicore/10_plan_respaldo_contingencia_sigd_org_v2.md)
 * 🧪 **Validación y Pruebas:** [`organicore/04_validacion_organizacion.md`](organicore/04_validacion_organizacion.md)
 * 📌 **Registro de Decisiones y Pendientes:** [`organicore/05_decisiones_y_preguntas_pendientes.md`](organicore/05_decisiones_y_preguntas_pendientes.md)
 
