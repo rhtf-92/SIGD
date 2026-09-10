@@ -11,57 +11,60 @@ El frontend está concebido para interoperar con la API RESTful del backend (Pos
 La documentación integral del frontend ha sido organizada en una arquitectura modular limpia en minúsculas (`kebab-case`), compuesta por tres documentos maestros y seis módulos funcionales con especificaciones técnicas secuenciales:
 
 ### Documentos Maestros
+- 📑 [Portal Maestro de Documentación Técnica Frontend (Gobernanza y DAG)](docs/README.md)
+- 🏛️ [Arquitectura y Orden de Implementación en Paralelo Frontend (DAG 5 Olas)](docs/00_ARQUITECTURA_ORDEN_IMPLEMENTACION_PARALELO.md)
 - 📘 [Plan de Trabajo General, Blueprint de Arquitectura y Diseño de Plantillas Frontend](docs/PLAN_DE_TRABAJO_GENERAL_FRONTEND_SIGD.md)
 - 📋 [Informe de Auditoría Técnica y Diagnóstico Forense de Documentación Frontend](docs/INFORME_AUDITORIA_DOCUMENTACION_FRONTEND.md)
 - 🎓 [Plan de Trabajo Modular y Rúbrica Docente de Evaluación Vigesimal Frontend SIGD](docs/PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
 
-### Catálogo de Módulos Funcionales de Documentación
-1. **Módulo 1: Identidad, Registro de Usuarios y Casilla Electrónica (`registro-usuarios-casilla/`)**
-   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (26 SP)](docs/registro-usuarios-casilla/00_plan_de_trabajo_y_evaluacion_docente.md)
-   - [01. Registro de Ciudadanos, Persona Natural y Jurídica (Ley N° 29733)](docs/registro-usuarios-casilla/01_registro_ciudadano_persona_natural_juridica.md)
-   - [02. Selector de Ubigeo en Cascada para Ucayali y SIAGIE](docs/registro-usuarios-casilla/02_ubigeo_cascada_ucayali_siagie.md)
-   - [03. Casilla Electrónica Ciudadana y Acuse Notificatorio](docs/registro-usuarios-casilla/03_casilla_electronica_y_ley_29733.md)
+### Catálogo de Módulos Funcionales por Prioridad de Implementación
 
-2. **Módulo 2: Registro Documentario, Ventanilla y Mesa de Partes (`registro-documentario/`)**
-   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (34 SP)](docs/registro-documentario/00_plan_de_trabajo_y_evaluacion_docente.md)
-   - [01. Arquitectura Técnica de Registro Documentario y Carga Desacoplada MinIO](docs/registro-documentario/01_arquitectura_tecnica_registro_documentario.md)
-   - [02. Especificación Funcional de Ventanilla Presencial y Mesa de Partes Virtual](docs/registro-documentario/02_especificacion_funcional_ventanilla_y_mesa_partes.md)
-   - [03. Componentes UI y Estados Reactivos de Formularios](docs/registro-documentario/03_componentes_ui_y_estados_formulario.md)
+1. **Ola 1A: Identidad, Registro de Usuarios y Casilla Electrónica (`01_registro-usuarios-casilla/`)**
+   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (26 SP)](docs/01_registro-usuarios-casilla/00_plan_de_trabajo_y_evaluacion_docente.md)
+   - [01. Registro de Ciudadanos, Persona Natural y Jurídica (Ley N° 29733)](docs/01_registro-usuarios-casilla/01_registro_ciudadano_persona_natural_juridica.md)
+   - [02. Selector de Ubigeo en Cascada para Ucayali y SIAGIE](docs/01_registro-usuarios-casilla/02_ubigeo_cascada_ucayali_siagie.md)
+   - [03. Casilla Electrónica Ciudadana y Acuse Notificatorio](docs/01_registro-usuarios-casilla/03_casilla_electronica_y_ley_29733.md)
 
-3. **Módulo 3: Bandejas del Funcionario y Gestión de Expedientes (`gestion-expedientes/`)**
-   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (28 SP)](docs/gestion-expedientes/00_plan_de_trabajo_y_evaluacion_docente.md)
-   - [01. Bandeja de Trabajo Diario del Servidor (6 Pestañas y Semáforo SLA)](docs/gestion-expedientes/01_bandeja_trabajo_diario_6_pestanas.md)
-   - [02. Cuadro de Clasificación Documental (CCD) y Archivística AGN](docs/gestion-expedientes/02_cuadro_clasificacion_documental_ccd_y_archivistica.md)
-   - [03. Modelo de Datos TypeScript y Trazabilidad Inmutable](docs/gestion-expedientes/03_modelo_datos_typescript_y_trazabilidad_inmutable.md)
+2. **Ola 1B: Administración Institucional, Seguridad RBAC y Auditoría (`02_administracion-seguridad-auditoria/`)**
+   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (28 SP)](docs/02_administracion-seguridad-auditoria/00_plan_de_trabajo_y_evaluacion_docente.md)
+   - [01. Descripción General de Administración y Gobernanza](docs/02_administracion-seguridad-auditoria/01_descripcion_general_administracion.md)
+   - [02. Mantenimiento de Tablas Maestras y Catálogos TUPA](docs/02_administracion-seguridad-auditoria/02_tablas_maestras_y_catalogos.md)
+   - [03. Control de Acceso Basado en Roles (RBAC) y Matriz de Permisos](docs/02_administracion-seguridad-auditoria/03_control_acceso_roles_permisos_rbac.md)
+   - [04. Logs de Auditoría Inmutable y Bitácora Forense](docs/02_administracion-seguridad-auditoria/04_logs_auditoria_inmutable_trazabilidad.md)
+   - [05. Directorio de Usuarios y Políticas de Seguridad de Acceso](docs/02_administracion-seguridad-auditoria/05_directorio_usuarios_y_seguridad_acceso.md)
+   - [06. Calendario Laboral y Cómputo de Plazos LPAG (Corte 16:30 hrs)](docs/02_administracion-seguridad-auditoria/06_calendario_laboral_y_jornada_lpag.md)
 
-4. **Módulo 4: Flujos Académicos, Firma Digital y Validez Legal (`flujo-validez-legal/`)**
-   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (29 SP)](docs/flujo-validez-legal/00_plan_de_trabajo_y_evaluacion_docente.md)
-   - [01. Descripción General del Módulo de Validez Legal](docs/flujo-validez-legal/01_descripcion_general_validez_legal.md)
-   - [02. Flujos de Trabajo Workflow Académico y Titulación](docs/flujo-validez-legal/02_flujos_trabajo_workflow_academico.md)
-   - [03. Documentos Oficiales y Proyección de Resoluciones](docs/flujo-validez-legal/03_documentos_oficiales_firma_digital.md)
-   - [04. Validez Legal, Pasarela Refirma RENIEC y Validador CVD](docs/flujo-validez-legal/04_validez_legal_y_validador_cvd.md)
-   - [05. Arquitectura Técnica y Contratos de Integración API](docs/flujo-validez-legal/05_arquitectura_tecnica_y_contratos_api.md)
-   - [06. Componentes de Interfaz UI y Visores Documentales](docs/flujo-validez-legal/06_componentes_interfaz_ui.md)
-   - [Diagrama de Datos DBML: Flujo y Validez Legal](docs/flujo-validez-legal/diagrama_flujo_validez_legal.dbml)
+3. **Ola 1C: Flujos Académicos, Firma Digital y Validez Legal (`03_flujo-validez-legal/`)**
+   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (29 SP)](docs/03_flujo-validez-legal/00_plan_de_trabajo_y_evaluacion_docente.md)
+   - [01. Descripción General del Módulo de Validez Legal](docs/03_flujo-validez-legal/01_descripcion_general_validez_legal.md)
+   - [02. Flujos de Trabajo Workflow Académico y Titulación](docs/03_flujo-validez-legal/02_flujos_trabajo_workflow_academico.md)
+   - [03. Documentos Oficiales y Proyección de Resoluciones](docs/03_flujo-validez-legal/03_documentos_oficiales_firma_digital.md)
+   - [04. Validez Legal, Pasarela Refirma RENIEC y Validador CVD](docs/03_flujo-validez-legal/04_validez_legal_y_validador_cvd.md)
+   - [05. Arquitectura Técnica y Contratos de Integración API](docs/03_flujo-validez-legal/05_arquitectura_tecnica_y_contratos_api.md)
+   - [06. Componentes de Interfaz UI y Visores Documentales](docs/03_flujo-validez-legal/06_componentes_interfaz_ui.md)
+   - [Diagrama de Datos DBML: Flujo y Validez Legal](docs/03_flujo-validez-legal/diagrama_flujo_validez_legal.dbml)
 
-5. **Módulo 5: Administración Institucional, Seguridad RBAC y Auditoría (`administracion-seguridad-auditoria/`)**
-   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (28 SP)](docs/administracion-seguridad-auditoria/00_plan_de_trabajo_y_evaluacion_docente.md)
-   - [01. Descripción General de Administración y Gobernanza](docs/administracion-seguridad-auditoria/01_descripcion_general_administracion.md)
-   - [02. Mantenimiento de Tablas Maestras y Catálogos TUPA](docs/administracion-seguridad-auditoria/02_tablas_maestras_y_catalogos.md)
-   - [03. Control de Acceso Basado en Roles (RBAC) y Matriz de Permisos](docs/administracion-seguridad-auditoria/03_control_acceso_roles_permisos_rbac.md)
-   - [04. Logs de Auditoría Inmutable y Bitácora Forense](docs/administracion-seguridad-auditoria/04_logs_auditoria_inmutable_trazabilidad.md)
-   - [05. Directorio de Usuarios y Políticas de Seguridad de Acceso](docs/administracion-seguridad-auditoria/05_directorio_usuarios_y_seguridad_acceso.md)
-   - [06. Calendario Laboral y Cómputo de Plazos LPAG (Corte 16:30 hrs)](docs/administracion-seguridad-auditoria/06_calendario_laboral_y_jornada_lpag.md)
+4. **Ola 2: Registro Documentario, Ventanilla y Mesa de Partes (`04_registro-documentario/`)**
+   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (34 SP)](docs/04_registro-documentario/00_plan_de_trabajo_y_evaluacion_docente.md)
+   - [01. Arquitectura Técnica de Registro Documentario y Carga Desacoplada MinIO](docs/04_registro-documentario/01_arquitectura_tecnica_registro_documentario.md)
+   - [02. Especificación Funcional de Ventanilla Presencial y Mesa de Partes Virtual](docs/04_registro-documentario/02_especificacion_funcional_ventanilla_y_mesa_partes.md)
+   - [03. Componentes UI y Estados Reactivos de Formularios](docs/04_registro-documentario/03_componentes_ui_y_estados_formulario.md)
 
-6. **Módulo 6: Indicadores de Gestión, KPIs MGD y Tableros de Control (`reportes-tableros-control/`)**
-   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (29 SP)](docs/reportes-tableros-control/00_plan_de_trabajo_y_evaluacion_docente.md)
-   - [01. Descripción General de Reportes y Tableros Directivos](docs/reportes-tableros-control/01_descripcion_general_reportes_dashboard.md)
-   - [02. Catálogo de KPIs y Métricas del Modelo de Gestión Documental](docs/reportes-tableros-control/02_catalogo_kpis_y_metricas_institucionales.md)
-   - [03. Fuentes de Datos y Fórmulas Matemáticas de Desempeño](docs/reportes-tableros-control/03_fuentes_datos_formulas_matematicas.md)
-   - [04. Diseño Visual, Cuadrículas y Gráficos Estadísticos](docs/reportes-tableros-control/04_diseno_visual_graficos_y_componentes.md)
-   - [05. Navegación, Filtros Multicriterio y Accesibilidad UX](docs/reportes-tableros-control/05_navegacion_filtros_y_accesibilidad_ux.md)
-   - [06. Arquitectura Frontend y Plan de Pruebas de Métricas](docs/reportes-tableros-control/06_arquitectura_frontend_y_plan_pruebas.md)
-   - [Diagrama de Datos DBML: Métricas del Dashboard](docs/reportes-tableros-control/diagrama_metricas_dashboard.dbml)
+5. **Ola 3: Bandejas del Funcionario y Gestión de Expedientes (`05_gestion-expedientes/`)**
+   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (28 SP)](docs/05_gestion-expedientes/00_plan_de_trabajo_y_evaluacion_docente.md)
+   - [01. Bandeja de Trabajo Diario del Servidor (6 Pestañas y Semáforo SLA)](docs/05_gestion-expedientes/01_bandeja_trabajo_diario_6_pestanas.md)
+   - [02. Cuadro de Clasificación Documental (CCD) y Archivística AGN](docs/05_gestion-expedientes/02_cuadro_clasificacion_documental_ccd_y_archivistica.md)
+   - [03. Modelo de Datos TypeScript y Trazabilidad Inmutable](docs/05_gestion-expedientes/03_modelo_datos_typescript_y_trazabilidad_inmutable.md)
+
+6. **Ola 4: Indicadores de Gestión, KPIs MGD y Tableros de Control (`06_reportes-tableros-control/`)**
+   - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (29 SP)](docs/06_reportes-tableros-control/00_plan_de_trabajo_y_evaluacion_docente.md)
+   - [01. Descripción General de Reportes y Tableros Directivos](docs/06_reportes-tableros-control/01_descripcion_general_reportes_dashboard.md)
+   - [02. Catálogo de KPIs y Métricas del Modelo de Gestión Documental](docs/06_reportes-tableros-control/02_catalogo_kpis_y_metricas_institucionales.md)
+   - [03. Fuentes de Datos y Fórmulas Matemáticas de Desempeño](docs/06_reportes-tableros-control/03_fuentes_datos_formulas_matematicas.md)
+   - [04. Diseño Visual, Cuadrículas y Gráficos Estadísticos](docs/06_reportes-tableros-control/04_diseno_visual_graficos_y_componentes.md)
+   - [05. Navegación, Filtros Multicriterio y Accesibilidad UX](docs/06_reportes-tableros-control/05_navegacion_filtros_y_accesibilidad_ux.md)
+   - [06. Arquitectura Frontend y Plan de Pruebas de Métricas](docs/06_reportes-tableros-control/06_arquitectura_frontend_y_plan_pruebas.md)
+   - [Diagrama de Datos DBML: Métricas del Dashboard](docs/06_reportes-tableros-control/diagrama_metricas_dashboard.dbml)
 
 ---
 
@@ -83,13 +86,15 @@ La documentación integral del frontend ha sido organizada en una arquitectura m
 
 ```text
 frontend/
-├── docs/                                       # Documentación técnica modular consolidada
-│   ├── administracion-seguridad-auditoria/     # Plan modular y especificaciones M5 (00 al 06)
-│   ├── flujo-validez-legal/                    # Plan modular y especificaciones M4 (00 al 06 + DBML)
-│   ├── gestion-expedientes/                    # Plan modular y especificaciones M3 (00 al 03)
-│   ├── registro-documentario/                  # Plan modular y especificaciones M2 (00 al 03)
-│   ├── registro-usuarios-casilla/              # Plan modular y especificaciones M1 (00 al 03)
-│   ├── reportes-tableros-control/              # Plan modular y especificaciones M6 (00 al 06 + DBML)
+├── docs/                                       # Documentación técnica modular consolidada (Priorizada)
+│   ├── README.md                               # Portal Maestro de Documentación Frontend (Gobernanza y DAG)
+│   ├── 00_ARQUITECTURA_ORDEN_IMPLEMENTACION_PARALELO.md # Arquitectura DAG 5 Olas y Paralelismo
+│   ├── 01_registro-usuarios-casilla/           # Ola 1A: Identidad, Ciudadanos y Casilla (IdentiCore)
+│   ├── 02_administracion-seguridad-auditoria/  # Ola 1B: Organización, RBAC y LPAG (OrganiCore)
+│   ├── 03_flujo-validez-legal/                 # Ola 1C: Tipos Doc, MinIO, Refirma, CVD (DocuCore)
+│   ├── 04_registro-documentario/               # Ola 2: Mesa de Partes Virtual y Ventanilla (TramiCore)
+│   ├── 05_gestion-expedientes/                 # Ola 3: Bandeja Servidor, Derivación, SLA (RutaDoc)
+│   ├── 06_reportes-tableros-control/           # Ola 4: Indicadores MGD-PCM y Tableros Directivos
 │   ├── INFORME_AUDITORIA_DOCUMENTACION_FRONTEND.md
 │   ├── PLAN_DE_TRABAJO_GENERAL_FRONTEND_SIGD.md
 │   └── PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md
