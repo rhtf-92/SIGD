@@ -1,28 +1,28 @@
-# Documentos de Trabajo Grupo 2 — Casos de Prueba y Validaciones de Registro
+﻿# Documentos de Trabajo Grupo 2 ΓÇö Casos de Prueba y Validaciones de Registro
 
-Este documento detalla los casos reales de prueba y scripts de validación ejecutados sobre PostgreSQL para asegurar la integridad referencial, restricciones y reglas de negocio del módulo de Trámite, Expediente y Asiento de Registro.
+Este documento detalla los casos reales de prueba y scripts de validaci├│n ejecutados sobre PostgreSQL para asegurar la integridad referencial, restricciones y reglas de negocio del m├│dulo de Tr├ímite, Expediente y Asiento de Registro.
 
 ---
 
-## 0. Entorno de ejecución (evidencia real)
+## 0. Entorno de ejecuci├│n (evidencia real)
 
 | Dato | Valor |
 |------|-------|
 | Motor de base de datos | PostgreSQL 18.3 on x86_64-windows (compilado por msvc-19.44.35225, 64-bit) |
-| Fecha de ejecución | 2026-08-30 |
-| Base de datos de pruebas | `tramicore_prueba` (entorno local aislado, autenticación trust, puerto 55432) |
+| Fecha de ejecuci├│n | 2026-08-30 |
+| Base de datos de pruebas | `tramicore_prueba` (entorno local aislado, autenticaci├│n trust, puerto 55432) |
 | Script de carga | `03_tramite_expediente_registro.sql` (ejecutado con `-v ON_ERROR_STOP=1`) |
 | Script de casos de prueba | `tramicore_validacion.sql` |
 
-> **Nota sobre versión objetivo:** Las pruebas se ejecutaron en **PostgreSQL 18.3**. El sistema tiene como versión objetivo **PostgreSQL 18.6** (según los planes de trabajo del proyecto); queda **pendiente** repetir la validación final en dicha versión antes de la entrega.
+> **Nota sobre versi├│n objetivo:** Las pruebas se ejecutaron en **PostgreSQL 18.3**. El sistema tiene como versi├│n objetivo **PostgreSQL 18.6** (seg├║n los planes de trabajo del proyecto); queda **pendiente** repetir la validaci├│n final en dicha versi├│n antes de la entrega.
 
-**Comando de ejecución del script de carga:**
+**Comando de ejecuci├│n del script de carga:**
 
 ```bat
 psql -w -h localhost -p 55432 -U postgres -d tramicore_prueba -v ON_ERROR_STOP=1 -f 03_tramite_expediente_registro.sql
 ```
 
-**Salida real de la carga** (creación de secuencia, tablas, índices y datos de prueba):
+**Salida real de la carga** (creaci├│n de secuencia, tablas, ├¡ndices y datos de prueba):
 
 ```sql
 CREATE SEQUENCE
@@ -41,9 +41,9 @@ COMMIT
 
 ---
 
-## 1. Consulta de Verificación General
+## 1. Consulta de Verificaci├│n General
 
-Valida la vinculación completa entre Trámites, Expedientes y Asientos de Registro en el Libro General.
+Valida la vinculaci├│n completa entre Tr├ímites, Expedientes y Asientos de Registro en el Libro General.
 
 ```sql
 SELECT
@@ -66,8 +66,8 @@ ORDER BY a.numero_registro ASC;
 ```
  id_tramite | codigo_tramite | codigo_expediente | asiento_global | canal_ingreso | asunto | estado | es_borrado_logico
 ------------+----------------+-------------------+----------------+---------------+------------------------------+-----------+-------------------
-          1 | TRM-2026-0001  | EXP-2026-000001   |          10001 | MESA_VIRTUAL  | Solicitud de Expedición de Título Profesional | EN_TRAMITE | f
-          2 | TRM-2026-0002  | EXP-2026-000002   |          10002 | MESA_PRESENCIAL | Rectificación de Notas de Asignatura de Base de Datos | OBSERVADO | f
+          1 | TRM-2026-0001  | EXP-2026-000001   |          10001 | MESA_VIRTUAL  | Solicitud de Expedici├│n de T├¡tulo Profesional | EN_TRAMITE | f
+          2 | TRM-2026-0002  | EXP-2026-000002   |          10002 | MESA_PRESENCIAL | Rectificaci├│n de Notas de Asignatura de Base de Datos | OBSERVADO | f
           3 | TRM-2026-0003  | EXP-2026-000003   |          10003 | MESA_VIRTUAL  | Mantenimiento preventivo de Servidores de Red | REGISTRADO | f
           4 | TRM-2026-0004  | EXP-2026-000004   |          10004 | MESA_PRESENCIAL | Solicitud Invalida con Error de Formato | ANULADO | t
 (4 filas)
@@ -75,12 +75,12 @@ ORDER BY a.numero_registro ASC;
 
 ---
 
-## 2. Prueba de Duplicidad de Código de Expediente
+## 2. Prueba de Duplicidad de C├│digo de Expediente
 
-**Objetivo:** Verificar que la restricción `UNIQUE` impida la creación de dos expedientes con el mismo código visible de negocio.
+**Objetivo:** Verificar que la restricci├│n `UNIQUE` impida la creaci├│n de dos expedientes con el mismo c├│digo visible de negocio.
 
 ```sql
--- Debe fallar por violación de restricción UNIQUE (codigo_expediente)
+-- Debe fallar por violaci├│n de restricci├│n UNIQUE (codigo_expediente)
 INSERT INTO expediente (codigo_expediente, fk_tramite)
 VALUES ('EXP-2026-000001', 3);
 ```
@@ -96,10 +96,10 @@ DETALLE:  Key (codigo_expediente)=(EXP-2026-000001) already exists.
 
 ## 3. Prueba de Unicidad de `numero_registro` (Secuencia Autogenerada)
 
-**Objetivo:** Validar que el Libro de Registro genera correlativos atómicos únicos mediante la secuencia `seq_asiento_numero_registro` sin permitir duplicación manual.
+**Objetivo:** Validar que el Libro de Registro genera correlativos at├│micos ├║nicos mediante la secuencia `seq_asiento_numero_registro` sin permitir duplicaci├│n manual.
 
 ```sql
--- Debe fallar al intentar forzar un número de registro ya asignado por la secuencia (ej. 10001)
+-- Debe fallar al intentar forzar un n├║mero de registro ya asignado por la secuencia (ej. 10001)
 INSERT INTO asiento_registro (numero_registro, canal_ingreso, asunto, fk_expediente, fk_remitente, fk_destinatario)
 VALUES (10001, 'MESA_PRESENCIAL', 'Intento de forzar numero de registro', 3, 101, 301);
 ```
@@ -111,13 +111,13 @@ ERROR:  duplicate key value violates unique constraint "asiento_registro_numero_
 DETALLE:  Key (numero_registro)=(10001) already exists.
 ```
 
-> **Nota conceptual:** la secuencia garantiza unicidad y monotonicidad, pero no la ausencia de vacíos; si una transacción consume `nextval()` y luego se revierte (`ROLLBACK`), el valor se pierde. Ello no afecta la integridad del Libro.
+> **Nota conceptual:** la secuencia garantiza unicidad y monotonicidad, pero no la ausencia de vac├¡os; si una transacci├│n consume `nextval()` y luego se revierte (`ROLLBACK`), el valor se pierde. Ello no afecta la integridad del Libro.
 
 ---
 
 ## 4. Prueba de Clave Inexistente (FK Rota / Integridad Referencial)
 
-**Objetivo:** Comprobar que no se pueda registrar un expediente o asiento enlazado a un trámite o expediente que no exista.
+**Objetivo:** Comprobar que no se pueda registrar un expediente o asiento enlazado a un tr├ímite o expediente que no exista.
 
 ```sql
 -- Debe fallar porque no existe el tramite id = 9999
@@ -134,7 +134,7 @@ DETALLE:  Key (fk_tramite)=(9999) is not present in table "tramite".
 
 ---
 
-## 5. Prueba de Estado Inválido (Restricción CHECK)
+## 5. Prueba de Estado Inv├ílido (Restricci├│n CHECK)
 
 **Objetivo:** Confirmar que no se puedan ingresar estados no permitidos por la directiva institucional.
 
@@ -153,17 +153,17 @@ DETALLE:  Failing row contains (5, TRM-2026-9999, Prueba estado no valido, APROB
 
 ---
 
-## 6. Prueba de Anulación Conservando el Registro (Borrado Lógico)
+## 6. Prueba de Anulaci├│n Conservando el Registro (Borrado L├│gico)
 
-**Objetivo:** Validar que un asiento anulado se marque como `anulado = true` y mantenga la inmutabilidad y trazabilidad sin aplicar comandos `DELETE`, sin generar un asiento nuevo ni reutilizar su número.
+**Objetivo:** Validar que un asiento anulado se marque como `anulado = true` y mantenga la inmutabilidad y trazabilidad sin aplicar comandos `DELETE`, sin generar un asiento nuevo ni reutilizar su n├║mero.
 
 ```sql
--- Ejecución de borrado lógico
+-- Ejecuci├│n de borrado l├│gico
 UPDATE asiento_registro
-SET anulado = TRUE, motivo_anulacion = 'Anulado por duplicidad en recepción física'
+SET anulado = TRUE, motivo_anulacion = 'Anulado por duplicidad en recepci├│n f├¡sica'
 WHERE id_asiento = 1;
 
--- Verificación de conservación de historial en auditoría
+-- Verificaci├│n de conservaci├│n de historial en auditor├¡a
 SELECT id_asiento, numero_registro, asunto, anulado, motivo_anulacion
 FROM asiento_registro
 WHERE id_asiento = 1;
@@ -176,11 +176,11 @@ UPDATE 1
 
  id_asiento | numero_registro | asunto | anulado | motivo_anulacion
 ------------+-----------------+-------------------------------+---------+-----------------------------------
-          1 |           10001 | Solicitud de Expedición de Título Profesional | t | Anulado por duplicidad en recepción física
+          1 |           10001 | Solicitud de Expedici├│n de T├¡tulo Profesional | t | Anulado por duplicidad en recepci├│n f├¡sica
 (1 fila)
 ```
 
-**Comprobación de que no se elimina el registro (total de asientos se mantiene en 4 después de la anulación):**
+**Comprobaci├│n de que no se elimina el registro (total de asientos se mantiene en 4 despu├⌐s de la anulaci├│n):**
 
 ```text
  total_asientos_tras_anulacion
@@ -189,4 +189,4 @@ UPDATE 1
 (1 fila)
 ```
 
-El asiento no se elimina y su número no se reutiliza; únicamente se actualizaron los campos de control de anulación (`anulado = true`, `motivo_anulacion`), tal como evidencia la consulta anterior.
+El asiento no se elimina y su n├║mero no se reutiliza; ├║nicamente se actualizaron los campos de control de anulaci├│n (`anulado = true`, `motivo_anulacion`), tal como evidencia la consulta anterior.
