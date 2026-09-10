@@ -1,9 +1,21 @@
 /*
 =========================================================
-Grupo 3 — OrganiCore · Consultas de Verificación
+[LEGACY / DEPRECADO] Grupo 3 — OrganiCore · Consultas de Verificación (Fase 1)
 Módulo de Organización, Roles y Permisos
 Responsable: Geiner Panaifo (B_PANAIFO) · Integración: Pool (B_POOL)
 Motor: PostgreSQL 18.6
+Estado: LEGACY — NO EJECUTAR EN FASE 2
+
+ESTE SCRIPT QUEDA COMO LEGACY por no estar alineado con Fase 2.
+Fue sustituido por la suite OFICIAL de QA:
+    docs/organicore/05_validacion_organicore_v2.sql
+(documento de referencia: docs/organicore/04_validacion_organicore_v2.md)
+
+Diferencias con la suite oficial (sigd_org):
+    - Consulta tablas public (areas, cargos, roles, ...) en lugar de sigd_org.
+    - Sin verificación de Materialized Path (path / nivel_organizacional).
+    - Sin casos negativos: ciclos directos/indirectos (SQLSTATE 23514),
+      solapamiento de encargaturas (EXCLUDE GiST) ni expiración de facultades.
 
 Consultas para demostrar que las tablas y relaciones funcionan
 =========================================================

@@ -1,4 +1,8 @@
 -- =========================================================================
+-- OBSOLETO / LEGACY v1 — NO USAR PARA v2. Fuente de verdad v2:
+-- backend/docs/identicore/03_esquema_sigd_auth_v2.sql (esquema sigd_auth).
+-- Este archivo se conserva solo como antecedente histórico.
+-- =========================================================================
 -- MÓDULO IDENTICORE - BORRADOR SQL PROVISIONAL (PostgreSQL 18.6)
 -- Responsable: Segundo (Rama B_SEGUNDO)
 -- Fuente de verdad: 02_modelo_datos_usuarios.md + 02_diccionario_datos_usuarios.md
