@@ -1,5 +1,7 @@
 # Diccionario de Datos - Módulo IdentiCore (Usuarios, Personas, Cuentas y Perfiles)
 
+> **OBSOLETO / LEGACY v1 — NO USAR PARA v2.** Fuente de verdad v2: `02_diccionario_datos_identicore_v2.md` + `03_esquema_sigd_auth_v2.sql`. Se conserva como antecedente.
+
 - **Grupo:** Grupo 4 — IdentiCore · Responsable del modelo: Segundo (B_SEGUNDO)
 - **Estado:** BORRADOR — PROPUESTA PENDIENTE DE VALIDACIÓN INSTITUCIONAL
 - **Fecha:** 30 de agosto de 2026

@@ -1,9 +1,20 @@
 /*
 =========================================================
-Grupo 3 — OrganiCore · DDL Físico
+[LEGACY / DEPRECADO] Grupo 3 — OrganiCore · DDL Físico (Fase 1)
 Módulo de Organización, Roles y Permisos
 Responsable: Geiner Panaifo (B_PANAIFO) · Integración: Pool (B_POOL)
 Motor: PostgreSQL 18.6
+Estado: LEGACY — NO EJECUTAR EN FASE 2
+
+ESTE SCRIPT QUEDA COMO LEGACY por no estar alineado con Fase 2.
+Fue sustituido por el DDL OFICIAL:
+    docs/organicore/03_esquema_sigd_org_v2.sql
+
+Diferencias con el DDL oficial (sigd_org):
+    - Esquema public en lugar de sigd_org.
+    - Claves bigserial/bigint en lugar de UUID.
+    - Sin columna path (Materialized Path) ni nivel_organizacional.
+    - Sin trigger fn_area_set_path ni prevención de ciclos (SQLSTATE 23514).
 
 IMPORTANTE:
 Este script es un BORRADOR técnico preliminar.

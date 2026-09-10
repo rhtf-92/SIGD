@@ -1,400 +1,101 @@
-# Plan de Ejecución Controlado
-## Módulo de Organización, Roles y Permisos
+# B_PANAIFO - Plan de Ejecución Controlado
 
-- Responsable: Geiner Panaifo
-- Rama: `B_PANAIFO`
-- Grupo: Grupo 3 — OrganiCore
-- Versión: 1.0 (Estandarizado)
-- Fecha: 2026-08-29
-- Objetivo: Ejecutar scripts SQL desde una base de datos completamente vacía
+**Versión:** 2.0  
+**Fecha:** 2026-09-08  
+**Estado:** Despliegue oficial de la Fase 2
 
----
+## 1. Prerrequisitos
 
-## 1. Prerequisitos
+- PostgreSQL 18.6 o superior.
+- Cliente `psql` disponible en el entorno de ejecución.
+- Usuario con permisos para crear bases de datos, esquemas, tablas, índices y restricciones.
+- Los tres entregables oficiales de OrganiCore disponibles en el mismo directorio:
+  - `03_esquema_sigd_org_v2.sql`
+  - `04_validacion_organicore_v2.md`
+  - `05_validacion_organicore_v2.sql`
 
-### Requerimientos de Software
-- **PostgreSQL:** 18.6 o superior (mínimo PostgreSQL 13)
-- **Cliente SQL:** psql o DBeaver (recomendado)
-- **Permisos:** Usuario con privilegios de CREATE TABLE, CREATE INDEX
+## 2. Despliegue oficial en QA
 
-### Verificación Previa
-
-```bash
-# Verificar versión de PostgreSQL
-psql --version
-
-# Conectarse a PostgreSQL (local)
-psql -U postgres -h localhost
-
-# Listar bases de datos existentes
-\l
-```
-
----
-
-## 2. Preparación de la Base de Datos
-
-### Paso 1: Crear Base de Datos Vacía
-
-```sql
--- En psql o cualquier cliente SQL
-CREATE DATABASE b_panaifo_test
-    WITH
-    ENCODING = 'UTF8'
-    LC_COLLATE = 'es_ES.UTF-8'
-    LC_CTYPE = 'es_ES.UTF-8'
-    TEMPLATE = template0;
-
--- Conectarse a la nueva BD
-\c b_panaifo_test
-```
-
-### Paso 2: Verificar que la BD está vacía
-
-```sql
--- Consultar todas las tablas
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema = 'public';
-
--- Resultado esperado: (no rows)
-```
-
----
-
-## 3. Ejecución Secuencial de Scripts
-
-### ✅ PASO 1: Crear Estructura de Tablas
-
-**Archivo:** `03_organizacion_roles_permisos.sql`
-
-**Comando:**
-```bash
-psql -U postgres -d b_panaifo_test -f 03_organizacion_roles_permisos.sql
-```
-
-**O en psql interactivo:**
-```sql
-\i '/ruta/completa/03_organizacion_roles_permisos.sql'
-```
-
-**Verificación después de ejecutar:**
-```sql
--- Contar tablas creadas
-SELECT COUNT(*) as total_tablas
-FROM information_schema.tables 
-WHERE table_schema = 'public';
-
--- Resultado esperado: 7 (areas, cargos, responsables, roles, permisos, roles_permisos, usuarios_roles)
-
--- Listar todas las tablas
-\dt
-```
-
-**Tablas que se deben crear:**
-```
-✓ areas
-✓ roles                    (ANTES que cargos)
-✓ cargos                   (DESPUÉS que roles)
-✓ responsables
-✓ permisos
-✓ roles_permisos
-✓ usuarios_roles
-```
-
----
-
-### ✅ PASO 2: Insertar Datos de Prueba
-
-**Archivo:** `03_datos_prueba_organizacion.sql`
-
-**Comando:**
-```bash
-psql -U postgres -d b_panaifo_test -f 03_datos_prueba_organizacion.sql
-```
-
-**O en psql interactivo:**
-```sql
-\i '/ruta/completa/03_datos_prueba_organizacion.sql'
-```
-
-**Verificación después de ejecutar:**
-```sql
--- Contar registros por tabla
-SELECT 'areas' as tabla, COUNT(*) FROM areas
-UNION ALL
-SELECT 'roles' as tabla, COUNT(*) FROM roles
-UNION ALL
-SELECT 'cargos' as tabla, COUNT(*) FROM cargos
-UNION ALL
-SELECT 'permisos' as tabla, COUNT(*) FROM permisos
-UNION ALL
-SELECT 'roles_permisos' as tabla, COUNT(*) FROM roles_permisos
-UNION ALL
-SELECT 'usuarios_roles' as tabla, COUNT(*) FROM usuarios_roles
-ORDER BY tabla;
-
--- Resultado esperado:
--- areas          | 5
--- cargos         | 4
--- permisos       | 6
--- roles          | 3
--- roles_permisos | 9
--- usuarios_roles | 3
-```
-
-**Secuencia de inserciones que se ejecuta:**
-```
-1. INSERT areas (5 registros)
-2. INSERT roles (3 registros)       ← ANTES que CARGOS
-3. INSERT cargos (4 registros)      ← DESPUÉS que ROLES
-4. INSERT permisos (6 registros)
-5. INSERT roles_permisos (9 registros)
-6. INSERT usuarios_roles (3 registros)
-```
-
----
-
-### ✅ PASO 3: Ejecutar Verificaciones
-
-**Archivo:** `03_verificacion_organizacion.sql`
-
-**Comando:**
-```bash
-psql -U postgres -d b_panaifo_test -f 03_verificacion_organizacion.sql
-```
-
-**O en psql interactivo:**
-```sql
-\i '/ruta/completa/03_verificacion_organizacion.sql'
-```
-
-**Verificaciones que se ejecutan:**
-1. ✓ Listar todas las áreas (verificar jerarquía)
-2. ✓ Listar todos los cargos con sus roles asociados
-3. ✓ Listar todos los roles
-4. ✓ Listar todos los permisos
-5. ✓ Verificar relación ROLES ↔ PERMISOS
-6. ✓ Verificar relación USUARIOS ↔ ROLES
-7. ✓ Verificar relación CARGOS ↔ ROLES
-8. ✓ Verificar acceso de ROLE_CONSULTA
-
-**Resultado esperado:** Todas las consultas devuelven datos sin errores.
-
----
-
-### ✅ PASO 4: Ejecutar Validaciones Adicionales
-
-**Archivo:** `04_validacion_organizacion.md`
-
-Contiene casos de prueba manuales para verificar:
-- Permisos por rol
-- Restricciones de integridad
-- Validaciones de fechas
-
----
-
-## 4. Secuencia de Ejecución Completa (Resumida)
+Ejecutar desde el directorio de los entregables:
 
 ```bash
-# 1. Crear BD vacía
-createdb b_panaifo_test
-
-# 2. Ejecutar scripts en orden
-psql -U postgres -d b_panaifo_test -f 03_organizacion_roles_permisos.sql
-psql -U postgres -d b_panaifo_test -f 03_datos_prueba_organizacion.sql
-psql -U postgres -d b_panaifo_test -f 03_verificacion_organizacion.sql
-
-# 3. Revisar resultados
-psql -U postgres -d b_panaifo_test
-
-# Dentro de psql:
-\i '04_validacion_organizacion.md'
+createdb sigd_qa
+psql -d sigd_qa -v ON_ERROR_STOP=1 -f 03_esquema_sigd_org_v2.sql
+psql -d sigd_qa -v ON_ERROR_STOP=1 -f 05_validacion_organicore_v2.sql
 ```
 
----
+El archivo `04_validacion_organicore_v2.md` contiene la matriz y la interpretación de los resultados de validación. No se ejecuta con `psql` porque es documentación.
 
-## 5. Manejo de Errores
+## 3. Criterios de aceptación
 
-### Error: "relation 'roles' does not exist"
+El despliegue se considera correcto cuando:
 
-**Causa:** Se intentó insertar en CARGOS antes de crear ROLES.
+- Se crea la base `sigd_qa` sin errores.
+- El esquema `sigd_org` existe.
+- Las tablas oficiales usan la nomenclatura v2.
+- Las entidades maestras tienen `activo BOOLEAN NOT NULL DEFAULT TRUE`.
+- No existe la tabla `responsables` en el modelo oficial.
+- Existen `sigd_org.asignacion_area` y `sigd_org.encargatura_despacho`.
+- Las vigencias usan `TSTZRANGE`.
+- Las restricciones e índices de exclusión GiST están creados.
+- El script `05_validacion_organicore_v2.sql` termina sin errores con `ON_ERROR_STOP=1`.
 
-**Solución:**
-```sql
--- Verificar orden de ejecución
--- PASO 1 (crear tablas) DEBE ejecutarse ANTES que PASO 2 (insertar datos)
--- ROLES debe crearse ANTES que CARGOS
-```
+## 4. Entregables oficiales
 
----
+1. `03_esquema_sigd_org_v2.sql`: creación del esquema, tablas, restricciones e índices.
+2. `04_validacion_organicore_v2.md`: matriz de validación y criterios de aceptación.
+3. `05_validacion_organicore_v2.sql`: consultas y pruebas ejecutables de validación.
+4. `10_plan_respaldo_contingencia_sigd_org_v2.md`: procedimientos de respaldo (backup) y prueba de restauración de los artefactos del esquema `sigd_org` v2. *(B_HECTOR)*
 
-### Error: "foreign key violation"
+## 5. Cierre de la Fase 2
 
-**Causa:** Se intentó insertar un rol_id que no existe.
+Después de ejecutar el despliegue y revisar los resultados:
 
-**Solución:**
-```sql
--- Verificar que los IDs de ROLES existan
-SELECT * FROM roles;
+1. Registrar la fecha, base de datos y versión de PostgreSQL utilizada.
+2. Conservar la salida de `05_validacion_organicore_v2.sql` como evidencia.
+3. Confirmar que no existen errores de integridad, solapamiento o nomenclatura.
+4. Marcar la Fase 2 como cerrada y aprobada.
 
--- Los IDs deben ser: 1 (ROLE_ADMIN), 2 (ROLE_OPERADOR), 3 (ROLE_CONSULTA)
+No se incluyen procedimientos manuales antiguos ni scripts del modelo provisional `b_panaifo_test`.
 
--- En CARGOS, los rol_id deben coincidir:
--- rol_id = 1 → existe (ROLE_ADMIN)
--- rol_id = 2 → existe (ROLE_OPERADOR)
--- rol_id = 3 → existe (ROLE_CONSULTA)
-```
+## 6. Respaldo y contingencia
 
----
+Documentado para el esquema `sigd_org` v2 conforme a la tarea de `B_HECTOR`. El detalle completo, la política de retención y el plan de contingencia están en [`10_plan_respaldo_contingencia_sigd_org_v2.md`](10_plan_respaldo_contingencia_sigd_org_v2.md).
 
-### Error: "unique constraint violation"
+### 6.1 Respaldo
 
-**Causa:** Intento de insertar un código de rol o permiso duplicado.
-
-**Solución:**
-```sql
--- Verificar datos existentes
-SELECT codigo FROM roles;
-SELECT codigo FROM permisos;
-
--- Si ejecutaste PASO 2 dos veces, las tablas pueden tener duplicados
--- Limpiar datos (ver Sección 6)
-```
-
----
-
-## 6. Revertir Cambios (Rollback)
-
-### Opción A: Borrar Todos los Datos (Soft Delete)
-
-```sql
--- Esto no borra las tablas, solo varía los datos
-DELETE FROM usuarios_roles;
-DELETE FROM roles_permisos;
-DELETE FROM permisos;
-DELETE FROM responsables;
-DELETE FROM cargos;
-DELETE FROM roles;
-DELETE FROM areas;
-
--- Reiniciar secuencias
-ALTER SEQUENCE areas_id_seq RESTART WITH 1;
-ALTER SEQUENCE roles_id_seq RESTART WITH 1;
-ALTER SEQUENCE cargos_id_seq RESTART WITH 1;
-ALTER SEQUENCE permisos_id_seq RESTART WITH 1;
-ALTER SEQUENCE responsables_id_seq RESTART WITH 1;
-
--- Verificar que está vacío
-SELECT * FROM areas;  -- Debe estar vacío
-```
-
----
-
-### Opción B: Borrar la Base de Datos Completamente
+Ejecutar un respaldo lógico diario de la base `sigd_qa` en formato custom. Debe realizarse después de cada despliegue y de forma automática diaria:
 
 ```bash
-# Desconectar de la BD primero
-psql -U postgres
-
-# Dentro de psql:
-DROP DATABASE b_panaifo_test;
-
-# Crear una nueva BD vacía
-CREATE DATABASE b_panaifo_test;
-
-# O desde terminal:
-dropdb b_panaifo_test
-createdb b_panaifo_test
+FECHA=$(date +%Y%m%d)
+pg_dump -w -h localhost -p 5432 -U postgres -d sigd_qa -Fc \
+  -f "backup/sigd_org_v2_${FECHA}.dump"
 ```
 
----
-
-### Opción C: Borrar Solo las Tablas
-
-```sql
--- Dentro de psql, conectado a b_panaifo_test
--- Ejecutar en orden inverso de dependencias
-
-DROP TABLE IF EXISTS usuarios_roles CASCADE;
-DROP TABLE IF EXISTS roles_permisos CASCADE;
-DROP TABLE IF EXISTS responsables CASCADE;
-DROP TABLE IF EXISTS cargos CASCADE;
-DROP TABLE IF EXISTS roles CASCADE;
-DROP TABLE IF EXISTS permisos CASCADE;
-DROP TABLE IF EXISTS areas CASCADE;
-
--- Verificar que no hay tablas
-\dt
-
--- Resultado esperado: (no rows)
-```
-
----
-
-## 7. Validación Final
-
-Cuando hayas ejecutado todos los pasos exitosamente, debes tener:
-
-✅ **7 tablas creadas** con estructura correcta  
-✅ **5 áreas** insertadas (1 raíz + 3 nivel 2 + 1 nivel 3)  
-✅ **3 roles** con códigos únicos  
-✅ **4 cargos** vinculados a roles  
-✅ **6 permisos** definidos  
-✅ **9 asignaciones** rol-permiso  
-✅ **3 usuarios** asignados a roles  
-✅ **Todas las relaciones** verificables sin errores  
-
----
-
-## 8. Checklist de Ejecución
-
-- [ ] PostgreSQL 18.6+ instalado y funcionando
-- [ ] Base de datos `b_panaifo_test` creada (vacía)
-- [ ] Archivo `03_organizacion_roles_permisos.sql` ejecutado correctamente
-- [ ] Archivo `03_datos_prueba_organizacion.sql` ejecutado correctamente
-- [ ] Archivo `03_verificacion_organizacion.sql` ejecutado correctamente
-- [ ] Todas las verificaciones pasan sin errores
-- [ ] Tablas tienen los datos esperados (ver cantidades en Paso 2)
-- [ ] Relaciones de integridad referencial verificadas
-- [ ] Script de rollback probado exitosamente
-- [ ] Documentación completada en `04_validacion_organizacion.md`
-
----
-
-## 9. Notas Importantes
-
-⚠️ **ESTOS SON DATOS DE PRUEBA FICTICIOS**
-- No contienen información personal real
-- No deben usarse en producción bajo ninguna circunstancia
-- Los IDs de usuario (1001, 1002, 1003) son ejemplos
-
-⚠️ **INTEGRACIÓN CON MÓDULO DE USUARIOS**
-- Las FK hacia `users` están en comentarios
-- Se activarán cuando la tabla `users` esté disponible
-- Comando preparado en `03_organizacion_roles_permisos.sql`
-
----
-
-## 10. Referencia Rápida
+Verificar el respaldo sin restaurar y registrar su suma de verificación:
 
 ```bash
-# Crear BD y cargar todo
-createdb b_panaifo_test
-psql -U postgres -d b_panaifo_test < 03_organizacion_roles_permisos.sql
-psql -U postgres -d b_panaifo_test < 03_datos_prueba_organizacion.sql
-psql -U postgres -d b_panaifo_test < 03_verificacion_organizacion.sql
-
-# Limpiar y empezar de nuevo
-dropdb b_panaifo_test
-createdb b_panaifo_test
-# Repetir pasos anteriores
-
-# Conectar a la BD para pruebas
-psql -U postgres -d b_panaifo_test
+pg_restore -l backup/sigd_org_v2_${FECHA}.dump | grep -i "sigd_org" | head -30
+sha256sum backup/sigd_org_v2_${FECHA}.dump > backup/sigd_org_v2_${FECHA}.dump.sha256
 ```
 
----
+### 6.2 Prueba de restauración
 
-**Fin del documento**  
-Próximo paso: Agregar pruebas avanzadas (jerarquía, vigencia, autorización)
+Tras cada despliegue y como mínimo mensual, restaurar el respaldo en una base temporal y validar con la suite oficial:
+
+```bash
+FECHA=$(date +%Y%m%d)
+dropdb --if-exists sigd_restore_test
+createdb sigd_restore_test
+pg_restore -w -h localhost -p 5432 -U postgres -d sigd_restore_test \
+  backup/sigd_org_v2_${FECHA}.dump
+psql -d sigd_restore_test -v ON_ERROR_STOP=1 -f 05_validacion_organicore_v2.sql
+```
+
+### 6.3 Criterios de aceptación
+
+- `pg_restore` restaura sin errores en `sigd_restore_test`.
+- `05_validacion_organicore_v2.sql` termina con `OK` y sin excepciones.
+- Existen las 9 tablas, 1 función, 1 trigger y 2 restricciones de exclusión GiST.
+- No se modifica la base operativa `sigd_qa`.
+- El resultado queda registrado en la bitácora de `10_plan_respaldo_contingencia_sigd_org_v2.md`.
