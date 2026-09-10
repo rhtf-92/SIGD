@@ -93,7 +93,7 @@
 | ultimo_cut_generado | VARCHAR(20) | | Sí | NULL | Último CUT emitido (formato `EXP-YYYY-XXXXXX`) | PROPUESTO |
 | creado_en | TIMESTAMPTZ | | No | NOW() | Marca de creación | CONFIRMADO |
 
-**Propósito:** Secuencia dedicada por año fiscal para generación atómica de CUT sin colisiones concurrentes `[CONFIRMADO]`
+**Propósito:** Tabla de control transparente (una fila por año fiscal) para la generación atómica del CUT sin colisiones concurrentes. La función `generar_cut_expediente` asegura la fila con `INSERT ... ON CONFLICT (anio_fiscal) DO NOTHING` y avanza el correlativo con `SELECT seq + 1 ... FOR UPDATE`. **No es una `SEQUENCE`** nativa: no se usa `nextval()` para el CUT. `[CONFIRMADO]`
 
 ---
 
@@ -120,8 +120,8 @@
 |-------|-------------|--------|
 | Identificadores internos | Generados por PostgreSQL (`GENERATED ALWAYS AS IDENTITY`) | CONFIRMADO |
 | CUT visible | Formato `EXP-YYYY-XXXXXX` vía `sigd_tra.generar_cut_expediente(p_anio INT)` | CONFIRMADO |
-| Prohibición MAX()+1 | Se usa `nextval()` de secuencia por año fiscal | CONFIRMADO |
-| Concurrencia CUT | Secuencias nativas garantizan unicidad atómica sin bloqueos muertos | CONFIRMADO |
+| Prohibición MAX()+1 | Tabla de control `secuencia_anual_cut`: `INSERT ... ON CONFLICT` (asegura fila anual) + `SELECT ... FOR UPDATE` (avanza correlativo). Sin `nextval()` para el CUT | CONFIRMADO |
+| Concurrencia CUT | Bloqueo de fila (`FOR UPDATE`) sobre `secuencia_anual_cut` serializa la generación por año fiscal sin colisiones ni deadlocks | CONFIRMADO |
 | Numero_registro Libro | Secuencia separada `seq_asiento_numero_registro`, inmutable, no reutilizable | CONFIRMADO |
 | Huecos en secuencia | Posibles ante ROLLBACK, aceptable para el Libro | CONFIRMADO |
 

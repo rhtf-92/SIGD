@@ -35,7 +35,7 @@ Subsanar las observaciones de arquitectura funcional del núcleo documental del 
 
 ### 2.2 Reglas de Generación Atómica y Concurrencia
 1. **Prohibición de `MAX() + 1` `[CONFIRMADO]`:** Se prohíbe consultar el último registro sumando 1, debido a colisiones en transacciones concurrentes.
-2. **Generador Transaccional Dedicado `[CONFIRMADO]`:** Se usará obligatoriamente la función `sigd_tra.generar_cut_expediente(p_anio INT)` con secuencias nativas de base de datos (`SEQUENCE`) particionadas por año fiscal para evitar colisiones concurrentes.
+2. **Generador Transaccional Dedicado `[CONFIRMADO]`:** Se usará obligatoriamente la función `sigd_tra.generar_cut_expediente(p_anio INT)`, respaldada por la tabla de control `secuencia_anual_cut` (una fila por año fiscal): un `INSERT ... ON CONFLICT ... DO NOTHING` asegura la fila del año y un `SELECT ... FOR UPDATE` serializa el avance del correlativo entre transacciones concurrentes. **No se usan secuencias nativas de base de datos (`SEQUENCE`/`nextval()`) para el CUT**; la secuencia nativa `seq_asiento_numero_registro` existe solo para el Libro (asientos) — ver `02_diccionario_datos_tramicore_v2.md`.
 
 ---
 

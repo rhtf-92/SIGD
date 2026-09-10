@@ -160,8 +160,8 @@ Modelo lógico actualizado que subsana las observaciones arquitectónicas del di
 
 - **Identificadores internos:** Generados por PostgreSQL (`BIGINT GENERATED ALWAYS AS IDENTITY`) `[CONFIRMADO]`
 - **CUT visible:** Formato `EXP-YYYY-XXXXXX` generado por función `sigd_tra.generar_cut_expediente(p_anio INT)` `[CONFIRMADO]`
-- **Prohibición absoluta de MAX()+1:** Se usa `nextval()` de secuencia dedicada por año fiscal `[CONFIRMADO]`
-- **Concurrencia:** Las secuencias de PostgreSQL garantizan unicidad atómica sin bloqueos muertos `[CONFIRMADO]`
+- **Prohibición absoluta de MAX()+1:** El CUT NO usa `nextval()`/secuencias nativas; se respalda en la tabla de control `secuencia_anual_cut` (una fila por año fiscal) con `INSERT ... ON CONFLICT ... DO NOTHING` para asegurar la fila anual y `SELECT ... FOR UPDATE` para avanzar el correlativo de forma atómica `[CONFIRMADO]`
+- **Concurrencia:** El bloqueo de fila (`SELECT ... FOR UPDATE`) sobre `secuencia_anual_cut` serializa la generación por año fiscal, evitando colisiones entre transacciones concurrentes (verificado en `04_validacion_tramicore_v2.md` B.1/B.2: 5 sesiones × 100 CUTs y carrera de año nuevo) `[CONFIRMADO]`
 - **Los correlativos del Libro:** Mediante secuencia separada, inmutables, no reutilizables `[CONFIRMADO]`
 
 ---

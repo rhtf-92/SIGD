@@ -3,8 +3,8 @@
 **Proyecto:** Sistema Integral de Gestión Documentaria (SIGD)
 **Grupo:** Grupo 2 – "TramiCore"
 **Autor:** Elmer Ramírez (B_RAMIREZ)
-**Versión:** 2.0 — Levantamiento de Observaciones
-**Fecha:** 30 de agosto de 2026
+**Versión:** 2.2 — Levantamiento de Observaciones
+**Fecha:** 30 de agosto de 2026 (rev. 2026-09-09)
 
 ---
 
@@ -90,12 +90,14 @@
 | Fecha | Responsable | Observación | Estado |
 |-------|-------------|-------------|--------|
 | 2026-08-30 | Elmer Ramírez | Observación arquitectónica 1:1 resuelta con modelo 1:N | RESUELTO |
-| 2026-08-30 | Elmer Ramírez | Observación de MAX()+1 resuelta con `nextval()` de secuencia | RESUELTO |
+| 2026-08-30 | Elmer Ramírez | Observación de MAX()+1 resuelta con tabla de control `secuencia_anual_cut` (`INSERT ... ON CONFLICT` + `SELECT ... FOR UPDATE`; sin `nextval()` para el CUT) | RESUELTO |
 | 2026-08-30 | Elmer Ramírez | Observación de ausencia de acumulación resuelta con `expediente_acumulacion` | RESUELTO |
 | 2026-08-30 | Elmer Ramírez | Observación de ausencia de foliatura digital resuelta con `expediente_documento_folio` | RESUELTO |
 | 2026-09-08 | Elmer Ramírez | Entregable de Sandy (modelo lógico v2.0, diccionario y diagramas) integrado | RESUELTO |
 | 2026-09-08 | Elmer Ramírez | Pruebas de concurrencia reproducibles mediante `07_lanzador_pruebas_tramicore.ps1` — PENDIENTE re-ejecución con DDL corregido (SQLSTATE 23514/23001, trigger anti-huecos, trigger acumulación) | EN PROCESO |
 | 2026-09-08 | Elmer Ramírez | Corrección H4: clasificaciones CONFIRMADO→PROPUESTO/PENDIENTE en DEC-01/03/05/07/09/16/17/18, DEC-UUID documentado como PENDIENTE, reescritura de DDL/demo/laboratorio con codificación UTF-8 limpia | RESUELTO |
+| 2026-09-09 | Elmer Ramírez | Corrección auditoría de foliado: el GUC `sigd.folio_escritura` (borrador, sin commitear) era inefectivo (`current_setting(guc,true)` devuelve NULL sin setear → la guarda no disparaba; además persistía entre transacciones). Descartado. Se protege la vía de INSERT directo BLOQUEANDO la fila del expediente (`SELECT ... FOR UPDATE`) en el trigger `fn_folio_verificar_solapamiento` antes de validar | RESUELTO |
+| 2026-09-09 | Elmer Ramírez | Disparidad de recuento plan (21) vs laboratorio (26): el plan cuenta P03 (concurrencia) como 1 y el resto como 20 puntos P01/P02/P04–P21; el laboratorio registra 26 porque P14a–d y P15a–d se desglosan (+6). Equivalencia documentada en `04_validacion_tramicore_v2.md`; el plan rector NO fue modificado y vuelve a declarar 21 | RESUELTO |
 
 ---
 
@@ -106,3 +108,4 @@
 | 1.0 | 2026-08-30 | Documento inicial con decisiones de la Fase 2 | Elmer Ramírez |
 | 2.0 | 2026-08-30 | Consolidación completa con fundamentación MGD-PCM, LPAG y AGN | Elmer Ramírez |
 | 2.1 | 2026-09-08 | Correcciones H4 post-auditoría: reclasificación de decisiones, DEC-UUID, alineación con DDL (secuencia anual, dos FK simples, índice parcial), evidencia reproducible | Elmer Ramírez |
+| 2.2 | 2026-09-09 | Corrección H4b-bis (auditoría de foliado): protección de la vía directa mediante bloqueo de fila en el trigger (descarte del GUC inefectivo), 3 pruebas de foliación en el lanzador (negativa secuencial + 2 concurrentes reales con `ON_ERROR_STOP=1`), documentación exacta del mecanismo CUT (`secuencia_anual_cut`, sin `nextval()`), plan rector restaurado a "21 pruebas", reconciliación 21/26, autoría verificada | Elmer Ramírez |
