@@ -17,7 +17,7 @@
   - **Desarrollador Frontend (FSM / Proyector RD):** `Isaí` (Rama: `F_ISAI`)
   - **Desarrolladora Frontend (Refirma / CVD / Validador):** `Mayra` (Rama: `F_MAYRA`)
 - **Carga de Trabajo Asignada:** `29 Story Points (SP)` distribuidos en 5 entregables atómicos
-- **Ubicación Canónica:** `frontend/docs/flujo-validez-legal/00_plan_de_trabajo_y_evaluacion_docente.md`
+- **Ubicación Canónica:** `frontend/docs/03_flujo-validez-legal/00_plan_de_trabajo_y_evaluacion_docente.md`
 - **Documento Maestro Institucional:** [PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md](../PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
 
 ---

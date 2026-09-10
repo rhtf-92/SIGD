@@ -16,7 +16,7 @@
   - **Desarrollador Frontend (SLA y LPAG):** `Willfredo Soria` (Git: `willfredo-soria` / `F_SORIA`)
   - **Desarrollador Frontend (CCD y Foliado AGN):** `Piero Bartra Montalvo` (Git: `ppierobartra` / `F_BARTRA`)
 - **Carga de Trabajo Asignada:** `28 Story Points (SP)` distribuidos en 5 entregables atómicos
-- **Ubicación Canónica:** `frontend/docs/gestion-expedientes/00_plan_de_trabajo_y_evaluacion_docente.md`
+- **Ubicación Canónica:** `frontend/docs/05_gestion-expedientes/00_plan_de_trabajo_y_evaluacion_docente.md`
 - **Documento Maestro Institucional:** [PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md](../PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
 
 ---

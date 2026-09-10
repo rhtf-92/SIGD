@@ -17,7 +17,7 @@
   - **Especialista de Integración (Ubigeo y SIAGIE):** `Ángel Jesús Vásquez Godoy` (Git: `angel-vasquez` / `angel` / `F_JESUS`)
   - **Especialista Arq. (JSON Schema / S3 / Validación):** `Carito Curto (Angy Curto)` (Git: `cakcy3-web` / `F_CURTO`)
 - **Carga de Trabajo Asignada:** `26 Story Points (SP)` distribuidos en 5 entregables atómicos
-- **Ubicación Canónica:** `frontend/docs/registro-usuarios-casilla/00_plan_de_trabajo_y_evaluacion_docente.md`
+- **Ubicación Canónica:** `frontend/docs/01_registro-usuarios-casilla/00_plan_de_trabajo_y_evaluacion_docente.md`
 - **Documento Maestro Institucional:** [PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md](../PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
 
 ---

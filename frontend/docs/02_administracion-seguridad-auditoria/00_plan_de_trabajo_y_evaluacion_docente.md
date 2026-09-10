@@ -17,7 +17,7 @@
   - **Desarrollador Auditoría Forense:** `Leonel Rivera Maxin ("Maxin")` (Git: `maxirivera` / `F_RIVERA`)
   - **Desarrollador Frontend / Seguridad:** `Cristian Macedo` (Git: `cristiamsaul2` / `F_CRISTIAM`)
 - **Carga de Trabajo Asignada:** `28 Story Points (SP)` distribuidos en 6 entregables atómicos
-- **Ubicación Canónica:** `frontend/docs/administracion-seguridad-auditoria/00_plan_de_trabajo_y_evaluacion_docente.md`
+- **Ubicación Canónica:** `frontend/docs/02_administracion-seguridad-auditoria/00_plan_de_trabajo_y_evaluacion_docente.md`
 - **Documento Maestro Institucional:** [PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md](../PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
 
 ---

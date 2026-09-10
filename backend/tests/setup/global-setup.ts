@@ -26,8 +26,12 @@ function directorioSetup(): string {
 }
 
 async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
-  const raizProyecto = path.resolve(directorioSetup(), '../..');
-  const archivoDdlAudit = path.resolve(raizProyecto, '../06_sigd_audit_esquema_ddl.sql');
+  const rutaDdlDocs = existsSync(path.resolve(raizProyecto, 'docs/00_corelink/06_sigd_audit_esquema_ddl.sql'))
+    ? path.resolve(raizProyecto, 'docs/00_corelink/06_sigd_audit_esquema_ddl.sql')
+    : path.resolve(raizProyecto, 'docs/corelink/06_sigd_audit_esquema_ddl.sql');
+  const archivoDdlAudit = existsSync(rutaDdlDocs)
+    ? rutaDdlDocs
+    : path.resolve(raizProyecto, '../06_sigd_audit_esquema_ddl.sql');
   const dirMigraciones = process.env.MIGRATIONS_DIR
     ? path.resolve(raizProyecto, process.env.MIGRATIONS_DIR)
     : path.join(raizProyecto, 'migraciones');

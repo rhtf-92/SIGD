@@ -1,7 +1,70 @@
+# ==============================================================================
+# SIGD BACKEND — .gitignore (Node.js / Express 5 / TypeScript / PostgreSQL 18)
+# ==============================================================================
+
+# --- Dependencias ---
 node_modules/
+.pnpm-store/
+
+# --- Compilación y Salidas de Build (TypeScript / JavaScript) ---
 dist/
+build/
+out/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# --- Variables de Entorno y Secretos ---
 .env
+.env.*
+!.env.example
+
+# --- Cobertura de Pruebas y Reportes ---
 coverage/
+.nyc_output/
+test-results/
+.vitest/
+
+# --- Logs del Sistema y Ejecución ---
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Excepciones: Preservar evidencias empíricas de pruebas y auditoría de laboratorio
+!docs/**/logs*/**/*.log
+!docs/**/logs*/**/*.json
+!docs/**/logs*/**/*.txt
 !docs/organicore/logs/ejecucion_suite_organicore_v2.log
+!docs/02_organicore/logs/ejecucion_suite_organicore_v2.log
+!docs/corelink/logs_pruebas/**
+!docs/00_corelink/logs_pruebas/**
+!docs/tramicore/logs_pruebas/**
+!docs/04_tramicore/logs_pruebas/**
+
+# --- Artefactos Temporales de Ofimática (Word / Excel Lock Files) ---
 grupos_docs/*.docx
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# --- Archivos Temporales y del Sistema Operativo ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.temp
+*.bak
+
+# --- Volcados de Base de Datos y Contenedores Locales ---
+*.dump
+*.sql.bak
+.testcontainers/
+
+# --- Informes de Auditoría, Diagnósticos y Planes Excluidos ---
+docs/DIAGNOSTICO_IDENTICORE.md
+docs/INFORME_AUDITORIA_CONSOLIDADA_BACKEND_SIGD.md
+docs/INFORME_AUDITORIA_CONTRIBUCIONES_BACKEND.md
+docs/Plan_de_mejora_nivel_backend_SIGD.md
+
+

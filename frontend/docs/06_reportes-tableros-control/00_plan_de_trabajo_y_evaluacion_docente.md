@@ -18,7 +18,7 @@
   - **Diseñador UX / Accesibilidad (WCAG AA):** `Barbarán Gonzales` (Rama: `F_BARBARAN`)
   - **Desarrollador Frontend (Exportador PDF/Excel):** `Lloner Vargas Huayunga` (Git: `lloner-araujo` / Rama: `F_VARGAS`)
 - **Carga de Trabajo Asignada:** `29 Story Points (SP)` distribuidos en 5 entregables atómicos
-- **Ubicación Canónica:** `frontend/docs/reportes-tableros-control/00_plan_de_trabajo_y_evaluacion_docente.md`
+- **Ubicación Canónica:** `frontend/docs/06_reportes-tableros-control/00_plan_de_trabajo_y_evaluacion_docente.md`
 - **Documento Maestro Institucional:** [PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md](../PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
 
 ---

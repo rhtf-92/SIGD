@@ -17,7 +17,7 @@
   - **Desarrolladora Frontend (Wizard MPV de 4 Pasos):** `Anllely Melgarejo V.` (Git: `Anllely-melgarejo` / `F_ANLLELY`)
   - **Desarrolladora Frontend (Requisitos TUPA y Horario LPAG):** `Noelia Alva` (Git: `noelia-alva` / `F_NOELIA`)
 - **Carga de Trabajo Asignada:** `34 Story Points (SP)` distribuidos en 6 entregables atómicos
-- **Ubicación Canónica:** `frontend/docs/registro-documentario/00_plan_de_trabajo_y_evaluacion_docente.md`
+- **Ubicación Canónica:** `frontend/docs/04_registro-documentario/00_plan_de_trabajo_y_evaluacion_docente.md`
 - **Documento Maestro Institucional:** [PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md](../PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md)
 
 ---
