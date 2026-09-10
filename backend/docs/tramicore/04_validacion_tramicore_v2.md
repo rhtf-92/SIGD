@@ -5,6 +5,7 @@
 **Motor:** PostgreSQL 18.3+
 **Revisión H4 (post-auditoría):** 2026-09-08
 **Revisión H4b (correcciones de auditoría):** 2026-09-09
+**Revisión H4b-bis (auditoría de foliado):** 2026-09-09
 
 ---
 
@@ -22,7 +23,8 @@
 > **Reproducibilidad (evidencia H4):** la ejecución completa se reproduce con un
 > solo comando. El lanzador reconstruye la base, carga los datos demo, ejecuta el
 > laboratorio determinista y abre **5 sesiones reales simultáneas** (logs
-> separados en `logs_pruebas/`), más la carrera de inicialización de año nuevo.
+> separados en `logs_pruebas/`), más la carrera de inicialización de año nuevo y
+> **3 escenarios de foliación** (negativo secuencial + 2 concurrentes reales).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File 07_lanzador_pruebas_tramicore.ps1
@@ -119,11 +121,12 @@ SELECT sigd_tra.generar_cut_expediente(2028);
 | CUTs devueltos | `EXP-2028-000001`, `EXP-2028-000002`, `EXP-2028-000003` |
 | Filas en `secuencia_anual_cut` para 2028 | **1** (la carga atómica `ON CONFLICT` no duplicó la fila) |
 
-### B.3 — Foliado: prueba negativa real de solapamiento
+### B.3 — Foliado: prueba negativa SECUENCIAL de solapamiento
 
 **Corrección H4b:** la versión anterior del lanzador probaba con rangos
 contiguos (0 solapados), lo que no ejercitaba el rechazo. Se reemplazó por una
-**prueba negativa determinista** sobre un expediente limpio:
+**prueba negativa determinista** sobre un expediente limpio (archivos de sesión
+`folio_negativo_0.*` y `folio_negativo_1.*`):
 
 ```sql
 -- sesión 0 (exit 0 esperado): folia el expediente vía función canónica
@@ -137,7 +140,8 @@ La ejecución es secuencial determinista (la sesión 0 termina antes de iniciar
 la 1) y usa `ON_ERROR_STOP=1`: sin él, psql continuaría y devolvería exit 0
 pese al error, enmascarando el rechazo (bug de la versión anterior).
 
-**Ejecutado 2026-09-09** (evidencia `evidencia_h4.json`):
+**Ejecutado 2026-09-09** (evidencia `evidencia_h4.json`, bloque
+`foliado_negativo_solapamiento`):
 
 | Métrica | Valor |
 |---------|-------|
@@ -149,6 +153,62 @@ pese al error, enmascarando el rechazo (bug de la versión anterior).
 > Nota: `agregar_folio_expediente` (sesión 0) dispara también el trigger; el
 > trigger anti-huecos se corrigió en la re-ejecución para no rechazar el folio
 > contiguo precedente (ver `03_esquema_...sql`, bloque CORRECCIÓN 2026-09-09).
+
+### B.4 — Foliado: dos pruebas concurrentes REALES (2 sesiones simultáneas)
+
+**Corrección H4b-bis (auditoría de foliado):** el DDL anterior validaba el
+solapamiento/hueco SIN bloquear el expediente, por lo que dos sesiones
+concurrentes podían leer el mismo estado y confirmar rangos incompatibles. La
+corrección bloquea la fila del expediente (`SELECT ... FOR UPDATE`) dentro del
+mismo trigger `trg_folio_verificar_solapamiento` antes de validar, serializando
+las escrituras concurrentes sobre un expediente (READ COMMITTED).
+
+Cada `psql` se lanza con `-v ON_ERROR_STOP=1` para que el rechazo de un INSERT
+directo se traduzca en exit != 0 y no quede enmascarado.
+
+**B.4.1 — Concurrente, función canónica (debe salir bien):** dos sesiones
+simultáneas (`folio_concurrente_0.*` / `folio_concurrente_1.*`) folian el mismo
+expediente limpio con `agregar_folio_expediente(...)`, cada una 5 folios. El
+bloqueo de fila del expediente dentro de la función serializa; ambas confirman
+y los rangos quedan contiguos:
+
+```sql
+-- cada sesión, en proceso psql separado
+SELECT sigd_tra.agregar_folio_expediente(<id_con>, <id_doc_i>, 5);
+```
+
+**Ejecutado 2026-09-09** (evidencia, bloque `foliado_concurrente`):
+
+| Métrica | Valor |
+|---------|-------|
+| ExitCodes | **0 y 0** |
+| Rangos finales | `1-5, 6-10` (contiguos, sin huecos) |
+| Resultado | **PASS** |
+
+**B.4.2 — Concurrente, INSERT directo (debe rechazarse uno):** dos sesiones
+simultáneas (`folio_concurrente_directo_0.*` / `folio_concurrente_directo_1.*`)
+insertan el **mismo rango 1-5** sobre un expediente limpio. El bloqueo de fila
+del trigger serializa; la que confirma primero deja el rango `1|5` y la segunda
+es rechazada por solapamiento `[23514]`:
+
+```sql
+-- cada sesión, en proceso psql separado
+INSERT INTO sigd_tra.expediente_documento_folio (id_expediente, id_documento,
+    folio_inicio, folio_fin, total_folios) VALUES (<id_directo>, <id_doc_i>, 1, 5, 5);
+```
+
+**Ejecutado 2026-09-09** (evidencia, bloque `foliado_concurrente_insert_directo`):
+
+| Métrica | Valor |
+|---------|-------|
+| ExitCodes | **0 y 3** (segunda rechazada) |
+| Rangos finales | `1|5` (solo un rango confirmado; sin rangos incompatibles) |
+| Rechazo | stderr `psql:...: ERROR: Solapamiento de folios ... [23514]` |
+| Resultado | **PASS** — `solapamiento_bloqueado: true`, `un_solo_aceptado: true` |
+
+> Este escenario es la prueba de humo de la decisión del revisor: un par de
+> INSERTs directos concurrentes que calculaban `MAX(folio_fin)+1` sobre el mismo
+> snapshot ya no pueden confirmar rangos incompatibles.
 
 ---
 
@@ -191,21 +251,30 @@ FROM sigd_tra.expediente ORDER BY id_expediente;
 
 **Ejecución:** lanzador re-ejecutado contra PostgreSQL 18.3 con el DDL
 corregido (SQLSTATE 23514/23001, trigger anti-huecos sin falso positivo,
-prueba negativa de foliado y P19 reescrito). Resultado global **PASS**.
-Evidencia en `logs_pruebas/evidencia_h4.json` (fechas, ddl_hash, exit codes y
-resultados por bloque) más logs de sesión `concurrente_*.log`,
-`anio_nuevo_*.log` y `folio_*.log/.err`.
+pruebas de foliación negativa/secuencial + 2 concurrentes reales y P19
+reescrito). Resultado global **PASS**. Evidencia en
+`logs_pruebas/evidencia_h4.json` (fechas, ddl_hash, exit codes y resultados por
+bloque) más logs de sesión `concurrente_*.log`, `anio_nuevo_*.log`,
+`folio_negativo_*.log/.err`, `folio_concurrente_*.log` y
+`folio_concurrente_directo_*.log/.err`.
 
-> **Recuento:** el laboratorio cubre **26 pruebas** (P01, P02, P04–P21 con
-> P14a–d y P15a–d). La concurrencia (P03) la ejecuta el lanzador en B.1/B.2 y
-> se evalúa aparte; el lanzador exige **26** pruebas OK en el laboratorio.
+> **Recuento:** el laboratorio cubre **26 entradas verdes** (P01, P02, P04–P21
+> con P14a–d y P15a–d; +6 por el desglose de P14/P15). El **plan rector
+> (02_plan_...) declara 21 pruebas** porque cuenta P03 (concurrencia) como 1 y
+> P14/P15 como una prueba cada una: 20 puntos numerados P01/P02/P04–P21 + P03 =
+> 21. Ambas cifras son consistentes: el plan describe el escenario y el
+> laboratorio registra cada afirmación comprobada. La concurrencia (P03) la
+> ejecuta el lanzador en B.1/B.2 y se evalúa aparte; el lanzador exige **26**
+> entradas OK en el laboratorio.
 
 | Bloque | Resultado | Estado |
 |--------|-----------|--------|
 | Laboratorio determinista (26 pruebas) | 26/26 OK (exit 0) | ✅ EJECUTADO |
 | Concurrencia 2026 (5 sesiones × 100) | 500/500 únicos, exit 0, 0 errores | ✅ EJECUTADO |
 | Carrera año 2028 (3 CUTs exactos 000001, 000002, 000003) | OK — 1 fila anual | ✅ EJECUTADO |
-| Foliado: solapamiento rechazado (prueba negativa) | Población exit 0; rechazo exit 3 `[23514]` | ✅ EJECUTADO |
+| Foliado: solapamiento rechazado (prueba negativa SECUENCIAL) | Población exit 0; rechazo exit 3 `[23514]` | ✅ EJECUTADO (B.3) |
+| Foliado concurrente (función canónica) | 2 sesiones exit 0/0; rangos `1-5, 6-10` contiguos | ✅ EJECUTADO (B.4.1) |
+| Foliado concurrente (INSERT directo mismo rango) | exit 0/3; rechazo `[23514]`; solo `1|5` confirmado | ✅ EJECUTADO (B.4.2) |
 | CUT por año fiscal | Reinicia en `000001`; sin secuencia global | ✅ Verificado en DDL |
 | CUT auto-conectado al INSERT | Trigger `trg_expediente_asignar_cut` | ✅ Verificado en DDL |
 | CHECK de formato CUT | `chk_expediente_cut_formato` (VARCHAR(20)) | ✅ Verificado en DDL |
@@ -220,4 +289,5 @@ resultados por bloque) más logs de sesión `concurrente_*.log`,
 | Evidencia consolidada | `logs_pruebas/evidencia_h4.json` — generada en la re-ejecución | ✅ EJECUTADO |
 | Verificación ExitCode procesos | Cada proceso psql verificado individualmente | ✅ Verificado en DDL |
 
-DDL hash de la re-ejecución: `B570585ACEBC634D4DEBC643EFD51355F36AE1A13768EC730A30EBF6D0716133`.
+DDL hash de la re-ejecución H4b-bis: `B0071A000563A802A53214EAB7CDE6E47BB0CE0F6318B383D2F8C45407307FCA`.
+(Revisión H4b: `B570585ACEBC634D4DEBC643EFD51355F36AE1A13768EC730A30EBF6D0716133` — DDL previo, sin bloqueo de foliado concurrente.)

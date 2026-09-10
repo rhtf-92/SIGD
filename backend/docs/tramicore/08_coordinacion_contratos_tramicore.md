@@ -3,6 +3,7 @@
 **Proyecto:** SIGD — Grupo 2 "TramiCore"
 **Autor:** Elmer Ramírez (B_RAMIREZ)
 **Fecha:** 2026-09-08
+**Revisión H4b-bis:** 2026-09-09 (protección de foliado concurrente, evidencia, autoría)
 **Motivo:** Auditoría del líder (revisión H4). Este documento registra las acciones de
 coordinación pendientes con los integrantes del grupo y el contrato bilateral con RutaDoc
 que deben cerrarse ANTES del PR hacia `B_GERIC`.
@@ -17,8 +18,11 @@ que deben cerrarse ANTES del PR hacia `B_GERIC`.
 | Laboratorio determinista | ✅ EJECUTADO 26/26 (2026-09-09) | `06_pruebas_laboratorio_tramicore.sql` |
 | Concurrencia real | ✅ EJECUTADO 500/500 (2026-09-09) | `07_lanzador_pruebas_tramicore.ps1` → `logs_pruebas/` |
 | Carrera de año nuevo (2028) | ✅ EJECUTADO — 3 CUTs exactos, 1 fila anual (2026-09-09) | mismo lanzador |
+| Foliado · solapamiento rechazado (prueba negativa SECUENCIAL) | ✅ EJECUTADO — exit 0/3, `[23514]` (2026-09-09) | `logs_pruebas/folio_negativo_*.{sql,log,err}` |
+| Foliado · concurrente función canónica (2 sesiones) | ✅ EJECUTADO — exit 0/0, rangos `1-5, 6-10` (2026-09-09) | `logs_pruebas/folio_concurrente_*.{sql,log,err}` |
+| Foliado · concurrente INSERT directo (2 sesiones, mismo rango 1-5) | ✅ EJECUTADO — exit 0/3, rechazo `[23514]`, solo `1|5` confirmado (2026-09-09) | `logs_pruebas/folio_concurrente_directo_*.{sql,log,err}` |
 | Validación documentada | ✅ Reproducible en un solo comando | `04_validacion_tramicore_v2.md` |
-| Decisiones reclasificadas | ✅ PROPUESTO/PENDIENTE según evidencia | `05_decisiones_levantamiento_tramicore.md` (v2.1) |
+| Decisiones reclasificadas | ✅ PROPUESTO/PENDIENTE según evidencia | `05_decisiones_levantamiento_tramicore.md` (v2.2) |
 | Alineación con B_GERIC | ✅ Merge de `origin/B_GERIC` aplicado (sin conflictos) | B_RAMIREZ en `d9f372c` |
 | Evidencia `evidencia_h4.json` | ✅ GENERADA — resultado global PASS (2026-09-09) | `logs_pruebas/evidencia_h4.json` |
 
@@ -107,4 +111,39 @@ Pendiente común con RutaDoc antes de cerrar el diseño físico:
 | 13 | SQLSTATE corregido (42301 → 23514/23001) e índice redundante eliminado | Elmer | ✅ CORREGIDO (2026-09-09) |
 | 14 | Trigger anti-huecos y trigger de validación en acumulación | Elmer | ✅ AGREGADO (2026-09-09) |
 | 15 | Lanzador: conteo corregido a 26 pruebas (antes 21) y comparación exacta 000001, 000002, 000003 | Elmer | ✅ CORREGIDO (2026-09-09) |
-| 16 | PR final de B_RAMIREZ hacia B_GERIC (la rama ya está alineada con origin/B_GERIC) | Elmer | PENDIENTE (tras nueva revisión) |
+| 16 | H4b-bis: proteger la vía directa de foliado (bloqueo de fila del expediente en el trigger; descartado el GUC inefectivo) + 3 pruebas de foliación (negativa secuencial + 2 concurrentes reales) con `ON_ERROR_STOP=1` | Elmer | ✅ CORREGIDO Y EJECUTADO (2026-09-09) |
+| 17 | Documentar el mecanismo CUT exacto (`secuencia_anual_cut` / `ON CONFLICT` / `FOR UPDATE`; sin `nextval()` para CUT) en 01/02_modelo/02_diccionario/05 | Elmer | ✅ CORREGIDO (2026-09-09) |
+| 18 | Restaurar el plan rector a su contenido original (21 pruebas deterministas + requisito textual del UUID) y reconciliar 21/26 en `04_validacion`/`05_decisiones` | Elmer | ✅ RESTAURADO (2026-09-09) |
+| 19 | Transparencia de autoría: confirmar identidad Git de B_RAMIREZ y participación de Riquelmer/Sandy; documentar aquí | Elmer | ✅ DOCUMENTADO (sección 6) |
+| 20 | PR final de B_RAMIREZ hacia B_GERIC (la rama ya está alineada con origin/B_GERIC) | Elmer | PENDIENTE (tras nueva revisión) |
+
+---
+
+## 6. Transparencia de autoría y participación (verificación 2026-09-09)
+
+Verificación ejecutada a petición del revisor sobre **toda la historia de commits
+de la serie de correcciones H4** (`8e811ba` → `0e975cd`):
+
+| Aspecto | Verificado |
+|---------|-----------|
+| Identidad Git configurada en B_RAMIREZ | `user.name = ReyNorD23`, `user.email = zlkarozr3@gmail.com` (`git config`) |
+| Alias histórico en la rama | El commit inicial del repositorio y varios de la Fase 2 aparecen como `ElmerRC <zlkarozr3@gmail.com>` — **mismo correo** que `ReyNorD23`, por lo que se trata de la misma persona |
+| Autoría de las correcciones H4 | 100 % de los commits `8e811ba` → `0e975cd` son de `ReyNorD23 <zlkarozr3@gmail.com>` |
+| Participación de Riquelmer | `riquelmerfachin <riquelmerrojas@gmail.com>` — contribuyó en hitos previos (H1/análisis normativo, PR #74); **sin commits** en la serie de correcciones H4 |
+| Participación de Sandy | `sandymargarita08-cloud <sandymargarita08@gmail.com>` — contribuyó en H2 (modelo/diccionario v1, PR #74); **sin commits** en la serie de correcciones H4 |
+| Ramas de colaboradores | `origin/B_RIQUELMER` y `origin/B_SANDY` están forzadas en `71c3a15` (main); sus entregables históricos están integrados vía merge del PR #74 en B_RAMIREZ |
+
+**Conclusión:** los commits de la revisión H4/H4b/H4b-bis fueron redactados y
+publicados por una sola persona (ReyNorD23, alias Git del mismo autor Elmer
+Ramírez). Riquelmer y Sandy **no participaron** en esta iteración de
+correcciones; sus entregables normativos (H1) y de modelado (H2) sí quedaron
+integrados y son verificables en los documentos históricos de `B_RAMIREZ`.
+
+**Plan rector / aprobación del profesor:** el commit `3caa94a` había modificado
+el plan rector (contó 26 pruebas en lugar de 21 y retiró la mención textual del
+UUID en el evento a RutaDoc). **No existe evidencia de aprobación** por el
+profesor de una nueva versión del plan, por lo que el plan fue **restaurado a su
+contenido original** (21 pruebas deterministas + requisito textual del UUID) y
+la equivalencia 21/26 quedó documentada en `04_validacion_tramicore_v2.md` y
+`05_decisiones_levantamiento_tramicore.md` (v2.2). Si el profesor aprueba una
+nueva versión del plan, debe registrarse aquí con su evidencia.
