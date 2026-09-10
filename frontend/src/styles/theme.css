@@ -1,0 +1,124 @@
+@layer components {
+  .header-sigd {
+    background: linear-gradient(90deg, #006ec7 0%, #005ca2 100%);
+    color: #ffffff;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  }
+
+  .header-bar {
+    display: block;
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg, #006ec7 0%, #e6007e 50%, #f9e000 100%);
+  }
+
+  .card-sigd {
+    border-radius: 1rem;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #006ec7;
+  }
+
+  @media (min-width: 640px) {
+    .section-title {
+      font-size: 1.125rem;
+    }
+  }
+
+  .input-sigd {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: #0f172a;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .input-sigd::placeholder {
+    color: #94a3b8;
+  }
+
+  .input-sigd:focus {
+    border-color: #006ec7;
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(0, 110, 199, 0.12);
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    background: #006ec7;
+    padding: 0.875rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #ffffff;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    cursor: pointer;
+  }
+
+  .btn-primary:hover {
+    background: #0059a8;
+  }
+
+  .btn-primary:focus {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(0, 110, 199, 0.18);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    padding: 0.875rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #334155;
+    transition: border-color 0.2s ease, color 0.2s ease;
+  }
+
+  .btn-secondary:hover {
+    border-color: #006ec7;
+    color: #006ec7;
+  }
+
+  .table-sigd {
+    width: 100%;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+  }
+
+  .badge-sigd {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    border: 1px solid rgba(230, 0, 126, 0.3);
+    background: #fdf2f8;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #e6007e;
+  }
+}
