@@ -103,8 +103,10 @@
 | Estado | Descripción | Transición |
 |---|---|---|
 | `ACTIVA` | Cuenta operativa normal | Estado inicial |
-| `BLOQUEADA_TEMPORAL` | Bloqueada tras 5 intentos fallidos | Timeout de 15 min |
+| `BLOQUEADA_TEMPORAL` | Bloqueada tras 5 intentos fallidos (lógica de aplicación; en BD solo existen `intentos_fallidos`/`bloqueado_hasta`) | Timeout de 15 min (pendiente de confirmación institucional: 15/30 min) |
 | `INACTIVA` | Cuenta desactivada por administración | Reactivación manual |
+
+> **Nota de alcance (coherencia con `03_esquema_sigd_auth_v2.sql`):** los estados funcionales son de aplicación. En PostgreSQL solo existen columnas `estado BOOLEAN` + `intentos_fallidos`/`bloqueado_hasta`; no hay trigger automático 5 intentos/15 min. `Externo Ventanilla` = `SIN_CUENTA` = externo no registrado funcionalmente.
 
 ---
 
@@ -116,7 +118,7 @@
 | D-02 | Representación legal 1:1 por relación natural-jurídica | CONFIRMADO |
 | D-03 | Consentimiento con versiones controladas | CONFIRMADO |
 | D-04 | Ofuscación automática en consultas públicas | CONFIRMADO |
-| D-05 | Bloqueo temporal tras 5 intentos fallidos | CONFIRMADO |
+| D-05 | Bloqueo temporal tras 5 intentos fallidos (lógica de aplicación; BD solo aporta columnas) | PROPUESTO |
 
 ---
 

@@ -1,5 +1,7 @@
 # Validación Técnica del Borrador SQL - Módulo IdentiCore
 
+> **OBSOLETO / LEGACY v1 — NO USAR PARA v2.** Fuente de verdad v2: `04_validacion_identicore_v2.md` (V-01..V-07, estado NO EJECUTADA). Se conserva como antecedente.
+
 - **Responsable:** Segundo (Rama B_SEGUNDO)
 - **Motor de Base de Datos:** PostgreSQL 18.6
 - **Fecha de validación:** 30 de agosto de 2026

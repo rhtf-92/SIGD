@@ -1,5 +1,7 @@
 # Decisiones, Supuestos y Preguntas Pendientes - Módulo IdentiCore
 
+> **OBSOLETO / LEGACY v1 — NO USAR PARA v2.** Fuente de verdad v2: `05_decisiones_levantamiento_identicore.md`. Se conserva como antecedente.
+
 - **Grupo:** Grupo 4 — IdentiCore · Responsable del modelo: Segundo (B_SEGUNDO)
 - **Estado:** BORRADOR — PENDIENTE DE VALIDACIÓN INSTITUCIONAL Y DEL PROFESOR
 - **Fecha:** 30 de agosto de 2026
