@@ -8,10 +8,13 @@ import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosPage from "../pages/administracion/UsuariosPage";
+<<<<<<< HEAD
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
 import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
 import WorkflowAcademicoPage from "../pages/flujos/WorkflowAcademicoPage";
 import ValidadorPublicoCvdPage from "../pages/validador/ValidadorPublicoCvdPage";
+=======
+>>>>>>> 110b9d0ab4e1f8c7e20d4b7f0874a93079d9be09
 
 export default function AppRouter() {
   return (
@@ -33,6 +36,7 @@ export default function AppRouter() {
         element={<CalendarioLaboralPage />}
       />
       <Route path="/administracion/seguridad" element={<SeguridadPage />} />
+<<<<<<< HEAD
       <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
       <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
       <Route
@@ -40,6 +44,8 @@ export default function AppRouter() {
         element={<PasarelaFirmaPage />}
       />
       <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
+=======
+>>>>>>> 110b9d0ab4e1f8c7e20d4b7f0874a93079d9be09
     </Routes>
   );
 }
