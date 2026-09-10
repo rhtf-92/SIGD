@@ -56,6 +56,10 @@ function rutaFixture(): string {
   return path.join(raizImpl, 'tests', 'fixtures', '01_schema_fixtures_test.sql');
 }
 
+function rutaRelativa(ruta: string): string {
+  return path.relative(process.cwd(), ruta) || ruta;
+}
+
 async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
   const ddl = rutaDdlAudit();
   const fixture = rutaFixture();
@@ -67,20 +71,25 @@ async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
 
     if (!existsSync(ddl)) {
       throw new Error(
-        `[MIGRACION] DDL real de auditoría no encontrado en ${ddl}. ` +
+        `[MIGRACION] DDL real de auditoría no encontrado en ${rutaRelativa(ddl)}. ` +
           'La suite requiere el esquema sigd_audit real; NO se sustituye por un stub del fixture.',
       );
     }
 
-    console.log(`[MIGRACION] Aplicando DDL real de auditoría (${ON_ERROR_STOP}): ${ddl}`);
+    console.log(`[MIGRACION] Aplicando DDL real de auditoría (${ON_ERROR_STOP}): ${rutaRelativa(ddl)}`);
     await aplicarSql(cliente, ddl);
 
     console.log(
-      `[MIGRACION] Aplicando FIXTURES PROVISIONALES (5 esquemas de módulos; sigd_audit NO está aquí): ${fixture}`,
+      `[MIGRACION] Aplicando FIXTURES PROVISIONALES (5 esquemas de módulos; sigd_audit NO está aquí): ${rutaRelativa(fixture)}`,
     );
     await aplicarSql(cliente, fixture);
     console.log(
       '[MIGRACION] Entorno preparado: sigd_audit del DDL real de integracion/ + stubs provisionales de los 5 módulos.',
+    );
+    console.log(
+      '[MIGRACION] ALCANCE: la suite valida SOLO el prototipo CoreLink (sigd_audit real + stubs provisionales). ' +
+        'No se ejecutan las migraciones reales de los 6 módulos; la conformidad intermodular queda PARCIAL/PENDIENTE ' +
+        'en los docs de integracion/.',
     );
   } finally {
     await cliente.end();

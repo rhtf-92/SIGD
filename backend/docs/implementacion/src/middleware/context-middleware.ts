@@ -4,10 +4,11 @@ import { crearContexto, runWithContext } from '../shared/request-context/request
 
 export const CONTEXT_HEADER = 'x-correlation-id';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RFC4122_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function esUuid(valor: string): boolean {
-  return UUID_REGEX.test(valor);
+  return UUID_RFC4122_REGEX.test(valor);
 }
 
 export function contextMiddleware(req: Request, res: Response, next: NextFunction): void {

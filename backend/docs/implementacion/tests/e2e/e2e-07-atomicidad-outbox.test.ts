@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { obtenerAgente, limpiarAmbiente, cerrarAmbiente } from '../helpers/app.helper.js';
 import { obtenerPool } from '../helpers/database.helper.js';
-import { correlationIdFijo } from '../helpers/payloads.helper.js';
+import { correlationIdFijo, payloadRadicacionValido } from '../helpers/payloads.helper.js';
 
 describe('E2E-07 · Atomicidad expediente + evento outbox', () => {
   beforeAll(async () => {
@@ -113,6 +113,68 @@ describe('E2E-07 · Atomicidad expediente + evento outbox', () => {
     } finally {
       await pool.query(`DROP TRIGGER IF EXISTS e2e07_trg_falla ON sigd_audit.evento_outbox`);
       await pool.query(`DROP FUNCTION IF EXISTS sigd_audit.e2e07_falla_inducida()`);
+    }
+  });
+
+  it('rollback de derivación: falla inducida en movimiento_tramite no persiste movimiento ni su bitácora', async () => {
+    const pool = obtenerPool();
+    const area = await pool.query(
+      'INSERT INTO sigd_org.area (nombre, vigente) VALUES ($1, true) RETURNING id_area',
+      ['Área E2E-07'],
+    );
+    const areaId = area.rows[0].id_area;
+
+    const radicado = await obtenerAgente().post('/api/expedientes').send(payloadRadicacionValido());
+    expect(radicado.status).toBe(201);
+
+    await pool.query(
+      `CREATE OR REPLACE FUNCTION sigd_audit.e2e07_falla_movimiento()
+       RETURNS TRIGGER AS $$
+       BEGIN
+         RAISE EXCEPTION 'falla inducida E2E-07: el movimiento no debe persistir'
+           USING ERRCODE = 'P0001';
+       END;
+       $$ LANGUAGE plpgsql`,
+    );
+    await pool.query(
+      `DROP TRIGGER IF EXISTS e2e07_trg_falla_movimiento ON sigd_rut.movimiento_tramite`,
+    );
+    await pool.query(
+      `CREATE TRIGGER e2e07_trg_falla_movimiento
+       BEFORE INSERT ON sigd_rut.movimiento_tramite
+       FOR EACH ROW EXECUTE FUNCTION sigd_audit.e2e07_falla_movimiento()`,
+    );
+
+    try {
+      const countAntesMov = (
+        await pool.query('SELECT count(*)::int AS total FROM sigd_rut.movimiento_tramite')
+      ).rows[0].total;
+      const countAntesBit = (
+        await pool.query(
+          "SELECT count(*)::int AS total FROM sigd_audit.bitacora_auditoria WHERE esquema = 'sigd_rut' AND tabla = 'movimiento_tramite'",
+        )
+      ).rows[0].total;
+
+      const respuesta = await obtenerAgente()
+        .post('/api/expedientes/derivar')
+        .send({ id_expediente: radicado.body.id_expediente, id_area_destino: areaId });
+
+      expect(respuesta.status).toBeGreaterThanOrEqual(400);
+
+      const countDespuesMov = (
+        await pool.query('SELECT count(*)::int AS total FROM sigd_rut.movimiento_tramite')
+      ).rows[0].total;
+      const countDespuesBit = (
+        await pool.query(
+          "SELECT count(*)::int AS total FROM sigd_audit.bitacora_auditoria WHERE esquema = 'sigd_rut' AND tabla = 'movimiento_tramite'",
+        )
+      ).rows[0].total;
+
+      expect(countDespuesMov).toBe(countAntesMov);
+      expect(countDespuesBit).toBe(countAntesBit);
+    } finally {
+      await pool.query(`DROP TRIGGER IF EXISTS e2e07_trg_falla_movimiento ON sigd_rut.movimiento_tramite`);
+      await pool.query(`DROP FUNCTION IF EXISTS sigd_audit.e2e07_falla_movimiento()`);
     }
   });
 });

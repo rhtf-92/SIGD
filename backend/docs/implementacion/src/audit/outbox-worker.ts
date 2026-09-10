@@ -13,6 +13,7 @@ export interface EventoPendiente {
 
 export interface DespachadorEvento {
   despachar(evento: EventoPendiente): Promise<void>;
+  esErrorReintentable?: (error: unknown) => boolean;
 }
 
 export interface ConfiguracionWorker {
@@ -115,7 +116,18 @@ export class OutboxWorker {
             [evento.id_evento],
           );
           procesados += 1;
-        } catch {
+        } catch (error) {
+          const permanente =
+            this.despachador.esErrorReintentable && !this.despachador.esErrorReintentable(error);
+          if (permanente) {
+            await cliente.query(
+              `UPDATE sigd_audit.evento_outbox
+                  SET estado = 'FALLIDO', proxima_reintento_en = NULL
+                WHERE id_evento = $1`,
+              [evento.id_evento],
+            );
+            continue;
+          }
           const nuevosIntentos = evento.intentos + 1;
           if (nuevosIntentos >= this.maxIntentos) {
             await cliente.query(
