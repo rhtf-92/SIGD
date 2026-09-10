@@ -3,4 +3,5 @@ dist/
 .env
 coverage/
 *.log
+!docs/organicore/logs/ejecucion_suite_organicore_v2.log
 grupos_docs/*.docx
