@@ -96,13 +96,9 @@ Responsable de representar áreas institucionales, jerarquías recursivas, cargo
   * [Política de Eliminaciones Lógicas](organicore/07_politica_eliminaciones_logicas.md)
   * [Plan de Ejecución Controlado — BORRADOR](organicore/08_plan_ejecucion_controlado.md) *(referencia de ejecución; usar scripts v2)*
   * [Resumen Ejecutivo](organicore/09_resumen_ejecutivo_organizacion.md)
-<<<<<<< HEAD
+  * [Plan de Respaldo y Contingencia del Esquema sigd_org v2](organicore/10_plan_respaldo_contingencia_sigd_org_v2.md)
   * *(LEGACY / deprecados, no usar en Fase 2):* [`03_organizacion_roles_permisos.sql`](organicore/03_organizacion_roles_permisos.sql) · [`03_datos_prueba_organizacion.sql`](organicore/03_datos_prueba_organizacion.sql) · [`03_verificacion_organizacion.sql`](organicore/03_verificacion_organizacion.sql)
 * 🧪 **Validación y Pruebas:** [`organicore/04_validacion_organicore_v2.md`](organicore/04_validacion_organicore_v2.md) *(criterios Fase 2)* · [`organicore/04_validacion_organizacion.md`](organicore/04_validacion_organizacion.md) *(LEGACY Fase 1)*
-=======
-  * [Plan de Respaldo y Contingencia del Esquema sigd_org v2](organicore/10_plan_respaldo_contingencia_sigd_org_v2.md)
-* 🧪 **Validación y Pruebas:** [`organicore/04_validacion_organizacion.md`](organicore/04_validacion_organizacion.md)
->>>>>>> origin/B_HECTOR
 * 📌 **Registro de Decisiones y Pendientes:** [`organicore/05_decisiones_y_preguntas_pendientes.md`](organicore/05_decisiones_y_preguntas_pendientes.md)
 
 ---
