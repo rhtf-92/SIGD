@@ -28,13 +28,6 @@
 > roles `sigd_app` (escribe bitácora y encola eventos) y `sigd_worker` (solo SELECT/UPDATE del outbox);
 > (4) las garantías de **inmutabilidad, cero pérdida y atomicidad** quedan en estado `PROPUESTO`
 > hasta que existan pruebas E2E ejecutables (ver entregable 03 y evidencia).
->
-> **Revisión v1.6 (veredicto `REQUIERE CORRECCIONES`):** (1) el `correlation_id` acepta del header
-> `x-correlation-id` cualquier **UUID RFC 4122 (v1–v5)**; si falta o no es válido se genera un UUIDv4,
-> sin responder `400` por un valor inválido (corrección 14; D-04); (2) el worker distingue **errores
-> transitorios** (reintetables: timeout, red, 5xx) de **permanentes** (no reintetables: payload
-> inválido, esquema del envelope, autorización) que pasan **directamente a `FALLIDO`/DLQ sin
-> reintentar**; (3) el despachador de demostración queda rotulado `[DEMO]` como no productivo.
 
 ---
 
@@ -72,7 +65,7 @@ viajaría de punta a punta, y las notificaciones/eventos se perderían ante caí
 - Reglas de integración del contexto con la bitácora de auditoría.
 
 ### Fuera de alcance
-- Middleware de errores RFC 7807 (entregable 01 — Duque).
+- Middleware de errores RFC 7807 (entregable 01 — Azareño).
 - Pruebas de integración Testcontainers / k6 (entregable 03 — Zevallos).
 - Contratos intermodulares y matriz Productor-Consumidor (entregable 04 — Ricardo).
 
@@ -83,7 +76,7 @@ viajaría de punta a punta, y las notificaciones/eventos se perderían ante caí
 | Término | Definición |
 | :--- | :--- |
 | **AsyncLocalStorage** | API de Node.js que mantiene estado asíncrono a lo largo de toda la pila de llamadas de una solicitud, sin pasarlo por parámetros. |
-| **`correlation_id`** | UUID (RFC 4122). Identifica de forma única toda la cadena de operaciones de una solicitud. Se acepta del header `x-correlation-id` si es un UUID v1–v5 válido; si falta o no es válido, se genera un UUIDv4 (D-04; corrección 14). |
+| **`correlation_id`** | UUIDv4 que identifica de forma única toda la cadena de operaciones de una solicitud. |
 | **Bitácora forense** | Registro inmutable de auditoría que documenta los datos antes/después de cada mutación (`sigd_audit.bitacora_auditoria`). |
 | **Transactional Outbox** | Patrón que escribe eventos dentro de la misma transacción de negocio en `evento_outbox` y luego los despacha de forma asíncrona por un worker. |
 | **Append-only** | Política de solo-escritura: los registros de auditoría no se editan ni eliminan. |
@@ -96,11 +89,11 @@ viajaría de punta a punta, y las notificaciones/eventos se perderían ante caí
 ### 4.1. Contrato del contexto
 
 El contexto de solicitud es **la fuente de verdad de trazabilidad** definida en el entregable 01
-(Duque). Este documento lo **reutiliza** como insumo para la auditoría. Sus portadores son:
+(Azareño). Este documento lo **reutiliza** como insumo para la auditoría. Sus portadores son:
 
 | Campo | Tipo | Descripción |
 | :--- | :--- | :--- |
-| `correlation_id` | string (UUID RFC 4122 v1–v5) | Identificador único de la solicitud completa; se acepta del header `x-correlation-id` o se genera uno nuevo (v4) si falta o no es válido. |
+| `correlation_id` | string (UUIDv4) | Identificador único de la solicitud completa. |
 | `usuario_id` | string \| null | Identidad autenticada del usuario que ejecuta la mutación. |
 | `ip_origen` | string | IP del cliente que originó la solicitud. |
 | `user_agent` | string | Cliente (navegador/aplicación) que originó la solicitud. |
@@ -221,24 +214,22 @@ forma documental:
 | `agregado` | VARCHAR(64) | `NOT NULL` | Agregado que produjo el evento (p. ej. `expediente`, `movimiento`). |
 | `tipo_evento` | VARCHAR(64) | `NOT NULL` | Nombre del evento de dominio (p. ej. `TramiteRegistrado`). |
 | `payload` | JSONB | `NOT NULL` | Cuerpo del evento a despachar (datos + claves de idempotencia). |
-| `estado` | VARCHAR(16) | `NOT NULL`, default `PENDIENTE`, CHECK en (`PENDIENTE`, `EN_PROCESO`, `PROCESADO`, `FALLIDO`) | Ciclo de vida del evento. El estado intermedio `EN_PROCESO` (v1.5) representa la reserva transaccional del worker con `FOR UPDATE SKIP LOCKED`. |
+| `estado` | VARCHAR(16) | `NOT NULL`, default `PENDIENTE`, CHECK en (`PENDIENTE`, `PROCESADO`, `FALLIDO`) | Ciclo de vida del evento. |
 | `intentos` | SMALLINT | `NOT NULL`, default `0` | Número de reintentos de despacho realizados. |
 | `creado_en` | TIMESTAMPTZ | `NOT NULL`, default `now()` | Momento de creación del evento (dentro de la transacción). |
 | `procesado_en` | TIMESTAMPTZ | NULL | Momento en que se confirmó el despacho. |
-| `proxima_reintento_en` | TIMESTAMPTZ | NULL | Ventana de backoff exponencial (v1.5): el worker **no** vuelve a seleccionar el evento hasta `now() >= proxima_reintento_en`; `NULL` = listo para despachar. |
 
 ### 6.3. Máquina de estados del evento
 
 | Estado | Significado | Transiciones permitidas |
 | :--- | :--- | :--- |
-| `PENDIENTE` | Evento persistido en la transacción, esperando despacho. | → `EN_PROCESO` (reserva del worker). |
-| `EN_PROCESO` | Reservado por el worker (`FOR UPDATE SKIP LOCKED`) y en despacho. | → `PROCESADO` (confirmado) o → `FALLIDO`. |
+| `PENDIENTE` | Evento persistido en la transacción, esperando despacho. | → `PROCESADO` (éxito) o → `FALLIDO` (fallo persistente). |
 | `PROCESADO` | Entregado y confirmado por el servicio externo. Estado final. | Ninguna. |
-| `FALLIDO` | Error permanente (no reintentable) o agotó los reintentos; requiere revisión manual (dead-letter). Estado final. | Ninguna (solo revisión manual fuera del flujo). |
+| `FALLIDO` | Agotó los reintentos; requiere revisión manual (dead-letter). Estado final. | Ninguna (solo revisión manual fuera del flujo). |
 
 **Reglas de transición:**
 - Los casos de uso **solo insertan** eventos en estado `PENDIENTE`; jamás los actualizan.
-- Únicamente el **worker outbox** modifica `estado, intentos, procesado_en, proxima_reintento_en`.
+- Únicamente el **worker outbox** modifica `estado, intentos, procesado_en`.
 - No se permite reencolar un `PROCESADO`; la idempotencia la garantiza el consumidor con las claves
   del `payload`.
 
@@ -274,15 +265,11 @@ sequenceDiagram
 3. **Despacho:** enviar al destino externo (email, casilla, publicador de eventos).
 4. **Confirmación:** marcar `PROCESADO` y fijar `procesado_en` **solo tras la confirmación** del
    destino; no antes.
-5. **Falla transitoria (reintentable):** incrementar `intentos`, dejar en `PENDIENTE` y reintentar con
-   **backoff exponencial** (esperas crecientes entre reintentos): timeouts, fallos de red o HTTP 5xx
-   del destino.
-6. **Falla permanente (no reintentable):** un error que jamás tendrá éxito al reintentar (payload
-   inválido, incompatibilidad de esquema del envelope, autorización denegada) pasa **directamente a
-   `FALLIDO`** y a la **Dead Letter Queue**, **sin reintentar** (corrección 19).
-7. **Falla tras reintentos:** si se agota el máximo ante fallas transitorias recurrentes, pasar a
-   `FALLIDO` y derivar el evento a una **Dead Letter Queue** para revisión manual.
-8. **Idempotencia del consumidor:** el `payload` debe incluir el `correlation_id` y la clave de negocio
+5. **Falla transitoria:** incrementar `intentos`, dejar en `PENDIENTE` y reintentar con **backoff
+   exponencial** (esperas crecientes entre reintentos).
+6. **Falla persistente:** al superar el máximo de intentos configurado, pasar a `FALLIDO` y derivar el
+   evento a una **Dead Letter Queue** para revisión manual.
+7. **Idempotencia del consumidor:** el `payload` debe incluir el `correlation_id` y la clave de negocio
    afectada, de modo que el receptor pueda detectar e ignorar duplicados en caso de reintento.
 
 ### 6.6. Índice recomendado
@@ -304,7 +291,7 @@ definiciones exactas por evento — incluidos los tres de RutaDoc — constan en
 | `id_expediente` | UUID | Expediente afectado (identificador normalizado `id_<agregado>`). |
 | `id_movimiento` | UUID | Movimiento que originó el evento (aplica a operaciones de RutaDoc). |
 | `ocurrido_en` | ISO-8601 UTC | Fecha y hora del hecho de negocio (adicional a `creado_en` del outbox). |
-| `correlation_id` | UUID RFC 4122 (aceptado v1–v5; se genera UUIDv4 si falta/no es válido) | Correlación de la solicitud completa (D-04; corrección 14). |
+| `correlation_id` | UUIDv4 | Correlación de la solicitud completa. |
 | `clave_idempotencia` | string | `tipo_evento:id_expediente:id_movimiento` (compuesta), para que el consumidor descarte duplicados. |
 | `datos` | JSONB | Bloque específico de negocio del evento (autocontenido). |
 
@@ -323,12 +310,10 @@ definiciones exactas por evento — incluidos los tres de RutaDoc — constan en
 | **Solo el worker modifica el ciclo de vida** | Casos de uso: solo `INSERT` con estado `PENDIENTE`. Estado, `intentos` y `procesado_en` son exclusivos del worker (§6.3). |
 | **Lote y concurrencia** | Leer lotes `PENDIENTE` (≈100) con `FOR UPDATE SKIP LOCKED`; dos instancias no procesan el mismo evento. |
 | **Confirmación previa a `PROCESADO`** | Marcar `PROCESADO` y fijar `procesado_en` **solo tras la confirmación** del destino; jamás antes. |
-| **Falla transitoria** | Incrementar `intentos`, permanecer `PENDIENTE` y reintentar con **backoff exponencial** (equivale a un **error reintentable**: timeout, red, HTTP 5xx del destino). |
-| **Falla permanente** | Un **error no reintentable** (payload inválido, esquema/445 desacuerdo, autorización denegada) pasa **directamente a `FALLIDO`** y a la **Dead Letter Queue**, **sin reintentar** (v1.6, corrección 19). |
-| **Falla tras reintentos** | Si se agota el máximo de validaciones ante fallas transitorias recurrentes, pasar a `FALLIDO` y derivar a DLQ para revisión manual. |
+| **Falla transitoria** | Incrementar `intentos`, permanecer `PENDIENTE` y reintentar con **backoff exponencial**. |
+| **Falla persistente** | Tras el máximo de intentos, pasar a `FALLIDO` y derivar a **Dead Letter Queue** para revisión manual. |
 | **Sin reencolado** | No reencolar `PROCESADO`; la idempotencia del consumidor (clave de la sección 6.7) cubre los reintentos. |
 | **No decide duplicados** | El worker entrega y confirma; la detección de duplicados es exclusiva del consumidor. |
-| **Despachador de demostración** | El binario de demo (`despachadorDemostracion`) está rotulado `[DEMO]` como **no productivo**; el despacho real es el `OutboxWorker` (corrección 19). |
 
 ---
 
@@ -409,22 +394,21 @@ sequenceDiagram
 | 1 | El esquema define la bitácora forense inmutable con `datos_antes`/`datos_despues` en `JSONB`. | ✅ |
 | 2 | La bitácora se integra con el contexto (`correlation_id`, `usuario_id`, `ip_origen`, `user_agent`) de forma transparente. | ✅ |
 | 3 | `evento_outbox` implementa el patrón Transactional Outbox con escritura atómica. | ✅ |
-| 4 | El worker especifica lote, `FOR UPDATE SKIP LOCKED`, confirmación previa a `PROCESADO`, backoff exponencial, distinción **transitorio/permanente** y dead-letter (v1.6). | ✅ |
+| 4 | El worker especifica lote, `FOR UPDATE SKIP LOCKED`, confirmación previa a `PROCESADO`, backoff exponencial y dead-letter. | ✅ |
 | 5 | Se plantea cero pérdida de notificaciones ante fallas de los servicios externos. | 🟡 (PROPUESTO — validar con E2E, entregable 03/08) |
 | 6 | El `payload` define versionado (`schema_version`), serialización JSON `snake_case` y clave de idempotencia compuesta (v1.2). | ✅ |
-| 7 | El despachador define responsabilidades: confirmación previa a `PROCESADO`, reintentos con backoff, DLQ, no reencolado y rotulación del despachador de demo como no productivo (v1.6). | ✅ |
+| 7 | El despachador define responsabilidades: confirmación previa a `PROCESADO`, reintentos con backoff, DLQ y no reencolado. | ✅ |
 | 8 | Los identificadores de negocio se normalizan a `id_<agregado>` (`id_expediente`, `id_movimiento`). | ✅ |
-| 9 | `correlation_id` no tiene valor por defecto y proviene siempre del contexto AsyncLocalStorage; acepta UUID RFC 4122 (v1–v5) o genera UUIDv4 (v1.6). | ✅ |
+| 9 | `correlation_id` no tiene valor por defecto y proviene siempre del contexto AsyncLocalStorage (v1.3). | ✅ |
 | 10 | La FK `usuario_id -> sigd_auth` queda SUSPENDIDA (PENDIENTE) hasta el contrato con IdentiCore (`id_usuario`). | ✅ |
 | 11 | Los roles `sigd_app` y `sigd_worker` separan escritura de bitácora/encolado del despacho del outbox (v1.3). | ✅ |
-| 12 | `DATABASE_URL` es exigida de forma explícita por el servidor y el worker; falta = error claro (sin fallback) (corrección 15). | ✅ |
-| 13 | La documentación queda lista para que los equipos implementen sin ambigüedad. | ✅ |
+| 12 | La documentación queda lista para que los equipos implementen sin ambigüedad. | ✅ |
 
 ---
 
 ## 10. Dependencias y Decisiones
 
-- **Dependencia (Duque):** el `RequestContext` se complementa con la especificación del middleware
+- **Dependencia (Azareño):** el `RequestContext` se complementa con la especificación del middleware
   RFC 7807 (`01_especificacion_middleware_rfc7807.md`), que lo usa para poblar `correlation_id` en las
   respuestas de error. Este documento **consume** ese contrato para la auditoría.
 - **Dependencia (Zevallos):** la reproducibilidad de las migraciones y el comportamiento de outbox y
@@ -444,10 +428,9 @@ sequenceDiagram
     `usuario_id` SUSPENDIDA hasta contrato con IdentiCore, roles `sigd_app`/`sigd_worker` separados, y
     garantías de atomicidad, cero pérdida e inmutabilidad en estado `PROPUESTO` hasta su validación
     con pruebas E2E ejecutables.
-- **Taxonomía:** `CONFIRMADO` — patrón Transactional Outbox y esquema base; `PARCIAL` — garantías de
-  atomicidad, cero pérdida e inmutabilidad, validadas en PostgreSQL 16 local (prototipo); `PROPUESTO` —
-  índices y tamaño de columna `user_agent`; `PENDIENTE` — re-ejecución en Testcontainers/PG18 + DDL
-  real de los 6 módulos; `EJEMPLO` — payloads mostrados.
+- **Taxonomía:** `CONFIRMADO` — patrón Transactional Outbox y esquema base; `PROPUESTO` — índices,
+  tamaño de columna `user_agent` y garantías de atomicidad/cero pérdida/inmutabilidad hasta su
+  validación; `EJEMPLO` — payloads mostrados.
 
 ---
 
@@ -456,9 +439,5 @@ Observaciones del Grupo 6 CoreLink. Revisión 1.2: atiende las observaciones del
 PR #79 (fecha_hora en la bitácora, versionado/serialización del payload, idempotencia, nomenclatura
 de identificadores y responsabilidades del despachador). Revisión 1.3: corrige la revisión del
 liderazgo tras la cancelación del PR #79 (correlation_id sin default, FK de IdentiCore SUSPENDIDA,
-roles sigd_app/sigd_worker, garantías a PROPUESTO hasta pruebas E2E). Revisión v1.6 (REQUIERE
-CORRECCIONES): correlation_id acepta UUID RFC 4122 v1–v5 (o genera UUIDv4), el worker distingue
-errores transitorios/permanentes y el despachador de demo queda rotulado como no productivo; las
-garantías validadas en PostgreSQL 16 local pasan a `PARCIAL` (re-ejecución Testcontainers/PG18
-`PENDIENTE`). La autoría nominal de este entregable requiere confirmación escrita de Reátegui
-(entregable 04 §10.1).*
+roles sigd_app/sigd_worker, garantías a PROPUESTO hasta pruebas E2E). La autoría nominal de este
+entregable requiere confirmación escrita de Reátegui (entregable 04 §10.1).*

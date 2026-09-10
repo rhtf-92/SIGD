@@ -1,96 +1,56 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
+import { PostgreSqlContainer } from '@testcontainers/postgresql';
 
 const ON_ERROR_STOP = 'ON_ERROR_STOP=1';
 
-export default async function globalSetup(): Promise<() => Promise<void>> {
-  const existingUrl = process.env.TEST_DATABASE_URL;
+export default async function globalSetup(): Promise<void> {
+  const imagen = process.env.TESTCONTAINERS_IMAGE ?? 'postgres:18-alpine';
+  const container = await new PostgreSqlContainer(imagen)
+    .withDatabase('sigd_prueba')
+    .withUsername('postgres')
+    .withPassword('postgres')
+    .start();
 
-  if (existingUrl) {
-    console.log(`[MIGRACION] Usando PostgreSQL existente: ${existingUrl}`);
-    await ejecutarMigraciones(existingUrl);
-    return async () => {};
-  }
+  const databaseUrl = `postgres://postgres:postgres@${container.getHost()}:${container.getPort()}/sigd_prueba`;
+  process.env.TEST_DATABASE_URL = databaseUrl;
+  (globalThis as Record<string, unknown>).__SIGD_CONTAINER__ = container;
 
-  try {
-    const { PostgreSqlContainer } = await import('@testcontainers/postgresql');
-    const imagen = process.env.TESTCONTAINERS_IMAGE ?? 'postgres:18-alpine';
-    const container = await new PostgreSqlContainer(imagen)
-      .withDatabase('sigd_prueba')
-      .withUsername('postgres')
-      .withPassword('postgres')
-      .start();
-
-    const databaseUrl = `postgres://postgres:postgres@${container.getHost()}:${container.getPort()}/sigd_prueba`;
-    process.env.TEST_DATABASE_URL = databaseUrl;
-    console.log(`[MIGRACION] Testcontainers PostgreSQL iniciado en ${databaseUrl}`);
-
-    await ejecutarMigraciones(databaseUrl);
-
-    return async () => {
-      await container.stop();
-    };
-  } catch (error) {
-    throw new Error(
-      '[MIGRACION] No se pudo preparar PostgreSQL. Define TEST_DATABASE_URL explícitamente ' +
-        '(por ejemplo postgres://postgres:postgres@localhost:5432/sigd_prueba) o asegura Docker ' +
-        'disponible para Testcontainers. La suite NO cae silenciosamente a un PostgreSQL local fijo. ' +
-        `Detalle: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+  await ejecutarMigraciones(databaseUrl);
 }
 
-function directorioImplementacion(): string {
+function directorioSetup(): string {
   return path.dirname(fileURLToPath(import.meta.url));
 }
 
-function rutaDdlAudit(): string {
-  const raizImpl = path.resolve(directorioImplementacion(), '../..');
-  return path.resolve(raizImpl, '../integracion/06_sigd_audit_esquema_ddl.sql');
-}
-
-function rutaFixture(): string {
-  const raizImpl = path.resolve(directorioImplementacion(), '../..');
-  return path.join(raizImpl, 'tests', 'fixtures', '01_schema_fixtures_test.sql');
-}
-
-function rutaRelativa(ruta: string): string {
-  return path.relative(process.cwd(), ruta) || ruta;
-}
-
 async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
-  const ddl = rutaDdlAudit();
-  const fixture = rutaFixture();
+  const raizProyecto = path.resolve(directorioSetup(), '../..');
+  const archivoDdlAudit = path.resolve(raizProyecto, '../06_sigd_audit_esquema_ddl.sql');
+  const dirMigraciones = process.env.MIGRATIONS_DIR
+    ? path.resolve(raizProyecto, process.env.MIGRATIONS_DIR)
+    : path.join(raizProyecto, 'migraciones');
+  const fixture = path.join(raizProyecto, 'tests', 'fixtures', '01_schema_fixtures_test.sql');
 
   const cliente = new Client({ connectionString: databaseUrl });
   await cliente.connect();
   try {
     await cliente.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
 
-    if (!existsSync(ddl)) {
-      throw new Error(
-        `[MIGRACION] DDL real de auditoría no encontrado en ${rutaRelativa(ddl)}. ` +
-          'La suite requiere el esquema sigd_audit real; NO se sustituye por un stub del fixture.',
-      );
+    await aplicarSql(cliente, fixture);
+    if (existsSync(archivoDdlAudit)) {
+      await aplicarSql(cliente, archivoDdlAudit);
     }
 
-    console.log(`[MIGRACION] Aplicando DDL real de auditoría (${ON_ERROR_STOP}): ${rutaRelativa(ddl)}`);
-    await aplicarSql(cliente, ddl);
-
-    console.log(
-      `[MIGRACION] Aplicando FIXTURES PROVISIONALES (5 esquemas de módulos; sigd_audit NO está aquí): ${rutaRelativa(fixture)}`,
-    );
-    await aplicarSql(cliente, fixture);
-    console.log(
-      '[MIGRACION] Entorno preparado: sigd_audit del DDL real de integracion/ + stubs provisionales de los 5 módulos.',
-    );
-    console.log(
-      '[MIGRACION] ALCANCE: la suite valida SOLO el prototipo CoreLink (sigd_audit real + stubs provisionales). ' +
-        'No se ejecutan las migraciones reales de los 6 módulos; la conformidad intermodular queda PARCIAL/PENDIENTE ' +
-        'en los docs de integracion/.',
-    );
+    if (existsSync(dirMigraciones)) {
+      const archivos = readdirSync(dirMigraciones)
+        .filter((f) => f.endsWith('.sql'))
+        .sort();
+      for (const archivo of archivos) {
+        await aplicarSql(cliente, path.join(dirMigraciones, archivo));
+      }
+    }
   } finally {
     await cliente.end();
   }

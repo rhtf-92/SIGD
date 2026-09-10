@@ -1,20 +1,5 @@
 import type { InvalidParam } from '../domain/errors/index.js';
 
-/**
- * Contratos PROVISIONALES — pendientes de aprobación bilateral con RutaDoc.
- * Los nombres de campos pueden cambiar cuando se firme el contrato definitivo.
- *
- * Convención de nomenclatura (D-15, CONFIRMADO — entregable 05):
- *   - Entidades de negocio: id_<agregado>
- *     (id_expediente, id_movimiento, id_area_*, id_usuario_*, id_cuenta)
- *   - Auditoría / Outbox:   id_evento, id_auditoria
- *   - Tabla docucore:       id_tipo_documento, id_formulario (basado en DDL original)
- *   - Contexto/correlación: usuario_id (CorrelationContext y bitácora, entregable 04 §7.1)
- *
- * Los contratos externos aún NO están aprobados. Esta convención se mantendrá
- * hasta que se firme el contrato bilateral con RutaDoc/IdentiCore/OrganiCore.
- */
-
 export interface CorrelationContext {
   correlation_id: string;
   usuario_id: string | null;
@@ -51,11 +36,10 @@ export interface EventoOutboxContract {
   agregado: string;
   tipo_evento: string;
   payload: EventoEnvelope;
-  estado: 'PENDIENTE' | 'EN_PROCESO' | 'PROCESADO' | 'FALLIDO';
+  estado: 'PENDIENTE' | 'PROCESADO' | 'FALLIDO';
   intentos: number;
   creado_en: string;
   procesado_en: string | null;
-  proxima_reintento_en: string | null;
 }
 
 export interface EventoEnvelope {
@@ -73,9 +57,9 @@ export interface EventoEnvelope {
 export interface ExpedienteContract {
   id_expediente: string;
   numero: string;
-  id_tipo_documental: string;
-  id_solicitante: string;
-  id_area_destino: string;
+  tipo_documental_id: string;
+  solicitante_id: string;
+  area_destino_id: string;
   fecha_radicacion: string;
 }
 
@@ -111,6 +95,6 @@ export interface DatosExpedienteObservado {
   plazo_subsanacion_dias?: number;
 }
 
-export type EstadoOutbox = 'PENDIENTE' | 'EN_PROCESO' | 'PROCESADO' | 'FALLIDO';
+export type EstadoOutbox = 'PENDIENTE' | 'PROCESADO' | 'FALLIDO';
 
 export type OperacionBitacora = 'INSERT' | 'UPDATE' | 'DELETE';

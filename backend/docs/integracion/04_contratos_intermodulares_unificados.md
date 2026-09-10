@@ -6,8 +6,8 @@
 **Área:** Backend — CoreLink
 **Responsable del entregable:** Ricardo · `B_AREVALO`
 **Documento:** `04_contratos_intermodulares_unificados.md`
-**Fecha:** 9 de septiembre de 2026
-**Versión:** 1.6 (Revisión del Liderazgo — PR #79 cancelado · veredicto `REQUIERE CORRECCIONES`)
+**Fecha:** 8 de septiembre de 2026
+**Versión:** 1.3 (Revisión del Liderazgo — PR #79 cancelado · correcciones pre-merge)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
@@ -26,23 +26,8 @@
 > **Revisión v1.3 (PR #79 cancelado):** C-08 pasa a `PROPUESTO` (su garantía de registro **atómico**
 > de bitácora + evento requiere pruebas E2E ejecutables); la FK `usuario_id -> sigd_auth` queda
 > SUSPENDIDA hasta contrato con IdentiCore (`id_usuario`, no `id`); se registra la discrepancia de
-> autoría del entregable 01 entre el plan de Fase 1 (Duque) y el de Fase 2 (Azareño), **resuelta** en
-> favor del plan Fase 1 (07 §1.2): la atribución vigente es **Duque** (§10.1).
->
-> **Revisión v1.5:** C-08 vuelve a `CONFIRMADO` — su garantía de **registro atómico** (bitácora +
-> evento outbox en la misma transacción) queda demostrada por el caso E2E-07 ejecutado (persistencia
-> conjunta y rollback completo ante falla inducida, sin contaminación de expediente/outbox/bitácora);
-> evidencia en `implementacion/evidencia/` (E2E 12/12 · 22/22; carga k6 con P95 < 200 ms y 0 % errores).
->
-> **Revisión v1.6 (veredicto `REQUIERE CORRECCIONES`):** C-08 desciende a **`PARCIAL`**. Su prueba
-> ejecutable (E2E-07 ampliado a **3 casos**: radicación atómica, rollback de radicación y rollback de
-> **derivación** sobre `sigd_rut.movimiento_tramite`) se generó contra **PostgreSQL 16 local** y la
-> suite solo consume el **prototipo CoreLink** (DDL real de `sigd_audit` + stubs provisionales de 5
-> esquemas, sin las migraciones reales de los 6 módulos); la ejecución exigida (Testcontainers/PG18 y
-> migraciones reales) queda `PENDIENTE` (runbook 08 §6.2). La evidencia E1–E4 está ahora en
-> `implementacion/evidencia/e2e-20260909-204737/` (23/23) y `k6-20260909-145820/`. Los **tres eventos
-> de RutaDoc** (E-02, E-06, E-07) permanecen `PENDIENTE` y **sin implementación** en este entregable:
-> son de **dominio RutaDoc** (productor RutaDoc) y no se declaran ejecutados (ver matriz E).
+> autoría del entregable 01 entre el plan de Fase 1 (Duque) y el de Fase 2 (Azareño), pendiente de
+> decisión del liderazgo (§10.1).
 
 ---
 
@@ -65,7 +50,7 @@ eventos de integración se diseñarían en cada equipo por su cuenta y el result
 - Contratos tipados (`shared/types`) que toda la organización Backend puede importar sin duplicar.
 - Matriz de eventos Outbox alineada con el despacho asíncrono del entregable 02 (Reátegui).
 - Contrato de eventos **versionado** con clave de idempotencia explícita y serialización definida.
-- Reglas de integración alineadas con el manejo de errores del entregable 01 (Duque) y con la
+- Reglas de integración alineadas con el manejo de errores del entregable 01 (Azareño) y con la
   validación del entregable 03 (Zevallos).
 
 ---
@@ -83,7 +68,7 @@ eventos de integración se diseñarían en cada equipo por su cuenta y el result
 - Registro de aprobaciones bilaterales y evidencia de autoría (sección 10).
 
 ### Fuera de alcance
-- Middleware de errores RFC 7807 (entregable 01 — Duque).
+- Middleware de errores RFC 7807 (entregable 01 — Azareño).
 - Arquitectura de auditoría y AsyncLocalStorage (entregable 02 — Reátegui).
 - Suite de pruebas Testcontainers / k6 (entregable 03 — Zevallos).
 - Endpoints funcionales concretos de los módulos: cada grupo define sus rutas cumpliendo estos
@@ -138,7 +123,7 @@ sin evidencia de aprobación del grupo propietario.
 | C-05 | RutaDoc | TramiCore, OrganiCore | Movimiento/derivación/atención/observación del expediente y estado actual. | La transición debe estar permitida por la máquina de estados de RutaDoc. | PENDIENTE | RutaDoc |
 | C-06 | TramiCore | RutaDoc | Creación del expediente dispara `movimiento` inicial. | Toda radicación debe generar al menos un movimiento inicial. | PENDIENTE | TramiCore / RutaDoc |
 | C-07 | CoreLink | Todos los módulos | `correlation_id` y formato de error RFC 7807/9457. | Respuestas de error conforme al entregable 01; nunca exponer rastros. | CONFIRMADO | CoreLink (propio) |
-| C-08 | CoreLink | Todos los módulos | Bitácora de auditoría y cola Outbox. | Toda mutación registra y todo evento se persiste de forma atómica (entregable 02). Garantía de **registro atómico** parcialmente demostrada: E2E-07 ahora cubre 3 casos (persistencia conjunta, rollback de radicación y rollback de derivación sobre `sigd_rut.movimiento_tramite`); evidencia ejecutada en **PostgreSQL 16 local** contra prototipo (sin migraciones reales de los 6 módulos): `PARCIAL` / `PENDIENTE` re-ejecución Testcontainers PG18. Artefactos: `implementacion/evidencia/e2e-20260909-204737/`. | PARCIAL | CoreLink (propio) |
+| C-08 | CoreLink | Todos los módulos | Bitácora de auditoría y cola Outbox. | Toda mutación registra y todo evento se persiste de forma atómica (entregable 02). La garantía de **registro atómico** queda `PROPUESTO` hasta validarla con las pruebas E2E (03/08). | PROPUESTO | CoreLink (propio) |
 
 ### 5.1. Reglas que rigen los contratos de API
 
@@ -207,8 +192,8 @@ el liderazgo. Este bloque permanece en estado **`PENDIENTE`** hasta la aprobaci�
 | 8 | **Productor y consumidores** | Productor: **RutaDoc**. Consumidores: **TramiCore** (actualiza ubicación/estado y cargas de notificación) y **notificador** (email/casilla); Archivo histórico en E-05/E-06. |
 | 9 | **Estructura del payload** | Envelope normalizado (tabla 6.2.1) + bloque específico por evento (tabla 6.2.2). |
 | 10 | **Serialización** | JSON UTF-8 en `snake_case`, almacenado en `payload JSONB`. Cabecera con `schema_version`, `id_evento`, `id_expediente`, `id_movimiento`, `correlation_id` y `ocurrido_en`. |
-| 11 | **Estados del Outbox** | `PENDIENTE` → `EN_PROCESO` (reserva `FOR UPDATE SKIP LOCKED`) → `PROCESADO`, o `PENDIENTE` → `FALLIDO` (dead-letter). Solo `INSERT` desde los casos de uso; solo el worker modifica `estado`, `intentos`, `procesado_en` y `proxima_reintento_en` (entregable 02 §6.3; DDL 06 v1.5). |
-| 12 | **Reintentos y manejo de errores** | Backoff exponencial real (`proxima_reintento_en` = `intento_desde` + `backoffBaseMs × 2^(intentos-1)`); máximo 5 intentos; error transitorio mantiene `PENDIENTE`, incrementa `intentos` y agenda `proxima_reintento_en`; error persistente deriva a `FALLIDO` (DLQ). Confirmación del consumidor antes de marcar `PROCESADO`. |
+| 11 | **Estados del Outbox** | `PENDIENTE` → `PROCESADO` o `PENDIENTE` → `FALLIDO` (dead-letter). Solo `INSERT` desde los casos de uso; solo el worker modifica `estado`, `intentos`, `procesado_en` (entregable 02 §6.3). |
+| 12 | **Reintentos y manejo de errores** | Backoff exponencial; máximo 5 intentos; error transitorio mantiene `PENDIENTE` e incrementa `intentos`; error persistente deriva a `FALLIDO` (DLQ). Confirmación del consumidor antes de marcar `PROCESADO`. |
 | 13 | **Responsabilidades del despachador** | Despachador = **worker outbox** (CoreLink). Debe: leer lotes con `FOR UPDATE SKIP LOCKED`, despachar al destino, confirmar antes de `PROCESADO`, aplicar reintentos/backoff, derivar a `FALLIDO` y no reencolar `PROCESADO`. |
 | 14 | **Aprobación bilateral** | Evidencia del Grupo 1 (RutaDoc): ruta del archivo, rama, commit o PR, definición exacta, explicación de autoría y confirmación del estado contractual (sección 10). |
 
@@ -222,7 +207,7 @@ el liderazgo. Este bloque permanece en estado **`PENDIENTE`** hasta la aprobaci�
 | `id_expediente` | UUID | Expediente afectado (`sigd_tra`). |
 | `id_movimiento` | UUID | Movimiento que originó el evento (`sigd_rut.movimiento_tramite`). |
 | `ocurrido_en` | ISO-8601 UTC | Fecha y hora del hecho de negocio. |
-| `correlation_id` | UUID RFC 4122 (aceptado v1–v5; se genera UUIDv4 si falta/no es válido) | Correlación de la solicitud completa (D-04, corrección 14). |
+| `correlation_id` | UUIDv4 | Correlación de la solicitud completa. |
 | `clave_idempotencia` | string | `tipo_evento:id_expediente:id_movimiento` (para derivación/atención/observación). |
 | `datos` | JSON | Bloque específico del evento (tabla 6.2.2). |
 
@@ -267,7 +252,7 @@ Contexto de la solicitud compartido entre capas (definido en el entregable 01 y 
 
 | Campo | Tipo | Descripción |
 | :--- | :--- | :--- |
-| `correlation_id` | UUID RFC 4122 (aceptado v1–v5; se genera UUIDv4 si falta/no es válido) | Identificador único de la solicitud. |
+| `correlation_id` | UUIDv4 | Identificador único de la solicitud. |
 | `usuario_id` | UUID \| null | Identidad autenticada, si existe. |
 | `ip_origen` | string | IP del cliente. |
 | `user_agent` | string | Cliente que originó la solicitud. |
@@ -304,9 +289,9 @@ Contrato del dato más consumido por los módulos. **En v1.2 se normaliza el ide
 | :--- | :--- | :--- |
 | `id_expediente` | UUID | Identificador único del expediente (`id_<agregado>`). |
 | `numero` | string | Número único de radicación (ver TramiCore). |
-| `id_tipo_documental` | UUID | Tipo documental vigente en `sigd_doc`. |
-| `id_solicitante` | UUID | Identidad del solicitante en `sigd_auth`. |
-| `id_area_destino` | UUID | Área destino en `sigd_org`. |
+| `tipo_documental_id` | UUID | Tipo documental vigente en `sigd_doc`. |
+| `solicitante_id` | UUID | Identidad del solicitante en `sigd_auth`. |
+| `area_destino_id` | UUID | Área destino en `sigd_org`. |
 | `fecha_radicacion` | timestamp | Momento de radicación. |
 
 > 🔎 **Criterio de avance:** este catálogo se expandirá cuando TramiCore confirme su modelo como
@@ -353,7 +338,7 @@ Unión tipada de los tres eventos de RutaDoc: `ExpedienteDerivado`, `ExpedienteA
 | R-01 | Divergencia en el nombre de esquemas (`sigd_*`) entre los 6 DDL | Fallas de migración e integración E2E | Todos los grupos; valida Zevallos | Migraciones ejecutables en la suite del entregable 03 | EN GESTIÓN |
 | R-02 | Contrato del `numero` de expediente sin confirmar (TramiCore) | C-01 y `ExpedienteContract` inconsistentes | TramiCore / Ricardo | Confirmación del `ExpedienteContract` (7.5) con `id_expediente` | PENDIENTE |
 | R-03 | Consumidores sin idempotencia de eventos | Duplicados de notificación/derivación | Cada consumidor; coordina Ricardo | Índice único `(tipo_evento, clave_idempotencia)` (sección 6.3) | PENDIENTE |
-| R-04 | Módulos respondiendo errores sin RFC 7807 | Contrato de error roto ante los consumidores | Todos los módulos; valida Duque | Pasos E2E-02/03/08/09/10 (entregable 03) | EN GESTIÓN |
+| R-04 | Módulos respondiendo errores sin RFC 7807 | Contrato de error roto ante los consumidores | Todos los módulos; valida Azareño | Pasos E2E-02/03/08/09/10 (entregable 03) | EN GESTIÓN |
 | R-05 | `usuario_id` ausente en operaciones de sistema | Auditoría sin identidad | Reátegui | Política de `usuario_id` nullable documentada (entregable 02) | CONFIRMADO |
 | R-06 | Nomenclatura de identificadores alternada (`id_expediente` vs `expediente_id`) | Contratos y eventos inconsistentes | Ricardo; valida cada módulo | Normalización en v1.2 (secciones 6.2, 7.5 y 8) | EN GESTIÓN |
 | R-07 | Eventos de RutaDoc `ExpedienteAtendido` y `ExpedienteObservado` no definidos/aprobados | Máquina de estados de RutaDoc incompleta en integración | RutaDoc (Grupo 1) / Ricardo | Contrato formal 6.2 aprobado bilateralmente | PENDIENTE |
@@ -380,13 +365,14 @@ Para cerrar cada contrato cruzado se requiere que **cada sublíder** envíe al r
 > ⚠️ **Nota v1.3 — discrepancia de autoría del entregable 01:** el plan de **Fase 1**
 > (`planes_trabajo/06_plan_trabajo_grupo_6_corelink.md`) asigna las convenciones de API a **Duque
 > (`B_DUQUE`)**, mientras el plan de **Fase 2** (`levantamiento_de_observaciones/06_plan_...`) asigna
-> la especificación del middleware RFC 7807 a **Azareño (`B_AZAREÑO`)**. **RESUELTO (9 sept 2026):**
-> prevalece el plan de Fase 1; la atribución corregida es **Duque** (07 §1.2). Los documentos de
-> Fase 2 mantienen la referencia histórica. Autor declarado: Duque.
+> la especificación del middleware RFC 7807 a **Azareño (`B_AZAREÑO`)**. Este registro mantiene la
+> atribución de Fase 2 (cabecera del documento 01 y D-01/D-02/D-04/D-14), y queda **pendiente de
+> decisión del liderazgo** cuál plan prevalece antes de cerrar la autoría. Se anexa la causal en el
+> entregable 07 §1.2.
 
 | Entregable | Autor declarado en el documento | Rama | Commit / PR | Explicación de autoría (si solo hay commits en `B_AREVALO`) | Estado contractual |
 | :--- | :--- | :--- | :--- | :--- | :---: |
-| `01_especificacion_middleware_rfc7807.md` | Duque (`B_DUQUE`) — plan Fase 1 | `B_DUQUE` | <commit/PR pendiente> | Atribución corregida a Duque (07 §1.2); la mención a Azareño en Fase 2 fue error de planificación | PENDIENTE |
+| `01_especificacion_middleware_rfc7807.md` | Azareño (`B_AZAREÑO`) | `B_AZAREÑO` | PR #79 (consolidado) | Pendiente de confirmación por Azareño | PENDIENTE |
 | `02_arquitectura_auditoria_contexto_asynclocalstorage.md` | Reátegui (`B_REATEGUI`) | `B_REATEGUI` | PR #79 (consolidado) | Pendiente de confirmación por Reátegui | PENDIENTE |
 | `03_suite_pruebas_testcontainers_k6.md` | Zevallos (`B_ZEVALLOS`) | `B_ZEVALLOS` | PR #79 (consolidado) | Pendiente de confirmación por Zevallos | PENDIENTE |
 | `04_contratos_intermodulares_unificados.md` | Ricardo (`B_AREVALO`) | `B_AREVALO` | PR #79 | Sublíder y coordinador de integración | PROPUESTO |
@@ -455,15 +441,15 @@ Para cerrar cada contrato cruzado se requiere que **cada sublíder** envíe al r
 
 ## 13. Dependencias y Decisiones
 
-- **Dependencia (Duque):** el formato de error y el `correlation_id` provienen del entregable 01.
+- **Dependencia (Azareño):** el formato de error y el `correlation_id` provienen del entregable 01.
 - **Dependencia (Reátegui):** el despacho de eventos se apoya en `sigd_audit.evento_outbox` del
   entregable 02 y en el DDL `06_sigd_audit_esquema_ddl.sql`.
 - **Dependencia (Zevallos):** los contratos C-01, C-03 y los eventos E-01, E-02, E-06 y E-07 se
   verifican en los casos E2E del entregable 03.
 - **Decisiones registradas:**
-  - `CONFIRMADO` (propios de CoreLink): C-07, C-08 y la política de `usuario_id` nullable (R-05).
-  - C-08: su garantía de **registro atómico** (bitácora + evento) quedó validada con la evidencia
-    E2E ejecutada (v1.5; E2E-07: persistencia conjunta y rollback completo).
+  - `CONFIRMADO` (propios de CoreLink): C-07 y la política de `usuario_id` nullable (R-05).
+  - `PROPUESTO` (propio de CoreLink): C-08 — su garantía de **registro atómico** (bitácora + evento)
+    requiere validación con pruebas E2E ejecutables (v1.3).
   - `PROPUESTO`: identidad vía `sigd_auth` (C-02), área vía `sigd_org` (C-03), `ExpedienteContract`
     (7.5) y evento E-01.
   - `PENDIENTE`: contratos de movimientos/estados de RutaDoc (C-05, C-06) y eventos
@@ -472,18 +458,7 @@ Para cerrar cada contrato cruzado se requiere que **cada sublíder** envíe al r
     `ExpedienteAtendido`/`ExpedienteObservado`, se define la clave de idempotencia compuesta y se
     exige evidencia de autoría y aprobación bilateral para marcar `CONFIRMADO`.
   - **v1.3:** C-08 a `PROPUESTO`; FK `usuario_id -> sigd_auth` SUSPENDIDA (IdentiCore usa `id_usuario`);
-    discrepancia de autoría del entregable 01 (Duque vs Azareño) **resuelta** a Duque (07 §1.2).
-  - **v1.4:** contrato formal de RutaDoc materializado como propuesta autocontenida en el entregable
-    `09_propuesta_contractual_rutadoc.md`; `ExpedienteContract` 7.5 y reintentos del outbox alineados
-    con D-15/DDL 06 v1.5 (`proxima_reintento_en`, estado `EN_PROCESO`).
-  - **v1.5:** C-08 vuelve a `CONFIRMADO` con la evidencia de registro atómico (E2E-07) y, en general, con la
-    suite E2E 12/12 · 22/22 y la carga k6 dentro de umbrales (`implementacion/evidencia/`).
-  - **v1.6 (REQUIERE CORRECCIONES):** C-08 desciende a `PARCIAL` — la evidencia E2E-07 ampliada a 3 casos
-    (radicación, rollback radicación, rollback derivación) se ejecutó en PostgreSQL 16 local contra el
-    prototipo CoreLink (fixtures provisionales); la suite consumió solo `sigd_audit` real + stubs y la ejecución
-    exigida (Testcontainers/PG18, migraciones reales de los 6 módulos) queda `PENDIENTE`. E2E 23/23 casos.
-    Los eventos de RutaDoc (E-02, E-06, E-07) se confirman como `PENDIENTE` y **productor RutaDoc**;
-    los tipos TypeScript son contratos provisionales sin implementación de emisores en CoreLink.
+    discrepancia de autoría del entregable 01 (Duque vs Azareño) registrada y pendiente del liderazgo.
 
 ---
 
@@ -492,9 +467,4 @@ Observaciones del Grupo 6 CoreLink. Revisión 1.2: atiende las observaciones del
 PR #79 (eventos RutaDoc, nomenclatura de identificadores, idempotencia, estado contractual y
 evidencia de autoría/aprobación bilateral). Revisión 1.3: corrige la revisión del liderazgo tras la
 cancelación del PR #79 (C-08 a `PROPUESTO` por garantía atómica pendiente de pruebas, FK de
-IdentiCore SUSPENDIDA y discrepancia de autoría del entregable 01 registrada). Revisión 1.5: C-08
-vuelve a `CONFIRMADO` con la evidencia E2E ejecutada (12/12 · 22/22) y la carga k6 dentro de umbrales
-(P95 < 200 ms, 0 % errores) — `implementacion/evidencia/`. Revisión 1.6 (REQUIERE CORRECCIONES):
-C-08 → `PARCIAL` (evidencia en PG16 local, prototipo CoreLink); migraciones reales y Testcontainers/PG18
-quedan `PENDIENTE`; los eventos de RutaDoc se declaran `PENDIENTE` con productor RutaDoc; se declara el
-alcance de prototipo CoreLink y se aclaran las semánticas de umbrales k6.*
+IdentiCore SUSPENDIDA y discrepancia de autoría del entregable 01 registrada).*

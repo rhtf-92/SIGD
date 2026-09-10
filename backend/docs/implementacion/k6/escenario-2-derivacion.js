@@ -2,7 +2,7 @@
 // Umbrales (sección 6.1 del entregable 03):
 //   Latencia P95   < 200 ms
 //   Tasa de errores < 0.1 % (rate < 0.001)
-// Ejecutar: AUTH_TOKEN=<token> k6 run k6/escenario-2-derivacion.js
+// Ejecutar: k6 run k6/escenario-2-derivacion.js
 
 import http from 'k6/http';
 import { check } from 'k6';
@@ -23,14 +23,6 @@ export const options = {
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
 
-function headers() {
-  const cabeceras = { 'Content-Type': 'application/json' };
-  if (__ENV.AUTH_TOKEN) {
-    cabeceras.Authorization = `Bearer ${__ENV.AUTH_TOKEN}`;
-  }
-  return cabeceras;
-}
-
 function idUnico() {
   return `${__VU}-${Date.now()}`;
 }
@@ -41,31 +33,31 @@ export default function () {
   const creaArea = http.post(
     `${BASE_URL}/api/areas`,
     JSON.stringify({ nombre: `Area-${token}` }),
-    { headers: headers() },
+    { headers: { 'Content-Type': 'application/json' } },
   );
   check(creaArea, { 'área creada 201': (r) => r.status === 201 });
-  const areaDestino = creaArea.json('id_area');
+  const areaDestino = creaArea.json('area_id');
 
   const payload = {
     numero: `EXP-DER-${token}`,
     dni_solicitante: String(__VU).padStart(8, '0'),
     numero_documento: `DOC-DER-${token}`,
     folios: (__VU % 50) + 1,
-    id_tipo_documental: '00000000-0000-4000-8000-000000000001',
-    id_solicitante: '00000000-0000-4000-8000-000000000002',
-    id_area_destino: '00000000-0000-4000-8000-000000000003',
+    tipo_documental_id: '00000000-0000-4000-8000-000000000001',
+    solicitante_id: '00000000-0000-4000-8000-000000000002',
+    area_destino_id: '00000000-0000-4000-8000-000000000003',
   };
 
   const radica = http.post(`${BASE_URL}/api/expedientes`, JSON.stringify(payload), {
-    headers: headers(),
+    headers: { 'Content-Type': 'application/json' },
   });
   check(radica, { 'expediente radicado 201': (r) => r.status === 201 });
-  const expedienteId = radica.json('id_expediente');
+  const expedienteId = radica.json('expediente_id');
 
   const deriva = http.post(
     `${BASE_URL}/api/expedientes/derivar`,
-    JSON.stringify({ id_expediente: expedienteId, id_area_destino: areaDestino }),
-    { headers: headers() },
+    JSON.stringify({ expediente_id: expedienteId, area_destino_id: areaDestino }),
+    { headers: { 'Content-Type': 'application/json' } },
   );
   check(deriva, { 'derivación 200': (r) => r.status === 200 });
 }

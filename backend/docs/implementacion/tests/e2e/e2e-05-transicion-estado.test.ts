@@ -16,24 +16,24 @@ describe('E2E-05 · Transición Mesa de Partes → Jefatura', () => {
   it('deriva a un área vigente y registra el movimiento (200 OK)', async () => {
     const pool = obtenerPool();
     const area = await pool.query(
-      'INSERT INTO sigd_org.area (nombre, vigente) VALUES ($1, true) RETURNING id_area',
+      'INSERT INTO sigd_org.area (nombre, vigente) VALUES ($1, true) RETURNING area_id',
       ['Jefatura'],
     );
-    const areaId = area.rows[0].id_area;
+    const areaId = area.rows[0].area_id;
 
     const radicado = await obtenerAgente().post('/api/expedientes').send(payloadRadicacionValido());
     expect(radicado.status).toBe(201);
 
     const respuesta = await obtenerAgente()
       .post('/api/expedientes/derivar')
-      .send({ id_expediente: radicado.body.id_expediente, id_area_destino: areaId });
+      .send({ expediente_id: radicado.body.expediente_id, area_destino_id: areaId });
 
     expect(respuesta.status).toBe(200);
     expect(respuesta.body.ok).toBe(true);
 
     const movimiento = await pool.query(
-      'SELECT id_movimiento FROM sigd_rut.movimiento_tramite WHERE id_expediente = $1 AND id_area_destino = $2',
-      [radicado.body.id_expediente, areaId],
+      'SELECT id FROM sigd_rut.movimiento_tramite WHERE expediente_id = $1 AND area_destino_id = $2',
+      [radicado.body.expediente_id, areaId],
     );
     expect(movimiento.rowCount).toBe(1);
 
@@ -47,7 +47,7 @@ describe('E2E-05 · Transición Mesa de Partes → Jefatura', () => {
   it('rechaza derivación a área no vigente', async () => {
     const pool = obtenerPool();
     const area = await pool.query(
-      'INSERT INTO sigd_org.area (nombre, vigente) VALUES ($1, false) RETURNING id_area',
+      'INSERT INTO sigd_org.area (nombre, vigente) VALUES ($1, false) RETURNING area_id',
       ['Área inactiva'],
     );
 
@@ -55,7 +55,7 @@ describe('E2E-05 · Transición Mesa de Partes → Jefatura', () => {
 
     const respuesta = await obtenerAgente()
       .post('/api/expedientes/derivar')
-      .send({ id_expediente: radicado.body.id_expediente, id_area_destino: area.rows[0].id_area });
+      .send({ expediente_id: radicado.body.expediente_id, area_destino_id: area.rows[0].area_id });
 
     expect([400, 404]).toContain(respuesta.status);
   });

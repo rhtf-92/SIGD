@@ -1,6 +1,6 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 
-export type EstadoOutbox = 'PENDIENTE' | 'EN_PROCESO' | 'PROCESADO' | 'FALLIDO';
+export type EstadoOutbox = 'PENDIENTE' | 'PROCESADO' | 'FALLIDO';
 
 export interface EventoPendiente {
   id_evento: string;
@@ -13,7 +13,6 @@ export interface EventoPendiente {
 
 export interface DespachadorEvento {
   despachar(evento: EventoPendiente): Promise<void>;
-  esErrorReintentable?: (error: unknown) => boolean;
 }
 
 export interface ConfiguracionWorker {
@@ -64,7 +63,6 @@ export class OutboxWorker {
     const cliente = await this.pool.connect();
     try {
       await cliente.query('BEGIN');
-
       const origen = await cliente.query<{
         id_evento: string;
         correlation_id: string | null;
@@ -76,25 +74,12 @@ export class OutboxWorker {
         `SELECT id_evento, correlation_id, agregado, tipo_evento, payload, intentos
            FROM sigd_audit.evento_outbox
           WHERE estado = 'PENDIENTE'
-            AND (proxima_reintento_en IS NULL OR proxima_reintento_en <= now())
           ORDER BY creado_en
           LIMIT $1
             FOR UPDATE SKIP LOCKED`,
         [this.lote],
       );
-
-      if (origen.rows.length === 0) {
-        await cliente.query('ROLLBACK');
-        return 0;
-      }
-
-      const ids = origen.rows.map((r) => r.id_evento);
-      await cliente.query(
-        `UPDATE sigd_audit.evento_outbox
-            SET estado = 'EN_PROCESO'
-          WHERE id_evento = ANY($1::uuid[])`,
-        [ids],
-      );
+      await cliente.query('COMMIT');
 
       let procesados = 0;
       for (const fila of origen.rows) {
@@ -109,55 +94,45 @@ export class OutboxWorker {
 
         try {
           await this.despachador.despachar(evento);
-          await cliente.query(
-            `UPDATE sigd_audit.evento_outbox
-                SET estado = 'PROCESADO', procesado_en = now()
-              WHERE id_evento = $1`,
-            [evento.id_evento],
-          );
+          await this.marcarProcesado(cliente, evento.id_evento);
           procesados += 1;
-        } catch (error) {
-          const permanente =
-            this.despachador.esErrorReintentable && !this.despachador.esErrorReintentable(error);
-          if (permanente) {
-            await cliente.query(
-              `UPDATE sigd_audit.evento_outbox
-                  SET estado = 'FALLIDO', proxima_reintento_en = NULL
-                WHERE id_evento = $1`,
-              [evento.id_evento],
-            );
-            continue;
-          }
-          const nuevosIntentos = evento.intentos + 1;
-          if (nuevosIntentos >= this.maxIntentos) {
-            await cliente.query(
-              `UPDATE sigd_audit.evento_outbox
-                  SET intentos = $2, estado = 'FALLIDO', proxima_reintento_en = NULL
-                WHERE id_evento = $1`,
-              [evento.id_evento, nuevosIntentos],
-            );
-          } else {
-            const retrasoMs = this.backoffBaseMs * 2 ** (nuevosIntentos - 1);
-            await cliente.query(
-              `UPDATE sigd_audit.evento_outbox
-                  SET intentos = $2,
-                      estado = 'PENDIENTE',
-                      proxima_reintento_en = now() + ($3 * interval '1 millisecond')
-                WHERE id_evento = $1`,
-              [evento.id_evento, nuevosIntentos, retrasoMs],
-            );
-          }
+        } catch {
+          await this.registrarFallo(cliente, evento);
         }
       }
-
-      await cliente.query('COMMIT');
       return procesados;
-    } catch (error) {
-      await cliente.query('ROLLBACK');
-      throw error;
     } finally {
       cliente.release();
     }
+  }
+
+  private async marcarProcesado(cliente: PoolClient, idEvento: string): Promise<void> {
+    await cliente.query(
+      `UPDATE sigd_audit.evento_outbox
+          SET estado = 'PROCESADO', procesado_en = now()
+        WHERE id_evento = $1`,
+      [idEvento],
+    );
+  }
+
+  private async registrarFallo(cliente: PoolClient, evento: EventoPendiente): Promise<void> {
+    const nuevosIntentos = evento.intentos + 1;
+    if (nuevosIntentos >= this.maxIntentos) {
+      await cliente.query(
+        `UPDATE sigd_audit.evento_outbox
+            SET intentos = $2, estado = 'FALLIDO'
+          WHERE id_evento = $1`,
+        [evento.id_evento, nuevosIntentos],
+      );
+      return;
+    }
+    await cliente.query(
+      `UPDATE sigd_audit.evento_outbox
+          SET intentos = $2
+        WHERE id_evento = $1`,
+      [evento.id_evento, nuevosIntentos],
+    );
+    await this.esperar(this.backoffBaseMs * 2 ** nuevosIntentos);
   }
 
   private esperar(ms: number): Promise<void> {

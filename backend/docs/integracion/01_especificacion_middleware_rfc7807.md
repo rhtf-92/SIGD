@@ -4,10 +4,10 @@
 **Proyecto:** Sistema Integral de Gestión Documentaria (SIGD)
 **Institución:** IESTP "Suiza" (Pucallpa, Ucayali, Perú) — PE DSI
 **Área:** Backend — CoreLink
-**Responsable del entregable:** Duque · `B_DUQUE`
+**Responsable del entregable:** Azareño · `B_AZAREÑO`
 **Documento:** `01_especificacion_middleware_rfc7807.md`
 **Fecha:** 3 de septiembre de 2026
-**Versión:** 1.2 (Fase 2 — Levantamiento de Observaciones · corrección de autoría)
+**Versión:** 1.1 (Fase 2 — Levantamiento de Observaciones · Revisión de documentación)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni código
@@ -245,11 +245,9 @@ para que el comportamiento sea **igual en todos los módulos** y no dependa de c
   `getStore()` **sin recibir estos datos por parámetros**. Las firmas de los métodos de negocio se
   mantienen limpias.
 - **Correlación hacia el cliente:** el `correlation_id` se acepta de entrada si el cliente ya lo
-  envía en el header `x-correlation-id` **y es un UUID RFC 4122 válido (versiones 1 a 5)** (para
-  encadenar con sistemas externos). Si no se envía, o el valor **no es un UUID RFC 4122 válido**, se
-  genera uno nuevo (UUIDv4) — **nunca se responde `400` por un `correlation_id` inválido** (decisión
-  D-04, v1.4; corrección 14). En todos los casos, la respuesta devuelve el header `x-correlation-id`
-  con el valor efectivamente usado, para que el consumidor pueda correlacionar respuestas y errores.
+  envía en el header `x-correlation-id` (para encadenar con sistemas externos); si no, se genera uno
+  nuevo (UUIDv4). En ambos casos, la respuesta devuelve el header `x-correlation-id` con el valor
+  efectivamente usado, para que el consumidor pueda correlacionar respuestas y errores.
 - **Identidad del usuario:** la autenticación se puede completar después de que el contexto se cree.
   Para que la auditoría capture la identidad real, el flujo recomendado es: (1) el middleware de
   contexto genera el `correlation_id`; (2) el middleware de autenticación valida el token y deja el
@@ -287,9 +285,7 @@ El detalle del esquema de la bitácora y del worker de outbox se encuentra en el
 
 ### 8.5. Reglas de implementación para los equipos
 
-- **Generar siempre UUIDv4** como `correlation_id`; no usar fechas, secuencias ni correlativos. El
-  header `x-correlation-id` de entrada se acepta si es un UUID RFC 4122 válido (v1–v5); un valor no
-  válido no provoca `400`: se descarta y se genera uno nuevo (v4) (D-04, corrección 14).
+- **Generar siempre UUIDv4** como `correlation_id`; no usar fechas, secuencias ni correlativos.
 - **No almacenar el contexto en variables globales** ni en el ámbito de módulo: usar exclusivamente
   `AsyncLocalStorage` para respetar el aislamiento entre solicitudes concurrentes.
 - **Tolerancia en contextos sin HTTP:** en procesos programados o workers, `getStore()` puede devolver
@@ -390,8 +386,6 @@ Para que los demás grupos avancen de forma consistente, se recomienda ejecutar 
 
 ---
 
-*Documento elaborado por Duque (`B_DUQUE`) como entregable de Fase 2 — Levantamiento de
+*Documento elaborado por Azareño (`B_AZAREÑO`) como entregable de Fase 2 — Levantamiento de
 Observaciones del Grupo 6 CoreLink. Revisión 1.1: convertido a especificación de documentación pura,
-sin código ejecutable, para guiar a los equipos de implementación.
-Corrección de autoría (Revisión 1.2): la titularidad del entregable 01 se atribuye a Duque; ver
-`07_evidencia_autorias_y_aprobaciones.md` §1.*
+sin código ejecutable, para guiar a los equipos de implementación.*

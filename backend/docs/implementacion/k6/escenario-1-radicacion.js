@@ -2,7 +2,7 @@
 // Umbrales (sección 6.1 del entregable 03):
 //   Latencia P95   < 200 ms
 //   Tasa de errores < 0.1 % (rate < 0.001)
-// Ejecutar: AUTH_TOKEN=<token> k6 run k6/escenario-1-radicacion.js
+// Ejecutar: k6 run k6/escenario-1-radicacion.js
 
 import http from 'k6/http';
 import { check } from 'k6';
@@ -28,14 +28,6 @@ export const options = {
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
 
-function headers() {
-  const cabeceras = { 'Content-Type': 'application/json' };
-  if (__ENV.AUTH_TOKEN) {
-    cabeceras.Authorization = `Bearer ${__ENV.AUTH_TOKEN}`;
-  }
-  return cabeceras;
-}
-
 function numeroUnico() {
   return `${__VU}-${Date.now()}`;
 }
@@ -47,13 +39,13 @@ export default function () {
     dni_solicitante: String(__VU).padStart(8, '0'),
     numero_documento: `DOC-${seed}`,
     folios: (__VU % 50) + 1,
-    id_tipo_documental: '00000000-0000-4000-8000-000000000001',
-    id_solicitante: '00000000-0000-4000-8000-000000000002',
-    id_area_destino: '00000000-0000-4000-8000-000000000003',
+    tipo_documental_id: '00000000-0000-4000-8000-000000000001',
+    solicitante_id: '00000000-0000-4000-8000-000000000002',
+    area_destino_id: '00000000-0000-4000-8000-000000000003',
   };
 
   const respuesta = http.post(`${BASE_URL}/api/expedientes`, JSON.stringify(payload), {
-    headers: headers(),
+    headers: { 'Content-Type': 'application/json' },
   });
 
   check(respuesta, {

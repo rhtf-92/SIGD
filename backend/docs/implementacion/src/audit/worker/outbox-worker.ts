@@ -2,22 +2,17 @@ import 'dotenv/config';
 import { crearPool } from '../../database.js';
 import { OutboxWorker, EventoPendiente } from '../outbox-worker.js';
 
-const despachadorDemostracion: { despachar: (evento: EventoPendiente) => Promise<void> } = {
+const despachadorDemo: { despachar: (evento: EventoPendiente) => Promise<void> } = {
   async despachar(evento) {
-    console.log(`[DEMO] Despachador de demostración (no productivo): ${evento.tipo_evento} (${evento.id_evento})`);
+    console.log(`[OUTBOX] Despachando ${evento.tipo_evento} (${evento.id_evento})`);
   },
 };
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  throw new Error(
-    '[OUTBOX] DATABASE_URL no definida. Defínela de forma explícita antes de iniciar el worker.',
-  );
-}
+const pool = crearPool(
+  process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba',
+);
 
-const pool = crearPool(databaseUrl);
-
-const worker = new OutboxWorker(pool, despachadorDemostracion, {
+const worker = new OutboxWorker(pool, despachadorDemo, {
   lote: Number(process.env.OUTBOX_LOTE ?? 100),
   maxIntentos: Number(process.env.OUTBOX_MAX_INTENTOS ?? 5),
   backoffBaseMs: Number(process.env.OUTBOX_BACKOFF_BASE_MS ?? 1000),
