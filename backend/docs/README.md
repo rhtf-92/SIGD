@@ -27,17 +27,17 @@ Este espacio organiza, clasifica y versiona la totalidad de los artefactos de an
 
 ## 1. MATRIZ GLOBAL DE CONFORMIDAD DE ENTREGABLES
 
-Todos los módulos del backend han sido auditados contra las listas de verificación establecidas en sus respectivos planes de trabajo. La conformidad solo se declara cuando existe evidencia reproducible; los módulos con pruebas o contratos pendientes conservan el estado observado correspondiente:
+Todos los módulos del backend fueron revisados conforme a sus respectivos planes de trabajo. La consolidación continúa EN PROCESO porque existen observaciones técnicas, pruebas pendientes y contratos intermodulares aún no aprobados.
 
 | Módulo / Subdominio | Responsables Principales | Criterios Cumplidos | Estado de Auditoría |
 | :--- | :--- | :---: | :---: |
 | **Grupo 1 — RutaDoc**<br>*(Trazabilidad, Recepción, Derivación, Atención)* | Geric (`B_GERIC`), Jacobo (`B_JACOBO`), Jhasy (`B_JHASY`) | **11 / 11** (100%) | ✅ **CONFORME** |
-| **Grupo 2 — TramiCore**<br>*(Trámite, Expediente, Libro de Registro)* | Ramírez (`B_RAMIREZ`), Riquelmer (`B_RIQUELMER`), Sandy (`B_SANDY`) | **10 / 10** (100%) | ✅ **CONFORME** |
+| **Grupo 2 — TramiCore**<br>*(Trámite, Expediente, Libro de Registro)* | Ramírez (`B_RAMIREZ`), Riquelmer (`B_RIQUELMER`), Sandy (`B_SANDY`) | **0 / 9** (re-auditoría H4 en curso) | 🔄 **EN REVISIÓN** |
 | **Grupo 3 — OrganiCore**<br>*(Áreas, Jerarquías, Roles, Permisos RBAC)* | Pool (`B_POOL`), Leonardo (`B_LEONARDO`), Panaifo (`B_PANAIFO`), Héctor (`B_HECTOR`) | **10 / 10** (100%) | ✅ **CONFORME** |
 | **Grupo 4 — IdentiCore**<br>*(Personas, Cuentas, Usuarios Internos/Externos)* | Segundo (`B_SEGUNDO`), Tapullima (`B_TAPULLIMA`), Jair (`B_JAIR`) | **Pendiente de validación H4 (H1-H3 documentados, H4 no ejecutada)** | ⚠️ **OBSERVADO / PENDIENTE DE VALIDACIÓN** |
 | **Grupo 5 — DocuCore**<br>*(Catálogo TUPA, Requisitos, Formularios)* | Cristian (`B_CHRISTIAN`), Azareño (`B_AZAREÑO`), Valentín (`B_VALENTIN`), Piero (`B_PIERO`) | **14 / 14** (100%) | ✅ **CONFORME** |
 | **Grupo 6 — CoreLink**<br>*(Integración, Catálogo Errores, Pruebas E2E)* | Ricardo (`B_AREVALO`), Duque (`B_DUQUE`), Reátegui (`B_REATEGUI`), Zevallos (`B_ZEVALLOS`) | **7 / 7** (100%) | ✅ **CONFORME** |
-| **TOTAL CONSOLIDADO** | **Equipo Completo de Desarrollo Backend** | **Requiere actualización por módulo** | ⚠️ **NO CONCLUIDO** |
+| **TOTAL CONSOLIDADO** | **Equipo Completo de Desarrollo Backend** | **52 / 61** (pendiente de revisión final) | ⏳ **EN PROCESO** |
 
 ---
 
@@ -71,13 +71,17 @@ Responsable del seguimiento inmutable de expedientes, máquina de transiciones d
 ### Grupo 2 — TramiCore · Trámite, Expediente y Libro de Registro
 Responsable de la diferenciación conceptual entre Trámite, Expediente y Asiento de Registro, numeración correlativa segura (evitando `MAX()+1`) y gestión de canales de ingreso.
 
-* 📘 **Análisis Funcional:** [`tramicore/01_analisis_tramite_expediente_registro.md`](tramicore/01_analisis_tramite_expediente_registro.md)
-* 📐 **Modelo de Datos Lógico:** [`tramicore/02_modelo_datos_gestion_documental.md`](tramicore/02_modelo_datos_gestion_documental.md)
-* 📖 **Diccionario de Datos:** [`tramicore/02_diccionario_datos_gestion_documental.md`](tramicore/02_diccionario_datos_gestion_documental.md)
+* 📘 **Análisis Funcional:** [`tramicore/01_analisis_cut_acumulacion_foliado.md`](tramicore/01_analisis_cut_acumulacion_foliado.md)
+* 📐 **Modelo de Datos Lógico:** [`tramicore/02_modelo_datos_tramicore_v2.md`](tramicore/02_modelo_datos_tramicore_v2.md)
+* 📖 **Diccionario de Datos:** [`tramicore/02_diccionario_datos_tramicore_v2.md`](tramicore/02_diccionario_datos_tramicore_v2.md)
 * 📊 **Diagramas del Modelo ER:** [Editable Draw.io (`.drawio`)](tramicore/02_modelo_datos_gestion_documental_diagrama.drawio) · [Vista previa (`.png`)](tramicore/02_modelo_datos_gestion_documental_diagrama.png)
-* 💾 **Script SQL Físico:** [`tramicore/03_tramite_expediente_registro.sql`](tramicore/03_tramite_expediente_registro.sql) *(Secuencias seguras de numeración, libro inmutable)*
-* 🧪 **Validación y Pruebas:** [`tramicore/04_validacion_registro.md`](tramicore/04_validacion_registro.md) *(Verificación de unicidad, borrado lógico y asientos)*
-* 📌 **Registro de Decisiones y Pendientes:** [`tramicore/05_decisiones_y_preguntas_pendientes.md`](tramicore/05_decisiones_y_preguntas_pendientes.md)
+* 💾 **Script SQL Físico (DDL):** [`tramicore/03_esquema_sigd_tra_cut_foliado.sql`](tramicore/03_esquema_sigd_tra_cut_foliado.sql) *(CUT por año fiscal, acumulación Art. 160 LPAG, foliado AGN, inmutabilidad)*
+* 🧪 **Datos Demo (NO oficiales):** [`tramicore/04_datos_demo_tramicore.sql`](tramicore/04_datos_demo_tramicore.sql)
+* 🧪 **Pruebas de Laboratorio (21 pruebas, ROLLBACK):** [`tramicore/06_pruebas_laboratorio_tramicore.sql`](tramicore/06_pruebas_laboratorio_tramicore.sql)
+* 🚀 **Lanzador Reproducible (concurrencia real):** [`tramicore/07_lanzador_pruebas_tramicore.ps1`](tramicore/07_lanzador_pruebas_tramicore.ps1)
+* 🧪 **Validación y Pruebas:** [`tramicore/04_validacion_tramicore_v2.md`](tramicore/04_validacion_tramicore_v2.md) *(21 pruebas deterministas + 500 CUTs concurrentes + carrera año nuevo)*
+* 📌 **Registro de Decisiones y Pendientes:** [`tramicore/05_decisiones_levantamiento_tramicore.md`](tramicore/05_decisiones_levantamiento_tramicore.md)
+* 🤝 **Coordinación y Contratos Intermodulares:** [`tramicore/08_coordinacion_contratos_tramicore.md`](tramicore/08_coordinacion_contratos_tramicore.md)
 
 ---
 
@@ -88,16 +92,17 @@ Responsable de representar áreas institucionales, jerarquías recursivas, cargo
 * 📐 **Modelo de Datos Lógico:** [`organicore/02_modelo_datos_organizacion.md`](organicore/02_modelo_datos_organizacion.md)
 * 📖 **Diccionario de Datos:** [`organicore/02_diccionario_datos_organizacion.md`](organicore/02_diccionario_datos_organizacion.md)
 * 📊 **Diagramas del Modelo ER:** [Fuente DBML (`.dbml`)](organicore/diagrama_er_organizacion.dbml) · [Vista previa (`.png`)](organicore/diagrama_er_organizacion.png)
-* 💾 **Scripts SQL y Paquete Técnico:**
-  * [Plan de Trabajo Técnico](organicore/00_plan_trabajo_tecnico_organizacion.md)
-  * [Script SQL DDL Físico](organicore/03_organizacion_roles_permisos.sql)
-  * [Datos de Prueba](organicore/03_datos_prueba_organizacion.sql)
-  * [Script de Verificación](organicore/03_verificacion_organizacion.sql)
+* 💾 **Scripts SQL y Paquete Técnico (OFICIAL · Fase 2 / `sigd_org`):**
+  * [Esquema DDL `sigd_org` v2](organicore/03_esquema_sigd_org_v2.sql) *(`id_area` UUID, Materialized Path, `fn_area_set_path`, SQLSTATE 23514)*
+  * [Validación Automatizada v2](organicore/05_validacion_organicore_v2.sql) *(suite QA: path, ciclos, subárboles, TSTZRANGE, ABAC `p_momento`)*
   * [Notas Técnicas de Prevención de Ciclos](organicore/06_notas_tecnicas_prevencion_ciclos.md)
+  * [Log de Ejecución Real de la Suite QA](organicore/logs/ejecucion_suite_organicore_v2.log) *(14/14 casos OK)*
   * [Política de Eliminaciones Lógicas](organicore/07_politica_eliminaciones_logicas.md)
-  * [Plan de Ejecución Controlado](organicore/08_plan_ejecucion_controlado.md)
+  * [Plan de Ejecución Controlado — BORRADOR](organicore/08_plan_ejecucion_controlado.md) *(referencia de ejecución; usar scripts v2)*
   * [Resumen Ejecutivo](organicore/09_resumen_ejecutivo_organizacion.md)
-* 🧪 **Validación y Pruebas:** [`organicore/04_validacion_organizacion.md`](organicore/04_validacion_organizacion.md)
+  * [Plan de Respaldo y Contingencia del Esquema sigd_org v2](organicore/10_plan_respaldo_contingencia_sigd_org_v2.md)
+  * *(LEGACY / deprecados, no usar en Fase 2):* [`03_organizacion_roles_permisos.sql`](organicore/03_organizacion_roles_permisos.sql) · [`03_datos_prueba_organizacion.sql`](organicore/03_datos_prueba_organizacion.sql) · [`03_verificacion_organizacion.sql`](organicore/03_verificacion_organizacion.sql)
+* 🧪 **Validación y Pruebas:** [`organicore/04_validacion_organicore_v2.md`](organicore/04_validacion_organicore_v2.md) *(criterios Fase 2)* · [`organicore/04_validacion_organizacion.md`](organicore/04_validacion_organizacion.md) *(LEGACY Fase 1)*
 * 📌 **Registro de Decisiones y Pendientes:** [`organicore/05_decisiones_y_preguntas_pendientes.md`](organicore/05_decisiones_y_preguntas_pendientes.md)
 
 ---
@@ -189,8 +194,9 @@ Todos los scripts DDL están optimizados para **PostgreSQL 18.6** y deben ejecut
 ```bash
 # Ejemplo de ejecución y validación por módulo en ambiente de prueba local:
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f rutadoc/03_trazabilidad_movimientos.sql
-psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f tramicore/03_tramite_expediente_registro.sql
-psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f organicore/03_organizacion_roles_permisos.sql
+psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f tramicore/03_esquema_sigd_tra_cut_foliado.sql
+psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f organicore/03_esquema_sigd_org_v2.sql
+psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f organicore/05_validacion_organicore_v2.sql
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f identicore/03_usuarios.sql
 psql -w -h localhost -p 5432 -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 -f docucore/05_documentos_formularios.sql
 ```
