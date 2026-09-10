@@ -1,0 +1,580 @@
+-- ============================================================================
+-- OrganiCore v2 - Suite automatizada de QA (reproducible)
+-- Responsable: B_PANAIFO
+--
+-- Requiere ejecutar antes 03_esquema_sigd_org_v2.sql en una base QA vacia.
+--
+-- Cobertura:
+--   QA-001  Path materializado y niveles (estructura inicial)
+--   QA-002  Rechazo de ciclos directos
+--   QA-003  Movimiento de subarboles con propagacion en cascada del path
+--   QA-004  Rechazo de ciclos indirectos (raiz bajo su descendiente)
+--   QA-005  Rechazo de ciclos indirectos (nodo intermedio bajo su descendiente)
+--   QA-006  Movimiento con cambio de nivel (delta) y restauracion
+--   QA-007  Integridad del arbol tras rechazos y reposicionamientos
+--   QA-008  Solapamiento parcial de encargaturas (TSTZRANGE, exclusion GiST)
+--   QA-009  Adyacencia valida entre encargaturas (bordes medio-abiertos)
+--   QA-010  Solapamiento por punto en borde inclusivo (TSTZRANGE)
+--   QA-011  ABAC: evaluacion estricta del parametro p_momento (facultad futura)
+--   QA-012  ABAC: evaluacion estricta del parametro p_momento (facultad vencida)
+--   QA-013  ABAC: facultad vigente dentro del periodo (autoriza)
+--   QA-014  ABAC: encargatura expirada respecto a p_momento (deniega)
+--
+-- Todos los datos usan UUID fijos (ficticios) y se revierten con ROLLBACK.
+-- Cada caso escribe su resultado en log_pruebas; al final se imprime el log de
+-- ejecucion real y la suite falla si alguna prueba no paso.
+-- ============================================================================
+
+\set ON_ERROR_STOP on
+BEGIN;
+
+-- ---------------------------------------------------------------------------
+-- Log de ejecucion real (se consulta al final de la suite)
+-- ---------------------------------------------------------------------------
+CREATE TEMP TABLE log_pruebas (
+    id_prueba  VARCHAR(10) PRIMARY KEY,
+    resultado  TEXT NOT NULL,
+    descripcion TEXT NOT NULL
+);
+
+-- ===========================================================================
+-- 1. Datos: jerarquia de areas (UUID fijos)
+--    [101] ==raiz A==> [102] PADRE ==> [103] HIJO ==> [104] NIETO
+--    [105] raiz B (destino del movimiento de subarbol)
+-- ===========================================================================
+INSERT INTO sigd_org.area (id_area, nombre, sigla)
+VALUES
+    ('00000000-0000-0000-0000-000000000101', 'Raiz QA A', 'QA-RAIZ-A'),
+    ('00000000-0000-0000-0000-000000000105', 'Raiz QA B', 'QA-RAIZ-B');
+
+INSERT INTO sigd_org.area (id_area, nombre, sigla, parent_id)
+VALUES ('00000000-0000-0000-0000-000000000102', 'Padre QA', 'QA-PADRE',
+        '00000000-0000-0000-0000-000000000101');
+INSERT INTO sigd_org.area (id_area, nombre, sigla, parent_id)
+VALUES ('00000000-0000-0000-0000-000000000103', 'Hijo QA', 'QA-HIJO',
+        '00000000-0000-0000-0000-000000000102');
+INSERT INTO sigd_org.area (id_area, nombre, sigla, parent_id)
+VALUES ('00000000-0000-0000-0000-000000000104', 'Nieto QA', 'QA-NIETO',
+        '00000000-0000-0000-0000-000000000103');
+
+-- ---------------------------------------------------------------------------
+-- QA-001: path materializado y niveles de la estructura inicial
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    n INTEGER;
+    niveles INTEGER[];
+BEGIN
+    SELECT count(*) INTO n FROM sigd_org.area
+     WHERE path LIKE '/00000000-0000-0000-0000-000000000101/%';
+
+    SELECT array_agg(nivel_organizacional ORDER BY path) INTO niveles
+      FROM sigd_org.area
+     WHERE id_area IN ('00000000-0000-0000-0000-000000000101',
+                       '00000000-0000-0000-0000-000000000102',
+                       '00000000-0000-0000-0000-000000000103',
+                       '00000000-0000-0000-0000-000000000104');
+
+    IF n = 4 AND niveles = ARRAY[1, 2, 3, 4] THEN
+        INSERT INTO log_pruebas VALUES
+            ('QA-001', 'OK', 'Path materializado y niveles (101 > 102 > 103 > 104)');
+    ELSE
+        INSERT INTO log_pruebas VALUES
+            ('QA-001', 'FAIL: subarbol 101 = ' || n || ', niveles = '
+                      || array_to_string(niveles, '-'),
+             'Path materializado y niveles (101 > 102 > 103 > 104)');
+    END IF;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-002: ciclo directo (un area no puede depender de si misma)
+-- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+    BEGIN
+        UPDATE sigd_org.area
+           SET parent_id = id_area
+         WHERE id_area = '00000000-0000-0000-0000-000000000101';
+        INSERT INTO log_pruebas VALUES
+            ('QA-002', 'FAIL: se permitio el ciclo directo',
+             'Ciclo directo rechazado con SQLSTATE 23514');
+    EXCEPTION
+        WHEN SQLSTATE '23514' THEN
+            INSERT INTO log_pruebas VALUES
+                ('QA-002', 'OK', 'Ciclo directo rechazado con SQLSTATE 23514');
+        WHEN OTHERS THEN
+            INSERT INTO log_pruebas VALUES
+                ('QA-002', 'FAIL: SQLSTATE ' || SQLSTATE,
+                 'Ciclo directo rechazado con SQLSTATE 23514');
+    END;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-003: movimiento de subarbol (102 pasa a depender de 105) y propagacion
+-- en cascada del path sobre todos los descendientes (103 y 104).
+-- ---------------------------------------------------------------------------
+UPDATE sigd_org.area
+   SET parent_id = '00000000-0000-0000-0000-000000000105'
+ WHERE id_area = '00000000-0000-0000-0000-000000000102';
+
+DO $$
+DECLARE
+    p102 VARCHAR(255); p103 VARCHAR(255); p104 VARCHAR(255);
+    l102 INTEGER; l103 INTEGER; l104 INTEGER;
+    n_a INTEGER; n_b INTEGER;
+BEGIN
+    SELECT path, nivel_organizacional INTO p102, l102
+      FROM sigd_org.area WHERE id_area = '00000000-0000-0000-0000-000000000102';
+    SELECT path, nivel_organizacional INTO p103, l103
+      FROM sigd_org.area WHERE id_area = '00000000-0000-0000-0000-000000000103';
+    SELECT path, nivel_organizacional INTO p104, l104
+      FROM sigd_org.area WHERE id_area = '00000000-0000-0000-0000-000000000104';
+    SELECT count(*) INTO n_a FROM sigd_org.area
+     WHERE path LIKE '/00000000-0000-0000-0000-000000000101/%';
+    SELECT count(*) INTO n_b FROM sigd_org.area
+     WHERE path LIKE '/00000000-0000-0000-0000-000000000105/%';
+
+    IF p102 = '/00000000-0000-0000-0000-000000000105/00000000-0000-0000-0000-000000000102/'
+       AND p103 = '/00000000-0000-0000-0000-000000000105/00000000-0000-0000-0000-000000000102/00000000-0000-0000-0000-000000000103/'
+       AND p104 = '/00000000-0000-0000-0000-000000000105/00000000-0000-0000-0000-000000000102/00000000-0000-0000-0000-000000000103/00000000-0000-0000-0000-000000000104/'
+       AND (l102, l103, l104) = (2, 3, 4)
+       AND n_a = 1 AND n_b = 4 THEN
+        INSERT INTO log_pruebas VALUES
+            ('QA-003', 'OK',
+             'Movimiento de subarbol con propagacion en cascada (102/103/104 bajo 105)');
+    ELSE
+        INSERT INTO log_pruebas VALUES
+            ('QA-003', 'FAIL: ' || p102 || ' | ' || p103 || ' | ' || p104
+                      || ' | (niveles ' || l102 || ',' || l103 || ',' || l104
+                      || ') | sub101=' || n_a || ', sub105=' || n_b,
+             'Movimiento de subarbol con propagacion en cascada (102/103/104 bajo 105)');
+    END IF;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-004: ciclo indirecto (la raiz 105 no puede depender de su nieto 104).
+-- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+    BEGIN
+        UPDATE sigd_org.area
+           SET parent_id = '00000000-0000-0000-0000-000000000104'
+         WHERE id_area = '00000000-0000-0000-0000-000000000105';
+        INSERT INTO log_pruebas VALUES
+            ('QA-004', 'FAIL: se permitio el ciclo indirecto',
+             'Ciclo indirecto: 105 bajo 104 rechazado con SQLSTATE 23514');
+    EXCEPTION
+        WHEN SQLSTATE '23514' THEN
+            INSERT INTO log_pruebas VALUES
+                ('QA-004', 'OK',
+                 'Ciclo indirecto: 105 bajo 104 rechazado con SQLSTATE 23514');
+        WHEN OTHERS THEN
+            INSERT INTO log_pruebas VALUES
+                ('QA-004', 'FAIL: SQLSTATE ' || SQLSTATE,
+                 'Ciclo indirecto: 105 bajo 104 rechazado con SQLSTATE 23514');
+    END;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-005: ciclo indirecto en nodo intermedio (102 no puede depender de 104).
+-- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+    BEGIN
+        UPDATE sigd_org.area
+           SET parent_id = '00000000-0000-0000-0000-000000000104'
+         WHERE id_area = '00000000-0000-0000-0000-000000000102';
+        INSERT INTO log_pruebas VALUES
+            ('QA-005', 'FAIL: se permitio el ciclo indirecto',
+             'Ciclo indirecto: 102 bajo 104 rechazado con SQLSTATE 23514');
+    EXCEPTION
+        WHEN SQLSTATE '23514' THEN
+            INSERT INTO log_pruebas VALUES
+                ('QA-005', 'OK',
+                 'Ciclo indirecto: 102 bajo 104 rechazado con SQLSTATE 23514');
+        WHEN OTHERS THEN
+            INSERT INTO log_pruebas VALUES
+                ('QA-005', 'FAIL: SQLSTATE ' || SQLSTATE,
+                 'Ciclo indirecto: 102 bajo 104 rechazado con SQLSTATE 23514');
+    END;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-006: reposicionamiento con cambio de nivel y restauracion. Se mueve 103
+-- (nivel 3) bajo 101 (nivel 1); 103 y su descendiente 104 deben bajar al 2 y 3
+-- (delta -1 propagado en cascada). Luego se restaura 103 bajo 102.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    p3 VARCHAR(255); l3 INTEGER;
+    p4 VARCHAR(255); l4 INTEGER;
+BEGIN
+    UPDATE sigd_org.area
+       SET parent_id = '00000000-0000-0000-0000-000000000101'
+     WHERE id_area = '00000000-0000-0000-0000-000000000103';
+
+    SELECT path, nivel_organizacional INTO p3, l3
+      FROM sigd_org.area WHERE id_area = '00000000-0000-0000-0000-000000000103';
+    SELECT path, nivel_organizacional INTO p4, l4
+      FROM sigd_org.area WHERE id_area = '00000000-0000-0000-0000-000000000104';
+
+    IF NOT (p3 = '/00000000-0000-0000-0000-000000000101/00000000-0000-0000-0000-000000000103/'
+            AND p4 = '/00000000-0000-0000-0000-000000000101/00000000-0000-0000-0000-000000000103/00000000-0000-0000-0000-000000000104/'
+            AND (l3, l4) = (2, 3)) THEN
+        INSERT INTO log_pruebas VALUES
+            ('QA-006', 'FAIL: ' || p3 || ' | ' || p4 || ' | niveles ' || l3 || ',' || l4,
+             'Movimiento con delta de nivel propagado en cascada');
+        RETURN;
+    END IF;
+
+    UPDATE sigd_org.area
+       SET parent_id = '00000000-0000-0000-0000-000000000102'
+     WHERE id_area = '00000000-0000-0000-0000-000000000103';
+
+    SELECT path, nivel_organizacional INTO p3, l3
+      FROM sigd_org.area WHERE id_area = '00000000-0000-0000-0000-000000000103';
+    SELECT path, nivel_organizacional INTO p4, l4
+      FROM sigd_org.area WHERE id_area = '00000000-0000-0000-0000-000000000104';
+
+    IF p3 = '/00000000-0000-0000-0000-000000000105/00000000-0000-0000-0000-000000000102/00000000-0000-0000-0000-000000000103/'
+       AND p4 = '/00000000-0000-0000-0000-000000000105/00000000-0000-0000-0000-000000000102/00000000-0000-0000-0000-000000000103/00000000-0000-0000-0000-000000000104/'
+       AND (l3, l4) = (3, 4) THEN
+        INSERT INTO log_pruebas VALUES
+            ('QA-006', 'OK',
+             'Movimiento con delta de nivel propagado en cascada (idem al restaurar)');
+    ELSE
+        INSERT INTO log_pruebas VALUES
+            ('QA-006', 'FAIL: ' || p3 || ' | ' || p4 || ' | niveles ' || l3 || ',' || l4,
+             'Movimiento con delta de nivel propagado en cascada (idem al restaurar)');
+    END IF;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-007: integridad del organigrama tras los rechazos y reposicionamientos.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    n_a INTEGER; n_b INTEGER;
+    niveles INTEGER[];
+BEGIN
+    SELECT count(*) INTO n_a FROM sigd_org.area
+     WHERE path LIKE '/00000000-0000-0000-0000-000000000101/%';
+    SELECT count(*) INTO n_b FROM sigd_org.area
+     WHERE path LIKE '/00000000-0000-0000-0000-000000000105/%';
+    SELECT array_agg(nivel_organizacional ORDER BY path) INTO niveles
+      FROM sigd_org.area
+     WHERE path LIKE '/00000000-0000-0000-0000-000000000105/%';
+
+    IF n_a = 1 AND n_b = 4 AND niveles = ARRAY[1, 2, 3, 4] THEN
+        INSERT INTO log_pruebas VALUES
+            ('QA-007', 'OK',
+             'Integridad del arbol tras rechazos de ciclos y reposicionamientos');
+    ELSE
+        INSERT INTO log_pruebas VALUES
+            ('QA-007', 'FAIL: sub101=' || n_a || ', sub105=' || n_b
+                      || ', niveles=' || array_to_string(niveles, '-'),
+             'Integridad del arbol tras rechazos de ciclos y reposicionamientos');
+    END IF;
+END;
+$$;
+
+-- ===========================================================================
+-- 2. Datos: cargos, facultades, encargaturas y asignaciones (ABAC)
+--    Cargos 201 (QA), 202 (facultad futura) y 203 (facultad vencida)
+-- ===========================================================================
+INSERT INTO sigd_org.cargo (cargo_id, nombre, es_titular_despacho)
+VALUES
+    ('00000000-0000-0000-0000-000000000201', 'Cargo QA', TRUE),
+    ('00000000-0000-0000-0000-000000000202', 'Cargo Facultad Futura', FALSE),
+    ('00000000-0000-0000-0000-000000000203', 'Cargo Facultad Vencida', FALSE);
+
+INSERT INTO sigd_org.facultad_despacho
+    (cargo_id, codigo, puede_firmar, vigente_desde, vigente_hasta)
+VALUES
+    ('00000000-0000-0000-0000-000000000201', 'FIRMA_QA',      TRUE, DATE '2026-01-01', NULL),
+    ('00000000-0000-0000-0000-000000000202', 'FIRMA_FUTURA',  TRUE, DATE '2026-09-05', NULL),
+    ('00000000-0000-0000-0000-000000000203', 'FIRMA_VENCIDA', TRUE, DATE '2026-01-01', DATE '2026-09-15');
+
+-- Encargaturas sobre el area 101 (suplencias del cargo 201 y 202).
+INSERT INTO sigd_org.encargatura_despacho
+    (cuenta_titular_id, cuenta_suplente_id, id_area, cargo_id,
+     tipo_encargatura, documento_sustento, periodo_vigencia)
+VALUES
+    ('00000000-0000-0000-0000-000000000301',
+     '00000000-0000-0000-0000-000000000302',
+     '00000000-0000-0000-0000-000000000101',
+     '00000000-0000-0000-0000-000000000201',
+     'SUPLENTE', 'QA-RES-001',
+     tstzrange('2026-09-01 00:00+00', '2026-10-01 00:00+00', '[)')),
+    ('00000000-0000-0000-0000-000000000301',
+     '00000000-0000-0000-0000-000000000304',
+     '00000000-0000-0000-0000-000000000101',
+     '00000000-0000-0000-0000-000000000201',
+     'SUPLENTE', 'QA-RES-003',
+     tstzrange('2026-10-01 00:00+00', '2026-11-01 00:00+00', '[)')),
+    ('00000000-0000-0000-0000-000000000301',
+     '00000000-0000-0000-0000-000000000305',
+     '00000000-0000-0000-0000-000000000101',
+     '00000000-0000-0000-0000-000000000201',
+     'DELEGADO', 'QA-RES-004',
+     tstzrange('2026-11-01 00:00+00', '2026-12-01 00:00+00', '[]')),
+    ('00000000-0000-0000-0000-000000000301',
+     '00000000-0000-0000-0000-000000000307',
+     '00000000-0000-0000-0000-000000000101',
+     '00000000-0000-0000-0000-000000000202',
+     'SUPLENTE', 'QA-RES-006',
+     tstzrange('2026-08-01 00:00+00', '2026-10-01 00:00+00', '[)'));
+
+-- Asignaciones del personal (canal alterno de autorizacion ABAC).
+INSERT INTO sigd_org.asignacion_personal
+    (cuenta_id, id_area, cargo_id, fecha_inicio, fecha_fin, es_principal)
+VALUES
+    ('00000000-0000-0000-0000-000000000401',
+     '00000000-0000-0000-0000-000000000101',
+     '00000000-0000-0000-0000-000000000202',
+     DATE '2026-08-01', DATE '2026-09-30', TRUE),
+    ('00000000-0000-0000-0000-000000000402',
+     '00000000-0000-0000-0000-000000000101',
+     '00000000-0000-0000-0000-000000000203',
+     DATE '2026-08-01', DATE '2026-12-31', TRUE);
+
+-- ---------------------------------------------------------------------------
+-- QA-008: solapamiento parcial de encargaturas (mismo cargo y periodo &&).
+-- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+    BEGIN
+        INSERT INTO sigd_org.encargatura_despacho
+            (cuenta_titular_id, cuenta_suplente_id, id_area, cargo_id,
+             tipo_encargatura, documento_sustento, periodo_vigencia)
+        VALUES
+            ('00000000-0000-0000-0000-000000000301',
+             '00000000-0000-0000-0000-000000000303',
+             '00000000-0000-0000-0000-000000000101',
+             '00000000-0000-0000-0000-000000000201',
+             'DELEGADO', 'QA-RES-002',
+             tstzrange('2026-09-15 00:00+00', '2026-10-15 00:00+00', '[)'));
+        INSERT INTO log_pruebas VALUES
+            ('QA-008', 'FAIL: se permitio el solapamiento parcial',
+             'Solapamiento parcial rechazado por ex_encargatura_cargo_periodo');
+    EXCEPTION
+        WHEN exclusion_violation THEN
+            INSERT INTO log_pruebas VALUES
+                ('QA-008', 'OK',
+                 'Solapamiento parcial rechazado por ex_encargatura_cargo_periodo');
+        WHEN OTHERS THEN
+            INSERT INTO log_pruebas VALUES
+                ('QA-008', 'FAIL: SQLSTATE ' || SQLSTATE,
+                 'Solapamiento parcial rechazado por ex_encargatura_cargo_periodo');
+    END;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-009: adyacencia valida entre encargaturas con TSTZRANGE medio-abierto.
+-- [Sep, Oct) y [Oct, Nov) no se tocan; la exclusion no debe bloquearlas.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    n INTEGER;
+BEGIN
+    SELECT count(*) INTO n FROM sigd_org.encargatura_despacho
+     WHERE cargo_id = '00000000-0000-0000-0000-000000000201' AND activo;
+
+    IF n = 3 THEN
+        INSERT INTO log_pruebas VALUES
+            ('QA-009', 'OK',
+             'Adyacencia valida: 3 encargaturas activas en cargo 201 sin solaparse');
+    ELSE
+        INSERT INTO log_pruebas VALUES
+            ('QA-009', 'FAIL: se obtuvieron ' || n || ' encargaturas activas',
+             'Adyacencia valida: 3 encargaturas activas en cargo 201 sin solaparse');
+    END IF;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-010: solapamiento por punto en borde inclusivo. [.. , Dec 01 00:00] y
+-- [Dec 01 00:00, ..] comparten el instante 2026-12-01 00:00+00: && == true.
+-- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+    BEGIN
+        INSERT INTO sigd_org.encargatura_despacho
+            (cuenta_titular_id, cuenta_suplente_id, id_area, cargo_id,
+             tipo_encargatura, documento_sustento, periodo_vigencia)
+        VALUES
+            ('00000000-0000-0000-0000-000000000301',
+             '00000000-0000-0000-0000-000000000306',
+             '00000000-0000-0000-0000-000000000101',
+             '00000000-0000-0000-0000-000000000201',
+             'DELEGADO', 'QA-RES-005',
+             tstzrange('2026-12-01 00:00+00', '2026-12-30 00:00+00', '[]'));
+        INSERT INTO log_pruebas VALUES
+            ('QA-010', 'FAIL: se permitio el solape por punto en borde inclusivo',
+             'Solapamiento por punto ([] con [) rechazado por la exclusion GiST');
+    EXCEPTION
+        WHEN exclusion_violation THEN
+            INSERT INTO log_pruebas VALUES
+                ('QA-010', 'OK',
+                 'Solapamiento por punto ([] con [) rechazado por la exclusion GiST');
+        WHEN OTHERS THEN
+            INSERT INTO log_pruebas VALUES
+                ('QA-010', 'FAIL: SQLSTATE ' || SQLSTATE,
+                 'Solapamiento por punto ([] con [) rechazado por la exclusion GiST');
+    END;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-011: ABAC - la funcion debe evaluar solo con p_momento, no con
+-- CURRENT_DATE. La facultad FIRMA_FUTURA inicia el 2026-09-05; con p_momento
+-- 2026-09-01 la autorizacion es falsa aunque hoy (CURRENT_DATE) ya estaria
+-- vigente. Al evaluar con un p_momento posterior (2026-09-10) autoriza.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    v_encargatura BOOLEAN;
+    v_asignacion  BOOLEAN;
+    v_posterior   BOOLEAN;
+BEGIN
+    SELECT sigd_org.usuario_tiene_facultad_despacho(
+        '00000000-0000-0000-0000-000000000307',
+        '00000000-0000-0000-0000-000000000101',
+        '00000000-0000-0000-0000-000000000202',
+        '2026-09-01 12:00+00') INTO v_encargatura;
+
+    SELECT sigd_org.usuario_tiene_facultad_despacho(
+        '00000000-0000-0000-0000-000000000401',
+        '00000000-0000-0000-0000-000000000101',
+        '00000000-0000-0000-0000-000000000202',
+        '2026-09-01 12:00+00') INTO v_asignacion;
+
+    SELECT sigd_org.usuario_tiene_facultad_despacho(
+        '00000000-0000-0000-0000-000000000307',
+        '00000000-0000-0000-0000-000000000101',
+        '00000000-0000-0000-0000-000000000202',
+        '2026-09-10 12:00+00') INTO v_posterior;
+
+    IF NOT v_encargatura AND NOT v_asignacion AND v_posterior THEN
+        INSERT INTO log_pruebas VALUES
+            ('QA-011', 'OK',
+             'ABAC estricto con p_momento: facultad futura deniega antes y autoriza despues');
+    ELSE
+        INSERT INTO log_pruebas VALUES
+            ('QA-011', 'FAIL: encargatura=' || v_encargatura
+                      || ', asignacion=' || v_asignacion
+                      || ', posterior=' || v_posterior,
+             'ABAC estricto con p_momento: facultad futura deniega antes y autoriza despues');
+    END IF;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-012: ABAC - evaluacion estricta con p_momento de una facultad vencida.
+-- FIRMA_VENCIDA termina el 2026-09-15; con p_momento 2026-09-20 deniega
+-- aunque CURRENT_DATE (anterior al corte) hubiera autorizado.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    v_vencida BOOLEAN;
+    v_vigente BOOLEAN;
+BEGIN
+    SELECT sigd_org.usuario_tiene_facultad_despacho(
+        '00000000-0000-0000-0000-000000000402',
+        '00000000-0000-0000-0000-000000000101',
+        '00000000-0000-0000-0000-000000000203',
+        '2026-09-20 12:00+00') INTO v_vencida;
+
+    SELECT sigd_org.usuario_tiene_facultad_despacho(
+        '00000000-0000-0000-0000-000000000402',
+        '00000000-0000-0000-0000-000000000101',
+        '00000000-0000-0000-0000-000000000203',
+        '2026-09-10 12:00+00') INTO v_vigente;
+
+    IF NOT v_vencida AND v_vigente THEN
+        INSERT INTO log_pruebas VALUES
+            ('QA-012', 'OK',
+             'ABAC estricto con p_momento: facultad vencida deniega despues del corte');
+    ELSE
+        INSERT INTO log_pruebas VALUES
+            ('QA-012', 'FAIL: vencida=' || v_vencida || ', vigente=' || v_vigente,
+             'ABAC estricto con p_momento: facultad vencida deniega despues del corte');
+    END IF;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-013: ABAC - facultad vigente dentro del periodo de la encargatura.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    v_ok BOOLEAN;
+BEGIN
+    SELECT sigd_org.usuario_tiene_facultad_despacho(
+        '00000000-0000-0000-0000-000000000302',
+        '00000000-0000-0000-0000-000000000101',
+        '00000000-0000-0000-0000-000000000201',
+        '2026-09-20 12:00+00') INTO v_ok;
+
+    IF v_ok THEN
+        INSERT INTO log_pruebas VALUES
+            ('QA-013', 'OK', 'ABAC: facultad vigente dentro del periodo autoriza');
+    ELSE
+        INSERT INTO log_pruebas VALUES
+            ('QA-013', 'FAIL: se rechazo una facultad vigente',
+             'ABAC: facultad vigente dentro del periodo autoriza');
+    END IF;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- QA-014: ABAC - encargatura expirada respecto a p_momento (borde exclusivo).
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    v_expirado BOOLEAN;
+BEGIN
+    SELECT sigd_org.usuario_tiene_facultad_despacho(
+        '00000000-0000-0000-0000-000000000302',
+        '00000000-0000-0000-0000-000000000101',
+        '00000000-0000-0000-0000-000000000201',
+        '2026-10-01 00:00+00') INTO v_expirado;
+
+    IF NOT v_expirado THEN
+        INSERT INTO log_pruebas VALUES
+            ('QA-014', 'OK', 'ABAC: encargatura expirada (borde exclusivo) deniega');
+    ELSE
+        INSERT INTO log_pruebas VALUES
+            ('QA-014', 'FAIL: se autorizo una facultad fuera del periodo',
+             'ABAC: encargatura expirada (borde exclusivo) deniega');
+    END IF;
+END;
+$$;
+
+-- ===========================================================================
+-- Cierre: imprimir el log de ejecucion real y fallar si alguna prueba no paso.
+-- ===========================================================================
+SELECT id_prueba, resultado, descripcion
+FROM log_pruebas
+ORDER BY id_prueba;
+
+DO $$
+DECLARE
+    fallas INTEGER;
+BEGIN
+    SELECT count(*) INTO fallas FROM log_pruebas WHERE resultado <> 'OK';
+    IF fallas > 0 THEN
+        RAISE EXCEPTION 'SUITE_FAIL: % prueba(s) no superaron la ejecucion', fallas;
+    END IF;
+END;
+$$;
+
+SELECT 'OK: OrganiCore v2 supero la suite automatizada' AS resultado;
+ROLLBACK;

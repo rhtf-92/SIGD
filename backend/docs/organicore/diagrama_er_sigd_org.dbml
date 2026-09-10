@@ -1,0 +1,82 @@
+// Diagrama DBML Refactorizado - OrganiCore (sigd_org)
+
+Table sigd_org_area {
+  area_id uuid [pk, default: `gen_random_uuid()`]
+  nombre varchar(150) [not null]
+  sigla varchar(20) [not null, unique]
+  parent_id uuid [ref: > sigd_org_area.area_id]
+  path text [not null]
+  nivel_organizacional int [not null]
+  activo boolean [not null, default: true]
+  creado_en timestamptz [not null, default: `now()`]
+  actualizado_en timestamptz [not null, default: `now()`]
+}
+
+Table sigd_org_cargo {
+  cargo_id uuid [pk, default: `gen_random_uuid()`]
+  nombre varchar(100) [not null, unique]
+  descripcion text
+  es_titular_despacho boolean [not null, default: false]
+  activo boolean [not null, default: true]
+  creado_en timestamptz [not null, default: `now()`]
+}
+
+Table sigd_org_asignacion_area {
+  asignacion_id uuid [pk, default: `gen_random_uuid()`]
+  cuenta_id uuid [not null]
+  area_id uuid [ref: > sigd_org_area.area_id, not null]
+  cargo_id uuid [ref: > sigd_org_cargo.cargo_id, not null]
+  fecha_inicio date [not null]
+  fecha_fin date
+  es_principal boolean [not null, default: true]
+  activo boolean [not null, default: true]
+  creado_en timestamptz [not null, default: `now()`]
+}
+
+Table sigd_org_encargatura_despacho {
+  encargatura_id uuid [pk, default: `gen_random_uuid()`]
+  cuenta_id uuid [not null]
+  area_id uuid [ref: > sigd_org_area.area_id, not null]
+  cargo_id uuid [ref: > sigd_org_cargo.cargo_id, not null]
+  tipo_encargatura varchar(30) [not null]
+  documento_sustento varchar(120) [not null]
+  fecha_inicio timestamptz [not null]
+  fecha_fin timestamptz [not null]
+  activo boolean [not null, default: true]
+  creado_en timestamptz [not null, default: `now()`]
+}
+
+Table sigd_org_rol_sistema {
+  rol_id uuid [pk, default: `gen_random_uuid()`]
+  codigo varchar(50) [not null, unique]
+  nombre varchar(100) [not null]
+  descripcion text
+  activo boolean [not null, default: true]
+}
+
+Table sigd_org_permiso_sistema {
+  permiso_id uuid [pk, default: `gen_random_uuid()`]
+  codigo varchar(80) [not null, unique]
+  modulo varchar(50) [not null]
+  descripcion text
+  alcance_predeterminado varchar(20) [not null, default: 'AREA']
+}
+
+Table sigd_org_rol_permiso {
+  rol_id uuid [ref: > sigd_org_rol_sistema.rol_id, not null]
+  permiso_id uuid [ref: > sigd_org_permiso_sistema.permiso_id, not null]
+
+  indexes {
+    (rol_id, permiso_id) [pk]
+  }
+}
+
+Table sigd_org_usuario_rol {
+  cuenta_id uuid [not null]
+  rol_id uuid [ref: > sigd_org_rol_sistema.rol_id, not null]
+  asignado_en timestamptz [not null, default: `now()`]
+
+  indexes {
+    (cuenta_id, rol_id) [pk]
+  }
+}
