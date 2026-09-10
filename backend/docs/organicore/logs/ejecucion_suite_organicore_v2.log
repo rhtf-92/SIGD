@@ -1,3 +1,11 @@
+﻿============================================================
+OrganiCore v2 - Log de ejecucion real de la suite QA
+Responsable: B_PANAIFO  |  Fecha: 2026-09-09 19:19:18
+Motor: PostgreSQL 18  |  Base: sigd_qa_organicore_v2_fix
+Comando: psql -v ON_ERROR_STOP=1 -f 05_validacion_organicore_v2.sql
+Script previo aplicado: 03_esquema_sigd_org_v2.sql (DDL)
+============================================================
+
 -- ============================================================================
 -- OrganiCore v2 - Suite automatizada de QA (reproducible)
 -- Responsable: B_PANAIFO
@@ -24,10 +32,9 @@
 -- Cada caso escribe su resultado en log_pruebas; al final se imprime el log de
 -- ejecucion real y la suite falla si alguna prueba no paso.
 -- ============================================================================
-
 \set ON_ERROR_STOP on
 BEGIN;
-
+BEGIN
 -- ---------------------------------------------------------------------------
 -- Log de ejecucion real (se consulta al final de la suite)
 -- ---------------------------------------------------------------------------
@@ -36,7 +43,7 @@ CREATE TEMP TABLE log_pruebas (
     resultado  TEXT NOT NULL,
     descripcion TEXT NOT NULL
 );
-
+CREATE TABLE
 -- ===========================================================================
 -- 1. Datos: jerarquia de areas (UUID fijos)
 --    [101] ==raiz A==> [102] PADRE ==> [103] HIJO ==> [104] NIETO
@@ -46,17 +53,19 @@ INSERT INTO sigd_org.area (id_area, nombre, sigla)
 VALUES
     ('00000000-0000-0000-0000-000000000101', 'Raiz QA A', 'QA-RAIZ-A'),
     ('00000000-0000-0000-0000-000000000105', 'Raiz QA B', 'QA-RAIZ-B');
-
+INSERT 0 2
 INSERT INTO sigd_org.area (id_area, nombre, sigla, parent_id)
 VALUES ('00000000-0000-0000-0000-000000000102', 'Padre QA', 'QA-PADRE',
         '00000000-0000-0000-0000-000000000101');
+INSERT 0 1
 INSERT INTO sigd_org.area (id_area, nombre, sigla, parent_id)
 VALUES ('00000000-0000-0000-0000-000000000103', 'Hijo QA', 'QA-HIJO',
         '00000000-0000-0000-0000-000000000102');
+INSERT 0 1
 INSERT INTO sigd_org.area (id_area, nombre, sigla, parent_id)
 VALUES ('00000000-0000-0000-0000-000000000104', 'Nieto QA', 'QA-NIETO',
         '00000000-0000-0000-0000-000000000103');
-
+INSERT 0 1
 -- ---------------------------------------------------------------------------
 -- QA-001: path materializado y niveles de la estructura inicial
 -- ---------------------------------------------------------------------------
@@ -86,7 +95,7 @@ BEGIN
     END IF;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-002: ciclo directo (un area no puede depender de si misma)
 -- ---------------------------------------------------------------------------
@@ -110,7 +119,7 @@ BEGIN
     END;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-003: movimiento de subarbol (102 pasa a depender de 105) y propagacion
 -- en cascada del path sobre todos los descendientes (103 y 104).
@@ -118,7 +127,7 @@ $$;
 UPDATE sigd_org.area
    SET parent_id = '00000000-0000-0000-0000-000000000105'
  WHERE id_area = '00000000-0000-0000-0000-000000000102';
-
+UPDATE 1
 DO $$
 DECLARE
     p102 VARCHAR(255); p103 VARCHAR(255); p104 VARCHAR(255);
@@ -153,7 +162,7 @@ BEGIN
     END IF;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-004: ciclo indirecto (la raiz 105 no puede depender de su nieto 104).
 -- ---------------------------------------------------------------------------
@@ -178,7 +187,7 @@ BEGIN
     END;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-005: ciclo indirecto en nodo intermedio (102 no puede depender de 104).
 -- ---------------------------------------------------------------------------
@@ -203,7 +212,7 @@ BEGIN
     END;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-006: reposicionamiento con cambio de nivel y restauracion. Se mueve 103
 -- (nivel 3) bajo 101 (nivel 1); 103 y su descendiente 104 deben bajar al 2 y 3
@@ -254,7 +263,7 @@ BEGIN
     END IF;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-007: integridad del organigrama tras los rechazos y reposicionamientos.
 -- ---------------------------------------------------------------------------
@@ -283,7 +292,7 @@ BEGIN
     END IF;
 END;
 $$;
-
+DO
 -- ===========================================================================
 -- 2. Datos: cargos, facultades, encargaturas y asignaciones (ABAC)
 --    Cargos 201 (QA), 202 (facultad futura) y 203 (facultad vencida)
@@ -293,14 +302,14 @@ VALUES
     ('00000000-0000-0000-0000-000000000201', 'Cargo QA', TRUE),
     ('00000000-0000-0000-0000-000000000202', 'Cargo Facultad Futura', FALSE),
     ('00000000-0000-0000-0000-000000000203', 'Cargo Facultad Vencida', FALSE);
-
+INSERT 0 3
 INSERT INTO sigd_org.facultad_despacho
     (cargo_id, codigo, puede_firmar, vigente_desde, vigente_hasta)
 VALUES
     ('00000000-0000-0000-0000-000000000201', 'FIRMA_QA',      TRUE, DATE '2026-01-01', NULL),
     ('00000000-0000-0000-0000-000000000202', 'FIRMA_FUTURA',  TRUE, DATE '2026-09-05', NULL),
     ('00000000-0000-0000-0000-000000000203', 'FIRMA_VENCIDA', TRUE, DATE '2026-01-01', DATE '2026-09-15');
-
+INSERT 0 3
 -- Encargaturas sobre el area 101 (suplencias del cargo 201 y 202).
 INSERT INTO sigd_org.encargatura_despacho
     (cuenta_titular_id, cuenta_suplente_id, id_area, cargo_id,
@@ -330,7 +339,7 @@ VALUES
      '00000000-0000-0000-0000-000000000202',
      'SUPLENTE', 'QA-RES-006',
      tstzrange('2026-08-01 00:00+00', '2026-10-01 00:00+00', '[)'));
-
+INSERT 0 4
 -- Asignaciones del personal (canal alterno de autorizacion ABAC).
 INSERT INTO sigd_org.asignacion_personal
     (cuenta_id, id_area, cargo_id, fecha_inicio, fecha_fin, es_principal)
@@ -343,7 +352,7 @@ VALUES
      '00000000-0000-0000-0000-000000000101',
      '00000000-0000-0000-0000-000000000203',
      DATE '2026-08-01', DATE '2026-12-31', TRUE);
-
+INSERT 0 2
 -- ---------------------------------------------------------------------------
 -- QA-008: solapamiento parcial de encargaturas (mismo cargo y periodo &&).
 -- ---------------------------------------------------------------------------
@@ -375,7 +384,7 @@ BEGIN
     END;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-009: adyacencia valida entre encargaturas con TSTZRANGE medio-abierto.
 -- [Sep, Oct) y [Oct, Nov) no se tocan; la exclusion no debe bloquearlas.
@@ -398,7 +407,7 @@ BEGIN
     END IF;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-010: solapamiento por punto en borde inclusivo. [.. , Dec 01 00:00] y
 -- [Dec 01 00:00, ..] comparten el instante 2026-12-01 00:00+00: && == true.
@@ -431,7 +440,7 @@ BEGIN
     END;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-011: ABAC - la funcion debe evaluar solo con p_momento, no con
 -- CURRENT_DATE. La facultad FIRMA_FUTURA inicia el 2026-09-05; con p_momento
@@ -475,7 +484,7 @@ BEGIN
     END IF;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-012: ABAC - evaluacion estricta con p_momento de una facultad vencida.
 -- FIRMA_VENCIDA termina el 2026-09-15; con p_momento 2026-09-20 deniega
@@ -509,7 +518,7 @@ BEGIN
     END IF;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-013: ABAC - facultad vigente dentro del periodo de la encargatura.
 -- ---------------------------------------------------------------------------
@@ -533,7 +542,7 @@ BEGIN
     END IF;
 END;
 $$;
-
+DO
 -- ---------------------------------------------------------------------------
 -- QA-014: ABAC - encargatura expirada respecto a p_momento (borde exclusivo).
 -- ---------------------------------------------------------------------------
@@ -557,13 +566,30 @@ BEGIN
     END IF;
 END;
 $$;
-
+DO
 -- ===========================================================================
 -- Cierre: imprimir el log de ejecucion real y fallar si alguna prueba no paso.
 -- ===========================================================================
 SELECT id_prueba, resultado, descripcion
 FROM log_pruebas
 ORDER BY id_prueba;
+ id_prueba | resultado |                                  descripcion                                  
+-----------+-----------+-------------------------------------------------------------------------------
+ QA-001    | OK        | Path materializado y niveles (101 > 102 > 103 > 104)
+ QA-002    | OK        | Ciclo directo rechazado con SQLSTATE 23514
+ QA-003    | OK        | Movimiento de subarbol con propagacion en cascada (102/103/104 bajo 105)
+ QA-004    | OK        | Ciclo indirecto: 105 bajo 104 rechazado con SQLSTATE 23514
+ QA-005    | OK        | Ciclo indirecto: 102 bajo 104 rechazado con SQLSTATE 23514
+ QA-006    | OK        | Movimiento con delta de nivel propagado en cascada (idem al restaurar)
+ QA-007    | OK        | Integridad del arbol tras rechazos de ciclos y reposicionamientos
+ QA-008    | OK        | Solapamiento parcial rechazado por ex_encargatura_cargo_periodo
+ QA-009    | OK        | Adyacencia valida: 3 encargaturas activas en cargo 201 sin solaparse
+ QA-010    | OK        | Solapamiento por punto ([] con [) rechazado por la exclusion GiST
+ QA-011    | OK        | ABAC estricto con p_momento: facultad futura deniega antes y autoriza despues
+ QA-012    | OK        | ABAC estricto con p_momento: facultad vencida deniega despues del corte
+ QA-013    | OK        | ABAC: facultad vigente dentro del periodo autoriza
+ QA-014    | OK        | ABAC: encargatura expirada (borde exclusivo) deniega
+(14 filas)
 
 DO $$
 DECLARE
@@ -575,6 +601,12 @@ BEGIN
     END IF;
 END;
 $$;
-
+DO
 SELECT 'OK: OrganiCore v2 supero la suite automatizada' AS resultado;
+                   resultado                    
+------------------------------------------------
+ OK: OrganiCore v2 supero la suite automatizada
+(1 fila)
+
 ROLLBACK;
+ROLLBACK

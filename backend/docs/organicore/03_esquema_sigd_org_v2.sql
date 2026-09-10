@@ -13,10 +13,10 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 CREATE SCHEMA IF NOT EXISTS sigd_org;
 
 CREATE TABLE IF NOT EXISTS sigd_org.area (
-    area_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_area UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nombre VARCHAR(150) NOT NULL,
     sigla VARCHAR(20) NOT NULL UNIQUE,
-    parent_id UUID REFERENCES sigd_org.area(area_id) ON DELETE RESTRICT,
+    parent_id UUID REFERENCES sigd_org.area(id_area) ON DELETE RESTRICT,
     path VARCHAR(255) NOT NULL,
     nivel_organizacional INTEGER NOT NULL DEFAULT 1,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
@@ -39,10 +39,10 @@ DECLARE
     parent_level INTEGER;
 BEGIN
     IF NEW.parent_id IS NULL THEN
-        NEW.path := '/' || NEW.area_id::text || '/';
+        NEW.path := '/' || NEW.id_area::text || '/';
         NEW.nivel_organizacional := 1;
     ELSE
-        IF NEW.parent_id = NEW.area_id THEN
+        IF NEW.parent_id = NEW.id_area THEN
             RAISE EXCEPTION 'Un área no puede ser hija de sí misma'
                 USING ERRCODE = '23514';
         END IF;
@@ -50,7 +50,7 @@ BEGIN
         SELECT a.path, a.nivel_organizacional
           INTO parent_path, parent_level
           FROM sigd_org.area AS a
-         WHERE a.area_id = NEW.parent_id
+         WHERE a.id_area = NEW.parent_id
          FOR SHARE;
 
         IF NOT FOUND THEN
@@ -58,16 +58,19 @@ BEGIN
                 USING ERRCODE = '23503';
         END IF;
 
+        -- Ciclo indirecto: un área no puede depender de uno de sus descendientes.
+        -- Si el nuevo padre pertenece al subárbol del nodo que se mueve, su path
+        -- materializado comienza con el path actual del nodo (OLD.path).
         IF TG_OP = 'UPDATE'
            AND NEW.parent_id IS DISTINCT FROM OLD.parent_id
            AND parent_path LIKE OLD.path || '%' THEN
             RAISE EXCEPTION
                 'Movimiento inválido: el área % no puede depender de su descendiente %',
-                NEW.area_id, NEW.parent_id
+                NEW.id_area, NEW.parent_id
                 USING ERRCODE = '23514';
         END IF;
 
-        NEW.path := parent_path || NEW.area_id::text || '/';
+        NEW.path := parent_path || NEW.id_area::text || '/';
         NEW.nivel_organizacional := parent_level + 1;
     END IF;
 
@@ -87,10 +90,16 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    -- Actualizar solo hijos directos; cada hijo propaga el cambio a su vez.
-    UPDATE sigd_org.area
-       SET parent_id = parent_id
-     WHERE parent_id = NEW.area_id;
+    -- Reescritura en cascada en una sola instrucción: en materialized path todos
+    -- los descendientes del subárbol comparten el prefijo OLD.path. Se sustituye
+    -- el prefijo por NEW.path y se corrige el nivel por el mismo delta del padre.
+    UPDATE sigd_org.area AS d
+       SET path = NEW.path || substr(d.path, char_length(OLD.path) + 1),
+           nivel_organizacional = d.nivel_organizacional
+                                  + (NEW.nivel_organizacional - OLD.nivel_organizacional),
+           actualizado_en = now()
+     WHERE d.path LIKE OLD.path || '%'
+       AND d.id_area <> NEW.id_area;
     RETURN NEW;
 END;
 $$;
@@ -114,7 +123,7 @@ CREATE TABLE IF NOT EXISTS sigd_org.cargo (
 CREATE TABLE IF NOT EXISTS sigd_org.asignacion_personal (
     asignacion_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cuenta_id UUID NOT NULL,
-    area_id UUID NOT NULL REFERENCES sigd_org.area(area_id) ON DELETE RESTRICT,
+    id_area UUID NOT NULL REFERENCES sigd_org.area(id_area) ON DELETE RESTRICT,
     cargo_id UUID NOT NULL REFERENCES sigd_org.cargo(cargo_id) ON DELETE RESTRICT,
     fecha_inicio DATE NOT NULL,
     fecha_fin DATE,
@@ -128,7 +137,7 @@ CREATE TABLE IF NOT EXISTS sigd_org.asignacion_personal (
 CREATE INDEX IF NOT EXISTS idx_asignacion_personal_cuenta
     ON sigd_org.asignacion_personal(cuenta_id);
 CREATE INDEX IF NOT EXISTS idx_asignacion_personal_area
-    ON sigd_org.asignacion_personal(area_id);
+    ON sigd_org.asignacion_personal(id_area);
 CREATE INDEX IF NOT EXISTS idx_asignacion_personal_cargo
     ON sigd_org.asignacion_personal(cargo_id);
 
@@ -151,7 +160,7 @@ CREATE TABLE IF NOT EXISTS sigd_org.encargatura_despacho (
     encargatura_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cuenta_titular_id UUID NOT NULL,
     cuenta_suplente_id UUID NOT NULL,
-    area_id UUID NOT NULL REFERENCES sigd_org.area(area_id) ON DELETE RESTRICT,
+    id_area UUID NOT NULL REFERENCES sigd_org.area(id_area) ON DELETE RESTRICT,
     cargo_id UUID NOT NULL REFERENCES sigd_org.cargo(cargo_id) ON DELETE RESTRICT,
     tipo_encargatura VARCHAR(30) NOT NULL,
     documento_sustento VARCHAR(120) NOT NULL,
@@ -167,7 +176,7 @@ CREATE TABLE IF NOT EXISTS sigd_org.encargatura_despacho (
 );
 
 CREATE INDEX IF NOT EXISTS idx_encargatura_area_cargo
-    ON sigd_org.encargatura_despacho(area_id, cargo_id);
+    ON sigd_org.encargatura_despacho(id_area, cargo_id);
 CREATE INDEX IF NOT EXISTS idx_encargatura_periodo
     ON sigd_org.encargatura_despacho USING GIST(periodo_vigencia);
 
@@ -213,7 +222,7 @@ CREATE TABLE IF NOT EXISTS sigd_org.usuario_rol (
 
 CREATE OR REPLACE FUNCTION sigd_org.usuario_tiene_facultad_despacho(
     p_cuenta_id UUID,
-    p_area_id UUID,
+    p_id_area UUID,
     p_cargo_id UUID,
     p_momento TIMESTAMPTZ DEFAULT now()
 )
@@ -226,28 +235,28 @@ AS $$
           FROM sigd_org.encargatura_despacho AS e
           JOIN sigd_org.facultad_despacho AS f ON f.cargo_id = e.cargo_id
          WHERE e.cuenta_suplente_id = p_cuenta_id
-           AND e.area_id = p_area_id
+           AND e.id_area = p_id_area
            AND e.cargo_id = p_cargo_id
            AND e.activo
            AND f.activo
            AND f.puede_firmar
            AND e.periodo_vigencia @> p_momento
-           AND CURRENT_DATE >= f.vigente_desde
-           AND (f.vigente_hasta IS NULL OR CURRENT_DATE <= f.vigente_hasta)
+           AND p_momento::date >= f.vigente_desde
+           AND (f.vigente_hasta IS NULL OR p_momento::date <= f.vigente_hasta)
     ) OR EXISTS (
         SELECT 1
           FROM sigd_org.asignacion_personal AS a
           JOIN sigd_org.facultad_despacho AS f ON f.cargo_id = a.cargo_id
          WHERE a.cuenta_id = p_cuenta_id
-           AND a.area_id = p_area_id
+           AND a.id_area = p_id_area
            AND a.cargo_id = p_cargo_id
            AND a.activo
            AND f.activo
            AND f.puede_firmar
            AND a.fecha_inicio <= p_momento::date
            AND (a.fecha_fin IS NULL OR a.fecha_fin >= p_momento::date)
-           AND CURRENT_DATE >= f.vigente_desde
-           AND (f.vigente_hasta IS NULL OR CURRENT_DATE <= f.vigente_hasta)
+           AND p_momento::date >= f.vigente_desde
+           AND (f.vigente_hasta IS NULL OR p_momento::date <= f.vigente_hasta)
     );
 $$;
 

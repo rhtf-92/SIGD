@@ -89,9 +89,10 @@ Responsable de representar áreas institucionales, jerarquías recursivas, cargo
 * 📖 **Diccionario de Datos:** [`organicore/02_diccionario_datos_organizacion.md`](organicore/02_diccionario_datos_organizacion.md)
 * 📊 **Diagramas del Modelo ER:** [Fuente DBML (`.dbml`)](organicore/diagrama_er_organizacion.dbml) · [Vista previa (`.png`)](organicore/diagrama_er_organizacion.png)
 * 💾 **Scripts SQL y Paquete Técnico (OFICIAL · Fase 2 / `sigd_org`):**
-  * [Esquema DDL `sigd_org` v2](organicore/03_esquema_sigd_org_v2.sql) *(UUID, Materialized Path, `fn_area_set_path`, SQLSTATE 23514)*
-  * [Validación Automatizada v2](organicore/05_validacion_organicore_v2.sql) *(suite QA: path, ciclos, encargaturas, facultades)*
+  * [Esquema DDL `sigd_org` v2](organicore/03_esquema_sigd_org_v2.sql) *(`id_area` UUID, Materialized Path, `fn_area_set_path`, SQLSTATE 23514)*
+  * [Validación Automatizada v2](organicore/05_validacion_organicore_v2.sql) *(suite QA: path, ciclos, subárboles, TSTZRANGE, ABAC `p_momento`)*
   * [Notas Técnicas de Prevención de Ciclos](organicore/06_notas_tecnicas_prevencion_ciclos.md)
+  * [Log de Ejecución Real de la Suite QA](organicore/logs/ejecucion_suite_organicore_v2.log) *(14/14 casos OK)*
   * [Política de Eliminaciones Lógicas](organicore/07_politica_eliminaciones_logicas.md)
   * [Plan de Ejecución Controlado — BORRADOR](organicore/08_plan_ejecucion_controlado.md) *(referencia de ejecución; usar scripts v2)*
   * [Resumen Ejecutivo](organicore/09_resumen_ejecutivo_organizacion.md)
