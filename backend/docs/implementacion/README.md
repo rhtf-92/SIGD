@@ -96,15 +96,23 @@ npm run load:derivacion
 Ver `../integracion/08_runbook_evidencia_pruebas.md` para instrucciones paso a paso
 sobre cómo generar y conservar evidencia (logs, timestamps, exit codes, P95, tasa de errores).
 
-Evidencia ejecutada (Sección 5 / ronda P2–P12):
+Evidencia ejecutada — alcance **prototipo CoreLink**, PostgreSQL **16 local** (no Docker / no
+Testcontainers) ⇒ estado **`PARCIAL`** (re-ejecución exigida con Testcontainers/PG18 + migraciones
+reales de los 6 módulos: `PENDIENTE`, ver `../integracion/05` riesgo R-10):
 
-- `evidencia/e2e-20260909-123500/` — suite E2E con `TEST_DATABASE_URL`: **12/12 archivos · 22/22
-  casos · EXIT_CODE=0** (`e2e.log` + `resumen.txt`).
+- `evidencia/e2e-20260909-204737/` — suite E2E con `TEST_DATABASE_URL` (`sigd_prueba`, PG16): **12/12
+  archivos · 23/23 casos · EXIT_CODE=0** (`e2e.log` + `resumen.txt`). Incluye los 3 casos de
+  atomicidad de `e2e-07` (persistencia conjunta, rollback de radicación y rollback de derivación
+  sobre `sigd_rut.movimiento_tramite`). El log está **sanitizado** (sin ANSI, sin rutas personales,
+  sin stack traces).
 - `evidencia/k6-20260909-145820/` — carga k6 v2.2.0: radicación **P95 150.96 ms** y derivación
   **P95 144.64 ms** (< 200 ms), **0 % errores**, checks 100 %, EXIT_CODE=0 (logs + summaries + resumen).
+  La semántica de los booleanos `thresholds` del JSON se explica en `resumen.txt`/runbook 08 §5.3
+  (`false` = umbral NO incumplido; señal autoritativa = EXIT_CODE + consola).
 
 > La suite se ejecutó sin Docker (PostgreSQL 16 local). Con Docker disponible use Testcontainers o la
-> base efímera del runbook; los umbrales de aceptación son los mismos.
+> base efímera del runbook; los umbrales de aceptación son los mismos. La captura de consola debe
+> hacerse en **UTF-8** y los logs versionados deben quedar sin rutas personales ni stack traces.
 
 ---
 
@@ -115,7 +123,7 @@ Evidencia ejecutada (Sección 5 / ronda P2–P12):
 | **Esquema de base de datos de la tarea del grupo** | `../integracion/06_sigd_audit_esquema_ddl.sql` (bitácora forense + transactional outbox) |
 | **Código fuente (capa de dominio / compartida)** | `src/shared/domain/errors/`, `src/shared/request-context/`, `src/shared/types/` |
 | **Código fuente (integración/cross-cutting)** | `src/middleware/`, `src/errors/`, `src/audit/` (worker incluido) |
-| **Suite de pruebas e integración** | `tests/e2e/*` (12 casos: happy path, atomicidad, concurrencia, aislamiento AsyncLocalStorage) sobre PostgreSQL real en Testcontainers |
+| **Suite de pruebas e integración** | `tests/e2e/*` (**12 archivos / 23 casos**: happy path, atomicidad, concurrencia, aislamiento AsyncLocalStorage) sobre PostgreSQL real (Testcontainers o `TEST_DATABASE_URL`) |
 | **Pruebas de carga** | `k6/escenario-*-*.js` con thresholds |
 | **Códigos de error nuevos** documentados | Se reutilizan los códigos de la matriz del entregable 01 (p. ej. `DUPLICATE_KEY`, `VALIDATION_ERROR`) |
 

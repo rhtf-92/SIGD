@@ -1,9 +1,9 @@
-﻿
-         /\      Grafana   /ÔÇ¥ÔÇ¥/  
-    /\  /  \     |\  __   /  /   
-   /  \/    \    | |/ /  /   ÔÇ¥ÔÇ¥\ 
-  /          \   |   (  |  (ÔÇ¥)  |
- / __________ \  |_|\_\  \_____/ 
+
+         /\      Grafana   /--/
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   --\
+  /          \   |   (  |  (-)  |
+ / __________ \  |_|\_\  \_____/
 
 
      execution: local
@@ -285,24 +285,24 @@ running (1m30.0s), 50/50 VUs, 18360 complete and 0 interrupted iterations
 derivacion   [ 100% ] 50 VUs  1m30.0s/1m30s
 
 
-  Ôûê THRESHOLDS 
+  # THRESHOLDS
 
     http_req_duration
-    Ô£ô 'p(95)<200' p(95)=144.64ms
+    v 'p(95)<200' p(95)=144.64ms
 
     http_req_failed
-    Ô£ô 'rate<0.001' rate=0.00%
+    v 'rate<0.001' rate=0.00%
 
 
-  Ôûê TOTAL RESULTS 
+  # TOTAL RESULTS
 
     checks_total.......: 55254   613.275139/s
     checks_succeeded...: 100.00% 55254 out of 55254
     checks_failed......: 0.00%   0 out of 55254
 
-    Ô£ô ├írea creada 201
-    Ô£ô expediente radicado 201
-    Ô£ô derivaci├│n 200
+    v |irea creada 201
+    v expediente radicado 201
+    v derivaci||n 200
 
     HTTP
     http_req_duration..............: avg=80.98ms  min=1.45ms  med=73.5ms   max=3.36s p(90)=114.22ms p(95)=144.64ms
@@ -324,7 +324,5 @@ derivacion   [ 100% ] 50 VUs  1m30.0s/1m30s
 
 
 running (1m30.1s), 00/50 VUs, 18418 complete and 0 interrupted iterations
-derivacion Ô£ô [ 100% ] 50 VUs  1m30s
+derivacion v [ 100% ] 50 VUs  1m30s
 EXIT_CODE=0
-
-

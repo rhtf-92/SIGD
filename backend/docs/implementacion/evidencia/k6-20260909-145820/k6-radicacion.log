@@ -1,9 +1,9 @@
-﻿
-         /\      Grafana   /ÔÇ¥ÔÇ¥/  
-    /\  /  \     |\  __   /  /   
-   /  \/    \    | |/ /  /   ÔÇ¥ÔÇ¥\ 
-  /          \   |   (  |  (ÔÇ¥)  |
- / __________ \  |_|\_\  \_____/ 
+
+         /\      Grafana   /--/
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   --\
+  /          \   |   (  |  (-)  |
+ / __________ \  |_|\_\  \_____/
 
 
      execution: local
@@ -375,31 +375,31 @@ running (2m00.0s), 001/100 VUs, 94520 complete and 0 interrupted iterations
 radicacion   [ 100% ] 001/100 VUs  2m00.0s/2m00.0s
 
 
-  Ôûê THRESHOLDS 
+  # THRESHOLDS
 
     http_req_duration
-    Ô£ô 'p(95)<200' p(95)=150.96ms
+    v 'p(95)<200' p(95)=150.96ms
 
     http_req_failed
-    Ô£ô 'rate<0.001' rate=0.00%
+    v 'rate<0.001' rate=0.00%
 
 
-  Ôûê TOTAL RESULTS 
+  # TOTAL RESULTS
 
     checks_total.......: 94525   787.684636/s
     checks_succeeded...: 100.00% 94525 out of 94525
     checks_failed......: 0.00%   0 out of 94525
 
-    Ô£ô HTTP 201
+    v HTTP 201
 
     HTTP
-    http_req_duration..............: avg=94.99ms min=536┬Ás med=103.11ms max=866.69ms p(90)=133.65ms p(95)=150.96ms
-      { expected_response:true }...: avg=94.99ms min=536┬Ás med=103.11ms max=866.69ms p(90)=133.65ms p(95)=150.96ms
+    http_req_duration..............: avg=94.99ms min=536us med=103.11ms max=866.69ms p(90)=133.65ms p(95)=150.96ms
+      { expected_response:true }...: avg=94.99ms min=536us med=103.11ms max=866.69ms p(90)=133.65ms p(95)=150.96ms
     http_req_failed................: 0.00% 0 out of 94525
     http_reqs......................: 94525 787.684636/s
 
     EXECUTION
-    iteration_duration.............: avg=95.23ms min=536┬Ás med=103.32ms max=893.15ms p(90)=133.91ms p(95)=151.36ms
+    iteration_duration.............: avg=95.23ms min=536us med=103.32ms max=893.15ms p(90)=133.91ms p(95)=151.36ms
     iterations.....................: 94525 787.684636/s
     vus............................: 1     min=1          max=100
     vus_max........................: 100   min=100        max=100
@@ -412,7 +412,5 @@ radicacion   [ 100% ] 001/100 VUs  2m00.0s/2m00.0s
 
 
 running (2m00.0s), 000/100 VUs, 94525 complete and 0 interrupted iterations
-radicacion Ô£ô [ 100% ] 000/100 VUs  2m0s
+radicacion v [ 100% ] 000/100 VUs  2m0s
 EXIT_CODE=0
-
-

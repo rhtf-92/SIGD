@@ -43,9 +43,28 @@ CONCLUSIÓN
   bitácora. Para el UAT se recomienda repetir en infraestructura de referencia
   (servidor y base separados) manteniendo los mismos perfiles y umbrales.
 
+  Aclaración sobre los archivos *-summary.json: cada métrica incluye la clave
+  "thresholds" con expresiones como "p(95)<200" o "rate<0.001". El booleano que
+  almacena NO es el resultado del umbral: es la bandera interna de k6 que indica
+  si en el momento final el umbral estaba SIENDO VIOLADO (true=incumplido,
+  false=cumplido). La señal autoritativa de aprobación es la segunda columna de
+  la consola (marca "v" en la sección THRESHOLDS de los *.log) más el código de
+  salida EXIT_CODE=0 del proceso. En ambas ejecuciones: p(95) real 150.96 ms y
+  144.64 ms (< 200 ms) y rate 0.00 % (< 0.1 %), por lo que los umbrales están
+  incumplidos en ninguno de los casos (false = no incumplido).
+
+  Sanitización de los *.log: salida de consola capturada sin códigos ANSI y
+  normalizada a ASCII (las cajas gráficas de k6 como ─│┼█ se sustituyen por -|+#,
+  el símbolo de aprobación ✓ se rotula como "v" y los símbolos de microsegundo
+  como "us"). Los valores numéricos, checks, percentiles y tasas no se alteran.
+
+  Requisito de entorno: el servidor y el worker exigen DATABASE_URL definida de
+  forma explícita (sin credenciales implícitas postgres:postgres). En esta
+  ejecución se exportó previamente: DATABASE_URL=postgres://postgres:postgres@localhost:5432/sigd_prueba
+
 ARTEFACTOS
 ----------
-  k6-radicacion.log / k6-derivacion.log      : salida completa (sin códigos ANSI)
+  k6-radicacion.log / k6-derivacion.log      : salida completa (sin códigos ANSI; ASCII)
   k6-radicacion-summary.json                 : métricas resumidas (escenario 1)
   k6-derivacion-summary.json                 : métricas resumidas (escenario 2)
   resumen.txt                                : este resumen
