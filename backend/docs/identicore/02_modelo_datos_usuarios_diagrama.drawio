@@ -1,10 +1,11 @@
 <mxfile host="app.diagrams.net">
+  <!-- Implementación actual: BIGSERIAL/BIGINT según 03_esquema_sigd_auth_v2.sql. Tipos UUID alineados a BIGINT en etiquetas y PlantUML embebido. PK físicas son BIGSERIAL (id), FK BIGINT. Reestructuración de nombres/entidades pendiente de validación Jair/Grupo 4. -->
   <diagram id="7BkisgQ1c9BIQ70pr51x" name="Página-1">
     <mxGraphModel dx="1717" dy="967" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <UserObject label="" plantUmlData="{&#xa;  &quot;data&quot;: &quot;```plantuml\n@startuml\nskinparam class {\n    BackgroundColor #FFFFFF\n    HeaderBackgroundColor #2563EB\n    BorderColor #2563EB\n    FontColor #000000\n    FontSize 12\n}\n\nentity \&quot;persona\&quot; as persona {\n    + PK id_persona : UUID\n    --\n    tipo_persona : VARCHAR(20)\n    estado : VARCHAR(20)\n    creado_en : TIMESTAMPTZ\n}\n\nentity \&quot;persona_natural\&quot; as persona_natural {\n    + PK/FK id_persona : UUID\n    --\n    tipo_documento : VARCHAR(20)\n    numero_documento : VARCHAR(20) [UQ]\n    nombres : VARCHAR(100)\n    apellido_paterno : VARCHAR(100)\n}\n\nentity \&quot;persona_juridica\&quot; as persona_juridica {\n    + PK/FK id_persona : UUID\n    --\n    ruc : VARCHAR(11) [UQ]\n    razon_social : VARCHAR(200)\n}\n\nentity \&quot;representacion_legal\&quot; as representacion_legal {\n    + PK id_representacion : UUID\n    --\n    FK persona_juridica_id : UUID\n    FK persona_natural_id : UUID\n    cargo : VARCHAR(100)\n    estado : VARCHAR(20)\n}\n\nentity \&quot;cuenta_usuario\&quot; as cuenta_usuario {\n    + PK id_cuenta : UUID\n    --\n    FK persona_id : UUID [UQ]\n    email : VARCHAR(150) [UQ]\n    password_hash : VARCHAR(255)\n    estado_cuenta : VARCHAR(20)\n}\n\nentity \&quot;sesion_usuario\&quot; as sesion_usuario {\n    + PK id_sesion : UUID\n    --\n    FK cuenta_id : UUID\n    refresh_token_hash : VARCHAR(255) [UQ]\n    expira_en : TIMESTAMPTZ\n}\n\nentity \&quot;consentimiento_datos\&quot; as consentimiento_datos {\n    + PK id_consentimiento : UUID\n    --\n    FK persona_id : UUID\n    version_politica : VARCHAR(20)\n    aceptado : BOOLEAN\n}\n\nentity \&quot;perfil_usuario\&quot; as perfil_usuario {\n    + PK id_perfil : UUID\n    --\n    FK cuenta_id : UUID\n    nombre_perfil : VARCHAR(50)\n}\n\npersona ||--|| persona_natural : \&quot;es\&quot;\npersona ||--|| persona_juridica : \&quot;es\&quot;\npersona ||--o| cuenta_usuario : \&quot;posee\&quot;\npersona ||--o{ consentimiento_datos : \&quot;registra\&quot;\npersona_juridica ||--o{ representacion_legal : \&quot;otorgada a\&quot;\npersona_natural ||--o{ representacion_legal : \&quot;ejerce\&quot;\ncuenta_usuario ||--o{ sesion_usuario : \&quot;inicia\&quot;\ncuenta_usuario ||--o{ perfil_usuario : \&quot;asigna\&quot;\n@enduml&quot;,&#xa;  &quot;config&quot;: null&#xa;}" id="6chg5QDyW_It_6WL7FqN-1">
+        <UserObject label="" plantUmlData="{&#xa;  &quot;data&quot;: &quot;```plantuml\n@startuml\nskinparam class {\n    BackgroundColor #FFFFFF\n    HeaderBackgroundColor #2563EB\n    BorderColor #2563EB\n    FontColor #000000\n    FontSize 12\n}\n\nentity \&quot;persona\&quot; as persona {\n    + PK id_persona : BIGINT\n    --\n    tipo_persona : VARCHAR(20)\n    estado : VARCHAR(20)\n    creado_en : TIMESTAMPTZ\n}\n\nentity \&quot;persona_natural\&quot; as persona_natural {\n    + PK/FK id_persona : BIGINT\n    --\n    tipo_documento : VARCHAR(20)\n    numero_documento : VARCHAR(20) [UQ]\n    nombres : VARCHAR(100)\n    apellido_paterno : VARCHAR(100)\n}\n\nentity \&quot;persona_juridica\&quot; as persona_juridica {\n    + PK/FK id_persona : BIGINT\n    --\n    ruc : VARCHAR(11) [UQ]\n    razon_social : VARCHAR(200)\n}\n\nentity \&quot;representacion_legal\&quot; as representacion_legal {\n    + PK id_representacion : BIGINT\n    --\n    FK persona_juridica_id : BIGINT\n    FK persona_natural_id : BIGINT\n    cargo : VARCHAR(100)\n    estado : VARCHAR(20)\n}\n\nentity \&quot;cuenta_usuario\&quot; as cuenta_usuario {\n    + PK id_cuenta : BIGINT\n    --\n    FK persona_id : BIGINT [UQ]\n    email : VARCHAR(150) [UQ]\n    password_hash : VARCHAR(255)\n    estado_cuenta : VARCHAR(20)\n}\n\nentity \&quot;sesion_usuario\&quot; as sesion_usuario {\n    + PK id_sesion : BIGINT\n    --\n    FK cuenta_id : BIGINT\n    refresh_token_hash : VARCHAR(255) [UQ]\n    expira_en : TIMESTAMPTZ\n}\n\nentity \&quot;consentimiento_datos\&quot; as consentimiento_datos {\n    + PK id_consentimiento : BIGINT\n    --\n    FK persona_id : BIGINT\n    version_politica : VARCHAR(20)\n    aceptado : BOOLEAN\n}\n\nentity \&quot;perfil_usuario\&quot; as perfil_usuario {\n    + PK id_perfil : BIGINT\n    --\n    FK cuenta_id : BIGINT\n    nombre_perfil : VARCHAR(50)\n}\n\npersona ||--|| persona_natural : \&quot;es\&quot;\npersona ||--|| persona_juridica : \&quot;es\&quot;\npersona ||--o| cuenta_usuario : \&quot;posee\&quot;\npersona ||--o{ consentimiento_datos : \&quot;registra\&quot;\npersona_juridica ||--o{ representacion_legal : \&quot;otorgada a\&quot;\npersona_natural ||--o{ representacion_legal : \&quot;ejerce\&quot;\ncuenta_usuario ||--o{ sesion_usuario : \&quot;inicia\&quot;\ncuenta_usuario ||--o{ perfil_usuario : \&quot;asigna\&quot;\n@enduml&quot;,&#xa;  &quot;config&quot;: null&#xa;}" id="6chg5QDyW_It_6WL7FqN-1">
           <mxCell connectable="0" parent="1" style="group;transparentBounds=1;editIcon=1;lockedGroup=0;groupPadding=10;" vertex="1">
             <mxGeometry as="geometry" />
           </mxCell>
@@ -19,7 +20,7 @@
             <mxGeometry height="22" width="22" x="63.471999999999994" y="5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="PK id_persona : UUID" plantUmlId="mb_4" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_persona : UUID" id="6chg5QDyW_It_6WL7FqN-4">
+        <UserObject label="PK id_persona : BIGINT" plantUmlId="mb_4" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_persona : BIGINT" id="6chg5QDyW_It_6WL7FqN-4">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-2" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="206.44" y="37.5" as="geometry" />
           </mxCell>
@@ -59,7 +60,7 @@
             <mxGeometry height="22" width="22" x="77.12625000000003" y="5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="PK/FK id_persona : UUID" plantUmlId="mb_12" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK/FK id_persona : UUID" id="6chg5QDyW_It_6WL7FqN-12">
+        <UserObject label="PK/FK id_persona : BIGINT" plantUmlId="mb_12" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK/FK id_persona : BIGINT" id="6chg5QDyW_It_6WL7FqN-12">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-10" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="288.6" y="37.5" as="geometry" />
           </mxCell>
@@ -104,7 +105,7 @@
             <mxGeometry height="22" width="22" x="37.31530000000001" y="5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="PK/FK id_persona : UUID" plantUmlId="mb_21" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK/FK id_persona : UUID" id="6chg5QDyW_It_6WL7FqN-21">
+        <UserObject label="PK/FK id_persona : BIGINT" plantUmlId="mb_21" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK/FK id_persona : BIGINT" id="6chg5QDyW_It_6WL7FqN-21">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-19" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="211.61" y="37.5" as="geometry" />
           </mxCell>
@@ -139,7 +140,7 @@
             <mxGeometry height="22" width="22" x="25.009400000000014" y="5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="PK id_representacion : UUID" plantUmlId="mb_28" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_representacion : UUID" id="6chg5QDyW_It_6WL7FqN-28">
+        <UserObject label="PK id_representacion : BIGINT" plantUmlId="mb_28" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_representacion : BIGINT" id="6chg5QDyW_It_6WL7FqN-28">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-26" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="215.34" y="37.5" as="geometry" />
           </mxCell>
@@ -154,12 +155,12 @@
             <mxGeometry height="8" width="215.34" y="56.5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="FK persona_juridica_id : UUID" plantUmlId="mb_31" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK persona_juridica_id : UUID" id="6chg5QDyW_It_6WL7FqN-31">
+        <UserObject label="FK persona_juridica_id : BIGINT" plantUmlId="mb_31" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK persona_juridica_id : BIGINT" id="6chg5QDyW_It_6WL7FqN-31">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-26" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="215.34" y="64.5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="FK persona_natural_id : UUID" plantUmlId="mb_32" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK persona_natural_id : UUID" id="6chg5QDyW_It_6WL7FqN-32">
+        <UserObject label="FK persona_natural_id : BIGINT" plantUmlId="mb_32" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK persona_natural_id : BIGINT" id="6chg5QDyW_It_6WL7FqN-32">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-26" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="215.34" y="83.5" as="geometry" />
           </mxCell>
@@ -184,7 +185,7 @@
             <mxGeometry height="22" width="22" x="51.577250000000014" y="5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="PK id_cuenta : UUID" plantUmlId="mb_37" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_cuenta : UUID" id="6chg5QDyW_It_6WL7FqN-37">
+        <UserObject label="PK id_cuenta : BIGINT" plantUmlId="mb_37" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_cuenta : BIGINT" id="6chg5QDyW_It_6WL7FqN-37">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-35" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="231.09" y="37.5" as="geometry" />
           </mxCell>
@@ -199,7 +200,7 @@
             <mxGeometry height="8" width="231.09" y="56.5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="FK persona_id : UUID [UQ]" plantUmlId="mb_40" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK persona_id : UUID [UQ]" id="6chg5QDyW_It_6WL7FqN-40">
+        <UserObject label="FK persona_id : BIGINT [UQ]" plantUmlId="mb_40" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK persona_id : BIGINT [UQ]" id="6chg5QDyW_It_6WL7FqN-40">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-35" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="231.09" y="64.5" as="geometry" />
           </mxCell>
@@ -229,7 +230,7 @@
             <mxGeometry height="22" width="22" x="83.98585" y="5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="PK id_sesion : UUID" plantUmlId="mb_46" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_sesion : UUID" id="6chg5QDyW_It_6WL7FqN-46">
+        <UserObject label="PK id_sesion : BIGINT" plantUmlId="mb_46" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_sesion : BIGINT" id="6chg5QDyW_It_6WL7FqN-46">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-44" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="294" y="37.5" as="geometry" />
           </mxCell>
@@ -244,7 +245,7 @@
             <mxGeometry height="8" width="294" y="56.5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="FK cuenta_id : UUID" plantUmlId="mb_49" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK cuenta_id : UUID" id="6chg5QDyW_It_6WL7FqN-49">
+        <UserObject label="FK cuenta_id : BIGINT" plantUmlId="mb_49" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK cuenta_id : BIGINT" id="6chg5QDyW_It_6WL7FqN-49">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-44" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="294" y="64.5" as="geometry" />
           </mxCell>
@@ -269,7 +270,7 @@
             <mxGeometry height="22" width="22" x="24.932950000000005" y="5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="PK id_consentimiento : UUID" plantUmlId="mb_54" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_consentimiento : UUID" id="6chg5QDyW_It_6WL7FqN-54">
+        <UserObject label="PK id_consentimiento : BIGINT" plantUmlId="mb_54" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_consentimiento : BIGINT" id="6chg5QDyW_It_6WL7FqN-54">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-52" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="224.19" y="37.5" as="geometry" />
           </mxCell>
@@ -284,7 +285,7 @@
             <mxGeometry height="8" width="224.19" y="56.5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="FK persona_id : UUID" plantUmlId="mb_57" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK persona_id : UUID" id="6chg5QDyW_It_6WL7FqN-57">
+        <UserObject label="FK persona_id : BIGINT" plantUmlId="mb_57" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK persona_id : BIGINT" id="6chg5QDyW_It_6WL7FqN-57">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-52" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="224.19" y="64.5" as="geometry" />
           </mxCell>
@@ -309,7 +310,7 @@
             <mxGeometry height="22" width="22" x="47.664400000000015" y="5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="PK id_perfil : UUID" plantUmlId="mb_62" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_perfil : UUID" id="6chg5QDyW_It_6WL7FqN-62">
+        <UserObject label="PK id_perfil : BIGINT" plantUmlId="mb_62" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="PK id_perfil : BIGINT" id="6chg5QDyW_It_6WL7FqN-62">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-60" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=20;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="213.53" y="37.5" as="geometry" />
           </mxCell>
@@ -324,7 +325,7 @@
             <mxGeometry height="8" width="213.53" y="56.5" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="FK cuenta_id : UUID" plantUmlId="mb_65" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK cuenta_id : UUID" id="6chg5QDyW_It_6WL7FqN-65">
+        <UserObject label="FK cuenta_id : BIGINT" plantUmlId="mb_65" plantUmlBaseStyle="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" plantUmlBaseValue="FK cuenta_id : BIGINT" id="6chg5QDyW_It_6WL7FqN-65">
           <mxCell parent="6chg5QDyW_It_6WL7FqN-60" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;rotatable=0;fillColor=none;strokeColor=none;fontSize=14;fontColor=#000000;fontStyle=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;" vertex="1">
             <mxGeometry height="19" width="213.53" y="64.5" as="geometry" />
           </mxCell>
