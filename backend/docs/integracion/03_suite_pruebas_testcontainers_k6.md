@@ -6,9 +6,9 @@
 **Área:** Backend — CoreLink
 **Responsable del entregable:** Zevallos · `B_ZEVALLOS`
 **Documento:** `03_suite_pruebas_testcontainers_k6.md`
-**Fecha:** 8 de septiembre de 2026
-**Versión:** 1.3 (Revisión del Liderazgo — PR #79 · Alineación con el envelope v1.2 y el contrato
-RutaDoc · evidencia E2E/k6 ejecutada)
+**Fecha:** 9 de septiembre de 2026
+**Versión:** 1.4 (Revisión del Liderazgo — PR #79 · veredicto `REQUIERE CORRECCIONES`: evidencia en
+PG16 local → casos `PARCIAL`; alcance de prototipo explícito; pendiente ejecución Testcontainers/PG18)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene scripts ejecutables ni código
@@ -158,23 +158,32 @@ Cada caso verifica la **integración entre módulos**, la **propagación de cont
 
 | ID | Módulo | Descripción | Resultado Esperado | Taxonomía |
 | :--- | :--- | :--- | :--- | :---: |
-| **E2E-01** | Mesa de Partes | Envío de solicitud con datos válidos de un ciudadano. | HTTP `201 Created` y persistencia del expediente con `correlation_id` asignado. | CONFIRMADO |
-| **E2E-02** | Mesa de Partes / Middleware | Envío de JSON con campos faltantes o formato incorrecto (p. ej. DNI inválido, folios negativos). | HTTP `400` estructurado bajo RFC 7807 con lista de `invalid_params`. | CONFIRMADO |
-| **E2E-03** | IdentiCore / Middleware | Registro de usuario con correo o DNI ya existente. | Captura de excepción PostgreSQL `23505` y mapeo a HTTP `409 Conflict`. | CONFIRMADO |
-| **E2E-04** | TramiCore / Middleware | Asignar/derivar trámite hacia un área que no existe. | Intercepción de violación `23503` y respuesta JSON indicando recurso inválido (`400/404`). | CONFIRMADO |
-| **E2E-05** | TramiCore / OrganiCore | Transición de estado desde Mesa de Partes hacia la jefatura. | HTTP `200 OK` y actualización correcta de la ubicación del documento. | CONFIRMADO |
-| **E2E-06** | Observabilidad / Contexto | Ejecutar una mutación verificando la captura de metadatos. | En `sigd_audit.bitacora_auditoria` constan `usuario_id`, `ip_origen` y `correlation_id` capturados automáticamente sin pasarlos en el código de negocio. | CONFIRMADO |
-| **E2E-07** | Observabilidad / Outbox | Radicar un expediente verificando atomicidad. | En la misma transacción se registran el expediente y el evento en `sigd_audit.evento_outbox` para su procesamiento asíncrono. | CONFIRMADO |
-| **E2E-08** | Seguridad / Middleware | Petición a ruta protegida sin token de autenticación. | HTTP `401 Unauthorized` en RFC 7807, bloqueando el acceso a la base de datos. | CONFIRMADO |
-| **E2E-09** | Seguridad / Middleware | Usuario con rol de operador intenta una acción de administrador. | HTTP `403 Forbidden` indicando privilegios insuficientes. | CONFIRMADO |
-| **E2E-10** | Middleware de Errores | Inducción deliberada de una falla crítica (p. ej. pérdida de conexión). | HTTP `500` estandarizado bajo RFC 7807 con ocultamiento total del *stack trace*. | CONFIRMADO |
+| **E2E-01** | Mesa de Partes | Envío de solicitud con datos válidos de un ciudadano. | HTTP `201 Created` y persistencia del expediente con `correlation_id` asignado. | PARCIAL (PG16 local) |
+| **E2E-02** | Mesa de Partes / Middleware | Envío de JSON con campos faltantes o formato incorrecto (p. ej. DNI inválido, folios negativos). | HTTP `400` estructurado bajo RFC 7807 con lista de `invalid_params`. | PARCIAL (PG16 local) |
+| **E2E-03** | IdentiCore / Middleware | Registro de usuario con correo o DNI ya existente. | Captura de excepción PostgreSQL `23505` y mapeo a HTTP `409 Conflict`. | PARCIAL (PG16 local) |
+| **E2E-04** | TramiCore / Middleware | Asignar/derivar trámite hacia un área que no existe. | Intercepción de violación `23503` y respuesta JSON indicando recurso inválido (`400/404`). | PARCIAL (PG16 local) |
+| **E2E-05** | TramiCore / OrganiCore | Transición de estado desde Mesa de Partes hacia la jefatura. | HTTP `200 OK` y actualización correcta de la ubicación del documento. | PARCIAL (PG16 local) |
+| **E2E-06** | Observabilidad / Contexto | Ejecutar una mutación verificando la captura de metadatos. | En `sigd_audit.bitacora_auditoria` constan `usuario_id`, `ip_origen` y `correlation_id` capturados automáticamente sin pasarlos en el código de negocio. | PARCIAL (PG16 local) |
+| **E2E-07** | Observabilidad / Outbox | Radicar un expediente verificando atomicidad. | En la misma transacción se registran el expediente y el evento en `sigd_audit.evento_outbox` para su procesamiento asíncrono. | PARCIAL (PG16 local) |
+| **E2E-08** | Seguridad / Middleware | Petición a ruta protegida sin token de autenticación. | HTTP `401 Unauthorized` en RFC 7807, bloqueando el acceso a la base de datos. | PARCIAL (PG16 local) |
+| **E2E-09** | Seguridad / Middleware | Usuario con rol de operador intenta una acción de administrador. | HTTP `403 Forbidden` indicando privilegios insuficientes. | PARCIAL (PG16 local) |
+| **E2E-10** | Middleware de Errores | Inducción deliberada de una falla crítica (p. ej. pérdida de conexión). | HTTP `500` estandarizado bajo RFC 7807 con ocultamiento total del *stack trace*. | PARCIAL (PG16 local) |
 
-> **Nota (v1.3):** estos casos estaban `PROPUESTO` (requisito de la suite, R-10). Pasan a `CONFIRMADO`
-> con la **evidencia ejecutable** de `implementacion/` (runbook 08): suite E2E corriendo con
-> `TEST_DATABASE_URL` (12/12 archivos · 22/22 casos · EXIT_CODE=0, `evidencia/e2e-20260909-123500/`)
-> y carga k6 dentro de umbrales (P95 < 200 ms · 0 % errores, `evidencia/k6-20260909-145820/`). La
-> suite de 12 archivos implementa los casos E2E-01…E2E-10 del plan (incluye atomicidad E2E-07,
-> captura de contexto y concurrencia del worker).
+> **Nota (v1.4):** los casos E2E-01…E2E-10 están implementados y **ejecutados** con la evidencia de
+> `implementacion/` (runbook 08): suite E2E con `TEST_DATABASE_URL` (12/12 archivos · 23/23 casos ·
+> EXIT_CODE=0, `evidencia/e2e-20260909-204737/`) y carga k6 dentro de umbrales (P95 < 200 ms ·
+> 0 % errores, `evidencia/k6-20260909-145820/`). Su estado es **`PARCIAL`** y NO `CONFIRMADO`
+> porque la ejecución se realizó contra **PostgreSQL 16 local**, y la ejecución exigida en el plan
+> (PostgreSQL 18 vía **Testcontainers/Docker**, con las migraciones reales de los 6 módulos) queda
+> **`PENDIENTE`** por no disponer de Docker en el entorno de esta máquina.
+>
+> **Alcance de la suite ejecutable (prototipo CoreLink):** la suite carga **únicamente** el DDL real
+> de `sigd_audit` (`integracion/06_sigd_audit_esquema_ddl.sql`) y **fixtures provisionales** para los
+> 5 esquemas de los restantes módulos (`tests/fixtures/01_schema_fixtures_test.sql`). **No ejecuta las
+> migraciones reales de los 6 módulos**; por tanto, la conformidad intermodular se valida contra los
+> contratos aprobados (04) y stubs provisionales, y queda **`PARCIAL`/`PENDIENTE`** hasta que cada
+> grupo entregue y la suite consuma sus migraciones reales. El mensaje de arranque de la suite lo
+> declara explícitamente (sección §4.3).
 
 ### 5.1. Especificación detallada de cada caso
 
@@ -342,6 +351,11 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
 3. Generar un informe con: ejecución (P95 y tasa de errores por escenario), violaciones de umbral si
    existieran y conclusión de aptitud (aprobado / no aprobado).
 4. Documentar el informe dentro del entregable de calidad para evidencia del pase a producción.
+5. **Semántica de los `*-summary.json` de k6:** la clave `"thresholds"` no almacena el resultado del
+   umbral sino la bandera interna de k6 de **violación en el momento final** (`true` = incumplido,
+   `false` = cumplido). La señal autoritativa de aprobación es la columna de estados en consola
+   (marca de ✓ en la sección THRESHOLDS del log) más el **código de salida 0** del proceso. Ver
+   runbook 08 §5.3.
 
 ---
 
@@ -388,7 +402,7 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
 | # | Criterio | Cumple |
 | :---: | :--- | :---: |
 | 1 | La estrategia de pruebas de integración utiliza **Testcontainers** para levantar PostgreSQL efímero en Docker. | ✅ |
-| 2 | Se define la ejecución automática de las migraciones DDL de los 6 esquemas. | ✅ |
+| 2 | Se define la ejecución automática de las migraciones DDL de los 6 esquemas en el plan; la suite **ejecutable actual valida solo el prototipo CoreLink** (DDL real de `sigd_audit` + fixtures provisionales de 5 esquemas) → estado `PARCIAL/PENDIENTE` (ver §5). | ⚠️ PARCIAL |
 | 3 | Se especifican los **10 casos de prueba E2E** intermodulares con su resultado esperado. | ✅ |
 | 4 | Se especifican las pruebas de carga con **k6** con umbrales (P95 < 200 ms y errores < 0.1 %). | ✅ |
 | 5 | Las pruebas son 100 % reproducibles y autónomas (sin datos precargados manualmente). | ✅ |
@@ -411,7 +425,10 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
   - El punto de entrada (set-up) valida la disponibilidad de Docker y falla de forma explícita si no
     está disponible (no falla en silencio).
 - **Taxonomía:** `CONFIRMADO` — requisitos de la suite y umbrales del plan; `PROPUESTO` — detalles de
-  configuración del runner (imagen, tamaños de lote); `EJEMPLO` — datos y URLs de prueba.
+  configuración del runner (imagen, tamaños de lote); `PARCIAL` — implementado y ejecutado pero en
+  entorno no exigido (PostgreSQL 16 local, sin Testcontainers/PG18) o contra stubs provisionales;
+  `PENDIENTE` — bloquear hacia `CONFIRMADO` (re-ejecución Testcontainers, migraciones reales de los
+  6 módulos, aprobación bilateral); `EJEMPLO` — datos y URLs de prueba.
 
 ---
 
@@ -419,4 +436,8 @@ Para que la prueba de carga sea reproducible y no dependa de estado previo:
 Observaciones del Grupo 6 CoreLink. Revisión 1.2: alinea la suite con la v1.2 del entregable 02
 (envelope normalizado e idempotencia) y con el contrato de eventos RutaDoc del entregable 04 §6.2
 para el cierre del PR #79. Revisión 1.3: los 10 casos pasan a `CONFIRMADO` con la evidencia ejecutable
-E2E (12/12) y de carga k6 (P95 < 200 ms, 0 % errores) registrada en `implementacion/evidencia/`.*
+E2E (12/12) y de carga k6 (P95 < 200 ms, 0 % errores) registrada en `implementacion/evidencia/`.
+Revisión 1.4 (veredicto `REQUIERE CORRECCIONES`): los casos vuelven a **`PARCIAL`** porque la
+evidencia se generó en PostgreSQL 16 local y la ejecución exigida (Testcontainers/PG18 + migraciones
+reales de los 6 módulos) queda `PENDIENTE`; se declara explícitamente el **alcance de prototipo**
+(§5) y la **semántica de los umbrales k6** (§6.5 y resumen.txt).*

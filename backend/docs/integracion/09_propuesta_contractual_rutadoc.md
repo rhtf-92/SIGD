@@ -1,5 +1,6 @@
 # 09 · PROPUESTA CONTRACTUAL — EVENTOS DE RUTaDoc (Grupo 1)
-## Estado: **PROPUESTO / PENDIENTE** (aprobación bilateral de RutaDoc exigida)
+## Estado: **PENDIENTE** — propuesta enviada a RutaDoc; CoreLink aún **no implementa** estos eventos
+(E-02/E-06/E-07). Pasará a `CONFIRMADO` solo con la aprobación bilateral escrita de RutaDoc.
 
 **Grupo 6 "CoreLink" · Integración, Calidad y Pruebas del Backend — SIGD**
 **Proponente:** CoreLink (Ricardo `B_AREVALO`)
@@ -37,7 +38,7 @@ materialización de la sección 6.2 del entregable 04 para facilitar la revisió
 | `id_expediente` | UUID | Expediente afectado (`sigd_tra`); nomenclatura `id_<agregado>` (D-15). |
 | `id_movimiento` | UUID | Movimiento que originó el evento (`sigd_rut.movimiento_tramite`). |
 | `ocurrido_en` | ISO-8601 UTC | Fecha y hora del hecho de negocio. |
-| `correlation_id` | UUIDv4 | Correlación de la solicitud completa (entregable 01). |
+| `correlation_id` | UUID RFC 4122 (aceptado v1–v5 del header; si falta/no es válido se genera UUIDv4) | Correlación de la solicitud completa (entregables 01/02; D-04). |
 | `clave_idempotencia` | string | `tipo_evento:id_expediente:id_movimiento`. |
 | `datos` | JSON | Bloque específico del evento (sección 4). |
 
@@ -88,5 +89,6 @@ explicación de autoría y confirmación del estado contractual. El registro de 
 
 ---
 
-*Propuesta elaborada por Ricardo (`B_AREVALO`) para CoreLink. Estado `PROPUESTO`; no constituye
+*Propuesta elaborada por Ricardo (`B_AREVALO`) para CoreLink. Estado `PENDIENTE` (aprobación
+bilateral de RutaDoc exigida; CoreLink no implementa aún E-02/E-06/E-07); no constituye
 contrato vigente hasta la aprobación bilateral con RutaDoc.*

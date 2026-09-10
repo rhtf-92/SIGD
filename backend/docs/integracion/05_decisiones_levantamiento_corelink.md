@@ -6,8 +6,9 @@
 **Área:** Backend — CoreLink
 **Responsable del entregable:** Ricardo · `B_AREVALO`
 **Documento:** `05_decisiones_levantamiento_corelink.md`
-**Fecha:** 8 de septiembre de 2026
-**Versión:** 1.5 (Revisión del Liderazgo — segunda ronda: atribuciones, separación de migraciones y evidencias E2E/k6)
+**Fecha:** 9 de septiembre de 2026
+**Versión:** 1.6 (Revisión del Liderazgo — veredicto `REQUIERE CORRECCIONES`: evidencia PG16 local,
+alcance prototipo, semántica de umbrales k6, URN/DATABASE_URL y autorías)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
@@ -30,6 +31,21 @@
 > `CONFIRMADO` (04). D-05 (inmutabilidad) permanece `PROPUESTO`: la garantía no se ejercita en el
 > prototipo porque la suite corre como dueño del esquema y el `REVOKE` por rol no aplica; requiere una
 > prueba de permisos del rol `sigd_app` en el UAT. El riesgo R-10 pasa a `CERRADO` (evidencia E2E y k6).
+>
+> **Revisión v1.6 (veredicto `REQUIERE CORRECCIONES`):** (1) la evidencia E2E/k6 se generó en
+> **PostgreSQL 16 local** y contra el **prototipo CoreLink** — D-06/D-20 bajan a `PARCIAL`, D-07 queda
+> `PENDIENTE` y R-10 vuelve a `PENDIENTE (avance parcial)` hasta la re-ejecución exigida
+> (Testcontainers/PG18 + migraciones reales de los 6 módulos); (2) la suite valida solo el prototipo
+> CoreLink (declarado en `tests/setup/global-setup.ts` y runbook 08); (3) `x-correlation-id` acepta
+> cualquier UUID RFC 4122 (v1–v5) y la documentación lo declara (D-04); (4) `DATABASE_URL` es exigida de
+> forma explícita sin credenciales implícitas (server.ts y worker); (5) los logs versionados quedan
+> sanitizados (sin ANSI, sin rutas personales, sin stack traces, sin mojibake; `git diff --check`
+> limpio); (6) E2E-07 ampliado a 3 casos incluye rollback de `movimiento_tramite`; (7) los eventos de
+> RutaDoc (E-02/E-06/E-07) se declaran `PENDIENTE` con **productor RutaDoc** y sin implementación en
+> CoreLink; (8) el worker distingue errores **transitorios/permanentes** y el despachador de demo queda
+> rotulado como demostración; (9) la semántica de los booleans `thresholds` de k6 se documenta
+> (`false` = umbral NO incumplido; señal autoritativa = EXIT_CODE + consola); (10) las celdas con estado
+> combinado `PROPUESTO/PENDIENTE` se reducen a estado único (D-12/D-18 y propuesta 09).
 
 ---
 
@@ -90,10 +106,10 @@ sigue la taxonomía oficial.
 | D-01 | 03/09/2026 | Necesidad de un estándar de errores internacional y vigente. | Adoptar **RFC 9457** manteniendo compatibilidad con RFC 7807, con los 8 campos especificados. | CONFIRMADO | Duque |
 | D-02 | 03/09/2026 | Evitar respuestas HTTP dispersas en cada módulo. | Todo módulo **lanza** la jerarquía `AppError` al detectar un error; solo el middleware global serializa a HTTP. | CONFIRMADO | Duque |
 | D-03 | 03/09/2026 | Propagar contexto sin ensuciar firmas de métodos. | Usar **una única instancia de AsyncLocalStorage** compartida vía `shared`; cada solicitud crea su almacén. | CONFIRMADO | Reátegui |
-| D-04 | 03/09/2026 | Correlacionar solicitudes de punta a punta. | `correlation_id` es **UUIDv4**; se acepta del header `x-correlation-id` o se genera; siempre se devuelve en la respuesta. | CONFIRMADO | Duque |
+| D-04 | 03/09/2026 | Correlacionar solicitudes de punta a punta. | `correlation_id` se genera como **UUIDv4** (randomUUID); el header `x-correlation-id` acepta cualquier UUID RFC 4122 válido (versiones 1 a 5); si no es UUID válido RFC 4122 se genera uno nuevo (v4); siempre se devuelve en la respuesta. | CONFIRMADO | Duque |
 | D-05 | 03/09/2026 (v1.3) | Auditoría inmutable y reconstrucción de estados. | Bitácora **append-only** (`sigd_audit.bitacora_auditoria`) con `datos_antes/datos_despues` en `JSONB`; revocar `UPDATE/DELETE` al rol de aplicación. La garantía de **inmutabilidad real** es `PROPUESTO` (v1.5): no se ejercita en el prototipo porque la suite corre como dueño del esquema; requiere prueba de permisos del rol `sigd_app` en el UAT. | PROPUESTO | Reátegui |
-| D-06 | 03/09/2026 (v1.3/1.5) | Evitar pérdida de notificaciones ante caídas externas. | Patrón **Transactional Outbox** en `sigd_audit.evento_outbox`; el worker usa lote y `FOR UPDATE SKIP LOCKED`, confirma antes de marcar `PROCESADO`, con backoff exponencial y DLQ. **v1.5:** las garantías de **atomicidad y cero pérdida** pasan a `CONFIRMADO` con el caso E2E-07 ejecutado (persistencia conjunta y rollback completo ante falla inducida). | CONFIRMADO | Reátegui |
-| D-07 | 03/09/2026 | Pruebas de integración reproducibles y sin mocks de datos. | Entorno efímero con **Testcontainers (PostgreSQL 18 Alpine)** + migraciones de los 6 esquemas y `TRUNCATE ... CASCADE` entre escenarios. | CONFIRMADO | Zevallos |
+| D-06 | 03/09/2026 (v1.3/1.5/1.6) | Evitar pérdida de notificaciones ante caídas externas. | Patrón **Transactional Outbox** en `sigd_audit.evento_outbox`; el worker usa lote y `FOR UPDATE SKIP LOCKED`, confirma antes de marcar `PROCESADO`, con backoff exponencial, distinción **transitorio/permanente** y DLQ. **v1.5:** `CONFIRMADO` con E2E-07 (persistencia conjunta + rollback de radicación). **v1.6 (REQUIERE CORRECCIONES):** baja a `PARCIAL` — E2E-07 ampliado a 3 casos (incluye rollback de **derivación** sobre `sigd_rut.movimiento_tramite`) se ejecutó en **PostgreSQL 16 local** contra el prototipo CoreLink; la ejecución exigida (Testcontainers/PG18 + migraciones reales de los 6 módulos) queda `PENDIENTE`. | PARCIAL | Reátegui |
+| D-07 | 03/09/2026 | Pruebas de integración reproducibles y sin mocks de datos. | Entorno efímero con **Testcontainers (PostgreSQL 18 Alpine)** + migraciones de los 6 esquemas y `TRUNCATE ... CASCADE` entre escenarios. La ejecución exigida **no se ha realizado**: sin Docker en la máquina, la evidencia se generó en PostgreSQL 16 local y contra el DDL real de `sigd_audit` + stubs provisionales (prototipo, P3). **v1.6:** `PENDIENTE` (PARCIAL). | PENDIENTE | Zevallos |
 | D-08 | 03/09/2026 | Aptitud de rendimiento antes de producción. | Umbrales k6: **P95 < 200 ms** y **tasa de errores < 0.1 %**; escenarios de radicación (100 VU) y derivación (50 VU). | CONFIRMADO | Zevallos |
 | D-09 | 03/09/2026 | Unificar los nombres de esquemas entre los 6 DDL. | Nomenclatura consolidada `sigd_auth`, `sigd_org`, `sigd_doc`, `sigd_tra`, `sigd_rut`, `sigd_audit`, reemplazando variantes anteriores. | CONFIRMADO | Ricardo |
 | D-10 | 03/09/2026 | Mutaciones legítimas sin sesión de usuario (migraciones, máquina-a-máquina). | `usuario_id` es **nullable** en la bitácora; la ausencia se documenta y no se trata como inconsistencia. | CONFIRMADO | Reátegui |
@@ -104,9 +120,9 @@ sigue la taxonomía oficial.
 | D-15 | 08/09/2026 | Se alternaba `id_expediente` con `expediente_id` en contratos y eventos. | Nomenclatura normalizada **`id_<agregado>`** en todos los contratos de datos y eventos (`id_expediente`, `id_movimiento`, `id_cuenta`, `id_area_*`). | CONFIRMADO (propio) | Ricardo |
 | D-16 | 08/09/2026 | Faltaban `ExpedienteAtendido` y `ExpedienteObservado` para RutaDoc. | Incorporar los tres eventos de RutaDoc (`ExpedienteDerivado`, `ExpedienteAtendido`, `ExpedienteObservado`) con contrato formal (04 §6.2). | PENDIENTE (aprobación RutaDoc) | Ricardo |
 | D-17 | 08/09/2026 | Estrategia de idempotencia no resuelta. | Clave de idempotencia compuesta `tipo_evento:id_expediente:id_movimiento`; el consumidor implementa índice único `(tipo_evento, clave_idempotencia)` y descarta duplicados (04 §6.3). | CONFIRMADO (propio) | Ricardo |
-| D-18 | 08/09/2026 | Contratos cruzados marcados `CONFIRMADO` sin aprobación de los grupos propietarios. | Ningún contrato cruzado se marca `CONFIRMADO` sin evidencia bilateral; los pendientes quedan `PROPUESTO`/`PENDIENTE` hasta la aprobación documentada (04 §10.2). | CONFIRMADO (propio) | Ricardo |
+| D-18 | 08/09/2026 | Contratos cruzados marcados `CONFIRMADO` sin aprobación de los grupos propietarios. | Ningún contrato cruzado se marca `CONFIRMADO` sin evidencia bilateral; los pendientes quedan en estado único **`PENDIENTE`** (o `PROPUESTO`, con parciales listados) hasta la aprobación documentada (04 §10.2). | CONFIRMADO (propio) | Ricardo |
 | D-19 | 08/09/2026 | Los commits de PR #79 provienen únicamente de la cuenta `B_AREVALO`. | Exigir declaración de autoría (ruta, rama, commit/PR, definición, confirmación de estado) de Duque, Reátegui y Zevallos; incorporar registro de evidencia (07). | PENDIENTE | Todos |
-| D-20 | 08/09/2026 (v1.5) | Semántica de entrega del outbox y duplicados. | El worker entrega **al-menos-una-vez** con `FOR UPDATE SKIP LOCKED`; la idempotencia la garantiza el consumidor con la `clave_idempotencia`. **No se promete entrega exactamente-una-vez** (requiere coordinador transaccional externo). **v1.5:** pasa a `CONFIRMADO` con el caso E2E-12 ejecutado (dos workers concurrentes despachan cada evento una sola vez; reserva transaccional; reintentos → `FALLIDO`). | CONFIRMADO | Reátegui |
+| D-20 | 08/09/2026 (v1.5/1.6) | Semántica de entrega del outbox y duplicados. | El worker entrega **al-menos-una-vez** con `FOR UPDATE SKIP LOCKED`; distingue errores **transitorios** (reintento con backoff exponencial) de **permanentes** (→ `FALLIDO`/DLQ directo, sin reintentar); la idempotencia la garantiza el consumidor con la `clave_idempotencia`. **No se promete entrega exactamente-una-vez** (requiere coordinador transaccional externo). **v1.5:** `CONFIRMADO` con E2E-12. **v1.6:** baja a `PARCIAL` — E2E-12 ejecutado en PostgreSQL 16 local contra el prototipo; pendiente Testcontainers/PG18 y migraciones reales. | PARCIAL | Reátegui |
 | D-21 | 08/09/2026 | `correlation_id` con `DEFAULT gen_random_uuid()` podía diferir del contexto. | `correlation_id` de la bitácora **sin valor por defecto** (v1.3 del DDL 06): se propaga siempre desde AsyncLocalStorage; la BD no genera un UUID distinto; inserción sin contexto falla de forma explícita. | CONFIRMADO (propio) | Reátegui |
 | D-22 | 08/09/2026 | FK a `sigd_auth.cuenta_usuario(id)` sin contrato aprobado. | FK `usuario_id` **SUSPENDIDA (PENDIENTE)**: IdentiCore/RutaDoc mantienen la columna `id_usuario`; se activa solo con contrato bilateral aprobado (07). La decisión de suspender está confirmada; su activación, pendiente. | CONFIRMADO (propio) | Ricardo |
 | D-23 | 08/09/2026 | La aplicación podía actualizar el outbox y no existía rol de worker. | Separar roles (DDL 06 v1.3): `sigd_app` (bitácora y encolado) y `sigd_worker` (solo SELECT/UPDATE del outbox). La aplicación no modifica eventos ya insertados. | CONFIRMADO (propio) | Reátegui |
@@ -156,9 +172,10 @@ decisiones sin fundamento documentado:
 
 | Estado | Decisión(es) | Interpretación |
 | :--- | :--- | :--- |
-| **CONFIRMADO** | D-01…D-04, D-06…D-10, D-14, D-15, D-17, D-18, D-20, D-21, D-22, D-23 | Acordado por el equipo y coherente con el plan de mejora; base para implementar (incluidos nomenclatura `id_<agregado>`, idempotencia, gobernanza de estado contractual y las correcciones v1.3). **v1.5:** D-06 y D-20 se confirman con la evidencia E2E ejecutada (E2E-07/E2E-12). |
-| **PROPUESTO** | D-05, D-11, D-12, D-13 | Propuesta técnica elaborada que requiere validación al implementar o por el grupo propietario. D-05 (inmutabilidad) requiere la prueba de permisos del rol `sigd_app` en el UAT (v1.5). |
-| **PENDIENTE** | D-16 (RutaDoc), D-19 (autoría); contenido parcial de D-12 (C-06, E-04, E-05, número de expediente) y activación de D-22 (contrato IdentiCore) | Requiere confirmación de otro grupo, de las autoridades o la evidencia de autoría de los integrantes. |
+| **CONFIRMADO** | D-01…D-04, D-08…D-10, D-14, D-15, D-17, D-18, D-21, D-22, D-23 | Acordado por el equipo y coherente con el plan de mejora; base para implementar (incluidos nomenclatura `id_<agregado>`, idempotencia, gobernanza de estado contractual y las correcciones v1.3). |
+| **PARCIAL** | D-06, D-20 (v1.6) | Garantías validadas con prueba ejecutable, pero en **PostgreSQL 16 local** contra el prototipo CoreLink; la ejecución exigida (Testcontainers/PG18 + migraciones reales de los 6 módulos) queda `PENDIENTE`. |
+| **PROPUESTO** | D-05, D-11, D-12, D-13 | Propuesta técnica elaborada que requiere validación al implementar o por el grupo propietario. D-05 (inmutabilidad) requiere la prueba de permisos del rol `sigd_app` en el UAT. |
+| **PENDIENTE** | D-07 (v1.6: Testcontainers/PG18 no ejecutado), D-16 (RutaDoc), D-19 (autoría); contenido parcial de D-12 (C-06, E-04, E-05, número de expediente) y activación de D-22 (contrato IdentiCore) | Requiere infraestructura (Docker/Testcontainers), confirmación de otro grupo, de las autoridades o la evidencia de autoría de los integrantes. |
 | **EJEMPLO** | Payloads y URLs de los documentos 01 a 04 | Dato ficticio de demostración; no representa datos reales de alumnos ni instituciones. |
 
 ---
@@ -215,7 +232,7 @@ trabajo del autor; se solicita corrección al responsable cuando corresponde.
 | R-07 | RutaDoc opera sin eventos de atención/observación. | RutaDoc no recibe retorno del ciclo expediente. | RutaDoc / Ricardo | Aprobación bilateral de E-06 y E-07 (04 §10.2). | PENDIENTE |
 | R-08 | Autoría de Reátegui, Zevallos y Duque no verificable en los commits del PR #79. | Trazabilidad del trabajo en equipo exigida por el liderazgo. | Duque / Reátegui / Zevallos | Declaraciones de autoría con rama y commit (07). | PENDIENTE |
 | R-09 | FK `usuario_id` suspendida sin contrato IdentiCore. | Sin integridad referencial de identidad mientras no se active. | Ricardo | Contrato bilateral aprobado y excepción (`ALTER TABLE`) registrada (07). | PENDIENTE |
-| R-10 | Evidencia E2E/k6 sin ejecutar (sin Docker). | Garantías y umbrales no demostrados; bloquea `CONFIRMADO`. | Zevallos / Ricardo | **E2E ejecutado** con `TEST_DATABASE_URL` (12/12 archivos · 22/22 casos · EXIT_CODE=0) y **carga k6 ejecutada** contra la API local (P95 150.96 / 144.64 ms < 200 ms · 0 % errores · EXIT_CODE=0). Artefactos en `implementacion/evidencia/e2e-20260909-123500/` y `implementacion/evidencia/k6-20260909-145820/`. | CERRADO |
+| R-10 | Evidencia E2E/k6 sin ejecutar. | Garantías y umbrales no demostrados; bloquea `CONFIRMADO`. | Zevallos / Ricardo | **v1.6:** la evidencia E2E/k6 se ejecutó, pero en **PostgreSQL 16 local** contra el prototipo CoreLink (E2E 12/12 archivos · **23/23** casos · EXIT_CODE=0; k6 P95 150.96 / 144.64 ms < 200 ms · 0 % errores · EXIT_CODE=0). Artefactos: `implementacion/evidencia/e2e-20260909-204737/` y `implementacion/evidencia/k6-20260909-145820/`. **Permanecerá `PENDIENTE`** hasta re-ejecutar en Testcontainers/PostgreSQL 18 con las migraciones reales de los 6 módulos. | PENDIENTE (avance parcial) |
 
 ---
 
@@ -226,9 +243,13 @@ trabajo del autor; se solicita corrección al responsable cuando corresponde.
 3. [ ] Recoger la aprobación bilateral del contrato RutaDoc (04 §6.2/§10.2) de TramiCore, DocuCore y RutaDoc.
 4. [ ] Recoger las declaraciones de autoría de Duque, Reátegui y Zevallos (07) con rama y commit.
 5. [x] Ejecutar la evidencia E2E/k6 y adjuntar reportes (logs, timestamps, exit codes, P95, error
-       rate). **Ejecutado:** E2E 12/12 · 22/22 con `TEST_DATABASE_URL` y k6 2/2 dentro de umbrales —
-       `implementacion/evidencia/e2e-20260909-123500/` y `implementacion/evidencia/k6-20260909-145820/`
-       (runbook 08).
+       rate). **Ejecutado (parcial):** E2E 12/12 · **23/23** con `TEST_DATABASE_URL` y k6 2/2 dentro de
+       umbrales — `implementacion/evidencia/e2e-20260909-204737/` y `implementacion/evidencia/k6-20260909-145820/`
+       (runbook 08). **Pendiente:** re-ejecución en Testcontainers/PG18 (R-10).
+5b. [ ] Reforzar la **sanitización de evidencias**: capturar con `[Console]::OutputEncoding = UTF8`,
+       sin códigos ANSI, sin rutas personales ni stack traces en los logs versionados (runbook 08 §6.1), y
+       explicar la semántica de los booleans `thresholds` de k6 (`false` = umbral NO incumplido; la señal
+       autoritativa es EXIT_CODE y la marca de consola) en el resumen.txt de cada corrida (corrección 9).
 6. [ ] Reconciliar `B_AREVALO` con `origin/B_GERIC` (4 commits de base) sin perder las correcciones v1.3.
 7. [ ] **No reabrir el PR hasta que el profesor lo autorice** tras cancelar el PR #79.
 8. [ ] Registrar la revisión final de Geric (`B_GERIC`) en la sección 6.2.
@@ -274,4 +295,9 @@ pruebas E2E, D-12 con estado único, detalle ADR en §4.3 y decisiones D-20 a D-
 atribuciones a Duque y separación de migraciones en la suite (P3/P10). Revisión 1.5: D-06 (atomicidad
 y cero pérdida) y D-20 (entrega al-menos-una-vez) pasan a `CONFIRMADO` con la evidencia E2E ejecutada;
 D-05 (inmutabilidad) se acota a `PROPUESTO` pendiente de la prueba de permisos `sigd_app` en UAT; el
-riesgo R-10 queda `CERRADO` con la carga k6 ejecutada (P95 < 200 ms, 0 % errores).*
+riesgo R-10 queda `CERRADO` con la carga k6 ejecutada (P95 < 200 ms, 0 % errores). **Revisión 1.6
+(REQUIERE CORRECCIONES):** D-06 y D-20 bajan a **`PARCIAL`** y D-07 queda `PENDIENTE` porque la
+evidencia se ejecutó en PostgreSQL 16 local contra el prototipo CoreLink; R-10 pasa a `PENDIENTE
+(avance parcial)` con e2e-20260909-204737 (23/23); se aclara la semántica de `thresholds` de k6 y la
+exigencia de `DATABASE_URL` explícita; se eliminan las celdas con estado combinado `PROPUESTO/PENDIENTE`
+(D-12/D-18) y los eventos RutaDoc permanecen `PENDIENTE` con productor RutaDoc.*

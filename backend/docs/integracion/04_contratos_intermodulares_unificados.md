@@ -6,8 +6,8 @@
 **Área:** Backend — CoreLink
 **Responsable del entregable:** Ricardo · `B_AREVALO`
 **Documento:** `04_contratos_intermodulares_unificados.md`
-**Fecha:** 8 de septiembre de 2026
-**Versión:** 1.5 (Revisión del Liderazgo — PR #79 cancelado · correcciones pre-merge · C-08 con evidencia)
+**Fecha:** 9 de septiembre de 2026
+**Versión:** 1.6 (Revisión del Liderazgo — PR #79 cancelado · veredicto `REQUIERE CORRECCIONES`)
 
 > [!NOTE]
 > Este documento es una **especificación de referencia**. No contiene instrucciones ejecutables ni
@@ -33,6 +33,16 @@
 > evento outbox en la misma transacción) queda demostrada por el caso E2E-07 ejecutado (persistencia
 > conjunta y rollback completo ante falla inducida, sin contaminación de expediente/outbox/bitácora);
 > evidencia en `implementacion/evidencia/` (E2E 12/12 · 22/22; carga k6 con P95 < 200 ms y 0 % errores).
+>
+> **Revisión v1.6 (veredicto `REQUIERE CORRECCIONES`):** C-08 desciende a **`PARCIAL`**. Su prueba
+> ejecutable (E2E-07 ampliado a **3 casos**: radicación atómica, rollback de radicación y rollback de
+> **derivación** sobre `sigd_rut.movimiento_tramite`) se generó contra **PostgreSQL 16 local** y la
+> suite solo consume el **prototipo CoreLink** (DDL real de `sigd_audit` + stubs provisionales de 5
+> esquemas, sin las migraciones reales de los 6 módulos); la ejecución exigida (Testcontainers/PG18 y
+> migraciones reales) queda `PENDIENTE` (runbook 08 §6.2). La evidencia E1–E4 está ahora en
+> `implementacion/evidencia/e2e-20260909-204737/` (23/23) y `k6-20260909-145820/`. Los **tres eventos
+> de RutaDoc** (E-02, E-06, E-07) permanecen `PENDIENTE` y **sin implementación** en este entregable:
+> son de **dominio RutaDoc** (productor RutaDoc) y no se declaran ejecutados (ver matriz E).
 
 ---
 
@@ -128,7 +138,7 @@ sin evidencia de aprobación del grupo propietario.
 | C-05 | RutaDoc | TramiCore, OrganiCore | Movimiento/derivación/atención/observación del expediente y estado actual. | La transición debe estar permitida por la máquina de estados de RutaDoc. | PENDIENTE | RutaDoc |
 | C-06 | TramiCore | RutaDoc | Creación del expediente dispara `movimiento` inicial. | Toda radicación debe generar al menos un movimiento inicial. | PENDIENTE | TramiCore / RutaDoc |
 | C-07 | CoreLink | Todos los módulos | `correlation_id` y formato de error RFC 7807/9457. | Respuestas de error conforme al entregable 01; nunca exponer rastros. | CONFIRMADO | CoreLink (propio) |
-| C-08 | CoreLink | Todos los módulos | Bitácora de auditoría y cola Outbox. | Toda mutación registra y todo evento se persiste de forma atómica (entregable 02). Garantía de **registro atómico** demostrada por E2E-07 (persistencia conjunta + rollback completo ante falla inducida); evidencia en `implementacion/evidencia/`. | CONFIRMADO | CoreLink (propio) |
+| C-08 | CoreLink | Todos los módulos | Bitácora de auditoría y cola Outbox. | Toda mutación registra y todo evento se persiste de forma atómica (entregable 02). Garantía de **registro atómico** parcialmente demostrada: E2E-07 ahora cubre 3 casos (persistencia conjunta, rollback de radicación y rollback de derivación sobre `sigd_rut.movimiento_tramite`); evidencia ejecutada en **PostgreSQL 16 local** contra prototipo (sin migraciones reales de los 6 módulos): `PARCIAL` / `PENDIENTE` re-ejecución Testcontainers PG18. Artefactos: `implementacion/evidencia/e2e-20260909-204737/`. | PARCIAL | CoreLink (propio) |
 
 ### 5.1. Reglas que rigen los contratos de API
 
@@ -212,7 +222,7 @@ el liderazgo. Este bloque permanece en estado **`PENDIENTE`** hasta la aprobaci�
 | `id_expediente` | UUID | Expediente afectado (`sigd_tra`). |
 | `id_movimiento` | UUID | Movimiento que originó el evento (`sigd_rut.movimiento_tramite`). |
 | `ocurrido_en` | ISO-8601 UTC | Fecha y hora del hecho de negocio. |
-| `correlation_id` | UUIDv4 | Correlación de la solicitud completa. |
+| `correlation_id` | UUID RFC 4122 (aceptado v1–v5; se genera UUIDv4 si falta/no es válido) | Correlación de la solicitud completa (D-04, corrección 14). |
 | `clave_idempotencia` | string | `tipo_evento:id_expediente:id_movimiento` (para derivación/atención/observación). |
 | `datos` | JSON | Bloque específico del evento (tabla 6.2.2). |
 
@@ -257,7 +267,7 @@ Contexto de la solicitud compartido entre capas (definido en el entregable 01 y 
 
 | Campo | Tipo | Descripción |
 | :--- | :--- | :--- |
-| `correlation_id` | UUIDv4 | Identificador único de la solicitud. |
+| `correlation_id` | UUID RFC 4122 (aceptado v1–v5; se genera UUIDv4 si falta/no es válido) | Identificador único de la solicitud. |
 | `usuario_id` | UUID \| null | Identidad autenticada, si existe. |
 | `ip_origen` | string | IP del cliente. |
 | `user_agent` | string | Cliente que originó la solicitud. |
@@ -466,8 +476,14 @@ Para cerrar cada contrato cruzado se requiere que **cada sublíder** envíe al r
   - **v1.4:** contrato formal de RutaDoc materializado como propuesta autocontenida en el entregable
     `09_propuesta_contractual_rutadoc.md`; `ExpedienteContract` 7.5 y reintentos del outbox alineados
     con D-15/DDL 06 v1.5 (`proxima_reintento_en`, estado `EN_PROCESO`).
-  - **v1.5:** C-08 a `CONFIRMADO` con la evidencia de registro atómico (E2E-07) y, en general, con la
+  - **v1.5:** C-08 vuelve a `CONFIRMADO` con la evidencia de registro atómico (E2E-07) y, en general, con la
     suite E2E 12/12 · 22/22 y la carga k6 dentro de umbrales (`implementacion/evidencia/`).
+  - **v1.6 (REQUIERE CORRECCIONES):** C-08 desciende a `PARCIAL` — la evidencia E2E-07 ampliada a 3 casos
+    (radicación, rollback radicación, rollback derivación) se ejecutó en PostgreSQL 16 local contra el
+    prototipo CoreLink (fixtures provisionales); la suite consumió solo `sigd_audit` real + stubs y la ejecución
+    exigida (Testcontainers/PG18, migraciones reales de los 6 módulos) queda `PENDIENTE`. E2E 23/23 casos.
+    Los eventos de RutaDoc (E-02, E-06, E-07) se confirman como `PENDIENTE` y **productor RutaDoc**;
+    los tipos TypeScript son contratos provisionales sin implementación de emisores en CoreLink.
 
 ---
 
@@ -478,4 +494,7 @@ evidencia de autoría/aprobación bilateral). Revisión 1.3: corrige la revisió
 cancelación del PR #79 (C-08 a `PROPUESTO` por garantía atómica pendiente de pruebas, FK de
 IdentiCore SUSPENDIDA y discrepancia de autoría del entregable 01 registrada). Revisión 1.5: C-08
 vuelve a `CONFIRMADO` con la evidencia E2E ejecutada (12/12 · 22/22) y la carga k6 dentro de umbrales
-(P95 < 200 ms, 0 % errores) — `implementacion/evidencia/`.*
+(P95 < 200 ms, 0 % errores) — `implementacion/evidencia/`. Revisión 1.6 (REQUIERE CORRECCIONES):
+C-08 → `PARCIAL` (evidencia en PG16 local, prototipo CoreLink); migraciones reales y Testcontainers/PG18
+quedan `PENDIENTE`; los eventos de RutaDoc se declaran `PENDIENTE` con productor RutaDoc; se declara el
+alcance de prototipo CoreLink y se aclaran las semánticas de umbrales k6.*

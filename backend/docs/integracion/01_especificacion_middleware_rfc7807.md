@@ -245,9 +245,11 @@ para que el comportamiento sea **igual en todos los módulos** y no dependa de c
   `getStore()` **sin recibir estos datos por parámetros**. Las firmas de los métodos de negocio se
   mantienen limpias.
 - **Correlación hacia el cliente:** el `correlation_id` se acepta de entrada si el cliente ya lo
-  envía en el header `x-correlation-id` (para encadenar con sistemas externos); si no, se genera uno
-  nuevo (UUIDv4). En ambos casos, la respuesta devuelve el header `x-correlation-id` con el valor
-  efectivamente usado, para que el consumidor pueda correlacionar respuestas y errores.
+  envía en el header `x-correlation-id` **y es un UUID RFC 4122 válido (versiones 1 a 5)** (para
+  encadenar con sistemas externos). Si no se envía, o el valor **no es un UUID RFC 4122 válido**, se
+  genera uno nuevo (UUIDv4) — **nunca se responde `400` por un `correlation_id` inválido** (decisión
+  D-04, v1.4; corrección 14). En todos los casos, la respuesta devuelve el header `x-correlation-id`
+  con el valor efectivamente usado, para que el consumidor pueda correlacionar respuestas y errores.
 - **Identidad del usuario:** la autenticación se puede completar después de que el contexto se cree.
   Para que la auditoría capture la identidad real, el flujo recomendado es: (1) el middleware de
   contexto genera el `correlation_id`; (2) el middleware de autenticación valida el token y deja el
@@ -285,7 +287,9 @@ El detalle del esquema de la bitácora y del worker de outbox se encuentra en el
 
 ### 8.5. Reglas de implementación para los equipos
 
-- **Generar siempre UUIDv4** como `correlation_id`; no usar fechas, secuencias ni correlativos.
+- **Generar siempre UUIDv4** como `correlation_id`; no usar fechas, secuencias ni correlativos. El
+  header `x-correlation-id` de entrada se acepta si es un UUID RFC 4122 válido (v1–v5); un valor no
+  válido no provoca `400`: se descarta y se genera uno nuevo (v4) (D-04, corrección 14).
 - **No almacenar el contexto en variables globales** ni en el ámbito de módulo: usar exclusivamente
   `AsyncLocalStorage` para respetar el aislamiento entre solicitudes concurrentes.
 - **Tolerancia en contextos sin HTTP:** en procesos programados o workers, `getStore()` puede devolver
