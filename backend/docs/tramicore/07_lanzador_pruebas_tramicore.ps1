@@ -9,8 +9,19 @@
 #      con logs separados por sesión.
 #   5) Carrera de año nuevo: 3 sesiones simultáneas piden el primer CUT del
 #      año 2028 (prueba que la inicialización anual no duplica la fila).
-#   6) Prueba de foliado NEGATIVA REAL: INSERT directo con rango solapado debe
-#      ser rechazado por el trigger (exit != 0 + 'Solapamiento' en stderr).
+#   6) Pruebas de foliado:
+#      6a) NEGATIVA REAL (secuencial): sobre un expediente ya foliado, un INSERT
+#          directo con rango solapado es rechazado por el trigger (exit != 0 +
+#          'Solapamiento' [23514] en stderr).
+#      6b) CONCURRENCIA REAL (positiva): 2 sesiones paralelas folian el MISMO
+#          expediente vía la función canónica; ambas terminan exit 0 y los
+#          rangos quedan contiguos (1-5 y 6-10), sin solapamientos ni huecos.
+#      6c) CONCURRENCIA REAL (negativa, INSERT directo): 2 sesiones paralelas
+#          insertan el MISMO rango 1-5 sobre un expediente vacío. El bloqueo
+#          previo de la fila del expediente en el trigger serializa la escritura
+#          y solo UNA confirma (exit 0); la segunda es rechazada (exit != 0,
+#          [23514]). Al final queda un único rango 1|5: no se aceptan rangos
+#          incompatibles bajo concurrencia.
 #   7) Genera evidencia consolidada en evidencia_h4.json con:
 #      - Fecha, hora, versión de PostgreSQL, hash del esquema.
 #      - Resultados de cada bloque (EXITCODE, pruebas OK/FALLO).
@@ -34,6 +45,11 @@ $dbPort = '5432'
 $dbUser = 'postgres'
 $dbName = 'tramicore_prueba'
 
+# Fuerza la salida de psql (stdout y stderr de sesiones y consultas) a UTF-8:
+# sin esto, psql escribe los mensajes en la página de códigos de la consola
+# (p.ej. cp1252/cp850) y los .log/.err de evidencia quedan con mojibake.
+$env:PGCLIENTENCODING = 'UTF8'
+
 $base = Split-Path -Parent $MyInvocation.MyCommand.Path
 $archivoDdl    = Join-Path $base '03_esquema_sigd_tra_cut_foliado.sql'
 $archivoDemo   = Join-Path $base '04_datos_demo_tramicore.sql'
@@ -50,7 +66,7 @@ function Invoke-Sql {
 
 function Invoke-Query {
     param([string]$Sql)
-    $output = & $psql -w -h $dbHost -p $dbPort -U $dbUser -d $dbName -At -c $Sql 2>&1
+    $output = & $psql -w -h $dbHost -p $dbPort -U $dbUser -d $dbName -qAt -c $Sql 2>&1
     $exitCode = $LASTEXITCODE
     return @{ Output = $output; ExitCode = $exitCode }
 }
@@ -66,7 +82,13 @@ function Start-PsqlSession {
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
-    $psi.Arguments = '-w -h ' + $dbHost + ' -p ' + $dbPort + ' -U ' + $dbUser + ' -d ' + $dbName + ' -qAt -f "' + $SqlFile + '"'
+    # psql escribe los mensajes en la codificación del cliente (UTF-8 gracias a
+    # PGCLIENTENCODING). Sin estos encoders, .NET decodificaría las tuberías con
+    # la página de códigos de la consola y los .log/.err quedarían con mojibake
+    # (doble codificación de caracteres acentuados).
+    $psi.StandardOutputEncoding = New-Object System.Text.UTF8Encoding($false)
+    $psi.StandardErrorEncoding = New-Object System.Text.UTF8Encoding($false)
+    $psi.Arguments = '-w -h ' + $dbHost + ' -p ' + $dbPort + ' -U ' + $dbUser + ' -d ' + $dbName + ' -qAt -v ON_ERROR_STOP=1 -f "' + $SqlFile + '"'
     return [System.Diagnostics.Process]::Start($psi)
 }
 
@@ -232,60 +254,144 @@ $filas2028 = (Invoke-Query "SELECT COUNT(*) FROM sigd_tra.secuencia_anual_cut WH
 Write-Host "Año 2028: CUTs=$($unicos2028 -join ', '), esperados=$($expected2028 -join ', '), filas_anuales=$filas2028" -ForegroundColor Yellow
 
 # ===========================================================================
-# 6) Prueba de foliado: solapamiento rechazado en expediente limpio (PRUEBA
-#    NEGATIVA REAL: INSERT directo que solapa es rechazado por el trigger
-#    trg_folio_verificar_solapamiento con SQLSTATE 23514 y exit code != 0).
+# 6) Pruebas de foliado:
+#    6a) NEGATIVA REAL (secuencial): INSERT directo con rango solapado sobre un
+#        expediente ya foliado es rechazado por el trigger [23514] (exit != 0).
+#    6b) CONCURRENCIA REAL (positiva): 2 sesiones paralelas folian el MISMO
+#        expediente vía la función canónica; ambas terminan exit 0 y los rangos
+#        quedan contiguos (1-5 y 6-10), sin solapamientos ni huecos.
+#    6c) CONCURRENCIA REAL (negativa, INSERT directo): 2 sesiones paralelas
+#        insertan el MISMO rango 1-5 sobre un expediente vacío. El bloqueo
+#        previo de la fila del expediente en el trigger serializa la escritura:
+#        solo UNA confirma (exit 0) y la otra es rechazada (exit != 0, [23514]).
 # ===========================================================================
-Write-Host '[6/7] Prueba de foliado: solapamiento rechazado (prueba negativa real)...'
-$folioSql1 = Join-Path $dirLogs "folio_concurrente_0.sql"
-$folioSql2 = Join-Path $dirLogs "folio_concurrente_1.sql"
-$folioOut1 = Join-Path $dirLogs "folio_concurrente_0.log"
-$folioOut2 = Join-Path $dirLogs "folio_concurrente_1.log"
-$folioErr1 = Join-Path $dirLogs "folio_concurrente_0.err"
-$folioErr2 = Join-Path $dirLogs "folio_concurrente_1.err"
+Write-Host '[6/7] Pruebas de foliado: negativa real + 2 pruebas concurrentes...'
 
-# Crear expediente limpio (sin folios previos) para la prueba
-$expedienteLimpio = (Invoke-Query "SELECT id_expediente FROM sigd_tra.expediente WHERE id_expediente NOT IN (SELECT id_expediente FROM sigd_tra.expediente_documento_folio) ORDER BY id_expediente OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;").Output
-if ([string]::IsNullOrWhiteSpace($expedienteLimpio)) {
-    # Si no hay expediente sin folios, crear uno nuevo
-    $nuevoId = (Invoke-Query "INSERT INTO sigd_tra.tramite (asunto, estado, fk_remitente, fk_destinatario) VALUES ('Expediente limpio para prueba de foliado', 'REGISTRADO', 101, 301) RETURNING id_tramite;").Output.Trim()
-    $expedienteLimpio = (Invoke-Query "INSERT INTO sigd_tra.expediente (fk_tramite) VALUES ($nuevoId) RETURNING id_expediente;").Output.Trim()
+function New-ExpedienteFoliable {
+    $v1 = @((Invoke-Query "INSERT INTO sigd_tra.tramite (asunto, estado, fk_remitente, fk_destinatario) VALUES ('Expediente para prueba de foliado', 'REGISTRADO', 101, 301) RETURNING id_tramite;").Output)
+    $idTramite = ($v1 | Where-Object { $_ -is [string] -and $_.Trim() -match '^\d+$' } | Select-Object -First 1).Trim()
+    $v2 = @((Invoke-Query "INSERT INTO sigd_tra.expediente (fk_tramite) VALUES ($idTramite) RETURNING id_expediente;").Output)
+    $idExp = ($v2 | Where-Object { $_ -is [string] -and $_.Trim() -match '^\d+$' } | Select-Object -First 1).Trim()
+    return $idExp
 }
-$idExpLimpio = $expedienteLimpio.Trim()
 
-# Sesión 0: folia el expediente limpio vía función canónica (folios 1-10).
-#            Exit 0 esperado.
+# --- 6a) NEGATIVA REAL (secuencial): solapamiento rechazado [23514] ----------
+$folioSqlNeg1 = Join-Path $dirLogs "folio_negativo_0.sql"
+$folioSqlNeg2 = Join-Path $dirLogs "folio_negativo_1.sql"
+$folioOutNeg1 = Join-Path $dirLogs "folio_negativo_0.log"
+$folioOutNeg2 = Join-Path $dirLogs "folio_negativo_1.log"
+$folioErrNeg1 = Join-Path $dirLogs "folio_negativo_0.err"
+$folioErrNeg2 = Join-Path $dirLogs "folio_negativo_1.err"
+
+$idNeg = New-ExpedienteFoliable
 @(
     "SET search_path TO sigd_tra, public;",
-    "SELECT sigd_tra.agregar_folio_expediente($idExpLimpio, 901, 10);"
-) | Set-Content -LiteralPath $folioSql1 -Encoding UTF8
-
-# Sesión 1: INSERT directo que SOLAPA el rango 1-10 recién asignado con 1-5.
-#            Debe ser rechazado (exit != 0) y dejar el mensaje 'Solapamiento'
-#            / SQLSTATE 23514 en stderr: prueba negativa real y reproducible.
+    "SELECT sigd_tra.agregar_folio_expediente($idNeg, 901, 10);"
+) | Set-Content -LiteralPath $folioSqlNeg1 -Encoding UTF8
 @(
     "SET search_path TO sigd_tra, public;",
-    "INSERT INTO sigd_tra.expediente_documento_folio (id_expediente, id_documento, folio_inicio, folio_fin, total_folios) VALUES ($idExpLimpio, 902, 1, 5, 5);"
-) | Set-Content -LiteralPath $folioSql2 -Encoding UTF8
+    "INSERT INTO sigd_tra.expediente_documento_folio (id_expediente, id_documento, folio_inicio, folio_fin, total_folios) VALUES ($idNeg, 902, 1, 5, 5);"
+) | Set-Content -LiteralPath $folioSqlNeg2 -Encoding UTF8
 
 # Ejecución DETERMINISTA: primero se pueblan los folios 1-10 (sesión 0 termina
-# antes de iniciar la sesión 1), de modo que el rango solapado 1-5 encuentre
-# siempre los folios ya confirmados y el trigger lo rechace de forma segura.
-# ON_ERROR_STOP=1: sin él, psql continuaría y devolvería exit 0 pese al error,
-# enmascarando la prueba negativa (bug que afectaba a la versión previa).
-$out1 = & $psql -w -h $dbHost -p $dbPort -U $dbUser -d $dbName -qAt -v ON_ERROR_STOP=1 -f $folioSql1 2>$folioErr1
-$folioExit0 = $LASTEXITCODE
-Set-Content -LiteralPath $folioOut1 -Value $out1 -Encoding UTF8
-$out2 = & $psql -w -h $dbHost -p $dbPort -U $dbUser -d $dbName -qAt -v ON_ERROR_STOP=1 -f $folioSql2 2>$folioErr2
-$folioExit1 = $LASTEXITCODE
-Set-Content -LiteralPath $folioOut2 -Value $out2 -Encoding UTF8
-$folioErr1Content = (Get-Content $folioErr2 -ErrorAction SilentlyContinue) -join "`n"
-$folioSolapamientoDetectado = ($folioErr1Content -match '23514|Solapamiento|solapamiento')
-Write-Host "Foliado: poblacion exit=$folioExit0, solapamiento rechazado exit=$folioExit1, detectado=$folioSolapamientoDetectado" -ForegroundColor Yellow
+# antes de iniciar la sesión 1) y luego el INSERT directo 1-5 (solapado) debe
+# ser rechazado. ON_ERROR_STOP=1: sin él, psql continuaría y devolvería exit 0
+# pese al error, enmascarando la prueba negativa.
+# Nota de codificación: se usa el mismo mecanismo de sesión que 6b/6c
+# (redirección cruda de streams) para que los .log/.err queden en UTF-8 limpio;
+# el operador `2>` de PowerShell escribiría UTF-16 con prefijo "psql.exe :".
+$pNeg0 = Start-PsqlSession -SqlFile $folioSqlNeg1
+$stdoutNeg0 = $pNeg0.StandardOutput.ReadToEnd()
+$stderrNeg0 = $pNeg0.StandardError.ReadToEnd()
+$pNeg0.WaitForExit()
+$folioNegExit0 = $pNeg0.ExitCode
+[System.IO.File]::WriteAllText($folioOutNeg1, $stdoutNeg0, (New-Object System.Text.UTF8Encoding($false)))
+[System.IO.File]::WriteAllText($folioErrNeg1, $stderrNeg0, (New-Object System.Text.UTF8Encoding($false)))
+$pNeg1 = Start-PsqlSession -SqlFile $folioSqlNeg2
+$stdoutNeg1 = $pNeg1.StandardOutput.ReadToEnd()
+$stderrNeg1 = $pNeg1.StandardError.ReadToEnd()
+$pNeg1.WaitForExit()
+$folioNegExit1 = $pNeg1.ExitCode
+[System.IO.File]::WriteAllText($folioOutNeg2, $stdoutNeg1, (New-Object System.Text.UTF8Encoding($false)))
+[System.IO.File]::WriteAllText($folioErrNeg2, $stderrNeg1, (New-Object System.Text.UTF8Encoding($false)))
+$folioNegErrContent = (Get-Content $folioErrNeg2 -ErrorAction SilentlyContinue) -join "`n"
+$folioNegSolapamiento = ($folioNegErrContent -match '23514|Solapamiento|solapamiento')
+$folioNegRows = @(Invoke-Query "SELECT string_agg(folio_inicio || '|' || folio_fin, ', ' ORDER BY folio_inicio) FROM sigd_tra.expediente_documento_folio WHERE id_expediente = $idNeg;").Output
+Write-Host "Foliado 6a: poblacion exit=$folioNegExit0, rechazo exit=$folioNegExit1, detectado=$folioNegSolapamiento, rangos=$folioNegRows" -ForegroundColor Yellow
 
-# Verificar que NO quedó el rango solapado: solo deben existir los folios 1-10.
-$folioRows = @(Invoke-Query "SELECT folio_inicio, folio_fin FROM sigd_tra.expediente_documento_folio WHERE id_expediente = $idExpLimpio ORDER BY folio_inicio;").Output
-Write-Host "Folios en expediente ${idExpLimpio}: $folioRows" -ForegroundColor Yellow
+# --- 6b) CONCURRENCIA REAL positiva: 2 sesiones canónicas sobre el MISMO
+#         expediente. El FOR UPDATE del expediente serializa y ambas confirman
+#         rangos contiguos (1-5 y 6-10), sin solapamientos ni huecos. ---------
+$idConc = New-ExpedienteFoliable
+$procesosConc = @()
+$detallesConc = @{}
+for ($i = 0; $i -lt 2; $i++) {
+    $sql = Join-Path $dirLogs "folio_concurrente_$i.sql"
+    $out = Join-Path $dirLogs "folio_concurrente_$i.log"
+    $err = Join-Path $dirLogs "folio_concurrente_$i.err"
+    $doc = 910 + $i
+    @(
+        "SET search_path TO sigd_tra, public;",
+        "SELECT sigd_tra.agregar_folio_expediente($idConc, $doc, 5);"
+    ) | Set-Content -LiteralPath $sql -Encoding UTF8
+    $p = Start-PsqlSession -SqlFile $sql
+    $procesosConc += $p
+    $detallesConc[$p.Id] = @{ Out = $out; Err = $err }
+}
+$exitCodesConc = @{}
+$procesosConc | ForEach-Object {
+    $stdout = $_.StandardOutput.ReadToEnd()
+    $stderr = $_.StandardError.ReadToEnd()
+    $_.WaitForExit()
+    $det = $detallesConc[$_.Id]
+    [System.IO.File]::WriteAllText($det.Out, $stdout, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($det.Err, $stderr, (New-Object System.Text.UTF8Encoding($false)))
+    $exitCodesConc[$_.Id] = $_.ExitCode
+}
+$concErrores = @($exitCodesConc.Values | Where-Object { $_ -ne 0 }).Count
+$folioConcRows = @(Invoke-Query "SELECT string_agg(folio_inicio || '-' || folio_fin, ', ' ORDER BY folio_inicio) FROM sigd_tra.expediente_documento_folio WHERE id_expediente = $idConc;").Output
+$folioConcContiguos = ("$folioConcRows".Trim() -eq '1-5, 6-10')
+Write-Host "Foliado 6b: exit=$($exitCodesConc.Values -join ','), rangos=$folioConcRows, contiguos=$folioConcContiguos" -ForegroundColor Yellow
+
+# --- 6c) CONCURRENCIA REAL negativa: 2 sesiones paralelas insertan el MISMO
+#         rango 1-5 sobre un expediente vacío (INSERT directo). El bloqueo
+#         previo en el trigger serializa: exactamente UNA confirma (exit 0) y
+#         la otra es rechazada (exit != 0, [23514]). Queda un único rango 1|5.
+#         Ningún rango incompatible se confirma bajo concurrencia. -------------
+$idDirect = New-ExpedienteFoliable
+$procesosDirect = @()
+$detallesDirect = @{}
+for ($i = 0; $i -lt 2; $i++) {
+    $sql = Join-Path $dirLogs "folio_concurrente_directo_$i.sql"
+    $out = Join-Path $dirLogs "folio_concurrente_directo_$i.log"
+    $err = Join-Path $dirLogs "folio_concurrente_directo_$i.err"
+    $doc = 920 + $i
+    @(
+        "SET search_path TO sigd_tra, public;",
+        "INSERT INTO sigd_tra.expediente_documento_folio (id_expediente, id_documento, folio_inicio, folio_fin, total_folios) VALUES ($idDirect, $doc, 1, 5, 5);"
+    ) | Set-Content -LiteralPath $sql -Encoding UTF8
+    $p = Start-PsqlSession -SqlFile $sql
+    $procesosDirect += $p
+    $detallesDirect[$p.Id] = @{ Out = $out; Err = $err }
+}
+$exitCodesDirect = @{}
+$procesosDirect | ForEach-Object {
+    $stdout = $_.StandardOutput.ReadToEnd()
+    $stderr = $_.StandardError.ReadToEnd()
+    $_.WaitForExit()
+    $det = $detallesDirect[$_.Id]
+    [System.IO.File]::WriteAllText($det.Out, $stdout, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($det.Err, $stderr, (New-Object System.Text.UTF8Encoding($false)))
+    $exitCodesDirect[$_.Id] = $_.ExitCode
+}
+$directExit0 = @($exitCodesDirect.Values | Where-Object { $_ -eq 0 }).Count
+$directExitNo0 = @($exitCodesDirect.Values | Where-Object { $_ -ne 0 }).Count
+$directErr = @(Get-ChildItem "$dirLogs\folio_concurrente_directo_*.err" |
+    ForEach-Object { Get-Content $_.FullName } |
+    Where-Object { $_ -match '23514|Solapamiento|solapamiento' })
+$folioDirectRows = @(Invoke-Query "SELECT string_agg(folio_inicio || '|' || folio_fin, ', ' ORDER BY folio_inicio) FROM sigd_tra.expediente_documento_folio WHERE id_expediente = $idDirect;").Output
+$unSoloAceptado = ($directExit0 -eq 1 -and $directExitNo0 -eq 1 -and $directErr.Count -ge 1 -and "$folioDirectRows".Trim() -eq '1|5')
+Write-Host "Foliado 6c: exit0s=$directExit0, rechazos=$directExitNo0, bloqueado=$($directErr.Count -gt 0), rangos=$folioDirectRows" -ForegroundColor Yellow
 
 # ===========================================================================
 # 7) Resumen final y evidencia consolidada
@@ -298,7 +404,9 @@ $criterios = @(
     @{ Nombre = '500 CUTs únicos (5 sesiones)'; Cond = ($totalCuts -eq 500 -and $unicosCuts -eq 500); Detalle = "total=$totalCuts unicos=$unicosCuts" }
     @{ Nombre = 'Sin errores/deadlocks en concurrencia'; Cond = ($errores2026.Count -eq 0); Detalle = "errores=$($errores2026.Count)" }
     @{ Nombre = 'Carrera año 2028: 3 CUTs exactos 000001, 000002, 000003 y 1 fila anual'; Cond = ($coinciden2028 -and "$filas2028".Trim() -eq '1'); Detalle = "cuts=$($unicos2028.Count) coinciden=$coinciden2028 filas=$filas2028" }
-    @{ Nombre = 'Foliado: solapamiento rechazado (prueba negativa real)'; Cond = ($folioExit0 -eq 0 -and $folioExit1 -ne 0 -and $folioSolapamientoDetectado); Detalle = "popula=$folioExit0 solapado=$folioExit1 detectado=$folioSolapamientoDetectado rangos=$folioRows" }
+    @{ Nombre = 'Foliado: solapamiento rechazado (prueba negativa SECUENCIAL)'; Cond = ($folioNegExit0 -eq 0 -and $folioNegExit1 -ne 0 -and $folioNegSolapamiento); Detalle = "popula=$folioNegExit0 solapado=$folioNegExit1 detectado=$folioNegSolapamiento rangos=$folioNegRows" }
+    @{ Nombre = 'Foliado concurrente (función canónica): 2 sesiones, rangos contiguos 1-5 y 6-10'; Cond = ($concErrores -eq 0 -and $folioConcContiguos); Detalle = "exit=$($exitCodesConc.Values -join ',') rangos=$folioConcRows contiguos=$folioConcContiguos" }
+    @{ Nombre = 'Foliado concurrente (INSERT directo): solo 1 de 2 sesiones confirma el rango 1-5; sin rangos incompatibles'; Cond = $unSoloAceptado; Detalle = "exit0s=$directExit0 rechazos=$directExitNo0 bloqueado=$($directErr.Count -gt 0) rangos=$folioDirectRows" }
 )
 
 $fail = $false
@@ -338,11 +446,26 @@ $evidencia = @{
             exit_codes   = @($exitCodesAnio.GetEnumerator() | Sort-Object Key | ForEach-Object { "$($_.Key)=$($_.Value)" })
             resultado    = if ($coinciden2028 -and "$filas2028".Trim() -eq '1') { 'PASS' } else { 'FAIL' }
         }
+        foliado_negativo_solapamiento = @{
+            exit_codes     = @($folioNegExit0, $folioNegExit1)
+            rangos         = $folioNegRows
+            solapamiento_detectado = $folioNegSolapamiento
+            resultado      = if ($folioNegExit0 -eq 0 -and $folioNegExit1 -ne 0 -and $folioNegSolapamiento) { 'PASS' } else { 'FAIL' }
+        }
         foliado_concurrente = @{
-            exit_codes     = @($folioExit0, $folioExit1)
-            rangos         = $folioRows
-            solapamiento_detectado = $folioSolapamientoDetectado
-            resultado      = if ($folioExit0 -eq 0 -and $folioExit1 -ne 0 -and $folioSolapamientoDetectado) { 'PASS' } else { 'FAIL' }
+            sesiones       = 2
+            exit_codes     = @($exitCodesConc.GetEnumerator() | Sort-Object Key | ForEach-Object { "$($_.Key)=$($_.Value)" })
+            rangos         = $folioConcRows
+            contiguos      = $folioConcContiguos
+            resultado      = if ($concErrores -eq 0 -and $folioConcContiguos) { 'PASS' } else { 'FAIL' }
+        }
+        foliado_concurrente_insert_directo = @{
+            sesiones       = 2
+            exit_codes     = @($exitCodesDirect.GetEnumerator() | Sort-Object Key | ForEach-Object { "$($_.Key)=$($_.Value)" })
+            rangos         = $folioDirectRows
+            un_solo_aceptado      = $unSoloAceptado
+            solapamiento_bloqueado = ($directErr.Count -gt 0)
+            resultado      = if ($unSoloAceptado) { 'PASS' } else { 'FAIL' }
         }
     }
     criterios_aprobacion = $criterios | ForEach-Object {

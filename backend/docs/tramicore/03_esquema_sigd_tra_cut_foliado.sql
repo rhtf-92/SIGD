@@ -15,6 +15,11 @@
 --     rechazaba por error el folio contiguo precedente (folio_fin = folio_inicio - 1).
 --     Se reemplaza por la regla de contigüidad estricta
 --     NEW.folio_inicio = COALESCE(MAX(folio_fin), 0) + 1.
+--   * CORRECCIÓN 2026-09-09 (revisión final): fn_folio_verificar_solapamiento
+--     ahora bloquea la fila del expediente (SELECT ... FOR UPDATE) ANTES de
+--     validar solapamientos/huecos, cerrando la vía de dos INSERTs directos
+--     concurrentes que leyeran el mismo estado (MAX+1) y confirmaran rangos
+--     incompatibles. La función canónica ya aplicaba este bloqueo.
 --   * CUT por año fiscal sobre secuencia_anual_cut con FOR UPDATE (sin secuencia
 --     global) eliminando la carrera en la inicialización de año nuevo.
 --   * CHECK de formato EXP-YYYY-XXXXXX y columna codigo_expediente VARCHAR(20).
@@ -452,9 +457,16 @@ CREATE INDEX idx_folio_expediente_rango ON expediente_documento_folio (id_expedi
 
 -- =============================================================================
 -- 11. FUNCIÓN: agregar_folio_expediente(...)
--- Vía CANÓNICA de foliatura. Bloquea el expediente (FOR UPDATE) y asigna el
--- siguiente rango contiguo (MAX(folio_fin)+1), garantizando sin solapamientos
--- ni vacíos incluso bajo concurrencia.
+-- Vía CANÓNICA de foliatura (recomendada y única para la aplicación). Bloquea la
+-- fila del expediente (SELECT ... FOR UPDATE) y asigna el siguiente rango
+-- contiguo (MAX(folio_fin)+1). El bloqueo se adquiere en su propio statement y
+-- el INSERT posterior ve los datos ya confirmados (READ COMMITTED), de modo que
+-- dos llamadas concurrentes sobre el mismo expediente se serializan y nunca
+-- confirman rangos solapados ni huecos.
+-- NOTA de arquitectura: la tabla también acepta INSERTs directos en DDL, pero
+-- el trigger trg_folio_verificar_solapamiento replica el mismo bloqueo previo de
+-- la fila del expediente antes de validar, cerrando la vía directa bajo
+-- concurrencia (corrección 2026-09-09, ver sección 12).
 -- =============================================================================
 CREATE OR REPLACE FUNCTION sigd_tra.agregar_folio_expediente(
     p_id_expediente BIGINT,
@@ -504,15 +516,34 @@ REVOKE EXECUTE ON FUNCTION sigd_tra.agregar_folio_expediente(BIGINT, BIGINT, INT
 -- 12. TRIGGERS DE FOLIACIÓN
 -- =============================================================================
 
--- Red de seguridad anti-solapamiento para INSERTs directos fuera de la función.
--- Usa SQLSTATE 23514 (integrity constraint violation) para ser consistente
--- con los CHECK constraints del esquema.
+-- Red de seguridad anti-solapamiento/huecos para TODAS las vías de escritura
+-- (función canónica y cualquier INSERT directo sobre la tabla).
+-- 1) BLOQUEO PREVIO DE LA FILA DEL EXPEDIENTE (SELECT ... FOR UPDATE) en el
+--    statement del trigger: dos sesiones READ COMMITTED que inserten folios
+--    sobre el mismo expediente se serializan aquí; la segunda espera a que la
+--    primera confirme y vuelve a leer el estado real antes de validar. Con esto,
+--    un par de INSERTs directos concurrentes que hubieran calculado
+--    MAX(folio_fin)+1 sobre el mismo snapshot NO pueden confirmar rangos
+--    incompatibles: el segundo es rechazado por solapamiento o hueco [23514].
+--    (Corrección 2026-09-09: el trigger anterior validaba sin bloquear, por lo
+--    que dos sesiones concurrentes podían leer el mismo estado y aceptar rangos
+--    incompatibles.)
+-- 2) Solapamientos y huecos usan SQLSTATE 23514 (integrity constraint
+--    violation), consistente con los CHECK constraints del esquema.
 CREATE OR REPLACE FUNCTION sigd_tra.fn_folio_verificar_solapamiento()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SET search_path = sigd_tra, public
 AS $$
 BEGIN
+    -- Serializa la escritura sobre el expediente (READ COMMITTED): espera a que
+    -- la transacción concurrente confirme y valida contra el estado ya
+    -- confirmado. La función canónica ya realiza este bloqueo; aquí se aplica
+    -- también a la vía de INSERT directo.
+    PERFORM 1 FROM sigd_tra.expediente
+    WHERE id_expediente = NEW.id_expediente
+    FOR UPDATE;
+
     IF EXISTS (
         SELECT 1
         FROM sigd_tra.expediente_documento_folio x
@@ -523,7 +554,7 @@ BEGIN
         RAISE EXCEPTION 'Solapamiento de folios en expediente % (rango %-% en conflicto)',
             NEW.id_expediente, NEW.folio_inicio, NEW.folio_fin
             USING ERRCODE = '23514',
-                  HINT = 'Use sigd_tra.agregar_folio_expediente() para foliación continua.';
+                  HINT = 'Solo la foliación canónica es contigua: no se permite una cesión parcial del rango.';
     END IF;
     -- Prevenir huecos: el rango debe comenzar exactamente en MAX(folio_fin)+1 del
     -- expediente (contigüidad estricta). Corrige un falso positivo de la condición

@@ -1,0 +1,3 @@
+psql:C:/TrabajosProyectos/ProyectoRenato/backend/docs/tramicore/logs_pruebas/folio_concurrente_directo_1.sql:2: ERROR:  Solapamiento de folios en expediente 13 (rango 1-5 en conflicto)
+SUGERENCIA:  Solo la foliación canónica es contigua: no se permite una cesión parcial del rango.
+CONTEXTO:  función PL/pgSQL fn_folio_verificar_solapamiento() en la línea 18 en RAISE
