@@ -1,0 +1,38 @@
+@layer theme, base, components, utilities;
+@import "../../styles/theme.css";
+
+.m03 { color: #0f172a; min-width: 0; overflow-wrap: anywhere; }
+.m03 :is(button, input, select, textarea, a, [tabindex]):focus-visible {
+  outline: 3px solid #0059a8; outline-offset: 3px;
+}
+.m03 button { min-height: 44px; cursor: pointer; }
+.m03 button:disabled { cursor: not-allowed; opacity: .65; }
+.m03-panel { border: 1px solid #cbd5e1; border-radius: 1rem; padding: clamp(1rem, 3vw, 1.5rem); background: white; }
+.m03-heading { font-size: 1.125rem; font-weight: 700; margin-bottom: .75rem; }
+.m03-help { color: #475569; font-size: .875rem; margin-block: .5rem; }
+.m03-alert { border: 1px solid #fca5a5; border-radius: .5rem; padding: .75rem; background: #fef2f2; color: #991b1b; }
+.m03-notice { border: 1px solid #cbd5e1; border-radius: .5rem; padding: .75rem; background: #f1f5f9; }
+.m03-field { display: grid; gap: .4rem; margin-block: 1rem; }
+.m03-field label { font-weight: 600; }
+.m03-field :is(input, select, textarea) { min-height: 44px; }
+.m03-field textarea { min-height: 100px; resize: vertical; }
+.m03-error { color: #991b1b; font-size: .875rem; }
+.m03-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .75rem; margin-top: 1.25rem; }
+.m03-tree, .m03-tree [role=group] { list-style: none; padding: 0; }
+.m03-tree [role=group] { padding-left: clamp(.6rem, 3vw, 1.5rem); }
+.m03-tree [role=treeitem] { border-radius: .5rem; outline-offset: -2px; }
+.m03-tree-label { display: flex; align-items: center; gap: .5rem; padding: .7rem .5rem; min-height: 44px; border-radius: .5rem; cursor: pointer; }
+.m03-tree [aria-selected=true] > .m03-tree-label { color: #fff; background: #0059a8; font-weight: 700; }
+.m03-tree [aria-disabled=true] > .m03-tree-label { color: #64748b; cursor: not-allowed; }
+.m03-folio-page { position: relative; border: 1px solid #cbd5e1; border-radius: .5rem; background: #f8fafc; padding: 3.5rem .75rem .75rem; min-height: 220px; }
+.m03-folio-stamp { position: absolute; right: .75rem; top: .75rem; padding: .25rem .6rem; border: 2px solid #0f172a; color: #0f172a; background: white; font-weight: 700; }
+.m03-folio-page img { display: block; max-width: 100%; height: auto; margin: auto; }
+.m03-dialog { width: min(42rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; padding: 0; border: 1px solid #cbd5e1; border-radius: 1rem; overflow-y: auto; overscroll-behavior: contain; }
+.m03-dialog::backdrop { background: rgb(15 23 42 / .6); }
+.m03-dialog-content { padding: clamp(1rem, 3vw, 1.5rem); }
+.m03-dialog-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.m03-results { max-height: 15rem; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: .5rem; }
+.m03-result { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem; border-bottom: 1px solid #e2e8f0; }
+.m03-toast { margin-block: 1rem; padding: 1rem; border: 1px solid #047857; border-radius: .75rem; background: #ecfdf5; color: #065f46; }
+.m03-toast[data-tipo=error] { border-color: #b91c1c; background: #fef2f2; color: #991b1b; }
+@media (max-width: 480px) { .m03-actions > button { width: 100%; } .m03-result { flex-wrap: wrap; } }
