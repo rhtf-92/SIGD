@@ -35,4 +35,18 @@
 .m03-result { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem; border-bottom: 1px solid #e2e8f0; }
 .m03-toast { margin-block: 1rem; padding: 1rem; border: 1px solid #047857; border-radius: .75rem; background: #ecfdf5; color: #065f46; }
 .m03-toast[data-tipo=error] { border-color: #b91c1c; background: #fef2f2; color: #991b1b; }
+.m03-timeline { position: relative; display: grid; gap: 1rem; margin: 1.25rem 0 0; padding: 0 0 0 1.25rem; list-style: none; }
+.m03-timeline::before { position: absolute; inset: 0 auto 0 .3rem; width: 2px; background: #bfdbfe; content: ""; }
+.m03-timeline-item { position: relative; }
+.m03-timeline-item::before { position: absolute; top: 1.25rem; left: -.99rem; z-index: 1; width: .75rem; height: .75rem; border: 2px solid #fff; border-radius: 9999px; background: #006ec7; box-shadow: 0 0 0 2px #93c5fd; content: ""; }
+.m03-timeline-card { position: relative; border: 1px solid #cbd5e1; border-radius: .75rem; padding: 1rem; background: #fff; box-shadow: 0 1px 2px rgb(15 23 42 / .04); }
+.m03-timeline-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.m03-timeline-date { margin: 0 0 .25rem; color: #475569; font-size: .875rem; font-weight: 600; }
+.m03-timeline-readonly { flex: none; border-radius: 9999px; background: #f1f5f9; padding: .25rem .5rem; color: #475569; font-size: .7rem; font-weight: 700; text-transform: uppercase; }
+.m03-timeline-details { display: grid; gap: .75rem; margin: 1rem 0 0; }
+.m03-timeline-details dt { color: #475569; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.m03-timeline-details dd { margin: .2rem 0 0; color: #0f172a; }
+.m03-timeline-details a { color: #0059a8; text-decoration: underline; }
+.m03-timeline-hash { border-top: 1px solid #e2e8f0; padding-top: .75rem; }
+@media (min-width: 640px) { .m03-timeline-details { grid-template-columns: repeat(2, minmax(0, 1fr)); } .m03-timeline-hash { grid-column: 1 / -1; } }
 @media (max-width: 480px) { .m03-actions > button { width: 100%; } .m03-result { flex-wrap: wrap; } }
