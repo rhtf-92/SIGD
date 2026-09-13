@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
+import AdminPageHeader from "../../components/administracion/AdminPageHeader";
+
 const modulos = [
   {
     titulo: "Usuarios",
@@ -28,7 +30,7 @@ const modulos = [
   {
     titulo: "Calendario Laboral",
     descripcion:
-      "Configura días hábiles, horario, feriados y días no laborables.",
+      "Configura días hábiles, horario, corte LPAG y feriados de Ucayali.",
     ruta: "/administracion/calendario-laboral",
   },
   {
@@ -44,17 +46,10 @@ export default function AdministracionPage() {
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-5">
-          <p className="text-sm font-bold text-blue-700">SIGD</p>
-          <h1 className="text-2xl font-bold">
-            Administración, Seguridad y Auditoría
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Configuración y control administrativo del sistema.
-          </p>
-        </div>
-      </header>
+      <AdminPageHeader
+        title="Panel de Administración"
+        description="Administración, Seguridad y Auditoría: configuración y control administrativo del sistema."
+      />
 
       <section className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-7">

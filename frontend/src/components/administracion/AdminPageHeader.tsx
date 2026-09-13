@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
+import AdminBreadcrumbs from "./AdminBreadcrumbs";
+
 interface AdminPageHeaderProps {
   title: string;
   description: string;
@@ -14,6 +16,8 @@ export default function AdminPageHeader({
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto max-w-7xl px-6 py-5">
+        <AdminBreadcrumbs />
+
         <button
           type="button"
           onClick={() => navigate("/administracion")}
