@@ -8,6 +8,8 @@ import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosPage from "../pages/administracion/UsuariosPage";
+import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
+import ExpedienteDetallePage from "../pages/expedientes/ExpedienteDetallePage";
 
 export default function AppRouter() {
   return (
@@ -29,6 +31,8 @@ export default function AppRouter() {
         element={<CalendarioLaboralPage />}
       />
       <Route path="/administracion/seguridad" element={<SeguridadPage />} />
+      <Route path="/expedientes" element={<BandejaExpedientesPage />} />
+      <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
     </Routes>
   );
 }
