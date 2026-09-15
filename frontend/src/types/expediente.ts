@@ -14,8 +14,11 @@ export interface ClasificacionCCD {
   seccion: string;
   /** Serie documental reglamentaria (ej. 'TITULACION_PROFESIONAL'). */
   serieDocumental: string;
+  /** Subdivisión de la serie, cuando ha sido clasificada. */
+  subserieDocumental?: string;
   /** Código unificado de la serie archivística (ej. 'CCD-SA-TIT'). */
   codigoSerie: string;
+  codigoSubserie?: string;
 }
 
 /** Representa una versión inmutable de un documento adjunto o proyectado. */
@@ -24,6 +27,8 @@ export interface VersionDocumento {
   versionId: string;
   /** Número correlativo incremental. */
   numeroVersion: number;
+  /** Estado del documento dentro de su historial de versiones. */
+  estado: "VIGENTE" | "HISTORICA";
   /** Nombre del archivo original. */
   nombreArchivo: string;
   /** Clave o URL de almacenamiento seguro en MinIO / S3. */
@@ -59,6 +64,7 @@ export interface MetadatosAvanzados {
   creadorNombre: string;
   responsableAsignadoId?: string;
   responsableAsignadoNombre?: string;
+  canalIngreso?: "MESA_DE_PARTES_VIRTUAL" | "VENTANILLA_PRESENCIAL";
 }
 
 /** Información del solicitante o administrado (modelo polimórfico). */

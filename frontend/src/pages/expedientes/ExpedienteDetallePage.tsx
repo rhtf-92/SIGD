@@ -1,19 +1,21 @@
 import { useNavigate, useParams } from "react-router-dom";
 
 import ExpedienteTimeline from "../../components/expedientes/ExpedienteTimeline";
+import ExpedienteClasificacion from "../../components/expedientes/ExpedienteClasificacion";
+import ExpedienteMetadatos from "../../components/expedientes/ExpedienteMetadatos";
+import ExpedienteVersiones from "../../components/expedientes/ExpedienteVersiones";
 import { useExpedientesBase } from "../../hooks/useBandejaExpedientes";
 import { useExpedienteTimeline } from "../../hooks/useExpedienteTimeline";
-import { ETIQUETAS_ESTADO_FLUJO } from "../../types/expediente";
 
 export default function ExpedienteDetallePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: expedientes, isLoading: cargandoExpediente } =
+  const { data: expedientes, isLoading: cargandoExpediente, isError: errorExpediente } =
     useExpedientesBase();
   const expediente = expedientes?.find((exp) => exp.id === id);
 
-  const { data: eventos, isLoading: cargandoTimeline } =
+  const { data: eventos, isLoading: cargandoTimeline, isError: errorTimeline } =
     useExpedienteTimeline(id);
 
   return (
@@ -29,7 +31,7 @@ export default function ExpedienteDetallePage() {
           </button>
 
           <p className="text-sm font-bold text-blue-700">SIGD</p>
-          <h1 className="text-2xl font-bold">
+          <h1 className="break-words text-2xl font-bold">
             {expediente ? expediente.codigoExpediente : "Detalle de Expediente"}
           </h1>
           {expediente && (
@@ -38,56 +40,29 @@ export default function ExpedienteDetallePage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         {cargandoExpediente && (
           <p className="text-sm text-slate-500">Cargando expediente…</p>
         )}
 
-        {!cargandoExpediente && !expediente && (
+        {errorExpediente && <p role="alert" className="rounded-xl border border-red-200 bg-white p-6 text-sm text-red-800">No se pudo cargar el expediente. Vuelve a la bandeja e inténtalo nuevamente.</p>}
+
+        {!cargandoExpediente && !errorExpediente && !expediente && (
           <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
             No se encontró el expediente solicitado.
           </p>
         )}
 
         {expediente && (
-          <div className="mb-8 grid gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Solicitante
-              </p>
-              <p className="text-sm text-slate-800">
-                {expediente.solicitante.nombreOrazonSocial} (
-                {expediente.solicitante.tipoDocumento}{" "}
-                {expediente.solicitante.numeroDocumento})
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Estado actual
-              </p>
-              <p className="text-sm text-slate-800">
-                {ETIQUETAS_ESTADO_FLUJO[expediente.estadoFlujo]}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Serie CCD
-              </p>
-              <p className="text-sm text-slate-800">
-                {expediente.clasificacionCCD.serieDocumental}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Área actual
-              </p>
-              <p className="text-sm text-slate-800">{expediente.areaActual}</p>
-            </div>
-          </div>
+          <>
+            <ExpedienteMetadatos expediente={expediente} />
+            <ExpedienteClasificacion clasificacion={expediente.clasificacionCCD} />
+            <ExpedienteVersiones versiones={expediente.versionesDocumentos} />
+            {errorTimeline ? <p role="alert" className="rounded-xl border border-red-200 bg-white p-6 text-sm text-red-800">No se pudo cargar la Hoja de Ruta y Trazabilidad.</p> : <ExpedienteTimeline eventos={eventos ?? []} cargando={cargandoTimeline} />}
+          </>
         )}
 
-        <ExpedienteTimeline eventos={eventos ?? []} cargando={cargandoTimeline} />
-      </section>
+      </div>
     </main>
   );
 }

@@ -1,5 +1,6 @@
-import type { ExpedienteSGD } from "../types/expediente";
-import type { BitacoraEventoExpediente } from "../types/trazabilidadExpediente";
+import type { EstadoFlujoExpediente, ExpedienteSGD, VersionDocumento } from "../types/expediente";
+import type { BitacoraEventoExpediente, TipoEventoBitacora } from "../types/trazabilidadExpediente";
+import { etiquetaExpediente } from "../utils/expedientePresentacion";
 
 /**
  * Fixtures locales usadas cuando VITE_ENABLE_MOCKS=true (modo Stubs / Desarrollo Aislado),
@@ -9,7 +10,7 @@ import type { BitacoraEventoExpediente } from "../types/trazabilidadExpediente";
  * Permiten desarrollar y demostrar la Bandeja y el Timeline sin depender de que el
  * backend (`sigd_tra` / TramiCore) esté desplegado.
  */
-export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = [
+const expedientesBase: ExpedienteSGD[] = [
   {
     id: "8f1c9b2e-0001-4a11-9c1a-000000000001",
     codigoExpediente: "EXP-2026-000104",
@@ -26,11 +27,14 @@ export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = [
       fondo: "IESTP_SUIZA",
       seccion: "SECRETARIA_ACADEMICA",
       serieDocumental: "MATRICULA_Y_ACTAS",
+      subserieDocumental: "Certificados de Estudios",
       codigoSerie: "CCD-SA-MAT",
+      codigoSubserie: "CCD-SA-MAT-CE",
     },
     metadatos: {
       tipoDocumentoPrincipal: "SOLICITUD",
       palabrasClave: ["certificado", "estudios"],
+      canalIngreso: "MESA_DE_PARTES_VIRTUAL",
       creadorId: "u-001",
       creadorNombre: "Juan Pérez Ríos",
       responsableAsignadoId: "u-100",
@@ -41,7 +45,7 @@ export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = [
     estadoFlujo: "PENDIENTE",
     prioridad: "NORMAL",
     fechaIngreso: "2026-09-05T09:12:00-05:00",
-    fechaUltimoMovimiento: "2026-09-05T09:12:00-05:00",
+    fechaUltimoMovimiento: "2026-09-05T10:06:00-05:00",
     fechaLimiteAtencion: "2026-10-17T16:30:00-05:00",
     versionesDocumentos: [],
     cantidadFolios: 3,
@@ -62,11 +66,14 @@ export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = [
       fondo: "IESTP_SUIZA",
       seccion: "UNIDAD_ACADEMICA",
       serieDocumental: "PRACTICAS_PREPROFESIONALES",
+      subserieDocumental: "Informes de Prácticas",
       codigoSerie: "CCD-UA-PPP",
+      codigoSubserie: "CCD-UA-PPP-INF",
     },
     metadatos: {
       tipoDocumentoPrincipal: "INFORME",
       palabrasClave: ["prácticas pre-profesionales"],
+      canalIngreso: "VENTANILLA_PRESENCIAL",
       creadorId: "u-002",
       creadorNombre: "Ana Ramos Tello",
       responsableAsignadoId: "u-100",
@@ -83,6 +90,7 @@ export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = [
       {
         versionId: "v1.0",
         numeroVersion: 1,
+        estado: "VIGENTE",
         nombreArchivo: "informe_practicas_v1.pdf",
         urlArchivo: "https://storage.local/expedientes/EXP-2026-000089/v1.0.pdf",
         autorCambioId: "u-100",
@@ -111,11 +119,14 @@ export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = [
       fondo: "IESTP_SUIZA",
       seccion: "SECRETARIA_ACADEMICA",
       serieDocumental: "CONVALIDACIONES",
+      subserieDocumental: "Informes Técnicos de Convalidación",
       codigoSerie: "CCD-SA-CON",
+      codigoSubserie: "CCD-SA-CON-INF",
     },
     metadatos: {
       tipoDocumentoPrincipal: "INFORME",
       palabrasClave: ["convalidación"],
+      canalIngreso: "VENTANILLA_PRESENCIAL",
       creadorId: "u-003",
       creadorNombre: "Carlos Ruiz Panduro",
       responsableAsignadoId: "u-101",
@@ -147,11 +158,14 @@ export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = [
       fondo: "IESTP_SUIZA",
       seccion: "SECRETARIA_ACADEMICA",
       serieDocumental: "TITULACION_PROFESIONAL",
+      subserieDocumental: "Expedientes de Titulación",
       codigoSerie: "CCD-SA-TIT",
+      codigoSubserie: "CCD-SA-TIT-EXP",
     },
     metadatos: {
       tipoDocumentoPrincipal: "RESOLUCION_DIRECTORAL",
       palabrasClave: ["titulación"],
+      canalIngreso: "VENTANILLA_PRESENCIAL",
       creadorId: "u-004",
       creadorNombre: "María Torres Vela",
       responsableAsignadoId: "u-100",
@@ -188,6 +202,7 @@ export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = [
     metadatos: {
       tipoDocumentoPrincipal: "RESOLUCION_DIRECTORAL",
       palabrasClave: ["reconocimiento de créditos"],
+      canalIngreso: "MESA_DE_PARTES_VIRTUAL",
       creadorId: "u-005",
       creadorNombre: "Luis Sánchez Reátegui",
       responsableAsignadoId: "u-100",
@@ -224,6 +239,7 @@ export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = [
     metadatos: {
       tipoDocumentoPrincipal: "SOLICITUD",
       palabrasClave: ["matrícula"],
+      canalIngreso: "MESA_DE_PARTES_VIRTUAL",
       creadorId: "u-006",
       creadorNombre: "Rosa Flores Nunta",
       responsableAsignadoId: "u-100",
@@ -241,8 +257,49 @@ export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = [
   },
 ];
 
-/** Bitácora inmutable de ejemplo para el expediente EXP-2026-000104 (usado por el Timeline, ENT-M03-03). */
-export const BITACORA_FIXTURE: Record<string, BitacoraEventoExpediente[]> = {
+/** Identificadores de integridad demo; no representan hashes calculados de documentos reales. */
+function hashDemo(expedienteId: string, version: number): string {
+  return expedienteId.replaceAll("-", "") + version.toString(16).padStart(32, "0");
+}
+
+function crearVersionesDemo(expediente: ExpedienteSGD): VersionDocumento[] {
+  return [
+    {
+      versionId: "v1.0", numeroVersion: 1, estado: "HISTORICA",
+      nombreArchivo: `${expediente.codigoExpediente}_solicitud.pdf`, urlArchivo: "",
+      autorCambioId: expediente.metadatos.creadorId,
+      autorCambioNombre: expediente.metadatos.creadorNombre,
+      fechaRegistro: expediente.fechaIngreso,
+      motivoModificacion: "Registro inicial de la documentación presentada.",
+      hashIntegridad: hashDemo(expediente.id, 1),
+    },
+    {
+      versionId: "v1.1", numeroVersion: 2, estado: "VIGENTE",
+      nombreArchivo: `${expediente.codigoExpediente}_documentacion.pdf`, urlArchivo: "",
+      autorCambioId: expediente.metadatos.responsableAsignadoId ?? expediente.metadatos.creadorId,
+      autorCambioNombre: expediente.metadatos.responsableAsignadoNombre ?? expediente.metadatos.creadorNombre,
+      fechaRegistro: expediente.fechaUltimoMovimiento,
+      motivoModificacion: "Incorporación de la clasificación documental y revisión de metadatos.",
+      hashIntegridad: hashDemo(expediente.id, 2),
+    },
+  ];
+}
+
+export const EXPEDIENTES_FIXTURE: ExpedienteSGD[] = expedientesBase.map((expediente) => ({
+  ...expediente,
+  clasificacionCCD: {
+    ...expediente.clasificacionCCD,
+    ...(expediente.estadoFlujo === "NOTIFICADO" ? {
+      subserieDocumental: "Reconocimiento de Créditos", codigoSubserie: "CCD-SA-MAT-RC",
+    } : expediente.estadoFlujo === "ARCHIVADO" ? {
+      subserieDocumental: "Expedientes de Matrícula", codigoSubserie: "CCD-SA-MAT-EXP",
+    } : {}),
+  },
+  versionesDocumentos: expediente.versionesDocumentos.length > 0 ? expediente.versionesDocumentos : crearVersionesDemo(expediente),
+}));
+
+/** Se conserva la bitácora original del expediente EXP-2026-000104. */
+const bitacoraCertificado: Record<string, BitacoraEventoExpediente[]> = {
   "8f1c9b2e-0001-4a11-9c1a-000000000001": [
     {
       eventoId: "evt-001",
@@ -290,3 +347,39 @@ export const BITACORA_FIXTURE: Record<string, BitacoraEventoExpediente[]> = {
     },
   ],
 };
+
+const eventosPorEstado: Record<EstadoFlujoExpediente, { tipo: TipoEventoBitacora; descripcion: string }> = {
+  PENDIENTE: { tipo: "CREACION", descripcion: "Registro del expediente para su atención." },
+  EN_PROCESO: { tipo: "RECEPCION", descripcion: "Recepción formal e inicio de la revisión del expediente." },
+  OBSERVADO: { tipo: "OBSERVACION", descripcion: "Observación documental registrada para su subsanación." },
+  DERIVADO: { tipo: "DERIVACION", descripcion: "Derivación del expediente al área responsable de su atención." },
+  NOTIFICADO: { tipo: "NOTIFICACION", descripcion: "Notificación de la resolución al solicitante." },
+  ARCHIVADO: { tipo: "ARCHIVADO", descripcion: "Cierre de atención y traslado al Archivo Central." },
+};
+
+function crearBitacoraDemo(expediente: ExpedienteSGD): BitacoraEventoExpediente[] {
+  const actual = eventosPorEstado[expediente.estadoFlujo];
+  return [
+    {
+      eventoId: `${expediente.id}-registro`, expedienteId: expediente.id,
+      tipoEvento: "CREACION", timestamp: expediente.fechaIngreso,
+      usuarioId: expediente.metadatos.creadorId, usuarioNombre: expediente.metadatos.creadorNombre,
+      areaNombre: etiquetaExpediente(expediente.areaOrigen), estadoNuevo: "PENDIENTE",
+      descripcionDetallada: `Registro del expediente ${expediente.codigoExpediente}.`,
+      hashTransaccion: hashDemo(expediente.id, 3),
+    },
+    {
+      eventoId: `${expediente.id}-actual`, expedienteId: expediente.id,
+      tipoEvento: actual.tipo, timestamp: expediente.fechaUltimoMovimiento,
+      usuarioId: expediente.metadatos.responsableAsignadoId ?? expediente.metadatos.creadorId,
+      usuarioNombre: expediente.metadatos.responsableAsignadoNombre ?? expediente.metadatos.creadorNombre,
+      areaNombre: etiquetaExpediente(expediente.areaActual), estadoAnterior: "PENDIENTE",
+      estadoNuevo: expediente.estadoFlujo, descripcionDetallada: actual.descripcion,
+      hashTransaccion: hashDemo(expediente.id, 4),
+    },
+  ];
+}
+
+export const BITACORA_FIXTURE: Record<string, BitacoraEventoExpediente[]> = Object.fromEntries(
+  EXPEDIENTES_FIXTURE.map((expediente) => [expediente.id, bitacoraCertificado[expediente.id] ?? crearBitacoraDemo(expediente)]),
+);
