@@ -39,13 +39,10 @@ export default function UsuariosPage() {
 
       <section className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h2 className="text-3xl font-bold">Usuarios</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Directorio institucional de {totalUsuarios} cuentas registradas.
-              Búsqueda en tiempo real y filtro por estado operativo.
-            </p>
-          </div>
+          <p className="text-sm text-slate-600">
+            Directorio institucional de {totalUsuarios} cuentas registradas.
+            Búsqueda en tiempo real y filtro por estado operativo.
+          </p>
           <span className="rounded-lg bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700">
             Datos de demostración hasta integrar GET /api/v1/usuarios
           </span>

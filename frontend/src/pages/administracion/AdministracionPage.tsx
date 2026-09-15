@@ -52,12 +52,9 @@ export default function AdministracionPage() {
       />
 
       <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-7">
-          <h2 className="text-3xl font-bold">Panel de Administración</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Selecciona una opción para administrar el SIGD.
-          </p>
-        </div>
+        <p className="mb-7 text-sm text-slate-600">
+          Selecciona una opción para administrar el SIGD.
+        </p>
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {modulos.map((modulo) => (
