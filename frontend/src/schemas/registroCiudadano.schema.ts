@@ -83,7 +83,8 @@ const validateRucModulo11 = (ruc: string): boolean => {
   }
 
   const resto = suma % 11;
-  const modulo11 = resto === 0 ? 0 : 11 - resto;
+  const resta = 11 - resto;
+  const modulo11 = resta === 10 ? 0 : resta === 11 ? 1 : resta;
 
   return digitoVerificador === modulo11.toString();
 };
