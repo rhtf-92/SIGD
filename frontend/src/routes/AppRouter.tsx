@@ -8,6 +8,8 @@ import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosPage from "../pages/administracion/UsuariosPage";
+import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
+
 
 export default function AppRouter() {
   return (
@@ -29,6 +31,7 @@ export default function AppRouter() {
         element={<CalendarioLaboralPage />}
       />
       <Route path="/administracion/seguridad" element={<SeguridadPage />} />
+      <Route path="/registro" element={<RegistroCiudadanoPage />} />
     </Routes>
   );
 }
