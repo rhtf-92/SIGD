@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 
 import HomePage from "../pages/HomePage";
+import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import AdministracionPage from "../pages/administracion/AdministracionPage";
 import AuditoriaPage from "../pages/administracion/AuditoriaPage";
 import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
@@ -13,6 +14,11 @@ export default function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/casilla" element={<CasillaElectronicaPage />} />
+      <Route
+        path="/casilla-electronica"
+        element={<CasillaElectronicaPage />}
+      />
       <Route path="/administracion" element={<AdministracionPage />} />
       <Route path="/administracion/usuarios" element={<UsuariosPage />} />
       <Route
