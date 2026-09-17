@@ -21,7 +21,9 @@ export type Natural = {
   tipoDocumento: "DNI" | "CE";
   numeroDocumento: string;
   declaracionJuradaAceptada: boolean; // debe ser true
-  consentimientoDatosPersonales: boolean; // debe ser true
+  consentimientoLey29733: boolean; // debe ser true
+  version: "1.0";
+  fechaAceptacion: string; // ISO-8601, se completa al marcar el consentimiento
 };
 
 /* Persona Jurídica - RegistroCiudadanoJuridica */
@@ -41,7 +43,9 @@ export type Juridical = {
   celularContacto: string; // exactamente 9 dígitos empezando en 9
   domicilio: Address;
   declaracionJuradaAceptada: boolean; // debe ser true
-  consentimientoDatosPersonales: boolean; // debe ser true
+  consentimientoLey29733: boolean; // debe ser true
+  version: "1.0";
+  fechaAceptacion: string; // ISO-8601, se completa al marcar el consentimiento
 };
 
 /* Unión discriminada para RegistroCiudadanoRequest */

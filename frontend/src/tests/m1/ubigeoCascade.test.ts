@@ -1,49 +1,61 @@
 import { describe, it, expect } from 'vitest';
-import { UCAYALI_PROVINCIAS } from '../../components/common/UbigeoSelector';
+import { PROVINCIAS_UCAYALI, DISTRITOS_UCAYALI } from '../../data/ucayali';
+import type { UbigeoItem } from '../../data/ucayali';
 
-describe('Catálogo UCAYALI_PROVINCIAS', () => {
+describe('Catálogo PROVINCIAS_UCAYALI y DISTRITOS_UCAYALI', () => {
   describe('Estructura general', () => {
     it('debe contener exactamente 4 provincias', () => {
-      expect(UCAYALI_PROVINCIAS).toHaveLength(4);
+      expect(PROVINCIAS_UCAYALI).toHaveLength(4);
     });
 
-    it('las provincias deben ser: Coronel Portillo, Padre Abad, Atalaya, Purús', () => {
-      const nombres = UCAYALI_PROVINCIAS.map((prov) => prov.nombre);
+    it('las provincias deben ser: CORONEL PORTILLO, ATALAYA, PADRE ABAD, PURUS', () => {
+      const nombres = PROVINCIAS_UCAYALI.map((prov: UbigeoItem) => prov.nombre);
       expect(nombres).toEqual([
-        'Coronel Portillo',
-        'Padre Abad',
-        'Atalaya',
-        'Purús',
+        'CORONEL PORTILLO',
+        'ATALAYA',
+        'PADRE ABAD',
+        'PURUS',
       ]);
     });
 
-    it('la suma total de distritos entre todas las provincias debe ser 19', () => {
-      const sumaCalculada = UCAYALI_PROVINCIAS.reduce(
-        (acum, prov) => acum + prov.distritos.length,
+    it('la suma total de distritos entre todas las provincias debe ser 17', () => {
+      const sumaCalculada = PROVINCIAS_UCAYALI.reduce(
+        (acum: number, prov: UbigeoItem) => {
+          const distritos = DISTRITOS_UCAYALI.filter(
+            (dist: UbigeoItem) => dist.padreId === prov.id
+          );
+          return acum + distritos.length;
+        },
         0
       );
-      expect(sumaCalculada).toBe(19);
+      expect(sumaCalculada).toBe(17);
     });
 
     it('cada provincia debe tener al menos 1 distrito (ninguna vacía)', () => {
-      UCAYALI_PROVINCIAS.forEach((prov) => {
-        expect(prov.distritos.length).toBeGreaterThan(0);
+      PROVINCIAS_UCAYALI.forEach((prov: UbigeoItem) => {
+        const distritos = DISTRITOS_UCAYALI.filter(
+          (dist: UbigeoItem) => dist.padreId === prov.id
+        );
+        expect(distritos.length).toBeGreaterThan(0);
       });
     });
   });
 
   describe('Unicidad de códigos', () => {
     it('los códigos de provincia deben ser únicos', () => {
-      const codigosProvincia = UCAYALI_PROVINCIAS.map((prov) => prov.codigo);
+      const codigosProvincia = PROVINCIAS_UCAYALI.map((prov: UbigeoItem) => prov.id);
       const unicos = new Set(codigosProvincia);
       expect(unicos.size).toBe(codigosProvincia.length);
     });
 
     it('los códigos de distrito deben ser únicos globalmente entre todas las provincias', () => {
       const todosLosCodigos: string[] = [];
-      UCAYALI_PROVINCIAS.forEach((prov) => {
-        prov.distritos.forEach((distrito) => {
-          todosLosCodigos.push(distrito.codigo);
+      PROVINCIAS_UCAYALI.forEach((prov: UbigeoItem) => {
+        const distritos = DISTRITOS_UCAYALI.filter(
+          (dist: UbigeoItem) => dist.padreId === prov.id
+        );
+        distritos.forEach((distrito: UbigeoItem) => {
+          todosLosCodigos.push(distrito.id);
         });
       });
       const unicos = new Set(todosLosCodigos);
@@ -52,31 +64,37 @@ describe('Catálogo UCAYALI_PROVINCIAS', () => {
   });
 
   describe('Pruebas específicas', () => {
-    it('la provincia "Coronel Portillo" (código "2501") debe contener exactamente el distrito "Callería" con código "250101"', () => {
-      const coronelPortillo = UCAYALI_PROVINCIAS.find(
-        (prov) => prov.codigo === '2501'
+    it('la provincia "CORONEL PORTILLO" (código "2501") debe contener exactamente el distrito "CALLERIA" con código "250101"', () => {
+      const coronelPortillo = PROVINCIAS_UCAYALI.find(
+        (prov: UbigeoItem) => prov.id === '2501'
       );
       expect(coronelPortillo).toBeDefined();
       if (coronelPortillo) {
-        expect(coronelPortillo.nombre).toBe('Coronel Portillo');
-        const calleria = coronelPortillo.distritos.find(
-          (d) => d.codigo === '250101'
+        expect(coronelPortillo.nombre).toBe('CORONEL PORTILLO');
+        const distritosPortillo = DISTRITOS_UCAYALI.filter(
+          (d: UbigeoItem) => d.padreId === coronelPortillo.id
+        );
+        const calleria = distritosPortillo.find(
+          (d: UbigeoItem) => d.id === '250101'
         );
         expect(calleria).toBeDefined();
         if (calleria) {
-          expect(calleria.nombre).toBe('Callería');
+          expect(calleria.nombre).toBe('CALLERIA');
         }
       }
     });
 
-    it('la provincia "Purús" debe tener exactamente 1 distrito', () => {
-      const purus = UCAYALI_PROVINCIAS.find(
-        (prov) => prov.codigo === '2504'
+    it('la provincia "PURUS" debe tener exactamente 1 distrito', () => {
+      const purus = PROVINCIAS_UCAYALI.find(
+        (prov: UbigeoItem) => prov.id === '2504'
       );
       expect(purus).toBeDefined();
       if (purus) {
-        expect(purus.nombre).toBe('Purús');
-        expect(purus.distritos).toHaveLength(1);
+        expect(purus.nombre).toBe('PURUS');
+        const distritosPurus = DISTRITOS_UCAYALI.filter(
+          (d: UbigeoItem) => d.padreId === purus.id
+        );
+        expect(distritosPurus).toHaveLength(1);
       }
     });
   });

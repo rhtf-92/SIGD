@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
   },
   "engines": {
@@ -19,6 +20,7 @@
     "@hookform/resolvers": "^5.9.1",
     "@tanstack/react-query": "^5.83.0",
     "axios": "^1.11.0",
+    "lucide-react": "^1.46.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.88.0",
@@ -34,6 +36,7 @@
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^5.0.1",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4.1.11",
     "typescript": "~5.9.2",

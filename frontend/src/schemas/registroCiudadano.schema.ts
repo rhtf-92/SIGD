@@ -44,8 +44,15 @@ export const naturalSchema = z
       departamentoCodigo: z.string(),
       provinciaCodigo: z.string(),
       distritoCodigo: z.string(),
-      direccionExacta: z.string(),
-      referencia: z.string().optional(),
+      direccionExacta: z
+        .string()
+        .min(5, {
+          message: "La dirección exacta debe tener al menos 5 caracteres",
+        })
+        .max(200, {
+          message: "La dirección exacta debe tener máximo 200 caracteres",
+        }),
+      referencia: z.string().max(200).optional(),
     }),
     tipoDocumento: z.enum(["DNI", "CE"]),
     numeroDocumento: z
@@ -60,11 +67,14 @@ export const naturalSchema = z
     declaracionJuradaAceptada: z.boolean().refine((val) => val === true, {
       message: "Debe aceptar la declaración jurada",
     }),
-    consentimientoDatosPersonales: z
-      .boolean()
-      .refine((val) => val === true, {
-        message: "Debe aceptar el consentimiento de datos personales",
-      }),
+    consentimientoLey29733: z.boolean().refine((val) => val === true, {
+      message:
+        "Debe aceptar el consentimiento de tratamiento de datos personales conforme a la Ley N° 29733",
+    }),
+    version: z.literal("1.0"),
+    fechaAceptacion: z.string().datetime({
+      message: "fechaAceptacion debe ser un string en formato ISO 8601 válido",
+    }),
   });
 
 /* --- Persona Jurídica --- */
@@ -146,19 +156,27 @@ export const juridicalSchema = z
       departamentoCodigo: z.string(),
       provinciaCodigo: z.string(),
       distritoCodigo: z.string(),
-      direccionExacta: z.string(),
-      referencia: z.string().optional(),
+      direccionExacta: z
+        .string()
+        .min(5, {
+          message: "La dirección exacta debe tener al menos 5 caracteres",
+        })
+        .max(200, {
+          message: "La dirección exacta debe tener máximo 200 caracteres",
+        }),
+      referencia: z.string().max(200).optional(),
     }),
-    declaracionJuradaAceptada: z
-      .boolean()
-      .refine((val) => val === true, {
-        message: "Debe aceptar la declaración jurada",
-      }),
-    consentimientoDatosPersonales: z
-      .boolean()
-      .refine((val) => val === true, {
-        message: "Debe aceptar el consentimiento de datos personales",
-      }),
+    declaracionJuradaAceptada: z.boolean().refine((val) => val === true, {
+      message: "Debe aceptar la declaración jurada",
+    }),
+    consentimientoLey29733: z.boolean().refine((val) => val === true, {
+      message:
+        "Debe aceptar el consentimiento de tratamiento de datos personales conforme a la Ley N° 29733",
+    }),
+    version: z.literal("1.0"),
+    fechaAceptacion: z.string().datetime({
+      message: "fechaAceptacion debe ser un string en formato ISO 8601 válido",
+    }),
   });
 
 /* --- Unión discriminada RegistroCiudadanoRequest --- */

@@ -24,7 +24,9 @@ type PersonaNatural = {
   tipoDocumento: "DNI" | "CE";
   numeroDocumento: string;
   declaracionJuradaAceptada: boolean;
-  consentimientoDatosPersonales: boolean;
+  consentimientoLey29733: boolean;
+  version: "1.0";
+  fechaAceptacion: string;
 };
 
 type PersonaJuridica = {
@@ -43,7 +45,9 @@ type PersonaJuridica = {
   celularContacto: string;
   domicilio: Ubigeo;
   declaracionJuradaAceptada: boolean;
-  consentimientoDatosPersonales: boolean;
+  consentimientoLey29733: boolean;
+  version: "1.0";
+  fechaAceptacion: string;
 };
 
 const crearUbigeo = (): Ubigeo => ({
@@ -78,7 +82,9 @@ const personaNaturalBase = {
   tipoDocumento: "DNI" as const,
   numeroDocumento: "12345678",
   declaracionJuradaAceptada: true,
-  consentimientoDatosPersonales: true,
+  consentimientoLey29733: true,
+  version: "1.0" as const,
+  fechaAceptacion: new Date().toISOString(),
 } satisfies PersonaNatural;
 
 const crearPersonaNatural = (
@@ -104,7 +110,9 @@ const personaJuridicaBase = {
   celularContacto: "987654321",
   domicilio: crearUbigeo(),
   declaracionJuradaAceptada: true,
-  consentimientoDatosPersonales: true,
+  consentimientoLey29733: true,
+  version: "1.0" as const,
+  fechaAceptacion: new Date().toISOString(),
 } satisfies PersonaJuridica;
 
 const crearPersonaJuridica = (
@@ -137,6 +145,20 @@ describe("naturalSchema", () => {
     if (resultado.success) {
       expect(resultado.data.numeroDocumento).toBe("12345678");
     }
+  });
+
+  it("debe RECHAZAR un CE con menos de 9 caracteres", () => {
+    const resultado = naturalSchema.safeParse(
+      crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "AB12345" })
+    );
+    expect(resultado.success).toBe(false);
+  });
+
+  it("debe ACEPTAR un CE válido de 9 a 12 caracteres alfanuméricos", () => {
+    const resultado = naturalSchema.safeParse(
+      crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "AB1234567X" })
+    );
+    expect(resultado.success).toBe(true);
   });
 
   it("debe RECHAZAR una persona menor de 16 años", () => {
@@ -177,9 +199,9 @@ describe("naturalSchema", () => {
     expect(resultado.success).toBe(false);
   });
 
-  it("debe RECHAZAR si consentimientoDatosPersonales es false", () => {
+  it("debe RECHAZAR si consentimientoLey29733 es false", () => {
     const resultado = naturalSchema.safeParse(
-      crearPersonaNatural({ consentimientoDatosPersonales: false })
+      crearPersonaNatural({ consentimientoLey29733: false })
     );
     expect(resultado.success).toBe(false);
   });
