@@ -1,52 +1,29 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
-
-interface CuentaBloqueada {
-  id: number;
-  usuario: string;
-  correo: string;
-  motivo: string;
-  fecha: string;
-}
-
-interface IntentoAcceso {
-  id: number;
-  fecha: string;
-  usuario: string;
-  ip: string;
-  resultado: "Correcto" | "Fallido";
-}
-
-const intentos: IntentoAcceso[] = [
-  { id: 1, fecha: "29/08/2026 10:20", usuario: "jperez@institutosuiza.edu.pe", ip: "192.168.1.18", resultado: "Correcto" },
-  { id: 2, fecha: "29/08/2026 09:57", usuario: "atorres@institutosuiza.edu.pe", ip: "192.168.1.42", resultado: "Fallido" },
-  { id: 3, fecha: "29/08/2026 09:56", usuario: "atorres@institutosuiza.edu.pe", ip: "192.168.1.42", resultado: "Fallido" },
-  { id: 4, fecha: "29/08/2026 09:55", usuario: "atorres@institutosuiza.edu.pe", ip: "192.168.1.42", resultado: "Fallido" },
-  { id: 5, fecha: "29/08/2026 08:35", usuario: "mlopez@institutosuiza.edu.pe", ip: "192.168.1.25", resultado: "Correcto" },
-];
-
-const cuentasIniciales: CuentaBloqueada[] = [
-  {
-    id: 1,
-    usuario: "Ana Torres García",
-    correo: "atorres@institutosuiza.edu.pe",
-    motivo: "Exceso de intentos fallidos",
-    fecha: "29/08/2026 09:57",
-  },
-];
+import { useSeguridadPolicies } from "../../hooks/useSeguridadPolicies";
 
 export default function SeguridadPage() {
-  const [cuentasBloqueadas, setCuentasBloqueadas] = useState(cuentasIniciales);
-  const [maxIntentos, setMaxIntentos] = useState(5);
-  const [minutosBloqueo, setMinutosBloqueo] = useState(30);
-  const [minutosSesion, setMinutosSesion] = useState(30);
-  const [mensaje, setMensaje] = useState("");
+  const {
+    maxIntentos,
+    setMaxIntentos,
+    minutosBloqueo,
+    setMinutosBloqueo,
+    minutosSesion,
+    setMinutosSesion,
+    cuentasBloqueadas,
+    desbloquearCuenta,
+    intentosFallidos,
+    intentosIniciales,
+    guardarPoliticas,
+    mensaje,
+    setMensaje,
+  } = useSeguridadPolicies();
 
-  const fallidos = useMemo(
-    () => intentos.filter((intento) => intento.resultado === "Fallido").length,
-    [],
+  const [cuentaEnDesbloqueo, setCuentaEnDesbloqueo] = useState<number | null>(
+    null,
   );
+  const [justificacion, setJustificacion] = useState("");
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -63,7 +40,7 @@ export default function SeguridadPage() {
           </article>
           <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Intentos fallidos visibles</p>
-            <p className="mt-2 text-3xl font-bold">{fallidos}</p>
+            <p className="mt-2 text-3xl font-bold">{intentosFallidos}</p>
           </article>
           <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Sesión configurada</p>
@@ -81,7 +58,8 @@ export default function SeguridadPage() {
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold">Políticas de acceso</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Parámetros de demostración para su futura integración con autenticación.
+              Parámetros de demostración para su futura integración con
+              autenticación JWT.
             </p>
 
             <div className="mt-5 space-y-4">
@@ -106,7 +84,9 @@ export default function SeguridadPage() {
                   type="number"
                   min={1}
                   value={minutosBloqueo}
-                  onChange={(event) => setMinutosBloqueo(Number(event.target.value))}
+                  onChange={(event) =>
+                    setMinutosBloqueo(Number(event.target.value))
+                  }
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 />
               </div>
@@ -119,18 +99,16 @@ export default function SeguridadPage() {
                   type="number"
                   min={5}
                   value={minutosSesion}
-                  onChange={(event) => setMinutosSesion(Number(event.target.value))}
+                  onChange={(event) =>
+                    setMinutosSesion(Number(event.target.value))
+                  }
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 />
               </div>
 
               <button
                 type="button"
-                onClick={() =>
-                  setMensaje(
-                    `Políticas preparadas: ${maxIntentos} intentos, ${minutosBloqueo} min de bloqueo y ${minutosSesion} min de sesión.`,
-                  )
-                }
+                onClick={guardarPoliticas}
                 className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
               >
                 Guardar políticas
@@ -140,6 +118,9 @@ export default function SeguridadPage() {
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold">Cuentas bloqueadas</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              El desbloqueo exige justificación forense obligatoria.
+            </p>
 
             <div className="mt-5 space-y-3">
               {cuentasBloqueadas.length === 0 ? (
@@ -159,17 +140,16 @@ export default function SeguridadPage() {
                         <p className="mt-2 text-sm text-slate-600">
                           {cuenta.motivo}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">{cuenta.fecha}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {cuenta.fecha}
+                        </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => {
-                          setCuentasBloqueadas((actuales) =>
-                            actuales.filter((item) => item.id !== cuenta.id),
-                          );
-                          setMensaje(
-                            `Cuenta de ${cuenta.usuario} desbloqueada en la vista de demostración.`,
-                          );
+                          setMensaje("");
+                          setJustificacion("");
+                          setCuentaEnDesbloqueo(cuenta.id);
                         }}
                         className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                       >
@@ -199,11 +179,13 @@ export default function SeguridadPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {intentos.map((intento) => (
+                {intentosIniciales.map((intento) => (
                   <tr key={intento.id}>
                     <td className="px-6 py-4 text-sm">{intento.fecha}</td>
                     <td className="px-6 py-4 text-sm">{intento.usuario}</td>
-                    <td className="px-6 py-4 font-mono text-xs">{intento.ip}</td>
+                    <td className="px-6 py-4 font-mono text-xs">
+                      {intento.ip}
+                    </td>
                     <td className="px-6 py-4">
                       <span
                         className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -222,6 +204,46 @@ export default function SeguridadPage() {
           </div>
         </section>
       </section>
+
+      {cuentaEnDesbloqueo !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-xl font-bold">Desbloqueo supervisado</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Registra la justificación forense obligatoria de esta acción.
+            </p>
+
+            <textarea
+              value={justificacion}
+              onChange={(event) => setJustificacion(event.target.value)}
+              placeholder="Motivo del desbloqueo (será registrado en auditoría WORM)"
+              rows={4}
+              className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600"
+            />
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCuentaEnDesbloqueo(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!justificacion.trim()}
+                onClick={() => {
+                  desbloquearCuenta(cuentaEnDesbloqueo, justificacion);
+                  setCuentaEnDesbloqueo(null);
+                }}
+                className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Confirmar desbloqueo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

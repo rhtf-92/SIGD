@@ -9,6 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "typecheck:m03": "tsc --noEmit -p tsconfig.m03.json",
+    "lint": "eslint src --max-warnings 0",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
@@ -28,6 +30,7 @@
     "zod": "^4.6.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@tailwindcss/vite": "^4.1.11",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
@@ -40,6 +43,7 @@
     "jsdom": "^29.1.1",
     "tailwindcss": "^4.1.11",
     "typescript": "~5.9.2",
+    "typescript-eslint": "^8.0.0",
     "vite": "^6.3.5",
     "vitest": "^5.0.0"
   }

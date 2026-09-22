@@ -1,5 +1,6 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
+import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
 import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import AdministracionPage from "../pages/administracion/AdministracionPage";
