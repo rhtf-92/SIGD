@@ -15,7 +15,7 @@ export interface DashboardMetricsQuery {
   diasLimite?: number;
 }
 
-export function useDashboardMetrics(_params: DashboardMetricsQuery): DashboardEjecutivoData & {
+export function useDashboardMetrics(params: DashboardMetricsQuery): DashboardEjecutivoData & {
   isLoading: boolean;
   isError: boolean;
   errorMessage?: string;
@@ -94,13 +94,18 @@ export function useDashboardMetrics(_params: DashboardMetricsQuery): DashboardEj
     { area: "Registro", expedienteCount: 18, diasPromedio: 5.2, severity: "low" },
   ];
 
+  const rangoInvalido =
+    params.fechaFin && params.fechaInicio && params.fechaFin < params.fechaInicio;
+
   return {
     summary,
     trend,
     estados,
     cuellosBotella,
     isLoading: false,
-    isError: false,
-    errorMessage: undefined,
+    isError: Boolean(rangoInvalido),
+    errorMessage: rangoInvalido
+      ? "El rango de fechas es inválido: la fecha final es anterior a la inicial."
+      : undefined,
   };
 }

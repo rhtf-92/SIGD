@@ -14,10 +14,10 @@ export default function AccesoDenegadoPage() {
         </p>
 
         <Link
-          to="/administracion"
+          to="/"
           className="mt-6 inline-block rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
         >
-          Volver al panel
+          Volver al inicio
         </Link>
       </section>
     </main>
