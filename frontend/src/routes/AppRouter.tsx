@@ -2,9 +2,15 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
-import LoginPage from "../pages/LoginPage";
-import AdminRoutes from "./AdminRoutes";
-import ProtectedRoute from "./ProtectedRoute";
+import AdministracionPage from "../pages/administracion/AdministracionPage";
+import AuditoriaPage from "../pages/administracion/AuditoriaPage";
+import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
+import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
+import SeguridadPage from "../pages/administracion/SeguridadPage";
+import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
+import UsuariosPage from "../pages/administracion/UsuariosPage";
+import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
+import ExpedienteDetallePage from "../pages/expedientes/ExpedienteDetallePage";
 
 export default function AppRouter() {
   return (
@@ -14,18 +20,12 @@ export default function AppRouter() {
       <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
 
       <Route
-        path="/administracion"
-        element={
-          <ProtectedRoute
-            requiredModule="Administración"
-            requiredAction="ver"
-          />
-        }
-      >
-        {AdminRoutes()}
-      </Route>
-
-      <Route path="*" element={<Navigate to="/" replace />} />
+        path="/administracion/calendario-laboral"
+        element={<CalendarioLaboralPage />}
+      />
+      <Route path="/administracion/seguridad" element={<SeguridadPage />} />
+      <Route path="/expedientes" element={<BandejaExpedientesPage />} />
+      <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
     </Routes>
   );
 }
