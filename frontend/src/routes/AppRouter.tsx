@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
+import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import AdministracionPage from "../pages/administracion/AdministracionPage";
 import AuditoriaPage from "../pages/administracion/AuditoriaPage";
 import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
@@ -9,23 +10,35 @@ import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosPage from "../pages/administracion/UsuariosPage";
-import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
-import ExpedienteDetallePage from "../pages/expedientes/ExpedienteDetallePage";
+import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
+
 
 export default function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
-
+      <Route path="/casilla" element={<CasillaElectronicaPage />} />
+      <Route
+        path="/casilla-electronica"
+        element={<CasillaElectronicaPage />}
+      />
+      <Route path="/administracion" element={<AdministracionPage />} />
+      <Route path="/administracion/usuarios" element={<UsuariosPage />} />
+      <Route
+        path="/administracion/roles-permisos"
+        element={<RolesPermisosPage />}
+      />
+      <Route path="/administracion/auditoria" element={<AuditoriaPage />} />
+      <Route
+        path="/administracion/tablas-maestras"
+        element={<TablasMaestrasPage />}
+      />
       <Route
         path="/administracion/calendario-laboral"
         element={<CalendarioLaboralPage />}
       />
       <Route path="/administracion/seguridad" element={<SeguridadPage />} />
-      <Route path="/expedientes" element={<BandejaExpedientesPage />} />
-      <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
+      <Route path="/registro" element={<RegistroCiudadanoPage />} />
     </Routes>
   );
 }
