@@ -2,13 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
-import AdministracionPage from "../pages/administracion/AdministracionPage";
-import AuditoriaPage from "../pages/administracion/AuditoriaPage";
-import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
-import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
-import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
-import UsuariosPage from "../pages/administracion/UsuariosPage";
+import DashboardEjecutivoPage from "../pages/reportes/DashboardEjecutivoPage";
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
 import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
 import WorkflowAcademicoPage from "../pages/flujos/WorkflowAcademicoPage";
@@ -19,7 +14,9 @@ import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
 import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
 import ExpedienteDetallePage from "../pages/expedientes/ExpedienteDetallePage";
 import MesaPartesVirtualPage from "../pages/tramite/MesaPartesVirtualPage";
+import VentanillaPresencialPage from "../pages/tramite/VentanillaPresencialPage";
 import TramitePage from "../pages/tramite/TramitePage";
+import ProyectorResolucionesPage from "../pages/flujos/ProyectorResolucionesPage";
 import AdminRoutes from "./AdminRoutes";
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -46,9 +43,21 @@ export default function AppRouter() {
         path="/mesa-partes"
         element={<MesaPartesVirtualPage />}
       />
+      <Route
+        path="/tramite/ventanilla-presencial"
+        element={<VentanillaPresencialPage />}
+      />
+      <Route
+        path="/ventanilla"
+        element={<VentanillaPresencialPage />}
+      />
       <Route path="/administracion/seguridad" element={<SeguridadPage />} />
       <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
       <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
+      <Route
+        path="/flujos/proyector-resoluciones"
+        element={<ProyectorResolucionesPage />}
+      />
       <Route
         path="/flujo-validez-legal/firma"
         element={<PasarelaFirmaPage />}
@@ -70,6 +79,9 @@ export default function AppRouter() {
 
       <Route path="/expedientes" element={<BandejaExpedientesPage />} />
       <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
+
+      <Route path="/reportes" element={<DashboardEjecutivoPage />} />
+      <Route path="/reportes/dashboard" element={<DashboardEjecutivoPage />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
 

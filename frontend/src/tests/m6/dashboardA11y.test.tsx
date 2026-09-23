@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import DashboardEjecutivoPage from "@/pages/reportes/DashboardEjecutivoPage";
@@ -15,9 +16,11 @@ function renderDashboard() {
   });
 
   return render(
-    <QueryClientProvider client={queryClient}>
-      <DashboardEjecutivoPage />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <DashboardEjecutivoPage />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 

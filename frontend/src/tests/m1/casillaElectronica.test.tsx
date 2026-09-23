@@ -3,6 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import CasillaElectronicaPage from "../../pages/casilla/CasillaElectronicaPage";
 import { casillaService } from "../../services/casillaService";
@@ -227,7 +228,9 @@ function renderConQueryClient(ui: ReactElement) {
   });
 
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 

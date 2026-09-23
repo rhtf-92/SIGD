@@ -1,75 +1,104 @@
-import type { ExportableReportRecord, ReportExportRequest, ReportExportResponse } from "@/types/reportExportConfig";
+import type {
+  ExportableReportRecord,
+  ReportExportRequest,
+  ReportExportResponse,
+} from "@/types/reportExportConfig";
 
-function escapeCellValue(value: string | number | boolean | null | undefined): string {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  return String(value).replace(/\r?\n/g, " ").trim();
+function escapeXml(value: string | number | boolean | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
-function buildWorkbookRows(records: ExportableReportRecord[], filters: ReportExportRequest["filters"]): string[][] {
-  const headers = [
-    "Reporte",
-    "Fecha de emisión",
-    "Fecha inicio",
-    "Fecha fin",
-    "Periodo",
-    "Días límite",
-    ...Object.keys(records[0] ?? {}),
-  ];
+/**
+ * Genera un archivo de hoja de cálculo nativo compatible con Microsoft Excel y LibreOffice
+ * utilizando el estándar SpreadsheetML (XML Spreadsheet 2003).
+ */
+export function buildGenuineSpreadsheetXml(
+  records: ExportableReportRecord[],
+  filters: ReportExportRequest["filters"],
+  reportName: string,
+): string {
+  const headers = records.length > 0 ? Object.keys(records[0]) : ["Sin datos"];
 
-  const rows: string[][] = [headers];
-  const now = new Date().toISOString();
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Bottom"/>
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#000000"/>
+  </Style>
+  <Style ss:ID="HeaderStyle">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#1D4ED8" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="TitleStyle">
+   <Font ss:FontName="Calibri" ss:Size="14" ss:Bold="1" ss:Color="#0F172A"/>
+  </Style>
+  <Style ss:ID="MetaStyle">
+   <Font ss:FontName="Calibri" ss:Size="10" ss:Italic="1" ss:Color="#64748B"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="${escapeXml(reportName.slice(0, 31) || "Reporte")}">
+  <Table>
+   <Row>
+    <Cell ss:StyleID="TitleStyle"><Data ss:Type="String">IESTP SUIZA - ${escapeXml(reportName.toUpperCase())}</Data></Cell>
+   </Row>
+   <Row>
+    <Cell ss:StyleID="MetaStyle"><Data ss:Type="String">Periodo: ${escapeXml(filters.periodo || "General")} | Fecha Inicio: ${escapeXml(filters.fechaInicio || "-")} | Fecha Fin: ${escapeXml(filters.fechaFin || "-")}</Data></Cell>
+   </Row>
+   <Row></Row>
+   <Row>`;
 
-  rows.push([
-    "Dashboard ejecutivo",
-    now,
-    filters.fechaInicio ?? "-",
-    filters.fechaFin ?? "-",
-    filters.periodo ?? "mensual",
-    String(filters.diasLimite ?? 5),
-    ...new Array(Math.max(Object.keys(records[0] ?? {}).length, 0)).fill(""),
-  ]);
+  // Encabezados de tabla
+  for (const h of headers) {
+    xml += `<Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`;
+  }
+  xml += `</Row>`;
 
-  rows.push([
-    "Filtros aplicados",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ...new Array(Math.max(Object.keys(records[0] ?? {}).length, 0)).fill(""),
-  ]);
-
+  // Filas de datos
   for (const record of records) {
-    const values = Object.values(record).map((value) => escapeCellValue(value));
-    rows.push([
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      ...values,
-    ]);
+    xml += `<Row>`;
+    for (const h of headers) {
+      const val = record[h];
+      const isNumber = typeof val === "number";
+      const type = isNumber ? "Number" : "String";
+      xml += `<Cell><Data ss:Type="${type}">${escapeXml(val)}</Data></Cell>`;
+    }
+    xml += `</Row>`;
   }
 
-  return rows;
+  xml += `
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+  return xml;
 }
 
-export async function exportExcelReport(request: ReportExportRequest): Promise<ReportExportResponse> {
-  const headers = [
-    "Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; charset=utf-8",
-  ];
+export async function exportExcelReport(
+  request: ReportExportRequest,
+): Promise<ReportExportResponse> {
+  const xmlContent = buildGenuineSpreadsheetXml(
+    request.records,
+    request.filters,
+    request.reportName,
+  );
 
-  const csvRows = buildWorkbookRows(request.records, request.filters);
-  const csvContent = csvRows
-    .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
-    .join("\n");
-
-  const blob = new Blob([new TextEncoder().encode(csvContent)], { type: headers[0] });
-  const fileName = `${request.reportName || "reporte"}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const blob = new Blob([new TextEncoder().encode(xmlContent)], {
+    type: "application/vnd.ms-excel;charset=utf-8",
+  });
+  const fileName = `${request.reportName || "reporte"}-${new Date().toISOString().slice(0, 10)}.xls`;
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -78,7 +107,10 @@ export async function exportExcelReport(request: ReportExportRequest): Promise<R
   link.click();
   URL.revokeObjectURL(url);
 
-  const checksum = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(csvContent));
+  const checksum = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(xmlContent),
+  );
   const checksumHex = Array.from(new Uint8Array(checksum))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
@@ -86,5 +118,6 @@ export async function exportExcelReport(request: ReportExportRequest): Promise<R
   return {
     descargaUrl: url,
     sha256Checksum: checksumHex,
+    fileName,
   };
 }

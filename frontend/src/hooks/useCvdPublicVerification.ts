@@ -4,17 +4,12 @@ import axios from "axios";
 
 import { apiClient } from "../api/client";
 import { env } from "../config/env";
+import type { ApiProblemDetails } from "../types/api";
 import type { ErrorValidacionCvd, ValidacionCVDResult } from "../types/validadorCvd";
 
 export const CVD_VALIDO = "CVD-2026-RD-000412-892F";
 export const CVD_ALTERADO = "CVD-2026-RD-000413-ALTE";
 const USAR_MOCKS = env.enableMocks || env.isDevelopment;
-
-interface ApiProblemDetails {
-  title?: string;
-  detail?: string;
-  status?: number;
-}
 
 export class CvdError extends Error implements ErrorValidacionCvd {
   readonly titulo: string;

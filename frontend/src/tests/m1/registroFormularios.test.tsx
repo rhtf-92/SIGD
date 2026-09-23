@@ -2,6 +2,7 @@ import { useState } from "react";
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
 
 import RegistroCiudadanoPage from "../../pages/registro/RegistroCiudadanoPage";
@@ -14,7 +15,11 @@ import { consentimientoLey29733Schema } from "../../schemas/consentimiento.schem
 describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / ENT-M01-04 / ENT-M01-05)", () => {
   it("a) RegistroCiudadanoPage: el conmutador role=\"tablist\" alterna entre Persona Natural y Persona Jurídica sin recargar, y cambia los campos visibles", async () => {
     const user = userEvent.setup();
-    render(<RegistroCiudadanoPage />);
+    render(
+      <MemoryRouter>
+        <RegistroCiudadanoPage />
+      </MemoryRouter>,
+    );
 
     // Verificar existencia del conmutador con role="tablist"
     const tablist = screen.getByRole("tablist", { name: /Tipo de persona/i });
@@ -257,7 +262,11 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
   it("h) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Natural y muestra la casilla creada", async () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const user = userEvent.setup();
-    render(<RegistroCiudadanoPage />);
+    render(
+      <MemoryRouter>
+        <RegistroCiudadanoPage />
+      </MemoryRouter>,
+    );
 
     // Llenar campos de Persona Natural
     await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
@@ -337,7 +346,11 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
   it("i) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Jurídica y muestra la casilla creada", async () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const user = userEvent.setup();
-    render(<RegistroCiudadanoPage />);
+    render(
+      <MemoryRouter>
+        <RegistroCiudadanoPage />
+      </MemoryRouter>,
+    );
 
     // Cambiar a Persona Jurídica
     await user.click(screen.getByRole("tab", { name: /Persona Jurídica/i }));
