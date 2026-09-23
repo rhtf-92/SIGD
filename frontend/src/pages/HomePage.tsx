@@ -10,6 +10,14 @@ const secciones = [
     destacado: true,
   },
   {
+    titulo: "Mesa de Partes Virtual",
+    subtitulo: "ENT-M02 / TUPA",
+    descripcion:
+      "Presentación y radicación de trámites digitales, requisitos TUPA y anexos documentales.",
+    ruta: "/tramite",
+    destacado: true,
+  },
+  {
     titulo: "Registro Ciudadano",
     subtitulo: "ENT-M01-01 / ENT-M01-02",
     descripcion:

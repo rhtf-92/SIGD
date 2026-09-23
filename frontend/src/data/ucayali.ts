@@ -80,3 +80,44 @@ export const DISTRITOS_UCAYALI: ReadonlyArray<UbigeoItem> = [
   // --- Provincia: Purús (2504) ---
   { id: '250401', nombre: 'PURUS', padreId: '2504' },
 ];
+
+/**
+ * Estructura de compatibilidad para el asistente de trámites (ENT-M02 / ENT-M04)
+ */
+export interface Provincia {
+  nombre: string;
+  distritos: string[];
+}
+
+export const UCAYALI_PROVINCIAS: readonly Provincia[] = [
+  {
+    nombre: 'Coronel Portillo',
+    distritos: [
+      'Callería',
+      'Campoverde',
+      'Iparía',
+      'Masisea',
+      'Yarinacocha',
+      'Nueva Requena',
+      'Manantay',
+    ],
+  },
+  {
+    nombre: 'Atalaya',
+    distritos: ['Raymondi', 'Sepahua', 'Tahuanía', 'Yurúa'],
+  },
+  {
+    nombre: 'Padre Abad',
+    distritos: [
+      'Padre Abad',
+      'Irazola',
+      'Curimaná',
+      'Neshuya',
+      'Alexander von Humboldt',
+    ],
+  },
+  {
+    nombre: 'Purús',
+    distritos: ['Purús'],
+  },
+];

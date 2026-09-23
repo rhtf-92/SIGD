@@ -7,6 +7,8 @@ import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
 import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
 import ExpedienteDetallePage from "../pages/expedientes/ExpedienteDetallePage";
+import MesaPartesVirtualPage from "../pages/tramite/MesaPartesVirtualPage";
+import TramitePage from "../pages/tramite/TramitePage";
 import AdminRoutes from "./AdminRoutes";
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -23,6 +25,16 @@ export default function AppRouter() {
         element={<CasillaElectronicaPage />}
       />
       <Route path="/registro" element={<RegistroCiudadanoPage />} />
+
+      <Route path="/tramite" element={<TramitePage />} />
+      <Route
+        path="/tramite/mesa-partes-virtual"
+        element={<MesaPartesVirtualPage />}
+      />
+      <Route
+        path="/mesa-partes"
+        element={<MesaPartesVirtualPage />}
+      />
 
       <Route
         path="/administracion"
