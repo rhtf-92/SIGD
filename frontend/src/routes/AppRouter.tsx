@@ -2,6 +2,17 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
+import AdministracionPage from "../pages/administracion/AdministracionPage";
+import AuditoriaPage from "../pages/administracion/AuditoriaPage";
+import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
+import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
+import SeguridadPage from "../pages/administracion/SeguridadPage";
+import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
+import UsuariosPage from "../pages/administracion/UsuariosPage";
+import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
+import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
+import WorkflowAcademicoPage from "../pages/flujos/WorkflowAcademicoPage";
+import ValidadorPublicoCvdPage from "../pages/validador/ValidadorPublicoCvdPage";
 import LoginPage from "../pages/LoginPage";
 import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
@@ -35,6 +46,15 @@ export default function AppRouter() {
         path="/mesa-partes"
         element={<MesaPartesVirtualPage />}
       />
+      <Route path="/administracion/seguridad" element={<SeguridadPage />} />
+      <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
+      <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
+      <Route
+        path="/flujo-validez-legal/firma"
+        element={<PasarelaFirmaPage />}
+      />
+      <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
+
 
       <Route
         path="/administracion"
@@ -52,6 +72,7 @@ export default function AppRouter() {
       <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
+
     </Routes>
   );
 }
