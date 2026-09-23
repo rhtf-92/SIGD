@@ -56,10 +56,10 @@ export default function ValidadorPublicoCvdPage() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-4xl px-6 py-5">
           <Link
-            to="/flujo-validez-legal"
+            to="/"
             className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
           >
-            ← Volver
+            ← Volver al inicio
           </Link>
           <p className="text-sm font-bold text-blue-700">
             ENT-M04-05 · Adriano David Espinoza Ramírez (R/A) · Mayra (R)

@@ -17,15 +17,14 @@
  */
 
 import { useState } from "react";
-import MainLayout from "../../layouts/MainLayout";
+import { Link } from "react-router-dom";
 import TramiteWizard from "../../components/tramite/TramiteWizard";
 
 export default function TramitePage() {
   const [ultimoCut, setUltimoCut] = useState<string | null>(null);
 
   return (
-    <MainLayout>
-      <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
         {/* CABECERA INSTITUCIONAL OFICIAL */}
         <header className="rounded-2xl border border-blue-200/80 bg-linear-to-r from-blue-50 via-sky-50/50 to-indigo-50/40 p-6 sm:p-8 shadow-xs">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -47,7 +46,13 @@ export default function TramitePage() {
               </p>
             </div>
 
-            <div className="shrink-0 self-start md:self-auto">
+            <div className="flex shrink-0 items-center gap-3 self-start md:self-auto">
+              <Link
+                to="/"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                ← Volver al inicio
+              </Link>
               <span className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-xs">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Ventanilla Virtual Abierta
@@ -86,6 +91,5 @@ export default function TramitePage() {
           />
         </main>
       </div>
-    </MainLayout>
   );
 }

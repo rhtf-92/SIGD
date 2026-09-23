@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 
+import { Link } from "react-router-dom";
 import FileUploadDropzone from "../../components/common/FileUploadDropzone";
 import HorarioCorteNotice from "../../components/tramite/HorarioCorteNotice";
 import {
@@ -69,6 +70,12 @@ export default function MesaPartesVirtualPage() {
                 control de horario legal LPAG.
               </p>
             </div>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-500 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              ← Volver al inicio
+            </Link>
             <span className="rounded-full border border-amber-300/50 bg-amber-300/10 px-3 py-2 text-xs font-semibold text-amber-200">
               DEMO CONTROLADA · BACKEND NO DISPONIBLE
             </span>

@@ -4,6 +4,8 @@
  * Cumplimiento de la Ley N° 27444 (LPAG) y Ley N° 29733 (Protección de Datos Personales)
  */
 
+import { Link } from "react-router-dom";
+
 import NotificationList from "../../components/casilla/NotificacionList";
 import NotificacionDetailModal from "../../components/casilla/NotificacionDetailModal";
 import { useCasilla } from "../../hooks/useCasilla";
@@ -64,27 +66,35 @@ export default function CasillaElectronicaPage() {
             </div>
 
             {/* Ficha del Administrado y Dirección de Casilla */}
-            <div className="flex items-center gap-3.5 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-3.5 shadow-xs">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-700 font-bold text-white shadow-sm">
-                SP
-              </div>
-              <div className="text-xs">
-                <div className="flex items-center gap-1.5">
-                  <p className="font-bold text-slate-900">
-                    Sergio Serruche Panduro
+            <div className="flex items-center gap-3.5">
+              <div className="flex items-center gap-3.5 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-3.5 shadow-xs">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-700 font-bold text-white shadow-sm">
+                  SP
+                </div>
+                <div className="text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-bold text-slate-900">
+                      Sergio Serruche Panduro
+                    </p>
+                    <span className="rounded bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-blue-800">
+                      DNI 74561238
+                    </span>
+                  </div>
+                  <p className="font-mono text-[11px] text-blue-700 font-semibold mt-0.5">
+                    74561238@casilla.iestpsuiza.edu.pe
                   </p>
-                  <span className="rounded bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-blue-800">
-                    DNI 74561238
-                  </span>
-                </div>
-                <p className="font-mono text-[11px] text-blue-700 font-semibold mt-0.5">
-                  74561238@casilla.iestpsuiza.edu.pe
-                </p>
-                <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  <span>Casilla vinculada y homologada (Ley N° 29733)</span>
+                  <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span>Casilla vinculada y homologada (Ley N° 29733)</span>
+                  </div>
                 </div>
               </div>
+              <Link
+                to="/"
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                ← Volver al inicio
+              </Link>
             </div>
           </div>
         </div>
