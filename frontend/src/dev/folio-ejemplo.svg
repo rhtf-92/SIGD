@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800" role="img" aria-label="Página ilustrativa sin datos personales">
+  <rect width="640" height="800" fill="white"/>
+  <rect x="40" y="40" width="560" height="8" fill="#006ec7"/>
+  <g font-family="Arial, sans-serif" fill="#0f172a">
+    <text x="40" y="100" font-size="24" font-weight="700">IESTP “Suiza” · SIGD</text>
+    <text x="40" y="150" font-size="22">Página ilustrativa de documento</text>
+    <text x="40" y="200" font-size="18">Muestra local para revisar el foliado.</text>
+    <text x="40" y="235" font-size="18">No representa un expediente real.</text>
+    <text x="40" y="690" font-size="16">El visor no modifica este archivo.</text>
+  </g>
+  <g stroke="#cbd5e1" stroke-width="3">
+    <path d="M40 300H600 M40 340H600 M40 380H520 M40 450H600 M40 490H600 M40 530H480"/>
+  </g>
+</svg>

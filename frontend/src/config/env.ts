@@ -9,4 +9,5 @@ if (!apiBaseUrl) {
 export const env = {
   apiBaseUrl,
   isDevelopment: import.meta.env.DEV,
+  enableMocks: import.meta.env.VITE_ENABLE_MOCKS === "true",
 } as const;
