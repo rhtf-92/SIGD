@@ -40,6 +40,10 @@ export default function AppRouter() {
         element={<MesaPartesVirtualPage />}
       />
       <Route
+        path="/tramite/mesa-partes"
+        element={<Navigate to="/tramite/mesa-partes-virtual" replace />}
+      />
+      <Route
         path="/mesa-partes"
         element={<MesaPartesVirtualPage />}
       />
@@ -76,6 +80,10 @@ export default function AppRouter() {
       >
         {AdminRoutes()}
       </Route>
+      <Route
+        path="/admin"
+        element={<Navigate to="/administracion" replace />}
+      />
 
       <Route path="/expedientes" element={<BandejaExpedientesPage />} />
       <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />

@@ -68,6 +68,7 @@ apiClient.interceptors.response.use(
 
       const correlationId =
         (typeof responseData?.correlationId === "string" && responseData.correlationId) ||
+        (typeof responseData?.correlation_id === "string" && (responseData.correlation_id as string)) ||
         (typeof error.config?.headers?.["X-Correlation-ID"] === "string" &&
           (error.config.headers["X-Correlation-ID"] as string)) ||
         (typeof error.response?.headers?.["x-correlation-id"] === "string" &&
@@ -117,7 +118,9 @@ apiClient.interceptors.response.use(
         correlationId,
         invalidParams: Array.isArray(responseData?.invalidParams)
           ? (responseData.invalidParams as ApiProblemDetails["invalidParams"])
-          : undefined,
+          : Array.isArray(responseData?.invalid_params)
+            ? (responseData.invalid_params as ApiProblemDetails["invalidParams"])
+            : undefined,
         retryable,
       };
 

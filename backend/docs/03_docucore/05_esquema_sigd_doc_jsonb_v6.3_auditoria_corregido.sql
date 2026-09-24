@@ -9,41 +9,41 @@
 
 -- *Criterios consolidados:*
 
--- *  * TIPO_TRAMITE_TUPA y TIPO_DOCUMENTO son entidades separadas.*
+-- *  * TIPO_TRAMITE_TUPA y TIPO_DOCUMENTO son entidades separadas.*
 
--- *  * TIPO_TRAMITE_TUPA <-> TIPO_DOCUMENTO se mantiene 1:1.*
+-- *  * TIPO_TRAMITE_TUPA <-> TIPO_DOCUMENTO se mantiene 1:1.*
 
--- *  * USUARIO pertenece a sigd_auth; sus UUID se manejan como referencias*
+-- *  * USUARIO pertenece a sigd_auth; sus UUID se manejan como referencias*
 
--- *    externas, sin tabla ni FK local en DocuCore.*
+-- *    externas, sin tabla ni FK local en DocuCore.*
 
--- *  * FORMULARIO_VERSION almacena JSON Schema Draft 2020-12 en JSONB.*
+-- *  * FORMULARIO_VERSION almacena JSON Schema Draft 2020-12 en JSONB.*
 
--- *  * EXPEDIENTE_FORMULARIO_RESPUESTA almacena payload_respuestas JSONB y conserva la versión exacta*
+-- *  * EXPEDIENTE_FORMULARIO_RESPUESTA almacena payload_respuestas JSONB y conserva la versión exacta*
 
--- *    del formulario utilizada para iniciar el trámite.*
+-- *    del formulario utilizada para iniciar el trámite.*
 
--- *  * CAMPO_FORMULARIO / VALOR_CAMPO no existen: se elimina el antipatrón EAV.*
+-- *  * CAMPO_FORMULARIO / VALOR_CAMPO no existen: se elimina el antipatrón EAV.*
 
--- *  * DOCUMENTO_ADJUNTO almacena solo metadatos; el archivo físico vive en*
+-- *  * DOCUMENTO_ADJUNTO almacena solo metadatos; el archivo físico vive en*
 
--- *    MinIO/S3 y se carga mediante URLs prefirmadas.*
+-- *    MinIO/S3 y se carga mediante URLs prefirmadas.*
 
--- *  * Magic Bytes y SHA-256 se calculan en aplicación/servicio de almacenamiento.*
+-- *  * Magic Bytes y SHA-256 se calculan en aplicación/servicio de almacenamiento.*
 
--- *  * El expediente NO se radica automáticamente por cargar requisitos.*
+-- *  * El expediente NO se radica automáticamente por cargar requisitos.*
 
--- *  * BORRADOR permanece separado de la radicación administrativa.*
+-- *  * BORRADOR permanece separado de la radicación administrativa.*
 
--- *  * El estado de EXPEDIENTE_REQUISITO se deriva de los documentos vigentes.*
+-- *  * El estado de EXPEDIENTE_REQUISITO se deriva de los documentos vigentes.*
 
--- *  * El estado administrativo del EXPEDIENTE solo se actualiza mediante*
+-- *  * El estado administrativo del EXPEDIENTE solo se actualiza mediante*
 
--- *    operaciones controladas y nunca por completar automáticamente un requisito*
+-- *    operaciones controladas y nunca por completar automáticamente un requisito*
 
--- *    de un borrador.*
+-- *    de un borrador.*
 
--- *  * La deduplicación de sha256_hash es por requisito, no global (v6.2).*
+-- *  * La deduplicación de sha256_hash es por requisito, no global (v6.2).*
 
 -- *============================================================================*
 
@@ -65,35 +65,15 @@ DO $$
 
 BEGIN
 
-    CREATE TYPE sigd_doc.calificacion_administrativa_enum AS ENUM (
+    CREATE TYPE sigd_doc.calificacion_administrativa_enum AS ENUM (
 
-        'APROBACION_AUTOMATICA',
+        'APROBACION_AUTOMATICA',
 
-        'EVALUACION_PREVIA_SAP',
+        'EVALUACION_PREVIA_SAP',
 
-        'EVALUACION_PREVIA_SAN'
+        'EVALUACION_PREVIA_SAN'
 
-    );
-
-EXCEPTION WHEN duplicate_object THEN NULL;
-
-END
-
-$$;
-
-DO $$
-
-BEGIN
-
-    CREATE TYPE sigd_doc.tipo_obligatoriedad_enum AS ENUM (
-
-        'OBLIGATORIO',
-
-        'OPCIONAL',
-
-        'CONDICIONAL'
-
-    );
+    );
 
 EXCEPTION WHEN duplicate_object THEN NULL;
 
@@ -105,23 +85,15 @@ DO $$
 
 BEGIN
 
-    CREATE TYPE sigd_doc.estado_expediente_enum AS ENUM (
+    CREATE TYPE sigd_doc.tipo_obligatoriedad_enum AS ENUM (
 
-        'BORRADOR',
+        'OBLIGATORIO',
 
-        'EN_REVISION',
+        'OPCIONAL',
 
-        'OBSERVADO',
+        'CONDICIONAL'
 
-        'SUBSANACION',
-
-        'APROBADO',
-
-        'RECHAZADO_POR_CADUCIDAD',
-
-        'INACTIVO'
-
-    );
+    );
 
 EXCEPTION WHEN duplicate_object THEN NULL;
 
@@ -133,17 +105,23 @@ DO $$
 
 BEGIN
 
-    CREATE TYPE sigd_doc.estado_expediente_requisito_enum AS ENUM (
+    CREATE TYPE sigd_doc.estado_expediente_enum AS ENUM (
 
-        'PENDIENTE',
+        'BORRADOR',
 
-        'OBSERVADO',
+        'EN_REVISION',
 
-        'SUBSANADO',
+        'OBSERVADO',
 
-        'APROBADO'
+        'SUBSANACION',
 
-    );
+        'APROBADO',
+
+        'RECHAZADO_POR_CADUCIDAD',
+
+        'INACTIVO'
+
+    );
 
 EXCEPTION WHEN duplicate_object THEN NULL;
 
@@ -155,19 +133,41 @@ DO $$
 
 BEGIN
 
-    CREATE TYPE sigd_doc.estado_documento_enum AS ENUM (
+    CREATE TYPE sigd_doc.estado_expediente_requisito_enum AS ENUM (
 
-        'CARGADO',
+        'PENDIENTE',
 
-        'OBSERVADO',
+        'OBSERVADO',
 
-        'APROBADO',
+        'SUBSANADO',
 
-        'REEMPLAZADO',
+        'APROBADO'
 
-        'ELIMINADO'
+    );
 
-    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+
+END
+
+$$;
+
+DO $$
+
+BEGIN
+
+    CREATE TYPE sigd_doc.estado_documento_enum AS ENUM (
+
+        'CARGADO',
+
+        'OBSERVADO',
+
+        'APROBADO',
+
+        'REEMPLAZADO',
+
+        'ELIMINADO'
+
+    );
 
 EXCEPTION WHEN duplicate_object THEN NULL;
 
@@ -185,59 +185,59 @@ $$;
 
 CREATE TABLE IF NOT EXISTS sigd_doc.tipo_tramite_tupa (
 
-    id_tipo_tramite_tupa UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_tipo_tramite_tupa UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    codigo_tupa VARCHAR(30),
+    codigo_tupa VARCHAR(30),
 
-    denominacion VARCHAR(200) NOT NULL,
+    denominacion VARCHAR(200) NOT NULL,
 
-    es_tupa BOOLEAN NOT NULL,
+    es_tupa BOOLEAN NOT NULL,
 
-    calificacion_administrativa sigd_doc.calificacion_administrativa_enum NOT NULL,
+    calificacion_administrativa sigd_doc.calificacion_administrativa_enum NOT NULL,
 
-    plazo_max_dias_habiles INTEGER,
+    plazo_max_dias_habiles INTEGER,
 
-    costo NUMERIC(8,2),
+    costo NUMERIC(8,2),
 
-    unidad_organica_responsable VARCHAR(150),
+    unidad_organica_responsable VARCHAR(150),
 
-    base_legal TEXT,
+    base_legal TEXT,
 
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT uq_tupa_codigo UNIQUE (codigo_tupa),
+    CONSTRAINT uq_tupa_codigo UNIQUE (codigo_tupa),
 
-    CONSTRAINT ck_tupa_codigo_no_vacio CHECK (
+    CONSTRAINT ck_tupa_codigo_no_vacio CHECK (
 
-        codigo_tupa IS NULL OR btrim(codigo_tupa) <> ''
+        codigo_tupa IS NULL OR btrim(codigo_tupa) <> ''
 
-    ),
+    ),
 
-    CONSTRAINT ck_tupa_denominacion_no_vacia CHECK (
+    CONSTRAINT ck_tupa_denominacion_no_vacia CHECK (
 
-        btrim(denominacion) <> ''
+        btrim(denominacion) <> ''
 
-    ),
+    ),
 
-    CONSTRAINT ck_tupa_plazo_no_negativo CHECK (
+    CONSTRAINT ck_tupa_plazo_no_negativo CHECK (
 
-        plazo_max_dias_habiles IS NULL OR plazo_max_dias_habiles >= 0
+        plazo_max_dias_habiles IS NULL OR plazo_max_dias_habiles >= 0
 
-    ),
+    ),
 
-    CONSTRAINT ck_tupa_costo_no_negativo CHECK (
+    CONSTRAINT ck_tupa_costo_no_negativo CHECK (
 
-        costo IS NULL OR costo >= 0
+        costo IS NULL OR costo >= 0
 
-    ),
+    ),
 
-    CONSTRAINT ck_tupa_calificacion_coherente CHECK (
+    CONSTRAINT ck_tupa_calificacion_coherente CHECK (
 
-        es_tupa = FALSE OR calificacion_administrativa IS NOT NULL
+        es_tupa = FALSE OR calificacion_administrativa IS NOT NULL
 
-    )
+    )
 
 );
 
@@ -255,47 +255,47 @@ CREATE TABLE IF NOT EXISTS sigd_doc.tipo_tramite_tupa (
 
 CREATE TABLE IF NOT EXISTS sigd_doc.tipo_documento (
 
-    id_tipo_documento UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_tipo_documento UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    id_tipo_tramite_tupa UUID,
+    id_tipo_tramite_tupa UUID,
 
-    codigo_tipo VARCHAR(30) NOT NULL,
+    codigo_tipo VARCHAR(30) NOT NULL,
 
-    nombre VARCHAR(150) NOT NULL,
+    nombre VARCHAR(150) NOT NULL,
 
-    descripcion TEXT,
+    descripcion TEXT,
 
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    id_usuario_creador UUID,
+    id_usuario_creador UUID,
 
-    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT uq_tipo_documento_codigo UNIQUE (codigo_tipo),
+    CONSTRAINT uq_tipo_documento_codigo UNIQUE (codigo_tipo),
 
-    CONSTRAINT uq_tipo_documento_tupa UNIQUE (id_tipo_tramite_tupa),
+    CONSTRAINT uq_tipo_documento_tupa UNIQUE (id_tipo_tramite_tupa),
 
-    CONSTRAINT fk_tipo_documento_tupa
+    CONSTRAINT fk_tipo_documento_tupa
 
-        FOREIGN KEY (id_tipo_tramite_tupa)
+        FOREIGN KEY (id_tipo_tramite_tupa)
 
-        REFERENCES sigd_doc.tipo_tramite_tupa(id_tipo_tramite_tupa)
+        REFERENCES sigd_doc.tipo_tramite_tupa(id_tipo_tramite_tupa)
 
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT
 
-        ON UPDATE RESTRICT,
+        ON UPDATE RESTRICT,
 
-    CONSTRAINT ck_tipo_documento_codigo_no_vacio CHECK (
+    CONSTRAINT ck_tipo_documento_codigo_no_vacio CHECK (
 
-        btrim(codigo_tipo) <> ''
+        btrim(codigo_tipo) <> ''
 
-    ),
+    ),
 
-    CONSTRAINT ck_tipo_documento_nombre_no_vacio CHECK (
+    CONSTRAINT ck_tipo_documento_nombre_no_vacio CHECK (
 
-        btrim(nombre) <> ''
+        btrim(nombre) <> ''
 
-    )
+    )
 
 );
 
@@ -309,37 +309,37 @@ CREATE TABLE IF NOT EXISTS sigd_doc.tipo_documento (
 
 CREATE TABLE IF NOT EXISTS sigd_doc.formulario_version (
 
-    id_formulario_version UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_formulario_version UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    id_tipo_documento UUID NOT NULL,
+    id_tipo_documento UUID NOT NULL,
 
-    version SMALLINT NOT NULL,
+    version SMALLINT NOT NULL,
 
-    schema_definicion JSONB NOT NULL,
+    schema_definicion JSONB NOT NULL,
 
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_formulario_version_tipo_documento
+    CONSTRAINT fk_formulario_version_tipo_documento
 
-        FOREIGN KEY (id_tipo_documento)
+        FOREIGN KEY (id_tipo_documento)
 
-        REFERENCES sigd_doc.tipo_documento(id_tipo_documento)
+        REFERENCES sigd_doc.tipo_documento(id_tipo_documento)
 
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT
 
-        ON UPDATE RESTRICT,
+        ON UPDATE RESTRICT,
 
-    CONSTRAINT uq_formulario_version UNIQUE (id_tipo_documento, version),
+    CONSTRAINT uq_formulario_version UNIQUE (id_tipo_documento, version),
 
-    CONSTRAINT ck_formulario_version_mayor_cero CHECK (version > 0),
+    CONSTRAINT ck_formulario_version_mayor_cero CHECK (version > 0),
 
-    CONSTRAINT ck_formulario_version_schema_objeto CHECK (
+    CONSTRAINT ck_formulario_version_schema_objeto CHECK (
 
-        jsonb_typeof(schema_definicion) = 'object'
+        jsonb_typeof(schema_definicion) = 'object'
 
-    )
+    )
 
 );
 
@@ -359,59 +359,59 @@ WHERE activo = TRUE;
 
 -- *IMPORTANTE:*
 
--- *  BORRADOR = preparación. No tiene codigo_oficial ni fecha_radicacion.*
+-- *  BORRADOR = preparación. No tiene codigo_oficial ni fecha_radicacion.*
 
--- *  La radicación es explícita y administrativa.*
+-- *  La radicación es explícita y administrativa.*
 
 -- *============================================================================*
 
 CREATE TABLE IF NOT EXISTS sigd_doc.expediente (
 
-    id_expediente UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_expediente UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    codigo_oficial VARCHAR(30),
+    codigo_oficial VARCHAR(30),
 
-    id_formulario_version UUID NOT NULL,
+    id_formulario_version UUID NOT NULL,
 
-    id_usuario_solicitante UUID NOT NULL,
+    id_usuario_solicitante UUID NOT NULL,
 
-    estado sigd_doc.estado_expediente_enum NOT NULL DEFAULT 'BORRADOR',
+    estado sigd_doc.estado_expediente_enum NOT NULL DEFAULT 'BORRADOR',
 
-    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    fecha_radicacion TIMESTAMPTZ,
+    fecha_radicacion TIMESTAMPTZ,
 
-    CONSTRAINT fk_expediente_formulario_version
+    CONSTRAINT fk_expediente_formulario_version
 
-        FOREIGN KEY (id_formulario_version)
+        FOREIGN KEY (id_formulario_version)
 
-        REFERENCES sigd_doc.formulario_version(id_formulario_version)
+        REFERENCES sigd_doc.formulario_version(id_formulario_version)
 
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT
 
-        ON UPDATE RESTRICT,
+        ON UPDATE RESTRICT,
 
-    CONSTRAINT uq_expediente_codigo_oficial UNIQUE (codigo_oficial),
+    CONSTRAINT uq_expediente_codigo_oficial UNIQUE (codigo_oficial),
 
-    CONSTRAINT ck_expediente_codigo_oficial CHECK (
+    CONSTRAINT ck_expediente_codigo_oficial CHECK (
 
-        (estado = 'BORRADOR' AND codigo_oficial IS NULL)
+        (estado = 'BORRADOR' AND codigo_oficial IS NULL)
 
-        OR
+        OR
 
-        (estado <> 'BORRADOR' AND codigo_oficial IS NOT NULL)
+        (estado <> 'BORRADOR' AND codigo_oficial IS NOT NULL)
 
-    ),
+    ),
 
-    CONSTRAINT ck_expediente_radicacion CHECK (
+    CONSTRAINT ck_expediente_radicacion CHECK (
 
-        (estado = 'BORRADOR' AND fecha_radicacion IS NULL)
+        (estado = 'BORRADOR' AND fecha_radicacion IS NULL)
 
-        OR
+        OR
 
-        (estado <> 'BORRADOR' AND fecha_radicacion IS NOT NULL)
+        (estado <> 'BORRADOR' AND fecha_radicacion IS NOT NULL)
 
-    )
+    )
 
 );
 
@@ -463,91 +463,91 @@ FOR EACH ROW EXECUTE FUNCTION sigd_doc.fn_validar_expediente_formulario_respuest
 
 CREATE TABLE IF NOT EXISTS sigd_doc.requisito (
 
-    id_requisito UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_requisito UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    codigo_requisito VARCHAR(20) NOT NULL,
+    codigo_requisito VARCHAR(20) NOT NULL,
 
-    nombre VARCHAR(150) NOT NULL,
+    nombre VARCHAR(150) NOT NULL,
 
-    descripcion_guia TEXT,
+    descripcion_guia TEXT,
 
-    tipo_obligatoriedad sigd_doc.tipo_obligatoriedad_enum NOT NULL,
+    tipo_obligatoriedad sigd_doc.tipo_obligatoriedad_enum NOT NULL,
 
-    orden_presentacion SMALLINT NOT NULL,
+    orden_presentacion SMALLINT NOT NULL,
 
-    requiere_vigencia BOOLEAN NOT NULL DEFAULT FALSE,
+    requiere_vigencia BOOLEAN NOT NULL DEFAULT FALSE,
 
-    dias_vigencia_max INTEGER,
+    dias_vigencia_max INTEGER,
 
-    permite_multiples BOOLEAN NOT NULL DEFAULT FALSE,
+    permite_multiples BOOLEAN NOT NULL DEFAULT FALSE,
 
-    cantidad_max_archivos SMALLINT NOT NULL DEFAULT 1,
+    cantidad_max_archivos SMALLINT NOT NULL DEFAULT 1,
 
-    peso_maximo_mb NUMERIC(5,2) NOT NULL,
+    peso_maximo_mb NUMERIC(5,2) NOT NULL,
 
-    formatos_permitidos VARCHAR(100) NOT NULL,
+    formatos_permitidos VARCHAR(100) NOT NULL,
 
-    CONSTRAINT uq_requisito_codigo UNIQUE (codigo_requisito),
+    CONSTRAINT uq_requisito_codigo UNIQUE (codigo_requisito),
 
-    CONSTRAINT ck_requisito_codigo_no_vacio CHECK (
+    CONSTRAINT ck_requisito_codigo_no_vacio CHECK (
 
-        btrim(codigo_requisito) <> ''
+        btrim(codigo_requisito) <> ''
 
-    ),
+    ),
 
-    CONSTRAINT ck_requisito_nombre_no_vacio CHECK (
+    CONSTRAINT ck_requisito_nombre_no_vacio CHECK (
 
-        btrim(nombre) <> ''
+        btrim(nombre) <> ''
 
-    ),
+    ),
 
-    CONSTRAINT ck_requisito_orden CHECK (
+    CONSTRAINT ck_requisito_orden CHECK (
 
-        orden_presentacion > 0
+        orden_presentacion > 0
 
-    ),
+    ),
 
-    CONSTRAINT ck_requisito_vigencia CHECK (
+    CONSTRAINT ck_requisito_vigencia CHECK (
 
-        (
+        (
 
-            requiere_vigencia = TRUE
+            requiere_vigencia = TRUE
 
-            AND dias_vigencia_max IS NOT NULL
+            AND dias_vigencia_max IS NOT NULL
 
-            AND dias_vigencia_max > 0
+            AND dias_vigencia_max > 0
 
-        )
+        )
 
-        OR
+        OR
 
-        (
+        (
 
-            requiere_vigencia = FALSE
+            requiere_vigencia = FALSE
 
-            AND dias_vigencia_max IS NULL
+            AND dias_vigencia_max IS NULL
 
-        )
+        )
 
-    ),
+    ),
 
-    CONSTRAINT ck_requisito_cantidad_archivos CHECK (
+    CONSTRAINT ck_requisito_cantidad_archivos CHECK (
 
-        cantidad_max_archivos > 0
+        cantidad_max_archivos > 0
 
-    ),
+    ),
 
-    CONSTRAINT ck_requisito_peso_maximo CHECK (
+    CONSTRAINT ck_requisito_peso_maximo CHECK (
 
-        peso_maximo_mb > 0 AND peso_maximo_mb <= 25
+        peso_maximo_mb > 0 AND peso_maximo_mb <= 25
 
-    ),
+    ),
 
-    CONSTRAINT ck_requisito_formatos_no_vacios CHECK (
+    CONSTRAINT ck_requisito_formatos_no_vacios CHECK (
 
-        btrim(formatos_permitidos) <> ''
+        btrim(formatos_permitidos) <> ''
 
-    )
+    )
 
 );
 
@@ -563,67 +563,67 @@ CREATE TABLE IF NOT EXISTS sigd_doc.requisito (
 
 CREATE TABLE IF NOT EXISTS sigd_doc.tipo_documento_requisito (
 
-    id_tipo_documento_requisito UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_tipo_documento_requisito UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    id_tipo_documento UUID NOT NULL,
+    id_tipo_documento UUID NOT NULL,
 
-    id_requisito UUID NOT NULL,
+    id_requisito UUID NOT NULL,
 
-    obligatoriedad_override sigd_doc.tipo_obligatoriedad_enum,
+    obligatoriedad_override sigd_doc.tipo_obligatoriedad_enum,
 
-    campo_condicionante_path TEXT,
+    campo_condicionante_path TEXT,
 
-    valor_condicionante VARCHAR(100),
+    valor_condicionante VARCHAR(100),
 
-    CONSTRAINT fk_tdr_tipo_documento
+    CONSTRAINT fk_tdr_tipo_documento
 
-        FOREIGN KEY (id_tipo_documento)
+        FOREIGN KEY (id_tipo_documento)
 
-        REFERENCES sigd_doc.tipo_documento(id_tipo_documento)
+        REFERENCES sigd_doc.tipo_documento(id_tipo_documento)
 
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT
 
-        ON UPDATE RESTRICT,
+        ON UPDATE RESTRICT,
 
-    CONSTRAINT fk_tdr_requisito
+    CONSTRAINT fk_tdr_requisito
 
-        FOREIGN KEY (id_requisito)
+        FOREIGN KEY (id_requisito)
 
-        REFERENCES sigd_doc.requisito(id_requisito)
+        REFERENCES sigd_doc.requisito(id_requisito)
 
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT
 
-        ON UPDATE RESTRICT,
+        ON UPDATE RESTRICT,
 
-    CONSTRAINT uq_tipo_documento_requisito
+    CONSTRAINT uq_tipo_documento_requisito
 
-        UNIQUE (id_tipo_documento, id_requisito),
+        UNIQUE (id_tipo_documento, id_requisito),
 
-    CONSTRAINT ck_tdr_condicion_completa CHECK (
+    CONSTRAINT ck_tdr_condicion_completa CHECK (
 
-        (
+        (
 
-            campo_condicionante_path IS NULL
+            campo_condicionante_path IS NULL
 
-            AND valor_condicionante IS NULL
+            AND valor_condicionante IS NULL
 
-        )
+        )
 
-        OR
+        OR
 
-        (
+        (
 
-            campo_condicionante_path IS NOT NULL
+            campo_condicionante_path IS NOT NULL
 
-            AND btrim(campo_condicionante_path) <> ''
+            AND btrim(campo_condicionante_path) <> ''
 
-            AND valor_condicionante IS NOT NULL
+            AND valor_condicionante IS NOT NULL
 
-            AND btrim(valor_condicionante) <> ''
+            AND btrim(valor_condicionante) <> ''
 
-        )
+        )
 
-    )
+    )
 
 );
 
@@ -639,65 +639,65 @@ CREATE TABLE IF NOT EXISTS sigd_doc.tipo_documento_requisito (
 
 CREATE TABLE IF NOT EXISTS sigd_doc.expediente_requisito (
 
-    id_expediente_requisito UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_expediente_requisito UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    id_expediente UUID NOT NULL,
+    id_expediente UUID NOT NULL,
 
-    id_tipo_documento_requisito UUID NOT NULL,
+    id_tipo_documento_requisito UUID NOT NULL,
 
-    estado sigd_doc.estado_expediente_requisito_enum NOT NULL DEFAULT 'PENDIENTE',
+    estado sigd_doc.estado_expediente_requisito_enum NOT NULL DEFAULT 'PENDIENTE',
 
-    id_evaluador UUID,
+    id_evaluador UUID,
 
-    fecha_evaluacion TIMESTAMPTZ,
+    fecha_evaluacion TIMESTAMPTZ,
 
-    fecha_activacion TIMESTAMPTZ,
+    fecha_activacion TIMESTAMPTZ,
 
-    CONSTRAINT fk_expediente_requisito_expediente
+    CONSTRAINT fk_expediente_requisito_expediente
 
-        FOREIGN KEY (id_expediente)
+        FOREIGN KEY (id_expediente)
 
-        REFERENCES sigd_doc.expediente(id_expediente)
+        REFERENCES sigd_doc.expediente(id_expediente)
 
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT
 
-        ON UPDATE RESTRICT,
+        ON UPDATE RESTRICT,
 
-    CONSTRAINT fk_expediente_requisito_tdr
+    CONSTRAINT fk_expediente_requisito_tdr
 
-        FOREIGN KEY (id_tipo_documento_requisito)
+        FOREIGN KEY (id_tipo_documento_requisito)
 
-        REFERENCES sigd_doc.tipo_documento_requisito(id_tipo_documento_requisito)
+        REFERENCES sigd_doc.tipo_documento_requisito(id_tipo_documento_requisito)
 
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT
 
-        ON UPDATE RESTRICT,
+        ON UPDATE RESTRICT,
 
-    CONSTRAINT uq_expediente_requisito
+    CONSTRAINT uq_expediente_requisito
 
-        UNIQUE (id_expediente, id_tipo_documento_requisito),
+        UNIQUE (id_expediente, id_tipo_documento_requisito),
 
-    CONSTRAINT ck_expediente_requisito_evaluacion CHECK (
+    CONSTRAINT ck_expediente_requisito_evaluacion CHECK (
 
-        (
+        (
 
-            id_evaluador IS NULL
+            id_evaluador IS NULL
 
-            AND fecha_evaluacion IS NULL
+            AND fecha_evaluacion IS NULL
 
-        )
+        )
 
-        OR
+        OR
 
-        (
+        (
 
-            id_evaluador IS NOT NULL
+            id_evaluador IS NOT NULL
 
-            AND fecha_evaluacion IS NOT NULL
+            AND fecha_evaluacion IS NOT NULL
 
-        )
+        )
 
-    )
+    )
 
 );
 
@@ -725,91 +725,91 @@ CREATE TABLE IF NOT EXISTS sigd_doc.expediente_requisito (
 
 CREATE TABLE IF NOT EXISTS sigd_doc.documento_adjunto (
 
-    id_documento_adjunto UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_documento_adjunto UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    id_expediente_requisito UUID NOT NULL,
+    id_expediente_requisito UUID NOT NULL,
 
-    id_usuario_subida UUID NOT NULL,
+    id_usuario_subida UUID NOT NULL,
 
-    nombre_original VARCHAR(255) NOT NULL,
+    nombre_original VARCHAR(255) NOT NULL,
 
-    s3_bucket VARCHAR(100) NOT NULL,
+    s3_bucket VARCHAR(100) NOT NULL,
 
-    s3_key VARCHAR(500) NOT NULL,
+    s3_key VARCHAR(500) NOT NULL,
 
-    formato_extension VARCHAR(10) NOT NULL,
+    formato_extension VARCHAR(10) NOT NULL,
 
-    mime_type VARCHAR(100) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
 
-    tamanio_bytes BIGINT NOT NULL,
+    tamanio_bytes BIGINT NOT NULL,
 
-    sha256_hash CHAR(64) NOT NULL,
+    sha256_hash CHAR(64) NOT NULL,
 
-    magic_bytes_validado BOOLEAN NOT NULL DEFAULT FALSE,
+    magic_bytes_validado BOOLEAN NOT NULL DEFAULT FALSE,
 
-    version_num SMALLINT NOT NULL DEFAULT 1,
+    version_num SMALLINT NOT NULL DEFAULT 1,
 
-    id_documento_anterior UUID,
+    id_documento_anterior UUID,
 
-    estado_documento sigd_doc.estado_documento_enum NOT NULL DEFAULT 'CARGADO',
+    estado_documento sigd_doc.estado_documento_enum NOT NULL DEFAULT 'CARGADO',
 
-    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_documento_expediente_requisito
+    CONSTRAINT fk_documento_expediente_requisito
 
-        FOREIGN KEY (id_expediente_requisito)
+        FOREIGN KEY (id_expediente_requisito)
 
-        REFERENCES sigd_doc.expediente_requisito(id_expediente_requisito)
+        REFERENCES sigd_doc.expediente_requisito(id_expediente_requisito)
 
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT
 
-        ON UPDATE RESTRICT,
+        ON UPDATE RESTRICT,
 
-    CONSTRAINT fk_documento_anterior
+    CONSTRAINT fk_documento_anterior
 
-        FOREIGN KEY (id_documento_anterior)
+        FOREIGN KEY (id_documento_anterior)
 
-        REFERENCES sigd_doc.documento_adjunto(id_documento_adjunto)
+        REFERENCES sigd_doc.documento_adjunto(id_documento_adjunto)
 
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT
 
-        ON UPDATE RESTRICT,
+        ON UPDATE RESTRICT,
 
-    CONSTRAINT uq_documento_s3_key UNIQUE (s3_key),
+    CONSTRAINT uq_documento_s3_key UNIQUE (s3_key),
 
-    CONSTRAINT uq_documento_anterior UNIQUE (id_documento_anterior),
+    CONSTRAINT uq_documento_anterior UNIQUE (id_documento_anterior),
 
-    CONSTRAINT ck_documento_nombre_no_vacio CHECK (btrim(nombre_original) <> ''),
+    CONSTRAINT ck_documento_nombre_no_vacio CHECK (btrim(nombre_original) <> ''),
 
-    CONSTRAINT ck_documento_bucket_no_vacio CHECK (btrim(s3_bucket) <> ''),
+    CONSTRAINT ck_documento_bucket_no_vacio CHECK (btrim(s3_bucket) <> ''),
 
-    CONSTRAINT ck_documento_s3_key_no_vacio CHECK (btrim(s3_key) <> ''),
+    CONSTRAINT ck_documento_s3_key_no_vacio CHECK (btrim(s3_key) <> ''),
 
-    CONSTRAINT ck_documento_extension CHECK (
+    CONSTRAINT ck_documento_extension CHECK (
 
-        formato_extension ~ '^[A-Za-z0-9]{1,10}$'
+        formato_extension ~ '^[A-Za-z0-9]{1,10}$'
 
-    ),
+    ),
 
-    CONSTRAINT ck_documento_mime_no_vacio CHECK (btrim(mime_type) <> ''),
+    CONSTRAINT ck_documento_mime_no_vacio CHECK (btrim(mime_type) <> ''),
 
-    CONSTRAINT ck_documento_tamanio CHECK (tamanio_bytes > 0),
+    CONSTRAINT ck_documento_tamanio CHECK (tamanio_bytes > 0),
 
-    CONSTRAINT ck_documento_hash CHECK (
+    CONSTRAINT ck_documento_hash CHECK (
 
-        sha256_hash ~ '^[0-9a-fA-F]{64}$'
+        sha256_hash ~ '^[0-9a-fA-F]{64}$'
 
-    ),
+    ),
 
-    CONSTRAINT ck_documento_version CHECK (version_num > 0),
+    CONSTRAINT ck_documento_version CHECK (version_num > 0),
 
-    CONSTRAINT ck_documento_no_autorreferencia CHECK (
+    CONSTRAINT ck_documento_no_autorreferencia CHECK (
 
-        id_documento_anterior IS NULL
+        id_documento_anterior IS NULL
 
-        OR id_documento_anterior <> id_documento_adjunto
+        OR id_documento_anterior <> id_documento_adjunto
 
-    )
+    )
 
 );
 
@@ -974,23 +974,23 @@ AS $$
 
 BEGIN
 
-    IF NEW.campo_condicionante_path IS NOT NULL
+    IF NEW.campo_condicionante_path IS NOT NULL
 
-       AND NEW.campo_condicionante_path !~
+       AND NEW.campo_condicionante_path !~
 
-           '^/(?:([^~/]|~[01])*(?:/([^~/]|~[01])*)*)?$'
+           '^/(?:([^~/]|~[01])*(?:/([^~/]|~[01])*)*)?$'
 
-    THEN
+    THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El campo_condicionante_path "%" no es un JSON Pointer válido.',
+            'El campo_condicionante_path "%" no es un JSON Pointer válido.',
 
-            NEW.campo_condicionante_path;
+            NEW.campo_condicionante_path;
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1026,21 +1026,21 @@ AS $$
 
 BEGIN
 
-    IF NEW.activo = TRUE
+    IF NEW.activo = TRUE
 
-       AND NEW.id_tipo_tramite_tupa IS NULL
+       AND NEW.id_tipo_tramite_tupa IS NULL
 
-    THEN
+    THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'No se puede activar el tipo_documento % sin clasificación TUPA.',
+            'No se puede activar el tipo_documento % sin clasificación TUPA.',
 
-            NEW.id_tipo_documento;
+            NEW.id_tipo_documento;
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1076,25 +1076,25 @@ AS $$
 
 BEGIN
 
-    IF TG_OP = 'UPDATE' THEN
+    IF TG_OP = 'UPDATE' THEN
 
-        IF OLD.schema_definicion IS DISTINCT FROM NEW.schema_definicion
+        IF OLD.schema_definicion IS DISTINCT FROM NEW.schema_definicion
 
-           OR OLD.version IS DISTINCT FROM NEW.version
+           OR OLD.version IS DISTINCT FROM NEW.version
 
-           OR OLD.id_tipo_documento IS DISTINCT FROM NEW.id_tipo_documento
+           OR OLD.id_tipo_documento IS DISTINCT FROM NEW.id_tipo_documento
 
-        THEN
+        THEN
 
-            RAISE EXCEPTION
+            RAISE EXCEPTION
 
-                'Las versiones de formularios son inmutables. Cree una nueva versión.';
+                'Las versiones de formularios son inmutables. Cree una nueva versión.';
 
-        END IF;
+        END IF;
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1130,51 +1130,51 @@ AS $$
 
 DECLARE
 
-    v_tipo_activo BOOLEAN;
+    v_tipo_activo BOOLEAN;
 
-    v_formulario_activo BOOLEAN;
+    v_formulario_activo BOOLEAN;
 
 BEGIN
 
-    SELECT fv.activo, td.activo
+    SELECT fv.activo, td.activo
 
-      INTO v_formulario_activo, v_tipo_activo
+      INTO v_formulario_activo, v_tipo_activo
 
-      FROM sigd_doc.formulario_version fv
+      FROM sigd_doc.formulario_version fv
 
-      JOIN sigd_doc.tipo_documento td
+      JOIN sigd_doc.tipo_documento td
 
-        ON td.id_tipo_documento = fv.id_tipo_documento
+        ON td.id_tipo_documento = fv.id_tipo_documento
 
-     WHERE fv.id_formulario_version = NEW.id_formulario_version;
+     WHERE fv.id_formulario_version = NEW.id_formulario_version;
 
-    IF NOT FOUND THEN
+    IF NOT FOUND THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El formulario_version % no existe.',
+            'El formulario_version % no existe.',
 
-            NEW.id_formulario_version;
+            NEW.id_formulario_version;
 
-    END IF;
+    END IF;
 
-    IF v_formulario_activo IS NOT TRUE THEN
+    IF v_formulario_activo IS NOT TRUE THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'No se puede crear o actualizar un expediente con un formulario_version inactivo.';
+            'No se puede crear o actualizar un expediente con un formulario_version inactivo.';
 
-    END IF;
+    END IF;
 
-    IF v_tipo_activo IS NOT TRUE THEN
+    IF v_tipo_activo IS NOT TRUE THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'No se puede crear o actualizar un expediente con un tipo_documento inactivo.';
+            'No se puede crear o actualizar un expediente con un tipo_documento inactivo.';
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1212,67 +1212,67 @@ AS $$
 
 DECLARE
 
-    v_tipo_documento_expediente UUID;
+    v_tipo_documento_expediente UUID;
 
-    v_tipo_documento_requisito UUID;
+    v_tipo_documento_requisito UUID;
 
 BEGIN
 
-    SELECT fv.id_tipo_documento
+    SELECT fv.id_tipo_documento
 
-      INTO v_tipo_documento_expediente
+      INTO v_tipo_documento_expediente
 
-      FROM sigd_doc.expediente e
+      FROM sigd_doc.expediente e
 
-      JOIN sigd_doc.formulario_version fv
+      JOIN sigd_doc.formulario_version fv
 
-        ON fv.id_formulario_version = e.id_formulario_version
+        ON fv.id_formulario_version = e.id_formulario_version
 
-     WHERE e.id_expediente = NEW.id_expediente;
+     WHERE e.id_expediente = NEW.id_expediente;
 
-    SELECT tdr.id_tipo_documento
+    SELECT tdr.id_tipo_documento
 
-      INTO v_tipo_documento_requisito
+      INTO v_tipo_documento_requisito
 
-      FROM sigd_doc.tipo_documento_requisito tdr
+      FROM sigd_doc.tipo_documento_requisito tdr
 
-     WHERE tdr.id_tipo_documento_requisito =
+     WHERE tdr.id_tipo_documento_requisito =
 
-           NEW.id_tipo_documento_requisito;
+           NEW.id_tipo_documento_requisito;
 
-    IF v_tipo_documento_expediente IS NULL THEN
+    IF v_tipo_documento_expediente IS NULL THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El expediente % no existe o no tiene una versión de formulario válida.',
+            'El expediente % no existe o no tiene una versión de formulario válida.',
 
-            NEW.id_expediente;
+            NEW.id_expediente;
 
-    END IF;
+    END IF;
 
-    IF v_tipo_documento_requisito IS NULL THEN
+    IF v_tipo_documento_requisito IS NULL THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El tipo_documento_requisito % no existe.',
+            'El tipo_documento_requisito % no existe.',
 
-            NEW.id_tipo_documento_requisito;
+            NEW.id_tipo_documento_requisito;
 
-    END IF;
+    END IF;
 
-    IF v_tipo_documento_expediente <> v_tipo_documento_requisito THEN
+    IF v_tipo_documento_expediente <> v_tipo_documento_requisito THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El requisito % no pertenece al tipo de documento del expediente %.',
+            'El requisito % no pertenece al tipo de documento del expediente %.',
 
-            NEW.id_tipo_documento_requisito,
+            NEW.id_tipo_documento_requisito,
 
-            NEW.id_expediente;
+            NEW.id_expediente;
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1320,23 +1320,23 @@ AS $$
 
 BEGIN
 
-    IF TG_OP = 'UPDATE'
+    IF TG_OP = 'UPDATE'
 
-       AND OLD.estado IS DISTINCT FROM NEW.estado
+       AND OLD.estado IS DISTINCT FROM NEW.estado
 
-       AND pg_trigger_depth() = 1
+       AND pg_trigger_depth() = 1
 
-    THEN
+    THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El estado de expediente_requisito es derivado y no puede modificarse directamente. '
+            'El estado de expediente_requisito es derivado y no puede modificarse directamente. '
 
-            'Debe cambiar como consecuencia de la evaluación de sus documentos.';
+            'Debe cambiar como consecuencia de la evaluación de sus documentos.';
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1374,111 +1374,111 @@ AS $$
 
 DECLARE
 
-    v_peso_maximo_mb NUMERIC(5,2);
+    v_peso_maximo_mb NUMERIC(5,2);
 
-    v_cantidad_max_archivos SMALLINT;
+    v_cantidad_max_archivos SMALLINT;
 
-    v_permite_multiples BOOLEAN;
+    v_permite_multiples BOOLEAN;
 
-    v_tamanio_maximo_bytes BIGINT;
+    v_tamanio_maximo_bytes BIGINT;
 
-    v_cantidad_actual INTEGER;
+    v_cantidad_actual INTEGER;
 
 BEGIN
 
-    SELECT
+    SELECT
 
-        r.peso_maximo_mb,
+        r.peso_maximo_mb,
 
-        r.cantidad_max_archivos,
+        r.cantidad_max_archivos,
 
-        r.permite_multiples
+        r.permite_multiples
 
-    INTO
+    INTO
 
-        v_peso_maximo_mb,
+        v_peso_maximo_mb,
 
-        v_cantidad_max_archivos,
+        v_cantidad_max_archivos,
 
-        v_permite_multiples
+        v_permite_multiples
 
-    FROM sigd_doc.expediente_requisito er
+    FROM sigd_doc.expediente_requisito er
 
-    JOIN sigd_doc.tipo_documento_requisito tdr
+    JOIN sigd_doc.tipo_documento_requisito tdr
 
-      ON tdr.id_tipo_documento_requisito = er.id_tipo_documento_requisito
+      ON tdr.id_tipo_documento_requisito = er.id_tipo_documento_requisito
 
-    JOIN sigd_doc.requisito r
+    JOIN sigd_doc.requisito r
 
-      ON r.id_requisito = tdr.id_requisito
+      ON r.id_requisito = tdr.id_requisito
 
-    WHERE er.id_expediente_requisito = NEW.id_expediente_requisito
+    WHERE er.id_expediente_requisito = NEW.id_expediente_requisito
 
-    FOR UPDATE OF er;
+    FOR UPDATE OF er;
 
-    IF NOT FOUND THEN
+    IF NOT FOUND THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El expediente_requisito % no existe.',
+            'El expediente_requisito % no existe.',
 
-            NEW.id_expediente_requisito;
+            NEW.id_expediente_requisito;
 
-    END IF;
+    END IF;
 
-    v_tamanio_maximo_bytes :=
+    v_tamanio_maximo_bytes :=
 
-        CEIL(v_peso_maximo_mb * 1024 * 1024)::BIGINT;
+        CEIL(v_peso_maximo_mb * 1024 * 1024)::BIGINT;
 
-    IF NEW.tamanio_bytes > v_tamanio_maximo_bytes THEN
+    IF NEW.tamanio_bytes > v_tamanio_maximo_bytes THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El archivo excede el peso máximo permitido de % MB.',
+            'El archivo excede el peso máximo permitido de % MB.',
 
-            v_peso_maximo_mb;
+            v_peso_maximo_mb;
 
-    END IF;
+    END IF;
 
-    SELECT COUNT(*)
+    SELECT COUNT(*)
 
-      INTO v_cantidad_actual
+      INTO v_cantidad_actual
 
-      FROM sigd_doc.documento_adjunto da
+      FROM sigd_doc.documento_adjunto da
 
-     WHERE da.id_expediente_requisito = NEW.id_expediente_requisito
+     WHERE da.id_expediente_requisito = NEW.id_expediente_requisito
 
-       AND da.id_documento_adjunto <> NEW.id_documento_adjunto
+       AND da.id_documento_adjunto <> NEW.id_documento_adjunto
 
-       AND da.estado_documento NOT IN ('REEMPLAZADO', 'ELIMINADO')
+       AND da.estado_documento NOT IN ('REEMPLAZADO', 'ELIMINADO')
 
-       AND (
+       AND (
 
-           NEW.id_documento_anterior IS NULL
+           NEW.id_documento_anterior IS NULL
 
-           OR da.id_documento_adjunto <> NEW.id_documento_anterior
+           OR da.id_documento_adjunto <> NEW.id_documento_anterior
 
-       );
+       );
 
-    IF v_permite_multiples IS FALSE AND v_cantidad_actual >= 1 THEN
+    IF v_permite_multiples IS FALSE AND v_cantidad_actual >= 1 THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El requisito no permite múltiples archivos.';
+            'El requisito no permite múltiples archivos.';
 
-    END IF;
+    END IF;
 
-    IF v_cantidad_actual >= v_cantidad_max_archivos THEN
+    IF v_cantidad_actual >= v_cantidad_max_archivos THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'Se alcanzó la cantidad máxima de % archivos para el requisito.',
+            'Se alcanzó la cantidad máxima de % archivos para el requisito.',
 
-            v_cantidad_max_archivos;
+            v_cantidad_max_archivos;
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1514,77 +1514,77 @@ AS $$
 
 BEGIN
 
-    IF TG_OP = 'DELETE' THEN
+    IF TG_OP = 'DELETE' THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'No se permite eliminar físicamente un documento. Utilice estado ELIMINADO.';
+            'No se permite eliminar físicamente un documento. Utilice estado ELIMINADO.';
 
-    END IF;
+    END IF;
 
-    IF TG_OP = 'INSERT' AND NEW.estado_documento <> 'CARGADO' THEN
+    IF TG_OP = 'INSERT' AND NEW.estado_documento <> 'CARGADO' THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'Un documento nuevo debe registrarse inicialmente en estado CARGADO.';
+            'Un documento nuevo debe registrarse inicialmente en estado CARGADO.';
 
-    END IF;
+    END IF;
 
-    IF TG_OP = 'UPDATE' THEN
+    IF TG_OP = 'UPDATE' THEN
 
-        IF OLD.estado_documento = 'APROBADO'
+        IF OLD.estado_documento = 'APROBADO'
 
-           AND NEW IS DISTINCT FROM OLD
+           AND NEW IS DISTINCT FROM OLD
 
-        THEN
+        THEN
 
-            RAISE EXCEPTION
+            RAISE EXCEPTION
 
-                'Un documento aprobado es inmutable.';
+                'Un documento aprobado es inmutable.';
 
-        END IF;
+        END IF;
 
-        IF OLD.estado_documento IN ('REEMPLAZADO', 'ELIMINADO')
+        IF OLD.estado_documento IN ('REEMPLAZADO', 'ELIMINADO')
 
-           AND NEW.estado_documento <> OLD.estado_documento
+           AND NEW.estado_documento <> OLD.estado_documento
 
-        THEN
+        THEN
 
-            RAISE EXCEPTION
+            RAISE EXCEPTION
 
-                'Un documento % no puede volver a un estado activo.',
+                'Un documento % no puede volver a un estado activo.',
 
-                OLD.estado_documento;
+                OLD.estado_documento;
 
-        END IF;
+        END IF;
 
-        IF NEW.id_documento_anterior IS DISTINCT FROM OLD.id_documento_anterior
+        IF NEW.id_documento_anterior IS DISTINCT FROM OLD.id_documento_anterior
 
-           AND NEW.id_documento_anterior IS NOT NULL
+           AND NEW.id_documento_anterior IS NOT NULL
 
-        THEN
+        THEN
 
-            RAISE EXCEPTION
+            RAISE EXCEPTION
 
-                'La cadena de reemplazo se establece al insertar una nueva versión.';
+                'La cadena de reemplazo se establece al insertar una nueva versión.';
 
-        END IF;
+        END IF;
 
-    END IF;
+    END IF;
 
-    IF NEW.estado_documento = 'APROBADO'
+    IF NEW.estado_documento = 'APROBADO'
 
-       AND NEW.magic_bytes_validado IS NOT TRUE
+       AND NEW.magic_bytes_validado IS NOT TRUE
 
-    THEN
+    THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'Un documento no puede aprobarse hasta validar sus Magic Bytes.';
+            'Un documento no puede aprobarse hasta validar sus Magic Bytes.';
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1622,33 +1622,33 @@ AS $$
 
 BEGIN
 
-    IF EXISTS (
+    IF EXISTS (
 
-        SELECT 1
+        SELECT 1
 
-        FROM sigd_doc.documento_adjunto
+        FROM sigd_doc.documento_adjunto
 
-        WHERE sha256_hash = NEW.sha256_hash
+        WHERE sha256_hash = NEW.sha256_hash
 
-          AND id_expediente_requisito = NEW.id_expediente_requisito
+          AND id_expediente_requisito = NEW.id_expediente_requisito
 
-    )
+    )
 
-    THEN
+    THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'No se permite registrar un documento duplicado en el mismo requisito. Ya existe un documento con el SHA-256 % para el requisito %.',
+            'No se permite registrar un documento duplicado en el mismo requisito. Ya existe un documento con el SHA-256 % para el requisito %.',
 
-            NEW.sha256_hash,
+            NEW.sha256_hash,
 
-            NEW.id_expediente_requisito
+            NEW.id_expediente_requisito
 
-            USING ERRCODE = '23505';
+            USING ERRCODE = '23505';
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1678,19 +1678,19 @@ AS $$
 
 BEGIN
 
-    IF TG_OP = 'UPDATE'
+    IF TG_OP = 'UPDATE'
 
-       AND OLD.sha256_hash IS DISTINCT FROM NEW.sha256_hash
+       AND OLD.sha256_hash IS DISTINCT FROM NEW.sha256_hash
 
-    THEN
+    THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El sha256_hash es inmutable y no puede modificarse después de insertar el documento.';
+            'El sha256_hash es inmutable y no puede modificarse después de insertar el documento.';
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1726,85 +1726,85 @@ AS $$
 
 DECLARE
 
-    v_expediente_requisito UUID;
+    v_expediente_requisito UUID;
 
-    v_version_anterior SMALLINT;
+    v_version_anterior SMALLINT;
 
-    v_estado_anterior sigd_doc.estado_documento_enum;
+    v_estado_anterior sigd_doc.estado_documento_enum;
 
 BEGIN
 
-    IF NEW.id_documento_anterior IS NULL THEN
+    IF NEW.id_documento_anterior IS NULL THEN
 
-        IF NEW.version_num <> 1 THEN
+        IF NEW.version_num <> 1 THEN
 
-            RAISE EXCEPTION
+            RAISE EXCEPTION
 
-                'El primer documento de una cadena debe tener version_num = 1.';
+                'El primer documento de una cadena debe tener version_num = 1.';
 
-        END IF;
+        END IF;
 
-    ELSE
+    ELSE
 
-        SELECT
+        SELECT
 
-            id_expediente_requisito,
+            id_expediente_requisito,
 
-            version_num,
+            version_num,
 
-            estado_documento
+            estado_documento
 
-        INTO
+        INTO
 
-            v_expediente_requisito,
+            v_expediente_requisito,
 
-            v_version_anterior,
+            v_version_anterior,
 
-            v_estado_anterior
+            v_estado_anterior
 
-        FROM sigd_doc.documento_adjunto
+        FROM sigd_doc.documento_adjunto
 
-        WHERE id_documento_adjunto = NEW.id_documento_anterior
+        WHERE id_documento_adjunto = NEW.id_documento_anterior
 
-        FOR UPDATE;
+        FOR UPDATE;
 
-        IF NOT FOUND THEN
+        IF NOT FOUND THEN
 
-            RAISE EXCEPTION
+            RAISE EXCEPTION
 
-                'El documento anterior % no existe.',
+                'El documento anterior % no existe.',
 
-                NEW.id_documento_anterior;
+                NEW.id_documento_anterior;
 
-        END IF;
+        END IF;
 
-        IF v_expediente_requisito <> NEW.id_expediente_requisito THEN
+        IF v_expediente_requisito <> NEW.id_expediente_requisito THEN
 
-            RAISE EXCEPTION
+            RAISE EXCEPTION
 
-                'El documento anterior debe pertenecer al mismo requisito del expediente.';
+                'El documento anterior debe pertenecer al mismo requisito del expediente.';
 
-        END IF;
+        END IF;
 
-        IF v_estado_anterior <> 'OBSERVADO' THEN
+        IF v_estado_anterior <> 'OBSERVADO' THEN
 
-            RAISE EXCEPTION
+            RAISE EXCEPTION
 
-                'Solo un documento observado puede ser reemplazado.';
+                'Solo un documento observado puede ser reemplazado.';
 
-        END IF;
+        END IF;
 
-        IF NEW.version_num <> v_version_anterior + 1 THEN
+        IF NEW.version_num <> v_version_anterior + 1 THEN
 
-            RAISE EXCEPTION
+            RAISE EXCEPTION
 
-                'La versión del documento debe ser consecutiva.';
+                'La versión del documento debe ser consecutiva.';
 
-        END IF;
+        END IF;
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1834,33 +1834,33 @@ AS $$
 
 BEGIN
 
-    IF TG_OP = 'INSERT'
+    IF TG_OP = 'INSERT'
 
-       AND NEW.id_documento_anterior IS NOT NULL
+       AND NEW.id_documento_anterior IS NOT NULL
 
-    THEN
+    THEN
 
-        UPDATE sigd_doc.documento_adjunto
+        UPDATE sigd_doc.documento_adjunto
 
-           SET estado_documento = 'REEMPLAZADO'
+           SET estado_documento = 'REEMPLAZADO'
 
-         WHERE id_documento_adjunto = NEW.id_documento_anterior
+         WHERE id_documento_adjunto = NEW.id_documento_anterior
 
-           AND estado_documento = 'OBSERVADO';
+           AND estado_documento = 'OBSERVADO';
 
-        IF NOT FOUND THEN
+        IF NOT FOUND THEN
 
-            RAISE EXCEPTION
+            RAISE EXCEPTION
 
-                'El documento anterior % ya no se encuentra en estado OBSERVADO.',
+                'El documento anterior % ya no se encuentra en estado OBSERVADO.',
 
-                NEW.id_documento_anterior;
+                NEW.id_documento_anterior;
 
-        END IF;
+        END IF;
 
-    END IF;
+    END IF;
 
-    RETURN NEW;
+    RETURN NEW;
 
 END;
 
@@ -1888,7 +1888,7 @@ EXECUTE FUNCTION sigd_doc.fn_postprocesar_documento();
 
 CREATE OR REPLACE FUNCTION sigd_doc.fn_eliminar_logicamente_documento(
 
-    p_id_documento UUID
+    p_id_documento UUID
 
 )
 
@@ -1900,23 +1900,23 @@ AS $$
 
 BEGIN
 
-    UPDATE sigd_doc.documento_adjunto
+    UPDATE sigd_doc.documento_adjunto
 
-       SET estado_documento = 'ELIMINADO'
+       SET estado_documento = 'ELIMINADO'
 
-     WHERE id_documento_adjunto = p_id_documento
+     WHERE id_documento_adjunto = p_id_documento
 
-       AND estado_documento <> 'APROBADO';
+       AND estado_documento <> 'APROBADO';
 
-    IF NOT FOUND THEN
+    IF NOT FOUND THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El documento % no existe o ya fue aprobado.',
+            'El documento % no existe o ya fue aprobado.',
 
-            p_id_documento;
+            p_id_documento;
 
-    END IF;
+    END IF;
 
 END;
 
@@ -1928,15 +1928,15 @@ $$;
 
 --
 
--- *PENDIENTE  : no existe documento vigente.*
+-- *PENDIENTE  : no existe documento vigente.*
 
--- *OBSERVADO  : el documento vigente está observado.*
+-- *OBSERVADO  : el documento vigente está observado.*
 
--- *SUBSANADO  : existe una nueva versión CARGADO que reemplazó a un documento*
+-- *SUBSANADO  : existe una nueva versión CARGADO que reemplazó a un documento*
 
--- *             OBSERVADO.*
+-- *             OBSERVADO.*
 
--- *APROBADO   : el documento vigente está aprobado.*
+-- *APROBADO   : el documento vigente está aprobado.*
 
 --
 
@@ -1946,7 +1946,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION sigd_doc.fn_recalcular_estado_requisito(
 
-    p_id_expediente_requisito UUID
+    p_id_expediente_requisito UUID
 
 )
 
@@ -1958,101 +1958,101 @@ AS $$
 
 DECLARE
 
-    v_estado sigd_doc.estado_expediente_requisito_enum;
+    v_estado sigd_doc.estado_expediente_requisito_enum;
 
 BEGIN
 
-    SELECT CASE
+    SELECT CASE
 
-        WHEN EXISTS (
+        WHEN EXISTS (
 
-            SELECT 1
+            SELECT 1
 
-            FROM sigd_doc.documento_adjunto da
+            FROM sigd_doc.documento_adjunto da
 
-            WHERE da.id_expediente_requisito = p_id_expediente_requisito
+            WHERE da.id_expediente_requisito = p_id_expediente_requisito
 
-              AND da.estado_documento = 'APROBADO'
+              AND da.estado_documento = 'APROBADO'
 
-              AND NOT EXISTS (
+              AND NOT EXISTS (
 
-                  SELECT 1
+                  SELECT 1
 
-                  FROM sigd_doc.documento_adjunto newer
+                  FROM sigd_doc.documento_adjunto newer
 
-                  WHERE newer.id_documento_anterior = da.id_documento_adjunto
+                  WHERE newer.id_documento_anterior = da.id_documento_adjunto
 
-                    AND newer.estado_documento NOT IN ('REEMPLAZADO', 'ELIMINADO')
+                    AND newer.estado_documento NOT IN ('REEMPLAZADO', 'ELIMINADO')
 
-              )
+              )
 
-        ) THEN 'APROBADO'::sigd_doc.estado_expediente_requisito_enum
+        ) THEN 'APROBADO'::sigd_doc.estado_expediente_requisito_enum
 
-        WHEN EXISTS (
+        WHEN EXISTS (
 
-            SELECT 1
+            SELECT 1
 
-            FROM sigd_doc.documento_adjunto da
+            FROM sigd_doc.documento_adjunto da
 
-            WHERE da.id_expediente_requisito = p_id_expediente_requisito
+            WHERE da.id_expediente_requisito = p_id_expediente_requisito
 
-              AND da.estado_documento = 'OBSERVADO'
+              AND da.estado_documento = 'OBSERVADO'
 
-              AND NOT EXISTS (
+              AND NOT EXISTS (
 
-                  SELECT 1
+                  SELECT 1
 
-                  FROM sigd_doc.documento_adjunto newer
+                  FROM sigd_doc.documento_adjunto newer
 
-                  WHERE newer.id_documento_anterior = da.id_documento_adjunto
+                  WHERE newer.id_documento_anterior = da.id_documento_adjunto
 
-                    AND newer.estado_documento NOT IN ('REEMPLAZADO', 'ELIMINADO')
+                    AND newer.estado_documento NOT IN ('REEMPLAZADO', 'ELIMINADO')
 
-              )
+              )
 
-        ) THEN 'OBSERVADO'::sigd_doc.estado_expediente_requisito_enum
+        ) THEN 'OBSERVADO'::sigd_doc.estado_expediente_requisito_enum
 
-        WHEN EXISTS (
+        WHEN EXISTS (
 
-            SELECT 1
+            SELECT 1
 
-            FROM sigd_doc.documento_adjunto da
+            FROM sigd_doc.documento_adjunto da
 
-            JOIN sigd_doc.documento_adjunto prev
+            JOIN sigd_doc.documento_adjunto prev
 
-              ON prev.id_documento_adjunto = da.id_documento_anterior
+              ON prev.id_documento_adjunto = da.id_documento_anterior
 
-            WHERE da.id_expediente_requisito = p_id_expediente_requisito
+            WHERE da.id_expediente_requisito = p_id_expediente_requisito
 
-              AND da.estado_documento = 'CARGADO'
+              AND da.estado_documento = 'CARGADO'
 
-              AND prev.estado_documento IN ('OBSERVADO', 'REEMPLAZADO')
+              AND prev.estado_documento IN ('OBSERVADO', 'REEMPLAZADO')
 
-              AND NOT EXISTS (
+              AND NOT EXISTS (
 
-                  SELECT 1
+                  SELECT 1
 
-                  FROM sigd_doc.documento_adjunto newer
+                  FROM sigd_doc.documento_adjunto newer
 
-                  WHERE newer.id_documento_anterior = da.id_documento_adjunto
+                  WHERE newer.id_documento_anterior = da.id_documento_adjunto
 
-                    AND newer.estado_documento NOT IN ('REEMPLAZADO', 'ELIMINADO')
+                    AND newer.estado_documento NOT IN ('REEMPLAZADO', 'ELIMINADO')
 
-              )
+              )
 
-        ) THEN 'SUBSANADO'::sigd_doc.estado_expediente_requisito_enum
+        ) THEN 'SUBSANADO'::sigd_doc.estado_expediente_requisito_enum
 
-        ELSE 'PENDIENTE'::sigd_doc.estado_expediente_requisito_enum
+        ELSE 'PENDIENTE'::sigd_doc.estado_expediente_requisito_enum
 
-    END
+    END
 
-    INTO v_estado;
+    INTO v_estado;
 
-    UPDATE sigd_doc.expediente_requisito
+    UPDATE sigd_doc.expediente_requisito
 
-       SET estado = v_estado
+       SET estado = v_estado
 
-     WHERE id_expediente_requisito = p_id_expediente_requisito;
+     WHERE id_expediente_requisito = p_id_expediente_requisito;
 
 END;
 
@@ -2068,27 +2068,27 @@ AS $$
 
 BEGIN
 
-    IF TG_OP = 'UPDATE'
+    IF TG_OP = 'UPDATE'
 
-       AND OLD.id_expediente_requisito IS DISTINCT FROM NEW.id_expediente_requisito
+       AND OLD.id_expediente_requisito IS DISTINCT FROM NEW.id_expediente_requisito
 
-    THEN
+    THEN
 
-        PERFORM sigd_doc.fn_recalcular_estado_requisito(
+        PERFORM sigd_doc.fn_recalcular_estado_requisito(
 
-            OLD.id_expediente_requisito
+            OLD.id_expediente_requisito
 
-        );
+        );
 
-    END IF;
+    END IF;
 
-    PERFORM sigd_doc.fn_recalcular_estado_requisito(
+    PERFORM sigd_doc.fn_recalcular_estado_requisito(
 
-        COALESCE(NEW.id_expediente_requisito, OLD.id_expediente_requisito)
+        COALESCE(NEW.id_expediente_requisito, OLD.id_expediente_requisito)
 
-    );
+    );
 
-    RETURN COALESCE(NEW, OLD);
+    RETURN COALESCE(NEW, OLD);
 
 END;
 
@@ -2142,7 +2142,7 @@ EXECUTE FUNCTION sigd_doc.fn_postprocesar_estado_requisito();
 
 CREATE OR REPLACE FUNCTION sigd_doc.fn_json_pointer_tokens(
 
-    p_pointer TEXT
+    p_pointer TEXT
 
 )
 
@@ -2156,41 +2156,41 @@ AS $$
 
 DECLARE
 
-    v_tokens TEXT[];
+    v_tokens TEXT[];
 
-    v_i INTEGER;
+    v_i INTEGER;
 
 BEGIN
 
-    IF p_pointer IS NULL OR p_pointer = '' THEN
+    IF p_pointer IS NULL OR p_pointer = '' THEN
 
-        RETURN ARRAY[]::TEXT[];
+        RETURN ARRAY[]::TEXT[];
 
-    END IF;
+    END IF;
 
-    IF p_pointer = '/' THEN
+    IF p_pointer = '/' THEN
 
-        RETURN ARRAY[''];
+        RETURN ARRAY[''];
 
-    END IF;
+    END IF;
 
-    v_tokens := string_to_array(substr(p_pointer, 2), '/');
+    v_tokens := string_to_array(substr(p_pointer, 2), '/');
 
-    FOR v_i IN 1 .. COALESCE(array_length(v_tokens, 1), 0) LOOP
+    FOR v_i IN 1 .. COALESCE(array_length(v_tokens, 1), 0) LOOP
 
-        v_tokens[v_i] :=
+        v_tokens[v_i] :=
 
-            replace(
+            replace(
 
-                replace(v_tokens[v_i], '~1', '/'),
+                replace(v_tokens[v_i], '~1', '/'),
 
-                '~0', '~'
+                '~0', '~'
 
-            );
+            );
 
-    END LOOP;
+    END LOOP;
 
-    RETURN v_tokens;
+    RETURN v_tokens;
 
 END;
 
@@ -2198,7 +2198,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION sigd_doc.fn_tdr_es_aplicable(
 
-    p_id_expediente_requisito UUID
+    p_id_expediente_requisito UUID
 
 )
 
@@ -2212,95 +2212,95 @@ AS $$
 
 DECLARE
 
-    v_tipo sigd_doc.tipo_obligatoriedad_enum;
+    v_tipo sigd_doc.tipo_obligatoriedad_enum;
 
-    v_path TEXT;
+    v_path TEXT;
 
-    v_valor VARCHAR(100);
+    v_valor VARCHAR(100);
 
-    v_payload JSONB;
+    v_payload JSONB;
 
-    v_actual JSONB;
+    v_actual JSONB;
 
-    v_tokens TEXT[];
+    v_tokens TEXT[];
 
 BEGIN
 
-    SELECT
+    SELECT
 
-        COALESCE(tdr.obligatoriedad_override, r.tipo_obligatoriedad),
+        COALESCE(tdr.obligatoriedad_override, r.tipo_obligatoriedad),
 
-        tdr.campo_condicionante_path,
+        tdr.campo_condicionante_path,
 
-        tdr.valor_condicionante,
+        tdr.valor_condicionante,
 
-        efr.payload_respuestas
+        efr.payload_respuestas
 
-    INTO
+    INTO
 
-        v_tipo,
+        v_tipo,
 
-        v_path,
+        v_path,
 
-        v_valor,
+        v_valor,
 
-        v_payload
+        v_payload
 
-    FROM sigd_doc.expediente_requisito er
+    FROM sigd_doc.expediente_requisito er
 
-    JOIN sigd_doc.tipo_documento_requisito tdr
+    JOIN sigd_doc.tipo_documento_requisito tdr
 
-      ON tdr.id_tipo_documento_requisito = er.id_tipo_documento_requisito
+      ON tdr.id_tipo_documento_requisito = er.id_tipo_documento_requisito
 
-    JOIN sigd_doc.requisito r
+    JOIN sigd_doc.requisito r
 
-      ON r.id_requisito = tdr.id_requisito
+      ON r.id_requisito = tdr.id_requisito
 
-    JOIN sigd_doc.expediente e
+    JOIN sigd_doc.expediente e
 
-      ON e.id_expediente = er.id_expediente
+      ON e.id_expediente = er.id_expediente
 
-    JOIN sigd_doc.expediente_formulario_respuesta efr
+    JOIN sigd_doc.expediente_formulario_respuesta efr
       ON efr.id_expediente = e.id_expediente
     WHERE er.id_expediente_requisito = p_id_expediente_requisito;
 
-    IF NOT FOUND THEN
+    IF NOT FOUND THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'No existe expediente_requisito %.',
+            'No existe expediente_requisito %.',
 
-            p_id_expediente_requisito;
+            p_id_expediente_requisito;
 
-    END IF;
+    END IF;
 
-    IF v_tipo <> 'CONDICIONAL' THEN
+    IF v_tipo <> 'CONDICIONAL' THEN
 
-        RETURN TRUE;
+        RETURN TRUE;
 
-    END IF;
+    END IF;
 
-    IF v_path IS NULL OR v_valor IS NULL THEN
+    IF v_path IS NULL OR v_valor IS NULL THEN
 
-        RETURN FALSE;
+        RETURN FALSE;
 
-    END IF;
+    END IF;
 
-    v_tokens := sigd_doc.fn_json_pointer_tokens(v_path);
+    v_tokens := sigd_doc.fn_json_pointer_tokens(v_path);
 
-    v_actual := v_payload #> v_tokens;
+    v_actual := v_payload #> v_tokens;
 
-    IF v_actual IS NULL THEN
+    IF v_actual IS NULL THEN
 
-        RETURN FALSE;
+        RETURN FALSE;
 
-    END IF;
+    END IF;
 
-    -- *La regla almacenada compara el valor lógico de la propiedad.*
+    -- *La regla almacenada compara el valor lógico de la propiedad.*
 
-    -- *La validación semántica completa del formulario sigue en aplicación.*
+    -- *La validación semántica completa del formulario sigue en aplicación.*
 
-    RETURN trim(both '"' from v_actual::TEXT) = v_valor;
+    RETURN trim(both '"' from v_actual::TEXT) = v_valor;
 
 END;
 
@@ -2308,7 +2308,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION sigd_doc.fn_calcular_estado_documental_expediente(
 
-    p_id_expediente UUID
+    p_id_expediente UUID
 
 )
 
@@ -2320,75 +2320,75 @@ AS $$
 
 DECLARE
 
-    v_total_aplicables INTEGER;
+    v_total_aplicables INTEGER;
 
-    v_aprobados INTEGER;
+    v_aprobados INTEGER;
 
-    v_observados INTEGER;
+    v_observados INTEGER;
 
-    v_subsanados INTEGER;
+    v_subsanados INTEGER;
 
 BEGIN
 
-    SELECT
+    SELECT
 
-        COUNT(*),
+        COUNT(*),
 
-        COUNT(*) FILTER (WHERE er.estado = 'APROBADO'),
+        COUNT(*) FILTER (WHERE er.estado = 'APROBADO'),
 
-        COUNT(*) FILTER (WHERE er.estado = 'OBSERVADO'),
+        COUNT(*) FILTER (WHERE er.estado = 'OBSERVADO'),
 
-        COUNT(*) FILTER (WHERE er.estado = 'SUBSANADO')
+        COUNT(*) FILTER (WHERE er.estado = 'SUBSANADO')
 
-    INTO
+    INTO
 
-        v_total_aplicables,
+        v_total_aplicables,
 
-        v_aprobados,
+        v_aprobados,
 
-        v_observados,
+        v_observados,
 
-        v_subsanados
+        v_subsanados
 
-    FROM sigd_doc.expediente_requisito er
+    FROM sigd_doc.expediente_requisito er
 
-    JOIN sigd_doc.tipo_documento_requisito tdr
+    JOIN sigd_doc.tipo_documento_requisito tdr
 
-      ON tdr.id_tipo_documento_requisito = er.id_tipo_documento_requisito
+      ON tdr.id_tipo_documento_requisito = er.id_tipo_documento_requisito
 
-    JOIN sigd_doc.requisito r
+    JOIN sigd_doc.requisito r
 
-      ON r.id_requisito = tdr.id_requisito
+      ON r.id_requisito = tdr.id_requisito
 
-    WHERE er.id_expediente = p_id_expediente
+    WHERE er.id_expediente = p_id_expediente
 
-      AND COALESCE(tdr.obligatoriedad_override, r.tipo_obligatoriedad)
+      AND COALESCE(tdr.obligatoriedad_override, r.tipo_obligatoriedad)
 
-          <> 'OPCIONAL'
+          <> 'OPCIONAL'
 
-      AND sigd_doc.fn_tdr_es_aplicable(er.id_expediente_requisito);
+      AND sigd_doc.fn_tdr_es_aplicable(er.id_expediente_requisito);
 
-    IF v_observados > 0 THEN
+    IF v_observados > 0 THEN
 
-        RETURN 'SUBSANACION';
+        RETURN 'SUBSANACION';
 
-    ELSIF v_subsanados > 0 THEN
+    ELSIF v_subsanados > 0 THEN
 
-        RETURN 'EN_REVISION';
+        RETURN 'EN_REVISION';
 
-    ELSIF v_total_aplicables > 0
+    ELSIF v_total_aplicables > 0
 
-          AND v_aprobados = v_total_aplicables
+          AND v_aprobados = v_total_aplicables
 
-    THEN
+    THEN
 
-        RETURN 'APROBADO';
+        RETURN 'APROBADO';
 
-    ELSE
+    ELSE
 
-        RETURN 'EN_REVISION';
+        RETURN 'EN_REVISION';
 
-    END IF;
+    END IF;
 
 END;
 
@@ -2396,11 +2396,11 @@ $$;
 
 CREATE OR REPLACE FUNCTION sigd_doc.fn_radicacion_expediente(
 
-    p_id_expediente UUID,
+    p_id_expediente UUID,
 
-    p_codigo_oficial VARCHAR(30),
+    p_codigo_oficial VARCHAR(30),
 
-    p_fecha_radicacion TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    p_fecha_radicacion TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 
 )
 
@@ -2412,63 +2412,63 @@ AS $$
 
 DECLARE
 
-    v_estado sigd_doc.estado_expediente_enum;
+    v_estado sigd_doc.estado_expediente_enum;
 
 BEGIN
 
-    SELECT estado
+    SELECT estado
 
-      INTO v_estado
+      INTO v_estado
 
-      FROM sigd_doc.expediente
+      FROM sigd_doc.expediente
 
-     WHERE id_expediente = p_id_expediente
+     WHERE id_expediente = p_id_expediente
 
-     FOR UPDATE;
+     FOR UPDATE;
 
-    IF NOT FOUND THEN
+    IF NOT FOUND THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El expediente % no existe.',
+            'El expediente % no existe.',
 
-            p_id_expediente;
+            p_id_expediente;
 
-    END IF;
+    END IF;
 
-    IF v_estado <> 'BORRADOR' THEN
+    IF v_estado <> 'BORRADOR' THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'Solo un expediente BORRADOR puede ser radicado.';
+            'Solo un expediente BORRADOR puede ser radicado.';
 
-    END IF;
+    END IF;
 
-    IF p_codigo_oficial IS NULL OR btrim(p_codigo_oficial) = '' THEN
+    IF p_codigo_oficial IS NULL OR btrim(p_codigo_oficial) = '' THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'La radicación requiere un codigo_oficial.';
+            'La radicación requiere un codigo_oficial.';
 
-    END IF;
+    END IF;
 
-    IF p_fecha_radicacion IS NULL THEN
+    IF p_fecha_radicacion IS NULL THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'La radicación requiere fecha_radicacion.';
+            'La radicación requiere fecha_radicacion.';
 
-    END IF;
+    END IF;
 
-    UPDATE sigd_doc.expediente
+    UPDATE sigd_doc.expediente
 
-       SET codigo_oficial = p_codigo_oficial,
+       SET codigo_oficial = p_codigo_oficial,
 
-           fecha_radicacion = p_fecha_radicacion,
+           fecha_radicacion = p_fecha_radicacion,
 
-           estado = 'EN_REVISION'
+           estado = 'EN_REVISION'
 
-     WHERE id_expediente = p_id_expediente;
+     WHERE id_expediente = p_id_expediente;
 
 END;
 
@@ -2476,7 +2476,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION sigd_doc.fn_actualizar_estado_expediente(
 
-    p_id_expediente UUID
+    p_id_expediente UUID
 
 )
 
@@ -2488,61 +2488,61 @@ AS $$
 
 DECLARE
 
-    v_estado_actual sigd_doc.estado_expediente_enum;
+    v_estado_actual sigd_doc.estado_expediente_enum;
 
-    v_nuevo_estado sigd_doc.estado_expediente_enum;
+    v_nuevo_estado sigd_doc.estado_expediente_enum;
 
 BEGIN
 
-    SELECT estado
+    SELECT estado
 
-      INTO v_estado_actual
+      INTO v_estado_actual
 
-      FROM sigd_doc.expediente
+      FROM sigd_doc.expediente
 
-     WHERE id_expediente = p_id_expediente
+     WHERE id_expediente = p_id_expediente
 
-     FOR UPDATE;
+     FOR UPDATE;
 
-    IF NOT FOUND THEN
+    IF NOT FOUND THEN
 
-        RAISE EXCEPTION
+        RAISE EXCEPTION
 
-            'El expediente % no existe.',
+            'El expediente % no existe.',
 
-            p_id_expediente;
+            p_id_expediente;
 
-    END IF;
+    END IF;
 
-    -- *Nunca se modifica automáticamente un BORRADOR.*
+    -- *Nunca se modifica automáticamente un BORRADOR.*
 
-    IF v_estado_actual = 'BORRADOR' THEN
+    IF v_estado_actual = 'BORRADOR' THEN
 
-        RETURN 'BORRADOR';
+        RETURN 'BORRADOR';
 
-    END IF;
+    END IF;
 
-    -- *Estados terminales/administrativos que no deben ser pisados por la*
+    -- *Estados terminales/administrativos que no deben ser pisados por la*
 
-    -- *derivación documental.*
+    -- *derivación documental.*
 
-    IF v_estado_actual IN ('RECHAZADO_POR_CADUCIDAD', 'INACTIVO') THEN
+    IF v_estado_actual IN ('RECHAZADO_POR_CADUCIDAD', 'INACTIVO') THEN
 
-        RETURN v_estado_actual;
+        RETURN v_estado_actual;
 
-    END IF;
+    END IF;
 
-    v_nuevo_estado :=
+    v_nuevo_estado :=
 
-        sigd_doc.fn_calcular_estado_documental_expediente(p_id_expediente);
+        sigd_doc.fn_calcular_estado_documental_expediente(p_id_expediente);
 
-    UPDATE sigd_doc.expediente
+    UPDATE sigd_doc.expediente
 
-       SET estado = v_nuevo_estado
+       SET estado = v_nuevo_estado
 
-     WHERE id_expediente = p_id_expediente;
+     WHERE id_expediente = p_id_expediente;
 
-    RETURN v_nuevo_estado;
+    RETURN v_nuevo_estado;
 
 END;
 
@@ -2556,387 +2556,387 @@ $$;
 
 SELECT 'tablas_principales' AS prueba,
 
-       COUNT(*) = 9 AS ok
+       COUNT(*) = 9 AS ok
 
 FROM information_schema.tables
 
 WHERE table_schema = 'sigd_doc'
 
-  AND table_name IN (
+  AND table_name IN (
 
-      'tipo_tramite_tupa',
+      'tipo_tramite_tupa',
 
-      'tipo_documento',
+      'tipo_documento',
 
-      'formulario_version',
+      'formulario_version',
 
-      'expediente',
+      'expediente',
 
-      'requisito',
+      'requisito',
 
-      'tipo_documento_requisito',
+      'tipo_documento_requisito',
 
-      'expediente_requisito',
+      'expediente_requisito',
 
-      'documento_adjunto'
+      'documento_adjunto'
 
-  ,
+  ,
 
       'expediente_formulario_respuesta');
 
 SELECT 'indices_gin_jsonb' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_indexes
+           FROM pg_indexes
 
-           WHERE schemaname = 'sigd_doc'
+           WHERE schemaname = 'sigd_doc'
 
-             AND indexname = 'idx_formulario_version_schema_gin'
+             AND indexname = 'idx_formulario_version_schema_gin'
 
-             AND indexdef ILIKE '%USING gin%'
+             AND indexdef ILIKE '%USING gin%'
 
-       )
+       )
 
-       AND EXISTS (
+       AND EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_indexes
+           FROM pg_indexes
 
-           WHERE schemaname = 'sigd_doc'
+           WHERE schemaname = 'sigd_doc'
 
-             AND indexname = 'idx_efr_payload_gin'
+             AND indexname = 'idx_efr_payload_gin'
 
-             AND indexdef ILIKE '%jsonb_path_ops%'
+             AND indexdef ILIKE '%jsonb_path_ops%'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'version_activa_unica' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_indexes
+           FROM pg_indexes
 
-           WHERE schemaname = 'sigd_doc'
+           WHERE schemaname = 'sigd_doc'
 
-             AND indexname = 'uq_formulario_version_activa'
+             AND indexname = 'uq_formulario_version_activa'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'constraint_radicacion' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_constraint
+           FROM pg_constraint
 
-           WHERE conrelid = 'sigd_doc.expediente'::regclass
+           WHERE conrelid = 'sigd_doc.expediente'::regclass
 
-             AND conname = 'ck_expediente_radicacion'
+             AND conname = 'ck_expediente_radicacion'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'constraint_codigo_oficial' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_constraint
+           FROM pg_constraint
 
-           WHERE conrelid = 'sigd_doc.expediente'::regclass
+           WHERE conrelid = 'sigd_doc.expediente'::regclass
 
-             AND conname = 'ck_expediente_codigo_oficial'
+             AND conname = 'ck_expediente_codigo_oficial'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'constraint_tamanio_positivo' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_constraint
+           FROM pg_constraint
 
-           WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
+           WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
 
-             AND conname = 'ck_documento_tamanio'
+             AND conname = 'ck_documento_tamanio'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'sha256_check' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_constraint
+           FROM pg_constraint
 
-           WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
+           WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
 
-             AND conname = 'ck_documento_hash'
+             AND conname = 'ck_documento_hash'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'sha256_inmutable' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_trigger
+           FROM pg_trigger
 
-           WHERE tgrelid = 'sigd_doc.documento_adjunto'::regclass
+           WHERE tgrelid = 'sigd_doc.documento_adjunto'::regclass
 
-             AND NOT tgisinternal
+             AND NOT tgisinternal
 
-             AND tgname = 'tr_proteger_sha256'
+             AND tgname = 'tr_proteger_sha256'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'sha256_deduplicacion_por_requisito' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_trigger
+           FROM pg_trigger
 
-           WHERE tgrelid = 'sigd_doc.documento_adjunto'::regclass
+           WHERE tgrelid = 'sigd_doc.documento_adjunto'::regclass
 
-             AND NOT tgisinternal
+             AND NOT tgisinternal
 
-             AND tgname = 'tr_validar_sha256_duplicado'
+             AND tgname = 'tr_validar_sha256_duplicado'
 
-       )
+       )
 
-       AND EXISTS (
+       AND EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_indexes
+           FROM pg_indexes
 
-           WHERE schemaname = 'sigd_doc'
+           WHERE schemaname = 'sigd_doc'
 
-             AND indexname = 'uq_documento_sha256_por_requisito'
+             AND indexname = 'uq_documento_sha256_por_requisito'
 
-             AND indexdef ILIKE '%id_expediente_requisito%'
+             AND indexdef ILIKE '%id_expediente_requisito%'
 
-             AND indexdef ILIKE '%sha256_hash%'
+             AND indexdef ILIKE '%sha256_hash%'
 
-       )
+       )
 
-       AND NOT EXISTS (
+       AND NOT EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_indexes
+           FROM pg_indexes
 
-           WHERE schemaname = 'sigd_doc'
+           WHERE schemaname = 'sigd_doc'
 
-             AND indexname = 'uq_documento_sha256'
+             AND indexname = 'uq_documento_sha256'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'sin_check_alta_forzada_cargado' AS prueba,
 
-       NOT EXISTS (
+       NOT EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_constraint
+           FROM pg_constraint
 
-           WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
+           WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
 
-             AND conname = 'ck_documento_alta_cargado'
+             AND conname = 'ck_documento_alta_cargado'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'documento_permite_transiciones_estado' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_trigger
+           FROM pg_trigger
 
-           WHERE tgrelid = 'sigd_doc.documento_adjunto'::regclass
+           WHERE tgrelid = 'sigd_doc.documento_adjunto'::regclass
 
-             AND NOT tgisinternal
+             AND NOT tgisinternal
 
-             AND tgname = 'tr_proteger_documento'
+             AND tgname = 'tr_proteger_documento'
 
-       )
+       )
 
-       AND NOT EXISTS (
+       AND NOT EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_constraint
+           FROM pg_constraint
 
-           WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
+           WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
 
-             AND contype = 'c'
+             AND contype = 'c'
 
-             AND pg_get_constraintdef(oid) ILIKE '%estado_documento = ''CARGADO''%'
+             AND pg_get_constraintdef(oid) ILIKE '%estado_documento = ''CARGADO''%'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'magic_bytes_delimitado' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_description d
+           FROM pg_description d
 
-           JOIN pg_attribute a
+           JOIN pg_attribute a
 
-             ON a.attrelid = d.objoid
+             ON a.attrelid = d.objoid
 
-            AND a.attnum = d.objsubid
+            AND a.attnum = d.objsubid
 
-           WHERE d.objoid = 'sigd_doc.documento_adjunto'::regclass
+           WHERE d.objoid = 'sigd_doc.documento_adjunto'::regclass
 
-             AND a.attname = 'magic_bytes_validado'
+             AND a.attname = 'magic_bytes_validado'
 
-             AND d.description ILIKE '%capa de aplicación%'
+             AND d.description ILIKE '%capa de aplicación%'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'tupa_calificacion_condicionada' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_constraint
+           FROM pg_constraint
 
-           WHERE conrelid = 'sigd_doc.tipo_tramite_tupa'::regclass
+           WHERE conrelid = 'sigd_doc.tipo_tramite_tupa'::regclass
 
-             AND conname = 'ck_tupa_calificacion_coherente'
+             AND conname = 'ck_tupa_calificacion_coherente'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'tupa_tipo_documento_1_a_1' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_constraint
+           FROM pg_constraint
 
-           WHERE conrelid = 'sigd_doc.tipo_documento'::regclass
+           WHERE conrelid = 'sigd_doc.tipo_documento'::regclass
 
-             AND conname = 'uq_tipo_documento_tupa'
+             AND conname = 'uq_tipo_documento_tupa'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'estado_requisito_derivado' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_trigger
+           FROM pg_trigger
 
-           WHERE tgrelid = 'sigd_doc.expediente_requisito'::regclass
+           WHERE tgrelid = 'sigd_doc.expediente_requisito'::regclass
 
-             AND NOT tgisinternal
+             AND NOT tgisinternal
 
-             AND tgname = 'tr_proteger_estado_expediente_requisito'
+             AND tgname = 'tr_proteger_estado_expediente_requisito'
 
-       )
+       )
 
-       AND EXISTS (
+       AND EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_trigger
+           FROM pg_trigger
 
-           WHERE tgrelid = 'sigd_doc.documento_adjunto'::regclass
+           WHERE tgrelid = 'sigd_doc.documento_adjunto'::regclass
 
-             AND NOT tgisinternal
+             AND NOT tgisinternal
 
-             AND tgname = 'tr_recalcular_estado_requisito'
+             AND tgname = 'tr_recalcular_estado_requisito'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'sin_trigger_automatico_radicacion' AS prueba,
 
-       NOT EXISTS (
+       NOT EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_trigger t
+           FROM pg_trigger t
 
-           JOIN pg_proc p ON p.oid = t.tgfoid
+           JOIN pg_proc p ON p.oid = t.tgfoid
 
-           WHERE t.tgrelid = 'sigd_doc.expediente_requisito'::regclass
+           WHERE t.tgrelid = 'sigd_doc.expediente_requisito'::regclass
 
-             AND NOT t.tgisinternal
+             AND NOT t.tgisinternal
 
-             AND p.proname IN (
+             AND p.proname IN (
 
-                 'fn_recalcular_estado_expediente',
+                 'fn_recalcular_estado_expediente',
 
-                 'fn_postprocesar_estado_expediente'
+                 'fn_postprocesar_estado_expediente'
 
-             )
+             )
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'sin_indice_redundante_expediente_requisito' AS prueba,
 
-       NOT EXISTS (
+       NOT EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_indexes
+           FROM pg_indexes
 
-           WHERE schemaname = 'sigd_doc'
+           WHERE schemaname = 'sigd_doc'
 
-             AND indexname = 'idx_expediente_requisito_integridad'
+             AND indexname = 'idx_expediente_requisito_integridad'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'funcion_radicacion_explicita' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_proc p
+           FROM pg_proc p
 
-           JOIN pg_namespace n ON n.oid = p.pronamespace
+           JOIN pg_namespace n ON n.oid = p.pronamespace
 
-           WHERE n.nspname = 'sigd_doc'
+           WHERE n.nspname = 'sigd_doc'
 
-             AND p.proname = 'fn_radicacion_expediente'
+             AND p.proname = 'fn_radicacion_expediente'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'funcion_estado_documental' AS prueba,
 
-       EXISTS (
+       EXISTS (
 
-           SELECT 1
+           SELECT 1
 
-           FROM pg_proc p
+           FROM pg_proc p
 
-           JOIN pg_namespace n ON n.oid = p.pronamespace
+           JOIN pg_namespace n ON n.oid = p.pronamespace
 
-           WHERE n.nspname = 'sigd_doc'
+           WHERE n.nspname = 'sigd_doc'
 
-             AND p.proname = 'fn_calcular_estado_documental_expediente'
+             AND p.proname = 'fn_calcular_estado_documental_expediente'
 
-       ) AS ok;
+       ) AS ok;
 
 SELECT 'tipo_documento_activo_default_true' AS prueba,
        EXISTS (SELECT 1 FROM pg_attribute a JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum

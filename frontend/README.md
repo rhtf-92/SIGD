@@ -691,7 +691,7 @@ La documentación técnica exhaustiva del frontend se encuentra disponible en [`
 
 - 🏠 **[README Maestro del Monorepo SIGD](../README.md):** Visión global del sistema, arquitectura monorepo integrada y guía de inicio rápido unificada.
 - ⚙️ **[README Especializado del Backend (`backend/`)](../backend/README.md):** Arquitectura Express 5, esquemas en PostgreSQL 18 (`identicore`, `organicore`, `tramicore`, `docucore`), patrones Outbox WORM y pruebas de integración.
-- 👥 **[Gobernanza y Cuadro de Contribuidores](../colaboradores.md):** Registro formal de los 21 integrantes del equipo de desarrollo, matrices RACI y contribuciones individuales por módulo.
+- 👥 **[Gobernanza y Cuadro de Contribuidores](../colaboradores.md):** Registro formal de los 22 integrantes del equipo de desarrollo frontend, líderes de grupo, matrices RACI y contribuciones individuales por módulo.
 
 ---
 

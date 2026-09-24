@@ -13,7 +13,7 @@
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --dir tests/e2e",
+    "test": "vitest run",
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "test:e2e": "vitest run",
     "load:radicacion": "k6 run k6/escenario-1-radicacion.js",

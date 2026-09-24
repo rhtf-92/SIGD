@@ -56,7 +56,7 @@ const roles: Rol[] = [
   },
 ];
 
-const permisosIniciales: MatrizPermisos = {
+export const permisosIniciales: MatrizPermisos = {
   SUPER_ADMIN: [
     { modulo: "Expedientes", ver: true, crear: true, editar: true, derivar: true, archivar: true, eliminar: true, exportar: true },
     { modulo: "Documentos", ver: true, crear: true, editar: true, derivar: true, archivar: true, eliminar: true, exportar: true },

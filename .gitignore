@@ -108,6 +108,8 @@ TEST_INFRA.md
 TEST_READY.md
 
 # --- Informes de Auditoría, Diagnósticos y Planes de Trabajo Excluidos ---
+AUDIT_MATRIX.md
+OPERATIONAL_GUIDE.md
 backend/docs/DIAGNOSTICO_IDENTICORE.md
 DIAGNOSTICO_IDENTICORE.md
 backend/docs/INFORME_AUDITORIA_CONSOLIDADA_BACKEND_SIGD.md

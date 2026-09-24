@@ -28,7 +28,7 @@ El **Sistema Integral de Gestión Documentaria (SIGD)** es la plataforma oficial
 | **Periodo Académico** | Semestre Lectivo 2026-II (2026-2) |
 | **Unidad Didáctica Rectora** | Taller de Programación Web / Proyecto Integrador SIGD |
 | **Docente Titular y Product Owner** | **Ing. Renato Henyer Tarazona Flores** (`rhtf-92` / `rtarazona.flores@gmail.com`) |
-| **Equipo de Desarrollo** | **21 Estudiantes Desarrolladores** distribuidos en 6 Grupos Modulares de Trabajo |
+| **Equipo de Desarrollo** | **Equipos de Especialidad Frontend (22 miembros) y Backend (21 miembros)** distribuidos en 6 Grupos Modulares de Trabajo |
 | **Directorio de Colaboradores** | [Directorio Oficial de Colaboradores, Ramas y Roles (`./colaboradores.md`)](./colaboradores.md) |
 
 ### Estructura Orgánica de los 6 Grupos de Trabajo
@@ -40,7 +40,7 @@ El desarrollo del monorepo se encuentra distribuido orgánicamente en 6 grupos d
 | **Grupo 1** | **Registro Documentario, Ventanilla y Mesa de Partes (MPV 24x7)** | Patricia Marina (Patty) | **RutaDoc** (Trazabilidad y FSM) | `sigd_rut` | Geric Aldair Salas Ormeño |
 | **Grupo 2** | **Identidad, Registro de Usuarios, Ubigeo Ucayali y Casilla** | Matías Tiziano Zumaeta Alva | **TramiCore** (Expedientes y CUT) | `sigd_tra` | Elmer Ramírez |
 | **Grupo 3** | **Bandejas del Servidor, Trabajo Diario y Gestión Expedientes** | Isack Vargas | **OrganiCore** (Estructura Orgánica) | `sigd_org` | Pool Angelo Carranza |
-| **Grupo 4** | **Administración Institucional, Seguridad RBAC y Auditoría** | Jhonatan Nijar Gonzales | **IdentiCore** (Cuentas Polimórficas) | `sigd_auth` | Segundo |
+| **Grupo 4** | **Administración Institucional, Seguridad RBAC y Auditoría** | Cristiam Macedo | **IdentiCore** (Cuentas Polimórficas) | `sigd_auth` | Segundo |
 | **Grupo 5** | **Flujos Académicos, Firma Digital (Refirma) y Validez CVD** | Adriano David Espinoza | **DocuCore** (JSON Schema y S3) | `sigd_doc` | Christian Jhoel Rodríguez |
 | **Grupo 6** | **Indicadores de Gestión, KPIs del MGD (PCM) y Accesibilidad** | Clider Lex Urquia López | **CoreLink** (Plataforma y Auditoría) | `sigd_audit` | Ricardo Arévalo |
 
@@ -322,7 +322,7 @@ c:\Users\SAITAMA\Desktop\py_SIGD\SIGD\
 ├── PROJECT.md               # Definición del alcance, contratos y arquitectura FSD
 ├── TEST_INFRA.md            # Especificación de infraestructura de pruebas automatizadas
 ├── TEST_READY.md            # Catálogo de suites de prueba aprobadas y gates de calidad
-├── colaboradores.md         # Directorio oficial de 21 colaboradores, roles, correos y ramas
+├── colaboradores.md         # Directorio oficial de colaboradores (Frontend y Backend), roles y ramas
 ├── docker-compose.yml       # Orquestación de los 5 servicios Docker para desarrollo local
 ├── scripts/                 # Scripts de validación pericial de links, markdown y oráculos
 │   ├── adversarial_tests.js
@@ -358,7 +358,7 @@ c:\Users\SAITAMA\Desktop\py_SIGD\SIGD\
 ### Detalle de Directorios y Archivos Maestros
 
 - [**`docker-compose.yml`**](./docker-compose.yml): Configuración consolidada de 5 servicios Docker (`postgres`, `minio`, `redis`, `backend`, `frontend`) con *healthchecks* declarativos y volúmenes persistentes.
-- [**`colaboradores.md`**](./colaboradores.md): Directorio oficial de los 21 estudiantes desarrolladores, asignaciones de liderazgo por módulo, roles funcionales, ramas Git y cuentas institucionales.
+- [**`colaboradores.md`**](./colaboradores.md): Directorio oficial de los colaboradores de Frontend y Backend, asignaciones de liderazgo por módulo, roles funcionales, ramas Git y cuentas institucionales.
 - [**`PROJECT.md`**](./PROJECT.md): Especificación técnica del proyecto, límites de aislamiento de archivos y matriz de hitos de la Ronda 11.
 - [**`scripts/`**](./scripts/): Herramientas periciales automatizadas de verificación de enlaces, análisis sintáctico de diagramas Mermaid, oráculos adversariales y chequeo de integridad estructural.
 - [**`backend/`**](./backend/README.md): Microservicios de API RESTful en Express 5, modelos de dominio, esquemas DDL en 5 olas y worker transaccional Outbox.

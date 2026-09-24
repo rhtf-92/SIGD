@@ -679,7 +679,7 @@ backend/
 
 * 🏛️ [**README Maestro del Repositorio Raíz (`../README.md`)**](../README.md): Visión monorepo global, arquitectura general y despliegue rápido.
 * 🖥️ [**README Especializado de Frontend (`../frontend/README.md`)**](../frontend/README.md): Arquitectura en React 19, Tailwind CSS 4, catálogo de pantallas y accesibilidad WCAG 2.1 AA.
-* 👥 [**Directorio Oficial de Colaboradores (`../colaboradores.md`)**](../colaboradores.md): Asignación formal de los 22 desarrolladores backend y líderes de grupo del IESTP "Suiza".
+* 👥 [**Directorio Oficial de Colaboradores (`../colaboradores.md`)**](../colaboradores.md): Asignación formal de los 21 desarrolladores backend, sublíderes y líderes de grupo del IESTP "Suiza".
 * 📑 [**Portal Maestro de Documentación Técnica Backend (`docs/README.md`)**](docs/README.md): Índice canónico de los 6 dominios, modelos ER, diccionarios de datos y secuencias DDL.
 * 📊 [**Informe de Auditoría Consolidada de Backend (`docs/INFORME_AUDITORIA_CONSOLIDADA_BACKEND_SIGD.md`)**](docs/INFORME_AUDITORIA_CONSOLIDADA_BACKEND_SIGD.md): Dictamen pericial forense y balance de conformidad.
 * 🛠️ [**Guía Maestra: Orden de Implementación en Paralelo (`docs/00_ARQUITECTURA_ORDEN_IMPLEMENTACION_PARALELO.md`)**](docs/00_ARQUITECTURA_ORDEN_IMPLEMENTACION_PARALELO.md): Especificación exhaustiva del Grafo Acíclico Dirigido (DAG).
