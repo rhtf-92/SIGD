@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { ConflictError } from '../../shared/domain/errors/conflict-error.js';
 import type { EstadoRutaDoc } from './rutadoc.fsm.js';
 import type { CompensacionFolios, MovimientoObjetivo } from './rutadoc.reversion.types.js';
+import { bloquearExpedienteRutaDoc } from './rutadoc.lock.js';
 
 interface ErrorPostgres { code?: string }
 
@@ -27,6 +28,7 @@ interface FilaObjetivo {
   estado_anterior: EstadoRutaDoc;
   estado_nuevo: EstadoRutaDoc;
   evento: string;
+  area_anterior_id: string | null;
 }
 
 export class RepositorioReversionRutaDoc {
@@ -40,7 +42,7 @@ export class RepositorioReversionRutaDoc {
     const cliente = await this.pool.connect();
     try {
       await cliente.query('BEGIN');
-      await cliente.query("SELECT pg_advisory_xact_lock(hashtext('exp_' || $1::text))", [expedienteId]);
+      await bloquearExpedienteRutaDoc(cliente, expedienteId);
       const resultado = await ejecutar(cliente);
       await cliente.query('COMMIT');
       return resultado;
@@ -74,16 +76,23 @@ export class RepositorioReversionRutaDoc {
 
   async objetivo(cliente: PoolClient, expedienteId: string, secuencia: string): Promise<MovimientoObjetivo | null> {
     const consulta = await cliente.query<FilaObjetivo>(`
-      SELECT id_movimiento::text, expediente_id::text, secuencia::text,
-             fecha_hora, estado_anterior, estado_nuevo, evento
-        FROM sigd_rut.movimiento_tramite
-       WHERE expediente_id = $1::bigint AND secuencia = $2::bigint`, [expedienteId, secuencia]);
+      SELECT m.id_movimiento::text, m.expediente_id::text, m.secuencia::text,
+             m.fecha_hora, m.estado_anterior, m.estado_nuevo, m.evento,
+             (SELECT previo.datos->>'areaId' FROM (
+                SELECT secuencia, datos FROM sigd_rut.movimiento_tramite
+                 WHERE expediente_id = $1::bigint AND secuencia < $2::bigint
+                UNION ALL
+                SELECT secuencia, datos FROM sigd_rut.movimiento_compensatorio
+                 WHERE expediente_id = $1::bigint AND secuencia < $2::bigint
+              ) previo ORDER BY previo.secuencia DESC LIMIT 1) AS area_anterior_id
+        FROM sigd_rut.movimiento_tramite m
+       WHERE m.expediente_id = $1::bigint AND m.secuencia = $2::bigint`, [expedienteId, secuencia]);
     const fila = consulta.rows[0];
     return fila ? {
       idMovimiento: fila.id_movimiento, expedienteId: fila.expediente_id,
       secuencia: fila.secuencia, fechaHora: fila.fecha_hora,
       estadoAnterior: fila.estado_anterior, estadoNuevo: fila.estado_nuevo,
-      evento: fila.evento,
+      evento: fila.evento, areaAnteriorId: fila.area_anterior_id,
     } : null;
   }
 
@@ -122,6 +131,7 @@ export class RepositorioReversionRutaDoc {
       movimientoObjetivoSecuencia: objetivo.secuencia,
       motivo, estadoAntesDeReversion: objetivo.estadoNuevo,
       estadoRestaurado: objetivo.estadoAnterior,
+      areaId: objetivo.areaAnteriorId,
       compensacionFolios,
     };
     const consulta = await cliente.query<FilaCompensacion>(`

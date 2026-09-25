@@ -15,7 +15,7 @@ export class ServicioRutaDoc {
     const tieneMas = resultado.elementos.length > filtros.limite;
     const elementos = resultado.elementos.slice(0, filtros.limite);
     const ultimo = elementos.at(-1);
-    const contadores = Object.fromEntries(Object.entries(ESTADOS_POR_PESTANA).map(
+    const contadores = resultado.porPestana ?? Object.fromEntries(Object.entries(ESTADOS_POR_PESTANA).map(
       ([pestana, estados]) => [pestana, estados.reduce(
         (total, estado) => total + (resultado.porEstado[estado] ?? 0), 0)],
     )) as ContadoresRutaDoc;

@@ -282,4 +282,300 @@ COMMENT ON TABLE sigd_rut.movimiento_compensatorio IS
 COMMENT ON COLUMN sigd_rut.movimiento_compensatorio.secuencia IS
     'Secuencia global por expediente reservada con el mismo trigger de RD-02.';
 
+-- Solicitud local de integración con DocuCore. El asiento histórico permanece
+-- inmutable; el estado mutable de entrega vive aquí. CoreLink puede recibir una
+-- copia transaccional en su outbox si el esquema ya está instalado.
+CREATE TABLE IF NOT EXISTS sigd_rut.solicitud_compensacion_folios (
+    id_solicitud UUID PRIMARY KEY,
+    expediente_id BIGINT NOT NULL,
+    movimiento_original_id UUID NOT NULL,
+    movimiento_compensatorio_id UUID NOT NULL UNIQUE
+        REFERENCES sigd_rut.movimiento_compensatorio (id_movimiento),
+    rango_afectado JSONB,
+    motivo TEXT NOT NULL,
+    actor_id BIGINT NOT NULL,
+    correlation_id TEXT NOT NULL,
+    clave_idempotencia UUID NOT NULL,
+    estado TEXT NOT NULL DEFAULT 'PENDIENTE'
+        CHECK (estado IN ('PENDIENTE', 'PROCESANDO', 'COMPLETADO', 'FALLIDO')),
+    id_evento_outbox UUID,
+    creado_en TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    actualizado_en TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE (expediente_id, clave_idempotencia),
+    CHECK (rango_afectado IS NULL OR jsonb_typeof(rango_afectado) = 'object')
+);
+CREATE INDEX IF NOT EXISTS ix_solicitud_folios_estado_fecha
+    ON sigd_rut.solicitud_compensacion_folios (estado, creado_en);
+
+-- Proyección reconstruible para bandejas. La fuente histórica única permanece
+-- en movimiento_tramite más sus asientos compensatorios; esta tabla guarda sólo
+-- el último estado por expediente y se actualiza en la misma transacción.
+CREATE TABLE IF NOT EXISTS sigd_rut.estado_actual_expediente (
+    expediente_id BIGINT PRIMARY KEY,
+    secuencia BIGINT NOT NULL CHECK (secuencia > 0),
+    estado_nuevo TEXT NOT NULL REFERENCES sigd_rut.estado_tramite (codigo),
+    evento TEXT NOT NULL,
+    area_actual_id TEXT,
+    id_movimiento UUID NOT NULL,
+    fecha_hora TIMESTAMPTZ(3) NOT NULL,
+    usuario_operador_id BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_estado_actual_estado_expediente
+    ON sigd_rut.estado_actual_expediente (estado_nuevo, expediente_id);
+CREATE INDEX IF NOT EXISTS ix_estado_actual_area_estado
+    ON sigd_rut.estado_actual_expediente (area_actual_id, estado_nuevo, expediente_id);
+CREATE INDEX IF NOT EXISTS ix_estado_actual_expediente_conteo
+    ON sigd_rut.estado_actual_expediente (expediente_id)
+    INCLUDE (estado_nuevo, area_actual_id);
+
+-- Backfill idempotente para instalaciones que ya tengan historial.
+INSERT INTO sigd_rut.estado_actual_expediente
+    (expediente_id, secuencia, estado_nuevo, evento, area_actual_id,
+     id_movimiento, fecha_hora, usuario_operador_id)
+SELECT DISTINCT ON (expediente_id)
+    expediente_id, secuencia, estado_nuevo, evento, datos->>'areaId',
+    id_movimiento, fecha_hora, usuario_operador_id
+FROM (
+    SELECT expediente_id, secuencia, estado_nuevo, evento, datos,
+           id_movimiento, fecha_hora, usuario_operador_id
+      FROM sigd_rut.movimiento_tramite
+    UNION ALL
+    SELECT expediente_id, secuencia, estado_nuevo, evento, datos,
+           id_movimiento, fecha_hora, usuario_operador_id
+      FROM sigd_rut.movimiento_compensatorio
+) historial
+ORDER BY expediente_id, secuencia DESC
+ON CONFLICT (expediente_id) DO UPDATE SET
+    secuencia = EXCLUDED.secuencia,
+    estado_nuevo = EXCLUDED.estado_nuevo,
+    evento = EXCLUDED.evento,
+    area_actual_id = EXCLUDED.area_actual_id,
+    id_movimiento = EXCLUDED.id_movimiento,
+    fecha_hora = EXCLUDED.fecha_hora,
+    usuario_operador_id = EXCLUDED.usuario_operador_id
+WHERE sigd_rut.estado_actual_expediente.secuencia < EXCLUDED.secuencia;
+
+CREATE OR REPLACE FUNCTION sigd_rut.actualizar_estado_actual_expediente()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = pg_catalog, sigd_rut AS $func$
+BEGIN
+    INSERT INTO sigd_rut.estado_actual_expediente
+        (expediente_id, secuencia, estado_nuevo, evento, area_actual_id,
+         id_movimiento, fecha_hora, usuario_operador_id)
+    VALUES (NEW.expediente_id, NEW.secuencia, NEW.estado_nuevo, NEW.evento,
+            NEW.datos->>'areaId', NEW.id_movimiento, NEW.fecha_hora,
+            NEW.usuario_operador_id)
+    ON CONFLICT (expediente_id) DO UPDATE SET
+        secuencia = EXCLUDED.secuencia,
+        estado_nuevo = EXCLUDED.estado_nuevo,
+        evento = EXCLUDED.evento,
+        area_actual_id = EXCLUDED.area_actual_id,
+        id_movimiento = EXCLUDED.id_movimiento,
+        fecha_hora = EXCLUDED.fecha_hora,
+        usuario_operador_id = EXCLUDED.usuario_operador_id
+    WHERE sigd_rut.estado_actual_expediente.secuencia < EXCLUDED.secuencia;
+    RETURN NULL;
+END;
+$func$;
+
+DO $proyeccion_triggers$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger
+        WHERE tgrelid = 'sigd_rut.movimiento_tramite'::regclass
+          AND tgname = 'tr_estado_actual_movimiento' AND NOT tgisinternal) THEN
+        CREATE TRIGGER tr_estado_actual_movimiento
+            AFTER INSERT ON sigd_rut.movimiento_tramite
+            FOR EACH ROW EXECUTE FUNCTION sigd_rut.actualizar_estado_actual_expediente();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger
+        WHERE tgrelid = 'sigd_rut.movimiento_compensatorio'::regclass
+          AND tgname = 'tr_estado_actual_compensacion' AND NOT tgisinternal) THEN
+        CREATE TRIGGER tr_estado_actual_compensacion
+            AFTER INSERT ON sigd_rut.movimiento_compensatorio
+            FOR EACH ROW EXECUTE FUNCTION sigd_rut.actualizar_estado_actual_expediente();
+    END IF;
+END;
+$proyeccion_triggers$;
+
+-- Seis contadores locales reconstruibles. Cuando existe sigd_tra.expediente,
+-- incluyen también los expedientes sin movimiento como PENDIENTES.
+CREATE TABLE IF NOT EXISTS sigd_rut.contador_pestana_local (
+    pestana TEXT PRIMARY KEY CHECK (pestana IN
+        ('PENDIENTES', 'EN_TRAMITE', 'DERIVADOS', 'POR_FIRMAR', 'ATENDIDOS', 'ARCHIVADOS')),
+    cantidad BIGINT NOT NULL CHECK (cantidad >= 0)
+);
+
+CREATE OR REPLACE FUNCTION sigd_rut.pestana_de_estado(p_estado TEXT)
+RETURNS TEXT LANGUAGE SQL IMMUTABLE STRICT SET search_path = pg_catalog AS $func$
+    SELECT CASE
+        WHEN p_estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION') THEN 'PENDIENTES'
+        WHEN p_estado IN ('EN_REVISION', 'OBSERVADO', 'SUBSANADO') THEN 'EN_TRAMITE'
+        WHEN p_estado = 'DERIVADO' THEN 'DERIVADOS'
+        WHEN p_estado = 'EN_FIRMA' THEN 'POR_FIRMAR'
+        WHEN p_estado = 'RESUELTO' THEN 'ATENDIDOS'
+        WHEN p_estado = 'ARCHIVADO' THEN 'ARCHIVADOS'
+    END
+$func$;
+
+-- La reconstrucción toma locks de tabla para no pisar escrituras concurrentes.
+LOCK TABLE sigd_rut.estado_actual_expediente IN SHARE ROW EXCLUSIVE MODE;
+INSERT INTO sigd_rut.contador_pestana_local (pestana, cantidad) VALUES
+    ('PENDIENTES', 0), ('EN_TRAMITE', 0), ('DERIVADOS', 0),
+    ('POR_FIRMAR', 0), ('ATENDIDOS', 0), ('ARCHIVADOS', 0)
+ON CONFLICT (pestana) DO NOTHING;
+DO $reconstruir_contadores$
+BEGIN
+    IF to_regclass('sigd_tra.expediente') IS NOT NULL THEN
+        EXECUTE 'LOCK TABLE sigd_tra.expediente IN SHARE ROW EXCLUSIVE MODE';
+        WITH totales AS (
+            SELECT sigd_rut.pestana_de_estado(
+                COALESCE(p.estado_nuevo, 'REGISTRADO')) AS pestana,
+                count(*) AS cantidad
+              FROM sigd_tra.expediente e
+              LEFT JOIN sigd_rut.estado_actual_expediente p
+                ON p.expediente_id = e.id_expediente
+             GROUP BY 1
+        )
+        UPDATE sigd_rut.contador_pestana_local c
+           SET cantidad = COALESCE(t.cantidad, 0)
+          FROM (SELECT c0.pestana, totales.cantidad
+                  FROM sigd_rut.contador_pestana_local c0
+                  LEFT JOIN totales ON totales.pestana = c0.pestana) t
+         WHERE t.pestana = c.pestana;
+    ELSE
+        WITH totales AS (
+            SELECT sigd_rut.pestana_de_estado(estado_nuevo) AS pestana,
+                count(*) AS cantidad
+              FROM sigd_rut.estado_actual_expediente GROUP BY 1
+        )
+        UPDATE sigd_rut.contador_pestana_local c
+           SET cantidad = COALESCE(t.cantidad, 0)
+          FROM (SELECT c0.pestana, totales.cantidad
+                  FROM sigd_rut.contador_pestana_local c0
+                  LEFT JOIN totales ON totales.pestana = c0.pestana) t
+         WHERE t.pestana = c.pestana;
+    END IF;
+END;
+$reconstruir_contadores$;
+
+CREATE OR REPLACE FUNCTION sigd_rut.actualizar_contador_pestana_local()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = pg_catalog, sigd_rut AS $func$
+DECLARE
+    v_anterior TEXT;
+    v_nueva TEXT;
+    v_expediente BIGINT;
+    v_visible BOOLEAN;
+BEGIN
+    v_expediente := CASE WHEN TG_OP = 'DELETE' THEN OLD.expediente_id
+                         ELSE NEW.expediente_id END;
+    PERFORM pg_advisory_xact_lock(hashtext('exp_' || v_expediente::text));
+    IF to_regclass('sigd_tra.expediente') IS NOT NULL THEN
+        SELECT EXISTS(SELECT 1 FROM sigd_tra.expediente
+            WHERE id_expediente = v_expediente) INTO v_visible;
+        IF NOT v_visible THEN
+            RETURN NULL;
+        END IF;
+    END IF;
+    IF TG_OP <> 'INSERT' THEN
+        v_anterior := sigd_rut.pestana_de_estado(OLD.estado_nuevo);
+    ELSIF to_regclass('sigd_tra.expediente') IS NOT NULL THEN
+        v_anterior := 'PENDIENTES';
+    END IF;
+    IF TG_OP <> 'DELETE' THEN
+        v_nueva := sigd_rut.pestana_de_estado(NEW.estado_nuevo);
+    ELSIF to_regclass('sigd_tra.expediente') IS NOT NULL THEN
+        v_nueva := 'PENDIENTES';
+    END IF;
+    IF v_anterior IS NOT DISTINCT FROM v_nueva THEN
+        RETURN NULL;
+    END IF;
+    -- Orden fijo para evitar deadlocks entre cambios de pestaña concurrentes.
+    PERFORM 1 FROM sigd_rut.contador_pestana_local
+     WHERE pestana IN (v_anterior, v_nueva) ORDER BY pestana FOR UPDATE;
+    IF v_anterior IS NOT NULL THEN
+        UPDATE sigd_rut.contador_pestana_local
+           SET cantidad = cantidad - 1 WHERE pestana = v_anterior;
+    END IF;
+    IF v_nueva IS NOT NULL THEN
+        UPDATE sigd_rut.contador_pestana_local
+           SET cantidad = cantidad + 1 WHERE pestana = v_nueva;
+    END IF;
+    RETURN NULL;
+END;
+$func$;
+
+DO $contador_trigger$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger
+        WHERE tgrelid = 'sigd_rut.estado_actual_expediente'::regclass
+          AND tgname = 'tr_contador_pestana_local' AND NOT tgisinternal) THEN
+        CREATE TRIGGER tr_contador_pestana_local
+            AFTER INSERT OR UPDATE OR DELETE ON sigd_rut.estado_actual_expediente
+            FOR EACH ROW EXECUTE FUNCTION sigd_rut.actualizar_contador_pestana_local();
+    END IF;
+END;
+$contador_trigger$;
+
+-- Adaptador síncrono del contrato externo: altas, bajas o cambios de ID del
+-- expediente ajustan los contadores en su misma transacción. No toca sus datos.
+CREATE OR REPLACE FUNCTION sigd_rut.actualizar_contador_expediente_externo()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = pg_catalog, sigd_rut AS $func$
+DECLARE
+    v_vieja TEXT;
+    v_nueva TEXT;
+BEGIN
+    IF TG_OP = 'UPDATE' AND OLD.id_expediente = NEW.id_expediente THEN
+        RETURN NULL;
+    END IF;
+    IF TG_OP <> 'INSERT' THEN
+        PERFORM pg_advisory_xact_lock(hashtext('exp_' || OLD.id_expediente::text));
+        SELECT sigd_rut.pestana_de_estado(COALESCE(p.estado_nuevo, 'REGISTRADO'))
+          INTO v_vieja FROM (SELECT 1) base
+          LEFT JOIN sigd_rut.estado_actual_expediente p
+            ON p.expediente_id = OLD.id_expediente;
+    END IF;
+    IF TG_OP <> 'DELETE' THEN
+        PERFORM pg_advisory_xact_lock(hashtext('exp_' || NEW.id_expediente::text));
+        SELECT sigd_rut.pestana_de_estado(COALESCE(p.estado_nuevo, 'REGISTRADO'))
+          INTO v_nueva FROM (SELECT 1) base
+          LEFT JOIN sigd_rut.estado_actual_expediente p
+            ON p.expediente_id = NEW.id_expediente;
+    END IF;
+    PERFORM 1 FROM sigd_rut.contador_pestana_local
+     WHERE pestana IN (v_vieja, v_nueva) ORDER BY pestana FOR UPDATE;
+    IF v_vieja IS NOT NULL THEN
+        UPDATE sigd_rut.contador_pestana_local
+           SET cantidad = cantidad - 1 WHERE pestana = v_vieja;
+    END IF;
+    IF v_nueva IS NOT NULL THEN
+        UPDATE sigd_rut.contador_pestana_local
+           SET cantidad = cantidad + 1 WHERE pestana = v_nueva;
+    END IF;
+    RETURN NULL;
+END;
+$func$;
+
+DO $trigger_expediente_externo$
+BEGIN
+    IF to_regclass('sigd_tra.expediente') IS NOT NULL AND
+       NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger
+          WHERE tgrelid = to_regclass('sigd_tra.expediente')
+            AND tgname = 'tr_rutadoc_contador_expediente' AND NOT tgisinternal) THEN
+        EXECUTE 'CREATE TRIGGER tr_rutadoc_contador_expediente
+            AFTER INSERT OR UPDATE OR DELETE ON sigd_tra.expediente
+            FOR EACH ROW EXECUTE FUNCTION sigd_rut.actualizar_contador_expediente_externo()';
+    END IF;
+END;
+$trigger_expediente_externo$;
+
+-- Contrato de índice de bandeja sobre TramiCore: lo crea la migración propia sólo
+-- si la tabla externa ya existe (runner institucional: 03 antes de 06).
+DO $indice_expediente$
+BEGIN
+    IF to_regclass('sigd_tra.expediente') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS ix_rutadoc_expediente_fecha_id
+            ON sigd_tra.expediente (creado_en DESC, id_expediente DESC);
+    END IF;
+END;
+$indice_expediente$;
+
 COMMIT;

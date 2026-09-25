@@ -47,4 +47,11 @@ describe('DDL RutaDoc y FSM publicada', () => {
     expect(sql).toContain('REFERENCES sigd_rut.movimiento_tramite (fecha_hora, id_movimiento)');
     expect(sql).toContain('EXECUTE FUNCTION sigd_rut.registrar_movimiento_identidad()');
   });
+
+  it('incluye proyección reconstruible, solicitud de folios y único historial particionado', () => {
+    expect(sql).toContain('PARTITION BY RANGE (fecha_hora)');
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS sigd_rut.estado_actual_expediente');
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS sigd_rut.solicitud_compensacion_folios');
+    expect(sql).not.toContain('CREATE TABLE sigd_tra.movimiento');
+  });
 });

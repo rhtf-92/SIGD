@@ -7,17 +7,13 @@ import { UnauthorizedError } from '../../shared/domain/errors/unauthorized-error
 import { esIdExpediente } from './rutadoc.cursor.js';
 import { RepositorioReversionRutaDoc, type FilaCompensacion } from './rutadoc.reversion.repository.js';
 import type {
-  ComandoReversion, CompensacionFolios, PoliticaReversionRutaDoc,
+  ComandoReversion, CompensacionFolios, FolioCompensationPort, PoliticaReversionRutaDoc,
   PrepararCompensacionFolios, ResultadoReversion,
 } from './rutadoc.reversion.types.js';
 import type { ActorRutaDoc } from './rutadoc.types.js';
+import { FolioCompensationPostgres, prepararCompensacionPendiente } from './rutadoc.folio-compensation.js';
 
-export const prepararCompensacionPendiente: PrepararCompensacionFolios = (objetivo) => ({
-  estado: 'PENDIENTE',
-  movimientoRelacionadoId: objetivo.idMovimiento,
-  rangoAfectado: null,
-  referencia: null,
-});
+export { prepararCompensacionPendiente };
 
 function huellaComando(expedienteId: string, comando: ComandoReversion): string {
   return createHash('sha256').update(JSON.stringify({
@@ -46,6 +42,7 @@ export class ServicioReversionRutaDoc {
     private readonly repositorio: RepositorioReversionRutaDoc,
     private readonly puedeRevertir: PoliticaReversionRutaDoc = () => false,
     private readonly prepararFolios: PrepararCompensacionFolios = prepararCompensacionPendiente,
+    private readonly folioPort: FolioCompensationPort = new FolioCompensationPostgres(),
   ) {}
 
   async revertir(expedienteId: string, comando: ComandoReversion,
@@ -94,6 +91,14 @@ export class ServicioReversionRutaDoc {
         objetivo, usuarioOperadorId: actor.id, motivo: comando.motivo,
         claveIdempotencia: comando.claveIdempotencia, huellaComando: huella,
         correlationId, compensacionFolios: folios,
+      });
+      if (!folios.referencia) throw new Error('La solicitud de folios carece de referencia.');
+      await this.folioPort.solicitar(cliente, {
+        expedienteId, movimientoOriginal: objetivo,
+        movimientoCompensatorioId: creada.id_movimiento,
+        rangoAfectado: folios.rangoAfectado, motivo: comando.motivo,
+        actor, correlationId, claveIdempotencia: comando.claveIdempotencia,
+        referencia: folios.referencia,
       });
       return respuesta(creada);
     });

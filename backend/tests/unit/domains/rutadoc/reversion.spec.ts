@@ -13,7 +13,7 @@ const actor: ActorRutaDoc = { id: '7', roles: ['MESA_PARTES'], puedeVerExpedient
 const objetivo: MovimientoObjetivo = {
   idMovimiento: 'cc423832-82c7-4e30-803f-6a637e40b8f6', expedienteId: '42', secuencia: '2',
   fechaHora: new Date('2026-09-24T10:00:00.000Z'), estadoAnterior: 'RECEPCIONADO',
-  estadoNuevo: 'EN_CALIFICACION', evento: 'INICIAR_CALIFICACION',
+  estadoNuevo: 'EN_CALIFICACION', evento: 'INICIAR_CALIFICACION', areaAnteriorId: null,
 };
 const compensacion: FilaCompensacion = {
   id_movimiento: 'a3401043-807f-41f3-9de8-a042e4b312d4', expediente_id: '42', secuencia: '3',
@@ -36,8 +36,10 @@ function preparar() {
     insertar: vi.fn().mockResolvedValue(compensacion),
   };
   const politica = vi.fn().mockResolvedValue(true);
-  const servicio = new ServicioReversionRutaDoc(repo as unknown as RepositorioReversionRutaDoc, politica);
-  return { repo, politica, servicio };
+  const folioPort = { solicitar: vi.fn().mockResolvedValue(undefined) };
+  const servicio = new ServicioReversionRutaDoc(repo as unknown as RepositorioReversionRutaDoc,
+    politica, undefined, folioPort);
+  return { repo, politica, folioPort, servicio };
 }
 
 describe('Reversión administrativa RutaDoc', () => {
@@ -115,7 +117,7 @@ describe('Reversión administrativa RutaDoc', () => {
   });
 
   it('inserta compensación y devuelve el estado anterior persistido', async () => {
-    const { repo, servicio } = preparar();
+    const { repo, folioPort, servicio } = preparar();
     const resultado = await servicio.revertir('42', comando, actor, 'corr-1');
     expect(repo.insertar).toHaveBeenCalledOnce();
     expect(repo.insertar.mock.calls[0][1]).toMatchObject({ objetivo,
@@ -123,16 +125,28 @@ describe('Reversión administrativa RutaDoc', () => {
     expect(resultado).toMatchObject({ expedienteId: '42', movimientoRevertidoId: '2',
       movimientoCompensatorioId: '3', estadoAntesDeReversion: 'EN_CALIFICACION',
       estadoRestaurado: 'RECEPCIONADO', compensacionFolios: { estado: 'PENDIENTE' } });
+    expect(folioPort.solicitar).toHaveBeenCalledOnce();
+    expect(folioPort.solicitar.mock.calls[0][1]).toMatchObject({ expedienteId: '42',
+      movimientoOriginal: objetivo, movimientoCompensatorioId: compensacion.id_movimiento,
+      motivo: comando.motivo, actor, correlationId: 'corr-1', claveIdempotencia: clave });
   });
 
   it('repite la misma clave sin insertar otro movimiento', async () => {
-    const { repo, servicio } = preparar();
+    const { repo, folioPort, servicio } = preparar();
     const primero = await servicio.revertir('42', comando, actor, 'corr-1');
     const huella = repo.insertar.mock.calls[0][1].huellaComando as string;
     repo.porClave.mockResolvedValue({ ...compensacion, huella_comando: huella });
     const repetido = await servicio.revertir('42', comando, actor, 'corr-2');
     expect(repetido).toEqual(primero);
     expect(repo.insertar).toHaveBeenCalledOnce();
+    expect(folioPort.solicitar).toHaveBeenCalledOnce();
+  });
+
+  it('propaga fallo del puerto de folios para rollback de la transacción', async () => {
+    const { folioPort, servicio } = preparar();
+    folioPort.solicitar.mockRejectedValue(new Error('fallo de solicitud'));
+    await expect(servicio.revertir('42', comando, actor, 'corr-1'))
+      .rejects.toThrow('fallo de solicitud');
   });
 
   it('rechaza reutilizar la misma clave con contenido diferente', async () => {

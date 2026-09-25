@@ -132,4 +132,76 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
       WHERE c.contype = 'f' AND n.nspname = 'sigd_rut' AND rn.nspname <> 'sigd_rut'`);
     expect(externas.rows[0].total).toBe('0');
   });
+
+  it('mantiene proyección del último estado y la reconstruye sin duplicar al repetir DDL', async () => {
+    const antes = await cliente.query<{ secuencia: string; estado_nuevo: string }>(`
+      SELECT secuencia::text, estado_nuevo FROM sigd_rut.estado_actual_expediente
+      WHERE expediente_id = 105`);
+    expect(antes.rows).toEqual([{ secuencia: '2', estado_nuevo: 'RECEPCIONADO' }]);
+    await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
+      (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
+      VALUES (105, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7)`);
+    const sql = readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8');
+    await cliente.query(sql);
+    const despues = await cliente.query<{ secuencia: string; estado_nuevo: string }>(`
+      SELECT secuencia::text, estado_nuevo FROM sigd_rut.estado_actual_expediente
+      WHERE expediente_id = 105`);
+    expect(despues.rows).toEqual([{ secuencia: '3', estado_nuevo: 'EN_CALIFICACION' }]);
+    const indices = await cliente.query<{ indexname: string }>(`
+      SELECT indexname FROM pg_indexes WHERE schemaname = 'sigd_rut'
+        AND tablename = 'estado_actual_expediente'`);
+    expect(indices.rows.map((fila) => fila.indexname)).toEqual(expect.arrayContaining([
+      'ix_estado_actual_estado_expediente', 'ix_estado_actual_area_estado',
+      'ix_estado_actual_expediente_conteo',
+    ]));
+  });
+
+  it('reconstruye seis contadores exactos y los actualiza atómicamente al cambiar de pestaña', async () => {
+    const leer = async () => (await cliente.query<{ pestana: string; cantidad: string }>(
+      'SELECT pestana, cantidad::text FROM sigd_rut.contador_pestana_local ORDER BY pestana')).rows;
+    const antes = await leer();
+    expect(antes).toHaveLength(6);
+    await insertar(777, '2026-09-25T09:00:00.123Z');
+    await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
+      (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
+      VALUES (777, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7),
+             (777, 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', 7)`);
+    const despues = await leer();
+    const porPestana = Object.fromEntries(despues.map((fila) => [fila.pestana, Number(fila.cantidad)]));
+    const conteoReal = await cliente.query<{ pestana: string; cantidad: number }>(`
+      SELECT sigd_rut.pestana_de_estado(estado_nuevo) pestana, count(*)::integer cantidad
+        FROM sigd_rut.estado_actual_expediente GROUP BY 1`);
+    for (const fila of conteoReal.rows) expect(porPestana[fila.pestana]).toBe(fila.cantidad);
+    expect(porPestana.DERIVADOS).toBe(
+      Number(antes.find((fila) => fila.pestana === 'DERIVADOS')?.cantidad) + 1);
+    const sql = readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8');
+    await cliente.query(sql);
+    expect(await leer()).toEqual(despues);
+    await expect(cliente.query(`UPDATE sigd_rut.contador_pestana_local
+      SET cantidad = -1 WHERE pestana = 'DERIVADOS'`)).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('revierte contadores con la transacción y evita pérdida bajo escrituras concurrentes', async () => {
+    const contar = async () => Number((await cliente.query<{ cantidad: string }>(`
+      SELECT cantidad::text FROM sigd_rut.contador_pestana_local
+      WHERE pestana = 'PENDIENTES'`)).rows[0].cantidad);
+    const inicial = await contar();
+    await cliente.query('BEGIN');
+    await insertar(778, '2026-09-25T09:00:00.123Z');
+    expect(await contar()).toBe(inicial + 1);
+    await cliente.query('ROLLBACK');
+    expect(await contar()).toBe(inicial);
+    const a = new Client({ connectionString: contenedor.getConnectionUri() });
+    const b = new Client({ connectionString: contenedor.getConnectionUri() });
+    await Promise.all([a.connect(), b.connect()]);
+    try {
+      await Promise.all([a, b].map((conexion, indice) => conexion.query(`
+        INSERT INTO sigd_rut.movimiento_tramite
+          (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
+        VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7)`, [779 + indice])));
+      expect(await contar()).toBe(inicial + 2);
+    } finally {
+      await Promise.all([a.end(), b.end()]);
+    }
+  });
 });
