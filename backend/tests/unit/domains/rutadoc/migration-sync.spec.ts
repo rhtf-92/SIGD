@@ -40,4 +40,11 @@ describe('DDL RutaDoc y FSM publicada', () => {
     expect(filas('transicion_estado_tramite')).toEqual(esperadas);
     expect(esperadas).toHaveLength(13);
   });
+
+  it('separa REVERSION_ADMINISTRATIVA de las transiciones normales', () => {
+    expect(sql).toContain("VALUES ('REVERSION_ADMINISTRATIVA')");
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS sigd_rut.movimiento_compensatorio');
+    expect(sql).toContain('REFERENCES sigd_rut.movimiento_tramite (fecha_hora, id_movimiento)');
+    expect(sql).toContain('EXECUTE FUNCTION sigd_rut.registrar_movimiento_identidad()');
+  });
 });

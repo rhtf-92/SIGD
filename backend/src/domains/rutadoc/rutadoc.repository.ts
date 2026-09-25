@@ -40,8 +40,19 @@ const BASE = `
   LEFT JOIN LATERAL (
     SELECT m.id_movimiento, m.estado_nuevo, m.evento, m.fecha_hora,
            m.usuario_operador_id, m.datos
-      FROM sigd_rut.movimiento_tramite m
-     WHERE m.expediente_id = e.id_expediente
+      FROM (
+        (SELECT id_movimiento, estado_nuevo, evento, fecha_hora,
+                usuario_operador_id, datos, secuencia
+           FROM sigd_rut.movimiento_tramite
+          WHERE expediente_id = e.id_expediente
+          ORDER BY secuencia DESC LIMIT 1)
+        UNION ALL
+        (SELECT id_movimiento, estado_nuevo, evento, fecha_hora,
+                usuario_operador_id, datos, secuencia
+           FROM sigd_rut.movimiento_compensatorio
+          WHERE expediente_id = e.id_expediente
+          ORDER BY secuencia DESC LIMIT 1)
+      ) m
      ORDER BY m.secuencia DESC
      LIMIT 1
   ) ultimo ON TRUE`;
