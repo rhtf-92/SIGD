@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import FileUploadDropzone from "../../components/common/FileUploadDropzone";
 import HorarioCorteNotice from "../../components/tramite/HorarioCorteNotice";
-import { useCalendarioOficial } from "../../hooks/useCalendarioOficial";
 import {
   calculateHorarioCorte,
   useHorarioCorte,
@@ -12,6 +11,8 @@ import type {
   UploadedFile,
   UploadStatus,
 } from "../../hooks/usePresignedUpload";
+
+const FERIADOS_CONFIGURADOS: string[] = [];
 
 function formatStatus(status: UploadStatus): string {
   const labels: Record<UploadStatus, string> = {
@@ -33,29 +34,16 @@ export default function MesaPartesVirtualPage() {
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
   const [asunto, setAsunto] = useState("");
   const [solicitante, setSolicitante] = useState("");
-  // Calendario oficial del backend: antes se pasaba una lista vacía, por lo que el
-  // corte LPAG (Art. 138) ignoraba feriados y habilitaciones expresas.
-  const { diasNoLaborables, diasLaborablesExcepcionales } = useCalendarioOficial();
-  const liveHorario = useHorarioCorte(
-    new Date(),
-    diasNoLaborables,
-    diasLaborablesExcepcionales,
-  );
+  const liveHorario = useHorarioCorte(new Date(), FERIADOS_CONFIGURADOS);
   const horario = useMemo(
     () =>
       simulationTime
         ? calculateHorarioCorte(
             new Date(simulationTime),
-            diasNoLaborables,
-            diasLaborablesExcepcionales,
+            FERIADOS_CONFIGURADOS,
           )
         : liveHorario,
-    [
-      simulationTime,
-      liveHorario,
-      diasNoLaborables,
-      diasLaborablesExcepcionales,
-    ],
+    [simulationTime, liveHorario],
   );
 
   const handleUploadStatus = useCallback((status: UploadStatus) => {

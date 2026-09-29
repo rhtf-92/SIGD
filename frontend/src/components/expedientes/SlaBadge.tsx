@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { useCalendarioOficial } from "../../hooks/useCalendarioOficial";
 import {
   calculateSlaStatus,
   type SlaStatus,
@@ -52,18 +51,14 @@ export default function SlaBadge({
   mostrarTooltip = true,
   className = "",
 }: SlaBadgeProps) {
-  // Calendario oficial del backend: única fuente de feriados del semáforo.
-  const { calendario } = useCalendarioOficial();
-
   const slaResult = useMemo(
     () =>
       calculateSlaStatus(
         fechaIngreso,
         fechaReferencia,
         plazoMaximoDiasHabiles,
-        calendario,
       ),
-    [fechaIngreso, fechaReferencia, plazoMaximoDiasHabiles, calendario],
+    [fechaIngreso, fechaReferencia, plazoMaximoDiasHabiles],
   );
 
   const {
