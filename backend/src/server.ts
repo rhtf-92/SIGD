@@ -4,13 +4,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearPool } from './database.js';
 import { construirApp } from './app.js';
+import { inicializarCachePermisos } from './redis.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
 const port = Number(process.env.PORT ?? 3000);
 
 const pool = crearPool(databaseUrl);
-const app = construirApp(pool);
+const runtimePermisos = await inicializarCachePermisos(process.env.REDIS_URL);
+const app = construirApp(pool, runtimePermisos.cache, runtimePermisos.comando);
 
 app.listen(port, () => {
   console.log(`SIGD Backend escuchando en http://localhost:${port}`);
@@ -55,10 +57,12 @@ try {
 
 process.on('SIGINT', () => {
   if (viteProc) viteProc.kill();
+  void runtimePermisos.cerrar();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   if (viteProc) viteProc.kill();
+  void runtimePermisos.cerrar();
   process.exit(0);
 });
