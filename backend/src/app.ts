@@ -7,6 +7,7 @@ import { crearRouterRutaDoc } from './domains/rutadoc/rutadoc.router.js';
 import type { ObtenerActorRutaDoc } from './domains/rutadoc/rutadoc.controller.js';
 import type { FolioCompensationPort, PoliticaReversionRutaDoc, PrepararCompensacionFolios } from './domains/rutadoc/rutadoc.reversion.types.js';
 import type { ActorProviderRutaDoc } from './domains/rutadoc/rutadoc.actor-provider.js';
+import { crearRouterAdminMaestras } from './domains/organicore/adminMaestras.routes.js';
 
 export function construirApp(pool: Pool, opciones: {
   obtenerActorRutaDoc?: ObtenerActorRutaDoc;
@@ -29,6 +30,12 @@ export function construirApp(pool: Pool, opciones: {
   app.use('/api/v1', crearRouterRutaDoc(pool, opciones.obtenerActorRutaDoc,
     opciones.politicaReversionRutaDoc, opciones.prepararCompensacionFolios,
     opciones.actorProviderRutaDoc, opciones.folioCompensationPort));
+
+  // Superficie canónica /api/v1 del plan maestro (OrganiCore, B_HECTOR).
+  // Se monta después de `/api/v1` porque `crearRouterRutaDoc` sólo declara rutas
+  // específicas de expedientes (sin comodín), de modo que las peticiones de
+  // /api/v1/admin la atraviesan sin ser atendidas y llegan a este router.
+  app.use('/api/v1/admin', crearRouterAdminMaestras(pool));
 
   app.use(errorMiddleware);
 

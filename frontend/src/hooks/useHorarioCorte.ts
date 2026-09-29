@@ -52,7 +52,19 @@ function addCalendarDays(date: string, days: number): string {
   return value.toISOString().slice(0, 10);
 }
 
-function isBusinessDate(date: string, holidays: ReadonlySet<string>): boolean {
+/**
+ * ¿Es `date` un día laborable según el calendario oficial?
+ *
+ * Precedencia: un día habilitado expresamente (`laborables`) manda sobre el fin
+ * de semana y sobre cualquier feriado, porque es la resolución posterior
+ * (misma regla que `sigd_org.es_dia_no_laborable` y `slaCalculator`).
+ */
+function isBusinessDate(
+  date: string,
+  holidays: ReadonlySet<string>,
+  laborables: ReadonlySet<string> = new Set(),
+): boolean {
+  if (laborables.has(date)) return true;
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
   return weekday !== 0 && weekday !== 6 && !holidays.has(date);
 }
@@ -60,9 +72,10 @@ function isBusinessDate(date: string, holidays: ReadonlySet<string>): boolean {
 export function getNextBusinessDate(
   date: string,
   holidays: ReadonlySet<string>,
+  laborables: ReadonlySet<string> = new Set(),
 ): string {
   let candidate = addCalendarDays(date, 1);
-  while (!isBusinessDate(candidate, holidays)) {
+  while (!isBusinessDate(candidate, holidays, laborables)) {
     candidate = addCalendarDays(candidate, 1);
   }
   return candidate;
@@ -71,16 +84,17 @@ export function getNextBusinessDate(
 export function calculateHorarioCorte(
   now: Date,
   holidays: readonly string[] = [],
+  laborables: readonly string[] = [],
 ): HorarioCorteResult {
   const parts = getLimaParts(now);
   const holidaySet = new Set(holidays);
-  const isNonBusinessDay =
-    parts.weekday === 0 || parts.weekday === 6 || holidaySet.has(parts.date);
+  const laborableSet = new Set(laborables);
+  const isNonBusinessDay = !isBusinessDate(parts.date, holidaySet, laborableSet);
   const isAfterCutoff =
     parts.hour * 60 + parts.minute >= CORTE_MINUTES;
   const requiresProjection = isNonBusinessDay || isAfterCutoff;
   const legalDate = requiresProjection
-    ? getNextBusinessDate(parts.date, holidaySet)
+    ? getNextBusinessDate(parts.date, holidaySet, laborableSet)
     : parts.date;
 
   return {
@@ -96,6 +110,7 @@ export function calculateHorarioCorte(
 export function useHorarioCorte(
   now: Date = new Date(),
   holidays: readonly string[] = [],
+  laborables: readonly string[] = [],
 ) {
   const [currentTime, setCurrentTime] = useState(now);
 
@@ -105,7 +120,7 @@ export function useHorarioCorte(
   }, []);
 
   return useMemo(
-    () => calculateHorarioCorte(currentTime, holidays),
-    [currentTime, holidays],
+    () => calculateHorarioCorte(currentTime, holidays, laborables),
+    [currentTime, holidays, laborables],
   );
 }
