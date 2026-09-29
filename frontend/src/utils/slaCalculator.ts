@@ -1,15 +1,9 @@
 /**
  * Utilidad de cálculo de SLA en días hábiles conforme al TUO de la Ley N° 27444 (LPAG)
- * Entregable: ENT-M03-02 · Tarea: T-BE-OC-13/T-BE-OC-14 (fuente única del calendario)
+ * Entregable: ENT-M03-02
  *
- * Este módulo es puro: no conoce React, ni la red, ni el backend. El calendario
- * laboral se recibe como parámetro (`CalendarioLaboral`) y su única fuente es
- * `GET /api/v1/admin/calendario-laboral`, es decir la tabla `sigd_org.calendario_laboral`
- * del backend. Antes esta función arrastraba una lista de feriados escrita a mano
- * (constante `FERIADOS_RECURRENTES_PE_UCAYALI`), que obligaba a editar código cada
- * ejercicio fiscal: exactamente el problema que T-BE-OC-13 elimina.
- *
- * Regla base: 30 días hábiles de plazo legal máximo para procedimientos ordinarios.
+ * Excluye fines de semana y feriados oficiales (nacionales y regionales de Ucayali).
+ * Regla base: 30 días hábiles de plazo legal máximo para procedimientos administrativos ordinarios.
  */
 
 export type SlaStatus = "NORMAL" | "ALERTA" | "CRITICO" | "VENCIDO";
@@ -26,32 +20,28 @@ export interface SlaCalculationResult {
 }
 
 /**
- * Calendario laboral oficial recibido del backend, en fechas `YYYY-MM-DD`.
- *
- * - `noLaborables`: feriados y días inhábiles registrados en `sigd_org.calendario_laboral`.
- * - `laborablesExcepcionales`: días habilitados por resolución (por ejemplo un sábado
- *   laborable). Tienen prioridad sobre `noLaborables`, igual que la función
- *   `sigd_org.es_dia_no_laborable` del backend.
+ * Catálogo canónico de feriados nacionales (D. Leg. N° 713) y regionales de Ucayali.
+ * Se representan en formato MM-DD para aplicar independientemente del año,
+ * complementados con feriados con año específico.
  */
-export interface CalendarioLaboral {
-  noLaborables: ReadonlySet<string>;
-  laborablesExcepcionales: ReadonlySet<string>;
-}
-
-/**
- * Calendario vacío: sin feriados conocidos. Es el valor por defecto y equivale a
- * "sólo lunes a viernes", para que las funciones puras sigan siendo utilizables
- * (y testeables) sin depender de una llamada de red.
- */
-export const CALENDARIO_LABORAL_VACIO: CalendarioLaboral = {
-  noLaborables: new Set<string>(),
-  laborablesExcepcionales: new Set<string>(),
-};
-
-/** Día de la semana de una fecha `YYYY-MM-DD` sin sufijos de zona horaria. */
-function dayOfWeekFromKey(yyyyMmDd: string): number {
-  return new Date(`${yyyyMmDd}T12:00:00Z`).getUTCDay();
-}
+export const FERIADOS_RECURRENTES_PE_UCAYALI: readonly string[] = [
+  "01-01", // Año Nuevo
+  "05-01", // Día del Trabajo
+  "06-07", // Batalla de Arica y Día de la Bandera
+  "06-24", // Fiesta Patronal de San Juan Bautista (Feriado Regional Ucayali)
+  "06-29", // San Pedro y San Pablo
+  "07-23", // Día de la Fuerza Aérea del Perú
+  "07-28", // Fiestas Patrias
+  "07-29", // Fiestas Patrias
+  "08-06", // Batalla de Junín
+  "08-30", // Santa Rosa de Lima
+  "10-08", // Combate de Angamos
+  "10-13", // Aniversario de la Provincia de Coronel Portillo / Pucallpa (Feriado Regional Ucayali)
+  "11-01", // Todos los Santos
+  "12-08", // Inmaculada Concepción
+  "12-09", // Batalla de Ayacucho
+  "12-25", // Navidad
+] as const;
 
 /**
  * Normaliza una fecha a formato YYYY-MM-DD local
@@ -64,30 +54,27 @@ export function formatLocalDateKey(date: Date): string {
 }
 
 /**
- * Verifica si una fecha es un día hábil según el calendario oficial.
- *
- * Orden de precedencia (idéntico al backend):
- *   1. Si la fecha está habilitada por resolución, es hábil aunque sea fin de semana.
- *   2. Si está registrada como no laborable, no es hábil.
- *   3. En cualquier otro caso, es hábil si es lunes a viernes.
+ * Verifica si una fecha dada es un día hábil (lunes a viernes no feriado).
  */
-export function isBusinessDay(
-  date: Date,
-  calendario: CalendarioLaboral = CALENDARIO_LABORAL_VACIO,
-): boolean {
-  const yyyyMmDd = formatLocalDateKey(date);
-
-  if (calendario.laborablesExcepcionales.has(yyyyMmDd)) {
-    return true;
-  }
-
-  const dayOfWeek = dayOfWeekFromKey(yyyyMmDd);
+export function isBusinessDay(date: Date, feriadosPersonalizados?: string[]): boolean {
+  const dayOfWeek = date.getDay();
   // 0 = Domingo, 6 = Sábado
   if (dayOfWeek === 0 || dayOfWeek === 6) {
     return false;
   }
 
-  return !calendario.noLaborables.has(yyyyMmDd);
+  const yyyyMmDd = formatLocalDateKey(date);
+  const mmDd = yyyyMmDd.slice(5);
+
+  if (FERIADOS_RECURRENTES_PE_UCAYALI.includes(mmDd)) {
+    return false;
+  }
+
+  if (feriadosPersonalizados && feriadosPersonalizados.includes(yyyyMmDd)) {
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -97,7 +84,7 @@ export function isBusinessDay(
 export function addBusinessDays(
   startDate: Date | string,
   businessDays: number,
-  calendario: CalendarioLaboral = CALENDARIO_LABORAL_VACIO,
+  feriadosPersonalizados?: string[],
 ): Date {
   const current = new Date(startDate);
   // Normalizar hora a inicio del día
@@ -106,7 +93,7 @@ export function addBusinessDays(
   let added = 0;
   while (added < businessDays) {
     current.setDate(current.getDate() + 1);
-    if (isBusinessDay(current, calendario)) {
+    if (isBusinessDay(current, feriadosPersonalizados)) {
       added++;
     }
   }
@@ -121,7 +108,7 @@ export function addBusinessDays(
 export function countBusinessDays(
   startDate: Date | string,
   endDate: Date | string,
-  calendario: CalendarioLaboral = CALENDARIO_LABORAL_VACIO,
+  feriadosPersonalizados?: string[],
 ): number {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -140,7 +127,7 @@ export function countBusinessDays(
 
   while (cursor.getTime() < to.getTime()) {
     cursor.setDate(cursor.getDate() + 1);
-    if (isBusinessDay(cursor, calendario)) {
+    if (isBusinessDay(cursor, feriadosPersonalizados)) {
       count++;
     }
   }
@@ -161,18 +148,18 @@ export function calculateSlaStatus(
   fechaIngreso: string | Date,
   fechaReferencia: Date = new Date(),
   plazoMaximoDiasHabiles = 30,
-  calendario: CalendarioLaboral = CALENDARIO_LABORAL_VACIO,
+  feriadosPersonalizados?: string[],
 ): SlaCalculationResult {
   const fechaIngresoDate = new Date(fechaIngreso);
   const fechaLimiteCalculada = addBusinessDays(
     fechaIngresoDate,
     plazoMaximoDiasHabiles,
-    calendario,
+    feriadosPersonalizados,
   );
 
   const diasConsumidos = Math.max(
     0,
-    countBusinessDays(fechaIngresoDate, fechaReferencia, calendario),
+    countBusinessDays(fechaIngresoDate, fechaReferencia, feriadosPersonalizados),
   );
 
   const diasRestantes = plazoMaximoDiasHabiles - diasConsumidos;
