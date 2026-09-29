@@ -2,9 +2,15 @@ import express, { Express } from 'express';
 import type { Pool } from 'pg';
 import { contextMiddleware } from './middleware/context-middleware.js';
 import { errorMiddleware } from './middleware/error-middleware.js';
+import { crearRouterIdenticore } from './domains/identicore/identicore.router.js';
+import type { CacheDistribuida } from './domains/identicore/ubigeo.service.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
 
-export function construirApp(pool: Pool): Express {
+export interface AppOptions {
+  ubigeoCache?: CacheDistribuida;
+}
+
+export function construirApp(pool: Pool, opciones: AppOptions = {}): Express {
   const app = express();
   app.disable('x-powered-by');
 
@@ -15,6 +21,7 @@ export function construirApp(pool: Pool): Express {
     res.json({ status: 'ok' });
   });
 
+  app.use('/api/v1', crearRouterIdenticore(pool, opciones.ubigeoCache));
   app.use('/api', crearRouterReferencia(pool));
 
   app.use(errorMiddleware);
@@ -22,4 +29,4 @@ export function construirApp(pool: Pool): Express {
   return app;
 }
 
-export default construirApp;
+export default construirApp;
