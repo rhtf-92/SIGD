@@ -18,7 +18,7 @@ export default function CalendarioLaboralPage() {
     setZonaHoraria,
     feriados,
     agregarFeriado,
-    quitarFeriado,
+    cargando,
     fechaNueva,
     setFechaNueva,
     nombreNuevo,
@@ -145,7 +145,10 @@ export default function CalendarioLaboralPage() {
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold">Feriados y días no laborables</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Feriados nacionales (D. Leg. N° 713) y regionales de Ucayali.
+              Calendario oficial de <code>sigd_org.calendario_laboral</code>:
+              feriados nacionales (D. Leg. N° 713), regionales de Ucayali y
+              habilitaciones expresas. El alta se registra en el backend y recalcula
+              de inmediato el semáforo SLA.
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-[170px_1fr_auto]">
@@ -164,9 +167,10 @@ export default function CalendarioLaboralPage() {
               <button
                 type="button"
                 onClick={agregarFeriado}
-                className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+                disabled={cargando}
+                className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
               >
-                Agregar
+                {cargando ? "Registrando…" : "Agregar"}
               </button>
             </div>
 
@@ -178,15 +182,12 @@ export default function CalendarioLaboralPage() {
                 >
                   <div>
                     <p className="text-sm font-semibold">{feriado.nombre}</p>
-                    <p className="text-xs text-slate-500">{feriado.fecha}</p>
+                    <p className="text-xs text-slate-500">
+                      {feriado.fecha}
+                      {feriado.tipo_feriado ? ` · ${feriado.tipo_feriado}` : ""}
+                      {feriado.esLaborable ? " · día laborable" : ""}
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => quitarFeriado(feriado.id)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
-                  >
-                    Quitar
-                  </button>
                 </div>
               ))}
             </div>

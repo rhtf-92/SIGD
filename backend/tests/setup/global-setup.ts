@@ -37,6 +37,12 @@ async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
     ? path.resolve(raizProyecto, process.env.MIGRATIONS_DIR)
     : path.join(raizProyecto, 'migraciones');
   const fixture = path.join(raizProyecto, 'tests', 'fixtures', '01_schema_fixtures_test.sql');
+  const ddlCalendario = path.join(
+    raizProyecto,
+    'docs',
+    '02_organicore',
+    '11_esquema_calendario_laboral.sql',
+  );
 
   const cliente = new Client({ connectionString: databaseUrl });
   await cliente.connect();
@@ -46,6 +52,11 @@ async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
     await aplicarSql(cliente, fixture);
     if (existsSync(archivoDdlAudit)) {
       await aplicarSql(cliente, archivoDdlAudit);
+    }
+    // T-BE-OC-13: `sigd_org.calendario_laboral` debe existir antes de cualquier
+    // prueba que ejercite el calendario oficial o el cómputo de días hábiles.
+    if (existsSync(ddlCalendario)) {
+      await aplicarSql(cliente, ddlCalendario);
     }
 
     if (existsSync(dirMigraciones)) {

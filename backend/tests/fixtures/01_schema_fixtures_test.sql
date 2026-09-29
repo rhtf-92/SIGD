@@ -11,6 +11,38 @@ CREATE TABLE IF NOT EXISTS sigd_auth.cuenta_usuario (
 
 CREATE SCHEMA IF NOT EXISTS sigd_org;
 
+-- Modelo RBAC mínimo: la suite E2E necesita resolver el permiso
+-- CALENDARIO_LABORAL_GESTIONAR sin depender del DDL completo de sigd_org v2.
+-- `cuenta_usuario.id` es UUID aquí para ser coherente con `usuario_rol.cuenta_id`.
+CREATE TABLE IF NOT EXISTS sigd_org.rol_sistema (
+    rol_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo  VARCHAR(50) NOT NULL UNIQUE,
+    nombre  VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    activo  BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS sigd_org.permiso_sistema (
+    permiso_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo                VARCHAR(100) NOT NULL UNIQUE,
+    descripcion           TEXT,
+    alcance_predeterminado VARCHAR(20) NOT NULL DEFAULT 'AREA',
+    activo                BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS sigd_org.rol_permiso (
+    rol_id     UUID NOT NULL REFERENCES sigd_org.rol_sistema (rol_id) ON DELETE CASCADE,
+    permiso_id UUID NOT NULL REFERENCES sigd_org.permiso_sistema (permiso_id) ON DELETE CASCADE,
+    PRIMARY KEY (rol_id, permiso_id)
+);
+
+CREATE TABLE IF NOT EXISTS sigd_org.usuario_rol (
+    cuenta_id UUID NOT NULL REFERENCES sigd_auth.cuenta_usuario (id) ON DELETE CASCADE,
+    rol_id    UUID NOT NULL REFERENCES sigd_org.rol_sistema (rol_id) ON DELETE CASCADE,
+    vigencia  TSTZRANGE NOT NULL DEFAULT tstzrange(now(), NULL, '[)'),
+    PRIMARY KEY (cuenta_id, rol_id)
+);
+
 CREATE TABLE IF NOT EXISTS sigd_org.area (
     area_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nombre  TEXT NOT NULL,

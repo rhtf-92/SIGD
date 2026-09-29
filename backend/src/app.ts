@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { contextMiddleware } from './middleware/context-middleware.js';
 import { errorMiddleware } from './middleware/error-middleware.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
+import { crearRouterAdminMaestras } from './domains/organicore/adminMaestras.routes.js';
 
 export function construirApp(pool: Pool): Express {
   const app = express();
@@ -16,6 +17,9 @@ export function construirApp(pool: Pool): Express {
   });
 
   app.use('/api', crearRouterReferencia(pool));
+
+  // Superficie canónica /api/v1 del plan maestro (OrganiCore, B_HECTOR).
+  app.use('/api/v1/admin', crearRouterAdminMaestras(pool));
 
   app.use(errorMiddleware);
 

@@ -1,15 +1,27 @@
-// Hook del Calendario Laboral y Jornada LPAG (ENT-M05-06)
-import { useState } from "react";
+// Hook del Calendario Laboral y Jornada LPAG (ENT-M05-06) · T-BE-OC-14
+import { useCallback, useMemo, useState } from "react";
+
+import { useCalendarioOficial } from "./useCalendarioOficial";
+import { CORTE_MINUTES } from "./useHorarioCorte";
+import type { FeriadoExcepcionalInput } from "../types/calendarioLaboral";
 
 export interface DiaLaboral {
   nombre: string;
   activo: boolean;
 }
 
+/**
+ * Feriado o día no laborable tal como lo publica el backend
+ * (`sigd_org.calendario_laboral`). Antes se declaraban 16 fechas fijas de 2026
+ * escritas en el cliente; ahora provienen del calendario oficial.
+ */
 export interface Feriado {
-  id: number;
+  id: string;
   fecha: string;
   nombre: string;
+  tipo_feriado: string | null;
+  esLaborable: boolean;
+  baseLegal: string | null;
 }
 
 export interface ConfiguracionJornada {
@@ -21,10 +33,11 @@ export interface ConfiguracionJornada {
   feriados: Feriado[];
 }
 
-// Corte normativo no negociable (Art. 138 TUO Ley N° 27444)
+// Corte normativo no negociable (Art. 138 TUO Ley N° 27444).
+// Se deriva de `CORTE_MINUTES` para no duplicar la constante normativa.
 export const HORA_INICIO_REFERENCIA = "08:00";
 export const HORA_FIN_REFERENCIA = "16:30";
-export const HORA_CORTE_LPAG = "16:30";
+export const HORA_CORTE_LPAG = `${String(Math.floor(CORTE_MINUTES / 60)).padStart(2, "0")}:${String(CORTE_MINUTES % 60).padStart(2, "0")}`;
 
 const diasIniciales: DiaLaboral[] = [
   { nombre: "Lunes", activo: true },
@@ -36,36 +49,35 @@ const diasIniciales: DiaLaboral[] = [
   { nombre: "Domingo", activo: false },
 ];
 
-// Catálogo oficial de feriados conforme a D. Leg. N° 713 y Ucayali
-const feriadosIniciales: Feriado[] = [
-  { id: 1, fecha: "2026-01-01", nombre: "Año Nuevo" },
-  { id: 2, fecha: "2026-05-01", nombre: "Día del Trabajo" },
-  { id: 3, fecha: "2026-06-07", nombre: "Batalla de Arica y Día de la Bandera" },
-  { id: 4, fecha: "2026-06-24", nombre: "Fiesta Patronal de San Juan Bautista (Ucayali)" },
-  { id: 5, fecha: "2026-06-29", nombre: "San Pedro y San Pablo" },
-  { id: 6, fecha: "2026-07-23", nombre: "Día de la Fuerza Aérea del Perú" },
-  { id: 7, fecha: "2026-07-28", nombre: "Fiestas Patrias" },
-  { id: 8, fecha: "2026-07-29", nombre: "Fiestas Patrias" },
-  { id: 9, fecha: "2026-08-06", nombre: "Batalla de Junín" },
-  { id: 10, fecha: "2026-08-30", nombre: "Santa Rosa de Lima" },
-  { id: 11, fecha: "2026-10-08", nombre: "Combate de Angamos" },
-  { id: 12, fecha: "2026-10-13", nombre: "Aniversario de la Provincia de Coronel Portillo (Pucallpa)" },
-  { id: 13, fecha: "2026-11-01", nombre: "Día de Todos los Santos" },
-  { id: 14, fecha: "2026-12-08", nombre: "Inmaculada Concepción" },
-  { id: 15, fecha: "2026-12-09", nombre: "Batalla de Ayacucho" },
-  { id: 16, fecha: "2026-12-25", nombre: "Navidad del Señor" },
-];
-
 export function useCalendarioLaboral() {
   const [dias, setDias] = useState(diasIniciales);
   const [horaInicio, setHoraInicio] = useState(HORA_INICIO_REFERENCIA);
   const [horaFin, setHoraFin] = useState(HORA_FIN_REFERENCIA);
-  const [horaCorteRecepcion, setHoraCorteRecepcion] = useState(HORA_CORTE_LPAG);
+  const [horaCorteRecepcion, setHoraCorteRecepcion] = useState(
+    HORA_CORTE_LPAG,
+  );
   const [zonaHoraria, setZonaHoraria] = useState("America/Lima");
-  const [feriados, setFeriados] = useState(feriadosIniciales);
   const [fechaNueva, setFechaNueva] = useState("");
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [mensaje, setMensaje] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  const { vista, registrarFeriado, cargando } = useCalendarioOficial();
+
+  // El listado de la consola se deriva del calendario oficial; la jornada y la
+  // zona horaria siguen siendo configuración local de la interfaz.
+  const feriados = useMemo<Feriado[]>(
+    () =>
+      vista.calendario.map((dia) => ({
+        id: dia.id_calendario,
+        fecha: dia.fecha,
+        nombre: dia.descripcion,
+        tipo_feriado: dia.tipo_feriado,
+        esLaborable: dia.es_laborable,
+        baseLegal: dia.base_legal,
+      })),
+    [vista.calendario],
+  );
 
   function alternarDia(indice: number) {
     setMensaje("");
@@ -76,26 +88,39 @@ export function useCalendarioLaboral() {
     );
   }
 
-  function agregarFeriado() {
+  /**
+   * Da de alta el feriado en el backend. Éste escribe la fila, el asiento en la
+   * bitácora WORM y el evento del outbox en una sola transacción, invalida su
+   * caché y devuelve; el hook invalida la query del calendario y la lista se
+   * actualiza sola. Un duplicado responde 409 y se reporta como aviso.
+   */
+  const agregarFeriado = useCallback(async () => {
     if (!fechaNueva || !nombreNuevo.trim()) return;
 
-    setFeriados((actuales) => [
-      ...actuales,
-      {
-        id: Math.max(0, ...actuales.map((feriado) => feriado.id)) + 1,
-        fecha: fechaNueva,
-        nombre: nombreNuevo.trim(),
-      },
-    ]);
-    setFechaNueva("");
-    setNombreNuevo("");
+    setGuardando(true);
     setMensaje("");
-  }
+    const entrada: FeriadoExcepcionalInput = {
+      fecha: fechaNueva,
+      descripcion: nombreNuevo.trim(),
+    };
 
-  function quitarFeriado(id: number) {
-    setFeriados((actuales) => actuales.filter((item) => item.id !== id));
-    setMensaje("");
-  }
+    try {
+      const registrado = await registrarFeriado(entrada);
+      setFechaNueva("");
+      setNombreNuevo("");
+      setMensaje(
+        `Feriado registrado (${registrado.fecha}). El semáforo SLA se recalculó con el nuevo calendario oficial.`,
+      );
+    } catch (error) {
+      const detalle =
+        error instanceof Error ? error.message : "Error desconocido";
+      setMensaje(
+        `No se pudo registrar el feriado: ${detalle}. Verifique que la fecha no esté duplicada.`,
+      );
+    } finally {
+      setGuardando(false);
+    }
+  }, [fechaNueva, nombreNuevo, registrarFeriado]);
 
   function guardarConfiguracion(): ConfiguracionJornada {
     const configuracion: ConfiguracionJornada = {
@@ -110,12 +135,10 @@ export function useCalendarioLaboral() {
     const corteOk = horaCorteRecepcion === HORA_CORTE_LPAG;
     setMensaje(
       `Configuración preparada: ${horaInicio} - ${horaFin}, corte de recepción ${
-        horaCorteRecepcion
-      } hrs (${
         corteOk
           ? "conforme a la LPAG Ley N° 27444"
           : "ADVERTENCIA: el corte no coincide con las 16:30 hrs normativas"
-      }), zona ${zonaHoraria}. Falta persistencia del backend.`,
+      }, zona ${zonaHoraria}. Los ${feriados.length} feriados provienen del calendario oficial (sigd_org.calendario_laboral); la jornada aún no se persiste.`,
     );
 
     return configuracion;
@@ -134,7 +157,7 @@ export function useCalendarioLaboral() {
     setZonaHoraria,
     feriados,
     agregarFeriado,
-    quitarFeriado,
+    cargando: cargando || guardando,
     fechaNueva,
     setFechaNueva,
     nombreNuevo,
