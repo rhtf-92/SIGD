@@ -573,4 +573,91 @@ describe('RBAC · OrganiCore (matriz de permisos en PostgreSQL)', () => {
       );
     });
   });
+
+  /**
+   * DoD: "SUPER_ADMIN tiene trazabilidad total pero no puede eludir los triggers de
+   * inmutabilidad WORM". La inmutabilidad real la garantizan los triggers y los
+   * GRANT/REVOKE de PostgreSQL (docs/00_corelink/06_sigd_audit_esquema_ddl.sql); lo
+   * que se verifica aqui es el limite de la capa de aplicacion: el RBAC solo anade
+   * filas a la bitacora, no las modifica ni las borra, no admite permisos fuera del
+   * catalogo y no otorga exencion permanente al rol mas alto.
+   */
+  describe('6. SUPER_ADMIN: trazabilidad total sin eludir WORM', () => {
+    it('deja una unica entrada en la bitacora por cada mutacion de la matriz', async () => {
+      const respuesta = await request(app)
+        .put('/api/v1/admin/roles-permisos')
+        .set('x-usuario-id', CUENTA_ADMIN)
+        .send({ rol_id: IDs.DOCENTE, codigos_permisos: ['expediente.ver', 'firma.firmar'] });
+
+      expect(respuesta.status).toBe(200);
+      expect(bd.count('sigd_audit.bitacora_auditoria')).toBe(1);
+    });
+
+    it('la bitacora es append-only: el servicio nunca la actualiza ni la borra', async () => {
+      await request(app)
+        .put('/api/v1/admin/roles-permisos')
+        .set('x-usuario-id', CUENTA_ADMIN)
+        .send({ rol_id: IDs.DOCENTE, codigos_permisos: ['expediente.ver'] });
+
+      const escriturasNoInsert = bd.consultas.filter(
+        (sql) => sql.includes('sigd_audit.bitacora_auditoria') && !sql.startsWith('INSERT'),
+      );
+
+      expect(escriturasNoInsert).toEqual([]);
+    });
+
+    it('no concede a SUPER_ADMIN nada fuera del catalogo, asi que no hay atajo WORM', async () => {
+      const respuesta = await request(app)
+        .get('/api/v1/admin/roles-permisos')
+        .set('x-usuario-id', CUENTA_ADMIN);
+
+      const superAdmin = respuesta.body.matriz.find(
+        (rol: { codigo: string }) => rol.codigo === 'SUPER_ADMIN',
+      );
+      const concedidos: string[] = superAdmin.permisos.map((p: { codigo: string }) => p.codigo).sort();
+
+      expect(concedidos).toEqual([...CATALOGO].sort());
+      expect(concedidos.some((codigo) => /trigger|worm|replication_role|bitacora/.test(codigo))).toBe(
+        false,
+      );
+    });
+
+    it('rechaza fabricar un permiso de evasion WORM y deja la matriz intacta', async () => {
+      const respuesta = await request(app)
+        .put('/api/v1/admin/roles-permisos')
+        .set('x-usuario-id', CUENTA_ADMIN)
+        .send({
+          rol_id: IDs.SUPER_ADMIN,
+          codigos_permisos: ['worm.desabilitar', 'trigger.eliminar', 'session_replication_role'],
+        });
+
+      expect(respuesta.status).toBe(400);
+      expect(respuesta.body.code).toBe('VALIDATION_ERROR');
+      expect(estado.matriz.get(IDs.SUPER_ADMIN)).toEqual(new Set(CATALOGO));
+    });
+
+    it('no tiene auto-exencion: al revocarse su propio permiso de gestion queda bloqueado', async () => {
+      const lecturaPrevia = await request(app)
+        .get('/api/v1/admin/roles-permisos')
+        .set('x-usuario-id', CUENTA_ADMIN);
+      expect(lecturaPrevia.status).toBe(200);
+
+      const revocacion = await request(app)
+        .put('/api/v1/admin/roles-permisos')
+        .set('x-usuario-id', CUENTA_ADMIN)
+        .send({ rol_id: IDs.SUPER_ADMIN, codigos_permisos: ['rol.ver'] });
+      expect(revocacion.status).toBe(200);
+
+      const escritura = await request(app)
+        .put('/api/v1/admin/roles-permisos')
+        .set('x-usuario-id', CUENTA_ADMIN)
+        .send({ rol_id: IDs.DOCENTE, codigos_permisos: [] });
+      expect(escritura.status).toBe(403);
+
+      const lecturaPosterior = await request(app)
+        .get('/api/v1/admin/roles-permisos')
+        .set('x-usuario-id', CUENTA_ADMIN);
+      expect(lecturaPosterior.status).toBe(200);
+    });
+  });
 });
