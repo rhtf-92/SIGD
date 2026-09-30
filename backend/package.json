@@ -21,6 +21,8 @@
     "worker:outbox": "tsx src/audit/worker/outbox-worker.ts"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "pg": "^8.14.1",
