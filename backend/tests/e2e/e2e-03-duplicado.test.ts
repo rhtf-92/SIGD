@@ -13,7 +13,7 @@ describe('E2E-03 · Registro duplicado (PostgreSQL 23505 → 409)', () => {
 
   it('mapea la violación de unicidad a 409 DUPLICATE_KEY sin exponer mensaje del motor', async () => {
     const numeroUnico = `DUP-${Date.now()}`;
-    const payload = { ...payloadRadicacionValido(), numero: numeroUnico };
+    const payload = { ...(await payloadRadicacionValido()), numero: numeroUnico };
 
     const primera = await obtenerAgente().post('/api/expedientes').send(payload);
     expect(primera.status).toBe(201);

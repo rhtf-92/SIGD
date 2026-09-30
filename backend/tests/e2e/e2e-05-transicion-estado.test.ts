@@ -21,7 +21,9 @@ describe('E2E-05 · Transición Mesa de Partes → Jefatura', () => {
     );
     const areaId = area.rows[0].area_id;
 
-    const radicado = await obtenerAgente().post('/api/expedientes').send(payloadRadicacionValido());
+    const radicado = await obtenerAgente()
+      .post('/api/expedientes')
+      .send(await payloadRadicacionValido());
     expect(radicado.status).toBe(201);
 
     const respuesta = await obtenerAgente()
@@ -51,7 +53,9 @@ describe('E2E-05 · Transición Mesa de Partes → Jefatura', () => {
       ['Área inactiva'],
     );
 
-    const radicado = await obtenerAgente().post('/api/expedientes').send(payloadRadicacionValido());
+    const radicado = await obtenerAgente()
+      .post('/api/expedientes')
+      .send(await payloadRadicacionValido());
 
     const respuesta = await obtenerAgente()
       .post('/api/expedientes/derivar')

@@ -17,7 +17,7 @@ describe('E2E-07 · Atomicidad expediente + evento outbox', () => {
     const respuesta = await obtenerAgente()
       .post('/api/expedientes')
       .set('x-correlation-id', correlation)
-      .send(payloadRadicacionValido());
+      .send(await payloadRadicacionValido());
 
     expect(respuesta.status).toBe(201);
 

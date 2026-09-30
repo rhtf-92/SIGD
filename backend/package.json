@@ -18,7 +18,8 @@
     "test:e2e": "vitest run",
     "load:radicacion": "k6 run k6/escenario-1-radicacion.js",
     "load:derivacion": "k6 run k6/escenario-2-derivacion.js",
-    "worker:outbox": "tsx src/audit/worker/outbox-worker.ts"
+    "worker:outbox": "tsx src/audit/worker/outbox-worker.ts",
+    "migrate": "tsx src/db/migrate-cli.ts"
   },
   "dependencies": {
     "dotenv": "^16.5.0",

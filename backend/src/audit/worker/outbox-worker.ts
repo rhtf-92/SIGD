@@ -16,6 +16,7 @@ const worker = new OutboxWorker(pool, despachadorDemo, {
   lote: Number(process.env.OUTBOX_LOTE ?? 100),
   maxIntentos: Number(process.env.OUTBOX_MAX_INTENTOS ?? 5),
   backoffBaseMs: Number(process.env.OUTBOX_BACKOFF_BASE_MS ?? 1000),
+  backoffTechoMs: Number(process.env.OUTBOX_BACKOFF_TECHO_MS ?? 300000),
   intervaloPollMs: Number(process.env.OUTBOX_POLL_INTERVAL_MS ?? 5000),
 });
 

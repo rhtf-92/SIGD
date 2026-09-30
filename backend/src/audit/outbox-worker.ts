@@ -1,4 +1,5 @@
 import { Pool, PoolClient } from 'pg';
+import { backoffExponencialConJitter, esperarConJitter } from '../utils/backoff.util.js';
 
 export type EstadoOutbox = 'PENDIENTE' | 'PROCESADO' | 'FALLIDO';
 
@@ -19,6 +20,7 @@ export interface ConfiguracionWorker {
   lote?: number;
   maxIntentos?: number;
   backoffBaseMs?: number;
+  backoffTechoMs?: number;
   intervaloPollMs?: number;
 }
 
@@ -28,6 +30,7 @@ export class OutboxWorker {
   private readonly lote: number;
   private readonly maxIntentos: number;
   private readonly backoffBaseMs: number;
+  private readonly backoffTechoMs: number;
   private readonly intervaloPollMs: number;
   private detenido = false;
 
@@ -37,6 +40,7 @@ export class OutboxWorker {
     this.lote = config.lote ?? 100;
     this.maxIntentos = config.maxIntentos ?? 5;
     this.backoffBaseMs = config.backoffBaseMs ?? 1000;
+    this.backoffTechoMs = config.backoffTechoMs ?? 300_000;
     this.intervaloPollMs = config.intervaloPollMs ?? 5000;
   }
 
@@ -59,8 +63,20 @@ export class OutboxWorker {
     this.detenido = true;
   }
 
+  /**
+   * Reserva y despacha un lote.
+   *
+   * La selección `FOR UPDATE SKIP LOCKED` y la actualización de estado ocurren
+   * en la MISMA transacción que el despacho. Confirmar la reserva antes de
+   * despachar liberaría los bloqueos de fila y dos workers podrían seleccionar
+   * el mismo evento, duplicando la entrega. El trade-off es retener los locks
+   * durante la llamada externa; se acepta porque el lote es acotado y el
+   * transporte es rápido. Migrar a un lease con `reservado_hasta` si el despacho
+   * se vuelve lento o asíncrono.
+   */
   async ciclo(): Promise<number> {
     const cliente = await this.pool.connect();
+    let esperaPostCiclo = 0;
     try {
       await cliente.query('BEGIN');
       const origen = await cliente.query<{
@@ -79,7 +95,6 @@ export class OutboxWorker {
             FOR UPDATE SKIP LOCKED`,
         [this.lote],
       );
-      await cliente.query('COMMIT');
 
       let procesados = 0;
       for (const fila of origen.rows) {
@@ -97,10 +112,19 @@ export class OutboxWorker {
           await this.marcarProcesado(cliente, evento.id_evento);
           procesados += 1;
         } catch {
-          await this.registrarFallo(cliente, evento);
+          esperaPostCiclo = Math.max(esperaPostCiclo, await this.registrarFallo(cliente, evento));
         }
       }
+
+      await cliente.query('COMMIT');
+
+      if (esperaPostCiclo > 0) {
+        await this.esperar(esperaPostCiclo);
+      }
       return procesados;
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      throw error;
     } finally {
       cliente.release();
     }
@@ -115,7 +139,7 @@ export class OutboxWorker {
     );
   }
 
-  private async registrarFallo(cliente: PoolClient, evento: EventoPendiente): Promise<void> {
+  private async registrarFallo(cliente: PoolClient, evento: EventoPendiente): Promise<number> {
     const nuevosIntentos = evento.intentos + 1;
     if (nuevosIntentos >= this.maxIntentos) {
       await cliente.query(
@@ -124,7 +148,7 @@ export class OutboxWorker {
           WHERE id_evento = $1`,
         [evento.id_evento, nuevosIntentos],
       );
-      return;
+      return 0;
     }
     await cliente.query(
       `UPDATE sigd_audit.evento_outbox
@@ -132,10 +156,10 @@ export class OutboxWorker {
         WHERE id_evento = $1`,
       [evento.id_evento, nuevosIntentos],
     );
-    await this.esperar(this.backoffBaseMs * 2 ** nuevosIntentos);
+    return backoffExponencialConJitter(this.backoffBaseMs, nuevosIntentos, this.backoffTechoMs);
   }
 
   private esperar(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return esperarConJitter(ms);
   }
 }

@@ -13,7 +13,7 @@ describe('E2E-01 · Radicación exitosa en Mesa de Partes', () => {
   });
 
   it('persiste el expediente y asigna correlation_id', async () => {
-    const payload = payloadRadicacionValido();
+    const payload = await payloadRadicacionValido();
     const respuesta = await obtenerAgente().post('/api/expedientes').send(payload);
 
     expect(respuesta.status).toBe(201);

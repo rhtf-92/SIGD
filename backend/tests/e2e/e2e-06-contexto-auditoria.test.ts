@@ -24,7 +24,7 @@ describe('E2E-06 · Captura automática de contexto en la bitácora', () => {
       .post('/api/expedientes')
       .set('x-correlation-id', correlation)
       .set('x-usuario-id', usuarioId)
-      .send(payloadRadicacionValido());
+      .send(await payloadRadicacionValido());
 
     expect(respuesta.status).toBe(201);
 

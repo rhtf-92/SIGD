@@ -4,17 +4,41 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearPool } from './database.js';
 import { construirApp } from './app.js';
+import { API_PREFIX } from './config/rutas.js';
+import { BusSse, HEARTBEAT_SEGUNDOS } from './modules/corelink/sseStream.service.js';
+import { ejecutarMigraciones } from './db/migrate.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
 const port = Number(process.env.PORT ?? 3000);
 
 const pool = crearPool(databaseUrl);
-const app = construirApp(pool);
+const busSse = new BusSse();
 
-app.listen(port, () => {
+if (process.env.MIGRATE_ON_BOOT !== 'false') {
+  await ejecutarMigraciones(pool);
+}
+
+const app = construirApp(pool, busSse);
+const servidor = app.listen(port, () => {
   console.log(`SIGD Backend escuchando en http://localhost:${port}`);
+  console.log(`API canónica: http://localhost:${port}${API_PREFIX}`);
+  console.log(`Sondas: http://localhost:${port}/health · http://localhost:${port}/ready`);
 });
+
+const intervaloHeartbeat = setInterval(
+  () => busSse.emitirHeartbeat(),
+  HEARTBEAT_SEGUNDOS * 1000,
+);
+intervaloHeartbeat.unref?.();
+
+const apagar = (senal: string): void => {
+  console.log(`[SERVER] Señal ${senal} recibida; cerrando conexiones SSE.`);
+  clearInterval(intervaloHeartbeat);
+  busSse.cerrarTodos();
+  servidor.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 5000).unref?.();
+};
 
 // En desarrollo, iniciar concurrentemente el servidor Vite del Frontend en el puerto 5173
 const __filename = fileURLToPath(import.meta.url);
@@ -29,7 +53,7 @@ try {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
-      VITE_API_BASE_URL: 'http://localhost:3000/api',
+      VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
       VITE_ENABLE_MOCKS: 'true',
     },
   });
@@ -55,10 +79,10 @@ try {
 
 process.on('SIGINT', () => {
   if (viteProc) viteProc.kill();
-  process.exit(0);
+  apagar('SIGINT');
 });
 
 process.on('SIGTERM', () => {
   if (viteProc) viteProc.kill();
-  process.exit(0);
-});
+  apagar('SIGTERM');
+});

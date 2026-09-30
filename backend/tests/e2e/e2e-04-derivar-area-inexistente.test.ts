@@ -16,7 +16,7 @@ describe('E2E-04 · Derivación a área inexistente', () => {
   it('no deriva y responde 400/404 cuando el área destino no existe', async () => {
     const radicado = await obtenerAgente()
       .post('/api/expedientes')
-      .send(payloadRadicacionValido());
+      .send(await payloadRadicacionValido());
     expect(radicado.status).toBe(201);
 
     const areaInexistente = randomUUID();
