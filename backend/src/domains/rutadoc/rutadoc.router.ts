@@ -9,7 +9,8 @@ import type { FolioCompensationPort, PoliticaReversionRutaDoc, PrepararCompensac
 import { actorProviderNoConfigurado, type ActorProviderRutaDoc } from './rutadoc.actor-provider.js';
 import { crearControladorLecturasRutaDoc } from './lecturas.controller.js';
 import { RepositorioSlaRutaDoc, ServicioSlaRutaDoc } from './sla.service.js';
-import { ServicioCcdRutaDoc } from './ccd.service.js';
+import { calendarioLaboralPredeterminadoRutaDoc } from './sla.calendario.js';
+import { clasificadorCcdPredeterminadoRutaDoc, ServicioCcdRutaDoc } from './ccd.service.js';
 import { ServicioTrazabilidadRutaDoc } from './trazabilidad.service.js';
 import { ServicioFoliacionRutaDoc } from './foliacion.service.js';
 import { crearRepositoriosLecturaRutaDoc } from './lecturas.repository.js';
@@ -34,9 +35,10 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
   const controladorLecturas = crearControladorLecturasRutaDoc(obtenerActor ? { obtenerActor } : actorProvider, {
     trazabilidad: new ServicioTrazabilidadRutaDoc(repositoriosLectura.trazabilidad),
     foliacion: new ServicioFoliacionRutaDoc(repositoriosLectura.foliacion, lecturas.documentoMetadata),
-    sla: new ServicioSlaRutaDoc(new RepositorioSlaRutaDoc(pool), lecturas.calendarioLaboral,
+    sla: new ServicioSlaRutaDoc(new RepositorioSlaRutaDoc(pool),
+      lecturas.calendarioLaboral ?? calendarioLaboralPredeterminadoRutaDoc,
       undefined, { porcentajeAmarilloDesde: lecturas.porcentajeAmarilloSlaDesde ?? 80 }),
-    ccd: new ServicioCcdRutaDoc(lecturas.clasificadorCcd),
+    ccd: new ServicioCcdRutaDoc(lecturas.clasificadorCcd ?? clasificadorCcdPredeterminadoRutaDoc),
   });
   router.get('/expedientes', controlador.listar);
   router.get('/expedientes/clasificador-ccd', controladorLecturas.ccd);

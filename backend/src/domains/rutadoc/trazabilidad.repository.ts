@@ -46,8 +46,8 @@ export class RepositorioPostgresTrazabilidadRutaDoc implements RepositorioTrazab
       SELECT id_movimiento::text AS movimiento_id, secuencia::text, fecha_hora,
              estado_anterior, evento, estado_nuevo, usuario_operador_id::text,
              area_anterior_id, datos->>'areaId' AS area_destino_id,
-             NULL::text AS remitente, NULL::text AS destinatario,
-             NULL::jsonb AS proveido, datos AS datos_asociados,
+             datos->>'remitente' AS remitente, datos->>'destinatario' AS destinatario,
+             datos->'proveido' AS proveido, datos AS datos_asociados,
              tipo_actuacion
         FROM enriquecido
        ORDER BY secuencia ASC, fecha_hora ASC, id_movimiento ASC`, [idExpediente]);

@@ -1,15 +1,31 @@
-import { AppError } from '../../shared/domain/errors/app-error.js';
 import type { ClasificadorCcdPort, NodoCcd } from './ccd.types.js';
 
-export const clasificadorCcdNoConfigurado: ClasificadorCcdPort = Object.freeze({
-  obtenerArbol: async () => {
-    throw new AppError({ status: 503, code: 'CCD_NO_DISPONIBLE',
-      message: 'El catálogo institucional CCD no tiene un contrato conectado.' });
-  },
+/** Seed mínimo RutaDoc hasta que se publique el CCD institucional canónico. */
+export const catalogoCcdInicialRutaDoc: readonly NodoCcd[] = Object.freeze([
+  Object.freeze({
+    id: 'rutadoc-serie-demo-01',
+    codigo: 'DEMO-01',
+    nombre: 'Serie de ejemplo (no oficial)',
+    tipo: 'SERIE' as const,
+    hijos: Object.freeze([
+      Object.freeze({
+        id: 'rutadoc-subserie-demo-01-01',
+        codigo: 'DEMO-01.01',
+        nombre: 'Subserie de ejemplo (no oficial)',
+        tipo: 'SUBSERIE' as const,
+        hijos: Object.freeze([]),
+      }),
+    ]),
+  }),
+]);
+
+/** Implementación autónoma sustituible por el port del catálogo institucional. */
+export const clasificadorCcdPredeterminadoRutaDoc: ClasificadorCcdPort = Object.freeze({
+  obtenerArbol: async () => catalogoCcdInicialRutaDoc,
 });
 
 export class ServicioCcdRutaDoc {
-  constructor(private readonly clasificador: ClasificadorCcdPort = clasificadorCcdNoConfigurado) {}
+  constructor(private readonly clasificador: ClasificadorCcdPort = clasificadorCcdPredeterminadoRutaDoc) {}
 
   async obtenerArbol(): Promise<readonly NodoCcd[]> {
     const nodos = await this.clasificador.obtenerArbol();

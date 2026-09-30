@@ -1,7 +1,7 @@
-import { AppError } from '../../shared/domain/errors/app-error.js';
 import { NotFoundError } from '../../shared/domain/errors/not-found-error.js';
 import type { Pool } from 'pg';
 import type { CalendarioLaboralPort, EntradaSla, ResultadoSla } from './sla.types.js';
+import { calendarioLaboralPredeterminadoRutaDoc } from './sla.calendario.js';
 
 const ISO_DIA = /^\d{4}-\d{2}-\d{2}$/;
 const MS_DIA = 86_400_000;
@@ -62,13 +62,6 @@ export function calcularSla(entrada: EntradaSla): ResultadoSla {
   };
 }
 
-export const calendarioNoConfigurado: CalendarioLaboralPort = Object.freeze({
-  obtenerDiasNoLaborables: async () => {
-    throw new AppError({ status: 503, code: 'CALENDARIO_NO_DISPONIBLE',
-      message: 'El calendario laboral institucional no está conectado.' });
-  },
-});
-
 interface FilaFechaExpediente { fecha_inicio: string }
 
 function fechaHoyLima(): string {
@@ -92,7 +85,7 @@ export class RepositorioSlaRutaDoc {
 
 export class ServicioSlaRutaDoc {
   constructor(private readonly repositorio: RepositorioSlaRutaDoc,
-    private readonly calendario: CalendarioLaboralPort = calendarioNoConfigurado,
+    private readonly calendario: CalendarioLaboralPort = calendarioLaboralPredeterminadoRutaDoc,
     private readonly hoy: () => string = fechaHoyLima,
     private readonly politica: { porcentajeAmarilloDesde: number } = { porcentajeAmarilloDesde: 80 }) {}
 

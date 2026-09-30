@@ -1,13 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ServicioCcdRutaDoc } from '../../../../src/domains/rutadoc/ccd.service.js';
+import { catalogoCcdInicialRutaDoc, clasificadorCcdPredeterminadoRutaDoc, ServicioCcdRutaDoc } from '../../../../src/domains/rutadoc/ccd.service.js';
 import { ServicioFoliacionRutaDoc } from '../../../../src/domains/rutadoc/foliacion.service.js';
 import { ServicioSlaRutaDoc } from '../../../../src/domains/rutadoc/sla.service.js';
+import { CalendarioLaboralRutaDoc, calendarioLaboralPredeterminadoRutaDoc } from '../../../../src/domains/rutadoc/sla.calendario.js';
 import { ServicioTrazabilidadRutaDoc } from '../../../../src/domains/rutadoc/trazabilidad.service.js';
 import type { ActorRutaDoc } from '../../../../src/domains/rutadoc/rutadoc.types.js';
 import type { RepositorioTrazabilidadRutaDoc } from '../../../../src/domains/rutadoc/trazabilidad.types.js';
 import type { RepositorioFoliacionRutaDoc } from '../../../../src/domains/rutadoc/foliacion.types.js';
 
 const actor: ActorRutaDoc = { id: '7', roles: ['SUPER_ADMIN'], puedeVerExpediente: () => true };
+function fechaTrasDiasHabiles(inicio: string, cantidad: number): string {
+  let cursor = Date.parse(`${inicio}T00:00:00.000Z`);
+  let contados = 0;
+  while (contados < cantidad) {
+    cursor += 86_400_000;
+    const dia = new Date(cursor).getUTCDay();
+    if (dia !== 0 && dia !== 6) contados++;
+  }
+  return new Date(cursor).toISOString().slice(0, 10);
+}
 const fila = (secuencia: string, fechaHora: string, tipoActuacion: 'NORMAL' | 'COMPENSATORIA' = 'NORMAL') => ({
   movimientoId: `m-${secuencia}`, secuencia, fechaHora, estadoAnterior: 'REGISTRADO' as const,
   evento: tipoActuacion === 'NORMAL' ? 'RECEPCION' : 'REVERSION_ADMINISTRATIVA',
@@ -66,6 +77,10 @@ describe('ServicioFoliacionRutaDoc', () => {
     expect((await conMetadata.obtener('9', actor))[0]).toMatchObject({ checksumSha256: 'a'.repeat(64), nombre: 'resolucion.pdf', tipo: 'RESOLUCION' });
     expect((await new ServicioFoliacionRutaDoc(folios).obtener('9', actor))[0].checksumSha256).toBeNull();
   });
+  it('nunca fabrica SHA-256 cuando el adaptador predeterminado no tiene fuente válida', async () => {
+    const resultado = await new ServicioFoliacionRutaDoc(folios).obtener('9', actor);
+    expect(resultado.every((folio) => folio.checksumSha256 === null)).toBe(true);
+  });
   it('no divulga folios cuando falta permiso', async () => {
     await expect(new ServicioFoliacionRutaDoc(folios).obtener('9', { ...actor, puedeVerExpediente: () => false }))
       .rejects.toMatchObject({ status: 403 });
@@ -90,8 +105,20 @@ describe('ServicioCcdRutaDoc', () => {
     expect(arbol[0].tipo).toBe('SERIE');
     expect(arbol[0].hijos.map((n) => n.tipo)).toEqual(['SUBSERIE', 'SUBSERIE']);
   });
-  it('responde 503 mientras no se conecte una fuente institucional', async () => {
-    await expect(new ServicioCcdRutaDoc().obtenerArbol()).rejects.toMatchObject({ status: 503, code: 'CCD_NO_DISPONIBLE' });
+  it('usa por defecto el seed RutaDoc con jerarquía y orden estables', async () => {
+    const servicio = new ServicioCcdRutaDoc();
+    const primera = await servicio.obtenerArbol();
+    const segunda = await servicio.obtenerArbol();
+    expect(primera).toEqual(segunda);
+    expect(primera).toEqual(catalogoCcdInicialRutaDoc);
+    expect(primera[0]).toMatchObject({ tipo: 'SERIE', codigo: 'DEMO-01', nombre: 'Serie de ejemplo (no oficial)' });
+    expect(primera[0].hijos[0]).toMatchObject({ tipo: 'SUBSERIE', codigo: 'DEMO-01.01', nombre: 'Subserie de ejemplo (no oficial)' });
+  });
+  it('permite sustituir el catálogo predeterminado a través del port', async () => {
+    const alternativa = [{ id: 'institucional', codigo: 'A', nombre: 'Catálogo alternativo', tipo: 'SERIE' as const, hijos: [] }];
+    const servicio = new ServicioCcdRutaDoc({ obtenerArbol: async () => alternativa });
+    expect(await servicio.obtenerArbol()).toEqual(alternativa);
+    expect(clasificadorCcdPredeterminadoRutaDoc).toBeDefined();
   });
 });
 
@@ -101,9 +128,38 @@ describe('ServicioSlaRutaDoc', () => {
     await expect(new ServicioSlaRutaDoc(repo as never, { obtenerDiasNoLaborables: async () => [] }).obtener('9'))
       .rejects.toMatchObject({ status: 404 });
   });
-  it('falla explícitamente si no se conectó el calendario institucional', async () => {
-    const repo = { obtenerFechaInicio: async () => '2026-01-05' };
-    await expect(new ServicioSlaRutaDoc(repo as never, undefined, () => '2026-01-06').obtener('9'))
-      .rejects.toMatchObject({ status: 503, code: 'CALENDARIO_NO_DISPONIBLE' });
+  it('usa el calendario RutaDoc predeterminado y respeta el fin de semana', async () => {
+    const repo = { obtenerFechaInicio: async () => '2026-09-25' };
+    const result = await new ServicioSlaRutaDoc(repo as never, undefined, () => '2026-09-28').obtener('9');
+    expect(result.diasHabilesTranscurridos).toBe(1);
+    expect(result.estado).toBe('VERDE');
+    expect(calendarioLaboralPredeterminadoRutaDoc).toBeDefined();
+  });
+  it('mantiene día hábil 30 fuera de ROJO y activa ROJO desde día 31 con el default', async () => {
+    const fechaInicio = '2026-01-05';
+    const repo = { obtenerFechaInicio: async () => fechaInicio };
+    const alDia30 = await new ServicioSlaRutaDoc(repo as never, undefined,
+      () => fechaTrasDiasHabiles(fechaInicio, 30)).obtener('9');
+    const alDia31 = await new ServicioSlaRutaDoc(repo as never, undefined,
+      () => fechaTrasDiasHabiles(fechaInicio, 31)).obtener('9');
+    expect(alDia30).toMatchObject({ diasHabilesTranscurridos: 30, estado: 'AMARILLO' });
+    expect(alDia31).toMatchObject({ diasHabilesTranscurridos: 31, estado: 'ROJO' });
+  });
+  it('el calendario predeterminado configura las fechas regionales documentadas', async () => {
+    await expect(calendarioLaboralPredeterminadoRutaDoc.obtenerDiasNoLaborables('2026-06-23', '2026-06-25'))
+      .resolves.toContain('2026-06-24');
+    await expect(calendarioLaboralPredeterminadoRutaDoc.obtenerDiasNoLaborables('2026-10-12', '2026-10-14'))
+      .resolves.toContain('2026-10-13');
+  });
+  it('admite fechas extraordinarias y listas anuales sustituibles sin tocar el motor', async () => {
+    const calendario = new CalendarioLaboralRutaDoc({ diasNoLaborables: ['2026-09-29'], fechasAnuales: [{ mes: 1, dia: 2 }] });
+    await expect(calendario.obtenerDiasNoLaborables('2026-09-28', '2026-09-30')).resolves.toEqual(['2026-09-29']);
+    await expect(calendario.obtenerDiasNoLaborables('2026-01-01', '2026-01-03')).resolves.toEqual(['2026-01-02']);
+  });
+  it('permite sustituir calendario predeterminado a través del port', async () => {
+    const repo = { obtenerFechaInicio: async () => '2026-09-28' };
+    const reemplazo = { obtenerDiasNoLaborables: async () => ['2026-09-29'] };
+    const result = await new ServicioSlaRutaDoc(repo as never, reemplazo, () => '2026-09-30').obtener('9');
+    expect(result.diasHabilesTranscurridos).toBe(1);
   });
 });

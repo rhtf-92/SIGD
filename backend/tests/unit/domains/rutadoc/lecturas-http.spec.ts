@@ -5,7 +5,11 @@ import { construirApp } from '../../../../src/app.js';
 import type { ActorRutaDoc } from '../../../../src/domains/rutadoc/rutadoc.types.js';
 
 function app(actor: ActorRutaDoc | null) {
-  const pool = { query: async () => { throw new Error('No se esperaba acceso a PostgreSQL'); } } as unknown as Pool;
+  const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const pool = { query: async (sql: string) => {
+    if (sql.includes('creado_en AT TIME ZONE')) return { rows: [{ fecha_inicio: hoy }] };
+    throw new Error('No se esperaba acceso a PostgreSQL');
+  } } as unknown as Pool;
   return construirApp(pool, { actorProviderRutaDoc: { obtenerActor: () => actor } });
 }
 
@@ -27,9 +31,17 @@ describe('endpoints de lectura RutaDoc', () => {
     expect(response.body).toMatchObject({ status: 403 });
   });
 
-  it('resuelve la ruta CCD estática antes de /expedientes/:id y falla cerrado si no hay catálogo', async () => {
+  it('resuelve la ruta CCD estática antes de /expedientes/:id y devuelve el catálogo predeterminado', async () => {
     const response = await request(app({ id: '8', roles: ['SUPER_ADMIN'] })).get('/api/v1/expedientes/clasificador-ccd');
-    expect(response.status).toBe(503);
-    expect(response.body).toMatchObject({ status: 503, code: 'CCD_NO_DISPONIBLE' });
+    expect(response.status).toBe(200);
+    expect(response.body.elementos[0]).toMatchObject({ tipo: 'SERIE', codigo: 'DEMO-01' });
+    expect(response.body.elementos[0].hijos[0]).toMatchObject({ tipo: 'SUBSERIE', codigo: 'DEMO-01.01' });
+  });
+
+  it('sla-status responde con el calendario predeterminado sin requerir un port externo', async () => {
+    const response = await request(app({ id: '8', roles: ['SUPER_ADMIN'], puedeVerExpediente: async () => true }))
+      .get('/api/v1/expedientes/12/sla-status');
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ diasHabilesTranscurridos: 0, estado: 'VERDE' });
   });
 });
