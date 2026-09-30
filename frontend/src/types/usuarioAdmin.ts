@@ -29,3 +29,22 @@ export interface UpdateEstadoDTO {
 }
 
 export type UsuarioDetailDTO = Usuario;
+
+// Filtros de servidor exigidos por T-FE-ADM-01: unidad orgánica, sede, rol y estado.
+export interface FiltrosUsuarios {
+  busqueda: string;
+  area: string;
+  sede: string;
+  rol: string;
+  estado: EstadoUsuario | "Todos";
+}
+
+export const FILTROS_USUARIOS_INICIALES: FiltrosUsuarios = {
+  busqueda: "",
+  area: "",
+  sede: "",
+  rol: "",
+  estado: "Todos",
+};
+
+export const DEBOUNCE_BUSQUEDA_MS = 300;
