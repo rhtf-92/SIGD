@@ -14,6 +14,9 @@ import { clasificadorCcdPredeterminadoRutaDoc, ServicioCcdRutaDoc } from './ccd.
 import { ServicioTrazabilidadRutaDoc } from './trazabilidad.service.js';
 import { ServicioFoliacionRutaDoc } from './foliacion.service.js';
 import { crearRepositoriosLecturaRutaDoc } from './lecturas.repository.js';
+import { crearRouterDerivaciones } from './derivaciones.controller.js';
+import { setUnidadOrganicaId, setUsuarioId } from '../../shared/request-context/request-context.js';
+import { UnauthorizedError } from '../../shared/domain/errors/index.js';
 import type { CalendarioLaboralPort } from './sla.types.js';
 import type { ClasificadorCcdPort } from './ccd.types.js';
 import type { DocumentoMetadataPort } from './foliacion.types.js';
@@ -29,10 +32,11 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
   const servicio = new ServicioRutaDoc(new RepositorioPostgresRutaDoc(pool));
   const reversion = new ServicioReversionRutaDoc(
     new RepositorioReversionRutaDoc(pool), politicaReversion, prepararFolios, folioPort);
+  const proveedorActor = obtenerActor ? { obtenerActor } : actorProvider;
   const controlador = crearControladorRutaDoc(servicio, reversion,
-    obtenerActor ? { obtenerActor } : actorProvider);
+    proveedorActor);
   const repositoriosLectura = crearRepositoriosLecturaRutaDoc(pool);
-  const controladorLecturas = crearControladorLecturasRutaDoc(obtenerActor ? { obtenerActor } : actorProvider, {
+  const controladorLecturas = crearControladorLecturasRutaDoc(proveedorActor, {
     trazabilidad: new ServicioTrazabilidadRutaDoc(repositoriosLectura.trazabilidad),
     foliacion: new ServicioFoliacionRutaDoc(repositoriosLectura.foliacion, lecturas.documentoMetadata),
     sla: new ServicioSlaRutaDoc(new RepositorioSlaRutaDoc(pool),
@@ -47,5 +51,15 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
   router.get('/expedientes/:id/sla-status', controladorLecturas.sla);
   router.get('/expedientes/:id', controlador.obtener);
   router.post('/expedientes/:id/revertir-actuacion', controlador.revertir);
+  const derivaciones = Router();
+  derivaciones.use(async (req, _res, next) => {
+    const actor = await proveedorActor.obtenerActor(req);
+    if (!actor) throw new UnauthorizedError();
+    setUsuarioId(actor.id);
+    setUnidadOrganicaId(actor.unidadOrganicaId ?? null);
+    next();
+  });
+  derivaciones.use(crearRouterDerivaciones(pool));
+  router.use('/expedientes', derivaciones);
   return router;
 }

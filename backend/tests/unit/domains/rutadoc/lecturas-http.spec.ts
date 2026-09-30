@@ -9,7 +9,10 @@ function app(actor: ActorRutaDoc | null) {
   const pool = { query: async (sql: string) => {
     if (sql.includes('creado_en AT TIME ZONE')) return { rows: [{ fecha_inicio: hoy }] };
     throw new Error('No se esperaba acceso a PostgreSQL');
-  } } as unknown as Pool;
+  }, connect: async () => ({
+    query: async () => ({ rowCount: 0, rows: [] }),
+    release: () => undefined,
+  }) } as unknown as Pool;
   return construirApp(pool, { actorProviderRutaDoc: { obtenerActor: () => actor } });
 }
 
@@ -43,5 +46,18 @@ describe('endpoints de lectura RutaDoc', () => {
       .get('/api/v1/expedientes/12/sla-status');
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ diasHabilesTranscurridos: 0, estado: 'VERDE' });
+  });
+
+  it.each([
+    ['/api/v1/expedientes/12/derivar', { destinos: [{ area_destino_id: 'a1a1a1a1-a1a1-41a1-81a1-a1a1a1a1a1a1' }], proveido: 'Derivar' }],
+    ['/api/v1/expedientes/12/atender', { resultado_resumen: 'Atendido' }],
+    ['/api/v1/expedientes/12/archivar', { estante: 'A', balda: '1', caja: '1' }],
+  ])('registra la operación RutaDoc de main y exige identidad verificada: %s', async (path, body) => {
+    const sinActor = await request(app(null)).post(path).set('x-usuario-id', 'no-verificado').send(body);
+    expect(sinActor.status).toBe(401);
+
+    const conActor = await request(app({ id: '7', roles: ['SUPER_ADMIN'] })).post(path).send(body);
+    // La ruta autenticó al actor y consultó el expediente; la base de prueba indica que no existe.
+    expect(conActor.status).toBe(404);
   });
 });
