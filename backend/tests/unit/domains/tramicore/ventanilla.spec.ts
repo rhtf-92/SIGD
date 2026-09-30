@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { VentanillaPresencialService } from '../../../../src/domains/tramicore/ventanillaPresencial.service';
-import { TicketTermicoUtil } from '../../../../src/domains/tramicore/ticketTermico.util';
+import { VentanillaPresencialService } from '../../../../src/domains/tramicore/ventanillaPresencial.service.js';
+import { TicketTermicoUtil } from '../../../../src/domains/tramicore/ticketTermico.util.js';
 
 describe('Módulo TramiCore - Ventanilla Presencial y Ticket', () => {
   

@@ -7,19 +7,42 @@ import { RepositorioReversionRutaDoc } from './rutadoc.reversion.repository.js';
 import { ServicioReversionRutaDoc } from './rutadoc.reversion.service.js';
 import type { FolioCompensationPort, PoliticaReversionRutaDoc, PrepararCompensacionFolios } from './rutadoc.reversion.types.js';
 import { actorProviderNoConfigurado, type ActorProviderRutaDoc } from './rutadoc.actor-provider.js';
+import { crearControladorLecturasRutaDoc } from './lecturas.controller.js';
+import { RepositorioSlaRutaDoc, ServicioSlaRutaDoc } from './sla.service.js';
+import { ServicioCcdRutaDoc } from './ccd.service.js';
+import { ServicioTrazabilidadRutaDoc } from './trazabilidad.service.js';
+import { ServicioFoliacionRutaDoc } from './foliacion.service.js';
+import { crearRepositoriosLecturaRutaDoc } from './lecturas.repository.js';
+import type { CalendarioLaboralPort } from './sla.types.js';
+import type { ClasificadorCcdPort } from './ccd.types.js';
+import type { DocumentoMetadataPort } from './foliacion.types.js';
 
 /** Montar en /api/v1. Sin IdentiCore, la resolución predeterminada deniega acceso. */
 export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDoc,
   politicaReversion?: PoliticaReversionRutaDoc, prepararFolios?: PrepararCompensacionFolios,
   actorProvider: ActorProviderRutaDoc = actorProviderNoConfigurado,
-  folioPort?: FolioCompensationPort): Router {
+  folioPort?: FolioCompensationPort,
+  lecturas: { calendarioLaboral?: CalendarioLaboralPort; clasificadorCcd?: ClasificadorCcdPort;
+    documentoMetadata?: DocumentoMetadataPort; porcentajeAmarilloSlaDesde?: number } = {}): Router {
   const router = Router();
   const servicio = new ServicioRutaDoc(new RepositorioPostgresRutaDoc(pool));
   const reversion = new ServicioReversionRutaDoc(
     new RepositorioReversionRutaDoc(pool), politicaReversion, prepararFolios, folioPort);
   const controlador = crearControladorRutaDoc(servicio, reversion,
     obtenerActor ? { obtenerActor } : actorProvider);
+  const repositoriosLectura = crearRepositoriosLecturaRutaDoc(pool);
+  const controladorLecturas = crearControladorLecturasRutaDoc(obtenerActor ? { obtenerActor } : actorProvider, {
+    trazabilidad: new ServicioTrazabilidadRutaDoc(repositoriosLectura.trazabilidad),
+    foliacion: new ServicioFoliacionRutaDoc(repositoriosLectura.foliacion, lecturas.documentoMetadata),
+    sla: new ServicioSlaRutaDoc(new RepositorioSlaRutaDoc(pool), lecturas.calendarioLaboral,
+      undefined, { porcentajeAmarilloDesde: lecturas.porcentajeAmarilloSlaDesde ?? 80 }),
+    ccd: new ServicioCcdRutaDoc(lecturas.clasificadorCcd),
+  });
   router.get('/expedientes', controlador.listar);
+  router.get('/expedientes/clasificador-ccd', controladorLecturas.ccd);
+  router.get('/expedientes/:id/trazabilidad', controladorLecturas.trazabilidad);
+  router.get('/expedientes/:id/foliacion', controladorLecturas.foliacion);
+  router.get('/expedientes/:id/sla-status', controladorLecturas.sla);
   router.get('/expedientes/:id', controlador.obtener);
   router.post('/expedientes/:id/revertir-actuacion', controlador.revertir);
   return router;
