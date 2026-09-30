@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 export interface RequestContext {
   correlation_id: string;
   usuario_id: string | null;
+  unidad_organica_id?: string | null;
   ip_origen: string;
   user_agent: string;
 }
@@ -11,6 +12,7 @@ export interface RequestContext {
 export interface NuevoContexto {
   correlation_id?: string;
   usuario_id?: string | null;
+  unidad_organica_id?: string | null;
   ip_origen?: string;
   user_agent?: string;
 }
@@ -44,6 +46,7 @@ export function crearContexto(input: NuevoContexto = {}): RequestContext {
   return {
     correlation_id: input.correlation_id ?? randomUUID(),
     usuario_id: input.usuario_id ?? null,
+    unidad_organica_id: input.unidad_organica_id ?? null,
     ip_origen: input.ip_origen ?? '',
     user_agent: input.user_agent ?? '',
   };
