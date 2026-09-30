@@ -7,6 +7,9 @@ import { construirApp } from './app.js';
 import { API_PREFIX } from './config/rutas.js';
 import { BusSse, HEARTBEAT_SEGUNDOS } from './modules/corelink/sseStream.service.js';
 import { ejecutarMigraciones } from './db/migrate.js';
+import { OutboxWorker } from './audit/outbox-worker.js';
+import { crearDespachadorPorDefecto } from './audit/despachador-notificaciones.js';
+import { BridgeNotificacion } from './core/realtime/bridge-notificacion.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
@@ -32,9 +35,28 @@ const intervaloHeartbeat = setInterval(
 );
 intervaloHeartbeat.unref?.();
 
+// Reparto de eventos entre réplicas: cada instancia suscribe su propio listener
+// de NOTIFY y publica los eventos que su Outbox despacha.
+const bridge = new BridgeNotificacion(databaseUrl, busSse);
+await bridge.iniciar();
+
+const outboxWorker = new OutboxWorker(
+  pool,
+  crearDespachadorPorDefecto(busSse, pool, bridge),
+  {
+    backoffBaseMs: Number(process.env.OUTBOX_BACKOFF_BASE_MS ?? 1000),
+    backoffTechoMs: Number(process.env.OUTBOX_BACKOFF_TECHO_MS ?? 300_000),
+    intervaloPollMs: Number(process.env.OUTBOX_POLL_MS ?? 5000),
+  },
+);
+const cicloOutbox = outboxWorker.iniciar();
+cicloOutbox.catch((error: unknown) => console.error('[OUTBOX] El poller terminó con error:', error));
+
 const apagar = (senal: string): void => {
   console.log(`[SERVER] Señal ${senal} recibida; cerrando conexiones SSE.`);
   clearInterval(intervaloHeartbeat);
+  outboxWorker.detener();
+  void bridge.detener();
   busSse.cerrarTodos();
   servidor.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 5000).unref?.();

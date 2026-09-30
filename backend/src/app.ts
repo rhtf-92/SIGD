@@ -7,6 +7,7 @@ import { crearRouterSalud } from './controllers/health.controller.js';
 import { crearRouterRealtime } from './modules/corelink/realtime.routes.js';
 import { BusSse } from './modules/corelink/sseStream.service.js';
 import { crearRouterFirma } from './modules/firma/firma.routes.js';
+import { crearRouterReportes } from './modules/reportes/reportes.routes.js';
 import { API_PREFIX, API_PREFIX_LEGADO, marcarRutaLegada } from './config/rutas.js';
 
 export function construirApp(pool: Pool, busSse: BusSse = new BusSse()): Express {
@@ -21,6 +22,7 @@ export function construirApp(pool: Pool, busSse: BusSse = new BusSse()): Express
   const api = express.Router();
   api.use('/realtime', crearRouterRealtime(busSse));
   api.use('/firma', crearRouterFirma(pool));
+  api.use('/reportes', crearRouterReportes(pool));
   api.use(crearRouterReferencia(pool));
   app.use(API_PREFIX, api);
 

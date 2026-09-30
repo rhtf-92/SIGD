@@ -1,7 +1,10 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import type { Pool } from 'pg';
-import { ForbiddenError } from '../../shared/domain/errors/index.js';
+import { AppError } from '../../shared/domain/errors/index.js';
+import { resolverIdentidad, verificarFacultadFirma } from '../../core/auth/auth.guard.js';
+import { extraerClaveDeReferencia, generarUrlPresigned } from '../../core/storage/s3-storage.service.js';
+import { obtenerConfiguracionS3, type ConfiguracionS3 } from '../../config/s3.config.js';
 
 export const TIPOS_RESOLUCION = [
   'DIRECTORAL_TITULACION',
@@ -94,6 +97,7 @@ export async function listarPendientesFirma(
   pool: Pool,
   usuarioId: string,
   parametros: z.infer<typeof esquemaConsulta>,
+  configS3: ConfiguracionS3 = obtenerConfiguracionS3(),
 ): Promise<ColaFirmaPendientes> {
   const cliente = await pool.connect();
   try {
@@ -194,6 +198,10 @@ export async function listarPendientesFirma(
     const documentos: DocumentoPendienteFirma[] = filas.map((fila) => {
       const diasHabiles = diasHabilesRestantes(new Date(fila.fecha_limite), new Date());
       const puedeFirmar = fila.puede_firmar;
+      // El plan exige `s3PreviewUrl` con URL prefirmada: el frontend abre el PDF
+      // en el visor nativo del navegador sin que el backend exponga credenciales
+      // de MinIO ni sirva el binario.
+      const clave = extraerClaveDeReferencia(fila.s3_referencia ?? '');
       return {
         resolucionId: fila.resolucion_id,
         expedienteId: fila.expediente_id,
@@ -204,7 +212,7 @@ export async function listarPendientesFirma(
         solicitanteNombre: fila.solicitante_nombre,
         fechaProyeccion: new Date(fila.fecha_proyeccion).toISOString(),
         foliosTotal: fila.folios_total,
-        s3PreviewUrl: fila.s3_referencia ?? '',
+        s3PreviewUrl: clave ? generarUrlPresigned(clave, configS3) : '',
         puedeFirmar,
         ...(puedeFirmar
           ? {}
@@ -228,15 +236,32 @@ export async function listarPendientesFirma(
 export function crearRouterFirma(pool: Pool): Router {
   const router = Router();
 
+  /**
+   * GET /api/v1/firma/pendientes — endpoint #56.
+   *
+   * El plan exige dos barreras: identidad verificable (401 si el token es
+   * inválido o expira) y facultad de despacho vigente (403 `USER_CANNOT_SIGN`
+   * para el funcionario que no está habilitado, aunque pueda autenticarse).
+   * `puedeFirmar` por documento se mantiene para distinguir una facultad
+   * global de una facultad acotada por tipo de resolución.
+   */
   router.get('/pendientes', async (req: Request, res: Response) => {
     const parametros = esquemaConsulta.parse(req.query);
-    const usuarioId = req.get('x-usuario-id');
+    const identidad = resolverIdentidad(req);
+    const facultad = await verificarFacultadFirma(pool, identidad.idUsuario, identidad.roles);
 
-    if (!usuarioId) {
-      throw new ForbiddenError({ detail: 'Se requiere una identidad autenticada para consultar la cola de firma.' });
+    if (!facultad.puedeFirmar) {
+      throw new AppError({
+        status: 403,
+        code: 'USER_CANNOT_SIGN',
+        message: 'El funcionario no tiene facultad de despacho.',
+        detail:
+          facultad.motivo ??
+          'No existe facultad de despacho vigente ni encargo de suplencia registrado para su usuario.',
+      });
     }
 
-    const cola = await listarPendientesFirma(pool, usuarioId, parametros);
+    const cola = await listarPendientesFirma(pool, identidad.idUsuario, parametros);
     res.status(200).json(cola);
   });
 

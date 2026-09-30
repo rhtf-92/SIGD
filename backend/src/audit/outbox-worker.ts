@@ -12,8 +12,16 @@ export interface EventoPendiente {
   intentos: number;
 }
 
+/**
+ * Contrato mínimo de despacho del worker. Al worker solo le interesa que la
+ * promesa se resuelva o se rechace: un rechazo activa el backoff exponencial y,
+ * agotados los `maxIntentos`, el dead-letter. Por eso el valor de resolución es
+ * `unknown` y no `void` — así un despachador puede devolver telemetría propia
+ * (p. ej. `ResumenDespacho` con los destinos notificados) sin romper la
+ * inyectabilidad.
+ */
 export interface DespachadorEvento {
-  despachar(evento: EventoPendiente): Promise<void>;
+  despachar(evento: EventoPendiente): Promise<unknown>;
 }
 
 export interface ConfiguracionWorker {
