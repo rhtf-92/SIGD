@@ -184,6 +184,68 @@ COMMENT ON COLUMN sigd_doc.documento_bucket.s3_key IS
     'Clave S3 del objeto físico. Nunca se expone públicamente; solo a través de URLs prefirmadas.';
 
 -- =============================================================================
+-- 6. SECUENCIA_ANUAL_RESOLUCION — correlativo anual atómico de resoluciones
+-- =============================================================================
+-- Garantiza numeración correlativa anual segura ante concurrencia. El avance
+-- del correlativo se hace con un UPDATE que bloquea la fila del año (patrón
+-- FOR UPDATE heredado de sigd_tra.secuencia_anual_cut): dos proyecciones
+-- simultáneas jamás obtienen el mismo número. Los correlativos reinician en
+-- 000001 cada año fiscal.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS sigd_doc.secuencia_anual_resolucion (
+    id_secuencia BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    anio_fiscal INT NOT NULL UNIQUE,
+    secuencia BIGINT NOT NULL DEFAULT 0,
+    ultimo_numero_generado VARCHAR(30),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT ck_sar_anio_positivo CHECK (anio_fiscal > 2000),
+    CONSTRAINT ck_sar_secuencia_positiva CHECK (secuencia >= 0)
+);
+
+COMMENT ON TABLE sigd_doc.secuencia_anual_resolucion IS
+    'Correlativo anual de Resoluciones Directorales gestionado de forma atómica (T-BE-DC-03).';
+COMMENT ON COLUMN sigd_doc.secuencia_anual_resolucion.ultimo_numero_generado IS
+    'Último número emitido, formato RD-AAAA-NNNNNN, para trazabilidad y auditoría.';
+
+-- =============================================================================
+-- 7. PROYECTO_RESOLUCION — borrador de Resolución Directoral A4
+-- =============================================================================
+-- Proyecto de acto resolutivo con membrete del IESTP "Suiza", número
+-- correlativo anual y secciones normativas. `html_renderizado` conserva la
+-- vista tipográfica A4 normalizada generada por el servicio (T-BE-DC-03).
+-- La firma (cianuro/certificado) y el PDF sellado son responsabilidad de
+-- Azareño (B_AZAREÑO), por lo que aquí solo se gestiona el borrador.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS sigd_doc.proyecto_resolucion (
+    id_proyecto UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    numero_resolucion VARCHAR(30) NOT NULL,
+    tipo_resolucion VARCHAR(32) NOT NULL,
+    id_expediente UUID NOT NULL,
+    id_usuario_creador UUID,
+    estado VARCHAR(16) NOT NULL DEFAULT 'BORRADOR',
+    visto TEXT NOT NULL,
+    considerandos JSONB NOT NULL DEFAULT '[]',
+    articulos JSONB NOT NULL DEFAULT '[]',
+    distribucion JSONB NOT NULL DEFAULT '[]',
+    html_renderizado TEXT NOT NULL,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_proyecto_numero UNIQUE (numero_resolucion),
+    CONSTRAINT ck_proyecto_tipo CHECK (
+        tipo_resolucion IN ('DIRECTORAL_TITULACION', 'DIRECTORAL_CONVALIDACION', 'DIRECTORAL_ADMINISTRATIVA')
+    ),
+    CONSTRAINT ck_proyecto_estado CHECK (estado IN ('BORRADOR', 'EN_VISADO', 'APROBADO', 'FIRMADO'))
+);
+
+COMMENT ON TABLE sigd_doc.proyecto_resolucion IS
+    'Borrador de Resolución Directoral con proyección tipográfica A4 normalizada (T-BE-DC-03).';
+
+CREATE INDEX IF NOT EXISTS idx_proyecto_resolucion_expediente
+    ON sigd_doc.proyecto_resolucion (id_expediente);
+
+-- =============================================================================
 -- 5. VERIFICACIÓN CON EXPLAIN (evidencia documental — ejecutar en laboratorio)
 -- =============================================================================
 -- EXPLAIN (ANALYZE, BUFFERS)

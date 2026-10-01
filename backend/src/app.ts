@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { contextMiddleware } from './middleware/context-middleware.js';
 import { errorMiddleware } from './middleware/error-middleware.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
+import { crearRouterResoluciones } from './domains/docucore/resoluciones.controller.js';
 
 export function construirApp(pool: Pool): Express {
   const app = express();
@@ -16,6 +17,7 @@ export function construirApp(pool: Pool): Express {
   });
 
   app.use('/api', crearRouterReferencia(pool));
+  app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
 
   app.use(errorMiddleware);
 
