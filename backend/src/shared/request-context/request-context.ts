@@ -42,6 +42,13 @@ export function setUsuarioId(usuario_id: string | null): void {
   }
 }
 
+export function setUnidadOrganicaId(unidad_organica_id: string | null): void {
+  const ctx = storage.getStore();
+  if (ctx) {
+    ctx.unidad_organica_id = unidad_organica_id;
+  }
+}
+
 export function crearContexto(input: NuevoContexto = {}): RequestContext {
   return {
     correlation_id: input.correlation_id ?? randomUUID(),

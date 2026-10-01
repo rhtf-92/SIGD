@@ -100,6 +100,28 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
            FROM sigd_tra.expediente e LEFT JOIN sigd_rut.estado_actual_expediente u
              ON u.expediente_id = e.id_expediente)::text estados`);
       expect(volumen.rows[0]).toEqual({ expedientes: '50000', movimientos: '45000', estados: '10' });
+      const sqlProyeccion10k = `SELECT e.id_expediente, COALESCE(u.estado_nuevo, 'REGISTRADO') AS estado_actual
+        FROM sigd_tra.expediente e LEFT JOIN sigd_rut.estado_actual_expediente u
+          ON u.expediente_id = e.id_expediente
+        WHERE e.id_expediente BETWEEN 100001 AND 110000
+        ORDER BY e.id_expediente`;
+      const explicacionProyeccion = await pool.query(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${sqlProyeccion10k}`);
+      const tiemposProyeccion: number[] = [];
+      let filasProyeccion = 0;
+      for (let i = 0; i < 25; i += 1) {
+        const inicio = performance.now();
+        const resultado = await pool.query(sqlProyeccion10k);
+        const duracion = performance.now() - inicio;
+        if (i >= 5) tiemposProyeccion.push(duracion);
+        filasProyeccion = resultado.rowCount ?? 0;
+      }
+      const ordenadosProyeccion = [...tiemposProyeccion].sort((a, b) => a - b);
+      const proyeccionMedianaMs = (ordenadosProyeccion[9] + ordenadosProyeccion[10]) / 2;
+      console.log(JSON.stringify({ nombre: 'estado_actual_expediente_10k', expedientes: filasProyeccion,
+        calentamientos: 5, mediciones: 20, medianaMs: proyeccionMedianaMs,
+        explain: explicacionProyeccion.rows[0] }));
+      expect(filasProyeccion).toBe(10_000);
+      expect(proyeccionMedianaMs).toBeLessThan(50);
       const sqlDirecto = `SELECT estado_nuevo, count(*)::integer total
         FROM sigd_rut.estado_actual_expediente GROUP BY estado_nuevo`;
       const sqlSinMovimiento = `SELECT count(*)::integer total

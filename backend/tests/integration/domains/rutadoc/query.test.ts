@@ -42,7 +42,8 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
         id_expediente BIGINT PRIMARY KEY, codigo_expediente TEXT NOT NULL,
         fk_tramite BIGINT NOT NULL, creado_en TIMESTAMPTZ NOT NULL);
       CREATE TABLE sigd_tra.expediente_documento_folio (
-        id_expediente BIGINT NOT NULL, id_documento BIGINT NOT NULL, total_folios INT NOT NULL);
+        id_expediente BIGINT NOT NULL, id_documento BIGINT NOT NULL,
+        folio_inicio INT NOT NULL, folio_fin INT NOT NULL, total_folios INT NOT NULL);
     `);
     await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
     for (let id = 1; id <= 12; id += 1) {
@@ -62,7 +63,8 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
         [id, ...transicion, JSON.stringify(id === 2 ? { areaId: AREA } : {})]);
       }
     }
-    await pool.query(`INSERT INTO sigd_tra.expediente_documento_folio VALUES (2, 501, 3), (2, 502, 2)`);
+    await pool.query(`INSERT INTO sigd_tra.expediente_documento_folio VALUES
+      (2, 501, 1, 3, 3), (2, 502, 4, 5, 2)`);
   });
 
   afterAll(async () => {
@@ -292,5 +294,92 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
     const duracionHttp = performance.now() - inicioHttp;
     expect(respuesta.status).toBe(200);
     console.log(`RD-03 GET completo con contadores: ${duracionHttp} ms`);
+  });
+
+  it('GET trazabilidad une particiones históricas en orden de secuencia y mide duración entre estaciones', async () => {
+    await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
+      (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora, datos)
+      VALUES (2, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7,
+        '2027-01-02T10:00:00Z', jsonb_build_object('areaId', $1::text))`, [AREA]);
+    const movimientoObjetivo = await pool.query<{ fecha_hora: Date; id_movimiento: string }>(`
+      SELECT fecha_hora, id_movimiento::text FROM sigd_rut.movimiento_tramite
+       WHERE expediente_id = 2 AND secuencia = 2`);
+    await pool.query(`INSERT INTO sigd_rut.movimiento_compensatorio
+      (expediente_id, estado_anterior, estado_nuevo, usuario_operador_id, fecha_hora,
+       correlation_id, clave_idempotencia, movimiento_objetivo_fecha_hora,
+       movimiento_objetivo_id, movimiento_objetivo_secuencia, huella_comando,
+       motivo, compensacion_folios, datos)
+      VALUES (2, 'EN_CALIFICACION', 'RECEPCIONADO', 7, '2027-01-03T10:00:00Z',
+       'integration-correlation', 'integration-idempotency', $1, $2::uuid, 2,
+       'integration-fingerprint', 'Reversión aprobada para probar lectura', '{}'::jsonb,
+       jsonb_build_object('areaId', $3::text))`,
+    [movimientoObjetivo.rows[0].fecha_hora, movimientoObjetivo.rows[0].id_movimiento, AREA]);
+    const respuesta = await request(app()).get('/api/v1/expedientes/2/trazabilidad');
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.actuaciones.map((fila: { secuencia: string }) => fila.secuencia)).toEqual(['1', '2', '3']);
+    expect(respuesta.body.actuaciones.map((fila: { fechaHora: string }) => fila.fechaHora)).toEqual([
+      '2026-09-25T10:00:00.000Z', '2027-01-02T10:00:00.000Z', '2027-01-03T10:00:00.000Z',
+    ]);
+    expect(respuesta.body.actuaciones[0]).toMatchObject({ areaDestinoId: AREA,
+      duracionMs: Date.parse('2027-01-02T10:00:00Z') - Date.parse('2026-09-25T10:00:00Z'),
+      duracionMinutos: (Date.parse('2027-01-02T10:00:00Z') - Date.parse('2026-09-25T10:00:00Z')) / 60_000,
+    });
+    expect(respuesta.body.actuaciones[0].tipoActuacion).toBe('NORMAL');
+    expect(respuesta.body.actuaciones[2]).toMatchObject({ tipoActuacion: 'COMPENSATORIA', duracionMs: null });
+  });
+
+  it('GET foliación ordena estrictamente, presenta rangos y conserva metadata ausente como null', async () => {
+    const respuesta = await request(construirApp(pool, {
+      actorProviderRutaDoc: actorProviderDePrueba(actor),
+    })).get('/api/v1/expedientes/2/foliacion');
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.map((fila: { folioInicio: number }) => fila.folioInicio)).toEqual([1, 4]);
+    expect(respuesta.body[0]).toMatchObject({ idDocumento: '501', cantidadFolios: 3,
+      rango: 'F. 0001 a F. 0003', nombre: null, tipo: null, checksumSha256: null });
+    const ausente = await request(app()).get('/api/v1/expedientes/999/foliacion');
+    expect(ausente.status).toBe(404);
+  });
+
+  it('GET foliación adjunta checksum solo cuando lo resuelve el contrato inyectado', async () => {
+    const respuesta = await request(construirApp(pool, {
+      actorProviderRutaDoc: actorProviderDePrueba(actor),
+      documentoMetadataRutaDoc: { obtenerMetadataDocumento: async (id) => ({
+        checksumSha256: id === '501' ? 'b'.repeat(64) : null, nombre: 'anexo.pdf', tipo: 'ANEXO',
+      }) },
+    })).get('/api/v1/expedientes/2/foliacion');
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body[0]).toMatchObject({ checksumSha256: 'b'.repeat(64), nombre: 'anexo.pdf', tipo: 'ANEXO' });
+  });
+
+  it('GET SLA consume fechas del calendario inyectado y entrega un resultado completo', async () => {
+    let rangoConsultado: [string, string] | null = null;
+    const respuesta = await request(construirApp(pool, {
+      actorProviderRutaDoc: actorProviderDePrueba(actor),
+      calendarioLaboralRutaDoc: { obtenerDiasNoLaborables: async (desde, hasta) => {
+        rangoConsultado = [desde, hasta];
+        return ['2026-09-28'];
+      } },
+    })).get('/api/v1/expedientes/2/sla-status');
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.fechaInicio).toBe('2026-09-24');
+    expect(respuesta.body).toEqual(expect.objectContaining({ fechaCalculo: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      fechaLimite: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      diasHabilesTranscurridos: expect.any(Number), diasHabilesRestantes: expect.any(Number),
+      porcentaje: expect.any(Number), estado: expect.stringMatching(/^(VERDE|AMARILLO|ROJO)$/) }));
+    expect(rangoConsultado?.[0]).toBe('2026-09-24');
+  });
+
+  it('GET CCD serializa el árbol del port institucional sin sembrar datos productivos', async () => {
+    const respuesta = await request(construirApp(pool, {
+      actorProviderRutaDoc: actorProviderDePrueba(actor),
+      clasificadorCcdRutaDoc: { obtenerArbol: async () => [
+        { id: 'ccd-1', codigo: '01', nombre: 'Serie', tipo: 'SERIE' as const, hijos: [
+          { id: 'ccd-2', codigo: '01.01', nombre: 'Subserie', tipo: 'SUBSERIE' as const, hijos: [] },
+        ] },
+      ] },
+    })).get('/api/v1/expedientes/clasificador-ccd');
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.elementos).toMatchObject([{ id: 'ccd-1', tipo: 'SERIE',
+      hijos: [{ id: 'ccd-2', tipo: 'SUBSERIE' }] }]);
   });
 });
