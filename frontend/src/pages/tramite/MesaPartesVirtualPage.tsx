@@ -245,7 +245,7 @@ export default function MesaPartesVirtualPage() {
 
         <footer className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
           <strong>Evidencia / estado de pruebas:</strong> suite M2 disponible
-          en <code>src/tests/m2</code>. Ejecuta <code>npm test</code> para
+          en <code>tests/unit</code> y <code>tests/integration/m2</code>. Ejecuta <code>npm test</code> para
           verificar Magic Bytes, SHA-256, cancelación y casos 16:29, 16:30,
           posterior y día inhábil.
         </footer>

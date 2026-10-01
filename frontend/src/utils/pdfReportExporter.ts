@@ -108,7 +108,7 @@ export async function exportPdfReport(
   URL.revokeObjectURL(url);
 
   const arrayBuffer = await blob.arrayBuffer();
-  const checksum = await crypto.subtle.digest("SHA-256", arrayBuffer);
+  const checksum = await crypto.subtle.digest("SHA-256", new Uint8Array(arrayBuffer));
   const checksumHex = Array.from(new Uint8Array(checksum))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
