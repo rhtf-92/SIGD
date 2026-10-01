@@ -6,6 +6,7 @@ import { apiClient } from "../api/client";
 import { env } from "../config/env";
 import type { ApiProblemDetails } from "../types/api";
 import type { ErrorValidacionCvd, ValidacionCVDResult } from "../types/validadorCvd";
+import { normalizarCvd, validarCvd } from "../utils/cvdValidator";
 
 export const CVD_VALIDO = "CVD-2026-RD-000412-892F";
 export const CVD_ALTERADO = "CVD-2026-RD-000413-ALTE";
@@ -70,8 +71,9 @@ function crearResultadoValido(): ValidacionCVDResult {
       ],
       hashIntegridadSha256:
         "c1f2a3b4d5e6f708192a3b4c5d6e7f80a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d",
-      urlDescargaAutentica:
-        "https://tramite.institutosuiza.edu.pe/expedientes/rd-0412-2026.pdf",
+      // Ruta interna al visor de representación impresa (ENT-M04-04): el PDF
+      // externo no existe en este entorno, así el enlace siempre abre.
+      urlDescargaAutentica: `/flujo-validez-legal/visor-cvd?cvd=${CVD_VALIDO}`,
     },
     selloTiempoTsa: "2026-09-05T11:42:16-05:00",
     mensajeSeguridad:
@@ -105,17 +107,43 @@ async function consultarMock(codigoCvd: string): Promise<ValidacionCVDResult> {
 }
 
 async function consultarApi(codigoCvd: string): Promise<ValidacionCVDResult> {
-  const normalizado = codigoCvd.trim().toUpperCase();
+  const normalizado = normalizarCvd(codigoCvd);
   const { data } = await apiClient.get<ValidacionCVDResult>(
-    `/validador/cvd/${encodeURIComponent(normalizado)}`,
+    `/api/v1/validador/cvd/${encodeURIComponent(normalizado)}`,
   );
   return data;
 }
 
 async function consultarCvd(codigoCvd: string): Promise<ValidacionCVDResult> {
+  // T-FE-DOC-05: rechazo temprano en cliente de códigos con formato apócrifo,
+  // sin siquiera disparar la petición HTTP.
+  const chequeo = validarCvd(codigoCvd);
+  if (!chequeo.valido) {
+    throw new CvdError(
+      "Código CVD inválido",
+      chequeo.motivo ?? "El código ingresado no tiene un formato CVD válido.",
+      400,
+    );
+  }
+  const normalizado = chequeo.normalizado;
+  // Códigos con formato válido pero inexistentes resuelven dictamen "alterado"
+  // en modo mock para la alerta roja formal (no un 404 crudo).
+  if (USAR_MOCKS) {
+    if (normalizado !== CVD_VALIDO && normalizado !== CVD_ALTERADO) {
+      await new Promise((r) => setTimeout(r, 800));
+      return {
+        esValido: false,
+        cvd: normalizado,
+        documento: null,
+        selloTiempoTsa: null,
+        mensajeSeguridad:
+          "El documento ingresado no coincide con ningún registro institucional legítimo o su contenido ha sido alterado tras la emisión.",
+      };
+    }
+    return await consultarMock(normalizado);
+  }
   try {
-    if (USAR_MOCKS) return await consultarMock(codigoCvd);
-    return await consultarApi(codigoCvd);
+    return await consultarApi(normalizado);
   } catch (origen) {
     throw convertirError(origen);
   }
