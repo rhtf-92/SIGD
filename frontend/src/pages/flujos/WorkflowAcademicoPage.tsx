@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import AcademicWorkflowStepper from "../../components/flujos/AcademicWorkflowStepper";
@@ -34,6 +34,13 @@ function formatoFecha(fecha: string): string {
 }
 
 export default function WorkflowAcademicoPage() {
+  const [ahora, setAhora] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setAhora(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const {
     workflow,
     etapas,
@@ -64,7 +71,7 @@ export default function WorkflowAcademicoPage() {
     if (inicio >= limite) {
       return "border-red-200 bg-red-50 text-red-700";
     }
-    const consumo = ((Date.now() - inicio) / (limite - inicio)) * 100;
+    const consumo = ((ahora - inicio) / (limite - inicio)) * 100;
     if (consumo < 60) {
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
     }
@@ -72,7 +79,7 @@ export default function WorkflowAcademicoPage() {
       return "border-amber-200 bg-amber-50 text-amber-700";
     }
     return "border-red-200 bg-red-50 text-red-700";
-  }, [workflow.fechaRegistro, workflow.fechaLimiteSla, estado]);
+  }, [ahora, workflow.fechaRegistro, workflow.fechaLimiteSla, estado]);
 
   const semaforoTexto = useMemo(() => {
     if (estado === "RESUELTO") return "Culminado";
@@ -80,11 +87,11 @@ export default function WorkflowAcademicoPage() {
     const inicio = new Date(workflow.fechaRegistro).getTime();
     const limite = new Date(workflow.fechaLimiteSla).getTime();
     if (inicio >= limite) return "Vencido / riesgo de silencio";
-    const consumo = ((Date.now() - inicio) / (limite - inicio)) * 100;
+    const consumo = ((ahora - inicio) / (limite - inicio)) * 100;
     if (consumo < 60) return "En plazo (SLA < 60%)";
     if (consumo <= 85) return "Próximo a vencer (60%–85%)";
     return "Vencido / riesgo (SLA > 85%)";
-  }, [workflow.fechaRegistro, workflow.fechaLimiteSla, estado]);
+  }, [ahora, workflow.fechaRegistro, workflow.fechaLimiteSla, estado]);
 
   const acciones = [
     {

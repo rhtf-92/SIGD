@@ -66,6 +66,7 @@ export function useRefirmaGateway(
   const pasoRef = useRef<number | null>(null);
   const temporizadorLargoRef = useRef<number | null>(null);
   const onCompletadoRef = useRef(onCompletado);
+  const avanzarPasoRef = useRef<(indicePaso: number) => void>(() => undefined);
 
   useEffect(() => {
     onCompletadoRef.current = onCompletado;
@@ -89,9 +90,8 @@ export function useRefirmaGateway(
     };
   }, [limpiarTemporizadores]);
 
-  const avanzarPaso = useCallback(
-    (indicePaso: number) => {
-      if (!secuenciaActivaRef.current) return;
+  const avanzarPaso = useCallback((indicePaso: number): void => {
+    if (!secuenciaActivaRef.current) return;
 
       if (indicePaso >= PASOS_SECUENCIA.length) {
         secuenciaActivaRef.current = false;
@@ -118,11 +118,13 @@ export function useRefirmaGateway(
 
       pasoRef.current = window.setTimeout(() => {
         pasoRef.current = null;
-        avanzarPaso(indicePaso + 1);
+        avanzarPasoRef.current(indicePaso + 1);
       }, PASO_MS);
-    },
-    [limpiarTemporizadores],
-  );
+  }, [limpiarTemporizadores]);
+
+  useEffect(() => {
+    avanzarPasoRef.current = avanzarPaso;
+  }, [avanzarPaso]);
 
   const iniciarFirma = useCallback(
     (doc: DocumentoOficial, firmanteDni: string) => {
