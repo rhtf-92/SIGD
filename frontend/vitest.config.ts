@@ -8,9 +8,14 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+<<<<<<< HEAD
+    include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
+    exclude: ["node_modules", "dist"],
+=======
     // Cubre las pruebas bajo `src/` y las del directorio de pruebas
     // del plan maestro (`tests/unit/...`).
     include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
+>>>>>>> 5dd5ca85bdc127d057e36367d98d51db000b7ac3
     restoreMocks: true,
     coverage: {
       provider: "v8",
