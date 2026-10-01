@@ -71,14 +71,14 @@ export function crearRouterReportes(pool: Pool): Router {
   });
 
   /**
-   * GET /api/v1/reportes/vistas-materializadas/refresh — endpoint #51.
+   * POST /api/v1/reportes/vistas-materializadas/refresh — endpoint #51.
    *
    * Dispara `REFRESH MATERIALIZED VIEW CONCURRENTLY` sin bloquear lecturas, por
    * lo que es una operación administrativa y no de lectura del tablero. Se
    * reserva al rol ADMINISTRADOR para que un usuario consulta no pueda provocar
    * la reescritura completa de las vistas materializadas del sistema.
    */
-  router.get('/vistas-materializadas/refresh', async (req: Request, res: Response) => {
+  router.post('/vistas-materializadas/refresh', async (req: Request, res: Response) => {
     const identidad = resolverIdentidad(req);
     exigirRolAdministrativo(identidad.roles);
 
