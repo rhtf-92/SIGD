@@ -1,4 +1,5 @@
 import type { ReportExportRequest, ReportExportResponse } from "@/types/reportExportConfig";
+import { computeSha256Hex } from "./cryptoSha256";
 
 /**
  * Escapa texto para cadenas literales PDF en ASCII/WinAnsi.
@@ -108,10 +109,14 @@ export async function exportPdfReport(
   URL.revokeObjectURL(url);
 
   const arrayBuffer = await blob.arrayBuffer();
+<<<<<<< HEAD
   const checksum = await crypto.subtle.digest("SHA-256", new Uint8Array(arrayBuffer));
   const checksumHex = Array.from(new Uint8Array(checksum))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+=======
+  const checksumHex = await computeSha256Hex(arrayBuffer);
+>>>>>>> origin/main
 
   return {
     descargaUrl: url,

@@ -341,7 +341,13 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     const botonCerrarExito = screen.getByLabelText(/Cerrar mensaje de éxito/i);
     await user.click(botonCerrarExito);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+<<<<<<< HEAD:frontend/tests/integration/m1/registroFormularios.test.tsx
   }, 15000);
+=======
+    // FIX estabilidad (F_ADRIANO): flujo con ~100 keystrokes de user-event;
+    // bajo carga de suite completa supera el timeout de 5 s de Vitest.
+  }, 30_000);
+>>>>>>> origin/main:frontend/src/tests/m1/registroFormularios.test.tsx
 
   it("i) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Jurídica y muestra la casilla creada", async () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -432,5 +438,10 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     expect(payload.domicilio.direccionExacta).not.toBe("");
 
     consoleSpy.mockRestore();
+<<<<<<< HEAD:frontend/tests/integration/m1/registroFormularios.test.tsx
   }, 15000);
+=======
+    // FIX estabilidad (F_ADRIANO): idem test h) — flujo largo de user-event.
+  }, 30_000);
+>>>>>>> origin/main:frontend/src/tests/m1/registroFormularios.test.tsx
 });

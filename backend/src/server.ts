@@ -2,15 +2,37 @@ import 'dotenv/config';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Redis } from 'ioredis';
 import { crearPool } from './database.js';
 import { construirApp } from './app.js';
+import type { CacheDistribuida } from './domains/identicore/ubigeo.service.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
 const port = Number(process.env.PORT ?? 3000);
 
 const pool = crearPool(databaseUrl);
-const app = construirApp(pool);
+const redis = process.env.REDIS_URL
+  ? new Redis(process.env.REDIS_URL, {
+      lazyConnect: true,
+      enableOfflineQueue: false,
+      maxRetriesPerRequest: 1,
+      retryStrategy: (intento) => (intento > 3 ? null : Math.min(intento * 100, 1_000)),
+    })
+  : undefined;
+redis?.on('error', (error: Error) => {
+  console.error('[Redis Ubigeo] caché no disponible:', error.message);
+});
+
+const ubigeoCache: CacheDistribuida | undefined = redis
+  ? {
+      get: (clave) => redis.get(clave),
+      set: async (clave, valor, ttlSegundos) => {
+        await redis.set(clave, valor, 'EX', ttlSegundos);
+      },
+    }
+  : undefined;
+const app = construirApp(pool, { ubigeoCache });
 
 app.listen(port, () => {
   console.log(`SIGD Backend escuchando en http://localhost:${port}`);
@@ -53,12 +75,12 @@ try {
   console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
 }
 
-process.on('SIGINT', () => {
+function cerrarServidor(): void {
   if (viteProc) viteProc.kill();
-  process.exit(0);
-});
+  void Promise.allSettled([pool.end(), redis?.quit() ?? Promise.resolve()]).finally(() => {
+    process.exit(0);
+  });
+}
 
-process.on('SIGTERM', () => {
-  if (viteProc) viteProc.kill();
-  process.exit(0);
-});
+process.on('SIGINT', cerrarServidor);
+process.on('SIGTERM', cerrarServidor);
