@@ -13,9 +13,11 @@ import type { ClasificadorCcdPort } from './domains/rutadoc/ccd.types.js';
 import type { DocumentoMetadataPort } from './domains/rutadoc/foliacion.types.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
 import { crearRouterTramites } from './domains/tramicore/tramites.controller.js';
+import { crearRouterReportes } from './domains/corelink/reportes.router.js';
 
 export interface AppOptions {
   ubigeoCache?: CacheDistribuida;
+  mgdCache?: CacheDistribuida;
   obtenerActorRutaDoc?: ObtenerActorRutaDoc;
   actorProviderRutaDoc?: ActorProviderRutaDoc;
   politicaReversionRutaDoc?: PoliticaReversionRutaDoc;
@@ -25,6 +27,8 @@ export interface AppOptions {
   clasificadorCcdRutaDoc?: ClasificadorCcdPort;
   documentoMetadataRutaDoc?: DocumentoMetadataPort;
   porcentajeAmarilloSlaRutaDocDesde?: number;
+  /** Proveedor de identidad de la analítica ejecutiva; sin él, falla cerrado. */
+  actorProviderReportes?: ActorProviderRutaDoc;
 }
 
 export function construirApp(pool: Pool, opciones: AppOptions = {}): Express {
@@ -49,6 +53,7 @@ export function construirApp(pool: Pool, opciones: AppOptions = {}): Express {
       documentoMetadata: opciones.documentoMetadataRutaDoc,
       porcentajeAmarilloSlaDesde: opciones.porcentajeAmarilloSlaRutaDocDesde,
     }));
+  app.use('/api/v1', crearRouterReportes(pool, opciones.actorProviderReportes, opciones.mgdCache));
 
   app.use(errorMiddleware);
 
