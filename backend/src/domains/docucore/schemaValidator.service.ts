@@ -104,42 +104,47 @@ function recorrerYVerificar(
   if (estado.nodos > config.maxNodos) {
     throw new SchemaInvalidoError(`Esquema demasiado grande (nodos > ${config.maxNodos}).`);
   }
+  estado.profundidad += 1;
   if (estado.profundidad > config.maxProfundidad) {
     throw new SchemaInvalidoError(`Esquema demasiado profundo (> ${config.maxProfundidad}).`);
   }
-  if (Array.isArray(valor)) {
-    for (const hijo of valor) {
-      recorrerYVerificar(hijo, `${camino}[]`, config, estado);
-    }
-    return;
-  }
-  if (!esObjetoPlano(valor)) {
-    return;
-  }
-  for (const clave of Object.keys(valor)) {
-    const claveMinus = clave.toLowerCase();
-    if (PROPIEDADES_PELIGROSAS.includes(clave)) {
-      throw new SchemaInvalidoError(`Propiedad no permitida en esquema: "${clave}" (${camino}).`);
-    }
-    // Refs remotas: Ajv no las resolvería, pero se bloquean explícitamente.
-    if (claveMinus === '$ref' && typeof valor[clave] === 'string') {
-      const ref = String(valor[clave]);
-      if (/^(https?:)?\/\//i.test(ref) || ref.startsWith('//')) {
-        throw new SchemaInvalidoError(`$ref remota no permitida en esquema: "${ref}".`);
+  try {
+    if (Array.isArray(valor)) {
+      for (const hijo of valor) {
+        recorrerYVerificar(hijo, `${camino}[]`, config, estado);
       }
-      for (const frag of ['__proto__', 'constructor', 'prototype']) {
-        if (ref.toLowerCase().includes(frag)) {
-          throw new SchemaInvalidoError(`$ref con segmento peligroso: "${ref}".`);
+      return;
+    }
+    if (!esObjetoPlano(valor)) {
+      return;
+    }
+    for (const clave of Object.keys(valor)) {
+      const claveMinus = clave.toLowerCase();
+      if (PROPIEDADES_PELIGROSAS.includes(clave)) {
+        throw new SchemaInvalidoError(`Propiedad no permitida en esquema: "${clave}" (${camino}).`);
+      }
+      // Refs remotas: Ajv no las resolvería, pero se bloquean explícitamente.
+      if (claveMinus === '$ref' && typeof valor[clave] === 'string') {
+        const ref = String(valor[clave]);
+        if (/^(https?:)?\/\//i.test(ref) || ref.startsWith('//')) {
+          throw new SchemaInvalidoError(`$ref remota no permitida en esquema: "${ref}".`);
+        }
+        for (const frag of ['__proto__', 'constructor', 'prototype']) {
+          if (ref.toLowerCase().includes(frag)) {
+            throw new SchemaInvalidoError(`$ref con segmento peligroso: "${ref}".`);
+          }
         }
       }
-    }
-    if (claveMinus === '$id' && typeof valor[clave] === 'string') {
-      const id = String(valor[clave]);
-      if (/^(https?:)?\/\//i.test(id) || id.startsWith('//')) {
-        throw new SchemaInvalidoError(`$id con URI externa no permitida: "${id}".`);
+      if (claveMinus === '$id' && typeof valor[clave] === 'string') {
+        const id = String(valor[clave]);
+        if (/^(https?:)?\/\//i.test(id) || id.startsWith('//')) {
+          throw new SchemaInvalidoError(`$id con URI externa no permitida: "${id}".`);
+        }
       }
+      recorrerYVerificar(valor[clave], `${camino}.${clave}`, config, estado);
     }
-    recorrerYVerificar(valor[clave], `${camino}.${clave}`, config, estado);
+  } finally {
+    estado.profundidad -= 1;
   }
 }
 
