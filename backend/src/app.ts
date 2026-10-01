@@ -3,12 +3,17 @@ import type { Pool } from 'pg';
 import { contextMiddleware } from './middleware/context-middleware.js';
 import { errorMiddleware } from './middleware/error-middleware.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
+import { crearRouterDocuCore } from './domains/docucore/docucore.router.js';
 
 export function construirApp(pool: Pool): Express {
   const app = express();
   app.disable('x-powered-by');
 
-  app.use(express.json());
+  app.use(express.json({
+    verify: (req, _res, buffer) => {
+      req.rawBody = buffer.toString('utf8');
+    },
+  }));
   app.use(contextMiddleware);
 
   app.get('/health', (_req, res) => {
@@ -16,10 +21,11 @@ export function construirApp(pool: Pool): Express {
   });
 
   app.use('/api', crearRouterReferencia(pool));
+  app.use('/api', crearRouterDocuCore(pool));
 
   app.use(errorMiddleware);
 
   return app;
 }
 
-export default construirApp;
+export default construirApp;
