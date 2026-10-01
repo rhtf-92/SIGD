@@ -53,10 +53,10 @@ export interface TramiteWizardProps {
 const CATALOGO_TUPA_OPCIONES: readonly SelectOption[] = TRAMITES_TUPA_MOCK.map(
   (t) => ({
     value: t.id,
-    label: t.nombre,
-    description: `${t.unidadOrganica} • Plazo: ${t.diasPlazoLegal} días hábiles • Costo: ${
-      t.costoSoles > 0 ? `S/. ${t.costoSoles.toFixed(2)}` : "Gratuito"
-    }`,
+    label: `${t.codigo} - ${t.nombre}`,
+    description: [t.unidadOrganica, t.descripcion]
+      .filter(Boolean)
+      .join(" • "),
   })
 );
 
@@ -449,6 +449,8 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
                       nombreOficinaDestino: sel.unidadOrganica,
                       costoSoles: sel.costoSoles,
                       diasPlazoLegal: sel.diasPlazoLegal,
+                      derechoPago: sel.derechoPago,
+                      tiempoMaximo: sel.tiempoMaximo,
                     });
                   } else {
                     updateStepData("tramite", {
@@ -585,10 +587,11 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
                   label="Costo Oficial del Trámite"
                   readOnly
                   value={
-                    formData.tramite.costoSoles !== undefined &&
+                    formData.tramite.derechoPago ||
+                    (formData.tramite.costoSoles !== undefined &&
                     formData.tramite.costoSoles > 0
                       ? `S/. ${formData.tramite.costoSoles.toFixed(2)}`
-                      : "Gratuito / No tarifado"
+                      : "Gratuito / No tarifado")
                   }
                   className="bg-slate-50 text-slate-700 font-medium"
                 />
@@ -596,9 +599,10 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
                   label="Plazo Legal Máximo"
                   readOnly
                   value={
-                    formData.tramite.diasPlazoLegal
+                    formData.tramite.tiempoMaximo ||
+                    (formData.tramite.diasPlazoLegal
                       ? `${formData.tramite.diasPlazoLegal} días hábiles (LPAG)`
-                      : "30 días hábiles (Ley 27444)"
+                      : "No especificado en el TUPA")
                   }
                   className="bg-slate-50 text-slate-700 font-medium"
                 />
