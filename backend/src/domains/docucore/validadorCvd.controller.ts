@@ -19,9 +19,15 @@ interface DocumentoFirmado {
   s3_key: string;
 }
 
+const defaultStorage: GeneradorUrlDescarga = {
+  async generarUrlDescarga(bucket: string, key: string) {
+    return `/api/v1/storage/download/${encodeURIComponent(bucket)}/${encodeURIComponent(key)}`;
+  },
+};
+
 export function crearVerificadorCvd(
   pool: Pool,
-  storage: GeneradorUrlDescarga,
+  storage: GeneradorUrlDescarga = defaultStorage,
 ) {
   return async (req: Request, res: Response): Promise<void> => {
     const cvd = String(req.params.cvd ?? '').trim().toUpperCase();

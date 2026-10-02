@@ -1,4 +1,3 @@
-﻿import React from "react";
 import {
   ETIQUETAS_ESTADO_FLUJO,
   ORDEN_PESTANAS_BANDEJA,

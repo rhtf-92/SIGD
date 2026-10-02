@@ -2,6 +2,9 @@ import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
+import {
+  ValidationError,
+} from '../../shared/domain/errors/index.js';
 
 import {
   asignarFoliacionContinua,
@@ -40,28 +43,43 @@ export function crearRouterDocuCore(pool: Pool): Router {
   router.post(
     '/v1/expedientes/:id/foliar-documento',
     async (req: Request, res: Response, next: NextFunction) => {
-      const cliente = await pool.connect();
-
       try {
+        const idParam = req.params.id;
+        if (Array.isArray(idParam)) {
+          throw new ValidationError({
+            invalidParams: [{ name: 'id', reason: 'El ID de expediente no puede ser un arreglo.' }],
+          });
+        }
+        if (!idParam || typeof idParam !== 'string' || !idParam.trim()) {
+          throw new ValidationError({
+            invalidParams: [{ name: 'id', reason: 'El ID de expediente es obligatorio.' }],
+          });
+        }
+
         const datos = foliacionSchema.parse(req.body);
 
-        await cliente.query('BEGIN');
+        const cliente = await pool.connect();
+        try {
+          await cliente.query('BEGIN');
 
-        const foliacion = await asignarFoliacionContinua(
-          cliente,
-          req.params.id,
-          datos.documento_id,
-          datos.total_folios,
-        );
+          const foliacion = await asignarFoliacionContinua(
+            cliente,
+            idParam.trim(),
+            datos.documento_id,
+            datos.total_folios,
+          );
 
-        await cliente.query('COMMIT');
+          await cliente.query('COMMIT');
 
-        return res.status(201).json(foliacion);
+          return res.status(201).json(foliacion);
+        } catch (error) {
+          await cliente.query('ROLLBACK');
+          throw error;
+        } finally {
+          cliente.release();
+        }
       } catch (error) {
-        await cliente.query('ROLLBACK');
         return next(error);
-      } finally {
-        cliente.release();
       }
     },
   );
@@ -69,42 +87,51 @@ export function crearRouterDocuCore(pool: Pool): Router {
   router.post(
     '/v1/firma/callback-refirma',
     async (
-      req: RequestConRawBody,
+      req: Request,
       res: Response,
       next: NextFunction,
     ) => {
-      const cliente = await pool.connect();
-
       try {
-        if (!req.rawBody) {
-          throw new Error(
-            'No se recibió el cuerpo original para validar el callback.',
-          );
+        const rawReq = req as RequestConRawBody;
+        if (!rawReq.rawBody) {
+          throw new ValidationError({
+            invalidParams: [
+              {
+                name: 'rawBody',
+                reason: 'No se recibió el cuerpo original para validar el callback.',
+              },
+            ],
+          });
         }
 
         verificarFirmaWebhook(
-          req.rawBody,
+          rawReq.rawBody,
           req.get('x-refirma-signature') ?? undefined,
           process.env.REFIRMA_WEBHOOK_SECRET ?? '',
         );
 
         const datos = callbackSchema.parse(req.body);
 
-        await cliente.query('BEGIN');
+        const cliente = await pool.connect();
+        try {
+          await cliente.query('BEGIN');
 
-        const cvd = await registrarCallbackRefirma(cliente, datos);
+          const cvd = await registrarCallbackRefirma(cliente, datos);
 
-        await cliente.query('COMMIT');
+          await cliente.query('COMMIT');
 
-        return res.status(200).json({
-          estado: 'FIRMADO_DIGITALMENTE',
-          cvd,
-        });
+          return res.status(200).json({
+            estado: 'FIRMADO_DIGITALMENTE',
+            cvd,
+          });
+        } catch (error) {
+          await cliente.query('ROLLBACK');
+          throw error;
+        } finally {
+          cliente.release();
+        }
       } catch (error) {
-        await cliente.query('ROLLBACK');
         return next(error);
-      } finally {
-        cliente.release();
       }
     },
   );

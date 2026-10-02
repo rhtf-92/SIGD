@@ -1,4 +1,4 @@
-import argon2 from 'argon2';
+import { Argon2Service } from './argon2.service.js';
 import type { Pool } from 'pg';
 import { AppError, ConflictError, ValidationError } from '../../shared/domain/errors/index.js';
 import type {
@@ -130,7 +130,7 @@ export class RegistroCiudadanoService {
       });
     }
 
-    const passwordHash = await argon2.hash(datos.password, PARAMETROS_ARGON2ID);
+    const passwordHash = await Argon2Service.hash(datos.password, PARAMETROS_ARGON2ID);
     const cliente = await this.pool.connect();
     let transaccionAbierta = false;
 

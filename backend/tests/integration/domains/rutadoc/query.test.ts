@@ -7,13 +7,15 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { construirApp } from '../../../../src/app.js';
 import { SQL_LISTAR_RUTADOC } from '../../../../src/domains/rutadoc/rutadoc.repository.js';
-import type { ActorRutaDoc, PestanaRutaDoc } from '../../../../src/domains/rutadoc/rutadoc.types.js';
+import type { ActorRutaDoc } from '../../../../src/domains/rutadoc/rutadoc.types.js';
 import { actorProviderDePrueba } from '../../../support/rutadoc-actor-provider.js';
 
 const AREA = 'da7aa251-a027-47f3-8bfd-4cc94df486d1';
 const actor: ActorRutaDoc = { id: 'operador', roles: ['MESA_PARTES'], puedeVerExpediente: () => true };
-const destinos = [
-  null, ['REGISTRADO', 'RECEPCION', 'RECEPCIONADO'],
+type TransicionTupla = readonly [estadoAnterior: string, evento: string, estadoNuevo: string];
+const destinos: ReadonlyArray<TransicionTupla | null> = [
+  null,
+  ['REGISTRADO', 'RECEPCION', 'RECEPCIONADO'],
   ['RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION'],
   ['EN_CALIFICACION', 'INICIAR_REVISION', 'EN_REVISION'],
   ['EN_REVISION', 'OBSERVACION', 'OBSERVADO'],
@@ -22,7 +24,7 @@ const destinos = [
   ['EN_REVISION', 'ENVIAR_A_FIRMA', 'EN_FIRMA'],
   ['EN_FIRMA', 'FIRMA', 'RESUELTO'],
   ['RESUELTO', 'CIERRE', 'ARCHIVADO'],
-] as const;
+];
 
 let contenedor: StartedPostgreSqlContainer;
 let pool: Pool;
@@ -74,18 +76,18 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
 
   function app() { return construirApp(pool, { actorProviderRutaDoc: actorProviderDePrueba(actor) }); }
 
-  it.each([
+  it.each<[string, readonly string[]]>([
     ['PENDIENTES', ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION']],
     ['EN_TRAMITE', ['EN_REVISION', 'OBSERVADO', 'SUBSANADO']],
     ['DERIVADOS', ['DERIVADO']],
     ['POR_FIRMAR', ['EN_FIRMA']],
     ['ATENDIDOS', ['RESUELTO']],
     ['ARCHIVADOS', ['ARCHIVADO']],
-  ] as const)('GET %s devuelve sólo los estados de su pestaña', async (pestana, estados) => {
+  ])('GET %s devuelve sólo los estados de su pestaña', async (pestana, estados) => {
     const respuesta = await request(app()).get('/api/v1/expedientes').query({ pestana });
     expect(respuesta.status).toBe(200);
     expect(respuesta.body.elementos.length).toBeGreaterThan(0);
-    expect(respuesta.body.elementos.every((fila: { estadoActual: string }) => estados.includes(fila.estadoActual as never))).toBe(true);
+    expect(respuesta.body.elementos.every((fila: { estadoActual: string }) => estados.includes(fila.estadoActual))).toBe(true);
   });
 
   it('calcula los seis contadores sobre la misma lectura', async () => {
@@ -343,7 +345,7 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
   it('GET foliación adjunta checksum solo cuando lo resuelve el contrato inyectado', async () => {
     const respuesta = await request(construirApp(pool, {
       actorProviderRutaDoc: actorProviderDePrueba(actor),
-      documentoMetadataRutaDoc: { obtenerMetadataDocumento: async (id) => ({
+      documentoMetadataRutaDoc: { obtenerMetadataDocumento: async (id: string) => ({
         checksumSha256: id === '501' ? 'b'.repeat(64) : null, nombre: 'anexo.pdf', tipo: 'ANEXO',
       }) },
     })).get('/api/v1/expedientes/2/foliacion');
@@ -355,7 +357,7 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
     let rangoConsultado: [string, string] | null = null;
     const respuesta = await request(construirApp(pool, {
       actorProviderRutaDoc: actorProviderDePrueba(actor),
-      calendarioLaboralRutaDoc: { obtenerDiasNoLaborables: async (desde, hasta) => {
+      calendarioLaboralRutaDoc: { obtenerDiasNoLaborables: async (desde: string, hasta: string) => {
         rangoConsultado = [desde, hasta];
         return ['2026-09-28'];
       } },

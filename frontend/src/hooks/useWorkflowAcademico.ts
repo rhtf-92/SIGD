@@ -319,6 +319,11 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
     [tramite],
   );
 
+  const requisitosPendientesEtapaActual = useMemo(
+    () => requisitosPendientesDe(tramite, tramite.etapaActualId),
+    [tramite],
+  );
+
   const validarTransicion = useCallback(
     (desde: EstadoTramite, hacia: EstadoTramite, mensaje: string): boolean => {
       if (desde !== estado || !TRANSICIONES_FSM[desde].includes(hacia)) {

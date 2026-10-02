@@ -7,9 +7,9 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
-import QrCodeGenerator from "../../components/common/QrCodeGenerator";
-import CvdStampBadge from "../../components/firma/CvdStampBadge";
-import type { EstampaCvdData } from "../../types/cvdVerificacion";
+import QrCodeGenerator from "../../../src/components/common/QrCodeGenerator";
+import CvdStampBadge from "../../../src/components/firma/CvdStampBadge";
+import type { EstampaCvdData } from "../../../src/types/cvdVerificacion";
 
 const ESTAMPA: EstampaCvdData = {
   codigoCvd: "CVD-2026-RD-000412-892F",

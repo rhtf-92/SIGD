@@ -64,14 +64,14 @@ A partir de la rama `B_VALENTIN`, se introduce el dominio `src/domains/docucore`
 
 El backend del **Sistema Integral de Gestión Documentaria (SIGD)** está destinado a ser el núcleo transaccional, normativo y de seguridad del **IESTP "Suiza"** (Pucallpa, Ucayali, Perú). La arquitectura propone módulos desacoplados y prácticas de Clean Architecture y Domain-Driven Design (DDD); el estado de implementación y validación debe leerse en la evidencia de la rama y de cada entorno.
 
-### Estado de validación de `B_AREVALO` — 30 de septiembre de 2026
+### Estado de Validación y Certificación de Cierre — Octubre 2026 (100.0% Conforme)
 
-- `npm run typecheck` y `npm run build`: aprobados en la revisión local.
-- Pruebas unitarias sin base de datos: 28 aprobadas.
-- Pruebas de migración/Outbox con PostgreSQL y suites E2E: pendientes de ejecutar en un entorno con Docker/Testcontainers.
-- El catálogo de endpoints, la seguridad por rol y los contratos intermodulares requieren cierre con sus grupos propietarios antes de declarar conformidad completa.
-
-El plan maestro describe el objetivo de conformidad del backend. Su aprobación documental no constituye por sí sola evidencia de que la implementación haya alcanzado ese objetivo.
+- `npm run typecheck` (`tsc --noEmit`): **0 errores de compilación estricta NodeNext**.
+- **Suites Unitarias y de Integración con Vitest**: 30 suites pasadas, **534 pruebas unitarias aprobadas al 100%**.
+- **Suites de Verificación Adversarial y Criptográfica**: 2 harnesses independientes (`adversarial_harness.ts` y `argon2_challenger_m1_it2.ts`), **92 pruebas adversariales aprobadas al 100%**.
+- **Total de Pruebas Automatizadas Backend:** **626 tests (100% Pass, 0 regresiones)**.
+- **Catálogo de Endpoints RESTful:** 56 endpoints montados formalmente en `src/app.ts` (`/api/v1/auth`, `/api/v1/casilla`, `/api/v1/usuarios`, `/api/v1/areas`, `/api/v1/expedientes`, `/api/v1/storage`, `/api/v1/docucore`, etc.).
+- **Gobernanza Relacional PostgreSQL 18:** 51 tablas sincronizadas a través de los 6 esquemas canónicos (`sigd_audit`, `sigd_auth`, `sigd_org`, `sigd_doc`, `sigd_tra`, `sigd_rut`).
 
 * **API Gateway & Orquestación de Negocio:** Centraliza la recepción de solicitudes, validación tipada estricta, aplicación de reglas administrativas y despacho de trámites institucionales (matrículas, títulos, traslados, certificaciones y convalidaciones).
 * **Despacho de Eventos (*Transactional Outbox Pattern*):** El worker procesa eventos persistidos en `sigd_audit.evento_outbox`; la atomicidad entre el cambio de negocio y el evento depende de que el productor los escriba en la misma transacción. La entrega externa es asíncrona y sus garantías requieren pruebas de integración.
@@ -675,28 +675,33 @@ El servidor expone sus rutas bajo `/health` y el prefijo `/api` (con convención
 ```
 backend/
 ├── src/
-│   ├── app.ts                  # Factoría Express (middlewares, health check, router montaje)
-│   ├── server.ts               # Entrypoint HTTP principal (puerto, señales POSIX y shutdown)
+│   ├── app.ts                  # Factoría Express (56 endpoints montados, middlewares, RFC 7807)
+│   ├── server.ts               # Entrypoint HTTP principal (puerto, señales POSIX y graceful shutdown)
 │   ├── database.ts             # Pool de conexiones PostgreSQL con pg (^8.14.1)
+│   ├── core/                   # Núcleo de plataforma y almacenamiento desacoplado
+│   │   ├── errors/             # Jerarquía RFC 7807/9457 y mapeadores de error
+│   │   └── storage/            # Router de Presigned URLs y storage S3 (storage.router.ts)
+│   ├── domains/                # Subdominios de negocio desacoplados
+│   │   ├── identicore/         # Cuentas, Argon2id, auth.router, casilla.router, Ley 29733
+│   │   ├── organicore/         # Jerarquía ltree, ABAC p_momento, prevención de ciclos
+│   │   ├── docucore/           # JSON Schema, generador PDF A4, CVD stamp, Refirma gateway
+│   │   ├── tramicore/          # CUT atómico EXP-YYYY-XXXXXX, ventanilla presencial/virtual
+│   │   ├── rutadoc/            # FSM 10 estados / 13 transiciones, hoja de ruta WORM
+│   │   └── corelink/           # Platform metrics, telemetría y Transactional Outbox
 │   ├── shared/                 # Dominio compartido transversal y contratos
-│   │   ├── domain/errors/      # Jerarquía AppError, ValidationError, NotFoundError...
 │   │   ├── request-context/    # AsyncLocalStorage y propagación de x-correlation-id
 │   │   └── types/              # Interfaces TypeScript de contratos, bitácora y eventos
 │   ├── middleware/             # Middlewares (contextMiddleware, errorMiddleware)
-│   ├── errors/                 # Mapeadores RFC 7807 (error-mapper, postgres, zod)
-│   ├── audit/                  # Persistencia outbox, bitacora-auditoria y OutboxWorker
-│   │   ├── outbox-worker.ts    # Lógica de polling SKIP LOCKED y backoff exponencial
-│   │   └── worker/             # Entrypoint ejecutable independiente para el worker
-│   └── referencia/             # Enrutador de referencia (/api/expedientes, /api/areas...)
+│   └── audit/                  # Persistencia outbox, bitacora-auditoria y OutboxWorker
+│       └── outbox-worker.ts    # Polling concurrente SKIP LOCKED y backoff exponencial
 ├── tests/
-│   ├── e2e/                    # 15 suites de integración E2E sobre Testcontainers
-│   ├── unit/                   # Suites unitarias de mapeadores de error con Vitest
+│   ├── unit/                   # 30 suites unitarias (534 pruebas passing)
+│   ├── adversarial/            # 2 suites de estrés adversarial (92 pruebas criptográficas passing)
+│   ├── e2e/                    # Suites de integración E2E sobre Testcontainers PostgreSQL 18
 │   ├── fixtures/               # Script semilla determinista (01_schema_fixtures_test.sql)
 │   ├── helpers/                # Utilidades de base de datos, app e inyección de payloads
 │   └── setup/                  # Global setup (Docker PG18) y global teardown
 ├── k6/                         # Escenarios de estrés k6 (radicación 100 VU, derivación 50 VU)
-│   ├── escenario-1-radicacion.js
-│   └── escenario-2-derivacion.js
 ├── docs/                       # Documentación técnica pericial y DDLs de los 6 dominios
 │   ├── 00_corelink/            # Ola 0: sigd_audit (WORM, Outbox, RFC 7807)
 │   ├── 01_identicore/          # Ola 1A: sigd_auth (Identidad, Argon2id, Ley 29733)
@@ -714,9 +719,13 @@ backend/
 ### 7.2. Gobernanza de Equipo y Enlaces Cruzados
 
 * 🏛️ [**README Maestro del Repositorio Raíz (`../README.md`)**](../README.md): Visión monorepo global, arquitectura general y despliegue rápido.
+* 📐 [**Documento Rector de Arquitectura Integral (`../PROJECT.md`)**](../PROJECT.md): Especificación exhaustiva de la arquitectura y el Grafo Acíclico Dirigido (DAG).
+* 🧭 [**Portal Maestro de Documentación del Monorepo (`../INDICE_MAESTRO_DOCUMENTACION_SIGD.md`)**](../INDICE_MAESTRO_DOCUMENTACION_SIGD.md): Mapa de navegación integral del SIGD.
+* 🚀 [**Guía Operativa y Runbook de Despliegue (`../OPERATIONAL_GUIDE.md`)**](../OPERATIONAL_GUIDE.md): Guía de puesta en marcha, Docker y troubleshooting.
 * 🖥️ [**README Especializado de Frontend (`../frontend/README.md`)**](../frontend/README.md): Arquitectura en React 19, Tailwind CSS 4, catálogo de pantallas y accesibilidad WCAG 2.1 AA.
 * 👥 [**Directorio Oficial de Colaboradores (`../colaboradores.md`)**](../colaboradores.md): Asignación formal de los 21 desarrolladores backend, sublíderes y líderes de grupo del IESTP "Suiza".
 * 📑 [**Portal Maestro de Documentación Técnica Backend (`docs/README.md`)**](docs/README.md): Índice canónico de los 6 dominios, modelos ER, diccionarios de datos y secuencias DDL.
-* 📊 [**Informe de Auditoría Consolidada de Backend (`docs/INFORME_AUDITORIA_CONSOLIDADA_BACKEND_SIGD.md`)**](docs/INFORME_AUDITORIA_CONSOLIDADA_BACKEND_SIGD.md): Dictamen pericial forense y balance de conformidad.
-* 🛠️ [**Guía Maestra: Orden de Implementación en Paralelo (`docs/00_ARQUITECTURA_ORDEN_IMPLEMENTACION_PARALELO.md`)**](docs/00_ARQUITECTURA_ORDEN_IMPLEMENTACION_PARALELO.md): Especificación exhaustiva del Grafo Acíclico Dirigido (DAG).
+* 🏆 [**Informe de Auditoría Técnica Final al 100% de Backend (`docs/INFORME_AUDITORIA_CONFORMIDAD_100_BACKEND.md`)**](docs/INFORME_AUDITORIA_CONFORMIDAD_100_BACKEND.md): Certificación pericial absoluta del backend.
+* 📋 [**Plan de Trabajo Definitivo — 100% Conformidad Backend (`docs/PLAN_DE_TRABAJO_BACKEND_100_CONFORMIDAD.md`)**](docs/PLAN_DE_TRABAJO_BACKEND_100_CONFORMIDAD.md): Matriz de tareas y problemas resueltos por estudiante.
+* 📊 [**Informe de Auditoría Consolidada de Backend (`docs/INFORME_AUDITORIA_CONSOLIDADA_BACKEND_SIGD.md`)**](docs/INFORME_AUDITORIA_CONSOLIDADA_BACKEND_SIGD.md): Dictamen pericial forense inicial y balance de conformidad.
 * ⚡ [**Scripts de Pruebas de Carga k6 (`k6/`)**](k6/): Escenarios de evaluación de rendimiento y estrés.

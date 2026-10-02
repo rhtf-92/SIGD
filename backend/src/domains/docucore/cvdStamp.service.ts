@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
-import QRCode from 'qrcode';
+import * as QRCode from 'qrcode';
 
 /**
  * Debe ejecutarse ANTES de enviar el PDF a Refirma.

@@ -3,7 +3,7 @@ import { useState } from "react";
 import AcuseNotificacionModal, { type AcuseEmitidoServidor } from "../components/casilla/AcuseNotificacionModal";
 import NotificationList from "../components/casilla/NotificacionList";
 import { useCasilla } from "../hooks/useCasilla";
-import type { AcuseNotificacion, EstadoNotificacion, Notificacion } from "../types/casilla";
+import type { EstadoNotificacion, Notificacion } from "../types/casilla";
 
 type PestañaLegal = "TODOS" | "NO_LEÍDO" | "LEÍDO" | "CON_ACUSE";
 

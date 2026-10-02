@@ -7,11 +7,11 @@ import userEvent from "@testing-library/user-event";
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import BuscadorExpedientes from "../../components/flujos/BuscadorExpedientes";
+import BuscadorExpedientes from "../../../src/components/flujos/BuscadorExpedientes";
 import {
   EXPEDIENTES_DEMO,
   useWorkflowAcademico,
-} from "../../hooks/useWorkflowAcademico";
+} from "../../../src/hooks/useWorkflowAcademico";
 
 describe("Buscador de expedientes — ENT-M04-01", () => {
   it("lista la bandeja demo y filtra por CUT", async () => {

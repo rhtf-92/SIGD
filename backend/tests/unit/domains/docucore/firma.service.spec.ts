@@ -7,7 +7,7 @@
  */
 
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 
 import { InMemoryAlmacenDocumentosFirmables } from "../../../../src/domains/docucore/documentoFirmable.store.js";
 import { ErrorFirma } from "../../../../src/domains/docucore/firma.errors.js";

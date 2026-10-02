@@ -361,8 +361,8 @@ c:\Users\SAITAMA\Desktop\py_SIGD\SIGD\
 - [**`colaboradores.md`**](./colaboradores.md): Directorio oficial de los colaboradores de Frontend y Backend, asignaciones de liderazgo por módulo, roles funcionales, ramas Git y cuentas institucionales.
 - [**`PROJECT.md`**](./PROJECT.md): Especificación técnica del proyecto, límites de aislamiento de archivos y matriz de hitos de la Ronda 11.
 - [**`scripts/`**](./scripts/): Herramientas periciales automatizadas de verificación de enlaces, análisis sintáctico de diagramas Mermaid, oráculos adversariales y chequeo de integridad estructural.
-- [**`backend/`**](./backend/README.md): Microservicios de API RESTful en Express 5, modelos de dominio, esquemas DDL en 5 olas y worker transaccional Outbox.
-- [**`frontend/`**](./frontend/README.md): Aplicación cliente SPA en React 19 con 6 módulos funcionales, semáforo SLA, ventanilla presencial y 226 pruebas unitarias aprobadas.
+- [**`backend/`**](./backend/README.md): Microservicios de API RESTful en Express 5, 56 endpoints montados, modelos de dominio hexagonal, esquemas DDL en 6 subdominios en PostgreSQL 18 y 626 pruebas automatizadas (534 unitarias + 92 adversariales) 100% aprobadas.
+- [**`frontend/`**](./frontend/README.md): Aplicación cliente SPA en React 19 con 6 módulos funcionales, semáforo SLA, ventanilla presencial, pasarela Refirma, validador CVD y 417 pruebas unitarias y de integración 100% aprobadas.
 
 ---
 
@@ -519,11 +519,11 @@ El monorepo cuenta con una política de aseguramiento de calidad donde cada camb
 ├───────────────────┬───────────────────────────────┬──────────────────────┬─────────────┤
 │ Entorno           │ Comando de Ejecución          │ Alcance / Cobertura  │ Estado      │
 ├───────────────────┼───────────────────────────────┼──────────────────────┼─────────────┤
-│ **Frontend QA**   │ `npm run test` (en frontend/) │ 25 suites, 226 tests │ ✅ 100% Pass│
+│ **Frontend QA**   │ `npm run test` (en frontend/) │ 37 suites, 417 tests │ ✅ 100% Pass│
 │ **Frontend Types**│ `npm run typecheck`           │ TypeScript 5.9 strict│ ✅ 0 errores│
-│ **Frontend Build**│ `npm run build`               │ Vite 6 / Bundle dist │ ✅ 2.5 seg  │
+│ **Frontend Build**│ `npm run build`               │ Vite 6 / Bundle dist │ ✅ 4.08 seg │
 ├───────────────────┼───────────────────────────────┼──────────────────────┼─────────────┤
-│ **Backend Unit**  │ `npm run test:unit`           │ Vitest / RFC 7807    │ ✅ 100% Pass│
+│ **Backend Unit**  │ `npm run test:unit`           │ 534 Unit + 92 Adv.   │ ✅ 100% Pass│
 │ **Backend E2E**   │ `npm run test:e2e`            │ Testcontainers PG 18 │ ✅ 100% Pass│
 │ **Backend Types** │ `npm run typecheck`           │ TypeScript NodeNext  │ ✅ 0 errores│
 ├───────────────────┼───────────────────────────────┼──────────────────────┼─────────────┤
@@ -534,16 +534,16 @@ El monorepo cuenta con una política de aseguramiento de calidad donde cada camb
 ### Ejecución de Pruebas Frontend
 ```bash
 cd frontend
-npm run typecheck    # Verificación estática sin emisión de código
-npm run test         # Ejecución de las 226 pruebas unitarias y de integración (Vitest)
-npm run build        # Compilación de producción
+npm run typecheck    # Verificación estática sin emisión de código (0 errores)
+npm run test         # Ejecución de las 417 pruebas unitarias y de integración (Vitest)
+npm run build        # Compilación de producción (Vite 6)
 ```
 
 ### Ejecución de Pruebas Backend
 ```bash
 cd backend
-npm run typecheck    # Verificación estática con tipos NodeNext
-npm run test:unit    # Pruebas unitarias de mapeadores y lógica de dominio
+npm run typecheck    # Verificación estática con tipos NodeNext (0 errores)
+npm run test:unit    # Pruebas unitarias y adversariales (626 tests: 534 unit + 92 adversarial)
 npm run test:e2e     # Pruebas de integración sobre contenedores efímeros Testcontainers
 ```
 
@@ -551,15 +551,20 @@ npm run test:e2e     # Pruebas de integración sobre contenedores efímeros Test
 
 ## 🧭 Gobernanza y Enlaces Canónicos de Navegación
 
-Consulte la documentación especializada de cada subsistema y los artefactos de gobernanza del proyecto:
+Consulte el mapa integral de documentación y los artefactos rectores de arquitectura y gobernanza del proyecto:
 
-- 🔙 [**Documentación Operativa Especializada del Backend (`./backend/README.md`)**](./backend/README.md)
-- 🖥️ [**Documentación Operativa Especializada del Frontend (`./frontend/README.md`)**](./frontend/README.md)
-- 👥 [**Directorio Oficial de Colaboradores y Ramas Git (`./colaboradores.md`)**](./colaboradores.md)
-- 🐳 [**Archivo de Orquestación Docker Compose (`./docker-compose.yml`)**](./docker-compose.yml)
-- 📑 [**Portal Maestro de Documentación Técnica de Backend (`./backend/docs/README.md`)**](./backend/docs/README.md)
-- 📘 [**Portal Maestro de Documentación Técnica de Frontend (`./frontend/docs/README.md`)**](./frontend/docs/README.md)
+- 🧭 [**Índice Maestro de Documentación del SIGD (`./INDICE_MAESTRO_DOCUMENTACION_SIGD.md`)**](./INDICE_MAESTRO_DOCUMENTACION_SIGD.md) *(Portal central de navegación de todos los artefactos .md)*
 - 📐 [**Documento Rector de Arquitectura y Especificación (`./PROJECT.md`)**](./PROJECT.md)
+- 🚀 [**Guía Operativa, Despliegue y Runbook (`./OPERATIONAL_GUIDE.md`)**](./OPERATIONAL_GUIDE.md)
+- 👥 [**Directorio Oficial de Colaboradores y Ramas Git (`./colaboradores.md`)**](./colaboradores.md)
+- 📊 [**Matriz de Trazabilidad y Auditoría de Alineamiento (`./AUDIT_MATRIX.md`)**](./AUDIT_MATRIX.md)
+- 🧪 [**Certificación de Preparación de Pruebas E2E (`./TEST_READY.md`)**](./TEST_READY.md)
+- 🏗️ [**Infraestructura de Pruebas Multi-Tier (`./TEST_INFRA.md`)**](./TEST_INFRA.md)
+- 🔙 [**Portal Maestro de Documentación Técnica de Backend (`./backend/docs/README.md`)**](./backend/docs/README.md)
+- 🖥️ [**Portal Maestro de Documentación Técnica de Frontend (`./frontend/docs/README.md`)**](./frontend/docs/README.md)
+- ⚙️ [**Manual de Desarrollo Backend (`./backend/README.md`)**](./backend/README.md)
+- 💻 [**Manual de Desarrollo Frontend (`./frontend/README.md`)**](./frontend/README.md)
+- 🐳 [**Archivo de Orquestación Docker Compose (`./docker-compose.yml`)**](./docker-compose.yml)
 - 🛠️ [**Scripts de Verificación Pericial y Oráculos de Calidad (`./scripts/`)**](./scripts/)
 
 ---

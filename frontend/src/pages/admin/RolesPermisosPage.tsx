@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import RbacPermissionMatrix from '../../components/admin/RbacPermissionMatrix';
 
 export default function RolesPermisosPage() {

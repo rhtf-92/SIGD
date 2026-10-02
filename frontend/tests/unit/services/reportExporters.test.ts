@@ -28,7 +28,7 @@ describe("exportadores de reportes institucionales", () => {
       createObjectURL: vi.fn(() => "blob:reporte-temporal"),
       revokeObjectURL: vi.fn(),
     });
-    vi.spyOn(window, "setTimeout").mockImplementation(() => 1);
+    vi.spyOn(window, "setTimeout").mockImplementation(() => 1 as unknown as ReturnType<typeof setTimeout>);
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   });
 

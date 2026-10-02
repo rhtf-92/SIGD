@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import React from 'react';
 import RbacGuard from '../../../src/components/common/RbacGuard';
 
 describe('RbacGuard Component - Aislamiento y Restricción por Roles (12 Tests)', () => {

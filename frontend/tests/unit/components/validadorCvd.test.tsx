@@ -8,16 +8,16 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import CvdIntegrityReport from "../../components/cvd/CvdIntegrityReport";
-import { requisitosPendientesDe } from "../../hooks/useWorkflowAcademico";
-import type { ValidacionCVDResult } from "../../types/validadorCvd";
-import type { WorkflowAcademico } from "../../types/workflowAcademico";
+import CvdIntegrityReport from "../../../src/components/cvd/CvdIntegrityReport";
+import { requisitosPendientesDe } from "../../../src/hooks/useWorkflowAcademico";
+import type { ValidacionCVDResult } from "../../../src/types/validadorCvd";
+import type { WorkflowAcademico } from "../../../src/types/workflowAcademico";
 import {
   aplicarMascaraCvd,
   extraerCvdDeTexto,
   validarCvd,
-} from "../../utils/cvdValidator";
-import { diasHabilesEntre } from "../../utils/diasHabiles";
+} from "../../../src/utils/cvdValidator";
+import { diasHabilesEntre } from "../../../src/utils/diasHabiles";
 
 const RESULTADO_VALIDO: ValidacionCVDResult = {
   esValido: true,

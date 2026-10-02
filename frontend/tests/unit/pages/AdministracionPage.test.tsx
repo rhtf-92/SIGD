@@ -1,9 +1,9 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
-import AdministracionPage from "../../src/pages/admin/AdministracionPage";
-import { vi } from "vitest";
+import AdministracionPage from "../../../src/pages/admin/AdministracionPage";
+import { describe, test, expect, vi } from "vitest";
 
-vi.mock("../../src/hooks/useRbacConfig", () => ({
+vi.mock("../../../src/hooks/useRbacConfig", () => ({
   useRbacConfig: () => ({
     puedeVerAuditoria: true,
     cargando: false,
@@ -17,7 +17,7 @@ describe("AdministracionPage (F_GONZALES - ENT-M05-01)", () => {
   test("1. Renderiza el título del panel de administración", () => {
     renderConRouter(<AdministracionPage />);
     expect(
-      screen.getByText(/Panel de Administración/i)
+      screen.getByRole("heading", { name: /Panel de Administración/i })
     ).toBeInTheDocument();
   });
 

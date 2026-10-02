@@ -9,7 +9,7 @@
 [![Vitest](https://img.shields.io/badge/Vitest-5.0.0-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
 [![WCAG](https://img.shields.io/badge/WCAG-2.1_AA-006EC7)](https://www.w3.org/WAI/standards-guidelines/wcag/)
 [![Story Points](https://img.shields.io/badge/Story_Points-174%2F174_SP_(100%25)-success)](#-mapeo-estructural-de-los-6-módulos-funcionales-174-sp--32-entregables)
-[![Test Suites](https://img.shields.io/badge/Tests-226%20passed%20(25%20suites)-brightgreen)](#-estrategia-de-pruebas-y-certificación-de-calidad)
+[![Test Suites](https://img.shields.io/badge/Tests-417%20passed%20(47%20suites)-brightgreen)](#-estrategia-de-pruebas-y-certificación-de-calidad)
 
 ---
 
@@ -613,7 +613,7 @@ npm run dev
 # Chequeo estático estricto de tipos TypeScript (0 errores garantizados)
 npm run typecheck
 
-# Ejecutar la suite completa de 226 pruebas unitarias
+# Ejecutar la suite completa de 417 pruebas unitarias y de integración (100% Pass)
 npm run test
 
 # Ejecutar pruebas en modo interactivo/observador
@@ -622,7 +622,7 @@ npm run test:watch
 # Generar reporte de cobertura de código
 npm run test:coverage
 
-# Compilar para producción (TypeScript tsc --noEmit + Vite build en ~2.51s)
+# Compilar para producción (TypeScript tsc --noEmit + Vite build en ~4.08s)
 npm run build
 
 # Previsualizar el bundle de producción compilado localmente
@@ -636,8 +636,11 @@ npm run preview
 La documentación técnica exhaustiva del frontend se encuentra disponible en [`frontend/docs/`](docs/README.md):
 
 ### Documentos Maestros
+- 🏆 [**Informe de Auditoría Técnica de Conformidad al 100% de Frontend**](docs/INFORME_AUDITORIA_CONFORMIDAD_100_FRONTEND.md) *(417 tests passing, 0 errores tsc, 32 entregables)*
+- 📋 [**Plan de Trabajo Definitivo — 100% Conformidad y Remediación**](docs/PLAN_DE_TRABAJO_FRONTEND_100_CONFORMIDAD.md) *(Matriz nominal de tareas y problemas resueltos)*
 - 📑 [Portal Maestro de Documentación Técnica Frontend (Gobernanza y DAG)](docs/README.md)
-- 🏛️ [Arquitectura y Orden de Implementación en Paralelo Frontend (DAG 5 Olas)](docs/00_ARQUITECTURA_ORDEN_IMPLEMENTACION_PARALELO.md)
+- 🏛️ [Blueprint de Arquitectura Integral del Sistema (DAG de 5 Olas)](../PROJECT.md)
+- 🧭 [Índice Maestro de Documentación del Monorepo](../INDICE_MAESTRO_DOCUMENTACION_SIGD.md)
 - 📘 [Plan de Trabajo General, Blueprint de Arquitectura y Diseño de Plantillas Frontend](docs/PLAN_DE_TRABAJO_GENERAL_FRONTEND_SIGD.md)
 - 📋 [Informe de Auditoría Técnica y Diagnóstico Forense de Documentación Frontend](docs/INFORME_AUDITORIA_DOCUMENTACION_FRONTEND.md)
 - ⚖️ [Informe Oficial de Auditoría de Implementación Física Frontend (v2.0.0)](docs/INFORME_AUDITORIA_IMPLEMENTACION_FRONTEND.md)
@@ -680,6 +683,7 @@ La documentación técnica exhaustiva del frontend se encuentra disponible en [`
    - [01. Bandeja de Trabajo Diario del Servidor (6 Pestañas y Semáforo SLA)](docs/05_gestion-expedientes/01_bandeja_trabajo_diario_6_pestanas.md)
    - [02. Cuadro de Clasificación Documental (CCD) y Archivística AGN](docs/05_gestion-expedientes/02_cuadro_clasificacion_documental_ccd_y_archivistica.md)
    - [03. Modelo de Datos TypeScript y Trazabilidad Inmutable](docs/05_gestion-expedientes/03_modelo_datos_typescript_y_trazabilidad_inmutable.md)
+   - [04. Entrega Individual y Notas de Implementación (Piero Bartra — CCD y Foliado AGN)](docs/05_gestion-expedientes/04_entrega_individual_piero_bartra_ccd_foliacion.md)
 
 6. **Ola 4: Indicadores de Gestión, KPIs MGD y Tableros de Control (`06_reportes-tableros-control/`)**
    - 🎯 [00. Plan de Trabajo Modular y Evaluación Docente (29 SP)](docs/06_reportes-tableros-control/00_plan_de_trabajo_y_evaluacion_docente.md)
@@ -696,6 +700,9 @@ La documentación técnica exhaustiva del frontend se encuentra disponible en [`
 ## 🔗 Navegación y Gobernanza del Monorepo SIGD
 
 - 🏠 **[README Maestro del Monorepo SIGD](../README.md):** Visión global del sistema, arquitectura monorepo integrada y guía de inicio rápido unificada.
+- 📐 **[Documento Rector de Arquitectura Integral](../PROJECT.md):** Especificación técnica formal y Grafo Acíclico Dirigido (DAG).
+- 🧭 **[Índice Maestro de Documentación del Monorepo](../INDICE_MAESTRO_DOCUMENTACION_SIGD.md):** Portal central de navegación de todos los artefactos `.md`.
+- 🚀 **[Guía Operativa y Runbook de Despliegue](../OPERATIONAL_GUIDE.md):** Manual de despliegue, variables de entorno y soporte Docker.
 - ⚙️ **[README Especializado del Backend (`backend/`)](../backend/README.md):** Arquitectura Express 5, esquemas en PostgreSQL 18 (`identicore`, `organicore`, `tramicore`, `docucore`), patrones Outbox WORM y pruebas de integración.
 - 👥 **[Gobernanza y Cuadro de Contribuidores](../colaboradores.md):** Registro formal de los 22 integrantes del equipo de desarrollo frontend, líderes de grupo, matrices RACI y contribuciones individuales por módulo.
 

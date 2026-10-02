@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   ESTADOS_RUTADOC,
@@ -8,9 +8,12 @@ import {
   TRANSICIONES_RUTADOC,
 } from '../../../../src/domains/rutadoc/rutadoc.fsm.js';
 
-const ruta = path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql');
-const documento = path.resolve(process.cwd(), 'docs/05_rutadoc/06_esquema_sigd_rut_fsm_v6.3.sql');
-const sql = readFileSync(ruta, 'utf8');
+const ruta = fileURLToPath(new URL('../../../../migraciones/06_sigd_rut.sql', import.meta.url));
+const documento = fileURLToPath(
+  new URL('../../../../docs/05_rutadoc/06_esquema_sigd_rut_fsm_v6.3.sql', import.meta.url),
+);
+const normalizar = (txt: string): string => txt.replace(/\r\n/g, '\n');
+const sql = normalizar(readFileSync(ruta, 'utf8'));
 
 function filas(tabla: string): string[][] {
   const inicio = sql.indexOf(`INSERT INTO sigd_rut.${tabla}`);
@@ -24,8 +27,9 @@ function filas(tabla: string): string[][] {
 
 describe('DDL RutaDoc y FSM publicada', () => {
   it('mantiene idénticos el SQL ejecutable y el entregable documental', () => {
-    const hash = (contenido: Buffer): string => createHash('sha256').update(contenido).digest('hex');
-    expect(hash(readFileSync(ruta))).toBe(hash(readFileSync(documento)));
+    const hash = (contenido: string): string =>
+      createHash('sha256').update(normalizar(contenido)).digest('hex');
+    expect(hash(readFileSync(ruta, 'utf8'))).toBe(hash(readFileSync(documento, 'utf8')));
   });
 
   it('incluye exactamente los estados, eventos y transiciones de TypeScript', () => {

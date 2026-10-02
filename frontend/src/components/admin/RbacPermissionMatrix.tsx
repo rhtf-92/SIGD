@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const roles = ['SUPER_ADMIN', 'DIRECTOR', 'DOCENTE', 'MESA_PARTES', 'ESTUDIANTE'];
 const permisos = [
