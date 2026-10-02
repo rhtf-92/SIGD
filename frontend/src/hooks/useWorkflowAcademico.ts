@@ -319,29 +319,23 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
     [tramite],
   );
 
-  const requisitosPendientesEtapaActual = useMemo<string[]>(
-    () => requisitosPendientesDe(tramite, tramite.etapaActualId),
-    [tramite],
+  const validarTransicion = useCallback(
+    (desde: EstadoTramite, hacia: EstadoTramite, mensaje: string): boolean => {
+      if (desde !== estado || !TRANSICIONES_FSM[desde].includes(hacia)) {
+        setErrorFsm(mensaje);
+        return false;
+      }
+      setErrorFsm(null);
+      return true;
+    },
+    [estado],
   );
-
-  const validarTransicion = (
-    desde: EstadoTramite,
-    hacia: EstadoTramite,
-    mensaje: string,
-  ): boolean => {
-    if (desde !== estado || !TRANSICIONES_FSM[desde].includes(hacia)) {
-      setErrorFsm(mensaje);
-      return false;
-    }
-    setErrorFsm(null);
-    return true;
-  };
 
   const tomarEnRevision = useCallback(() => {
     if (validarTransicion("EN_TRAMITE", "EN_REVISION", "El trámite no está en estado EN_TRAMITE.")) {
       setTramite((actual) => ({ ...actual, estado: "EN_REVISION" }));
     }
-  }, [estado]);
+  }, [validarTransicion]);
 
   /** Buscador ENT-M04-01: carga un expediente de la bandeja para pasarlo a revisión. */
   const cargarExpediente = useCallback((idTramite: number) => {
@@ -395,7 +389,7 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
         estado: "EN_TRAMITE",
       };
     });
-  }, [estado, tramite]);
+  }, [validarTransicion]);
 
   const observarEtapaActual = useCallback(
     (observacion: string) => {
@@ -412,7 +406,7 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
         ),
       }));
     },
-    [estado],
+    [validarTransicion],
   );
 
   const subsanar = useCallback(() => {
@@ -420,7 +414,7 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
       return;
     }
     setTramite((actual) => ({ ...actual, estado: "SUBSANADO" }));
-  }, [estado]);
+  }, [validarTransicion]);
 
   const reanudarRevision = useCallback(() => {
     if (!validarTransicion("SUBSANADO", "EN_REVISION", "El trámite no se encuentra SUBSANADO.")) {
@@ -435,7 +429,7 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
           : etapa,
       ),
     }));
-  }, [estado]);
+  }, [validarTransicion]);
 
   const firmarDocumento = useCallback(() => {
     if (!validarTransicion("PARA_FIRMA", "RESUELTO", "El documento no está listo para firma (PARA_FIRMA).")) {
@@ -467,7 +461,7 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
         ),
       };
     });
-  }, [estado, tramite]);
+  }, [validarTransicion]);
 
   const anularTramite = useCallback(() => {
     const permitido = estado === "EN_REVISION" || estado === "OBSERVADO";

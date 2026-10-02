@@ -165,8 +165,12 @@ export interface TramiteSeleccionado {
   justificacionPrioridad?: string;
   /** Costo administrativo oficial del trámite en Soles (PEN) */
   costoSoles?: number;
+  /** Derecho de pago textual, conservando tarifas compuestas del TUPA */
+  derechoPago?: string;
   /** Plazo máximo legal de resolución en días hábiles (LPAG Ley 27444) */
   diasPlazoLegal?: number;
+  /** Tiempo máximo según el texto oficial del procedimiento */
+  tiempoMaximo?: string;
 }
 
 // =============================================================================

@@ -120,4 +120,4 @@ export const UCAYALI_PROVINCIAS: readonly Provincia[] = [
     nombre: 'Purús',
     distritos: ['Purús'],
   },
-];
+];

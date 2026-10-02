@@ -60,6 +60,13 @@ const secciones = [
       "Ingreso al sistema SIGD con credenciales y verificación de perfil asignado.",
     ruta: "/login",
   },
+  {
+    titulo: "Reportes y Tableros de Control",
+    subtitulo: "06_reportes-tablero-control",
+    descripcion:
+      "Consulta indicadores ejecutivos, tendencias, distribución de expedientes y áreas con cuellos de botella.",
+    ruta: "/reportes/dashboard",
+  },
 ];
 
 export default function HomePage() {

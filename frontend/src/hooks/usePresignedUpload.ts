@@ -3,8 +3,8 @@ import { useCallback, useRef, useState } from "react";
 import axios, { type AxiosRequestConfig } from "axios";
 
 import { apiClient } from "../api/client";
-import { computeFileSha256 } from "../utils/cryptoSha256";
-import { validatePdfMagicBytes } from "../utils/magicBytesValidator";
+import { calculateFileSha256 } from "../services/storageService";
+import { validatePdfFile } from "../utils/fileValidation";
 
 export interface PresignedUrlRequest {
   nombreArchivo: string;
@@ -30,6 +30,7 @@ export interface UploadedFile {
 export type UploadStatus =
   | "idle"
   | "validating"
+  | "hashing"
   | "requesting-url"
   | "uploading"
   | "success"
@@ -108,23 +109,29 @@ export function usePresignedUpload(
       setResult(null);
 
       try {
-        if (file.size === 0 || !file.name.toLowerCase().endsWith(".pdf")) {
+        if (file.size === 0) {
           throw new UploadError(
             "Seleccione un archivo PDF no vacío.",
             "invalid-file",
           );
         }
 
-        if (!(await validatePdfMagicBytes(file))) {
+        const validation = await validatePdfFile(file);
+        if (!validation.valid) {
           throw new UploadError(
-            "El archivo no contiene la firma binaria PDF válida.",
+            validation.reason,
             "invalid-magic-bytes",
           );
         }
 
+        if (controller.signal.aborted) {
+          throw new UploadError("La carga fue cancelada.", "cancelled");
+        }
+
+        setStatus("hashing");
         let sha256: string;
         try {
-          sha256 = await computeFileSha256(file);
+          sha256 = await calculateFileSha256(file);
         } catch (cause) {
           throw new UploadError(
             cause instanceof Error
@@ -132,6 +139,10 @@ export function usePresignedUpload(
               : "No fue posible calcular el hash SHA-256.",
             "hash",
           );
+        }
+
+        if (controller.signal.aborted) {
+          throw new UploadError("La carga fue cancelada.", "cancelled");
         }
 
         setStatus("requesting-url");
@@ -157,7 +168,7 @@ export function usePresignedUpload(
         } else {
           try {
             const response = await apiClient.post<PresignedUrlResponse>(
-              "/v1/storage/presigned-url",
+              "/api/v1/storage/presigned-url",
               {
                 nombreArchivo: file.name,
                 mimeType: "application/pdf",
