@@ -1,7 +1,14 @@
 import type { Pool } from "pg";
-import { registrarMutacion } from "../../audit/bitacora-auditoria.repository.js";
+
+import {
+  AppError,
+  NotFoundError,
+} from "../../shared/domain/errors/index.js";
+
 import type {
   ListarUsuariosQuery,
+  CrearUsuarioAdminDTO,
+  ActualizarUsuarioAdminDTO,
 } from "./dto/usuarioAdmin.dto.js";
 
 /**
@@ -10,7 +17,9 @@ import type {
  * Rama: B_LEONARDO
  *
  * Tareas:
- * - T-BE-OC-06: Directorio institucional de usuarios
+ * - T-BE-OC-05: Catálogo de sedes y puestos laborales
+ * - T-BE-OC-06: Directorio institucional con Full-Text Search
+ * - T-BE-OC-07: Validación de correo institucional
  * - T-BE-OC-08: Revocación de sesiones al desactivar usuarios
  */
 
@@ -71,49 +80,61 @@ export function crearUsuariosAdminService(pool: Pool) {
     }
 
     /**
-     * Búsqueda del directorio.
+     * T-BE-OC-06
      *
-     * Se busca por:
-     * - nombres
-     * - apellidos
-     * - DNI/documento
-     * - correo institucional
+     * Full-Text Search del directorio.
+     *
+     * La expresión debe coincidir con el índice GIN definido
+     * en 03_catalogo_sedes_puestos_laborales.sql.
      */
     if (busqueda && busqueda.trim() !== "") {
-      const posicion = agregarParametro(busqueda.trim());
+      const posicion = agregarParametro(
+        busqueda.trim(),
+      );
 
       condiciones.push(`
         (
           to_tsvector(
             'spanish',
-            concat_ws(
-              ' ',
-              p.nombres,
-              p.apellido_paterno,
-              p.apellido_materno,
-              p.numero_documento
-            )
+            COALESCE(p.nombres, '') || ' ' ||
+            COALESCE(p.apellido_paterno, '') || ' ' ||
+            COALESCE(p.apellido_materno, '') || ' ' ||
+            COALESCE(p.numero_documento, '')
           )
-          @@ websearch_to_tsquery('spanish', ${posicion})
-          OR p.numero_documento ILIKE '%' || ${posicion} || '%'
-          OR cu.email_login ILIKE '%' || ${posicion} || '%'
+          @@ websearch_to_tsquery(
+            'spanish',
+            ${posicion}
+          )
+          OR p.numero_documento
+             ILIKE '%' || ${posicion} || '%'
+          OR cu.email_login
+             ILIKE '%' || ${posicion} || '%'
         )
       `);
     }
 
     if (areaId) {
       const posicion = agregarParametro(areaId);
-      condiciones.push(`pl.id_area = ${posicion}`);
+
+      condiciones.push(
+        `pl.id_area = ${posicion}`,
+      );
     }
 
     if (sedeId) {
       const posicion = agregarParametro(sedeId);
-      condiciones.push(`pl.sede_id = ${posicion}`);
+
+      condiciones.push(
+        `pl.sede_id = ${posicion}`,
+      );
     }
 
     if (rolId) {
       const posicion = agregarParametro(rolId);
-      condiciones.push(`ur.rol_id = ${posicion}`);
+
+      condiciones.push(
+        `ur.rol_id = ${posicion}`,
+      );
     }
 
     if (estado) {
@@ -147,10 +168,14 @@ export function crearUsuariosAdminService(pool: Pool) {
         ? `WHERE ${condiciones.join(" AND ")}`
         : "";
 
-    const offset = (pagina - 1) * limite;
+    const offset =
+      (pagina - 1) * limite;
 
-    const parametroLimite = agregarParametro(limite);
-    const parametroOffset = agregarParametro(offset);
+    const parametroLimite =
+      agregarParametro(limite);
+
+    const parametroOffset =
+      agregarParametro(offset);
 
     const sqlDatos = `
       SELECT DISTINCT
@@ -176,10 +201,13 @@ export function crearUsuariosAdminService(pool: Pool) {
         rs.nombre AS rol,
 
         CASE
-          WHEN cu.estado = FALSE THEN 'INACTIVO'
+          WHEN cu.estado = FALSE
+            THEN 'INACTIVO'
+
           WHEN cu.bloqueado_hasta IS NOT NULL
                AND cu.bloqueado_hasta > now()
             THEN 'BLOQUEADO'
+
           ELSE 'ACTIVO'
         END AS estado,
 
@@ -190,13 +218,24 @@ export function crearUsuariosAdminService(pool: Pool) {
       INNER JOIN sigd_auth.persona AS p
         ON p.id = cu.persona_id
 
+      /*
+       * Contrato intermodular pendiente:
+       *
+       * sigd_auth.cuenta_usuario.id = BIGINT
+       * sigd_org.asignacion_personal.cuenta_id = UUID
+       *
+       * Los casts existentes se conservan temporalmente
+       * para no modificar contratos pertenecientes a
+       * otros módulos.
+       */
       LEFT JOIN sigd_org.asignacion_personal AS ap
         ON ap.cuenta_id::text = cu.id::text
         AND ap.activo = TRUE
         AND ap.vigencia @> now()
 
       LEFT JOIN sigd_org.puesto_laboral AS pl
-        ON pl.puesto_laboral_id = ap.puesto_laboral_id
+        ON pl.puesto_laboral_id =
+           ap.puesto_laboral_id
         AND pl.activo = TRUE
 
       LEFT JOIN sigd_org.sede AS s
@@ -225,13 +264,15 @@ export function crearUsuariosAdminService(pool: Pool) {
     `;
 
     /**
-     * Para contar se usan los mismos filtros,
-     * pero sin LIMIT ni OFFSET.
+     * Conteo total usando exactamente
+     * los mismos filtros, pero sin LIMIT/OFFSET.
      */
-    const parametrosConteo = parametros.slice(0, -2);
+    const parametrosConteo =
+      parametros.slice(0, -2);
 
     const sqlConteo = `
-      SELECT COUNT(DISTINCT cu.id)::int AS total
+      SELECT
+        COUNT(DISTINCT cu.id)::int AS total
 
       FROM sigd_auth.cuenta_usuario AS cu
 
@@ -244,7 +285,8 @@ export function crearUsuariosAdminService(pool: Pool) {
         AND ap.vigencia @> now()
 
       LEFT JOIN sigd_org.puesto_laboral AS pl
-        ON pl.puesto_laboral_id = ap.puesto_laboral_id
+        ON pl.puesto_laboral_id =
+           ap.puesto_laboral_id
         AND pl.activo = TRUE
 
       LEFT JOIN sigd_org.usuario_rol AS ur
@@ -254,11 +296,15 @@ export function crearUsuariosAdminService(pool: Pool) {
       ${where};
     `;
 
-    const [resultadoDatos, resultadoConteo] = await Promise.all([
+    const [
+      resultadoDatos,
+      resultadoConteo,
+    ] = await Promise.all([
       pool.query<UsuarioDirectorio>(
         sqlDatos,
         parametros,
       ),
+
       pool.query<{ total: number }>(
         sqlConteo,
         parametrosConteo,
@@ -275,6 +321,7 @@ export function crearUsuariosAdminService(pool: Pool) {
         pagina,
         limite,
         total,
+
         totalPaginas:
           total === 0
             ? 0
@@ -284,18 +331,148 @@ export function crearUsuariosAdminService(pool: Pool) {
   }
 
   /**
+   * T-BE-OC-05
+   *
+   * Comprueba que el puesto laboral:
+   * - exista;
+   * - se encuentre activo.
+   *
+   * El DoD de Leonardo establece que no se puede
+   * asignar personal a un puesto laboral inactivo.
+   */
+  async function validarPuestoLaboralActivo(
+    puestoLaboralId: string,
+  ): Promise<void> {
+    const resultado =
+      await pool.query<{
+        activo: boolean;
+      }>(
+        `
+          SELECT activo
+          FROM sigd_org.puesto_laboral
+          WHERE puesto_laboral_id = $1
+        `,
+        [puestoLaboralId],
+      );
+
+    const puesto = resultado.rows[0];
+
+    if (!puesto) {
+      throw new NotFoundError({
+        message:
+          "El puesto laboral indicado no existe.",
+      });
+    }
+
+    if (!puesto.activo) {
+      throw new AppError({
+        status: 422,
+        code: "PUESTO_LABORAL_INACTIVO",
+        message:
+          "No es posible asignar un usuario a un puesto laboral inactivo.",
+        detail:
+          "Seleccione un puesto laboral activo antes de registrar o reasignar al usuario.",
+      });
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/usuarios
+   *
+   * El DTO y la validación funcional perteneciente
+   * a OrganiCore están implementados.
+   *
+   * La persistencia completa queda protegida mientras
+   * exista la incompatibilidad de identificadores:
+   *
+   * sigd_auth.cuenta_usuario.id = BIGINT
+   * sigd_org.asignacion_personal.cuenta_id = UUID
+   * sigd_org.usuario_rol.cuenta_id = UUID
+   *
+   * No se modifican contratos de IdentiCore ni
+   * de otros integrantes desde B_LEONARDO.
+   */
+  async function crearUsuario(
+    datos: CrearUsuarioAdminDTO,
+  ): Promise<never> {
+    await validarPuestoLaboralActivo(
+      datos.puestoLaboralId,
+    );
+
+    throw new AppError({
+      status: 503,
+      code: "CONTRATO_INTERMODULAR_PENDIENTE",
+      message:
+        "No se puede completar el alta institucional hasta unificar los identificadores entre IdentiCore y OrganiCore.",
+      detail:
+        "sigd_auth.cuenta_usuario.id utiliza BIGINT, mientras sigd_org.asignacion_personal.cuenta_id y sigd_org.usuario_rol.cuenta_id utilizan UUID.",
+    });
+  }
+
+  /**
+   * PUT /api/v1/admin/usuarios/:id
+   *
+   * Comprueba primero que la cuenta exista.
+   *
+   * Si se solicita una reasignación de puesto,
+   * también se valida que el nuevo puesto esté activo.
+   *
+   * La vinculación final con OrganiCore queda
+   * protegida por el contrato intermodular pendiente.
+   */
+  async function actualizarUsuario(
+    usuarioId: number,
+    datos: ActualizarUsuarioAdminDTO,
+  ): Promise<never> {
+    const resultadoUsuario =
+      await pool.query<{ id: number }>(
+        `
+          SELECT id
+          FROM sigd_auth.cuenta_usuario
+          WHERE id = $1
+        `,
+        [usuarioId],
+      );
+
+    if (!resultadoUsuario.rows[0]) {
+      throw new NotFoundError({
+        message:
+          "El usuario indicado no existe.",
+      });
+    }
+
+    if (datos.puestoLaboralId) {
+      await validarPuestoLaboralActivo(
+        datos.puestoLaboralId,
+      );
+    }
+
+    throw new AppError({
+      status: 503,
+      code: "CONTRATO_INTERMODULAR_PENDIENTE",
+      message:
+        "No se puede completar la actualización institucional hasta unificar los identificadores entre IdentiCore y OrganiCore.",
+      detail:
+        "La cuenta de IdentiCore utiliza BIGINT y las relaciones de usuario de OrganiCore utilizan UUID.",
+    });
+  }
+
+  /**
    * T-BE-OC-08
    *
    * Revoca todas las sesiones activas almacenadas
    * en PostgreSQL para un usuario.
    *
-   * Se usará cuando la cuenta sea:
-   * - desactivada
-   * - bloqueada administrativamente
+   * Se utiliza como parte de la baja o bloqueo
+   * administrativo de personal.
    *
-   * La integración con Redis queda pendiente
-   * hasta que exista la implementación real
-   * correspondiente en el backend.
+   * Redis ya existe como infraestructura general
+   * del backend, pero el módulo de autenticación/login
+   * que debe consultar una lista de revocación todavía
+   * no se encuentra implementado.
+   *
+   * Por eso esta función se limita al contrato
+   * actualmente disponible: sigd_auth.sesion_usuario.
    */
   async function revocarSesionesUsuario(
     usuarioId: number,
@@ -313,9 +490,14 @@ export function crearUsuariosAdminService(pool: Pool) {
 
   return {
     listarUsuarios,
+    validarPuestoLaboralActivo,
+    crearUsuario,
+    actualizarUsuario,
     revocarSesionesUsuario,
   };
 }
 
 export type UsuariosAdminService =
-  ReturnType<typeof crearUsuariosAdminService>;
+  ReturnType<
+    typeof crearUsuariosAdminService
+  >;

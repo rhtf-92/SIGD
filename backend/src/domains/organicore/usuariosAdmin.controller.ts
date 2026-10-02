@@ -1,4 +1,8 @@
-import type { Request, Response, NextFunction } from "express";
+import type {
+  Request,
+  Response,
+  NextFunction,
+} from "express";
 
 import {
   listarUsuariosQuerySchema,
@@ -7,7 +11,9 @@ import {
   usuarioIdParamSchema,
 } from "./dto/usuarioAdmin.dto.js";
 
-import type { UsuariosAdminService } from "./usuariosAdmin.service.js";
+import type {
+  UsuariosAdminService,
+} from "./usuariosAdmin.service.js";
 
 /**
  * OrganiCore - Controller de administración de usuarios
@@ -25,6 +31,8 @@ export function crearUsuariosAdminController(
 ) {
   /**
    * GET /api/v1/admin/usuarios
+   *
+   * Directorio institucional paginado.
    */
   async function listarUsuarios(
     req: Request,
@@ -32,9 +40,15 @@ export function crearUsuariosAdminController(
     next: NextFunction,
   ): Promise<void> {
     try {
-      const filtros = listarUsuariosQuerySchema.parse(req.query);
+      const filtros =
+        listarUsuariosQuerySchema.parse(
+          req.query,
+        );
 
-      const resultado = await service.listarUsuarios(filtros);
+      const resultado =
+        await service.listarUsuarios(
+          filtros,
+        );
 
       res.status(200).json(resultado);
     } catch (error) {
@@ -45,8 +59,8 @@ export function crearUsuariosAdminController(
   /**
    * POST /api/v1/admin/usuarios
    *
-   * El método queda preparado para conectarse con
-   * service.crearUsuario cuando implementemos la siguiente fase.
+   * Valida los datos del usuario institucional
+   * y delega las reglas de negocio al servicio.
    */
   async function crearUsuario(
     req: Request,
@@ -54,20 +68,17 @@ export function crearUsuariosAdminController(
     next: NextFunction,
   ): Promise<void> {
     try {
-      const datos = crearUsuarioAdminSchema.parse(req.body);
+      const datos =
+        crearUsuarioAdminSchema.parse(
+          req.body,
+        );
 
-      res.status(501).json({
-        code: "NOT_IMPLEMENTED",
-        message:
-          "La creación de usuarios será habilitada al integrar IdentiCore y OrganiCore.",
-        datosValidados: {
-          numeroDocumento: datos.numeroDocumento,
-          correo: datos.correo,
-          username: datos.username,
-          puestoLaboralId: datos.puestoLaboralId,
-          rolId: datos.rolId,
-        },
-      });
+      const resultado =
+        await service.crearUsuario(
+          datos,
+        );
+
+      res.status(201).json(resultado);
     } catch (error) {
       next(error);
     }
@@ -76,9 +87,8 @@ export function crearUsuariosAdminController(
   /**
    * PUT /api/v1/admin/usuarios/:id
    *
-   * El método queda preparado para conectarse con
-   * service.actualizarUsuario cuando se unifique
-   * el contrato de identificadores.
+   * Valida el identificador y los datos
+   * enviados para la actualización.
    */
   async function actualizarUsuario(
     req: Request,
@@ -86,18 +96,23 @@ export function crearUsuariosAdminController(
     next: NextFunction,
   ): Promise<void> {
     try {
-      const { id } = usuarioIdParamSchema.parse(req.params);
+      const { id } =
+        usuarioIdParamSchema.parse(
+          req.params,
+        );
 
       const datos =
-        actualizarUsuarioAdminSchema.parse(req.body);
+        actualizarUsuarioAdminSchema.parse(
+          req.body,
+        );
 
-      res.status(501).json({
-        code: "NOT_IMPLEMENTED",
-        message:
-          "La actualización de usuarios será habilitada al integrar IdentiCore y OrganiCore.",
-        usuarioId: id,
-        datosValidados: datos,
-      });
+      const resultado =
+        await service.actualizarUsuario(
+          id,
+          datos,
+        );
+
+      res.status(200).json(resultado);
     } catch (error) {
       next(error);
     }
@@ -111,4 +126,6 @@ export function crearUsuariosAdminController(
 }
 
 export type UsuariosAdminController =
-  ReturnType<typeof crearUsuariosAdminController>;
+  ReturnType<
+    typeof crearUsuariosAdminController
+  >;

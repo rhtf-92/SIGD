@@ -46,7 +46,9 @@ describe('correoInstitucionalSchema', () => {
       'leonardo@iestpsuiza.edu.pe',
     );
 
-    expect(resultado).toBe('leonardo@iestpsuiza.edu.pe');
+    expect(resultado).toBe(
+      'leonardo@iestpsuiza.edu.pe',
+    );
   });
 
   it('acepta el dominio institucional sin importar mayúsculas', () => {
@@ -62,7 +64,9 @@ describe('correoInstitucionalSchema', () => {
       '  leonardo@iestpsuiza.edu.pe  ',
     );
 
-    expect(resultado).toBe('leonardo@iestpsuiza.edu.pe');
+    expect(resultado).toBe(
+      'leonardo@iestpsuiza.edu.pe',
+    );
   });
 
   it('rechaza cuentas Gmail', () => {
@@ -104,29 +108,32 @@ describe('correoInstitucionalSchema', () => {
 
 describe('listarUsuariosQuerySchema', () => {
   it('aplica paginación por defecto', () => {
-    const resultado = listarUsuariosQuerySchema.parse({});
+    const resultado =
+      listarUsuariosQuerySchema.parse({});
 
     expect(resultado.pagina).toBe(1);
     expect(resultado.limite).toBe(20);
   });
 
   it('convierte pagina y limite desde string a number', () => {
-    const resultado = listarUsuariosQuerySchema.parse({
-      pagina: '2',
-      limite: '10',
-    });
+    const resultado =
+      listarUsuariosQuerySchema.parse({
+        pagina: '2',
+        limite: '10',
+      });
 
     expect(resultado.pagina).toBe(2);
     expect(resultado.limite).toBe(10);
   });
 
   it('acepta filtros UUID válidos', () => {
-    const resultado = listarUsuariosQuerySchema.parse({
-      areaId: AREA_ID,
-      sedeId: SEDE_ID,
-      rolId: ROL_ID,
-      estado: 'ACTIVO',
-    });
+    const resultado =
+      listarUsuariosQuerySchema.parse({
+        areaId: AREA_ID,
+        sedeId: SEDE_ID,
+        rolId: ROL_ID,
+        estado: 'ACTIVO',
+      });
 
     expect(resultado.areaId).toBe(AREA_ID);
     expect(resultado.sedeId).toBe(SEDE_ID);
@@ -188,9 +195,13 @@ describe('crearUsuarioAdminSchema', () => {
 
   it('acepta un usuario institucional válido', () => {
     const resultado =
-      crearUsuarioAdminSchema.parse(payloadValido);
+      crearUsuarioAdminSchema.parse(
+        payloadValido,
+      );
 
-    expect(resultado.numeroDocumento).toBe('74851201');
+    expect(resultado.numeroDocumento).toBe(
+      '74851201',
+    );
 
     expect(resultado.correo).toBe(
       'leonardo@iestpsuiza.edu.pe',
@@ -308,9 +319,10 @@ describe('actualizarUsuarioAdminSchema', () => {
 
 describe('usuarioIdParamSchema', () => {
   it('convierte id string a number', () => {
-    const resultado = usuarioIdParamSchema.parse({
-      id: '15',
-    });
+    const resultado =
+      usuarioIdParamSchema.parse({
+        id: '15',
+      });
 
     expect(resultado.id).toBe(15);
   });
@@ -382,10 +394,11 @@ describe('crearUsuariosAdminService', () => {
     const service =
       crearUsuariosAdminService(mockPool);
 
-    const resultado = await service.listarUsuarios({
-      pagina: 1,
-      limite: 20,
-    });
+    const resultado =
+      await service.listarUsuarios({
+        pagina: 1,
+        limite: 20,
+      });
 
     expect(resultado.datos).toEqual([
       usuarioMock,
@@ -425,7 +438,6 @@ describe('crearUsuariosAdminService', () => {
     expect(sql).toContain('OFFSET');
 
     expect(parametros).toContain(10);
-
     expect(parametros).toContain(10);
   });
 
@@ -435,14 +447,17 @@ describe('crearUsuariosAdminService', () => {
     const service =
       crearUsuariosAdminService(mockPool);
 
-    const resultado = await service.listarUsuarios({
-      pagina: 1,
-      limite: 20,
-    });
+    const resultado =
+      await service.listarUsuarios({
+        pagina: 1,
+        limite: 20,
+      });
 
     expect(resultado.datos).toEqual([]);
 
-    expect(resultado.paginacion.total).toBe(0);
+    expect(
+      resultado.paginacion.total,
+    ).toBe(0);
 
     expect(
       resultado.paginacion.totalPaginas,
@@ -455,10 +470,11 @@ describe('crearUsuariosAdminService', () => {
     const service =
       crearUsuariosAdminService(mockPool);
 
-    const resultado = await service.listarUsuarios({
-      pagina: 1,
-      limite: 20,
-    });
+    const resultado =
+      await service.listarUsuarios({
+        pagina: 1,
+        limite: 20,
+      });
 
     expect(
       resultado.paginacion.totalPaginas,
@@ -747,6 +763,10 @@ describe('crearUsuariosAdminService', () => {
     );
   });
 
+  /* =========================================================
+   * SERVICE - REVOCACIÓN DE SESIONES
+   * ========================================================= */
+
   it('revoca las sesiones activas de un usuario', async () => {
     mockQuery.mockResolvedValue({
       rows: [],
@@ -759,7 +779,9 @@ describe('crearUsuariosAdminService', () => {
     const total =
       await service.revocarSesionesUsuario(15);
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(
+      mockQuery,
+    ).toHaveBeenCalledWith(
       expect.stringContaining(
         'DELETE FROM sigd_auth.sesion_usuario',
       ),
@@ -782,5 +804,113 @@ describe('crearUsuariosAdminService', () => {
       await service.revocarSesionesUsuario(15);
 
     expect(total).toBe(0);
+  });
+
+  /* =========================================================
+   * SERVICE - VALIDACIÓN DE PUESTO / ALTA
+   * ========================================================= */
+
+  it('rechaza asignar un puesto laboral inactivo', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          activo: false,
+        },
+      ],
+      rowCount: 1,
+    });
+
+    const service =
+      crearUsuariosAdminService(mockPool);
+
+    await expect(
+      service.crearUsuario({
+        tipoDocumentoId: 1,
+        numeroDocumento: '74851201',
+        nombres: 'Leonardo',
+        apellidoPaterno: 'Rodriguez',
+        apellidoMaterno: null,
+        telefono: null,
+        correo: 'leonardo@iestpsuiza.edu.pe',
+        username: 'leonardo.rodriguez',
+        passwordInicial: 'ClaveSegura2026!',
+        puestoLaboralId: PUESTO_ID,
+        rolId: ROL_ID,
+      }),
+    ).rejects.toMatchObject({
+      status: 422,
+      code: 'PUESTO_LABORAL_INACTIVO',
+    });
+
+    expect(
+      mockQuery,
+    ).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'FROM sigd_org.puesto_laboral',
+      ),
+      [PUESTO_ID],
+    );
+  });
+
+  it('rechaza un puesto laboral inexistente', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [],
+      rowCount: 0,
+    });
+
+    const service =
+      crearUsuariosAdminService(mockPool);
+
+    await expect(
+      service.crearUsuario({
+        tipoDocumentoId: 1,
+        numeroDocumento: '74851201',
+        nombres: 'Leonardo',
+        apellidoPaterno: 'Rodriguez',
+        apellidoMaterno: null,
+        telefono: null,
+        correo: 'leonardo@iestpsuiza.edu.pe',
+        username: 'leonardo.rodriguez',
+        passwordInicial: 'ClaveSegura2026!',
+        puestoLaboralId: PUESTO_ID,
+        rolId: ROL_ID,
+      }),
+    ).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it('documenta el bloqueo intermodular al crear con puesto activo', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          activo: true,
+        },
+      ],
+      rowCount: 1,
+    });
+
+    const service =
+      crearUsuariosAdminService(mockPool);
+
+    await expect(
+      service.crearUsuario({
+        tipoDocumentoId: 1,
+        numeroDocumento: '74851201',
+        nombres: 'Leonardo',
+        apellidoPaterno: 'Rodriguez',
+        apellidoMaterno: null,
+        telefono: null,
+        correo: 'leonardo@iestpsuiza.edu.pe',
+        username: 'leonardo.rodriguez',
+        passwordInicial: 'ClaveSegura2026!',
+        puestoLaboralId: PUESTO_ID,
+        rolId: ROL_ID,
+      }),
+    ).rejects.toMatchObject({
+      status: 503,
+      code:
+        'CONTRATO_INTERMODULAR_PENDIENTE',
+    });
   });
 });
