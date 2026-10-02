@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
+import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 
@@ -16,11 +17,16 @@ export default function VentanillaPresencialPage() {
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [procedimientoTupa, setProcedimientoTupa] = useState("");
+  const [requisitosRecibidos, setRequisitosRecibidos] = useState<Set<number>>(new Set());
   const [tipoDocumento, setTipoDocumento] = useState("SOLICITUD");
   const [asunto, setAsunto] = useState("");
   const [cantidadFolios, setCantidadFolios] = useState(1);
   const [cargoGenerado, setCargoGenerado] = useState<CargoOficialTramite | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_2026.find(
+    (procedimiento) => procedimiento.codigo === procedimientoTupa,
+  );
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -47,7 +53,9 @@ export default function VentanillaPresencialPage() {
         correoElectronico: correo,
         telefono,
       },
-      asunto,
+      asunto: procedimientoSeleccionado
+        ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
+        : asunto,
       documentoPrincipalTipo: tipoDocumento,
       cantidadFolios: Number(cantidadFolios) || 1,
       hashSha256Recepcion: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -65,6 +73,8 @@ export default function VentanillaPresencialPage() {
     setNombre("");
     setCorreo("");
     setTelefono("");
+    setProcedimientoTupa("");
+    setRequisitosRecibidos(new Set());
     setAsunto("");
     setCantidadFolios(1);
     setModalAbierto(false);
@@ -251,11 +261,35 @@ export default function VentanillaPresencialPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="tipo-tramite-select" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="procedimiento-tupa-select" className="block text-xs font-semibold text-slate-700 mb-1">
+                Procedimiento TUPA 2026 *
+              </label>
+              <select
+                id="procedimiento-tupa-select"
+                required
+                value={procedimientoTupa}
+                onChange={(e) => {
+                  setProcedimientoTupa(e.target.value);
+                  setRequisitosRecibidos(new Set());
+                }}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+              >
+                <option value="">Seleccione un procedimiento o servicio</option>
+                <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
+                {PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => (
+                  <option key={procedimiento.codigo} value={procedimiento.codigo}>
+                    {procedimiento.codigo} - {procedimiento.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="tipo-documento-select" className="block text-xs font-semibold text-slate-700 mb-1">
                 Tipo de Documento Presentado *
               </label>
               <select
-                id="tipo-tramite-select"
+                id="tipo-documento-select"
                 value={tipoDocumento}
                 onChange={(e) => setTipoDocumento(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
@@ -284,6 +318,88 @@ export default function VentanillaPresencialPage() {
               />
             </div>
           </div>
+
+          {procedimientoSeleccionado && (
+            <section
+              aria-labelledby="detalle-tupa-heading"
+              className="rounded-lg border border-blue-200 bg-blue-50/60 p-4"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-200 pb-3">
+                <div>
+                  <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
+                    TUPA {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Pasco</p>
+                </div>
+                {procedimientoSeleccionado.derechoPago && (
+                  <p className="max-w-xl text-sm font-semibold text-slate-800">
+                    Derecho de pago: {procedimientoSeleccionado.derechoPago}
+                  </p>
+                )}
+              </div>
+
+              {procedimientoSeleccionado.requisitos && (
+                <div className="mt-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold uppercase text-slate-700">Requisitos documentarios</h4>
+                    <span className="text-xs text-slate-600">
+                      {requisitosRecibidos.size} de {procedimientoSeleccionado.requisitos.length} verificados
+                    </span>
+                  </div>
+                  <ul className="grid gap-2 sm:grid-cols-2">
+                    {procedimientoSeleccionado.requisitos.map((requisito, index) => (
+                      <li key={`${procedimientoSeleccionado.codigo}-${index}`}>
+                        <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={requisitosRecibidos.has(index)}
+                            onChange={(event) => {
+                              setRequisitosRecibidos((actuales) => {
+                                const siguientes = new Set(actuales);
+                                if (event.target.checked) siguientes.add(index);
+                                else siguientes.delete(index);
+                                return siguientes;
+                              });
+                            }}
+                            className="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
+                          />
+                          <span>{requisito}</span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {procedimientoSeleccionado.detalleTarifas && (
+                <div className="mt-3">
+                  <h4 className="mb-2 text-xs font-bold uppercase text-slate-700">Servicios y tarifas</h4>
+                  <ul className="grid gap-1 text-sm text-slate-700 sm:grid-cols-2">
+                    {procedimientoSeleccionado.detalleTarifas.map((tarifa) => (
+                      <li key={tarifa}>{tarifa}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {(procedimientoSeleccionado.dependencia || procedimientoSeleccionado.autoridad || procedimientoSeleccionado.tiempoMaximo) && (
+                <dl className="mt-3 grid gap-2 border-t border-blue-200 pt-3 text-xs sm:grid-cols-3">
+                  {procedimientoSeleccionado.dependencia && (
+                    <div><dt className="font-bold text-slate-700">Dependencia</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.dependencia}</dd></div>
+                  )}
+                  {procedimientoSeleccionado.autoridad && (
+                    <div><dt className="font-bold text-slate-700">Autoridad</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.autoridad}</dd></div>
+                  )}
+                  {procedimientoSeleccionado.tiempoMaximo && (
+                    <div><dt className="font-bold text-slate-700">Tiempo máximo</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.tiempoMaximo}</dd></div>
+                  )}
+                </dl>
+              )}
+              {procedimientoSeleccionado.nota && (
+                <p className="mt-3 text-xs text-slate-600">{procedimientoSeleccionado.nota}</p>
+              )}
+            </section>
+          )}
 
           <div>
             <label htmlFor="asunto-input" className="block text-xs font-semibold text-slate-700 mb-1">

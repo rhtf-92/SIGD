@@ -6,22 +6,18 @@ interface ConsentimientoLey29733ModalProps {
 }
 
 export function ConsentimientoLey29733Modal({ isOpen, onClose }: ConsentimientoLey29733ModalProps) {
-  if (!isOpen) {
-    return null;
-  }
-
-  const handleEscapeKey = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      onClose();
-    }
-  };
-
   useEffect(() => {
+    if (!isOpen) return;
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
     document.addEventListener('keydown', handleEscapeKey);
     return () => {
       document.removeEventListener('keydown', handleEscapeKey);
     };
-  }, [onClose]);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>

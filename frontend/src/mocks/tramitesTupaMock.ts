@@ -19,6 +19,7 @@ import {
   PROGRAMAS_ESTUDIO_CATALOGO,
 } from "../types/tramiteWizard";
 import { type SelectOption } from "../components/common/SearchableSelect";
+import { PROCEDIMIENTOS_TUPA_2026 } from "../data/tupaPasco2026";
 
 /**
  * Lista canónica y oficial de las 11 Carreras Profesionales del IESTP "Suiza".
@@ -37,113 +38,48 @@ export interface TramiteTupaMockItem {
   readonly esTupa: boolean;
   readonly unidadOrganica: string;
   readonly unidadId: string;
-  readonly diasPlazoLegal: number;
-  readonly costoSoles: number;
+  readonly diasPlazoLegal?: number;
+  readonly costoSoles?: number;
+  readonly derechoPago?: string;
+  readonly tiempoMaximo?: string;
   readonly descripcion: string;
   readonly carrerasAplica: readonly ProgramaEstudioCodigo[];
 }
 
+const TODOS_LOS_PROGRAMAS = PROGRAMAS_ESTUDIO_CATALOGO.map(
+  ({ value }) => value
+);
+
 export const TRAMITES_TUPA_MOCK: readonly TramiteTupaMockItem[] = [
-  {
-    id: "TUPA-01",
-    codigo: "TUPA-01",
-    nombre: "TUPA 01: Certificado Oficial de Estudios Modulares / Regular",
-    esTupa: true,
-    unidadOrganica: "Secretaría Académica",
-    unidadId: "SEC_ACAD",
-    diasPlazoLegal: 7,
-    costoSoles: 25.0,
-    descripcion:
-      "Expedición física y digital de certificados modulares para egresados y estudiantes regulares.",
-    carrerasAplica: [
-      "ADE",
-      "AOT",
-      "ASAD",
-      "CONT",
-      "CCIV",
-      "DSI",
-      "EIND",
-      "ENF",
-      "MFOR",
-      "MAUT",
-      "PAGR",
-    ],
-  },
-  {
-    id: "TUPA-02",
-    codigo: "TUPA-02",
-    nombre: "TUPA 02: Emisión de Título Profesional Técnico y Duplicado",
-    esTupa: true,
-    unidadOrganica: "Dirección General",
-    unidadId: "DIR_GRAL",
-    diasPlazoLegal: 30,
-    costoSoles: 120.0,
-    descripcion:
-      "Trámite de titulación oficial e inscripción ante la Dirección Regional de Educación Ucayali.",
-    carrerasAplica: [
-      "ADE",
-      "AOT",
-      "ASAD",
-      "CONT",
-      "CCIV",
-      "DSI",
-      "EIND",
-      "ENF",
-      "MFOR",
-      "MAUT",
-      "PAGR",
-    ],
-  },
-  {
-    id: "TUPA-03",
-    codigo: "TUPA-03",
-    nombre: "TUPA 03: Constancia de Matrícula, No Adeudo o Egresado",
-    esTupa: true,
-    unidadOrganica: "Secretaría Académica",
-    unidadId: "SEC_ACAD",
-    diasPlazoLegal: 3,
-    costoSoles: 15.0,
-    descripcion:
-      "Constancias institucionales inmediatas para becas PRONABEC, pasantías y convenios.",
-    carrerasAplica: [
-      "ADE",
-      "AOT",
-      "ASAD",
-      "CONT",
-      "CCIV",
-      "DSI",
-      "EIND",
-      "ENF",
-      "MFOR",
-      "MAUT",
-      "PAGR",
-    ],
-  },
-  {
-    id: "TUPA-04",
-    codigo: "TUPA-04",
-    nombre: "TUPA 04: Convalidación y Reincorporación de Matrícula",
-    esTupa: true,
-    unidadOrganica: "Unidad Académica",
-    unidadId: "UNID_ACAD",
-    diasPlazoLegal: 15,
-    costoSoles: 45.0,
-    descripcion:
-      "Evaluación curricular de asignaturas cursadas para cambio de plan o traslado institucional.",
-    carrerasAplica: [
-      "ADE",
-      "AOT",
-      "ASAD",
-      "CONT",
-      "CCIV",
-      "DSI",
-      "EIND",
-      "ENF",
-      "MFOR",
-      "MAUT",
-      "PAGR",
-    ],
-  },
+  ...PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => {
+    const dependencia = procedimiento.dependencia ?? "Mesa de Partes";
+    const datosDescripcion = [
+      procedimiento.derechoPago
+        ? `Derecho de pago: ${procedimiento.derechoPago}`
+        : undefined,
+      procedimiento.tiempoMaximo
+        ? `Tiempo máximo: ${procedimiento.tiempoMaximo}`
+        : undefined,
+      ...(procedimiento.detalleTarifas ?? []),
+      procedimiento.nota,
+    ].filter((dato): dato is string => Boolean(dato));
+
+    return {
+      id: `TUPA-${procedimiento.codigo}`,
+      codigo: procedimiento.codigo,
+      nombre: procedimiento.nombre,
+      esTupa: true,
+      unidadOrganica: dependencia,
+      unidadId: dependencia
+        .split(" / ")[0]
+        .toUpperCase()
+        .replaceAll(" ", "_"),
+      derechoPago: procedimiento.derechoPago,
+      tiempoMaximo: procedimiento.tiempoMaximo,
+      descripcion: datosDescripcion.join(" • "),
+      carrerasAplica: TODOS_LOS_PROGRAMAS,
+    };
+  }),
   {
     id: "LIBRE",
     codigo: "LIBRE",
@@ -151,8 +87,8 @@ export const TRAMITES_TUPA_MOCK: readonly TramiteTupaMockItem[] = [
     esTupa: false,
     unidadOrganica: "Mesa de Partes Central",
     unidadId: "MESA_PARTES",
-    diasPlazoLegal: 30,
-    costoSoles: 0.0,
+    derechoPago: "Gratuito / no tarifado",
+    tiempoMaximo: "30 días hábiles (referencial)",
     descripcion:
       "Ingreso directo a la Mesa de Partes Central para requerimientos no tarifados por el TUPA.",
     carrerasAplica: [],
