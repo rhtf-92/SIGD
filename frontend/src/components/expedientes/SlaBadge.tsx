@@ -17,7 +17,7 @@ export interface SlaBadgeProps {
 const ESTILOS_ESTADO: Record<
   SlaStatus,
   {
-    contenedor: string;
+    contenedor: string; 
     puntoIndicador: string;
     etiquetaTexto: string;
   }
