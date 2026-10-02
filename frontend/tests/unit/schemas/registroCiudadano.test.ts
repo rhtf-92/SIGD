@@ -254,6 +254,48 @@ describe("juridicalSchema", () => {
     expect(resultado.success).toBe(true);
   });
 
+  it("debe ACEPTAR un RUC válido de persona natural con negocio (10123456781)", () => {
+    const resultado = juridicalSchema.safeParse(
+      crearPersonaJuridica({ ruc: "10123456781" })
+    );
+    expect(resultado.success).toBe(true);
+  });
+
+  it("debe ACEPTAR un segundo RUC válido con prefijo 10 (10987654321)", () => {
+    const resultado = juridicalSchema.safeParse(
+      crearPersonaJuridica({ ruc: "10987654321" })
+    );
+    expect(resultado.success).toBe(true);
+  });
+
+  it("debe ACEPTAR un RUC válido de institución pública con prefijo 20 (20987654326)", () => {
+    const resultado = juridicalSchema.safeParse(
+      crearPersonaJuridica({ ruc: "20987654326" })
+    );
+    expect(resultado.success).toBe(true);
+  });
+
+  it("debe RECHAZAR un RUC con caracteres alfanuméricos (2013131295A)", () => {
+    const resultado = juridicalSchema.safeParse(
+      crearPersonaJuridica({ ruc: "2013131295A" })
+    );
+    expect(resultado.success).toBe(false);
+  });
+
+  it("debe RECHAZAR un RUC con longitud incorrecta, menos de 11 dígitos (2013131295)", () => {
+    const resultado = juridicalSchema.safeParse(
+      crearPersonaJuridica({ ruc: "2013131295" })
+    );
+    expect(resultado.success).toBe(false);
+  });
+
+  it("debe RECHAZAR un RUC con longitud incorrecta, más de 11 dígitos (201313129550)", () => {
+    const resultado = juridicalSchema.safeParse(
+      crearPersonaJuridica({ ruc: "201313129550" })
+    );
+    expect(resultado.success).toBe(false);
+  });
+
   it("debe RECHAZAR si falta cualquier campo de representanteLegal", () => {
     const personaSinNombres = {
       ...personaJuridicaBase,
