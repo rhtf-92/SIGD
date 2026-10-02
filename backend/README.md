@@ -19,6 +19,26 @@
 
 ---
 
+## 🏛️ Arquitectura del Backend Integrado
+
+El backend del SIGD implementa una arquitectura desacoplada, orientada a dominios y con observabilidad transversal:
+
+1. **Serialización Global de Errores (RFC 7807 / RFC 9457):** Todas las respuestas de error siguen el estándar `application/problem+json`, mapeando deterministamente excepciones de negocio y violaciones de integridad de PostgreSQL (`23505` a 409 Conflict, `23503` a 400 Bad Request, `P0001` a 422 Unprocessable Entity).
+2. **Trazabilidad Contextual con `AsyncLocalStorage`:** Propagación transparente del contexto de solicitud (`correlation_id`, usuario actor, IP de origen) a través de todas las capas sin contaminar las firmas de los casos de uso.
+3. **Patrón Transactional Outbox:** Encolado transaccional de eventos de dominio en `sigd_audit.evento_outbox` y procesamiento asíncrono con worker en background utilizando `FOR UPDATE SKIP LOCKED`.
+4. **Validación de Esquemas con Zod:** Validación estricta en tiempo de ejecución de payloads de entrada mapeados a `invalid_params`.
+
+### Dominio DocuCore (Firma Digital y Generación A4 - B_VALENTIN)
+
+A partir de la rama `B_VALENTIN`, se introduce el dominio `src/domains/docucore` que encapsula la generación institucional de PDF A4, la pasarela de firma digital Refirma y la gestión de sesiones efímeras:
+
+- **A4GeneratorService**: Generador de PDF en hoja A4 exacta (210×297 mm), márgenes 25 mm, membrete institucional, control de viudas/huérfanas, tablas atómicas y bloque de firma atómico.
+- **RefirmaGatewayService**: Pasarela del protocolo `refirma://sign?arguments=[BASE64URL]` con validación estricta de payload (cuatro claves obligatorias, HTTPS, lista blanca de hosts, SHA-256 en minúsculas, Base64URL sin padding).
+- **FirmaSessionStore**: Tokens de 256 bits, TTL 300 s, clave derivada por SHA-256, consumo atómico (`GETDEL` en Redis / `delete` en memoria).
+- **ServicioFirmaService**: Orquestación completa: generación de PDF, emisión de token, construcción de URI, callback con autodestrucción de sesión, URL temporal de descarga.
+
+---
+
 ## 📑 ÍNDICE GENERAL
 
 1. [Identidad Institucional y Rol del Backend](#1-identidad-institucional-y-rol-del-backend)
