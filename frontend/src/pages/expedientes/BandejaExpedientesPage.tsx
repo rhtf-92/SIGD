@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import BandejaTabFilter from "../../components/expedientes/BandejaTabFilter";
@@ -82,6 +82,12 @@ export default function BandejaExpedientesPage() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroCcd, setFiltroCcd] = useState<RutaCcdSeleccionada | null>(null);
   const [mostrarFiltroCcd, setMostrarFiltroCcd] = useState(false);
+  const [ahora, setAhora] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setAhora(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const { data: expedientesBase } = useExpedientesBase();
   const { data: expedientesFiltradosApi, isLoading, isError } =
@@ -112,7 +118,7 @@ export default function BandejaExpedientesPage() {
   const proximosAVencer =
     expedientesBase?.filter((exp) => {
       const diasRestantes = Math.ceil(
-        (new Date(exp.fechaLimiteAtencion).getTime() - Date.now()) /
+        (new Date(exp.fechaLimiteAtencion).getTime() - ahora) /
           (1000 * 60 * 60 * 24),
       );
       return diasRestantes >= 0 && diasRestantes <= 2;

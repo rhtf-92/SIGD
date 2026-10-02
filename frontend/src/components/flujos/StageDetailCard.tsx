@@ -4,6 +4,8 @@ interface StageDetailCardProps {
   etapa: EtapaWorkflowVisual;
   indice: number;
   esActual: boolean;
+  /** F_ADRIANO T-FE-DOC-01: permite cargar actas/certificados en la etapa actual. */
+  onToggleRequisito?: (idEtapa: number, idRequisito: number, cumplido: boolean) => void;
 }
 
 const ESTILOS_ESTADO_ETAPA: Record<
@@ -82,6 +84,7 @@ export default function StageDetailCard({
   etapa,
   indice,
   esActual,
+  onToggleRequisito,
 }: StageDetailCardProps) {
   const estilo = ESTILOS_ESTADO_ETAPA[etapa.estado];
 
@@ -127,9 +130,21 @@ export default function StageDetailCard({
         <ul className="mt-4 space-y-2.5">
           {etapa.requisitos.map((requisito) => (
             <li key={requisito.idRequisito} className="flex items-start gap-2.5">
-              <span className="mt-0.5 shrink-0">
-                {requisito.cumplido ? <IconoCheque /> : <IconoX />}
-              </span>
+              {onToggleRequisito && esActual ? (
+                <input
+                  type="checkbox"
+                  checked={requisito.cumplido}
+                  onChange={(e) =>
+                    onToggleRequisito(etapa.idEtapa, requisito.idRequisito, e.target.checked)
+                  }
+                  aria-label={`Marcar requisito: ${requisito.descripcion}`}
+                  className="mt-1 h-4 w-4 shrink-0 accent-blue-700"
+                />
+              ) : (
+                <span className="mt-0.5 shrink-0">
+                  {requisito.cumplido ? <IconoCheque /> : <IconoX />}
+                </span>
+              )}
               <div>
                 <p
                   className={`text-sm ${requisito.cumplido ? "text-slate-700" : "text-slate-500"}`}
