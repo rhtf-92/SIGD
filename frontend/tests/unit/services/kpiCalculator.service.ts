@@ -1,18 +1,7 @@
 /**
- * @file kpiCalculator.service.ts
- * @description Servicio de cálculo matemático de KPIs del Modelo de Gestión Documental (MGD)
- * @module services/kpiCalculator
- * @author Jennifer Gatica Saavedra
- * @version 1.0.0
- * @since 2026-09-10
- * 
- * Implementa las 4 fórmulas oficiales del SIGD:
- * - KPI-01: Volumen Total de Expedientes Procesados (VTEP)
- * - KPI-02: Tiempo Promedio de Respuesta (TPR)
- * - KPI-03: Tasa de Resolución Oportuna (TRO)
- * - KPI-04: Tasa de Expedientes Observados (TEO)
+ * Motor Matemático de los 4 KPIs Oficiales (MGD)
+ * Desarrollado por: Jennifer Gatica (F_GATICA)
  */
-
 export const KpiCalculatorService = {
 
   // 1. VTEP: (Atendidos + Archivados / Radicados) * 100 (Meta >= 95)
