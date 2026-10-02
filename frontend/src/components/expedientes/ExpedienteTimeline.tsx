@@ -1,50 +1,49 @@
-import type { EventoTrazabilidadExpediente } from "../../types/trazabilidadExpediente";
+import type { BitacoraEventoExpediente } from "../../types/trazabilidadExpediente";
 import TimelineItemCard from "./TimelineItemCard";
-import "./expedientes.css";
 
-export interface ExpedienteTimelineProps {
-  readonly eventos: readonly EventoTrazabilidadExpediente[];
+interface ExpedienteTimelineProps {
+  eventos: BitacoraEventoExpediente[];
+  cargando?: boolean;
 }
 
-function ordenarCronologicamente(
-  eventos: readonly EventoTrazabilidadExpediente[],
-): readonly EventoTrazabilidadExpediente[] {
-  return eventos
-    .map((evento, indice) => ({ evento, indice }))
-    .sort((a, b) => {
-      const diferencia = Date.parse(a.evento.fechaHora) - Date.parse(b.evento.fechaHora);
-      return Number.isNaN(diferencia) || diferencia === 0
-        ? a.indice - b.indice
-        : diferencia;
-    })
-    .map(({ evento }) => evento);
-}
+/**
+ * Timeline inmutable de trazabilidad (ENT-M03-03).
+ * Componente de SOLO LECTURA (Write Once, Read Many): no expone ninguna acción de
+ * edición o eliminación sobre los eventos de la bitácora, salvaguardando la cadena
+ * de custodia del expediente.
+ */
+export default function ExpedienteTimeline({
+  eventos,
+  cargando = false,
+}: ExpedienteTimelineProps) {
+  if (cargando) {
+    return (
+      <p className="text-sm text-slate-500">Cargando trazabilidad del expediente…</p>
+    );
+  }
 
-export default function ExpedienteTimeline({ eventos }: ExpedienteTimelineProps) {
-  const eventosOrdenados = ordenarCronologicamente(eventos);
+  if (eventos.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+        Este expediente todavía no registra movimientos en su bitácora.
+      </div>
+    );
+  }
 
   return (
-    <section className="m03 m03-panel" aria-labelledby="timeline-titulo">
-      <h2 id="timeline-titulo" className="m03-heading">
-        Hoja de ruta y trazabilidad
+    <div>
+      <h2 className="mb-4 text-lg font-bold text-slate-900">
+        Hoja de Ruta y Trazabilidad
       </h2>
-      <p className="m03-help">
-        Historial cronológico inmutable del expediente. Esta vista es de solo lectura.
-      </p>
-
-      {eventosOrdenados.length === 0 ? (
-        <p className="m03-notice" role="status">
-          No hay movimientos registrados para este expediente.
-        </p>
-      ) : (
-        <ol className="m03-timeline" aria-label="Movimientos del expediente">
-          {eventosOrdenados.map((evento) => (
-            <li key={evento.id} className="m03-timeline-item">
-              <TimelineItemCard evento={evento} />
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
+      <ol className="relative space-y-4 border-l-2 border-slate-200 pl-0">
+        {eventos.map((evento, indice) => (
+          <TimelineItemCard
+            key={evento.eventoId}
+            evento={evento}
+            esMasReciente={indice === eventos.length - 1}
+          />
+        ))}
+      </ol>
+    </div>
   );
 }

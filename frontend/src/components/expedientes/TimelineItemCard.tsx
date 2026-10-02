@@ -1,73 +1,83 @@
-import type { EventoTrazabilidadExpediente } from "../../types/trazabilidadExpediente";
-import "./expedientes.css";
+import {
+  ETIQUETAS_TIPO_EVENTO,
+  type BitacoraEventoExpediente,
+} from "../../types/trazabilidadExpediente";
 
 interface TimelineItemCardProps {
-  readonly evento: EventoTrazabilidadExpediente;
+  evento: BitacoraEventoExpediente;
+  /** Indica si es el último nodo (más reciente) para resaltarlo visualmente. */
+  esMasReciente?: boolean;
 }
 
-function formatearFecha(fechaHora: string): string {
-  const fecha = new Date(fechaHora);
-  if (Number.isNaN(fecha.getTime())) return fechaHora;
-  return new Intl.DateTimeFormat("es-PE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(fecha);
-}
+const formateadorFechaHora = new Intl.DateTimeFormat("es-PE", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
-export default function TimelineItemCard({ evento }: TimelineItemCardProps) {
+export default function TimelineItemCard({
+  evento,
+  esMasReciente = false,
+}: TimelineItemCardProps) {
   return (
-    <article className="m03-timeline-card" aria-labelledby={`evento-${evento.id}`}>
-      <header className="m03-timeline-card-header">
-        <div>
-          <p className="m03-timeline-date">{formatearFecha(evento.fechaHora)}</p>
-          <h3 id={`evento-${evento.id}`} className="m03-heading">
-            {evento.tipoMovimiento}
-          </h3>
-        </div>
-        <span className="m03-timeline-readonly">Solo lectura</span>
-      </header>
+    <li className="relative pl-10">
+      <span
+        className={`absolute left-0 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 ${
+          esMasReciente
+            ? "border-blue-700 bg-blue-700"
+            : "border-slate-300 bg-white"
+        }`}
+        aria-hidden="true"
+      />
 
-      <dl className="m03-timeline-details">
-        <div>
-          <dt>Área emisora</dt>
-          <dd>{evento.unidadEmisora}</dd>
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-slate-900">
+            {ETIQUETAS_TIPO_EVENTO[evento.tipoEvento]}
+          </h3>
+          <time
+            dateTime={evento.timestamp}
+            className="text-xs font-medium text-slate-500"
+          >
+            {formateadorFechaHora.format(new Date(evento.timestamp))}
+          </time>
         </div>
-        <div>
-          <dt>Área receptora</dt>
-          <dd>{evento.unidadReceptora}</dd>
-        </div>
-        <div>
-          <dt>Servidor responsable</dt>
-          <dd>{evento.servidorResponsable}</dd>
-        </div>
-        <div>
-          <dt>Proveído</dt>
-          <dd className="whitespace-pre-wrap">{evento.proveido}</dd>
-        </div>
-        <div className="m03-timeline-hash">
-          <dt>Hash de integridad SHA-256</dt>
-          <dd className="font-mono text-xs break-all">{evento.hashIntegridad}</dd>
-        </div>
-        {evento.documentoAsociado ? (
+
+        <p className="mt-1 text-sm text-slate-600">
+          {evento.descripcionDetallada}
+        </p>
+
+        <dl className="mt-3 grid gap-1 text-xs text-slate-500 sm:grid-cols-2">
           <div>
-            <dt>Documento asociado</dt>
-            <dd>
-              {evento.documentoAsociado.url ? (
-                <a
-                  href={evento.documentoAsociado.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {evento.documentoAsociado.nombre}
-                </a>
-              ) : (
-                evento.documentoAsociado.nombre
-              )}
+            <dt className="inline font-semibold text-slate-600">Usuario: </dt>
+            <dd className="inline">{evento.usuarioNombre}</dd>
+          </div>
+          <div>
+            <dt className="inline font-semibold text-slate-600">Área: </dt>
+            <dd className="inline">{evento.areaNombre}</dd>
+          </div>
+          {evento.estadoAnterior && (
+            <div>
+              <dt className="inline font-semibold text-slate-600">
+                Transición:{" "}
+              </dt>
+              <dd className="inline">
+                {evento.estadoAnterior} → {evento.estadoNuevo}
+              </dd>
+            </div>
+          )}
+          <div className="truncate" title={evento.hashTransaccion}>
+            <dt className="inline font-semibold text-slate-600">
+              Hash SHA-256:{" "}
+            </dt>
+            <dd className="inline font-mono">
+              {evento.hashTransaccion.slice(0, 16)}…
             </dd>
           </div>
-        ) : null}
-      </dl>
-    </article>
+        </dl>
+      </article>
+    </li>
   );
 }
-

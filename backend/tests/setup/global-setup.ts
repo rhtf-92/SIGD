@@ -26,6 +26,7 @@ function directorioSetup(): string {
 }
 
 async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
+  const raizProyecto = path.resolve(directorioSetup(), '../..');
   const rutaDdlDocs = existsSync(path.resolve(raizProyecto, 'docs/00_corelink/06_sigd_audit_esquema_ddl.sql'))
     ? path.resolve(raizProyecto, 'docs/00_corelink/06_sigd_audit_esquema_ddl.sql')
     : path.resolve(raizProyecto, 'docs/corelink/06_sigd_audit_esquema_ddl.sql');

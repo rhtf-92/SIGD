@@ -21,7 +21,7 @@ function respuestaNoConfirmada(): never {
 }
 
 function urlMovimiento(id: string, accion: "derivar" | "observar", baseURL: string | undefined): string {
-  // El cliente de ejemplo termina en /api. Una URL absoluta evita /api/api/v1.
+  // Ruta absoluta: evita duplicar el prefijo si el baseURL ya incluye /api o /api/v1.
   const base = new URL(baseURL ?? "/", window.location.origin);
   return new URL(`/api/v1/expedientes/${encodeURIComponent(id)}/movimientos/${accion}`, base).href;
 }
