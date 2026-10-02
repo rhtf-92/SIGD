@@ -104,12 +104,14 @@ CREATE TABLE movimiento_tramite (
     CONSTRAINT ck_movimiento_secuencia_positiva CHECK (secuencia > 0)
 );
 
--- 5. derivacion_tramite (Detalle opcional - 4 atributos)
+-- 5. derivacion_tramite (Detalle opcional - 6 atributos)
 CREATE TABLE derivacion_tramite (
     movimiento_id       BIGINT PRIMARY KEY REFERENCES movimiento_tramite(movimiento_id) ON DELETE RESTRICT,
     area_origen_id      VARCHAR(64) NOT NULL, -- REF externa Grupo 3
     area_destino_id     VARCHAR(64) NOT NULL, -- REF externa Grupo 3
     motivo              TEXT NOT NULL,
+    es_copia            BOOLEAN NOT NULL DEFAULT FALSE,
+    usuario_asignado_id VARCHAR(64),
     CONSTRAINT ck_derivacion_areas_distintas CHECK (area_origen_id <> area_destino_id)
 );
 
@@ -134,6 +136,18 @@ CREATE TABLE atencion_tramite (
     movimiento_id       BIGINT PRIMARY KEY REFERENCES movimiento_tramite(movimiento_id) ON DELETE RESTRICT,
     resultado_resumen   TEXT NOT NULL
 );
+
+-- ==============================================================================
+-- Compatibilidad temporal para requerimiento T-BE-RD-08:
+-- Registro de información física asociada al archivado documental.
+-- ==============================================================================
+CREATE TABLE archivo_tramite (
+    movimiento_id       BIGINT PRIMARY KEY REFERENCES movimiento_tramite(movimiento_id) ON DELETE RESTRICT,
+    estante             VARCHAR(100),
+    balda               VARCHAR(100),
+    caja                VARCHAR(100)
+);
+-- ==============================================================================
 
 -- 9. tipo_relacion_movimiento (Catálogo - 5 atributos)
 CREATE TABLE tipo_relacion_movimiento (
@@ -284,6 +298,9 @@ BEGIN
         RAISE EXCEPTION 'Incompatibilidad: detalle observacion_tramite solo aplica a acción OBSERVACION (acción actual: %)', v_codigo_accion;
     ELSIF TG_TABLE_NAME = 'atencion_tramite' AND v_codigo_accion <> 'ATENCION' THEN
         RAISE EXCEPTION 'Incompatibilidad: detalle atencion_tramite solo aplica a acción ATENCION (acción actual: %)', v_codigo_accion;
+    -- [B_JACOBO] Inyección T-BE-RD-08
+    ELSIF TG_TABLE_NAME = 'archivo_tramite' AND v_codigo_accion <> 'ARCHIVAR' THEN
+        RAISE EXCEPTION 'Incompatibilidad: detalle archivo_tramite solo aplica a acción ARCHIVAR (acción actual: %)', v_codigo_accion;
     END IF;
 
     IF TG_TABLE_NAME = 'recepcion_tramite' THEN
@@ -333,6 +350,11 @@ CREATE TRIGGER trg_validar_detalle_observacion
 
 CREATE TRIGGER trg_validar_detalle_atencion
     BEFORE INSERT OR UPDATE ON atencion_tramite
+    FOR EACH ROW EXECUTE FUNCTION fn_validar_compatibilidad_detalle();
+
+-- [B_JACOBO] Inyección T-BE-RD-08
+CREATE TRIGGER trg_validar_detalle_archivo
+    BEFORE INSERT OR UPDATE ON archivo_tramite
     FOR EACH ROW EXECUTE FUNCTION fn_validar_compatibilidad_detalle();
 
 -- 4.4 Coherencia secuencial, transicion aplicable y cierre posterior a atencion
@@ -528,6 +550,8 @@ CREATE CONSTRAINT TRIGGER trg_validar_relacion_obligatoria
 INSERT INTO accion_tramite (codigo, nombre, descripcion, activo) VALUES
 ('REGISTRO_EXTERNO',     'Registro externo',          'Ingreso inicial del expediente desde el Grupo 2', TRUE),
 ('RECEPCION',            'Recepción',                 'Confirmación de recepción inicial o en destino', TRUE),
+-- [B_JACOBO] Inyección T-BE-RD-08
+('ARCHIVAR',             'Archivar expediente',       'Registro físico posterior al cierre', TRUE),
 ('INICIAR_REVISION',     'Iniciar revisión',          'Inicio de evaluación de información y requisitos', TRUE),
 ('OBSERVACION',          'Observación',               'Registro de observación por requisitos faltantes', TRUE),
 ('CORRECCION',           'Corrección',                'Registro de subsanación o corrección aportada', TRUE),

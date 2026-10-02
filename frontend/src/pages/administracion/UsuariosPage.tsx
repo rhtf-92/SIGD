@@ -1,87 +1,15 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
-
-type EstadoUsuario = "Activo" | "Inactivo" | "Bloqueado";
-
-interface Usuario {
-  id: number;
-  nombre: string;
-  dni: string;
-  correo: string;
-  sede: string;
-  area: string;
-  cargo: string;
-  rol: string;
-  estado: EstadoUsuario;
-  ultimoAcceso: string;
-}
-
-const usuariosIniciales: Usuario[] = [
-  {
-    id: 1,
-    nombre: "Juan Carlos Pérez",
-    dni: "71234567",
-    correo: "jperez@institutosuiza.edu.pe",
-    sede: "Sede Principal",
-    area: "Mesa de Partes",
-    cargo: "Asistente Administrativo",
-    rol: "Operador",
-    estado: "Activo",
-    ultimoAcceso: "29/08/2026 09:42",
-  },
-  {
-    id: 2,
-    nombre: "María Fernanda López",
-    dni: "74561238",
-    correo: "mlopez@institutosuiza.edu.pe",
-    sede: "Sede Principal",
-    area: "Secretaría Académica",
-    cargo: "Secretaria",
-    rol: "Responsable de Área",
-    estado: "Activo",
-    ultimoAcceso: "29/08/2026 08:35",
-  },
-  {
-    id: 3,
-    nombre: "Luis Alberto Ramos",
-    dni: "70124589",
-    correo: "lramos@institutosuiza.edu.pe",
-    sede: "Sede Principal",
-    area: "Archivo Central",
-    cargo: "Encargado de Archivo",
-    rol: "Archivador",
-    estado: "Inactivo",
-    ultimoAcceso: "25/08/2026 16:20",
-  },
-  {
-    id: 4,
-    nombre: "Ana Torres García",
-    dni: "73654821",
-    correo: "atorres@institutosuiza.edu.pe",
-    sede: "Sede Principal",
-    area: "Administración",
-    cargo: "Administradora",
-    rol: "Administrador",
-    estado: "Bloqueado",
-    ultimoAcceso: "28/08/2026 14:12",
-  },
-];
-
-const roles = [
-  "Administrador",
-  "Responsable de Área",
-  "Operador",
-  "Archivador",
-  "Consulta",
-];
-
-const areas = [
-  "Administración",
-  "Mesa de Partes",
-  "Secretaría Académica",
-  "Archivo Central",
-];
+import UserEditModal from "../../components/administracion/UserEditModal";
+import {
+  CATALOGO_AREAS,
+  CATALOGO_ROLES_USUARIOS,
+  CATALOGO_SEDES,
+  useUsuariosAdmin,
+} from "../../hooks/useUsuariosAdmin";
+import type { ApiHttpError } from "../../types/api";
+import type { EstadoUsuario } from "../../types/usuarioAdmin";
 
 function estiloEstado(estado: EstadoUsuario) {
   if (estado === "Activo") return "bg-emerald-100 text-emerald-700";
@@ -90,38 +18,58 @@ function estiloEstado(estado: EstadoUsuario) {
 }
 
 export default function UsuariosPage() {
-  const [usuarios, setUsuarios] = useState(usuariosIniciales);
-  const [busqueda, setBusqueda] = useState("");
-  const [estado, setEstado] = useState<EstadoUsuario | "Todos">("Todos");
-  const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
   const [mensaje, setMensaje] = useState("");
+  const [errorServidor, setErrorServidor] = useState("");
 
-  const usuariosFiltrados = useMemo(() => {
-    const texto = busqueda.trim().toLowerCase();
+  const {
+    usuarios,
+    totalUsuarios,
+    busqueda,
+    setBusqueda,
+    area,
+    setArea,
+    sede,
+    setSede,
+    rol,
+    setRol,
+    estado,
+    setEstado,
+    usuarioEditando,
+    setUsuarioEditando,
+    actualizarUsuario,
+    conmutarEstado,
+    isLoading,
+    isFetching,
+    error,
+    guardarPendiente,
+  } = useUsuariosAdmin();
 
-    return usuarios.filter((usuario) => {
-      const coincideBusqueda =
-        texto === "" ||
-        usuario.nombre.toLowerCase().includes(texto) ||
-        usuario.dni.includes(texto) ||
-        usuario.correo.toLowerCase().includes(texto) ||
-        usuario.area.toLowerCase().includes(texto);
+  async function guardar(usuarioActualizado: Parameters<typeof actualizarUsuario>[0]) {
+    setErrorServidor("");
+    try {
+      await actualizarUsuario(usuarioActualizado);
+      setUsuarioEditando(null);
+      setMensaje("Los cambios fueron registrados correctamente.");
+    } catch (error) {
+      // El error se propaga para que el modal mapee los `invalidParams` de
+      // RFC 7807 al campo infractor; aquí solo se informa el fallo global.
+      setMensaje("");
+      setErrorServidor(
+        "No se pudo guardar la modificación. Revise los campos marcados e intente nuevamente.",
+      );
+      throw error;
+    }
+  }
 
-      const coincideEstado = estado === "Todos" || usuario.estado === estado;
-      return coincideBusqueda && coincideEstado;
-    });
-  }, [busqueda, estado, usuarios]);
-
-  function actualizarUsuario() {
-    if (!usuarioEditando) return;
-
-    setUsuarios((actuales) =>
-      actuales.map((usuario) =>
-        usuario.id === usuarioEditando.id ? usuarioEditando : usuario,
-      ),
-    );
-    setMensaje("Cambios aplicados en la vista de demostración.");
-    setUsuarioEditando(null);
+  async function alternarEstado(id: number) {
+    setErrorServidor("");
+    try {
+      await conmutarEstado(id);
+      setMensaje("El estado operativo fue actualizado.");
+    } catch {
+      setMensaje("");
+      setErrorServidor("No se pudo conmutar el estado del usuario.");
+    }
   }
 
   return (
@@ -133,26 +81,53 @@ export default function UsuariosPage() {
 
       <section className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h2 className="text-3xl font-bold">Usuarios</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Este módulo administra cuentas existentes. El registro inicial de
-              usuarios puede integrarse con el módulo de registro del sistema.
-            </p>
-          </div>
-          <span className="rounded-lg bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700">
-            Datos de demostración hasta integrar el backend
-          </span>
+          <p className="text-sm text-slate-600">
+            Directorio institucional de {totalUsuarios} cuentas registradas.
+            Búsqueda en tiempo real y filtro por estado operativo.
+          </p>
+          {isFetching && !isLoading && (
+            <span
+              role="status"
+              aria-live="polite"
+              className="rounded-lg bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700"
+            >
+              Consultando directorio institucional...
+            </span>
+          )}
         </div>
 
         {mensaje && (
-          <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+          >
             {mensaje}
           </div>
         )}
 
+        {errorServidor && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {errorServidor}
+          </div>
+        )}
+
+        {error && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            No fue posible consultar el directorio institucional. Intente nuevamente.
+          </div>
+        )}
+
         <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <div>
               <label htmlFor="busqueda" className="mb-2 block text-sm font-semibold">
                 Buscar usuario
@@ -164,6 +139,63 @@ export default function UsuariosPage() {
                 placeholder="Nombre, DNI, correo o área"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600"
               />
+            </div>
+
+            <div>
+              <label htmlFor="area" className="mb-2 block text-sm font-semibold">
+                Unidad orgánica
+              </label>
+              <select
+                id="area"
+                value={area}
+                onChange={(event) => setArea(event.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              >
+                <option value="">Todas</option>
+                {CATALOGO_AREAS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="sede" className="mb-2 block text-sm font-semibold">
+                Sede
+              </label>
+              <select
+                id="sede"
+                value={sede}
+                onChange={(event) => setSede(event.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              >
+                <option value="">Todas</option>
+                {CATALOGO_SEDES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="rol" className="mb-2 block text-sm font-semibold">
+                Rol asignado
+              </label>
+              <select
+                id="rol"
+                value={rol}
+                onChange={(event) => setRol(event.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              >
+                <option value="">Todos</option>
+                {CATALOGO_ROLES_USUARIOS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -191,8 +223,8 @@ export default function UsuariosPage() {
           <div className="border-b border-slate-200 px-6 py-4">
             <h3 className="font-bold">Usuarios registrados</h3>
             <p className="mt-1 text-xs text-slate-500">
-              {usuariosFiltrados.length} resultado
-              {usuariosFiltrados.length === 1 ? "" : "s"}
+              {usuarios.length} resultado
+              {usuarios.length === 1 ? "" : "s"}
             </p>
           </div>
 
@@ -211,48 +243,95 @@ export default function UsuariosPage() {
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-100">
-                {usuariosFiltrados.map((usuario) => (
-                  <tr key={usuario.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-semibold">{usuario.nombre}</p>
-                      <p className="text-xs text-slate-500">{usuario.correo}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm">{usuario.dni}</td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium">{usuario.area}</p>
-                      <p className="text-xs text-slate-500">{usuario.sede}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      {usuario.cargo}
-                    </td>
-                    <td className="px-6 py-4 text-sm">{usuario.rol}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${estiloEstado(
-                          usuario.estado,
-                        )}`}
-                      >
-                        {usuario.estado}
+              <tbody className="divide-y divide-slate-100" aria-busy={isLoading}>
+                {isLoading && (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-10 text-center">
+                      <span className="sr-only">
+                        Cargando directorio institucional de usuarios...
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      {usuario.ultimoAcceso}
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMensaje("");
-                          setUsuarioEditando({ ...usuario });
-                        }}
-                        className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                      >
-                        Administrar
-                      </button>
+                      <div className="mx-auto w-full max-w-md space-y-2" aria-hidden="true">
+                        {[0, 1, 2].map((fila) => (
+                          <div
+                            key={fila}
+                            className="h-10 animate-pulse rounded-lg bg-slate-200"
+                          />
+                        ))}
+                      </div>
                     </td>
                   </tr>
-                ))}
+                )}
+
+                {!isLoading && usuarios.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-10 text-center">
+                      <div className="rounded-lg bg-blue-50 px-6 py-8 text-blue-600">
+                        <p className="font-semibold">
+                          No se registran usuarios institucionales
+                        </p>
+                        <p className="mt-1 text-sm">
+                          Ajuste los filtros o consulte nuevamente para obtener
+                          resultados.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading &&
+                  usuarios.map((usuario) => (
+                    <tr key={usuario.id} className="hover:bg-slate-50">
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-semibold">{usuario.nombre}</p>
+                        <p className="text-xs text-slate-500">{usuario.correo}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm">{usuario.dni}</td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium">{usuario.area}</p>
+                        <p className="text-xs text-slate-500">{usuario.sede}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {usuario.cargo}
+                      </td>
+                      <td className="px-6 py-4 text-sm">{usuario.rol}</td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${estiloEstado(
+                            usuario.estado,
+                          )}`}
+                        >
+                          {usuario.estado}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {usuario.ultimoAcceso}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMensaje("");
+                              setErrorServidor("");
+                              setUsuarioEditando({ ...usuario });
+                            }}
+                            className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                          >
+                            Administrar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void alternarEstado(usuario.id)}
+                            disabled={guardarPendiente}
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+                            title="Conmutar estado (Activo → Inactivo → Bloqueado)"
+                          >
+                            Conmutar estado
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -260,102 +339,24 @@ export default function UsuariosPage() {
       </section>
 
       {usuarioEditando && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-bold">Administrar cuenta</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  {usuarioEditando.nombre}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setUsuarioEditando(null)}
-                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-500 hover:bg-slate-100"
-              >
-                Cerrar
-              </button>
-            </div>
-
-            <div className="grid gap-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold">Área</label>
-                <select
-                  value={usuarioEditando.area}
-                  onChange={(event) =>
-                    setUsuarioEditando({
-                      ...usuarioEditando,
-                      area: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                >
-                  {areas.map((area) => (
-                    <option key={area} value={area}>
-                      {area}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold">Rol</label>
-                <select
-                  value={usuarioEditando.rol}
-                  onChange={(event) =>
-                    setUsuarioEditando({
-                      ...usuarioEditando,
-                      rol: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                >
-                  {roles.map((rol) => (
-                    <option key={rol} value={rol}>
-                      {rol}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold">Estado</label>
-                <select
-                  value={usuarioEditando.estado}
-                  onChange={(event) =>
-                    setUsuarioEditando({
-                      ...usuarioEditando,
-                      estado: event.target.value as EstadoUsuario,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                >
-                  <option value="Activo">Activo</option>
-                  <option value="Inactivo">Inactivo</option>
-                  <option value="Bloqueado">Bloqueado</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setUsuarioEditando(null)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={actualizarUsuario}
-                className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
-              >
-                Guardar cambios
-              </button>
-            </div>
-          </div>
-        </div>
+        <UserEditModal
+          usuario={usuarioEditando}
+          areas={CATALOGO_AREAS}
+          sedes={CATALOGO_SEDES}
+          roles={CATALOGO_ROLES_USUARIOS}
+          onClose={() => {
+            setMensaje("");
+            setUsuarioEditando(null);
+          }}
+          onSave={guardar}
+          onServerError={(err: ApiHttpError) => {
+            if (err?.correlationId) {
+              setErrorServidor(
+                `Operación rechazada por el servidor. Código de correlación: ${err.correlationId}.`,
+              );
+            }
+          }}
+        />
       )}
     </main>
   );
