@@ -1,7 +1,21 @@
-// Hook de administración del Directorio de Usuarios (ENT-M05-02)
-import { useMemo, useState } from "react";
+// Hook de administración del Directorio de Usuarios (ENT-M05-02 / T-FE-ADM-01)
+// Desacoplado del mock `usuariosIniciales`: delega la carga en
+// `adminUsuariosService` (TanStack Query) y aplica debounce de 300 ms al
+// buscador para evitar peticiones redundantes al servidor.
+import { useEffect, useMemo, useState } from "react";
 
-import type { EstadoUsuario, Usuario } from "../types/usuarioAdmin";
+import {
+  useActualizarUsuarioMutation,
+  useConmutarEstadoMutation,
+  useUsuariosQuery,
+} from "../services/adminUsuariosService";
+import {
+  DEBOUNCE_BUSQUEDA_MS,
+  FILTROS_USUARIOS_INICIALES,
+  type EstadoUsuario,
+  type FiltrosUsuarios,
+  type Usuario,
+} from "../types/usuarioAdmin";
 
 export const CATALOGO_ROLES_USUARIOS = [
   "Administrador",
@@ -21,57 +35,6 @@ export const CATALOGO_AREAS = [
 
 export const CATALOGO_SEDES = ["Sede Principal"];
 
-const usuariosIniciales: Usuario[] = [
-  {
-    id: 1,
-    nombre: "Juan Carlos Pérez",
-    dni: "71234567",
-    correo: "jperez@institutosuiza.edu.pe",
-    sede: "Sede Principal",
-    area: "Mesa de Partes",
-    cargo: "Asistente Administrativo",
-    rol: "Operador",
-    estado: "Activo",
-    ultimoAcceso: "29/08/2026 09:42",
-  },
-  {
-    id: 2,
-    nombre: "María Fernanda López",
-    dni: "74561238",
-    correo: "mlopez@institutosuiza.edu.pe",
-    sede: "Sede Principal",
-    area: "Secretaría Académica",
-    cargo: "Secretaria Académica",
-    rol: "Responsable de Área",
-    estado: "Activo",
-    ultimoAcceso: "29/08/2026 08:35",
-  },
-  {
-    id: 3,
-    nombre: "Luis Alberto Ramos",
-    dni: "70124589",
-    correo: "lramos@institutosuiza.edu.pe",
-    sede: "Sede Principal",
-    area: "Archivo Central",
-    cargo: "Encargado de Archivo",
-    rol: "Consulta",
-    estado: "Inactivo",
-    ultimoAcceso: "25/08/2026 16:20",
-  },
-  {
-    id: 4,
-    nombre: "Ana Torres García",
-    dni: "73654821",
-    correo: "atorres@institutosuiza.edu.pe",
-    sede: "Sede Principal",
-    area: "Administración",
-    cargo: "Administradora",
-    rol: "Administrador",
-    estado: "Bloqueado",
-    ultimoAcceso: "28/08/2026 14:12",
-  },
-];
-
 function siguienteEstado(estado: EstadoUsuario): EstadoUsuario {
   if (estado === "Activo") return "Inactivo";
   if (estado === "Inactivo") return "Bloqueado";
@@ -79,61 +42,83 @@ function siguienteEstado(estado: EstadoUsuario): EstadoUsuario {
 }
 
 export function useUsuariosAdmin() {
-  const [usuarios, setUsuarios] = useState(usuariosIniciales);
-  const [busqueda, setBusqueda] = useState("");
-  const [estado, setEstado] = useState<EstadoUsuario | "Todos">("Todos");
+  const [busqueda, setBusqueda] = useState(FILTROS_USUARIOS_INICIALES.busqueda);
+  const [busquedaAplicada, setBusquedaAplicada] = useState(
+    FILTROS_USUARIOS_INICIALES.busqueda,
+  );
+  const [area, setArea] = useState(FILTROS_USUARIOS_INICIALES.area);
+  const [sede, setSede] = useState(FILTROS_USUARIOS_INICIALES.sede);
+  const [rol, setRol] = useState(FILTROS_USUARIOS_INICIALES.rol);
+  const [estado, setEstado] = useState<EstadoUsuario | "Todos">(
+    FILTROS_USUARIOS_INICIALES.estado,
+  );
   const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
-  const [mensaje, setMensaje] = useState("");
 
-  const filtrados = useMemo(() => {
-    const texto = busqueda.trim().toLowerCase();
+  // Debounce de 300 ms: el texto tecleado no dispara peticiones hasta 300 ms
+  // después de la última pulsación, reduciendo el tráfico hacia el backend.
+  useEffect(() => {
+    if (busqueda === busquedaAplicada) return;
+    const temporizador = setTimeout(() => {
+      setBusquedaAplicada(busqueda);
+    }, DEBOUNCE_BUSQUEDA_MS);
 
-    return usuarios.filter((usuario) => {
-      const coincideBusqueda =
-        texto === "" ||
-        usuario.nombre.toLowerCase().includes(texto) ||
-        usuario.dni.includes(texto) ||
-        usuario.correo.toLowerCase().includes(texto) ||
-        usuario.area.toLowerCase().includes(texto);
+    return () => clearTimeout(temporizador);
+  }, [busqueda, busquedaAplicada]);
 
-      const coincideEstado = estado === "Todos" || usuario.estado === estado;
-      return coincideBusqueda && coincideEstado;
-    });
-  }, [busqueda, estado, usuarios]);
+  const filtros = useMemo<FiltrosUsuarios>(
+    () => ({ busqueda: busquedaAplicada, area, sede, rol, estado }),
+    [busquedaAplicada, area, sede, rol, estado],
+  );
+
+  const consulta = useUsuariosQuery(filtros);
+  const mutacionActualizacion = useActualizarUsuarioMutation();
+  const mutacionEstado = useConmutarEstadoMutation();
+
+  const usuarios = useMemo(() => consulta.data ?? [], [consulta.data]);
 
   function actualizarUsuario(usuarioActualizado: Usuario) {
-    setUsuarios((actuales) =>
-      actuales.map((usuario) =>
-        usuario.id === usuarioActualizado.id ? usuarioActualizado : usuario,
-      ),
-    );
-    setMensaje("Cambios aplicados en la vista de demostración.");
-    setUsuarioEditando(null);
+    return mutacionActualizacion.mutateAsync({
+      id: usuarioActualizado.id,
+      cambios: {
+        area: usuarioActualizado.area,
+        sede: usuarioActualizado.sede,
+        cargo: usuarioActualizado.cargo,
+        rol: usuarioActualizado.rol,
+      },
+    });
   }
 
   function conmutarEstado(id: number) {
-    setUsuarios((actuales) =>
-      actuales.map((usuario) =>
-        usuario.id === id
-          ? { ...usuario, estado: siguienteEstado(usuario.estado) }
-          : usuario,
-      ),
-    );
-    setMensaje("");
+    const usuario = usuarios.find((item) => item.id === id);
+    if (!usuario) return undefined;
+
+    return mutacionEstado.mutateAsync({
+      id,
+      estado: siguienteEstado(usuario.estado),
+    });
   }
 
   return {
-    usuarios: filtrados,
+    usuarios,
     totalUsuarios: usuarios.length,
     busqueda,
     setBusqueda,
+    area,
+    setArea,
+    sede,
+    setSede,
+    rol,
+    setRol,
     estado,
     setEstado,
     usuarioEditando,
     setUsuarioEditando,
     actualizarUsuario,
     conmutarEstado,
-    mensaje,
-    setMensaje,
+    isLoading: consulta.isLoading,
+    isFetching: consulta.isFetching,
+    error: consulta.error,
+    guardarPendiente: mutacionActualizacion.isPending,
+    estadoPendiente: mutacionEstado.isPending,
   };
 }

@@ -33,6 +33,7 @@ import {
   getNombreProgramaEstudio,
 } from "../../mocks/tramitesTupaMock";
 import { WizardStepBar } from "./WizardStepBar";
+import HorarioCorteBanner from "./HorarioCorteBanner";
 import Step1Identificacion from "./steps/Step1Identificacion";
 import DynamicSchemaForm from "./DynamicSchemaForm";
 import TextInput from "../common/TextInput";
@@ -45,6 +46,8 @@ export interface TramiteWizardProps {
   className?: string;
   /** Datos iniciales opcionales para precarga o edición de borrador */
   initialData?: Partial<TramiteWizardFormData>;
+  /** Fechas institucionales inhábiles con formato YYYY-MM-DD */
+  holidays?: readonly string[];
 }
 
 /**
@@ -93,6 +96,7 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
   onSuccess,
   className = "",
   initialData,
+  holidays,
 }) => {
   const wizardId = useId();
 
@@ -346,6 +350,8 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
 
   return (
     <div className={`space-y-6 ${className}`}>
+      <HorarioCorteBanner holidays={holidays} />
+
       {/* 1. BARRA DE PROGRESO ACCESIBLE (WCAG 2.1 AA) */}
       <WizardStepBar
         currentStep={currentStep}
@@ -552,13 +558,13 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
                     Asunto o Petitorio Sucinto *
                   </label>
                   <span className="text-xs text-slate-500 font-mono">
-                    {formData.tramite.asunto.length}/250 caracteres (mínimo 10)
+                    {formData.tramite.asunto.length}/500 caracteres (mínimo 10)
                   </span>
                 </div>
                 <textarea
                   id={`${wizardId}-asunto`}
                   rows={3}
-                  maxLength={250}
+                  maxLength={500}
                   value={formData.tramite.asunto}
                   onChange={(e) =>
                     updateStepData("tramite", { asunto: e.target.value })
@@ -973,6 +979,12 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
                     id={`${wizardId}-declJurada`}
                     type="checkbox"
                     aria-required="true"
+                    aria-invalid={Boolean(stepErrors.declaracionJurada)}
+                    aria-describedby={
+                      stepErrors.declaracionJurada
+                        ? `${wizardId}-declJurada-error`
+                        : undefined
+                    }
                     checked={formData.declaracionJurada.aceptada}
                     onChange={(e) =>
                       updateStepData("declaracionJurada", {
@@ -980,7 +992,11 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
                         fechaAceptacion: new Date().toISOString(),
                       })
                     }
-                    className="mt-1 h-4 w-4 rounded border-slate-300 text-[#006EC7] focus:ring-[#006EC7] cursor-pointer"
+                    className={`mt-1 h-4 w-4 rounded text-[#006EC7] focus:ring-[#006EC7] cursor-pointer ${
+                      stepErrors.declaracionJurada
+                        ? "border-red-500 ring-2 ring-red-200"
+                        : "border-slate-300"
+                    }`}
                   />
                   <label
                     htmlFor={`${wizardId}-declJurada`}
@@ -996,6 +1012,56 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
                     administrativa y legal en caso de falsedad.
                   </label>
                 </div>
+                {stepErrors.declaracionJurada && (
+                  <p
+                    id={`${wizardId}-declJurada-error`}
+                    className="text-xs font-medium text-red-700"
+                  >
+                    {stepErrors.declaracionJurada[0]}
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                <div className="flex items-start gap-3">
+                  <input
+                    id={`${wizardId}-terminos`}
+                    type="checkbox"
+                    aria-required="true"
+                    aria-invalid={Boolean(stepErrors.leidoPoliticasPrivacidad)}
+                    aria-describedby={
+                      stepErrors.leidoPoliticasPrivacidad
+                        ? `${wizardId}-terminos-error`
+                        : undefined
+                    }
+                    checked={formData.declaracionJurada.leidoPoliticasPrivacidad}
+                    onChange={(event) =>
+                      updateStepData("declaracionJurada", {
+                        leidoPoliticasPrivacidad: event.target.checked,
+                      })
+                    }
+                    className={`mt-1 h-4 w-4 rounded text-[#006EC7] focus:ring-[#006EC7] cursor-pointer ${
+                      stepErrors.leidoPoliticasPrivacidad
+                        ? "border-red-500 ring-2 ring-red-200"
+                        : "border-slate-300"
+                    }`}
+                  />
+                  <label
+                    htmlFor={`${wizardId}-terminos`}
+                    className="text-xs sm:text-sm text-slate-700 cursor-pointer select-none leading-relaxed"
+                  >
+                    Acepto los términos del trámite y la política de protección
+                    de datos personales.
+                  </label>
+                </div>
+                {stepErrors.leidoPoliticasPrivacidad && (
+                  <p
+                    id={`${wizardId}-terminos-error`}
+                    className="text-xs font-medium text-red-700"
+                  >
+                    {stepErrors.leidoPoliticasPrivacidad[0]}
+                  </p>
+                )}
               </div>
             </div>
           )}

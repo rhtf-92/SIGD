@@ -3,6 +3,7 @@ import type {
   ReportExportRequest,
   ReportExportResponse,
 } from "@/types/reportExportConfig";
+import { computeSha256Hex } from "./cryptoSha256";
 
 function escapeXml(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined) return "";
@@ -107,13 +108,7 @@ export async function exportExcelReport(
   link.click();
   URL.revokeObjectURL(url);
 
-  const checksum = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(xmlContent),
-  );
-  const checksumHex = Array.from(new Uint8Array(checksum))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+  const checksumHex = await computeSha256Hex(new TextEncoder().encode(xmlContent));
 
   return {
     descargaUrl: url,

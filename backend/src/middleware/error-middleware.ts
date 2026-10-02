@@ -32,6 +32,7 @@ export function errorMiddleware(error: unknown, req: Request, res: Response, _ne
     invalid_params: serializado.invalidParams,
   };
 
+  res.setHeader('Content-Type', 'application/problem+json');
   res.status(serializado.status).json(body);
 }
 
