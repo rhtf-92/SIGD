@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/components/expedientes/**/*.tsx",
+    "src/types/ccdArchivistica.ts",
+    "src/types/expedienteActions.ts",
+    "src/hooks/useExpedienteActions.ts",
+    "src/hooks/useExpedienteActions.test.tsx",
+    "src/hooks/useFormularioExpediente.ts",
+    "src/utils/foliado*.ts",
+    "src/utils/expedienteActions*.ts",
+    "src/api/expedienteActions*.ts",
+    "src/test/**/*.ts",
+    "src/dev/expedientesDemo.tsx",
+    "src/vite-env.d.ts",
+    "vitest.config.ts"
+  ]
+}
