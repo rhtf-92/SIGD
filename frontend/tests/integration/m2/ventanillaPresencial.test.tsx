@@ -46,8 +46,26 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     expect(screen.getByLabelText(/Persona Natural/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Persona Jurídica/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Número de Documento \*/i)).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Trámite no TUPA \/ documentación general/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /48 - Otros servicios y alquileres/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Cantidad de Folios Físicos \*/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /✓ Registrar y Emitir Cargo CUT/i })).toBeInTheDocument();
+  });
+
+  it("muestra requisitos, tarifas y datos del procedimiento TUPA seleccionado", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <VentanillaPresencialPage />
+      </MemoryRouter>,
+    );
+
+    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "01");
+
+    expect(screen.getByText("Constancia de No Adeudar", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText(/S\/. 11\.00 por semestre/i)).toBeInTheDocument();
+    expect(screen.getByText(/05 días hábiles/i)).toBeInTheDocument();
   });
 
   it("CargoDigitalModal: renderiza el ticket térmico con CUT, QR y datos del solicitante", () => {
@@ -80,6 +98,7 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     await user.type(screen.getByLabelText(/Apellidos y Nombres \*/i), "Sergio Serruche");
     await user.type(screen.getByLabelText(/Correo Electrónico para Notificación \*/i), "sergio@correo.pe");
     await user.type(screen.getByLabelText(/Teléfono \/ Celular de Contacto \*/i), "961234567");
+    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "01");
     await user.type(screen.getByLabelText(/Asunto \/ Petitorio Concreto \*/i), "Solicitud de convalidación académica");
 
     const botonRegistrar = screen.getByRole("button", { name: /✓ Registrar y Emitir Cargo CUT/i });
