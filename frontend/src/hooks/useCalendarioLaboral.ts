@@ -23,7 +23,7 @@ export interface ConfiguracionJornada {
 
 // Corte normativo no negociable (Art. 138 TUO Ley N° 27444)
 export const HORA_INICIO_REFERENCIA = "08:00";
-export const HORA_FIN_REFERENCIA = "17:00";
+export const HORA_FIN_REFERENCIA = "16:30";
 export const HORA_CORTE_LPAG = "16:30";
 
 const diasIniciales: DiaLaboral[] = [

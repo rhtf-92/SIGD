@@ -1,4 +1,5 @@
 import type { ExpedienteSGD } from "../../types/expediente";
+import SlaBadge from "./SlaBadge";
 
 interface ExpedienteTableProps {
   expedientes: ExpedienteSGD[];
@@ -10,40 +11,6 @@ const formateadorFecha = new Intl.DateTimeFormat("es-PE", {
   month: "2-digit",
   day: "2-digit",
 });
-
-/**
- * NOTA PARA EL EQUIPO: Este cálculo es un placeholder simplificado (días calendario)
- * únicamente para poder mostrar la columna "Plazo Restante" mientras se integra el
- * cálculo oficial en días hábiles de `slaCalculator.ts` (ENT-M03-02, responsable
- * Willfredo Soria). Cuando ese archivo exista, reemplazar esta función por
- * `calculateBusinessDays` + `getSlaAlertStatus` y por el componente `SlaBadge.tsx`.
- */
-function calcularEstadoPlazoPlaceholder(fechaLimiteAtencion: string): {
-  etiqueta: string;
-  clase: string;
-} {
-  const hoy = new Date();
-  const limite = new Date(fechaLimiteAtencion);
-  const diffMs = limite.getTime() - hoy.getTime();
-  const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDias < 0) {
-    return {
-      etiqueta: `Vencido (${Math.abs(diffDias)} d.)`,
-      clase: "bg-red-100 text-red-700",
-    };
-  }
-  if (diffDias <= 2) {
-    return {
-      etiqueta: `${diffDias} día(s) [Advertencia]`,
-      clase: "bg-amber-100 text-amber-700",
-    };
-  }
-  return {
-    etiqueta: `${diffDias} días [Normal]`,
-    clase: "bg-emerald-100 text-emerald-700",
-  };
-}
 
 export default function ExpedienteTable({
   expedientes,
@@ -74,10 +41,6 @@ export default function ExpedienteTable({
         </thead>
         <tbody className="divide-y divide-slate-100">
           {expedientes.map((expediente) => {
-            const plazo = calcularEstadoPlazoPlaceholder(
-              expediente.fechaLimiteAtencion,
-            );
-
             return (
               <tr key={expediente.id} className="hover:bg-slate-50">
                 <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold text-blue-700">
@@ -99,11 +62,10 @@ export default function ExpedienteTable({
                   {formateadorFecha.format(new Date(expediente.fechaIngreso))}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${plazo.clase}`}
-                  >
-                    {plazo.etiqueta}
-                  </span>
+                  <SlaBadge
+                    fechaIngreso={expediente.fechaIngreso}
+                    fechaLimiteAtencion={expediente.fechaLimiteAtencion}
+                  />
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right">
                   <button

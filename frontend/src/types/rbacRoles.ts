@@ -1,5 +1,12 @@
-// Modelos RBAC de los 5 íconos canónicos y la matriz de permisos (ENT-M05-03)
-// Alineado al documento SIGD-DOC-ADMIN-SEGURIDAD-AUDITORIA-03
+// Modelos RBAC de los 5 roles canónicos institucionales y la matriz de permisos (ENT-M05-03)
+// Conforme a SIGD-DOC-ADMIN-SEGURIDAD-AUDITORIA-03
+
+export type RolCanonicoId =
+  | "SUPER_ADMIN"
+  | "DIRECTOR"
+  | "DOCENTE"
+  | "MESA_PARTES"
+  | "ESTUDIANTE";
 
 export interface Rol {
   id: string;
