@@ -8,22 +8,22 @@ describe("FoliadoDocumentoViewer", () => {
   it("mantiene F. 1 a N al cambiar de documento y es solo lectura", async () => {
     const user = userEvent.setup();
     render(<FoliadoDocumentoViewer recurso={{ estado: "listo", datos: documentos }} />);
-    expect(screen.getByText("F. 1")).toBeInTheDocument();
+    expect(screen.getByText("F. [0001]")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Folio anterior" })).toBeDisabled();
     const imagen = screen.getByRole("img");
     expect(imagen).toHaveAccessibleName(/página 1, folio 1/);
     fireEvent.load(imagen);
     expect(screen.queryByText("Cargando página…")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Folio siguiente" }));
-    expect(screen.getByText("F. 2")).toBeInTheDocument();
+    expect(screen.getByText("F. [0002]")).toBeInTheDocument();
     expect(screen.getByText(/Vista previa de esta página no disponible/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Folio siguiente" }));
-    expect(screen.getByText("F. 3")).toBeInTheDocument();
+    expect(screen.getByText("F. [0003]")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Informe de prueba · Página 1 · Folio 3 de 3");
     expect(screen.getByRole("link", { name: /Abrir documento original/ })).toHaveAttribute("rel", "noopener noreferrer");
     expect(screen.getByRole("button", { name: "Folio siguiente" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Folio anterior" }));
-    expect(screen.getByText("F. 2")).toBeInTheDocument();
+    expect(screen.getByText("F. [0002]")).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
