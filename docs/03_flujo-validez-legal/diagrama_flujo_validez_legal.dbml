@@ -1,0 +1,99 @@
+// Diagrama del Módulo de Flujo Interno y Validez Legal
+// Flujos de Trabajo (Workflow) + Documentos + Firma Digital
+
+Table tipo_tramite {
+  id_tipo_tramite PK
+  nombre varchar
+  descripcion text
+  flujo_activo boolean
+}
+
+Table tramite {
+  id_tramite PK
+  codigo_tramite varchar
+  id_tipo_tramite FK
+  id_solicitante FK >- persona
+  id_expediente FK >- expediente
+  estado varchar
+  etapa_actual int
+  fecha_inicio datetime
+  fecha_fin datetime
+  observacion text
+}
+
+Table persona {
+  id_persona PK
+  nombre varchar
+  tipo_documento varchar
+  numero_documento varchar
+  correo varchar
+  telefono varchar
+}
+
+Table expediente {
+  id_expediente PK
+  codigo varchar
+  asunto varchar
+  fecha_registro datetime
+}
+
+Table etapa_tramite {
+  id_etapa PK
+  id_tipo_tramite FK
+  orden int
+  nombre_etapa varchar
+  rol_responsable varchar
+  es_obligatoria boolean
+  plazo_horas int
+}
+
+Table historial_tramite {
+  id_historial PK
+  id_tramite FK
+  id_etapa FK
+  id_usuario FK
+  accion varchar
+  fecha datetime
+  observacion text
+}
+
+Table documento {
+  id_documento PK
+  id_tramite FK
+  id_tipo_documento FK
+  numero_documento varchar
+  anio int
+  ruta_archivo varchar
+  estado_firma varchar
+  version int
+  fecha_generacion datetime
+}
+
+Table tipo_documento {
+  id_tipo_documento PK
+  nombre varchar
+  plantilla_path varchar
+  requiere_firma_sec_academica boolean
+  requiere_firma_admin boolean
+  requiere_firma_direccion boolean
+}
+
+Table firma {
+  id_firma PK
+  id_documento FK
+  id_usuario FK
+  rol_firmante varchar
+  proveedor varchar
+  hash_documento text
+  sello_tiempo datetime
+  estado varchar
+}
+
+Ref: tramite.id_tipo_tramite > tipo_tramite.id_tipo_tramite
+Ref: etapa_tramite.id_tipo_tramite > tipo_tramite.id_tipo_tramite
+Ref: historial_tramite.id_tramite > tramite.id_tramite
+Ref: historial_tramite.id_etapa > etapa_tramite.id_etapa
+Ref: documento.id_tramite > tramite.id_tramite
+Ref: documento.id_tipo_documento > tipo_documento.id_tipo_documento
+Ref: firma.id_documento > documento.id_documento
+Ref: tramite.id_expediente > expediente.id_expediente
