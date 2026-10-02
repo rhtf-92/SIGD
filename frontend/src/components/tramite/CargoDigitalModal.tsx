@@ -16,13 +16,40 @@ export default function CargoDigitalModal({
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
+
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    focusable?.item(0)?.focus();
+
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
+        return;
+      }
+
+      if (e.key !== "Tab" || !focusable?.length) return;
+
+      const first = focusable.item(0);
+      const last = focusable.item(focusable.length - 1);
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;

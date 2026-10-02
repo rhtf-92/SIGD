@@ -44,15 +44,18 @@ export default function FirmaBatchDrawer({
 
   useEffect(() => {
     if (!abierto) return;
-    setItems(
-      documentos.map((documento) => ({
-        documento,
-        estado: "PENDIENTE" as const,
-        cvd: null,
-      })),
-    );
-    setSeleccionados(documentos.map((documento) => documento.idDocumento));
-    setProcesando(false);
+    const timer = window.setTimeout(() => {
+      setItems(
+        documentos.map((documento) => ({
+          documento,
+          estado: "PENDIENTE" as const,
+          cvd: null,
+        })),
+      );
+      setSeleccionados(documentos.map((documento) => documento.idDocumento));
+      setProcesando(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [abierto, documentos]);
 
   useEffect(() => {

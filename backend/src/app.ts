@@ -24,4 +24,4 @@ export function construirApp(pool: Pool): Express {
   return app;
 }
 
-export default construirApp;
+export default construirApp;

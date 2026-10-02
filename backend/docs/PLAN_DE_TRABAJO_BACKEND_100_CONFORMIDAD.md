@@ -19,6 +19,8 @@
 | **Aprobación Oficial / Product Owner** | **Ing. Renato Henyer Tarazona Flores** (Docente Titular / Product Owner) |
 | **Estado del Documento** | **VINCULANTE Y OFICIALMENTE APROBADO (100.0% CONFORMIDAD REMEDIADA)** |
 
+> **Aclaración de estado (30-09-2026):** la aprobación indicada en esta ficha corresponde al plan. El 100.0% es el objetivo del plan y no acredita que el código de la rama `B_AREVALO` o el backend integrado hayan alcanzado conformidad. Para declarar cierre se requiere la evidencia de implementación, ejecución de pruebas, aprobación de los grupos propietarios e integración institucional.
+
 ---
 
 ## 📑 ÍNDICE GENERAL
@@ -36,7 +38,7 @@
    - 2.5 Diagrama Mermaid de Arquitectura Modular de Backend
 3. [Pipeline Automatizado de Migraciones DDL PostgreSQL 18](#3-pipeline-automatizado-de-migraciones-ddl-postgresql-18)
    - 3.1 Inventario Exhaustivo de los 6 Esquemas y las 51 Tablas Físicas
-   - 3.2 Secuencia de Scripts DDL Canónicos (`01_sigd_audit.sql` a `06_sigd_rut.sql`)
+   - 3.2 Secuencia de Migraciones DDL (`01_sigd_audit.sql` a `07_sigd_reportes.sql`)
    - 3.3 Arquitectura del Runner de Migraciones Automatizado (`backend/src/db/migrate.ts`) y PostgreSQL Advisory Lock
    - 3.4 Invariantes Críticos de Base de Datos (WORM, `ltree`, Particionamiento con DEFAULT, GiST y Concurrencia CUT)
 4. [Catálogo Detallado de Endpoints REST (`/api/v1/...`)](#4-catálogo-detallado-de-endpoints-rest-apiv1)
@@ -233,7 +235,7 @@ backend/
 ├── tsconfig.build.json
 ├── vitest.config.ts
 ├── vitest.unit.config.ts
-├── migraciones/                      <-- Runner DDL y scripts SQL 01 a 06
+├── migraciones/                      <-- Runner DDL y scripts SQL 01 a 07
 │   ├── 01_sigd_audit.sql
 │   ├── 02_sigd_auth.sql
 │   ├── 03_sigd_org.sql
@@ -421,7 +423,7 @@ La persistencia del SIGD en PostgreSQL 18 se estructura en **6 esquemas de datos
 
 ---
 
-### 3.2 Secuencia de Scripts DDL Canónicos (`01_sigd_audit.sql` a `06_sigd_rut.sql`)
+### 3.2 Secuencia de Migraciones DDL (`01_sigd_audit.sql` a `07_sigd_reportes.sql`)
 
 Los scripts de migración se alojan en `backend/migraciones/` y deben ejecutarse en un orden de dependencias estrictamente lineal:
 
@@ -431,105 +433,16 @@ Los scripts de migración se alojan en `backend/migraciones/` y deben ejecutarse
 4. **`04_sigd_doc.sql`:** Crea el esquema `sigd_doc`. Modela los procedimientos TUPA, versiones de formularios JSON Schema Draft 2020-12 con disparador de inmutabilidad `tr_proteger_formulario_version`, y la tabla `documento_adjunto` con metadatos para MinIO S3 y deduplicación por hash SHA-256.
 5. **`05_sigd_tra.sql`:** Crea el esquema `sigd_tra`. Define la secuencia anual de CUT, la función PL/pgSQL `sigd_tra.generar_cut_expediente(p_anio INT)` con bloqueo concurrente `FOR UPDATE`, la tabla de foliación correlativa continua `expediente_documento_folio` con la función `agregar_folio_expediente` y disparadores de bloqueo `trg_folio_no_update`/`trg_folio_no_delete`.
 6. **`06_sigd_rut.sql`:** Crea el esquema `sigd_rut`. Modela la máquina de estados FSM de 10 estados, la matriz de 13 transiciones, la tabla particionada declarativamente por rango `movimiento_tramite` con sus particiones `movimiento_tramite_2026`, `movimiento_tramite_2027` y la partición por defecto `movimiento_tramite_default`, y el disparador de inmutabilidad histórica `fn_rechazar_mutacion_historica` que emite `SQLSTATE '23001'`.
+7. **`07_sigd_reportes.sql`:** Extiende el esquema `sigd_tra` con vistas materializadas e índices que soportan las métricas MGD y la retención por área. Es una migración adicional de reportes; no crea un séptimo esquema ni se cuenta como tabla física de negocio.
 
 > **Gobernanza de Dependencias Referenciales y Despliegue de Esquema Base:**  
-> Debido a que las tablas de tramitación (`sigd_tra`) y enrutamiento (`sigd_rut`) mantienen claves foráneas hacia los esquemas de organización (`sigd_org.area`) y tipología documental (`sigd_doc.tipo_documento`, `sigd_doc.formulario_version`), el runner automatizado `migrate.ts` despliega los 6 scripts canónicos completos (`01` al `06`) en orden lineal durante la fase de inicialización base de infraestructura (Sprint 1). Esto garantiza que la totalidad de las 51 tablas existan y estén validadas con sus constraints desde el inicio, evitando fallas de dependencias invertidas (como la invocación de esquemas dinámicos JSON Schema en Sprint 2 antes de la creación formal del DDL de formularios), mientras que los controladores, repositorios y endpoints de negocio se activan e integran progresivamente en sus sprints respectivos.
+> Debido a que los esquemas de tramitación y enrutamiento dependen de organización y documentos, las migraciones `01` a `06` crean los seis esquemas y sus tablas en orden. El runner procesa además `07_sigd_reportes.sql`, que crea vistas materializadas para el OE6. El orden alfabético de los siete scripts se aplica secuencialmente y cada archivo queda registrado con su checksum. La existencia del DDL no acredita por sí misma que las rutas o reglas de negocio estén implementadas.
 
 ---
 
 ### 3.3 Arquitectura del Runner de Migraciones Automatizado (`backend/src/db/migrate.ts`)
 
-El runner de migraciones automatizado se ejecuta durante el despliegue del backend antes del arranque del servidor HTTP (`npm run migrate` o pre-arranque en `server.ts`). Para blindar la operación ante entornos contenerizados con múltiples réplicas concurrentes (pods en Docker/Kubernetes), el runner adquiere un **PostgreSQL Advisory Lock exclusivo** a nivel de sesión (`pg_advisory_lock`), garantizando que solo una instancia ejecute el pipeline DDL:
-
-```typescript
-// backend/src/db/migrate.ts - Especificación de Arquitectura de Migración con Advisory Lock
-import fs from 'node:fs';
-import path from 'node:path';
-import crypto from 'node:crypto';
-import type { Pool } from 'pg';
-
-interface RegistroMigracion {
-  id: number;
-  nombre_script: string;
-  checksum_sha256: string;
-  ejecutado_en: Date;
-}
-
-// Identificador numérico institucional único para Advisory Lock en PostgreSQL
-const SIGD_MIGRATION_ADVISORY_LOCK_ID = 928374182;
-
-export async function ejecutarMigraciones(pool: Pool): Promise<void> {
-  const client = await pool.connect();
-  try {
-    // 0. Adquirir Advisory Lock exclusivo a nivel de sesión (evita carreras y deadlocks entre réplicas)
-    console.log('[MIGRATE] Adquiriendo PostgreSQL Advisory Lock (928374182)...');
-    await client.query('SELECT pg_advisory_lock($1)', [SIGD_MIGRATION_ADVISORY_LOCK_ID]);
-
-    await client.query('BEGIN');
-
-    // 1. Tabla de control de migraciones
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS public.sigd_migraciones (
-        id SERIAL PRIMARY KEY,
-        nombre_script VARCHAR(255) NOT NULL UNIQUE,
-        checksum_sha256 CHAR(64) NOT NULL,
-        ejecutado_en TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-    `);
-
-    // 2. Localizar y ordenar scripts en backend/migraciones (orden estricto 01 -> 06)
-    const dirMigraciones = path.resolve(__dirname, '../../migraciones');
-    const archivos = fs.readdirSync(dirMigraciones)
-      .filter((f) => f.endsWith('.sql'))
-      .sort();
-
-    // 3. Ejecutar secuencialmente
-    for (const archivo of archivos) {
-      const rutaCompleta = path.join(dirMigraciones, archivo);
-      const contenidoSql = fs.readFileSync(rutaCompleta, 'utf-8');
-      const checksum = crypto.createHash('sha256').update(contenidoSql).digest('hex');
-
-      const res = await client.query<RegistroMigracion>(
-        'SELECT checksum_sha256 FROM public.sigd_migraciones WHERE nombre_script = $1',
-        [archivo]
-      );
-
-      if (res.rowCount && res.rowCount > 0) {
-        if (res.rows[0].checksum_sha256 !== checksum) {
-          throw new Error(
-            `Error de Integridad DDL: El archivo ${archivo} ha sido alterado post-ejecución. Checksum esperado: ${res.rows[0].checksum_sha256}, actual: ${checksum}`
-          );
-        }
-        continue; // Migración ya aplicada
-      }
-
-      console.log(`[MIGRATE] Aplicando migración DDL: ${archivo}...`);
-      await client.query(contenidoSql);
-
-      await client.query(
-        'INSERT INTO public.sigd_migraciones (nombre_script, checksum_sha256) VALUES ($1, $2)',
-        [archivo, checksum]
-      );
-      console.log(`[MIGRATE] Migración ${archivo} completada exitosamente.`);
-    }
-
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('[MIGRATE] Falla crítica durante la ejecución de migraciones DDL:', error);
-    throw error;
-  } finally {
-    // Liberación garantizada del Advisory Lock en el bloque finally
-    try {
-      await client.query('SELECT pg_advisory_unlock($1)', [SIGD_MIGRATION_ADVISORY_LOCK_ID]);
-      console.log('[MIGRATE] PostgreSQL Advisory Lock liberado exitosamente.');
-    } catch (unlockErr) {
-      console.error('[MIGRATE] Error al liberar advisory lock:', unlockErr);
-    }
-    client.release();
-  }
-}
-```
+La implementación canónica y actualizada está en [`backend/src/db/migrate.ts`](../src/db/migrate.ts); el plan no mantiene una copia ejecutable del runner para evitar que el ejemplo quede desfasado. El código obtiene el identificador predeterminado `987654321` (configurable con `MIGRATE_ADVISORY_LOCK_ID`), adquiere el lock de sesión mediante `pg_try_advisory_lock` con reintentos y timeout, inicia una transacción, ordena todos los `.sql` disponibles, verifica los checksums, ejecuta las migraciones nuevas y registra su aplicación. Ante un error revierte el lote y libera el lock en `finally`.
 
 ---
 
@@ -1623,7 +1536,7 @@ export default async function () {
     connectionString: container.getConnectionUri()
   });
 
-  // Ejecución de las 6 migraciones canónicas (51 tablas)
+  // Ejecución secuencial de las migraciones 01–07 (6 esquemas, 51 tablas y vistas de reportes)
   await ejecutarMigraciones(pool);
   
   // Exponer conexión para suites de pruebas
@@ -2565,7 +2478,7 @@ A continuación se detalla la planificación operativa individual, la asignació
 - **Tareas Técnicas Detalladas y Problemas a Solucionar / Optimizar:**
   - `T-BE-CL-01`: Construir el runner de migraciones DDL idempotente con Advisory Locks.
     - *Problema a Solucionar / Optimizar:* Al escalar el backend en contenedores o clústeres réplica, múltiples instancias intentaban ejecutar simultáneamente las migraciones DDL, provocando errores de colisión DDL, bloqueos de catálogos y corrupción del esquema de PostgreSQL.
-    - *Solución Técnica / Optimización Aplicada:* Implementar en `backend/src/db/migrate.ts` un mecanismo de exclusión mutua global mediante `pg_try_advisory_lock(987654321)`. Si una réplica detecta el candado activo, entra en espera pasiva hasta que la migración concluya, asegurando ejecución atómica y estrictamente secuencial de los scripts `01` al `06`.
+    - *Solución Técnica / Optimización Aplicada:* Implementar en `backend/src/db/migrate.ts` un mecanismo de exclusión mutua global mediante `pg_try_advisory_lock(987654321)`. Si una réplica detecta el candado activo, espera con backoff y jitter hasta que la migración concluya. El runner procesa secuencialmente los scripts SQL disponibles (`01` al `07` en el inventario actual), registra su checksum y aplica el lote en una transacción.
   - `T-BE-CL-02`: Diseñar e implementar el Transactional Outbox Worker con `FOR UPDATE SKIP LOCKED`.
     - *Problema a Solucionar / Optimizar:* Pérdida de eventos o notificaciones por correo cuando la base de datos confirmaba la transacción pero el servicio externo de correo o SSE fallaba en ese instante (problema de dual-write).
     - *Solución Técnica / Optimización Aplicada:* Implementar el patrón arquitectónico *Transactional Outbox*: las notificaciones se graban en la tabla `sigd_audit.outbox` dentro de la misma transacción de negocio. Un worker en segundo plano consume los mensajes mediante `SELECT ... FOR UPDATE SKIP LOCKED`, garantizando entrega garantizada (*at-least-once*) sin bloqueos entre hilos.
@@ -2639,7 +2552,7 @@ A continuación se detalla la planificación operativa individual, la asignació
   - Endpoints de analítica ejecutiva y métricas de retención por unidad orgánica.
 - **Endpoints Específicos Asignados:**
   - `GET /api/v1/reportes/dashboard-ejecutivo` (#50): Tablero MGD con consolidado en tiempo real de los 4 KPIs (VTEP, TPR, TRO, TEO), desglose por mes y por área.
-  - `GET /api/v1/reportes/vistas-materializadas/refresh` (#51): Endpoint administrativo para invocación de `REFRESH MATERIALIZED VIEW CONCURRENTLY` sin bloquear lecturas.
+  - `POST /api/v1/reportes/vistas-materializadas/refresh` (#51): Endpoint administrativo para invocación de `REFRESH MATERIALIZED VIEW CONCURRENTLY` sin bloquear lecturas.
   - `GET /api/v1/reportes/tiempos-atencion` (#52): Distribución de tiempos de permanencia de expedientes por área e identificación de cuellos de botella.
 - **Tareas Técnicas Detalladas y Problemas a Solucionar / Optimizar:**
   - `T-BE-CL-10`: Escribir el script SQL `07_vistas_materializadas_mgd.sql` con vistas materializadas e índices únicos.
@@ -2707,11 +2620,11 @@ A continuación se detalla la planificación operativa individual, la asignació
 
 ### 7.5 Catálogo Maestro de los 56 Endpoints de Backend y Mapeo de Responsabilidades
 
-El siguiente catálogo exhaustivo consolida los **56 endpoints canónicos de la API RESTful (/api/v1/...)**, especificando su método HTTP, ruta oficial, subdominio asignado, sprint de implementación, carga en Story Points, responsable nominal, rama Git oficial y el invariante arquitectónico o mandato legal que garantiza el **100.0% de conformidad institucional**:
+El siguiente catálogo define los **56 endpoints objetivo** de la API RESTful (`/api/v1/...`), con método HTTP, ruta, subdominio, sprint, carga, responsable, rama e invariante esperado. Es una especificación de alcance; no afirma que las 56 rutas estén implementadas ni que por sí solas acrediten conformidad. El estado observado por rama debe registrarse con evidencia de ruta, autorización y prueba.
 
 ```
 +==========================================================================================================================================================================+
-|                                              CATÁLOGO MAESTRO DE LOS 56 ENDPOINTS DE BACKEND (SIGD / EXPRESS 5)                                                          |
+|                                      CATÁLOGO OBJETIVO DE LOS 56 ENDPOINTS DE BACKEND (SIGD / EXPRESS 5)                                                                   |
 +----+--------+-------------------------------------------------+---------+--------+----+--------------------------+--------------+---------------------------------------+
 | #  | MÉTODO | RUTA CANÓNICA REST (/api/v1/...)                | SUBDOM. | SPRINT | SP | RESPONSABLE NOMINAL      | RAMA GIT     | INVARIANTE / MANDATO LEGAL APLICABLE  |
 +----+--------+-------------------------------------------------+---------+--------+----+--------------------------+--------------+---------------------------------------+
@@ -2770,7 +2683,7 @@ El siguiente catálogo exhaustivo consolida los **56 endpoints canónicos de la 
 | 49 | POST   | `/api/v1/admin/calendario-laboral/feriado-excep`| Organ   | S5     | 1  | Héctor                   | `B_HECTOR`   | Alta de feriados regionales no hábiles|
 +----+--------+-------------------------------------------------+---------+--------+----+--------------------------+--------------+---------------------------------------+
 | 50 | GET    | `/api/v1/reportes/dashboard-ejecutivo`          | CoreL   | S6     | 2  | Reátegui                 | `B_REATEGUI` | 4 Fórmulas MGD-PCM (VTEP/TPR/TRO/TEO).|
-| 51 | GET    | `/api/v1/reportes/vistas-materializadas/refresh`| CoreL   | S6     | 2  | Reátegui                 | `B_REATEGUI` | REFRESH MATERIALIZED VIEW CONCURRENTLY|
+| 51 | POST   | `/api/v1/reportes/vistas-materializadas/refresh`| CoreL   | S6     | 2  | Reátegui                 | `B_REATEGUI` | REFRESH MATERIALIZED VIEW CONCURRENTLY|
 | 52 | GET    | `/api/v1/reportes/tiempos-atencion`             | CoreL   | S6     | 2  | Reátegui                 | `B_REATEGUI` | Métricas de retención y cuellos botella|
 | 53 | GET    | `/api/v1/reportes/exportar-pdf`                 | CoreL   | S6     | 2  | Zevallos                 | `B_ZEVALLOS` | Exportador binario PDF 1.4 por streams|
 | 54 | GET    | `/api/v1/reportes/exportar-excel`               | CoreL   | S6     | 2  | Zevallos                 | `B_ZEVALLOS` | Exportador SpreadsheetML estructurado.|
@@ -2778,7 +2691,7 @@ El siguiente catálogo exhaustivo consolida los **56 endpoints canónicos de la 
 | 55 | GET    | `/api/v1/realtime/stream`                       | CoreL   | S1-S6  | 4  | Ricardo Arévalo          | `B_AREVALO`  | Server-Sent Events SSE para UI reactiv|
 | 56 | GET    | `/api/v1/firma/pendientes`                      | CoreL   | S4-S6  | 4  | Ricardo Arévalo          | `B_AREVALO`  | Cola priorizada de firma institucional|
 +====+========+=================================================+=========+========+====+==========================+==============+=======================================+
-| -> | TOTAL  | 56 ENDPOINTS OPERATIVOS EN EXPRESS 5            | 6 SUBD. | 12 SEM | 176| 21 DESARROLLADORES       | 21 RAMAS GIT | 100.0% CONFORMIDAD INSTITUCIONAL SIGD |
+| -> | TOTAL  | 56 ENDPOINTS ESPECIFICADOS; VERIFICAR IMPLEMENTACIÓN | 6 SUBD. | 12 SEM | 176| 21 DESARROLLADORES       | 21 RAMAS GIT | META DE CONFORMIDAD INSTITUCIONAL SIGD |
 +----+--------+-------------------------------------------------+---------+--------+----+--------------------------+--------------+---------------------------------------+
 ```
 
@@ -2891,7 +2804,7 @@ Para que un entregable o Pull Request sea declarado formalmente terminado y acep
 ### 8.2 Protocolo de Aprobación, Migración y Verificación Forense
 
 1. **Revisión de Pares (Peer Review):** Todo PR debe contar con la aprobación técnica de al menos dos colaboradores de subdominios cruzados.
-2. **Prueba de Humo contra Contenedores:** La suite de Testcontainers debe levantar automáticamente la imagen `postgres:18-alpine`, correr las 6 migraciones completas y aprobar las 15 suites de prueba en menos de 90 segundos.
+2. **Prueba de Humo contra Contenedores:** La suite de Testcontainers debe levantar automáticamente la imagen `postgres:18-alpine`, ejecutar los siete scripts SQL (seis esquemas y una migración de reportes) y aprobar las suites E2E en menos de 90 segundos. El criterio es una meta de aceptación; requiere un reporte de ejecución para considerarse acreditado.
 3. **Desacoplamiento del Frontend:** A medida que cada Sprint habilita un subdominio de endpoints, el equipo frontend conmuta la variable `VITE_ENABLE_MOCKS=false` para certificar la comunicación end-to-end con datos persistidos.
 4. **Visto Bueno del Product Owner:** El Docente Titular (**Ing. Renato Henyer Tarazona Flores**) valida la conformidad académica e institucional del entregable antes de autorizar el merge a la rama `main`.
 

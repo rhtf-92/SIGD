@@ -30,6 +30,7 @@ import {
   validateFieldValue,
   mockTupaSchema,
 } from "../utils/schemaFormParser";
+import { pasosWizardSchemas } from "../features/tramites/validations/tramiteWizardValidation";
 
 const DEFAULT_STORAGE_KEY = "sigd_tramite_wizard_borrador_v1";
 
@@ -154,9 +155,9 @@ function validatePaso2(data: TramiteWizardFormData): StepValidationResult {
     errors.asunto = [
       `El asunto debe contener al menos 10 caracteres (actual: ${asunto.length}).`,
     ];
-  } else if (asunto.length > 250) {
+  } else if (asunto.length > 500) {
     errors.asunto = [
-      `El asunto no puede exceder los 250 caracteres (actual: ${asunto.length}).`,
+      `El asunto no puede exceder los 500 caracteres (actual: ${asunto.length}).`,
     ];
   }
 
@@ -257,6 +258,64 @@ function validatePaso4(data: TramiteWizardFormData): StepValidationResult {
     isValid: Object.keys(errors).length === 0,
     errors,
   };
+}
+
+function validatePasoConZod(
+  step: WizardStepId,
+  data: TramiteWizardFormData,
+): StepValidationResult {
+  const schema = pasosWizardSchemas[step - 1];
+  let stepData: unknown;
+
+  switch (step) {
+    case 1:
+      stepData = {
+        tipoDocumento: data.solicitante.tipoDocumento,
+        numeroDocumento: data.solicitante.numeroDocumento,
+        nombres: data.solicitante.nombres,
+        razonSocial: data.solicitante.razonSocial,
+        email: data.solicitante.correo,
+        telefono: data.solicitante.celular,
+      };
+      break;
+    case 2:
+      stepData = {
+        tipoDocumento: data.tramite.tipoDocumentoPresentado,
+        numeroFolios: data.tramite.cantidadFolios,
+        asunto: data.tramite.asunto,
+      };
+      break;
+    case 3:
+      stepData = {
+        anexos: data.documentoPrincipal?.fileRef
+          ? [data.documentoPrincipal.fileRef]
+          : [],
+      };
+      break;
+    case 4:
+      stepData = {
+        declaracionJurada: data.declaracionJurada.aceptada,
+        aceptacionTerminos: data.declaracionJurada.leidoPoliticasPrivacidad,
+      };
+      break;
+  }
+
+  const parsed = schema.safeParse(stepData);
+  if (parsed.success) return { isValid: true, errors: {} };
+
+  const errors: Record<string, string[]> = {};
+  for (const issue of parsed.error.issues) {
+    const rawField = issue.path.length > 0 ? String(issue.path[0]) : "general";
+    const fieldAliases: Partial<Record<WizardStepId, Record<string, string>>> = {
+      1: { email: "correo", telefono: "celular" },
+      2: { tipoDocumento: "tipoDocumentoPresentado", numeroFolios: "cantidadFolios" },
+      3: { anexos: "documentoPrincipal" },
+      4: { aceptacionTerminos: "leidoPoliticasPrivacidad" },
+    };
+    const field = fieldAliases[step]?.[rawField] ?? rawField;
+    errors[field] = [...(errors[field] ?? []), issue.message];
+  }
+  return { isValid: false, errors };
 }
 
 // =============================================================================
@@ -378,19 +437,30 @@ export function useTramiteWizard(
         return res;
       }
 
-      // Validadores predeterminados según el paso
+      // Ejecuta las validaciones existentes y las reglas declarativas Zod del paso.
+      let validation: StepValidationResult;
       switch (step) {
         case 1:
-          return validatePaso1(dataToValidate);
+          validation = validatePaso1(dataToValidate);
+          break;
         case 2:
-          return validatePaso2(dataToValidate);
+          validation = validatePaso2(dataToValidate);
+          break;
         case 3:
-          return validatePaso3(dataToValidate);
+          validation = validatePaso3(dataToValidate);
+          break;
         case 4:
-          return validatePaso4(dataToValidate);
+          validation = validatePaso4(dataToValidate);
+          break;
         default:
           return { isValid: true, errors: {} };
       }
+
+      const zodValidation = validatePasoConZod(step, dataToValidate);
+      return {
+        isValid: validation.isValid && zodValidation.isValid,
+        errors: { ...validation.errors, ...zodValidation.errors },
+      };
     },
     [customValidators]
   );

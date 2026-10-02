@@ -11,9 +11,9 @@ interface TarjetaModulo {
 const MODULOS: TarjetaModulo[] = [
   {
     codigo: "ENT-M04-01",
-    titulo: "Flujo de Titulación / Trabajo de Investigación",
+    titulo: "Flujo de expedientes",
     descripcion:
-      "Workflow académico de 5 etapas administrado por la Secretaría Académica (verificación, revisión de requisitos, observaciones, subsanación y emisión de resolución).",
+      "Workflow de 5 etapas de la Secretaría Académica para titulación, grados, certificaciones, convalidaciones y trabajos de investigación (verificación, revisión de requisitos, observaciones, subsanación y emisión de resolución).",
     responsables: "Adriano D. Espinoza (R/A)",
     ruta: "/flujos/titulacion",
   },
@@ -37,9 +37,9 @@ const MODULOS: TarjetaModulo[] = [
     codigo: "ENT-M04-04",
     titulo: "Visor Documental y Códigos QR",
     descripcion:
-      "Renderizado de copias auténticas con estampado QR (pendiente de implementación).",
+      "Renderizado de copias auténticas A4 con estampa lateral CVD de 20mm y QR de cotejo (D.S. 070-2013-PCM).",
     responsables: "Mayra (R)",
-    ruta: null,
+    ruta: "/flujo-validez-legal/visor-cvd",
   },
   {
     codigo: "ENT-M04-05",

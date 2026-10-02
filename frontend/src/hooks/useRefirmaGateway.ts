@@ -16,7 +16,8 @@ const PASOS_SECUENCIA: readonly PasoProcesoFirma[] = [
 ];
 
 const PASO_MS = 2400;
-const TIMEOUT_AGENTE_MS = 45000;
+export const TIMEOUT_AGENTE_MS = 5 * 60 * 1000; // 5 minutos (barra de espera del modal)
+const IFRAME_LIMPIEZA_MS = 2000;
 
 function generarTokenSesion(): string {
   const bytes = new Uint8Array(16);
@@ -40,12 +41,38 @@ export function generarCvdDocumento(documento: DocumentoOficial): string {
   return `CVD-${documento.anio}-${documento.tipoActo}-${serie}-${checksum}`;
 }
 
+/**
+ * T-FE-DOC-10: invoca el esquema `refirma://` con un iframe oculto de corta
+ * duración para no recargar la SPA ni perder la sesión del director.
+ * Las redirecciones ordinarias (`window.location.href = ...`) disparaban
+ * alertas de seguridad intrusivas y desmontaban el estado React.
+ */
+export function dispararProtocoloViaIframe(uri: string): void {
+  try {
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.setAttribute("tabindex", "-1");
+    iframe.style.display = "none";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.src = uri;
+    document.body.appendChild(iframe);
+    window.setTimeout(() => {
+      iframe.remove();
+    }, IFRAME_LIMPIEZA_MS);
+  } catch {
+    // El navegador carece de un manejador registrado para refirma://.
+  }
+}
+
 export interface UseRefirmaGatewayResultado {
   estado: EstadoGatewayRefirma;
   pasoActual: PasoProcesoFirma | null;
   documento: DocumentoOficial | null;
   resultado: RefirmaRespuestaDTO | null;
   mensajeError: string | null;
+  segundosRestantes: number | null;
+  timeoutMs: number;
   iniciarFirma: (documento: DocumentoOficial, firmanteDni: string) => void;
   reintentar: () => void;
   cancelar: () => void;
@@ -59,13 +86,16 @@ export function useRefirmaGateway(
   const [documento, setDocumento] = useState<DocumentoOficial | null>(null);
   const [resultado, setResultado] = useState<RefirmaRespuestaDTO | null>(null);
   const [mensajeError, setMensajeError] = useState<string | null>(null);
+  const [segundosRestantes, setSegundosRestantes] = useState<number | null>(null);
 
   const documentoRef = useRef<DocumentoOficial | null>(null);
   const dniRef = useRef<string>("");
   const secuenciaActivaRef = useRef(false);
   const pasoRef = useRef<number | null>(null);
   const temporizadorLargoRef = useRef<number | null>(null);
+  const cuentaRegresivaRef = useRef<number | null>(null);
   const onCompletadoRef = useRef(onCompletado);
+  const avanzarPasoRef = useRef<(indicePaso: number) => void>(() => undefined);
 
   useEffect(() => {
     onCompletadoRef.current = onCompletado;
@@ -80,6 +110,10 @@ export function useRefirmaGateway(
       window.clearTimeout(temporizadorLargoRef.current);
       temporizadorLargoRef.current = null;
     }
+    if (cuentaRegresivaRef.current !== null) {
+      window.clearInterval(cuentaRegresivaRef.current);
+      cuentaRegresivaRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -89,13 +123,13 @@ export function useRefirmaGateway(
     };
   }, [limpiarTemporizadores]);
 
-  const avanzarPaso = useCallback(
-    (indicePaso: number) => {
-      if (!secuenciaActivaRef.current) return;
+  const avanzarPaso = useCallback((indicePaso: number): void => {
+    if (!secuenciaActivaRef.current) return;
 
       if (indicePaso >= PASOS_SECUENCIA.length) {
         secuenciaActivaRef.current = false;
         limpiarTemporizadores();
+        setSegundosRestantes(null);
         const doc = documentoRef.current;
         if (!doc) return;
         const respuesta: RefirmaRespuestaDTO = {
@@ -118,11 +152,13 @@ export function useRefirmaGateway(
 
       pasoRef.current = window.setTimeout(() => {
         pasoRef.current = null;
-        avanzarPaso(indicePaso + 1);
+        avanzarPasoRef.current(indicePaso + 1);
       }, PASO_MS);
-    },
-    [limpiarTemporizadores],
-  );
+  }, [limpiarTemporizadores]);
+
+  useEffect(() => {
+    avanzarPasoRef.current = avanzarPaso;
+  }, [avanzarPaso]);
 
   const iniciarFirma = useCallback(
     (doc: DocumentoOficial, firmanteDni: string) => {
@@ -146,13 +182,14 @@ export function useRefirmaGateway(
       };
 
       try {
-        window.location.href = construirUriRefirma(parametros);
+        dispararProtocoloViaIframe(construirUriRefirma(parametros));
       } catch {
         // El navegador carece de un manejador registrado para refirma://.
       }
 
       setEstado("CONECTANDO");
       setPasoActual("CONECTANDO_AGENTE");
+      setSegundosRestantes(Math.floor(TIMEOUT_AGENTE_MS / 1000));
 
       pasoRef.current = window.setTimeout(() => {
         pasoRef.current = null;
@@ -164,12 +201,19 @@ export function useRefirmaGateway(
           secuenciaActivaRef.current = false;
           limpiarTemporizadores();
           setPasoActual(null);
+          setSegundosRestantes(null);
           setMensajeError(
             "No se detectó el agente local Refirma / RENIEC. Verifique que el componente de firma esté instalado y que el DNIe o token esté conectado.",
           );
           setEstado("TIMEOUT");
         }
       }, TIMEOUT_AGENTE_MS);
+
+      cuentaRegresivaRef.current = window.setInterval(() => {
+        setSegundosRestantes((prev) =>
+          prev !== null && prev > 0 ? prev - 1 : prev,
+        );
+      }, 1000);
     },
     [avanzarPaso, limpiarTemporizadores],
   );
@@ -188,6 +232,7 @@ export function useRefirmaGateway(
     setDocumento(null);
     setResultado(null);
     setMensajeError(null);
+    setSegundosRestantes(null);
   }, [limpiarTemporizadores]);
 
   return {
@@ -196,6 +241,8 @@ export function useRefirmaGateway(
     documento,
     resultado,
     mensajeError,
+    segundosRestantes,
+    timeoutMs: TIMEOUT_AGENTE_MS,
     iniciarFirma,
     reintentar,
     cancelar,

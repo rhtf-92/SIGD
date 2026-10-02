@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import AcademicWorkflowStepper from "../../components/flujos/AcademicWorkflowStepper";
+import BuscadorExpedientes from "../../components/flujos/BuscadorExpedientes";
 import StageDetailCard from "../../components/flujos/StageDetailCard";
+import { useTitulacionBackend } from "../../hooks/useTitulacionBackend";
 import { useWorkflowAcademico } from "../../hooks/useWorkflowAcademico";
 import type { EstadoTramite } from "../../types/workflowAcademico";
 import { ETIQUETA_ESTADO_TRAMITE } from "../../types/workflowAcademico";
@@ -34,11 +36,20 @@ function formatoFecha(fecha: string): string {
 }
 
 export default function WorkflowAcademicoPage() {
+  const [ahora, setAhora] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setAhora(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const {
     workflow,
     etapas,
     estado,
     errorFsm,
+    requisitosPendientesEtapaActual,
+    expedientesDisponibles,
     puedeTomar,
     puedeAprobar,
     puedeObservar,
@@ -47,12 +58,14 @@ export default function WorkflowAcademicoPage() {
     puedeFirmar,
     puedeAnular,
     tomarEnRevision,
+    cargarExpediente,
     aprobarEtapaActual,
     observarEtapaActual,
     subsanar,
     reanudarRevision,
     firmarDocumento,
     anularTramite,
+    marcarRequisito,
   } = useWorkflowAcademico();
 
   const semaforoClase = useMemo(() => {
@@ -64,7 +77,7 @@ export default function WorkflowAcademicoPage() {
     if (inicio >= limite) {
       return "border-red-200 bg-red-50 text-red-700";
     }
-    const consumo = ((Date.now() - inicio) / (limite - inicio)) * 100;
+    const consumo = ((ahora - inicio) / (limite - inicio)) * 100;
     if (consumo < 60) {
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
     }
@@ -72,7 +85,7 @@ export default function WorkflowAcademicoPage() {
       return "border-amber-200 bg-amber-50 text-amber-700";
     }
     return "border-red-200 bg-red-50 text-red-700";
-  }, [workflow.fechaRegistro, workflow.fechaLimiteSla, estado]);
+  }, [ahora, workflow.fechaRegistro, workflow.fechaLimiteSla, estado]);
 
   const semaforoTexto = useMemo(() => {
     if (estado === "RESUELTO") return "Culminado";
@@ -80,11 +93,11 @@ export default function WorkflowAcademicoPage() {
     const inicio = new Date(workflow.fechaRegistro).getTime();
     const limite = new Date(workflow.fechaLimiteSla).getTime();
     if (inicio >= limite) return "Vencido / riesgo de silencio";
-    const consumo = ((Date.now() - inicio) / (limite - inicio)) * 100;
+    const consumo = ((ahora - inicio) / (limite - inicio)) * 100;
     if (consumo < 60) return "En plazo (SLA < 60%)";
     if (consumo <= 85) return "Próximo a vencer (60%–85%)";
     return "Vencido / riesgo (SLA > 85%)";
-  }, [workflow.fechaRegistro, workflow.fechaLimiteSla, estado]);
+  }, [ahora, workflow.fechaRegistro, workflow.fechaLimiteSla, estado]);
 
   const acciones = [
     {
@@ -149,18 +162,45 @@ export default function WorkflowAcademicoPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             Máquina de Estados Finitos (FSM) de 10 estados · Procedimiento
-            PROC-ACA-01 de Titulación Profesional Técnica.
+            PROC-ACA-01 de Expedientes Académicos (titulación, grados,
+            certificaciones, convalidaciones y trabajos de investigación).
           </p>
+          <p className="mt-2 inline-flex flex-wrap items-center gap-2 text-xs">
+            <span
+              data-testid="numero-expediente"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 font-bold text-slate-700"
+            >
+              N.° expediente: {workflow.idTramite}
+            </span>
+            <span
+              data-testid="cut-expediente"
+              className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-mono font-bold text-blue-700"
+            >
+              CUT: {workflow.cut}
+            </span>
+          </p>
+          <InsigniaConexionBackend tramiteId={workflow.idTramite} />
         </div>
       </header>
 
       <section className="mx-auto max-w-7xl px-6 py-8">
+        <BuscadorExpedientes
+          expedientes={expedientesDisponibles}
+          expedienteActualId={workflow.idTramite}
+          onSeleccionar={cargarExpediente}
+        />
+
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
               Expediente
             </p>
-            <p className="mt-1 text-lg font-bold">{workflow.cut}</p>
+            <p className="mt-1 text-lg font-bold" data-testid="expediente-cut">
+              {workflow.cut}
+            </p>
+            <p className="text-xs font-semibold text-slate-600">
+              N.° expediente: {workflow.idTramite} · {workflow.codigoProcedimiento}
+            </p>
             <p className="text-xs text-slate-500">{workflow.nombreTramite}</p>
           </div>
 
@@ -259,6 +299,28 @@ export default function WorkflowAcademicoPage() {
           </div>
         )}
 
+        {requisitosPendientesEtapaActual.length > 0 && estado === "EN_REVISION" && (
+          <div
+            role="status"
+            className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          >
+            <p className="font-bold">
+              Bloqueo FSM activo: faltan {requisitosPendientesEtapaActual.length} requisito(s) en la
+              etapa actual
+            </p>
+            <ul className="mt-1 list-inside list-disc">
+              {requisitosPendientesEtapaActual.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+            <p className="mt-1 text-xs">
+              Marque cada acta/certificado en la tarjeta de la etapa en curso para habilitar
+              “Aprobar etapa”. Sin actas de sustentación y certificados no hay pase a la etapa
+              resolutiva.
+            </p>
+          </div>
+        )}
+
         <h2 className="mb-3 text-lg font-bold">Detalle por etapa</h2>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {etapas.map((etapa, indice) => (
@@ -267,11 +329,18 @@ export default function WorkflowAcademicoPage() {
               etapa={etapa}
               indice={indice}
               esActual={etapa.idEtapa === workflow.etapaActualId}
+              onToggleRequisito={marcarRequisito}
             />
           ))}
         </div>
 
         <p className="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-xs leading-5 text-slate-500">
+          5 fases obligatorias:{" "}
+          <strong className="text-slate-700">
+            Expedito → Prácticas Preprofesionales (EFSRT) → Jurado y Sustentación → Emisión de
+            Resolución → Registro MinEdu
+          </strong>
+          .<br />
           Transiciones permitidas por la FSM:{" "}
           <code className="text-slate-700">
             REGISTRADO → EN_TRAMITE → EN_REVISION → (OBSERVADO ⇄ SUBSANADO) →
@@ -283,5 +352,38 @@ export default function WorkflowAcademicoPage() {
         </p>
       </section>
     </main>
+  );
+}
+
+function InsigniaConexionBackend({ tramiteId }: { tramiteId: number }) {
+  const { conectado, cargandoRemoto } = useTitulacionBackend(tramiteId);
+  if (cargandoRemoto) {
+    return (
+      <p className="mt-2 text-xs text-slate-400" role="status">
+        Sincronizando FSM con el backend…
+      </p>
+    );
+  }
+  return (
+    <p className="mt-2">
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${
+          conectado
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : "border-slate-200 bg-slate-100 text-slate-500"
+        }`}
+        title={
+          conectado
+            ? "La FSM se consume desde GET /api/v1/flujos/titulacion/:id"
+            : "Sin backend disponible: opera la FSM local del cliente (mocks solo en desarrollo)"
+        }
+      >
+        <span
+          className={`h-2 w-2 rounded-full ${conectado ? "bg-emerald-500" : "bg-slate-400"}`}
+          aria-hidden="true"
+        />
+        {conectado ? "FSM backend conectada" : "FSM local (modo desarrollo)"}
+      </span>
+    </p>
   );
 }
