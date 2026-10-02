@@ -14,15 +14,19 @@ export interface RolFalso {
   codigo: string;
   nombre: string;
   descripcion: string | null;
-  activo: boolean;
+  /** Columna canonica de `03_sigd_org.sql` (NO `activo`). */
+  vigente: boolean;
 }
 
 export interface PermisoFalso {
   permiso_id: string;
   codigo: string;
-  descripcion: string | null;
-  alcance_predeterminado: 'AREA' | 'SUBAREAS' | 'GLOBAL';
-  activo: boolean;
+  /** Columna canonica (NO `descripcion`). */
+  nombre: string;
+  /** Columna canonica: solo 'AREA' | 'GLOBAL' (NO `alcance_predetermido`). */
+  ambito: 'AREA' | 'GLOBAL';
+  /** Areas que acotan el permiso; vacio = alcance AREA completo. */
+  subareas: string[];
 }
 
 export interface EstadoRbac {
@@ -30,12 +34,20 @@ export interface EstadoRbac {
   permisos: PermisoFalso[];
   /** rol_id → códigos de permiso concedidos. Ausente = el rol no tiene ninguno. */
   matriz: Map<string, Set<string>>;
-  /** cuenta_id → roles vigentes. */
+  /** `usuario_rol.id_usuario` → roles vigentes. */
   usuarioRoles: Map<string, Array<{ rol_id: string; codigo: string }>>;
+  /** código de permiso → areas que lo acotan. Ausente = sin restriccion. */
+  restriccionesArea: Map<string, string[]>;
 }
 
 export function crearEstadoRbac(): EstadoRbac {
-  return { roles: [], permisos: [], matriz: new Map(), usuarioRoles: new Map() };
+  return {
+    roles: [],
+    permisos: [],
+    matriz: new Map(),
+    usuarioRoles: new Map(),
+    restriccionesArea: new Map(),
+  };
 }
 
 export interface BdFalsa {
@@ -73,6 +85,11 @@ async function responder(
     return { rows: [{ id_auditoria: 'aud-1' }], rowCount: 1 };
   }
 
+  // OC-11: evento del outbox transaccional. `insertarEvento` lee `rows[0].id_evento`.
+  if (texto.includes('sigd_audit.evento_outbox')) {
+    return { rows: [{ id_evento: 'evt-rbac-1' }], rowCount: 1 };
+  }
+
   if (texto === 'BEGIN' || texto === 'COMMIT' || texto === 'ROLLBACK') {
     return { rows: [], rowCount: 0 };
   }
@@ -98,10 +115,14 @@ async function responder(
   }
 
   // --- Roles vigentes de una cuenta (lo resuelve la autenticación) ---
+  // Clave: `usuario_rol.id_usuario` (columna canónica de 03_sigd_org.sql).
   if (texto.includes('sigd_org.usuario_rol')) {
-    const cuenta_id = valores[0] as string;
-    const rows = estado.usuarioRoles.get(cuenta_id) ?? [];
-    return { rows: rows.map((r) => ({ ...r })), rowCount: rows.length };
+    const id_usuario = valores[0] as string;
+    const rows = (estado.usuarioRoles.get(id_usuario) ?? [])
+      // El SQL real filtra `r.vigente = true`; el doble replica ese filtro.
+      .filter((asignacion) => estado.roles.find((r) => r.rol_id === asignacion.rol_id)?.vigente === true)
+      .map((r) => ({ ...r }));
+    return { rows, rowCount: rows.length };
   }
 
   // --- Bloqueo del rol dentro de la transacción de actualización ---
@@ -111,21 +132,6 @@ async function responder(
     return { rows: rol ? [{ ...rol }] : [], rowCount: rol ? 1 : 0 };
   }
 
-  // --- Permisos previos del rol (para calcular agregados y revocados) ---
-  if (
-    texto.startsWith('SELECT') &&
-    texto.includes('sigd_org.rol_permiso') &&
-    texto.includes('ORDER BY p.codigo') &&
-    !texto.includes('p.activo = true') &&
-    valores.length === 1
-  ) {
-    const rol_id = valores[0] as string;
-    const rows = [...(estado.matriz.get(rol_id) ?? [])]
-      .sort()
-      .map((codigo) => ({ codigo }));
-    return { rows, rowCount: rows.length };
-  }
-
   // --- Validación de existencia de permisos (dentro de la transacción) ---
   if (texto.includes('WHERE codigo = ANY($1::text[])')) {
     const codigos = valores[0] as string[];
@@ -133,14 +139,22 @@ async function responder(
     return { rows, rowCount: rows.length };
   }
 
-  // --- Consultar permisos de un rol (camino con cache-miss) ---
+  // --- Areas que acotan un permiso (OC-09: modelo de subáreas) ---
+  if (texto.includes('sigd_org.permiso_restriccion_area') && texto.includes('p.codigo = $1')) {
+    const areas = estado.restriccionesArea.get(valores[0] as string) ?? [];
+    const rows = areas.map((codigo) => ({ codigo }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // --- Permisos de un rol por `rp.rol_id = $1` ---
+  // Sirve a dos consultas equivalentes en el SQL canonico (los permisos previos
+  // dentro de la transaccion y el camino con cache-miss): ambas proyectan
+  // `p.codigo` para un unico `rol_id` y ordenan por codigo.
   if (texto.startsWith('SELECT') && texto.includes('rp.rol_id = $1')) {
     const rol_id = valores[0] as string;
-    const codigos = [...(estado.matriz.get(rol_id) ?? [])]
-      .filter((codigo) => estado.permisos.find((p) => p.codigo === codigo)?.activo !== false)
-      .sort()
-      .map((codigo) => ({ codigo }));
-    return { rows: codigos, rowCount: codigos.length };
+    const codigos = [...(estado.matriz.get(rol_id) ?? [])].sort();
+    const rows = codigos.map((codigo) => ({ codigo }));
+    return { rows, rowCount: rows.length };
   }
 
   // --- Matriz completa rol-permiso (consulta del controlador) ---
@@ -150,7 +164,11 @@ async function responder(
       for (const codigo of estado.matriz.get(rol.rol_id) ?? []) {
         const permiso = estado.permisos.find((p) => p.codigo === codigo);
         if (permiso) {
-          rows.push({ rol_id: rol.rol_id, ...permiso });
+          rows.push({
+            rol_id: rol.rol_id,
+            ...permiso,
+            subareas: estado.restriccionesArea.get(codigo) ?? [],
+          });
         }
       }
     }
@@ -165,20 +183,18 @@ async function responder(
 
   // --- Catálogo de roles ---
   if (texto.startsWith('SELECT') && texto.includes('FROM sigd_org.rol_sistema')) {
-    const soloActivos = texto.includes('activo = true');
+    const soloVigentes = texto.includes('vigente = true');
     const rows = estado.roles
-      .filter((r) => !soloActivos || r.activo)
+      .filter((r) => !soloVigentes || r.vigente)
       .map((r) => ({ ...r }))
       .sort((a, b) => a.codigo.localeCompare(b.codigo));
     return { rows, rowCount: rows.length };
   }
 
-  // --- Catálogo de permisos ---
+  // --- Catálogo de permisos (sin columna de vigencia en el esquema canónico) ---
   if (texto.startsWith('SELECT') && texto.includes('FROM sigd_org.permiso_sistema')) {
-    const soloActivos = texto.includes('activo = true');
     const rows = estado.permisos
-      .filter((p) => !soloActivos || p.activo)
-      .map((p) => ({ ...p }))
+      .map((p) => ({ ...p, subareas: estado.restriccionesArea.get(p.codigo) ?? [] }))
       .sort((a, b) => a.codigo.localeCompare(b.codigo));
     return { rows, rowCount: rows.length };
   }
@@ -191,6 +207,8 @@ export interface CacheFalsa extends CachePermisos {
   escrituras: Array<{ rol_id: string; permisos: string[] }>;
   invalidaciones: string[];
   invalidacionesMasivas: number;
+  /** Permite simular un Redis caido: lanza en `invalidar`. */
+  fallarInvalidacion?: () => never;
 }
 
 export function crearCacheFalsa(): CacheFalsa {
@@ -212,6 +230,7 @@ export function crearCacheFalsa(): CacheFalsa {
     },
 
     async invalidar(rol_id: string) {
+      cache.fallarInvalidacion?.();
       cache.invalidaciones.push(rol_id);
       almacen.delete(rol_id);
     },

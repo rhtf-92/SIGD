@@ -8,9 +8,14 @@ import { API_PREFIX } from './config/rutas.js';
 import { BusSse, HEARTBEAT_SEGUNDOS } from './modules/corelink/sseStream.service.js';
 import { ejecutarMigraciones } from './db/migrate.js';
 import { OutboxWorker } from './audit/outbox-worker.js';
-import { crearDespachadorPorDefecto } from './audit/despachador-notificaciones.js';
+import {
+  DespachadorNotificaciones,
+  DestinoSse,
+  DestinoCasilla,
+} from './audit/despachador-notificaciones.js';
 import { BridgeNotificacion } from './core/realtime/bridge-notificacion.js';
 import { inicializarCachePermisos } from './redis.js';
+import { DestinoRbacInvalidacion } from './domains/organicore/rbac.outbox.destino.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
@@ -49,7 +54,14 @@ await bridge.iniciar();
 
 const outboxWorker = new OutboxWorker(
   pool,
-  crearDespachadorPorDefecto(busSse, pool, bridge),
+  // Se componen los destinos de main (SSE y Casilla) mas el de OrganiCore, en
+  // lugar de tocar `crearDespachadorPorDefecto`. Un fallo en cualquiera de ellos
+  // repropaga el error para que el worker reintente con backoff.
+  new DespachadorNotificaciones([
+    new DestinoSse(busSse, bridge),
+    new DestinoCasilla(pool),
+    new DestinoRbacInvalidacion(runtimePermisos.cache, runtimePermisos.comando),
+  ]),
   {
     backoffBaseMs: Number(process.env.OUTBOX_BACKOFF_BASE_MS ?? 1000),
     backoffTechoMs: Number(process.env.OUTBOX_BACKOFF_TECHO_MS ?? 300_000),
