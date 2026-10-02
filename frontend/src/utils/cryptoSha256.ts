@@ -48,3 +48,5 @@ export async function computeFileSha256(file: File): Promise<string> {
   const rawBuffer = await file.arrayBuffer();
   return computeSha256Hex(rawBuffer);
 }
+
+export const calculateFileSha256 = computeFileSha256;

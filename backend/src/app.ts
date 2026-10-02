@@ -48,7 +48,11 @@ export function construirApp(
   const app = express();
   app.disable('x-powered-by');
 
-  app.use(express.json());
+  app.use(express.json({
+    verify: (req, _res, buffer) => {
+      req.rawBody = buffer.toString('utf8');
+    },
+  }));
   app.use(contextMiddleware);
 
   app.use(crearRouterSalud(pool));

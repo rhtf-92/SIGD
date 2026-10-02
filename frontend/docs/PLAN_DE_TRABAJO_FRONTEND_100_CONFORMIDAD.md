@@ -1080,7 +1080,7 @@ A continuación se detalla la planificación operativa individual, la asignació
   - `frontend/src/components/tramite/WizardSteps/`: Directorio con los 4 componentes de paso.
   - `frontend/src/components/tramite/CargoDigitalModal.tsx`: Modal conmemorativo y probatorio de radicación.
   - `frontend/src/pages/MesaPartesVirtualPage.tsx`: Vista pública de radicación ciudadana.
-  - `frontend/tests/unit/components/TramiteWizard.test.tsx`: 10 pruebas de integración de flujo de usuario.
+  - `frontend/tests/integration/m2/TramiteWizard.test.tsx`: objetivo de 10 pruebas de integración, pendiente de implementación.
 - **Criterios de Aceptación (DoD):**
   - Flujo de 4 pasos sin recarga de página, con validación reactiva en cada paso.
   - El modal de cargo se dispara únicamente tras recibir la respuesta `HTTP 201 Created` con el CUT atómico del backend.
@@ -1353,7 +1353,7 @@ A continuación se detalla la planificación operativa individual, la asignació
   - `frontend/src/components/expedientes/FoliadoDocumentoViewer.tsx`: Visor con foliado visual AGN.
   - `frontend/src/utils/foliadoValidator.ts`: Validador estricto de correlatividad de folios.
   - `frontend/tests/unit/components/CcdTreeSelector.test.tsx`: Pruebas de navegación en árbol archivístico.
-  - `frontend/tests/unit/utils/foliadoValidator.test.ts`: Pruebas de reglas de no salto ni duplicación.
+  - `frontend/tests/unit/utils/foliado.test.ts`: prueba física actual de reglas de foliado y validación de URL documental.
 - **Criterios de Aceptación (DoD):**
   - La numeración de folios se visualiza con el formato canónico `F. [Número]` en la esquina superior derecha.
   - El sistema bloquea el intento de registrar documentos si el número inicial del folio no empalma estrictamente con el último folio consolidado.
@@ -1677,7 +1677,7 @@ A continuación se detalla la planificación operativa individual, la asignació
   - `frontend/src/pages/DashboardEjecutivoPage.tsx`: Vista principal de mando gerencial.
   - `frontend/src/components/dashboard/ExecutiveKpiSummary.tsx`: Resumen ejecutivo superior.
   - `frontend/src/components/dashboard/TimeFilterControls.tsx`: Barra de filtros de fecha y área.
-  - `frontend/tests/unit/pages/DashboardEjecutivoPage.test.tsx`: 8 casos de prueba sobre comportamiento reactivo.
+  - `frontend/tests/unit/pages/DashboardEjecutivoPage.test.tsx`: objetivo de 8 pruebas de comportamiento reactivo, pendiente; la suite física actual solo cubre accesibilidad básica.
 - **Criterios de Aceptación (DoD):**
   - Cero desbordes horizontales o superposiciones en pantallas de 320px de ancho (móvil) hasta 1920px (desktop).
   - Toda consulta responde y se renderiza en menos de 1.5 segundos utilizando datos cacheados de TanStack Query.
@@ -1717,7 +1717,7 @@ A continuación se detalla la planificación operativa individual, la asignació
   - `frontend/src/services/pdfReportExporter.ts`: Exportador binario PDF 1.4.
   - `frontend/src/services/excelReportExporter.ts`: Exportador estructurado Excel SpreadsheetML XML.
   - `frontend/src/components/dashboard/ExportActionsToolbar.tsx`: Barra de botones de exportación.
-  - `frontend/tests/unit/services/reportExporters.test.ts`: 12 pruebas de integridad de archivos generados.
+  - `frontend/tests/unit/utils/reportExportersIntegrity.test.ts`: suite física actual de 3 pruebas; el objetivo de 12 pruebas de integridad sigue pendiente.
 - **Criterios de Aceptación (DoD):**
   - Los archivos generados se descargan correctamente sin corromperse en Adobe Acrobat Reader ni en Microsoft Excel / LibreOffice Calc.
   - Las celdas numéricas de Excel conservan el formato matemático (no texto) permitiendo la sumatoria directa por parte del usuario.
@@ -1789,7 +1789,7 @@ A continuación se detalla la planificación operativa individual, la asignació
 - **Entregables Físicos de Código:**
   - `frontend/src/components/common/A11ySkipLink.tsx`: Enlace accesible de salto al contenido.
   - `frontend/src/styles/accessibility.css`: Sobrescrituras y utilidades de alto contraste y anillos de foco.
-  - `frontend/tests/a11y/dashboardA11y.test.tsx`: Suite de pruebas de accesibilidad automatizada.
+  - `frontend/tests/unit/pages/dashboardA11y.test.tsx`: 2 comprobaciones de accesibilidad en JSDOM; auditoría `axe-core` con Playwright E2E pendiente.
 - **Criterios de Aceptación (DoD):**
   - Cero violaciones detectadas por el motor de auditoría axe-core.
   - La navegación completa por teclado funciona sin trampas de foco en toda la aplicación.
