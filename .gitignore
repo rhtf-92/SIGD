@@ -1,38 +1,121 @@
-# Dependencies
+# ==============================================================================
+# SIGD MONOREPO — .gitignore Maestro (IESTP "Suiza" — PE DSI 2026-2)
+# ==============================================================================
+
+# --- Dependencias Globales y Gestores de Paquetes ---
 node_modules/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
 
-# Agent runtime & internal tools
-.agents/
-scripts/
+# --- Compilación y Salidas de Build ---
+dist/
+build/
+out/
+.vite/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
 
-# Python bytecode & caches
+# --- Python Bytecode & Entornos Virtuales ---
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+.venv/
 
-# Environment & local settings
+# --- Variables de Entorno y Secretos (Seguridad y LPDP Ley N° 29733) ---
 .env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .env.*.local
+*.pem
+*.key
+*.cert
+!.env.example
+!backend/.env.example
+!frontend/.env.example
 
-# System & temporary files
+# --- Logs del Sistema y Gestores de Paquetes ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Excepciones: Preservar evidencias empíricas de pruebas y auditoría de laboratorio
+!backend/docs/**/logs*/**/*.log
+!backend/docs/**/logs*/**/*.json
+!backend/docs/**/logs*/**/*.txt
+!backend/docs/organicore/logs/ejecucion_suite_organicore_v2.log
+!backend/docs/02_organicore/logs/ejecucion_suite_organicore_v2.log
+!backend/docs/corelink/logs_pruebas/**
+!backend/docs/00_corelink/logs_pruebas/**
+!backend/docs/tramicore/logs_pruebas/**
+!backend/docs/04_tramicore/logs_pruebas/**
+
+# --- Cobertura de Pruebas y Reportes ---
+coverage/
+.nyc_output/
+test-results/
+.vitest/
+
+# --- IDEs, Editores y Entornos de Desarrollo ---
+.idea/
+*.sublime-project
+*.sublime-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# --- Sistema Operativo y Archivos Temporales ---
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
 *.tmp
+*.temp
 *.bak
+*.swp
+*.swo
+*~
+~$*.docx
+~$*.xlsx
+~$*.pptx
 
-# Root audit, testing & agent tracking artifacts
-colaboradores.md
+# --- Runtime de Asistentes y Herramientas Locales ---
+.agents/
+.antigravity/
+.gemini/
+scripts/
+
+# --- Artefactos de Seguimiento de Agentes ---
 ORIGINAL_REQUEST.md
 PROJECT.md
 TEST_INFRA.md
 TEST_READY.md
 
-# Backend audit & master improvement plans
+# --- Informes de Auditoría, Diagnósticos y Planes de Trabajo Excluidos ---
+backend/docs/DIAGNOSTICO_IDENTICORE.md
+backend/docs/INFORME_AUDITORIA_CONSOLIDADA_BACKEND_SIGD.md
 backend/docs/INFORME_AUDITORIA_CONTRIBUCIONES_BACKEND.md
 backend/docs/Plan_de_mejora_nivel_backend_SIGD.md
-
-# Frontend audit & master plan documents
 frontend/docs/INFORME_AUDITORIA_DOCUMENTACION_FRONTEND.md
 frontend/docs/PLAN_DE_TRABAJO_GENERAL_FRONTEND_SIGD.md
 frontend/docs/PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md
+colaboradores.md
+
+
 

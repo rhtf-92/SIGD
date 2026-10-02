@@ -1,15 +1,14 @@
-import "dotenv/config";
+import 'dotenv/config';
+import { crearPool } from './database.js';
+import { construirApp } from './app.js';
 
-import app from "./app.js";
-
+const databaseUrl =
+  process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
 const port = Number(process.env.PORT ?? 3000);
 
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error(
-    "La variable de entorno PORT debe ser un número entero entre 1 y 65535.",
-  );
-}
+const pool = crearPool(databaseUrl);
+const app = construirApp(pool);
 
 app.listen(port, () => {
-  console.log(`Servidor SIGD iniciado en el puerto ${port}`);
+  console.log(`SIGD Backend escuchando en http://localhost:${port}`);
 });

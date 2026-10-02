@@ -1,0 +1,176 @@
+https://www.drawio.com/
+en editar/pegar/ejecutar.
+
+<mxfile host="app.diagrams.net" modified="2026-09-10T01:45:00.000Z" agent="ChatGPT" version="24.0.0" type="device">
+  <diagram name="SIGD - DocuCore v2.1" id="sigd-docucore-v21">
+    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1250" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title1" value="DIAGRAMA DEL MODELO DE DATOS - SIGD (MÓDULO DOCUCORE)" style="text;html=1;align=center;verticalAlign=middle;fontSize=26;fontStyle=1;fontColor=#1A1A66;" vertex="1" parent="1">
+          <mxGeometry x="300" y="10" width="1000" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="title2" value="DocuCore v2.1 - Modelo alineado con SQL v6.3 y validación H4" style="text;html=1;align=center;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="300" y="45" width="1000" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="infobox" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1A1A66;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1330" y="10" width="430" height="105" as="geometry"/>
+        </mxCell>
+        <mxCell id="infotext" value="&lt;div style=&quot;text-align:left;font-family:monospace;font-size:11px;&quot;&gt;&lt;b&gt;Sistema:&lt;/b&gt; SIGD - Sistema Integral de Gestión Documentaria&lt;br&gt;&lt;b&gt;Módulo:&lt;/b&gt; DocuCore&lt;br&gt;&lt;b&gt;Autor:&lt;/b&gt; Cristian&lt;br&gt;&lt;b&gt;Rama Git:&lt;/b&gt; B_CHRISTIAN&lt;br&gt;&lt;b&gt;Modelo:&lt;/b&gt; DocuCore v2.1 / SQL v6.3&lt;br&gt;&lt;b&gt;Fecha:&lt;/b&gt; 10 de septiembre de 2026&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="1330" y="10" width="430" height="105" as="geometry"/>
+        </mxCell>
+
+        <!-- 1 TIPO_TRAMITE_TUPA -->
+        <mxCell id="tupa" value="TIPO_TRAMITE_TUPA" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#E8DAEF;strokeColor=#7D3C98;strokeWidth=2;startSize=30;fontColor=#512E5F;align=center;" vertex="1" parent="1">
+          <mxGeometry x="20" y="145" width="360" height="285" as="geometry"/>
+        </mxCell>
+        <mxCell id="tupa_f" value="PK  id_tipo_tramite_tupa UUID&#10;    codigo_tupa             VARCHAR(50) UNIQUE&#10;    nombre                   VARCHAR(150)&#10;    descripcion              TEXT&#10;    calificacion_administrativa VARCHAR(30)&#10;    plazo_max_dias_habiles   INTEGER&#10;    costo_monto              NUMERIC(12,2)&#10;    unidad_responsable       VARCHAR(150)&#10;    base_legal               TEXT&#10;    activo                   BOOLEAN DEFAULT TRUE&#10;    fecha_creacion           TIMESTAMPTZ DEFAULT now()" style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="tupa">
+          <mxGeometry width="360" height="250" as="geometry"/>
+        </mxCell>
+
+        <!-- 2 TIPO_DOCUMENTO -->
+        <mxCell id="tipodoc" value="TIPO_DOCUMENTO" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#D6EAF8;strokeColor=#1F618D;strokeWidth=2;startSize=30;fontColor=#154360;align=center;" vertex="1" parent="1">
+          <mxGeometry x="430" y="145" width="380" height="285" as="geometry"/>
+        </mxCell>
+        <mxCell id="tipodoc_f" value="PK  id_tipo_documento       UUID&#10;FK  id_tipo_tramite_tupa    UUID NULL&#10;    codigo_tipo             VARCHAR(50) UNIQUE&#10;    nombre                  VARCHAR(150)&#10;    descripcion             TEXT&#10;    activo                  BOOLEAN DEFAULT TRUE&#10;    id_usuario_creador      UUID (EXTERNO: sigd_auth)&#10;    fecha_creacion          TIMESTAMPTZ DEFAULT now()&#10;&#10;Clasificación TUPA: 0..1 mientras&#10;la configuración técnica está en borrador." style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="tipodoc">
+          <mxGeometry width="380" height="250" as="geometry"/>
+        </mxCell>
+
+        <!-- 3 FORMULARIO_VERSION -->
+        <mxCell id="formversion" value="FORMULARIO_VERSION" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#D5F5E3;strokeColor=#1E8449;strokeWidth=2;startSize=30;fontColor=#145A32;align=center;" vertex="1" parent="1">
+          <mxGeometry x="860" y="145" width="400" height="285" as="geometry"/>
+        </mxCell>
+        <mxCell id="formversion_f" value="PK  id_formulario_version   UUID&#10;FK  id_tipo_documento        UUID&#10;    version                 SMALLINT&#10;    schema_definicion       JSONB&#10;    activo                  BOOLEAN DEFAULT TRUE&#10;    fecha_creacion          TIMESTAMPTZ DEFAULT now()&#10;&#10;JSON Schema Draft 2020-12&#10;Versión inmutable después de publicada.&#10;Conserva historial de formularios." style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="formversion">
+          <mxGeometry width="400" height="250" as="geometry"/>
+        </mxCell>
+
+        <!-- 4 EXPEDIENTE -->
+        <mxCell id="expediente" value="EXPEDIENTE" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#FADBD8;strokeColor=#C0392B;strokeWidth=2;startSize=30;fontColor=#78281F;align=center;" vertex="1" parent="1">
+          <mxGeometry x="430" y="480" width="410" height="320" as="geometry"/>
+        </mxCell>
+        <mxCell id="expediente_f" value="PK  id_expediente            UUID&#10;    codigo_oficial           VARCHAR(30) UNIQUE NULL&#10;FK  id_formulario_version   UUID&#10;    id_usuario_solicitante   UUID (EXTERNO: sigd_auth)&#10;    calificacion_administrativa VARCHAR(30) NOT NULL&#10;    estado                   ENUM&#10;    fecha_creacion           TIMESTAMPTZ DEFAULT now()&#10;    fecha_radicacion         TIMESTAMPTZ NULL&#10;&#10;Estados administrativos:&#10;BORRADOR / EN_REVISION / OBSERVADO&#10;SUBSANACION / APROBADO / RECHAZADO_POR_CADUCIDAD / INACTIVO&#10;&#10;Las respuestas NO están aquí:&#10;se almacenan en EXPEDIENTE_FORMULARIO_RESPUESTA.&#10;&#10;BORRADOR ≠ radicación automática." style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="expediente">
+          <mxGeometry width="410" height="285" as="geometry"/>
+        </mxCell>
+
+        <!-- 5 EXPEDIENTE_FORMULARIO_RESPUESTA -->
+        <mxCell id="respuesta" value="EXPEDIENTE_FORMULARIO_RESPUESTA" style="swimlane;html=1;fontSize=13;fontStyle=1;fillColor=#FCF3CF;strokeColor=#B7950B;strokeWidth=2;startSize=30;fontColor=#7D6608;align=center;" vertex="1" parent="1">
+          <mxGeometry x="900" y="480" width="430" height="245" as="geometry"/>
+        </mxCell>
+        <mxCell id="respuesta_f" value="PK  id_expediente_formulario_respuesta UUID&#10;FK  id_expediente               UUID UNIQUE NOT NULL&#10;FK  id_formulario_version        UUID NOT NULL&#10;    payload_respuestas           JSONB NOT NULL&#10;&#10;Relación 1:1 con EXPEDIENTE.&#10;Las respuestas se validan contra&#10;FORMULARIO_VERSION.schema_definicion.&#10;Índice GIN sobre payload_respuestas." style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="respuesta">
+          <mxGeometry width="430" height="210" as="geometry"/>
+        </mxCell>
+
+        <!-- 6 REQUISITO -->
+        <mxCell id="requisito" value="REQUISITO" style="swimlane;html=1;fontSize=14;fontStyle=1;fillColor=#D1F2EB;strokeColor=#117A65;strokeWidth=2;startSize=30;fontColor=#0B5345;align=center;" vertex="1" parent="1">
+          <mxGeometry x="20" y="860" width="350" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="requisito_f" value="PK  id_requisito           UUID&#10;    nombre                  VARCHAR(150)&#10;    descripcion             TEXT&#10;    peso_max_mb             NUMERIC(6,2)&#10;    activo                  BOOLEAN DEFAULT TRUE&#10;    fecha_creacion          TIMESTAMPTZ DEFAULT now()&#10;&#10;El límite global institucional&#10;impide configurar un peso máximo&#10;por encima del máximo permitido." style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="requisito">
+          <mxGeometry width="350" height="265" as="geometry"/>
+        </mxCell>
+
+        <!-- 7 TIPO_DOCUMENTO_REQUISITO -->
+        <mxCell id="tdrequisito" value="TIPO_DOCUMENTO_REQUISITO" style="swimlane;html=1;fontSize=13;fontStyle=1;fillColor=#D1F2EB;strokeColor=#117A65;strokeWidth=2;startSize=30;fontColor=#0B5345;align=center;" vertex="1" parent="1">
+          <mxGeometry x="410" y="860" width="400" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="tdrequisito_f" value="PK  id_tipo_documento_requisito UUID&#10;FK  id_tipo_documento          UUID&#10;FK  id_requisito                UUID&#10;    obligatorio               BOOLEAN&#10;    condicion_activacion       TEXT NULL&#10;    permite_multiples           BOOLEAN DEFAULT FALSE&#10;    orden                      SMALLINT&#10;&#10;UK  (id_tipo_documento, id_requisito)&#10;&#10;La condición usa una ruta JSON Pointer&#10;del formulario; la aplicación verifica&#10;que exista en el JSON Schema." style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="tdrequisito">
+          <mxGeometry width="400" height="265" as="geometry"/>
+        </mxCell>
+
+        <!-- 8 EXPEDIENTE_REQUISITO -->
+        <mxCell id="exprequisito" value="EXPEDIENTE_REQUISITO" style="swimlane;html=1;fontSize=13;fontStyle=1;fillColor=#FDEBD0;strokeColor=#CA6F1E;strokeWidth=2;startSize=30;fontColor=#7E5109;align=center;" vertex="1" parent="1">
+          <mxGeometry x="850" y="860" width="400" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="exprequisito_f" value="PK  id_expediente_requisito UUID&#10;FK  id_expediente            UUID&#10;FK  id_tipo_documento_req    UUID&#10;    estado                   ENUM (DERIVADO)&#10;    observacion               TEXT NULL&#10;    fecha_creacion            TIMESTAMPTZ DEFAULT now()&#10;    fecha_actualizacion       TIMESTAMPTZ DEFAULT now()&#10;    id_usuario_evaluador      UUID (EXTERNO: sigd_auth)&#10;&#10;Estados derivados:&#10;PENDIENTE / OBSERVADO / SUBSANADO / APROBADO&#10;&#10;El estado se deriva de los documentos&#10;adjuntos actuales. No modifica automáticamente&#10;EXPEDIENTE.estado." style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="exprequisito">
+          <mxGeometry width="400" height="265" as="geometry"/>
+        </mxCell>
+
+        <!-- 9 DOCUMENTO_ADJUNTO -->
+        <mxCell id="adjunto" value="DOCUMENTO_ADJUNTO" style="swimlane;html=1;fontSize=13;fontStyle=1;fillColor=#EDE7F6;strokeColor=#5E35B1;strokeWidth=2;startSize=30;fontColor=#4527A0;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1330" y="480" width="430" height="520" as="geometry"/>
+        </mxCell>
+        <mxCell id="adjunto_f" value="PK  id_documento_adjunto UUID&#10;FK  id_expediente_requisito UUID&#10;    nombre_original        VARCHAR(255)&#10;    extension               VARCHAR(20)&#10;    mime_tipo               VARCHAR(100)&#10;    tamanio_bytes           BIGINT&#10;    magic_bytes             BYTEA&#10;    s3_bucket               VARCHAR(100)&#10;    s3_key                  VARCHAR(1000)&#10;    sha256_hash             VARCHAR(64)&#10;    magic_bytes_validado    BOOLEAN&#10;    estado_documento        ENUM&#10;    version_documento       SMALLINT&#10;FK  id_documento_anterior  UUID NULL&#10;    id_usuario_subida       UUID (EXTERNO: sigd_auth)&#10;    fecha_subida            TIMESTAMPTZ DEFAULT now()&#10;    eliminado_logico        BOOLEAN DEFAULT FALSE&#10;&#10;Estados: CARGADO / OBSERVADO / APROBADO&#10;REEMPLAZADO / ELIMINADO&#10;&#10;Binario: MinIO / S3&#10;PostgreSQL: metadatos y trazabilidad.&#10;&#10;UNIQUE: (id_expediente_requisito, sha256_hash)&#10;NO existe UNIQUE global sobre sha256_hash." style="text;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=10;spacingLeft=8;spacingTop=6;whiteSpace=wrap;" vertex="1" parent="adjunto">
+          <mxGeometry width="430" height="485" as="geometry"/>
+        </mxCell>
+
+        <!-- Relationships -->
+        <mxCell id="e1" value="0..1       clasifica       1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="tupa" target="tipodoc">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" value="1       tiene versiones       N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="tipodoc" target="formversion">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" value="1       es usada por       N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="formversion" target="expediente">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" value="1       define       N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="tipodoc" target="tdrequisito">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" value="1       se relaciona con       N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="requisito" target="tdrequisito">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" value="1       contiene       N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="expediente" target="exprequisito">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" value="1       instancia       N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="tdrequisito" target="exprequisito">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e8" value="1       tiene       N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="exprequisito" target="adjunto">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e9" value="1       tiene respuestas       1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;" edge="1" parent="1" source="expediente" target="respuesta">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e10" value="N       corresponde a       1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=11;fontStyle=1;dashed=1;" edge="1" parent="1" source="respuesta" target="formversion">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" value="V1 → V2 → V3 (cadena secuencial)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=10;fontStyle=1;dashed=1;exitX=1;exitY=0.35;entryX=1;entryY=0.70;" edge="1" parent="1" source="adjunto" target="adjunto">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1760" y="610"/>
+              <mxPoint x="1760" y="900"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Notes -->
+        <mxCell id="notas" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1A1A66;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="1190" width="830" height="125" as="geometry"/>
+        </mxCell>
+        <mxCell id="notas_t" value="NOTAS DEL MODELO" style="text;html=1;align=center;fontStyle=1;fontSize=14;fontColor=#1A1A66;" vertex="1" parent="1">
+          <mxGeometry x="20" y="1195" width="830" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="notas_body" value="&lt;div style=&quot;font-size:11px;text-align:left;&quot;&gt;&amp;#8226; USUARIO es externo y gestionado por sigd_auth; no existe tabla USUARIO local ni FK local.&lt;br&gt;&amp;#8226; FORMULARIO_VERSION es versionado e inmutable; cada EXPEDIENTE apunta a la versión exacta utilizada.&lt;br&gt;&amp;#8226; EXPEDIENTE no almacena payload_respuestas. Las respuestas están en EXPEDIENTE_FORMULARIO_RESPUESTA (1:1).&lt;br&gt;&amp;#8226; EXPEDIENTE_REQUISITO.estado se deriva de DOCUMENTO_ADJUNTO y no propaga automáticamente cambios a EXPEDIENTE.estado.&lt;br&gt;&amp;#8226; La radicación es explícita mediante fn_radicacion_expediente(); cargar documentos no radica automáticamente.&lt;br&gt;&amp;#8226; Magic Bytes y SHA-256 se validan/calculan en la aplicación/almacenamiento. La unicidad SHA-256 es por requisito.&lt;br&gt;&amp;#8226; Los binarios viven en MinIO/S3; PostgreSQL conserva metadatos, trazabilidad y control de versiones.&lt;br&gt;&amp;#8226; H4 debe ejecutarse realmente antes de declarar el modelo validado.&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=5;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="20" y="1220" width="810" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="leyenda" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1A1A66;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="880" y="1190" width="390" height="125" as="geometry"/>
+        </mxCell>
+        <mxCell id="leyenda_t" value="LEYENDA" style="text;html=1;align=center;fontStyle=1;fontSize=14;fontColor=#1A1A66;" vertex="1" parent="1">
+          <mxGeometry x="880" y="1195" width="390" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leyenda_body" value="&lt;div style=&quot;font-family:monospace;font-size:11px;text-align:left;&quot;&gt;&lt;b&gt;PK&lt;/b&gt; = Clave primaria&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; = Clave foránea&lt;br&gt;&lt;b&gt;UUID EXTERNO&lt;/b&gt; = Referencia a sigd_auth sin FK local&lt;br&gt;&lt;b&gt;1:N&lt;/b&gt; = Uno a muchos &nbsp;&nbsp; &lt;b&gt;1:1&lt;/b&gt; = Uno a uno&lt;br&gt;&lt;b&gt;0..1&lt;/b&gt; = Relación opcional&lt;br&gt;&lt;b&gt;JSONB&lt;/b&gt; = JSON almacenado en PostgreSQL&lt;br&gt;&lt;b&gt;S3 / MinIO&lt;/b&gt; = Almacenamiento del binario&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="880" y="1220" width="370" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- States -->
+        <mxCell id="estados" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1A1A66;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="1030" width="470" height="285" as="geometry"/>
+        </mxCell>
+        <mxCell id="estados_t" value="ESTADOS PRINCIPALES" style="text;html=1;align=center;fontStyle=1;fontSize=14;fontColor=#1A1A66;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="1035" width="470" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="estados_body" value="&lt;div style=&quot;font-size:11px;text-align:left;&quot;&gt;&lt;b style=&quot;color:#C0392B&quot;&gt;EXPEDIENTE:&lt;/b&gt;&lt;br&gt;&amp;#8226; BORRADOR &nbsp;&nbsp; &amp;#8226; EN_REVISION &nbsp;&nbsp; &amp;#8226; OBSERVADO&lt;br&gt;&amp;#8226; SUBSANACION &nbsp;&nbsp; &amp;#8226; APROBADO &nbsp;&nbsp; &amp;#8226; RECHAZADO_POR_CADUCIDAD &nbsp;&nbsp; &amp;#8226; INACTIVO&lt;br&gt;&lt;br&gt;&lt;b style=&quot;color:#CA6F1E&quot;&gt;EXPEDIENTE_REQUISITO (DERIVADO):&lt;/b&gt;&lt;br&gt;&amp;#8226; PENDIENTE - sin documentos válidos cargados&lt;br&gt;&amp;#8226; OBSERVADO - existe observación sin subsanar&lt;br&gt;&amp;#8226; SUBSANADO - nueva versión válida después de observación&lt;br&gt;&amp;#8226; APROBADO - documento vigente aprobado&lt;br&gt;&lt;br&gt;&lt;b style=&quot;color:#5E35B1&quot;&gt;DOCUMENTO_ADJUNTO:&lt;/b&gt;&lt;br&gt;&amp;#8226; CARGADO / OBSERVADO / APROBADO / REEMPLAZADO / ELIMINADO&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=5;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="1060" width="450" height="245" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="footer" value="Todas las fechas se manejan como TIMESTAMPTZ. H4: pendiente de ejecución real." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1A1A66;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="1330" width="1240" height="35" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

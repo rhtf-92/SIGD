@@ -1,0 +1,147 @@
+{
+    "metrics": {
+        "data_sent": {
+            "count": 15862980,
+            "rate": 176066.3710787196
+        },
+        "vus_max": {
+            "value": 50,
+            "min": 50,
+            "max": 50
+        },
+        "iterations": {
+            "rate": 204.42504639909131,
+            "count": 18418
+        },
+        "http_req_tls_handshaking": {
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0
+        },
+        "http_req_sending": {
+            "max": 113.7212,
+            "p(90)": 0,
+            "p(95)": 0.515,
+            "avg": 0.06604124226300377,
+            "min": 0,
+            "med": 0
+        },
+        "data_received": {
+            "count": 19869686,
+            "rate": 220537.59813689734
+        },
+        "http_req_duration": {
+            "med": 73.50319999999999,
+            "max": 3366.9756,
+            "p(90)": 114.22267000000004,
+            "p(95)": 144.64583,
+            "avg": 80.98668104752537,
+            "min": 1.4524,
+            "thresholds": {
+                "p(95)<200": false
+            }
+        },
+        "http_req_connecting": {
+            "p(95)": 0,
+            "avg": 0.003112075143880987,
+            "min": 0,
+            "med": 0,
+            "max": 9.2506,
+            "p(90)": 0
+        },
+        "http_req_waiting": {
+            "min": 1.4524,
+            "med": 73.08445,
+            "max": 3364.9434,
+            "p(90)": 113.52898000000009,
+            "p(95)": 143.74647499999998,
+            "avg": 80.4689300322147
+        },
+        "checks": {
+            "passes": 55254,
+            "fails": 0,
+            "value": 1
+        },
+        "vus": {
+            "value": 50,
+            "min": 50,
+            "max": 50
+        },
+        "http_req_blocked": {
+            "med": 0,
+            "max": 48.0612,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.04958964056900857,
+            "min": 0
+        },
+        "http_req_receiving": {
+            "min": 0,
+            "med": 0,
+            "max": 163.1267,
+            "p(90)": 1.1087100000000014,
+            "p(95)": 1.5966049999999996,
+            "avg": 0.4517097730481039
+        },
+        "iteration_duration": {
+            "max": 3590.1565,
+            "p(90)": 323.11404,
+            "p(95)": 421.09148999999917,
+            "avg": 244.43768187099425,
+            "min": 35.4743,
+            "med": 217.6643
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 55254,
+            "thresholds": {
+                "rate<0.001": false
+            },
+            "value": 0
+        },
+        "http_req_duration{expected_response:true}": {
+            "avg": 80.98668104752537,
+            "min": 1.4524,
+            "med": 73.50319999999999,
+            "max": 3366.9756,
+            "p(90)": 114.22267000000004,
+            "p(95)": 144.64583
+        },
+        "http_reqs": {
+            "count": 55254,
+            "rate": 613.2751391972739
+        }
+    },
+    "root_group": {
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "área creada 201": {
+                    "id": "a5547bb1d11b456c6433bf32511623b1",
+                    "passes": 18418,
+                    "fails": 0,
+                    "name": "área creada 201",
+                    "path": "::área creada 201"
+                },
+                "expediente radicado 201": {
+                    "name": "expediente radicado 201",
+                    "path": "::expediente radicado 201",
+                    "id": "afb3dbb19f7d1aec76b7dda85ed4aa61",
+                    "passes": 18418,
+                    "fails": 0
+                },
+                "derivación 200": {
+                    "id": "ff30b6cd4a539c708a5e12047226d708",
+                    "passes": 18418,
+                    "fails": 0,
+                    "name": "derivación 200",
+                    "path": "::derivación 200"
+                }
+            },
+        "name": "",
+        "path": ""
+    }
+}

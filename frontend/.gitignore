@@ -1,7 +1,62 @@
+# ==============================================================================
+# SIGD FRONTEND — .gitignore (Vite 6 / React 19 / TypeScript / Tailwind CSS)
+# ==============================================================================
+
+# --- Dependencias ---
 node_modules/
+.pnpm-store/
+
+# --- Compilación y Salidas de Build (Vite / Bundler) ---
 dist/
-.env
-coverage/
-*.log
+dist-ssr/
+build/
+.vite/
 *.local
+
+# --- Cachés de TypeScript y Linters ---
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+# --- Variables de Entorno y Secretos ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+!.env.example
+
+# --- Cobertura de Pruebas y Reportes ---
+coverage/
+.nyc_output/
+test-results/
+.vitest/
+
+# --- Logs del Sistema y Gestores de Paquetes ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Archivos Temporales y del Sistema Operativo ---
 .DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.temp
+*.bak
+
+# --- Artefactos Temporales de Ofimática ---
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# --- Informes de Auditoría y Planes Excluidos ---
+docs/INFORME_AUDITORIA_DOCUMENTACION_FRONTEND.md
+docs/PLAN_DE_TRABAJO_GENERAL_FRONTEND_SIGD.md
+docs/PLAN_DE_TRABAJO_MODULAR_Y_EVALUACION_DOCENTE.md
+
+
