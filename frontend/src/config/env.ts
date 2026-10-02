@@ -1,10 +1,5 @@
-const apiBaseUrlCrudo = import.meta.env.VITE_API_BASE_URL;
-
-if (!apiBaseUrlCrudo) {
-  throw new Error(
-    "La variable de entorno VITE_API_BASE_URL debe estar definida en el archivo .env.",
-  );
-}
+const apiBaseUrlCrudo =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
 /**
  * Prefijo canónico de la API (contrato REST v1 del backend).
@@ -29,3 +24,4 @@ export const env = {
   isDevelopment: import.meta.env.DEV,
   enableMocks: import.meta.env.VITE_ENABLE_MOCKS === "true",
 } as const;
+
