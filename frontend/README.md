@@ -548,23 +548,29 @@ frontend/
 
 El frontend cuenta con una sólida suite de pruebas unitarias y de integración de componentes ejecutada mediante **Vitest** en entorno **JSDOM**:
 
+- `tests/unit/`: lógica, esquemas, servicios, hooks y componentes aislados, organizados por capa.
+- `tests/integration/`: flujos de módulos que combinan páginas, componentes y servicios.
+- `tests/setup.ts` y `tests/fixtures/`: configuración y datos compartidos.
+
+No se incluyen pruebas E2E de navegador en esta suite; los casos de interacción UI se ejecutan con Testing Library en JSDOM.
+
 ```bash
 # Ejecución de la suite completa de pruebas unitarias
 npx vitest run
 ```
 
-### Certificación de Ejecución Exitosa: 25 Suites / 226 Tests (100% Pass Rate)
+### Certificación de Ejecución Exitosa: 26 Suites / 235 Tests (100% Pass Rate)
 
 | Módulo / Dominio | Archivo(s) de Prueba | Suites | Pruebas | Resultado |
 |---|---|:---:|:---:|:---:|
-| **Transversal / API** | `src/tests/apiClient.test.ts` | 1 | 4 | ✅ **APROBADO** |
+| **Transversal / API** | `tests/unit/api/apiClient.test.ts` | 1 | 4 | ✅ **APROBADO** |
 | **M01: Identidad & Casilla** | `registroCiudadano`, `casillaElectronica`, `registroFormularios`, `ubigeoCascade`, `ubigeoSelector` | 5 | 53 | ✅ **APROBADO** |
-| **M02: Mesa de Partes & Ventanilla** | `horarioCorte`, `magicBytesValidator`, `ventanillaPresencial` | 3 | 14 | ✅ **APROBADO** |
+| **M02: Mesa de Partes & Ventanilla** | `useHorarioCorte`, `magicBytesValidator`, `fileValidation`, `ventanillaPresencial` | 4 | 23 | ✅ **APROBADO** |
 | **M03: Bandeja & Expedientes** | `slaBadge`, `slaCalculator`, `AccionesModales`, `CcdTreeSelector`, `ExpedienteTimeline`, `FoliadoDocumentoViewer`, `useExpedienteActions`, `expedienteActions` (api/utils), `foliado` | 10 | 99 | ✅ **APROBADO** |
 | **M04: Validez Legal & Firma** | `documentoCvdViewer`, `proyectorResoluciones` | 2 | 6 | ✅ **APROBADO** |
 | **M05: Administración & RBAC** | `rbacRolesCanonicos` | 1 | 4 | ✅ **APROBADO** |
 | **M06: Reportes & Dashboards** | `kpiCalculator`, `dashboardA11y`, `reportExportersIntegrity` | 3 | 46 | ✅ **APROBADO** |
-| **TOTAL GENERAL** | **25 archivos de pruebas** | **25** | **226** | **100% EXITOSO** |
+| **TOTAL GENERAL** | **26 archivos de pruebas** | **26** | **235** | **100% EXITOSO** |
 
 ---
 

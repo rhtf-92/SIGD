@@ -19,10 +19,30 @@
 
 ---
 
+## 🏛️ Arquitectura del Backend Integrado
+
+El backend del SIGD implementa una arquitectura desacoplada, orientada a dominios y con observabilidad transversal:
+
+1. **Serialización Global de Errores (RFC 7807 / RFC 9457):** Todas las respuestas de error siguen el estándar `application/problem+json`, mapeando deterministamente excepciones de negocio y violaciones de integridad de PostgreSQL (`23505` a 409 Conflict, `23503` a 400 Bad Request, `P0001` a 422 Unprocessable Entity).
+2. **Trazabilidad Contextual con `AsyncLocalStorage`:** Propagación transparente del contexto de solicitud (`correlation_id`, usuario actor, IP de origen) a través de todas las capas sin contaminar las firmas de los casos de uso.
+3. **Patrón Transactional Outbox:** Encolado transaccional de eventos de dominio en `sigd_audit.evento_outbox` y procesamiento asíncrono con worker en background utilizando `FOR UPDATE SKIP LOCKED`.
+4. **Validación de Esquemas con Zod:** Validación estricta en tiempo de ejecución de payloads de entrada mapeados a `invalid_params`.
+
+### Dominio DocuCore (Firma Digital y Generación A4 - B_VALENTIN)
+
+A partir de la rama `B_VALENTIN`, se introduce el dominio `src/domains/docucore` que encapsula la generación institucional de PDF A4, la pasarela de firma digital Refirma y la gestión de sesiones efímeras:
+
+- **A4GeneratorService**: Generador de PDF en hoja A4 exacta (210×297 mm), márgenes 25 mm, membrete institucional, control de viudas/huérfanas, tablas atómicas y bloque de firma atómico.
+- **RefirmaGatewayService**: Pasarela del protocolo `refirma://sign?arguments=[BASE64URL]` con validación estricta de payload (cuatro claves obligatorias, HTTPS, lista blanca de hosts, SHA-256 en minúsculas, Base64URL sin padding).
+- **FirmaSessionStore**: Tokens de 256 bits, TTL 300 s, clave derivada por SHA-256, consumo atómico (`GETDEL` en Redis / `delete` en memoria).
+- **ServicioFirmaService**: Orquestación completa: generación de PDF, emisión de token, construcción de URI, callback con autodestrucción de sesión, URL temporal de descarga.
+
+---
+
 ## 📑 ÍNDICE GENERAL
 
 1. [Identidad Institucional y Rol del Backend](#1-identidad-institucional-y-rol-del-backend)
-2. [Stack Tecnológico y Entorno de Ejecución (100% Verificado)](#2-stack-tecnológico-y-entorno-de-ejecución-100-verificado)
+2. [Stack Tecnológico Declarado](#2-stack-tecnológico-declarado)
 3. [Patrones Arquitectónicos y Núcleo Transversal](#3-patrones-arquitectónicos-y-núcleo-transversal)
    - 3.1 [Serialización Estándar de Errores RFC 7807 / RFC 9457 (`ApiProblemDetails`)](#31-serialización-estándar-de-errores-rfc-7807--rfc-9457-apiproblemdetails)
    - 3.2 [Trazabilidad Contextual con `AsyncLocalStorage` (`X-Correlation-ID`)](#32-trazabilidad-contextual-con-asynclocalstorage-x-correlation-id)
@@ -34,7 +54,7 @@
    - 5.1 [Suites de Integración E2E sobre Testcontainers (PostgreSQL 18)](#51-suites-de-integración-e2e-sobre-testcontainers-postgresql-18)
    - 5.2 [Suites Unitarias con Vitest](#52-suites-unitarias-con-vitest)
    - 5.3 [Pruebas de Estrés y Carga con Grafana k6](#53-pruebas-de-estrés-y-carga-con-grafana-k6)
-   - 5.4 [Matriz de Comandos Operativos Verificados](#54-matriz-de-comandos-operativos-verificados)
+   - 5.4 [Matriz de Comandos Operativos](#54-matriz-de-comandos-operativos)
 6. [Catálogo Exhaustivo de Contratos y Endpoints de la API](#6-catálogo-exhaustivo-de-contratos-y-endpoints-de-la-api)
 7. [Estructura del Directorio, Gobernanza y Enlaces Maestros](#7-estructura-del-directorio-gobernanza-y-enlaces-maestros)
 
@@ -42,10 +62,19 @@
 
 ## 1. IDENTIDAD INSTITUCIONAL Y ROL DEL BACKEND
 
-El backend del **Sistema Integral de Gestión Documentaria (SIGD)** constituye el núcleo transaccional, normativo y de seguridad del **IESTP "Suiza"** (Pucallpa, Ucayali, Perú). Diseñado bajo principios de Clean Architecture y Domain-Driven Design (DDD), opera como un motor desacoplado de alta disponibilidad que garantiza:
+El backend del **Sistema Integral de Gestión Documentaria (SIGD)** está destinado a ser el núcleo transaccional, normativo y de seguridad del **IESTP "Suiza"** (Pucallpa, Ucayali, Perú). La arquitectura propone módulos desacoplados y prácticas de Clean Architecture y Domain-Driven Design (DDD); el estado de implementación y validación debe leerse en la evidencia de la rama y de cada entorno.
+
+### Estado de validación de `B_AREVALO` — 30 de septiembre de 2026
+
+- `npm run typecheck` y `npm run build`: aprobados en la revisión local.
+- Pruebas unitarias sin base de datos: 28 aprobadas.
+- Pruebas de migración/Outbox con PostgreSQL y suites E2E: pendientes de ejecutar en un entorno con Docker/Testcontainers.
+- El catálogo de endpoints, la seguridad por rol y los contratos intermodulares requieren cierre con sus grupos propietarios antes de declarar conformidad completa.
+
+El plan maestro describe el objetivo de conformidad del backend. Su aprobación documental no constituye por sí sola evidencia de que la implementación haya alcanzado ese objetivo.
 
 * **API Gateway & Orquestación de Negocio:** Centraliza la recepción de solicitudes, validación tipada estricta, aplicación de reglas administrativas y despacho de trámites institucionales (matrículas, títulos, traslados, certificaciones y convalidaciones).
-* **Despacho Transaccional de Eventos (*Transactional Outbox Pattern*):** Garantiza atomicidad absoluta entre la mutación de estado en base de datos y la publicación de eventos hacia servicios periféricos sin recurrir a costosos protocolos de bloqueo distribuido (Two-Phase Commit).
+* **Despacho de Eventos (*Transactional Outbox Pattern*):** El worker procesa eventos persistidos en `sigd_audit.evento_outbox`; la atomicidad entre el cambio de negocio y el evento depende de que el productor los escriba en la misma transacción. La entrega externa es asíncrona y sus garantías requieren pruebas de integración.
 * **Bitácora Criptográfica Inmutable WORM (*Write Once, Read Many*):** Implementa un registro forense inalterable con factor de relleno `fillfactor = 100`, restricción de privilegios en base de datos (`REVOKE UPDATE, DELETE`) y preservación de huellas digitales SHA-256, blindando la trazabilidad institucional ante cualquier intento de alteración retrospectiva.
 * **Alineamiento Pleno al Marco Normativo Peruano:**
   - **TUO de la Ley N° 27444 (LPAG):** Cómputo de plazos máximos en días hábiles (30 días), acumulación de expedientes (Art. 160), regla de corte legal a las 16:30 hrs y Libro General de Registros (Arts. 153-156).
@@ -56,9 +85,9 @@ El backend del **Sistema Integral de Gestión Documentaria (SIGD)** constituye e
 
 ---
 
-## 2. STACK TECNOLÓGICO Y ENTORNO DE EJECUCIÓN (100% VERIFICADO)
+## 2. STACK TECNOLÓGICO DECLARADO
 
-Cada elemento del stack ha sido validado contra `backend/package.json`, `tsconfig.json`, `tsconfig.build.json` y el código fuente en `src/`:
+Las versiones declaradas se contrastan con `backend/package.json`; la presencia de una dependencia o configuración no acredita por sí misma su operación en producción:
 
 | Capa Arquitectónica | Tecnología / Paquete | Versión Declarada | Detalle de Configuración y Propósito en Producción |
 | :--- | :--- | :--- | :--- |
@@ -106,7 +135,7 @@ flowchart TD
 
 ### 3.1. Serialización Estándar de Errores RFC 7807 / RFC 9457 (`ApiProblemDetails`)
 
-El backend prohíbe de forma terminante la fuga de detalles de infraestructura, trazas internas de pila o mensajes ambiguos hacia el exterior. Todas las fallas son interceptadas y serializadas bajo el estándar **IETF RFC 7807 / RFC 9457** (`application/problem+json`).
+El middleware central serializa errores bajo el formato Problem Details documentado como **IETF RFC 7807 / RFC 9457** (`application/problem+json`). La ausencia de fugas debe comprobarse con pruebas de seguridad por clase de error y no se infiere solo de que exista el middleware.
 
 #### Arquitectura de Componentes de Error:
 * **`src/middleware/error-middleware.ts`:** Middleware terminal de Express. Extrae el `correlation_id` del contexto activo, registra en `console.error` únicamente los errores de nivel 5xx con metadatos contextuales (sin exponerlos al cliente), fija la cabecera HTTP `x-correlation-id` y emite el payload tipado.
@@ -373,7 +402,7 @@ El backend implementa una estrategia de prueba en tres niveles (*Unitario, E2E c
        ▲
       / \        Pruebas de Carga k6 (100 VU Radicación, 50 VU Derivación, P95 < 200 ms)
      /   \
-    / E2E \      12 Suites E2E sobre Testcontainers (postgres:18-alpine dinámico)
+    / E2E \      15 Suites E2E sobre Testcontainers (postgres:18-alpine dinámico)
    /       \
   / Unitarias \  Vitest Suites Rápidas (error-mapper, serialización, Zod, sanitización)
  /_____________\
@@ -381,9 +410,9 @@ El backend implementa una estrategia de prueba en tres niveles (*Unitario, E2E c
 
 ### 5.1. Suites de Integración E2E sobre Testcontainers (PostgreSQL 18)
 
-Las pruebas E2E se ejecutan contra una instancia real de PostgreSQL 18 levantada automáticamente en Docker mediante Testcontainers (`tests/setup/global-setup.ts`). Al iniciar, el runner inicializa `postgres:18-alpine`, instala `pgcrypto`, ejecuta las semillas de `tests/fixtures/01_schema_fixtures_test.sql` y el DDL de `sigd_audit`:
+Las pruebas E2E están configuradas para ejecutarse contra PostgreSQL 18 en Docker mediante Testcontainers (`tests/setup/global-setup.ts`). El setup aplica en orden todos los scripts SQL de `migraciones/` (`01`–`07`) y luego `tests/fixtures/01_schema_fixtures_test.sql`. La configuración existe; su ejecución debe confirmarse en un entorno con Docker:
 
-| Archivo de Prueba E2E | Escenario Evaluado y Regla de Negocio Certificada | Código HTTP Esperado |
+| Archivo de Prueba E2E | Escenario y aserciones definidos en la suite | Código HTTP esperado |
 | :--- | :--- | :---: |
 | **`e2e-01-radicacion.test.ts`** | Radicación exitosa en Mesa de Partes, persistencia en `sigd_tra.expediente` y emisión de cabecera `x-correlation-id`. | `201 Created` |
 | **`e2e-02-validacion.test.ts`** | Validación Zod con fallo en formato de DNI y folios negativos, retornando lista estructurada `invalid_params`. | `400 Bad Request` |
@@ -397,6 +426,9 @@ Las pruebas E2E se ejecutan contra una instancia real de PostgreSQL 18 levantada
 | **`e2e-10-falla-critica.test.ts`** | Simulación de excepción no controlada en el servidor; verificación de que no se expongan stack traces al cliente. | `500 Server Error` |
 | **`e2e-11-concurrencia-async-local-storage.test.ts`** | **100 tareas asíncronas simultáneas** con demoras aleatorias; certificación de cero contaminación cruzada de contexto. | *Aserción Memoria* |
 | **`e2e-12-concurrencia-worker.test.ts`** | **Dos instancias simultáneas de `OutboxWorker`** con `SKIP LOCKED`; certificación de cero eventos duplicados o perdidos. | *Aserción BD* |
+| **`e2e-13-versionado-y-sondas.test.ts`** | Versionado HTTP y sondas operativas de dependencias. | *Aserciones HTTP* |
+| **`e2e-14-stream-sse.test.ts`** | Acceso, eventos y reconexión del stream SSE. | *Aserciones HTTP/SSE* |
+| **`e2e-15-sondas-degradadas.test.ts`** | Respuestas de salud/readiness cuando dependencias están degradadas. | *Aserciones HTTP* |
 
 ---
 
@@ -404,7 +436,8 @@ Las pruebas E2E se ejecutan contra una instancia real de PostgreSQL 18 levantada
 
 * **Archivo de Configuración:** `vitest.unit.config.ts`.
 * **Propósito:** Pruebas unitarias de aislamiento ultra-rápidas ejecutables en local o en pipelines de CI/CD sin requerir Docker ni PostgreSQL.
-* **Cobertura:** `tests/unit/error-mapper.test.ts` valida la serialización determinista de errores de dominio `ValidationError`, issues de Zod, excepciones `23505` de PostgreSQL y enmascaramiento seguro de excepciones 500.
+* **Cobertura funcional actual:** pruebas de mapeo de errores, backoff, stream SSE, rutas canónicas y SLA de firma. Los casos de migración y Outbox que necesitan PostgreSQL se ejecutan con `npm run test:db`.
+* **Cobertura porcentual:** la última ejecución midió 22.60% de líneas, 27.81% de funciones y 72.89% de ramas para todo `src/`, por debajo de los umbrales configurados (85% líneas/funciones y 80% ramas); no se considera una suite con cobertura suficiente.
 
 ---
 
@@ -426,9 +459,9 @@ Ubicadas en `backend/k6/`:
 
 ---
 
-### 5.4. Matriz de Comandos Operativos Verificados
+### 5.4. Matriz de Comandos Operativos
 
-Todos los comandos están verificados contra los scripts oficiales de `backend/package.json`:
+Los scripts definidos en `package.json` son:
 
 ```bash
 # 1. Desarrollo con recarga automática en caliente (Hot Reload)
@@ -451,23 +484,26 @@ npm run typecheck
 npm run test:unit
 # Ejecuta: vitest run --config vitest.unit.config.ts
 
-# 6. Ejecución de las 12 pruebas de integración E2E sobre Testcontainers (requiere Docker)
+# 6. Ejecución de pruebas E2E sobre Testcontainers (requiere Docker)
 npm run test:e2e
 # Ejecuta: vitest run
 
-# 7. Ejecución abreviada de tests E2E
-npm test
-# Ejecuta: vitest run --dir tests/e2e
+# 7. Ejecución de pruebas de migraciones y Outbox en PostgreSQL (requiere Docker)
+npm run test:db
+# Ejecuta: vitest run --config vitest.db.config.ts
 
-# 8. Ejecución del worker asíncrono despachador del Transactional Outbox
+# 8. Cobertura unitaria (el umbral actual es 85% para src/)
+npm run test:coverage
+
+# 9. Ejecución del worker asíncrono despachador del Transactional Outbox
 npm run worker:outbox
 # Ejecuta: tsx src/audit/worker/outbox-worker.ts
 
-# 9. Ejecución de la prueba de carga k6 (Escenario 1 - Radicación 100 VU)
+# 10. Ejecución de la prueba de carga k6 (Escenario 1 - Radicación 100 VU)
 npm run load:radicacion
 # Ejecuta: k6 run k6/escenario-1-radicacion.js
 
-# 10. Ejecución de la prueba de carga k6 (Escenario 2 - Derivación 50 VU)
+# 11. Ejecución de la prueba de carga k6 (Escenario 2 - Derivación 50 VU)
 npm run load:derivacion
 # Ejecuta: k6 run k6/escenario-2-derivacion.js
 ```
@@ -653,7 +689,7 @@ backend/
 │   │   └── worker/             # Entrypoint ejecutable independiente para el worker
 │   └── referencia/             # Enrutador de referencia (/api/expedientes, /api/areas...)
 ├── tests/
-│   ├── e2e/                    # 12 suites de integración E2E sobre Testcontainers
+│   ├── e2e/                    # 15 suites de integración E2E sobre Testcontainers
 │   ├── unit/                   # Suites unitarias de mapeadores de error con Vitest
 │   ├── fixtures/               # Script semilla determinista (01_schema_fixtures_test.sql)
 │   ├── helpers/                # Utilidades de base de datos, app e inyección de payloads

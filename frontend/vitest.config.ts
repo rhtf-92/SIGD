@@ -7,8 +7,12 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   test: {
     environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}", "tests/unit/**/*.test.{ts,tsx}"],
+    setupFiles: ["./tests/setup.ts"],
+    // Cubre las pruebas bajo `src/` y las del directorio de pruebas
+    // del plan maestro (`tests/unit/...`).
+    include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
+    exclude: ["node_modules", "dist"],
+    testTimeout: 10000,
     restoreMocks: true,
     coverage: {
       provider: "v8",

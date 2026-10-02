@@ -65,6 +65,8 @@ export interface ResultadoBandeja {
 export interface ActorRutaDoc {
   id: string;
   roles: readonly string[];
+  /** Unidad derivada por el proveedor de identidad verificado, si está disponible. */
+  unidadOrganicaId?: string | null;
   /** La visibilidad fina queda a cargo del proveedor de autenticación. */
   puedeVerExpediente?: (idExpediente: string) => boolean | Promise<boolean>;
 }

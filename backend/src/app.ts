@@ -3,18 +3,20 @@ import type { Pool } from 'pg';
 import { contextMiddleware } from './middleware/context-middleware.js';
 import { errorMiddleware } from './middleware/error-middleware.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
-import { crearRouterRutaDoc } from './domains/rutadoc/rutadoc.router.js';
-import type { ObtenerActorRutaDoc } from './domains/rutadoc/rutadoc.controller.js';
-import type { FolioCompensationPort, PoliticaReversionRutaDoc, PrepararCompensacionFolios } from './domains/rutadoc/rutadoc.reversion.types.js';
-import type { ActorProviderRutaDoc } from './domains/rutadoc/rutadoc.actor-provider.js';
+import { crearRouterResoluciones } from './domains/docucore/resoluciones.controller.js';
 
-export function construirApp(pool: Pool, opciones: {
-  obtenerActorRutaDoc?: ObtenerActorRutaDoc;
-  actorProviderRutaDoc?: ActorProviderRutaDoc;
-  politicaReversionRutaDoc?: PoliticaReversionRutaDoc;
-  prepararCompensacionFolios?: PrepararCompensacionFolios;
-  folioCompensationPort?: FolioCompensationPort;
-} = {}): Express {
+// Módulos de DocuCore / Firma Digital (B_VALENTIN)
+import { crearFirmaRouter } from './domains/docucore/firma.controller.js';
+import {
+  InMemoryFirmaSessionStore,
+  RedisFirmaSessionStore,
+  type FirmaSessionStore,
+} from './domains/docucore/firmaSession.store.js';
+import { InMemoryAlmacenDocumentosFirmables } from './domains/docucore/documentoFirmable.store.js';
+import { RefirmaGatewayService } from './domains/docucore/refirmaGateway.service.js';
+import { ServicioFirmaService } from './domains/docucore/firma.service.js';
+
+export function construirApp(pool: Pool, ..._resto: unknown[]): Express {
   const app = express();
   app.disable('x-powered-by');
 
@@ -25,10 +27,35 @@ export function construirApp(pool: Pool, opciones: {
     res.json({ status: 'ok' });
   });
 
+  // Configuración de Pasarela y Sesiones de Firma (DocuCore - B_VALENTIN)
+  const hostsPermitidos = (process.env.REFIRMA_HOSTS_PERMITIDOS ?? 'sigd.iestp-suiza.edu.pe')
+    .split(',')
+    .map((h) => h.trim())
+    .filter((h) => h.length > 0);
+
+  const pasarela = new RefirmaGatewayService({
+    hostsPermitidos,
+    exigirHttps: process.env.REFIRMA_EXIGIR_HTTPS !== 'false',
+  });
+
+  let sesiones: FirmaSessionStore;
+  if (process.env.REDIS_URL) {
+    try {
+      sesiones = RedisFirmaSessionStore.desdeEntorno();
+    } catch {
+      sesiones = new InMemoryFirmaSessionStore();
+    }
+  } else {
+    sesiones = new InMemoryFirmaSessionStore();
+  }
+
+  const almacen = new InMemoryAlmacenDocumentosFirmables(sesiones);
+  const servicio = new ServicioFirmaService({ sesiones, almacen, pasarela });
+
+  // Rutas
   app.use('/api', crearRouterReferencia(pool));
-  app.use('/api/v1', crearRouterRutaDoc(pool, opciones.obtenerActorRutaDoc,
-    opciones.politicaReversionRutaDoc, opciones.prepararCompensacionFolios,
-    opciones.actorProviderRutaDoc, opciones.folioCompensationPort));
+  app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
+  app.use('/api/v1/firma', crearFirmaRouter(servicio));
 
   app.use(errorMiddleware);
 
