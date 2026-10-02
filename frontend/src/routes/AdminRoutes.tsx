@@ -9,12 +9,26 @@ import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosPage from "../pages/administracion/UsuariosPage";
+import ProtectedRoute from "./ProtectedRoute";
 
 export default function AdminRoutes() {
   return (
     <>
       <Route index element={<AdministracionPage />} />
-      <Route path="usuarios" element={<UsuariosPage />} />
+      {/* DoD ENT-M05-02: el directorio de personal solo es accesible para
+          SUPER_ADMIN y DIRECTOR mediante guarda de ruta activa. */}
+      <Route
+        path="usuarios"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
+            requiredModule="Administración"
+            requiredAction="editar"
+          >
+            <UsuariosPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="roles-permisos" element={<RolesPermisosPage />} />
       <Route path="auditoria" element={<AuditoriaPage />} />
       <Route path="tablas-maestras" element={<TablasMaestrasPage />} />
