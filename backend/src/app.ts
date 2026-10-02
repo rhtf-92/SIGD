@@ -16,7 +16,49 @@ import { InMemoryAlmacenDocumentosFirmables } from './domains/docucore/documento
 import { RefirmaGatewayService } from './domains/docucore/refirmaGateway.service.js';
 import { ServicioFirmaService } from './domains/docucore/firma.service.js';
 
-export function construirApp(pool: Pool, ..._resto: unknown[]): Express {
+// Módulos CoreLink, IdentiCore, TramiCore, RutaDoc (B_REATEGUI)
+import { crearRouterIdenticore } from './domains/identicore/identicore.router.js';
+import type { CacheDistribuida } from './domains/identicore/ubigeo.service.js';
+import { crearRouterRutaDoc } from './domains/rutadoc/rutadoc.router.js';
+import type { ObtenerActorRutaDoc } from './domains/rutadoc/rutadoc.controller.js';
+import type {
+  FolioCompensationPort,
+  PoliticaReversionRutaDoc,
+  PrepararCompensacionFolios,
+} from './domains/rutadoc/rutadoc.reversion.types.js';
+import type { ActorProviderRutaDoc } from './domains/rutadoc/rutadoc.actor-provider.js';
+import type { CalendarioLaboralPort } from './domains/rutadoc/sla.types.js';
+import type { ClasificadorCcdPort } from './domains/rutadoc/ccd.types.js';
+import type { DocumentoMetadataPort } from './domains/rutadoc/foliacion.types.js';
+import { crearRouterTramites } from './domains/tramicore/tramites.controller.js';
+import { crearRouterReportes } from './domains/corelink/reportes.router.js';
+
+export interface AppOptions {
+  ubigeoCache?: CacheDistribuida;
+  mgdCache?: CacheDistribuida;
+  obtenerActorRutaDoc?: ObtenerActorRutaDoc;
+  actorProviderRutaDoc?: ActorProviderRutaDoc;
+  politicaReversionRutaDoc?: PoliticaReversionRutaDoc;
+  prepararCompensacionFolios?: PrepararCompensacionFolios;
+  folioCompensationPort?: FolioCompensationPort;
+  calendarioLaboralRutaDoc?: CalendarioLaboralPort;
+  clasificadorCcdRutaDoc?: ClasificadorCcdPort;
+  documentoMetadataRutaDoc?: DocumentoMetadataPort;
+  porcentajeAmarilloSlaRutaDocDesde?: number;
+  /** Proveedor de identidad de la analítica ejecutiva; sin él, falla cerrado. */
+  actorProviderReportes?: ActorProviderRutaDoc;
+}
+
+export function construirApp(
+  pool: Pool,
+  opciones: AppOptions | unknown = {},
+  ..._resto: unknown[]
+): Express {
+  const opts: AppOptions =
+    typeof opciones === 'object' && opciones !== null && !('emitirHeartbeat' in opciones)
+      ? (opciones as AppOptions)
+      : {};
+
   const app = express();
   app.disable('x-powered-by');
 
@@ -54,6 +96,26 @@ export function construirApp(pool: Pool, ..._resto: unknown[]): Express {
 
   // Rutas
   app.use('/api', crearRouterReferencia(pool));
+  app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
+  app.use('/api/v1', crearRouterTramites(pool));
+  app.use(
+    '/api/v1',
+    crearRouterRutaDoc(
+      pool,
+      opts.obtenerActorRutaDoc,
+      opts.politicaReversionRutaDoc,
+      opts.prepararCompensacionFolios,
+      opts.actorProviderRutaDoc,
+      opts.folioCompensationPort,
+      {
+        calendarioLaboral: opts.calendarioLaboralRutaDoc,
+        clasificadorCcd: opts.clasificadorCcdRutaDoc,
+        documentoMetadata: opts.documentoMetadataRutaDoc,
+        porcentajeAmarilloSlaDesde: opts.porcentajeAmarilloSlaRutaDocDesde,
+      },
+    ),
+  );
+  app.use('/api/v1', crearRouterReportes(pool, opts.actorProviderReportes, opts.mgdCache));
   app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
   app.use('/api/v1/firma', crearFirmaRouter(servicio));
 
