@@ -4,6 +4,7 @@ import { contextMiddleware } from './middleware/context-middleware.js';
 import { errorMiddleware } from './middleware/error-middleware.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
 import { crearRouterResoluciones } from './domains/docucore/resoluciones.controller.js';
+import { crearUsuariosAdminRouter } from './domains/organicore/usuariosAdmin.routes.js';
 
 // Módulos de DocuCore / Firma Digital (B_VALENTIN)
 import { crearFirmaRouter } from './domains/docucore/firma.controller.js';
@@ -118,6 +119,18 @@ export function construirApp(
   app.use('/api/v1', crearRouterReportes(pool, opts.actorProviderReportes, opts.mgdCache));
   app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
   app.use('/api/v1/firma', crearFirmaRouter(servicio));
+
+  /*
+ * OrganiCore - Administración de usuarios
+ *
+ * GET  /api/v1/admin/usuarios
+ * POST /api/v1/admin/usuarios
+ * PUT  /api/v1/admin/usuarios/:id
+ */
+app.use(
+  '/api/v1/admin/usuarios',
+  crearUsuariosAdminRouter(pool),
+);
 
   app.use(errorMiddleware);
 

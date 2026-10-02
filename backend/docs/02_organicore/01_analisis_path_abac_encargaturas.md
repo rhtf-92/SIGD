@@ -1,8 +1,8 @@
-﻿# An├ílisis Funcional de ├üreas, Roles y Permisos
+﻿# Análisis Funcional de Materialized Path, ABAC y Encargaturas
 
 ## Grupo 3 - OrganiCore
 
-**Proyecto:** Sistema Integral de Gesti├│n Documentaria (SIGD)  
+**Proyecto:** Sistema Integral de Gestión Documentaria (SIGD)  
 **Responsable:** Leonardo  
 **Rama:** `B_LEONARDO`  
 **Estado:** `PROPUESTO`
@@ -11,266 +11,235 @@
 
 ## 1. Objetivo
 
-Definir c├│mo el SIGD administrar├í ├íreas, jerarqu├¡as, asignaciones, responsables, cargos, roles, permisos y alcance de autorizaciones.
+Definir funcionalmente las mejoras de la Fase 2 de OrganiCore relacionadas con jerarquía organizacional, control de acceso contextual y encargaturas temporales.
 
-Las reglas no confirmadas se mantienen como `PENDIENTE`.
-
----
-
-## 2. ├üreas y estructura organizacional
-
-Una ├║nica entidad conceptual `area` representar├í las unidades organizacionales.
-
-La jerarqu├¡a debe permitir varios niveles y evitar ciclos.
-
-```text
-├ürea A
-ÔööÔöÇÔöÇ ├ürea B
-    ÔööÔöÇÔöÇ ├ürea C
-```
-
-Ejemplo de ciclo inv├ílido:
-
-```text
-A -> B -> C -> A
-```
-
-Para la Fase 2, la jerarqu├¡a evoluciona al uso de `parent_id` + Materialized Path.
-
-La jerarqu├¡a utilizar├í una ruta `path` indexada para consultar sub├íreas de forma eficiente y evitar depender de consultas recursivas.
-
-Ver detalle en:
-
-```text
-01_analisis_path_abac_encargaturas.md
-```
-
-**Clasificaci├│n:** `PROPUESTO`
-
-### Pendiente
-
-- Organigrama institucional.
-- Tipos oficiales de ├íreas.
+Las reglas institucionales no confirmadas se mantienen como `PENDIENTE`.
 
 ---
 
-## 3. Usuarios, asignaciones y responsables
+## 2. Jerarquía de áreas
 
-Un usuario podr├í relacionarse con un ├írea mediante una asignaci├│n con vigencia.
+Cada área podrá depender de otra mediante `parent_id`.
+
+Además, se utilizará un `path` jerárquico para representar su ubicación dentro del organigrama.
+
+Ejemplo:
 
 ```text
-Usuario
-   Ôåô
-Asignaci├│n
-   Ôåô
-├ürea
+Dirección General
+└── Administración
+    └── Tesorería
 ```
 
-Los reemplazos temporales se manejar├ín mediante encargaturas o suplencias, con periodo de vigencia y resoluci├│n.
+```text
+direccion_general
+direccion_general.administracion
+direccion_general.administracion.tesoreria
+```
 
-**Clasificaci├│n:** `PROPUESTO`
+Esto permitirá consultar áreas superiores y subáreas de forma eficiente.
 
-### Pendiente
+**Clasificación:** `PROPUESTO`
 
-- Si un usuario puede pertenecer a varias ├íreas.
-- Tipos oficiales de responsabilidad.
-- Reglas institucionales de reemplazo temporal.
+---
+
+## 3. Prevención de ciclos
+
+El sistema deberá impedir relaciones jerárquicas inválidas.
+
+Ejemplo:
+
+```text
+A → B → C → A
+```
+
+Antes de cambiar el área superior, deberá verificarse que el nuevo padre no sea la propia área ni uno de sus descendientes.
+
+**Clasificación:** `PROPUESTO`
 
 ---
 
 ## 4. Diferencia entre conceptos
 
-| Concepto | Funci├│n |
+| Concepto | Función |
 |---|---|
-| ├ürea | Unidad organizacional |
+| Área | Unidad organizacional |
 | Cargo | Puesto institucional |
-| Rol | Agrupaci├│n de permisos t├®cnicos |
-| Permiso | Acci├│n t├®cnica autorizable |
-| Responsable | Persona asignada a un ├írea |
-| Facultad de despacho | Atribuci├│n institucional para acciones sensibles |
+| Rol | Agrupación de permisos técnicos |
+| Permiso | Acción autorizable |
+| Facultad de despacho | Atribución institucional |
+| Encargatura | Delegación temporal de funciones |
 
 Un cargo no equivale a un rol del sistema.
 
-**Clasificaci├│n:** `PROPUESTO`
-
 ---
 
-## 5. Roles y permisos
+## 5. RBAC y ABAC
 
-Un usuario podr├í tener uno o varios roles y cada rol podr├í agrupar varios permisos.
-
-```text
-Usuario
-   Ôåô
-Roles
-   Ôåô
-Permisos
-```
-
-Ejemplo:
+RBAC determinará si el usuario posee un permiso.
 
 ```text
-Usuario A
-Ôö£ÔöÇÔöÇ Rol Operativo
-Ôöé   Ôö£ÔöÇÔöÇ tramite.ver
-Ôöé   ÔööÔöÇÔöÇ tramite.recibir
-ÔööÔöÇÔöÇ Rol Derivador
-    ÔööÔöÇÔöÇ tramite.derivar
+Usuario → Rol → Permiso
 ```
 
-**Clasificaci├│n:** `EJEMPLO`
+ABAC evaluará si ese permiso puede utilizarse según el contexto:
 
-A nivel de arquitectura backend, se propone utilizar identificadores UUID para las entidades del m├│dulo.
+- área;
+- cargo;
+- asignación vigente;
+- alcance;
+- facultad de despacho;
+- encargatura vigente.
 
-**Clasificaci├│n:** `PROPUESTO`
+```text
+Permiso RBAC
+      +
+Contexto ABAC
+      ↓
+Permitir / Denegar
+```
+
+**Clasificación:** `PROPUESTO`
 
 ---
 
 ## 6. Alcance de permisos
 
-Se proponen los siguientes alcances:
+Se proponen:
 
-- `AREA`: solo el ├írea asignada.
-- `SUBAREAS`: ├írea asignada y descendientes.
+- `AREA`: solo el área asignada.
+- `SUBAREAS`: área y descendientes.
 - `GLOBAL`: alcance general autorizado.
 
-No se heredar├ín permisos autom├íticamente.
+Los permisos no se heredarán automáticamente.
 
-**Clasificaci├│n:** `PROPUESTO`
-
-El alcance definitivo queda `PENDIENTE`.
+**Clasificación:** `PROPUESTO`
 
 ---
 
-## 7. Validaci├│n de autorizaci├│n
+## 7. Matriz RBAC vs ABAC
 
-El backend deber├í validar:
+**EJEMPLO**
+
+| Acción | RBAC | ABAC | Resultado |
+|---|---|---|---|
+| Consultar trámite | `tramite.ver` | Área válida | Permitir |
+| Derivar trámite | `tramite.derivar` | Área dentro del alcance | Permitir |
+| Firmar documento | Permiso de firma | Facultad vigente | Permitir |
+| Firmar por suplencia | Permiso técnico | Encargatura vigente | Permitir |
+| Firmar con encargatura vencida | Permiso técnico | Vigencia vencida | Denegar |
+
+---
+
+## 8. Encargaturas y suplencias
+
+Las encargaturas permitirán reemplazos temporales por vacaciones, licencia u otras ausencias.
+
+Deberán registrar:
+
+- área;
+- cargo;
+- usuario titular;
+- usuario suplente;
+- fecha de inicio y fin;
+- resolución o documento de autorización.
+
+Flujo:
+
+```text
+Ausencia del titular
+      ↓
+Resolución o autorización
+      ↓
+Registro del suplente
+      ↓
+Periodo de vigencia
+      ↓
+Validación de facultad
+      ↓
+Encargatura activa
+```
+
+Cuando finalice el periodo, la delegación deberá dejar de ser válida automáticamente.
+
+**Clasificación:** `PROPUESTO`
+
+---
+
+## 9. Validación de autorización
+
+Antes de una operación protegida, el backend deberá comprobar:
 
 ```text
 Usuario activo
-      Ôåô
-Asignaci├│n vigente
-      Ôåô
-Rol vigente
-      Ôåô
-Permiso
-      Ôåô
-Contexto de ├írea
-      Ôåô
+      ↓
+Asignación vigente
+      ↓
+Rol y permiso
+      ↓
+Alcance
+      ↓
+Contexto de área
+      ↓
+Facultad o encargatura, si corresponde
+      ↓
 Permitir / Denegar
 ```
 
-Para acciones sensibles tambi├®n se validar├í:
-
-- cargo institucional;
-- facultad de despacho;
-- encargatura vigente;
-- ├írea de la operaci├│n.
-
-Ocultar botones en frontend no reemplaza esta validaci├│n.
-
-**Clasificaci├│n:** `PROPUESTO`
+El frontend no sustituye estas validaciones.
 
 ---
 
-## 8. RBAC y m├¡nimo privilegio
+## 10. Casos que deben rechazarse
 
-RBAC controla acciones mediante roles y permisos.
-
-Se aplicar├í m├¡nimo privilegio:
-
-- no conceder permisos por defecto;
-- no heredar autom├íticamente a sub├íreas;
-- validar alcance;
-- validar en backend;
-- separar permiso t├®cnico de facultad institucional.
-
-**Clasificaci├│n:** `PROPUESTO`
-
----
-
-## 9. Inactivaci├│n e historial
-
-Los registros importantes deber├ín conservar historial mediante inactivaci├│n l├│gica o vigencia.
-
-```text
-activo = true  -> vigente
-activo = false -> inactivo
-```
-
-Los registros inactivos no participar├ín en nuevas operaciones.
-
-**Clasificaci├│n:** `PROPUESTO`
-
----
-
-## 10. Casos excepcionales
-
-El backend deber├í rechazar:
-
-- ├írea o usuario inexistente;
-- ├írea o usuario inactivo;
-- asignaci├│n vencida;
-- rol vencido;
+- usuario o área inactiva;
+- asignación vencida;
 - permiso insuficiente;
-- operaci├│n fuera de alcance;
-- ciclo jer├írquico;
-- acci├│n sensible sin facultad de despacho;
-- encargatura vencida.
-
-**Clasificaci├│n:** `PROPUESTO`
+- operación fuera de alcance;
+- ciclo jerárquico;
+- acción sensible sin facultad;
+- encargatura inexistente o vencida.
 
 ---
 
-## 11. Matriz funcional de ejemplo
+## 11. Información pendiente
 
-| Acci├│n | Consulta | Operativo | Administraci├│n |
-|---|---:|---:|---:|
-| Consultar tr├ímite | S├¡ | S├¡ | S├¡ |
-| Recibir tr├ímite | No | S├¡ | S├¡ |
-| Derivar tr├ímite | No | S├¡ | S├¡ |
-| Administrar ├íreas | No | No | S├¡ |
-| Designar responsables | No | No | S├¡ |
-| Asignar roles | No | No | S├¡ |
+1. Organigrama oficial.
+2. Cargos oficiales.
+3. Roles y permisos oficiales.
+4. Alcances permitidos.
+5. Facultades institucionales por cargo.
+6. Reglas de encargaturas y suplencias.
+7. Quién administrará estas configuraciones.
 
-**Clasificaci├│n:** `EJEMPLO`
-
----
-
-## 12. Informaci├│n pendiente
-
-1. Organigrama institucional.
-2. Tipos oficiales de ├íreas.
-3. Si un usuario puede pertenecer a varias ├íreas.
-4. Cargos oficiales.
-5. Roles oficiales.
-6. Permisos oficiales.
-7. Alcances autorizados.
-8. Tipos de responsables.
-9. Facultades institucionales por cargo.
-10. Reglas de encargaturas y suplencias.
-11. Qui├®n administrar├í ├íreas, roles, permisos y responsabilidades.
-
-**Clasificaci├│n:** `PENDIENTE`
+**Clasificación:** `PENDIENTE`
 
 ---
 
-## 13. Conclusi├│n
+## 12. Conclusión
 
-OrganiCore mantendr├í separados ├írea, cargo, rol, permiso, responsabilidad y facultad de despacho.
-
-La autorizaci├│n aplicar├í m├¡nimo privilegio, validaci├│n contextual en backend y conservaci├│n de historial.
-
-La Fase 2 se desarrolla en:
+OrganiCore combinará:
 
 ```text
-01_analisis_path_abac_encargaturas.md
+parent_id
++
+Materialized Path
++
+RBAC
++
+ABAC
++
+Encargaturas
 ```
+
+La jerarquía permitirá organizar áreas de varios niveles, RBAC controlará permisos técnicos y ABAC validará el contexto de uso.
+
+Las encargaturas permitirán delegaciones temporales conservando vigencia e historial.
 
 ---
 
-## 14. Fuentes y referencias
+## 13. Fuentes
 
-- Plan de trabajo del Grupo 3 - OrganiCore.
-- Plan de levantamiento de observaciones del Grupo 3 - OrganiCore.
-- Documentaci├│n institucional del IESTP "Suiza", cuando sea validada.
+- Plan de Trabajo del Grupo 3 — OrganiCore.
+- Plan de Levantamiento de Observaciones del Grupo 3 — OrganiCore.
+- Documentación institucional del IESTP "Suiza", cuando sea validada.

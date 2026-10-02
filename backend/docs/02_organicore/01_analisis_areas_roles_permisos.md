@@ -1,95 +1,103 @@
-# Análisis funcional de áreas, roles y permisos
+# Análisis Funcional de Áreas, Roles y Permisos
 
-- Responsable: Leonardo
-- Rama: `B_LEONARDO`
-- Grupo: Grupo 3 — OrganiCore
-- Estado: PROPUESTA PRELIMINAR (Insumo para Modelo de Datos)
-- Validación institucional: PENDIENTE
+## Grupo 3 - OrganiCore
+
+**Proyecto:** Sistema Integral de Gestión Documentaria (SIGD)  
+**Responsable:** Leonardo  
+**Rama:** `B_LEONARDO`  
+**Estado:** `PROPUESTO`
 
 ---
 
 ## 1. Objetivo
 
-**PROPUESTO**
+Definir cómo el SIGD administrará áreas, jerarquías, asignaciones, responsables, cargos, roles, permisos y alcance de autorizaciones.
 
-Definir cómo el SIGD organizará las áreas, usuarios, responsables, roles y permisos, asegurando que el backend controle las acciones autorizadas y mantenga la trazabilidad de la información.
-
-Las reglas institucionales que todavía no hayan sido proporcionadas se mantienen como **PENDIENTE**.
+Las reglas no confirmadas se mantienen como `PENDIENTE`.
 
 ---
 
 ## 2. Áreas y estructura organizacional
 
-**PROPUESTO**
+Una única entidad conceptual `area` representará las unidades organizacionales.
 
-En la base de datos se manejará una sola entidad denominada **Área**.
-
-Las denominaciones institucionales como Gerencia, Subgerencia, Oficina u otras se diferenciarán mediante un tipo o nivel organizacional.
-
-**EJEMPLO**
+La jerarquía debe permitir varios niveles y evitar ciclos.
 
 ```text
+Área A
+└── Área B
+    └── Área C
+```
+
+Ejemplo de ciclo inválido:
+
+```text
+A -> B -> C -> A
+```
+
+Para la Fase 2, la jerarquía evoluciona al uso de `parent_id` + Materialized Path.
+
+La jerarquía utilizará una ruta `path` indexada para consultar subáreas de forma eficiente y evitar depender de consultas recursivas.
+
+Ver detalle en:
+
+```text
+01_analisis_path_abac_encargaturas.md
+```
+
+**Clasificación:** `PROPUESTO`
+
+### Pendiente
+
+- Organigrama institucional.
+- Tipos oficiales de áreas.
+
+---
+
+## 3. Usuarios, asignaciones y responsables
+
+Un usuario podrá relacionarse con un área mediante una asignación con vigencia.
+
+```text
+Usuario
+   ↓
+Asignación
+   ↓
 Área
-- Gerencia
-- Subgerencia
-- Oficina
 ```
 
-La jerarquía permitirá relacionar áreas superiores y dependientes:
+Los reemplazos temporales se manejarán mediante encargaturas o suplencias, con periodo de vigencia y resolución.
 
-```text
-Gerencia
-   ↓
-Subgerencia
-   ↓
-Oficina
-```
+**Clasificación:** `PROPUESTO`
 
-El sistema deberá impedir ciclos jerárquicos.
+### Pendiente
 
-**PENDIENTE**
-
-Confirmar el organigrama y los tipos oficiales de áreas.
+- Si un usuario puede pertenecer a varias áreas.
+- Tipos oficiales de responsabilidad.
+- Reglas institucionales de reemplazo temporal.
 
 ---
 
-## 3. Usuarios y responsables
+## 4. Diferencia entre conceptos
 
-**PROPUESTO**
+| Concepto | Función |
+|---|---|
+| Área | Unidad organizacional |
+| Cargo | Puesto institucional |
+| Rol | Agrupación de permisos técnicos |
+| Permiso | Acción técnica autorizable |
+| Responsable | Persona asignada a un área |
+| Facultad de despacho | Atribución institucional para acciones sensibles |
 
-Un usuario podrá estar relacionado con un área mediante una asignación y podrá conservarse su vigencia para mantener historial.
+Un cargo no equivale a un rol del sistema.
 
-```text
-Usuario → Área → Vigencia
-```
-
-Los responsables también tendrán fecha de inicio y fin.
-
-Para reemplazos temporales podrá existir la figura de **Responsable Interino**.
-
-**EJEMPLO**
-
-```text
-Área: Oficina A
-Responsable: Usuario B
-Tipo: INTERINO
-Inicio: 01/08/2026
-Fin: 15/08/2026
-```
-
-Esto permitirá cubrir vacaciones, licencias u otros reemplazos sin eliminar al responsable anterior.
-
-**PENDIENTE**
-
-Confirmar si un usuario puede pertenecer simultáneamente a varias áreas y qué tipos oficiales de responsables existirán.
+**Clasificación:** `PROPUESTO`
 
 ---
 
-## 4. Roles y permisos
+## 5. Roles y permisos
 
-**PROPUESTO**
-
-Un usuario podrá tener **uno o varios roles**, y cada rol podrá contener varios permisos.
+Un usuario podrá tener uno o varios roles y cada rol podrá agrupar varios permisos.
 
 ```text
 Usuario
@@ -99,124 +107,122 @@ Roles
 Permisos
 ```
 
-**EJEMPLO**
+Ejemplo:
 
 ```text
 Usuario A
-├── Rol 1
+├── Rol Operativo
 │   ├── tramite.ver
 │   └── tramite.recibir
-└── Rol 2
+└── Rol Derivador
     └── tramite.derivar
 ```
 
-Los nombres anteriores son ficticios.
+**Clasificación:** `EJEMPLO`
 
-### Alcance de permisos
+A nivel de arquitectura backend, se propone utilizar identificadores UUID para las entidades del módulo.
 
-Para aplicar mínimo privilegio, los permisos **no se heredarán automáticamente** hacia las subáreas.
-
-Un permiso podrá definir un alcance:
-
-```text
-AREA      → únicamente el área asignada
-SUBAREAS  → área asignada y sus áreas dependientes
-GLOBAL    → todas las áreas
-```
-
-**EJEMPLO**
-
-```text
-Permiso: tramite.ver
-Alcance: AREA
-Área: Oficina A
-```
-
-En este caso el usuario no obtiene automáticamente acceso a las oficinas dependientes.
-
-**PENDIENTE**
-
-Confirmar los roles, permisos y alcances oficiales.
+**Clasificación:** `PROPUESTO`
 
 ---
 
-## 5. Inactivación y conservación del historial
+## 6. Alcance de permisos
 
-**PROPUESTO**
+Se proponen los siguientes alcances:
 
-Las áreas, usuarios, asignaciones y demás registros importantes **no se eliminarán físicamente** cuando dejen de utilizarse.
+- `AREA`: solo el área asignada.
+- `SUBAREAS`: área asignada y descendientes.
+- `GLOBAL`: alcance general autorizado.
 
-Se aplicará una inactivación lógica o *soft delete*:
+No se heredarán permisos automáticamente.
 
-```text
-activo = true   → registro vigente
-activo = false  → registro inactivo
-```
+**Clasificación:** `PROPUESTO`
 
-De esta manera se mantiene el historial necesario para conocer qué área, usuario o responsable participó anteriormente en un trámite.
-
-Un registro inactivo no deberá utilizarse para nuevas operaciones, salvo que una regla específica indique lo contrario.
+El alcance definitivo queda `PENDIENTE`.
 
 ---
 
-## 6. Validación de autorización
+## 7. Validación de autorización
 
-**PROPUESTO**
-
-Antes de ejecutar una operación protegida, el backend deberá comprobar:
+El backend deberá validar:
 
 ```text
 Usuario activo
       ↓
 Asignación vigente
       ↓
-Roles vigentes
+Rol vigente
       ↓
-Permisos
+Permiso
       ↓
-Alcance
+Contexto de área
       ↓
 Permitir / Denegar
 ```
 
-Ocultar botones en el frontend no reemplaza esta validación.
+Para acciones sensibles también se validará:
 
-Entre los casos que deberán rechazarse se consideran:
+- cargo institucional;
+- facultad de despacho;
+- encargatura vigente;
+- área de la operación.
 
-- Usuario o área inexistente.
-- Usuario o área inactiva.
-- Ciclo jerárquico.
-- Asignación vencida.
-- Rol vencido.
-- Permiso insuficiente.
-- Permiso fuera de su alcance.
+Ocultar botones en frontend no reemplaza esta validación.
+
+**Clasificación:** `PROPUESTO`
 
 ---
 
-## 7. RBAC y mínimo privilegio
+## 8. RBAC y mínimo privilegio
 
-**PROPUESTO — BASADO EN INVESTIGACIÓN**
+RBAC controla acciones mediante roles y permisos.
 
-El modelo RBAC organiza las autorizaciones mediante roles:
+Se aplicará mínimo privilegio:
+
+- no conceder permisos por defecto;
+- no heredar automáticamente a subáreas;
+- validar alcance;
+- validar en backend;
+- separar permiso técnico de facultad institucional.
+
+**Clasificación:** `PROPUESTO`
+
+---
+
+## 9. Inactivación e historial
+
+Los registros importantes deberán conservar historial mediante inactivación lógica o vigencia.
 
 ```text
-Usuario → Roles → Permisos
+activo = true  -> vigente
+activo = false -> inactivo
 ```
 
-El principio de mínimo privilegio establece que cada usuario debe recibir únicamente los permisos necesarios.
+Los registros inactivos no participarán en nuevas operaciones.
 
-Por ello:
-
-- No se conceden permisos por defecto.
-- No existe herencia automática hacia subáreas.
-- Los permisos deben tener un alcance definido.
-- La autorización se comprueba en el backend.
+**Clasificación:** `PROPUESTO`
 
 ---
 
-## 8. Matriz funcional de ejemplo
+## 10. Casos excepcionales
 
-**EJEMPLO — PENDIENTE DE VALIDACIÓN**
+El backend deberá rechazar:
+
+- área o usuario inexistente;
+- área o usuario inactivo;
+- asignación vencida;
+- rol vencido;
+- permiso insuficiente;
+- operación fuera de alcance;
+- ciclo jerárquico;
+- acción sensible sin facultad de despacho;
+- encargatura vencida.
+
+**Clasificación:** `PROPUESTO`
+
+---
+
+## 11. Matriz funcional de ejemplo
 
 | Acción | Consulta | Operativo | Administración |
 |---|---:|---:|---:|
@@ -227,38 +233,44 @@ Por ello:
 | Designar responsables | No | No | Sí |
 | Asignar roles | No | No | Sí |
 
-Esta matriz es únicamente demostrativa.
+**Clasificación:** `EJEMPLO`
 
 ---
 
-## 9. Información pendiente
-
-**PENDIENTE**
-
-Debe confirmarse con el profesor:
+## 12. Información pendiente
 
 1. Organigrama institucional.
 2. Tipos oficiales de áreas.
 3. Si un usuario puede pertenecer a varias áreas.
-4. Roles oficiales.
-5. Permisos oficiales.
-6. Alcances permitidos.
-7. Tipos oficiales de responsables.
-8. Quién administrará áreas, responsables, roles y permisos.
+4. Cargos oficiales.
+5. Roles oficiales.
+6. Permisos oficiales.
+7. Alcances autorizados.
+8. Tipos de responsables.
+9. Facultades institucionales por cargo.
+10. Reglas de encargaturas y suplencias.
+11. Quién administrará áreas, roles, permisos y responsabilidades.
 
-No se utilizará la categoría **CONFIRMADO** hasta contar con una indicación expresa del profesor o información institucional verificada.
----
-
-## 10. Conclusión
-
-El módulo utilizará una estructura única de áreas, permitirá múltiples roles por usuario, controlará el alcance de los permisos, conservará los registros mediante inactivación lógica y permitirá responsables interinos con vigencia.
-
-Estas decisiones se consideran **PROPUESTO** hasta su validación institucional.
+**Clasificación:** `PENDIENTE`
 
 ---
 
-## 11. Fuentes y Referencias
+## 13. Conclusión
 
-1. **Documentación Oficial y Manuales Organizacionales de Culper:** Estructura orgánica, organigrama institucional y manual de perfiles de puesto utilizados para la definición de áreas y responsabilidades.
-2. **Especificaciones Funcionales del Sistema Culper:** Requisitos de negocio para la gestión de usuarios, asignación de cargos, trazabilidad e historial de responsables.
-3. **Estándar de Control de Acceso (RBAC / NIST SP 800-162):** Criterios técnicos de seguridad para el diseño de roles, permisos y mínimos privilegios en la arquitectura del sistema.
+OrganiCore mantendrá separados área, cargo, rol, permiso, responsabilidad y facultad de despacho.
+
+La autorización aplicará mínimo privilegio, validación contextual en backend y conservación de historial.
+
+La Fase 2 se desarrolla en:
+
+```text
+01_analisis_path_abac_encargaturas.md
+```
+
+---
+
+## 14. Fuentes y referencias
+
+- Plan de trabajo del Grupo 3 - OrganiCore.
+- Plan de levantamiento de observaciones del Grupo 3 - OrganiCore.
+- Documentación institucional del IESTP "Suiza", cuando sea validada.
