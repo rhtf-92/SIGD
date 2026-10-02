@@ -168,7 +168,7 @@ export function usePresignedUpload(
         } else {
           try {
             const response = await apiClient.post<PresignedUrlResponse>(
-              "/v1/storage/presigned-url",
+              "/api/v1/storage/presigned-url",
               {
                 nombreArchivo: file.name,
                 mimeType: "application/pdf",

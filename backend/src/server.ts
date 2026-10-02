@@ -2,41 +2,65 @@ import 'dotenv/config';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Redis } from 'ioredis';
 import { crearPool } from './database.js';
 import { construirApp } from './app.js';
-import type { CacheDistribuida } from './domains/identicore/ubigeo.service.js';
+import { API_PREFIX } from './config/rutas.js';
+import { BusSse, HEARTBEAT_SEGUNDOS } from './modules/corelink/sseStream.service.js';
+import { ejecutarMigraciones } from './db/migrate.js';
+import { OutboxWorker } from './audit/outbox-worker.js';
+import { crearDespachadorPorDefecto } from './audit/despachador-notificaciones.js';
+import { BridgeNotificacion } from './core/realtime/bridge-notificacion.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
 const port = Number(process.env.PORT ?? 3000);
 
 const pool = crearPool(databaseUrl);
-const redis = process.env.REDIS_URL
-  ? new Redis(process.env.REDIS_URL, {
-      lazyConnect: true,
-      enableOfflineQueue: false,
-      maxRetriesPerRequest: 1,
-      retryStrategy: (intento) => (intento > 3 ? null : Math.min(intento * 100, 1_000)),
-    })
-  : undefined;
-redis?.on('error', (error: Error) => {
-  console.error('[Redis Ubigeo] caché no disponible:', error.message);
-});
+const busSse = new BusSse();
 
-const ubigeoCache: CacheDistribuida | undefined = redis
-  ? {
-      get: (clave) => redis.get(clave),
-      set: async (clave, valor, ttlSegundos) => {
-        await redis.set(clave, valor, 'EX', ttlSegundos);
-      },
-    }
-  : undefined;
-const app = construirApp(pool, { ubigeoCache });
+if (process.env.MIGRATE_ON_BOOT !== 'false') {
+  await ejecutarMigraciones(pool);
+}
 
-app.listen(port, () => {
+const app = construirApp(pool, busSse);
+const servidor = app.listen(port, () => {
   console.log(`SIGD Backend escuchando en http://localhost:${port}`);
+  console.log(`API canónica: http://localhost:${port}${API_PREFIX}`);
+  console.log(`Sondas: http://localhost:${port}/health · http://localhost:${port}/ready`);
 });
+
+const intervaloHeartbeat = setInterval(
+  () => busSse.emitirHeartbeat(),
+  HEARTBEAT_SEGUNDOS * 1000,
+);
+intervaloHeartbeat.unref?.();
+
+// Reparto de eventos entre réplicas: cada instancia suscribe su propio listener
+// de NOTIFY y publica los eventos que su Outbox despacha.
+const bridge = new BridgeNotificacion(databaseUrl, busSse);
+await bridge.iniciar();
+
+const outboxWorker = new OutboxWorker(
+  pool,
+  crearDespachadorPorDefecto(busSse, pool, bridge),
+  {
+    backoffBaseMs: Number(process.env.OUTBOX_BACKOFF_BASE_MS ?? 1000),
+    backoffTechoMs: Number(process.env.OUTBOX_BACKOFF_TECHO_MS ?? 300_000),
+    intervaloPollMs: Number(process.env.OUTBOX_POLL_MS ?? 5000),
+  },
+);
+const cicloOutbox = outboxWorker.iniciar();
+cicloOutbox.catch((error: unknown) => console.error('[OUTBOX] El poller terminó con error:', error));
+
+const apagar = (senal: string): void => {
+  console.log(`[SERVER] Señal ${senal} recibida; cerrando conexiones SSE.`);
+  clearInterval(intervaloHeartbeat);
+  outboxWorker.detener();
+  void bridge.detener();
+  busSse.cerrarTodos();
+  servidor.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 5000).unref?.();
+};
 
 // En desarrollo, iniciar concurrentemente el servidor Vite del Frontend en el puerto 5173
 const __filename = fileURLToPath(import.meta.url);
@@ -51,7 +75,7 @@ try {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
-      VITE_API_BASE_URL: 'http://localhost:3000/api',
+      VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
       VITE_ENABLE_MOCKS: 'true',
     },
   });
@@ -75,12 +99,12 @@ try {
   console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
 }
 
-function cerrarServidor(): void {
+process.on('SIGINT', () => {
   if (viteProc) viteProc.kill();
-  void Promise.allSettled([pool.end(), redis?.quit() ?? Promise.resolve()]).finally(() => {
-    process.exit(0);
-  });
-}
+  apagar('SIGINT');
+});
 
-process.on('SIGINT', cerrarServidor);
-process.on('SIGTERM', cerrarServidor);
+process.on('SIGTERM', () => {
+  if (viteProc) viteProc.kill();
+  apagar('SIGTERM');
+});
