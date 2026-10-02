@@ -88,20 +88,43 @@ export default function RefirmaConnectorModal({
     pasoActual,
     resultado,
     mensajeError,
+    segundosRestantes,
+    timeoutMs,
     iniciarFirma,
     reintentar,
+    cancelar,
   } = useRefirmaGateway(onFirmado);
 
   const fase = pasoActual ? PASOS.findIndex((paso) => paso.clave === pasoActual) : -1;
+  const totalSegundos = Math.floor(timeoutMs / 1000);
+  const progresoTimeout =
+    segundosRestantes !== null
+      ? Math.max(0, Math.min(100, (segundosRestantes / totalSegundos) * 100))
+      : 100;
+
+  const cerrarConLimpieza = () => {
+    // T-FE-DOC-11: cancelar el polling/SSE al cerrar para no dejar timers vivos.
+    if (
+      estado === "PREPARANDO" ||
+      estado === "CONECTANDO" ||
+      estado === "ESPERANDO_PIN" ||
+      estado === "SOLICITANDO_TSA" ||
+      estado === "SELLANDO_CVD"
+    ) {
+      cancelar();
+    }
+    onCerrar();
+  };
 
   useEffect(() => {
     if (!abierto) return;
     const manejador = (evento: KeyboardEvent) => {
-      if (evento.key === "Escape") onCerrar();
+      if (evento.key === "Escape") cerrarConLimpieza();
     };
     window.addEventListener("keydown", manejador);
     return () => window.removeEventListener("keydown", manejador);
-  }, [abierto, onCerrar]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abierto]);
 
   if (!abierto || !documento) return null;
 
@@ -204,6 +227,34 @@ export default function RefirmaConnectorModal({
               <p className="pt-1 text-xs text-slate-400" role="status">
                 Firma PAdES-BES · Sellado de tiempo criptográfico TSA (RFC 3161)
               </p>
+              {/* T-FE-DOC-11: barra de espera de 5 minutos con cuenta regresiva */}
+              {segundosRestantes !== null && (
+                <div className="pt-1" aria-live="polite">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>
+                      1. Agente Refirma invocado → 2. Ingrese su PIN en su
+                      computadora → 3. Esperando confirmación de RENIEC…
+                    </span>
+                    <span className="font-mono font-bold text-slate-700">
+                      {Math.floor(segundosRestantes / 60)}:
+                      {String(segundosRestantes % 60).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <div
+                    className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(progresoTimeout)}
+                    aria-label="Tiempo restante de espera de firma"
+                  >
+                    <div
+                      className="h-full rounded-full bg-blue-600 transition-all"
+                      style={{ width: `${progresoTimeout}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -238,7 +289,7 @@ export default function RefirmaConnectorModal({
             <>
               <button
                 type="button"
-                onClick={onCerrar}
+                onClick={cerrarConLimpieza}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
               >
                 Cerrar
@@ -256,7 +307,7 @@ export default function RefirmaConnectorModal({
           {enProceso && (
             <button
               type="button"
-              onClick={onCerrar}
+              onClick={cerrarConLimpieza}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
             >
               Cancelar
@@ -267,7 +318,7 @@ export default function RefirmaConnectorModal({
             <>
               <button
                 type="button"
-                onClick={onCerrar}
+                onClick={cerrarConLimpieza}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
               >
                 Cerrar
@@ -285,7 +336,7 @@ export default function RefirmaConnectorModal({
           {estado === "COMPLETADO" && (
             <button
               type="button"
-              onClick={onCerrar}
+              onClick={cerrarConLimpieza}
               className="rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
             >
               Finalizar

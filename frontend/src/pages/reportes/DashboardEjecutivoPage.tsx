@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import ExecutiveKpiSummary from "@/components/dashboard/ExecutiveKpiSummary";
+import TimeFilterControls, { type DashboardPeriodMode } from "@/components/dashboard/TimeFilterControls";
 import KpiMetricGrid from "@/components/reportes/KpiMetricGrid";
 import ReportExportModal from "@/components/reportes/ReportExportModal";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
@@ -19,15 +21,52 @@ function SkeletonCard() {
 }
 
 export default function DashboardEjecutivoPage() {
-  const { summary, trend, estados, cuellosBotella, isLoading, isError, errorMessage } = useDashboardMetrics({
-    fechaInicio: "2026-01-01",
-    fechaFin: "2026-12-31",
-    periodo: "mensual",
+  const [year, setYear] = useState(2026);
+  const [periodMode, setPeriodMode] = useState<DashboardPeriodMode>("year");
+  const [month, setMonth] = useState("01");
+  const [rangeStart, setRangeStart] = useState("2026-01-01");
+  const [rangeEnd, setRangeEnd] = useState("2026-12-31");
+  const [unitId, setUnitId] = useState("");
+  const start = periodMode === "custom"
+    ? rangeStart
+    : periodMode === "month"
+      ? `${year}-${month}-01`
+      : `${year}-01-01`;
+  const end = periodMode === "custom"
+    ? rangeEnd
+    : periodMode === "month"
+      ? new Date(Date.UTC(year, Number(month), 0)).toISOString().slice(0, 10)
+      : `${year}-12-31`;
+  const filters = {
+    fechaInicio: start,
+    fechaFin: end,
+    periodo: periodMode === "year" ? "anual" : periodMode === "month" ? "mensual" : "personalizado",
     diasLimite: 5,
-  });
+    anio: year,
+    ...(periodMode === "month" ? { mes: month } : {}),
+    ...(unitId ? { unidadOrganicaId: unitId } : {}),
+  };
+  const { summary, trend, estados, cuellosBotella, executive, units, isLoading, isError, errorMessage } = useDashboardMetrics(filters);
 
   const state: DashboardPageState = isLoading ? "loading" : isError ? "error" : "ready";
   const summaryMetrics = summary?.metrics ?? [];
+  const filterControls = (
+    <TimeFilterControls
+      year={year}
+      mode={periodMode}
+      month={month}
+      rangeStart={rangeStart}
+      rangeEnd={rangeEnd}
+      unitId={unitId}
+      units={units}
+      onYearChange={setYear}
+      onModeChange={setPeriodMode}
+      onMonthChange={setMonth}
+      onRangeStartChange={setRangeStart}
+      onRangeEndChange={setRangeEnd}
+      onUnitChange={setUnitId}
+    />
+  );
 
   const trendChart = useMemo(() => {
     const maxValue = Math.max(...trend.flatMap((point) => [point.radicados, point.resueltos]), 1);
@@ -47,12 +86,15 @@ export default function DashboardEjecutivoPage() {
           Cargando tablero ejecutivo.
         </div>
         <div className="mx-auto max-w-7xl space-y-6">
-          <div className="h-12 w-64 animate-pulse rounded bg-slate-200" />
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <header className="rounded-lg border border-slate-200 bg-white p-4">
+            <h1 className="text-2xl font-bold text-slate-900">Tablero Directivo Ejecutivo</h1>
+          </header>
+          {filterControls}
+          <section aria-label="Métricas ejecutivas principales" className="grid grid-cols-1 gap-4 sm:grid-cols-2 min-[1025px]:grid-cols-4">
             {Array.from({ length: 4 }).map((_, index) => (
               <SkeletonCard key={index} />
             ))}
-          </div>
+          </section>
         </div>
       </main>
     );
@@ -65,12 +107,13 @@ export default function DashboardEjecutivoPage() {
           Error al cargar el tablero ejecutivo.
         </div>
         <section
-          className="max-w-xl rounded-2xl border border-red-200 bg-white p-8 text-center shadow-sm"
+          className="w-full max-w-xl rounded-lg border border-red-200 bg-white p-8 text-center shadow-sm"
           role="alert"
           aria-label="Error del tablero ejecutivo"
         >
           <h1 className="text-2xl font-bold text-slate-900">No se pudo cargar el tablero ejecutivo</h1>
           <p className="mt-3 text-slate-600">{errorMessage ?? "La consulta a la API de reportes no respondió correctamente."}</p>
+            {filterControls}
         </section>
       </main>
     );
@@ -95,12 +138,7 @@ export default function DashboardEjecutivoPage() {
           </div>
           <ReportExportModal
             reportName="dashboard-ejecutivo"
-            filters={{
-              fechaInicio: "2026-01-01",
-              fechaFin: "2026-12-31",
-              periodo: "mensual",
-              diasLimite: 5,
-            }}
+            filters={filters}
             records={summaryMetrics.map((metric) => ({
               indicador: metric.title,
               valor: metric.value,
@@ -110,9 +148,11 @@ export default function DashboardEjecutivoPage() {
           />
         </header>
 
+        {filterControls}
+        <ExecutiveKpiSummary metrics={executive} />
         <KpiMetricGrid metrics={summaryMetrics} />
 
-        <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
+        <div className="grid min-w-0 grid-cols-1 gap-6 min-[1025px]:grid-cols-[1.7fr_1fr]">
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="trend-title">
             <div className="mb-4 flex items-center justify-between">
               <h2 id="trend-title" className="text-lg font-semibold text-slate-900">
