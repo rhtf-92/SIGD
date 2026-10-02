@@ -2,8 +2,8 @@
 
 **Sistema:** Sistema Integral de Gestión Documentaria (SIGD)
 **Módulo:** Módulo de Gestión Documental y Expedientes - DocuCore
-**Autor:** Valentin
-**Rama Git:** `B_VALENTIN`
+**Autor:** Azareño
+**Rama Git:** `B_AZAÑERO`
 **Entregable:** `docs/analisis-funcional/01_analisis_objetivo_actores_flujo.md`
 **Destinatario:** Cristian (Modelado de Datos - `B_CHRISTIAN`)
 **Fecha:** 29 de agosto de 2026
