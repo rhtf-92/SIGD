@@ -31,7 +31,7 @@ function VisorFolios({ documentos, origenesPermitidos }: { documentos: readonly 
     <p className="m03-help">Foliación continua de solo lectura. El sello visual no altera el archivo original.</p>
     <p role="status" className="mb-3">{documento.nombre} · Página {folio.pagina} · Folio {folio.numero} de {paginas.length}</p>
     <div className="m03-folio-page">
-      <span className="m03-folio-stamp" aria-hidden="true">F. {folio.numero}</span>
+      <span className="m03-folio-stamp" aria-hidden="true">F. [{String(folio.numero).padStart(4, "0")}]</span>
       {urlInsegura ? <p role="alert" className="m03-alert">La dirección del documento no es segura o no está autorizada.</p> : imagen ?
         <ImagenFolio key={`${documento.id}-${folio.pagina}-${imagen}`} url={imagen} descripcion={`${documento.nombre}, página ${folio.pagina}, folio ${folio.numero}`} /> :
         <p className="m03-notice">Vista previa de esta página no disponible. {original ? "Puede consultar el documento original con el enlace inferior." : "Solicite una copia disponible al área responsable."}</p>}

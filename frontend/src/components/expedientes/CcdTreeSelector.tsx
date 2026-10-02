@@ -100,7 +100,7 @@ function ArbolCcd({ fondos, seleccion, onSeleccionar, disabled = false, permitir
       case "Enter": case " ": activar(item); break;
       default: {
         if (event.key.length !== 1) return;
-        const tiempo = Date.now();
+        const tiempo = event.timeStamp;
         const texto = (tiempo - busqueda.current.tiempo < 700 ? busqueda.current.texto : "") + event.key.toLocaleLowerCase("es");
         busqueda.current = { texto, tiempo };
         const orden = [...visibles.slice(indice + 1), ...visibles.slice(0, indice + 1)];
