@@ -186,7 +186,7 @@ El frontend contiene la totalidad de los 174 Story Points físicos en disco, div
   - `NotificacionList.tsx` y `NotificacionDetailModal.tsx` (Bandeja de casilla ciudadana con acuse de notificación legal fehaciente).
   - `UbigeoSelector.tsx` y `useUbigeoCascade.ts` (Selector en cascada para el departamento de Ucayali: 4 provincias y 17 distritos según catálogo INEI).
 - **Esquemas & Servicios:** `registroCiudadano.schema.ts`, `consentimiento.schema.ts`, `casillaService.ts`, `data/ucayali.ts`.
-- **Pruebas Automatizadas:** 53 tests unitarios aprobados en 5 suites (`registroCiudadano`, `casillaElectronica`, `registroFormularios`, `ubigeoCascade`, `ubigeoSelector`).
+- **Pruebas Automatizadas:** 72 tests unitarios e integrados aprobados en 8 suites (`registroCiudadano`, `casillaElectronica`, `casillaService`, `registroFormularios`, `ConsentimientoModal`, `UbigeoSelector`, `ubigeoCascade`, `authStore`).
 
 ### 2. Módulo 02 (M02): Mesa de Partes Digital & Registro de Trámites (CUT)
 - **Story Points:** 34 SP | **Entregables:** 6 (`ENT-M02-01` a `ENT-M02-06`)
@@ -202,7 +202,7 @@ El frontend contiene la totalidad de los 174 Story Points físicos en disco, div
   - `CargoDigitalModal.tsx` (Emisión de cargo con CUT `EXP-YYYY-XXXXXX`, código QR vectorial y formato de ticket térmico `@media print` 80mm/58mm).
   - `HorarioCorteNotice.tsx` y `useHorarioCorte.ts` (Control normativo de corte diario a las **16:30 hrs** según Ley 27444 con zona horaria `America/Lima`).
   - `FileUploadDropzone.tsx`, `magicBytesValidator.ts` (Validación de cabecera binaria Magic Bytes `%PDF` `0x25 0x50 0x44 0x46`) y `cryptoSha256.ts` (Cálculo criptográfico SHA-256 en cliente para subida segura vía Presigned URLs a MinIO/S3).
-- **Pruebas Automatizadas:** 14 tests unitarios aprobados en 3 suites (`magicBytesValidator`, `horarioCorte`, `ventanillaPresencial`).
+- **Pruebas Automatizadas:** 46 tests unitarios e integrados aprobados en 7 suites (`TramiteWizard`, `ventanillaPresencial`, `useHorarioCorte`, `magicBytesValidator`, `fileValidation`, `DynamicSchemaForm`, `tramiteTupaCatalog`).
 
 ### 3. Módulo 03 (M03): Bandeja de Gestión, Derivación & Trazabilidad
 - **Story Points:** 28 SP | **Entregables:** 5 (`ENT-M03-01` a `ENT-M03-05`)
@@ -219,7 +219,7 @@ El frontend contiene la totalidad de los 174 Story Points físicos en disco, div
   - `CcdTreeSelector.tsx` (Selector interactivo accesible del Cuadro de Clasificación Documental AGN con navegación completa por teclado).
   - `FoliadoDocumentoViewer.tsx` (Visor de documentos con estampa marginal de foliado continuo correlativo F. 1 a N).
   - Modales de Acción: `DerivacionModal.tsx` (Derivación múltiple a unidades orgánicas), `ObservacionModal.tsx` (Suspensión formal de plazos SLA) y `AcumulacionModal.tsx` (Acumulación de expedientes conforme al Art. 160 del TUO LPAG).
-- **Pruebas Automatizadas:** 99 tests unitarios aprobados en 10 suites (`slaBadge`, `slaCalculator`, `AccionesModales`, `CcdTreeSelector`, `ExpedienteTimeline`, `FoliadoDocumentoViewer`, `useExpedienteActions`, `expedienteActions` api/utils, `foliado`).
+- **Pruebas Automatizadas:** 162 tests unitarios e integrados aprobados en 16 suites (`AccionesModales`, `buscadorExpedientes`, `CcdTreeSelector`, `ExpedienteTimeline`, `FoliadoDocumentoViewer`, `slaBadge`, `slaCalculator`, `useExpedienteActions`, `BandejaExpedientesPage`, `RegistroFoliado`, `ccdFoliado`, `expedienteActions`, `foliado`, `foliadoValidator`).
 
 ### 4. Módulo 04 (M04): Emisión, Proyección & Foliación de Documentos (Flujos Académicos)
 - **Story Points:** 29 SP | **Entregables:** 5 (`ENT-M04-01` a `ENT-M04-05`)
@@ -237,7 +237,7 @@ El frontend contiene la totalidad de los 174 Story Points físicos en disco, div
   - `DocumentoCvdViewer.tsx` y `CvdStampBadge.tsx` (Representación impresa con estampa lateral derecha según D.S. 070-2013-PCM).
   - `RefirmaConnectorModal.tsx` (Conector con la aplicación cliente oficial de Refirma RENIEC mediante protocolo URI `refirma://sign?...`).
   - `CvdVerificationResult.tsx` (Despliegue pericial del resultado de validación criptográfica).
-- **Pruebas Automatizadas:** 6 tests unitarios aprobados en 2 suites (`documentoCvdViewer`, `proyectorResoluciones`).
+- **Pruebas Automatizadas:** 33 tests unitarios aprobados en 6 suites (`documentoCvdViewer`, `proyectorResoluciones`, `refirmaGateway`, `validadorCvd`, `useRefirmaGateway`, `ValidadorCvdPage`).
 
 ### 5. Módulo 05 (M05): Firma Digital, Visado & Verificación CVD/QR (Administración y RBAC)
 - **Story Points:** 28 SP | **Entregables:** 6 (`ENT-M05-01` a `ENT-M05-06`)
@@ -257,7 +257,7 @@ El frontend contiene la totalidad de los 174 Story Points físicos en disco, div
   - `UserEditModal.tsx` (Gestión de credenciales, roles y estado de cuentas).
   - `AdminBreadcrumbs.tsx` y `AdminPageHeader.tsx` (Navegación contextual y migas de pan institucionales).
 - **Guardianes & Hooks:** `ProtectedRoute.tsx` (Validador de permisos y redirección a `/acceso-denegado`), `useRbacConfig.ts`, `useAuditLogs.ts`, `useCalendarioLaboral.ts` (`HORA_FIN_REFERENCIA = "16:30"`).
-- **Pruebas Automatizadas:** 4 tests unitarios aprobados (`rbacRolesCanonicos`).
+- **Pruebas Automatizadas:** 26 tests aprobados en 5 suites (`AdministracionPage`, `UsuariosPage`, `RbacGuard`, `rbacRolesCanonicos`, `apiClient`).
 
 ### 6. Módulo 06 (M06): Reportes, Indicadores SLA & Administración del Sistema (MGD-PCM)
 - **Story Points:** 29 SP | **Entregables:** 5 (`ENT-M06-01` a `ENT-M06-05`)
@@ -275,7 +275,7 @@ El frontend contiene la totalidad de los 174 Story Points físicos en disco, div
   - `kpiCalculator.service.ts` (Cálculo matemático determinista de indicadores institucionales).
   - `pdfReportExporter.ts` (Generador físico de documentos Adobe `%PDF-1.4` con cabecera estándar, MediaBox A4 y tabla xref).
   - `excelReportExporter.ts` (Generador estructurado de libros Microsoft SpreadsheetML XML 2003 codificado en UTF-8 con estilos de celdas).
-- **Pruebas Automatizadas:** 46 tests unitarios aprobados en 3 suites (`kpiCalculator`, `dashboardA11y`, `reportExportersIntegrity`).
+- **Pruebas Automatizadas:** 78 tests unitarios aprobados en 5 suites (`DashboardEjecutivoPage`, `dashboardA11y`, `kpiCalculator`, `reportExporters`, `reportExportersIntegrity`).
 
 ---
 
@@ -559,18 +559,18 @@ No se incluyen pruebas E2E de navegador en esta suite; los casos de interacción
 npx vitest run
 ```
 
-### Certificación de Ejecución Exitosa: 26 Suites / 235 Tests (100% Pass Rate)
+### Certificación de Ejecución Exitosa: 47 Suites / 417 Tests (100% Pass Rate)
 
 | Módulo / Dominio | Archivo(s) de Prueba | Suites | Pruebas | Resultado |
 |---|---|:---:|:---:|:---:|
-| **Transversal / API** | `tests/unit/api/apiClient.test.ts` | 1 | 4 | ✅ **APROBADO** |
-| **M01: Identidad & Casilla** | `registroCiudadano`, `casillaElectronica`, `registroFormularios`, `ubigeoCascade`, `ubigeoSelector` | 5 | 53 | ✅ **APROBADO** |
-| **M02: Mesa de Partes & Ventanilla** | `useHorarioCorte`, `magicBytesValidator`, `fileValidation`, `ventanillaPresencial` | 4 | 23 | ✅ **APROBADO** |
-| **M03: Bandeja & Expedientes** | `slaBadge`, `slaCalculator`, `AccionesModales`, `CcdTreeSelector`, `ExpedienteTimeline`, `FoliadoDocumentoViewer`, `useExpedienteActions`, `expedienteActions` (api/utils), `foliado` | 10 | 99 | ✅ **APROBADO** |
-| **M04: Validez Legal & Firma** | `documentoCvdViewer`, `proyectorResoluciones` | 2 | 6 | ✅ **APROBADO** |
-| **M05: Administración & RBAC** | `rbacRolesCanonicos` | 1 | 4 | ✅ **APROBADO** |
-| **M06: Reportes & Dashboards** | `kpiCalculator`, `dashboardA11y`, `reportExportersIntegrity` | 3 | 46 | ✅ **APROBADO** |
-| **TOTAL GENERAL** | **26 archivos de pruebas** | **26** | **235** | **100% EXITOSO** |
+| **Transversal / Plataforma** | `tests/unit/api/apiClient.test.ts` | 1 | 4 | ✅ **APROBADO** |
+| **M01: Identidad & Casilla** | `registroCiudadano.test.ts`, `casillaElectronica.test.tsx`, `casillaService.test.ts`, `registroFormularios.test.tsx`, `ConsentimientoModal.test.tsx`, `UbigeoSelector.test.tsx`, `ubigeoCascade.test.ts`, `authStore.test.ts` | 8 | 72 | ✅ **APROBADO** |
+| **M02: Mesa de Partes & Ventanilla** | `TramiteWizard.test.tsx`, `ventanillaPresencial.test.tsx`, `useHorarioCorte.test.ts`, `magicBytesValidator.test.ts`, `fileValidation.test.ts`, `DynamicSchemaForm.test.tsx`, `tramiteTupaCatalog.test.ts` | 7 | 46 | ✅ **APROBADO** |
+| **M03: Bandeja & Gestión Expedientes** | `AccionesModales.test.tsx`, `buscadorExpedientes.test.tsx`, `CcdTreeSelector.test.tsx`, `ExpedienteTimeline.test.tsx`, `FoliadoDocumentoViewer.test.tsx`, `slaBadge.test.tsx`, `slaCalculator.test.ts`, `useExpedienteActions.test.tsx`, `BandejaExpedientesPage.test.tsx` (x2), `RegistroFoliado.test.tsx`, `ccdFoliado.test.ts`, `expedienteActions.test.ts` (x2), `foliado.test.ts`, `foliadoValidator.test.ts` | 16 | 162 | ✅ **APROBADO** |
+| **M04: Validez Legal, Firma & CVD** | `documentoCvdViewer.test.tsx`, `proyectorResoluciones.test.tsx`, `refirmaGateway.test.tsx`, `validadorCvd.test.tsx`, `useRefirmaGateway.test.ts`, `ValidadorCvdPage.test.tsx` | 6 | 33 | ✅ **APROBADO** |
+| **M05: Administración & Seguridad RBAC** | `AdministracionPage.test.tsx`, `UsuariosPage.test.tsx`, `RbacGuard.test.tsx`, `rbacRolesCanonicos.test.ts` | 4 | 22 | ✅ **APROBADO** |
+| **M06: Reportes, Métricas & KPIs MGD** | `DashboardEjecutivoPage.test.tsx`, `dashboardA11y.test.tsx`, `kpiCalculator.test.ts`, `reportExporters.test.ts`, `reportExportersIntegrity.test.ts` | 5 | 78 | ✅ **APROBADO** |
+| **TOTAL GENERAL** | **47 archivos de pruebas (100% suites passing)** | **47** | **417** | **100% EXITOSO** |
 
 ---
 

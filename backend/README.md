@@ -480,9 +480,15 @@ npm start
 npm run typecheck
 # Ejecuta: tsc --noEmit
 
-# 5. Ejecución de pruebas unitarias rápidas (sin requerir Docker)
+# 5. Ejecución de pruebas unitarias rápidas (534 tests, 100% aprobadas)
 npm run test:unit
 # Ejecuta: vitest run --config vitest.unit.config.ts
+
+# 5.1. Ejecución de la suite adversarial de robustez criptográfica (64 aserciones)
+npx tsx tests/adversarial/adversarial_harness.ts
+
+# 5.2. Ejecución de la suite challenger Argon2id de frontera (28 aserciones)
+npx tsx tests/adversarial/argon2_challenger_m1_it2.ts
 
 # 6. Ejecución de pruebas E2E sobre Testcontainers (requiere Docker)
 npm run test:e2e
@@ -510,161 +516,83 @@ npm run load:derivacion
 
 ---
 
-## 6. CATÁLOGO EXHAUSTIVO DE CONTRATOS Y ENDPOINTS DE LA API
+## 6. CATÁLOGO EXHAUSTIVO DE CONTRATOS Y ENDPOINTS DE LA API (56 ENDPOINTS MONTADOS)
 
-El servidor expone sus rutas bajo `/health` y el prefijo `/api` (con convención de integración canónica `/api/v1/...` documentada para los clientes frontend):
+El servidor expone sus rutas bajo `/health`, `/ready` y el prefijo `/api/v1` (con retrocompatibilidad `/api` para rutas de referencia), articulando los 6 subdominios canónicos montados en `src/app.ts`:
 
-### 6.1. Endpoint de Chequeo de Salud (Health Check)
-* **`GET /health`**
-  - **Propósito:** Sondeo de liveness/readiness para balanceadores y Kubernetes.
-  - **Respuesta (200 OK):**
-    ```json
-    { "status": "ok" }
-    ```
-
----
-
-### 6.2. Endpoints de Diagnóstico y Seguridad Transversal
-* **`GET /api/protegido`**
-  - **Propósito:** Verificación de autenticación en cabeceras HTTP.
-  - **Cabeceras Requeridas:** `x-auth: <token>`
-  - **Respuestas:**
-    * `200 OK`: `{ "ok": true }`
-    * `401 Unauthorized`: Formato RFC 7807 (`code: 'UNAUTHORIZED'`).
-
-* **`POST /api/accion-admin`**
-  - **Propósito:** Verificación de autorización RBAC basada en roles.
-  - **Cabeceras Requeridas:** `x-auth: <token>`, `x-rol: admin`
-  - **Respuestas:**
-    * `200 OK`: `{ "ok": true }`
-    * `401 Unauthorized`: Si falta `x-auth`.
-    * `403 Forbidden`: Si `x-rol` no es `admin` (`code: 'FORBIDDEN'`).
-
-* **`GET /api/falla-critica`**
-  - **Propósito:** Endpoint de prueba para certificar la sanitización de errores internos 500 y verificar que jamás se filtren stack traces.
-  - **Respuesta:**
-    * `500 Internal Server Error`: Formato RFC 7807 (`code: 'INTERNAL_ERROR'`).
+### 6.1. Plataforma Transversal, Liveness y Streaming en Tiempo Real
+* **`GET /health`**: Sondeo de liveness/readiness para balanceadores y Kubernetes. Retorna `{ status: "ok", estado: "UP", timestamp }`.
+* **`GET /ready`**: Verificación de conectividad transaccional con PostgreSQL (`SELECT 1`). Retorna 200 OK si la base de datos responde o 503 Service Unavailable.
+* **`GET /api/v1/realtime/events`**: Canal de streaming reactivo mediante Server-Sent Events (SSE) para actualización en vivo de bandejas del servidor.
+* **`GET /api/protegido`**: Endpoint de verificación de autenticación mediante cabecera `x-auth: <token>`.
+* **`POST /api/accion-admin`**: Verificación de autorización RBAC basada en roles (`x-rol: admin`).
+* **`GET /api/falla-critica`**: Endpoint de certificación RFC 7807/9457; garantiza que errores 500 jamás expongan stack traces en producción.
 
 ---
 
-### 6.3. Dominio de Organización (`sigd_org`)
-* **`POST /api/areas`**
-  - **Propósito:** Registro de una nueva unidad orgánica en el organigrama institucional.
-  - **Validación de Entrada (Zod Schema):**
-    ```typescript
-    z.object({
-      nombre: z.string().min(1, 'El nombre es obligatorio.')
-    })
-    ```
-  - **Ejemplo de Request:**
-    ```json
-    { "nombre": "Jefatura de Unidad Académica DSI" }
-    ```
-  - **Respuestas:**
-    * `201 Created`:
-      ```json
-      { "area_id": "018f45a0-974a-711e-b876-b63e1fa21430" }
-      ```
-    * `400 Bad Request`: Falla de validación en `nombre`.
+### 6.2. Dominio IdentiCore (`sigd_auth`): Identidad, Autenticación, Casilla y Ubigeo
+* **`POST /api/v1/auth/login`**: Autenticación institucional con verificación criptográfica Argon2id (`argon2.service.ts`). Verifica credenciales contra `sigd_auth.cuenta_usuario`, emite JWT y persiste la sesión en `sigd_auth.sesion_usuario`.
+* **`POST /api/v1/registro-ciudadano`**: Registro unificado de personas naturales (DNI, 8 dígitos, edad $\ge 16$, teléfono móvil prefijo 9) y personas jurídicas (RUC 11 dígitos con validación estricta Módulo 11 SUNAT), apertura automática de casilla digital y captura de consentimiento expreso (Ley N° 29733).
+* **`GET /api/v1/ubigeo/departamentos`**: Catálogo normalizado de departamentos del Perú con precarga inmutable de Ucayali.
+* **`GET /api/v1/ubigeo/provincias/:departamentoId`**: Selector en cascada con las 4 provincias de Ucayali (Coronel Portillo, Atalaya, Padre Abad, Purús).
+* **`GET /api/v1/ubigeo/distritos/:provinciaId`**: Catálogo de los 17 distritos oficiales de Ucayali según la codificación del INEI.
+* **`GET /api/v1/casilla/notificaciones`**: Bandeja personal de notificaciones administrativas del administrado con soporte de paginación y filtros.
+* **`POST /api/v1/casilla/notificaciones/:id/leido`**: Marcado de lectura de notificación administrativa.
+* **`POST /api/v1/casilla/notificaciones/:id/acuse`**: Emisión del acuse legal de notificación electrónica con fecha legal fehaciente (Art. 20 Ley N° 27444) e impronta SHA-256.
 
 ---
 
-### 6.4. Dominio Transaccional y Radicación (`sigd_tra` & `sigd_audit`)
-* **`POST /api/expedientes`**
-  - **Propósito:** Radicación formal de expediente en Mesa de Partes con emisión atómica de bitácora WORM y evento outbox.
-  - **Validación de Entrada (Zod Schema):**
-    ```typescript
-    const esquemaRadicacion = z.object({
-      numero: z.string().min(1, 'El campo es obligatorio.'),
-      dni_solicitante: z.string().regex(/^\d{8}$/, 'Formato de DNI inválido.'),
-      numero_documento: z.string().min(1, 'El campo es obligatorio.'),
-      folios: z.number().int().min(0, 'Los folios no pueden ser negativos.'),
-      tipo_documental_id: z.string().uuid(),
-      solicitante_id: z.string().uuid(),
-      area_destino_id: z.string().uuid(),
-    });
-    ```
-  - **Ejemplo de Request:**
-    ```json
-    {
-      "numero": "EXP-2026-000142",
-      "dni_solicitante": "74859612",
-      "numero_documento": "SOL-2026-089",
-      "folios": 12,
-      "tipo_documental_id": "00000000-0000-4000-8000-000000000001",
-      "solicitante_id": "00000000-0000-4000-8000-000000000002",
-      "area_destino_id": "00000000-0000-4000-8000-000000000003"
-    }
-    ```
-  - **Respuestas:**
-    * `201 Created`:
-      ```json
-      {
-        "expediente_id": "018f45b2-3e21-789a-bcde-123456789abc",
-        "numero": "EXP-2026-000142",
-        "correlation_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
-      }
-      ```
-    * `400 Bad Request`: Payload inválido (`invalid_params`).
-    * `409 Conflict`: Número de expediente colisiona con uno existente (`DUPLICATE_KEY`).
+### 6.3. Dominio OrganiCore (`sigd_org`): Administración, Jerarquías ltree y Gobernanza
+* **`GET /api/v1/admin/usuarios`**: Listado paginado de servidores públicos y docentes con filtros por área, rol institucional y estado.
+* **`POST /api/v1/admin/usuarios`**: Alta de servidor público con asignación de cargo, área y hash Argon2id.
+* **`PUT /api/v1/admin/usuarios/:id`**: Actualización de roles, estado de cuenta o área orgánica del servidor.
+* **`GET /api/v1/admin/organigrama/arbol`**: Estructura orgánica institucional renderizada en árbol jerárquico mediante la extensión `ltree`.
+* **`POST /api/v1/admin/organigrama/areas`**: Creación de unidades orgánicas con asignación de Materialized Path y prevención de ciclos (SQLSTATE 23514).
+* **`PUT /api/v1/admin/organigrama/areas/:id`**: Reorganización de áreas con actualización recursiva automática de descendientes (`fn_area_set_path`).
+* **`GET /api/v1/admin/calendario-laboral`** y **`GET /api/v1/admin/calendario/feriados`**: Calendario oficial institucional que computa el corte diario a las 16:30 hrs y los feriados no laborables de Ucayali (24 de junio y 13 de octubre).
+* **`GET /api/v1/admin/auditoria/bitacora`**: Visor forense inmutable de la bitácora WORM (`sigd_audit.bitacora_auditoria`) con filtros por `X-Correlation-ID` y agente.
+* **`GET /api/v1/admin/maestras/procedimientos-tupa`**: Catálogo oficial de procedimientos administrativos institucionales TUPA.
+* **`GET /api/v1/admin/maestras/tipos-documentales`**: Tipos documentales normalizados (Oficio, Memorando, Resolución, Informe).
 
 ---
 
-### 6.5. Dominio de Trazabilidad y Derivación (`sigd_rut`)
-* **`POST /api/expedientes/derivar`**
-  - **Propósito:** Traslado inter-áreas de un expediente con verificación de existencia de área activa y registro de movimiento.
-  - **Validación de Entrada (Zod Schema):**
-    ```typescript
-    z.object({
-      expediente_id: z.string().uuid(),
-      area_destino_id: z.string().uuid()
-    });
-    ```
-  - **Ejemplo de Request:**
-    ```json
-    {
-      "expediente_id": "018f45b2-3e21-789a-bcde-123456789abc",
-      "area_destino_id": "018f45a0-974a-711e-b876-b63e1fa21430"
-    }
-    ```
-  - **Respuestas:**
-    * `200 OK`:
-      ```json
-      {
-        "ok": true,
-        "expediente_id": "018f45b2-3e21-789a-bcde-123456789abc"
-      }
-      ```
-    * `400 Bad Request`: UUID malformado.
-    * `404 Not Found`: El área de destino no existe o no se encuentra activa (`detail: 'El área de destino no existe.'`).
+### 6.4. Dominio DocuCore (`sigd_doc`): Storage MinIO S3, Proyector A4 y Firma Digital
+* **`POST /api/v1/storage/presigned-url`**: Generación de URLs prefirmadas para subida directa de requisitos y sustentos a MinIO/S3, con verificación previa de Magic Bytes (`%PDF-`), validación de tamaño máximo y hash SHA-256.
+* **`POST /api/v1/docucore/a4/generar`**: Motor de generación de resoluciones y documentos oficiales en hoja A4 exacta (210×297 mm), márgenes normalizados de 25 mm, membrete institucional y control de líneas viudas y huérfanas.
+* **`GET /api/v1/validador/cvd/:codigo`** y **`POST /api/v1/docucore/validador-cvd`**: Validador público de autenticidad de documentos. Recibe el CVD de 16 caracteres alfanuméricos, verifica integridad en base de datos y expone metadatos de los firmantes.
+* **`POST /api/v1/firma/iniciar`**: Despacho de sesión efímera para firma digital; genera token criptográfico de 256 bits y construye la URI oficial `refirma://sign?arguments=[BASE64URL]` para invocación a Refirma Suite de RENIEC.
+* **`GET /api/v1/firma/sesion/:token`**: Consulta de estado y recuperación de parámetros de la sesión de firma.
+* **`POST /api/v1/firma/callback`**: Endpoint de recepción de confirmación de firma desde la pasarela con autodestrucción atómica de sesión (`GETDEL`).
+* **`GET /api/v1/firmas/cola-firmantes`** (o `/pendientes`): Bandeja de actos administrativos y resoluciones pendientes de suscripción por la autoridad.
+* **`POST /api/v1/resoluciones`**: Emisión estructurada de resoluciones rectoras con secciones VISTO, CONSIDERANDO y SE RESUELVE.
 
 ---
 
-### 6.6. Contratos de Almacenamiento Desacoplado MinIO / S3 (`sigd_doc`)
-* **`POST /api/v1/storage/presigned-url`**
-  - **Propósito:** Generación de URL prefirmada para subida directa de archivos desde el cliente (evitando saturar el buffer del backend).
-  - **Request Body:**
-    ```json
-    {
-      "fileName": "solicitud_titulacion_firmada.pdf",
-      "fileSize": 2048576,
-      "contentType": "application/pdf",
-      "sha256Hex": "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e",
-      "category": "REQUISITO_TUPA"
-    }
-    ```
-  - **Response (200 OK):**
-    ```json
-    {
-      "uploadUrl": "https://storage.iestpsuiza.edu.pe/sigd-docs/2026/09/exp-000142/a591a6d4.pdf?X-Amz-Signature=...",
-      "fileKey": "2026/09/exp-000142/a591a6d4.pdf",
-      "expiresAt": "2026-09-23T23:59:59.000Z",
-      "requiredHeaders": {
-        "Content-Type": "application/pdf",
-        "x-amz-checksum-sha256": "pZGm1Av0IEBKARczz7exkNYsZb8LzaMrV7J32a2fFG4="
-      }
-    }
-    ```
+### 6.5. Dominio TramiCore (`sigd_tra`): Radicación Atómica, Ventanilla y Acumulación
+* **`POST /api/v1/tramites/radicar`**: Radicación formal en Mesa de Partes Virtual (24x7) con aplicación automática de la regla de corte de las 16:30 hrs y generación concurrente de CUT `EXP-YYYY-XXXXXX` con bloqueo pesimista `SELECT FOR UPDATE`.
+* **`POST /api/v1/tramites/ventanilla/registrar`**: Ventanilla presencial física con emisión de ticket térmico descargable e imprimible para impresoras ESC/POS de 80mm y 58mm.
+* **`POST /api/v1/tramites/acumular`**: Acumulación de expedientes conexos bajo el Artículo 160 del TUO de la Ley N° 27444 con prevención algorítmica de grafos cíclicos.
+* **`GET /api/v1/tramites/procedimientos-tupa`**: Consulta pública de requisitos, plazos legales y tasas de procedimientos TUPA.
+
+---
+
+### 6.6. Dominio RutaDoc (`sigd_rut`): Trazabilidad, Derivaciones y Ciclo de Vida
+* **`GET /api/v1/expedientes/bandeja`**: Bandeja de trabajo diario del servidor segmentada en 6 estados sincronizados (`Pendientes`, `En Proceso`, `Derivados`, `Por Archivar`, `Archivados`, `Rechazados`).
+* **`GET /api/v1/expedientes/:id/trazabilidad`**: Línea de tiempo inmutable con toda la cadena de custodia, proveídos, pases y sellos de integridad SHA-256.
+* **`POST /api/v1/expedientes/:id/derivar`**: Derivación formal a otra unidad orgánica con proveído mandatorio y activación del cómputo de SLA.
+* **`POST /api/v1/expedientes/:id/observar`**: Emisión de pliego de observaciones normativas; congela temporalmente el cómputo de los 30 días hábiles de la LPAG hasta la subsanación del administrado.
+* **`GET /api/v1/expedientes/clasificador-ccd`**: Cuadro de Clasificación Documental jerárquico bajo las directivas del Archivo General de la Nación (Fondo $\rightarrow$ Sección $\rightarrow$ Serie Documental).
+* **`GET /api/v1/expedientes/:id/foliacion`**: Visor y control de foliación correlativa inmutable (F. 1 a N) sin enmendaduras ni saltos.
+
+---
+
+### 6.7. Dominio CoreLink & Analítica (`sigd_audit`): Indicadores MGD-PCM
+* **`GET /api/v1/reportes/mgd`**: Consolidación analítica de los cuatro indicadores oficiales del Modelo de Gestión Documental de la PCM:
+  - **VTEP:** Volumen Total de Expedientes Procesados en el periodo evaluado.
+  - **TPR:** Tiempo Promedio de Tramitación en horas y días hábiles.
+  - **ICL:** Índice de Cumplimiento Legal (Tasa de Resolución Oportuna dentro del SLA de 30 días hábiles).
+  - **PEO:** Porcentaje de Expedientes Observados respecto al universo radicado.
+
 
 ---
 

@@ -519,7 +519,7 @@ El monorepo cuenta con una política de aseguramiento de calidad donde cada camb
 ├───────────────────┬───────────────────────────────┬──────────────────────┬─────────────┤
 │ Entorno           │ Comando de Ejecución          │ Alcance / Cobertura  │ Estado      │
 ├───────────────────┼───────────────────────────────┼──────────────────────┼─────────────┤
-│ **Frontend QA**   │ `npm run test` (en frontend/) │ 37 suites, 417 tests │ ✅ 100% Pass│
+│ **Frontend QA**   │ `npm run test` (en frontend/) │ 47 suites, 417 tests │ ✅ 100% Pass│
 │ **Frontend Types**│ `npm run typecheck`           │ TypeScript 5.9 strict│ ✅ 0 errores│
 │ **Frontend Build**│ `npm run build`               │ Vite 6 / Bundle dist │ ✅ 4.08 seg │
 ├───────────────────┼───────────────────────────────┼──────────────────────┼─────────────┤
