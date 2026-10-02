@@ -7,6 +7,7 @@ import { crearRouterResoluciones } from './domains/docucore/resoluciones.control
 import { crearRbacService, crearRouterRbac } from './domains/organicore/rbac.controller.js';
 import { crearCachePermisosSinCache, type CachePermisos, type ConexionRedis } from './redis.js';
 import type { BusSse } from './modules/corelink/sseStream.service.js';
+import { crearRouterRutaDoc } from './domains/rutadoc/rutadoc.router.js';
 
 // Módulos de DocuCore / Firma Digital (B_VALENTIN)
 import { crearFirmaRouter } from './domains/docucore/firma.controller.js';
@@ -78,9 +79,41 @@ export function construirApp(pool: Pool, opciones: OpcionesApp = {}): Express {
 
   // Rutas
   app.use('/api', crearRouterReferencia(pool));
+  app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
+  app.use('/api/v1', crearRouterTramites(pool));
+  app.use(
+    '/api/v1',
+    crearRouterRutaDoc(
+      pool,
+      opts.obtenerActorRutaDoc,
+      opts.politicaReversionRutaDoc,
+      opts.prepararCompensacionFolios,
+      opts.actorProviderRutaDoc,
+      opts.folioCompensationPort,
+      {
+        calendarioLaboral: opts.calendarioLaboralRutaDoc,
+        clasificadorCcd: opts.clasificadorCcdRutaDoc,
+        documentoMetadata: opts.documentoMetadataRutaDoc,
+        porcentajeAmarilloSlaDesde: opts.porcentajeAmarilloSlaRutaDocDesde,
+      },
+    ),
+  );
+  app.use('/api/v1', crearRouterReportes(pool, opts.actorProviderReportes, opts.mgdCache));
   app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
   app.use('/api/v1/firma', crearFirmaRouter(servicio));
   app.use('/api/v1/admin', crearRouterRbac(pool, cache, { redis }));
+
+  /*
+ * OrganiCore - Administración de usuarios
+ *
+ * GET  /api/v1/admin/usuarios
+ * POST /api/v1/admin/usuarios
+ * PUT  /api/v1/admin/usuarios/:id
+ */
+app.use(
+  '/api/v1/admin/usuarios',
+  crearUsuariosAdminRouter(pool),
+);
 
   app.use(errorMiddleware);
 
