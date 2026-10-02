@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
+import LoginPage from "../pages/LoginPage";
 import AdministracionPage from "../pages/administracion/AdministracionPage";
 import AuditoriaPage from "../pages/administracion/AuditoriaPage";
 import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";

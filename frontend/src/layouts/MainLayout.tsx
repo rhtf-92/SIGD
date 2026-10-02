@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import HeaderInstitucional from "../components/HeaderInstitucional";
 
 interface MainLayoutProps {
   children: ReactNode;
