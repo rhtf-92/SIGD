@@ -9,6 +9,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "test": "node --import tsx --test \"tests/**/*.spec.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
@@ -17,6 +18,8 @@
   "dependencies": {
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "ioredis": "^5.11.1",
+    "pdf-lib": "^1.17.1",
     "pg": "^8.23.0"
   },
   "devDependencies": {
