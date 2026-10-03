@@ -69,6 +69,22 @@ COMMENT ON FUNCTION sigd_tra.generar_cut_expediente(INT) IS
 REVOKE EXECUTE ON FUNCTION sigd_tra.generar_cut_expediente(INT) FROM PUBLIC;
 
 -- -----------------------------------------------------------------------------
+-- 5.2b fn_generar_cut(p_anio INT) — Alias de compatibilidad canónica para CutService
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION sigd_tra.fn_generar_cut(p_anio INT)
+RETURNS VARCHAR(20)
+LANGUAGE sql
+STRICT
+AS $$
+    SELECT sigd_tra.generar_cut_expediente(p_anio);
+$$;
+
+COMMENT ON FUNCTION sigd_tra.fn_generar_cut(INT) IS
+    'Alias canónico de compatibilidad para sigd_tra.generar_cut_expediente(INT).';
+REVOKE EXECUTE ON FUNCTION sigd_tra.fn_generar_cut(INT) FROM PUBLIC;
+
+
+-- -----------------------------------------------------------------------------
 -- 5.3 expediente — registro formal y CUT
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sigd_tra.expediente (
@@ -151,6 +167,77 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_expediente_acumulacion_vigente
 
 CREATE INDEX IF NOT EXISTS idx_expediente_acumulacion_accesorio
     ON sigd_tra.expediente_acumulacion (expediente_accesorio);
+
+-- -----------------------------------------------------------------------------
+-- 5.4b acumular_expediente — Acumulación conexa atómica (Art. 160 LPAG)
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION sigd_tra.acumular_expediente(
+    p_expediente_principal UUID,
+    p_expediente_accesorio UUID,
+    p_acto_resolutivo TEXT
+)
+RETURNS UUID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_id_acumulacion UUID;
+BEGIN
+    IF p_expediente_principal = p_expediente_accesorio THEN
+        RAISE EXCEPTION 'Un expediente no puede acumularse a sí mismo: %', p_expediente_principal
+            USING ERRCODE = '22023';
+    END IF;
+    IF p_acto_resolutivo IS NULL OR btrim(p_acto_resolutivo) = '' THEN
+        RAISE EXCEPTION 'La acumulación exige un acto resolutivo justificado'
+            USING ERRCODE = '22023';
+    END IF;
+
+    -- Bloqueo pesimista de ambas filas
+    PERFORM 1 FROM sigd_tra.expediente WHERE expediente_id = p_expediente_principal FOR UPDATE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Expediente principal no encontrado: %', p_expediente_principal
+            USING ERRCODE = '02000';
+    END IF;
+
+    PERFORM 1 FROM sigd_tra.expediente WHERE expediente_id = p_expediente_accesorio FOR UPDATE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Expediente accesorio no encontrado: %', p_expediente_accesorio
+            USING ERRCODE = '02000';
+    END IF;
+
+    -- Validar que el accesorio no esté ya acumulado
+    IF EXISTS (
+        SELECT 1 FROM sigd_tra.expediente_acumulacion
+         WHERE expediente_accesorio = p_expediente_accesorio
+           AND estado = 'ACUMULADO'
+    ) THEN
+        RAISE EXCEPTION 'El expediente accesorio % ya se encuentra acumulado activamente', p_expediente_accesorio
+            USING ERRCODE = '23505';
+    END IF;
+
+    -- Prevenir ciclos (que el principal no sea accesorio del que se pretende acumular)
+    IF EXISTS (
+        SELECT 1 FROM sigd_tra.expediente_acumulacion
+         WHERE expediente_principal = p_expediente_accesorio
+           AND expediente_accesorio = p_expediente_principal
+           AND estado = 'ACUMULADO'
+    ) THEN
+        RAISE EXCEPTION 'Ciclo de dependencia detectado entre expedientes % y %', p_expediente_principal, p_expediente_accesorio
+            USING ERRCODE = '23514';
+    END IF;
+
+    INSERT INTO sigd_tra.expediente_acumulacion (
+        expediente_principal, expediente_accesorio, acto_resolutivo, estado
+    ) VALUES (
+        p_expediente_principal, p_expediente_accesorio, p_acto_resolutivo, 'ACUMULADO'
+    ) RETURNING id_acumulacion INTO v_id_acumulacion;
+
+    RETURN v_id_acumulacion;
+END;
+$$;
+
+COMMENT ON FUNCTION sigd_tra.acumular_expediente(UUID, UUID, TEXT) IS
+    'Acumula expedientes conexos bajo el Art. 160 del TUO de la Ley N° 27444 con control acíclico.';
+
 
 -- -----------------------------------------------------------------------------
 -- 5.5 expediente_documento_folio — foliación continua AGN (F. 1 a N)

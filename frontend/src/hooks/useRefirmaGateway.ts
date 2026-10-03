@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiClient } from "../api/client";
 
 import type {
   DocumentoOficial,
@@ -170,23 +171,6 @@ export function useRefirmaGateway(
       setDocumento(doc);
       setResultado(null);
       setMensajeError(null);
-      setEstado("PREPARANDO");
-
-      const parametros: RefirmaParamDTO = {
-        idDocumento: doc.idDocumento,
-        firmanteDni,
-        tokenSesion: generarTokenSesion(),
-        hashSha256: doc.hashSha256,
-        urlCallback: `${window.location.origin}/firma/callback`,
-        proveedor: "REFIRMA_RENIEC",
-      };
-
-      try {
-        dispararProtocoloViaIframe(construirUriRefirma(parametros));
-      } catch {
-        // El navegador carece de un manejador registrado para refirma://.
-      }
-
       setEstado("CONECTANDO");
       setPasoActual("CONECTANDO_AGENTE");
       setSegundosRestantes(Math.floor(TIMEOUT_AGENTE_MS / 1000));
@@ -214,6 +198,45 @@ export function useRefirmaGateway(
           prev !== null && prev > 0 ? prev - 1 : prev,
         );
       }, 1000);
+
+      // Invocación a pasarela real
+      void (async () => {
+        let uriProtocolarFinal: string;
+        try {
+          const res = await apiClient.post<{
+            sesionId: string;
+            token: string;
+            uriProtocolar: string;
+            urlDocumento: string;
+            hashDocumento: string;
+          }>("/api/v1/firma/invocar-refirma", {
+            documentoId: String(doc.idDocumento),
+            firmante: {
+              id: firmanteDni,
+              nombre: "Director General",
+              documento: firmanteDni,
+            },
+            hostPublico: typeof window !== "undefined" ? window.location.host : "localhost:3000",
+          });
+          uriProtocolarFinal = res.data.uriProtocolar;
+        } catch {
+          const parametros: RefirmaParamDTO = {
+            idDocumento: doc.idDocumento,
+            firmanteDni,
+            tokenSesion: generarTokenSesion(),
+            hashSha256: doc.hashSha256,
+            urlCallback: `${window.location.origin}/api/v1/firma/callback-refirma`,
+            proveedor: "REFIRMA_RENIEC",
+          };
+          uriProtocolarFinal = construirUriRefirma(parametros);
+        }
+
+        try {
+          dispararProtocoloViaIframe(uriProtocolarFinal);
+        } catch {
+          // El navegador carece de un manejador registrado para refirma://.
+        }
+      })();
     },
     [avanzarPaso, limpiarTemporizadores],
   );

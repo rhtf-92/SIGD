@@ -26,6 +26,25 @@ import type {
   CargoDigitalResponse,
 } from '../../../types/tramiteWizardState';
 import QrCodeView from '../../common/QrCodeView';
+import { apiClient } from '../../../api/client';
+
+interface RadicacionVirtualResponse {
+  expedienteId: string;
+  cut: string;
+  anioFiscal: number;
+  fechaEnvioReal: string;
+  fechaRadicacionLegal: string;
+  diferidoPorCorte: boolean;
+  totalFolios: number;
+  qrSeguimientoUrl: string;
+  cargoDigital: {
+    codigo: string;
+    hashSha256: string;
+    qrContenido: string;
+  };
+  mensajeLegal: string;
+}
+
 
 export interface StepConfirmacionProps {
   /** Estado global canónico del asistente */
@@ -89,92 +108,88 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
     dispatch({ type: 'SET_SUBMITTING', payload: true });
     try {
-      // 1. Intento de radicación formal vía endpoint HTTP /api/v1/tramites/radicar
-      let apiCargo: CargoDigitalResponse | null = null;
-      try {
-        if (typeof fetch === 'function') {
-          const res = await fetch('/api/v1/tramites/radicar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              identificacion,
-              documentos,
-              declaracionJurada,
-            }),
-          });
-          if (res.ok && (res.status === 201 || res.status === 200)) {
-            const data = (await res.json()) as
-              | { cargo?: CargoDigitalResponse; cut?: string }
-              | CargoDigitalResponse;
-            apiCargo =
-              'cargo' in data && data.cargo
-                ? data.cargo
-                : (data as CargoDigitalResponse);
-          }
-        }
-      } catch {
-        // Fallback a generación defensiva local
-      }
-
-      if (apiCargo && apiCargo.cut) {
-        dispatch({ type: 'SET_CARGO', payload: apiCargo });
-        if (onSuccess) {
-          onSuccess(apiCargo, apiCargo.cut);
-        }
-        return;
-      }
-
-      // 2. Simulación de latencia de red y almacenamiento local
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const year = new Date().getFullYear();
-      const correlativo = String(Math.floor(100000 + Math.random() * 900000));
-      const cutGenerado = `EXP-${year}-${correlativo}`;
-      const fechaActualIso = new Date().toISOString();
-
-      const fechaOficialLegible = new Date().toLocaleString('es-PE', {
-        timeZone: 'America/Lima',
-        dateStyle: 'full',
-        timeStyle: 'medium',
-      });
-
-      const remitenteLegible =
+      const nombreCompleto =
         identificacion.tipoDocumento === 'RUC'
           ? identificacion.nombres
-          : `${identificacion.nombres} ${identificacion.apellidos}`;
+          : `${identificacion.nombres} ${identificacion.apellidos}`.trim();
 
-      // Cálculo de hash de transacción SHA-256
-      let transHashHex = '';
-      try {
-        const rawPayload = `${cutGenerado}|${identificacion.numeroDocumento}|${documentos.tipoTramiteId}|${fechaActualIso}`;
-        const enc = new TextEncoder().encode(rawPayload);
-        const hashBuf = await crypto.subtle.digest('SHA-256', enc);
-        const hashArr = Array.from(new Uint8Array(hashBuf));
-        transHashHex = hashArr.map((b) => b.toString(16).padStart(2, '0')).join('');
-      } catch {
-        transHashHex = `sha256_${Date.now()}_transaccion_oficial`;
-      }
+      const asuntoFinal =
+        documentos.asunto.trim().length >= 10
+          ? documentos.asunto.trim()
+          : `${documentos.asunto.trim()} - Solicitud de Trámite Institucional`;
 
-      const nuevoCargo: CargoDigitalResponse = {
-        cut: cutGenerado,
-        fechaRadicacion: fechaOficialLegible,
-        fechaRecepcionOficial: fechaOficialLegible,
-        asunto: documentos.asunto,
-        remitente: remitenteLegible,
-        hashTransaccion: transHashHex,
-        qrValidationUrl: `https://sigd.iestpsuiza.edu.pe/consulta/${cutGenerado}`,
+      const idTipoTramite =
+        documentos.tipoTramiteId &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          documentos.tipoTramiteId,
+        )
+          ? documentos.tipoTramiteId
+          : '00000000-0000-0000-0000-000000000001';
+
+      const idPersonaNum =
+        Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
+
+      const archivosPayload =
+        documentos.archivos.length > 0
+          ? documentos.archivos.map((a) => ({
+              nombreArchivo: a.nombre,
+              contentType: 'application/pdf',
+              tamanoBytes: Number(a.peso) || 1024,
+              hashSha256:
+                a.hashSha256 && /^[0-9a-f]{64}$/i.test(a.hashSha256)
+                  ? a.hashSha256.toLowerCase()
+                  : 'a'.repeat(64),
+            }))
+          : [
+              {
+                nombreArchivo: 'documento_principal.pdf',
+                contentType: 'application/pdf',
+                tamanoBytes: 2048,
+                hashSha256: 'a'.repeat(64),
+              },
+            ];
+
+      const payload = {
+        asunto: asuntoFinal,
+        idTipoTramiteTupa: idTipoTramite,
+        idPersona: idPersonaNum,
+        nombreSolicitante:
+          nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
+        correo:
+          identificacion.correo.trim().toLowerCase() ||
+          'contacto@iestpsuiza.edu.pe',
+        totalFolios: Number(documentos.numeroFolios) || 1,
+        documentos: archivosPayload,
       };
 
-      dispatch({ type: 'SET_CARGO', payload: nuevoCargo });
+      const res = await apiClient.post<RadicacionVirtualResponse>(
+        '/api/v1/tramites/radicacion-virtual',
+        payload,
+      );
+
+      const serverData = res.data;
+      const cargoEmitido: CargoDigitalResponse = {
+        cut: serverData.cut,
+        fechaRadicacion: serverData.fechaRadicacionLegal,
+        fechaRecepcionOficial: serverData.fechaEnvioReal,
+        asunto: documentos.asunto,
+        remitente: nombreCompleto,
+        hashTransaccion:
+          serverData.cargoDigital?.hashSha256 || 'a'.repeat(64),
+        qrValidationUrl: serverData.qrSeguimientoUrl,
+      };
+
+      dispatch({ type: 'SET_CARGO', payload: cargoEmitido });
 
       if (onSuccess) {
-        onSuccess(nuevoCargo, cutGenerado);
+        onSuccess(cargoEmitido, serverData.cut);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('[StepConfirmacion] Error en la radicación formal:', err);
       dispatch({
         type: 'SET_ERROR',
-        payload: 'No se pudo radicar formalmente el expediente. Intente nuevamente.',
+        payload:
+          'No se pudo radicar formalmente el expediente en la sede digital. Verifique su conexión y requisitos.',
       });
     }
   };

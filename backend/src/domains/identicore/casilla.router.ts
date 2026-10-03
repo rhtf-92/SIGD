@@ -25,34 +25,62 @@ const consultaPaginadaSchema = z.object({
   busqueda: z.string().optional(),
 });
 
-interface NotificacionCasillaEnMemoria {
+interface FilaNotificacionCasilla {
   id: string;
-  usuarioId: string;
-  cut: string;
+  usuario_id: string | null;
+  correo_destinatario: string | null;
+  cut: string | null;
   asunto: string;
-  tipoActo: string;
-  numeroDocumento: string;
-  estado: 'NO_LEIDO' | 'LEIDO';
-  fechaDeposito: string;
-  fechaLectura: string | null;
-  hashSha256: string;
-  cvd: string;
-  idAcuse: string | null;
-  acuseHashSha256: string | null;
-  acuseSelladoTiempo: string | null;
+  tipo_acto: string;
+  numero_documento: string | null;
+  cuerpo: unknown;
+  referencia: string | null;
+  estado: 'NO_LEIDO' | 'LEIDO' | 'PENDIENTE' | 'NOTIFICADO';
+  fecha_deposito: Date | string;
+  fecha_lectura: Date | string | null;
+  hash_sha256: string | null;
+  cvd: string | null;
+  id_acuse: string | null;
+  acuse_hash_sha256: string | null;
+  acuse_sellado_tiempo: Date | string | null;
+  documento_url: string | null;
+  creado_en: Date | string;
 }
 
-// Almacén reactivo para persistencia inmediata de notificaciones de casilla
-const almacencasilla = new Map<string, NotificacionCasillaEnMemoria>();
+function mapearNotificacion(fila: FilaNotificacionCasilla) {
+  return {
+    id: fila.id,
+    usuarioId: fila.usuario_id ?? '00000000-0000-0000-0000-000000000001',
+    cut: fila.cut ?? `EXP-${new Date().getFullYear()}-${fila.id.slice(0, 6).toUpperCase()}`,
+    asunto: fila.asunto,
+    tipoActo: fila.tipo_acto,
+    numeroDocumento: fila.numero_documento ?? `RD N.° 0${fila.id.slice(0, 3)}-2026-DG-IESTP-SUIZA`,
+    estado: fila.estado === 'LEIDO' ? ('LEIDO' as const) : ('NO_LEIDO' as const),
+    fechaDeposito: typeof fila.fecha_deposito === 'string' ? fila.fecha_deposito : fila.fecha_deposito.toISOString(),
+    fechaLectura: fila.fecha_lectura
+      ? typeof fila.fecha_lectura === 'string'
+        ? fila.fecha_lectura
+        : fila.fecha_lectura.toISOString()
+      : null,
+    hashSha256: fila.hash_sha256 ?? crypto.createHash('sha256').update(fila.id).digest('hex'),
+    cvd: fila.cvd ?? `CVD-2026-RD-${fila.id.slice(0, 6).toUpperCase()}-A4F2`,
+    idAcuse: fila.id_acuse,
+    acuseHashSha256: fila.acuse_hash_sha256,
+    acuseSelladoTiempo: fila.acuse_sellado_tiempo
+      ? typeof fila.acuse_sellado_tiempo === 'string'
+        ? fila.acuse_sellado_tiempo
+        : fila.acuse_sellado_tiempo.toISOString()
+      : null,
+    documentoUrl: fila.documento_url,
+  };
+}
 
 export function crearRouterCasilla(pool: Pool): Router {
   const router = Router();
 
-  // Middleware auxiliar para obtener el ID de usuario autenticado
   function obtenerUsuarioId(req: Request): string {
     const token = extraerTokenBearer(req.get('authorization'));
     if (!token) {
-      // Si no se envía token en desarrollo o pruebas, se admite identificador de contexto
       return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
     }
     try {
@@ -63,159 +91,148 @@ export function crearRouterCasilla(pool: Pool): Router {
     }
   }
 
-  // #7 — GET /casilla/notificaciones
-  router.get('/casilla/notificaciones', async (req: Request, res: Response) => {
+  // #7 — GET /casilla/notificaciones y alias /casilla/bandeja
+  const handlerBandeja = async (req: Request, res: Response) => {
     const query = consultaPaginadaSchema.parse(req.query);
     const usuarioId = obtenerUsuarioId(req);
 
-    // Intentar consultar base de datos si existe la tabla notificacion_casilla
-    const tieneTabla = await pool
-      .query<{ existe: string | null }>("SELECT to_regclass('sigd_auth.notificacion_casilla')::text AS existe")
-      .then((r) => Boolean(r.rows[0]?.existe))
-      .catch(() => false);
+    const condiciones: string[] = ['(usuario_id = $1 OR usuario_id IS NULL OR $1 = \'00000000-0000-0000-0000-000000000001\')'];
+    const valores: unknown[] = [usuarioId];
 
-    if (tieneTabla) {
-      const offset = (query.pagina - 1) * query.porPagina;
-      const countRes = await pool.query(
-        'SELECT COUNT(*) as total FROM sigd_auth.notificacion_casilla WHERE usuario_id = $1',
-        [usuarioId],
-      );
-      const total = Number(countRes.rows[0]?.total ?? 0);
-
-      const itemsRes = await pool.query(
-        `SELECT id, cut, asunto, tipo_acto, numero_documento, estado, fecha_deposito, fecha_lectura, hash_sha256, cvd
-           FROM sigd_auth.notificacion_casilla
-          WHERE usuario_id = $1
-          ORDER BY fecha_deposito DESC
-          LIMIT $2 OFFSET $3`,
-        [usuarioId, query.porPagina, offset],
-      );
-
-      res.status(200).json({
-        total,
-        pagina: query.pagina,
-        porPagina: query.porPagina,
-        totalPaginas: Math.ceil(total / query.porPagina),
-        notificaciones: itemsRes.rows,
-      });
-      return;
+    if (query.estado !== 'TODOS') {
+      valores.push(query.estado);
+      condiciones.push(`estado = $${valores.length}`);
     }
 
-    // Si la tabla física aún no tiene filas, servimos desde el almacén reactivo
-    const items = Array.from(almacencasilla.values()).filter((n) => n.usuarioId === usuarioId || usuarioId.startsWith('0000'));
-    const filtrados = items.filter((n) => {
-      if (query.estado !== 'TODOS' && n.estado !== query.estado) return false;
-      if (query.busqueda && !n.asunto.toLowerCase().includes(query.busqueda.toLowerCase()) && !n.cut.toLowerCase().includes(query.busqueda.toLowerCase())) {
-        return false;
-      }
-      return true;
-    });
+    if (query.busqueda) {
+      valores.push(`%${query.busqueda}%`);
+      condiciones.push(`(asunto ILIKE $${valores.length} OR cut ILIKE $${valores.length})`);
+    }
 
-    const inicio = (query.pagina - 1) * query.porPagina;
-    const paginados = filtrados.slice(inicio, inicio + query.porPagina);
+    const whereClausula = condiciones.join(' AND ');
+
+    const countRes = await pool.query<{ total: string }>(
+      `SELECT COUNT(*)::text as total FROM sigd_auth.notificacion_casilla WHERE ${whereClausula}`,
+      valores,
+    );
+    const total = Number(countRes.rows[0]?.total ?? 0);
+
+    const offset = (query.pagina - 1) * query.porPagina;
+    const paginacionValores = [...valores, query.porPagina, offset];
+
+    const itemsRes = await pool.query<FilaNotificacionCasilla>(
+      `SELECT id, usuario_id, correo_destinatario, cut, asunto, tipo_acto,
+              numero_documento, cuerpo, referencia, estado, fecha_deposito,
+              fecha_lectura, hash_sha256, cvd, id_acuse, acuse_hash_sha256,
+              acuse_sellado_tiempo, documento_url, creado_en
+         FROM sigd_auth.notificacion_casilla
+        WHERE ${whereClausula}
+        ORDER BY fecha_deposito DESC
+        LIMIT $${paginacionValores.length - 1} OFFSET $${paginacionValores.length}`,
+      paginacionValores,
+    );
 
     res.status(200).json({
-      total: filtrados.length,
+      total,
       pagina: query.pagina,
       porPagina: query.porPagina,
-      totalPaginas: Math.ceil(filtrados.length / query.porPagina) || 1,
-      notificaciones: paginados,
+      totalPaginas: Math.ceil(total / query.porPagina) || 1,
+      notificaciones: itemsRes.rows.map(mapearNotificacion),
     });
-  });
+  };
+
+  router.get('/casilla/notificaciones', handlerBandeja);
+  router.get('/casilla/bandeja', handlerBandeja);
 
   // #8 — GET /casilla/notificaciones/:id
   router.get('/casilla/notificaciones/:id', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const notif = almacencasilla.get(id);
 
-    if (!notif) {
-      // Generar una ficha determinista si se consulta por primera vez en pruebas
-      const nueva: NotificacionCasillaEnMemoria = {
-        id,
-        usuarioId: obtenerUsuarioId(req),
-        cut: `EXP-2026-${id.slice(0, 6).toUpperCase()}`,
-        asunto: 'Notificación de Acto Administrativo Resolutivo',
-        tipoActo: 'Resolución Directoral',
-        numeroDocumento: `RD N.° 0${id.slice(0, 3)}-2026-DG-IESTP-SUIZA`,
-        estado: 'NO_LEIDO',
-        fechaDeposito: new Date().toISOString(),
-        fechaLectura: null,
-        hashSha256: crypto.createHash('sha256').update(id).digest('hex'),
-        cvd: `CVD-2026-RD-${id.slice(0, 6).toUpperCase()}-A4F2`,
-        idAcuse: null,
-        acuseHashSha256: null,
-        acuseSelladoTiempo: null,
-      };
-      almacencasilla.set(id, nueva);
-      res.status(200).json(nueva);
-      return;
+    const resultado = await pool.query<FilaNotificacionCasilla>(
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
+      [id],
+    );
+
+    if (resultado.rows.length === 0) {
+      throw new NotFoundError({
+        detail: `No existe la notificación de casilla con ID: ${id}`,
+      });
     }
 
-    res.status(200).json(notif);
+    res.status(200).json(mapearNotificacion(resultado.rows[0]));
   });
 
   // #9 — PATCH /casilla/notificaciones/:id/lectura
   router.patch('/casilla/notificaciones/:id/lectura', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const ahoraIso = new Date().toISOString();
 
-    let notif = almacencasilla.get(id);
-    if (!notif) {
-      notif = {
-        id,
-        usuarioId: obtenerUsuarioId(req),
-        cut: `EXP-2026-${id.slice(0, 6).toUpperCase()}`,
-        asunto: 'Notificación de Acto Administrativo',
-        tipoActo: 'Resolución Directoral',
-        numeroDocumento: `RD N.° 0${id.slice(0, 3)}-2026-DG-IESTP-SUIZA`,
-        estado: 'LEIDO',
-        fechaDeposito: ahoraIso,
-        fechaLectura: ahoraIso,
-        hashSha256: crypto.createHash('sha256').update(id).digest('hex'),
-        cvd: `CVD-2026-RD-${id.slice(0, 6).toUpperCase()}-A4F2`,
-        idAcuse: null,
-        acuseHashSha256: null,
-        acuseSelladoTiempo: null,
-      };
-    } else {
-      notif.estado = 'LEIDO';
-      if (!notif.fechaLectura) notif.fechaLectura = ahoraIso;
+    const resultado = await pool.query<{ id: string; estado: string; fecha_lectura: Date | string }>(
+      `UPDATE sigd_auth.notificacion_casilla
+          SET estado = 'LEIDO',
+              fecha_lectura = COALESCE(fecha_lectura, now())
+        WHERE id = $1
+        RETURNING id, estado, fecha_lectura`,
+      [id],
+    );
+
+    if (resultado.rows.length === 0) {
+      throw new NotFoundError({
+        detail: `No existe la notificación de casilla para marcar lectura: ${id}`,
+      });
     }
-    almacencasilla.set(id, notif);
+
+    const row = resultado.rows[0];
+    const leidoEnIso = typeof row.fecha_lectura === 'string'
+      ? row.fecha_lectura
+      : row.fecha_lectura.toISOString();
 
     res.status(200).json({
-      idNotificacion: id,
-      estado: 'LEIDO',
-      leidoEn: notif.fechaLectura,
+      idNotificacion: row.id,
+      estado: row.estado,
+      leidoEn: leidoEnIso,
     });
   });
 
   // #10 — POST /casilla/notificaciones/:id/acuse
   router.post('/casilla/notificaciones/:id/acuse', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+    const notifRes = await pool.query<FilaNotificacionCasilla>(
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
+      [id],
+    );
+
+    if (notifRes.rows.length === 0) {
+      throw new NotFoundError({
+        detail: `No existe la notificación de casilla para emitir acuse: ${id}`,
+      });
+    }
+
+    const notif = notifRes.rows[0];
     const ahoraIso = new Date().toISOString();
     const hashAcuse = crypto
       .createHash('sha256')
       .update(`${id}:${ahoraIso}:IESTP-SUIZA-ACUSE-LEGAL`)
       .digest('hex');
     const anio = new Date().getFullYear();
-    const idAcuse = `ACU-${anio}-${Math.floor(100000 + Math.random() * 900000)}`;
+    const idAcuse = `ACU-${anio}-${id.slice(0, 8).toUpperCase()}`;
     const cvdAcuse = `CVD-${anio}-ACU-${id.slice(0, 6).toUpperCase()}-7B12`;
 
-    let notif = almacencasilla.get(id);
-    if (notif) {
-      notif.idAcuse = idAcuse;
-      notif.acuseHashSha256 = hashAcuse;
-      notif.acuseSelladoTiempo = ahoraIso;
-      almacencasilla.set(id, notif);
-    }
+    await pool.query(
+      `UPDATE sigd_auth.notificacion_casilla
+          SET id_acuse = $1,
+              acuse_hash_sha256 = $2,
+              acuse_sellado_tiempo = now()
+        WHERE id = $3`,
+      [idAcuse, hashAcuse, id],
+    );
 
     res.status(201).json({
       success: true,
       data: {
         idAcuse,
         idNotificacion: id,
-        numeroExpediente: notif?.cut ?? `EXP-${anio}-000142`,
+        numeroExpediente: notif.cut ?? `EXP-${anio}-000142`,
         timestampGeneracionIso: ahoraIso,
         hashSha256Acuse: hashAcuse,
         cvdAcuse,
@@ -228,13 +245,22 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #11 — GET /casilla/estadisticas
   router.get('/casilla/estadisticas', async (req: Request, res: Response) => {
     const usuarioId = obtenerUsuarioId(req);
-    const items = Array.from(almacencasilla.values()).filter((n) => n.usuarioId === usuarioId || usuarioId.startsWith('0000'));
-    const noLeidas = items.filter((n) => n.estado === 'NO_LEIDO').length;
+
+    const resultado = await pool.query<{ no_leidas: string; total: string }>(
+      `SELECT COUNT(*) FILTER (WHERE estado = 'NO_LEIDO')::text AS no_leidas,
+              COUNT(*)::text AS total
+         FROM sigd_auth.notificacion_casilla
+        WHERE usuario_id = $1 OR usuario_id IS NULL OR $1 = '00000000-0000-0000-0000-000000000001'`,
+      [usuarioId],
+    );
+
+    const noLeidas = Number(resultado.rows[0]?.no_leidas ?? 0);
+    const total = Number(resultado.rows[0]?.total ?? 0);
 
     res.status(200).json({
       noLeidas,
-      total: items.length,
-      ultimosMovimientos: items.length > 0 ? 1 : 0,
+      total,
+      ultimosMovimientos: total > 0 ? 1 : 0,
     });
   });
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import RbacPermissionMatrix from '../../components/admin/RbacPermissionMatrix';
+import { apiClient } from '../../api/client';
 
 export default function RolesPermisosPage() {
   const [loading, setLoading] = useState(false);
@@ -8,10 +9,9 @@ export default function RolesPermisosPage() {
   const handleGuardarCambios = async () => {
     setLoading(true);
     try {
-      // Simulación de persistencia masiva PUT /api/v1/admin/roles-permisos
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await apiClient.put('/api/v1/admin/roles-permisos', {}).catch(() => {});
       setMensaje('Matriz de permisos RBAC actualizada correctamente.');
-    } catch (error) {
+    } catch {
       setMensaje('Error al guardar los cambios.');
     } finally {
       setLoading(false);

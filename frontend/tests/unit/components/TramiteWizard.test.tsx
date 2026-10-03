@@ -32,7 +32,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TramiteWizard } from '@/components/tramite/TramiteWizard';
 import { TRAMITE_WIZARD_STORAGE_KEY } from '@/hooks/useTramiteWizardReducer';
-import type { CargoDigitalResponse } from '@/types/tramiteWizardState';
+import { apiClient } from '@/api/client';
 
 describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', () => {
   beforeEach(() => {
@@ -439,12 +439,12 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   it('Test 9: Disparo y bloqueo del botón "Radicar Trámite" mostrando estado de carga', async () => {
     const user = userEvent.setup();
 
-    // Mock de fetch pendiente para verificar estado transitorio de carga
-    let resolverPromesa: ((value: Response) => void) | null = null;
-    const mockFetchPromise = new Promise<Response>((resolve) => {
+    // Mock de apiClient.post pendiente para verificar estado transitorio de carga
+    let resolverPromesa: ((value: any) => void) | null = null;
+    const mockPostPromise = new Promise((resolve) => {
       resolverPromesa = resolve;
     });
-    global.fetch = vi.fn().mockImplementation(() => mockFetchPromise);
+    vi.spyOn(apiClient, 'post').mockImplementation(() => mockPostPromise as any);
 
     render(<TramiteWizard />);
 
@@ -470,19 +470,25 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
 
     // Resolver la promesa pendiente para evitar timers colgados
     resolverPromesa!({
-      ok: true,
-      status: 201,
-      json: async () => ({
+      data: {
+        expedienteId: '00000000-0000-0000-0000-000000000001',
         cut: 'EXP-2026-999888',
-        fechaRadicacion: '25/09/2026, 16:30',
-        fechaRecepcionOficial: '25/09/2026, 16:30',
-        asunto: 'Solicitud formal de prueba',
-        remitente: 'María Elena Vargas Paredes',
-        hashTransaccion:
-          '7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
-        qrValidationUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-999888',
-      }),
-    } as Response);
+        anioFiscal: 2026,
+        fechaRadicacionLegal: '25/09/2026, 16:30',
+        fechaEnvioReal: '25/09/2026, 16:30',
+        diferidoPorCorte: false,
+        totalFolios: 1,
+        qrSeguimientoUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-999888',
+        cargoDigital: {
+          codigo: 'EXP-2026-999888',
+          hashSha256:
+            '7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
+          qrContenido: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-999888',
+        },
+        mensajeLegal: 'Trámite radicado conforme a LPAG Ley N° 27444.',
+      },
+      status: 201,
+    });
   });
 
   // ===========================================================================
@@ -491,23 +497,27 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   it('Test 10: Renderizado y apertura de CargoDigitalModal con CUT visible ante respuesta HTTP 201 Created simulada', async () => {
     const user = userEvent.setup();
 
-    const cargoSimulado: CargoDigitalResponse = {
-      cut: 'EXP-2026-778899',
-      fechaRadicacion: '25 de Septiembre de 2026, 16:30 hrs',
-      fechaRecepcionOficial: '25 de Septiembre de 2026, 16:30 hrs',
-      asunto: 'Solicitud formal de certificado oficial de estudios concluidos',
-      remitente: 'María Elena Vargas Paredes',
-      hashTransaccion:
-        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-      qrValidationUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-778899',
-    };
-
     // Mock de API REST con código HTTP 201 Created
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
+    vi.spyOn(apiClient, 'post').mockResolvedValue({
+      data: {
+        expedienteId: '00000000-0000-0000-0000-000000000001',
+        cut: 'EXP-2026-778899',
+        anioFiscal: 2026,
+        fechaRadicacionLegal: '25 de Septiembre de 2026, 16:30 hrs',
+        fechaEnvioReal: '25 de Septiembre de 2026, 16:30 hrs',
+        diferidoPorCorte: false,
+        totalFolios: 1,
+        qrSeguimientoUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-778899',
+        cargoDigital: {
+          codigo: 'EXP-2026-778899',
+          hashSha256:
+            'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          qrContenido: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-778899',
+        },
+        mensajeLegal: 'Trámite radicado formalmente.',
+      },
       status: 201,
-      json: async () => cargoSimulado,
-    } as Response);
+    } as any);
 
     render(<TramiteWizard />);
 

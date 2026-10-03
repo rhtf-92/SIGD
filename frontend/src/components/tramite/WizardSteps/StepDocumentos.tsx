@@ -177,20 +177,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
         },
       });
     } catch {
-      // Fallback seguro de cálculo criptográfico
-      const fallbackHash = `sha256_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-      const nuevoArchivo: ArchivoTramite = {
-        nombre: file.name,
-        peso: file.size,
-        hashSha256: fallbackHash,
-      };
-
-      dispatch({
-        type: 'UPDATE_DOCUMENTOS',
-        payload: {
-          archivos: [...data.archivos, nuevoArchivo],
-        },
-      });
+      setFileError('No se pudo calcular la huella criptográfica SHA-256 del archivo seleccionado.');
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';

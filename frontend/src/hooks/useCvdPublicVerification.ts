@@ -10,7 +10,7 @@ import { normalizarCvd, validarCvd } from "../utils/cvdValidator";
 
 export const CVD_VALIDO = "CVD-2026-RD-000412-892F";
 export const CVD_ALTERADO = "CVD-2026-RD-000413-ALTE";
-const USAR_MOCKS = env.enableMocks || env.isDevelopment;
+const USAR_MOCKS = env.enableMocks;
 
 export class CvdError extends Error implements ErrorValidacionCvd {
   readonly titulo: string;

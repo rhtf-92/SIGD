@@ -1,5 +1,6 @@
 // src/services/ubigeoService.ts
 
+import { apiClient } from '../api/client';
 import {
   DEPARTAMENTO_UCAYALI,
   PROVINCIAS_UCAYALI,
@@ -15,40 +16,27 @@ export const ubigeoKeys = {
 };
 
 export const fetchDepartamentos = async (): Promise<UbigeoItem[]> => {
-  try {
-    return await new Promise<UbigeoItem[]>((resolve) => {
-      setTimeout(() => resolve([DEPARTAMENTO_UCAYALI]), 100);
-    });
-  } catch (error) {
-    console.warn('Fallback activado para Departamentos:', error);
-    return [DEPARTAMENTO_UCAYALI];
-  }
+  return [DEPARTAMENTO_UCAYALI];
 };
 
 export const fetchProvincias = async (departamentoId: string): Promise<UbigeoItem[]> => {
-  try {
-    return await new Promise<UbigeoItem[]>((resolve) => {
-      setTimeout(() => {
-        const result = PROVINCIAS_UCAYALI.filter((p) => p.padreId === departamentoId);
-        resolve([...result]);
-      }, 100);
-    });
-  } catch (error) {
-    console.warn('Fallback activado para Provincias:', error);
-    return PROVINCIAS_UCAYALI.filter((p) => p.padreId === departamentoId);
-  }
+  return PROVINCIAS_UCAYALI.filter((p) => p.padreId === departamentoId);
 };
 
 export const fetchDistritos = async (provinciaId: string): Promise<UbigeoItem[]> => {
   try {
-    return await new Promise<UbigeoItem[]>((resolve) => {
-      setTimeout(() => {
-        const result = DISTRITOS_UCAYALI.filter((d) => d.padreId === provinciaId);
-        resolve([...result]);
-      }, 100);
-    });
-  } catch (error) {
-    console.warn('Fallback activado para Distritos:', error);
-    return DISTRITOS_UCAYALI.filter((d) => d.padreId === provinciaId);
+    const res = await apiClient.get<Array<{ codigo: string; nombre: string; provinciaCodigo: string }>>(
+      `/api/v1/ubigeo/distritos-ucayali?provinciaCodigo=${encodeURIComponent(provinciaId)}`,
+    );
+    if (Array.isArray(res.data) && res.data.length > 0) {
+      return res.data.map((d) => ({
+        id: d.codigo,
+        nombre: d.nombre,
+        padreId: d.provinciaCodigo,
+      }));
+    }
+  } catch {
+    // Fallback al catálogo oficial de Ucayali
   }
+  return DISTRITOS_UCAYALI.filter((d) => d.padreId === provinciaId);
 };

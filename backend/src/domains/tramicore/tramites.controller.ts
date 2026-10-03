@@ -64,41 +64,23 @@ export function crearRouterTramites(
   // #15 en catálogo — Catálogo de tipos de trámite TUPA y trámites internos
   const handlerTiposTupa = async (_req: Request, res: Response) => {
     const query = `
-      SELECT id_tipo_tramite, codigo, denominacion, descripcion,
-             plazo_dias_habiles, calificacion, base_legal
+      SELECT tipo_tramite_id AS id,
+             tipo_tramite_id AS id_tipo_tramite,
+             codigo,
+             denominacion,
+             descripcion,
+             unidad_organica,
+             plazo_dias,
+             plazo_dias AS plazo_dias_habiles,
+             silencio_administrativo,
+             silencio_administrativo AS calificacion,
+             base_legal,
+             vigente
         FROM sigd_doc.tipo_tramite_tupa
-       WHERE activo = TRUE
+       WHERE vigente = TRUE
        ORDER BY codigo ASC;
     `;
-    const resultado = await pool.query(query).catch(() => ({ rows: [] }));
-
-    if (resultado.rows.length === 0) {
-      // Catálogo inicial canónico TUPA IESTP Suiza
-      return res.status(200).json([
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          codigo: 'TUPA-01',
-          denominacion: 'Emisión de Certificado de Estudios Oficial',
-          plazoDiasHabiles: 7,
-          calificacion: 'APROBACION_AUTOMATICA',
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000002',
-          codigo: 'TUPA-02',
-          denominacion: 'Expedición de Título Profesional Técnico',
-          plazoDiasHabiles: 30,
-          calificacion: 'EVALUACION_PREVIA',
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000003',
-          codigo: 'TUPA-03',
-          denominacion: 'Convalidación de Créditos y Prácticas Pre-Profesionales',
-          plazoDiasHabiles: 15,
-          calificacion: 'EVALUACION_PREVIA',
-        },
-      ]);
-    }
-
+    const resultado = await pool.query(query);
     res.status(200).json(resultado.rows);
   };
 

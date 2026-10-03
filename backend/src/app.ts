@@ -167,10 +167,9 @@ export function construirApp(
    * POST /api/v1/admin/usuarios
    * PUT  /api/v1/admin/usuarios/:id
    */
-  app.use(
-    '/api/v1/admin/usuarios',
-    crearUsuariosAdminRouter(pool),
-  );
+  const usuariosAdminRouter = crearUsuariosAdminRouter(pool);
+  app.use('/api/v1/admin/usuarios', usuariosAdminRouter);
+  app.use('/api/v1/usuarios', usuariosAdminRouter);
 
   /*
    * OrganiCore - Tablas Maestras y Calendario Laboral (Feriados Ucayali) (#47, #48, #49)

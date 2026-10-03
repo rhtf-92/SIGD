@@ -2,11 +2,32 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import VentanillaPresencialPage from "../../../src/pages/tramite/VentanillaPresencialPage";
 import CargoDigitalModal from "../../../src/components/tramite/CargoDigitalModal";
 import type { CargoOficialTramite } from "../../../src/types/cargoOficial";
+import { apiClient } from "@/api/client";
+
+const mockRespuestaVentanilla = {
+  data: {
+    expedienteId: "00000000-0000-0000-0000-000000000001",
+    cut: "EXP-2026-000155",
+    anioFiscal: 2026,
+    fechaRadicacion: "2026-09-23T10:30:00.000Z",
+    ticketImpresion: "TICKET",
+    cargo: {
+      cut: "EXP-2026-000155",
+      remitente: "Sergio Serruche",
+      dni: "74561238",
+      asunto: "Solicitud de convalidación académica",
+      folios: 1,
+      fechaRecepcion: "2026-09-23T10:30:00.000Z",
+      hashSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      qrSeguimientoUrl: "https://sigd.iestpsuiza.edu.pe/tramite?cut=EXP-2026-000155",
+    },
+  },
+};
 
 const cargoMuestra: CargoOficialTramite = {
   codigoExpediente: "EXP-2026-000155",
@@ -33,6 +54,10 @@ const cargoMuestra: CargoOficialTramite = {
 };
 
 describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-05)", () => {
+  beforeEach(() => {
+    vi.spyOn(apiClient, "post").mockResolvedValue(mockRespuestaVentanilla as any);
+  });
+
   it("renderiza el formulario de ventanilla presencial con campos obligatorios y conmutador de persona", () => {
     render(
       <MemoryRouter>
@@ -105,7 +130,7 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     await user.click(botonRegistrar);
 
     // Debe abrir el modal de cargo con el CUT generado
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/Sergio Serruche/i)).toBeInTheDocument();
     expect(screen.getByText(/EXP-2026-/i)).toBeInTheDocument();
   });

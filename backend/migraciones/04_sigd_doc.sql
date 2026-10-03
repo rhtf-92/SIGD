@@ -226,3 +226,43 @@ CREATE TABLE IF NOT EXISTS sigd_doc.resolucion (
 
 CREATE INDEX IF NOT EXISTS idx_resolucion_estado ON sigd_doc.resolucion (estado);
 CREATE INDEX IF NOT EXISTS idx_resolucion_proyeccion ON sigd_doc.resolucion (fecha_proyeccion);
+
+-- -----------------------------------------------------------------------------
+-- 4.9 firma_digital_documento (Evidencia legal de firma Refirma y Validador CVD)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sigd_doc.firma_digital_documento (
+    documento_id       UUID         PRIMARY KEY
+                                    REFERENCES sigd_doc.documento_adjunto (documento_adjunto_id) ON DELETE CASCADE,
+    cvd                VARCHAR(40)  NOT NULL UNIQUE DEFAULT (
+        'CVD-' ||
+        to_char(current_date, 'YYYY') ||
+        '-' ||
+        upper(substr(md5(gen_random_uuid()::text), 1, 16))
+    ),
+    sha256_firmado     CHAR(64)     NOT NULL
+                                    CONSTRAINT chk_firma_sha256 CHECK (sha256_firmado ~ '^[0-9a-fA-F]{64}$'),
+    firmante           TEXT         NOT NULL,
+    fecha_sello_tsa    TIMESTAMPTZ  NOT NULL,
+    s3_bucket          VARCHAR(100) NOT NULL,
+    s3_key             VARCHAR(500) NOT NULL,
+    estado             VARCHAR(30)  NOT NULL DEFAULT 'FIRMADO_DIGITALMENTE'
+                                    CONSTRAINT chk_firma_estado CHECK (estado = 'FIRMADO_DIGITALMENTE'),
+    fecha_registro     TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_firma_digital_cvd
+    ON sigd_doc.firma_digital_documento (cvd);
+CREATE INDEX IF NOT EXISTS idx_firma_digital_sha256
+    ON sigd_doc.firma_digital_documento (sha256_firmado);
+
+-- -----------------------------------------------------------------------------
+-- 4.10 Semillas canónicas TUPA IESTP Suiza
+-- -----------------------------------------------------------------------------
+INSERT INTO sigd_doc.tipo_tramite_tupa (
+    tipo_tramite_id, codigo, denominacion, descripcion, unidad_organica, plazo_dias, silencio_administrativo, base_legal, vigente
+) VALUES
+('00000000-0000-0000-0000-000000000001', 'TUPA-01', 'Emisión de Certificado de Estudios Oficial', 'Expedición de certificado oficial de estudios técnicos', 'Secretaría Académica', 7, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('00000000-0000-0000-0000-000000000002', 'TUPA-02', 'Expedición de Título Profesional Técnico', 'Tramitación de título a nombre de la Nación', 'Dirección General', 30, 'NEGATIVO', 'Ley N° 30512', TRUE),
+('00000000-0000-0000-0000-000000000003', 'TUPA-03', 'Convalidación de Créditos y Prácticas Pre-Profesionales', 'Convalidación de módulos formativos y EFSRT', 'Jefatura de Unidad Académica', 15, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE)
+ON CONFLICT (codigo) DO NOTHING;
+

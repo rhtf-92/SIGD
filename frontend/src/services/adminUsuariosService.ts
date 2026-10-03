@@ -25,7 +25,7 @@ import type {
   Usuario,
 } from "../types/usuarioAdmin";
 
-const RUTA_CANONICA_USUARIOS = "/api/v1/usuarios";
+const RUTA_CANONICA_USUARIOS = "/api/v1/admin/usuarios";
 
 export const usuariosAdminKeys = {
   todos: ["admin", "usuarios"] as const,
@@ -136,9 +136,10 @@ export async function conmutarEstadoUsuario(
   id: number,
   cambios: UpdateEstadoDTO,
 ): Promise<Usuario> {
-  const response = await apiClient.patch(
-    `${RUTA_CANONICA_USUARIOS}/${id}/estado`,
-    cambios,
+  const estadoBackend = cambios.estado.toUpperCase();
+  const response = await apiClient.put(
+    `${RUTA_CANONICA_USUARIOS}/${id}`,
+    { estado: estadoBackend },
   );
   const normalizado = normalizarUsuario(response.data);
 
@@ -147,9 +148,9 @@ export async function conmutarEstadoUsuario(
       type: "about:blank",
       title: "Respuesta incompleta del servidor",
       status: 502,
-      detail: "El servidor no devolvió el detalle del usuario con estado conmutado.",
-      instance: `${RUTA_CANONICA_USUARIOS}/${id}/estado`,
-      code: "ERR_ESTADO_INVALIDO",
+      detail: "El servidor no devolvió el detalle del usuario con el nuevo estado.",
+      instance: `${RUTA_CANONICA_USUARIOS}/${id}`,
+      code: "ERR_USUARIO_ESTADO",
       category: "System",
       correlationId: "",
       retryable: true,

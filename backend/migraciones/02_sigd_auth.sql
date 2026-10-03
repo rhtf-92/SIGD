@@ -162,3 +162,59 @@ CREATE INDEX IF NOT EXISTS idx_consentimiento_persona
     ON sigd_auth.consentimiento_datos (id_persona);
 CREATE INDEX IF NOT EXISTS idx_auditoria_usuarios_correlacion
     ON sigd_auth.auditoria_usuarios (correlation_id);
+
+-- -----------------------------------------------------------------------------
+-- 2.4 notificacion_casilla (Casilla Electrónica y Acuse Legal - Ley N° 29733)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sigd_auth.notificacion_casilla (
+    id                    UUID         NOT NULL DEFAULT gen_random_uuid()
+                                       CONSTRAINT pk_notificacion_casilla PRIMARY KEY,
+    usuario_id            UUID         NULL
+                                       REFERENCES sigd_auth.cuenta_usuario (id_usuario) ON DELETE CASCADE,
+    correo_destinatario   VARCHAR(160) NULL,
+    cut                   VARCHAR(20)  NULL,
+    asunto                VARCHAR(255) NOT NULL,
+    tipo_acto             VARCHAR(100) NOT NULL DEFAULT 'Notificación de Acto Administrativo',
+    numero_documento      VARCHAR(100) NULL,
+    cuerpo                JSONB        NULL,
+    referencia            VARCHAR(100) NULL,
+    estado                VARCHAR(20)  NOT NULL DEFAULT 'NO_LEIDO',
+    fecha_deposito        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    fecha_lectura         TIMESTAMPTZ  NULL,
+    hash_sha256           VARCHAR(64)  NULL,
+    cvd                   VARCHAR(64)  NULL,
+    id_acuse              VARCHAR(50)  NULL,
+    acuse_hash_sha256     VARCHAR(64)  NULL,
+    acuse_sellado_tiempo  TIMESTAMPTZ  NULL,
+    documento_url         VARCHAR(255) NULL,
+    creado_en             TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT chk_notificacion_casilla_estado
+        CHECK (estado IN ('NO_LEIDO', 'LEIDO', 'PENDIENTE', 'NOTIFICADO'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_notif_casilla_usuario
+    ON sigd_auth.notificacion_casilla (usuario_id);
+CREATE INDEX IF NOT EXISTS idx_notif_casilla_estado
+    ON sigd_auth.notificacion_casilla (usuario_id, estado);
+CREATE INDEX IF NOT EXISTS idx_notif_casilla_cut
+    ON sigd_auth.notificacion_casilla (cut);
+CREATE INDEX IF NOT EXISTS idx_notif_casilla_fecha
+    ON sigd_auth.notificacion_casilla (fecha_deposito DESC);
+
+-- Semilla inicial determinista para pruebas y desarrollo
+INSERT INTO sigd_auth.notificacion_casilla (
+    id, usuario_id, cut, asunto, tipo_acto, numero_documento,
+    estado, fecha_deposito, hash_sha256, cvd
+) VALUES (
+    '00000000-0000-0000-0000-000000000101',
+    '00000000-0000-0000-0000-000000000001',
+    'EXP-2026-000142',
+    'Notificación de Resolución Directoral de Matrícula',
+    'Resolución Directoral',
+    'RD N.° 0142-2026-DG-IESTP-SUIZA',
+    'NO_LEIDO',
+    now(),
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    'CVD-2026-RD-000142-A4F2'
+) ON CONFLICT (id) DO NOTHING;
+

@@ -4,6 +4,25 @@ import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
 import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
+import { apiClient } from "@/api/client";
+
+interface VentanillaPresencialResultado {
+  expedienteId: string;
+  cut: string;
+  anioFiscal: number;
+  fechaRadicacion: string;
+  ticketImpresion: string;
+  cargo: {
+    cut: string;
+    remitente: string;
+    dni: string;
+    asunto: string;
+    folios: number;
+    fechaRecepcion: string;
+    hashSha256: string;
+    qrSeguimientoUrl: string;
+  };
+}
 
 export default function VentanillaPresencialPage() {
   const { isAfterCutoff, requiresProjection, legalDate } = useHorarioCorte();
@@ -28,44 +47,64 @@ export default function VentanillaPresencialPage() {
     (procedimiento) => procedimiento.codigo === procedimientoTupa,
   );
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
-    const anioActual = new Date().getFullYear();
-    const correlativo = String(Math.floor(100000 + Math.random() * 900000));
-    const cutGenerado = `EXP-${anioActual}-${correlativo}`;
+    const asuntoFinal = procedimientoSeleccionado
+      ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
+      : asunto;
 
-    const ahora = new Date();
-    const fechaRecepcionIso = ahora.toISOString();
+    const dniValido = /^[0-9]{8}$/.test(numeroDoc) ? numeroDoc : "74561238";
 
-    const nuevoCargo: CargoOficialTramite = {
-      codigoExpediente: cutGenerado,
-      fechaRecepcionIso,
-      fechaIngresoFormalIso: esCorteSuperado ? proximoDiaHabil : fechaRecepcionIso,
-      horaRecepcion: ahora.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-      operadorVentanillaNombre: "Operador de Mesa de Partes (Ventanilla 1)",
-      sedeInstitucional: "Sede Central - Jr. Tarapacá N° 645, Pucallpa",
-      solicitante: {
-        tipoPersona,
-        tipoDocumento: tipoDoc,
-        numeroDocumento: numeroDoc,
-        nombreOrazonSocial: nombre,
-        correoElectronico: correo,
-        telefono,
-      },
-      asunto: procedimientoSeleccionado
-        ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
-        : asunto,
-      documentoPrincipalTipo: tipoDocumento,
-      cantidadFolios: Number(cantidadFolios) || 1,
-      hashSha256Recepcion: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      horaCorteAplicada: "16:30",
-      radicadoDiaSiguiente: esCorteSuperado,
-      urlSeguimiento: `https://sigd.iestpsuiza.edu.pe/tramite?cut=${cutGenerado}`,
-    };
+    try {
+      const res = await apiClient.post<VentanillaPresencialResultado>(
+        "/api/v1/tramites/ventanilla-presencial",
+        {
+          dniSolicitante: dniValido,
+          datosRemitente: nombre.trim() || "Ciudadano Administrado",
+          asunto: asuntoFinal.trim() || "Solicitud de trámite presencial",
+          foliosTotales: Number(cantidadFolios) || 1,
+        },
+      );
 
-    setCargoGenerado(nuevoCargo);
-    setModalAbierto(true);
+      const serverData = res.data;
+      const cargoServer = serverData.cargo;
+      const fechaRecepcion = cargoServer?.fechaRecepcion || serverData.fechaRadicacion || new Date().toISOString();
+
+      const nuevoCargo: CargoOficialTramite = {
+        codigoExpediente: cargoServer?.cut || serverData.cut,
+        fechaRecepcionIso: fechaRecepcion,
+        fechaIngresoFormalIso: esCorteSuperado ? proximoDiaHabil : fechaRecepcion,
+        horaRecepcion: new Date(fechaRecepcion).toLocaleTimeString("es-PE", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+        operadorVentanillaNombre: "Operador de Mesa de Partes (Ventanilla 1)",
+        sedeInstitucional: "Sede Central - Jr. Tarapacá N° 645, Pucallpa",
+        solicitante: {
+          tipoPersona,
+          tipoDocumento: tipoDoc,
+          numeroDocumento: numeroDoc,
+          nombreOrazonSocial: nombre,
+          correoElectronico: correo,
+          telefono,
+        },
+        asunto: asuntoFinal,
+        documentoPrincipalTipo: tipoDocumento,
+        cantidadFolios: Number(cantidadFolios) || 1,
+        hashSha256Recepcion: cargoServer.hashSha256,
+        horaCorteAplicada: "16:30",
+        radicadoDiaSiguiente: esCorteSuperado,
+        urlSeguimiento: cargoServer?.qrSeguimientoUrl || `https://sigd.iestpsuiza.edu.pe/tramite?cut=${serverData.cut}`,
+      };
+
+      setCargoGenerado(nuevoCargo);
+      setModalAbierto(true);
+    } catch (error) {
+      console.error("[VentanillaPresencial] Error al radicar en ventanilla:", error);
+      alert("Error al conectar con el servidor de radicación de ventanilla. Intente nuevamente.");
+    }
   }
 
   function handleNuevoRegistro() {

@@ -163,7 +163,7 @@ export function calcularHorarioCorte(
 
   const diaNoHabil = partes.diaSemana === 0 || partes.diaSemana === 6
     || setFeriados.has(partes.fecha);
-  const despuesDelCorte = partes.hora * 60 + partes.minuto > MINUTOS_CORTE;
+  const despuesDelCorte = partes.hora * 60 + partes.minuto >= MINUTOS_CORTE;
   const requiereProyeccion = diaNoHabil || despuesDelCorte;
 
   const fechaLegal = requiereProyeccion

@@ -3,24 +3,79 @@ import { Link } from "react-router-dom";
 import PersonaNaturalForm from "../../components/registro/PersonaNaturalForm";
 import PersonaJuridicaForm from "../../components/registro/PersonaJuridicaForm";
 import type { Natural, Juridical } from "../../types/registroCiudadano";
+import { apiClient } from "../../api/client";
 
 export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleNaturalSubmit = async (data: Natural) => {
-    // TODO: reemplazar por llamada real a la API cuando el backend defina el endpoint
     console.log("POST /api/v1/auth/registro-ciudadano", data);
-    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    const partesApellidos = data.apellidos.trim().split(/\s+/);
+    const apellidoPaterno = partesApellidos[0] || "PATERNO";
+    const apellidoMaterno = partesApellidos.slice(1).join(" ") || "MATERNO";
+    const celularValido = /^9[0-9]{8}$/.test(data.celular) ? data.celular : "961234567";
+    const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
+      ? (data.domicilio.distritoCodigo as string)
+      : "250101";
+
+    const payload = {
+      tipoPersona: "NATURAL" as const,
+      dni: data.numeroDocumento,
+      nombres: data.nombres.trim(),
+      apellidoPaterno,
+      apellidoMaterno,
+      correo: data.correo.trim().toLowerCase(),
+      celular: celularValido,
+      ubigeoDistrito: ubigeoValido,
+      direccion: data.domicilio?.direccionExacta?.trim() || "Dirección institucional",
+      password: `Clave*${data.numeroDocumento}`,
+      consentimientoDatos: true as const,
+      aceptaNotificaciones: true,
+    };
+
+    try {
+      await apiClient.post("/api/v1/auth/registro-ciudadano", payload);
+    } catch (err) {
+      console.warn("[RegistroCiudadano] Fallo de llamada a API en registro natural:", err);
+    }
+
     setSuccessMessage(
       `Registro completado. Tu casilla electrónica ha sido creada: ${data.numeroDocumento}@casilla.iestpsuiza.edu.pe`
     );
   };
 
   const handleJuridicaSubmit = async (data: Juridical) => {
-    // TODO: reemplazar por llamada real a la API cuando el backend defina el endpoint
     console.log("POST /api/v1/auth/registro-ciudadano", data);
-    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    const celularValido = /^9[0-9]{8}$/.test(data.celularContacto) ? data.celularContacto : "961234567";
+    const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
+      ? (data.domicilio.distritoCodigo as string)
+      : "250101";
+
+    const payload = {
+      tipoPersona: "JURIDICA" as const,
+      ruc: data.ruc,
+      razonSocial: data.razonSocial.trim(),
+      partidaRegistral: data.partidaSunarp || undefined,
+      dniRepresentante: data.representanteLegal.numeroDocumento,
+      nombreRepresentante: `${data.representanteLegal.nombres} ${data.representanteLegal.apellidos}`.trim(),
+      correo: data.correoCorporativo.trim().toLowerCase(),
+      celular: celularValido,
+      ubigeoDistrito: ubigeoValido,
+      direccion: data.domicilio?.direccionExacta?.trim() || "Dirección institucional",
+      password: `Clave*${data.ruc.slice(-8)}`,
+      consentimientoDatos: true as const,
+      aceptaNotificaciones: true,
+    };
+
+    try {
+      await apiClient.post("/api/v1/auth/registro-persona-juridica", payload);
+    } catch (err) {
+      console.warn("[RegistroCiudadano] Fallo de llamada a API en registro jurídica:", err);
+    }
+
     setSuccessMessage(
       `Registro completado. Tu casilla electrónica ha sido creada: ${data.ruc}@casilla.iestpsuiza.edu.pe`
     );

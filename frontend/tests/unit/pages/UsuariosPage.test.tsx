@@ -67,7 +67,7 @@ function problemaDuplicado(campo: string, motivo: string) {
     title: "Conflicto de unicidad institucional",
     status: 409,
     detail: "Ya existe un usuario registrado con el mismo valor.",
-    instance: "/api/v1/usuarios/1",
+    instance: "/api/v1/admin/usuarios/1",
     code: "ERR_USUARIO_DUPLICADO",
     category: "Conflict",
     correlationId: "9f1c3a52-0d8e-4c1a-9c3b-7d2e5a6b8c40",
@@ -98,7 +98,7 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     ).toBeInTheDocument();
     expect(screen.getByText("María Fernanda López")).toBeInTheDocument();
     expect(get).toHaveBeenCalledWith(
-      "/api/v1/usuarios",
+      "/api/v1/admin/usuarios",
       expect.objectContaining({ params: expect.any(Object) }),
     );
   });
@@ -187,7 +187,7 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
 
     await waitFor(() => {
       expect(put).toHaveBeenCalledWith(
-        "/api/v1/usuarios/1",
+        "/api/v1/admin/usuarios/1",
         expect.objectContaining({ cargo: "Jefe de Mesa de Partes" }),
       );
     });

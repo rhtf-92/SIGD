@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
 import FirmaBatchDrawer from "../../components/firma/FirmaBatchDrawer";
@@ -7,6 +7,7 @@ import type {
   DocumentoOficial,
   RefirmaRespuestaDTO,
 } from "../../types/firmaDigital";
+import { apiClient } from "../../api/client";
 
 const DOCUMENTOS_INICIALES: DocumentoOficial[] = [
   {
@@ -85,6 +86,37 @@ export default function PasarelaFirmaPage() {
     null,
   );
   const [drawerAbierto, setDrawerAbierto] = useState(false);
+
+  useEffect(() => {
+    let activo = true;
+    apiClient
+      .get<{ documentos: Array<Record<string, unknown>> }>("/api/v1/firmas/cola-firmantes")
+      .then((res) => {
+        if (!activo) return;
+        const docs = res.data?.documentos;
+        if (Array.isArray(docs) && docs.length > 0) {
+          const mapeados: DocumentoOficial[] = docs.map((d, i) => ({
+            idDocumento: i + 1,
+            idTramite: 400 + i,
+            tipoActo: (String(d.tipoResolucion ?? "").includes("TITULACION") ? "RD" : "ACTA") as "RD" | "ACTA",
+            numeroCorrelativo: String(d.numeroBorrador ?? `RD N.° 0${400 + i}-2026-DG`),
+            anio: 2026,
+            asunto: String(d.asunto ?? "Documento en cola de firma"),
+            urlPdfOriginal: String(d.s3PreviewUrl ?? `/pdfs/doc-${i + 1}.pdf`),
+            hashSha256: String(d.resolucionId ?? "").replace(/-/g, "").padEnd(64, "0"),
+            estadoFirma: "PENDIENTE" as const,
+            fechaGeneracion: String(d.fechaProyeccion ?? new Date().toISOString()),
+          }));
+          setDocumentos(mapeados);
+        }
+      })
+      .catch(() => {
+        // Preserva datos iniciales si la cola no tiene registros activos
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
 
   const abrirFirmaUnica = (documento: DocumentoOficial) => {
     setDocumentoActivo(documento);

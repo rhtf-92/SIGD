@@ -241,3 +241,38 @@ VALUES
     ('ADMIN_USUARIOS', 'Administrar usuarios y roles', 'GLOBAL'),
     ('REPORTE_LEER', 'Consultar reportes MGD', 'GLOBAL')
 ON CONFLICT (codigo) DO NOTHING;
+
+-- -----------------------------------------------------------------------------
+-- 3.7 calendario_laboral (Feriados Nacionales, Regionales Ucayali y Duelo)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sigd_org.calendario_laboral (
+    id_calendario       UUID         NOT NULL DEFAULT gen_random_uuid()
+                                     CONSTRAINT pk_calendario_laboral PRIMARY KEY,
+    fecha               DATE         NOT NULL,
+    anio                INT          GENERATED ALWAYS AS (EXTRACT(YEAR FROM fecha)::INT) STORED,
+    tipo_feriado        VARCHAR(30)  NULL,
+    descripcion         VARCHAR(255) NOT NULL,
+    unidad_territorial  VARCHAR(30)  NOT NULL DEFAULT 'NACIONAL',
+    es_laborable        BOOLEAN      NOT NULL DEFAULT FALSE,
+    es_feriado          BOOLEAN      GENERATED ALWAYS AS (NOT es_laborable) STORED,
+    base_legal          VARCHAR(255) NULL,
+    registrado_por      UUID         NULL,
+    activo              BOOLEAN      NOT NULL DEFAULT TRUE,
+    creado_en           TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    actualizado_en      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT uq_calendario_fecha_unidad UNIQUE (fecha, unidad_territorial)
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendario_fecha
+    ON sigd_org.calendario_laboral (fecha);
+CREATE INDEX IF NOT EXISTS idx_calendario_anio
+    ON sigd_org.calendario_laboral (anio);
+
+-- Feriados Regionales Ucayali 2026 (San Juan y Creación de Ucayali)
+INSERT INTO sigd_org.calendario_laboral (
+    fecha, tipo_feriado, descripcion, unidad_territorial, es_laborable, base_legal
+) VALUES
+('2026-06-24', 'REGIONAL_UCAYALI', 'Fiesta Patronal de San Juan Bautista', 'REGIONAL_UCAYALI', FALSE, 'Ley N° 29001'),
+('2026-10-13', 'REGIONAL_UCAYALI', 'Aniversario de Creación de Ucayali', 'REGIONAL_UCAYALI', FALSE, 'Ley N° 29001')
+ON CONFLICT (fecha, unidad_territorial) DO NOTHING;
+
