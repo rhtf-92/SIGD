@@ -25,15 +25,37 @@ export const fetchProvincias = async (departamentoId: string): Promise<UbigeoIte
 
 export const fetchDistritos = async (provinciaId: string): Promise<UbigeoItem[]> => {
   try {
-    const res = await apiClient.get<Array<{ codigo: string; nombre: string; provinciaCodigo: string }>>(
+    const res = await apiClient.get<
+      | {
+          provincias?: Array<{
+            codigo: string;
+            nombre: string;
+            distritos: Array<{ codigo: string; nombre: string }>;
+          }>;
+        }
+      | Array<{ codigo: string; nombre: string; provinciaCodigo: string }>
+    >(
       `/api/v1/ubigeo/distritos-ucayali?provinciaCodigo=${encodeURIComponent(provinciaId)}`,
     );
-    if (Array.isArray(res.data) && res.data.length > 0) {
-      return res.data.map((d) => ({
-        id: d.codigo,
-        nombre: d.nombre,
-        padreId: d.provinciaCodigo,
-      }));
+    if (res.data) {
+      if ('provincias' in res.data && Array.isArray(res.data.provincias)) {
+        const distritos = res.data.provincias.flatMap((p) =>
+          p.distritos.map((d) => ({
+            id: d.codigo,
+            nombre: d.nombre,
+            padreId: p.codigo,
+          })),
+        );
+        if (distritos.length > 0) {
+          return distritos;
+        }
+      } else if (Array.isArray(res.data) && res.data.length > 0) {
+        return res.data.map((d) => ({
+          id: d.codigo,
+          nombre: d.nombre,
+          padreId: d.provinciaCodigo,
+        }));
+      }
     }
   } catch {
     // Fallback al catálogo oficial de Ucayali

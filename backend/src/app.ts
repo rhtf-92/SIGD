@@ -57,7 +57,11 @@ import { crearRouterStorage } from './core/storage/storage.router.js';
 // Módulo Firma Pendientes (#56)
 import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/firma.routes.js';
 
+import { corsMiddleware } from './middleware/cors.middleware.js';
+import { verificarTokenAcceso } from './core/auth/jwt.service.js';
+
 export interface AppOptions {
+  busSse?: BusSse;
   ubigeoCache?: CacheDistribuida;
   mgdCache?: CacheDistribuida;
   obtenerActorRutaDoc?: ObtenerActorRutaDoc;
@@ -78,14 +82,27 @@ export function construirApp(
   opciones: AppOptions | unknown = {},
   ..._resto: unknown[]
 ): Express {
-  const opts: AppOptions =
-    typeof opciones === 'object' && opciones !== null && !('emitirHeartbeat' in opciones)
-      ? (opciones as AppOptions)
-      : {};
+  let busSse: BusSse;
+  let opts: AppOptions;
+
+  if (
+    opciones instanceof BusSse ||
+    (typeof opciones === 'object' && opciones !== null && 'emitirHeartbeat' in opciones)
+  ) {
+    busSse = opciones as BusSse;
+    opts = {};
+  } else if (typeof opciones === 'object' && opciones !== null) {
+    opts = opciones as AppOptions;
+    busSse = opts.busSse ?? new BusSse();
+  } else {
+    opts = {};
+    busSse = new BusSse();
+  }
 
   const app = express();
   app.disable('x-powered-by');
 
+  app.use(corsMiddleware);
   app.use(express.json());
   app.use(contextMiddleware);
 
@@ -133,6 +150,33 @@ export function construirApp(
   const servicio = new ServicioFirmaService({ sesiones, almacen, pasarela });
 
   // Rutas
+  const jwtActorProvider: ActorProviderRutaDoc = {
+    obtenerActor: (req) => {
+      const auth = req.headers.authorization;
+      if (auth && auth.startsWith('Bearer ')) {
+        const token = auth.slice(7).trim();
+        try {
+          const claims = verificarTokenAcceso(token);
+          return {
+            id: claims.sub,
+            roles: claims.roles ?? [],
+            unidadOrganicaId: null,
+            puedeVerExpediente: () => true,
+          };
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    },
+  };
+
+  const actorProviderRutaDocEfectivo =
+    opts.actorProviderRutaDoc ??
+    (opts.obtenerActorRutaDoc ? { obtenerActor: opts.obtenerActorRutaDoc } : jwtActorProvider);
+  const actorProviderReportesEfectivo =
+    opts.actorProviderReportes ?? opts.actorProviderRutaDoc ?? jwtActorProvider;
+
   app.use('/api', crearRouterReferencia(pool));
   app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
   app.use('/api/v1', crearRouterAuth(pool));
@@ -146,7 +190,7 @@ export function construirApp(
       opts.obtenerActorRutaDoc,
       opts.politicaReversionRutaDoc,
       opts.prepararCompensacionFolios,
-      opts.actorProviderRutaDoc,
+      actorProviderRutaDocEfectivo,
       opts.folioCompensationPort,
       {
         calendarioLaboral: opts.calendarioLaboralRutaDoc,
@@ -156,7 +200,7 @@ export function construirApp(
       },
     ),
   );
-  app.use('/api/v1', crearRouterReportes(pool, opts.actorProviderReportes, opts.mgdCache));
+  app.use('/api/v1', crearRouterReportes(pool, actorProviderReportesEfectivo, opts.mgdCache));
   app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
   app.use('/api/v1/firma', crearFirmaRouter(servicio));
 
@@ -203,7 +247,6 @@ export function construirApp(
   /*
    * CoreLink - Streaming reactivo Server-Sent Events (SSE) (#55)
    */
-  const busSse = new BusSse();
   app.use('/api/v1/realtime', crearRouterRealtime(busSse));
 
   /*

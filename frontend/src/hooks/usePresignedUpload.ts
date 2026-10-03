@@ -11,13 +11,15 @@ export interface PresignedUrlRequest {
   mimeType: string;
   tamanoBytes: number;
   checksumSha256: string;
+  sha256Hash?: string;
   categoria: string;
 }
 
 export interface PresignedUrlResponse {
   uploadUrl: string;
   s3Key: string;
-  expiresIn: number;
+  expiresIn?: number;
+  expiraEnSegundos?: number;
   requiredHeaders?: Record<string, string>;
 }
 
@@ -174,6 +176,7 @@ export function usePresignedUpload(
                 mimeType: "application/pdf",
                 tamanoBytes: file.size,
                 checksumSha256: sha256,
+                sha256Hash: sha256,
                 categoria: options.categoria ?? "EXPEDIENTE_INGRESO",
               } satisfies PresignedUrlRequest,
               { signal: controller.signal },
@@ -233,6 +236,20 @@ export function usePresignedUpload(
               : "La carga directa al almacenamiento falló.",
             "upload",
           );
+        }
+
+        if (!options.demoMode) {
+          try {
+            await apiClient.post("/api/v1/storage/confirmar-carga", {
+              s3Key: presigned.s3Key,
+              sha256Hash: sha256,
+            });
+          } catch (confirmError) {
+            console.warn(
+              "[usePresignedUpload] Aviso al confirmar carga en almacenamiento:",
+              confirmError,
+            );
+          }
         }
 
         const uploaded: UploadResult = { file, sha256, s3Key: presigned.s3Key };

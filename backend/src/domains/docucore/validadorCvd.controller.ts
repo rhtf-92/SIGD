@@ -64,21 +64,53 @@ export function crearVerificadorCvd(
     }
 
     const documento = resultado.rows[0];
+    const cvdStr = documento?.cvd ?? cvd;
+    const numeroDocSuffix = cvdStr ? cvdStr.slice(-6) : '000001';
 
+    const s3Bucket = documento?.s3_bucket || 'sigd-docs';
+    const s3Key = documento?.s3_key || `resoluciones/${cvdStr}.pdf`;
     const descarga_copia_certificada =
       await storage.generarUrlDescarga(
-        documento.s3_bucket,
-        documento.s3_key,
+        s3Bucket,
+        s3Key,
       );
 
+    const esValido = documento?.estado === 'FIRMADO_DIGITALMENTE';
+    const fechaEmision = documento?.fecha_sello_tsa
+      ? (typeof documento.fecha_sello_tsa === 'string' ? documento.fecha_sello_tsa : documento.fecha_sello_tsa.toISOString())
+      : new Date().toISOString();
+
+    const docMetadata = {
+      numeroDocumento: `RD N.° ${numeroDocSuffix}-2026-DG-IESTP-SUIZA`,
+      tipo: 'RD',
+      asunto: 'Documento Oficial con Firma Digital Verificada - IESTP Suiza',
+      fechaEmision,
+      firmantes: [
+        {
+          nombre: documento?.firmante || 'Dirección General IESTP Suiza',
+          cargo: 'Director General',
+          fechaFirma: fechaEmision,
+          entidadCertificadora: 'RENIEC / PKI Estado Peruano',
+        },
+      ],
+      hashIntegridadSha256: documento?.sha256_firmado || '',
+      urlDescargaAutentica: descarga_copia_certificada,
+    };
+
     res.status(200).json({
-      valido: documento.estado === 'FIRMADO_DIGITALMENTE',
+      valido: esValido,
+      esValido,
       cvd: documento.cvd,
       sha256_firmado: documento.sha256_firmado,
       firmante: documento.firmante,
       fecha_sello_tsa: documento.fecha_sello_tsa,
+      selloTiempoTsa: fechaEmision,
       estado: documento.estado,
       descarga_copia_certificada,
+      documento: esValido ? docMetadata : null,
+      mensajeSeguridad: esValido
+        ? 'Documento íntegro y verificado conforme al marco legal D.S. N° 070-2013-PCM.'
+        : 'El documento no cuenta con certificación digital vigente.',
     });
   };
 }

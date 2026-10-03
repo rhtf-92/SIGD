@@ -4,13 +4,13 @@
   "private": true,
   "description": "Backend oficial del Sistema Integral de Gestión Documentaria (SIGD) — IESTP Suiza",
   "type": "module",
-  "main": "dist/server.js",
+  "main": "dist/src/server.js",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --configLoader runner",
@@ -22,7 +22,8 @@
     "load:radicacion": "k6 run k6/escenario-1-radicacion.js",
     "load:derivacion": "k6 run k6/escenario-2-derivacion.js",
     "worker:outbox": "tsx src/audit/worker/outbox-worker.ts",
-    "migrate": "tsx src/db/migrate-cli.ts"
+    "migrate": "tsx src/db/migrate-cli.ts",
+    "smoke:conmutation": "tsx tests/smoke_conmutation_test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1143.0",

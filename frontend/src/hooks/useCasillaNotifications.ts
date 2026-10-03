@@ -26,7 +26,14 @@ export function useCasillaNotifications() {
         (localStorage.getItem("sigd_token") || localStorage.getItem("token"))) ||
       undefined;
 
-    const streamUrl = new URL(`${env.apiBaseUrl}/v1/realtime/stream`);
+    const baseUrl = env.apiBaseUrl.replace(/\/+$/, '');
+    const rutaStream = baseUrl.endsWith('/v1')
+      ? `${baseUrl}/realtime/stream`
+      : `${baseUrl}/api/v1/realtime/stream`;
+    const streamUrl = new URL(
+      rutaStream,
+      typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
+    );
     streamUrl.searchParams.set("canales", "casilla");
     if (token) {
       streamUrl.searchParams.set("token", token);

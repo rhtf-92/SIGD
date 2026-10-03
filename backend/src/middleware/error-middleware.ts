@@ -21,6 +21,8 @@ export function errorMiddleware(error: unknown, req: Request, res: Response, _ne
 
   res.setHeader(CONTEXT_HEADER, correlation_id);
 
+  const ahoraIso = new Date().toISOString();
+
   const body: ApiErrorResponse = {
     type: `${BASE_TYPE_URI}/${serializado.code.toLowerCase()}`,
     title: titleForStatus(serializado.status, serializado.code),
@@ -28,8 +30,12 @@ export function errorMiddleware(error: unknown, req: Request, res: Response, _ne
     detail: serializado.detail,
     instance: req.originalUrl,
     code: serializado.code,
+    codigo: serializado.code,
     correlation_id,
+    correlationId: correlation_id,
     invalid_params: serializado.invalidParams,
+    invalidParams: serializado.invalidParams,
+    timestamp: ahoraIso,
   };
 
   res.setHeader('Content-Type', 'application/problem+json');

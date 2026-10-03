@@ -14,8 +14,12 @@ export interface ApiErrorResponse {
   detail: string;
   instance: string;
   code: string;
+  codigo?: string;
   correlation_id: string;
+  correlationId?: string;
   invalid_params: InvalidParam[];
+  invalidParams?: InvalidParam[];
+  timestamp?: string;
 }
 
 export interface PaginacionRequest {

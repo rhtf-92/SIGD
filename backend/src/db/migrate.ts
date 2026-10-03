@@ -45,7 +45,15 @@ function directorioMigraciones(): string {
     return path.resolve(process.env.MIGRATIONS_DIR);
   }
   const moduloActual = path.dirname(fileURLToPath(import.meta.url));
-  return path.resolve(moduloActual, '../../migraciones');
+  const rutaDev = path.resolve(moduloActual, '../../migraciones');
+  if (fs.existsSync(rutaDev)) {
+    return rutaDev;
+  }
+  const rutaDist = path.resolve(moduloActual, '../../../migraciones');
+  if (fs.existsSync(rutaDist)) {
+    return rutaDist;
+  }
+  return rutaDev;
 }
 
 async function esperarCandado(cliente: PoolClient, lockId: number, timeoutMs: number): Promise<void> {

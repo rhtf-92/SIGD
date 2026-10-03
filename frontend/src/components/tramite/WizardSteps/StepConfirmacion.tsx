@@ -118,16 +118,46 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           ? documentos.asunto.trim()
           : `${documentos.asunto.trim()} - Solicitud de Trámite Institucional`;
 
-      const idTipoTramite =
-        documentos.tipoTramiteId &&
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          documentos.tipoTramiteId,
-        )
-          ? documentos.tipoTramiteId
-          : '00000000-0000-0000-0000-000000000001';
+      let idTipoTramite = documentos.tipoTramiteId;
+      if (
+        !idTipoTramite ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite) ||
+        idTipoTramite === '00000000-0000-0000-0000-000000000001'
+      ) {
+        try {
+          const respTipos = await apiClient.get<Array<{ id: string; codigo?: string; id_tipo_tramite?: string }>>(
+            '/api/v1/tramites/tipos',
+          );
+          if (Array.isArray(respTipos?.data) && respTipos.data.length > 0) {
+            const encontrado = respTipos.data.find(
+              (t) => t.codigo === documentos.tipoTramiteId || t.id === documentos.tipoTramiteId,
+            );
+            const resId = (encontrado ? (encontrado.id || encontrado.id_tipo_tramite) : (respTipos.data[0].id || respTipos.data[0].id_tipo_tramite));
+            if (resId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resId)) {
+              idTipoTramite = resId;
+            }
+          }
+        } catch {
+          // Fallback defensivo si el endpoint no está disponible en entorno aislado
+        }
+      }
+      if (!idTipoTramite || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite)) {
+        idTipoTramite = '00000000-0000-0000-0000-000000000001';
+      }
 
-      const idPersonaNum =
-        Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
+      let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
+      try {
+        if (identificacion.numeroDocumento) {
+          const respPersona = await apiClient.get<{ persona?: { id: number | string } }>(
+            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(identificacion.numeroDocumento)}`
+          );
+          if (respPersona?.data?.persona?.id) {
+            idPersonaNum = Number(respPersona.data.persona.id);
+          }
+        }
+      } catch {
+        // Fallback defensivo
+      }
 
       const archivosPayload =
         documentos.archivos.length > 0

@@ -1,6 +1,7 @@
 // Hook de Tablas Maestras y Catálogos Paramétricos (ENT-M05-05)
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { apiClient } from "../api/client";
 import type {
   AreaOrganica,
   EstadoRegistro,
@@ -49,7 +50,42 @@ export function useTablasMaestras() {
   const [detalle, setDetalle] = useState("");
   const [mensaje, setMensaje] = useState("");
 
-  const areasOrganicas: AreaOrganica[] = ORGANIGRAMA_MATERIALIZED_PATH;
+  const [areasOrganicas, setAreasOrganicas] = useState<AreaOrganica[]>(ORGANIGRAMA_MATERIALIZED_PATH);
+
+  useEffect(() => {
+    let montado = true;
+    apiClient
+      .get<
+        Array<{
+          id?: string | number;
+          area_id?: string;
+          codigo?: string;
+          sigla?: string;
+          nombre: string;
+          ruta_jerarquica?: string;
+          path?: string;
+        }>
+      >("/api/v1/admin/organigrama")
+      .then((res) => {
+        if (!montado || !Array.isArray(res.data) || res.data.length === 0) return;
+        const mapped: AreaOrganica[] = res.data.map((item, index) => ({
+          id: typeof item.id === "number" ? item.id : index + 1,
+          codigo: item.codigo ?? item.sigla ?? `ARE-${String(index + 1).padStart(3, "0")}`,
+          nombre: item.nombre,
+          ruta: item.ruta_jerarquica ?? item.path ?? `01.${String(index + 1).padStart(2, "0")}`,
+          detalle: `Unidad orgánica institucional (${item.sigla ?? item.nombre})`,
+          estado: "Activo" as const,
+        }));
+        setAreasOrganicas(mapped);
+      })
+      .catch(() => {
+        // Fallback al catálogo predeterminado
+      });
+
+    return () => {
+      montado = false;
+    };
+  }, []);
 
   const filtrados = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();

@@ -15,12 +15,23 @@ import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { generarUrlPresigned } from './s3-storage.service.js';
 import { ValidationError } from '../../shared/domain/errors/index.js';
 
-const presignedInputSchema = z.object({
-  nombreArchivo: z.string().min(1).max(255),
-  tamanoBytes: z.number().int().positive().max(26_214_400), // Máximo 25 MB
-  mimeType: z.literal('application/pdf'),
-  sha256Hash: z.string().length(64).regex(/^[a-fA-F0-9]{64}$/),
-});
+const presignedInputSchema = z.preprocess(
+  (val: any) => {
+    if (val && typeof val === 'object') {
+      return {
+        ...val,
+        sha256Hash: val.sha256Hash ?? val.checksumSha256,
+      };
+    }
+    return val;
+  },
+  z.object({
+    nombreArchivo: z.string().min(1).max(255),
+    tamanoBytes: z.number().int().positive().max(26_214_400), // Máximo 25 MB
+    mimeType: z.literal('application/pdf'),
+    sha256Hash: z.string().length(64).regex(/^[a-fA-F0-9]{64}$/),
+  }),
+);
 
 const confirmarInputSchema = z.object({
   s3Key: z.string().min(3),
@@ -49,6 +60,7 @@ export function crearRouterStorage(pool?: Pool): Router {
       uploadUrl,
       s3Key,
       expiraEnSegundos: config.presignExpirationSegundos,
+      expiresIn: config.presignExpirationSegundos,
     });
   });
 

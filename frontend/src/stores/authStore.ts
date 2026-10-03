@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { apiClient } from "../api/client";
+import { permisosIniciales } from "../hooks/useRbacConfig";
 
 export interface UsuarioPerfil {
   id: string;
@@ -95,9 +96,41 @@ function createStore() {
         usuario: data.usuario,
         isAuthenticated: true,
       });
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          window.localStorage.setItem("sigd_token", data.accessToken);
+          window.localStorage.setItem("token", data.accessToken);
+          if (data.usuario?.rol) {
+            window.localStorage.setItem("sigd_rol", data.usuario.rol);
+          }
+          if (!window.localStorage.getItem("sigd_permisos")) {
+            window.localStorage.setItem("sigd_permisos", JSON.stringify(permisosIniciales));
+          }
+        }
+      } catch {
+        // Ignore storage errors
+      }
     },
     logout: () => {
       set({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false });
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          window.localStorage.removeItem("sigd_token");
+          window.localStorage.removeItem("token");
+          window.localStorage.removeItem("sigd_rol");
+          window.localStorage.removeItem("sigd_permisos");
+          window.localStorage.removeItem(STORAGE_KEY);
+        }
+      } catch {
+        // Ignore storage errors
+      }
+      try {
+        if (typeof window !== "undefined" && window.location) {
+          window.location.href = "/login";
+        }
+      } catch {
+        // Ignore navigation error in test environments
+      }
     },
     setToken: (accessToken: string, refreshToken: string | null = null) => {
       set((s) => ({
@@ -105,6 +138,14 @@ function createStore() {
         refreshToken: refreshToken ?? s.refreshToken,
         isAuthenticated: true,
       }));
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          window.localStorage.setItem("sigd_token", accessToken);
+          window.localStorage.setItem("token", accessToken);
+        }
+      } catch {
+        // Ignore storage errors
+      }
     },
   };
 

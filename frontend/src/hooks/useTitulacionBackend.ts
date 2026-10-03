@@ -12,7 +12,7 @@ import { queryKeys } from "../api/queryKeys";
 import { env } from "../config/env";
 import type { WorkflowAcademico } from "../types/workflowAcademico";
 
-const USAR_MOCKS = env.enableMocks || env.isDevelopment;
+const USAR_MOCKS = env.enableMocks;
 
 export type TransicionTitulacion =
   | "tomar_revision"

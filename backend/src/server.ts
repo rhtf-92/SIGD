@@ -76,7 +76,7 @@ try {
     env: {
       ...process.env,
       VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
-      VITE_ENABLE_MOCKS: 'true',
+      VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
     },
   });
 

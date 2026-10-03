@@ -18,6 +18,7 @@ import ExpedienteDetallePage from "../pages/expedientes/ExpedienteDetallePage";
 import MesaPartesVirtualPage from "../pages/tramite/MesaPartesVirtualPage";
 import VentanillaPresencialPage from "../pages/tramite/VentanillaPresencialPage";
 import TramitePage from "../pages/tramite/TramitePage";
+import ConsultaPublicaPage from "../pages/tramite/ConsultaPublicaPage";
 import ProyectorResolucionesPage from "../pages/flujos/ProyectorResolucionesPage";
 import AdminRoutes from "./AdminRoutes";
 import ProtectedRoute from "./ProtectedRoute";
@@ -28,6 +29,9 @@ export default function AppRouter() {
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
+
+      <Route path="/consulta" element={<ConsultaPublicaPage />} />
+      <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
 
       <Route path="/casilla" element={<CasillaElectronicaPage />} />
       <Route
