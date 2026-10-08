@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { FileSpreadsheet, FileText, LoaderCircle } from "lucide-react";
+import Button from "@/components/ui/Button";
 import { exportExcelReport } from "@/services/excelReportExporter";
 import { exportPdfReport } from "@/services/pdfReportExporter";
 import type {
@@ -47,26 +48,26 @@ export default function ExportActionsToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-2" aria-label="Exportación de reportes">
-      <button
-        type="button"
+      <Button
+        variant="primary"
         onClick={() => void handleExport("pdf")}
         disabled={isExportingPdf}
-        className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#124E5A] px-3 text-sm font-semibold text-white transition hover:bg-[#0D3D47] disabled:cursor-wait disabled:opacity-65"
+        className="min-h-10"
         aria-label={isExportingPdf ? "Generando PDF" : "Descargar reporte PDF"}
       >
         {isExportingPdf ? <LoaderCircle className="size-4 animate-spin" /> : <FileText className="size-4" />}
         {isExportingPdf ? "Generando PDF" : "PDF 1.4"}
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="secondary"
         onClick={() => void handleExport("excel")}
         disabled={isExportingExcel}
-        className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[#9BB9BC] bg-white px-3 text-sm font-semibold text-[#173D43] transition hover:bg-[#EEF5F3] disabled:cursor-wait disabled:opacity-65"
+        className="min-h-10"
         aria-label={isExportingExcel ? "Generando Excel" : "Descargar reporte Excel SpreadsheetML"}
       >
         {isExportingExcel ? <LoaderCircle className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
         {isExportingExcel ? "Generando Excel" : "Excel XML"}
-      </button>
+      </Button>
       <span className="sr-only" role="status" aria-live="polite">{status}</span>
     </div>
   );

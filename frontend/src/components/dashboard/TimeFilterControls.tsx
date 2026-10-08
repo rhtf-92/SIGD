@@ -20,7 +20,7 @@ interface TimeFilterControlsProps {
 
 const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-const fieldClass = "mt-1 w-full min-w-0 rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200";
+const fieldClass = "input-sigd mt-1";
 
 export default function TimeFilterControls({
   year,
@@ -38,7 +38,7 @@ export default function TimeFilterControls({
   onUnitChange,
 }: TimeFilterControlsProps) {
   return (
-    <section aria-label="Filtros del tablero" className="grid min-w-0 grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label="Filtros del tablero" className="card-sigd grid min-w-0 grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
       <label className="min-w-0 text-sm font-medium text-slate-700">
         Año
         <select className={fieldClass} value={year} onChange={(event) => onYearChange(Number(event.target.value))}>

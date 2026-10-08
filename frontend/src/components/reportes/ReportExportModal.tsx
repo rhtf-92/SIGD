@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import Button from "@/components/ui/Button";
 import { exportExcelReport } from "@/utils/excelReportExporter";
 import { exportPdfReport } from "@/utils/pdfReportExporter";
 import type { ExportableReportRecord, ReportExportFilterState, ReportFormat } from "@/types/reportExportConfig";
@@ -48,14 +49,13 @@ export default function ReportExportModal({ reportName, filters, records }: Repo
 
   return (
     <div className="relative">
-      <button
-        type="button"
+      <Button
         onClick={() => setIsOpen((current) => !current)}
-        className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+        className="min-h-10 px-4"
         aria-label="Abrir opciones de exportación del dashboard"
       >
         Exportar
-      </button>
+      </Button>
 
       {isOpen && (
         <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
