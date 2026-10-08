@@ -1,5 +1,5 @@
 @layer theme, base, components, utilities;
-@import "../../styles/theme.css";
+/* styles/theme.css se carga de forma global desde src/index.css */
 
 .m03 { color: #0f172a; min-width: 0; overflow-wrap: anywhere; }
 .m03 :is(button, input, select, textarea, a, [tabindex]):focus-visible {

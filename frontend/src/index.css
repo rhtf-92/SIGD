@@ -1,1 +1,29 @@
 @import "tailwindcss";
+@import "./styles/theme.css";
+
+/*
+  Tokens visuales del SIGD (Tailwind CSS 4).
+  `static` garantiza que las variables existan siempre, incluidas las que
+  referencian los componentes de src/styles/theme.css.
+  Paleta derivada de los colores ya existentes en tailwind.config.ts.
+*/
+@theme static {
+  --font-sans: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --font-display: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+
+  --color-sigd-blue: #006ec7;
+  --color-sigd-blue-dark: #0059a8;
+  --color-sigd-blue-deep: #004b8f;
+  --color-sigd-fuchsia: #e6007e;
+  --color-sigd-yellow: #f9e000;
+  --color-sigd-red: #d62828;
+  --color-sigd-ink: #111111;
+  --color-sigd-surface: #f1f5f9;
+  --color-sigd-line: #e2e8f0;
+
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-card-hover: 0 6px 16px rgba(15, 23, 42, 0.08);
+}

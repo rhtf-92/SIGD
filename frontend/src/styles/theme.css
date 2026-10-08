@@ -1,30 +1,40 @@
+/*
+  Sistema visual base del SIGD.
+  Todas las clases son consumidas por JSX existente: NO se renombran.
+  Los valores se apoyan en los tokens declarados en src/index.css (@theme).
+*/
+
 @layer components {
+  /* ── Cabecera institucional ─────────────────────────────────────────── */
   .header-sigd {
-    background: linear-gradient(90deg, #006ec7 0%, #005ca2 100%);
+    background: var(--color-sigd-blue);
     color: #ffffff;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
   }
 
+  /* Barra de acento sólida (sin degradados) */
   .header-bar {
     display: block;
     width: 100%;
-    height: 6px;
-    background: linear-gradient(90deg, #006ec7 0%, #e6007e 50%, #f9e000 100%);
+    height: 4px;
+    background: var(--color-sigd-blue);
   }
 
+  /* ── Tarjetas ───────────────────────────────────────────────────────── */
   .card-sigd {
-    border-radius: 1rem;
-    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--color-sigd-line);
     background: #ffffff;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    box-shadow: var(--shadow-card);
   }
 
+  /* ── Títulos de sección ─────────────────────────────────────────────── */
   .section-title {
     font-size: 1rem;
     font-weight: 700;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #006ec7;
+    color: var(--color-sigd-blue);
   }
 
   @media (min-width: 640px) {
@@ -33,92 +43,117 @@
     }
   }
 
+  /* ── Controles de formulario ────────────────────────────────────────── */
   .input-sigd {
     width: 100%;
-    border-radius: 0.75rem;
+    min-height: 2.5rem;
+    border-radius: var(--radius-control);
     border: 1px solid #cbd5e1;
     background: #ffffff;
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0.875rem;
     font-size: 0.875rem;
+    line-height: 1.25rem;
     color: #0f172a;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
 
   .input-sigd::placeholder {
     color: #94a3b8;
   }
 
+  .input-sigd:hover:not(:disabled) {
+    border-color: #94a3b8;
+  }
+
   .input-sigd:focus {
-    border-color: #006ec7;
+    border-color: var(--color-sigd-blue);
     outline: none;
-    box-shadow: 0 0 0 4px rgba(0, 110, 199, 0.12);
+    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.18);
   }
 
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.75rem;
-    background: #006ec7;
-    padding: 0.875rem 1.25rem;
-    font-size: 0.875rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #ffffff;
-    transition: background-color 0.2s ease, transform 0.2s ease;
-    cursor: pointer;
+  .input-sigd:disabled {
+    cursor: not-allowed;
+    background: #f1f5f9;
+    color: #94a3b8;
   }
 
-  .btn-primary:hover {
-    background: #0059a8;
-  }
-
-  .btn-primary:focus {
-    outline: none;
-    box-shadow: 0 0 0 4px rgba(0, 110, 199, 0.18);
-  }
-
+  /* ── Botones ────────────────────────────────────────────────────────── */
+  .btn-primary,
   .btn-secondary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 0.75rem;
-    border: 1px solid #d1d5db;
-    background: #ffffff;
-    padding: 0.875rem 1.25rem;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    border-radius: var(--radius-control);
+    padding: 0.5rem 1rem;
     font-size: 0.875rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    font-weight: 600;
+    line-height: 1.25rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .btn-primary {
+    border: 1px solid transparent;
+    background: var(--color-sigd-blue);
+    color: #ffffff;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-sigd-blue-dark);
+  }
+
+  .btn-primary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.3);
+  }
+
+  .btn-secondary {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
     color: #334155;
-    transition: border-color 0.2s ease, color 0.2s ease;
   }
 
-  .btn-secondary:hover {
-    border-color: #006ec7;
-    color: #006ec7;
+  .btn-secondary:hover:not(:disabled) {
+    border-color: var(--color-sigd-blue);
+    color: var(--color-sigd-blue);
   }
 
+  .btn-secondary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.2);
+  }
+
+  .btn-primary:disabled,
+  .btn-secondary:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  /* ── Tablas ─────────────────────────────────────────────────────────── */
   .table-sigd {
     width: 100%;
     overflow: hidden;
-    border-radius: 0.75rem;
-    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-sigd-line);
     background: #ffffff;
+    box-shadow: var(--shadow-card);
   }
 
+  /* ── Insignias ──────────────────────────────────────────────────────── */
   .badge-sigd {
     display: inline-flex;
     align-items: center;
     border-radius: 9999px;
-    border: 1px solid rgba(230, 0, 126, 0.3);
-    background: #fdf2f8;
-    padding: 0.35rem 0.6rem;
-    font-size: 0.625rem;
+    border: 1px solid #bae6fd;
+    background: #f0f9ff;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.65rem;
     font-weight: 700;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #e6007e;
+    color: var(--color-sigd-blue-dark);
   }
 }
