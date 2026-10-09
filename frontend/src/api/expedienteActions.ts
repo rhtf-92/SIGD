@@ -1,5 +1,19 @@
 import { ErrorAccionExpediente } from "../types/expedienteActions";
 import type { ResultadoDerivacion, ResultadoObservacion, ServicioExpedienteActions, SolicitudDerivacion, SolicitudObservacion } from "../types/expedienteActions";
+import type { MovimientoExpediente, MovimientoExpedienteDTO } from "../types/trazabilidadExpediente";
+
+/**
+ * Mapeador seguro para garantizar la compatibilidad entre el contrato Backend (BIGINT / nulls)
+ * y la capa Frontend React (string / 0% any).
+ */
+export const mapearMovimiento = (dto: MovimientoExpedienteDTO): MovimientoExpediente => ({
+  id: String(dto.id),
+  expedienteId: String(dto.expedienteId),
+  unidadOrigenId: dto.unidadOrigenId,
+  unidadDestinoId: dto.unidadDestinoId,
+  observaciones: dto.observaciones ?? "",
+  fechaMovimiento: dto.fechaMovimiento,
+});
 
 /** Implementar únicamente después de verificar el DTO real y sus consumidores. */
 export interface AdaptadorPayload<Entrada> {

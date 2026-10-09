@@ -6,6 +6,29 @@
  * desde la interfaz. El Timeline es de solo lectura (Write Once, Read Many).
  */
 
+/** Soporte para BIGINT (number | string) proveniente de la base de datos / API backend. */
+export type BigIntId = number | string;
+
+/** DTO que refleja la respuesta cruda del Backend (API/DB con BIGINT y campos nulos). */
+export interface MovimientoExpedienteDTO {
+  id: BigIntId;
+  expedienteId: BigIntId;
+  unidadOrigenId: number;
+  unidadDestinoId: number;
+  observaciones: string | null;
+  fechaMovimiento: string;
+}
+
+/** Interfaz limpia para el consumo dentro de componentes React. */
+export interface MovimientoExpediente {
+  id: string;
+  expedienteId: string;
+  unidadOrigenId: number;
+  unidadDestinoId: number;
+  observaciones: string;
+  fechaMovimiento: string;
+}
+
 /** Tipo de evento registrado en la bitácora inmutable del expediente. */
 export type TipoEventoBitacora =
   | "CREACION"
