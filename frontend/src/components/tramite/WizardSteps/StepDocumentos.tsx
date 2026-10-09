@@ -38,37 +38,22 @@ export interface StepDocumentosProps {
   isSubmitting?: boolean;
 }
 
-const CATALOGO_TUPA_INSTITUCIONAL = [
-  {
-    id: 'TUPA-01',
-    nombre: 'Certificado Oficial de Estudios (Por Semestre o Ciclo Completo)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-02',
-    nombre: 'Constancia de Matrícula, Egresado y No Adeudo',
-    unidad: 'Dirección de Asuntos Académicos',
-  },
-  {
-    id: 'TUPA-03',
-    nombre: 'Expedición de Título Profesional Técnico a Nombre de la Nación',
-    unidad: 'Área de Titulación y Grados',
-  },
-  {
-    id: 'TUPA-04',
-    nombre: 'Rectificación de Matrícula o Reserva de Vacante Temporal',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-05',
-    nombre: 'Convalidación y Homologación de Unidades Didácticas (Módulos)',
-    unidad: 'Coordinación de Programas de Estudio',
-  },
-  {
-    id: 'LIBRE-01',
-    nombre: 'Solicitud Formal General / Trámite Libre Institucional',
-    unidad: 'Mesa de Partes General',
-  },
+const opcionesTramite = [
+  { value: 'practicas_iniciales', label: 'Prácticas Iniciales — S/ 35.00' },
+  { value: 'practicas_intermedias', label: 'Prácticas Intermedias — S/ 45.00' },
+  { value: 'practicas_finales', label: 'Prácticas Finales — S/ 60.00' },
+  { value: 'experiencias_formativas', label: 'Exp. Formativas — S/ 46.50' },
+  { value: 'certificado_modular', label: 'Certificado Modular — S/ 100.00' },
+  { value: 'certificado_ingles', label: 'Certificado de Inglés — S/ 100.00' },
+  { value: 'matricula', label: 'Matrícula — S/ 200.00' },
+  { value: 'admision_2026', label: 'Admisión 2026 — S/ 250.00' },
+  { value: 'reincorporacion', label: 'Reincorporación — S/ 300.00' },
+  { value: 'examen_recuperacion', label: 'Examen de Recuperación — S/ 70.00' },
+  { value: 'examen_cargo', label: 'Examen de Cargo — S/ 70.00' },
+  { value: 'repitencia_unidad', label: 'Repitencia de Unidad — S/ 86.00' },
+  { value: 'repitencia_semestre', label: 'Repitencia de Semestre — S/ 80.00' },
+  { value: 'titulacion', label: 'Proceso de Titulación — S/ 917.50' },
+  { value: 'tramite_libre', label: 'Trámite no TUPA / Libre' },
 ] as const;
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -270,9 +255,9 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             } disabled:bg-slate-100`}
           >
             <option value="">-- Seleccione un procedimiento oficial --</option>
-            {CATALOGO_TUPA_INSTITUCIONAL.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id} — {t.nombre} ({t.unidad})
+            {opcionesTramite.map((tramite) => (
+              <option key={tramite.value} value={tramite.value}>
+                {tramite.label}
               </option>
             ))}
           </select>

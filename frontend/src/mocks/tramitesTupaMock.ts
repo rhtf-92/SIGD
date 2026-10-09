@@ -19,7 +19,8 @@ import {
   PROGRAMAS_ESTUDIO_CATALOGO,
 } from "../types/tramiteWizard";
 import { type SelectOption } from "../components/common/SearchableSelect";
-import { PROCEDIMIENTOS_TUPA_2026 } from "../data/tupaPasco2026";
+// ✅ TUPA IESTP SUIZA — Mock alineado con catálogo oficial
+import { PROCEDIMIENTOS_TUPA_SUIZA_2026 } from "@/data/tupaSuiza2026";
 
 /**
  * Lista canónica y oficial de las 11 Carreras Profesionales del IESTP "Suiza".
@@ -51,16 +52,16 @@ const TODOS_LOS_PROGRAMAS = PROGRAMAS_ESTUDIO_CATALOGO.map(
 );
 
 export const TRAMITES_TUPA_MOCK: readonly TramiteTupaMockItem[] = [
-  ...PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => {
+  ...PROCEDIMIENTOS_TUPA_SUIZA_2026.map((procedimiento) => {
     const dependencia = procedimiento.dependencia ?? "Mesa de Partes";
     const datosDescripcion = [
-      procedimiento.derechoPago
-        ? `Derecho de pago: ${procedimiento.derechoPago}`
+      procedimiento.derechoPago !== undefined
+        ? `Derecho de pago: S/. ${procedimiento.derechoPago.toFixed(2)}`
         : undefined,
       procedimiento.tiempoMaximo
         ? `Tiempo máximo: ${procedimiento.tiempoMaximo}`
         : undefined,
-      ...(procedimiento.detalleTarifas ?? []),
+      procedimiento.descripcion,
       procedimiento.nota,
     ].filter((dato): dato is string => Boolean(dato));
 
@@ -74,7 +75,9 @@ export const TRAMITES_TUPA_MOCK: readonly TramiteTupaMockItem[] = [
         .split(" / ")[0]
         .toUpperCase()
         .replaceAll(" ", "_"),
-      derechoPago: procedimiento.derechoPago,
+      derechoPago: procedimiento.derechoPago !== undefined
+        ? `S/. ${procedimiento.derechoPago.toFixed(2)}`
+        : undefined,
       tiempoMaximo: procedimiento.tiempoMaximo,
       descripcion: datosDescripcion.join(" • "),
       carrerasAplica: TODOS_LOS_PROGRAMAS,

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
-import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
+// ✅ TUPA IESTP SUIZA — Fuente oficial Enero 2026
+import { PROCEDIMIENTOS_TUPA_SUIZA_2026 } from "@/data/tupaSuiza2026";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
@@ -43,7 +44,7 @@ export default function VentanillaPresencialPage() {
   const [cantidadFolios, setCantidadFolios] = useState(1);
   const [cargoGenerado, setCargoGenerado] = useState<CargoOficialTramite | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
-  const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_2026.find(
+  const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_SUIZA_2026.find(
     (procedimiento) => procedimiento.codigo === procedimientoTupa,
   );
 
@@ -169,13 +170,12 @@ export default function VentanillaPresencialPage() {
           className="mb-6 rounded-xl border border-amber-400 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm"
         >
           <h2 id="tupa-referencial-heading" className="font-bold">
-            Catálogo TUPA referencial — no oficial para el IESTP Suiza
+            Catálogo TUPA del IESTP Suiza — enero de 2026
           </h2>
           <p className="mt-1">
-            Los procedimientos, requisitos y tarifas que se muestran provienen del TUPA 2026 del IESTP Pasco.
-            Esta pantalla corresponde al IESTP Suiza (Pucallpa): la integración de su catálogo propio está
-            pendiente. No use estos datos como información oficial del IESTP Suiza ni como base definitiva para
-            orientar o cobrar trámites.
+            Los procedimientos, requisitos y derechos de pago corresponden al catálogo TUPA del IESTP Suiza.
+            Verifique por los canales institucionales si existe una actualización vigente antes de orientar o cobrar
+            un trámite.
           </p>
         </aside>
 
@@ -331,7 +331,7 @@ export default function VentanillaPresencialPage() {
               >
                 <option value="">Seleccione un procedimiento o servicio</option>
                 <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
-                {PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => (
+                {PROCEDIMIENTOS_TUPA_SUIZA_2026.map((procedimiento) => (
                   <option key={procedimiento.codigo} value={procedimiento.codigo}>
                     {procedimiento.codigo} - {procedimiento.nombre}
                   </option>
@@ -384,7 +384,7 @@ export default function VentanillaPresencialPage() {
                   <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
                     TUPA {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
                   </h3>
-                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Pasco</p>
+                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Suiza</p>
                 </div>
                 {procedimientoSeleccionado.derechoPago && (
                   <p className="max-w-xl text-sm font-semibold text-slate-800">
@@ -426,7 +426,7 @@ export default function VentanillaPresencialPage() {
                 </div>
               )}
 
-              {procedimientoSeleccionado.detalleTarifas && (
+              {procedimientoSeleccionado.detalleTarifas.length > 0 && (
                 <div className="mt-3">
                   <h4 className="mb-2 text-xs font-bold uppercase text-slate-700">Servicios y tarifas</h4>
                   <ul className="grid gap-1 text-sm text-slate-700 sm:grid-cols-2">
