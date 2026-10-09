@@ -69,34 +69,36 @@ const frontendDir = path.resolve(__dirname, '../../frontend');
 const viteBin = path.resolve(frontendDir, 'node_modules/vite/bin/vite.js');
 
 let viteProc: ReturnType<typeof spawn> | null = null;
-try {
-  viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
-    cwd: frontendDir,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
-      VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
-    },
-  });
+if (process.env.START_VITE_WITH_BACKEND === 'true') {
+  try {
+    viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
+      cwd: frontendDir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
+        VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
+      },
+    });
 
-  viteProc.stdout?.on('data', (data) => {
-    console.log(`[Vite stdout] ${data}`);
-  });
+    viteProc.stdout?.on('data', (data) => {
+      console.log(`[Vite stdout] ${data}`);
+    });
 
-  viteProc.stderr?.on('data', (data) => {
-    console.error(`[Vite stderr] ${data}`);
-  });
+    viteProc.stderr?.on('data', (data) => {
+      console.error(`[Vite stderr] ${data}`);
+    });
 
-  viteProc.on('error', (err) => {
-    console.error('[Frontend Vite] Error al iniciar:', err);
-  });
+    viteProc.on('error', (err) => {
+      console.error('[Frontend Vite] Error al iniciar:', err);
+    });
 
-  viteProc.on('close', (code) => {
-    console.log(`[Frontend Vite] Proceso cerrado con código ${code}`);
-  });
-} catch (e) {
-  console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
+    viteProc.on('close', (code) => {
+      console.log(`[Frontend Vite] Proceso cerrado con código ${code}`);
+    });
+  } catch (e) {
+    console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
+  }
 }
 
 process.on('SIGINT', () => {

@@ -50,7 +50,7 @@ export function crearRouterStorage(pool?: Pool): Router {
     const extension = datos.nombreArchivo.split('.').pop() ?? 'pdf';
     const s3Key = `expedientes/${new Date().getFullYear()}/${uuid}.${extension}`;
 
-    const uploadUrl = generarUrlPresigned(s3Key, config, {
+    const uploadUrl = generarUrlPresigned(s3Key, { ...config, endpoint: config.publicEndpoint }, {
       metodo: 'PUT',
       contentType: datos.mimeType,
       expiraSegundos: config.presignExpirationSegundos,
@@ -102,7 +102,7 @@ export function crearRouterStorage(pool?: Pool): Router {
       });
     }
 
-    const configBucket = { ...config, bucket };
+    const configBucket = { ...config, bucket, endpoint: config.publicEndpoint };
     const downloadUrl = generarUrlPresigned(key, configBucket, {
       metodo: 'GET',
       expiraSegundos: 900,
