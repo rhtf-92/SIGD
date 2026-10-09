@@ -19,7 +19,7 @@ services:
 
   # 2. Almacenamiento de Objetos Compatible con Amazon S3
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/aistor/minio:latest
     container_name: sigd_minio
     command: server /data --console-address ":9001"
     environment:
@@ -52,11 +52,14 @@ services:
 
   # 4. API Backend y Worker Asíncrono de Auditoría Outbox
   backend:
-    image: node:20-alpine
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: sigd_backend
     working_dir: /app
     volumes:
       - ./backend:/app
+      - /app/node_modules
     command: sh -c "npm install && npm run dev"
     environment:
       PORT: 3000

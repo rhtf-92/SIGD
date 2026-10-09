@@ -201,20 +201,7 @@ CREATE INDEX IF NOT EXISTS idx_notif_casilla_cut
 CREATE INDEX IF NOT EXISTS idx_notif_casilla_fecha
     ON sigd_auth.notificacion_casilla (fecha_deposito DESC);
 
--- Semilla inicial determinista para pruebas y desarrollo
-INSERT INTO sigd_auth.notificacion_casilla (
-    id, usuario_id, cut, asunto, tipo_acto, numero_documento,
-    estado, fecha_deposito, hash_sha256, cvd
-) VALUES (
-    '00000000-0000-0000-0000-000000000101',
-    '00000000-0000-0000-0000-000000000001',
-    'EXP-2026-000142',
-    'Notificación de Resolución Directoral de Matrícula',
-    'Resolución Directoral',
-    'RD N.° 0142-2026-DG-IESTP-SUIZA',
-    'NO_LEIDO',
-    now(),
-    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    'CVD-2026-RD-000142-A4F2'
-) ON CONFLICT (id) DO NOTHING;
+-- Semilla inicial determinista DESACTIVADA (CP-POOL-003):
+-- INSERT INTO sigd_auth.notificacion_casilla ... (usuario_id inexistente en cuenta_usuario)
+-- ON CONFLICT (id) DO NOTHING;
 
