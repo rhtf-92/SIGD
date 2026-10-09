@@ -42,4 +42,9 @@ describe('contrato de migraciones ejecutables', () => {
     expect(reportes).not.toContain('fecha_movimiento');
     expect(reportes).not.toContain('estado_destino');
   });
+
+  it('no inserta una notificación de prueba para un usuario inexistente', () => {
+    const auth = leerMigracion('02_sigd_auth.sql');
+    expect(auth).toMatch(/'00000000-0000-0000-0000-000000000101',\s*NULL,/);
+  });
 });
