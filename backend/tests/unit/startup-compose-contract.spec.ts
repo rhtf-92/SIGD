@@ -26,6 +26,7 @@ describe('contrato de arranque con Docker Compose', () => {
     expect(compose).toContain('chainguard/minio:latest');
     expect(compose).toContain('condition: service_started');
     expect(compose).toContain('amazon/aws-cli:2.27.0');
+    expect(compose).toContain('entrypoint: ["/bin/sh", "-c",');
     expect(compose).toContain('aws --endpoint-url http://minio:9000 s3 mb s3://sigd-expedientes');
     expect(compose).toContain('"5433:5432"');
   });

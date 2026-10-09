@@ -28,10 +28,7 @@ services:
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadminpassword
       AWS_DEFAULT_REGION: us-east-1
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      until aws --endpoint-url http://minio:9000 s3api list-buckets > /dev/null 2>&1; do sleep 2; done;
-      aws --endpoint-url http://minio:9000 s3 mb s3://sigd-expedientes || true
+    entrypoint: ["/bin/sh", "-c", "until aws --endpoint-url http://minio:9000 s3api list-buckets > /dev/null 2>&1; do sleep 2; done; aws --endpoint-url http://minio:9000 s3 mb s3://sigd-expedientes || true"]
 
   # 2. Almacenamiento de Objetos Compatible con Amazon S3
   minio:
