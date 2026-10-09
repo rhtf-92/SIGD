@@ -15,6 +15,22 @@ interface LoginCredentials {
   password: string;
 }
 
+// Los roles canónicos del frontend (entorno RBAC ENT-M05-03) se expresan con
+// los códigos del backend (migraciones 03/08). Se normaliza para que
+// ProtectedRoute y la matriz `permisosIniciales` encuentren su fila.
+const ROL_CANONICO: Record<string, UsuarioPerfil['rol']> = {
+  ADMINISTRADOR: 'SUPER_ADMIN',
+  DIRECTOR: 'DIRECTOR',
+  MESA_PARTES: 'MESA_PARTES',
+  SECRETARIO: 'DOCENTE',
+  ESPECIALISTA: 'DOCENTE',
+  CIUDADANO: 'ESTUDIANTE',
+};
+
+function normalizarRol(rol: string): UsuarioPerfil['rol'] {
+  return ROL_CANONICO[rol] ?? 'ESTUDIANTE';
+}
+
 export interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
@@ -90,19 +106,24 @@ function createStore() {
     ...initialPersisted,
     login: async (credentials: LoginCredentials) => {
       const { data } = await apiClient.post("/api/v1/auth/login", credentials);
+      const usuarioCanonico: UsuarioPerfil | null = data.usuario
+        ? {
+            ...(data.usuario as UsuarioPerfil),
+            rol: normalizarRol(data.usuario.rol),
+          }
+        : null;
       set({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
-        usuario: data.usuario,
+        usuario: usuarioCanonico,
         isAuthenticated: true,
       });
       try {
         if (typeof window !== "undefined" && window.localStorage) {
           window.localStorage.setItem("sigd_token", data.accessToken);
           window.localStorage.setItem("token", data.accessToken);
-          if (data.usuario?.rol) {
-            window.localStorage.setItem("sigd_rol", data.usuario.rol);
-          }
+          const rolCanonico = usuarioCanonico?.rol ?? "ESTUDIANTE";
+          window.localStorage.setItem("sigd_rol", rolCanonico);
           if (!window.localStorage.getItem("sigd_permisos")) {
             window.localStorage.setItem("sigd_permisos", JSON.stringify(permisosIniciales));
           }

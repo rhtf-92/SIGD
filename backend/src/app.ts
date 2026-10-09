@@ -268,9 +268,9 @@ export function construirApp(
       const limite = Math.min(Number(req.query.limite ?? 50), 100);
       const offset = Number(req.query.offset ?? 0);
       const { rows } = await pool.query(
-        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, creado_en
+        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, fecha_hora
          FROM sigd_audit.bitacora_auditoria
-         ORDER BY creado_en DESC
+         ORDER BY fecha_hora DESC
          LIMIT $1 OFFSET $2`,
         [limite, offset],
       );
@@ -283,12 +283,12 @@ export function construirApp(
   app.get('/api/v1/admin/roles-permisos', async (_req, res, next) => {
     try {
       const { rows: roles } = await pool.query(
-        `SELECT r.id, r.codigo, r.nombre, r.descripcion,
+        `SELECT r.rol_id, r.codigo, r.nombre, r.descripcion,
                 COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
          FROM sigd_org.rol_sistema r
-         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.id
-         LEFT JOIN sigd_org.permiso_sistema p ON p.id = rp.permiso_id
-         GROUP BY r.id, r.codigo, r.nombre, r.descripcion`,
+         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
+         LEFT JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+         GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion`,
       );
       res.json({ roles });
     } catch {
@@ -316,7 +316,7 @@ export function construirApp(
   app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
     try {
       const { rows } = await pool.query(
-        `SELECT id, codigo, nombre, descripcion, dias_atencion_legal, vigente
+        `SELECT tipo_documental_id AS id, codigo, nombre, vigente
          FROM sigd_doc.tipo_documento
          WHERE vigente = TRUE
          ORDER BY nombre ASC`,

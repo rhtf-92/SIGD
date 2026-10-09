@@ -45,7 +45,7 @@ import {
 import type { CacheDistribuida } from '../identicore/ubigeo.service.js';
 
 /** Roles autorizados por §4.7 para la analítica ejecutiva. */
-const ROLES_ANALITICA = new Set(['DIRECTOR', 'SUPER_ADMIN']);
+const ROLES_ANALITICA = new Set(['DIRECTOR', 'SUPER_ADMIN', 'ADMINISTRADOR']);
 
 export interface ControladorReportes {
   resumen: RequestHandler;
