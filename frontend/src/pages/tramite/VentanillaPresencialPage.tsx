@@ -163,6 +163,22 @@ export default function VentanillaPresencialPage() {
       </header>
 
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+        <aside
+          role="note"
+          aria-labelledby="tupa-referencial-heading"
+          className="mb-6 rounded-xl border border-amber-400 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm"
+        >
+          <h2 id="tupa-referencial-heading" className="font-bold">
+            Catálogo TUPA referencial — no oficial para el IESTP Suiza
+          </h2>
+          <p className="mt-1">
+            Los procedimientos, requisitos y tarifas que se muestran provienen del TUPA 2026 del IESTP Pasco.
+            Esta pantalla corresponde al IESTP Suiza (Pucallpa): la integración de su catálogo propio está
+            pendiente. No use estos datos como información oficial del IESTP Suiza ni como base definitiva para
+            orientar o cobrar trámites.
+          </p>
+        </aside>
+
         {esCorteSuperado && (
           <div
             role="note"
@@ -438,6 +454,13 @@ export default function VentanillaPresencialPage() {
                 <p className="mt-3 text-xs text-slate-600">{procedimientoSeleccionado.nota}</p>
               )}
             </section>
+          )}
+
+          {procedimientoTupa === "NO_TUPA" && (
+            <p role="status" className="rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
+              Trámite no TUPA / documentación general seleccionado. No se muestran requisitos ni tarifas de catálogo;
+              confirme la documentación aplicable por los canales oficiales del IESTP Suiza.
+            </p>
           )}
 
           <div>
