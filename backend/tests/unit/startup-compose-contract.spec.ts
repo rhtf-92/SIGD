@@ -38,4 +38,8 @@ describe('contrato de arranque con Docker Compose', () => {
   it('no inicia Vite hijo salvo que se solicite explícitamente', () => {
     expect(server).toContain("process.env.START_VITE_WITH_BACKEND === 'true'");
   });
+
+  it('mantiene las dependencias del frontend en un volumen Linux', () => {
+    expect(compose).toContain('frontend_node_modules:/app/node_modules');
+  });
 });
