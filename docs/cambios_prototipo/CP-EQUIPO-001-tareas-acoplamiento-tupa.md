@@ -1,0 +1,80 @@
+# CP-EQUIPO-001 — Tareas del Grupo 6 actual para la capa de prototipo SIGD
+
+**Estado:** reparto documental corregido el 10-10-2026. **Fuente de autoridad cotejada:** `Plan_operativo_actualizado_SIGD_Grupo_6_TUPA_2026.pdf`, nueve páginas, SHA-256 `2F177B129F467B29DFC87A4AB3D60D1B36C843574F15DB62932DE3EF788C4F34`; confirma **exclusivamente a Geric, Pool, Cari, Ricardo, Jhasy y Valentin** (pp. 1, 3–7). La documentación del equipo que construyó la base representa una etapa anterior cerrada y no asigna trabajo en este prototipo. Véanse el [plan de acoplamiento](GERIC/CP-GERIC-006-plan-acoplamiento-tupa.md) y el [diagnóstico técnico](GERIC/CP-GERIC-005-diagnostico-normativo-y-reglas.md). Base local y remota confirmadas por `git ls-remote`: `b46c270c5572c4663e7a434ca94031cf85537ecd`; no se ejecutó `fetch` exitoso ni se conoce el estado de una base de datos.
+
+## 1. Límite de trabajo y responsables
+
+La **capa base protegida del profesor** abarca arquitectura, dominios, autenticación/autorización, rutas/contratos compartidos que funcionen, migraciones históricas, estructura principal y funciones ya cerradas. El Grupo 6 añade una **capa de prototipo**: TUPA Suiza 2026, conexión real UI–API–PostgreSQL, adaptadores para incompatibilidades demostradas, experiencia visual, RutaDoc demostrable, pruebas y evidencia. Se prefieren archivos nuevos y puntos de extensión. Cambiar un archivo existente exige necesidad demostrada, diff mínimo compatible, autorización de Geric, prueba de regresión y reversión. No se reconstruyen módulos base.
+
+| Integrante actual | Rol y límite declarado por Geric | Zona de propiedad del prototipo |
+|---|---|---|
+| **Geric** | Líder; contrato TUPA e integración. No desarrolla directamente todo el trabajo ajeno. | Decisiones de IDs/códigos, matriz TUPA–SIGD, revisión normativa técnica, coordinación de migración, integración y regresión final. |
+| **Pool** | Infraestructura, Docker, PostgreSQL e importación controlada. Sin lógica de negocio, API ni UI. | Entorno reproducible, volúmenes, healthchecks, arranque/persistencia e importador tras contrato aprobado. |
+| **Cari** | Backend y contratos de API. Sin UI, Docker ni migraciones históricas. | Catálogo TUPA/RutaDoc, payloads/IDs/filtros/paginación, HTTP/Problem Details, permisos y adaptaciones backend autorizadas. |
+| **Ricardo** | UI/UX principal y componentes reutilizables. Sin contratos, reglas TUPA, API ni infraestructura. | Sistema visual, layout/navegación, catálogo, bandeja, detalle, responsive y accesibilidad. |
+| **Jhasy** | RutaDoc, expedientes, trazabilidad y SLA. Sin rutas globales, migraciones, autenticación ni tipos compartidos sin autorización. | Bandeja/detalle, adaptadores DTO locales, consumo de API real, contexto TUPA y estados carga/vacío/error. |
+| **Valentin** | Pulido visual y QA. Sin infraestructura, routers, autenticación, migraciones ni contratos globales. | Login y formularios a nivel visual, botones, loaders, mensajes, iconos, responsive, checklist y defectos. |
+
+**Archivos compartidos protegidos para los seis:** `backend/src/app.ts`, routers globales, autenticación, `backend/src/db/migrate.ts`, `backend/migraciones/01*`–`07*`, DTO/tipos compartidos, `frontend/src/api/`, rutas globales, configuración/Compose existentes y `CP-GERIC-005`. Ninguno se modifica unilateralmente. `backend/migraciones/01*`–`07*` no se editan bajo ninguna tarea. Los archivos existentes de módulo solo se tocan tras demostrar que un adaptador o registro nuevo no basta.
+
+## 2. Matriz de tareas y orden de integración
+
+**Rama sugerida para cada integrante:** rama nueva y worktree propio desde el SHA base que Geric acuerde tras `git fetch --all --prune` exitoso; nombre exacto a acordar, no se presume titularidad de ramas históricas. Las rutas «permitidas» son **áreas propuestas para la fase de implementación**, no permiso para cambiar nada en esta corrección documental. Cada entrega declara archivos nuevos frente a modificaciones mínimas de existentes.
+
+| Tarea | Responsable | Dependencias | Archivos permitidos / contrato | Pruebas | Criterio de aceptación | Orden de integración |
+|---|---|---|---|---|---|---:|
+| G6-00 — contrato y matriz | Geric | PDF, homologación y decisiones institucionales | Nuevo documento/matriz bajo `docs/cambios_prototipo/GERIC/`; lee migraciones/API/UI; define `ProcedimientoTupaVersion`, UUID internos y códigos externos. No cambia tipos/rutas sin revisión. | Cotejo por página, hash y contrato; casos `TUPA-02/03`. | Equivalencias inequívocas o bloqueadas, sin valores inventados; decisiones pendientes explícitas. | 0 |
+| G6-01 — entorno, BD e importación | Pool | G6-00 aprobado; Geric coordina `08_*.sql` | Nuevos overlay/guía de arranque y pruebas de infraestructura; migración **nueva aditiva** e importador solo con contrato aprobado. Conserva Compose, volúmenes y runner base salvo cambio mínimo autorizado. | Docker aislado, healthchecks, reinicio/persistencia, migraciones desde cero y base desechable; checksums. | PostgreSQL reproducible; importación idempotente/controlada, sin tocar `01`–`07` ni datos reales. | 1 |
+| G6-02 — API TUPA/RutaDoc | Cari | G6-00; esquema G6-01; contratos acordados | Nuevos adaptadores/servicios locales en `backend/src/domains/tramicore/` y `rutadoc/`, pruebas `backend/tests/`; registro mínimo en controlador/router existente solo con autorización. Conserva rutas/DTO actuales. | Contrato, permisos, errores, paginación, casos de ID inválido y regresión de rutas actuales. | Catálogo y expediente devuelven ID, versión, filtros/HTTP/Problem Details coherentes; cliente antiguo sigue funcionando. | 2 |
+| G6-03 — sistema visual | Ricardo | G6-00 para etiquetas; contrato de datos G6-02 para conexión final | Nuevos componentes locales en `frontend/src/components/`; ajustes visuales mínimos en `frontend/src/layouts/MainLayout.tsx`, páginas de catálogo/bandeja/detalle solo tras coordinar dueño. No define reglas/DTO. | Componentes, accesibilidad, responsive, revisión visual y regresión de navegación. | Sistema visual reutilizable aprobado, sin alterar semántica TUPA ni llamadas API. | 2 en paralelo con Cari |
+| G6-04 — RutaDoc conectada | Jhasy | G6-02 estable y componentes G6-03 aprobados; G6-01 para datos | Adaptadores DTO **locales** y consumo en `frontend/src/pages/expedientes/`, servicios locales de RutaDoc y pruebas propias. No toca routers/tipos globales sin Geric. | Integración con API real, bandeja/detalle/trazabilidad/SLA, carga/vacío/red/400/401/403/404, ID cruzado y regresión. | Un CUT permite ver expediente, movimientos y contexto TUPA correctos sin mocks productivos; detalle consulta endpoint propio, no solo caché de bandeja; SLA usa cálculo backend y calendario aprobado. | 3 |
+| G6-05 — pulido y QA | Valentin | G6-03/04 funcionales | Estilos/componentes visuales locales de login/formularios/botones/loaders/mensajes/iconos; nuevo checklist y registro de defectos. Cambio de lógica/contrato vedado. | Revisión responsive, teclado, contraste, textos, regresión visual y defectos reproducibles. | Pulido no cambia comportamiento base; defectos críticos cerrados o bloqueados con evidencia. | 4 |
+| G6-06 — integración final | Geric | Entregas G6-01 a G6-05, aprobación institucional | Revisión de cada diff y archivo compartido; ajustes de integración mínimos y autorizados, pruebas finales e informe. No absorbe las tareas ajenas. | Typecheck, backend/frontend, contrato, E2E, seguridad/PII, migraciones desde cero, `git diff --check`. | Entregas integradas una a una con trazabilidad, regresión y rollback demostrado; pendientes institucionales no se declaran resueltos. | 5 |
+
+### Detalle obligatorio por tarea
+
+- **G6-00 Geric.** Entrada: PDF Suiza con hash, CP-005/006 y acto de homologación aún pendiente. Salida: contrato canónico, matriz TUPA→trámite→expediente→movimiento→documento, relación opcional expediente–concepto, semántica de IDs internos/códigos externos, revisión normativa técnica y decisiones bloqueadas. Endpoint implicado: `GET /api/v1/tramites/tipos`; DTO existente de radicación virtual usa `idTipoTramiteTupa`. Riesgo: convertir el PDF en norma o confundir códigos locales con oficiales. Reversión: retirar solo la versión propuesta; no tocar históricos. El plan operativo, p. 4, asigna coordinar un asistente/chatbot **solo después de cerrar el flujo principal**; no es dependencia de estas etapas. **Rama:** nueva propia sobre base aprobada, nombre pendiente.
+- **G6-01 Pool.** Entrada: contrato G6-00 y esquema/checksums `01`–`07`; salida: entorno aislado, guía de arranque/persistencia, migración aditiva coordinada, importador en modo controlado y reporte de conteos. Endpoints/DTO: no los cambia; recibe `ProcedimientoTupaVersion` como formato de importación aprobado. Riesgo: importar tarifas ambiguas, alterar volumen real o migración aplicada. Reversión: desactivar importador/overlay, conservar respaldo y datos para corrección; no hacer `DROP` con datos. **Rama:** nueva propia sobre base aprobada, nombre pendiente.
+- **G6-02 Cari.** Entrada: G6-00, DDL G6-01 y contratos vigentes; salida: especificación de payloads, IDs, filtros, paginación, HTTP y Problem Details, adaptadores backend autorizados y pruebas. Endpoints: catálogo `/api/v1/tramites/tipos` y `/tramites/tupa`, radicación virtual/presencial, consulta por CUT y rutas RutaDoc existentes; DTO de entrada/salida conservados con ampliaciones opcionales aprobadas. Riesgo: romper consumidores o permisos. Reversión: retirar registro/adaptador o bandera y mantener contrato previo. **Rama:** nueva propia sobre base aprobada, nombre pendiente.
+- **G6-03 Ricardo.** Entrada: contrato semántico G6-00 y estados de datos acordados con Cari/Jhasy; salida: componentes reutilizables y guía visual para catálogo, bandeja y detalle, responsive y accesibilidad. Consume GET catálogo y DTO de expediente como datos opacos; no los redefine. Riesgo: hacer que diseño represente un importe/plazo no homologado. Reversión: retirar componente/registro visual mínimo y volver a pantalla anterior. **Rama:** nueva propia sobre base aprobada, nombre pendiente.
+- **G6-04 Jhasy.** Entrada: endpoints/DTO G6-02 y componentes G6-03; salida: bandeja, detalle, trazabilidad y SLA conectados, adaptador local de DTO, contexto TUPA y estados de carga/vacío/red/400/401/403/404. Endpoints: `GET /api/v1/tramites/consulta-publica/:cut` y RutaDoc `/expedientes/:id`, `/:id/trazabilidad`, `/:id/foliacion`, `/:id/sla-status`; el detalle debe consultar su endpoint y no depender solo del caché de bandeja. Consumir SLA calculado por backend y representar ausencia/alerta/vencimiento; IDs no se convierten por cast. Riesgo: UUID/BIGINT o SLA sin calendario aprobado. Reversión: retirar adaptador local/flag, conservar datos y rutas base. **Rama:** nueva propia sobre base aprobada, nombre pendiente.
+- **G6-05 Valentin.** Entrada: funciones G6-03/04 conectadas y lista de defectos; salida: pulido de bajo riesgo, checklist QA y defectos con pasos de reproducción. Consume estados/DTO existentes sin cambiarlos; ningún endpoint propio. Riesgo: que un cambio visual altere login, envío de formularios o accesibilidad. Reversión: revertir solo estilo/componente visual acotado. **Rama:** nueva propia sobre base aprobada, nombre pendiente.
+- **G6-06 Geric.** Entrada: entregas individuales y decisiones aprobadas; salida: integración secuencial, matriz de regresión y evidencia final. Revisa todos los contratos/endpoints sin asumir propiedad de código ajeno. Riesgo: integrar con base o migraciones divergentes. Reversión: desactivar capa nueva y regresar al despliegue previo conservando datos. **Rama:** rama de integración propia sobre base aprobada, nombre pendiente.
+
+## 3. Dependencias, conflictos y bloqueos
+
+```text
+Etapa 0  Geric: contrato, IDs, códigos, matriz y decisiones
+Etapa 1  Geric + Pool: migración nueva, importador y entorno
+Etapa 2  Cari: API/contratos   ||   Ricardo: componentes visuales
+Etapa 3  Jhasy: RutaDoc con API estable y componentes aprobados
+Etapa 4  Valentin: pulido y QA sobre funciones conectadas
+Etapa 5  Geric: revisión e integración individual, regresión y evidencia
+```
+
+Zonas de conflicto: migración nueva (Geric decide contrato, Pool ejecutaría después de aprobación); controlador/router de API (Cari dueño, Geric aprueba registro mínimo); catálogo y tarifa (Geric define semántica, Cari expone, Ricardo presenta, Jhasy consume); bandeja/detalle (Ricardo diseña componentes, Jhasy conecta datos, Valentin pule tras entrega); configuración Docker (Pool dueño, Geric autoriza cambio global); tipos/rutas compartidos (Geric autoriza y exige regresión). Nadie modifica simultáneamente el mismo archivo. Se conserva la atribución de cada cambio en la entrega individual.
+
+**No resueltos:** homologación institucional y acto aprobatorio del TUPA; colisión semántica `TUPA-02/TUPA-03`; identidad canónica y puente de expediente `UUID`/`BIGINT`; referencias normativas que CP-005 dejó pendientes; estado real de migraciones. El plan operativo se cotejó y la base remota se confirmó mediante `ls-remote`; esas verificaciones no sustituyen decisiones institucionales ni pruebas de ejecución. Cada frente afectado espera su decisión; las revisiones documentales independientes pueden avanzar.
+
+## 4. Definition of Ready / Definition of Done
+
+**Ready:** integrantes y responsabilidades cotejados con el plan operativo; `fetch` exitoso y SHA base acordado. El plan, p. 8, reserva `B_GERIC` para integración revisada y `main` como referencia funcional; ninguna es rama personal de desarrollo. Además: rama/worktree propio, archivos y dueño único acordados, contrato G6-00 y homologación de datos relevantes aprobados, checksums y estado físico de migraciones comparados. Para pruebas de infraestructura: dependencias desde lockfiles, Docker aislado y base desechable. Si falta decisión institucional, Ready solo para diseño/test no dependiente.
+
+**Done:** diff acotado y explicado; archivos existentes tocados solo por necesidad demostrada, con autorización de Geric y regresión; base intacta y migraciones históricas sin cambios; pruebas propias y de contrato/E2E según etapa; evidencia reproducible sin datos personales/secretos; accesibilidad y errores revisados; rollback practicable; `git diff --check`; integración individual aceptada por Geric. Ningún resultado de pruebas se presume ejecutado en esta fase documental.
+
+## 5. Reglas comunes y checklist
+
+1. Usar la rama base exacta acordada tras fetch; rama y worktree propios; nunca trabajar directamente en `main`.
+2. No borrar, renombrar, trasladar ni reescribir archivos del profesor; no editar migraciones históricas.
+3. Preferir archivos nuevos/adaptadores; tocar existentes solo si es indispensable, mínimo, compatible, reversible, autorizado y probado.
+4. No cambiar tipos, rutas, contratos ni configuración global sin autorización de Geric.
+5. No inventar datos, catálogo, tarifas, requisitos ni fundamento legal; distinguir evidencia, inferencia, propuesta y decisión institucional.
+6. No guardar `.env`, credenciales, tokens ni datos personales; revisar permisos y logs.
+7. Detener la parte afectada ante contradicción, documentarla y continuar solo lo comprobable.
+8. Entregar pruebas y evidencias reproducibles; comparar checksums y estado de migraciones antes de integrar.
+9. No afirmar cumplimiento legal general ni dar por aprobadas referencias pendientes.
+10. No hacer merge, push o PR de implementaciones antes de pruebas y revisión; el cierre documental se autoriza por separado y no autoriza implementación.
+
+## 6. Formato de entrega individual
+
+`ID; integrante/rol; SHA base, rama y worktree; objetivo; archivos nuevos; archivos existentes modificados y justificación; punto de conexión; contrato/DTO/endpoints conservados; entradas/salidas; dependencias; pruebas/comandos/resultados; checksums/estado BD si aplica; regresión; riesgos y rollback; decisiones institucionales; diff --check; revisión de Geric`. Adjuntar solo evidencia sin secretos ni datos personales. Los campos sin sustento se marcan **PENDIENTE DE CONFIRMACIÓN**.
