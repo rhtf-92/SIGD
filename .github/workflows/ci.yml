@@ -1,0 +1,66 @@
+name: SIGD Pipeline CI
+
+on:
+  pull_request:
+    branches: [ "F_BARTRA", "main" ]
+
+jobs:
+  certificacion-calidad:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # --- BACKEND ---
+      - name: 1. Instalación reproducible (npm ci) - Backend
+        run: cd backend && npm ci
+
+      - name: 2. Typecheck Backend
+        run: cd backend && npm run typecheck --if-present
+
+      - name: 3. Build Backend
+        run: cd backend && npm run build
+
+      - name: 4. Pruebas Unitarias Backend
+        run: cd backend && npm run test:unit --if-present
+
+      - name: 5. Pruebas DB (Dependencia de Leonel)
+        run: echo "🚧 Pendiente: A la espera de los comandos de bootstrap DB de Leonel"
+
+      - name: 6. Pruebas E2E (Dependencia de Leonel)
+        run: echo "🚧 Pendiente: A la espera de los comandos E2E de Leonel"
+
+      # --- FRONTEND ---
+      - name: 7. Instalación reproducible (npm ci) - Frontend
+        run: cd frontend && npm ci
+
+      - name: 8. Typecheck Frontend
+        run: cd frontend && npm run typecheck --if-present
+
+      - name: 9. Typecheck M03 (Con tipos de jest-dom)
+        run: cd frontend && npm run typecheck:m03 --if-present
+
+      - name: 10. Lint Frontend
+        run: cd frontend && npm run lint --if-present
+
+      - name: 11. Pruebas Frontend
+        run: cd frontend && npm run test --if-present
+
+      - name: 12. Build Frontend
+        run: cd frontend && npm run build
+
+      # --- SEGURIDAD Y DOCKER ---
+      - name: 13a. Auditoría npm (Backend)
+        run: cd backend && npm audit --audit-level=high || true
+
+      - name: 13b. Auditoría npm (Frontend)
+        run: cd frontend && npm audit --audit-level=high || true
+
+      - name: 13c. Validación de Docker Compose
+        run: docker compose -f docker-compose.prod.yml config

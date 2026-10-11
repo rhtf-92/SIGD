@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:8080" # Nginx no-root escucha en el 8080 internamente
+    depends_on:
+      - backend
+    restart: always
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Secretos obligatorios (Docker fallará si están vacíos)
+      - DB_PASSWORD=${POSTGRES_PASSWORD:?La contraseña de PostgreSQL es obligatoria en produccion}
+      - JWT_SECRET=${JWT_SECRET:?El secreto JWT es obligatorio en produccion}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:?La clave de S3 es obligatoria}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:?El secreto de S3 es obligatorio}
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  db:
+    image: postgres:18-alpine
+    # 🔒 SIN SECCIÓN DE PUERTOS para no exponer la base de datos a internet
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?La contraseña de PostgreSQL es obligatoria}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    # 🔒 SIN SECCIÓN DE PUERTOS para no exponer caché a internet
+    restart: always
+
+volumes:
+  pgdata:

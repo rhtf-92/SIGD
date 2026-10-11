@@ -63,40 +63,44 @@ const apagar = (senal: string): void => {
 };
 
 // En desarrollo, iniciar concurrentemente el servidor Vite del Frontend en el puerto 5173
+// Si NODE_ENV=development Y RUN_VITE=true, intentar lanzar Vite como hijo.
+// En Docker Compose, el frontend corre en un contenedor separado; deshabilitar esta función.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDir = path.resolve(__dirname, '../../frontend');
 const viteBin = path.resolve(frontendDir, 'node_modules/vite/bin/vite.js');
 
 let viteProc: ReturnType<typeof spawn> | null = null;
-try {
-  viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
-    cwd: frontendDir,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
-      VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
-    },
-  });
+if (process.env.RUN_VITE_SUBPROCESS === 'true') {
+  try {
+    viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
+      cwd: frontendDir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
+        VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
+      },
+    });
 
-  viteProc.stdout?.on('data', (data) => {
-    console.log(`[Vite stdout] ${data}`);
-  });
+    viteProc.stdout?.on('data', (data) => {
+      console.log(`[Vite stdout] ${data}`);
+    });
 
-  viteProc.stderr?.on('data', (data) => {
-    console.error(`[Vite stderr] ${data}`);
-  });
+    viteProc.stderr?.on('data', (data) => {
+      console.error(`[Vite stderr] ${data}`);
+    });
 
-  viteProc.on('error', (err) => {
-    console.error('[Frontend Vite] Error al iniciar:', err);
-  });
+    viteProc.on('error', (err) => {
+      console.error('[Frontend Vite] Error al iniciar:', err);
+    });
 
-  viteProc.on('close', (code) => {
-    console.log(`[Frontend Vite] Proceso cerrado con código ${code}`);
-  });
-} catch (e) {
-  console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
+    viteProc.on('close', (code) => {
+      console.log(`[Frontend Vite] Proceso cerrado con código ${code}`);
+    });
+  } catch (e) {
+    console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
+  }
 }
 
 process.on('SIGINT', () => {

@@ -1,5 +1,8 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["@testing-library/jest-dom"]
+  },
   "include": [
     "src/components/expedientes/**/*.tsx",
     "src/types/ccdArchivistica.ts",
