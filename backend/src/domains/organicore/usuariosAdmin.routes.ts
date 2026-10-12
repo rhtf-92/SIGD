@@ -4,6 +4,7 @@ import type { Pool } from "pg";
 
 import { crearUsuariosAdminService } from "./usuariosAdmin.service.js";
 import { crearUsuariosAdminController } from "./usuariosAdmin.controller.js";
+import { autenticarJwt, autorizarPermisos, PERMISOS_RBAC } from "../../core/auth/auth.guard.js";
 
 /**
  * OrganiCore - Rutas de administración de usuarios
@@ -22,12 +23,17 @@ export function crearUsuariosAdminRouter(pool: Pool): Router {
   const service = crearUsuariosAdminService(pool);
 
   const controller = crearUsuariosAdminController(service);
+  const autenticar = autenticarJwt;
+  const permisoLectura = autorizarPermisos(PERMISOS_RBAC.USUARIOS_LEER);
+  const permisoGestion = autorizarPermisos(PERMISOS_RBAC.USUARIOS_GESTIONAR);
 
   /**
    * Directorio institucional paginado.
    */
   router.get(
     "/",
+    autenticar,
+    permisoLectura,
     controller.listarUsuarios,
   );
 
@@ -36,6 +42,8 @@ export function crearUsuariosAdminRouter(pool: Pool): Router {
    */
   router.post(
     "/",
+    autenticar,
+    permisoGestion,
     controller.crearUsuario,
   );
 
@@ -44,6 +52,8 @@ export function crearUsuariosAdminRouter(pool: Pool): Router {
    */
   router.put(
     "/:id",
+    autenticar,
+    permisoGestion,
     controller.actualizarUsuario,
   );
 
