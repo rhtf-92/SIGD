@@ -1,30 +1,56 @@
 import { describe, expect, it } from "vitest";
 
+import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaUcayali2026";
 import { TRAMITES_TUPA_MOCK } from "../../mocks/tramitesTupaMock";
 
 describe("catálogo TUPA del asistente de trámites", () => {
-  it("incluye los 48 procedimientos del TUPA 2026 y el trámite libre", () => {
+  it("incluye los conceptos del TUPA de Ucayali agrupados por sección y el trámite libre", () => {
     const procedimientosTupa = TRAMITES_TUPA_MOCK.filter(
       (tramite) => tramite.esTupa,
     );
 
-    expect(procedimientosTupa).toHaveLength(48);
-    expect(procedimientosTupa.map((tramite) => tramite.codigo)).toEqual(
-      Array.from({ length: 48 }, (_, index) =>
-        String(index + 1).padStart(2, "0"),
+    expect(procedimientosTupa).toHaveLength(77);
+    expect(PROCEDIMIENTOS_TUPA_2026).toHaveLength(77);
+    expect(
+      PROCEDIMIENTOS_TUPA_2026.filter(
+        (concepto) => concepto.seccion === "Servicios academicos",
       ),
-    );
+    ).toHaveLength(44);
+    expect(
+      PROCEDIMIENTOS_TUPA_2026.filter(
+        (concepto) => concepto.seccion === "Servicios productivos",
+      ),
+    ).toHaveLength(15);
+    expect(
+      PROCEDIMIENTOS_TUPA_2026.filter(
+        (concepto) => concepto.seccion === "Venta de bienes",
+      ),
+    ).toHaveLength(18);
+    expect(new Set(PROCEDIMIENTOS_TUPA_2026.map(({ codigo }) => codigo)).size).toBe(77);
     expect(TRAMITES_TUPA_MOCK.at(-1)?.id).toBe("LIBRE");
   });
 
-  it("conserva el plazo, las tasas variables y las tarifas detalladas", () => {
-    expect(TRAMITES_TUPA_MOCK[1]?.tiempoMaximo).toBe("Cronograma");
-    expect(TRAMITES_TUPA_MOCK[1]?.derechoPago).toContain("S/. 25.00");
-    expect(TRAMITES_TUPA_MOCK[46]?.descripcion).toContain(
-      "Curación pequeña: S/. 10.00",
+  it("conserva los importes, los requisitos y las tarifas tal como aparecen en la fuente", () => {
+    expect(PROCEDIMIENTOS_TUPA_2026[0]?.derechoPago).toContain("S/. 4.00");
+    expect(PROCEDIMIENTOS_TUPA_2026[0]?.requisitos).toContain(
+      "Comprobante de pago",
     );
-    expect(TRAMITES_TUPA_MOCK[47]?.descripcion).toContain(
-      "Alquiler Sala de Licenciamiento: S/. 300.00 / día",
+    expect(PROCEDIMIENTOS_TUPA_2026.find(({ codigo }) => codigo === "ACA-39")?.derechoPago).toContain(
+      "S/. 10.50",
     );
+    expect(PROCEDIMIENTOS_TUPA_2026.find(({ codigo }) => codigo === "PRO-10")?.derechoPago).toBe(
+      "S/. 400.00",
+    );
+    expect(PROCEDIMIENTOS_TUPA_2026.find(({ codigo }) => codigo === "BIE-11")?.detalleTarifas).toContain(
+      "Pichones hembras: S/. 30.00",
+    );
+    expect(PROCEDIMIENTOS_TUPA_2026.find(({ codigo }) => codigo === "BIE-16")?.detalleTarifas).toContain(
+      "Reproductor: S/. 25.00",
+    );
+    for (const codigo of ["ACA-39", "BIE-14"]) {
+      const concepto = PROCEDIMIENTOS_TUPA_2026.find((item) => item.codigo === codigo);
+      expect(concepto?.nota).toContain("Pendiente de confirmación administrativa");
+      expect(concepto?.nota).toContain("No utilizar para cobros automáticos ni liquidaciones definitivas");
+    }
   });
 });
