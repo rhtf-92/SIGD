@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { reintentar } from '../../utils/backoff.util.js';
 import type { ConfiguracionS3 } from '../../config/s3.config.js';
 
-export type MetodoS3 = 'GET' | 'PUT';
+export type MetodoS3 = 'GET' | 'PUT' | 'HEAD';
 
 export interface OpcionesPresign {
   metodo?: MetodoS3;
@@ -68,8 +68,6 @@ export function generarUrlPresigned(
 
   const cabecerasFirmadas: Record<string, string> = {
     host,
-    'x-amz-content-sha256': PAYLOAD_SIN_FIRMA,
-    'x-amz-date': amzFecha,
   };
   if (opciones.contentType) {
     cabecerasFirmadas['content-type'] = opciones.contentType;
@@ -115,7 +113,7 @@ export async function headObject(
   config: ConfiguracionS3,
   opciones: { signal?: AbortSignal; intentos?: number } = {},
 ): Promise<ResultadoHeadObject> {
-  const url = generarUrlPresigned(clave, config, { metodo: 'GET', expiraSegundos: 60 });
+  const url = generarUrlPresigned(clave, config, { metodo: 'HEAD', expiraSegundos: 60 });
 
   return reintentar(
     async () => {
