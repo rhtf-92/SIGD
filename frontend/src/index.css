@@ -948,6 +948,16 @@
   animation: sigd-universe-drift 10s ease-in-out infinite;
 }
 
+.sigd-universe-logo-slot {
+  position: fixed;
+  top: 118px;
+  right: 24px;
+  z-index: -2;
+  width: min(31vw, 420px);
+  height: min(31vw, 420px);
+  pointer-events: none;
+}
+
 .sigd-universe-sphere {
   position: absolute;
   inset: 23%;
@@ -1342,6 +1352,138 @@
   max-width: 820px;
 }
 
+/* Recurso SIGD original con una escena 3D ligera y reutilizable. */
+.sigd-logo-3d {
+  --logo-rx: 0deg;
+  --logo-ry: 0deg;
+  --logo-light-x: 50%;
+  --logo-light-y: 42%;
+}
+
+.sigd-logo-3d:not(.sigd-logo-3d--login) {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  perspective: 900px;
+  isolation: isolate;
+  contain: layout paint;
+}
+
+.sigd-logo-3d:not(.sigd-logo-3d--login)::before {
+  position: absolute;
+  inset: 12% 8%;
+  z-index: -1;
+  border-radius: 50%;
+  content: "";
+  background: radial-gradient(
+    circle at var(--logo-light-x) var(--logo-light-y),
+    rgba(86, 226, 255, 0.46),
+    rgba(0, 126, 220, 0.2) 32%,
+    transparent 70%
+  );
+  filter: blur(20px);
+  animation: sigd-logo-3d-glow 4.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.sigd-logo-3d__model {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  width: 72%;
+  height: 72%;
+  place-items: center;
+  transform: rotateX(var(--logo-rx)) rotateY(var(--logo-ry)) translateZ(20px);
+  transform-style: preserve-3d;
+  transition: transform 180ms ease-out;
+  will-change: transform;
+}
+
+.sigd-logo-3d__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 20px 24px rgba(0, 21, 70, 0.54)) drop-shadow(0 0 18px rgba(28, 201, 245, 0.28));
+  animation: sigd-logo-3d-float 5s ease-in-out infinite;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.sigd-logo-3d__orbit {
+  position: absolute;
+  inset: 14%;
+  z-index: 1;
+  border: 1px solid rgba(69, 211, 255, 0.3);
+  border-radius: 50%;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.sigd-logo-3d__orbit--one {
+  transform: rotateX(69deg) rotateZ(-10deg);
+  animation: sigd-logo-3d-orbit-one 14s linear infinite;
+}
+
+.sigd-logo-3d__orbit--two {
+  inset: 20% 8%;
+  border-color: rgba(61, 141, 255, 0.25);
+  transform: rotateY(67deg) rotateZ(22deg);
+  animation: sigd-logo-3d-orbit-two 17s linear infinite reverse;
+}
+
+.sigd-logo-3d__platform {
+  position: absolute;
+  right: 18%;
+  bottom: 10%;
+  left: 18%;
+  z-index: 0;
+  height: 16%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(42, 198, 246, 0.28), rgba(8, 71, 153, 0.1) 48%, transparent 72%);
+  filter: blur(7px);
+  transform: rotateX(69deg);
+  pointer-events: none;
+}
+
+.sigd-logo-3d--home {
+  width: clamp(260px, 30vw, 400px);
+  height: clamp(230px, 30vw, 360px);
+}
+
+.sigd-logo-3d--section {
+  width: clamp(128px, 14vw, 184px);
+  height: clamp(108px, 12vw, 150px);
+}
+
+.sigd-logo-3d--ambient {
+  width: 100%;
+  height: 100%;
+}
+
+.sigd-logo-3d--ambient .sigd-logo-3d__model {
+  transform: rotateX(var(--universe-rx)) rotateY(var(--universe-ry)) translateZ(20px);
+}
+
+@keyframes sigd-logo-3d-float {
+  0%, 100% { transform: translate3d(0, -4px, 0); }
+  50% { transform: translate3d(0, 7px, 0); }
+}
+
+@keyframes sigd-logo-3d-orbit-one {
+  to { transform: rotateX(69deg) rotateZ(350deg); }
+}
+
+@keyframes sigd-logo-3d-orbit-two {
+  to { transform: rotateY(67deg) rotateZ(382deg); }
+}
+
+@keyframes sigd-logo-3d-glow {
+  0%, 100% { opacity: 0.66; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
 .sigd-home-eyebrow,
 .sigd-section-kicker {
   color: #7dd3fc;
@@ -1545,6 +1687,14 @@
     opacity: 0.22;
   }
 
+  .sigd-universe-logo-slot {
+    top: 94px;
+    right: 8px;
+    width: min(62vw, 250px);
+    height: min(62vw, 250px);
+    opacity: 0.78;
+  }
+
   .sigd-header-inner {
     width: min(100% - 24px, 720px);
     min-height: 64px;
@@ -1602,6 +1752,8 @@
   .sigd-home-metrics { display: grid; grid-template-columns: 1fr; }
   .sigd-home-metrics span { width: max-content; }
   .sigd-module-card { padding: 21px; }
+  .sigd-logo-3d--home { width: min(280px, 90vw); height: 238px; }
+  .sigd-logo-3d--section { width: 138px; height: 116px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1616,6 +1768,15 @@
 
   .sigd-universe-pointer { display: none; }
   .sigd-universe-orb { transform: none; }
+
+  .sigd-logo-3d:not(.sigd-logo-3d--login),
+  .sigd-logo-3d:not(.sigd-logo-3d--login)::before,
+  .sigd-logo-3d:not(.sigd-logo-3d--login) * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .sigd-logo-3d__model { transform: none !important; }
 }
 
 /* Acceso institucional inspirado en el prototipo oficial del usuario. */

@@ -17,11 +17,13 @@ type UniverseStyle = CSSProperties & {
 interface AnimatedUniverseBackgroundProps {
   children?: ReactNode;
   compact?: boolean;
+  orbReplacement?: ReactNode;
 }
 
 export default function AnimatedUniverseBackground({
   children,
   compact = false,
+  orbReplacement,
 }: AnimatedUniverseBackgroundProps) {
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -76,12 +78,16 @@ export default function AnimatedUniverseBackground({
           />
         ))}
       </div>
-      <div className="sigd-universe-orb" aria-hidden="true">
-        <span className="sigd-universe-ring sigd-universe-ring--one" />
-        <span className="sigd-universe-ring sigd-universe-ring--two" />
-        <span className="sigd-universe-ring sigd-universe-ring--three" />
-        <span className="sigd-universe-sphere" />
-      </div>
+      {orbReplacement ? (
+        <div className="sigd-universe-logo-slot">{orbReplacement}</div>
+      ) : (
+        <div className="sigd-universe-orb" aria-hidden="true">
+          <span className="sigd-universe-ring sigd-universe-ring--one" />
+          <span className="sigd-universe-ring sigd-universe-ring--two" />
+          <span className="sigd-universe-ring sigd-universe-ring--three" />
+          <span className="sigd-universe-sphere" />
+        </div>
+      )}
       <div className="sigd-universe-waves" aria-hidden="true"><span /><span /><span /></div>
       <div className="sigd-universe-content">{children}</div>
     </div>

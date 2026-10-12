@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import sigdLogoHeader from '../assets/sigd-logo-header.png';
-import sigdLogoPrincipal from '../assets/sigd-logo-3d.png';
+import LogoSIGD3D from '../components/common/LogoSIGD3D';
 import { useAuthStore, type UsuarioPerfil } from '../stores/authStore';
 
 const ROLES_INSTITUCIONALES = [
@@ -225,13 +225,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <div className="sigd-auth__logo-stage" aria-label="Identidad visual SIGD SUIZA">
-            <div className="sigd-auth__orbit sigd-auth__orbit--one" aria-hidden="true" />
-            <div className="sigd-auth__orbit sigd-auth__orbit--two" aria-hidden="true" />
-            <div className="sigd-auth__platform" aria-hidden="true" />
-            <img src={sigdLogoPrincipal} alt="Logotipo principal SIGD SUIZA" />
-            <p>Mueve el cursor: el logo responde con profundidad 3D</p>
-          </div>
+          <LogoSIGD3D variant="login" showHint />
         </section>
 
         <section className="sigd-auth__access" aria-labelledby="sigd-auth-title">
