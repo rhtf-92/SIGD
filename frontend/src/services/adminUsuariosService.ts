@@ -30,7 +30,7 @@ const RUTA_CANONICA_USUARIOS = "/api/v1/admin/usuarios";
 export const usuariosAdminKeys = {
   todos: ["admin", "usuarios"] as const,
   lista: (filtros: FiltrosUsuarios) => ["admin", "usuarios", filtros] as const,
-  detalle: (id: number) => ["admin", "usuarios", "detalle", id] as const,
+  detalle: (id: string) => ["admin", "usuarios", "detalle", id] as const,
 };
 
 function toStringValue(value: unknown, porDefecto = ""): string {
@@ -42,8 +42,13 @@ function toStringValue(value: unknown, porDefecto = ""): string {
 function toEstadoUsuario(value: unknown): EstadoUsuario {
   const normalizado = toStringValue(value).trim().toLowerCase();
   if (normalizado === "inactivo" || normalizado === "inactiva") return "Inactivo";
-  if (normalizado === "bloqueado" || normalizado === "bloqueada") return "Bloqueado";
   return "Activo";
+}
+
+function referencia(value: unknown): { id: string | null; nombre: string } {
+  if (typeof value !== "object" || value === null) return { id: null, nombre: "—" };
+  const item = value as Record<string, unknown>;
+  return { id: toStringValue(item.id) || null, nombre: toStringValue(item.nombre, "—") };
 }
 
 /**
@@ -56,21 +61,33 @@ function normalizarUsuario(valor: unknown): Usuario | null {
   const registro = valor as Record<string, unknown>;
 
   const idCrudo = registro.id ?? registro.idUsuario ?? registro.id_usuario;
-  const id = typeof idCrudo === "number" ? idCrudo : Number(idCrudo);
-  if (!Number.isFinite(id)) return null;
+  const id = toStringValue(idCrudo);
+  if (!id) return null;
 
   const nombre = toStringValue(registro.nombre ?? registro.nombreCompleto ?? registro.nombre_completo);
   if (nombre === "") return null;
 
+  const area = typeof registro.area === "string"
+    ? { id: toStringValue(registro.areaId) || null, nombre: registro.area }
+    : referencia(registro.area);
+  const cargo = typeof registro.cargo === "string"
+    ? { id: toStringValue(registro.cargoId) || null, nombre: registro.cargo }
+    : referencia(registro.cargo);
+  const rol = typeof registro.rol === "string"
+    ? { id: toStringValue(registro.rolId) || null, nombre: registro.rol }
+    : referencia(registro.rol);
   return {
     id,
+    idPersona: toStringValue(registro.idPersona ?? registro.id_persona),
     nombre,
-    dni: toStringValue(registro.dni),
+    documento: toStringValue(registro.documento ?? registro.dni),
     correo: toStringValue(registro.correo ?? registro.correoInstitucional ?? registro.correo_institucional),
-    sede: toStringValue(registro.sede),
-    area: toStringValue(registro.area ?? registro.areaOrganica ?? registro.area_organica),
-    cargo: toStringValue(registro.cargo),
-    rol: toStringValue(registro.rol),
+    areaId: area.id,
+    area: area.nombre,
+    cargoId: cargo.id,
+    cargo: cargo.nombre,
+    rolId: rol.id,
+    rol: rol.nombre,
     estado: toEstadoUsuario(registro.estado),
     ultimoAcceso: toStringValue(registro.ultimoAcceso ?? registro.ultimo_acceso, "—"),
   };
@@ -82,6 +99,7 @@ function extraerUsuarios(payload: unknown): unknown[] {
   if (typeof payload === "object" && payload !== null) {
     const envuelto = payload as Record<string, unknown>;
     if (Array.isArray(envuelto.data)) return envuelto.data;
+    if (Array.isArray(envuelto.datos)) return envuelto.datos;
     if (Array.isArray(envuelto.usuarios)) return envuelto.usuarios;
     if (Array.isArray(envuelto.items)) return envuelto.items;
   }
@@ -95,10 +113,9 @@ export async function listarUsuarios(
   const response = await apiClient.get(RUTA_CANONICA_USUARIOS, {
     params: {
       busqueda: filtros.busqueda || undefined,
-      area: filtros.area || undefined,
-      sede: filtros.sede || undefined,
-      rol: filtros.rol || undefined,
-      estado: filtros.estado === "Todos" ? undefined : filtros.estado,
+      areaId: filtros.areaId || undefined,
+      rolId: filtros.rolId || undefined,
+      estado: filtros.estado === "Todos" ? undefined : filtros.estado.toUpperCase(),
     },
     signal,
   });
@@ -109,7 +126,7 @@ export async function listarUsuarios(
 }
 
 export async function actualizarUsuario(
-  id: number,
+  id: string,
   cambios: UpdateUsuarioDTO,
 ): Promise<Usuario> {
   const response = await apiClient.put(`${RUTA_CANONICA_USUARIOS}/${id}`, cambios);
@@ -133,7 +150,7 @@ export async function actualizarUsuario(
 }
 
 export async function conmutarEstadoUsuario(
-  id: number,
+  id: string,
   cambios: UpdateEstadoDTO,
 ): Promise<Usuario> {
   const estadoBackend = cambios.estado.toUpperCase();
@@ -172,7 +189,7 @@ export function useUsuariosQuery(
   });
 }
 
-type VariablesActualizacion = { id: number; cambios: UpdateUsuarioDTO };
+type VariablesActualizacion = { id: string; cambios: UpdateUsuarioDTO };
 
 // El snapshot guarda cada lista por su propia clave: la tabla vive en varias
 // claves (una por combinación de filtros) y revertir exige restaurarlas todas.
@@ -191,7 +208,7 @@ export function useActualizarUsuarioMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ id, cambios }: VariablesActualizacion) =>
       actualizarUsuario(id, cambios),
-    onMutate: async ({ id, cambios }: VariablesActualizacion) => {
+    onMutate: async () => {
       // 1. Cancelar consultas salientes para evitar sobrescrituras de la caché
       await queryClient.cancelQueries({ queryKey: usuariosAdminKeys.todos });
 
@@ -199,15 +216,6 @@ export function useActualizarUsuarioMutation(): UseMutationResult<
       const instantanea = queryClient.getQueriesData<Usuario[]>({
         queryKey: usuariosAdminKeys.todos,
       });
-
-      // 3. Actualización optimista de la caché con los cambios aún no confirmados
-      queryClient.setQueriesData<Usuario[]>(
-        { queryKey: usuariosAdminKeys.todos },
-        (actuales) =>
-          actuales?.map((usuario) =>
-            usuario.id === id ? { ...usuario, ...cambios } : usuario,
-          ),
-      );
 
       return { instantanea };
     },
@@ -231,7 +239,7 @@ export function useActualizarUsuarioMutation(): UseMutationResult<
 export function useConmutarEstadoMutation(): UseMutationResult<
   Usuario,
   ApiHttpError,
-  { id: number; estado: EstadoUsuario }
+  { id: string; estado: EstadoUsuario }
 > {
   const queryClient = useQueryClient();
 

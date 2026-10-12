@@ -1,84 +1,46 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Pool } from 'pg';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Pool, PoolClient } from 'pg';
+
 import { OrganigramaService } from '../../../../src/domains/organicore/organigrama.service.js';
 import { DomainError } from '../../../../src/shared/domain/errors/index.js';
 
-function crearPoolMock(rows: unknown[]): Partial<Pool> {
-  return {
-    query: vi.fn().mockResolvedValue({ rows }),
-  } as unknown as Partial<Pool>;
-}
+describe('OrganigramaService · contrato sigd_org.area', () => {
+  const query = vi.fn();
+  const pool = { query } as unknown as Pool;
+  beforeEach(() => vi.clearAllMocks());
 
-describe('OrganigramaService (ltree)', () => {
-  let pool: Partial<Pool>;
-
-  beforeEach(() => {
-    pool = {};
+  it('consulta la tabla real y ensambla el árbol', async () => {
+    query.mockResolvedValue({ rows: [
+      { id: '1', codigo: 'DIR', nombre: 'Dirección', padreId: null, path: 'a.DIR', nivel: 1, vigente: true },
+      { id: '2', codigo: 'ACA', nombre: 'Académica', padreId: '1', path: 'a.DIR.a.ACA', nivel: 2, vigente: true },
+    ] });
+    const arbol = await new OrganigramaService(pool).obtenerOrganigrama();
+    expect(String(query.mock.calls[0][0])).toContain('FROM sigd_org.area');
+    expect(String(query.mock.calls[0][0])).not.toContain('unidad_organica');
+    expect(arbol[0].children[0].codigo).toBe('ACA');
   });
 
-  describe('ensamblado de árbol jerárquico O(N)', () => {
-    it('transforma una lista plana en una estructura anidada', async () => {
-      pool = crearPoolMock([
-        { id: '1', sigla: 'DIR', nombre: 'Dirección', padre_id: null, path: 'DIR', estado: true },
-        { id: '2', sigla: 'ACA', nombre: 'Académica', padre_id: '1', path: 'DIR.ACA', estado: true },
-        { id: '3', sigla: 'ADM', nombre: 'Administración', padre_id: '1', path: 'DIR.ADM', estado: true },
-        { id: '4', sigla: 'INV', nombre: 'Investigación', padre_id: '2', path: 'DIR.ACA.INV', estado: true },
-      ]);
-
-      const servicio = new OrganigramaService(pool as Pool);
-      const arbol = await servicio.obtenerOrganigrama();
-
-      expect(arbol).toHaveLength(1);
-      expect(arbol[0].sigla).toBe('DIR');
-      expect(arbol[0].children).toHaveLength(2);
-      const academia = arbol[0].children.find((nodo) => nodo.sigla === 'ACA');
-      expect(academia?.children).toHaveLength(1);
-      expect(academia?.children[0].sigla).toBe('INV');
-    });
-
-    it('devolverá múltiples raíces cuando existan nodos sin padre', async () => {
-      pool = crearPoolMock([
-        { id: 'a', sigla: 'RAIZ1', nombre: 'Raíz 1', padre_id: null, path: 'RAIZ1', estado: true },
-        { id: 'b', sigla: 'RAIZ2', nombre: 'Raíz 2', padre_id: null, path: 'RAIZ2', estado: true },
-      ]);
-
-      const servicio = new OrganigramaService(pool as Pool);
-      const arbol = await servicio.obtenerOrganigrama();
-
-      expect(arbol).toHaveLength(2);
-    });
+  it('crea áreas con código normalizado y deja el path al trigger', async () => {
+    query.mockResolvedValue({ rows: [{ id: '1', codigo: 'ADM' }] });
+    await new OrganigramaService(pool).crearUnidad({ codigo: 'adm', nombre: 'Administración', padreId: null });
+    expect(String(query.mock.calls[0][0])).toContain('INSERT INTO sigd_org.area');
+    expect(query.mock.calls[0][1]).toEqual(['ADM', 'Administración', null]);
   });
 
-  describe('intercepción de JERARQUIA_CICLO_INVALIDO', () => {
-    it('relanza una excepción DomainError cuando la base rechaza un ciclo', async () => {
-      const errorBase = new Error('JERARQUIA_CICLO_INVALIDO: no se puede asignar un padre descendiente');
-      pool = {
-        query: vi.fn().mockRejectedValue(errorBase),
-      };
-
-      const servicio = new OrganigramaService(pool as Pool);
-
-      await expect(
-        servicio.actualizarUnidad('unidad-a', { padre_id: 'unidad-b' })
-      ).rejects.toBeInstanceOf(DomainError);
-
-      await expect(
-        servicio.actualizarUnidad('unidad-a', { padre_id: 'unidad-b' })
-      ).rejects.toMatchObject({ code: 'JERARQUIA_CICLO_INVALIDO' });
-    });
-
-    it('permite reubicar hacia un padre válido sin lanzar error', async () => {
-      pool = {
-        query: vi.fn().mockResolvedValue({
-          rows: [{ id: 'x', sigla: 'NUEVA', nombre: 'Nueva', padre_id: '1', path: 'DIR.NUEVA', estado: true }],
-        }),
-      };
-
-      const servicio = new OrganigramaService(pool as Pool);
-      const resultado = await servicio.actualizarUnidad('x', { padre_id: '1' });
-
-      expect(resultado.padre_id).toBe('1');
-      expect(resultado.path).toBe('DIR.NUEVA');
-    });
+  it('rechaza ciclos antes de cambiar la jerarquía', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ path: 'a.DIR' }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ uno: 1 }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [] }),
+      release: vi.fn(),
+    } as unknown as PoolClient;
+    const transactionalPool = { connect: vi.fn(async () => client) } as unknown as Pool;
+    await expect(new OrganigramaService(transactionalPool).actualizarUnidad(
+      '11111111-1111-4111-8111-111111111111',
+      { padreId: '22222222-2222-4222-8222-222222222222' },
+    )).rejects.toBeInstanceOf(DomainError);
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
   });
 });

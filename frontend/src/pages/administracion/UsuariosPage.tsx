@@ -2,18 +2,12 @@ import { useState } from "react";
 
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
 import UserEditModal from "../../components/administracion/UserEditModal";
-import {
-  CATALOGO_AREAS,
-  CATALOGO_ROLES_USUARIOS,
-  CATALOGO_SEDES,
-  useUsuariosAdmin,
-} from "../../hooks/useUsuariosAdmin";
+import { useUsuariosAdmin } from "../../hooks/useUsuariosAdmin";
 import type { ApiHttpError } from "../../types/api";
 import type { EstadoUsuario } from "../../types/usuarioAdmin";
 
 function estiloEstado(estado: EstadoUsuario) {
   if (estado === "Activo") return "bg-emerald-100 text-emerald-700";
-  if (estado === "Bloqueado") return "bg-red-100 text-red-700";
   return "bg-slate-200 text-slate-700";
 }
 
@@ -26,12 +20,10 @@ export default function UsuariosPage() {
     totalUsuarios,
     busqueda,
     setBusqueda,
-    area,
-    setArea,
-    sede,
-    setSede,
-    rol,
-    setRol,
+    areaId,
+    setAreaId,
+    rolId,
+    setRolId,
     estado,
     setEstado,
     usuarioEditando,
@@ -42,6 +34,7 @@ export default function UsuariosPage() {
     isFetching,
     error,
     guardarPendiente,
+    catalogos,
   } = useUsuariosAdmin();
 
   async function guardar(usuarioActualizado: Parameters<typeof actualizarUsuario>[0]) {
@@ -61,7 +54,7 @@ export default function UsuariosPage() {
     }
   }
 
-  async function alternarEstado(id: number) {
+  async function alternarEstado(id: string) {
     setErrorServidor("");
     try {
       await conmutarEstado(id);
@@ -127,7 +120,7 @@ export default function UsuariosPage() {
         )}
 
         <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div>
               <label htmlFor="busqueda" className="mb-2 block text-sm font-semibold">
                 Buscar usuario
@@ -147,33 +140,14 @@ export default function UsuariosPage() {
               </label>
               <select
                 id="area"
-                value={area}
-                onChange={(event) => setArea(event.target.value)}
+                value={areaId}
+                onChange={(event) => setAreaId(event.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               >
                 <option value="">Todas</option>
-                {CATALOGO_AREAS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="sede" className="mb-2 block text-sm font-semibold">
-                Sede
-              </label>
-              <select
-                id="sede"
-                value={sede}
-                onChange={(event) => setSede(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-              >
-                <option value="">Todas</option>
-                {CATALOGO_SEDES.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                {catalogos.areas.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.nombre}
                   </option>
                 ))}
               </select>
@@ -185,14 +159,14 @@ export default function UsuariosPage() {
               </label>
               <select
                 id="rol"
-                value={rol}
-                onChange={(event) => setRol(event.target.value)}
+                value={rolId}
+                onChange={(event) => setRolId(event.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               >
                 <option value="">Todos</option>
-                {CATALOGO_ROLES_USUARIOS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                {catalogos.roles.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.nombre}
                   </option>
                 ))}
               </select>
@@ -213,7 +187,6 @@ export default function UsuariosPage() {
                 <option value="Todos">Todos</option>
                 <option value="Activo">Activo</option>
                 <option value="Inactivo">Inactivo</option>
-                <option value="Bloqueado">Bloqueado</option>
               </select>
             </div>
           </div>
@@ -285,10 +258,9 @@ export default function UsuariosPage() {
                         <p className="text-sm font-semibold">{usuario.nombre}</p>
                         <p className="text-xs text-slate-500">{usuario.correo}</p>
                       </td>
-                      <td className="px-6 py-4 text-sm">{usuario.dni}</td>
+                      <td className="px-6 py-4 text-sm">{usuario.documento}</td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium">{usuario.area}</p>
-                        <p className="text-xs text-slate-500">{usuario.sede}</p>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {usuario.cargo}
@@ -324,7 +296,7 @@ export default function UsuariosPage() {
                             onClick={() => void alternarEstado(usuario.id)}
                             disabled={guardarPendiente}
                             className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-60"
-                            title="Conmutar estado (Activo → Inactivo → Bloqueado)"
+                            title="Conmutar estado (Activo ↔ Inactivo)"
                           >
                             Conmutar estado
                           </button>
@@ -341,9 +313,9 @@ export default function UsuariosPage() {
       {usuarioEditando && (
         <UserEditModal
           usuario={usuarioEditando}
-          areas={CATALOGO_AREAS}
-          sedes={CATALOGO_SEDES}
-          roles={CATALOGO_ROLES_USUARIOS}
+          areas={catalogos.areas}
+          cargos={catalogos.cargos}
+          roles={catalogos.roles}
           onClose={() => {
             setMensaje("");
             setUsuarioEditando(null);

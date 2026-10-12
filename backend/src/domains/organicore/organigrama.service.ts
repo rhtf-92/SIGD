@@ -1,109 +1,127 @@
-import type { Pool } from 'pg';
-import { DomainError } from '../../shared/domain/errors/index.js';
+import type { Pool, QueryResultRow } from 'pg';
 
-export interface UnidadOrganica {
+import { ConflictError, DomainError, NotFoundError } from '../../shared/domain/errors/index.js';
+
+export interface AreaOrganica extends QueryResultRow {
   id: string;
-  sigla: string;
+  codigo: string;
   nombre: string;
-  padre_id: string | null;
+  padreId: string | null;
   path: string;
-  estado: boolean;
+  nivel: number;
+  vigente: boolean;
 }
 
-export interface UnidadOrganicaAnidada extends UnidadOrganica {
-  children: UnidadOrganicaAnidada[];
+export interface AreaOrganicaAnidada extends AreaOrganica {
+  children: AreaOrganicaAnidada[];
 }
 
-export interface CrearUnidadDTO {
-  sigla: string;
-  nombre: string;
-  padre_id: string | null;
-}
+export interface CrearUnidadDTO { codigo: string; nombre: string; padreId: string | null }
+export interface ActualizarUnidadDTO { nombre?: string; padreId?: string | null; vigente?: boolean }
 
-export interface ActualizarUnidadDTO {
-  nombre?: string;
-  padre_id?: string | null;
+const PROYECCION = `area_id AS id, codigo, nombre, area_padre_id AS "padreId",
+  path::text AS path, nivel, vigente`;
+
+function traducirError(error: unknown): never {
+  const postgres = error as { code?: string };
+  if (postgres.code === '23505') throw new ConflictError({ message: 'Ya existe un área con el mismo código.' });
+  if (postgres.code === '23503') {
+    throw new DomainError({ code: 'AREA_PADRE_INVALIDA', message: 'El área padre indicada no existe.' });
+  }
+  throw error;
 }
 
 export class OrganigramaService {
   constructor(private readonly pool: Pool) {}
 
-  async obtenerOrganigrama(): Promise<UnidadOrganicaAnidada[]> {
-    const { rows } = await this.pool.query(
-      'SELECT id, sigla, nombre, padre_id, path, estado FROM sigd_org.unidad_organica WHERE estado = TRUE ORDER BY path ASC'
+  async obtenerOrganigrama(): Promise<AreaOrganicaAnidada[]> {
+    const { rows } = await this.pool.query<AreaOrganica>(
+      `SELECT ${PROYECCION} FROM sigd_org.area ORDER BY path ASC`,
     );
-
-    const planas = rows as UnidadOrganica[];
-    const mapa = new Map<string, UnidadOrganicaAnidada>();
-    const raices: UnidadOrganicaAnidada[] = [];
-
-    // Primera pasada: Crear nodos
-    for (const nodo of planas) {
-      mapa.set(nodo.id, { ...nodo, children: [] });
+    const mapa = new Map<string, AreaOrganicaAnidada>();
+    const raices: AreaOrganicaAnidada[] = [];
+    for (const area of rows) mapa.set(area.id, { ...area, children: [] });
+    for (const area of rows) {
+      const nodo = mapa.get(area.id)!;
+      const padre = area.padreId ? mapa.get(area.padreId) : undefined;
+      if (padre) padre.children.push(nodo);
+      else raices.push(nodo);
     }
-
-    // Segunda pasada: Ensamblar árbol O(N)
-    for (const nodo of planas) {
-      const nodoAnidado = mapa.get(nodo.id)!;
-      if (nodo.padre_id && mapa.has(nodo.padre_id)) {
-        mapa.get(nodo.padre_id)!.children.push(nodoAnidado);
-      } else {
-        raices.push(nodoAnidado);
-      }
-    }
-
     return raices;
   }
 
-  async crearUnidad(dto: CrearUnidadDTO): Promise<UnidadOrganica> {
-    const { sigla, nombre, padre_id } = dto;
-    const query = `
-      INSERT INTO sigd_org.unidad_organica (sigla, nombre, padre_id)
-      VALUES ($1, $2, $3)
-      RETURNING id, sigla, nombre, padre_id, path, estado
-    `;
-    const { rows } = await this.pool.query(query, [sigla, nombre, padre_id]);
-    return rows[0];
+  async crearUnidad(dto: CrearUnidadDTO): Promise<AreaOrganica> {
+    try {
+      const { rows } = await this.pool.query<AreaOrganica>(
+        `INSERT INTO sigd_org.area (codigo, nombre, area_padre_id, path)
+         VALUES ($1, $2, $3, 'temporal'::ltree)
+         RETURNING ${PROYECCION}`,
+        [dto.codigo.trim().toUpperCase(), dto.nombre.trim(), dto.padreId],
+      );
+      return rows[0];
+    } catch (error) {
+      return traducirError(error);
+    }
   }
 
-  async actualizarUnidad(id: string, dto: ActualizarUnidadDTO): Promise<UnidadOrganica> {
-    const { nombre, padre_id } = dto;
-    
-    const setClauses: string[] = [];
-    const values: any[] = [];
-    
-    if (nombre !== undefined) {
-      values.push(nombre);
-      setClauses.push(`nombre = $${values.length}`);
-    }
-    if (padre_id !== undefined) {
-      values.push(padre_id);
-      setClauses.push(`padre_id = $${values.length}`);
-    }
-
-    if (setClauses.length === 0) throw new Error('No se proporcionaron datos para actualizar');
-
-    values.push(id);
-    const query = `
-      UPDATE sigd_org.unidad_organica 
-      SET ${setClauses.join(', ')}, actualizado_en = now()
-      WHERE id = $${values.length}
-      RETURNING id, sigla, nombre, padre_id, path, estado
-    `;
-
+  async actualizarUnidad(id: string, dto: ActualizarUnidadDTO): Promise<AreaOrganica> {
+    const cliente = await this.pool.connect();
     try {
-      const { rows } = await this.pool.query(query, values);
-      if (rows.length === 0) throw new Error('Unidad orgánica no encontrada');
-      return rows[0];
-    } catch (error: any) {
-      if (error.message?.includes('JERARQUIA_CICLO_INVALIDO')) {
-        throw new DomainError({
-          code: 'JERARQUIA_CICLO_INVALIDO',
-          message: 'Operación rechazada: se ha detectado un ciclo jerárquico en la reubicación de la unidad orgánica.',
-          detail: 'Una unidad no puede ser asignada como hija de uno de sus propios descendientes.'
-        });
+      await cliente.query('BEGIN');
+      const actual = await cliente.query<{ path: string }>(
+        'SELECT path::text AS path FROM sigd_org.area WHERE area_id = $1 FOR UPDATE', [id],
+      );
+      if (!actual.rows[0]) throw new NotFoundError({ message: 'El área indicada no existe.' });
+      if (dto.padreId === id) {
+        throw new DomainError({ code: 'JERARQUIA_CICLO_INVALIDO', message: 'Un área no puede depender de sí misma.' });
       }
-      throw error;
+      if (dto.padreId) {
+        const ciclo = await cliente.query(
+          'SELECT 1 FROM sigd_org.area WHERE area_id = $1 AND path <@ $2::ltree',
+          [dto.padreId, actual.rows[0].path],
+        );
+        if (ciclo.rowCount) {
+          throw new DomainError({
+            code: 'JERARQUIA_CICLO_INVALIDO',
+            message: 'Un área no puede depender de uno de sus descendientes.',
+          });
+        }
+      }
+
+      const valores: unknown[] = [];
+      const cambios: string[] = [];
+      const agregar = (valor: unknown): string => { valores.push(valor); return `$${valores.length}`; };
+      if (dto.nombre !== undefined) cambios.push(`nombre = ${agregar(dto.nombre.trim())}`);
+      if (dto.padreId !== undefined) cambios.push(`area_padre_id = ${agregar(dto.padreId)}`);
+      if (dto.vigente !== undefined) cambios.push(`vigente = ${agregar(dto.vigente)}`);
+      if (!cambios.length) {
+        throw new DomainError({ code: 'DATOS_REQUERIDOS', message: 'No hay cambios para guardar.' });
+      }
+
+      valores.push(id);
+      const actualizado = await cliente.query<AreaOrganica>(
+        `UPDATE sigd_org.area SET ${cambios.join(', ')} WHERE area_id = $${valores.length}
+         RETURNING ${PROYECCION}`,
+        valores,
+      );
+      const area = actualizado.rows[0];
+      if (!area) throw new NotFoundError({ message: 'El área indicada no existe.' });
+      if (dto.padreId !== undefined && area.path !== actual.rows[0].path) {
+        await cliente.query(
+          `UPDATE sigd_org.area
+           SET path = $2::ltree || subpath(path, nlevel($1::ltree)),
+               nivel = nlevel($2::ltree || subpath(path, nlevel($1::ltree)))
+           WHERE path <@ $1::ltree AND area_id <> $3`,
+          [actual.rows[0].path, area.path, id],
+        );
+      }
+      await cliente.query('COMMIT');
+      return area;
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      return traducirError(error);
+    } finally {
+      cliente.release();
     }
   }
 }

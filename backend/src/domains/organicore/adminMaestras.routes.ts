@@ -28,6 +28,10 @@ import type { Pool } from 'pg';
 import { CalendarioService } from './calendario.service.js';
 import { TablasMaestrasService } from './tablasMaestras.service.js';
 import {
+  actualizarItemTablaMaestra,
+  cambiarVigenciaCalendario,
+  cambiarVigenciaTablaMaestra,
+  crearItemTablaMaestra,
   listarCalendario,
   listarTablasMaestras,
   registrarFeriadoExcepcional,
@@ -42,8 +46,12 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
   };
 
   router.get('/tablas-maestras', listarTablasMaestras(deps));
+  router.post('/tablas-maestras/:catalogo', crearItemTablaMaestra(deps));
+  router.put('/tablas-maestras/:catalogo/:id', actualizarItemTablaMaestra(deps));
+  router.patch('/tablas-maestras/:catalogo/:id/vigencia', cambiarVigenciaTablaMaestra(deps));
   router.get('/calendario-laboral', listarCalendario(deps));
   router.post('/calendario-laboral/feriado-excepcional', registrarFeriadoExcepcional(deps));
+  router.patch('/calendario-laboral/:id/vigencia', cambiarVigenciaCalendario(deps));
 
   return router;
 }
