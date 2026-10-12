@@ -1,7 +1,74 @@
-import type { Request } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import type { Pool } from 'pg';
-import { AppError } from '../../shared/domain/errors/index.js';
+import { AppError, ForbiddenError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 import { extraerTokenBearer, verificarTokenAcceso, type ClaimsJwt } from './jwt.service.js';
+
+export interface CuentaActual {
+  idUsuario: string;
+  roles: string[];
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      cuentaActual?: CuentaActual;
+    }
+  }
+}
+
+export const PERMISOS_RBAC = {
+  ADMIN_ACCESO: 'admin:acceso',
+  USUARIOS_LEER: 'usuarios:leer',
+  USUARIOS_GESTIONAR: 'usuarios:gestionar',
+  ROLES_LEER: 'roles:leer',
+  AUDITORIA_LEER: 'auditoria:leer',
+  ORGANIGRAMA_LEER: 'organigrama:leer',
+  ORGANIGRAMA_GESTIONAR: 'organigrama:gestionar',
+  MAESTRAS_LEER: 'maestras:leer',
+  MAESTRAS_GESTIONAR: 'maestras:gestionar',
+  CALENDARIO_LEER: 'calendario:leer',
+  CALENDARIO_GESTIONAR: 'calendario:gestionar',
+} as const;
+
+export type PermisoRbac = (typeof PERMISOS_RBAC)[keyof typeof PERMISOS_RBAC];
+
+const ROLES_POR_PERMISO: Record<PermisoRbac, readonly string[]> = {
+  [PERMISOS_RBAC.ADMIN_ACCESO]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
+  [PERMISOS_RBAC.USUARIOS_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
+  [PERMISOS_RBAC.USUARIOS_GESTIONAR]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
+  [PERMISOS_RBAC.ROLES_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
+  [PERMISOS_RBAC.AUDITORIA_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
+  [PERMISOS_RBAC.ORGANIGRAMA_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR', 'DIRECTOR'],
+  [PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
+  [PERMISOS_RBAC.MAESTRAS_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
+  [PERMISOS_RBAC.MAESTRAS_GESTIONAR]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
+  [PERMISOS_RBAC.CALENDARIO_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR', 'DIRECTOR'],
+  [PERMISOS_RBAC.CALENDARIO_GESTIONAR]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
+};
+
+export function autenticarJwt(req: Request, _res: Response, next: NextFunction): void {
+  const token = extraerTokenBearer(req.get('authorization'));
+  if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
+
+  const claims = verificarTokenAcceso(token);
+  req.cuentaActual = { idUsuario: claims.sub, roles: claims.roles };
+  next();
+}
+
+export function autorizarPermisos(...permisos: PermisoRbac[]) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    const cuenta = req.cuentaActual;
+    if (!cuenta) throw new UnauthorizedError({ detail: 'Autenticación requerida.' });
+
+    const roles = new Set(cuenta.roles.map((rol) => rol.toUpperCase()));
+    const autorizado = permisos.every((permiso) =>
+      ROLES_POR_PERMISO[permiso].some((rol) => roles.has(rol)),
+    );
+    if (!autorizado) throw new ForbiddenError();
+
+    next();
+  };
+}
 
 export interface IdentidadAutenticada {
   idUsuario: string;
@@ -35,7 +102,8 @@ export function resolverIdentidad(req: Request): IdentidadAutenticada {
   }
 
   const cabecera = req.get('x-usuario-id');
-  const cabeceraPermitida = (process.env.ALLOW_HEADER_IDENTITY ?? 'false') === 'true';
+  const cabeceraPermitida =
+    process.env.NODE_ENV === 'test' && (process.env.ALLOW_HEADER_IDENTITY ?? 'false') === 'true';
   if (cabecera && cabecera.trim() !== '' && cabeceraPermitida) {
     return { idUsuario: cabecera.trim(), roles: [], via: 'cabecera-interna' };
   }
