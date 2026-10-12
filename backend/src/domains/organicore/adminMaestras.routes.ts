@@ -14,17 +14,13 @@
  * propagan con `throw` para que los atienda `src/middleware/error-middleware.ts`
  * con el formato RFC 9457.
  *
- * NOTA DE ALCANCE: el endpoint #49 es una escritura con efecto legal sobre el
- * cómputo de plazos del Art. 143 LPAG y, por tanto, requeriría control de acceso
- * por permiso. Ese middleware (`src/middleware/autorizacion.ts` y su repositorio)
- * no forma parte de los cuatro entregables autorizados de T-BE-OC-13/14/15/16 y
- * se deja pendiente de autorización del docente. Hasta entonces los tres
- * endpoints quedan exposed sin autenticación, igual que el resto de catálogos de
- * solo lectura del proyecto.
+ * Los endpoints declaran permisos RBAC; el montaje de `/api/v1/admin` exige
+ * además autenticación JWT y acceso administrativo.
  */
 
 import { Router } from 'express';
 import type { Pool } from 'pg';
+import { autorizarPermisos, PERMISOS_RBAC } from '../../core/auth/auth.guard.js';
 import { CalendarioService } from './calendario.service.js';
 import { TablasMaestrasService } from './tablasMaestras.service.js';
 import {
@@ -41,9 +37,21 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
     tablasMaestras: new TablasMaestrasService(pool),
   };
 
-  router.get('/tablas-maestras', listarTablasMaestras(deps));
-  router.get('/calendario-laboral', listarCalendario(deps));
-  router.post('/calendario-laboral/feriado-excepcional', registrarFeriadoExcepcional(deps));
+  router.get(
+    '/tablas-maestras',
+    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_LEER),
+    listarTablasMaestras(deps),
+  );
+  router.get(
+    '/calendario-laboral',
+    autorizarPermisos(PERMISOS_RBAC.CALENDARIO_LEER),
+    listarCalendario(deps),
+  );
+  router.post(
+    '/calendario-laboral/feriado-excepcional',
+    autorizarPermisos(PERMISOS_RBAC.CALENDARIO_GESTIONAR),
+    registrarFeriadoExcepcional(deps),
+  );
 
   return router;
 }

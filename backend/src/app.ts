@@ -1,5 +1,7 @@
 import { cuentaActual } from './core/auth/cuenta-actual.js';
 import express, { Express } from 'express';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { contextMiddleware } from './middleware/context-middleware.js';
 import { errorMiddleware } from './middleware/error-middleware.js';
@@ -63,6 +65,7 @@ import { verificarTokenAcceso } from './core/auth/jwt.service.js';
 import { crearRouterSalud } from './controllers/health.controller.js';
 import { crearRouterWorkflowAcademico } from './domains/docucore/workflowAcademico.router.js';
 import { ForbiddenError, NotFoundError, ValidationError } from './shared/domain/errors/index.js';
+import { autenticarJwt, autorizarPermisos, PERMISOS_RBAC } from './core/auth/auth.guard.js';
 
 export interface AppOptions {
   busSse?: BusSse;
@@ -106,9 +109,45 @@ export function construirApp(
   const app = express();
   app.disable('x-powered-by');
 
+  app.use(helmet());
   app.use(corsMiddleware);
+  app.use((req, _res, next) => {
+    if (process.env.NODE_ENV !== 'test') {
+      delete req.headers['x-auth'];
+      delete req.headers['x-rol'];
+      delete req.headers['x-usuario-id'];
+    }
+    next();
+  });
   app.use(express.json());
   app.use(contextMiddleware);
+  app.use(
+    '/api/v1/admin',
+    autenticarJwt,
+    autorizarPermisos(PERMISOS_RBAC.ADMIN_ACCESO),
+  );
+
+  const loginRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  const refreshRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  const registroCiudadanoRateLimit = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use('/api/v1/auth/login', loginRateLimit);
+  app.use('/api/v1/auth/refresh', refreshRateLimit);
+  app.use('/api/v1/auth/registro-ciudadano', registroCiudadanoRateLimit);
 
   app.use(crearRouterSalud(pool));
 
@@ -156,7 +195,9 @@ export function construirApp(
   const actorProviderReportesEfectivo =
     opts.actorProviderReportes ?? opts.actorProviderRutaDoc ?? jwtActorProvider;
 
-  app.use('/api', crearRouterReferencia(pool));
+  if (process.env.NODE_ENV === 'test') {
+    app.use('/api', crearRouterReferencia(pool));
+  }
   app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
   app.use('/api/v1', crearRouterAuth(pool));
   app.use('/api/v1', crearRouterCasilla(pool));
@@ -192,7 +233,12 @@ export function construirApp(
    */
   const usuariosAdminRouter = crearUsuariosAdminRouter(pool);
   app.use('/api/v1/admin/usuarios', usuariosAdminRouter);
-  app.use('/api/v1/usuarios', usuariosAdminRouter);
+  app.use(
+    '/api/v1/usuarios',
+    autenticarJwt,
+    autorizarPermisos(PERMISOS_RBAC.USUARIOS_LEER),
+    usuariosAdminRouter,
+  );
 
   /*
    * OrganiCore - Tablas Maestras y Calendario Laboral (Feriados Ucayali) (#47, #48, #49)
@@ -208,10 +254,26 @@ export function construirApp(
    * OrganiCore - Organigrama y Áreas Jerárquicas ltree (#44, #45)
    */
   const organigramaCtrl = crearControladorOrganigrama(new OrganigramaService(pool));
-  app.get('/api/v1/admin/organigrama', organigramaCtrl.getOrganigrama);
-  app.get('/api/v1/admin/organigrama/arbol', organigramaCtrl.getOrganigrama);
-  app.post('/api/v1/admin/organigrama/areas', organigramaCtrl.crearUnidad);
-  app.put('/api/v1/admin/organigrama/areas/:id', organigramaCtrl.actualizarUnidad);
+  app.get(
+    '/api/v1/admin/organigrama',
+    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_LEER),
+    organigramaCtrl.getOrganigrama,
+  );
+  app.get(
+    '/api/v1/admin/organigrama/arbol',
+    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_LEER),
+    organigramaCtrl.getOrganigrama,
+  );
+  app.post(
+    '/api/v1/admin/organigrama/areas',
+    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR),
+    organigramaCtrl.crearUnidad,
+  );
+  app.put(
+    '/api/v1/admin/organigrama/areas/:id',
+    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR),
+    organigramaCtrl.actualizarUnidad,
+  );
 
   /*
    * DocuCore - Foliación continua AGN, Callback Refirma y Validador CVD/QR (#31, #35, #36)
@@ -243,38 +305,48 @@ export function construirApp(
   /*
    * OrganiCore / CoreLink - Auditoría Bitácora WORM (#46), Roles RBAC (#45) y Maestras
    */
-  app.get('/api/v1/admin/auditoria/bitacora', async (req, res, next) => {
-    try {
-      const limite = Math.min(Number(req.query.limite ?? 50), 100);
-      const offset = Number(req.query.offset ?? 0);
-      const { rows } = await pool.query(
-        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, creado_en
-         FROM sigd_audit.bitacora_auditoria
-         ORDER BY creado_en DESC
-         LIMIT $1 OFFSET $2`,
-        [limite, offset],
-      );
-      res.json({ total: rows.length, registros: rows });
-    } catch (error) {
-      next(error);
-    }
-  });
+  app.get(
+    '/api/v1/admin/auditoria/bitacora',
+    autorizarPermisos(PERMISOS_RBAC.AUDITORIA_LEER),
+    async (req, res, next) => {
+      try {
+        const limite = Math.min(Number(req.query.limite ?? 50), 100);
+        const offset = Number(req.query.offset ?? 0);
+        const { rows } = await pool.query(
+          `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, creado_en
+           FROM sigd_audit.bitacora_auditoria
+           ORDER BY creado_en DESC
+           LIMIT $1 OFFSET $2`,
+          [limite, offset],
+        );
+        res.json({ total: rows.length, registros: rows });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
-  app.get('/api/v1/admin/roles-permisos', async (_req, res, next) => {
-    try {
-      const { rows: roles } = await pool.query(
-        `SELECT r.rol_id AS id, r.codigo, r.nombre, r.descripcion,
-                COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
-         FROM sigd_org.rol_sistema r
-         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
-         LEFT JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
-         WHERE r.vigente = TRUE
-         GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion
-         ORDER BY r.codigo`,
-      );
-      res.json({ roles });
-    } catch (error) { next(error); }
-  });
+  app.get(
+    '/api/v1/admin/roles-permisos',
+    autorizarPermisos(PERMISOS_RBAC.ROLES_LEER),
+    async (_req, res, next) => {
+      try {
+        const { rows: roles } = await pool.query(
+          `SELECT r.rol_id AS id, r.codigo, r.nombre, r.descripcion,
+                  COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
+           FROM sigd_org.rol_sistema r
+           LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
+           LEFT JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+           WHERE r.vigente = TRUE
+           GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion
+           ORDER BY r.codigo`,
+        );
+        res.json({ roles });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.put('/api/v1/admin/roles/:codigo/permisos', async (req, res, next) => {
     const cliente = await pool.connect();
@@ -330,35 +402,36 @@ export function construirApp(
       next(error);
     } finally { cliente.release(); }
   });
+  app.get(
+    '/api/v1/admin/maestras/sede',
+    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_LEER),
+    (_req, res) => {
+      res.json({
+        sedes: [
+          { id: '1', codigo: 'SEDE_CENTRAL', nombre: 'Sede Central Pucallpa - Av. Túpac Amaru Km. 4.5' },
+          { id: '2', codigo: 'SEDE_FILIAL', nombre: 'Filial Yarinacocha' },
+        ],
+      });
+    },
+  );
 
-  app.get('/api/v1/admin/maestras/sede', (_req, res) => {
-    res.json({
-      sedes: [
-        { id: '1', codigo: 'SEDE_CENTRAL', nombre: 'Sede Central Pucallpa - Av. Túpac Amaru Km. 4.5' },
-        { id: '2', codigo: 'SEDE_FILIAL', nombre: 'Filial Yarinacocha' },
-      ],
-    });
-  });
-
-  app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
-    try {
-      const { rows } = await pool.query(
-        `SELECT id, codigo, nombre, descripcion, dias_atencion_legal, vigente
-         FROM sigd_doc.tipo_documento
-         WHERE vigente = TRUE
-         ORDER BY nombre ASC`,
-      );
-      res.json(rows);
-    } catch {
-      res.json([
-        { codigo: 'SOLICITUD', nombre: 'Solicitud' },
-        { codigo: 'OFICIO', nombre: 'Oficio' },
-        { codigo: 'MEMORANDO', nombre: 'Memorando' },
-        { codigo: 'INFORME', nombre: 'Informe Técnico' },
-        { codigo: 'RESOLUCION', nombre: 'Resolución Directoral' },
-      ]);
-    }
-  });
+  app.get(
+    '/api/v1/admin/maestras/tipo-documento',
+    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_LEER),
+    async (_req, res, next) => {
+      try {
+        const { rows } = await pool.query(
+          `SELECT id, codigo, nombre, descripcion, dias_atencion_legal, vigente
+           FROM sigd_doc.tipo_documento
+           WHERE vigente = TRUE
+           ORDER BY nombre ASC`,
+        );
+        res.json(rows);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   /*
    * Alias de Interoperabilidad Frontend-Backend (Plan Maestro §4.1)
