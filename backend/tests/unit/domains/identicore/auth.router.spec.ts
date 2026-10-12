@@ -63,7 +63,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
       id: '11111111-1111-1111-1111-111111111111',
       nombreCompleto: 'Administrador General',
       correo: 'admin@iestp-suiza.edu.pe',
-      rol: 'ADMINISTRADOR',
+      rol: 'SUPER_ADMIN',
     });
 
     // Validar alineación exacta de columnas en el SQL capturado
@@ -204,7 +204,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
       usuario: 'admin.institucional',
       correo: 'admin@iestp-suiza.edu.pe',
       nombreCompleto: 'Administrador General',
-      rol: 'ADMINISTRADOR',
+      rol: 'SUPER_ADMIN',
     });
 
     expect(capturedQuery).toContain('c.usuario');
