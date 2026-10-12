@@ -24,7 +24,7 @@ export function crearRouterReferencia(pool: Pool): Router {
   const router = Router();
 
   router.use((req, _res, next) => {
-    const usuarioId = req.get('x-usuario-id');
+    const usuarioId = process.env.NODE_ENV === 'test' ? req.get('x-usuario-id') : undefined;
     if (usuarioId) {
       setUsuarioId(usuarioId);
     }
@@ -32,14 +32,14 @@ export function crearRouterReferencia(pool: Pool): Router {
   });
 
   router.get('/protegido', (req, res) => {
-    if (!req.get('x-auth')) {
+    if (process.env.NODE_ENV !== 'test' || !req.get('x-auth')) {
       throw new UnauthorizedError();
     }
     res.json({ ok: true });
   });
 
   router.post('/accion-admin', (req, res) => {
-    if (!req.get('x-auth')) {
+    if (process.env.NODE_ENV !== 'test' || !req.get('x-auth')) {
       throw new UnauthorizedError();
     }
     if (req.get('x-rol') !== 'admin') {
