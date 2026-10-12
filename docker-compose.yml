@@ -23,8 +23,8 @@ services:
     container_name: sigd_s3
     command: mini -dir=/data
     environment:
-      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-minioadminpassword}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-EXAMPLE_STORAGE_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-EXAMPLE_STORAGE_SECRET_KEY}
       S3_BUCKET: ${S3_BUCKET:-sigd-expedientes}
     ports:
       - "127.0.0.1:9000:8333"
@@ -67,13 +67,13 @@ services:
       PORT: 3000
       NODE_ENV: development
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password}@postgres:5432/${POSTGRES_DB:-sigd_prueba}
-      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-sigd-local-jwt-secret-change-before-production-2026}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-REPLACE_WITH_RANDOM_SECRET_AT_LEAST_64_CHARACTERS}
       CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
       S3_ENDPOINT: http://s3:8333
       S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_REGION: us-east-1
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadminpassword}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-EXAMPLE_STORAGE_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-EXAMPLE_STORAGE_SECRET_KEY}
       S3_BUCKET: ${S3_BUCKET:-sigd-expedientes}
       S3_FORCE_PATH_STYLE: "true"
       REDIS_URL: redis://redis:6379

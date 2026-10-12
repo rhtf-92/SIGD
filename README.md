@@ -504,7 +504,7 @@ Una vez iniciados los servicios, valide su operatividad:
      "version": "1.0.0"
    }
    ```
-3. **Consola Web de MinIO:** Acceda a `http://localhost:9001` con usuario `minioadmin` y contraseña `minioadminpassword` para gestionar los buckets de almacenamiento de expedientes.
+3. **Consola Web de MinIO:** Acceda a `http://localhost:9001` usando las credenciales configuradas mediante `S3_ACCESS_KEY` y `S3_SECRET_KEY`; no reutilice los marcadores del archivo de ejemplo.
 4. **Verificación de Redis:** Compruebe la conectividad de cache ejecutando `redis-cli ping` (debe responder `PONG`).
 
 ---
