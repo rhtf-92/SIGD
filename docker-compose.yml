@@ -4,15 +4,15 @@ services:
     image: postgres:18-alpine
     container_name: sigd_postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_password
-      POSTGRES_DB: sigd_prueba
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER es obligatorio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB es obligatorio}
     ports:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d sigd_prueba"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,8 +25,8 @@ services:
       minio:
         condition: service_started
     environment:
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadminpassword
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?MINIO_ROOT_USER es obligatorio}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD es obligatorio}
       AWS_DEFAULT_REGION: us-east-1
     entrypoint: ["/bin/sh", "-c", "until aws --endpoint-url http://minio:9000 s3api list-buckets > /dev/null 2>&1; do sleep 2; done; aws --endpoint-url http://minio:9000 s3 mb s3://sigd-expedientes || true"]
 
@@ -36,8 +36,8 @@ services:
     container_name: sigd_minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadminpassword
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER es obligatorio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD es obligatorio}
     ports:
       - "9000:9000"   # API S3
       - "9001:9001"   # Consola Web
@@ -70,12 +70,12 @@ services:
     environment:
       PORT: 3000
       NODE_ENV: development
-      DATABASE_URL: postgres://postgres:postgres_password@postgres:5432/sigd_prueba
+      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER es obligatorio}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB es obligatorio}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET es obligatorio}
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_ENDPOINT: http://localhost:9000
-      S3_ACCESS_KEY: minioadmin
-      S3_SECRET_KEY: minioadminpassword
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER es obligatorio}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD es obligatorio}
       S3_BUCKET: sigd-expedientes
       REDIS_URL: redis://redis:6379
       OUTBOX_POLL_MS: 5000

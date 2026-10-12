@@ -10,6 +10,7 @@ import { DEBOUNCE_BUSQUEDA_MS, type Usuario } from "@/types/usuarioAdmin";
 
 const get = vi.fn();
 const put = vi.fn();
+const post = vi.fn();
 const patch = vi.fn();
 const AREA_ID = "11111111-1111-4111-8111-111111111111";
 const CARGO_ID = "22222222-2222-4222-8222-222222222222";
@@ -20,6 +21,7 @@ vi.mock("@/api/client", () => ({
   apiClient: {
     get: (...args: unknown[]) => get(...args),
     put: (...args: unknown[]) => put(...args),
+    post: (...args: unknown[]) => post(...args),
     patch: (...args: unknown[]) => patch(...args),
   },
 }));
@@ -37,6 +39,8 @@ const USUARIOS: Usuario[] = [
     cargo: "Asistente Administrativo",
     rolId: ROL_ID,
     rol: "Operador",
+    rolIds: [ROL_ID],
+    roles: [{ id: ROL_ID, nombre: "Operador" }],
     estado: "Activo",
     ultimoAcceso: "29/08/2026 09:42",
   },
@@ -52,6 +56,8 @@ const USUARIOS: Usuario[] = [
     cargo: "Secretaria Académica",
     rolId: ROL_ID,
     rol: "Responsable de Área",
+    rolIds: [ROL_ID],
+    roles: [{ id: ROL_ID, nombre: "Responsable de Área" }],
     estado: "Inactivo",
     ultimoAcceso: "29/08/2026 08:35",
   },
@@ -99,6 +105,7 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
       ] } })
       : Promise.resolve({ data: { datos: USUARIOS } }));
     put.mockResolvedValue({ data: USUARIOS[0] });
+    post.mockResolvedValue({ data: USUARIOS[0] });
     patch.mockResolvedValue({ data: { ...USUARIOS[0], estado: "Inactivo" } });
   });
 

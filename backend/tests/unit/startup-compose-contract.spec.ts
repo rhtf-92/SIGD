@@ -15,6 +15,9 @@ describe('contrato de arranque con Docker Compose', () => {
 
   it('documenta el secreto necesario para ejecutar Compose localmente', () => {
     expect(envExample()).toContain('AUTH_JWT_SECRET=');
+    expect(envExample()).toContain('POSTGRES_PASSWORD=CAMBIAR_');
+    expect(compose).not.toContain('postgres_password');
+    expect(compose).not.toContain('minioadminpassword');
   });
 
   it('separa la URL S3 pública de la URL interna del contenedor', () => {

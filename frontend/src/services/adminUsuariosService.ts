@@ -18,6 +18,7 @@ import {
 import { apiClient } from "../api/client";
 import { ApiHttpError, type InvalidParamDetail } from "../types/api";
 import type {
+  CrearUsuarioDTO,
   EstadoUsuario,
   FiltrosUsuarios,
   UpdateEstadoDTO,
@@ -42,6 +43,7 @@ function toStringValue(value: unknown, porDefecto = ""): string {
 function toEstadoUsuario(value: unknown): EstadoUsuario {
   const normalizado = toStringValue(value).trim().toLowerCase();
   if (normalizado === "inactivo" || normalizado === "inactiva") return "Inactivo";
+  if (normalizado === "bloqueado" || normalizado === "bloqueada") return "Bloqueado";
   return "Activo";
 }
 
@@ -76,6 +78,9 @@ function normalizarUsuario(valor: unknown): Usuario | null {
   const rol = typeof registro.rol === "string"
     ? { id: toStringValue(registro.rolId) || null, nombre: registro.rol }
     : referencia(registro.rol);
+  const roles = Array.isArray(registro.roles)
+    ? registro.roles.map(referencia).filter((item): item is { id: string; nombre: string } => Boolean(item.id))
+    : rol.id ? [{ id: rol.id, nombre: rol.nombre }] : [];
   return {
     id,
     idPersona: toStringValue(registro.idPersona ?? registro.id_persona),
@@ -88,9 +93,24 @@ function normalizarUsuario(valor: unknown): Usuario | null {
     cargo: cargo.nombre,
     rolId: rol.id,
     rol: rol.nombre,
+    rolIds: roles.map((item) => item.id),
+    roles,
     estado: toEstadoUsuario(registro.estado),
     ultimoAcceso: toStringValue(registro.ultimoAcceso ?? registro.ultimo_acceso, "—"),
   };
+}
+
+export async function crearUsuario(datos: CrearUsuarioDTO): Promise<Usuario> {
+  const response = await apiClient.post(RUTA_CANONICA_USUARIOS, datos);
+  const normalizado = normalizarUsuario(response.data);
+  if (!normalizado) {
+    throw new ApiHttpError({
+      type: "about:blank", title: "Respuesta incompleta del servidor", status: 502,
+      detail: "El servidor no devolvió el usuario creado.", instance: RUTA_CANONICA_USUARIOS,
+      code: "ERR_USUARIO_INVALIDO", category: "System", correlationId: "", retryable: true,
+    });
+  }
+  return normalizado;
 }
 
 /** Extrae el arreglo de usuarios tanto de una respuesta plana como envuelta en `data`. */
@@ -190,6 +210,14 @@ export function useUsuariosQuery(
 }
 
 type VariablesActualizacion = { id: string; cambios: UpdateUsuarioDTO };
+
+export function useCrearUsuarioMutation(): UseMutationResult<Usuario, ApiHttpError, CrearUsuarioDTO> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: crearUsuario,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: usuariosAdminKeys.todos }),
+  });
+}
 
 // El snapshot guarda cada lista por su propia clave: la tabla vive en varias
 // claves (una por combinación de filtros) y revertir exige restaurarlas todas.

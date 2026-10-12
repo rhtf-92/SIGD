@@ -1,4 +1,4 @@
-export type EstadoUsuario = "Activo" | "Inactivo";
+export type EstadoUsuario = "Activo" | "Inactivo" | "Bloqueado";
 
 export interface OpcionCatalogo { id: string; nombre: string }
 
@@ -14,6 +14,8 @@ export interface Usuario {
   cargo: string;
   rolId: string | null;
   rol: string;
+  rolIds: string[];
+  roles: OpcionCatalogo[];
   estado: EstadoUsuario;
   ultimoAcceso: string;
 }
@@ -23,7 +25,23 @@ export interface UpdateUsuarioDTO {
   areaId?: string;
   cargoId?: string;
   rolId?: string;
-  estado?: "ACTIVO" | "INACTIVO";
+  rolesAgregar?: string[];
+  rolesQuitar?: string[];
+  estado?: "ACTIVO" | "INACTIVO" | "BLOQUEADO";
+}
+
+export interface CrearUsuarioDTO {
+  tipo?: "NATURAL";
+  numeroDocumento: string;
+  nombres: string;
+  apellidos: string;
+  telefono?: string | null;
+  correo: string;
+  username: string;
+  passwordInicial: string;
+  areaId: string;
+  cargoId: string;
+  rolIds: string[];
 }
 
 export interface UpdateEstadoDTO { estado: EstadoUsuario }

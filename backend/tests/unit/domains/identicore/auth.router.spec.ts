@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { construirApp } from '../../../../src/app.js';
 import { Argon2Service } from '../../../../src/domains/identicore/argon2.service.js';
-import { firmarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
+import { firmarTokenAcceso, verificarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
 
 describe('Auth Router — Schema Alignment & Database Interactions', () => {
   const hashValido = Argon2Service.generateFallbackHash('PasswordValida123!');
@@ -28,7 +28,8 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
                 password_hash: hashValido,
                 activo: true,
                 nombre_completo: 'Administrador General',
-                rol_codigo: 'ADMINISTRADOR',
+                roles: ['ADMINISTRADOR', 'DIRECTOR'],
+                bloqueado_hasta: null,
                 area_id: null,
               },
             ],
@@ -64,16 +65,19 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
       nombreCompleto: 'Administrador General',
       correo: 'admin@iestp-suiza.edu.pe',
       rol: 'ADMINISTRADOR',
+      roles: ['ADMINISTRADOR', 'DIRECTOR'],
     });
+    expect(verificarTokenAcceso(res.body.accessToken).roles).toEqual(['ADMINISTRADOR', 'DIRECTOR']);
 
     // Validar alineación exacta de columnas en el SQL capturado
     expect(capturedQuery).toContain('c.usuario');
     expect(capturedQuery).toContain('c.correo');
     expect(capturedQuery).not.toContain('c.username');
     expect(capturedQuery).not.toContain('c.correo_institucional');
-    expect(capturedQuery).not.toContain('bloqueado_hasta');
+    expect(capturedQuery).toContain('bloqueado_hasta');
     expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
     expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
+    expect(capturedQuery).toContain('array_agg(DISTINCT r.codigo');
     expect(capturedQuery).not.toContain('r.id_rol');
     expect(capturedQuery).not.toContain('ur.estado');
     expect(capturedQuery).toContain('(c.usuario = $1 OR c.correo = $1)');
@@ -93,7 +97,8 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
                 password_hash: hashValido,
                 activo: true,
                 nombre_completo: 'Admin',
-                rol_codigo: 'ADMINISTRADOR',
+                roles: ['ADMINISTRADOR'],
+                bloqueado_hasta: null,
               },
             ],
             rowCount: 1,
@@ -133,7 +138,9 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
                 id_usuario: '11111111-1111-1111-1111-111111111111',
                 expira_en: expiraEn,
                 revocado_en: null,
-                rol_codigo: 'ADMINISTRADOR',
+                roles: ['ADMINISTRADOR', 'DIRECTOR'],
+                activo: true,
+                bloqueado_hasta: null,
               },
             ],
             rowCount: 1,
@@ -155,6 +162,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
 
     expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
     expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
+    expect(verificarTokenAcceso(res.body.accessToken).roles).toEqual(['ADMINISTRADOR', 'DIRECTOR']);
     expect(capturedQuery).not.toContain('ur.estado');
     expect(capturedQuery).not.toContain('r.id_rol');
   });
@@ -179,7 +187,9 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
                 usuario: 'admin.institucional',
                 correo: 'admin@iestp-suiza.edu.pe',
                 nombre_completo: 'Administrador General',
-                rol_codigo: 'ADMINISTRADOR',
+                roles: ['ADMINISTRADOR', 'DIRECTOR'],
+                activo: true,
+                bloqueado_hasta: null,
                 area_id: '33333333-3333-3333-3333-333333333333',
                 cargo_id: null,
                 telefono: '987654321',
@@ -205,6 +215,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
       correo: 'admin@iestp-suiza.edu.pe',
       nombreCompleto: 'Administrador General',
       rol: 'ADMINISTRADOR',
+      roles: ['ADMINISTRADOR', 'DIRECTOR'],
     });
 
     expect(capturedQuery).toContain('c.usuario');
@@ -213,5 +224,16 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
     expect(capturedQuery).not.toContain('c.correo_institucional');
     expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
     expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
+  });
+
+  it('POST /api/v1/auth/login rechaza una cuenta bloqueada', async () => {
+    const fakePool = {
+      query: vi.fn(async (queryText: string) => queryText.includes('FROM sigd_auth.cuenta_usuario') ? {
+        rows: [{ id_usuario: '11111111-1111-1111-1111-111111111111', usuario: 'bloqueado', correo: 'bloqueado@iestp-suiza.edu.pe', password_hash: hashValido, activo: true, bloqueado_hasta: 'infinity', roles: ['ADMINISTRADOR'] }], rowCount: 1,
+      } : { rows: [], rowCount: 0 }),
+    } as unknown as Pool;
+    const res = await request(construirApp(fakePool)).post('/api/v1/auth/login').send({ identificador: 'bloqueado', password: 'PasswordValida123!' });
+    expect(res.status).toBe(423);
+    expect(res.body.code).toBe('ACCOUNT_LOCKED');
   });
 });

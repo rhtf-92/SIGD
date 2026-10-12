@@ -18,7 +18,7 @@ interface Formulario {
   correo: string;
   areaId: string;
   cargoId: string;
-  rolId: string;
+  rolIds: string[];
   estado: EstadoUsuario;
 }
 
@@ -30,7 +30,7 @@ export default function UserEditModal({ usuario, areas, cargos, roles, onClose, 
       correo: usuario.correo,
       areaId: usuario.areaId ?? "",
       cargoId: usuario.cargoId ?? "",
-      rolId: usuario.rolId ?? "",
+      rolIds: usuario.rolIds,
       estado: usuario.estado,
     },
   });
@@ -45,8 +45,10 @@ export default function UserEditModal({ usuario, areas, cargos, roles, onClose, 
         area: nombre(areas, valores.areaId),
         cargoId: valores.cargoId,
         cargo: nombre(cargos, valores.cargoId),
-        rolId: valores.rolId,
-        rol: nombre(roles, valores.rolId),
+        rolId: valores.rolIds[0] ?? null,
+        rol: valores.rolIds.map((id) => nombre(roles, id)).join(", "),
+        rolIds: valores.rolIds,
+        roles: roles.filter((rol) => valores.rolIds.includes(rol.id)),
         estado: valores.estado,
       });
     } catch (error) {
@@ -57,7 +59,7 @@ export default function UserEditModal({ usuario, areas, cargos, roles, onClose, 
     }
   }
 
-  const selector = (name: "areaId" | "cargoId" | "rolId", label: string, opciones: OpcionCatalogo[]) => (
+  const selector = (name: "areaId" | "cargoId", label: string, opciones: OpcionCatalogo[]) => (
     <div>
       <label htmlFor={`usuario-${name}`} className="mb-1.5 block text-sm font-semibold">{label}</label>
       <select id={`usuario-${name}`} {...register(name, { required: `${label} es obligatorio.` })}
@@ -80,12 +82,25 @@ export default function UserEditModal({ usuario, areas, cargos, roles, onClose, 
         <form onSubmit={handleSubmit(enviar)} className="grid gap-4 md:grid-cols-2">
           {selector("areaId", "Área", areas)}
           {selector("cargoId", "Cargo", cargos)}
-          {selector("rolId", "Rol", roles)}
+          <fieldset className="rounded-lg border border-slate-200 p-3 md:col-span-2">
+            <legend className="px-1 text-sm font-semibold">Roles activos</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {roles.map((rol) => (
+                <label key={rol.id} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" value={rol.id} {...register("rolIds", {
+                    validate: (seleccionados) => seleccionados.length > 0 || "Seleccione al menos un rol.",
+                  })} />
+                  {rol.nombre}
+                </label>
+              ))}
+            </div>
+            {errors.rolIds && <p className="mt-1 text-xs text-red-700">{errors.rolIds.message}</p>}
+          </fieldset>
           <div>
             <label htmlFor="usuario-estado" className="mb-1.5 block text-sm font-semibold">Estado</label>
             <select id="usuario-estado" {...register("estado", { required: true })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
-              <option value="Activo">Activo</option><option value="Inactivo">Inactivo</option>
+              <option value="Activo">Activo</option><option value="Inactivo">Inactivo</option><option value="Bloqueado">Bloqueado</option>
             </select>
           </div>
           <div className="md:col-span-2">

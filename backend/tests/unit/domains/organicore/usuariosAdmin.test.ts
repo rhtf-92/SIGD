@@ -26,6 +26,7 @@ const usuario: UsuarioDirectorio = {
   area: { id: AREA_ID, nombre: 'Administración' },
   cargo: { id: CARGO_ID, nombre: 'Administrador' },
   rol: { id: ROL_ID, nombre: 'Administrador' },
+  roles: [{ id: ROL_ID, nombre: 'Administrador' }],
   estado: 'ACTIVO',
   ultimoAcceso: null,
 };
@@ -40,7 +41,7 @@ describe('DTO canónico de usuarios administrativos', () => {
 
     expect(filtros).toMatchObject({ areaId: AREA_ID, rolId: ROL_ID, estado: 'ACTIVO' });
     expect(() => listarUsuariosQuerySchema.parse({ sedeId: AREA_ID })).toThrow();
-    expect(() => listarUsuariosQuerySchema.parse({ estado: 'BLOQUEADO' })).toThrow();
+    expect(listarUsuariosQuerySchema.parse({ estado: 'BLOQUEADO' }).estado).toBe('BLOQUEADO');
   });
 
   it('valida :id como UUID', () => {
@@ -53,11 +54,11 @@ describe('DTO canónico de usuarios administrativos', () => {
       actualizarUsuarioAdminSchema.parse({
         areaId: AREA_ID,
         cargoId: CARGO_ID,
-        rolId: ROL_ID,
+        rolesAgregar: [ROL_ID],
         correo: 'nuevo@iestpsuiza.edu.pe',
         estado: 'INACTIVO',
       }),
-    ).toMatchObject({ areaId: AREA_ID, cargoId: CARGO_ID, rolId: ROL_ID });
+    ).toMatchObject({ areaId: AREA_ID, cargoId: CARGO_ID, rolesAgregar: [ROL_ID] });
   });
 });
 
@@ -100,7 +101,7 @@ describe('UsuariosAdminService · lectura canónica', () => {
 
     const [sql, parametros] = query.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('ap.area_id = $1');
-    expect(sql).toContain('ur.rol_id = $2');
+    expect(sql).toContain('filtro_rol.rol_id = $2');
     expect(sql).toContain('cu.activo = TRUE');
     expect(parametros).toEqual([AREA_ID, ROL_ID, 10, 10]);
   });
@@ -125,6 +126,18 @@ describe('UsuariosAdminService · actualización transaccional', () => {
         if (sql.includes('SELECT cu.id_usuario')) {
           return { rows: [{ id_usuario: USUARIO_ID, id_persona: PERSONA_ID }], rowCount: 1 };
         }
+        if (sql.includes('SELECT id_usuario, id_persona')) {
+          return { rows: [{ id_usuario: USUARIO_ID, id_persona: PERSONA_ID }], rowCount: 1 };
+        }
+        if (sql.includes('SELECT rol_id FROM sigd_org.rol_sistema')) {
+          return { rows: [{ rol_id: ROL_ID }], rowCount: 1 };
+        }
+        if (sql.includes('COUNT(*)::int AS total FROM sigd_org.usuario_rol')) {
+          return { rows: [{ total: 2 }], rowCount: 1 };
+        }
+        if (sql.includes('SELECT area_id, cargo_id')) {
+          return { rows: [{ area_id: AREA_ID, cargo_id: CARGO_ID }], rowCount: 1 };
+        }
         return { rows: [], rowCount: 1 };
       }),
       release: vi.fn(),
@@ -145,8 +158,8 @@ describe('UsuariosAdminService · actualización transaccional', () => {
       correo: 'nuevo@iestpsuiza.edu.pe',
       areaId: AREA_ID,
       cargoId: CARGO_ID,
-      rolId: ROL_ID,
-      estado: 'INACTIVO',
+      rolesAgregar: [ROL_ID],
+      estado: 'BLOQUEADO',
     });
 
     const sql = consultas.map((consulta) => consulta.sql).join('\n');
@@ -155,8 +168,8 @@ describe('UsuariosAdminService · actualización transaccional', () => {
     expect(sql).toContain('UPDATE sigd_auth.persona_natural');
     expect(sql).toContain('UPDATE sigd_org.asignacion_personal');
     expect(sql).toContain('INSERT INTO sigd_org.asignacion_personal');
-    expect(sql).toContain('UPDATE sigd_org.usuario_rol');
     expect(sql).toContain('INSERT INTO sigd_org.usuario_rol');
+    expect(sql).not.toMatch(/UPDATE sigd_org\.usuario_rol\s+SET vigente_hasta = now\(\)\s+WHERE id_usuario = \$1\s+AND \(vigente_hasta/);
     expect(sql).toContain('UPDATE sigd_auth.sesion_usuario');
     expect(consultas.at(-1)?.sql).toBe('COMMIT');
   });
@@ -168,7 +181,7 @@ describe('UsuariosAdminService · actualización transaccional', () => {
       crearUsuariosAdminService(pool).actualizarUsuario(USUARIO_ID, {
         areaId: AREA_ID,
         cargoId: CARGO_ID,
-        rolId: ROL_ID,
+        rolesAgregar: [ROL_ID],
       }),
     ).rejects.toThrow('fallo controlado');
 

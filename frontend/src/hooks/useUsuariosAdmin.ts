@@ -4,6 +4,7 @@ import { apiClient } from "../api/client";
 import {
   useActualizarUsuarioMutation,
   useConmutarEstadoMutation,
+  useCrearUsuarioMutation,
   useUsuariosQuery,
 } from "../services/adminUsuariosService";
 import {
@@ -59,20 +60,25 @@ export function useUsuariosAdmin() {
   const consulta = useUsuariosQuery(filtros);
   const mutacionActualizacion = useActualizarUsuarioMutation();
   const mutacionEstado = useConmutarEstadoMutation();
+  const mutacionCreacion = useCrearUsuarioMutation();
   const usuarios = useMemo(() => consulta.data ?? [], [consulta.data]);
 
   function actualizarUsuario(usuario: Usuario) {
-    if (!usuario.areaId || !usuario.cargoId || !usuario.rolId) {
-      return Promise.reject(new Error("Debe seleccionar área, cargo y rol."));
+    if (!usuario.areaId || !usuario.cargoId || !usuario.rolIds.length) {
+      return Promise.reject(new Error("Debe seleccionar área, cargo y al menos un rol."));
     }
+    const anterior = usuarios.find((item) => item.id === usuario.id);
+    const rolesPrevios = new Set(anterior?.rolIds ?? []);
+    const rolesNuevos = new Set(usuario.rolIds);
     return mutacionActualizacion.mutateAsync({
       id: usuario.id,
       cambios: {
         correo: usuario.correo,
         areaId: usuario.areaId,
         cargoId: usuario.cargoId,
-        rolId: usuario.rolId,
-        estado: usuario.estado.toUpperCase() as "ACTIVO" | "INACTIVO",
+        rolesAgregar: usuario.rolIds.filter((id) => !rolesPrevios.has(id)),
+        rolesQuitar: [...rolesPrevios].filter((id) => !rolesNuevos.has(id)),
+        estado: usuario.estado.toUpperCase() as "ACTIVO" | "INACTIVO" | "BLOQUEADO",
       },
     });
   }
@@ -83,14 +89,20 @@ export function useUsuariosAdmin() {
     return mutacionEstado.mutateAsync({ id, estado: siguienteEstado(usuario.estado) });
   }
 
+  function cambiarEstado(id: string, nuevoEstado: EstadoUsuario) {
+    return mutacionEstado.mutateAsync({ id, estado: nuevoEstado });
+  }
+
   return {
     usuarios, totalUsuarios: usuarios.length,
     busqueda, setBusqueda, areaId, setAreaId, rolId, setRolId, estado, setEstado,
-    usuarioEditando, setUsuarioEditando, actualizarUsuario, conmutarEstado,
+    usuarioEditando, setUsuarioEditando, actualizarUsuario, conmutarEstado, cambiarEstado,
+    crearUsuario: mutacionCreacion.mutateAsync,
     catalogos,
     isLoading: consulta.isLoading, isFetching: consulta.isFetching,
     error: consulta.error ?? errorCatalogos,
     guardarPendiente: mutacionActualizacion.isPending,
     estadoPendiente: mutacionEstado.isPending,
+    crearPendiente: mutacionCreacion.isPending,
   };
 }

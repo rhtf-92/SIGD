@@ -43,14 +43,21 @@ async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
   try {
     await cliente.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
 
-    await aplicarSql(cliente, fixture);
-    if (existsSync(archivoDdlAudit)) {
+    // Los fixtures mínimos tienen contratos heredados (por ejemplo `cuenta_usuario.id`)
+    // incompatibles con las migraciones canónicas (`id_usuario`). Solo se cargan en
+    // suites antiguas que los soliciten explícitamente; la suite DB valida DDL real.
+    if (process.env.USE_SCHEMA_FIXTURES === 'true') {
+      await aplicarSql(cliente, fixture);
+    }
+    if (process.env.USE_SCHEMA_FIXTURES === 'true' && existsSync(archivoDdlAudit)) {
       await aplicarSql(cliente, archivoDdlAudit);
     }
 
     if (existsSync(dirMigraciones)) {
+      const excluidas = new Set((process.env.MIGRATIONS_EXCLUDE ?? '').split(',').map((item) => item.trim()).filter(Boolean));
       const archivos = readdirSync(dirMigraciones)
         .filter((f) => f.endsWith('.sql'))
+        .filter((f) => !excluidas.has(f))
         .sort();
       for (const archivo of archivos) {
         await aplicarSql(cliente, path.join(dirMigraciones, archivo));

@@ -10,7 +10,7 @@
  *       GET  /api/v1/auth/perfil   — Alias de compatibilidad frontend
  *
  * ALINEACIÓN DDL POSTGRESQL 18:
- * - sigd_auth.cuenta_usuario: usuario, correo (no username ni correo_institucional; sin bloqueado_hasta).
+ * - sigd_auth.cuenta_usuario: usuario, correo, activo y bloqueado_hasta.
  * - sigd_auth.persona_natural: nombre_completo (no apellido_paterno / apellido_materno).
  * - sigd_org.usuario_rol: rol_id, (vigente_hasta IS NULL OR vigente_hasta > now()) (no id_rol ni estado).
  * - sigd_org.rol_sistema: rol_id (no id_rol).
@@ -38,6 +38,13 @@ async function verificarHashPassword(passwordPlana: string, hashAlmacenado: stri
   return Argon2Service.verify(hashAlmacenado, passwordPlana);
 }
 
+function cuentaBloqueada(valor: unknown): boolean {
+  if (valor === 'infinity' || valor === Number.POSITIVE_INFINITY) return true;
+  if (!valor) return false;
+  const instante = new Date(valor as string | number | Date).getTime();
+  return Number.isFinite(instante) && instante > Date.now();
+}
+
 export function crearRouterAuth(pool: Pool): Router {
   const router = Router();
 
@@ -47,15 +54,21 @@ export function crearRouterAuth(pool: Pool): Router {
 
     const query = `
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
-             c.password_hash, c.activo,
+             c.password_hash, c.activo, c.bloqueado_hasta,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
+             COALESCE(rv.roles, ARRAY['CIUDADANO']::text[]) AS roles,
              p.area_id
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
-        LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
-        LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+        LEFT JOIN LATERAL (
+          SELECT array_agg(DISTINCT r.codigo ORDER BY r.codigo)::text[] AS roles
+          FROM sigd_org.usuario_rol ur
+          JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id AND r.vigente = TRUE
+          WHERE ur.id_usuario = c.id_usuario
+            AND ur.vigente_desde <= now()
+            AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+        ) rv ON TRUE
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
        WHERE (c.usuario = $1 OR c.correo = $1)
        LIMIT 1;
@@ -79,6 +92,15 @@ export function crearRouterAuth(pool: Pool): Router {
       });
     }
 
+    if (cuentaBloqueada(usuario.bloqueado_hasta)) {
+      throw new AppError({
+        status: 423,
+        code: 'ACCOUNT_LOCKED',
+        message: 'Cuenta bloqueada.',
+        detail: 'Su cuenta institucional se encuentra bloqueada. Contacte al administrador.',
+      });
+    }
+
     const passwordValida = await verificarHashPassword(datos.password, usuario.password_hash);
     if (!passwordValida) {
       throw new UnauthorizedError({
@@ -86,10 +108,10 @@ export function crearRouterAuth(pool: Pool): Router {
       });
     }
 
-    const rol = usuario.rol_codigo ?? 'ESTUDIANTE';
+    const roles: string[] = usuario.roles?.length ? usuario.roles : ['CIUDADANO'];
     const accessToken = firmarTokenAcceso({
       sub: usuario.id_usuario,
-      roles: [rol],
+      roles,
       expiraSegundos: 900, // 15 minutos
     });
 
@@ -116,7 +138,8 @@ export function crearRouterAuth(pool: Pool): Router {
         id: usuario.id_usuario,
         nombreCompleto: usuario.nombre_completo,
         correo: usuario.correo ?? `${usuario.usuario}@iestp-suiza.edu.pe`,
-        rol: rol,
+        rol: roles[0],
+        roles,
         areaId: usuario.area_id ?? undefined,
       },
     });
@@ -146,11 +169,18 @@ export function crearRouterAuth(pool: Pool): Router {
     const { refreshToken } = refreshSchema.parse(req.body);
 
     const query = `
-      SELECT s.id_usuario, s.expira_en, s.revocado_en,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo
+      SELECT s.id_usuario, s.expira_en, s.revocado_en, c.activo, c.bloqueado_hasta,
+             COALESCE(rv.roles, ARRAY['CIUDADANO']::text[]) AS roles
         FROM sigd_auth.sesion_usuario s
-        LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
-        LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+        JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
+        LEFT JOIN LATERAL (
+          SELECT array_agg(DISTINCT r.codigo ORDER BY r.codigo)::text[] AS roles
+          FROM sigd_org.usuario_rol ur
+          JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id AND r.vigente = TRUE
+          WHERE ur.id_usuario = s.id_usuario
+            AND ur.vigente_desde <= now()
+            AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+        ) rv ON TRUE
        WHERE s.refresh_token = $1
        LIMIT 1;
     `;
@@ -164,9 +194,13 @@ export function crearRouterAuth(pool: Pool): Router {
       });
     }
 
+    if (!sesion.activo || cuentaBloqueada(sesion.bloqueado_hasta)) {
+      throw new AppError({ status: 423, code: 'ACCOUNT_LOCKED', message: 'La cuenta no está habilitada.' });
+    }
+
     const nuevoAccessToken = firmarTokenAcceso({
       sub: sesion.id_usuario,
-      roles: [sesion.rol_codigo],
+      roles: sesion.roles?.length ? sesion.roles : ['CIUDADANO'],
       expiraSegundos: 900,
     });
 
@@ -205,13 +239,20 @@ export function crearRouterAuth(pool: Pool): Router {
     const query = `
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
+             c.activo, c.bloqueado_hasta,
+             COALESCE(rv.roles, ARRAY['CIUDADANO']::text[]) AS roles,
              p.area_id, p.cargo_id, p.telefono
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
-        LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
-        LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+        LEFT JOIN LATERAL (
+          SELECT array_agg(DISTINCT r.codigo ORDER BY r.codigo)::text[] AS roles
+          FROM sigd_org.usuario_rol ur
+          JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id AND r.vigente = TRUE
+          WHERE ur.id_usuario = c.id_usuario
+            AND ur.vigente_desde <= now()
+            AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+        ) rv ON TRUE
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
        WHERE c.id_usuario = $1
        LIMIT 1;
@@ -223,6 +264,9 @@ export function crearRouterAuth(pool: Pool): Router {
     if (!usuario) {
       throw new UnauthorizedError({ detail: 'Usuario no encontrado o sesión caducada.' });
     }
+    if (!usuario.activo || cuentaBloqueada(usuario.bloqueado_hasta)) {
+      throw new UnauthorizedError({ detail: 'La cuenta no está habilitada.' });
+    }
 
     res.status(200).json({
       id: usuario.id_usuario,
@@ -230,7 +274,8 @@ export function crearRouterAuth(pool: Pool): Router {
       username: usuario.usuario,
       nombreCompleto: usuario.nombre_completo,
       correo: usuario.correo,
-      rol: usuario.rol_codigo,
+      rol: usuario.roles?.[0] ?? 'CIUDADANO',
+      roles: usuario.roles?.length ? usuario.roles : ['CIUDADANO'],
       areaId: usuario.area_id,
       cargoId: usuario.cargo_id,
       telefono: usuario.telefono,

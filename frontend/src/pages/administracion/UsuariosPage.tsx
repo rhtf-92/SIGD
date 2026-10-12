@@ -2,18 +2,21 @@ import { useState } from "react";
 
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
 import UserEditModal from "../../components/administracion/UserEditModal";
+import UserCreateModal from "../../components/administracion/UserCreateModal";
 import { useUsuariosAdmin } from "../../hooks/useUsuariosAdmin";
 import type { ApiHttpError } from "../../types/api";
 import type { EstadoUsuario } from "../../types/usuarioAdmin";
 
 function estiloEstado(estado: EstadoUsuario) {
   if (estado === "Activo") return "bg-emerald-100 text-emerald-700";
+  if (estado === "Bloqueado") return "bg-amber-100 text-amber-800";
   return "bg-slate-200 text-slate-700";
 }
 
 export default function UsuariosPage() {
   const [mensaje, setMensaje] = useState("");
   const [errorServidor, setErrorServidor] = useState("");
+  const [creando, setCreando] = useState(false);
 
   const {
     usuarios,
@@ -30,6 +33,8 @@ export default function UsuariosPage() {
     setUsuarioEditando,
     actualizarUsuario,
     conmutarEstado,
+    cambiarEstado,
+    crearUsuario,
     isLoading,
     isFetching,
     error,
@@ -65,6 +70,17 @@ export default function UsuariosPage() {
     }
   }
 
+  async function alternarBloqueo(id: string, estadoActual: EstadoUsuario) {
+    setErrorServidor("");
+    try {
+      await cambiarEstado(id, estadoActual === "Bloqueado" ? "Activo" : "Bloqueado");
+      setMensaje(estadoActual === "Bloqueado" ? "La cuenta fue desbloqueada." : "La cuenta fue bloqueada y sus sesiones fueron revocadas.");
+    } catch {
+      setMensaje("");
+      setErrorServidor("No se pudo cambiar el bloqueo de la cuenta.");
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <AdminPageHeader
@@ -78,6 +94,7 @@ export default function UsuariosPage() {
             Directorio institucional de {totalUsuarios} cuentas registradas.
             Búsqueda en tiempo real y filtro por estado operativo.
           </p>
+          <button type="button" onClick={() => setCreando(true)} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">Registrar usuario</button>
           {isFetching && !isLoading && (
             <span
               role="status"
@@ -187,6 +204,7 @@ export default function UsuariosPage() {
                 <option value="Todos">Todos</option>
                 <option value="Activo">Activo</option>
                 <option value="Inactivo">Inactivo</option>
+                <option value="Bloqueado">Bloqueado</option>
               </select>
             </div>
           </div>
@@ -265,7 +283,7 @@ export default function UsuariosPage() {
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {usuario.cargo}
                       </td>
-                      <td className="px-6 py-4 text-sm">{usuario.rol}</td>
+                      <td className="px-6 py-4 text-sm">{usuario.roles.map((rol) => rol.nombre).join(", ") || usuario.rol}</td>
                       <td className="px-6 py-4">
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${estiloEstado(
@@ -300,6 +318,10 @@ export default function UsuariosPage() {
                           >
                             Conmutar estado
                           </button>
+                          <button type="button" onClick={() => void alternarBloqueo(usuario.id, usuario.estado)} disabled={guardarPendiente}
+                            className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-60">
+                            {usuario.estado === "Bloqueado" ? "Desbloquear" : "Bloquear"}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -329,6 +351,21 @@ export default function UsuariosPage() {
             }
           }}
         />
+      )}
+      {creando && (
+        <UserCreateModal areas={catalogos.areas} cargos={catalogos.cargos} roles={catalogos.roles}
+          onClose={() => setCreando(false)} onSave={async (datos) => {
+            setErrorServidor("");
+            try {
+              await crearUsuario(datos);
+              setCreando(false);
+              setMensaje("El usuario fue registrado correctamente.");
+            } catch (error) {
+              setMensaje("");
+              setErrorServidor("No se pudo registrar el usuario. Verifique duplicados y datos obligatorios.");
+              throw error;
+            }
+          }} />
       )}
     </main>
   );
