@@ -54,7 +54,11 @@ async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
     }
 
     if (existsSync(dirMigraciones)) {
-      const excluidas = new Set((process.env.MIGRATIONS_EXCLUDE ?? '').split(',').map((item) => item.trim()).filter(Boolean));
+      // La suite DB de OrganiCore no debe bloquearse por el hallazgo preexistente
+      // de RutaDoc (06, SQLSTATE 42703). Se puede sobrescribir explícitamente con
+      // MIGRATIONS_EXCLUDE; una cadena vacía fuerza la ejecución de todas.
+      const exclusionesConfiguradas = process.env.MIGRATIONS_EXCLUDE ?? '06_sigd_rut.sql,07_sigd_reportes.sql';
+      const excluidas = new Set(exclusionesConfiguradas.split(',').map((item) => item.trim()).filter(Boolean));
       const archivos = readdirSync(dirMigraciones)
         .filter((f) => f.endsWith('.sql'))
         .filter((f) => !excluidas.has(f))

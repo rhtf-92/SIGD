@@ -9,6 +9,13 @@ const CLAVE_TOKEN = "sigd_token";
 const CLAVE_ROL = "sigd_rol";
 const CLAVE_PERMISOS = "sigd_permisos";
 
+const ROL_COMPATIBILIDAD: Record<string, string> = {
+  ADMINISTRADOR: "SUPER_ADMIN",
+  SECRETARIO: "DOCENTE",
+  ESPECIALISTA: "DOCENTE",
+  CIUDADANO: "ESTUDIANTE",
+};
+
 interface ProtectedRouteProps {
   children?: ReactNode;
   requiredRoles?: string[];
@@ -26,7 +33,7 @@ export function tienePermisoAlmacenado(
 
   try {
     const matriz = JSON.parse(crudo) as MatrizPermisos;
-    const filas = matriz[rol] ?? [];
+    const filas = matriz[rol] ?? matriz[ROL_COMPATIBILIDAD[rol]] ?? [];
     const fila = filas.find(
       (item) => item.modulo.toLowerCase() === modulo.toLowerCase(),
     );

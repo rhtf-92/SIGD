@@ -1,72 +1,120 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { permisosIniciales } from "../hooks/useRbacConfig";
+import { useAuthStore } from "../stores/authStore";
 
-const CLAVE_TOKEN = "sigd_token";
-const CLAVE_ROL = "sigd_rol";
-const CLAVE_PERMISOS = "sigd_permisos";
+const DESTINOS: Record<string, string> = {
+  ADMINISTRADOR: "/administracion",
+  DIRECTOR: "/administracion",
+  SECRETARIO: "/flujos/titulacion",
+  ESPECIALISTA: "/expedientes",
+  MESA_PARTES: "/tramite/ventanilla-presencial",
+  CIUDADANO: "/casilla",
+};
 
-export const ROLES_CANONICOS = [
-  { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", destino: "/administracion" },
-  { id: "DIRECTOR", label: "DIRECTOR — Director General", destino: "/administracion" },
-  { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", destino: "/flujos/titulacion" },
-  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", destino: "/tramite/ventanilla-presencial" },
-  { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", destino: "/casilla" },
-];
+function mensajeError(error: unknown): string {
+  if (typeof error === "object" && error !== null) {
+    const posible = error as { message?: string; problem?: { detail?: string }; detail?: string };
+    return posible.problem?.detail ?? posible.detail ?? posible.message ?? "No fue posible iniciar sesión.";
+  }
+  return "No fue posible iniciar sesión.";
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [rol, setRol] = useState("SUPER_ADMIN");
+  const login = useAuthStore((state) => state.login);
+  const seleccionarPerfil = useAuthStore((state) => state.seleccionarPerfil);
+  const rolesDisponibles = useAuthStore((state) => state.rolesDisponibles);
+  const [identificador, setIdentificador] = useState("");
+  const [password, setPassword] = useState("");
+  const [rolId, setRolId] = useState("");
+  const [procesando, setProcesando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function iniciarSesionDemo() {
-    window.localStorage.setItem(CLAVE_TOKEN, "demo-jwt-" + Date.now());
-    window.localStorage.setItem(CLAVE_ROL, rol);
-    window.localStorage.setItem(CLAVE_PERMISOS, JSON.stringify(permisosIniciales));
-    const encontrado = ROLES_CANONICOS.find((item) => item.id === rol);
-    const destino = encontrado ? encontrado.destino : "/administracion";
-    navigate(destino, { replace: true });
+  async function autenticar(event: FormEvent) {
+    event.preventDefault();
+    setProcesando(true);
+    setError(null);
+    try {
+      const ingresoDirecto = await login({ identificador, password });
+      if (ingresoDirecto) {
+        const rol = useAuthStore.getState().usuario?.rol ?? "";
+        navigate(DESTINOS[rol] ?? "/", { replace: true });
+      } else {
+        const primerRol = useAuthStore.getState().rolesDisponibles[0];
+        setRolId(primerRol?.id ?? "");
+      }
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  async function confirmarPerfil(event: FormEvent) {
+    event.preventDefault();
+    setProcesando(true);
+    setError(null);
+    try {
+      await seleccionarPerfil(rolId);
+      const rol = useAuthStore.getState().usuario?.rol ?? "";
+      navigate(DESTINOS[rol] ?? "/", { replace: true });
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setProcesando(false);
+    }
   }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-900">
       <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <Link
-          to="/"
-          className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-        >
+        <Link to="/" className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
           ← Volver al inicio
         </Link>
-        <p className="text-sm font-bold text-blue-700">SIGD IESTP "SUIZA"</p>
-        <h1 className="mt-1 text-2xl font-bold">Iniciar sesión</h1>
+        <p className="text-sm font-bold text-blue-700">SIGD IESTP &quot;SUIZA&quot;</p>
+        <h1 className="mt-1 text-2xl font-bold">{rolesDisponibles.length ? "Seleccionar perfil" : "Iniciar sesión"}</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Acceso por roles institucionales canónicos para control de acceso (RBAC).
+          {rolesDisponibles.length
+            ? "Elige uno de tus perfiles institucionales activos."
+            : "Ingresa con tus credenciales institucionales."}
         </p>
 
-        <div className="mt-6">
-          <label htmlFor="rol" className="mb-2 block text-sm font-semibold">
-            Rol institucional canónico
-          </label>
-          <select
-            id="rol"
-            value={rol}
-            onChange={(event) => setRol(event.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium"
-          >
-            {ROLES_CANONICOS.map((opcion) => (
-              <option key={opcion.id} value={opcion.id}>
-                {opcion.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {error && <div role="alert" className="mt-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-        <button
-          type="button"
-          onClick={iniciarSesionDemo}
-          className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition"
-        >
-          Ingresar al sistema
-        </button>
+        {rolesDisponibles.length ? (
+          <form className="mt-6 space-y-5" onSubmit={confirmarPerfil}>
+            <div>
+              <label htmlFor="perfil" className="mb-2 block text-sm font-semibold">Perfil activo</label>
+              <select id="perfil" value={rolId} onChange={(event) => setRolId(event.target.value)} required
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium">
+                {rolesDisponibles.map((rol) => <option key={rol.id} value={rol.id}>{rol.codigo} — {rol.nombre}</option>)}
+              </select>
+            </div>
+            <button type="submit" disabled={procesando || !rolId}
+              className="w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">
+              {procesando ? "Validando perfil…" : "Continuar"}
+            </button>
+          </form>
+        ) : (
+          <form className="mt-6 space-y-5" onSubmit={autenticar}>
+            <div>
+              <label htmlFor="identificador" className="mb-2 block text-sm font-semibold">Usuario o correo</label>
+              <input id="identificador" value={identificador} onChange={(event) => setIdentificador(event.target.value)}
+                autoComplete="username" required minLength={3}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+            </div>
+            <div>
+              <label htmlFor="password" className="mb-2 block text-sm font-semibold">Contraseña</label>
+              <input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password" required minLength={6}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+            </div>
+            <button type="submit" disabled={procesando}
+              className="w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">
+              {procesando ? "Ingresando…" : "Ingresar al sistema"}
+            </button>
+          </form>
+        )}
       </section>
     </main>
   );

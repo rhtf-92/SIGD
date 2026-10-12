@@ -6,8 +6,16 @@ export interface UsuarioPerfil {
   id: string;
   nombreCompleto: string;
   correo: string;
-  rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE';
+  rol: string;
+  roles?: string[];
   areaId?: string;
+}
+
+export interface RolDisponible {
+  id: string;
+  codigo: string;
+  nombre: string;
+  areaId?: string | null;
 }
 
 interface LoginCredentials {
@@ -19,8 +27,12 @@ export interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   usuario: UsuarioPerfil | null;
+  tokenSeleccionPerfil: string | null;
+  rolesDisponibles: RolDisponible[];
   isAuthenticated: boolean;
-  login: (credentials: LoginCredentials) => Promise<void>;
+  login: (credentials: LoginCredentials) => Promise<boolean>;
+  seleccionarPerfil: (rolId: string) => Promise<void>;
+  cambiarPerfil: (rolId: string) => Promise<void>;
   logout: () => void;
   setToken: (accessToken: string, refreshToken?: string | null) => void;
 }
@@ -88,13 +100,28 @@ function createStore() {
 
   let state: AuthState = {
     ...initialPersisted,
+    tokenSeleccionPerfil: null,
+    rolesDisponibles: [],
     login: async (credentials: LoginCredentials) => {
       const { data } = await apiClient.post("/api/v1/auth/login", credentials);
+      if (data.requiereSeleccionPerfil) {
+        set({
+          accessToken: null,
+          refreshToken: null,
+          usuario: null,
+          isAuthenticated: false,
+          tokenSeleccionPerfil: data.tokenSeleccionPerfil,
+          rolesDisponibles: data.rolesDisponibles ?? [],
+        });
+        return false;
+      }
       set({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
         usuario: data.usuario,
         isAuthenticated: true,
+        tokenSeleccionPerfil: null,
+        rolesDisponibles: [],
       });
       try {
         if (typeof window !== "undefined" && window.localStorage) {
@@ -110,9 +137,41 @@ function createStore() {
       } catch {
         // Ignore storage errors
       }
+      return true;
+    },
+    seleccionarPerfil: async (rolId: string) => {
+      if (!state.tokenSeleccionPerfil) throw new Error("La selección de perfil ha expirado. Inicie sesión nuevamente.");
+      const { data } = await apiClient.post("/api/v1/auth/seleccionar-perfil", {
+        tokenSeleccionPerfil: state.tokenSeleccionPerfil,
+        rolId,
+      });
+      set({ accessToken: data.accessToken, refreshToken: data.refreshToken, usuario: data.usuario,
+        isAuthenticated: true, tokenSeleccionPerfil: null, rolesDisponibles: [] });
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem("sigd_token", data.accessToken);
+        window.localStorage.setItem("token", data.accessToken);
+        window.localStorage.setItem("sigd_rol", data.usuario.rol);
+        if (!window.localStorage.getItem("sigd_permisos")) {
+          window.localStorage.setItem("sigd_permisos", JSON.stringify(permisosIniciales));
+        }
+      }
+    },
+    cambiarPerfil: async (rolId: string) => {
+      if (!state.refreshToken) throw new Error("No existe una sesión vigente para cambiar de perfil.");
+      const { data } = await apiClient.post("/api/v1/auth/cambiar-perfil", {
+        refreshToken: state.refreshToken,
+        rolId,
+      });
+      set({ accessToken: data.accessToken, refreshToken: data.refreshToken, usuario: data.usuario, isAuthenticated: true });
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem("sigd_token", data.accessToken);
+        window.localStorage.setItem("token", data.accessToken);
+        window.localStorage.setItem("sigd_rol", data.usuario.rol);
+      }
     },
     logout: () => {
-      set({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false });
+      set({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false,
+        tokenSeleccionPerfil: null, rolesDisponibles: [] });
       try {
         if (typeof window !== "undefined" && window.localStorage) {
           window.localStorage.removeItem("sigd_token");

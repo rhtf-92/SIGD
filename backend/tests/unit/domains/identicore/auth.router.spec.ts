@@ -2,237 +2,174 @@ import request from 'supertest';
 import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { construirApp } from '../../../../src/app.js';
+import { firmarTokenAcceso, firmarTokenSeleccionPerfil, verificarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
 import { Argon2Service } from '../../../../src/domains/identicore/argon2.service.js';
-import { firmarTokenAcceso, verificarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
 
-describe('Auth Router — Schema Alignment & Database Interactions', () => {
-  const hashValido = Argon2Service.generateFallbackHash('PasswordValida123!');
+const ID_USUARIO = '11111111-1111-1111-1111-111111111111';
+const ROL_ADMIN = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', codigo: 'ADMINISTRADOR', nombre: 'Administrador', areaId: null };
+const ROL_DIRECTOR = { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', codigo: 'DIRECTOR', nombre: 'Director', areaId: null };
+const hashValido = Argon2Service.generateFallbackHash('PasswordValida123!');
 
-  it('POST /api/v1/auth/login ejecuta query alineada a 02_sigd_auth y 03_sigd_org', async () => {
-    let capturedQuery = '';
-    let capturedParams: any[] = [];
-    let sessionInsertExecuted = false;
+function usuario(roles: unknown, extras: Record<string, unknown> = {}) {
+  return {
+    id_usuario: ID_USUARIO,
+    id_persona: '22222222-2222-2222-2222-222222222222',
+    usuario: 'admin.institucional',
+    correo: 'admin@iestp-suiza.edu.pe',
+    nombre_completo: 'Administrador General',
+    password_hash: hashValido,
+    activo: true,
+    bloqueado_hasta: null,
+    roles,
+    ...extras,
+  };
+}
 
+describe('Auth Router — perfil RBAC activo', () => {
+  it('con un rol inicia sesión y emite un JWT con exactamente ese rol', async () => {
+    let consultaLogin = '';
+    let insercionSesion = '';
     const fakePool = {
-      query: vi.fn(async (queryText: string, params?: any[]) => {
-        if (queryText.includes('FROM sigd_auth.cuenta_usuario')) {
-          capturedQuery = queryText;
-          capturedParams = params ?? [];
-          return {
-            rows: [
-              {
-                id_usuario: '11111111-1111-1111-1111-111111111111',
-                id_persona: '22222222-2222-2222-2222-222222222222',
-                usuario: 'admin.institucional',
-                correo: 'admin@iestp-suiza.edu.pe',
-                password_hash: hashValido,
-                activo: true,
-                nombre_completo: 'Administrador General',
-                roles: ['ADMINISTRADOR', 'DIRECTOR'],
-                bloqueado_hasta: null,
-                area_id: null,
-              },
-            ],
-            rowCount: 1,
-          };
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('FROM sigd_auth.cuenta_usuario c') && sql.includes('password_hash')) {
+          consultaLogin = sql;
+          return { rows: [usuario([ROL_ADMIN])], rowCount: 1 };
         }
-        if (queryText.includes('INSERT INTO sigd_auth.sesion_usuario')) {
-          sessionInsertExecuted = true;
+        if (sql.includes('INSERT INTO sigd_auth.sesion_usuario')) {
+          insercionSesion = sql;
           return { rows: [], rowCount: 1 };
         }
         return { rows: [], rowCount: 0 };
       }),
-      connect: vi.fn(async () => ({
-        query: vi.fn(async () => ({ rows: [], rowCount: 0 })),
-        release: vi.fn(),
-      })),
     } as unknown as Pool;
 
-    const app = construirApp(fakePool);
-
-    const res = await request(app)
-      .post('/api/v1/auth/login')
-      .send({
-        identificador: 'admin.institucional',
-        password: 'PasswordValida123!',
-      });
+    const res = await request(construirApp(fakePool)).post('/api/v1/auth/login')
+      .send({ identificador: 'admin.institucional', password: 'PasswordValida123!' });
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('accessToken');
-    expect(res.body).toHaveProperty('refreshToken');
-    expect(res.body.usuario).toMatchObject({
-      id: '11111111-1111-1111-1111-111111111111',
-      nombreCompleto: 'Administrador General',
-      correo: 'admin@iestp-suiza.edu.pe',
-      rol: 'ADMINISTRADOR',
-      roles: ['ADMINISTRADOR', 'DIRECTOR'],
-    });
-    expect(verificarTokenAcceso(res.body.accessToken).roles).toEqual(['ADMINISTRADOR', 'DIRECTOR']);
-
-    // Validar alineación exacta de columnas en el SQL capturado
-    expect(capturedQuery).toContain('c.usuario');
-    expect(capturedQuery).toContain('c.correo');
-    expect(capturedQuery).not.toContain('c.username');
-    expect(capturedQuery).not.toContain('c.correo_institucional');
-    expect(capturedQuery).toContain('bloqueado_hasta');
-    expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
-    expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
-    expect(capturedQuery).toContain('array_agg(DISTINCT r.codigo');
-    expect(capturedQuery).not.toContain('r.id_rol');
-    expect(capturedQuery).not.toContain('ur.estado');
-    expect(capturedQuery).toContain('(c.usuario = $1 OR c.correo = $1)');
-    expect(sessionInsertExecuted).toBe(true);
+    expect(res.body.requiereSeleccionPerfil).toBe(false);
+    expect(res.body.usuario).toMatchObject({ rol: 'ADMINISTRADOR', roles: ['ADMINISTRADOR'] });
+    expect(verificarTokenAcceso(res.body.accessToken).roles).toEqual(['ADMINISTRADOR']);
+    expect(consultaLogin).toContain("COALESCE(rv.roles, '[]'::jsonb)");
+    expect(consultaLogin).not.toContain("ARRAY['CIUDADANO']");
+    expect(insercionSesion).toContain('rol_activo_id');
   });
 
-  it('POST /api/v1/auth/login propaga error 500 si falla la insercion de sesion (no swallow)', async () => {
+  it('con varios roles exige selección y no entrega tokens de sesión', async () => {
+    let insertoSesion = false;
     const fakePool = {
-      query: vi.fn(async (queryText: string) => {
-        if (queryText.includes('FROM sigd_auth.cuenta_usuario')) {
-          return {
-            rows: [
-              {
-                id_usuario: '11111111-1111-1111-1111-111111111111',
-                usuario: 'admin.institucional',
-                correo: 'admin@iestp-suiza.edu.pe',
-                password_hash: hashValido,
-                activo: true,
-                nombre_completo: 'Admin',
-                roles: ['ADMINISTRADOR'],
-                bloqueado_hasta: null,
-              },
-            ],
-            rowCount: 1,
-          };
-        }
-        if (queryText.includes('INSERT INTO sigd_auth.sesion_usuario')) {
-          throw new Error('violacion de llave foranea o base de datos inaccesible');
-        }
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('password_hash')) return { rows: [usuario([ROL_ADMIN, ROL_DIRECTOR])], rowCount: 1 };
+        if (sql.includes('INSERT INTO sigd_auth.sesion_usuario')) insertoSesion = true;
         return { rows: [], rowCount: 0 };
       }),
     } as unknown as Pool;
 
-    const app = construirApp(fakePool);
+    const res = await request(construirApp(fakePool)).post('/api/v1/auth/login')
+      .send({ identificador: 'admin.institucional', password: 'PasswordValida123!' });
 
-    const res = await request(app)
-      .post('/api/v1/auth/login')
-      .send({
-        identificador: 'admin.institucional',
-        password: 'PasswordValida123!',
-      });
-
-    // No debe tragar el error con 200
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(200);
+    expect(res.body.requiereSeleccionPerfil).toBe(true);
+    expect(res.body.rolesDisponibles).toHaveLength(2);
+    expect(res.body).not.toHaveProperty('accessToken');
+    expect(res.body).not.toHaveProperty('refreshToken');
+    expect(() => verificarTokenAcceso(res.body.tokenSeleccionPerfil)).toThrow();
+    expect(insertoSesion).toBe(false);
   });
 
-  it('POST /api/v1/auth/refresh ejecuta query alineada a rol_id y vigente_hasta', async () => {
-    let capturedQuery = '';
-    const expiraEn = new Date(Date.now() + 3600 * 1000).toISOString();
+  it('sin roles activos deniega permisos y nunca aplica CIUDADANO por defecto', async () => {
+    const fakePool = { query: vi.fn(async () => ({ rows: [usuario([])], rowCount: 1 })) } as unknown as Pool;
+    const res = await request(construirApp(fakePool)).post('/api/v1/auth/login')
+      .send({ identificador: 'admin.institucional', password: 'PasswordValida123!' });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('ACCOUNT_WITHOUT_ACTIVE_ROLES');
+    expect(res.body).not.toHaveProperty('accessToken');
+  });
 
+  it('selecciona únicamente un rol incluido en el token y todavía vigente en PostgreSQL', async () => {
+    const tokenSeleccionPerfil = firmarTokenSeleccionPerfil({ sub: ID_USUARIO, rolesDisponibles: [ROL_DIRECTOR.id] });
     const fakePool = {
-      query: vi.fn(async (queryText: string) => {
-        if (queryText.includes('FROM sigd_auth.sesion_usuario s')) {
-          capturedQuery = queryText;
-          return {
-            rows: [
-              {
-                id_usuario: '11111111-1111-1111-1111-111111111111',
-                expira_en: expiraEn,
-                revocado_en: null,
-                roles: ['ADMINISTRADOR', 'DIRECTOR'],
-                activo: true,
-                bloqueado_hasta: null,
-              },
-            ],
-            rowCount: 1,
-          };
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('r.rol_id = $2')) return { rows: [usuario(undefined, { ...ROL_DIRECTOR })], rowCount: 1 };
+        return { rows: [], rowCount: 1 };
+      }),
+    } as unknown as Pool;
+    const res = await request(construirApp(fakePool)).post('/api/v1/auth/seleccionar-perfil')
+      .send({ tokenSeleccionPerfil, rolId: ROL_DIRECTOR.id });
+    expect(res.status).toBe(200);
+    expect(verificarTokenAcceso(res.body.accessToken).roles).toEqual(['DIRECTOR']);
+    expect(res.body.usuario.roles).toEqual(['DIRECTOR']);
+  });
+
+  it('rechaza seleccionar un rol que no estaba habilitado al autenticar', async () => {
+    const tokenSeleccionPerfil = firmarTokenSeleccionPerfil({ sub: ID_USUARIO, rolesDisponibles: [ROL_ADMIN.id] });
+    const fakePool = { query: vi.fn() } as unknown as Pool;
+    const res = await request(construirApp(fakePool)).post('/api/v1/auth/seleccionar-perfil')
+      .send({ tokenSeleccionPerfil, rolId: ROL_DIRECTOR.id });
+    expect(res.status).toBe(401);
+    expect(fakePool.query).not.toHaveBeenCalled();
+  });
+
+  it('refresh conserva únicamente el rol activo persistido en la sesión', async () => {
+    const expiraEn = new Date(Date.now() + 3600_000).toISOString();
+    const fakePool = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('FROM sigd_auth.sesion_usuario s')) {
+          return { rows: [{ id_usuario: ID_USUARIO, rol_activo_id: ROL_DIRECTOR.id, expira_en: expiraEn,
+            revocado_en: null, activo: true, bloqueado_hasta: null, codigo: 'DIRECTOR', nombre: 'Director' }], rowCount: 1 };
         }
         return { rows: [], rowCount: 1 };
       }),
     } as unknown as Pool;
-
-    const app = construirApp(fakePool);
-
-    const res = await request(app)
-      .post('/api/v1/auth/refresh')
+    const res = await request(construirApp(fakePool)).post('/api/v1/auth/refresh')
       .send({ refreshToken: 'abcdef1234567890abcdef1234567890' });
-
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('accessToken');
-    expect(res.body).toHaveProperty('refreshToken');
-
-    expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
-    expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
-    expect(verificarTokenAcceso(res.body.accessToken).roles).toEqual(['ADMINISTRADOR', 'DIRECTOR']);
-    expect(capturedQuery).not.toContain('ur.estado');
-    expect(capturedQuery).not.toContain('r.id_rol');
+    expect(verificarTokenAcceso(res.body.accessToken).roles).toEqual(['DIRECTOR']);
   });
 
-  it('GET /api/v1/auth/me retorna usuario con correo y usuario alineados', async () => {
-    let capturedQuery = '';
-    const token = firmarTokenAcceso({
-      sub: '11111111-1111-1111-1111-111111111111',
-      roles: ['ADMINISTRADOR'],
-      expiraSegundos: 300,
-    });
-
-    const fakePool = {
-      query: vi.fn(async (queryText: string) => {
-        if (queryText.includes('FROM sigd_auth.cuenta_usuario c')) {
-          capturedQuery = queryText;
-          return {
-            rows: [
-              {
-                id_usuario: '11111111-1111-1111-1111-111111111111',
-                id_persona: '22222222-2222-2222-2222-222222222222',
-                usuario: 'admin.institucional',
-                correo: 'admin@iestp-suiza.edu.pe',
-                nombre_completo: 'Administrador General',
-                roles: ['ADMINISTRADOR', 'DIRECTOR'],
-                activo: true,
-                bloqueado_hasta: null,
-                area_id: '33333333-3333-3333-3333-333333333333',
-                cargo_id: null,
-                telefono: '987654321',
-              },
-            ],
-            rowCount: 1,
-          };
+  it('cambio de perfil valida sesión, usuario y asignación activa en backend', async () => {
+    const accessToken = firmarTokenAcceso({ sub: ID_USUARIO, roles: ['ADMINISTRADOR'] });
+    const expiraEn = new Date(Date.now() + 3600_000).toISOString();
+    const client = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('FROM sigd_auth.sesion_usuario') && sql.includes('FOR UPDATE')) {
+          return { rows: [{ id_usuario: ID_USUARIO, expira_en: expiraEn, revocado_en: null }], rowCount: 1 };
         }
-        return { rows: [], rowCount: 0 };
+        if (sql.includes('r.rol_id = $2')) return { rows: [usuario(undefined, { ...ROL_DIRECTOR })], rowCount: 1 };
+        return { rows: [], rowCount: 1 };
       }),
-    } as unknown as Pool;
-
-    const app = construirApp(fakePool);
-
-    const res = await request(app)
-      .get('/api/v1/auth/me')
-      .set('Authorization', `Bearer ${token}`);
-
+      release: vi.fn(),
+    };
+    const fakePool = { connect: vi.fn(async () => client) } as unknown as Pool;
+    const res = await request(construirApp(fakePool)).post('/api/v1/auth/cambiar-perfil')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ refreshToken: 'abcdef1234567890abcdef1234567890', rolId: ROL_DIRECTOR.id });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({
-      id: '11111111-1111-1111-1111-111111111111',
-      usuario: 'admin.institucional',
-      correo: 'admin@iestp-suiza.edu.pe',
-      nombreCompleto: 'Administrador General',
-      rol: 'ADMINISTRADOR',
-      roles: ['ADMINISTRADOR', 'DIRECTOR'],
-    });
-
-    expect(capturedQuery).toContain('c.usuario');
-    expect(capturedQuery).toContain('c.correo');
-    expect(capturedQuery).not.toContain('c.username');
-    expect(capturedQuery).not.toContain('c.correo_institucional');
-    expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
-    expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
+    expect(verificarTokenAcceso(res.body.accessToken).roles).toEqual(['DIRECTOR']);
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
+    expect(client.release).toHaveBeenCalledOnce();
   });
 
-  it('POST /api/v1/auth/login rechaza una cuenta bloqueada', async () => {
+  it('GET /auth/me valida el rol del JWT y solo lo expone como rol autorizado', async () => {
+    const token = firmarTokenAcceso({ sub: ID_USUARIO, roles: ['ADMINISTRADOR'] });
     const fakePool = {
-      query: vi.fn(async (queryText: string) => queryText.includes('FROM sigd_auth.cuenta_usuario') ? {
-        rows: [{ id_usuario: '11111111-1111-1111-1111-111111111111', usuario: 'bloqueado', correo: 'bloqueado@iestp-suiza.edu.pe', password_hash: hashValido, activo: true, bloqueado_hasta: 'infinity', roles: ['ADMINISTRADOR'] }], rowCount: 1,
-      } : { rows: [], rowCount: 0 }),
+      query: vi.fn(async (_sql: string, params?: unknown[]) => ({
+        rows: [usuario(undefined, { roles_disponibles: [ROL_ADMIN, ROL_DIRECTOR], area_id: null })], rowCount: 1,
+        params,
+      })),
     } as unknown as Pool;
-    const res = await request(construirApp(fakePool)).post('/api/v1/auth/login').send({ identificador: 'bloqueado', password: 'PasswordValida123!' });
+    const res = await request(construirApp(fakePool)).get('/api/v1/auth/me').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.rol).toBe('ADMINISTRADOR');
+    expect(res.body.roles).toEqual(['ADMINISTRADOR']);
+    expect(res.body.rolesDisponibles).toHaveLength(2);
+    expect(fakePool.query).toHaveBeenCalledWith(expect.stringContaining('rol_activo.codigo = $2'), [ID_USUARIO, 'ADMINISTRADOR']);
+  });
+
+  it('rechaza una cuenta bloqueada', async () => {
+    const fakePool = { query: vi.fn(async () => ({ rows: [usuario([ROL_ADMIN], { bloqueado_hasta: 'infinity' })], rowCount: 1 })) } as unknown as Pool;
+    const res = await request(construirApp(fakePool)).post('/api/v1/auth/login')
+      .send({ identificador: 'bloqueado', password: 'PasswordValida123!' });
     expect(res.status).toBe(423);
     expect(res.body.code).toBe('ACCOUNT_LOCKED');
   });

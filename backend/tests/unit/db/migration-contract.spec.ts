@@ -18,4 +18,13 @@ describe('contrato de migraciones ejecutables', () => {
     expect(bloqueo).toContain('ADD COLUMN IF NOT EXISTS intentos_fallidos');
     expect(bloqueo).toContain('ADD COLUMN IF NOT EXISTS bloqueado_hasta');
   });
+
+  it('persiste el perfil activo por sesión con una migración posterior y compatible', () => {
+    const perfilActivo = leerMigracion('09_sigd_auth_perfil_activo.sql');
+    expect(perfilActivo).toContain('ADD COLUMN IF NOT EXISTS rol_activo_id');
+    expect(perfilActivo).toContain('REFERENCES sigd_org.rol_sistema (rol_id)');
+    expect(perfilActivo).not.toContain('DROP TABLE');
+    expect(perfilActivo).not.toContain('06_sigd_rut');
+    expect(perfilActivo).not.toContain('07_sigd_reportes');
+  });
 });

@@ -1,10 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
+import request from 'supertest';
 
+import { construirApp } from '../../../../src/app.js';
+import { verificarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
 import { CalendarioService } from '../../../../src/domains/organicore/calendario.service.js';
 import { OrganigramaService } from '../../../../src/domains/organicore/organigrama.service.js';
 import { TablasMaestrasService } from '../../../../src/domains/organicore/tablasMaestras.service.js';
 import { crearUsuariosAdminService } from '../../../../src/domains/organicore/usuariosAdmin.service.js';
+
+process.env.AUTH_JWT_SECRET ??= 'test-only-jwt-secret-for-postgres-integration';
 
 describe('OrganiCore y Administración con PostgreSQL real', () => {
   let pool: Pool;
@@ -37,7 +42,29 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     });
     expect(creado.roles).toHaveLength(2);
 
+    const app = construirApp(pool);
+    const login = await request(app).post('/api/v1/auth/login').send({
+      identificador: 'prueba.pr166', password: 'ClaveSegura166!',
+    });
+    expect(login.status).toBe(200);
+    expect(login.body.requiereSeleccionPerfil).toBe(true);
+    expect(login.body).not.toHaveProperty('accessToken');
+
+    const administrador = roles.rows.find((rol) => rol.codigo === 'ADMINISTRADOR')!;
+    const seleccion = await request(app).post('/api/v1/auth/seleccionar-perfil').send({
+      tokenSeleccionPerfil: login.body.tokenSeleccionPerfil,
+      rolId: administrador.rol_id,
+    });
+    expect(seleccion.status).toBe(200);
+    expect(verificarTokenAcceso(seleccion.body.accessToken).roles).toEqual(['ADMINISTRADOR']);
+
     const director = roles.rows.find((rol) => rol.codigo === 'DIRECTOR')!;
+    const cambio = await request(app).post('/api/v1/auth/cambiar-perfil')
+      .set('Authorization', `Bearer ${seleccion.body.accessToken}`)
+      .send({ refreshToken: seleccion.body.refreshToken, rolId: director.rol_id });
+    expect(cambio.status).toBe(200);
+    expect(verificarTokenAcceso(cambio.body.accessToken).roles).toEqual(['DIRECTOR']);
+
     const bloqueado = await usuarios.actualizarUsuario(creado.id, {
       rolesQuitar: [director.rol_id], estado: 'BLOQUEADO',
     });

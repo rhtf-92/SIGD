@@ -8,7 +8,54 @@ vi.mock("../api/client", () => ({
 
 describe("authStore", () => {
   beforeEach(() => {
-    useAuthStore.setState({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false });
+    useAuthStore.setState({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false,
+      tokenSeleccionPerfil: null, rolesDisponibles: [] });
+  });
+
+  it("login() multirrol no autentica hasta seleccionar un perfil validado", async () => {
+    const rolesDisponibles = [
+      { id: "r1", codigo: "ADMINISTRADOR", nombre: "Administrador" },
+      { id: "r2", codigo: "DIRECTOR", nombre: "Director" },
+    ];
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      data: { requiereSeleccionPerfil: true, tokenSeleccionPerfil: "selection-token", rolesDisponibles },
+    });
+
+    const ingresoDirecto = await useAuthStore.getState().login({ identificador: "juan", password: "pass123" });
+
+    expect(ingresoDirecto).toBe(false);
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().accessToken).toBeNull();
+    expect(useAuthStore.getState().rolesDisponibles).toEqual(rolesDisponibles);
+
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      data: { accessToken: "tok-r2", refreshToken: "rtok-r2", usuario: {
+        id: "u1", nombreCompleto: "Juan", correo: "juan@inst.edu.pe", rol: "DIRECTOR", roles: ["DIRECTOR"] } },
+    });
+    await useAuthStore.getState().seleccionarPerfil("r2");
+
+    expect(apiClient.post).toHaveBeenLastCalledWith("/api/v1/auth/seleccionar-perfil", {
+      tokenSeleccionPerfil: "selection-token", rolId: "r2",
+    });
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(useAuthStore.getState().usuario?.rol).toBe("DIRECTOR");
+    expect(useAuthStore.getState().rolesDisponibles).toEqual([]);
+  });
+
+  it("cambiarPerfil() rota ambos tokens con el perfil validado por backend", async () => {
+    useAuthStore.setState({ accessToken: "tok-admin", refreshToken: "rtok-admin", usuario: {
+      id: "u1", nombreCompleto: "Juan", correo: "juan@inst.edu.pe", rol: "ADMINISTRADOR" }, isAuthenticated: true });
+    vi.mocked(apiClient.post).mockResolvedValueOnce({ data: {
+      accessToken: "tok-director", refreshToken: "rtok-director",
+      usuario: { id: "u1", nombreCompleto: "Juan", correo: "juan@inst.edu.pe", rol: "DIRECTOR" },
+    } });
+
+    await useAuthStore.getState().cambiarPerfil("r2");
+
+    expect(apiClient.post).toHaveBeenCalledWith("/api/v1/auth/cambiar-perfil", { refreshToken: "rtok-admin", rolId: "r2" });
+    expect(useAuthStore.getState().accessToken).toBe("tok-director");
+    expect(useAuthStore.getState().refreshToken).toBe("rtok-director");
+    expect(useAuthStore.getState().usuario?.rol).toBe("DIRECTOR");
   });
 
   it("login() exitoso guarda accessToken, refreshToken, usuario e isAuthenticated en true", async () => {

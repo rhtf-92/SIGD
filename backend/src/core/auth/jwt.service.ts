@@ -9,9 +9,25 @@ export interface ClaimsJwt {
   typ: 'access';
 }
 
+export interface ClaimsSeleccionPerfil {
+  sub: string;
+  rolesDisponibles: string[];
+  iat: number;
+  exp: number;
+  typ: 'profile_selection';
+}
+
 export interface OpcionesFirma {
   sub: string;
   roles?: string[];
+  expiraSegundos?: number;
+  ahora?: number;
+  secreto?: string;
+}
+
+export interface OpcionesSeleccionPerfil {
+  sub: string;
+  rolesDisponibles: string[];
   expiraSegundos?: number;
   ahora?: number;
   secreto?: string;
@@ -27,6 +43,48 @@ function fromBase64url(texto: string): Buffer {
   const normalizado = texto.replace(/-/g, '+').replace(/_/g, '/');
   const relleno = normalizado.length % 4 === 0 ? '' : '='.repeat(4 - (normalizado.length % 4));
   return Buffer.from(normalizado + relleno, 'base64');
+}
+
+function firmarClaims(claims: ClaimsJwt | ClaimsSeleccionPerfil, secreto: string): string {
+  const encabezado = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const cuerpo = base64url(JSON.stringify(claims));
+  const firma = crypto
+    .createHmac('sha256', secreto)
+    .update(`${encabezado}.${cuerpo}`)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  return `${encabezado}.${cuerpo}.${firma}`;
+}
+
+function verificarFirmaYDecodificar(token: string, secreto: string): unknown {
+  const partes = token.trim().split('.');
+  if (partes.length !== 3 || !partes.every((p) => BASE64URL.test(p))) {
+    throw new UnauthorizedError({ detail: 'Token mal formado.' });
+  }
+
+  const [encabezadoCrudo, cuerpoCrudo, firma] = partes;
+  const esperado = crypto
+    .createHmac('sha256', secreto)
+    .update(`${encabezadoCrudo}.${cuerpoCrudo}`)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  const firmaRecibida = Buffer.from(firma);
+  const firmaEsperada = Buffer.from(esperado);
+  if (firmaRecibida.length !== firmaEsperada.length || !crypto.timingSafeEqual(firmaRecibida, firmaEsperada)) {
+    throw new UnauthorizedError({ detail: 'Firma del token inválida.' });
+  }
+
+  try {
+    return JSON.parse(fromBase64url(cuerpoCrudo).toString('utf8')) as unknown;
+  } catch {
+    throw new UnauthorizedError({ detail: 'Contenido del token ilegible.' });
+  }
 }
 
 export function secretoJwt(env: NodeJS.ProcessEnv = process.env): string {
@@ -50,49 +108,11 @@ export function firmarTokenAcceso(opciones: OpcionesFirma): string {
     typ: 'access',
   };
 
-  const encabezado = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const cuerpo = base64url(JSON.stringify(claims));
-  const firma = crypto
-    .createHmac('sha256', opciones.secreto ?? secretoJwt())
-    .update(`${encabezado}.${cuerpo}`)
-    .digest('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-
-  return `${encabezado}.${cuerpo}.${firma}`;
+  return firmarClaims(claims, opciones.secreto ?? secretoJwt());
 }
 
 export function verificarTokenAcceso(token: string, opciones: { ahora?: number; secreto?: string } = {}): ClaimsJwt {
-  const partes = token.trim().split('.');
-  if (partes.length !== 3 || !partes.every((p) => BASE64URL.test(p))) {
-    throw new UnauthorizedError({ detail: 'Token de acceso mal formado.' });
-  }
-
-  const [encabezadoCrudo, cuerpoCrudo, firma] = partes;
-  const esperado = crypto
-    .createHmac('sha256', opciones.secreto ?? secretoJwt())
-    .update(`${encabezadoCrudo}.${cuerpoCrudo}`)
-    .digest('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-
-  const firmaRecibida = Buffer.from(firma);
-  const firmaEsperada = Buffer.from(esperado);
-  if (
-    firmaRecibida.length !== firmaEsperada.length ||
-    !crypto.timingSafeEqual(firmaRecibida, firmaEsperada)
-  ) {
-    throw new UnauthorizedError({ detail: 'Firma del token de acceso inválida.' });
-  }
-
-  let claims: ClaimsJwt;
-  try {
-    claims = JSON.parse(fromBase64url(cuerpoCrudo).toString('utf8')) as ClaimsJwt;
-  } catch {
-    throw new UnauthorizedError({ detail: 'Contenido del token de acceso ilegible.' });
-  }
+  const claims = verificarFirmaYDecodificar(token, opciones.secreto ?? secretoJwt()) as ClaimsJwt;
 
   if (claims.typ !== 'access' || typeof claims.sub !== 'string' || claims.sub === '') {
     throw new UnauthorizedError({ detail: 'El token no corresponde a un token de acceso.' });
@@ -104,6 +124,40 @@ export function verificarTokenAcceso(token: string, opciones: { ahora?: number; 
   }
 
   return { ...claims, roles: Array.isArray(claims.roles) ? claims.roles : [] };
+}
+
+export function firmarTokenSeleccionPerfil(opciones: OpcionesSeleccionPerfil): string {
+  const ahora = Math.floor((opciones.ahora ?? Date.now()) / 1000);
+  return firmarClaims(
+    {
+      sub: opciones.sub,
+      rolesDisponibles: opciones.rolesDisponibles,
+      iat: ahora,
+      exp: ahora + (opciones.expiraSegundos ?? 300),
+      typ: 'profile_selection',
+    },
+    opciones.secreto ?? secretoJwt(),
+  );
+}
+
+export function verificarTokenSeleccionPerfil(
+  token: string,
+  opciones: { ahora?: number; secreto?: string } = {},
+): ClaimsSeleccionPerfil {
+  const claims = verificarFirmaYDecodificar(token, opciones.secreto ?? secretoJwt()) as ClaimsSeleccionPerfil;
+  if (
+    claims.typ !== 'profile_selection' ||
+    typeof claims.sub !== 'string' ||
+    claims.sub === '' ||
+    !Array.isArray(claims.rolesDisponibles)
+  ) {
+    throw new UnauthorizedError({ detail: 'El token no corresponde a una selección de perfil.' });
+  }
+  const ahora = Math.floor((opciones.ahora ?? Date.now()) / 1000);
+  if (typeof claims.exp !== 'number' || claims.exp <= ahora) {
+    throw new UnauthorizedError({ detail: 'La selección de perfil ha expirado.' });
+  }
+  return claims;
 }
 
 export function extraerTokenBearer(cabeceraAuthorization: string | undefined): string | null {
