@@ -2,216 +2,116 @@ import request from 'supertest';
 import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { construirApp } from '../../../../src/app.js';
+import { verificarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
 import { Argon2Service } from '../../../../src/domains/identicore/argon2.service.js';
-import { firmarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
 
-describe('Auth Router — Schema Alignment & Database Interactions', () => {
-  const hashValido = Argon2Service.generateFallbackHash('PasswordValida123!');
+const ID = '11111111-1111-1111-1111-111111111111';
+const PASSWORD = 'PasswordValida123!';
+const hashValido = Argon2Service.generateFallbackHash(PASSWORD);
 
-  it('POST /api/v1/auth/login ejecuta query alineada a 02_sigd_auth y 03_sigd_org', async () => {
-    let capturedQuery = '';
-    let capturedParams: any[] = [];
-    let sessionInsertExecuted = false;
+function crearPool(rolesIniciales: Array<{ rol_codigo: string; permiso_codigo: string | null }>, activo = true) {
+  let roles = [...rolesIniciales];
+  const sesiones = new Map<string, { id_usuario: string; expira_en: string; revocado_en: string | null }>();
+  const cuenta = { id_usuario: ID, id_persona: null, usuario: 'persona', correo: 'persona@suiza.edu.pe',
+    password_hash: hashValido, activo, nombre_completo: 'Persona Institucional', area_id: null };
+  const query = vi.fn(async (sql: string, params: unknown[] = []) => {
+    if (sql.includes('FROM sigd_auth.cuenta_usuario c') && sql.includes('password_hash')) {
+      return { rows: params[0] === cuenta.usuario || params[0] === cuenta.correo ? [cuenta] : [], rowCount: 1 };
+    }
+    if (sql.includes('FROM sigd_org.usuario_rol ur')) return { rows: roles, rowCount: roles.length };
+    if (sql.includes('FROM sigd_auth.cuenta_usuario c') && sql.includes('WHERE c.id_usuario')) {
+      return { rows: params[0] === ID ? [cuenta] : [], rowCount: 1 };
+    }
+    if (sql.includes('INSERT INTO sigd_auth.sesion_usuario')) {
+      sesiones.set(String(params[1]), { id_usuario: String(params[0]), expira_en: String(params[4]), revocado_en: null });
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('FROM sigd_auth.sesion_usuario s')) {
+      const sesion = sesiones.get(String(params[0]));
+      return { rows: sesion ? [{ ...sesion, activo }] : [], rowCount: sesion ? 1 : 0 };
+    }
+    if (sql.includes('UPDATE sigd_auth.sesion_usuario')) {
+      const sesion = sesiones.get(String(params[0]));
+      if (sesion) sesion.revocado_en = new Date().toISOString();
+      return { rows: [], rowCount: sesion ? 1 : 0 };
+    }
+    return { rows: [], rowCount: 0 };
+  });
+  return { pool: { query } as unknown as Pool, query, setRoles: (next: typeof roles) => { roles = [...next]; } };
+}
 
-    const fakePool = {
-      query: vi.fn(async (queryText: string, params?: any[]) => {
-        if (queryText.includes('FROM sigd_auth.cuenta_usuario')) {
-          capturedQuery = queryText;
-          capturedParams = params ?? [];
-          return {
-            rows: [
-              {
-                id_usuario: '11111111-1111-1111-1111-111111111111',
-                id_persona: '22222222-2222-2222-2222-222222222222',
-                usuario: 'admin.institucional',
-                correo: 'admin@iestp-suiza.edu.pe',
-                password_hash: hashValido,
-                activo: true,
-                nombre_completo: 'Administrador General',
-                rol_codigo: 'ADMINISTRADOR',
-                area_id: null,
-              },
-            ],
-            rowCount: 1,
-          };
-        }
-        if (queryText.includes('INSERT INTO sigd_auth.sesion_usuario')) {
-          sessionInsertExecuted = true;
-          return { rows: [], rowCount: 1 };
-        }
-        return { rows: [], rowCount: 0 };
-      }),
-      connect: vi.fn(async () => ({
-        query: vi.fn(async () => ({ rows: [], rowCount: 0 })),
-        release: vi.fn(),
-      })),
-    } as unknown as Pool;
-
-    const app = construirApp(fakePool);
-
-    const res = await request(app)
-      .post('/api/v1/auth/login')
-      .send({
-        identificador: 'admin.institucional',
-        password: 'PasswordValida123!',
-      });
-
+describe('Auth Router — perfiles institucionales activos', () => {
+  it('activa automáticamente el único rol vigente y limita el JWT a ese perfil', async () => {
+    const { pool } = crearPool([{ rol_codigo: 'ADMINISTRADOR', permiso_codigo: 'admin:acceso' }]);
+    const res = await request(construirApp(pool)).post('/api/v1/auth/login')
+      .send({ identificador: 'persona', password: PASSWORD });
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('accessToken');
-    expect(res.body).toHaveProperty('refreshToken');
-    expect(res.body.usuario).toMatchObject({
-      id: '11111111-1111-1111-1111-111111111111',
-      nombreCompleto: 'Administrador General',
-      correo: 'admin@iestp-suiza.edu.pe',
-      rol: 'SUPER_ADMIN',
-    });
-
-    // Validar alineación exacta de columnas en el SQL capturado
-    expect(capturedQuery).toContain('c.usuario');
-    expect(capturedQuery).toContain('c.correo');
-    expect(capturedQuery).not.toContain('c.username');
-    expect(capturedQuery).not.toContain('c.correo_institucional');
-    expect(capturedQuery).not.toContain('bloqueado_hasta');
-    expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
-    expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
-    expect(capturedQuery).not.toContain('r.id_rol');
-    expect(capturedQuery).not.toContain('ur.estado');
-    expect(capturedQuery).toContain('(c.usuario = $1 OR c.correo = $1)');
-    expect(sessionInsertExecuted).toBe(true);
+    expect(res.body).toMatchObject({ requiresRoleSelection: false,
+      usuario: { rol: 'SUPER_ADMIN', rolesAutorizados: ['SUPER_ADMIN'], permisos: ['admin:acceso'] } });
+    const claims = verificarTokenAcceso(res.body.accessToken);
+    expect(claims.roles).toEqual(['SUPER_ADMIN']);
+    expect(claims.rolActivo).toBe('SUPER_ADMIN');
   });
 
-  it('POST /api/v1/auth/login propaga error 500 si falla la insercion de sesion (no swallow)', async () => {
-    const fakePool = {
-      query: vi.fn(async (queryText: string) => {
-        if (queryText.includes('FROM sigd_auth.cuenta_usuario')) {
-          return {
-            rows: [
-              {
-                id_usuario: '11111111-1111-1111-1111-111111111111',
-                usuario: 'admin.institucional',
-                correo: 'admin@iestp-suiza.edu.pe',
-                password_hash: hashValido,
-                activo: true,
-                nombre_completo: 'Admin',
-                rol_codigo: 'ADMINISTRADOR',
-              },
-            ],
-            rowCount: 1,
-          };
-        }
-        if (queryText.includes('INSERT INTO sigd_auth.sesion_usuario')) {
-          throw new Error('violacion de llave foranea o base de datos inaccesible');
-        }
-        return { rows: [], rowCount: 0 };
-      }),
-    } as unknown as Pool;
-
-    const app = construirApp(fakePool);
-
-    const res = await request(app)
-      .post('/api/v1/auth/login')
-      .send({
-        identificador: 'admin.institucional',
-        password: 'PasswordValida123!',
-      });
-
-    // No debe tragar el error con 200
-    expect(res.status).toBe(500);
+  it('con varios roles entrega un token transitorio y no crea sesión todavía', async () => {
+    const { pool, query } = crearPool([
+      { rol_codigo: 'DOCENTE', permiso_codigo: 'expedientes:leer' },
+      { rol_codigo: 'DIRECTOR', permiso_codigo: 'reportes:leer' },
+    ]);
+    const res = await request(construirApp(pool)).post('/api/v1/auth/login')
+      .send({ identificador: 'persona', password: PASSWORD });
+    expect(res.status).toBe(200);
+    expect(res.body.requiresRoleSelection).toBe(true);
+    expect(res.body.rolesDisponibles).toEqual(['DIRECTOR', 'DOCENTE']);
+    expect(res.body.accessToken).toBeUndefined();
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO sigd_auth.sesion_usuario'))).toBe(false);
   });
 
-  it('POST /api/v1/auth/refresh ejecuta query alineada a rol_id y vigente_hasta', async () => {
-    let capturedQuery = '';
-    const expiraEn = new Date(Date.now() + 3600 * 1000).toISOString();
-
-    const fakePool = {
-      query: vi.fn(async (queryText: string) => {
-        if (queryText.includes('FROM sigd_auth.sesion_usuario s')) {
-          capturedQuery = queryText;
-          return {
-            rows: [
-              {
-                id_usuario: '11111111-1111-1111-1111-111111111111',
-                expira_en: expiraEn,
-                revocado_en: null,
-                rol_codigo: 'ADMINISTRADOR',
-              },
-            ],
-            rowCount: 1,
-          };
-        }
-        return { rows: [], rowCount: 1 };
-      }),
-    } as unknown as Pool;
-
-    const app = construirApp(fakePool);
-
-    const res = await request(app)
-      .post('/api/v1/auth/refresh')
-      .send({ refreshToken: 'abcdef1234567890abcdef1234567890' });
-
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('accessToken');
-    expect(res.body).toHaveProperty('refreshToken');
-
-    expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
-    expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
-    expect(capturedQuery).not.toContain('ur.estado');
-    expect(capturedQuery).not.toContain('r.id_rol');
+  it('valida de nuevo en servidor el perfil seleccionado y emite el perfil efectivo', async () => {
+    const { pool } = crearPool([{ rol_codigo: 'DOCENTE', permiso_codigo: 'expedientes:leer' },
+      { rol_codigo: 'DIRECTOR', permiso_codigo: 'reportes:leer' }]);
+    const app = construirApp(pool);
+    const login = await request(app).post('/api/v1/auth/login').send({ identificador: 'persona', password: PASSWORD });
+    const seleccion = await request(app).post('/api/v1/auth/select-role')
+      .send({ selectionToken: login.body.selectionToken, rol: 'DOCENTE' });
+    expect(seleccion.status).toBe(200);
+    expect(seleccion.body.usuario).toMatchObject({ rol: 'DOCENTE', permisos: ['expedientes:leer'] });
+    expect(verificarTokenAcceso(seleccion.body.accessToken)).toMatchObject({ rolActivo: 'DOCENTE', roles: ['DOCENTE'] });
   });
 
-  it('GET /api/v1/auth/me retorna usuario con correo y usuario alineados', async () => {
-    let capturedQuery = '';
-    const token = firmarTokenAcceso({
-      sub: '11111111-1111-1111-1111-111111111111',
-      roles: ['ADMINISTRADOR'],
-      expiraSegundos: 300,
-    });
+  it('rechaza un rol no asignado y uno que dejó de estar vigente', async () => {
+    const fixture = crearPool([{ rol_codigo: 'DOCENTE', permiso_codigo: null },
+      { rol_codigo: 'DIRECTOR', permiso_codigo: null }]);
+    const app = construirApp(fixture.pool);
+    const login = await request(app).post('/api/v1/auth/login').send({ identificador: 'persona', password: PASSWORD });
+    expect((await request(app).post('/api/v1/auth/select-role')
+      .send({ selectionToken: login.body.selectionToken, rol: 'SUPER_ADMIN' })).status).toBe(403);
+    fixture.setRoles([{ rol_codigo: 'DIRECTOR', permiso_codigo: null }]);
+    expect((await request(app).post('/api/v1/auth/select-role')
+      .send({ selectionToken: login.body.selectionToken, rol: 'DOCENTE' })).status).toBe(403);
+  });
 
-    const fakePool = {
-      query: vi.fn(async (queryText: string) => {
-        if (queryText.includes('FROM sigd_auth.cuenta_usuario c')) {
-          capturedQuery = queryText;
-          return {
-            rows: [
-              {
-                id_usuario: '11111111-1111-1111-1111-111111111111',
-                id_persona: '22222222-2222-2222-2222-222222222222',
-                usuario: 'admin.institucional',
-                correo: 'admin@iestp-suiza.edu.pe',
-                nombre_completo: 'Administrador General',
-                rol_codigo: 'ADMINISTRADOR',
-                area_id: '33333333-3333-3333-3333-333333333333',
-                cargo_id: null,
-                telefono: '987654321',
-              },
-            ],
-            rowCount: 1,
-          };
-        }
-        return { rows: [], rowCount: 0 };
-      }),
-    } as unknown as Pool;
+  it('deniega cuentas sin roles, deshabilitadas o con contraseña incorrecta', async () => {
+    const sinRoles = construirApp(crearPool([]).pool);
+    const deshabilitada = construirApp(crearPool([{ rol_codigo: 'DOCENTE', permiso_codigo: null }], false).pool);
+    expect((await request(sinRoles).post('/api/v1/auth/login').send({ identificador: 'persona', password: PASSWORD })).status).toBe(403);
+    expect((await request(deshabilitada).post('/api/v1/auth/login').send({ identificador: 'persona', password: PASSWORD })).status).toBe(403);
+    expect((await request(sinRoles).post('/api/v1/auth/login').send({ identificador: 'persona', password: 'incorrecta' })).status).toBe(401);
+  });
 
-    const app = construirApp(fakePool);
-
-    const res = await request(app)
-      .get('/api/v1/auth/me')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({
-      id: '11111111-1111-1111-1111-111111111111',
-      usuario: 'admin.institucional',
-      correo: 'admin@iestp-suiza.edu.pe',
-      nombreCompleto: 'Administrador General',
-      rol: 'SUPER_ADMIN',
-    });
-
-    expect(capturedQuery).toContain('c.usuario');
-    expect(capturedQuery).toContain('c.correo');
-    expect(capturedQuery).not.toContain('c.username');
-    expect(capturedQuery).not.toContain('c.correo_institucional');
-    expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
-    expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
+  it('permite cambiar solo a otro perfil actualmente asignado', async () => {
+    const fixture = crearPool([{ rol_codigo: 'DOCENTE', permiso_codigo: null },
+      { rol_codigo: 'DIRECTOR', permiso_codigo: 'reportes:leer' }]);
+    const app = construirApp(fixture.pool);
+    const login = await request(app).post('/api/v1/auth/login').send({ identificador: 'persona', password: PASSWORD });
+    const docente = await request(app).post('/api/v1/auth/select-role')
+      .send({ selectionToken: login.body.selectionToken, rol: 'DOCENTE' });
+    const cambio = await request(app).post('/api/v1/auth/switch-role')
+      .set('Authorization', `Bearer ${docente.body.accessToken}`).send({ rol: 'DIRECTOR', refreshToken: docente.body.refreshToken });
+    expect(cambio.status).toBe(200);
+    expect(cambio.body.usuario.rol).toBe('DIRECTOR');
+    expect(verificarTokenAcceso(cambio.body.accessToken).roles).toEqual(['DIRECTOR']);
+    expect((await request(app).post('/api/v1/auth/switch-role')
+      .set('Authorization', `Bearer ${cambio.body.accessToken}`).send({ rol: 'SUPER_ADMIN' })).status).toBe(403);
   });
 });

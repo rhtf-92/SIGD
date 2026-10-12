@@ -8,7 +8,6 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
-  Building2,
   Eye,
   EyeOff,
   LockKeyhole,
@@ -19,15 +18,15 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import sigdLogoHeader from '../assets/sigd-logo-header.png';
 import LogoSIGD3D from '../components/common/LogoSIGD3D';
-import { useAuthStore, type UsuarioPerfil } from '../stores/authStore';
+import { useAuthStore, type RolInstitucional, type UsuarioPerfil } from '../stores/authStore';
 
-const ROLES_INSTITUCIONALES = [
-  { value: 'SUPER_ADMIN', label: 'Superadministrador' },
-  { value: 'DIRECTOR', label: 'Director' },
-  { value: 'DOCENTE', label: 'Docente' },
-  { value: 'MESA_PARTES', label: 'Mesa de Partes' },
-  { value: 'ESTUDIANTE', label: 'Estudiante' },
-] as const;
+const NOMBRE_ROL: Record<RolInstitucional, string> = {
+  SUPER_ADMIN: 'Superadministrador',
+  DIRECTOR: 'Director',
+  DOCENTE: 'Docente',
+  MESA_PARTES: 'Mesa de Partes',
+  ESTUDIANTE: 'Estudiante',
+};
 
 const ESTRELLAS = [
   [5, 15, 1.5, 0.2], [13, 37, 1, 1.6], [20, 8, 2, 2.4], [28, 68, 1.5, 0.8],
@@ -49,7 +48,7 @@ type FaseValidacion = 'idle' | 'validando' | 'verificando' | 'autorizado' | 'rec
 
 const MENSAJE_VALIDACION: Record<Exclude<FaseValidacion, 'idle'>, { titulo: string; detalle: string }> = {
   validando: {
-    titulo: 'Validando contraseña...',
+    titulo: 'Validando credenciales...',
     detalle: 'Protegiendo la comunicación con el servidor institucional',
   },
   verificando: {
@@ -70,6 +69,15 @@ function esperar(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 }
 
+function mensajeDeError(error: unknown): string {
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as { detail?: unknown; message?: unknown };
+    if (typeof candidate.detail === 'string') return candidate.detail;
+    if (typeof candidate.message === 'string' && candidate.message !== 'Unauthorized') return candidate.message;
+  }
+  return 'Correo o contraseña incorrectos';
+}
+
 type EscenaStyle = CSSProperties & {
   '--auth-x'?: string;
   '--auth-y'?: string;
@@ -80,10 +88,12 @@ type EscenaStyle = CSSProperties & {
 export default function LoginPage() {
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
+  const seleccionarPerfil = useAuthStore((state) => state.seleccionarPerfil);
+  const selectionToken = useAuthStore((state) => state.selectionToken);
+  const rolesDisponibles = useAuthStore((state) => state.rolesDisponibles);
+  const usuarioPendiente = useAuthStore((state) => state.usuarioPendiente);
   const escenaRef = useRef<HTMLElement>(null);
-  const usuarioRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
-  const [rol, setRol] = useState('');
   const [identificador, setIdentificador] = useState('');
   const [password, setPassword] = useState('');
   const [mostrarPassword, setMostrarPassword] = useState(false);
@@ -96,17 +106,12 @@ export default function LoginPage() {
     if (busy) return;
     setError('');
 
-    if (!rol) {
-      setError('Selecciona tu rol institucional para continuar.');
-      return;
-    }
-
     setBusy(true);
     setFaseValidacion('validando');
     const movimientoReducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const duracionFase = movimientoReducido ? 100 : 720;
     const resultadoAutenticacion = login({ identificador, password })
-      .then(() => ({ autorizado: true as const }))
+      .then((resultado) => ({ autorizado: true as const, resultado }))
       .catch((loginError: unknown) => ({ autorizado: false as const, error: loginError }));
 
     await esperar(duracionFase);
@@ -117,8 +122,14 @@ export default function LoginPage() {
     ]);
 
     if (!resultado.autorizado) {
-      setError('Correo o contraseña incorrectos');
+      setError(mensajeDeError(resultado.error));
       setFaseValidacion('rechazado');
+      setBusy(false);
+      return;
+    }
+
+    if (resultado.resultado.requiresRoleSelection) {
+      setFaseValidacion('idle');
       setBusy(false);
       return;
     }
@@ -136,16 +147,30 @@ export default function LoginPage() {
     navigate(DESTINO_POR_ROL[usuarioAutenticado.rol], { replace: true });
   }
 
+  async function activarPerfil(rol: RolInstitucional) {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    setFaseValidacion('verificando');
+    try {
+      await seleccionarPerfil(rol);
+      const usuarioAutenticado = useAuthStore.getState().usuario;
+      if (!usuarioAutenticado) throw new Error('No fue posible confirmar el perfil institucional.');
+      setFaseValidacion('autorizado');
+      const movimientoReducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+      await esperar(movimientoReducido ? 150 : 1050);
+      navigate(DESTINO_POR_ROL[usuarioAutenticado.rol], { replace: true });
+    } catch (selectionError) {
+      setError(mensajeDeError(selectionError));
+      setFaseValidacion('rechazado');
+      setBusy(false);
+    }
+  }
+
   function cerrarValidacionRechazada() {
     if (faseValidacion !== 'rechazado') return;
     setFaseValidacion('idle');
     window.requestAnimationFrame(() => passwordRef.current?.focus());
-  }
-
-  function seleccionarRol(value: string) {
-    setRol(value);
-    setError('');
-    if (value) window.requestAnimationFrame(() => usuarioRef.current?.focus());
   }
 
   function actualizarPerspectiva(event: PointerEvent<HTMLElement>) {
@@ -234,37 +259,23 @@ export default function LoginPage() {
             <span className="sigd-auth__tag"><Sparkles aria-hidden="true" size={14} /> Acceso institucional</span>
             <h2 id="sigd-auth-title">Iniciar sesión</h2>
             <p className="sigd-auth__intro">
-              Selecciona tu rol e ingresa con tus credenciales institucionales.
+              Ingresa tus credenciales institucionales para acceder al sistema.
             </p>
 
             <form onSubmit={ingresar} className="sigd-auth__form">
-              <label className="sigd-auth__field">
-                <span>Rol institucional</span>
-                <span className="sigd-auth__control">
-                  <Building2 aria-hidden="true" size={18} />
-                  <select value={rol} onChange={(event) => seleccionarRol(event.target.value)} disabled={busy} required>
-                    <option value="">Selecciona tu rol</option>
-                    {ROLES_INSTITUCIONALES.map((opcion) => (
-                      <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
-                    ))}
-                  </select>
-                </span>
-              </label>
-
-              <div className={`sigd-auth__credentials${rol ? ' is-visible' : ''}`} aria-hidden={!rol}>
+              <div className="sigd-auth__credentials is-visible">
                 <label className="sigd-auth__field">
                   <span>Usuario o correo</span>
                   <span className="sigd-auth__control">
                     <UserRound aria-hidden="true" size={18} />
                     <input
-                      ref={usuarioRef}
-                      required={Boolean(rol)}
-                      tabIndex={rol ? 0 : -1}
+                      required
+                      autoFocus
                       autoComplete="username"
                       value={identificador}
                       onChange={(event) => setIdentificador(event.target.value)}
                       placeholder="Usuario institucional"
-                      disabled={busy || !rol}
+                      disabled={busy}
                     />
                   </span>
                 </label>
@@ -275,14 +286,13 @@ export default function LoginPage() {
                     <LockKeyhole aria-hidden="true" size={18} />
                     <input
                       ref={passwordRef}
-                      required={Boolean(rol)}
-                      tabIndex={rol ? 0 : -1}
+                      required
                       type={mostrarPassword ? 'text' : 'password'}
                       autoComplete="current-password"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       placeholder="Contraseña"
-                      disabled={busy || !rol}
+                      disabled={busy}
                     />
                     <button
                       type="button"
@@ -290,8 +300,7 @@ export default function LoginPage() {
                       onClick={() => setMostrarPassword((visible) => !visible)}
                       aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                       aria-pressed={mostrarPassword}
-                      disabled={busy || !rol}
-                      tabIndex={rol ? 0 : -1}
+                      disabled={busy}
                     >
                       {mostrarPassword ? <EyeOff aria-hidden="true" size={18} /> : <Eye aria-hidden="true" size={18} />}
                     </button>
@@ -300,12 +309,10 @@ export default function LoginPage() {
 
                 {error && <p className="sigd-auth__error" role="alert">{error}</p>}
 
-                <button type="submit" disabled={busy || !rol} className="sigd-auth__submit">
+                <button type="submit" disabled={busy} className="sigd-auth__submit">
                   {busy ? <><span className="sigd-auth__spinner" aria-hidden="true" /> Validando acceso…</> : <>Ingresar al sistema <ArrowRight aria-hidden="true" size={19} /></>}
                 </button>
               </div>
-
-              {!rol && error && <p className="sigd-auth__error" role="alert">{error}</p>}
             </form>
 
             <div className="sigd-auth__security">
@@ -315,6 +322,25 @@ export default function LoginPage() {
           </div>
         </section>
       </div>
+
+      {selectionToken && rolesDisponibles.length > 1 && faseValidacion === 'idle' ? (
+        <div className="sigd-auth-profile" role="dialog" aria-modal="true" aria-labelledby="sigd-auth-profile-title">
+          <div className="sigd-auth-profile__card">
+            <span className="sigd-auth__tag"><ShieldCheck aria-hidden="true" size={14} /> Identidad confirmada</span>
+            <h2 id="sigd-auth-profile-title">Selecciona tu perfil de trabajo</h2>
+            <p>{usuarioPendiente?.nombreCompleto}, el servidor confirmó estos perfiles vigentes para tu cuenta.</p>
+            <div className="sigd-auth-profile__roles">
+              {rolesDisponibles.map((rol) => (
+                <button key={rol} type="button" onClick={() => void activarPerfil(rol)} disabled={busy}>
+                  <ShieldCheck aria-hidden="true" size={20} />
+                  <span><strong>{NOMBRE_ROL[rol]}</strong><small>Continuar con este perfil autorizado</small></span>
+                  <ArrowRight aria-hidden="true" size={18} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {faseValidacion !== 'idle' ? (
         <div

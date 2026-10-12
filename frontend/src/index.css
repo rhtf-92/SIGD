@@ -2091,6 +2091,57 @@
   transition: max-height 350ms ease, opacity 250ms ease, transform 300ms ease;
 }
 .sigd-auth__credentials.is-visible { max-height: 390px; opacity: 1; transform: translateY(0); }
+
+.sigd-auth-profile {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(1 11 27 / 78%);
+  backdrop-filter: blur(18px);
+  animation: sigd-auth-modal-in 280ms ease-out both;
+}
+
+.sigd-auth-profile__card {
+  width: min(100%, 510px);
+  padding: clamp(24px, 5vw, 38px);
+  border: 1px solid rgb(118 196 255 / 30%);
+  border-radius: 28px;
+  background: linear-gradient(145deg, rgb(240 247 255 / 97%), rgb(218 232 247 / 96%));
+  box-shadow: 0 32px 90px rgb(0 7 24 / 55%), inset 0 1px 0 rgb(255 255 255 / 85%);
+}
+
+.sigd-auth-profile__card h2 { margin: 18px 0 8px; color: #071d3c; font-size: clamp(1.65rem, 5vw, 2.2rem); }
+.sigd-auth-profile__card > p { margin: 0 0 22px; color: #58708f; line-height: 1.55; }
+.sigd-auth-profile__roles { display: grid; gap: 11px; }
+.sigd-auth-profile__roles > button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 15px 17px;
+  border: 1px solid #bdd4ea;
+  border-radius: 16px;
+  color: #0a2b56;
+  background: rgb(255 255 255 / 72%);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+.sigd-auth-profile__roles > button:hover { transform: translateY(-2px); border-color: #22bfe7; box-shadow: 0 12px 28px rgb(7 86 151 / 15%); }
+.sigd-auth-profile__roles > button:focus-visible { outline: 3px solid rgb(0 181 229 / 30%); outline-offset: 3px; }
+.sigd-auth-profile__roles > button:disabled { cursor: wait; opacity: .64; }
+.sigd-auth-profile__roles span { display: grid; gap: 3px; }
+.sigd-auth-profile__roles strong { font-size: .96rem; }
+.sigd-auth-profile__roles small { color: #69819d; font-size: .76rem; }
+
+@keyframes sigd-auth-modal-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 .sigd-auth__error {
   margin: 0;
   padding: 10px 12px;
