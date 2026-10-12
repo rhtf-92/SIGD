@@ -1,594 +1,136 @@
-# TUPA 2026
-
-## Instituto de Educación Superior Tecnológico Público Pasco
-
-**Institución:** IESTP PASCO  
-**Documento:** Texto Único de Procedimientos Administrativos (TUPA) 2026  
-**Fecha:** Cerro de Pasco, febrero de 2026
-
-> Documento convertido desde el PDF `TUPA 2026.pdf`. La información se mantiene basada en el contenido del documento fuente.
-
-## Procedimientos administrativos
-
-### 1. Certificado de estudios
-**Requisitos**
-1. Solicitud FUT
-2. Constancia de No Adeudar
-3. Una fotografía tamaño pasaporte
-4. Derecho de trámite (recibo)
-
-**Derecho de pago:** S/. 11.00 por semestre; S/. 2.00  
-**Dependencia que inicia:** Mesa de Partes / Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 05 días hábiles
-
-### 2. Convalidación de estudios interna y externa
-**Requisitos**
-1. Solicitud FUT
-2. Certificados de Estudios Original
-3. Recibo por Derecho de convalidación
-4. Sílabo
-
-**Derecho de pago:** S/. 25.00 por asignatura interna; S/. 30.00 externa  
-**Dependencia que inicia:** Mesa de Partes / Unidad Académica  
-**Autoridad:** Unidad Académica  
-**Tiempo máximo:** Cronograma
-
-### 3. Constancia de aprobación de prácticas
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de pago por formato
-
-**Derecho de pago:** S/. 3.00  
-**Dependencia que inicia:** Mesa de Partes / Secretaría Académica  
-**Autoridad:** Secretaría General  
-**Tiempo máximo:** 01 día hábil
-
-### 4. Carta de presentación
-**Requisitos**
-1. Solicitud FUT
-2. Constancia de Aprobación de Prácticas
-3. Pago por Formato (03 ejemplares)
-
-**Derecho de pago:** S/. 3.00  
-**Dependencia que inicia:** Mesa de Partes  
-**Autoridad:** Unidad Académica  
-**Tiempo máximo:** 01 día
-
-### 5. Aprobación de borrador de informe de práctica profesional
-Incluye: Inicial, Intermedia y Final.
-
-**Requisitos**
-1. Solicitud FUT
-2. Un ejemplar - borrador
-3. Recibo de pago por derecho
-4. Revisión de informe y/o Monografía
-
-**Derecho de pago:** S/. 20.00  
-**Dependencia que inicia:** Mesa de Partes / Jefe de Área Académica / Docentes  
-**Autoridad:** Jefe de Área Académica / Unidad Académica  
-**Tiempo máximo:** 07 días
-
-### 6. Calificación de informe de práctica
-Incluye: Inicial, Intermedia y Final.
-
-**Requisitos**
-1. Solicitud FUT
-2. Ficha de Evaluación del Informe
-   - 01 ejemplar: P. Inicial
-   - 02 ejemplares: P. Intermedia
-   - 03 ejemplares: P. Final
-
-**Derecho de pago:** Gratuito  
-**Dependencia que inicia:** Área Académica / Docente  
-**Autoridad:** Jefe de Área Académica / Unidad Académica  
-**Tiempo máximo:** 02 días
-
-### 7. Convalidación de informes de prácticas empresariales
-
-#### Nivel inicial
-**Requisitos**
-1. Carpeta de práctica debidamente rellenada
-2. Solicitud FUT
-3. Ficha de Evaluación de Prácticas Profesionales (Consolidado)
-4. Ficha de Evaluación Individual
-5. Ficha de Supervisión
-6. Resolución Directoral
-
-**Derecho de pago:** S/. 150.00  
-**Dependencia:** Área Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 03 días
-
-#### Nivel intermedio
-**Requisito adicional indicado en el documento:** Recibo de Pago  
-**Derecho de pago:** S/. 150.00  
-**Tiempo máximo:** 03 días
-
-#### Nivel terminal
-**Requisitos**
-1. Solicitud FUT
-2. Ficha de Evaluación de Prácticas Profesionales (Consolidado)
-3. Ficha de Evaluación Empresarial y/o Institucional
-4. Ficha de Supervisión
-5. Constancia de Prácticas Profesionales
-6. Resolución Directoral
-7. Recibo de Pago
-
-**Derecho de pago:** S/. 150.00  
-**Tiempo máximo:** 03 días
-
-### 8. Módulo I-A al VI-A / Módulo I-B al VI-B
-
-**Módulo I-A al VI-A:** Semestral — Mecánica Automotriz  
-**Derecho de pago:** S/. 75.00
-
-**Módulo I-B al VI-B:** Anual  
-**Derecho de pago:** S/. 150.00
-
-**Requisitos**
-1. Solicitud FUT
-2. Ficha de Evaluación de Prácticas Profesionales (Consolidado)
-3. Ficha de Evaluación Individual
-4. Ficha de Supervisión
-5. Resolución Directoral
-6. Recibo de Pago
-
-### 9. Derecho de titulación
-**Requisitos**
-1. Solicitud FUT
-2. Certificado de Estudios Secundaria - Original
-3. Partida de Nacimiento Original
-4. Certificado de Estudios Superiores – Original
-5. Certificado de Estudios Inglés
-6. Constancias de Aprobación de Prácticas Profesionales
-7. Constancia de Egresado
-8. Acta de Examen Teórico/Práctico
-9. Oficio para Nombrar Jurado
-10. Resolución de Expedido
-11. Trámite de Titulación
-12. Derecho de Titulación
-13. Derecho de Examen Teórico Práctico (Jurados)
-14. Formato de Título
-15. Derecho de Colación
-16. Constancia de No Adeudar
-17. Asesoría para Titulación
-18. 02 Fotografías Pasaporte - Fondo Blanco
-19. Proyecto de Examen Teórico Sistema Modular
-20. Proyecto Examen Teórico Práctico Tradicional
-21. Revisión de trabajos de Investigación
-22. Recibo de Pago por derecho de Inscripción del Título DREP
-23. 03 Formatos de Registro de Título Expedido por la DREP
-24. Fotocopia de DNI autenticados por el Fedatario de la DREP
-25. Sobre Manila tamaño oficio
-26. 20 hojas de papel bond de 80 gramos
-
-**Derechos de pago indicados en el documento:** S/. 0.50, S/. 68.00, S/. 75.00, S/. 3.00, S/. 5.00, S/. 10.00, S/. 35.00, S/. 20.00, S/. 250.00, S/. 100.00, S/. 50.00, S/. 2.00, S/. 200.00, S/. 600.00, S/. 900.00 y S/. 300.00.
-
-**Dependencia:** Mesa de Partes / Secretaría General  
-**Tiempo máximo:** 15 días
-
-### 10. Constancia de no adeudar
-**Requisito:** Recibo de Pago  
-**Derecho de pago:** S/. 2.00  
-**Dependencia:** Administración / Biblioteca  
-**Autoridad:** Administración  
-**Tiempo máximo:** 01 día
-
-### 11. Constancia de egresado
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 5.00  
-**Dependencia:** Mesa de Partes / Secretaría Académica  
-**Autoridad:** Secretaría General  
-**Tiempo máximo:** 02 días
-
-### 12. Carné de estudiante
-**Requisito:** Recibo de Pago  
-**Derecho de pago:** S/. 10.00  
-**Dependencia:** Biblioteca
-
-### 13. Evaluación extraordinaria / subsanación de asignatura
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 35.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría General  
-**Tiempo máximo:** 02 días
-
-### 14. Pago al momento de matricularse
-Incluye:
-- Repitencia de asignaturas/unidad didáctica
-- Repitencia de semestre
-- Examen de cargo por asignatura/unidad didáctica
-- Examen de recuperación por asignatura/unidad didáctica
-
-**Requisitos y pagos indicados:** Recibo de Pago / Solicitud FUT / Pago de Recibo. El documento presenta tasas de S/. 35.00, S/. 35.00 y S/. 20.00 según el concepto.
-
-**Dependencia:** Secretaría Académica / Secretaría General  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 02 días
-
-### 15. Examen extraordinario de asignaturas y/o unidad didáctica
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 35.00 por asignatura / S/. 35.00 por unidad didáctica  
-**Dependencia:** Mesa de Partes / Unidad Académica  
-**Autoridad:** Unidad Académica
-
-### 16. Traslado interno
-**Requisitos**
-1. Solicitud FUT
-2. Derecho de Pago
-3. Certificado de Estudios Originales
-
-**Derecho de pago:** S/. 100.00  
-**Dependencia:** Mesa de Partes
-
-### 17. Traslado externo
-**Requisitos**
-1. Solicitud FUT
-2. Constancia de Vacante
-3. Recibo de Derecho de Pago
-
-**Derecho de pago:** S/. 150.00  
-**Dependencia:** Mesa de Partes
-
-### 18. Record de notas
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago por Semestre
-
-**Derecho de pago:** S/. 3.00 c/s  
-**Dependencia:** Mesa de Partes / Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 19. Constancia de haber sustentado examen T/práctico
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 20.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 20. Constancia de aprobación de examen teórico práctico antes del 2016
-**Requisitos**
-1. Solicitud
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 30.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 21. Aprobación del plan de proyecto, reparación, mantenimiento, implementación, producción, servicio e investigación
-**Requisitos**
-1. Solicitud FUT
-2. Plan de Proyecto
-3. Formato de Resolución
-4. Recibo de Pago
-
-**Derecho de pago:** Tasas vigentes según R.D. N.º 048  
-**Dependencia:** Área Académica  
-**Autoridad:** Dirección General / Unidad Académica  
-**Tiempo máximo:** 05 días
-
-### 22. Examen teórico práctico
-**Requisitos**
-1. Solicitud FUT
-2. Derecho de Examen Teórico Práctico - Jurados
-3. Certificado de Estudios Superiores (Original)
-4. Oficio Nombramiento de Jurados (03)
-5. Acta de Evaluación
-6. Constancia de Prácticas Profesionales
-7. Constancia de Aprobación de Módulos
-8. Resolución de Expedito
-9. Constancia de no adeudar
-10. Constancia de Expedito
-11. Asesoría para Titulación
-
-**Derechos de pago indicados:** S/. 250.00, S/. 10.00, S/. 10.00, S/. 10.00, S/. 3.00, S/. 5.00 y S/. 200.00.  
-**Dependencia:** Mesa de Partes  
-**Autoridad:** Unidad Académica
-
-### 23. Constancia de expedito
-**Requisitos**
-1. Formato de Expedito - Abastecimientos
-2. Solicitud FUT
-
-**Derecho de pago:** S/. 5.00  
-**Dependencia:** Abastecimientos / Áreas Académicas  
-**Tiempo máximo:** 01 día
-
-### 24. Certificación por módulo semestral y anual
-**Requisitos**
-1. Solicitud FUT
-2. Constancia de Aprobación de Módulo
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 20.00  
-**Dependencia:** Secretaría Académica / Dirección General
-
-### 25. Certificados de estudios urgentes
-**Modalidades:** Sistema Tradicional / Sistema Modular.
-
-**Requisitos**
-1. Solicitud FUT
-2. Constancia de No Adeudar
-3. 01 fotografía tamaño pasaporte
-4. Derecho de trámite
-
-**Derechos de pago indicados:** S/. 0.50 y S/. 15.00  
-**Dependencia:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 26. Actualización de matrícula - reentrante
-**Requisitos**
-1. Solicitud FUT
-2. Record de Notas
-
-**Derecho de pago:** S/. 50.00  
-**Dependencia:** Mesa de Partes  
-**Autoridad:** Dirección General
-
-### 27. Certificado de egresado
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 15.00  
-**Dependencia:** Dirección General  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 01 día
-
-### 28. Constancia de ingreso
-**Requisito:** Recibo de Pago  
-**Derecho de pago:** S/. 10.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 29. Devolución de expediente - estudiantes semestre I
-**Requisitos**
-1. Recibo de Pago
-2. Solicitud
-
-**Derecho de pago:** S/. 10.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 30. Autorización de titulación de otras instituciones
-**Requisitos**
-1. Solicitud
-2. Constancia de Prácticas
-3. Certificado de Estudios
-4. Constancia de autorización
-5. Recibo de Pago
-
-**Derecho de pago:** S/. 50.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 07 días
-
-### 31. Reserva de matrícula, ingreso y/o vacante
-**Requisitos**
-1. Solicitud
-2. Constancia de Matrícula
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 30.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 15 días
-
-### 32. Traslado de matrícula externa a otras instituciones
-**Requisitos**
-1. Solicitud
-2. Certificado de Estudios Superiores
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 150.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 07 días
-
-### 33. Traslado externo de otras instituciones
-**Requisitos**
-1. Solicitud
-2. Certificado de Estudios Superiores
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 150.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** Cronograma
-
-### 34. Traslado interno
-**Requisitos**
-1. Solicitud
-2. Certificado de Estudios
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 100.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** Cronograma
-
-### 35. Matrícula regular - invicto
-**Requisitos**
-1. Boleta de Notas
-2. 02 Fotografías
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 80.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 36. Matrícula repitente - reentrante
-**Requisitos**
-1. Resolución de Autorización
-2. Recibo de Pago
-3. 02 fotografías
-
-**Derecho de pago:** S/. 130.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 37. Matrícula con unidad a cargo
-**Requisitos**
-1. Boleta de Notas
-2. Recibo de Pago
-3. 02 fotografías
-
-**Derecho de pago:** S/. 100.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 38. Matrícula becada IESTP Pasco - primer puesto
-**Requisitos**
-1. Resolución Directoral
-2. Recibo de Pago
-3. 02 fotografías
-
-**Derecho de pago:** S/. 20.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 39. Matrícula semi beca IESTP - segundo puesto
-**Requisitos**
-1. Resolución Directoral
-2. Recibo de Pago
-3. 02 fotografías
-
-**Derecho de pago:** S/. 40.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 40. Matrícula becado externo
-**Requisitos**
-1. Boleta de Notas
-2. 02 fotografías
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 100.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 41. Examen de admisión ordinario
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 200.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 42. Examen de admisión - modalidad primeros puestos
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 220.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 43. Examen de admisión - modalidad titulados / segunda carrera
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 230.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 44. Examen de admisión - modalidad convenios institucionales
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 200.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 45. Examen de admisión - modalidad servicio militar, víctimas de violencia y personas con discapacidad
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 150.00  
-**Dependencia:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 46. Examen de admisión - modalidad deportistas destacados
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 200.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 47. Examen médico odontológico / tratamiento consultorio odontológico
-
-El documento incluye tarifas diferenciadas para estudiantes, docentes/administrativos y público en general, además de servicios como curación, visitas, extracción dental, profilaxis, fluorización, destartraje y rayos X.
-
-**Servicios y tarifas indicadas en el documento:**
-- Curación pequeña: S/. 10.00
-- Curación mediana: S/. 15.00
-- Curación grande: S/. 20.00
-- Curación extra grande: S/. 30.00
-- Extracción dental simple: S/. 15.00
-- Extracción dental complicada: S/. 50.00
-- Profilaxis: S/. 15.00
-- Fluorización: S/. 5.00
-- Destartraje: S/. 20.00
-- Rayos X peri apical: S/. 10.00
-- Rayos X oclusales: S/. 23.00
-
-**Dependencia:** Tópico  
-**Tiempo máximo:** Cronograma
-
-### 48. Otros
-
-Servicios de alquiler indicados en el documento:
-
-| Servicio | Tarifa |
-|---|---:|
-| Alquiler de Proyector Multimedia | S/. 10.00 / hora |
-| Alquiler de Power + parlante | S/. 20.00 / hora |
-| Alquiler de Auditorio - externo | S/. 50.00 / hora |
-| Alquiler de Auditorio interno | S/. 700.00 / día |
-| Alquiler de Ecram | S/. 20.00 / día |
-| Alquiler de Power | S/. 5.00 / hora |
-| Alquiler de mezclador | S/. 10.00 / hora |
-| Alquiler de Micrófono | S/. 10.00 / día |
-| Alquiler de Aula | S/. 80.00 / día |
-| Alquiler de Campo deportivo | S/. 50.00 / día |
-| Alquiler de Parrilla | S/. 20.00 / día |
-| Alquiler de Cochera - trabajador instituto | S/. 30.00 / mes |
-| Alquiler de Cochera - trabajador particular | S/. 30.00 / mes |
-| Alquiler de Laptop | S/. 3.00 / día |
-| Alquiler de PC por máquina | S/. 2.00 / hora |
-| Alquiler de equipo de soldar | S/. 10.00 / hora |
-| Alquiler de Silla blanca | S/. 2.00 / día |
-| Alquiler de Silla tapizada dúo | S/. 5.00 / día |
-| Alquiler de mesa | S/. 5.00 / día |
-| Alquiler Sala de Licenciamiento | S/. 300.00 / día |
-
----
-
-## Uso dentro del proyecto SIGD
-
-Este documento puede almacenarse como documentación del sistema, por ejemplo:
-
-```text
-frontend/
-└── docs/
-    └── registro-documentario/
-        └── TUPA_2026.md
-```
-
-**Fuente:** TUPA 2026 del Instituto de Educación Superior Tecnológico Público Pasco.
+# TUPA 2026 - IESTP Suiza, Ucayali
+
+**Entidad:** Dirección Regional de Educación de Ucayali
+
+**Unidad orgánica:** Dirección General de Educación Superior y Técnico Profesional
+
+**Institución:** Instituto de Educación Superior Tecnológico Público "Suiza"
+
+**Fecha del documento:** Pucallpa, enero de 2026
+
+**UIT indicada:** S/. 5,500.00
+**Fuente:** `DIRECCIÓN REGIONAL DE EDUCACIÓN DE UCAYALI.pdf`, proporcionado para actualizar este catálogo.
+
+El documento fuente comprende cuadros de servicios académicos, servicios productivos y venta de bienes. No asigna números a los conceptos: los códigos `ACA`, `PRO` y `BIE` de este catálogo son identificadores internos, no códigos oficiales del TUPA.
+
+## Servicios académicos
+
+### Proceso de titulación
+
+| ID interno | Concepto | Requisitos y descripción | Importe |
+| --- | --- | --- | --- |
+| ACA-01 | FUT | Pago en Tesorería; comprobante de pago. | S/. 4.00 (0.07 % UIT) |
+| ACA-02 | Constancia de no adeudar para fines de titulación | Pago en Tesorería; comprobante de pago. | S/. 16.50 (0.30 % UIT) |
+| ACA-03 | Trabajo de Aplicación Profesional (examen teórico práctico) | Pago en Tesorería. | S/. 57.00 (1.03 % UIT) |
+| ACA-04 | Examen de Suficiencia Profesional (examen teórico práctico) | Pago en Tesorería. | S/. 57.00 (1.03 % UIT) |
+| ACA-05 | Expedición de título | Pago en Tesorería; comprobante de pago. | S/. 105.00 (1.90 % UIT) |
+| ACA-06 | Certificado de estudios superiores (6 semestres) | Pago en Tesorería; comprobante de pago. | S/. 124.00 (2.24 % UIT) |
+| ACA-07 | Visación de certificado de estudios superiores | Pago en Tesorería; comprobante de pago. | S/. 16.00 (0.29 % UIT) |
+| ACA-08 | Caligrafiado de título | Pago en Tesorería; comprobante de pago. | S/. 26.00 (0.47 % UIT) |
+| ACA-09 | Derecho de formato de título | Pago en Tesorería; comprobante de pago. | S/. 42.00 (0.75 % UIT) |
+| ACA-10 | Inscripción de título | Pago en Tesorería; comprobante de pago. | S/. 120.00 |
+| ACA-11 | Medallas | Pago en Tesorería; comprobante de pago. | S/. 100.00 |
+| ACA-12 | Protector de título | Pago en Tesorería. | S/. 100.00 |
+| ACA-13 | Colación | Pago en Tesorería. | S/. 100.00 |
+| ACA-14 | Protector de certificado modular | Pago en Tesorería. | S/. 50.00 |
+
+### Otros servicios académicos
+
+| ID interno | Concepto | Requisitos y descripción | Importe |
+| --- | --- | --- | --- |
+| ACA-15 | Modificación de datos del título | Pago en Tesorería; comprobante de pago. | S/. 269.00 (4.88 % UIT) |
+| ACA-16 | Derecho de duplicado de título | Pago en Tesorería; comprobante de pago. | S/. 309.00 (5.61 % UIT) |
+| ACA-17 | Matrículas | Ficha de matrícula; pago de adeudos en Tesorería; pago del derecho de matrícula en Tesorería. | S/. 200.00 |
+| ACA-18 | Admisión 2026 | Pago en el Área de Tesorería. | S/. 250.00 |
+| ACA-19 | Guías del postulante | Pago en el Área de Tesorería. | S/. 50.00 |
+| ACA-20 | Ingreso de admisión 2026 - titulados | Pago en el Área de Tesorería. | S/. 500.00 |
+| ACA-21 | Derecho de reincorporación (reingreso) | Pago en el Área de Tesorería. | S/. 300.00 |
+| ACA-22 | Constancia de egresado | Pago en Tesorería. | S/. 31.00 |
+| ACA-23 | Certificado de bachillerato | Pago en Tesorería; comprobante de pago. | S/. 42.00 (0.75 % UIT) |
+| ACA-24 | Constancias (otros: de título, estudios y matrícula) | Pago en Tesorería; comprobante de pago. | S/. 23.00 (0.41 % UIT) |
+| ACA-25 | Convalidación entre planes de estudios | Pago en Tesorería. | S/. 46.50 (0.84 % UIT) |
+| ACA-26 | Convalidación por unidades de competencia | Pago en Tesorería; comprobante de pago. | S/. 46.50 (0.84 % UIT) |
+| ACA-27 | Devolución de expediente | Pago en Tesorería; comprobante de pago. | S/. 21.00 (0.37 % UIT) |
+| ACA-28 | Evaluación extraordinaria (A) | Pago en Tesorería; comprobante de pago. | S/. 93.00 (1.68 % UIT) |
+| ACA-29 | Evaluación extraordinaria (RM 069) | Pago en Tesorería; comprobante de pago. | S/. 70.00 (1.27 % UIT) |
+| ACA-30 | Examen de recuperación | Pago en Tesorería; comprobante de pago. | S/. 70.00 (1.27 % UIT) |
+| ACA-31 | Examen de cargo | Pago en Tesorería; comprobante de pago. | S/. 70.00 (1.27 % UIT) |
+| ACA-32 | Repitencia de unidad didáctica | Pago en Tesorería; comprobante de pago. | S/. 86.00 (1.56 % UIT) |
+| ACA-33 | Repitencia de semestre | Pago en Tesorería; comprobante de pago. | S/. 80.00 (1.45 % UIT) |
+| ACA-34 | Reserva de matrícula - ingresantes | Pago en Tesorería; Resolución Directoral de Secretaría Académica; comprobante de pago. | S/. 66.00 (1.20 % UIT) |
+| ACA-35 | Licencia de estudios - estudiantes antiguos | Pago en Tesorería; Resolución Directoral de Secretaría Académica; comprobante de pago. | S/. 66.00 (1.20 % UIT) |
+| ACA-36 | Traslado interno | Vacante en la carrera; Resolución Directoral de Secretaría Académica; pago en Tesorería; comprobante de pago. | S/. 309.00 (5.61 % UIT) |
+| ACA-37 | Traslado externo | Solicitud en FUT dirigida al Director; vacante en la carrera; Resolución Directoral de Secretaría Académica; pago en Tesorería; comprobante de pago. | S/. 412.00 (7.48 % UIT) |
+| ACA-38 | Demora en devolución de libro de biblioteca | Informe a la Unidad Administrativa de deudores de libros; derivación de la Unidad Administrativa a Tesorería; pago en Tesorería; comprobante de pago. | S/. 10.00 por día (0.19 % UIT) |
+| ACA-39 | Acceso a la información pública | Solicitud dirigida a Dirección en FUT; pago en Tesorería. | El cuadro indica S/. 10.50 (0.19 % UIT); la descripción dice S/. 10.00 por hoja. |
+| ACA-40 | Búsqueda y duplicados de boletas (C/U), sílabos (C/U) y otros trámites | Pago en Tesorería; otros trámites administrativos; comprobante de pago. | S/. 10.50 (0.19 % UIT) |
+| ACA-41 | Titulación de otros institutos tecnológicos | Pago en Tesorería; comprobante de pago; Resolución Directoral de Secretaría Académica. | S/. 515.00 (9.35 % UIT) |
+| ACA-42 | Examen de subsanación con jurado | Resolución Directoral de Secretaría Académica; pago en Tesorería; comprobante de pago. | S/. 33.00 (0.60 % UIT) |
+| ACA-43 | Prueba de suficiencia académica | Resolución Directoral de Secretaría Académica; pago en Tesorería; comprobante de pago. | S/. 105.00 (1.90 % UIT) |
+| ACA-44 | Carnets, insignia y distintivos | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 50.00 (0.93 % UIT) |
+
+## Servicios productivos
+
+### Ingresos propios y servicios académicos
+
+| ID interno | Concepto | Requisitos y descripción | Importe |
+| --- | --- | --- | --- |
+| PRO-01 | Prácticas iniciales | Pago del derecho en Tesorería; control en el Área Académica; comprobante de pago (0.64 % UIT vigente). | S/. 35.00 |
+| PRO-02 | Prácticas intermedias | Pago del derecho en Tesorería; control en el Área Académica; comprobante de pago (0.82 % UIT vigente). | S/. 45.00 |
+| PRO-03 | Prácticas finales | Pago del derecho en Tesorería; control en el Área Académica; comprobante de pago (1.09 % UIT vigente). | S/. 60.00 |
+| PRO-04 | Experiencias formativas en situaciones reales de trabajo (I, II, III y IV), por cada módulo | Informe del Área Académica que designa a los docentes responsables de la supervisión; pago en Tesorería; comprobante de pago (0.84 % UIT vigente). | S/. 46.50 |
+| PRO-05 | Certificado modular (I, II, III y IV), por cada módulo | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 100.00 |
+| PRO-06 | Certificado de inglés | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 100.00 |
+| PRO-07 | Centro de idiomas: inglés, portugués y japonés; nivel básico, paquete de 4 meses para alumnos del IESTP Suiza | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 300.00 |
+| PRO-08 | Centro de idiomas: inglés, portugués y japonés; nivel básico, paquete de 4 meses para alumnos externos del IESTP Suiza | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 350.00 |
+| PRO-09 | Examen de suficiencia de inglés y/o portugués | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 300.00 |
+
+### CEPRETEC 2026
+
+| ID interno | Concepto | Requisitos y descripción | Importe |
+| --- | --- | --- | --- |
+| PRO-10 | Matrícula | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 400.00 |
+| PRO-11 | Matrícula último mes | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 200.00 |
+| PRO-12 | Matrícula última semana | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 60.00 |
+| PRO-13 | Solo simulacro (C/U) | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 50.00 |
+| PRO-14 | Venta de guías | Pago en el Área de Tesorería; emisión de boleta de venta. | S/. 40.00 |
+| PRO-15 | Cambio de carrera antes del simulacro | Pago en el Área de Tesorería. | S/. 10.00 |
+
+## Venta de bienes y otros servicios
+
+### Servicios
+
+| ID interno | Concepto | Requisitos y descripción | Importe |
+| --- | --- | --- | --- |
+| BIE-01 | Alquiler del galpón agrícola para la crianza de pollos (por campaña) | Solicitud dirigida al Director del IESTP Suiza; suscripción del contrato; pago en Tesorería según contrato. | S/. 500.00 por campaña |
+| BIE-02 | Alquiler de retroproyector | Pago en Tesorería. | S/. 100.00 |
+| BIE-03 | Alquiler de aulas (diario) | Solicitud dirigida al Director; proveído a la Unidad Administrativa para autorización; pago en Tesorería; emisión de boleta de venta. | S/. 150.00 |
+| BIE-04 | Alquiler de la cancha de fútbol (diario) | Solicitud dirigida al Director; proveído a la Unidad Administrativa para autorización; pago en Tesorería; emisión de boleta de venta. | S/. 100.00 |
+| BIE-05 | Alquiler de ambientes para servicio de alimentación | Solicitud dirigida al Director; suscripción del contrato; pago en Tesorería según contrato. | S/. 1,000.00; precios según contrato de S/. 50.00 a S/. 350.00 |
+| BIE-06 | Alquiler del auditorio | Solicitud dirigida al Director; proveído a la Unidad Administrativa para autorización; pago en Tesorería; emisión de boleta de venta. | S/. 300.00 |
+| BIE-07 | Alquiler de laboratorio de cómputo a terceros | Por hora y por cada equipo. | S/. 20.00 por hora y equipo |
+| BIE-08 | Venta ambulatoria diaria | Solicitud dirigida al Director; proveído a la Unidad Administrativa para autorización; pago en Tesorería; emisión de boleta de venta. | S/. 20.00 |
+
+### Bienes
+
+Para las ventas de bienes, el documento indica pago en Tesorería, entrega del bien en Proyectos, papeleta de autorización de salida firmada por la Unidad Administrativa, el Área de Proyectos Productivos y Abastecimiento y Patrimonio, supervisión de vigilancia y emisión de boleta de venta, salvo donde se detalla otro requisito.
+
+| ID interno | Concepto | Importe |
+| --- | --- | --- |
+| BIE-09 | Mangos (ciento) | S/. 15.00 |
+| BIE-10 | Patos BB | S/. 15.00 |
+| BIE-11 | Patos pichones, de acuerdo con el tamaño | Hembras: S/. 30.00; machos: S/. 40.00 |
+| BIE-12 | Patí pollos | S/. 15.00 |
+| BIE-13 | Patos adultos hembras | S/. 40.00 |
+| BIE-14 | Patos adultos machos | S/. 50.00 y S/. 55.00 (el documento muestra ambos importes sin indicar a qué corresponden). |
+| BIE-15 | Porcino para consumo (kg) | S/. 20.00 |
+| BIE-16 | Porcino en pie (kg) | Reproductor: S/. 25.00; carne: S/. 15.00 |
+| BIE-17 | Ganado vacuno (kg) | Carcasa (sin pata, sin cabeza): S/. 20.00; en pie: S/. 15.00 |
+| BIE-18 | Servicio de empadre | Ejecución del servicio; pago en Tesorería; emisión de boleta de venta. S/. 50.00 |
+
+## Notas de transcripción
+
+- Se conservaron las denominaciones, montos y condiciones indicados en el documento escaneado. No se añadieron plazos ni autoridades que la fuente no especifica.
+- Los importes de acceso a la información pública aparecen como S/. 10.50 en el cuadro y S/. 10.00 por hoja en la descripción; ambos se mantienen para validación institucional.
+- Para patos adultos machos aparecen S/. 50.00 y S/. 55.00 sin asociar cada monto a una condición; no se presume una distinción.
+- La fuente identifica como base legal la Ley 28693, Ley General del Sistema Nacional de Tesorería, el principio de unidad de caja y la Directiva de Tesorería.
