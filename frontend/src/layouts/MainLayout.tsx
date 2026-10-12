@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
+import AnimatedUniverseBackground from "../components/common/AnimatedUniverseBackground";
 import HeaderInstitucional from "../components/HeaderInstitucional";
 
 interface MainLayoutProps {
@@ -6,18 +8,24 @@ interface MainLayoutProps {
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
+  const { pathname } = useLocation();
+
+  if (pathname === "/login") {
+    return <div className="min-h-screen bg-[#06132F]">{children}</div>;
+  }
+
   return (
-    <div className="min-h-screen bg-[#F3F4F6] text-[#111111]">
-      <HeaderInstitucional />
-
-      {children}
-
-      <footer className="border-t border-slate-200 bg-white/80 print:hidden">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4 text-center text-xs font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <span>Instituto Suiza • Sistema Integral de Gestión Documentaria</span>
-          <span>© 2026</span>
-        </div>
-      </footer>
-    </div>
+    <AnimatedUniverseBackground compact>
+      <div className="sigd-app-shell">
+        <HeaderInstitucional />
+        <div className="sigd-app-content">{children}</div>
+        <footer className="sigd-app-footer print:hidden">
+          <div>
+            <span>IESTP “Suiza” · Sistema Integral de Gestión Documentaria</span>
+            <span>Plataforma institucional segura · © {new Date().getFullYear()}</span>
+          </div>
+        </footer>
+      </div>
+    </AnimatedUniverseBackground>
   );
 }
