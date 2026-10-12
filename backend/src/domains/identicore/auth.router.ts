@@ -18,6 +18,7 @@
  */
 
 import crypto from 'node:crypto';
+import { rolCanonico } from '../../core/auth/cuenta-actual.js';
 import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
@@ -54,7 +55,7 @@ export function crearRouterAuth(pool: Pool): Router {
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
-        LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+        LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND ur.vigente_desde <= now() AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
        WHERE (c.usuario = $1 OR c.correo = $1)
@@ -86,7 +87,7 @@ export function crearRouterAuth(pool: Pool): Router {
       });
     }
 
-    const rol = usuario.rol_codigo ?? 'ESTUDIANTE';
+    const rol = rolCanonico(usuario.rol_codigo ?? 'ESTUDIANTE');
     const accessToken = firmarTokenAcceso({
       sub: usuario.id_usuario,
       roles: [rol],
@@ -114,6 +115,7 @@ export function crearRouterAuth(pool: Pool): Router {
       refreshToken,
       usuario: {
         id: usuario.id_usuario,
+        idPersona: usuario.id_persona,
         nombreCompleto: usuario.nombre_completo,
         correo: usuario.correo ?? `${usuario.usuario}@iestp-suiza.edu.pe`,
         rol: rol,
@@ -149,7 +151,7 @@ export function crearRouterAuth(pool: Pool): Router {
       SELECT s.id_usuario, s.expira_en, s.revocado_en,
              COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo
         FROM sigd_auth.sesion_usuario s
-        LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+        LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND ur.vigente_desde <= now() AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
        WHERE s.refresh_token = $1
        LIMIT 1;
@@ -166,7 +168,7 @@ export function crearRouterAuth(pool: Pool): Router {
 
     const nuevoAccessToken = firmarTokenAcceso({
       sub: sesion.id_usuario,
-      roles: [sesion.rol_codigo],
+      roles: [rolCanonico(sesion.rol_codigo)],
       expiraSegundos: 900,
     });
 
@@ -210,10 +212,10 @@ export function crearRouterAuth(pool: Pool): Router {
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
-        LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+        LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND ur.vigente_desde <= now() AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
-       WHERE c.id_usuario = $1
+       WHERE c.id_usuario = $1 AND c.activo
        LIMIT 1;
     `;
 
@@ -230,7 +232,7 @@ export function crearRouterAuth(pool: Pool): Router {
       username: usuario.usuario,
       nombreCompleto: usuario.nombre_completo,
       correo: usuario.correo,
-      rol: usuario.rol_codigo,
+      rol: rolCanonico(usuario.rol_codigo),
       areaId: usuario.area_id,
       cargoId: usuario.cargo_id,
       telefono: usuario.telefono,

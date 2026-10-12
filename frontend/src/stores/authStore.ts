@@ -4,6 +4,7 @@ import { permisosIniciales } from "../hooks/useRbacConfig";
 
 export interface UsuarioPerfil {
   id: string;
+  idPersona?: string;
   nombreCompleto: string;
   correo: string;
   rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE';

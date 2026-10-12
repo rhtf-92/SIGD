@@ -1,5 +1,7 @@
 // Hook de configuración RBAC de la Matriz de Control de Acceso (ENT-M05-03)
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { apiClient } from "../api/client";
 
 import type {
   ClavePermiso,
@@ -17,6 +19,28 @@ export const MODULOS_SISTEMA = [
 ] as const;
 
 export const CLAVE_STORAGE_PERMISOS = "sigd_permisos";
+
+export const CODIGO_PERMISO_BACKEND: Partial<Record<string, string>> = {
+  "Expedientes.ver": "EXPEDIENTE_LEER",
+  "Expedientes.derivar": "EXPEDIENTE_DERIVAR",
+  "Expedientes.editar": "EXPEDIENTE_RESOLVER",
+  "Documentos.editar": "FIRMA_FIRMAR",
+  "Administración.editar": "ADMIN_USUARIOS",
+  "Auditoría.exportar": "REPORTE_LEER",
+};
+
+const ROLES_BACKEND: Record<string, string[]> = {
+  SUPER_ADMIN: ["ADMINISTRADOR"],
+  DIRECTOR: ["DIRECTOR"],
+  DOCENTE: ["SECRETARIO", "ESPECIALISTA"],
+  MESA_PARTES: ["MESA_PARTES"],
+  ESTUDIANTE: ["CIUDADANO"],
+};
+
+interface RolBackend {
+  codigo: string;
+  permisos: string[];
+}
 
 const roles: Rol[] = [
   {
@@ -127,6 +151,35 @@ export function useRbacConfig() {
   const [permisos, setPermisos] = useState<MatrizPermisos>(permisosIniciales);
   const [mensaje, setMensaje] = useState("");
 
+  useEffect(() => {
+    if (!window.localStorage.getItem("sigd_token") && !window.localStorage.getItem("token")) return;
+    let vigente = true;
+    apiClient.get<{ roles: RolBackend[] }>("/api/v1/admin/roles-permisos")
+      .then(({ data }) => {
+        if (!vigente) return;
+        setPermisos((actuales) => {
+          const sincronizados = { ...actuales };
+          for (const [rolCanonico, codigos] of Object.entries(ROLES_BACKEND)) {
+            const permisosRol = new Set(
+              data.roles.filter((rol) => codigos.includes(rol.codigo)).flatMap((rol) => rol.permisos),
+            );
+            sincronizados[rolCanonico] = MODULOS_SISTEMA.map((modulo) => {
+              const fila = { modulo, ver: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false };
+              for (const clave of Object.keys(fila) as Array<keyof typeof fila>) {
+                if (clave === "modulo") continue;
+                const codigo = CODIGO_PERMISO_BACKEND[`${modulo}.${clave}`];
+                if (codigo) fila[clave] = permisosRol.has(codigo);
+              }
+              return fila;
+            });
+          }
+          return sincronizados;
+        });
+      })
+      .catch(() => vigente && setMensaje("No fue posible cargar la matriz RBAC desde PostgreSQL."));
+    return () => { vigente = false; };
+  }, []);
+
   const rolActual: Rol = useMemo(
     () => roles.find((rol) => rol.id === rolSeleccionado) ?? roles[0],
     [rolSeleccionado],
@@ -151,12 +204,22 @@ export function useRbacConfig() {
     return { roleId: rolSeleccionado, permissions };
   }
 
-  function guardarPermisos() {
+  async function guardarPermisos() {
     const payload = construirPayload();
-    window.localStorage.setItem(CLAVE_STORAGE_PERMISOS, JSON.stringify(permisos));
-    setMensaje(
-      `Matriz guardada para ${rolActual.nombre}. Persistencia preparada para PUT /api/v1/roles/${payload.roleId}/permisos.`,
+    const codigos = Object.values(payload.permissions).flatMap((fila) =>
+      (Object.keys(fila) as Array<keyof PermisoModulo>)
+        .filter((clave) => clave !== "modulo" && fila[clave] === true)
+        .map((clave) => CODIGO_PERMISO_BACKEND[`${fila.modulo}.${String(clave)}`])
+        .filter((codigo): codigo is string => Boolean(codigo)),
     );
+    try {
+      await apiClient.put(`/api/v1/admin/roles/${payload.roleId}/permisos`, {
+        permisos: [...new Set(codigos)],
+      });
+      setMensaje(`Matriz guardada en PostgreSQL para ${rolActual.nombre}.`);
+    } catch {
+      setMensaje(`No fue posible guardar la matriz de ${rolActual.nombre}.`);
+    }
   }
 
   return {
