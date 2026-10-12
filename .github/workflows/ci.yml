@@ -1,0 +1,81 @@
+name: SIGD CI
+
+on:
+  pull_request:
+    branches:
+      - F_BARTRA
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sigd-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 24.19
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.x
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar TypeScript
+        run: npm run typecheck
+
+      - name: Compilar backend
+        run: npm run build
+
+      - name: Ejecutar pruebas unitarias
+        run: npm exec -- vitest run --config vitest.unit.config.ts --configLoader bundle
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 24.19
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.x
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar TypeScript
+        run: npm run typecheck
+
+      - name: Verificar TypeScript M03
+        run: npm run typecheck:m03
+
+      - name: Ejecutar ESLint
+        run: npm run lint
+
+      - name: Ejecutar pruebas
+        run: npm test
+
+      - name: Compilar frontend
+        run: npm run build
