@@ -1,5 +1,5 @@
 # Etapa 1: Construcción (Build Vite)
-FROM node:20-alpine AS builder
+FROM node:24.19-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

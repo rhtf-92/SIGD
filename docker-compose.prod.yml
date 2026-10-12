@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   frontend:
@@ -24,6 +24,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:?El secreto JWT es obligatorio en produccion}
       - S3_ACCESS_KEY=${S3_ACCESS_KEY:?La clave de S3 es obligatoria}
       - S3_SECRET_KEY=${S3_SECRET_KEY:?El secreto de S3 es obligatorio}
+      - DATABASE_URL=postgresql://user:password@db:5432/sigd
     depends_on:
       - db
       - redis
