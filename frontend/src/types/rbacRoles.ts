@@ -2,10 +2,14 @@
 // Conforme a SIGD-DOC-ADMIN-SEGURIDAD-AUDITORIA-03
 
 export type RolCanonicoId =
+  | "ADMINISTRADOR"
   | "SUPER_ADMIN"
   | "DIRECTOR"
+  | "SECRETARIO"
+  | "ESPECIALISTA"
   | "DOCENTE"
   | "MESA_PARTES"
+  | "CIUDADANO"
   | "ESTUDIANTE";
 
 export interface Rol {

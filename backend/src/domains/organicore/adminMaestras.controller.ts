@@ -37,8 +37,10 @@ import {
 } from './calendario.service.js';
 import {
   CACHE_CONTROL_TABLAS_MAESTRAS,
+  CLAVES_CATALOGO,
   TablasMaestrasService,
   TTL_TABLAS_MAESTRAS_SEGUNDOS,
+  type ClaveCatalogo,
 } from './tablasMaestras.service.js';
 import { getRequestContext } from '../../shared/request-context/request-context.js';
 
@@ -60,6 +62,16 @@ export const esquemaConsultaTablasMaestras = z
   .strict();
 
 export type ConsultaTablasMaestras = z.infer<typeof esquemaConsultaTablasMaestras>;
+
+const claveCatalogoSchema = z.enum(CLAVES_CATALOGO);
+const idCatalogoSchema = z.string().uuid();
+const guardarItemSchema = z.object({
+  codigo: z.string().trim().min(1).max(30).regex(/^[A-Za-z0-9._-]+$/),
+  nombre: z.string().trim().min(1).max(160),
+  descripcion: z.string().trim().max(500).optional().nullable(),
+  padreId: z.string().uuid().optional().nullable(),
+}).strict();
+const vigenciaSchema = z.object({ vigente: z.boolean() }).strict();
 
 /** Servicios que el router inyecta en los handlers. */
 export interface DependenciasController {
@@ -84,6 +96,7 @@ export function listarCalendario(deps: DependenciasController) {
       desde: consulta.desde,
       hasta: consulta.hasta,
       incluirInactivos: consulta.incluir_inactivos ?? false,
+      estado: consulta.estado,
     });
 
     const anios = [...new Set(catalogo.map((dia) => dia.anio))].sort((a, b) => a - b);
@@ -113,6 +126,15 @@ export function registrarFeriadoExcepcional(deps: DependenciasController) {
   };
 }
 
+export function cambiarVigenciaCalendario(deps: DependenciasController) {
+  return async function cambiarVigenciaCalendarioHandler(req: Request, res: Response): Promise<void> {
+    const id = idCatalogoSchema.parse(req.params.id);
+    const { vigente } = vigenciaSchema.parse(req.body);
+    await deps.calendario.cambiarVigencia(id, vigente);
+    res.json({ guardado: true, vigente });
+  };
+}
+
 /**
  * `#47 GET /api/v1/admin/tablas-maestras`
  * Consulta unificada de catálogos maestros ya existentes (tipos de documentos,
@@ -130,6 +152,33 @@ export function listarTablasMaestras(deps: DependenciasController) {
     res.setHeader('Vary', 'Accept-Encoding');
     res.setHeader('X-Cache-TTL', String(TTL_TABLAS_MAESTRAS_SEGUNDOS));
     escribirRespuestaComprimida(req, res, payload);
+  };
+}
+
+export function crearItemTablaMaestra(deps: DependenciasController) {
+  return async function crearItemTablaMaestraHandler(req: Request, res: Response): Promise<void> {
+    const clave = claveCatalogoSchema.parse(req.params.catalogo) as ClaveCatalogo;
+    await deps.tablasMaestras.crear(clave, guardarItemSchema.parse(req.body));
+    res.status(201).json({ guardado: true });
+  };
+}
+
+export function actualizarItemTablaMaestra(deps: DependenciasController) {
+  return async function actualizarItemTablaMaestraHandler(req: Request, res: Response): Promise<void> {
+    const clave = claveCatalogoSchema.parse(req.params.catalogo) as ClaveCatalogo;
+    const id = idCatalogoSchema.parse(req.params.id);
+    await deps.tablasMaestras.actualizar(clave, id, guardarItemSchema.parse(req.body));
+    res.json({ guardado: true });
+  };
+}
+
+export function cambiarVigenciaTablaMaestra(deps: DependenciasController) {
+  return async function cambiarVigenciaTablaMaestraHandler(req: Request, res: Response): Promise<void> {
+    const clave = claveCatalogoSchema.parse(req.params.catalogo) as ClaveCatalogo;
+    const id = idCatalogoSchema.parse(req.params.id);
+    const { vigente } = vigenciaSchema.parse(req.body);
+    await deps.tablasMaestras.cambiarVigencia(clave, id, vigente);
+    res.json({ guardado: true, vigente });
   };
 }
 

@@ -3,11 +3,11 @@ services:
     image: postgres:18-alpine
     container_name: sigd_postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
-      POSTGRES_DB: ${POSTGRES_DB:-sigd_prueba}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER es obligatorio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB es obligatorio}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
@@ -23,8 +23,8 @@ services:
     container_name: sigd_s3
     command: mini -dir=/data
     environment:
-      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-EXAMPLE_STORAGE_ACCESS_KEY}
-      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-EXAMPLE_STORAGE_SECRET_KEY}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?S3_ACCESS_KEY es obligatorio}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY es obligatorio}
       S3_BUCKET: ${S3_BUCKET:-sigd-expedientes}
     ports:
       - "127.0.0.1:9000:8333"
@@ -66,14 +66,14 @@ services:
     environment:
       PORT: 3000
       NODE_ENV: development
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password}@postgres:5432/${POSTGRES_DB:-sigd_prueba}
-      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-REPLACE_WITH_RANDOM_SECRET_AT_LEAST_64_CHARACTERS}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET es obligatorio}
       CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
       S3_ENDPOINT: http://s3:8333
       S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_REGION: us-east-1
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-EXAMPLE_STORAGE_ACCESS_KEY}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:-EXAMPLE_STORAGE_SECRET_KEY}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?S3_ACCESS_KEY es obligatorio}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY es obligatorio}
       S3_BUCKET: ${S3_BUCKET:-sigd-expedientes}
       S3_FORCE_PATH_STYLE: "true"
       REDIS_URL: redis://redis:6379

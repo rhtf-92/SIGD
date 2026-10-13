@@ -35,13 +35,40 @@ interface CuentaAuth {
   correo: string | null;
   password_hash?: string;
   activo: boolean;
+  bloqueado_hasta: string | Date | null;
   nombre_completo: string;
   area_id: string | null;
 }
 
+function cuentaBloqueada(valor: unknown): boolean {
+  if (valor === 'infinity' || valor === Number.POSITIVE_INFINITY) return true;
+  if (!valor) return false;
+  const instante = new Date(valor as string | number | Date).getTime();
+  return Number.isFinite(instante) && instante > Date.now();
+}
+
+function asegurarCuentaHabilitada(cuenta: CuentaAuth): void {
+  if (!cuenta.activo) {
+    throw new AppError({
+      status: 403,
+      code: 'ACCOUNT_DISABLED',
+      message: 'Cuenta deshabilitada.',
+      detail: 'Su cuenta institucional se encuentra suspendida o deshabilitada.',
+    });
+  }
+  if (cuentaBloqueada(cuenta.bloqueado_hasta)) {
+    throw new AppError({
+      status: 423,
+      code: 'ACCOUNT_LOCKED',
+      message: 'Cuenta bloqueada.',
+      detail: 'Su cuenta institucional se encuentra bloqueada. Contacte al administrador.',
+    });
+  }
+}
+
 async function obtenerCuentaActiva(pool: Pool, idUsuario: string): Promise<CuentaAuth | undefined> {
   const { rows } = await pool.query<CuentaAuth>(
-    `SELECT c.id_usuario, c.id_persona, c.usuario, c.correo, c.activo,
+    `SELECT c.id_usuario, c.id_persona, c.usuario, c.correo, c.activo, c.bloqueado_hasta,
             COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
             p.area_id
        FROM sigd_auth.cuenta_usuario c
@@ -100,7 +127,7 @@ function exigirPerfiles(perfiles: PerfilRolActivo[]): void {
   if (perfiles.length === 0) {
     throw new AppError({
       status: 403,
-      code: 'NO_ACTIVE_ROLES',
+      code: 'ACCOUNT_WITHOUT_ACTIVE_ROLES',
       message: 'Sin perfiles institucionales activos.',
       detail: 'Su cuenta no tiene perfiles de trabajo vigentes. Contacte a administración.',
     });
@@ -113,7 +140,7 @@ export function crearRouterAuth(pool: Pool): Router {
   router.post('/auth/login', async (req: Request, res: Response) => {
     const datos = loginSchema.parse(req.body);
     const { rows } = await pool.query<CuentaAuth>(
-      `SELECT c.id_usuario, c.id_persona, c.usuario, c.correo, c.password_hash, c.activo,
+      `SELECT c.id_usuario, c.id_persona, c.usuario, c.correo, c.password_hash, c.activo, c.bloqueado_hasta,
               COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
               p.area_id
          FROM sigd_auth.cuenta_usuario c
@@ -128,14 +155,7 @@ export function crearRouterAuth(pool: Pool): Router {
     if (!cuenta?.password_hash || !(await Argon2Service.verify(cuenta.password_hash, datos.password))) {
       throw new UnauthorizedError({ detail: 'Credenciales inválidas. Verifique su usuario o contraseña institucional.' });
     }
-    if (!cuenta.activo) {
-      throw new AppError({
-        status: 403,
-        code: 'ACCOUNT_DISABLED',
-        message: 'Cuenta deshabilitada.',
-        detail: 'Su cuenta institucional se encuentra suspendida o deshabilitada.',
-      });
-    }
+    asegurarCuentaHabilitada(cuenta);
 
     const perfiles = await obtenerPerfilesActivos(pool, cuenta.id_usuario);
     exigirPerfiles(perfiles);
@@ -166,7 +186,8 @@ export function crearRouterAuth(pool: Pool): Router {
     const datos = seleccionPerfilSchema.parse(req.body);
     const claims = verificarTokenSeleccionPerfil(datos.selectionToken);
     const cuenta = await obtenerCuentaActiva(pool, claims.sub);
-    if (!cuenta?.activo) throw new UnauthorizedError({ detail: 'La cuenta ya no está habilitada.' });
+    if (!cuenta) throw new UnauthorizedError({ detail: 'La cuenta ya no está habilitada.' });
+    asegurarCuentaHabilitada(cuenta);
     const perfiles = await obtenerPerfilesActivos(pool, cuenta.id_usuario);
     if (!claims.rolesAutorizados.includes(datos.rol) || !perfiles.some((perfil) => perfil.rol === datos.rol)) {
       throw new ForbiddenError({ detail: 'El perfil solicitado no está asignado o ya no se encuentra vigente.' });
@@ -180,7 +201,8 @@ export function crearRouterAuth(pool: Pool): Router {
     if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
     const claims = verificarTokenAcceso(token);
     const cuenta = await obtenerCuentaActiva(pool, claims.sub);
-    if (!cuenta?.activo) throw new UnauthorizedError({ detail: 'La cuenta ya no está habilitada.' });
+    if (!cuenta) throw new UnauthorizedError({ detail: 'La cuenta ya no está habilitada.' });
+    asegurarCuentaHabilitada(cuenta);
     const perfiles = await obtenerPerfilesActivos(pool, cuenta.id_usuario);
     if (!perfiles.some((perfil) => perfil.rol === datos.rol)) {
       throw new ForbiddenError({ detail: 'El perfil solicitado no está asignado o ya no se encuentra vigente.' });
@@ -221,7 +243,8 @@ export function crearRouterAuth(pool: Pool): Router {
       throw new UnauthorizedError({ detail: 'El token de refresco es inválido o ha expirado.' });
     }
     const cuenta = await obtenerCuentaActiva(pool, claims.sub);
-    if (!cuenta?.activo) throw new UnauthorizedError({ detail: 'La cuenta ya no está habilitada.' });
+    if (!cuenta) throw new UnauthorizedError({ detail: 'La cuenta ya no está habilitada.' });
+    asegurarCuentaHabilitada(cuenta);
     const perfiles = await obtenerPerfilesActivos(pool, claims.sub);
     if (!perfiles.some((perfil) => perfil.rol === claims.rolActivo)) {
       throw new UnauthorizedError({ detail: 'El perfil activo ya no está vigente.' });
@@ -235,7 +258,8 @@ export function crearRouterAuth(pool: Pool): Router {
     if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
     const claims = verificarTokenAcceso(token);
     const cuenta = await obtenerCuentaActiva(pool, claims.sub);
-    if (!cuenta?.activo) throw new UnauthorizedError({ detail: 'Usuario no encontrado o sesión caducada.' });
+    if (!cuenta) throw new UnauthorizedError({ detail: 'Usuario no encontrado o sesión caducada.' });
+    asegurarCuentaHabilitada(cuenta);
     const perfiles = await obtenerPerfilesActivos(pool, claims.sub);
     const perfil = perfiles.find((item) => item.rol === claims.rolActivo);
     if (!perfil) throw new UnauthorizedError({ detail: 'El perfil activo ya no está vigente.' });

@@ -32,12 +32,12 @@ export default function AdminRoutes() {
     <>
       <Route index element={<AdministracionPage />} />
       {/* DoD ENT-M05-02: el directorio de personal solo es accesible para
-          SUPER_ADMIN y DIRECTOR mediante guarda de ruta activa. */}
+          ADMINISTRADOR y DIRECTOR mediante guarda de ruta activa. */}
       <Route
         path="usuarios"
         element={
           <ProtectedRoute
-            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
+            requiredRoles={["ADMINISTRADOR", "SUPER_ADMIN", "DIRECTOR"]}
             requiredModule="Administración"
             requiredAction="editar"
           >
