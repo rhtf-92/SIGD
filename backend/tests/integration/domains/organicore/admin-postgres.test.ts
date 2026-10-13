@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import request from 'supertest';
 
@@ -15,13 +16,41 @@ process.env.S3_SECRET_KEY ??= 'test-s3-secret-key-segura';
 
 describe('OrganiCore y Administración con PostgreSQL real', () => {
   let pool: Pool;
+  let usuarioCreadoId: string | undefined;
+  const sufijo = randomUUID().replaceAll('-', '').slice(0, 12);
+  const codigoPrueba = `QA_${sufijo.toUpperCase()}`;
+  const usernamePrueba = `prueba.${sufijo}`;
+  const correoPrueba = `${usernamePrueba}@iestpsuiza.edu.pe`;
+  const numeroDocumento = String(10_000_000 + (Number.parseInt(sufijo.slice(0, 8), 16) % 90_000_000));
+  const anioPrueba = 2200 + (Number.parseInt(sufijo.slice(8, 12), 16) % 700);
+  const fechaActiva = `${anioPrueba}-04-20`;
+  const fechaInactiva = `${anioPrueba}-04-21`;
+  const descripcionActiva = `Prueba PR 166 ${sufijo}`;
+  const descripcionInactiva = `Prueba inactiva PR 166 ${sufijo}`;
 
   beforeAll(() => {
     if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL no configurada por globalSetup');
     pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
   });
 
-  afterAll(async () => pool.end());
+  afterAll(async () => {
+    await pool.query('DELETE FROM sigd_org.calendario_laboral WHERE descripcion IN ($1, $2)', [
+      descripcionActiva,
+      descripcionInactiva,
+    ]);
+    if (usuarioCreadoId) {
+      const persona = await pool.query<{ id_persona: string }>(
+        'DELETE FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1 RETURNING id_persona',
+        [usuarioCreadoId],
+      );
+      if (persona.rows[0]) {
+        await pool.query('DELETE FROM sigd_auth.persona WHERE id_persona = $1', [persona.rows[0].id_persona]);
+      }
+    }
+    await pool.query('DELETE FROM sigd_org.cargo WHERE codigo = $1', [codigoPrueba]);
+    await pool.query('DELETE FROM sigd_org.area WHERE codigo = $1', [codigoPrueba]);
+    await pool.end();
+  });
 
   it('persiste organigrama, tablas maestras, calendario y un usuario multirrol bloqueable', async () => {
     const organigrama = new OrganigramaService(pool);
@@ -29,24 +58,25 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     const calendario = new CalendarioService(pool);
     const usuarios = crearUsuariosAdminService(pool);
 
-    const area = await organigrama.crearUnidad({ codigo: 'QA_PR166', nombre: 'Área QA PR 166', padreId: null });
-    await maestras.crear('cargos', { codigo: 'QA_PR166', nombre: 'Cargo QA PR 166' });
-    const cargo = await pool.query<{ cargo_id: string }>("SELECT cargo_id FROM sigd_org.cargo WHERE codigo = 'QA_PR166'");
+    const area = await organigrama.crearUnidad({ codigo: codigoPrueba, nombre: `Área QA PR 166 ${sufijo}`, padreId: null });
+    await maestras.crear('cargos', { codigo: codigoPrueba, nombre: `Cargo QA PR 166 ${sufijo}` });
+    const cargo = await pool.query<{ cargo_id: string }>('SELECT cargo_id FROM sigd_org.cargo WHERE codigo = $1', [codigoPrueba]);
     const roles = await pool.query<{ rol_id: string; codigo: string }>(
       "SELECT rol_id, codigo FROM sigd_org.rol_sistema WHERE codigo IN ('ADMINISTRADOR', 'DIRECTOR') ORDER BY codigo",
     );
     expect(roles.rows).toHaveLength(2);
 
     const creado = await usuarios.crearUsuario({
-      tipo: 'NATURAL', numeroDocumento: '99166123', nombres: 'Prueba', apellidos: 'Multirrol',
-      correo: 'prueba.pr166@iestpsuiza.edu.pe', username: 'prueba.pr166', passwordInicial: 'ClaveSegura166!',
+      tipo: 'NATURAL', numeroDocumento, nombres: 'Prueba', apellidos: 'Multirrol',
+      correo: correoPrueba, username: usernamePrueba, passwordInicial: 'ClaveSegura166!',
       areaId: area.id, cargoId: cargo.rows[0].cargo_id, rolIds: roles.rows.map((rol) => rol.rol_id),
     });
+    usuarioCreadoId = creado.id;
     expect(creado.roles).toHaveLength(2);
 
     const app = construirApp(pool);
     const login = await request(app).post('/api/v1/auth/login').send({
-      identificador: 'prueba.pr166', password: 'ClaveSegura166!',
+      identificador: usernamePrueba, password: 'ClaveSegura166!',
     });
     expect(login.status).toBe(200);
     expect(login.body.requiereSeleccionPerfil).toBe(true);
@@ -60,15 +90,14 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     expect(seleccion.status).toBe(200);
     expect(verificarTokenAcceso(seleccion.body.accessToken).roles).toEqual(['ADMINISTRADOR']);
 
-    const refresh = await request(app).post('/api/v1/auth/refresh').send({
-      refreshToken: seleccion.body.refreshToken,
-    });
+    const intentosRefresh = await Promise.all([
+      request(app).post('/api/v1/auth/refresh').send({ refreshToken: seleccion.body.refreshToken }),
+      request(app).post('/api/v1/auth/refresh').send({ refreshToken: seleccion.body.refreshToken }),
+    ]);
+    expect(intentosRefresh.map((respuesta) => respuesta.status).sort()).toEqual([200, 401]);
+    const refresh = intentosRefresh.find((respuesta) => respuesta.status === 200)!;
     expect(refresh.status).toBe(200);
     expect(verificarTokenAcceso(refresh.body.accessToken).roles).toEqual(['ADMINISTRADOR']);
-    const refreshAnterior = await request(app).post('/api/v1/auth/refresh').send({
-      refreshToken: seleccion.body.refreshToken,
-    });
-    expect(refreshAnterior.status).toBe(401);
 
     const director = roles.rows.find((rol) => rol.codigo === 'DIRECTOR')!;
     const cambio = await request(app).post('/api/v1/auth/cambiar-perfil')
@@ -88,7 +117,7 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     );
     expect(sesionesVigentesBloqueado.rows[0].total).toBe(0);
     const loginBloqueado = await request(app).post('/api/v1/auth/login').send({
-      identificador: 'prueba.pr166', password: 'ClaveSegura166!',
+      identificador: usernamePrueba, password: 'ClaveSegura166!',
     });
     expect(loginBloqueado.status).toBe(423);
     const refreshBloqueado = await request(app).post('/api/v1/auth/refresh').send({
@@ -102,7 +131,7 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     expect(reactivado.estado).toBe('ACTIVO');
     expect(reactivado.roles).toHaveLength(2);
     const loginDesbloqueado = await request(app).post('/api/v1/auth/login').send({
-      identificador: 'prueba.pr166', password: 'ClaveSegura166!',
+      identificador: usernamePrueba, password: 'ClaveSegura166!',
     });
     expect(loginDesbloqueado.status).toBe(200);
     expect(loginDesbloqueado.body.requiereSeleccionPerfil).toBe(true);
@@ -124,15 +153,19 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     await pool.query(
       `INSERT INTO sigd_org.calendario_laboral
        (fecha, tipo_feriado, descripcion, unidad_territorial, es_laborable, activo)
-       VALUES ('2099-04-20', 'INSTITUCIONAL', 'Prueba PR 166', 'NACIONAL', FALSE, TRUE),
-              ('2099-04-21', 'INSTITUCIONAL', 'Prueba inactiva PR 166', 'NACIONAL', FALSE, FALSE)`,
+       VALUES ($1, 'INSTITUCIONAL', $3, 'NACIONAL', FALSE, TRUE),
+              ($2, 'INSTITUCIONAL', $4, 'NACIONAL', FALSE, FALSE)`,
+      [fechaActiva, fechaInactiva, descripcionActiva, descripcionInactiva],
     );
-    expect(await calendario.listar({ anio: 2099, estado: 'ACTIVO' })).toHaveLength(1);
-    expect(await calendario.listar({ desde: '2099-04-20', hasta: '2099-04-21', estado: 'TODOS' })).toHaveLength(2);
-    expect(await calendario.listar({ anio: 2099, estado: 'INACTIVO' })).toHaveLength(1);
+    const activos = await calendario.listar({ anio: anioPrueba, estado: 'ACTIVO' });
+    const todos = await calendario.listar({ desde: fechaActiva, hasta: fechaInactiva, estado: 'TODOS' });
+    const inactivos = await calendario.listar({ anio: anioPrueba, estado: 'INACTIVO' });
+    expect(activos.some((item) => item.descripcion === descripcionActiva)).toBe(true);
+    expect(todos.filter((item) => [descripcionActiva, descripcionInactiva].includes(item.descripcion))).toHaveLength(2);
+    expect(inactivos.some((item) => item.descripcion === descripcionInactiva)).toBe(true);
 
     const catalogos = await maestras.listarMaestras(false, true);
-    expect(catalogos.catalogos.find((catalogo) => catalogo.clave === 'cargos')?.items.some((item) => item.codigo === 'QA_PR166')).toBe(true);
+    expect(catalogos.catalogos.find((catalogo) => catalogo.clave === 'cargos')?.items.some((item) => item.codigo === codigoPrueba)).toBe(true);
     expect((await organigrama.obtenerOrganigrama()).some((nodo) => nodo.id === area.id)).toBe(true);
   });
 });

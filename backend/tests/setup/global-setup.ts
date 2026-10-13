@@ -9,7 +9,7 @@ const ON_ERROR_STOP = 'ON_ERROR_STOP=1';
 export default async function globalSetup(): Promise<void> {
   const databaseUrlExterna = process.env.TEST_DATABASE_URL?.trim();
   if (databaseUrlExterna) {
-    validarBaseExclusivaDePruebas(databaseUrlExterna);
+    validarBaseExclusivaDePruebas(databaseUrlExterna, process.env.ALLOW_EXTERNAL_TEST_DATABASE);
     await ejecutarMigraciones(databaseUrlExterna);
     return;
   }
@@ -28,10 +28,13 @@ export default async function globalSetup(): Promise<void> {
   await ejecutarMigraciones(databaseUrl);
 }
 
-function validarBaseExclusivaDePruebas(databaseUrl: string): void {
-  const nombreBase = new URL(databaseUrl).pathname.replace(/^\//, '');
-  if (!/(test|prueba)/i.test(nombreBase)) {
-    throw new Error('TEST_DATABASE_URL debe apuntar a una base cuyo nombre contenga "test" o "prueba".');
+export function validarBaseExclusivaDePruebas(databaseUrl: string, habilitada?: string): void {
+  if (habilitada !== 'true') {
+    throw new Error('Una base externa requiere ALLOW_EXTERNAL_TEST_DATABASE=true de forma explícita.');
+  }
+  const nombreBase = decodeURIComponent(new URL(databaseUrl).pathname.replace(/^\//, ''));
+  if (!/^sigd_(?:test|prueba)(?:_[a-z0-9]+)*$/i.test(nombreBase)) {
+    throw new Error('TEST_DATABASE_URL debe usar un nombre canónico sigd_test_* o sigd_prueba_*.');
   }
 }
 

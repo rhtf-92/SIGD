@@ -112,7 +112,7 @@ describe('Auth Router — perfil RBAC activo', () => {
 
   it('refresh conserva únicamente el rol activo persistido en la sesión', async () => {
     const expiraEn = new Date(Date.now() + 3600_000).toISOString();
-    const fakePool = {
+    const client = {
       query: vi.fn(async (sql: string) => {
         if (sql.includes('FROM sigd_auth.sesion_usuario s')) {
           return { rows: [{ id_usuario: ID_USUARIO, rol_activo_id: ROL_DIRECTOR.id, expira_en: expiraEn,
@@ -120,19 +120,28 @@ describe('Auth Router — perfil RBAC activo', () => {
         }
         return { rows: [], rowCount: 1 };
       }),
-    } as unknown as Pool;
+      release: vi.fn(),
+    };
+    const fakePool = { connect: vi.fn(async () => client) } as unknown as Pool;
     const res = await request(construirApp(fakePool)).post('/api/v1/auth/refresh')
       .send({ refreshToken: 'abcdef1234567890abcdef1234567890' });
     expect(res.status).toBe(200);
     expect(verificarTokenAcceso(res.body.accessToken).roles).toEqual(['DIRECTOR']);
-    expect(fakePool.query).toHaveBeenCalledWith(
+    expect(client.query).toHaveBeenCalledWith('BEGIN');
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('FOR UPDATE'),
+      ['abcdef1234567890abcdef1234567890'],
+    );
+    expect(client.query).toHaveBeenCalledWith(
       expect.stringContaining('SET revocado_en = now()'),
       ['abcdef1234567890abcdef1234567890'],
     );
-    expect(fakePool.query).toHaveBeenCalledWith(
+    expect(client.query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO sigd_auth.sesion_usuario'),
       expect.arrayContaining([ID_USUARIO, ROL_DIRECTOR.id]),
     );
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
+    expect(client.release).toHaveBeenCalledOnce();
   });
 
   it('logout revoca el refresh token recibido', async () => {
@@ -150,7 +159,7 @@ describe('Auth Router — perfil RBAC activo', () => {
 
   it('refresh rechaza una sesión revocada y no emite nuevos tokens', async () => {
     const expiraEn = new Date(Date.now() + 3600_000).toISOString();
-    const fakePool = {
+    const client = {
       query: vi.fn(async (sql: string) => {
         if (sql.includes('FROM sigd_auth.sesion_usuario s')) {
           return { rows: [{ id_usuario: ID_USUARIO, rol_activo_id: ROL_ADMIN.id, expira_en: expiraEn,
@@ -159,17 +168,21 @@ describe('Auth Router — perfil RBAC activo', () => {
         }
         return { rows: [], rowCount: 1 };
       }),
-    } as unknown as Pool;
+      release: vi.fn(),
+    };
+    const fakePool = { connect: vi.fn(async () => client) } as unknown as Pool;
 
     const res = await request(construirApp(fakePool)).post('/api/v1/auth/refresh')
       .send({ refreshToken: 'abcdef1234567890abcdef1234567890' });
 
     expect(res.status).toBe(401);
     expect(res.body).not.toHaveProperty('accessToken');
-    expect(fakePool.query).not.toHaveBeenCalledWith(
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(client.query).not.toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO sigd_auth.sesion_usuario'),
       expect.anything(),
     );
+    expect(client.release).toHaveBeenCalledOnce();
   });
 
   it('cambio de perfil valida sesión, usuario y asignación activa en backend', async () => {

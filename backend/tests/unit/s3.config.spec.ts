@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { ZodError } from 'zod';
 import { obtenerConfiguracionS3 } from '../../src/config/s3.config.js';
+
+function rutaPrimerError(env: NodeJS.ProcessEnv): PropertyKey[] {
+  try {
+    obtenerConfiguracionS3(env);
+    throw new Error('Se esperaba que la configuración fuera rechazada.');
+  } catch (error) {
+    if (!(error instanceof ZodError)) throw error;
+    return error.issues[0]?.path ?? [];
+  }
+}
 
 describe('configuración S3', () => {
   it('conserva un endpoint público para URLs que abre el navegador', () => {
@@ -30,6 +41,24 @@ describe('configuración S3', () => {
       S3_ACCESS_KEY: accessKey,
       S3_SECRET_KEY: secretKey,
     })).toThrow(/credenciales S3 inseguras/i);
+  });
+
+  it('atribuye al campo correcto cada credencial insegura de producción', () => {
+    const accessKeyInsegura = rutaPrimerError({
+      NODE_ENV: 'production',
+      S3_ENDPOINT: 'https://s3.institucion.example',
+      S3_ACCESS_KEY: 'minioadmin',
+      S3_SECRET_KEY: 'secreto-produccion-gestionado-externamente',
+    });
+    const secretKeyInsegura = rutaPrimerError({
+      NODE_ENV: 'production',
+      S3_ENDPOINT: 'https://s3.institucion.example',
+      S3_ACCESS_KEY: 'sigd-production-service',
+      S3_SECRET_KEY: 'minioadmin',
+    });
+
+    expect(accessKeyInsegura).toEqual(['S3_ACCESS_KEY']);
+    expect(secretKeyInsegura).toEqual(['S3_SECRET_KEY']);
   });
 
   it('acepta credenciales explícitas no predeterminadas en producción', () => {

@@ -154,28 +154,42 @@ export function crearRouterAuth(pool: Pool): Router {
 
   router.post('/auth/refresh', async (req: Request, res: Response) => {
     const { refreshToken } = refreshSchema.parse(req.body);
-    const resultado = await pool.query(
-      `SELECT s.id_usuario, s.rol_activo_id, s.expira_en, s.revocado_en,
-              c.activo, c.bloqueado_hasta, r.codigo, r.nombre, ur.area_id AS "areaId"
-         FROM sigd_auth.sesion_usuario s
-         JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
-         JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND ur.rol_id = s.rol_activo_id
-         JOIN sigd_org.rol_sistema r ON r.rol_id = s.rol_activo_id AND r.vigente = TRUE
-        WHERE s.refresh_token = $1
-          AND ur.vigente_desde <= now()
-          AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
-        LIMIT 1;`,
-      [refreshToken],
-    );
-    const sesion = resultado.rows[0];
-    if (!sesion || sesion.revocado_en !== null || new Date(sesion.expira_en) < new Date()) {
-      throw new UnauthorizedError({ detail: 'El token de refresco o su perfil activo son inválidos o han expirado.' });
+    const client: PoolClient = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const resultado = await client.query(
+        `SELECT s.id_usuario, s.rol_activo_id, s.expira_en, s.revocado_en,
+                c.activo, c.bloqueado_hasta, r.codigo, r.nombre, ur.area_id AS "areaId"
+           FROM sigd_auth.sesion_usuario s
+           JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
+           JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND ur.rol_id = s.rol_activo_id
+           JOIN sigd_org.rol_sistema r ON r.rol_id = s.rol_activo_id AND r.vigente = TRUE
+          WHERE s.refresh_token = $1
+            AND ur.vigente_desde <= now()
+            AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+          LIMIT 1
+          FOR UPDATE OF s;`,
+        [refreshToken],
+      );
+      const sesion = resultado.rows[0];
+      if (!sesion || sesion.revocado_en !== null || new Date(sesion.expira_en) < new Date()) {
+        throw new UnauthorizedError({ detail: 'El token de refresco o su perfil activo son inválidos o han expirado.' });
+      }
+      asegurarCuentaHabilitada(sesion);
+      await client.query(
+        `UPDATE sigd_auth.sesion_usuario SET revocado_en = now() WHERE refresh_token = $1 AND revocado_en IS NULL;`,
+        [refreshToken],
+      );
+      const tokens = await crearSesion(client, req, sesion.id_usuario,
+        { id: sesion.rol_activo_id, codigo: sesion.codigo, nombre: sesion.nombre, areaId: sesion.areaId });
+      await client.query('COMMIT');
+      return res.status(200).json(tokens);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-    asegurarCuentaHabilitada(sesion);
-    await pool.query(`UPDATE sigd_auth.sesion_usuario SET revocado_en = now() WHERE refresh_token = $1;`, [refreshToken]);
-    const tokens = await crearSesion(pool, req, sesion.id_usuario,
-      { id: sesion.rol_activo_id, codigo: sesion.codigo, nombre: sesion.nombre, areaId: sesion.areaId });
-    res.status(200).json(tokens);
   });
 
   router.post('/auth/cambiar-perfil', async (req: Request, res: Response) => {

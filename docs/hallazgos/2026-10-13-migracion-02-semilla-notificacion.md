@@ -22,10 +22,23 @@ Se conserva la modificación mínima en la migración 02:
 
 - La semilla mantiene su identificador y contenido deterministas.
 - `usuario_id` se establece en `NULL`, valor permitido por el contrato existente.
-- No hay cambios de estructura ni impacto en datos productivos ya migrados.
+- No hay cambios de estructura ni se reescriben filas productivas ya migradas.
 - Las pruebas de contrato verifican que la semilla sea compatible con una base vacía.
 
 Esta excepción queda explícitamente documentada para revisión. Cualquier política futura que prohíba modificar migraciones históricas deberá acompañarse de una corrección del proceso de bootstrap, porque una migración incremental por sí sola no puede resolver este fallo previo.
+
+## Compatibilidad del checksum histórico
+
+El runner registra el SHA-256 de cada migración. Por ello, una instalación que hubiera conseguido registrar la versión anterior de `02_sigd_auth.sql` —por ejemplo, porque el UUID referenciado fue creado manualmente antes del bootstrap— detectaría el cambio de contenido aunque su esquema sea compatible.
+
+El runner incorpora una reconciliación limitada a esta transición conocida:
+
+- solo acepta los checksums exactos, LF y CRLF, de la versión anterior;
+- solo los reconcilia contra los checksums exactos de la versión corregida;
+- antes de actualizar el registro verifica que `sigd_auth.notificacion_casilla.usuario_id` sea nullable y conserve su clave foránea hacia `sigd_auth.cuenta_usuario`;
+- cualquier otro cambio o contrato incompleto mantiene el error de integridad DDL.
+
+De esta forma se preserva la detección general de migraciones alteradas sin bloquear una instalación que ya hubiera registrado específicamente la semilla defectuosa.
 
 ## Límites del PR #166
 
