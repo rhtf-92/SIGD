@@ -10,6 +10,8 @@ import { TablasMaestrasService } from '../../../../src/domains/organicore/tablas
 import { crearUsuariosAdminService } from '../../../../src/domains/organicore/usuariosAdmin.service.js';
 
 process.env.AUTH_JWT_SECRET ??= 'test-only-jwt-secret-for-postgres-integration';
+process.env.S3_ACCESS_KEY ??= 'test-s3-access-key';
+process.env.S3_SECRET_KEY ??= 'test-s3-secret-key-segura';
 
 describe('OrganiCore y Administración con PostgreSQL real', () => {
   let pool: Pool;
@@ -58,25 +60,66 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     expect(seleccion.status).toBe(200);
     expect(verificarTokenAcceso(seleccion.body.accessToken).roles).toEqual(['ADMINISTRADOR']);
 
+    const refresh = await request(app).post('/api/v1/auth/refresh').send({
+      refreshToken: seleccion.body.refreshToken,
+    });
+    expect(refresh.status).toBe(200);
+    expect(verificarTokenAcceso(refresh.body.accessToken).roles).toEqual(['ADMINISTRADOR']);
+    const refreshAnterior = await request(app).post('/api/v1/auth/refresh').send({
+      refreshToken: seleccion.body.refreshToken,
+    });
+    expect(refreshAnterior.status).toBe(401);
+
     const director = roles.rows.find((rol) => rol.codigo === 'DIRECTOR')!;
     const cambio = await request(app).post('/api/v1/auth/cambiar-perfil')
-      .set('Authorization', `Bearer ${seleccion.body.accessToken}`)
-      .send({ refreshToken: seleccion.body.refreshToken, rolId: director.rol_id });
+      .set('Authorization', `Bearer ${refresh.body.accessToken}`)
+      .send({ refreshToken: refresh.body.refreshToken, rolId: director.rol_id });
     expect(cambio.status).toBe(200);
     expect(verificarTokenAcceso(cambio.body.accessToken).roles).toEqual(['DIRECTOR']);
 
     const bloqueado = await usuarios.actualizarUsuario(creado.id, {
-      rolesQuitar: [director.rol_id], estado: 'BLOQUEADO',
+      estado: 'BLOQUEADO',
     });
     expect(bloqueado.estado).toBe('BLOQUEADO');
-    expect(bloqueado.roles).toHaveLength(1);
-    expect(bloqueado.roles[0].nombre).toContain('Administrador');
+    expect(bloqueado.roles).toHaveLength(2);
+    const sesionesVigentesBloqueado = await pool.query<{ total: number }>(
+      'SELECT COUNT(*)::int AS total FROM sigd_auth.sesion_usuario WHERE id_usuario = $1 AND revocado_en IS NULL',
+      [creado.id],
+    );
+    expect(sesionesVigentesBloqueado.rows[0].total).toBe(0);
+    const loginBloqueado = await request(app).post('/api/v1/auth/login').send({
+      identificador: 'prueba.pr166', password: 'ClaveSegura166!',
+    });
+    expect(loginBloqueado.status).toBe(423);
+    const refreshBloqueado = await request(app).post('/api/v1/auth/refresh').send({
+      refreshToken: cambio.body.refreshToken,
+    });
+    expect(refreshBloqueado.status).toBe(401);
 
     const reactivado = await usuarios.actualizarUsuario(creado.id, {
-      rolesAgregar: [director.rol_id], estado: 'ACTIVO',
+      estado: 'ACTIVO',
     });
     expect(reactivado.estado).toBe('ACTIVO');
     expect(reactivado.roles).toHaveLength(2);
+    const loginDesbloqueado = await request(app).post('/api/v1/auth/login').send({
+      identificador: 'prueba.pr166', password: 'ClaveSegura166!',
+    });
+    expect(loginDesbloqueado.status).toBe(200);
+    expect(loginDesbloqueado.body.requiereSeleccionPerfil).toBe(true);
+
+    const seleccionTrasDesbloqueo = await request(app).post('/api/v1/auth/seleccionar-perfil').send({
+      tokenSeleccionPerfil: loginDesbloqueado.body.tokenSeleccionPerfil,
+      rolId: administrador.rol_id,
+    });
+    expect(seleccionTrasDesbloqueo.status).toBe(200);
+    const logout = await request(app).post('/api/v1/auth/logout').send({
+      refreshToken: seleccionTrasDesbloqueo.body.refreshToken,
+    });
+    expect(logout.status).toBe(200);
+    const refreshTrasLogout = await request(app).post('/api/v1/auth/refresh').send({
+      refreshToken: seleccionTrasDesbloqueo.body.refreshToken,
+    });
+    expect(refreshTrasLogout.status).toBe(401);
 
     await pool.query(
       `INSERT INTO sigd_org.calendario_laboral

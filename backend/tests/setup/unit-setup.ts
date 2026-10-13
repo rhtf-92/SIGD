@@ -3,6 +3,8 @@ import { vi } from 'vitest';
 
 process.env.AUTH_JWT_SECRET ??= 'test-jwt-secret-minimo-32-caracteres-para-sigd-auth';
 process.env.JWT_SECRET ??= 'test-jwt-secret-minimo-32-caracteres-para-sigd-auth';
+process.env.S3_ACCESS_KEY ??= 'test-s3-access-key';
+process.env.S3_SECRET_KEY ??= 'test-s3-secret-key-segura';
 
 /**
  * Mock criptográfico limpio de la librería 'argon2' para entorno de pruebas unitarias.

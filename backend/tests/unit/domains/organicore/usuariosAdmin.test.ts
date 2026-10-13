@@ -187,4 +187,30 @@ describe('UsuariosAdminService · actualización transaccional', () => {
 
     expect(consultas.at(-1)?.sql).toBe('ROLLBACK');
   });
+
+  it('bloquea la cuenta de forma indefinida y revoca todas sus sesiones activas', async () => {
+    const { pool, consultas } = crearPoolTransaccional();
+
+    await crearUsuariosAdminService(pool).actualizarUsuario(USUARIO_ID, { estado: 'BLOQUEADO' });
+
+    const actualizacionCuenta = consultas.find((consulta) => consulta.sql.includes('UPDATE sigd_auth.cuenta_usuario'));
+    expect(actualizacionCuenta?.sql).toContain("THEN 'infinity'::timestamptz");
+    expect(actualizacionCuenta?.values).toEqual([USUARIO_ID, null, 'BLOQUEADO']);
+    expect(consultas.some((consulta) =>
+      consulta.sql.includes('UPDATE sigd_auth.sesion_usuario SET revocado_en = now()'),
+    )).toBe(true);
+  });
+
+  it('desbloquea la cuenta, limpia intentos fallidos y no reactiva sesiones revocadas', async () => {
+    const { pool, consultas } = crearPoolTransaccional();
+
+    await crearUsuariosAdminService(pool).actualizarUsuario(USUARIO_ID, { estado: 'ACTIVO' });
+
+    const actualizacionCuenta = consultas.find((consulta) => consulta.sql.includes('UPDATE sigd_auth.cuenta_usuario'));
+    expect(actualizacionCuenta?.sql).toContain("intentos_fallidos = CASE WHEN $3 = 'ACTIVO' THEN 0");
+    expect(actualizacionCuenta?.values).toEqual([USUARIO_ID, null, 'ACTIVO']);
+    expect(consultas.some((consulta) =>
+      consulta.sql.includes('UPDATE sigd_auth.sesion_usuario SET revocado_en = now()'),
+    )).toBe(false);
+  });
 });

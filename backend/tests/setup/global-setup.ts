@@ -7,6 +7,13 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 const ON_ERROR_STOP = 'ON_ERROR_STOP=1';
 
 export default async function globalSetup(): Promise<void> {
+  const databaseUrlExterna = process.env.TEST_DATABASE_URL?.trim();
+  if (databaseUrlExterna) {
+    validarBaseExclusivaDePruebas(databaseUrlExterna);
+    await ejecutarMigraciones(databaseUrlExterna);
+    return;
+  }
+
   const imagen = process.env.TESTCONTAINERS_IMAGE ?? 'postgres:18-alpine';
   const container = await new PostgreSqlContainer(imagen)
     .withDatabase('sigd_prueba')
@@ -19,6 +26,13 @@ export default async function globalSetup(): Promise<void> {
   (globalThis as Record<string, unknown>).__SIGD_CONTAINER__ = container;
 
   await ejecutarMigraciones(databaseUrl);
+}
+
+function validarBaseExclusivaDePruebas(databaseUrl: string): void {
+  const nombreBase = new URL(databaseUrl).pathname.replace(/^\//, '');
+  if (!/(test|prueba)/i.test(nombreBase)) {
+    throw new Error('TEST_DATABASE_URL debe apuntar a una base cuyo nombre contenga "test" o "prueba".');
+  }
 }
 
 function directorioSetup(): string {

@@ -18,6 +18,13 @@ describe('contrato de arranque con Docker Compose', () => {
     expect(envExample()).toContain('POSTGRES_PASSWORD=CAMBIAR_');
     expect(compose).not.toContain('postgres_password');
     expect(compose).not.toContain('minioadminpassword');
+    expect(compose).toContain('S3_ACCESS_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER es obligatorio}');
+    expect(compose).toContain('S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD es obligatorio}');
+  });
+
+  it('no conserva credenciales S3 predeterminadas en la configuración de runtime', () => {
+    const s3Config = readFileSync(`${raiz}/backend/src/config/s3.config.ts`, 'utf8');
+    expect(s3Config).not.toContain("default('minioadmin')");
   });
 
   it('separa la URL S3 pública de la URL interna del contenedor', () => {
