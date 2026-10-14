@@ -16,7 +16,14 @@ const esquema = z.object({
 }).superRefine((config, contexto) => {
   if (config.NODE_ENV !== 'production') return;
 
-  const valoresInseguros = new Set(['minioadmin', 'minioadminpassword', 'changeme', 'password']);
+  const valoresInseguros = new Set([
+    'minioadmin',
+    'minioadminpassword',
+    'changeme',
+    'password',
+    'example_s3_access_key',
+    'example_s3_secret_key',
+  ]);
   const accessKey = config.S3_ACCESS_KEY.toLowerCase();
   const secretKey = config.S3_SECRET_KEY.toLowerCase();
 

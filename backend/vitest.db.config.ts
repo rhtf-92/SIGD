@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     include: [
       'tests/unit/domains/corelink/outbox.spec.ts',
+      'tests/integration/db/migrate-production-runner.test.ts',
       'tests/integration/domains/organicore/admin-postgres.test.ts',
     ],
     globalSetup: ['./tests/setup/global-setup.ts'],

@@ -52,7 +52,7 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     await pool.end();
   });
 
-  it('persiste organigrama, tablas maestras, calendario y un usuario multirrol bloqueable', async () => {
+  it('persiste administración y permite exactamente un refresh entre dos solicitudes concurrentes', async () => {
     const organigrama = new OrganigramaService(pool);
     const maestras = new TablasMaestrasService(pool);
     const calendario = new CalendarioService(pool);
@@ -93,10 +93,18 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
       request(app).post('/api/v1/auth/refresh').send({ refreshToken: seleccion.body.refreshToken }),
       request(app).post('/api/v1/auth/refresh').send({ refreshToken: seleccion.body.refreshToken }),
     ]);
-    expect(intentosRefresh.map((respuesta) => respuesta.status).sort()).toEqual([200, 401]);
-    const refresh = intentosRefresh.find((respuesta) => respuesta.status === 200)!;
+    const refreshExitosos = intentosRefresh.filter((respuesta) => respuesta.status === 200);
+    const refreshRechazados = intentosRefresh.filter((respuesta) => respuesta.status === 401);
+    expect(refreshExitosos).toHaveLength(1);
+    expect(refreshRechazados).toHaveLength(1);
+    const refresh = refreshExitosos[0];
     expect(refresh.status).toBe(200);
     expect(verificarTokenAcceso(refresh.body.accessToken).roles).toEqual(['SUPER_ADMIN']);
+    const sesionesVigentesTrasCarrera = await pool.query<{ total: number }>(
+      'SELECT COUNT(*)::int AS total FROM sigd_auth.sesion_usuario WHERE id_usuario = $1 AND revocado_en IS NULL',
+      [creado.id],
+    );
+    expect(sesionesVigentesTrasCarrera.rows[0].total).toBe(1);
 
     const cambio = await request(app).post('/api/v1/auth/switch-role')
       .set('Authorization', `Bearer ${refresh.body.accessToken}`)

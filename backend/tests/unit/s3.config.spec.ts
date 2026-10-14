@@ -61,6 +61,24 @@ describe('configuración S3', () => {
     expect(secretKeyInsegura).toEqual(['S3_SECRET_KEY']);
   });
 
+  it('rechaza los marcadores EXAMPLE de acceso y secreto en producción', () => {
+    const accessKeyEjemplo = rutaPrimerError({
+      NODE_ENV: 'production',
+      S3_ENDPOINT: 'https://s3.institucion.example',
+      S3_ACCESS_KEY: 'EXAMPLE_S3_ACCESS_KEY',
+      S3_SECRET_KEY: 'secreto-produccion-gestionado-externamente',
+    });
+    const secretKeyEjemplo = rutaPrimerError({
+      NODE_ENV: 'production',
+      S3_ENDPOINT: 'https://s3.institucion.example',
+      S3_ACCESS_KEY: 'sigd-production-service',
+      S3_SECRET_KEY: 'EXAMPLE_S3_SECRET_KEY',
+    });
+
+    expect(accessKeyEjemplo).toEqual(['S3_ACCESS_KEY']);
+    expect(secretKeyEjemplo).toEqual(['S3_SECRET_KEY']);
+  });
+
   it('acepta credenciales explícitas no predeterminadas en producción', () => {
     const configuracion = obtenerConfiguracionS3({
       NODE_ENV: 'production',
