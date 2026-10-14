@@ -79,6 +79,32 @@ describe('configuración S3', () => {
     expect(secretKeyEjemplo).toEqual(['S3_SECRET_KEY']);
   });
 
+  it.each([
+    'cambiar_valor',
+    'prod_cambiar_valor',
+    'valor_cambiar_',
+  ])('rechaza el marcador cambiar_ en cualquier posición de S3_ACCESS_KEY: %s', (accessKey) => {
+    expect(rutaPrimerError({
+      NODE_ENV: 'production',
+      S3_ENDPOINT: 'https://s3.institucion.example',
+      S3_ACCESS_KEY: accessKey,
+      S3_SECRET_KEY: 'secreto-produccion-gestionado-externamente',
+    })).toEqual(['S3_ACCESS_KEY']);
+  });
+
+  it.each([
+    'cambiar_valor',
+    'prod_cambiar_valor',
+    'valor_cambiar_',
+  ])('rechaza el marcador cambiar_ en cualquier posición de S3_SECRET_KEY: %s', (secretKey) => {
+    expect(rutaPrimerError({
+      NODE_ENV: 'production',
+      S3_ENDPOINT: 'https://s3.institucion.example',
+      S3_ACCESS_KEY: 'sigd-production-service',
+      S3_SECRET_KEY: secretKey,
+    })).toEqual(['S3_SECRET_KEY']);
+  });
+
   it('acepta credenciales explícitas no predeterminadas en producción', () => {
     const configuracion = obtenerConfiguracionS3({
       NODE_ENV: 'production',
@@ -88,5 +114,6 @@ describe('configuración S3', () => {
     });
 
     expect(configuracion.accessKey).toBe('sigd-production-service');
+    expect(configuracion.secretKey).toBe('secreto-produccion-gestionado-externamente');
   });
 });

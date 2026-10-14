@@ -27,14 +27,14 @@ const esquema = z.object({
   const accessKey = config.S3_ACCESS_KEY.toLowerCase();
   const secretKey = config.S3_SECRET_KEY.toLowerCase();
 
-  if (valoresInseguros.has(accessKey) || accessKey.startsWith('cambiar_')) {
+  if (valoresInseguros.has(accessKey) || accessKey.includes('cambiar_')) {
     contexto.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Credenciales S3 inseguras: producción exige secretos externos no predeterminados.',
       path: ['S3_ACCESS_KEY'],
     });
   }
-  if (valoresInseguros.has(secretKey) || secretKey.startsWith('cambiar_')) {
+  if (valoresInseguros.has(secretKey) || secretKey.includes('cambiar_')) {
     contexto.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Credenciales S3 inseguras: producción exige secretos externos no predeterminados.',
