@@ -42,6 +42,6 @@ export function leerRangos(valor: unknown): RangoServidor[] {
 }
 export async function obtenerCatalogo(base: string, signal: AbortSignal) { return leerCatalogo(await consultar(base, "expedientes/clasificador-ccd", signal)); }
 export async function obtenerFoliacion(base: string, id: string, signal: AbortSignal) {
-  if (!/^[1-9]\d*$/.test(id) || BigInt(id) > 9223372036854775807n) throw new Error("Indique un identificador numérico de expediente válido.");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error("Indique un UUID de expediente valido.");
   return leerRangos(await consultar(base, `expedientes/${encodeURIComponent(id)}/foliacion`, signal));
 }

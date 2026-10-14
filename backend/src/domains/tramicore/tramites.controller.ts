@@ -1,4 +1,7 @@
 import crypto from 'node:crypto';
+import { cuentaActual } from '../../core/auth/cuenta-actual.js';
+import { ForbiddenError } from '../../shared/domain/errors/index.js';
+import { setUsuarioId, setUnidadOrganicaId } from '../../shared/request-context/request-context.js';
 import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
@@ -38,7 +41,11 @@ export function crearRouterTramites(
 
   // #14 — Radicación virtual (Mesa de Partes Virtual 24x7)
   router.post('/tramites/radicacion-virtual', async (req: Request, res: Response) => {
+    const cuenta = await cuentaActual(pool, req);
     const datos = radicacionVirtualSchema.parse(req.body);
+    if (datos.idPersona !== cuenta.id_persona) throw new ForbiddenError();
+    setUsuarioId(cuenta.id_usuario);
+    setUnidadOrganicaId(cuenta.area_id);
     const radicacion = await radicacionService.radicar(datos);
     res.status(201).json({
       expedienteId: radicacion.expedienteId,

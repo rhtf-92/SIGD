@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import type { Pool } from 'pg';
 import { AppError, ForbiddenError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 import { extraerTokenBearer, verificarTokenAcceso, type ClaimsJwt } from './jwt.service.js';
+import { rolCanonico } from './roles-activos.js';
 
 export interface CuentaActual {
   idUsuario: string;
@@ -116,7 +117,7 @@ export function resolverIdentidad(req: Request): IdentidadAutenticada {
   });
 }
 
-export const ROLES_FIRMA = ['DIRECTOR', 'ADMINISTRADOR'] as const;
+export const ROLES_FIRMA = ['DIRECTOR', 'SUPER_ADMIN'] as const;
 
 export interface FacultadFirma {
   puedeFirmar: boolean;
@@ -162,13 +163,19 @@ export async function verificarFacultadFirma(
     [idUsuario],
   );
 
-  const roles = new Set<string>(rolesDeclarados);
+  const rolesPerfilActivo = new Set(rolesDeclarados.map(rolCanonico));
+  const roles = new Set<string>(rolesPerfilActivo);
   const tipos = new Set<string>();
   let facultadGlobal = false;
   let motivo: string | null = null;
 
   for (const fila of resultado.rows) {
-    if (fila.rol_codigo) roles.add(fila.rol_codigo);
+    // La base confirma la vigencia, pero no debe ampliar el perfil elegido en
+    // el JWT. Un usuario multirrol solo ejerce el rol activo de esta sesión.
+    if (fila.rol_codigo) {
+      const rol = rolCanonico(fila.rol_codigo);
+      if (rolesPerfilActivo.has(rol)) roles.add(rol);
+    }
     if (!fila.vigente) {
       motivo ??= fila.motivo_no_habilitado;
       continue;

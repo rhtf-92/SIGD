@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 
@@ -42,14 +42,7 @@ export default function ConsultaPublicaPage() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (cut) {
-      setCutInput(cut);
-      consultar(cut);
-    }
-  }, [cut]);
-
-  const consultar = async (codigoCut: string) => {
+  const consultar = useCallback(async (codigoCut: string) => {
     const trimmed = codigoCut.trim().toUpperCase();
     if (!trimmed) {
       setError('Por favor, ingrese un código CUT válido.');
@@ -64,7 +57,7 @@ export default function ConsultaPublicaPage() {
         `/api/v1/tramites/consulta-publica/${encodeURIComponent(trimmed)}`
       );
       setResultado(res.data);
-    } catch (err: unknown) {
+    } catch {
       setResultado(null);
       setError(
         'No se encontró ningún expediente con el código CUT ingresado o ocurrió un error en la consulta.'
@@ -72,7 +65,13 @@ export default function ConsultaPublicaPage() {
     } finally {
       setCargando(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!cut) return undefined;
+    const temporizador = window.setTimeout(() => void consultar(cut), 0);
+    return () => window.clearTimeout(temporizador);
+  }, [consultar, cut]);
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();

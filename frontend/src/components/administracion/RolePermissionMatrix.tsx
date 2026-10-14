@@ -1,6 +1,9 @@
 // Matriz interactiva de permisos RBAC por módulo y acción (ENT-M05-03)
 import type { ClavePermiso, PermisoModulo } from "../../types/rbacRoles";
-import { ACCIONES_INMUTABLES_AUDITORIA } from "../../hooks/useRbacConfig";
+import {
+  ACCIONES_INMUTABLES_AUDITORIA,
+  CODIGO_PERMISO_BACKEND,
+} from "../../hooks/useRbacConfig";
 
 export const columnasPermisos: Array<{ clave: ClavePermiso; etiqueta: string }> =
   [
@@ -25,6 +28,10 @@ function esLecturaInmutable(modulo: string, clave: ClavePermiso): boolean {
   );
 }
 
+function esPermisoPersistible(modulo: string, clave: ClavePermiso): boolean {
+  return Boolean(CODIGO_PERMISO_BACKEND[`${modulo}.${clave}`]);
+}
+
 export default function RolePermissionMatrix({
   permisos,
   onAlternar,
@@ -47,10 +54,8 @@ export default function RolePermissionMatrix({
             <tr key={fila.modulo}>
               <td className="px-5 py-4 text-sm font-semibold">{fila.modulo}</td>
               {columnasPermisos.map((columna) => {
-                const bloqueado = esLecturaInmutable(
-                  fila.modulo,
-                  columna.clave,
-                );
+                const bloqueado = esLecturaInmutable(fila.modulo, columna.clave) ||
+                  !esPermisoPersistible(fila.modulo, columna.clave);
                 return (
                   <td key={columna.clave} className="px-4 py-4 text-center">
                     <input
@@ -62,7 +67,9 @@ export default function RolePermissionMatrix({
                       aria-label={`${columna.etiqueta} en ${fila.modulo}`}
                       title={
                         bloqueado
-                          ? "Acción bloqueada por inmutabilidad (principio WORM)"
+                          ? esLecturaInmutable(fila.modulo, columna.clave)
+                            ? "Acción bloqueada por inmutabilidad (principio WORM)"
+                            : "La política backend no define este permiso granular"
                           : undefined
                       }
                     />

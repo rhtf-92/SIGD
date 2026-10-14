@@ -1,117 +1,135 @@
+import {
+  ArrowUpRight,
+  BarChart3,
+  BellRing,
+  Boxes,
+  FileCheck2,
+  FileInput,
+  Fingerprint,
+  LogIn,
+  ShieldCheck,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 const secciones = [
   {
     titulo: "Flujo y Validez Legal",
     subtitulo: "MOD-04 / Firma Digital",
-    descripcion:
-      "Tramitación con plena validez legal: firma digital, re-firma, workflow académico y verificación pública de documentos (CVD).",
+    descripcion: "Firma digital, re-firma, workflow académico y verificación pública de documentos.",
     ruta: "/flujo-validez-legal",
+    icono: FileCheck2,
     destacado: true,
   },
   {
     titulo: "Casilla Electrónica",
     subtitulo: "ENT-M01-03",
-    descripcion:
-      "Consulta y recepción de notificaciones electrónicas institucionales con plena validez legal.",
+    descripcion: "Consulta y recepción de notificaciones institucionales con plena validez legal.",
     ruta: "/casilla",
+    icono: BellRing,
     destacado: true,
   },
   {
     titulo: "Mesa de Partes Virtual",
     subtitulo: "ENT-M02 / TUPA",
-    descripcion:
-      "Presentación y radicación de trámites digitales, requisitos TUPA y anexos documentales.",
+    descripcion: "Presentación y radicación de trámites digitales, requisitos TUPA y anexos.",
     ruta: "/tramite",
+    icono: FileInput,
     destacado: true,
   },
   {
     titulo: "Registro Ciudadano",
     subtitulo: "ENT-M01-01 / ENT-M01-02",
-    descripcion:
-      "Registro de personas naturales y jurídicas con validación RENIEC / SUNAT y Ubigeo Ucayali.",
+    descripcion: "Registro de personas naturales y jurídicas con validaciones institucionales.",
     ruta: "/registro",
+    icono: Fingerprint,
+    destacado: false,
   },
   {
     titulo: "Bandeja de Expedientes",
     subtitulo: "ENT-M05",
-    descripcion:
-      "Gestiona y consulta el estado, trazabilidad, providencias y foliado de expedientes.",
+    descripcion: "Gestión de estados, trazabilidad, providencias y foliado de expedientes.",
     ruta: "/expedientes",
+    icono: Boxes,
+    destacado: false,
   },
   {
     titulo: "Validador CVD",
     subtitulo: "MOD-04 / Verificación",
-    descripcion:
-      "Valida la autenticidad e integridad de documentos firmados digitalmente mediante el Código de Verificación de Documentos.",
+    descripcion: "Validación pública de autenticidad e integridad de documentos firmados.",
     ruta: "/validador-cvd",
+    icono: ShieldCheck,
+    destacado: false,
   },
   {
     titulo: "Panel de Administración",
     subtitulo: "ENT-M05-01 / RBAC",
-    descripcion:
-      "Gestión de usuarios, roles, permisos, auditoría, tablas maestras y calendario laboral.",
+    descripcion: "Usuarios, roles, permisos, auditoría, catálogos y calendario laboral.",
     ruta: "/administracion",
+    icono: Boxes,
+    destacado: false,
   },
   {
     titulo: "Iniciar Sesión",
     subtitulo: "Acceso Institucional",
-    descripcion:
-      "Ingreso al sistema SIGD con credenciales y verificación de perfil asignado.",
+    descripcion: "Ingreso seguro al SIGD con credenciales y perfil institucional asignado.",
     ruta: "/login",
+    icono: LogIn,
+    destacado: false,
   },
   {
-    titulo: "Reportes y Tableros de Control",
-    subtitulo: "06_reportes-tablero-control",
-    descripcion:
-      "Consulta indicadores ejecutivos, tendencias, distribución de expedientes y áreas con cuellos de botella.",
+    titulo: "Reportes y Tableros",
+    subtitulo: "Control de gestión",
+    descripcion: "Indicadores ejecutivos, tendencias, distribución y cuellos de botella.",
     ruta: "/reportes/dashboard",
+    icono: BarChart3,
+    destacado: false,
   },
-];
+] as const;
 
 export default function HomePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6 py-12 text-slate-900">
-      <div className="text-center space-y-2 max-w-2xl">
-        <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800">
-          IESTP &quot;Suiza&quot; — Pucallpa
+    <main className="sigd-home-page">
+      <section className="sigd-home-hero" aria-labelledby="home-title">
+        <div className="sigd-home-eyebrow">
+          <span /> IESTP “Suiza” · Pucallpa
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-          SIGD
-        </h1>
-        <p className="text-lg font-medium text-slate-700">
-          Sistema Integral de Gestión Documentaria
+        <h1 id="home-title">Gestión documental<br /><em>conectada y segura.</em></h1>
+        <p>
+          Una plataforma institucional para administrar el ciclo completo de cada documento,
+          desde su registro hasta su archivo y verificación legal.
         </p>
-        <p className="text-sm text-slate-500">
-          Plataforma Institucional y Notificación Electrónica con Validez Legal
-        </p>
-      </div>
+        <div className="sigd-home-metrics" aria-label="Capacidades principales">
+          <span><strong>360°</strong> Trazabilidad</span>
+          <span><strong>24/7</strong> Servicios digitales</span>
+          <span><strong>CVD</strong> Validez documental</span>
+        </div>
+      </section>
 
-      <div className="mt-10 grid w-full max-w-4xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {secciones.map((seccion) => (
-          <Link
-            key={seccion.ruta}
-            to={seccion.ruta}
-            className={`group rounded-xl border p-6 shadow-sm transition duration-200 ease-out hover:shadow-md motion-safe:hover:-translate-y-1 motion-reduce:transition-none ${
-              seccion.destacado
-                ? "border-blue-300 bg-blue-50/50 hover:border-blue-400"
-                : "border-slate-200 bg-white hover:border-slate-300"
-            }`}
-          >
-            {seccion.subtitulo && (
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600">
-                {seccion.subtitulo}
-              </span>
-            )}
-            <h2 className="mt-1 text-lg font-bold text-slate-900 group-hover:text-blue-700">
-              {seccion.titulo}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              {seccion.descripcion}
-            </p>
-          </Link>
-        ))}
-      </div>
+      <section className="sigd-module-section" aria-labelledby="modules-title">
+        <div className="sigd-section-heading">
+          <div>
+            <span className="sigd-section-kicker">Ecosistema SIGD</span>
+            <h2 id="modules-title">Módulos institucionales</h2>
+          </div>
+          <p>Selecciona un módulo para comenzar.</p>
+        </div>
+
+        <div className="sigd-module-grid">
+          {secciones.map(({ titulo, subtitulo, descripcion, ruta, icono: Icono, destacado }) => (
+            <Link
+              key={ruta}
+              to={ruta}
+              className={`sigd-module-card${destacado ? " is-featured" : ""}`}
+            >
+              <span className="sigd-module-icon"><Icono aria-hidden="true" size={23} /></span>
+              <span className="sigd-module-code">{subtitulo}</span>
+              <h3>{titulo}</h3>
+              <p>{descripcion}</p>
+              <span className="sigd-module-action">Abrir módulo <ArrowUpRight aria-hidden="true" size={16} /></span>
+            </Link>
+          ))}
+        </div>
+      </section>
     </main>
   );
 }

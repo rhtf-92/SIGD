@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import AcademicWorkflowStepper from "../../components/flujos/AcademicWorkflowStepper";
@@ -6,6 +6,8 @@ import BuscadorExpedientes from "../../components/flujos/BuscadorExpedientes";
 import StageDetailCard from "../../components/flujos/StageDetailCard";
 import { useTitulacionBackend } from "../../hooks/useTitulacionBackend";
 import { useWorkflowAcademico } from "../../hooks/useWorkflowAcademico";
+import { useWorkflowAcademicoRemoto } from "../../hooks/useWorkflowAcademicoRemoto";
+import { env } from "../../config/env";
 import type { EstadoTramite } from "../../types/workflowAcademico";
 import { ETIQUETA_ESTADO_TRAMITE } from "../../types/workflowAcademico";
 
@@ -35,7 +37,44 @@ function formatoFecha(fecha: string): string {
   }).format(fechaLocal);
 }
 
+type EstadoWorkflowVista = ReturnType<typeof useWorkflowAcademico>;
+
 export default function WorkflowAcademicoPage() {
+  return env.enableMocks ? <WorkflowAcademicoLocal /> : <WorkflowAcademicoRemoto />;
+}
+
+function WorkflowAcademicoLocal() {
+  const estadoWorkflow = useWorkflowAcademico();
+  return <WorkflowAcademicoContenido estadoWorkflow={estadoWorkflow} />;
+}
+
+function WorkflowAcademicoRemoto() {
+  const estadoWorkflow = useWorkflowAcademicoRemoto(true);
+  if (!estadoWorkflow.workflow) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
+        <div className="max-w-lg rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+          <h1 className="text-xl font-bold">Workflow académico</h1>
+          <p className="mt-2 text-sm text-slate-600" role="status">
+            {estadoWorkflow.cargando
+              ? "Sincronizando la FSM con PostgreSQL…"
+              : estadoWorkflow.errorFsm ?? "No existen workflows académicos disponibles."}
+          </p>
+          <Link to="/" className="mt-4 inline-block font-semibold text-blue-700 underline">
+            Volver al inicio
+          </Link>
+        </div>
+      </main>
+    );
+  }
+  return (
+    <WorkflowAcademicoContenido
+      estadoWorkflow={{ ...estadoWorkflow, workflow: estadoWorkflow.workflow } as EstadoWorkflowVista}
+    />
+  );
+}
+
+function WorkflowAcademicoContenido({ estadoWorkflow }: { estadoWorkflow: EstadoWorkflowVista }) {
   const [ahora, setAhora] = useState(() => Date.now());
 
   useEffect(() => {
@@ -66,9 +105,9 @@ export default function WorkflowAcademicoPage() {
     firmarDocumento,
     anularTramite,
     marcarRequisito,
-  } = useWorkflowAcademico();
+  } = estadoWorkflow;
 
-  const semaforoClase = useMemo(() => {
+  const semaforoClase = (() => {
     if (estado === "RESUELTO" || estado === "ANULADO") {
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
     }
@@ -85,9 +124,9 @@ export default function WorkflowAcademicoPage() {
       return "border-amber-200 bg-amber-50 text-amber-700";
     }
     return "border-red-200 bg-red-50 text-red-700";
-  }, [ahora, workflow.fechaRegistro, workflow.fechaLimiteSla, estado]);
+  })();
 
-  const semaforoTexto = useMemo(() => {
+  const semaforoTexto = (() => {
     if (estado === "RESUELTO") return "Culminado";
     if (estado === "ANULADO") return "Anulado";
     const inicio = new Date(workflow.fechaRegistro).getTime();
@@ -97,7 +136,7 @@ export default function WorkflowAcademicoPage() {
     if (consumo < 60) return "En plazo (SLA < 60%)";
     if (consumo <= 85) return "Próximo a vencer (60%–85%)";
     return "Vencido / riesgo (SLA > 85%)";
-  }, [ahora, workflow.fechaRegistro, workflow.fechaLimiteSla, estado]);
+  })();
 
   const acciones = [
     {
@@ -375,14 +414,14 @@ function InsigniaConexionBackend({ tramiteId }: { tramiteId: number }) {
         title={
           conectado
             ? "La FSM se consume desde GET /api/v1/flujos/titulacion/:id"
-            : "Sin backend disponible: opera la FSM local del cliente (mocks solo en desarrollo)"
+            : "La API de la FSM no está disponible"
         }
       >
         <span
           className={`h-2 w-2 rounded-full ${conectado ? "bg-emerald-500" : "bg-slate-400"}`}
           aria-hidden="true"
         />
-        {conectado ? "FSM backend conectada" : "FSM local (modo desarrollo)"}
+        {conectado ? "FSM backend conectada" : "FSM backend no disponible"}
       </span>
     </p>
   );

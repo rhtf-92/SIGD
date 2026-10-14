@@ -24,6 +24,10 @@ import { autorizarPermisos, PERMISOS_RBAC } from '../../core/auth/auth.guard.js'
 import { CalendarioService } from './calendario.service.js';
 import { TablasMaestrasService } from './tablasMaestras.service.js';
 import {
+  actualizarItemTablaMaestra,
+  cambiarVigenciaCalendario,
+  cambiarVigenciaTablaMaestra,
+  crearItemTablaMaestra,
   listarCalendario,
   listarTablasMaestras,
   registrarFeriadoExcepcional,
@@ -42,6 +46,21 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
     autorizarPermisos(PERMISOS_RBAC.MAESTRAS_LEER),
     listarTablasMaestras(deps),
   );
+  router.post(
+    '/tablas-maestras/:catalogo',
+    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_GESTIONAR),
+    crearItemTablaMaestra(deps),
+  );
+  router.put(
+    '/tablas-maestras/:catalogo/:id',
+    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_GESTIONAR),
+    actualizarItemTablaMaestra(deps),
+  );
+  router.patch(
+    '/tablas-maestras/:catalogo/:id/vigencia',
+    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_GESTIONAR),
+    cambiarVigenciaTablaMaestra(deps),
+  );
   router.get(
     '/calendario-laboral',
     autorizarPermisos(PERMISOS_RBAC.CALENDARIO_LEER),
@@ -51,6 +70,11 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
     '/calendario-laboral/feriado-excepcional',
     autorizarPermisos(PERMISOS_RBAC.CALENDARIO_GESTIONAR),
     registrarFeriadoExcepcional(deps),
+  );
+  router.patch(
+    '/calendario-laboral/:id/vigencia',
+    autorizarPermisos(PERMISOS_RBAC.CALENDARIO_GESTIONAR),
+    cambiarVigenciaCalendario(deps),
   );
 
   return router;

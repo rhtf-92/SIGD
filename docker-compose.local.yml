@@ -1,0 +1,17 @@
+﻿services:
+  s3:
+    image: chrislusf/seaweedfs:4.17@sha256:186de7ef977a20343ee9a5544073f081976a29e2d29ecf8379891e7bf177fbe9
+    container_name: sigd_s3
+    command: mini -dir=/data
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-EXAMPLE_STORAGE_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-EXAMPLE_STORAGE_SECRET_KEY}
+      S3_BUCKET: sigd-expedientes
+    ports:
+      - "127.0.0.1:9000:8333"
+      - "127.0.0.1:8888:8888"
+    volumes:
+      - s3data:/data
+volumes:
+  s3data:
+    name: sigd_s3data

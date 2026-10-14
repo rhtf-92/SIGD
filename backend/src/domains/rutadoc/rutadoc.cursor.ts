@@ -4,8 +4,12 @@ import type { FiltrosRutaDoc, PosicionCursor } from './rutadoc.types.js';
 
 const MAX_BIGINT = 9223372036854775807n;
 
-export function esIdExpediente(valor: unknown): valor is string {
+export function esSecuenciaMovimiento(valor: unknown): valor is string {
   return typeof valor === 'string' && /^[1-9]\d{0,18}$/.test(valor) && BigInt(valor) <= MAX_BIGINT;
+}
+
+export function esIdExpediente(valor: unknown): valor is string {
+  return typeof valor === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
 }
 
 export function huellaFiltros(filtros: FiltrosRutaDoc): string {

@@ -1,27 +1,29 @@
-import React from "react";
+// Subrutas del Hub de Administración (ENT-M05-01)
+// Se anidan bajo el path "/administracion" protegido en AppRouter.tsx
+import { lazy } from "react";
 import { Route } from "react-router-dom";
+
 import ProtectedRoute from "./ProtectedRoute";
 
-// 👇 IMPORTACIONES OPTIMIZADAS CON LAZY LOADING 👇
-const AdministracionPage = React.lazy(
+const AdministracionPage = lazy(
   () => import("../pages/administracion/AdministracionPage"),
 );
-const AuditoriaPage = React.lazy(
+const AuditoriaPage = lazy(
   () => import("../pages/administracion/AuditoriaPage"),
 );
-const CalendarioLaboralPage = React.lazy(
+const CalendarioLaboralPage = lazy(
   () => import("../pages/administracion/CalendarioLaboralPage"),
 );
-const RolesPermisosPage = React.lazy(
+const RolesPermisosPage = lazy(
   () => import("../pages/administracion/RolesPermisosPage"),
 );
-const SeguridadPage = React.lazy(
+const SeguridadPage = lazy(
   () => import("../pages/administracion/SeguridadPage"),
 );
-const TablasMaestrasPage = React.lazy(
+const TablasMaestrasPage = lazy(
   () => import("../pages/administracion/TablasMaestrasPage"),
 );
-const UsuariosPage = React.lazy(
+const UsuariosPage = lazy(
   () => import("../pages/administracion/UsuariosPage"),
 );
 
@@ -30,12 +32,12 @@ export default function AdminRoutes() {
     <>
       <Route index element={<AdministracionPage />} />
       {/* DoD ENT-M05-02: el directorio de personal solo es accesible para
-          SUPER_ADMIN y DIRECTOR mediante guarda de ruta activa. */}
+          ADMINISTRADOR y DIRECTOR mediante guarda de ruta activa. */}
       <Route
         path="usuarios"
         element={
           <ProtectedRoute
-            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
+            requiredRoles={["ADMINISTRADOR", "SUPER_ADMIN", "DIRECTOR"]}
             requiredModule="Administración"
             requiredAction="editar"
           >

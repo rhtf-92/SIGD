@@ -1,3 +1,4 @@
+import { cuentaActual } from './core/auth/cuenta-actual.js';
 import express, { Express } from 'express';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
@@ -61,6 +62,9 @@ import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
 import { verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { crearRouterSalud } from './controllers/health.controller.js';
+import { crearRouterWorkflowAcademico } from './domains/docucore/workflowAcademico.router.js';
+import { ForbiddenError, NotFoundError, ValidationError } from './shared/domain/errors/index.js';
 import { autenticarJwt, autorizarPermisos, PERMISOS_RBAC } from './core/auth/auth.guard.js';
 
 export interface AppOptions {
@@ -145,23 +149,7 @@ export function construirApp(
   app.use('/api/v1/auth/refresh', refreshRateLimit);
   app.use('/api/v1/auth/registro-ciudadano', registroCiudadanoRateLimit);
 
-  app.get('/health', (_req, res) => {
-    res.json({
-      status: 'ok',
-      estado: 'UP',
-      servicio: 'SIGD Backend',
-      timestamp: new Date().toISOString(),
-    });
-  });
-
-  app.get('/ready', async (_req, res) => {
-    try {
-      await pool.query('SELECT 1');
-      res.json({ status: 'ok', estado: 'READY', timestamp: new Date().toISOString() });
-    } catch {
-      res.status(503).json({ status: 'error', estado: 'NOT_READY' });
-    }
-  });
+  app.use(crearRouterSalud(pool));
 
   // Configuración de Pasarela y Sesiones de Firma (DocuCore - B_VALENTIN)
   const hostsPermitidos = (process.env.REFIRMA_HOSTS_PERMITIDOS ?? 'sigd.iestp-suiza.edu.pe')
@@ -190,23 +178,14 @@ export function construirApp(
 
   // Rutas
   const jwtActorProvider: ActorProviderRutaDoc = {
-    obtenerActor: (req) => {
-      const auth = req.headers.authorization;
-      if (auth && auth.startsWith('Bearer ')) {
-        const token = auth.slice(7).trim();
-        try {
-          const claims = verificarTokenAcceso(token);
-          return {
-            id: claims.sub,
-            roles: claims.roles ?? [],
-            unidadOrganicaId: null,
-            puedeVerExpediente: () => true,
-          };
-        } catch {
-          return null;
+    obtenerActor: async (req) => {
+      const cuenta = await cuentaActual(pool, req);
+      return { id: cuenta.id_usuario, roles: cuenta.roles, unidadOrganicaId: cuenta.area_id,
+        puedeVerExpediente: async (id: string) => {
+          const {rows} = await pool.query('SELECT solicitante_id,area_destino_id FROM sigd_tra.expediente WHERE expediente_id=$1',[id]);
+          return Boolean(rows[0] && (rows[0].solicitante_id===cuenta.id_persona || cuenta.permisos.includes('EXPEDIENTE_LEER')));
         }
-      }
-      return null;
+      };
     },
   };
 
@@ -317,6 +296,7 @@ export function construirApp(
   const routerFirmaPendientes = crearRouterFirmaPendientes(pool);
   app.use('/api/v1/firma', routerFirmaPendientes);
   app.use('/api/v1/firmas', routerFirmaPendientes);
+  app.use('/api/v1/flujos/titulacion', crearRouterWorkflowAcademico(pool));
   app.get('/api/v1/firmas/cola-firmantes', (req, res, next) => {
     req.url = '/pendientes';
     routerFirmaPendientes(req, res, next);
@@ -352,12 +332,14 @@ export function construirApp(
     async (_req, res, next) => {
       try {
         const { rows: roles } = await pool.query(
-          `SELECT r.rol_id, r.codigo, r.nombre, r.descripcion,
+          `SELECT r.rol_id AS id, r.codigo, r.nombre, r.descripcion,
                   COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
            FROM sigd_org.rol_sistema r
            LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
            LEFT JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
-           GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion`,
+           WHERE r.vigente = TRUE
+           GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion
+           ORDER BY r.codigo`,
         );
         res.json({ roles });
       } catch (error) {
@@ -366,6 +348,60 @@ export function construirApp(
     },
   );
 
+  app.put('/api/v1/admin/roles/:codigo/permisos', async (req, res, next) => {
+    const cliente = await pool.connect();
+    try {
+      const actor = await cuentaActual(pool, req);
+      if (!actor.roles.includes('SUPER_ADMIN') && !actor.permisos.includes('ADMIN_USUARIOS')) {
+        throw new ForbiddenError({ message: 'Se requiere el permiso ADMIN_USUARIOS.' });
+      }
+      if (!Array.isArray(req.body?.permisos) ||
+          req.body.permisos.some((permiso: unknown) => typeof permiso !== 'string')) {
+        throw new ValidationError({
+          invalidParams: [{ name: 'permisos', reason: 'Debe ser un arreglo de códigos de permiso.' }],
+        });
+      }
+      const alias: Record<string, string[]> = {
+        SUPER_ADMIN: ['ADMINISTRADOR'],
+        DOCENTE: ['SECRETARIO', 'ESPECIALISTA'],
+        ESTUDIANTE: ['CIUDADANO'],
+      };
+      const codigosRol = alias[String(req.params.codigo)] ?? [String(req.params.codigo)];
+      const permisos = [...new Set(req.body.permisos as string[])];
+      await cliente.query('BEGIN');
+      const roles = await cliente.query<{ rol_id: string; codigo: string }>(
+        'SELECT rol_id, codigo FROM sigd_org.rol_sistema WHERE codigo = ANY($1::text[]) AND vigente=TRUE FOR UPDATE',
+        [codigosRol],
+      );
+      if (roles.rows.length !== codigosRol.length) {
+        throw new NotFoundError({ message: `Rol ${String(req.params.codigo)} no encontrado.` });
+      }
+      const encontrados = permisos.length === 0 ? { rows: [] as Array<{ permiso_id: string; codigo: string }> } :
+        await cliente.query<{ permiso_id: string; codigo: string }>(
+          'SELECT permiso_id, codigo FROM sigd_org.permiso_sistema WHERE codigo = ANY($1::text[])', [permisos],
+        );
+      if (encontrados.rows.length !== permisos.length) {
+        throw new ValidationError({
+          invalidParams: [{ name: 'permisos', reason: 'Contiene uno o más códigos inexistentes.' }],
+        });
+      }
+      const idsRol = roles.rows.map((rol) => rol.rol_id);
+      await cliente.query('DELETE FROM sigd_org.rol_permiso WHERE rol_id = ANY($1::uuid[])', [idsRol]);
+      for (const rolId of idsRol) {
+        for (const permiso of encontrados.rows) {
+          await cliente.query(
+            'INSERT INTO sigd_org.rol_permiso(rol_id, permiso_id) VALUES($1,$2)',
+            [rolId, permiso.permiso_id],
+          );
+        }
+      }
+      await cliente.query('COMMIT');
+      res.json({ codigo: String(req.params.codigo), rolesActualizados: roles.rows.map((rol) => rol.codigo), permisos });
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      next(error);
+    } finally { cliente.release(); }
+  });
   app.get(
     '/api/v1/admin/maestras/sede',
     autorizarPermisos(PERMISOS_RBAC.MAESTRAS_LEER),

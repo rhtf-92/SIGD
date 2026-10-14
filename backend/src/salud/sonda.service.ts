@@ -1,5 +1,7 @@
 import net from 'node:net';
+import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import type { Pool } from 'pg';
+import { obtenerConfiguracionS3 } from '../config/s3.config.js';
 
 export type EstadoDependencia = 'ok' | 'degradado' | 'indisponible' | 'deshabilitado';
 
@@ -35,19 +37,33 @@ async function sondearPostgres(pool: Pool): Promise<ResultadoSonda> {
   return { estado: 'ok', detalle: valor, latencia_ms };
 }
 
-async function sondearMinio(endpoint: string): Promise<ResultadoSonda> {
-  const base = endpoint.replace(/\/+$/, '');
-  const url = `${base}/minio/health/live`;
+async function sondearS3(env: NodeJS.ProcessEnv): Promise<ResultadoSonda> {
+  const config = obtenerConfiguracionS3(env);
   const controlador = new AbortController();
   const temporizador = setTimeout(() => controlador.abort(), TIMEOUT_SONDA_MS);
+  const cliente = new S3Client({
+    region: config.region,
+    endpoint: config.endpoint,
+    forcePathStyle: config.forcePathStyle,
+    credentials: {
+      accessKeyId: config.accessKey,
+      secretAccessKey: config.secretKey,
+    },
+  });
   try {
-    const respuesta = await fetch(url, { signal: controlador.signal });
-    if (!respuesta.ok) {
-      throw new Error(`HTTP ${respuesta.status}`);
-    }
-    return { estado: 'ok', detalle: url, latencia_ms: 0 };
+    const { latencia_ms } = await cronometrar(() =>
+      cliente.send(new HeadBucketCommand({ Bucket: config.bucket }), {
+        abortSignal: controlador.signal,
+      }),
+    );
+    return {
+      estado: 'ok',
+      detalle: `${config.endpoint}/${config.bucket}`,
+      latencia_ms,
+    };
   } finally {
     clearTimeout(temporizador);
+    cliente.destroy();
   }
 }
 
@@ -102,7 +118,7 @@ export async function sondearDependencias(
 ): Promise<ResumenSondas> {
   const [postgres, minio, redis] = await Promise.all([
     ejecutarSonda('PostgreSQL', true, () => sondearPostgres(pool)),
-    ejecutarSonda('MinIO S3', Boolean(env.S3_ENDPOINT), () => sondearMinio(env.S3_ENDPOINT as string)),
+    ejecutarSonda('Almacenamiento S3', Boolean(env.S3_ENDPOINT), () => sondearS3(env)),
     ejecutarSonda('Redis 7', Boolean(env.REDIS_URL), () => sondearRedis(env.REDIS_URL as string)),
   ]);
 

@@ -1,4 +1,6 @@
-﻿import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { getRequestContext } from '../../shared/request-context/request-context.js';
+import { registrarActuacion } from '../rutadoc/derivaciones.service.js';
 import type { Pool, PoolClient } from 'pg';
 import { ValidationError } from '../../shared/domain/errors/index.js';
 import { CutService } from './cut.service.js';
@@ -119,9 +121,9 @@ export class RadicacionVirtualService {
 
   private async verificarTipoTramite(cliente: PoolClient, idTipoTramiteTupa: string): Promise<void> {
     const resultado = await cliente.query<FilaTramiteTupa>(
-      `SELECT id_tipo_tramite_tupa, activo
+      `SELECT tipo_tramite_id AS id_tipo_tramite_tupa, vigente AS activo
          FROM sigd_doc.tipo_tramite_tupa
-        WHERE id_tipo_tramite_tupa = $1`,
+        WHERE tipo_tramite_id = $1`,
       [idTipoTramiteTupa],
     );
     const tipo = resultado.rows[0];
@@ -141,9 +143,9 @@ export class RadicacionVirtualService {
     }
   }
 
-  private async verificarAdministrado(cliente: PoolClient, idPersona: number): Promise<void> {
+  private async verificarAdministrado(cliente: PoolClient, idPersona: string): Promise<void> {
     const resultado = await cliente.query<FilaPersona>(
-      'SELECT id::text AS id, estado FROM sigd_auth.persona WHERE id = $1',
+      'SELECT id_persona AS id, TRUE AS estado FROM sigd_auth.persona WHERE id_persona = $1',
       [idPersona],
     );
     const persona = resultado.rows[0];
@@ -169,27 +171,34 @@ export class RadicacionVirtualService {
     cut: string,
     horario: ResultadoHorarioCorte,
   ): Promise<FilaExpediente> {
+    const id = randomUUID();
+    const tipo = (await cliente.query("SELECT tipo_documental_id FROM sigd_doc.tipo_documento WHERE codigo='SOLICITUD'")).rows[0].tipo_documental_id;
+    const area = getRequestContext()?.unidad_organica_id ?? null;
     const resultado = await cliente.query<FilaExpediente>(
       `INSERT INTO sigd_tra.expediente
-         (cut, id_persona, id_tipo_tramite_tupa, nombre_solicitante,
-          correo_notificacion, asunto, canal_recepcion,
-          estado_tramite, total_folios, fecha_envio_real, fecha_radicacion_legal,
-          fuera_de_horario)
-       VALUES ($1, $2, $3, $4, $5, $6, 'MESA_VIRTUAL', 'REGISTRADO', $7, $8, $9, $10)
-       RETURNING expediente_id, cut, fecha_envio_real, fecha_radicacion_legal, fuera_de_horario`,
+         (codigo_expediente, solicitante_id, tipo_tramite_id, nombre_solicitante,
+          correo_notificacion, numero, total_folios, fecha_envio_real, fecha_radicacion,
+          fuera_de_horario, expediente_id, tipo_documental_id, area_destino_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       RETURNING expediente_id, codigo_expediente AS cut, fecha_envio_real, fecha_radicacion AS fecha_radicacion_legal, fuera_de_horario`,
       [
         cut,
         datos.idPersona,
         datos.idTipoTramiteTupa,
         datos.nombreSolicitante,
         datos.correo,
-        datos.asunto,
+        cut,
         datos.totalFolios,
         horario.envioReal,
         horario.radicacionLegal,
         horario.requiereProyeccion,
+        id, tipo, area,
       ],
     );
+    await cliente.query(`INSERT INTO sigd_doc.expediente(expediente_id,tipo_tramite_id,codigo_expediente,asunto,area_actual_id,solicitante_id)
+      VALUES($1,$2,$3,$4,$5,$6)`,[id,datos.idTipoTramiteTupa,cut,datos.asunto,area,datos.idPersona]);
+    await cliente.query('INSERT INTO sigd_tra.tramite(expediente_id,asunto) VALUES($1,$2)',[id,datos.asunto]);
+    await cliente.query('INSERT INTO sigd_tra.asiento_registro(expediente_id,asunto,remitente_id) VALUES($1,$2,$3)',[id,datos.asunto,datos.idPersona]);
     const expediente = resultado.rows[0];
     if (!expediente) {
       throw new Error('La insercion del expediente no devolvio fila.');
@@ -202,21 +211,35 @@ export class RadicacionVirtualService {
     expedienteId: string,
     datos: RadicacionVirtualInput,
   ): Promise<void> {
-    for (const documento of datos.documentos) {
+    const usuario = getRequestContext()?.usuario_id;
+    if (!usuario || datos.totalFolios < datos.documentos.length) throw new ValidationError({invalidParams:[]});
+    for (const [index, documento] of datos.documentos.entries()) {
+      const {rows} = await cliente.query(`SELECT * FROM sigd_doc.carga_documento WHERE s3_key=$1
+        AND usuario_id=$2 AND estado='CONFIRMADO' FOR UPDATE`,[documento.storagePath,usuario]);
+      const carga=rows[0];
+      if(!carga || carga.sha256!==documento.hashSha256.toLowerCase() || Number(carga.tamano_bytes)!==documento.tamanoBytes ||
+        carga.nombre_archivo!==documento.nombreArchivo || documento.contentType!=='application/pdf')
+        throw new ValidationError({invalidParams:[{name:'documento',reason:'El adjunto debe estar confirmado y pertenecer al solicitante.'}]});
       await cliente.query(
-        `INSERT INTO sigd_tra.documento_adjunto
-           (expediente_id, nombre_archivo, content_type, tamano_bytes, hash_sha256, storage_path)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO sigd_doc.documento_adjunto
+           (expediente_id, nombre_archivo, mime_type, tamano_bytes, sha256, s3_key,
+            documento_adjunto_id,s3_bucket,tipo_documental_id,subido_por)
+         SELECT $1,$2,$3,$4,$5,$6,$7,$8,tipo_documental_id,$9
+           FROM sigd_doc.tipo_documento WHERE codigo='SOLICITUD'`,
         [
           expedienteId,
           documento.nombreArchivo,
           documento.contentType,
           documento.tamanoBytes,
           documento.hashSha256.toLowerCase(),
-          documento.storagePath ?? null,
+          documento.storagePath, carga.carga_id, carga.s3_bucket, usuario,
         ],
       );
+      await cliente.query('SELECT sigd_tra.agregar_folio_expediente($1,$2,$3,$4)',
+        [expedienteId,carga.carga_id,index===0?datos.totalFolios-datos.documentos.length+1:1,usuario]);
+      await cliente.query("UPDATE sigd_doc.carga_documento SET estado='VINCULADO',expediente_id=$1 WHERE carga_id=$2",[expedienteId,carga.carga_id]);
     }
+    await registrarActuacion(cliente,expedienteId,'RECEPCION',{},'ExpedienteRadicado');
   }
 
   private async emitirCargoDigital(

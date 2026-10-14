@@ -19,8 +19,11 @@ export function crearRouterSalud(pool: Pool): Router {
 
     res.json({
       status: 'ok',
+      estado: 'UP',
+      servicio: 'SIGD Backend',
       version: process.env.npm_package_version ?? '1.0.0',
       uptime_s: Math.round(process.uptime()),
+      timestamp: new Date().toISOString(),
       dependencias: resumen.dependencias,
     });
   });
@@ -31,8 +34,10 @@ export function crearRouterSalud(pool: Pool): Router {
 
     res.status(caidas.length > 0 ? 503 : 200).json({
       status: caidas.length > 0 ? 'indisponible' : 'ok',
+      estado: caidas.length > 0 ? 'NOT_READY' : 'READY',
       version: process.env.npm_package_version ?? '1.0.0',
       uptime_s: Math.round(process.uptime()),
+      timestamp: new Date().toISOString(),
       dependencias: resumen.dependencias,
     });
   });

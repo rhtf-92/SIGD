@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "@/api/client";
+import { useAuthStore } from "@/stores/authStore";
 import type {
   DashboardCuelloBotellaItem,
   DashboardEjecutivoData,
@@ -49,7 +50,14 @@ function normalizeDashboard(value: unknown): DashboardEjecutivoData & {
   units: DashboardUnitOption[];
 } {
   const dto = unwrapPayload(value);
-  const rawMetrics = Array.isArray(dto.metrics) ? dto.metrics : [];
+  const counters = asRecord(dto.contadores);
+  const rawMetrics = Array.isArray(dto.metrics) ? dto.metrics : dto.contadores ? [
+    {id:'radicados',title:'Expedientes registrados',value:counters.nRadicados,unit:'casos'},
+    {id:'vtep',title:'VTEP',value:asRecord(dto.vtep).valor,unit:'%',description:'Expedientes atendidos y archivados respecto de los registrados.'},
+    {id:'tpr',title:'Tiempo de atencion',value:asRecord(dto.tprHorasHabiles).valor,unit:'horas',description:'Horas habiles de expedientes resueltos.'},
+    {id:'tro',title:'Resolucion oportuna',value:asRecord(dto.tro).valor,unit:'%'},
+    {id:'teo',title:'Expedientes observados',value:asRecord(dto.teo).valor,unit:'%'},
+  ] : [];
   const metrics: DashboardKpiMetric[] = rawMetrics.map((value, index) => {
     const metric = asRecord(value);
     const number = asNumber(metric.value);
@@ -104,11 +112,11 @@ function normalizeDashboard(value: unknown): DashboardEjecutivoData & {
   const bottlenecks = Array.isArray(dto.cuellosBotella) ? dto.cuellosBotella : [];
   const cuellosBotella: DashboardCuelloBotellaItem[] = bottlenecks.map((value) => {
     const item = asRecord(value);
-    const risk = String(item.severity ?? item.nivelAlerta ?? "low").toLowerCase();
+    const risk = String(item.severity ?? item.nivelAlerta ?? item.riesgo ?? "low").toLowerCase();
     return {
-      area: String(item.area ?? item.nombreArea ?? item.unidadOrganica ?? "Área"),
+      area: String(item.area ?? item.nombreArea ?? item.unidadOrganica ?? item.areaNombre ?? "Área"),
       expedienteCount: asNumber(item.expedienteCount ?? item.expedientesEstancados),
-      diasPromedio: asNumber(item.diasPromedio ?? item.tprPromedio),
+      diasPromedio: asNumber(item.diasPromedio ?? item.tprPromedio ?? item.diasRetencion),
       severity: risk === "high" || risk === "alto" || risk === "critico" ? "high" : risk === "medium" || risk === "medio" || risk === "advertencia" ? "medium" : "low",
     };
   });
@@ -136,24 +144,50 @@ function normalizeDashboard(value: unknown): DashboardEjecutivoData & {
 }
 
 export function useDashboardMetrics(params: DashboardMetricsQuery) {
+  const usuarioId = useAuthStore(s => s.usuario?.id);
   const query = useQuery({
-    queryKey: ["dashboard-ejecutivo", params],
+    queryKey: ["dashboard-ejecutivo", usuarioId, params],
     queryFn: async () => {
-      const response = await apiClient.get<unknown>("/api/v1/reportes/dashboard/resumen", {
-        params: {
-          fechaInicio: params.fechaInicio,
-          fechaFin: params.fechaFin,
-          periodo: params.periodo,
-          diasLimite: params.diasLimite,
-          anio: params.anio,
-          mes: params.mes,
-          unidadOrganicaId: params.unidadOrganicaId || undefined,
-        },
+      const first=params.fechaInicio.slice(0,7),last=params.fechaFin.slice(0,7);
+      const periods:string[]=[];
+      const cursor=new Date(first+'-01T00:00:00Z');
+      while(cursor.toISOString().slice(0,7)<=last && periods.length<120){
+        periods.push(cursor.toISOString().slice(0,7));cursor.setUTCMonth(cursor.getUTCMonth()+1);
+      }
+      const [summaries,trend,bottlenecks]=await Promise.all([
+        Promise.all(periods.map(periodo=>apiClient.get('/api/v1/reportes/dashboard/resumen',{params:{periodo}}))),
+        apiClient.get('/api/v1/reportes/dashboard/tendencias',{params:{anio:params.anio??Number(first.slice(0,4))}}),
+        Promise.all(periods.map(periodo=>apiClient.get('/api/v1/reportes/dashboard/cuellos-botella',{params:{periodo,diasLimite:params.diasLimite??5}}))),
+      ]);
+      const counts:Record<string,number>={};
+      for(const result of summaries)for(const [key,value] of Object.entries(asRecord(result.data.contadores)))counts[key]=(counts[key]??0)+asNumber(value);
+      const ratio=(n:number,d:number)=>d?Math.round(n/d*10000)/100:0;
+      const areas=new Map<string,Record<string,unknown>>();
+      for(const response of bottlenecks)for(const raw of response.data as Record<string,unknown>[]){
+        const id=String(raw.areaId),old=areas.get(id),n=asNumber(raw.expedientes),prior=asNumber(old?.expedientes);
+        const stalled=asNumber(raw.expedientesEstancados)+asNumber(old?.expedientesEstancados);
+        areas.set(id,{...raw,expedientes:n+prior,expedientesEstancados:stalled,
+          diasRetencion:(asNumber(raw.diasRetencion)*n+asNumber(old?.diasRetencion)*prior)/(n+prior||1),
+          riesgo:ratio(stalled,n+prior)>=50?'alto':ratio(stalled,n+prior)>=20?'medio':'bajo'});
+      }
+      const stateCounts=[['Pendientes',Math.max(0,(counts.nRadicados??0)-(counts.nEnTramite??0)-(counts.nAtendidos??0)-(counts.nArchivados??0))],
+        ['En tramite',counts.nEnTramite??0],['Atendidos',counts.nAtendidos??0],['Archivados',counts.nArchivados??0]] as const;
+      return normalizeDashboard({contadores:counts,
+        vtep:{valor:ratio((counts.nAtendidos??0)+(counts.nArchivados??0),counts.nRadicados??0)},
+        tprHorasHabiles:{valor:counts.nResueltos?counts.horasHabilesSuma/counts.nResueltos:0},
+        tro:{valor:ratio(counts.nResueltosDentroPlazo??0,counts.nResueltos??0)},
+        teo:{valor:ratio(counts.nObservados??0,counts.nEnTramite??0)},
+        tendencia:(trend.data as Record<string,unknown>[]).filter(p=>{
+          const month=String(params.anio??Number(first.slice(0,4)))+'-'+String(p.mes).padStart(2,'0');return month>=first&&month<=last;
+        }).map(p=>({...p,fechaLabel:String(p.mes).padStart(2,'0'),resueltos:p.atendidos})),
+        cuellosBotella:Array.from(areas.values()),
+        estados:stateCounts.map(([estado,n])=>({estado,porcentaje:ratio(n,counts.nRadicados??0)})),
+        conformidadGlobal:ratio(counts.nResueltosDentroPlazo??0,counts.nResueltos??0),
+        saludMesasPartes:areas.size?'Con actividad registrada':'Sin actividad registrada',
       });
-      return normalizeDashboard(response.data);
     },
     staleTime: 60_000,
-    placeholderData: (previousData) => previousData,
+    refetchInterval: 30_000,
     retry: 1,
     refetchOnWindowFocus: false,
   });

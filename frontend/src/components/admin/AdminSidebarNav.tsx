@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Users,
   ShieldCheck,
@@ -53,16 +53,10 @@ const ADMIN_ROUTES = [
 export default function AdminSidebarNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [colapsado, setColapsado] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const guardado = window.localStorage.getItem("adminSidebarColapsado");
-      if (guardado) {
-        setColapsado(guardado === "true");
-      }
-    }
-  }, []);
+  const [colapsado, setColapsado] = useState(() =>
+    typeof window !== "undefined" &&
+    window.localStorage.getItem("adminSidebarColapsado") === "true",
+  );
 
   const toggleColapsado = () => {
     setColapsado((prev) => {

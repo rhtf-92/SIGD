@@ -28,25 +28,33 @@ export function ConsentimientoLey29733Modal({
   onClose,
   onSubmit,
 }: ConsentimientoLey29733ModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <ConsentimientoLey29733Dialog
+      isSubmitting={isSubmitting}
+      onClose={onClose}
+      onSubmit={onSubmit}
+    />
+  );
+}
+
+function ConsentimientoLey29733Dialog({
+  isSubmitting,
+  onClose,
+  onSubmit,
+}: Omit<ConsentimientoLey29733ModalProps, "isOpen">) {
   const [consentimiento, setConsentimiento] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen) {
-      setConsentimiento(false);
-      setError(null);
-      return;
-    }
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !isSubmitting) onClose();
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, isSubmitting, onClose]);
-
-  if (!isOpen) return null;
+  }, [isSubmitting, onClose]);
 
   async function handleSubmit() {
     setError(null);

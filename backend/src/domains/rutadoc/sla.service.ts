@@ -76,9 +76,9 @@ export class RepositorioSlaRutaDoc {
 
   async obtenerFechaInicio(idExpediente: string): Promise<string | null> {
     const resultado = await this.pool.query<FilaFechaExpediente>(`
-      SELECT (creado_en AT TIME ZONE 'America/Lima')::date::text AS fecha_inicio
+      SELECT (fecha_radicacion AT TIME ZONE 'America/Lima')::date::text AS fecha_inicio
         FROM sigd_tra.expediente
-       WHERE id_expediente = $1::bigint`, [idExpediente]);
+       WHERE expediente_id = $1::uuid`, [idExpediente]);
     return resultado.rows[0]?.fecha_inicio ?? null;
   }
 }

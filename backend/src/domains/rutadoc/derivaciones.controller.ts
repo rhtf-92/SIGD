@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import { DerivarExpedienteSchema } from './dto/derivarExpediente.dto.js';
 import { AtenderExpedienteSchema } from './dto/atenderExpediente.dto.js';
 import { ArchivarExpedienteSchema } from './dto/archivarExpediente.dto.js';
-import { derivarExpediente, atenderExpediente, archivarExpediente } from './derivaciones.service.js';
+import { derivarExpediente, atenderExpediente, archivarExpediente, registrarActuacion } from './derivaciones.service.js';
 import { NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
 
 export function crearRouterDerivaciones(pool: Pool): Router {
@@ -160,14 +160,7 @@ export function crearRouterDerivaciones(pool: Pool): Router {
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        const resultado = await cliente.query(
-          `UPDATE sigd_tra.expediente SET estado = 'OBSERVADO' WHERE expediente_id = $1::uuid`,
-          [expedienteId],
-        );
-
-        if (resultado.rowCount === 0) {
-          throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
-        }
+        await registrarActuacion(cliente, expedienteId, 'OBSERVACION', { motivo }, 'ExpedienteObservado');
 
         await cliente.query('COMMIT');
 
@@ -202,14 +195,7 @@ export function crearRouterDerivaciones(pool: Pool): Router {
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        const resultado = await cliente.query(
-          `UPDATE sigd_tra.expediente SET estado = 'EN_TRAMITE' WHERE expediente_id = $1::uuid`,
-          [expedienteId],
-        );
-
-        if (resultado.rowCount === 0) {
-          throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
-        }
+        await registrarActuacion(cliente, expedienteId, 'CORRECCION', { motivo }, 'ExpedienteSubsanado');
 
         await cliente.query('COMMIT');
 
@@ -218,7 +204,7 @@ export function crearRouterDerivaciones(pool: Pool): Router {
           mensaje: 'Subsanación registrada exitosamente.',
           expedienteId,
           motivo,
-          estado: 'EN_TRAMITE',
+          estado: 'SUBSANADO',
         });
       } catch (error) {
         await cliente.query('ROLLBACK').catch(() => {});

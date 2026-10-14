@@ -1,13 +1,7 @@
-// Guardia de rutas protegidas del SIGD (ENT-M05-01 / doc 03 RBAC)
-// Si el token JWT expiró o el rol no posee el permiso, redirige a /login o a 403.
-import type { JSX, ReactNode } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
-
-import type { ClavePermiso, MatrizPermisos } from "../types/rbacRoles";
-
-const CLAVE_TOKEN = "sigd_token";
-const CLAVE_ROL = "sigd_rol";
-const CLAVE_PERMISOS = "sigd_permisos";
+import type { JSX, ReactNode } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
+import type { ClavePermiso } from '../types/rbacRoles';
 
 interface ProtectedRouteProps {
   children?: ReactNode;
@@ -16,48 +10,39 @@ interface ProtectedRouteProps {
   requiredAction?: ClavePermiso;
 }
 
-export function tienePermisoAlmacenado(
-  modulo: string,
-  accion: string,
-): boolean {
-  const rol = window.localStorage.getItem(CLAVE_ROL) ?? "";
-  const crudo = window.localStorage.getItem(CLAVE_PERMISOS);
-  if (!crudo) return false;
-
-  try {
-    const matriz = JSON.parse(crudo) as MatrizPermisos;
-    const filas = matriz[rol] ?? [];
-    const fila = filas.find(
-      (item) => item.modulo.toLowerCase() === modulo.toLowerCase(),
-    );
-    if (!fila) return false;
-    return accion in fila ? Boolean((fila as never)[accion]) : false;
-  } catch {
-    return false;
-  }
-}
+const PERMISO_BACKEND: Record<string, string | undefined> = {
+  'Expedientes.ver': 'EXPEDIENTE_LEER',
+  'Expedientes.derivar': 'EXPEDIENTE_DERIVAR',
+  'Expedientes.editar': 'EXPEDIENTE_RESOLVER',
+  'Documentos.editar': 'FIRMA_FIRMAR',
+  'Administración.ver': 'ADMIN_USUARIOS',
+  'Administración.editar': 'ADMIN_USUARIOS',
+  'Auditoría.ver': 'REPORTE_LEER',
+  'Auditoría.exportar': 'REPORTE_LEER',
+};
 
 export default function ProtectedRoute({
   children,
   requiredRoles = [],
   requiredModule,
-  requiredAction = "ver",
+  requiredAction = 'ver',
 }: ProtectedRouteProps): JSX.Element {
   const location = useLocation();
-  const token = window.localStorage.getItem(CLAVE_TOKEN);
-  const rol = window.localStorage.getItem(CLAVE_ROL);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const usuario = useAuthStore((state) => state.usuario);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
-  if (!token) {
+  if (!accessToken || !usuario || !isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
-
-  if (requiredRoles.length > 0 && !requiredRoles.includes(rol ?? "")) {
+  if (requiredRoles.length > 0 && !requiredRoles.includes(usuario.rol)) {
     return <Navigate to="/acceso-denegado" replace />;
   }
-
-  if (requiredModule && !tienePermisoAlmacenado(requiredModule, requiredAction)) {
-    return <Navigate to="/acceso-denegado" replace />;
+  if (requiredModule) {
+    const permiso = PERMISO_BACKEND[`${requiredModule}.${requiredAction}`];
+    if (!permiso || !(usuario.permisos ?? []).includes(permiso)) {
+      return <Navigate to="/acceso-denegado" replace />;
+    }
   }
-
   return <>{children ?? <Outlet />}</>;
 }

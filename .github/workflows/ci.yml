@@ -1,66 +1,103 @@
-name: SIGD Pipeline CI
+name: SIGD CI
 
 on:
   pull_request:
-    branches: [ "F_BARTRA", "main" ]
+    branches:
+      - F_BARTRA
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sigd-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  certificacion-calidad:
+  backend:
+    name: Backend
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
     steps:
-      - name: Checkout del código
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
+      - name: Configurar Node.js 24.19
         uses: actions/setup-node@v4
         with:
-          node-version: '24.19.x'
+          node-version: 24.19.x
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
 
-      # --- BACKEND ---
-      - name: 1. Instalación reproducible (npm ci) - Backend
-        run: cd backend && npm ci
+      - name: Instalar dependencias
+        run: npm ci
 
-      - name: 2. Typecheck Backend
-        run: cd backend && npm run typecheck --if-present
+      - name: Verificar TypeScript
+        run: npm run typecheck
 
-      - name: 3. Build Backend
-        run: cd backend && npm run build
+      - name: Compilar backend
+        run: npm run build
 
-      - name: 4. Pruebas Unitarias Backend
-        run: cd backend && npm run test:unit --if-present
+      - name: Ejecutar pruebas unitarias
+        run: npm exec -- vitest run --config vitest.unit.config.ts --configLoader bundle
 
-      - name: 5. Pruebas DB (Dependencia de Leonel)
-        run: echo "🚧 Pendiente: A la espera de los comandos de bootstrap DB de Leonel"
+      - name: Ejecutar pruebas de base de datos
+        run: npm run test:db
 
-      - name: 6. Pruebas E2E (Dependencia de Leonel)
-        run: echo "🚧 Pendiente: A la espera de los comandos E2E de Leonel"
+      - name: Ejecutar pruebas E2E
+        run: npm run test:e2e
 
-      # --- FRONTEND ---
-      - name: 7. Instalación reproducible (npm ci) - Frontend
-        run: cd frontend && npm ci
+      - name: Auditoría de seguridad NPM (Crítica)
+        run: npm audit --audit-level=critical
 
-      - name: 8. Typecheck Frontend
-        run: cd frontend && npm run typecheck --if-present
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: 9. Typecheck M03 (Con tipos de jest-dom)
-        run: cd frontend && npm run typecheck:m03 --if-present
+      - name: Configurar Node.js 24.19
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.x
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: 10. Lint Frontend
-        run: cd frontend && npm run lint --if-present
+      - name: Instalar dependencias
+        run: npm ci
 
-      - name: 11. Pruebas Frontend
-        run: cd frontend && npm run test --if-present
+      - name: Verificar TypeScript
+        run: npm run typecheck
 
-      - name: 12. Build Frontend
-        run: cd frontend && npm run build
+      - name: Verificar TypeScript M03
+        run: npm run typecheck:m03
 
-      # --- SEGURIDAD Y DOCKER ---
-      - name: 13a. Auditoría npm (Backend)
-        run: cd backend && npm audit --audit-level=high || true
+      - name: Ejecutar ESLint
+        run: npm run lint
 
-      - name: 13b. Auditoría npm (Frontend)
-        run: cd frontend && npm audit --audit-level=high || true
+      - name: Ejecutar pruebas
+        run: npm test
 
-      - name: 13c. Validación de Docker Compose
+      - name: Compilar frontend
+        run: npm run build
+
+      - name: Auditoría de seguridad NPM (Crítica)
+        run: npm audit --audit-level=critical
+
+  devops:
+    name: Infraestructura y Docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validación de Docker Compose
         run: docker compose -f docker-compose.prod.yml config

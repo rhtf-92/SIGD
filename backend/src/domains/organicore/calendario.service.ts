@@ -28,7 +28,7 @@
 
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
-import { ConflictError, ValidationError } from '../../shared/domain/errors/index.js';
+import { ConflictError, NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
 import { getRequestContext } from '../../shared/request-context/request-context.js';
 import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
 import { insertarEvento } from '../../audit/evento-outbox.repository.js';
@@ -519,6 +519,7 @@ export const esquemaConsultaCalendario = z
       .enum(['true', 'false'])
       .transform((valor) => valor === 'true')
       .optional(),
+    estado: z.enum(['ACTIVO', 'INACTIVO', 'TODOS']).optional(),
   })
   .superRefine((datos, ctx) => {
     // La coherencia del rango es una regla de validación de entrada, no del
@@ -552,6 +553,7 @@ export interface FilaCalendario {
 }
 
 const SELECCION = `
+  SELECT
     c.id_calendario,
     to_char(c.fecha, 'YYYY-MM-DD') AS fecha,
     c.anio,
@@ -578,6 +580,7 @@ export interface FiltroCalendario {
   desde?: string;
   hasta?: string;
   incluirInactivos?: boolean;
+  estado?: 'ACTIVO' | 'INACTIVO' | 'TODOS';
 }
 
 function mapearFila(fila: FilaCalendario): DiaCalendario {
@@ -651,8 +654,10 @@ async function listarCalendario(
   const condiciones: string[] = [];
   const valores: unknown[] = [];
 
-  if (!filtro.incluirInactivos) {
+  if (filtro.estado === 'ACTIVO' || (!filtro.estado && !filtro.incluirInactivos)) {
     condiciones.push('c.activo = TRUE');
+  } else if (filtro.estado === 'INACTIVO') {
+    condiciones.push('c.activo = FALSE');
   }
   if (filtro.anio !== undefined) {
     valores.push(filtro.anio);
@@ -819,6 +824,17 @@ export class CalendarioService {
       });
     }
     return this.listar({ anio });
+  }
+
+  public async cambiarVigencia(id: string, activo: boolean): Promise<void> {
+    const resultado = await this.pool.query(
+      'UPDATE sigd_org.calendario_laboral SET activo = $2 WHERE id_calendario = $1',
+      [id, activo],
+    );
+    if (!resultado.rowCount) {
+      throw new NotFoundError({ message: 'El registro del calendario no existe.' });
+    }
+    this.invalidarCache();
   }
 
   /** Fechas no laborables registradas en base de datos para el rango. */

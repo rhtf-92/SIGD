@@ -201,15 +201,14 @@ CREATE INDEX IF NOT EXISTS idx_notif_casilla_cut
 CREATE INDEX IF NOT EXISTS idx_notif_casilla_fecha
     ON sigd_auth.notificacion_casilla (fecha_deposito DESC);
 
--- Semilla inicial determinista para pruebas y desarrollo
--- Insertar solo si el usuario referenciado existe para evitar violaciones FK en entornos limpios
+-- -- Semilla de desarrollo: insertar solo si el usuario existe.
 INSERT INTO sigd_auth.notificacion_casilla (
     id, usuario_id, cut, asunto, tipo_acto, numero_documento,
     estado, fecha_deposito, hash_sha256, cvd
 )
 SELECT
     '00000000-0000-0000-0000-000000000101'::uuid,
-    '00000000-0000-0000-0000-000000000001'::uuid,
+    u.id_usuario,
     'EXP-2026-000142',
     'Notificación de Resolución Directoral de Matrícula',
     'Resolución Directoral',
@@ -218,8 +217,6 @@ SELECT
     now(),
     'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     'CVD-2026-RD-000142-A4F2'
-WHERE EXISTS (
-    SELECT 1 FROM sigd_auth.cuenta_usuario WHERE id_usuario = '00000000-0000-0000-0000-000000000001'
-)
+FROM sigd_auth.cuenta_usuario AS u
+WHERE u.id_usuario = '00000000-0000-0000-0000-000000000001'::uuid
 ON CONFLICT (id) DO NOTHING;
-
