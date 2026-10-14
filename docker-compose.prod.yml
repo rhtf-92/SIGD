@@ -1,12 +1,11 @@
-version: "3.8"
-
-services:
+﻿services:
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: production
     ports:
-      - "80:8080" # Nginx no-root escucha en el 8080 internamente
+      - "80:8080"
     depends_on:
       - backend
     restart: always
@@ -15,16 +14,20 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: production
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      # Secretos obligatorios (Docker fallará si están vacíos)
-      - DB_PASSWORD=${POSTGRES_PASSWORD:?La contraseña de PostgreSQL es obligatoria en produccion}
-      - JWT_SECRET=${JWT_SECRET:?El secreto JWT es obligatorio en produccion}
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY:?La clave de S3 es obligatoria}
-      - S3_SECRET_KEY=${S3_SECRET_KEY:?El secreto de S3 es obligatorio}
-      - DATABASE_URL=postgresql://user:password@db:5432/sigd
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-sigd_db}
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres_password}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password}@db:5432/${POSTGRES_DB:-sigd_db}
+      - JWT_SECRET=${JWT_SECRET:-secreto_super_seguro_prod}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-minioadmin}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-minioadmin}
     depends_on:
       - db
       - redis
@@ -32,16 +35,16 @@ services:
 
   db:
     image: postgres:18-alpine
-    # 🔒 SIN SECCIÓN DE PUERTOS para no exponer la base de datos a internet
     environment:
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?La contraseña de PostgreSQL es obligatoria}
+      - POSTGRES_DB=${POSTGRES_DB:-sigd_db}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres_password}
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: always
 
   redis:
     image: redis:7-alpine
-    # 🔒 SIN SECCIÓN DE PUERTOS para no exponer caché a internet
     restart: always
 
 volumes:
