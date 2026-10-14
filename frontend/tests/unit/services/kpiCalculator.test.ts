@@ -57,8 +57,8 @@ describe('calculateBusinessHours', () => {
     const friday = new Date('2026-09-11T00:00:00Z');
     const nextMonday = new Date('2026-09-14T00:00:00Z');
     const result = calculateBusinessHours(friday, nextMonday);
-    // Viernes + Lunes = 2 días = 48 horas
-    expect(result).toBe(48);
+    // La fecha final es exclusiva: solo se contabiliza el viernes.
+    expect(result).toBe(24);
   });
 
   it('debe calcular correctamente para una semana laboral completa', () => {
@@ -230,8 +230,8 @@ describe('calculateKpi02TempoPromedio', () => {
       },
     ];
     const result = calculateKpi02TempoPromedio(aggregateData);
-    // Viernes = 24 horas, Lunes = 24 horas = 48 horas
-    expect(result).toBe(48);
+    // La fecha final es exclusiva: solo se contabiliza el viernes.
+    expect(result).toBe(24);
   });
 
   it('debe redondear a 2 decimales', () => {
