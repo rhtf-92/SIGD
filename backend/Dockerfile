@@ -1,5 +1,5 @@
 # Usar imagen ligera de Node
-FROM node:20-alpine
+FROM node:24.19-alpine
 
 # Crear directorio de trabajo
 WORKDIR /app

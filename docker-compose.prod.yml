@@ -21,13 +21,13 @@
       - NODE_ENV=production
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=${POSTGRES_DB:-sigd_db}
-      - DB_USER=${POSTGRES_USER:-postgres}
-      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres_password}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password}@db:5432/${POSTGRES_DB:-sigd_db}
-      - JWT_SECRET=${JWT_SECRET:-secreto_super_seguro_prod}
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-minioadmin}
-      - S3_SECRET_KEY=${S3_SECRET_KEY:-minioadmin}
+      - DB_NAME=${POSTGRES_DB:?POSTGRES_DB es obligatorio}
+      - DB_USER=${POSTGRES_USER:?POSTGRES_USER es obligatorio}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER es obligatorio}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}@db:5432/${POSTGRES_DB:?POSTGRES_DB es obligatorio}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET es obligatorio}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:?S3_ACCESS_KEY es obligatorio}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:?S3_SECRET_KEY es obligatorio}
     depends_on:
       - db
       - redis
@@ -36,9 +36,9 @@
   db:
     image: postgres:18-alpine
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-sigd_db}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres_password}
+      - POSTGRES_DB=${POSTGRES_DB:?POSTGRES_DB es obligatorio}
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER es obligatorio}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: always

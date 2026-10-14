@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { obtenerAgente, limpiarAmbiente, cerrarAmbiente } from '../helpers/app.helper.js';
 import { obtenerPool } from '../helpers/database.helper.js';
 import { payloadRadicacionValido, correlationIdFijo } from '../helpers/payloads.helper.js';
 
-describe('E2E-06 · Captura automática de contexto en la bitácora', () => {
+describe('E2E-06 Â· Captura automÃ¡tica de contexto en la bitÃ¡cora', () => {
   beforeAll(async () => {
     await limpiarAmbiente();
   });
@@ -12,10 +12,10 @@ describe('E2E-06 · Captura automática de contexto en la bitácora', () => {
     await cerrarAmbiente();
   });
 
-  it('registra usuario_id, ip_origen y correlation_id sin pasarlos en el código de negocio', async () => {
+  it('registra usuario_id, ip_origen y correlation_id sin pasarlos en el cÃ³digo de negocio', async () => {
     const pool = obtenerPool();
     const cuenta = await pool.query(
-      'INSERT INTO sigd_auth.cuenta_usuario DEFAULT VALUES RETURNING id',
+      'INSERT INTO sigd_auth.cuenta_usuario DEFAULT VALUES RETURNING id_usuario',
     );
     const usuarioId = cuenta.rows[0].id;
     const correlation = correlationIdFijo();
