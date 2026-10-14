@@ -1,51 +1,92 @@
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import {
+  Archive,
+  BarChart3,
+  FileInput,
+  Home,
+  Inbox,
+  LogIn,
+  Menu,
+  Settings,
+  X,
+} from "lucide-react";
+import { Link, NavLink } from "react-router-dom";
+import sigdLogo from "../assets/LOGO 3.png";
+
+const NAVEGACION = [
+  { etiqueta: "Inicio", ruta: "/", icono: Home, exacta: true },
+  { etiqueta: "Trámites", ruta: "/tramite", icono: FileInput, exacta: false },
+  { etiqueta: "Expedientes", ruta: "/expedientes", icono: Archive, exacta: false },
+  { etiqueta: "Casilla", ruta: "/casilla", icono: Inbox, exacta: false },
+  { etiqueta: "Reportes", ruta: "/reportes/dashboard", icono: BarChart3, exacta: false },
+  { etiqueta: "Administración", ruta: "/administracion", icono: Settings, exacta: false },
+] as const;
 
 export default function HeaderInstitucional() {
-  const navigate = useNavigate();
+  const [menuAbierto, setMenuAbierto] = useState(false);
 
   return (
-    <header className="header-sigd bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-md print:hidden">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
-        <div
-          className="flex cursor-pointer items-center gap-3"
-          onClick={() => navigate("/")}
-        >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-blue-800 font-black text-base shadow-sm">
-            S
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-black tracking-wider uppercase text-white">
-                SIGD SUIZA
-              </span>
-              <span className="rounded bg-blue-600/60 px-1.5 py-0.2 font-mono text-[10px] font-bold text-blue-100">
-                v1.0
-              </span>
-            </div>
-            <p className="text-xs text-blue-100 font-medium">
-              Instituto de Educación Superior Tecnológico Público "Suiza"
-            </p>
-          </div>
-        </div>
+    <header className="sigd-app-header print:hidden">
+      <div className="sigd-header-inner">
+        <Link to="/" className="sigd-brand" aria-label="SIGD SUIZA — ir al inicio">
+          <span className="sigd-brand-logo"><img src={sigdLogo} alt="" /></span>
+          <span className="sigd-brand-copy">
+            <span className="sigd-brand-title">SIGD SUIZA <small>v1.0</small></span>
+            <span>Gestión Documental Institucional</span>
+          </span>
+        </Link>
 
-        <nav className="flex items-center gap-3 text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => navigate("/casilla")}
-            className="rounded-lg bg-white/10 px-3 py-1.5 text-white hover:bg-white/20 transition"
-          >
-            Casilla Electrónica
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/administracion")}
-            className="rounded-lg bg-white/10 px-3 py-1.5 text-white hover:bg-white/20 transition"
-          >
-            Administración
-          </button>
+        <nav className="sigd-desktop-nav" aria-label="Navegación principal">
+          {NAVEGACION.map(({ etiqueta, ruta, icono: Icono, exacta }) => (
+            <NavLink
+              key={ruta}
+              to={ruta}
+              end={exacta}
+              className={({ isActive }) => `sigd-nav-link${isActive ? " is-active" : ""}`}
+            >
+              <Icono aria-hidden="true" size={16} />
+              <span>{etiqueta}</span>
+            </NavLink>
+          ))}
         </nav>
+
+        <div className="sigd-header-actions">
+          <Link to="/login" className="sigd-access-link">
+            <LogIn aria-hidden="true" size={17} />
+            <span>Acceder</span>
+          </Link>
+          <button
+            type="button"
+            className="sigd-menu-toggle"
+            aria-label={menuAbierto ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={menuAbierto}
+            aria-controls="sigd-mobile-navigation"
+            onClick={() => setMenuAbierto((abierto) => !abierto)}
+          >
+            {menuAbierto ? <X aria-hidden="true" size={21} /> : <Menu aria-hidden="true" size={21} />}
+          </button>
+        </div>
       </div>
-      <div className="h-1 w-full bg-gradient-to-r from-blue-400 via-rose-500 to-amber-400" />
+
+      <nav
+        id="sigd-mobile-navigation"
+        className={`sigd-mobile-nav${menuAbierto ? " is-open" : ""}`}
+        aria-label="Navegación móvil"
+      >
+        {NAVEGACION.map(({ etiqueta, ruta, icono: Icono, exacta }) => (
+          <NavLink
+            key={ruta}
+            to={ruta}
+            end={exacta}
+            onClick={() => setMenuAbierto(false)}
+            className={({ isActive }) => `sigd-mobile-link${isActive ? " is-active" : ""}`}
+          >
+            <Icono aria-hidden="true" size={18} />
+            <span>{etiqueta}</span>
+          </NavLink>
+        ))}
+      </nav>
+      <div className="sigd-header-line" aria-hidden="true" />
     </header>
   );
 }

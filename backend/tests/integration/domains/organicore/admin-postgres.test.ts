@@ -25,8 +25,8 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
   const anioPrueba = 2200 + (Number.parseInt(sufijo.slice(8, 12), 16) % 700);
   const fechaActiva = `${anioPrueba}-04-20`;
   const fechaInactiva = `${anioPrueba}-04-21`;
-  const descripcionActiva = `Prueba PR 166 ${sufijo}`;
-  const descripcionInactiva = `Prueba inactiva PR 166 ${sufijo}`;
+  const descripcionActiva = `Prueba PR 167 ${sufijo}`;
+  const descripcionInactiva = `Prueba inactiva PR 167 ${sufijo}`;
 
   beforeAll(() => {
     if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL no configurada por globalSetup');
@@ -58,8 +58,8 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     const calendario = new CalendarioService(pool);
     const usuarios = crearUsuariosAdminService(pool);
 
-    const area = await organigrama.crearUnidad({ codigo: codigoPrueba, nombre: `Área QA PR 166 ${sufijo}`, padreId: null });
-    await maestras.crear('cargos', { codigo: codigoPrueba, nombre: `Cargo QA PR 166 ${sufijo}` });
+    const area = await organigrama.crearUnidad({ codigo: codigoPrueba, nombre: `Área QA PR 167 ${sufijo}`, padreId: null });
+    await maestras.crear('cargos', { codigo: codigoPrueba, nombre: `Cargo QA PR 167 ${sufijo}` });
     const cargo = await pool.query<{ cargo_id: string }>('SELECT cargo_id FROM sigd_org.cargo WHERE codigo = $1', [codigoPrueba]);
     const roles = await pool.query<{ rol_id: string; codigo: string }>(
       "SELECT rol_id, codigo FROM sigd_org.rol_sistema WHERE codigo IN ('ADMINISTRADOR', 'DIRECTOR') ORDER BY codigo",
@@ -79,16 +79,15 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
       identificador: usernamePrueba, password: 'ClaveSegura166!',
     });
     expect(login.status).toBe(200);
-    expect(login.body.requiereSeleccionPerfil).toBe(true);
+    expect(login.body.requiresRoleSelection).toBe(true);
     expect(login.body).not.toHaveProperty('accessToken');
 
-    const administrador = roles.rows.find((rol) => rol.codigo === 'ADMINISTRADOR')!;
-    const seleccion = await request(app).post('/api/v1/auth/seleccionar-perfil').send({
-      tokenSeleccionPerfil: login.body.tokenSeleccionPerfil,
-      rolId: administrador.rol_id,
+    const seleccion = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: login.body.selectionToken,
+      rol: 'SUPER_ADMIN',
     });
     expect(seleccion.status).toBe(200);
-    expect(verificarTokenAcceso(seleccion.body.accessToken).roles).toEqual(['ADMINISTRADOR']);
+    expect(verificarTokenAcceso(seleccion.body.accessToken).roles).toEqual(['SUPER_ADMIN']);
 
     const intentosRefresh = await Promise.all([
       request(app).post('/api/v1/auth/refresh').send({ refreshToken: seleccion.body.refreshToken }),
@@ -97,12 +96,11 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     expect(intentosRefresh.map((respuesta) => respuesta.status).sort()).toEqual([200, 401]);
     const refresh = intentosRefresh.find((respuesta) => respuesta.status === 200)!;
     expect(refresh.status).toBe(200);
-    expect(verificarTokenAcceso(refresh.body.accessToken).roles).toEqual(['ADMINISTRADOR']);
+    expect(verificarTokenAcceso(refresh.body.accessToken).roles).toEqual(['SUPER_ADMIN']);
 
-    const director = roles.rows.find((rol) => rol.codigo === 'DIRECTOR')!;
-    const cambio = await request(app).post('/api/v1/auth/cambiar-perfil')
+    const cambio = await request(app).post('/api/v1/auth/switch-role')
       .set('Authorization', `Bearer ${refresh.body.accessToken}`)
-      .send({ refreshToken: refresh.body.refreshToken, rolId: director.rol_id });
+      .send({ refreshToken: refresh.body.refreshToken, rol: 'DIRECTOR' });
     expect(cambio.status).toBe(200);
     expect(verificarTokenAcceso(cambio.body.accessToken).roles).toEqual(['DIRECTOR']);
 
@@ -134,11 +132,11 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
       identificador: usernamePrueba, password: 'ClaveSegura166!',
     });
     expect(loginDesbloqueado.status).toBe(200);
-    expect(loginDesbloqueado.body.requiereSeleccionPerfil).toBe(true);
+    expect(loginDesbloqueado.body.requiresRoleSelection).toBe(true);
 
-    const seleccionTrasDesbloqueo = await request(app).post('/api/v1/auth/seleccionar-perfil').send({
-      tokenSeleccionPerfil: loginDesbloqueado.body.tokenSeleccionPerfil,
-      rolId: administrador.rol_id,
+    const seleccionTrasDesbloqueo = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: loginDesbloqueado.body.selectionToken,
+      rol: 'SUPER_ADMIN',
     });
     expect(seleccionTrasDesbloqueo.status).toBe(200);
     const logout = await request(app).post('/api/v1/auth/logout').send({

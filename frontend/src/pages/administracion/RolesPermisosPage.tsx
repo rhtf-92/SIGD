@@ -86,8 +86,8 @@ export default function RolesPermisosPage() {
               <div className="border-b border-slate-200 px-6 py-4">
                 <h3 className="font-bold">Matriz de permisos</h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  La validación definitiva deberá aplicarse también en backend y
-                  base de datos (payload PUT /api/v1/roles/:id/permisos).
+                  Los controles habilitados corresponden a permisos canónicos
+                  aplicados por el backend y persistidos en PostgreSQL.
                 </p>
               </div>
 

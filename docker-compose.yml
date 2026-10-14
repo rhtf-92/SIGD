@@ -1,5 +1,4 @@
 services:
-  # 1. Base de Datos Relacional y Extensiones Criptográficas
   postgres:
     image: postgres:18-alpine
     container_name: sigd_postgres
@@ -8,43 +7,38 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB es obligatorio}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
 
-  # Crea el bucket una sola vez antes de que la API emita URLs prefirmadas.
-  minio-init:
-    image: amazon/aws-cli:2.27.0
-    container_name: sigd_minio_init
-    depends_on:
-      minio:
-        condition: service_started
+  s3:
+    image: chrislusf/seaweedfs:4.17@sha256:186de7ef977a20343ee9a5544073f081976a29e2d29ecf8379891e7bf177fbe9
+    container_name: sigd_s3
+    command: mini -dir=/data
     environment:
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?MINIO_ROOT_USER es obligatorio}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD es obligatorio}
-      AWS_DEFAULT_REGION: us-east-1
-    entrypoint: ["/bin/sh", "-c", "until aws --endpoint-url http://minio:9000 s3api list-buckets > /dev/null 2>&1; do sleep 2; done; aws --endpoint-url http://minio:9000 s3 mb s3://sigd-expedientes || true"]
-
-  # 2. Almacenamiento de Objetos Compatible con Amazon S3
-  minio:
-    image: chainguard/minio:latest
-    container_name: sigd_minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER es obligatorio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD es obligatorio}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?S3_ACCESS_KEY es obligatorio}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY es obligatorio}
+      S3_BUCKET: ${S3_BUCKET:-sigd-expedientes}
     ports:
-      - "9000:9000"   # API S3
-      - "9001:9001"   # Consola Web
+      - "127.0.0.1:9000:8333"
+      - "127.0.0.1:8888:8888"
     volumes:
-      - miniodata:/data
+      - s3data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8888/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
 
-  # 3. Almacén Clave-Valor en Memoria para Cache y Sesiones
   redis:
     image: redis:7-alpine
     container_name: sigd_redis
@@ -56,59 +50,83 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
-  # 4. API Backend y Worker Asíncrono de Auditoría Outbox
   backend:
-    image: node:24-alpine
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
     container_name: sigd_backend
     working_dir: /app
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
-    command: sh -c "npm install && npm run dev"
     environment:
       PORT: 3000
       NODE_ENV: development
-      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER es obligatorio}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB es obligatorio}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET es obligatorio}
-      S3_ENDPOINT: http://minio:9000
+      CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
+      S3_ENDPOINT: http://s3:8333
       S3_PUBLIC_ENDPOINT: http://localhost:9000
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER es obligatorio}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD es obligatorio}
-      S3_BUCKET: sigd-expedientes
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?S3_ACCESS_KEY es obligatorio}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY es obligatorio}
+      S3_BUCKET: ${S3_BUCKET:-sigd-expedientes}
+      S3_FORCE_PATH_STYLE: "true"
       REDIS_URL: redis://redis:6379
-      OUTBOX_POLL_MS: 5000
+      OUTBOX_POLL_INTERVAL_MS: 5000
+      MIGRATE_ON_BOOT: "true"
+      START_FRONTEND: "false"
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+      s3:
+        condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
 
-  # 5. Frontend Single Page Application (React 19 + Vite 6)
   frontend:
-    image: node:24-alpine
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
     container_name: sigd_frontend
     working_dir: /app
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     environment:
       VITE_API_BASE_URL: http://localhost:3000/api/v1
       VITE_ENABLE_MOCKS: "false"
+    command: ["npm", "exec", "--", "vite", "--host", "0.0.0.0", "--port", "5173", "--strictPort"]
     ports:
       - "5173:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
 
 volumes:
   pgdata:
-  miniodata:
   redisdata:
-  frontend_node_modules:
+  s3data:
   backend_node_modules:
+  frontend_node_modules:

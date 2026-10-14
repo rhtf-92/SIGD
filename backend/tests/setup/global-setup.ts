@@ -72,16 +72,33 @@ async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
 
     if (existsSync(dirMigraciones)) {
       // La suite DB de OrganiCore no debe bloquearse por el hallazgo preexistente
-      // de RutaDoc (06, SQLSTATE 42703). Se puede sobrescribir explícitamente con
+      // de RutaDoc (06, SQLSTATE 42703) ni por la migración MGD 11, que depende
+      // directamente de las relaciones creadas por 06. Se puede sobrescribir con
       // MIGRATIONS_EXCLUDE; una cadena vacía fuerza la ejecución de todas.
-      const exclusionesConfiguradas = process.env.MIGRATIONS_EXCLUDE ?? '06_sigd_rut.sql,07_sigd_reportes.sql';
+      const exclusionesConfiguradas = process.env.MIGRATIONS_EXCLUDE
+        ?? '06_sigd_rut.sql,07_sigd_reportes.sql,11_sigd_mgd_contract.sql';
       const excluidas = new Set(exclusionesConfiguradas.split(',').map((item) => item.trim()).filter(Boolean));
+      await cliente.query(`
+        CREATE TABLE IF NOT EXISTS public.sigd_prueba_migraciones (
+          nombre_script TEXT PRIMARY KEY,
+          aplicado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
       const archivos = readdirSync(dirMigraciones)
         .filter((f) => f.endsWith('.sql'))
         .filter((f) => !excluidas.has(f))
         .sort();
       for (const archivo of archivos) {
+        const aplicada = await cliente.query(
+          'SELECT 1 FROM public.sigd_prueba_migraciones WHERE nombre_script = $1',
+          [archivo],
+        );
+        if (aplicada.rowCount && aplicada.rowCount > 0) continue;
         await aplicarSql(cliente, path.join(dirMigraciones, archivo));
+        await cliente.query(
+          'INSERT INTO public.sigd_prueba_migraciones (nombre_script) VALUES ($1)',
+          [archivo],
+        );
       }
     }
   } finally {

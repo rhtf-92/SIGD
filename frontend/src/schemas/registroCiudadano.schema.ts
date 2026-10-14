@@ -94,7 +94,8 @@ const validateRucModulo11 = (ruc: string): boolean => {
 
   const resto = suma % 11;
   const resta = 11 - resto;
-  const modulo11 = resta === 10 ? 0 : resta === 11 ? 1 : resta;
+  // SUNAT: 11 se normaliza a 0 y 10 se normaliza a 1.
+  const modulo11 = resta === 11 ? 0 : resta === 10 ? 1 : resta;
 
   return digitoVerificador === modulo11.toString();
 };

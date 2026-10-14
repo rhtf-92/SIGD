@@ -15,9 +15,11 @@ const esquema = z.object({
   S3_PRESIGN_EXPIRATION_SEGUNDOS: z.coerce.number().int().min(60).max(604_800).default(900),
 }).superRefine((config, contexto) => {
   if (config.NODE_ENV !== 'production') return;
+
   const valoresInseguros = new Set(['minioadmin', 'minioadminpassword', 'changeme', 'password']);
   const accessKey = config.S3_ACCESS_KEY.toLowerCase();
   const secretKey = config.S3_SECRET_KEY.toLowerCase();
+
   if (valoresInseguros.has(accessKey) || accessKey.startsWith('cambiar_')) {
     contexto.addIssue({
       code: z.ZodIssueCode.custom,

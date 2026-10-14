@@ -157,9 +157,9 @@ describe('App Routing & Health Verification', () => {
     }
   });
 
-  it('POST /api/v1/storage/presigned-url responde con error de validacion si faltan datos', async () => {
+  it('POST /api/v1/storage/presigned-url exige autenticacion antes de validar el cuerpo', async () => {
     const res = await request(app).post('/api/v1/storage/presigned-url').send({});
-    expect([400, 422]).toContain(res.status);
+    expect(res.status).toBe(401);
   });
 
   it('GET /api/v1/firmas/cola-firmantes responde protegiendo acceso sin autenticacion', async () => {

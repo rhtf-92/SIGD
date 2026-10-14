@@ -1,3 +1,5 @@
+import { usePresignedUpload } from '../../../hooks/usePresignedUpload';
+import { apiClient } from '../../../api/client';
 /**
  * ==============================================================================
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
@@ -12,13 +14,13 @@
  *
  * Características:
  * - Validación reactiva de obligatoriedad, longitud mínima de asunto y archivos PDF.
- * - Validación de tamaño máximo de archivo (límite 25 MB según directiva LPAG).
+ * - Validación de tamaño máximo de archivo (límite 20 MB según directiva LPAG).
  * - Accesibilidad WCAG 2.1 AA con contraste reforzado y alertas de error en rojo.
  * - Cero 'any', 100% tipado estricto con contratos de tramiteWizardState.ts.
  * ==============================================================================
  */
 
-import React, { useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type {
   DocumentosData,
   ArchivoTramite,
@@ -38,40 +40,9 @@ export interface StepDocumentosProps {
   isSubmitting?: boolean;
 }
 
-const CATALOGO_TUPA_INSTITUCIONAL = [
-  {
-    id: 'TUPA-01',
-    nombre: 'Certificado Oficial de Estudios (Por Semestre o Ciclo Completo)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-02',
-    nombre: 'Constancia de Matrícula, Egresado y No Adeudo',
-    unidad: 'Dirección de Asuntos Académicos',
-  },
-  {
-    id: 'TUPA-03',
-    nombre: 'Expedición de Título Profesional Técnico a Nombre de la Nación',
-    unidad: 'Área de Titulación y Grados',
-  },
-  {
-    id: 'TUPA-04',
-    nombre: 'Rectificación de Matrícula o Reserva de Vacante Temporal',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-05',
-    nombre: 'Convalidación y Homologación de Unidades Didácticas (Módulos)',
-    unidad: 'Coordinación de Programas de Estudio',
-  },
-  {
-    id: 'LIBRE-01',
-    nombre: 'Solicitud Formal General / Trámite Libre Institucional',
-    unidad: 'Mesa de Partes General',
-  },
-] as const;
 
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   data,
@@ -81,9 +52,38 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   isSubmitting = false,
 }) => {
   const formId = useId();
+  const { upload } = usePresignedUpload();
+  const [CATALOGO_TUPA_INSTITUCIONAL,setCatalogo]=useState<{id:string;nombre:string;unidad:string}[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [fileError, setFileError] = useState<string | null>(null);
+  useEffect(() => {
+    const control = new AbortController();
+    apiClient
+      .get<Array<{ id: string; denominacion: string; unidad_organica: string }>>(
+        '/api/v1/tramites/tupa',
+        { signal: control.signal },
+      )
+      .then((respuesta) => {
+        setCatalogo(
+          respuesta.data.map((tramite) => ({
+            id: tramite.id,
+            nombre: tramite.denominacion,
+            unidad: tramite.unidad_organica,
+          })),
+        );
+      })
+      .catch((error: unknown) => {
+        if (!control.signal.aborted) {
+          setFileError(
+            error instanceof Error
+              ? `No se pudo cargar el catálogo de trámites: ${error.message}`
+              : 'No se pudo cargar el catálogo de trámites.',
+          );
+        }
+      });
+    return () => control.abort();
+  }, []);
 
   // ===========================================================================
   // VALIDACIÓN REACTIVA EN TIEMPO REAL
@@ -145,10 +145,10 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       return;
     }
 
-    // Validación de tamaño máximo (25 MB)
+    // Validación de tamaño máximo (20 MB)
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setFileError(
-        `El archivo excede el tamaño máximo permitido de 25 MB (tamaño actual: ${(
+        `El archivo excede el tamaño máximo permitido de 20 MB (tamaño actual: ${(
           file.size /
           (1024 * 1024)
         ).toFixed(2)} MB).`
@@ -158,18 +158,11 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     }
 
     try {
-      const buffer = await file.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-
+      const cargado = await upload(file);
+      if(!cargado) throw new Error('Carga no confirmada');
       const nuevoArchivo: ArchivoTramite = {
-        nombre: file.name,
-        peso: file.size,
-        hashSha256: hashHex,
-        storageUrl: URL.createObjectURL(file),
+        nombre:file.name,peso:file.size,hashSha256:cargado.sha256,storageUrl:cargado.s3Key,
       };
-
       dispatch({
         type: 'UPDATE_DOCUMENTOS',
         payload: {
@@ -191,19 +184,6 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       type: 'UPDATE_DOCUMENTOS',
       payload: { archivos: filtrados },
     });
-  };
-
-  const handleSimularArchivoPrueba = () => {
-    const dummy: ArchivoTramite = {
-      nombre: 'solicitud_firmada_estudios_2026.pdf',
-      peso: 154230,
-      hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    };
-    dispatch({
-      type: 'UPDATE_DOCUMENTOS',
-      payload: { archivos: [...data.archivos, dummy] },
-    });
-    setFileError(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -396,17 +376,10 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 Documentación Sustentatoria Principal en PDF <span className="text-red-600">*</span>
               </h3>
               <p className="text-xs text-slate-500">
-                Suba su solicitud o formulario formal en formato PDF (máximo 25 MB por archivo).
+                Suba su solicitud o formulario formal en formato PDF (máximo 20 MB por archivo).
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleSimularArchivoPrueba}
-              disabled={isSubmitting}
-              className="text-xs font-bold text-[#006EC7] hover:underline self-start sm:self-auto cursor-pointer"
-            >
-              + Cargar PDF de prueba
-            </button>
+
           </div>
 
           {/* Zona de Drop / Carga de Archivo */}

@@ -38,8 +38,10 @@ const CHECKSUMS_MIGRACION_02_ANTERIOR = new Set([
 ]);
 
 const CHECKSUMS_MIGRACION_02_CORREGIDA = new Set([
-  'd20fbe0023240efba2c12f8532ff4eab76b9b092771ec536cf2d4698c214405c',
-  '24e3107f5dc1e18e505ec9786eecfe63ccf72341ab197da9b740256b10c2cc1d',
+  // Contenido canónico actual de F_BARTRA con LF.
+  'ca12062af8029c793de4253db4f0519e4505bfa9f806452b7db22eb84ae9ddba',
+  // Mismo contenido materializado con CRLF en Windows.
+  '7c809dc8bed72d2e6d6ec73ea8ddf32ad5c2cbcb2eec0a6732836296d2a8ec57',
 ]);
 
 function resolverLockId(): number {

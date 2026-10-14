@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
-import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
+import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaUcayali2026";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
@@ -313,7 +313,7 @@ export default function VentanillaPresencialPage() {
                 }}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               >
-                <option value="">Seleccione un procedimiento o servicio</option>
+                <option value="">Seleccione un concepto o servicio</option>
                 <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
                 {PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => (
                   <option key={procedimiento.codigo} value={procedimiento.codigo}>
@@ -368,7 +368,7 @@ export default function VentanillaPresencialPage() {
                   <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
                     TUPA {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
                   </h3>
-                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Pasco</p>
+                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Suiza, Ucayali</p>
                 </div>
                 {procedimientoSeleccionado.derechoPago && (
                   <p className="max-w-xl text-sm font-semibold text-slate-800">

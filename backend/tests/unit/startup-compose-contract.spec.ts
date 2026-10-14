@@ -5,11 +5,12 @@ import { describe, expect, it } from 'vitest';
 const raiz = fileURLToPath(new URL('../../..', import.meta.url));
 const compose = readFileSync(`${raiz}/docker-compose.yml`, 'utf8');
 const server = readFileSync(`${raiz}/backend/src/server.ts`, 'utf8');
+const backendDockerfile = readFileSync(`${raiz}/backend/Dockerfile`, 'utf8');
 const envExample = () => readFileSync(`${raiz}/.env.example`, 'utf8');
 
 describe('contrato de arranque con Docker Compose', () => {
   it('usa una versión de Node compatible con el frontend y exige el secreto JWT', () => {
-    expect(compose).toContain('image: node:24-alpine');
+    expect(backendDockerfile).toContain('FROM node:24.19-alpine');
     expect(compose).toContain('AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET es obligatorio}');
   });
 
@@ -17,32 +18,22 @@ describe('contrato de arranque con Docker Compose', () => {
     expect(envExample()).toContain('AUTH_JWT_SECRET=');
     expect(envExample()).toContain('POSTGRES_PASSWORD=CAMBIAR_');
     expect(compose).not.toContain('postgres_password');
-    expect(compose).not.toContain('minioadminpassword');
-    expect(compose).toContain('S3_ACCESS_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER es obligatorio}');
-    expect(compose).toContain('S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD es obligatorio}');
-  });
-
-  it('no conserva credenciales S3 predeterminadas en la configuración de runtime', () => {
-    const s3Config = readFileSync(`${raiz}/backend/src/config/s3.config.ts`, 'utf8');
-    expect(s3Config).not.toContain("default('minioadmin')");
+    expect(compose).toContain('S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY es obligatorio}');
   });
 
   it('separa la URL S3 pública de la URL interna del contenedor', () => {
     expect(compose).toContain('S3_PUBLIC_ENDPOINT: http://localhost:9000');
   });
 
-  it('inicializa el bucket antes del backend y evita el puerto PostgreSQL ocupado del host', () => {
-    expect(compose).toContain('minio-init:');
-    expect(compose).toContain('chainguard/minio:latest');
-    expect(compose).toContain('condition: service_started');
-    expect(compose).toContain('amazon/aws-cli:2.27.0');
-    expect(compose).toContain('entrypoint: ["/bin/sh", "-c",');
-    expect(compose).toContain('aws --endpoint-url http://minio:9000 s3 mb s3://sigd-expedientes');
-    expect(compose).toContain('"5433:5432"');
+  it('mantiene el almacenamiento S3 persistente y evita el puerto PostgreSQL habitual', () => {
+    expect(compose).toContain('chrislusf/seaweedfs:4.17@sha256:');
+    expect(compose).toContain('S3_BUCKET: ${S3_BUCKET:-sigd-expedientes}');
+    expect(compose).toContain('s3data:/data');
+    expect(compose).toContain('127.0.0.1:${POSTGRES_PORT:-5433}:5432');
   });
 
   it('entrega al worker la variable que realmente consume', () => {
-    expect(compose).toContain('OUTBOX_POLL_MS: 5000');
+    expect(compose).toContain('OUTBOX_POLL_INTERVAL_MS: 5000');
   });
 
   it('no inicia Vite hijo salvo que se solicite explícitamente', () => {

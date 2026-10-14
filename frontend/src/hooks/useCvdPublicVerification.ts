@@ -106,9 +106,22 @@ async function consultarMock(codigoCvd: string): Promise<ValidacionCVDResult> {
   );
 }
 
+interface CvdApiResponse {
+  esValido?: boolean;
+  valido?: boolean;
+  cvd?: string;
+  documento?: ValidacionCVDResult["documento"];
+  selloTiempoTsa?: string | null;
+  fecha_sello_tsa?: string | null;
+  firmante?: string | null;
+  sha256_firmado?: string | null;
+  descarga_copia_certificada?: string | null;
+  mensajeSeguridad?: string;
+}
+
 async function consultarApi(codigoCvd: string): Promise<ValidacionCVDResult> {
   const normalizado = normalizarCvd(codigoCvd);
-  const { data } = await apiClient.get<any>(
+  const { data } = await apiClient.get<CvdApiResponse>(
     `/api/v1/validador/cvd/${encodeURIComponent(normalizado)}`,
   );
   const esValido = Boolean(data.esValido ?? data.valido);

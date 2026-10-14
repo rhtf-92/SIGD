@@ -10,6 +10,7 @@ import { ejecutarMigraciones } from './db/migrate.js';
 import { OutboxWorker } from './audit/outbox-worker.js';
 import { crearDespachadorPorDefecto } from './audit/despachador-notificaciones.js';
 import { BridgeNotificacion } from './core/realtime/bridge-notificacion.js';
+import { iniciarRefrescoMgd } from './domains/corelink/mgdRefresh.worker.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
@@ -23,6 +24,7 @@ if (process.env.MIGRATE_ON_BOOT !== 'false') {
 }
 
 const app = construirApp(pool, busSse);
+const detenerRefrescoMgd = iniciarRefrescoMgd(pool, Number(process.env.MGD_REFRESH_MS ?? 60_000));
 const servidor = app.listen(port, () => {
   console.log(`SIGD Backend escuchando en http://localhost:${port}`);
   console.log(`API canónica: http://localhost:${port}${API_PREFIX}`);
@@ -46,7 +48,9 @@ const outboxWorker = new OutboxWorker(
   {
     backoffBaseMs: Number(process.env.OUTBOX_BACKOFF_BASE_MS ?? 1000),
     backoffTechoMs: Number(process.env.OUTBOX_BACKOFF_TECHO_MS ?? 300_000),
-    intervaloPollMs: Number(process.env.OUTBOX_POLL_MS ?? 5000),
+    intervaloPollMs: Number(
+      process.env.OUTBOX_POLL_INTERVAL_MS ?? process.env.OUTBOX_POLL_MS ?? 5000,
+    ),
   },
 );
 const cicloOutbox = outboxWorker.iniciar();
@@ -55,6 +59,7 @@ cicloOutbox.catch((error: unknown) => console.error('[OUTBOX] El poller terminó
 const apagar = (senal: string): void => {
   console.log(`[SERVER] Señal ${senal} recibida; cerrando conexiones SSE.`);
   clearInterval(intervaloHeartbeat);
+  detenerRefrescoMgd();
   outboxWorker.detener();
   void bridge.detener();
   busSse.cerrarTodos();

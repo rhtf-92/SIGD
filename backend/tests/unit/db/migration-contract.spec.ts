@@ -10,7 +10,8 @@ const leerMigracion = (nombre: string) => readFileSync(rutaMigracion(nombre), 'u
 describe('contrato de migraciones ejecutables', () => {
   it('no inserta una notificación de prueba para un usuario inexistente', () => {
     const auth = leerMigracion('02_sigd_auth.sql');
-    expect(auth).toMatch(/'00000000-0000-0000-0000-000000000101',\s*NULL,/);
+    expect(auth).toContain('FROM sigd_auth.cuenta_usuario AS u');
+    expect(auth).toContain("WHERE u.id_usuario = '00000000-0000-0000-0000-000000000001'::uuid");
   });
 
   it('agrega bloqueo de cuentas mediante una migración incremental', () => {

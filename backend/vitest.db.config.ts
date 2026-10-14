@@ -12,7 +12,7 @@ export default defineConfig({
     hookTimeout: 120_000,
     pool: 'forks',
     env: {
-      MIGRATIONS_EXCLUDE: '06_sigd_rut.sql,07_sigd_reportes.sql',
+      MIGRATIONS_EXCLUDE: '06_sigd_rut.sql,07_sigd_reportes.sql,11_sigd_mgd_contract.sql',
     },
   },
 });

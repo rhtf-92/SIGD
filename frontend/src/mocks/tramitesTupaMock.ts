@@ -19,7 +19,7 @@ import {
   PROGRAMAS_ESTUDIO_CATALOGO,
 } from "../types/tramiteWizard";
 import { type SelectOption } from "../components/common/SearchableSelect";
-import { PROCEDIMIENTOS_TUPA_2026 } from "../data/tupaPasco2026";
+import { PROCEDIMIENTOS_TUPA_2026 } from "../data/tupaUcayali2026";
 
 /**
  * Lista canónica y oficial de las 11 Carreras Profesionales del IESTP "Suiza".

@@ -1,15 +1,31 @@
 // Subrutas del Hub de Administración (ENT-M05-01)
 // Se anidan bajo el path "/administracion" protegido en AppRouter.tsx
+import { lazy } from "react";
 import { Route } from "react-router-dom";
 
-import AdministracionPage from "../pages/administracion/AdministracionPage";
-import AuditoriaPage from "../pages/administracion/AuditoriaPage";
-import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
-import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
-import SeguridadPage from "../pages/administracion/SeguridadPage";
-import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
-import UsuariosPage from "../pages/administracion/UsuariosPage";
 import ProtectedRoute from "./ProtectedRoute";
+
+const AdministracionPage = lazy(
+  () => import("../pages/administracion/AdministracionPage"),
+);
+const AuditoriaPage = lazy(
+  () => import("../pages/administracion/AuditoriaPage"),
+);
+const CalendarioLaboralPage = lazy(
+  () => import("../pages/administracion/CalendarioLaboralPage"),
+);
+const RolesPermisosPage = lazy(
+  () => import("../pages/administracion/RolesPermisosPage"),
+);
+const SeguridadPage = lazy(
+  () => import("../pages/administracion/SeguridadPage"),
+);
+const TablasMaestrasPage = lazy(
+  () => import("../pages/administracion/TablasMaestrasPage"),
+);
+const UsuariosPage = lazy(
+  () => import("../pages/administracion/UsuariosPage"),
+);
 
 export default function AdminRoutes() {
   return (
