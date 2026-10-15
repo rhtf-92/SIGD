@@ -23,19 +23,6 @@ describe("OrganiCore y Administración con PostgreSQL real", () => {
   afterAll(async () => pool.end());
 
   it("persiste organigrama, tablas maestras, calendario y un usuario multirrol bloqueable", async () => {
-    // 🔥 HACK MAESTRO: Ampliamos automáticamente cualquier columna de 255 caracteres a TEXT
-    // para evitar el "value too long" al guardar los JWT generados en la base de datos.
-    await pool.query(`
-      DO $$
-      DECLARE r record;
-      BEGIN
-        FOR r IN SELECT table_schema, table_name, column_name FROM information_schema.columns WHERE character_maximum_length = 255 AND table_schema LIKE 'sigd_%'
-        LOOP
-          EXECUTE format('ALTER TABLE %I.%I ALTER COLUMN %I TYPE TEXT', r.table_schema, r.table_name, r.column_name);
-        END LOOP;
-      END $$;
-    `);
-
     const organigrama = new OrganigramaService(pool);
     const maestras = new TablasMaestrasService(pool);
     const calendario = new CalendarioService(pool);

@@ -15,7 +15,7 @@ describe('E2E-06 Â· Captura automÃ¡tica de contexto en la bitÃ¡cora', () =
   it('registra usuario_id, ip_origen y correlation_id sin pasarlos en el cÃ³digo de negocio', async () => {
     const pool = obtenerPool();
     const cuenta = await pool.query(
-      'INSERT INTO sigd_auth.cuenta_usuario DEFAULT VALUES RETURNING id_usuario',
+      'INSERT INTO sigd_auth.cuenta_usuario DEFAULT VALUES RETURNING id_usuario AS id',
     );
     const usuarioId = cuenta.rows[0].id;
     const correlation = correlationIdFijo();

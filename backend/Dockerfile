@@ -1,26 +1,24 @@
-# Usar imagen ligera de Node
-FROM node:24.19-alpine
-
-# Crear directorio de trabajo
+FROM node:24.19-alpine AS dependencies
 WORKDIR /app
-
-# Copiar solo archivos de dependencias primero (optimiza caché de Docker)
-COPY package*.json ./
-
-# Instalar dependencias exactas para producción
+COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copiar el resto del código fuente
+FROM dependencies AS development
 COPY . .
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
 
-# Construir el proyecto (compilar TypeScript a JavaScript)
+FROM dependencies AS build
+COPY . .
 RUN npm run build
 
-# Exponer el puerto en el que escucha el backend
+FROM node:24.19-alpine AS production
+ENV NODE_ENV=production
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /app/dist ./dist
+COPY migraciones ./migraciones
 EXPOSE 3000
-
-# Cambiar al usuario "node" (sin privilegios root) por seguridad
 USER node
-
-# Iniciar la aplicación
 CMD ["npm", "start"]
