@@ -41,28 +41,118 @@ export interface StepDocumentosProps {
 const CATALOGO_TUPA_INSTITUCIONAL = [
   {
     id: 'TUPA-01',
-    nombre: 'Certificado Oficial de Estudios (Por Semestre o Ciclo Completo)',
-    unidad: 'Secretaría Académica',
+    nombre: 'Expedición de Título Profesional Técnico',
+    unidad: 'Dirección General',
   },
   {
     id: 'TUPA-02',
-    nombre: 'Constancia de Matrícula, Egresado y No Adeudo',
-    unidad: 'Dirección de Asuntos Académicos',
+    nombre: 'Certificado de Estudios Superiores (6 Semestres)',
+    unidad: 'Secretaría Académica',
   },
   {
     id: 'TUPA-03',
-    nombre: 'Expedición de Título Profesional Técnico a Nombre de la Nación',
-    unidad: 'Área de Titulación y Grados',
+    nombre: 'Visación de Certificado de Estudios Superiores',
+    unidad: 'Secretaría Académica',
   },
   {
     id: 'TUPA-04',
-    nombre: 'Rectificación de Matrícula o Reserva de Vacante Temporal',
-    unidad: 'Jefatura de Unidad Académica',
+    nombre: 'Constancia de No Adeudar (Para Fines de Titulación)',
+    unidad: 'Unidad Administrativa',
   },
   {
     id: 'TUPA-05',
-    nombre: 'Convalidación y Homologación de Unidades Didácticas (Módulos)',
-    unidad: 'Coordinación de Programas de Estudio',
+    nombre: 'Constancia de Egresado',
+    unidad: 'Secretaría Académica',
+  },
+  {
+    id: 'TUPA-06',
+    nombre: 'Constancias Varias (Título, Estudios o Matrícula)',
+    unidad: 'Secretaría Académica',
+  },
+  {
+    id: 'TUPA-07',
+    nombre: 'Certificado Modular (I, II, III y IV)',
+    unidad: 'Secretaría Académica',
+  },
+  {
+    id: 'TUPA-08',
+    nombre: 'Certificado de Bachillerato',
+    unidad: 'Secretaría Académica',
+  },
+  {
+    id: 'TUPA-09',
+    nombre: 'Derecho de Duplicado de Título',
+    unidad: 'Dirección General',
+  },
+  {
+    id: 'TUPA-10',
+    nombre: 'Modificación de Datos del Título',
+    unidad: 'Dirección General',
+  },
+  {
+    id: 'TUPA-11',
+    nombre: 'Convalidación entre Planes de Estudios',
+    unidad: 'Jefatura de Unidad Académica',
+  },
+  {
+    id: 'TUPA-12',
+    nombre: 'Convalidación por Unidades de Competencia',
+    unidad: 'Jefatura de Unidad Académica',
+  },
+  {
+    id: 'TUPA-13',
+    nombre: 'Traslado Interno',
+    unidad: 'Secretaría Académica',
+  },
+  {
+    id: 'TUPA-14',
+    nombre: 'Traslado Externo',
+    unidad: 'Dirección General',
+  },
+  {
+    id: 'TUPA-15',
+    nombre: 'Reserva de Matrícula - Ingresantes',
+    unidad: 'Secretaría Académica',
+  },
+  {
+    id: 'TUPA-16',
+    nombre: 'Licencia de Estudios - Estudiantes Antiguos',
+    unidad: 'Secretaría Académica',
+  },
+  {
+    id: 'TUPA-17',
+    nombre: 'Derecho de Reincorporación (Reingreso)',
+    unidad: 'Secretaría Académica',
+  },
+  {
+    id: 'TUPA-18',
+    nombre: 'Examen de Recuperación / Subsanación con Jurado',
+    unidad: 'Jefatura de Unidad Académica',
+  },
+  {
+    id: 'TUPA-19',
+    nombre: 'Evaluación Extraordinaria',
+    unidad: 'Jefatura de Unidad Académica',
+  },
+  {
+    id: 'TUPA-20',
+    nombre: 'Prueba de Suficiencia Académica',
+    unidad: 'Jefatura de Unidad Académica',
+  },
+  {
+    id: 'TUPA-21',
+    nombre: 'Devolución de Expediente',
+    unidad: 'Mesa de Partes',
+  },
+  {
+    id: 'TUPA-22',
+    nombre: 'Acceso a la Información Pública',
+    unidad: 'Dirección General',
+  },
+  {
+    id: 'TUPA-23',
+    nombre: 'Búsqueda y Duplicados de Boletas / Sílabos',
+    unidad: 'Secretaría Académica',
   },
   {
     id: 'LIBRE-01',
