@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import request from 'supertest';
 
@@ -10,86 +11,325 @@ import { TablasMaestrasService } from '../../../../src/domains/organicore/tablas
 import { crearUsuariosAdminService } from '../../../../src/domains/organicore/usuariosAdmin.service.js';
 
 process.env.AUTH_JWT_SECRET ??= 'test-only-jwt-secret-for-postgres-integration';
+process.env.S3_ACCESS_KEY ??= 'test-s3-access-key';
+process.env.S3_SECRET_KEY ??= 'test-s3-secret-key-segura';
 
 describe('OrganiCore y Administración con PostgreSQL real', () => {
   let pool: Pool;
+  let usuarioCreadoId: string | undefined;
+  const sufijo = randomUUID().replaceAll('-', '').slice(0, 12);
+  const codigoPrueba = `QA_${sufijo.toUpperCase()}`;
+  const usernamePrueba = `prueba.${sufijo}`;
+  const correoPrueba = `${usernamePrueba}@iestpsuiza.edu.pe`;
+  const numeroDocumento = String(10_000_000 + (Number.parseInt(sufijo.slice(0, 8), 16) % 90_000_000));
+  const anioPrueba = 2200 + (Number.parseInt(sufijo.slice(8, 12), 16) % 700);
+  const fechaActiva = `${anioPrueba}-04-20`;
+  const fechaInactiva = `${anioPrueba}-04-21`;
+  const descripcionActiva = `Prueba PR 167 ${sufijo}`;
+  const descripcionInactiva = `Prueba inactiva PR 167 ${sufijo}`;
 
   beforeAll(() => {
     if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL no configurada por globalSetup');
     pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
   });
 
-  afterAll(async () => pool.end());
+  afterAll(async () => {
+    await pool.query('DELETE FROM sigd_org.calendario_laboral WHERE descripcion IN ($1, $2)', [
+      descripcionActiva,
+      descripcionInactiva,
+    ]);
+    if (usuarioCreadoId) {
+      const persona = await pool.query<{ id_persona: string }>(
+        'DELETE FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1 RETURNING id_persona',
+        [usuarioCreadoId],
+      );
+      if (persona.rows[0]) {
+        await pool.query('DELETE FROM sigd_auth.persona WHERE id_persona = $1', [persona.rows[0].id_persona]);
+      }
+    }
+    await pool.query('DELETE FROM sigd_org.cargo WHERE codigo = $1', [codigoPrueba]);
+    await pool.query('DELETE FROM sigd_org.area WHERE codigo = $1', [codigoPrueba]);
+    await pool.end();
+  });
 
-  it('persiste organigrama, tablas maestras, calendario y un usuario multirrol bloqueable', async () => {
+  it('persiste administración y permite exactamente un refresh entre dos solicitudes concurrentes', async () => {
     const organigrama = new OrganigramaService(pool);
     const maestras = new TablasMaestrasService(pool);
     const calendario = new CalendarioService(pool);
     const usuarios = crearUsuariosAdminService(pool);
 
-    const area = await organigrama.crearUnidad({ codigo: 'QA_PR166', nombre: 'Área QA PR 166', padreId: null });
-    await maestras.crear('cargos', { codigo: 'QA_PR166', nombre: 'Cargo QA PR 166' });
-    const cargo = await pool.query<{ cargo_id: string }>("SELECT cargo_id FROM sigd_org.cargo WHERE codigo = 'QA_PR166'");
+    const area = await organigrama.crearUnidad({ codigo: codigoPrueba, nombre: `Área QA PR 167 ${sufijo}`, padreId: null });
+    await maestras.crear('cargos', { codigo: codigoPrueba, nombre: `Cargo QA PR 167 ${sufijo}` });
+    const cargo = await pool.query<{ cargo_id: string }>('SELECT cargo_id FROM sigd_org.cargo WHERE codigo = $1', [codigoPrueba]);
     const roles = await pool.query<{ rol_id: string; codigo: string }>(
-      "SELECT rol_id, codigo FROM sigd_org.rol_sistema WHERE codigo IN ('ADMINISTRADOR', 'DIRECTOR') ORDER BY codigo",
+      `SELECT rol_id, codigo FROM sigd_org.rol_sistema
+        WHERE codigo IN ('ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES', 'CIUDADANO')
+        ORDER BY codigo`,
     );
-    expect(roles.rows).toHaveLength(2);
+    expect(roles.rows).toHaveLength(6);
+    const rolesMultirrol = roles.rows.filter((rol) => ['ADMINISTRADOR', 'DIRECTOR'].includes(rol.codigo));
 
     const creado = await usuarios.crearUsuario({
-      tipo: 'NATURAL', numeroDocumento: '99166123', nombres: 'Prueba', apellidos: 'Multirrol',
-      correo: 'prueba.pr166@iestpsuiza.edu.pe', username: 'prueba.pr166', passwordInicial: 'ClaveSegura166!',
-      areaId: area.id, cargoId: cargo.rows[0].cargo_id, rolIds: roles.rows.map((rol) => rol.rol_id),
+      tipo: 'NATURAL', numeroDocumento, nombres: 'Prueba', apellidos: 'Multirrol',
+      correo: correoPrueba, username: usernamePrueba, passwordInicial: 'ClaveSegura166!',
+      areaId: area.id, cargoId: cargo.rows[0].cargo_id, rolIds: rolesMultirrol.map((rol) => rol.rol_id),
     });
+    usuarioCreadoId = creado.id;
     expect(creado.roles).toHaveLength(2);
 
     const app = construirApp(pool);
+    const perfilesVigentes = [
+      ['ADMINISTRADOR', 'SUPER_ADMIN'],
+      ['DIRECTOR', 'DIRECTOR'],
+      ['SECRETARIO', 'DOCENTE'],
+      ['ESPECIALISTA', 'DOCENTE'],
+      ['MESA_PARTES', 'MESA_PARTES'],
+      ['CIUDADANO', 'ESTUDIANTE'],
+    ] as const;
+    for (const [codigoRol, rolCanonico] of perfilesVigentes) {
+      const rolObjetivo = roles.rows.find((rol) => rol.codigo === codigoRol);
+      expect(rolObjetivo).toBeDefined();
+      await usuarios.actualizarUsuario(creado.id, {
+        rolesQuitar: roles.rows.filter((rol) => rol.rol_id !== rolObjetivo!.rol_id).map((rol) => rol.rol_id),
+        rolesAgregar: [rolObjetivo!.rol_id],
+      });
+      const loginRol = await request(app).post('/api/v1/auth/login').send({
+        identificador: usernamePrueba,
+        password: 'ClaveSegura166!',
+      });
+      expect(loginRol.status).toBe(200);
+      expect(loginRol.body.requiresRoleSelection).toBe(false);
+      expect(verificarTokenAcceso(loginRol.body.accessToken).roles).toEqual([rolCanonico]);
+      expect((await request(app).post('/api/v1/auth/logout').send({
+        refreshToken: loginRol.body.refreshToken,
+      })).status).toBe(200);
+    }
+    const rolesIdsIniciales = rolesMultirrol.map((rol) => rol.rol_id);
+    await usuarios.actualizarUsuario(creado.id, {
+      rolesQuitar: roles.rows.filter((rol) => !rolesIdsIniciales.includes(rol.rol_id)).map((rol) => rol.rol_id),
+      rolesAgregar: rolesIdsIniciales,
+    });
+
     const login = await request(app).post('/api/v1/auth/login').send({
-      identificador: 'prueba.pr166', password: 'ClaveSegura166!',
+      identificador: usernamePrueba, password: 'ClaveSegura166!',
     });
     expect(login.status).toBe(200);
-    expect(login.body.requiereSeleccionPerfil).toBe(true);
+    expect(login.body.requiresRoleSelection).toBe(true);
     expect(login.body).not.toHaveProperty('accessToken');
 
-    const administrador = roles.rows.find((rol) => rol.codigo === 'ADMINISTRADOR')!;
-    const seleccion = await request(app).post('/api/v1/auth/seleccionar-perfil').send({
-      tokenSeleccionPerfil: login.body.tokenSeleccionPerfil,
-      rolId: administrador.rol_id,
+    const seleccion = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: login.body.selectionToken,
+      rol: 'SUPER_ADMIN',
     });
     expect(seleccion.status).toBe(200);
-    expect(verificarTokenAcceso(seleccion.body.accessToken).roles).toEqual(['ADMINISTRADOR']);
+    expect(verificarTokenAcceso(seleccion.body.accessToken).roles).toEqual(['SUPER_ADMIN']);
 
-    const director = roles.rows.find((rol) => rol.codigo === 'DIRECTOR')!;
-    const cambio = await request(app).post('/api/v1/auth/cambiar-perfil')
-      .set('Authorization', `Bearer ${seleccion.body.accessToken}`)
-      .send({ refreshToken: seleccion.body.refreshToken, rolId: director.rol_id });
+    const adminRol = roles.rows.find((rol) => rol.codigo === 'ADMINISTRADOR');
+    expect(adminRol).toBeDefined();
+    const permisosRbAC = await pool.query<{ permiso_id: string; codigo: string }>(
+      `INSERT INTO sigd_org.permiso_sistema (codigo, nombre, ambito)
+       VALUES ('admin:acceso', 'Acceso de administración', 'GLOBAL'),
+              ('organigrama:leer', 'Leer organigrama', 'GLOBAL')
+       ON CONFLICT (codigo) DO UPDATE SET codigo = EXCLUDED.codigo
+       RETURNING permiso_id, codigo`,
+    );
+    const permisoAdmin = permisosRbAC.rows.find((permiso) => permiso.codigo === 'admin:acceso');
+    const permisoOrganigrama = permisosRbAC.rows.find((permiso) => permiso.codigo === 'organigrama:leer');
+    expect(permisoAdmin).toBeDefined();
+    expect(permisoOrganigrama).toBeDefined();
+    await pool.query(
+      `INSERT INTO sigd_org.rol_permiso (rol_id, permiso_id)
+       VALUES ($1, $2), ($1, $3) ON CONFLICT DO NOTHING`,
+      [adminRol!.rol_id, permisoAdmin!.permiso_id, permisoOrganigrama!.permiso_id],
+    );
+    const tokenAdmin = `Bearer ${seleccion.body.accessToken}`;
+    expect((await request(app).get('/api/v1/admin/roles-permisos').set('Authorization', tokenAdmin)).status).toBe(200);
+    expect((await request(app).get('/api/v1/admin/organigrama').set('Authorization', tokenAdmin)).status).toBe(200);
+    await pool.query('DELETE FROM sigd_org.rol_permiso WHERE rol_id = $1 AND permiso_id = $2', [
+      adminRol!.rol_id,
+      permisoOrganigrama!.permiso_id,
+    ]);
+    expect((await request(app).get('/api/v1/admin/organigrama').set('Authorization', tokenAdmin)).status).toBe(403);
+    await pool.query('INSERT INTO sigd_org.rol_permiso (rol_id, permiso_id) VALUES ($1, $2)', [
+      adminRol!.rol_id,
+      permisoOrganigrama!.permiso_id,
+    ]);
+    expect((await request(app).get('/api/v1/admin/organigrama').set('Authorization', tokenAdmin)).status).toBe(200);
+
+    const intentosRefresh = await Promise.all([
+      request(app).post('/api/v1/auth/refresh').send({ refreshToken: seleccion.body.refreshToken }),
+      request(app).post('/api/v1/auth/refresh').send({ refreshToken: seleccion.body.refreshToken }),
+    ]);
+    const refreshExitosos = intentosRefresh.filter((respuesta) => respuesta.status === 200);
+    const refreshRechazados = intentosRefresh.filter((respuesta) => respuesta.status === 401);
+    expect(refreshExitosos).toHaveLength(1);
+    expect(refreshRechazados).toHaveLength(1);
+    const refresh = refreshExitosos[0];
+    expect(refresh.status).toBe(200);
+    expect(verificarTokenAcceso(refresh.body.accessToken).roles).toEqual(['SUPER_ADMIN']);
+    const sesionesVigentesTrasCarrera = await pool.query<{ total: number }>(
+      'SELECT COUNT(*)::int AS total FROM sigd_auth.sesion_usuario WHERE id_usuario = $1 AND revocado_en IS NULL',
+      [creado.id],
+    );
+    expect(sesionesVigentesTrasCarrera.rows[0].total).toBe(1);
+
+    const cambio = await request(app).post('/api/v1/auth/switch-role')
+      .set('Authorization', `Bearer ${refresh.body.accessToken}`)
+      .send({ refreshToken: refresh.body.refreshToken, rol: 'DIRECTOR' });
     expect(cambio.status).toBe(200);
     expect(verificarTokenAcceso(cambio.body.accessToken).roles).toEqual(['DIRECTOR']);
+    expect((await request(app).get('/api/v1/admin/roles-permisos')
+      .set('Authorization', `Bearer ${cambio.body.accessToken}`)).status).toBe(403);
 
     const bloqueado = await usuarios.actualizarUsuario(creado.id, {
-      rolesQuitar: [director.rol_id], estado: 'BLOQUEADO',
+      estado: 'BLOQUEADO',
     });
     expect(bloqueado.estado).toBe('BLOQUEADO');
-    expect(bloqueado.roles).toHaveLength(1);
-    expect(bloqueado.roles[0].nombre).toContain('Administrador');
+    expect(bloqueado.roles).toHaveLength(2);
+    expect((await request(app).get('/api/v1/admin/organigrama')
+      .set('Authorization', `Bearer ${cambio.body.accessToken}`)).status).toBe(403);
+    const sesionesVigentesBloqueado = await pool.query<{ total: number }>(
+      'SELECT COUNT(*)::int AS total FROM sigd_auth.sesion_usuario WHERE id_usuario = $1 AND revocado_en IS NULL',
+      [creado.id],
+    );
+    expect(sesionesVigentesBloqueado.rows[0].total).toBe(0);
+    const loginBloqueado = await request(app).post('/api/v1/auth/login').send({
+      identificador: usernamePrueba, password: 'ClaveSegura166!',
+    });
+    expect(loginBloqueado.status).toBe(423);
+    const refreshBloqueado = await request(app).post('/api/v1/auth/refresh').send({
+      refreshToken: cambio.body.refreshToken,
+    });
+    expect(refreshBloqueado.status).toBe(401);
 
     const reactivado = await usuarios.actualizarUsuario(creado.id, {
-      rolesAgregar: [director.rol_id], estado: 'ACTIVO',
+      estado: 'ACTIVO',
     });
     expect(reactivado.estado).toBe('ACTIVO');
     expect(reactivado.roles).toHaveLength(2);
+    const loginDesbloqueado = await request(app).post('/api/v1/auth/login').send({
+      identificador: usernamePrueba, password: 'ClaveSegura166!',
+    });
+    expect(loginDesbloqueado.status).toBe(200);
+    expect(loginDesbloqueado.body.requiresRoleSelection).toBe(true);
+
+    const seleccionTrasDesbloqueo = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: loginDesbloqueado.body.selectionToken,
+      rol: 'SUPER_ADMIN',
+    });
+    expect(seleccionTrasDesbloqueo.status).toBe(200);
+    const logout = await request(app).post('/api/v1/auth/logout').send({
+      refreshToken: seleccionTrasDesbloqueo.body.refreshToken,
+    });
+    expect(logout.status).toBe(200);
+    const refreshTrasLogout = await request(app).post('/api/v1/auth/refresh').send({
+      refreshToken: seleccionTrasDesbloqueo.body.refreshToken,
+    });
+    expect(refreshTrasLogout.status).toBe(401);
+    // La revocación actual afecta al refresh; el access JWT aún autoriza rutas
+    // OrganiCore mientras conserve rol y permisos. Se documenta ese límite abajo.
+    expect((await request(app).get('/api/v1/admin/organigrama')
+      .set('Authorization', `Bearer ${seleccionTrasDesbloqueo.body.accessToken}`)).status).toBe(200);
+
+    const loginExpiracion = await request(app).post('/api/v1/auth/login').send({
+      identificador: usernamePrueba,
+      password: 'ClaveSegura166!',
+    });
+    const sesionExpirable = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: loginExpiracion.body.selectionToken,
+      rol: 'DIRECTOR',
+    });
+    await pool.query(
+      `UPDATE sigd_auth.sesion_usuario
+          SET emitido_en = now() - interval '2 minutes', expira_en = now() - interval '1 minute'
+        WHERE refresh_token = $1`,
+      [sesionExpirable.body.refreshToken],
+    );
+    const refreshExpirado = await request(app).post('/api/v1/auth/refresh').send({
+      refreshToken: sesionExpirable.body.refreshToken,
+    });
+    expect(refreshExpirado.status).toBe(401);
 
     await pool.query(
       `INSERT INTO sigd_org.calendario_laboral
        (fecha, tipo_feriado, descripcion, unidad_territorial, es_laborable, activo)
-       VALUES ('2099-04-20', 'INSTITUCIONAL', 'Prueba PR 166', 'NACIONAL', FALSE, TRUE),
-              ('2099-04-21', 'INSTITUCIONAL', 'Prueba inactiva PR 166', 'NACIONAL', FALSE, FALSE)`,
+       VALUES ($1, 'INSTITUCIONAL', $3, 'NACIONAL', FALSE, TRUE),
+              ($2, 'INSTITUCIONAL', $4, 'NACIONAL', FALSE, FALSE)`,
+      [fechaActiva, fechaInactiva, descripcionActiva, descripcionInactiva],
     );
-    expect(await calendario.listar({ anio: 2099, estado: 'ACTIVO' })).toHaveLength(1);
-    expect(await calendario.listar({ desde: '2099-04-20', hasta: '2099-04-21', estado: 'TODOS' })).toHaveLength(2);
-    expect(await calendario.listar({ anio: 2099, estado: 'INACTIVO' })).toHaveLength(1);
+    const activos = await calendario.listar({ anio: anioPrueba, estado: 'ACTIVO' });
+    const todos = await calendario.listar({ desde: fechaActiva, hasta: fechaInactiva, estado: 'TODOS' });
+    const inactivos = await calendario.listar({ anio: anioPrueba, estado: 'INACTIVO' });
+    expect(activos.some((item) => item.descripcion === descripcionActiva)).toBe(true);
+    expect(todos.filter((item) => [descripcionActiva, descripcionInactiva].includes(item.descripcion))).toHaveLength(2);
+    expect(inactivos.some((item) => item.descripcion === descripcionInactiva)).toBe(true);
 
     const catalogos = await maestras.listarMaestras(false, true);
-    expect(catalogos.catalogos.find((catalogo) => catalogo.clave === 'cargos')?.items.some((item) => item.codigo === 'QA_PR166')).toBe(true);
+    expect(catalogos.catalogos.find((catalogo) => catalogo.clave === 'cargos')?.items.some((item) => item.codigo === codigoPrueba)).toBe(true);
     expect((await organigrama.obtenerOrganigrama()).some((nodo) => nodo.id === area.id)).toBe(true);
+
+    // Un cambio administrativo no puede dejar una cuenta sin roles. La
+    // transacción debe rechazarse íntegramente y conservar sus dos perfiles.
+    await expect(usuarios.actualizarUsuario(creado.id, {
+      rolesQuitar: rolesMultirrol.map((rol) => rol.rol_id),
+    })).rejects.toMatchObject({ code: 'USUARIO_SIN_ROLES', status: 422 });
+    const rolesTrasIntentoInvalido = await pool.query<{ total: number }>(
+      `SELECT COUNT(*)::int AS total FROM sigd_org.usuario_rol
+        WHERE id_usuario = $1 AND vigente_desde <= now()
+          AND (vigente_hasta IS NULL OR vigente_hasta > now())`,
+      [creado.id],
+    );
+    expect(rolesTrasIntentoInvalido.rows[0].total).toBe(2);
+
+    // Conservamos una sesión elegida antes de retirar directamente el último
+    // rol (escenario de revocación externa / cambios concurrentes en PostgreSQL).
+    const seleccionAntesDeRetirarRoles = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: loginDesbloqueado.body.selectionToken,
+      rol: 'SUPER_ADMIN',
+    });
+    expect(seleccionAntesDeRetirarRoles.status).toBe(200);
+    const tokenAccesoAnterior = seleccionAntesDeRetirarRoles.body.accessToken as string;
+    const refreshAnterior = seleccionAntesDeRetirarRoles.body.refreshToken as string;
+    const sesionesAntesDeIntentosSinRol = await pool.query<{ total: number }>(
+      'SELECT COUNT(*)::int AS total FROM sigd_auth.sesion_usuario WHERE id_usuario = $1',
+      [creado.id],
+    );
+
+    await pool.query(
+      `UPDATE sigd_org.usuario_rol
+          SET vigente_hasta = vigente_desde + interval '1 microsecond'
+        WHERE id_usuario = $1 AND vigente_desde <= now()
+          AND (vigente_hasta IS NULL OR vigente_hasta > now())`,
+      [creado.id],
+    );
+
+    // App independiente: la prueba previa recorre los roles y agota a propósito
+    // el rate limit de login de la instancia principal.
+    const appSinRoles = construirApp(pool);
+    const loginSinRoles = await request(appSinRoles).post('/api/v1/auth/login').send({
+      identificador: usernamePrueba, password: 'ClaveSegura166!',
+    });
+    expect(loginSinRoles.status).toBe(403);
+    expect(loginSinRoles.body.code).toBe('ACCOUNT_WITHOUT_ACTIVE_ROLES');
+
+    const seleccionSinRoles = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: loginDesbloqueado.body.selectionToken,
+      rol: 'SUPER_ADMIN',
+    });
+    expect(seleccionSinRoles.status).toBe(403);
+
+    // JWT anterior mantiene firma/vigencia, pero el guard PostgreSQL ya no ve
+    // perfil ni permiso vigentes y deniega el endpoint protegido.
+    expect((await request(app).get('/api/v1/admin/organigrama')
+      .set('Authorization', `Bearer ${tokenAccesoAnterior}`)).status).toBe(403);
+    expect((await request(app).post('/api/v1/auth/refresh')
+      .send({ refreshToken: refreshAnterior })).status).toBe(401);
+
+    const sesionesDespuesDeIntentosSinRol = await pool.query<{ total: number }>(
+      'SELECT COUNT(*)::int AS total FROM sigd_auth.sesion_usuario WHERE id_usuario = $1',
+      [creado.id],
+    );
+    expect(sesionesDespuesDeIntentosSinRol.rows[0].total)
+      .toBe(sesionesAntesDeIntentosSinRol.rows[0].total);
   });
 });

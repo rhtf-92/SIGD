@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 
 export const rolCanonico = (codigo: string): string =>
   ({
@@ -19,7 +19,7 @@ export interface PerfilRolActivo {
  * se unen sin confiar en datos enviados por el cliente.
  */
 export async function obtenerPerfilesActivos(
-  pool: Pool,
+  pool: Pool | PoolClient,
   idUsuario: string,
 ): Promise<PerfilRolActivo[]> {
   const { rows } = await pool.query<{ rol_codigo: string; permiso_codigo: string | null }>(

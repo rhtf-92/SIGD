@@ -2,7 +2,7 @@ import request from 'supertest';
 import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { construirApp } from '../../../../src/app.js';
-import { verificarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
+import { firmarTokenRefresco, verificarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
 import { Argon2Service } from '../../../../src/domains/identicore/argon2.service.js';
 
 const ID = '11111111-1111-1111-1111-111111111111';
@@ -113,5 +113,51 @@ describe('Auth Router — perfiles institucionales activos', () => {
     expect(verificarTokenAcceso(cambio.body.accessToken).roles).toEqual(['DIRECTOR']);
     expect((await request(app).post('/api/v1/auth/switch-role')
       .set('Authorization', `Bearer ${cambio.body.accessToken}`).send({ rol: 'SUPER_ADMIN' })).status).toBe(403);
+  });
+
+  it('rota el refresh token dentro de una transacción y bloquea la sesión consumida', async () => {
+    const refreshToken = firmarTokenRefresco({
+      sub: ID,
+      rolActivo: 'DOCENTE',
+      rolesAutorizados: ['DOCENTE'],
+    });
+    const cuenta = {
+      id_usuario: ID,
+      id_persona: null,
+      usuario: 'persona',
+      correo: 'persona@suiza.edu.pe',
+      activo: true,
+      bloqueado_hasta: null,
+      nombre_completo: 'Persona Institucional',
+      area_id: null,
+    };
+    const responder = async (sql: string) => {
+      if (sql.includes('FROM sigd_auth.sesion_usuario s')) {
+        return { rows: [{ id_usuario: ID, expira_en: new Date(Date.now() + 60_000).toISOString(), revocado_en: null, activo: true }], rowCount: 1 };
+      }
+      if (sql.includes('FROM sigd_auth.cuenta_usuario c')) return { rows: [cuenta], rowCount: 1 };
+      if (sql.includes('FROM sigd_org.usuario_rol ur')) {
+        return { rows: [{ rol_codigo: 'DOCENTE', permiso_codigo: 'expedientes:leer' }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    };
+    const client = { query: vi.fn(responder), release: vi.fn() };
+    const pool = {
+      query: vi.fn(responder),
+      connect: vi.fn(async () => client),
+    } as unknown as Pool;
+
+    const res = await request(construirApp(pool)).post('/api/v1/auth/refresh').send({ refreshToken });
+
+    expect(res.status).toBe(200);
+    expect(pool.connect).toHaveBeenCalledOnce();
+    expect(client.query).toHaveBeenCalledWith('BEGIN');
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining('FOR UPDATE OF s'), [refreshToken]);
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('SET revocado_en = now()'),
+      [refreshToken],
+    );
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
+    expect(client.release).toHaveBeenCalledOnce();
   });
 });

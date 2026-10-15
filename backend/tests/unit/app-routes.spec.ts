@@ -5,8 +5,25 @@ import { construirApp } from '../../src/app.js';
 import { firmarTokenAcceso } from '../../src/core/auth/jwt.service.js';
 
 describe('App Routing & Health Verification', () => {
+  const adminId = '00000000-0000-4000-8000-000000000001';
+  const permisosAdmin = [
+    'admin:acceso',
+    'usuarios:leer',
+    'usuarios:gestionar',
+    'roles:leer',
+    'auditoria:leer',
+    'organigrama:leer',
+    'organigrama:gestionar',
+    'maestras:leer',
+    'maestras:gestionar',
+    'calendario:leer',
+    'calendario:gestionar',
+  ].map((permiso_codigo) => ({ permiso_codigo }));
   const fakePool = {
-    query: async () => ({ rows: [], rowCount: 0 }),
+    query: async (sql: string, params: unknown[] = []) =>
+      sql.includes('SELECT DISTINCT ps.codigo AS permiso_codigo') && params[0] === adminId
+        ? { rows: permisosAdmin, rowCount: permisosAdmin.length }
+        : { rows: [], rowCount: 0 },
     connect: async () => ({
       query: async () => ({ rows: [], rowCount: 0 }),
       release: () => {},
@@ -14,7 +31,7 @@ describe('App Routing & Health Verification', () => {
   } as unknown as Pool;
 
   const adminToken = firmarTokenAcceso({
-    sub: '00000000-0000-4000-8000-000000000001',
+    sub: adminId,
     roles: ['ADMINISTRADOR'],
   });
   const app = construirApp(fakePool);

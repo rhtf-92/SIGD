@@ -33,20 +33,6 @@ export const PERMISOS_RBAC = {
 
 export type PermisoRbac = (typeof PERMISOS_RBAC)[keyof typeof PERMISOS_RBAC];
 
-const ROLES_POR_PERMISO: Record<PermisoRbac, readonly string[]> = {
-  [PERMISOS_RBAC.ADMIN_ACCESO]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
-  [PERMISOS_RBAC.USUARIOS_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
-  [PERMISOS_RBAC.USUARIOS_GESTIONAR]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
-  [PERMISOS_RBAC.ROLES_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
-  [PERMISOS_RBAC.AUDITORIA_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
-  [PERMISOS_RBAC.ORGANIGRAMA_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR', 'DIRECTOR'],
-  [PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
-  [PERMISOS_RBAC.MAESTRAS_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
-  [PERMISOS_RBAC.MAESTRAS_GESTIONAR]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
-  [PERMISOS_RBAC.CALENDARIO_LEER]: ['SUPER_ADMIN', 'ADMINISTRADOR', 'DIRECTOR'],
-  [PERMISOS_RBAC.CALENDARIO_GESTIONAR]: ['SUPER_ADMIN', 'ADMINISTRADOR'],
-};
-
 export function autenticarJwt(req: Request, _res: Response, next: NextFunction): void {
   const token = extraerTokenBearer(req.get('authorization'));
   if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
@@ -56,16 +42,34 @@ export function autenticarJwt(req: Request, _res: Response, next: NextFunction):
   next();
 }
 
-export function autorizarPermisos(...permisos: PermisoRbac[]) {
-  return (req: Request, _res: Response, next: NextFunction): void => {
+export function autorizarPermisos(pool: Pool, ...permisos: PermisoRbac[]) {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     const cuenta = req.cuentaActual;
     if (!cuenta) throw new UnauthorizedError({ detail: 'Autenticación requerida.' });
 
-    const roles = new Set(cuenta.roles.map((rol) => rol.toUpperCase()));
-    const autorizado = permisos.every((permiso) =>
-      ROLES_POR_PERMISO[permiso].some((rol) => roles.has(rol)),
+    const { rows } = await pool.query<{ permiso_codigo: string }>(
+      `SELECT DISTINCT ps.codigo AS permiso_codigo
+         FROM sigd_auth.cuenta_usuario c
+         JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario
+         JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id AND r.vigente
+         JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
+         JOIN sigd_org.permiso_sistema ps ON ps.permiso_id = rp.permiso_id
+        WHERE c.id_usuario = $1
+          AND c.activo
+          AND (c.bloqueado_hasta IS NULL OR c.bloqueado_hasta <= now())
+          AND ur.vigente_desde <= now()
+          AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+          AND CASE r.codigo
+                WHEN 'ADMINISTRADOR' THEN 'SUPER_ADMIN'
+                WHEN 'SECRETARIO' THEN 'DOCENTE'
+                WHEN 'ESPECIALISTA' THEN 'DOCENTE'
+                WHEN 'CIUDADANO' THEN 'ESTUDIANTE'
+                ELSE r.codigo
+              END = ANY($2::text[])`,
+      [cuenta.idUsuario, cuenta.roles.map(rolCanonico)],
     );
-    if (!autorizado) throw new ForbiddenError();
+    const permisosActuales = new Set(rows.map((fila) => fila.permiso_codigo));
+    if (!permisos.every((permiso) => permisosActuales.has(permiso))) throw new ForbiddenError();
 
     next();
   };

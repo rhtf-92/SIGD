@@ -30,6 +30,20 @@ export interface RegistroMigracion {
  */
 export const SIGD_MIGRATION_ADVISORY_LOCK_ID = 987654321;
 
+const CHECKSUMS_MIGRACION_02_ANTERIOR = new Set([
+  // Contenido Git/LF anterior: semilla con usuario UUID inexistente.
+  '14c804323b56f9e88cf74cab9ed1a1683fac6d748fee6090997ab777ee776fa2',
+  // Mismo contenido materializado con CRLF en Windows.
+  '047fba86d3b2a73d7b69a9a1f84ad0dcd47ed135efb5d4696b7d0d81fac1436b',
+]);
+
+const CHECKSUMS_MIGRACION_02_CORREGIDA = new Set([
+  // Contenido canónico actual de F_BARTRA con LF.
+  'ca12062af8029c793de4253db4f0519e4505bfa9f806452b7db22eb84ae9ddba',
+  // Mismo contenido materializado con CRLF en Windows.
+  '7c809dc8bed72d2e6d6ec73ea8ddf32ad5c2cbcb2eec0a6732836296d2a8ec57',
+]);
+
 function resolverLockId(): number {
   const crudo = process.env.MIGRATE_ADVISORY_LOCK_ID;
   if (!crudo) return SIGD_MIGRATION_ADVISORY_LOCK_ID;
@@ -78,6 +92,67 @@ async function esperarCandado(cliente: PoolClient, lockId: number, timeoutMs: nu
   }
 }
 
+async function reconciliarChecksumMigracion02(
+  cliente: PoolClient,
+  archivo: string,
+  checksumRegistrado: string,
+  checksumActual: string,
+): Promise<boolean> {
+  if (
+    archivo !== '02_sigd_auth.sql' ||
+    !CHECKSUMS_MIGRACION_02_ANTERIOR.has(checksumRegistrado) ||
+    !CHECKSUMS_MIGRACION_02_CORREGIDA.has(checksumActual)
+  ) {
+    return false;
+  }
+
+  const contrato = await cliente.query<{ compatible: boolean }>(`
+    SELECT (
+      EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = 'sigd_auth'
+           AND table_name = 'notificacion_casilla'
+           AND column_name = 'usuario_id'
+           AND is_nullable = 'YES'
+      )
+      AND EXISTS (
+        SELECT 1
+          FROM pg_constraint c
+          JOIN pg_attribute origen
+            ON origen.attrelid = c.conrelid
+           AND origen.attnum = c.conkey[1]
+           AND NOT origen.attisdropped
+          JOIN pg_attribute destino
+            ON destino.attrelid = c.confrelid
+           AND destino.attnum = c.confkey[1]
+           AND NOT destino.attisdropped
+         WHERE c.contype = 'f'
+           AND c.conrelid = to_regclass('sigd_auth.notificacion_casilla')
+           AND c.confrelid = to_regclass('sigd_auth.cuenta_usuario')
+           AND array_length(c.conkey, 1) = 1
+           AND array_length(c.confkey, 1) = 1
+           AND origen.attname = 'usuario_id'
+           AND destino.attname = 'id_usuario'
+           AND c.convalidated
+           AND c.confdeltype = 'c'
+      )
+    ) AS compatible;
+  `);
+  if (!contrato.rows[0]?.compatible) {
+    throw new Error(
+      'No se puede aplicar la compatibilidad de checksum de migración 02: el contrato esperado no está presente.',
+    );
+  }
+
+  await cliente.query(
+    'UPDATE public.sigd_migraciones SET checksum_sha256 = $2 WHERE nombre_script = $1',
+    [archivo, checksumActual],
+  );
+  console.log('[MIGRATE] Checksum histórico de 02_sigd_auth.sql reconciliado tras validar su contrato.');
+  return true;
+}
+
 export async function ejecutarMigraciones(pool: Pool, opciones: { timeoutLockMs?: number } = {}): Promise<string[]> {
   const lockId = resolverLockId();
   const timeoutLockMs = opciones.timeoutLockMs ?? 60_000;
@@ -118,6 +193,14 @@ export async function ejecutarMigraciones(pool: Pool, opciones: { timeoutLockMs?
 
       if (existentes.rowCount && existentes.rowCount > 0) {
         if (existentes.rows[0].checksum_sha256 !== checksum) {
+          if (await reconciliarChecksumMigracion02(
+            cliente,
+            archivo,
+            existentes.rows[0].checksum_sha256,
+            checksum,
+          )) {
+            continue;
+          }
           throw new Error(
             `Error de Integridad DDL: ${archivo} fue alterado tras su ejecución. ` +
               `Checksum registrado: ${existentes.rows[0].checksum_sha256}, actual: ${checksum}`,
