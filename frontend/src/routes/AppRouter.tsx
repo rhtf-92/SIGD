@@ -22,6 +22,8 @@ import ConsultaPublicaPage from "../pages/tramite/ConsultaPublicaPage";
 import ProyectorResolucionesPage from "../pages/flujos/ProyectorResolucionesPage";
 import AdminRoutes from "./AdminRoutes";
 import ProtectedRoute from "./ProtectedRoute";
+import TupaVigentePage from "../pages/TupaVigentePage";
+import TupaGestionPage from "../pages/TupaGestionPage";
 
 export default function AppRouter() {
   return (
@@ -29,6 +31,8 @@ export default function AppRouter() {
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
+      <Route path="/tupa" element={<TupaVigentePage />} />
+      <Route path="/tupa/gestion" element={<TupaGestionPage />} />
 
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />

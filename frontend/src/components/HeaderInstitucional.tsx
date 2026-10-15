@@ -31,6 +31,13 @@ export default function HeaderInstitucional() {
         <nav className="flex items-center gap-3 text-xs font-semibold">
           <button
             type="button"
+            onClick={() => navigate("/tupa")}
+            className="rounded-lg bg-white/10 px-3 py-1.5 text-white hover:bg-white/20 transition"
+          >
+            TUPA vigente
+          </button>
+          <button
+            type="button"
             onClick={() => navigate("/casilla")}
             className="rounded-lg bg-white/10 px-3 py-1.5 text-white hover:bg-white/20 transition"
           >

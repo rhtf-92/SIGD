@@ -26,6 +26,21 @@ const secciones = [
     destacado: true,
   },
   {
+    titulo: "TUPA vigente",
+    subtitulo: "Consulta pública",
+    descripcion:
+      "Busca trámites, derechos, plazos, requisitos y la información de la versión vigente del TUPA institucional.",
+    ruta: "/tupa",
+    destacado: true,
+  },
+  {
+    titulo: "Gestión de versiones TUPA",
+    subtitulo: "Administración",
+    descripcion:
+      "Crea borradores, edita fichas, carga resoluciones y publica nuevas versiones con bitácora inmutable.",
+    ruta: "/tupa/gestion",
+  },
+  {
     titulo: "Registro Ciudadano",
     subtitulo: "ENT-M01-01 / ENT-M01-02",
     descripcion:
