@@ -226,6 +226,10 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
       refreshToken: seleccionTrasDesbloqueo.body.refreshToken,
     });
     expect(refreshTrasLogout.status).toBe(401);
+    // La revocación actual afecta al refresh; el access JWT aún autoriza rutas
+    // OrganiCore mientras conserve rol y permisos. Se documenta ese límite abajo.
+    expect((await request(app).get('/api/v1/admin/organigrama')
+      .set('Authorization', `Bearer ${seleccionTrasDesbloqueo.body.accessToken}`)).status).toBe(200);
 
     const loginExpiracion = await request(app).post('/api/v1/auth/login').send({
       identificador: usernamePrueba,
@@ -263,5 +267,69 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     const catalogos = await maestras.listarMaestras(false, true);
     expect(catalogos.catalogos.find((catalogo) => catalogo.clave === 'cargos')?.items.some((item) => item.codigo === codigoPrueba)).toBe(true);
     expect((await organigrama.obtenerOrganigrama()).some((nodo) => nodo.id === area.id)).toBe(true);
+
+    // Un cambio administrativo no puede dejar una cuenta sin roles. La
+    // transacción debe rechazarse íntegramente y conservar sus dos perfiles.
+    await expect(usuarios.actualizarUsuario(creado.id, {
+      rolesQuitar: rolesMultirrol.map((rol) => rol.rol_id),
+    })).rejects.toMatchObject({ code: 'USUARIO_SIN_ROLES', status: 422 });
+    const rolesTrasIntentoInvalido = await pool.query<{ total: number }>(
+      `SELECT COUNT(*)::int AS total FROM sigd_org.usuario_rol
+        WHERE id_usuario = $1 AND vigente_desde <= now()
+          AND (vigente_hasta IS NULL OR vigente_hasta > now())`,
+      [creado.id],
+    );
+    expect(rolesTrasIntentoInvalido.rows[0].total).toBe(2);
+
+    // Conservamos una sesión elegida antes de retirar directamente el último
+    // rol (escenario de revocación externa / cambios concurrentes en PostgreSQL).
+    const seleccionAntesDeRetirarRoles = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: loginDesbloqueado.body.selectionToken,
+      rol: 'SUPER_ADMIN',
+    });
+    expect(seleccionAntesDeRetirarRoles.status).toBe(200);
+    const tokenAccesoAnterior = seleccionAntesDeRetirarRoles.body.accessToken as string;
+    const refreshAnterior = seleccionAntesDeRetirarRoles.body.refreshToken as string;
+    const sesionesAntesDeIntentosSinRol = await pool.query<{ total: number }>(
+      'SELECT COUNT(*)::int AS total FROM sigd_auth.sesion_usuario WHERE id_usuario = $1',
+      [creado.id],
+    );
+
+    await pool.query(
+      `UPDATE sigd_org.usuario_rol
+          SET vigente_hasta = vigente_desde + interval '1 microsecond'
+        WHERE id_usuario = $1 AND vigente_desde <= now()
+          AND (vigente_hasta IS NULL OR vigente_hasta > now())`,
+      [creado.id],
+    );
+
+    // App independiente: la prueba previa recorre los roles y agota a propósito
+    // el rate limit de login de la instancia principal.
+    const appSinRoles = construirApp(pool);
+    const loginSinRoles = await request(appSinRoles).post('/api/v1/auth/login').send({
+      identificador: usernamePrueba, password: 'ClaveSegura166!',
+    });
+    expect(loginSinRoles.status).toBe(403);
+    expect(loginSinRoles.body.code).toBe('ACCOUNT_WITHOUT_ACTIVE_ROLES');
+
+    const seleccionSinRoles = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: loginDesbloqueado.body.selectionToken,
+      rol: 'SUPER_ADMIN',
+    });
+    expect(seleccionSinRoles.status).toBe(403);
+
+    // JWT anterior mantiene firma/vigencia, pero el guard PostgreSQL ya no ve
+    // perfil ni permiso vigentes y deniega el endpoint protegido.
+    expect((await request(app).get('/api/v1/admin/organigrama')
+      .set('Authorization', `Bearer ${tokenAccesoAnterior}`)).status).toBe(403);
+    expect((await request(app).post('/api/v1/auth/refresh')
+      .send({ refreshToken: refreshAnterior })).status).toBe(401);
+
+    const sesionesDespuesDeIntentosSinRol = await pool.query<{ total: number }>(
+      'SELECT COUNT(*)::int AS total FROM sigd_auth.sesion_usuario WHERE id_usuario = $1',
+      [creado.id],
+    );
+    expect(sesionesDespuesDeIntentosSinRol.rows[0].total)
+      .toBe(sesionesAntesDeIntentosSinRol.rows[0].total);
   });
 });
