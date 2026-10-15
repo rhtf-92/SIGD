@@ -1,0 +1,149 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { mensajeError, tupaApi, type TupaTramite, type TupaVersion } from "../services/tupaApi";
+
+function formatoMonto(tramite: TupaTramite): string {
+  if (tramite.derecho_monto !== null) {
+    return `S/ ${Number(tramite.derecho_monto).toFixed(2)}`;
+  }
+  return tramite.derecho_texto || "No especificado";
+}
+
+export default function TupaVigentePage() {
+  const [version, setVersion] = useState<TupaVersion | null>(null);
+  const [tramites, setTramites] = useState<TupaTramite[]>([]);
+  const [rubros, setRubros] = useState<string[]>([]);
+  const [total, setTotal] = useState(0);
+  const [porPagina, setPorPagina] = useState(20);
+  const [pagina, setPagina] = useState(1);
+  const [rubro, setRubro] = useState("");
+  const [q, setQ] = useState("");
+  const [seleccionado, setSeleccionado] = useState<TupaTramite | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let activo = true;
+    Promise.all([tupaApi.vigente(), tupaApi.listarVigente({ q, rubro, pagina })])
+      .then(([versionActual, respuesta]) => {
+        if (!activo) return;
+        setVersion(versionActual);
+        setTramites(respuesta.tramites);
+        setRubros(respuesta.rubros);
+        setTotal(respuesta.total);
+        setPorPagina(respuesta.porPagina);
+      })
+      .catch((motivo: unknown) => {
+        if (activo) setError(mensajeError(motivo));
+      })
+      .finally(() => {
+        if (activo) setCargando(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [q, rubro, pagina]);
+
+  async function mostrarDetalle(codigo: string) {
+    setError("");
+    try {
+      setSeleccionado(await tupaApi.detalle(codigo));
+    } catch (motivo) {
+      setError(mensajeError(motivo));
+    }
+  }
+
+  return (
+    <main className="mx-auto min-h-screen max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">IESTP &quot;Suiza&quot; · Pucallpa</p>
+          <h1 className="mt-1 text-3xl font-bold">TUPA vigente</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            {version ? `${version.nombre} · ${version.codigo}` : "Información pública de trámites y servicios."}
+          </p>
+        </div>
+        <Link className="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50" to="/tupa/gestion">
+          Gestión de versiones
+        </Link>
+      </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="grid gap-3 sm:grid-cols-[1fr_20rem]">
+          <label className="text-sm font-medium text-slate-700">
+            Buscar trámite
+            <input
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+              onChange={(evento) => { setCargando(true); setError(""); setPagina(1); setQ(evento.target.value); }}
+              placeholder="Código o denominación"
+              value={q}
+            />
+          </label>
+          <label className="text-sm font-medium text-slate-700">
+            Rubro
+            <select className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" onChange={(evento) => { setCargando(true); setError(""); setPagina(1); setRubro(evento.target.value); }} value={rubro}>
+              <option value="">Todos los rubros</option>
+              {rubros.map((opcion) => <option key={opcion} value={opcion}>{opcion}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</p>}
+        {cargando ? (
+          <p className="py-8 text-center text-sm text-slate-600">Cargando trámites desde el servicio institucional…</p>
+        ) : tramites.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-600">No se encontraron trámites para esos filtros.</p>
+        ) : (
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                <tr><th className="p-3">Código</th><th className="p-3">Trámite</th><th className="p-3">Derecho</th><th className="p-3">Plazo</th></tr>
+              </thead>
+              <tbody>
+                {tramites.map((tramite) => (
+                  <tr className="border-t border-slate-100 hover:bg-blue-50/50" key={tramite.tramite_version_id}>
+                    <td className="p-3 font-mono text-xs">{tramite.codigo}</td>
+                    <td className="p-3"><button className="text-left font-semibold text-blue-800 hover:underline" onClick={() => void mostrarDetalle(tramite.codigo)}>{tramite.denominacion}</button></td>
+                    <td className="p-3">{formatoMonto(tramite)}</td>
+                    <td className="p-3">{tramite.plazo_texto || "No especificado"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {!cargando && total > porPagina && (
+          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
+            <span className="text-slate-600">{total} trámites · página {pagina} de {Math.ceil(total / porPagina)}</span>
+            <div className="flex gap-2">
+              <button className="rounded-md border px-3 py-1.5 disabled:opacity-40" disabled={pagina <= 1} onClick={() => setPagina((actual) => actual - 1)} type="button">Anterior</button>
+              <button className="rounded-md border px-3 py-1.5 disabled:opacity-40" disabled={pagina >= Math.ceil(total / porPagina)} onClick={() => setPagina((actual) => actual + 1)} type="button">Siguiente</button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {seleccionado && (
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-label="Detalle del trámite">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><p className="font-mono text-xs text-blue-700">{seleccionado.codigo}</p><h2 className="mt-1 text-xl font-bold">{seleccionado.denominacion}</h2></div>
+            <button className="rounded-md border px-3 py-1 text-sm" onClick={() => setSeleccionado(null)}>Cerrar detalle</button>
+          </div>
+          {seleccionado.observaciones?.includes("[VALIDAR]") && <p className="mt-4 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">Pendiente de validación</p>}
+          {seleccionado.observaciones && /\[REVISAR(?:\s*:|\])/i.test(seleccionado.observaciones) && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Esta ficha contiene datos transcritos que deben revisarse con el documento fuente.</p>}
+          <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div><dt className="text-xs font-semibold uppercase text-slate-500">Rubro</dt><dd className="mt-1">{seleccionado.rubro}</dd></div>
+            <div><dt className="text-xs font-semibold uppercase text-slate-500">Derecho de tramitación</dt><dd className="mt-1">{formatoMonto(seleccionado)}{seleccionado.derecho_porcentaje_uit != null && ` (${seleccionado.derecho_porcentaje_uit} % UIT)`}</dd></div>
+            <div><dt className="text-xs font-semibold uppercase text-slate-500">Cuenta de pago</dt><dd className="mt-1">{seleccionado.cuenta_pago || "No especificada"}</dd></div>
+            <div><dt className="text-xs font-semibold uppercase text-slate-500">Calificación / silencio</dt><dd className="mt-1">{seleccionado.calificacion} / {seleccionado.silencio_administrativo}</dd></div>
+            <div><dt className="text-xs font-semibold uppercase text-slate-500">Unidad que recibe</dt><dd className="mt-1">{seleccionado.unidad_recibe || "No especificada"}</dd></div>
+            <div><dt className="text-xs font-semibold uppercase text-slate-500">Autoridad que resuelve</dt><dd className="mt-1">{seleccionado.autoridad_resuelve || "No especificada"}</dd></div>
+            <div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase text-slate-500">Requisitos</dt><dd className="mt-1">{seleccionado.requisitos.length ? <ol className="list-decimal space-y-1 pl-5">{seleccionado.requisitos.map((requisito) => <li key={requisito.requisito_id}>{requisito.texto}</li>)}</ol> : "No figuran requisitos."}</dd></div>
+            <div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase text-slate-500">Recursos</dt><dd className="mt-1 whitespace-pre-wrap">{seleccionado.recursos || "No especificados"}</dd></div>
+            <div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase text-slate-500">Base legal</dt><dd className="mt-1 whitespace-pre-wrap">{seleccionado.base_legal || "No especificada"}</dd></div>
+          </dl>
+        </section>
+      )}
+    </main>
+  );
+}

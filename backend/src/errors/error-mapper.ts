@@ -41,5 +41,14 @@ export function serializeError(error: unknown): ErrorSerializado {
     return { ...mapeo, invalidParams: [] };
   }
 
+  if (error instanceof Error && 'status' in error && error.status === 413) {
+    return {
+      status: 413,
+      code: 'PAYLOAD_TOO_LARGE',
+      detail: 'El archivo supera el límite de tamaño permitido.',
+      invalidParams: [],
+    };
+  }
+
   return INTERNO;
 }
