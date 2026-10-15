@@ -1,51 +1,38 @@
-﻿services:
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production
-    ports:
-      - "80:8080"
-    depends_on:
-      - backend
-    restart: always
+﻿version: "3.8"
 
+services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
       target: production
-    ports:
-      - "3000:3000"
+    image: sigd-backend:production
     environment:
       - NODE_ENV=production
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_NAME=${POSTGRES_DB:?POSTGRES_DB es obligatorio}
-      - DB_USER=${POSTGRES_USER:?POSTGRES_USER es obligatorio}
-      - DB_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER es obligatorio}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}@db:5432/${POSTGRES_DB:?POSTGRES_DB es obligatorio}
-      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET es obligatorio}
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY:?S3_ACCESS_KEY es obligatorio}
-      - S3_SECRET_KEY=${S3_SECRET_KEY:?S3_SECRET_KEY es obligatorio}
-    depends_on:
-      - db
-      - redis
+      - PORT=${BACKEND_PORT:-3000}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - REDIS_URL=${REDIS_URL}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_REGION=${S3_REGION}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
     restart: always
-
-  db:
-    image: postgres:18-alpine
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB:?POSTGRES_DB es obligatorio}
-      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER es obligatorio}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    restart: always
-
-  redis:
-    image: redis:7-alpine
-    restart: always
-
-volumes:
-  pgdata:
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://localhost:3000/api/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
