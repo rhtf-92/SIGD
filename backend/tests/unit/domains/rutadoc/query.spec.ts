@@ -8,9 +8,11 @@ import type { RepositorioRutaDoc } from '../../../../src/domains/rutadoc/rutadoc
 
 const actor: ActorRutaDoc = { id: 'operador-1', roles: ['MESA_PARTES'], puedeVerExpediente: () => true };
 const filtros: FiltrosRutaDoc = { pestana: 'PENDIENTES', limite: 20 };
+const expedienteId = 'b85b5c8e-9709-4d60-9a71-7917f7f37e17';
+const expedienteAnteriorId = 'b85b5c8e-9709-4d60-9a71-7917f7f37e16';
 
 const fila: ExpedienteResumen = {
-  idExpediente: '17', cut: 'EXP-2026-000017', asunto: 'Solicitud',
+  idExpediente: expedienteId, cut: 'EXP-2026-000017', asunto: 'Solicitud',
   fechaRadicacion: '2026-09-24T14:30:00.000Z', estadoActual: 'REGISTRADO', areaActualId: null,
 };
 
@@ -43,8 +45,13 @@ describe('Consulta RutaDoc', () => {
   it('rechaza cursor malformado, alterado o usado con otros filtros', () => {
     expect(() => decodificarCursor('%', filtros)).toThrow();
     expect(() => decodificarCursor(Buffer.from('{"v":2}').toString('base64url'), filtros)).toThrow();
-    const cursor = codificarCursor({ fechaRadicacion: fila.fechaRadicacion, idExpediente: '17' }, filtros);
+    expect(() => decodificarCursor(Buffer.from(JSON.stringify({ v: 1,
+      fecha_radicacion: fila.fechaRadicacion, id_expediente: '17', filtros: 'legado',
+    })).toString('base64url'), filtros)).toThrow();
+    const cursor = codificarCursor({ fechaRadicacion: fila.fechaRadicacion, idExpediente: expedienteId }, filtros);
     expect(() => decodificarCursor(cursor, { ...filtros, terminoBusqueda: 'otro' })).toThrow();
+    expect(() => decodificarCursor(codificarCursor({ fechaRadicacion: fila.fechaRadicacion,
+      idExpediente: '17' }, filtros), filtros)).toThrow();
   });
 
   it('acepta límites 1, 20 por defecto y 100', () => {
@@ -70,9 +77,9 @@ describe('Consulta RutaDoc', () => {
     ]) expect(() => filtrosSchema.parse({ pestana: 'PENDIENTES', ...valores })).toThrow(z.ZodError);
   });
 
-  it('valida ID BIGINT positivo sin pérdida de precisión', () => {
-    expect(idSchema.parse('9223372036854775807')).toBe('9223372036854775807');
-    for (const id of ['0', '-1', '1.2', 'abc', '9223372036854775808']) {
+  it('valida el UUID de expediente sin convertir decimales legados', () => {
+    expect(idSchema.parse(expedienteId)).toBe(expedienteId);
+    for (const id of ['0', '-1', '17', 'abc', '9223372036854775807']) {
       expect(() => idSchema.parse(id)).toThrow(z.ZodError);
     }
   });
@@ -88,7 +95,7 @@ describe('Consulta RutaDoc', () => {
 
   it('recorta limite + 1 y emite cursor desde el último elemento visible', async () => {
     const repo = repositorioSimulado();
-    vi.mocked(repo.listar).mockResolvedValue({ elementos: [fila, { ...fila, idExpediente: '16' }], porEstado: {} });
+    vi.mocked(repo.listar).mockResolvedValue({ elementos: [fila, { ...fila, idExpediente: expedienteAnteriorId }], porEstado: {} });
     const resultado = await new ServicioRutaDoc(repo).listar({ ...filtros, limite: 1 }, actor);
     expect(resultado.elementos).toEqual([fila]);
     expect(resultado.tieneMas).toBe(true);
@@ -100,7 +107,7 @@ describe('Consulta RutaDoc', () => {
   it('responde 404 cuando el expediente no existe', async () => {
     const repo = repositorioSimulado();
     vi.mocked(repo.obtener).mockResolvedValue(null);
-    await expect(new ServicioRutaDoc(repo).obtener('17', actor)).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
+    await expect(new ServicioRutaDoc(repo).obtener(expedienteId, actor)).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
   });
 
   it('propaga el fallo de repositorio para que el middleware lo sanee', async () => {
@@ -114,7 +121,7 @@ describe('Consulta RutaDoc', () => {
     const servicio = new ServicioRutaDoc(repositorioSimulado());
     await expect(servicio.listar(filtros, { id: 'x', roles: ['ESTUDIANTE'] }))
       .rejects.toMatchObject({ status: 403 });
-    await expect(servicio.obtener('17', { id: 'x', roles: ['MESA_PARTES'] }))
+    await expect(servicio.obtener(expedienteId, { id: 'x', roles: ['MESA_PARTES'] }))
       .rejects.toMatchObject({ status: 403 });
   });
 });

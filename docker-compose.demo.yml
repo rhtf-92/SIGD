@@ -1,0 +1,80 @@
+name: sigd-geric-demo
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sigd_demo_local
+      POSTGRES_DB: sigd_demo
+    ports:
+      - "55432:5432"
+    volumes:
+      - demo_pgdata:/var/lib/postgresql
+      - ./backend/migraciones:/demo-migraciones:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sigd_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "56379:6379"
+    volumes:
+      - demo_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.demo
+    working_dir: /app
+    volumes:
+      - ./backend:/app:ro
+      - demo_backend_modules:/app/node_modules
+    command: >-
+      sh -ec 'if [ ! -x node_modules/.bin/tsx ]; then npm ci --no-audit --no-fund; fi;
+      exec npm run dev'
+    environment:
+      PORT: "3000"
+      NODE_ENV: development
+      DATABASE_URL: postgres://postgres:sigd_demo_local@postgres:5432/sigd_demo
+      REDIS_URL: redis://redis:6379
+      MIGRATE_ON_BOOT: "false"
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    image: node:24.19.0-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - ./frontend/package.json:/app/package.json:ro
+      - ./frontend/package-lock.json:/app/package-lock.json:ro
+      - demo_frontend_modules:/app/node_modules
+    command: >-
+      sh -ec 'if [ ! -x node_modules/.bin/vite ]; then npm ci --no-audit --no-fund; fi;
+      exec npm run dev -- --host 0.0.0.0'
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000/api/v1
+      VITE_ENABLE_MOCKS: "false"
+    ports:
+      - "5173:5173"
+
+volumes:
+  demo_pgdata:
+  demo_redisdata:
+  demo_backend_modules:
+  demo_frontend_modules:

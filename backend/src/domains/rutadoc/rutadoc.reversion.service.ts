@@ -4,7 +4,7 @@ import { ConflictError } from '../../shared/domain/errors/conflict-error.js';
 import { ForbiddenError } from '../../shared/domain/errors/forbidden-error.js';
 import { NotFoundError } from '../../shared/domain/errors/not-found-error.js';
 import { UnauthorizedError } from '../../shared/domain/errors/unauthorized-error.js';
-import { esIdExpediente } from './rutadoc.cursor.js';
+import { esIdNumericoPositivo } from './rutadoc.reversion.schemas.js';
 import { RepositorioReversionRutaDoc, type FilaCompensacion } from './rutadoc.reversion.repository.js';
 import type {
   ComandoReversion, CompensacionFolios, FolioCompensationPort, PoliticaReversionRutaDoc,
@@ -47,7 +47,7 @@ export class ServicioReversionRutaDoc {
 
   async revertir(expedienteId: string, comando: ComandoReversion,
     actor: ActorRutaDoc, correlationId: string): Promise<ResultadoReversion> {
-    if (!esIdExpediente(actor.id)) throw new UnauthorizedError();
+    if (!esIdNumericoPositivo(actor.id)) throw new UnauthorizedError();
     const huella = huellaComando(expedienteId, comando);
     return this.repositorio.conBloqueo(expedienteId, async (cliente) => {
       if (!await this.repositorio.existeExpediente(cliente, expedienteId)) {
