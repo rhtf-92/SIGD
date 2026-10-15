@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Pool } from 'pg';
@@ -57,13 +58,78 @@ describe('runner de producción con migración 15 sobre PostgreSQL real', () => 
         AND table_name = 'sesion_usuario'
         AND column_name = 'refresh_token'
     `);
-    const registro = await pool.query<{ total: number }>(
-      'SELECT COUNT(*)::int AS total FROM public.sigd_migraciones WHERE nombre_script = $1',
+    const registro = await pool.query<{ total: number; checksum_sha256: string }>(
+      'SELECT COUNT(*)::int AS total, MAX(checksum_sha256) AS checksum_sha256 FROM public.sigd_migraciones WHERE nombre_script = $1',
       [MIGRACION_15],
     );
 
     expect(columna.rows[0]).toEqual({ data_type: 'text', character_maximum_length: null });
     expect(registro.rows[0].total).toBe(1);
+    expect(registro.rows[0].checksum_sha256).toBe(
+      createHash('sha256').update(readFileSync(path.resolve('migraciones', MIGRACION_15), 'utf8')).digest('hex'),
+    );
+    await expect(ejecutarMigraciones(pool)).resolves.toEqual([]);
+    await expect(pool.query(
+      'SELECT COUNT(*)::int AS total FROM public.sigd_migraciones WHERE nombre_script = $1',
+      [MIGRACION_15],
+    )).resolves.toMatchObject({ rows: [{ total: 1 }] });
+  });
+
+  it('aplica la migración 15 desde una base nueva y rechaza cambios posteriores al checksum', async () => {
+    const urlBase = new URL(process.env.TEST_DATABASE_URL!);
+    const urlAdmin = new URL(urlBase);
+    const nombreBase = `sigd_mig15_${randomUUID().replaceAll('-', '')}`;
+    urlAdmin.pathname = '/postgres';
+    const poolAdmin = new Pool({ connectionString: urlAdmin.toString() });
+    const urlNueva = new URL(urlBase);
+    urlNueva.pathname = `/${nombreBase}`;
+    let poolNueva: Pool | undefined;
+    let baseCreada = false;
+
+    try {
+      await poolAdmin.query(`CREATE DATABASE "${nombreBase}"`);
+      baseCreada = true;
+      poolNueva = new Pool({ connectionString: urlNueva.toString() });
+      writeFileSync(
+        path.join(directorioTemporal, '14_fixture_sesion.sql'),
+        `CREATE SCHEMA sigd_auth;
+         CREATE TABLE sigd_auth.sesion_usuario (
+           id_usuario UUID NOT NULL,
+           refresh_token VARCHAR(255) NOT NULL
+         );\n`,
+        'utf8',
+      );
+      const contenidoMigracion = readFileSync(path.resolve('migraciones', MIGRACION_15), 'utf8');
+      writeFileSync(path.join(directorioTemporal, MIGRACION_15), contenidoMigracion, 'utf8');
+
+      await expect(ejecutarMigraciones(poolNueva)).resolves.toEqual(['14_fixture_sesion.sql', MIGRACION_15]);
+      const aplicado = await poolNueva.query<{ data_type: string; checksum_sha256: string }>(`
+        SELECT c.data_type, m.checksum_sha256
+          FROM information_schema.columns c
+          JOIN public.sigd_migraciones m ON m.nombre_script = '${MIGRACION_15}'
+         WHERE c.table_schema = 'sigd_auth'
+           AND c.table_name = 'sesion_usuario'
+           AND c.column_name = 'refresh_token'
+      `);
+      expect(aplicado.rows[0]).toEqual({
+        data_type: 'text',
+        checksum_sha256: createHash('sha256').update(contenidoMigracion).digest('hex'),
+      });
+
+      writeFileSync(path.join(directorioTemporal, MIGRACION_15), `${contenidoMigracion}\n-- checksum alterado\n`, 'utf8');
+      await expect(ejecutarMigraciones(poolNueva)).rejects.toThrow(/Error de Integridad DDL/u);
+      const estadoTrasRechazo = await poolNueva.query<{ data_type: string }>(`
+        SELECT data_type FROM information_schema.columns
+         WHERE table_schema = 'sigd_auth'
+           AND table_name = 'sesion_usuario'
+           AND column_name = 'refresh_token'
+      `);
+      expect(estadoTrasRechazo.rows[0].data_type).toBe('text');
+    } finally {
+      await poolNueva?.end();
+      if (baseCreada) await poolAdmin.query(`DROP DATABASE "${nombreBase}"`);
+      await poolAdmin.end();
+    }
   });
 
   it('revierte la migración 15 y su registro si una migración posterior falla', async () => {

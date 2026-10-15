@@ -124,7 +124,7 @@ export function construirApp(
   app.use(
     '/api/v1/admin',
     autenticarJwt,
-    autorizarPermisos(PERMISOS_RBAC.ADMIN_ACCESO),
+    autorizarPermisos(pool, PERMISOS_RBAC.ADMIN_ACCESO),
   );
 
   const loginRateLimit = rateLimit({
@@ -236,7 +236,7 @@ export function construirApp(
   app.use(
     '/api/v1/usuarios',
     autenticarJwt,
-    autorizarPermisos(PERMISOS_RBAC.USUARIOS_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.USUARIOS_LEER),
     usuariosAdminRouter,
   );
 
@@ -256,22 +256,22 @@ export function construirApp(
   const organigramaCtrl = crearControladorOrganigrama(new OrganigramaService(pool));
   app.get(
     '/api/v1/admin/organigrama',
-    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.ORGANIGRAMA_LEER),
     organigramaCtrl.getOrganigrama,
   );
   app.get(
     '/api/v1/admin/organigrama/arbol',
-    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.ORGANIGRAMA_LEER),
     organigramaCtrl.getOrganigrama,
   );
   app.post(
     '/api/v1/admin/organigrama/areas',
-    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR),
+    autorizarPermisos(pool, PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR),
     organigramaCtrl.crearUnidad,
   );
   app.put(
     '/api/v1/admin/organigrama/areas/:id',
-    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR),
+    autorizarPermisos(pool, PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR),
     organigramaCtrl.actualizarUnidad,
   );
 
@@ -307,7 +307,7 @@ export function construirApp(
    */
   app.get(
     '/api/v1/admin/auditoria/bitacora',
-    autorizarPermisos(PERMISOS_RBAC.AUDITORIA_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.AUDITORIA_LEER),
     async (req, res, next) => {
       try {
         const limite = Math.min(Number(req.query.limite ?? 50), 100);
@@ -328,7 +328,7 @@ export function construirApp(
 
   app.get(
     '/api/v1/admin/roles-permisos',
-    autorizarPermisos(PERMISOS_RBAC.ROLES_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.ROLES_LEER),
     async (_req, res, next) => {
       try {
         const { rows: roles } = await pool.query(
@@ -404,7 +404,7 @@ export function construirApp(
   });
   app.get(
     '/api/v1/admin/maestras/sede',
-    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_LEER),
     (_req, res) => {
       res.json({
         sedes: [
@@ -417,7 +417,7 @@ export function construirApp(
 
   app.get(
     '/api/v1/admin/maestras/tipo-documento',
-    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_LEER),
     async (_req, res, next) => {
       try {
         const { rows } = await pool.query(

@@ -62,19 +62,54 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     await maestras.crear('cargos', { codigo: codigoPrueba, nombre: `Cargo QA PR 167 ${sufijo}` });
     const cargo = await pool.query<{ cargo_id: string }>('SELECT cargo_id FROM sigd_org.cargo WHERE codigo = $1', [codigoPrueba]);
     const roles = await pool.query<{ rol_id: string; codigo: string }>(
-      "SELECT rol_id, codigo FROM sigd_org.rol_sistema WHERE codigo IN ('ADMINISTRADOR', 'DIRECTOR') ORDER BY codigo",
+      `SELECT rol_id, codigo FROM sigd_org.rol_sistema
+        WHERE codigo IN ('ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES', 'CIUDADANO')
+        ORDER BY codigo`,
     );
-    expect(roles.rows).toHaveLength(2);
+    expect(roles.rows).toHaveLength(6);
+    const rolesMultirrol = roles.rows.filter((rol) => ['ADMINISTRADOR', 'DIRECTOR'].includes(rol.codigo));
 
     const creado = await usuarios.crearUsuario({
       tipo: 'NATURAL', numeroDocumento, nombres: 'Prueba', apellidos: 'Multirrol',
       correo: correoPrueba, username: usernamePrueba, passwordInicial: 'ClaveSegura166!',
-      areaId: area.id, cargoId: cargo.rows[0].cargo_id, rolIds: roles.rows.map((rol) => rol.rol_id),
+      areaId: area.id, cargoId: cargo.rows[0].cargo_id, rolIds: rolesMultirrol.map((rol) => rol.rol_id),
     });
     usuarioCreadoId = creado.id;
     expect(creado.roles).toHaveLength(2);
 
     const app = construirApp(pool);
+    const perfilesVigentes = [
+      ['ADMINISTRADOR', 'SUPER_ADMIN'],
+      ['DIRECTOR', 'DIRECTOR'],
+      ['SECRETARIO', 'DOCENTE'],
+      ['ESPECIALISTA', 'DOCENTE'],
+      ['MESA_PARTES', 'MESA_PARTES'],
+      ['CIUDADANO', 'ESTUDIANTE'],
+    ] as const;
+    for (const [codigoRol, rolCanonico] of perfilesVigentes) {
+      const rolObjetivo = roles.rows.find((rol) => rol.codigo === codigoRol);
+      expect(rolObjetivo).toBeDefined();
+      await usuarios.actualizarUsuario(creado.id, {
+        rolesQuitar: roles.rows.filter((rol) => rol.rol_id !== rolObjetivo!.rol_id).map((rol) => rol.rol_id),
+        rolesAgregar: [rolObjetivo!.rol_id],
+      });
+      const loginRol = await request(app).post('/api/v1/auth/login').send({
+        identificador: usernamePrueba,
+        password: 'ClaveSegura166!',
+      });
+      expect(loginRol.status).toBe(200);
+      expect(loginRol.body.requiresRoleSelection).toBe(false);
+      expect(verificarTokenAcceso(loginRol.body.accessToken).roles).toEqual([rolCanonico]);
+      expect((await request(app).post('/api/v1/auth/logout').send({
+        refreshToken: loginRol.body.refreshToken,
+      })).status).toBe(200);
+    }
+    const rolesIdsIniciales = rolesMultirrol.map((rol) => rol.rol_id);
+    await usuarios.actualizarUsuario(creado.id, {
+      rolesQuitar: roles.rows.filter((rol) => !rolesIdsIniciales.includes(rol.rol_id)).map((rol) => rol.rol_id),
+      rolesAgregar: rolesIdsIniciales,
+    });
+
     const login = await request(app).post('/api/v1/auth/login').send({
       identificador: usernamePrueba, password: 'ClaveSegura166!',
     });
@@ -88,6 +123,38 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
     });
     expect(seleccion.status).toBe(200);
     expect(verificarTokenAcceso(seleccion.body.accessToken).roles).toEqual(['SUPER_ADMIN']);
+
+    const adminRol = roles.rows.find((rol) => rol.codigo === 'ADMINISTRADOR');
+    expect(adminRol).toBeDefined();
+    const permisosRbAC = await pool.query<{ permiso_id: string; codigo: string }>(
+      `INSERT INTO sigd_org.permiso_sistema (codigo, nombre, ambito)
+       VALUES ('admin:acceso', 'Acceso de administración', 'GLOBAL'),
+              ('organigrama:leer', 'Leer organigrama', 'GLOBAL')
+       ON CONFLICT (codigo) DO UPDATE SET codigo = EXCLUDED.codigo
+       RETURNING permiso_id, codigo`,
+    );
+    const permisoAdmin = permisosRbAC.rows.find((permiso) => permiso.codigo === 'admin:acceso');
+    const permisoOrganigrama = permisosRbAC.rows.find((permiso) => permiso.codigo === 'organigrama:leer');
+    expect(permisoAdmin).toBeDefined();
+    expect(permisoOrganigrama).toBeDefined();
+    await pool.query(
+      `INSERT INTO sigd_org.rol_permiso (rol_id, permiso_id)
+       VALUES ($1, $2), ($1, $3) ON CONFLICT DO NOTHING`,
+      [adminRol!.rol_id, permisoAdmin!.permiso_id, permisoOrganigrama!.permiso_id],
+    );
+    const tokenAdmin = `Bearer ${seleccion.body.accessToken}`;
+    expect((await request(app).get('/api/v1/admin/roles-permisos').set('Authorization', tokenAdmin)).status).toBe(200);
+    expect((await request(app).get('/api/v1/admin/organigrama').set('Authorization', tokenAdmin)).status).toBe(200);
+    await pool.query('DELETE FROM sigd_org.rol_permiso WHERE rol_id = $1 AND permiso_id = $2', [
+      adminRol!.rol_id,
+      permisoOrganigrama!.permiso_id,
+    ]);
+    expect((await request(app).get('/api/v1/admin/organigrama').set('Authorization', tokenAdmin)).status).toBe(403);
+    await pool.query('INSERT INTO sigd_org.rol_permiso (rol_id, permiso_id) VALUES ($1, $2)', [
+      adminRol!.rol_id,
+      permisoOrganigrama!.permiso_id,
+    ]);
+    expect((await request(app).get('/api/v1/admin/organigrama').set('Authorization', tokenAdmin)).status).toBe(200);
 
     const intentosRefresh = await Promise.all([
       request(app).post('/api/v1/auth/refresh').send({ refreshToken: seleccion.body.refreshToken }),
@@ -111,12 +178,16 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
       .send({ refreshToken: refresh.body.refreshToken, rol: 'DIRECTOR' });
     expect(cambio.status).toBe(200);
     expect(verificarTokenAcceso(cambio.body.accessToken).roles).toEqual(['DIRECTOR']);
+    expect((await request(app).get('/api/v1/admin/roles-permisos')
+      .set('Authorization', `Bearer ${cambio.body.accessToken}`)).status).toBe(403);
 
     const bloqueado = await usuarios.actualizarUsuario(creado.id, {
       estado: 'BLOQUEADO',
     });
     expect(bloqueado.estado).toBe('BLOQUEADO');
     expect(bloqueado.roles).toHaveLength(2);
+    expect((await request(app).get('/api/v1/admin/organigrama')
+      .set('Authorization', `Bearer ${cambio.body.accessToken}`)).status).toBe(403);
     const sesionesVigentesBloqueado = await pool.query<{ total: number }>(
       'SELECT COUNT(*)::int AS total FROM sigd_auth.sesion_usuario WHERE id_usuario = $1 AND revocado_en IS NULL',
       [creado.id],
@@ -155,6 +226,25 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
       refreshToken: seleccionTrasDesbloqueo.body.refreshToken,
     });
     expect(refreshTrasLogout.status).toBe(401);
+
+    const loginExpiracion = await request(app).post('/api/v1/auth/login').send({
+      identificador: usernamePrueba,
+      password: 'ClaveSegura166!',
+    });
+    const sesionExpirable = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: loginExpiracion.body.selectionToken,
+      rol: 'DIRECTOR',
+    });
+    await pool.query(
+      `UPDATE sigd_auth.sesion_usuario
+          SET emitido_en = now() - interval '2 minutes', expira_en = now() - interval '1 minute'
+        WHERE refresh_token = $1`,
+      [sesionExpirable.body.refreshToken],
+    );
+    const refreshExpirado = await request(app).post('/api/v1/auth/refresh').send({
+      refreshToken: sesionExpirable.body.refreshToken,
+    });
+    expect(refreshExpirado.status).toBe(401);
 
     await pool.query(
       `INSERT INTO sigd_org.calendario_laboral
