@@ -2,20 +2,20 @@
     "base_datos":  "tramicore_prueba",
     "resultado_global":  "PASS",
     "postgresql":  "PostgreSQL 18.3 on x86_64-windows, compiled by msvc-19.44.35225, 64-bit",
-    "ddl_hash":  "B0071A000563A802A53214EAB7CDE6E47BB0CE0F6318B383D2F8C45407307FCA",
+    "ddl_hash":  "47916447514F18E8B168F15954479C3748630DB4979F2CB5814463F3BB535FB9",
     "bloques":  {
                     "carrera_anio_nuevo":  {
                                                "resultado":  "PASS",
                                                "filas_anuales":  "1",
                                                "exit_codes":  [
-                                                                  "10896=0",
-                                                                  "24288=0",
-                                                                  "24904=0"
+                                                                  "17024=0",
+                                                                  "18212=0",
+                                                                  "18780=0"
                                                               ],
                                                "cuts":  [
-                                                            "EXP-2028-000003",
                                                             "EXP-2028-000001",
-                                                            "EXP-2028-000002"
+                                                            "EXP-2028-000002",
+                                                            "EXP-2028-000003"
                                                         ],
                                                "esperados":  [
                                                                  "EXP-2028-000001",
@@ -25,8 +25,8 @@
                                            },
                     "foliado_concurrente_insert_directo":  {
                                                                "exit_codes":  [
-                                                                                  "13348=0",
-                                                                                  "13412=3"
+                                                                                  "11348=3",
+                                                                                  "31244=0"
                                                                               ],
                                                                "solapamiento_bloqueado":  true,
                                                                "sesiones":  2,
@@ -42,11 +42,11 @@
                                     },
                     "concurrencia_2026":  {
                                               "exit_codes":  [
-                                                                 "10580=0",
-                                                                 "12204=0",
-                                                                 "26040=0",
-                                                                 "26948=0",
-                                                                 "29192=0"
+                                                                 "10840=0",
+                                                                 "12088=0",
+                                                                 "12972=0",
+                                                                 "27992=0",
+                                                                 "31460=0"
                                                              ],
                                               "cuts_unicos":  500,
                                               "cuts_total":  500,
@@ -58,8 +58,8 @@
                                                 "resultado":  "PASS",
                                                 "rangos":  "1-5, 6-10",
                                                 "exit_codes":  [
-                                                                   "29784=0",
-                                                                   "31732=0"
+                                                                   "6952=0",
+                                                                   "23000=0"
                                                                ],
                                                 "contiguos":  true,
                                                 "sesiones":  2
@@ -74,7 +74,7 @@
                                                           "solapamiento_detectado":  true
                                                       }
                 },
-    "fecha_inicio":  "2026-09-09T21:42:46Z",
+    "fecha_inicio":  "2026-09-30T17:05:44Z",
     "criterios_aprobacion":  [
                                  {
                                      "detalle":  "26 pruebas OK, exit 0",
@@ -112,6 +112,6 @@
                                      "pass":  true
                                  }
                              ],
-    "fecha_fin":  "2026-09-09T21:42:49Z",
+    "fecha_fin":  "2026-09-30T17:05:46Z",
     "proyecto":  "SIGD - TramiCore H4"
 }
