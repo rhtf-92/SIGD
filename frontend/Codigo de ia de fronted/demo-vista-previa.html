@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JARVIS SIGD — Modelo vista previa</title>
+<style>
+  * { box-sizing: border-box; font-family: Segoe UI, system-ui, Arial, sans-serif; }
+  body { margin: 0; background: #F3F4F6; color: #111; }
+  .topbar { background: #1e3a8a; color: #fff; padding: 12px 20px; font-weight: 700; }
+  .topbar small { display:block; font-weight:400; opacity:.8; }
+  .page { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-bottom:12px; }
+  .card h2 { margin:0 0 6px; font-size:18px; }
+  .card p { margin:4px 0; font-size:14px; color:#334155; }
+  .pill { display:inline-block; background:#dbeafe; color:#1d4ed8; border-radius:999px; padding:2px 10px; font-size:12px; font-weight:700; margin-right:6px; }
+  /* === Asistente (copia visual de AsistenteIA.tsx) === */
+  #btnFlotante { position:fixed; bottom:20px; right:20px; z-index:50; width:56px; height:56px; border-radius:50%; border:none; background:#1d4ed8; color:#fff; font-size:24px; cursor:pointer; box-shadow:0 10px 25px rgba(0,0,0,.25); }
+  #btnFlotante:hover { background:#1e40af; }
+  #chat { position:fixed; right:20px; bottom:88px; z-index:50; width:min(94vw,380px); height:520px; max-height:80vh; display:flex; flex-direction:column; overflow:hidden; border-radius:16px; border:1px solid #e2e8f0; background:#fff; box-shadow:0 20px 50px rgba(0,0,0,.25); }
+  #chat.oculto { display:none; }
+  .chatHead { display:flex; align-items:center; justify-content:space-between; gap:8px; background:linear-gradient(to right,#1e40af,#1e3a8a); padding:12px 16px; color:#fff; }
+  .chatHead .who { display:flex; align-items:center; gap:8px; }
+  .avatar { width:32px; height:32px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .badge { border-radius:999px; padding:2px 6px; font-size:10px; font-weight:800; background:rgba(255,255,255,.15); color:#dbeafe; }
+  .online { font-size:11px; color:#a7f3d0; }
+  #btnLimpiar { border:none; border-radius:8px; background:rgba(255,255,255,.1); color:#fff; padding:4px 8px; cursor:pointer; font-weight:700; }
+  #msgs { flex:1; overflow-y:auto; background:#f8fafc; padding:12px; display:flex; flex-direction:column; gap:12px; }
+  .fila { display:flex; } .fila.u { justify-content:flex-end; } .fila.a { justify-content:flex-start; }
+  .burbuja { max-width:88%; border-radius:16px; padding:8px 12px; font-size:13px; line-height:1.45; box-shadow:0 1px 2px rgba(0,0,0,.08); white-space:pre-line; }
+  .u .burbuja { background:#1d4ed8; color:#fff; border-bottom-right-radius:4px; }
+  .a .burbuja { background:#fff; color:#1e293b; border:1px solid #e2e8f0; border-bottom-left-radius:4px; }
+  .meta { margin-top:4px; display:flex; justify-content:space-between; gap:8px; font-size:10px; opacity:.6; }
+  .origen { background:#f1f5f9; padding:0 4px; border-radius:4px; font-weight:800; }
+  .enlaces { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; }
+  .enlaces button { border-radius:999px; background:#eff6ff; padding:4px 10px; font-size:11px; font-weight:800; color:#1d4ed8; border:1px solid #bfdbfe; cursor:pointer; }
+  .votos button { border:none; background:transparent; cursor:pointer; font-size:12px; border-radius:4px; padding:2px 6px; }
+  .votos button:hover { background:#f1f5f9; }
+  #atajos { display:flex; gap:6px; overflow-x:auto; border-top:1px solid #f1f5f9; background:#fff; padding:8px 12px; }
+  #atajos button { white-space:nowrap; border-radius:999px; border:1px solid #e2e8f0; background:#f8fafc; padding:4px 10px; font-size:11px; font-weight:700; color:#334155; cursor:pointer; }
+  #form { display:flex; align-items:center; gap:8px; border-top:1px solid #e2e8f0; background:#fff; padding:10px 12px; }
+  #input { flex:1; min-width:0; border-radius:12px; border:1px solid #cbd5e1; padding:8px 12px; font-size:14px; outline:none; }
+  #form button { border:none; border-radius:12px; padding:8px 12px; font-size:14px; font-weight:800; cursor:pointer; }
+  #btnVoz { background:#f1f5f9; } #btnSend { background:#1d4ed8; color:#fff; }
+  .escribiendo { background:#fff; border:1px solid #e2e8f0; border-radius:16px; border-bottom-left-radius:4px; padding:8px 12px; font-size:13px; color:#64748b; animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.6; } }
+  .nota { font-size:12px; color:#64748b; text-align:center; padding:8px; }
+</style>
+</head>
+<body>
+<div class="topbar">IESTP Suiza · SIGD <small>Modelo de vista previa — el código real está en src/ de esta misma carpeta</small></div>
+<div class="page">
+  <div class="card"><h2>Página simulada</h2><p>Esto simula tu sistema. El botón <b>🤖</b> de abajo a la derecha es el asistente real en apariencia y lógica simplificada.</p>
+  <p><span class="pill">Mesa de Partes</span><span class="pill">Casilla</span><span class="pill">Validador CVD</span><span class="pill">Consulta CUT</span></p></div>
+  <div class="card"><h2>Prueba sugerida</h2><p>1. Abre el 🤖 → 2. Clic un atajo → 3. Escribe <i>"llevame a mi casilla"</i> → 4. Escribe <i>"CUT-2026-000123"</i> → 5. Escribe <i>"gracias"</i></p></div>
+  <div class="card" id="moduloSimulado"><h2 id="tituloModulo">Módulo actual: Página Principal (/)</h2><p id="descModulo">El asistente puede "navegar" aquí mismo cambiando este panel, igual que hace con <i>navigate(ruta)</i> en el código real.</p></div>
+</div>
+
+<button id="btnFlotante" title="Abrir asistente de ayuda">🤖</button>
+
+<section id="chat" class="oculto" aria-label="Asistente virtual SIGD">
+  <div class="chatHead">
+    <div class="who"><span class="avatar">🤖</span>
+      <div><div style="font-size:14px;font-weight:800">JARVIS · Asistente SIGD <span class="badge" id="badgeModo">Local</span></div>
+      <div class="online" id="lineaFuente">● En línea · entiende lenguaje natural</div></div>
+    </div>
+    <button id="btnLimpiar" title="Reiniciar conversación">↺</button>
+  </div>
+  <div id="msgs"></div>
+  <div id="atajos"></div>
+  <form id="form"><input id="input" placeholder="Escriba su consulta…" autocomplete="off" /><button type="button" id="btnVoz" title="Dictar por voz">🎙</button><button type="submit" id="btnSend">➤</button></form>
+</section>
+<div class="nota">Doble clic en este archivo para verlo. No necesita npm ni internet. Lógica demo = subconjunto del <i>useAsistenteIA.ts</i> real.</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const chat=$('chat'), msgs=$('msgs'), atajos=$('atajos'), input=$('input');
+let n=0; const nid=()=>'m'+(++n)+Date.now();
+const hora=()=>new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+const votos=JSON.parse(localStorage.getItem('demo_votos')||'{}');
+
+function burbuja(rol,texto,enlaces){
+  const fila=document.createElement('div'); fila.className='fila '+(rol==='usuario'?'u':'a');
+  const b=document.createElement('div'); b.className='burbuja'; b.textContent=texto;
+  const meta=document.createElement('div'); meta.className='meta';
+  meta.innerHTML='<span>'+hora()+'</span>'+(rol==='asistente'?'<span class="origen">Local</span>':'');
+  b.appendChild(meta);
+  if(enlaces&&enlaces.length){ const d=document.createElement('div'); d.className='enlaces';
+    enlaces.forEach(e=>{ const btn=document.createElement('button'); btn.textContent=e.etiqueta+' →'; btn.onclick=()=>navegar(e.ruta,e.etiqueta); d.appendChild(btn); }); b.appendChild(d); }
+  if(rol==='asistente'){ const v=document.createElement('div'); v.className='votos';
+    v.innerHTML='<button title="Útil">👍</button><button title="No útil">👎</button>'; b.appendChild(v); }
+  fila.appendChild(b); msgs.appendChild(fila); msgs.scrollTop=msgs.scrollHeight;
+}
+function navegar(ruta,etiqueta){
+  $('tituloModulo').textContent='Módulo actual: '+etiqueta+' ('+ruta+')';
+  $('descModulo').textContent='El asistente te trajo aquí con accion { tipo: navegar, ruta: '+ruta+' }. En tu proyecto real esto es navigate("'+ruta+'").';
+  burbuja('asistente','Con todo gusto. Te estoy dirigiendo al módulo «'+etiqueta+'» ('+ruta+'). En tu proyecto real la página cambiaría sola en 900 ms.');
+}
+function norm(s){ return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function responder(pregunta){
+  const p=' '+norm(pregunta)+' ';
+  if(/cut[\s-]*\d/.test(p)) return {t:'Gracias por facilitarme su código. Le invito a acceder al módulo Consulta Pública e ingresarlo para ver el estado: registrado, en revisión, observado o atendido.', e:[{etiqueta:'Consulta Pública',ruta:'/consulta'}]};
+  if(p.includes('casilla')||p.includes('notificacion')||p.includes('buzon')) return {t:'Su Casilla Electrónica es su domicilio digital oficial. Inicie sesión y revísela periódicamente; la notificación surte efectos desde su depósito.', e:[{etiqueta:'Mi Casilla',ruta:'/casilla'}]};
+  if(p.includes('llevame')||p.includes('lleva')||p.includes('abre')||p.includes('abrir')||p.includes('dirige')){
+    const mods=[['/tramite','Mesa de Partes Virtual',['mesa','tramite','tupa','solicitud']],['/casilla','Casilla Electrónica',['casilla','notificacion']],['/consulta','Consulta Pública',['consulta','cut','seguimiento']],['/validador-cvd','Validador CVD',['validador','cvd','validar','qr']],['/expedientes','Bandeja de Expedientes',['expediente']],['/registro','Registro Ciudadano',['registro','cuenta']]];
+    for(const [ruta,et,ncl] of mods){ if(ncl.some(k=>p.includes(k))){ setTimeout(()=>navegar(ruta,et),600); return {t:'Con todo gusto. Le estoy dirigiendo al módulo «'+et+'». En breve visualizará la página correspondiente.', e:[{etiqueta:et,ruta}]}; } }
+  }
+  if(p.includes('cvd')||p.includes('validar')||p.includes('verificar')||p.includes('qr')||p.includes('autentic')) return {t:'Valide sin cuenta: entre al Validador CVD, ingrese el código de su PDF o escanee el QR. Verá autenticidad, firmante y si fue alterado.', e:[{etiqueta:'Validador CVD',ruta:'/validador-cvd'}]};
+  if(p.includes('tramite')||p.includes('mesa')||p.includes('tupa')||p.includes('requisito')||p.includes('presentar')) return {t:'Procedimiento: (1) Mesa de Partes Virtual, (2) elija TUPA, (3) complete datos y adjunte PDF, (4) envíe y guarde su CUT para seguimiento en Consulta Pública.', e:[{etiqueta:'Mesa de Partes Virtual',ruta:'/tramite'},{etiqueta:'Consultar trámite',ruta:'/consulta'}]};
+  if(p.includes('costo')||p.includes('cuesta')||p.includes('pago')||p.includes('tupa')||p.includes('precio')) return {t:'TUPA 2026 (UIT S/ 5,500): Prácticas Iniciales S/ 35, Intermedias S/ 45, Finales S/ 60; Certificado S/ 100. Se paga en Tesorería (Bco. Nación 0512-039170) y se adjunta el voucher.', e:[{etiqueta:'Mesa de Partes Virtual',ruta:'/tramite'}]};
+  if(p.includes('registro')||p.includes('registrar')||p.includes('cuenta')||p.includes('contrasena')||p.includes('entrar')||p.includes('acceder')||p.includes('dni')) return {t:'Regístrese en Registro Ciudadano con DNI/RUC y luego inicie sesión eligiendo su rol. Si ve «Acceso denegado» es por su rol, no por la clave.', e:[{etiqueta:'Registro Ciudadano',ruta:'/registro'},{etiqueta:'Iniciar sesión',ruta:'/login'}]};
+  if(p.includes('observado')||p.includes('estado')||p.includes('demora')||p.includes('plazo')) return {t:'Estados: registrado → en revisión → observado (subsane por Mesa de Partes) → atendido (descargue y valide con CVD).', e:[{etiqueta:'Consulta Pública',ruta:'/consulta'}]};
+  if(p.includes('hola')||p.includes('buenas')||p.includes('buenos dias')) return {t:'Buenos días. Soy JARVIS, asistente institucional del SIGD. Puedo ayudarle con trámites, notificaciones, validación CVD o acceso. ¿En qué puedo servirle?'};
+  if(p.includes('gracias')||p.includes('genial')||p.includes('perfecto')) return {t:'Ha sido un placer asistirle. Quedo a su disposición para cualquier consulta adicional. ¿Desea apoyo en otro trámite?'};
+  if(p.includes('adios')||p.includes('chao')||p.includes('hasta luego')) return {t:'Gracias por su visita. Quedo atento en la burbuja inferior derecha. Éxito en sus gestiones.'};
+  if(p.includes('ayuda')||p.includes('quien eres')||p.includes('que puedes')) return {t:'Puedo orientarle en: (1) trámites TUPA, (2) CUT, (3) Casilla, (4) CVD, (5) registro/acceso, (6) titulación. Ej.: «llévame a mi casilla».', e:[{etiqueta:'Mesa de Partes',ruta:'/tramite'},{etiqueta:'Consulta CUT',ruta:'/consulta'}]};
+  return {t:'Gracias por su consulta. Puedo asistirle con trámites y TUPA, CUT, Casilla, CVD, registro, titulación o reportes. ¿Podría reformular con más detalle? Ej.: «¿dónde consulto mis notificaciones?»'};
+}
+const ATAJOS=['Llévame a Mesa de Partes Virtual','¿Dónde consulto mis notificaciones?','Perdí mi CUT, ¿cómo lo recupero?','¿Cómo valido un documento por CVD?'];
+function pintarAtajos(){ atajos.innerHTML=''; ATAJOS.slice(0,4).forEach(s=>{ const b=document.createElement('button'); b.textContent=s; b.onclick=()=>enviar(s); atajos.appendChild(b); }); }
+function enviar(texto){
+  const t=(texto??input.value).trim(); if(!t) return;
+  burbuja('usuario',t); input.value='';
+  const e=document.createElement('div'); e.className='fila a'; e.innerHTML='<div class="escribiendo">JARVIS está escribiendo…</div>'; msgs.appendChild(e); msgs.scrollTop=msgs.scrollHeight;
+  setTimeout(()=>{ e.remove(); const r=responder(t); burbuja('asistente',r.t,r.e); },550);
+}
+$('btnFlotante').onclick=()=>{ chat.classList.toggle('oculto'); $('btnFlotante').textContent=chat.classList.contains('oculto')?'🤖':'✕'; };
+$('btnLimpiar').onclick=()=>{ msgs.innerHTML=''; burbuja('asistente','He reiniciado nuestra conversación. Quedo a su disposición; indíqueme en qué puedo servirle.'); };
+document.querySelector('#form').onsubmit=e=>{ e.preventDefault(); enviar(); };
+$('btnVoz').onclick=()=>alert('En el código real usa SpeechRecognition (es-PE) para dictar. Aquí es solo demostrativo.');
+pintarAtajos();
+burbuja('asistente','Buenos días. Soy JARVIS, asistente institucional del SIGD. Puedo orientarle y, si usted lo autoriza, dirigirle al módulo correspondiente, por ejemplo: «llévame a mi casilla» o «abre el validador». ¿En qué puedo servirle?');
+</script>
+</body>
+</html>
