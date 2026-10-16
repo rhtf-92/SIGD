@@ -27,6 +27,8 @@ import type {
 } from '../../../types/tramiteWizardState';
 import QrCodeView from '../../common/QrCodeView';
 import { apiClient } from '../../../api/client';
+import { buildGenuinePdfBlob } from '../../../services/pdfReportExporter';
+import { downloadReportBlob } from '../../../services/reportDownload';
 
 interface RadicacionVirtualResponse {
   expedienteId: string;
@@ -101,6 +103,41 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
   const handleImprimir = () => {
     window.print();
+  };
+
+  const handleDescargarCargoPdf = () => {
+    if (!state.cargoEmitido) return;
+
+    const cargo = state.cargoEmitido;
+    const archivoPrincipal = state.documentos.archivos[0];
+
+    const metadatos = [
+      { etiqueta: 'CÓDIGO ÚNICO DE TRÁMITE (CUT)', valor: cargo.cut },
+      { etiqueta: 'ADMINISTRADO / REMITENTE', valor: cargo.remitente },
+      { etiqueta: 'DOCUMENTO DE IDENTIDAD', valor: `${state.identificacion.tipoDocumento}: ${state.identificacion.numeroDocumento}` },
+      { etiqueta: 'PROCEDIMIENTO / TRÁMITE', valor: state.documentos.tipoTramiteId },
+      { etiqueta: 'ASUNTO DEL PETITORIO', valor: state.documentos.asunto },
+      { etiqueta: 'FECHA Y HORA DE INGRESO', valor: cargo.fechaRadicacion },
+      { etiqueta: 'FECHA JURÍDICA DE RECEPCIÓN', valor: cargo.fechaRecepcionOficial },
+      { etiqueta: 'FOLIOS DECLARADOS', valor: String(state.documentos.numeroFolios) },
+      { etiqueta: 'DOCUMENTO ADJUNTO', valor: archivoPrincipal ? `${archivoPrincipal.nombre} (${(archivoPrincipal.peso / 1024).toFixed(1)} KB)` : 'Sin adjuntos' },
+      { etiqueta: 'HASH SHA-256 DEL DOCUMENTO', valor: archivoPrincipal ? archivoPrincipal.hashSha256 : 'N/A' },
+      { etiqueta: 'FIRMA CRIPTOGRÁFICA / TX', valor: cargo.hashTransaccion },
+    ];
+
+    const blob = buildGenuinePdfBlob({
+      reportName: 'CARGO FORMAL DE RECEPCIÓN DOCUMENTARIA',
+      format: 'pdf',
+      generatedAt: cargo.fechaRecepcionOficial || cargo.fechaRadicacion,
+      filters: {
+        periodo: 'SISTEMA INTEGRADO DE GESTIÓN DOCUMENTAL — IESTP SUIZA',
+      },
+      records: metadatos.map((item) => ({
+        CAMPO: item.etiqueta,
+        VALOR: item.valor,
+      })),
+    });
+    void downloadReportBlob(blob, `Cargo_Recepcion_${cargo.cut}.pdf`);
   };
 
   const handleRadicar = async () => {
@@ -325,6 +362,14 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
           {/* Botonera Posterior */}
           <div className="mt-7 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={handleDescargarCargoPdf}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#006EC7] hover:bg-[#005ba3] text-white text-xs font-bold shadow-xs transition cursor-pointer"
+            >
+              <span>📥</span>
+              <span>Descargar Cargo Oficial (PDF)</span>
+            </button>
             <button
               type="button"
               onClick={handleImprimir}

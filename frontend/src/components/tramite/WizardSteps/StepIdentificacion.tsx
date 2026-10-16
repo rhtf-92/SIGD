@@ -45,6 +45,8 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
 }) => {
   const formId = useId();
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [isConsulting, setIsConsulting] = useState(false);
+  const [consultMessage, setConsultMessage] = useState<{ tipo: 'success' | 'info' | 'error'; texto: string } | null>(null);
   const firstFieldRef = useRef<HTMLSelectElement>(null);
 
   // Foco accesible inicial en el primer campo interactivo del formulario
@@ -147,6 +149,50 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
     });
   };
 
+  const handleConsultarIdentidad = async () => {
+    const doc = data.numeroDocumento.trim();
+    if (!doc || errors.numeroDocumento) return;
+
+    setIsConsulting(true);
+    setConsultMessage(null);
+
+    // Simulación de latencia de red (400ms)
+    await new Promise((res) => setTimeout(res, 400));
+
+    // Padrón institucional demostrativo / institucional base
+    const padronPruebas: Record<string, { nombres: string; apellidos: string }> = {
+      '70123456': { nombres: 'JUAN CARLOS', apellidos: 'QUISPE MORALES' },
+      '45891234': { nombres: 'MARÍA ELENA', apellidos: 'RODRÍGUEZ SÁNCHEZ' },
+      '09876543': { nombres: 'ANLLELY', apellidos: 'MELGAREJO VARGAS' },
+      '20123456789': { nombres: 'INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA', apellidos: '' },
+      '10701234561': { nombres: 'JUAN CARLOS QUISPE MORALES', apellidos: '' }
+    };
+
+    const match = padronPruebas[doc];
+
+    if (match) {
+      dispatch({
+        type: 'UPDATE_IDENTIFICACION',
+        payload: {
+          nombres: match.nombres,
+          apellidos: data.tipoDocumento === 'RUC' ? '' : match.apellidos
+        }
+      });
+      setConsultMessage({
+        tipo: 'success',
+        texto: 'Datos validados y autocompletados correctamente desde el padrón institucional.'
+      });
+    } else {
+      // Si no está en el mock, se orienta al administrado a consignar sus datos manualmente
+      setConsultMessage({
+        tipo: 'info',
+        texto: 'Documento no registrado en padrón automático. Por favor, consigne sus nombres y apellidos manualmente.'
+      });
+    }
+
+    setIsConsulting(false);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Marcar todos como tocados para revelar errores si los hubiera
@@ -215,36 +261,57 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
           >
             Número de Documento <span className="text-red-600">*</span>
           </label>
-          <input
-            id={`${formId}-numeroDocumento`}
-            name="numeroDocumento"
-            type="text"
-            required
-            aria-required="true"
-            aria-invalid={touched.numeroDocumento && Boolean(errors.numeroDocumento)}
-            aria-describedby={
-              touched.numeroDocumento && errors.numeroDocumento
-                ? `${formId}-numeroDocumento-error`
-                : undefined
-            }
-            maxLength={data.tipoDocumento === 'DNI' ? 8 : data.tipoDocumento === 'RUC' ? 11 : 12}
-            placeholder={
-              data.tipoDocumento === 'DNI'
-                ? '8 dígitos numéricos'
-                : data.tipoDocumento === 'RUC'
-                ? '11 dígitos (inicia con 10, 15, 17 o 20)'
-                : '6 a 12 caracteres alfanuméricos'
-            }
-            value={data.numeroDocumento}
-            onChange={(e) => handleFieldChange('numeroDocumento', e.target.value.trim())}
-            onBlur={() => markTouched('numeroDocumento')}
-            disabled={isSubmitting}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm font-mono shadow-xs focus:outline-none focus:ring-2 transition ${
-              touched.numeroDocumento && errors.numeroDocumento
-                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
-            } disabled:bg-slate-100`}
-          />
+          <div className="flex gap-2">
+            <input
+              id={`${formId}-numeroDocumento`}
+              name="numeroDocumento"
+              type="text"
+              required
+              aria-required="true"
+              aria-invalid={touched.numeroDocumento && Boolean(errors.numeroDocumento)}
+              aria-describedby={
+                touched.numeroDocumento && errors.numeroDocumento
+                  ? `${formId}-numeroDocumento-error`
+                  : undefined
+              }
+              maxLength={data.tipoDocumento === 'DNI' ? 8 : data.tipoDocumento === 'RUC' ? 11 : 12}
+              placeholder={
+                data.tipoDocumento === 'DNI'
+                  ? '8 dígitos numéricos'
+                  : data.tipoDocumento === 'RUC'
+                  ? '11 dígitos (inicia con 10, 15, 17 o 20)'
+                  : '6 a 12 caracteres alfanuméricos'
+              }
+              value={data.numeroDocumento}
+              onChange={(e) => handleFieldChange('numeroDocumento', e.target.value.trim())}
+              onBlur={() => markTouched('numeroDocumento')}
+              disabled={isSubmitting}
+              className={`flex-1 w-full rounded-lg border px-3.5 py-2.5 text-sm font-mono shadow-xs focus:outline-none focus:ring-2 transition ${
+                touched.numeroDocumento && errors.numeroDocumento
+                  ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
+                  : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
+              } disabled:bg-slate-100`}
+            />
+            <button
+              type="button"
+              onClick={handleConsultarIdentidad}
+              disabled={isSubmitting || isConsulting || Boolean(errors.numeroDocumento) || !data.numeroDocumento.trim()}
+              className="px-3.5 py-2.5 bg-[#006EC7] hover:bg-[#005ba3] text-white text-xs font-semibold rounded-lg shadow-xs transition inline-flex items-center gap-1.5 shrink-0 disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer disabled:cursor-not-allowed"
+              title="Consultar datos de identidad"
+            >
+              {isConsulting ? (
+                <>
+                  <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Validando...</span>
+                </>
+              ) : (
+                <>
+                  <span>🔍</span>
+                  <span>Consultar</span>
+                </>
+              )}
+            </button>
+          </div>
           {touched.numeroDocumento && errors.numeroDocumento && (
             <p
               id={`${formId}-numeroDocumento-error`}
@@ -252,6 +319,19 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
               className="mt-1.5 text-xs text-red-600 font-medium"
             >
               {errors.numeroDocumento}
+            </p>
+          )}
+          {consultMessage && (
+            <p
+              className={`mt-1.5 text-xs font-medium ${
+                consultMessage.tipo === 'success'
+                  ? 'text-emerald-700'
+                  : consultMessage.tipo === 'error'
+                  ? 'text-red-600'
+                  : 'text-blue-700'
+              }`}
+            >
+              {consultMessage.texto}
             </p>
           )}
         </div>

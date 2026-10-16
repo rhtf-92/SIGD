@@ -17,14 +17,33 @@ export const ROLES_CANONICOS = [
 export default function LoginPage() {
   const navigate = useNavigate();
   const [rol, setRol] = useState("SUPER_ADMIN");
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function iniciarSesionDemo() {
-    window.localStorage.setItem(CLAVE_TOKEN, "demo-jwt-" + Date.now());
-    window.localStorage.setItem(CLAVE_ROL, rol);
-    window.localStorage.setItem(CLAVE_PERMISOS, JSON.stringify(permisosIniciales));
-    const encontrado = ROLES_CANONICOS.find((item) => item.id === rol);
-    const destino = encontrado ? encontrado.destino : "/administracion";
-    navigate(destino, { replace: true });
+  function manejarEnvio(e: any) {
+    e.preventDefault();
+    setError(null);
+
+    if (!rol) {
+      setError("Por favor, selecciona un rol institucional válido.");
+      return;
+    }
+
+    setCargando(true);
+
+    try {
+      window.localStorage.setItem(CLAVE_TOKEN, "demo-jwt-" + Date.now());
+      window.localStorage.setItem(CLAVE_ROL, rol);
+      window.localStorage.setItem(CLAVE_PERMISOS, JSON.stringify(permisosIniciales));
+
+      const encontrado = ROLES_CANONICOS.find((item) => item.id === rol);
+      const destino = encontrado ? encontrado.destino : "/administracion";
+
+      navigate(destino, { replace: true });
+    } catch {
+      setError("Ocurrió un error al guardar la sesión local.");
+      setCargando(false);
+    }
   }
 
   return (
@@ -32,7 +51,7 @@ export default function LoginPage() {
       <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
         <Link
           to="/"
-          className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+          className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           ← Volver al inicio
         </Link>
@@ -42,31 +61,47 @@ export default function LoginPage() {
           Acceso por roles institucionales canónicos para control de acceso (RBAC).
         </p>
 
-        <div className="mt-6">
-          <label htmlFor="rol" className="mb-2 block text-sm font-semibold">
-            Rol institucional canónico
-          </label>
-          <select
-            id="rol"
-            value={rol}
-            onChange={(event) => setRol(event.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium"
-          >
-            {ROLES_CANONICOS.map((opcion) => (
-              <option key={opcion.id} value={opcion.id}>
-                {opcion.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {error && (
+          <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700 border border-red-200" role="alert">
+            {error}
+          </div>
+        )}
 
-        <button
-          type="button"
-          onClick={iniciarSesionDemo}
-          className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition"
-        >
-          Ingresar al sistema
-        </button>
+        <form onSubmit={manejarEnvio} className="mt-6">
+          <div>
+            <label htmlFor="rol" className="mb-2 block text-sm font-semibold">
+              Rol institucional canónico
+            </label>
+            <select
+              id="rol"
+              value={rol}
+              onChange={(event) => setRol(event.target.value)}
+              disabled={cargando}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:cursor-not-allowed"
+            >
+              {ROLES_CANONICOS.map((opcion) => (
+                <option key={opcion.id} value={opcion.id}>
+                  {opcion.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            disabled={cargando}
+            className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {cargando ? (
+              <>
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                Ingresando...
+              </>
+            ) : (
+              "Ingresar al sistema"
+            )}
+          </button>
+        </form>
       </section>
     </main>
   );

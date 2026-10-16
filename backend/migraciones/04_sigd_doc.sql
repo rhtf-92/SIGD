@@ -255,14 +255,41 @@ CREATE INDEX IF NOT EXISTS idx_firma_digital_cvd
 CREATE INDEX IF NOT EXISTS idx_firma_digital_sha256
     ON sigd_doc.firma_digital_documento (sha256_firmado);
 
--- -----------------------------------------------------------------------------
--- 4.10 Semillas canónicas TUPA IESTP Suiza
--- -----------------------------------------------------------------------------
+-- ============================================================================
+-- 4.10 SEMILLAS CANÓNICAS TUPA IESTP SUIZA (ACTUALIZADO 2026)
+-- ============================================================================
 INSERT INTO sigd_doc.tipo_tramite_tupa (
-    tipo_tramite_id, codigo, denominacion, descripcion, unidad_organica, plazo_dias, silencio_administrativo, base_legal, vigente
+    codigo, denominacion, descripcion, unidad_organica, plazo_dias, silencio_administrativo, base_legal, vigente
 ) VALUES
-('00000000-0000-0000-0000-000000000001', 'TUPA-01', 'Emisión de Certificado de Estudios Oficial', 'Expedición de certificado oficial de estudios técnicos', 'Secretaría Académica', 7, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
-('00000000-0000-0000-0000-000000000002', 'TUPA-02', 'Expedición de Título Profesional Técnico', 'Tramitación de título a nombre de la Nación', 'Dirección General', 30, 'NEGATIVO', 'Ley N° 30512', TRUE),
-('00000000-0000-0000-0000-000000000003', 'TUPA-03', 'Convalidación de Créditos y Prácticas Pre-Profesionales', 'Convalidación de módulos formativos y EFSRT', 'Jefatura de Unidad Académica', 15, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE)
-ON CONFLICT (codigo) DO NOTHING;
+('TUPA-01', 'Expedición de Título Profesional Técnico', 'Requisitos: Pago del derecho en Tesorería (1.90% UIT Vigente - S/ 105.00), FUT, constancia de no adeudar y carpeta completa.', 'Dirección General', 30, 'NEGATIVO', 'Ley N° 30512', TRUE),
+('TUPA-02', 'Certificado de Estudios Superiores (6 Semestres)', 'Requisitos: Pago del derecho en Tesorería (2.24% UIT Vigente - S/ 124.00) y FUT dirigido a Secretaría Académica.', 'Secretaría Académica', 7, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-03', 'Visación de Certificado de Estudios Superiores', 'Requisitos: Pago del derecho en Tesorería (0.29% UIT Vigente - S/ 16.00) y presentación de certificados originales.', 'Secretaría Académica', 5, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-04', 'Constancia de No Adeudar (Para Fines de Titulación)', 'Requisitos: Pago del derecho en Tesorería (0.30% UIT Vigente - S/ 16.50).', 'Unidad Administrativa', 3, 'POSITIVO', 'Ley N° 28693', TRUE),
+('TUPA-05', 'Constancia de Egresado', 'Requisitos: Pago del derecho en Tesorería (S/ 31.00) y verificación de récord académico.', 'Secretaría Académica', 5, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-06', 'Constancias Varias (Título, Estudios o Matrícula)', 'Requisitos: Pago del derecho en Tesorería (0.41% UIT Vigente - S/ 23.00) y FUT.', 'Secretaría Académica', 5, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-07', 'Certificado Modular (I, II, III y IV)', 'Requisitos: Pago en Tesorería (S/ 100.00 por módulo) y emisión de B/V.', 'Secretaría Académica', 10, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-08', 'Certificado de Bachillerato', 'Requisitos: Pago del derecho en Tesorería (0.75% UIT Vigente - S/ 42.00) y comprobante de pago.', 'Secretaría Académica', 15, 'POSITIVO', 'Ley N° 30512', TRUE),
+('TUPA-09', 'Derecho de Duplicado de Título', 'Requisitos: Pago del derecho en Tesorería (5.61% UIT Vigente - S/ 309.00), publicación en diario y denuncia policial.', 'Dirección General', 30, 'NEGATIVO', 'Ley N° 30512', TRUE),
+('TUPA-10', 'Modificación de Datos del Título', 'Requisitos: Pago del derecho en Tesorería (4.88% UIT Vigente - S/ 269.00) y partida/DNI rectificado.', 'Dirección General', 20, 'POSITIVO', 'Ley N° 30512', TRUE),
+('TUPA-11', 'Convalidación entre Planes de Estudios', 'Requisitos: Pago del derecho en Tesorería (0.84% UIT Vigente - S/ 46.50) y sílabos visados.', 'Jefatura de Unidad Académica', 15, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-12', 'Convalidación por Unidades de Competencia', 'Requisitos: Pago del derecho en Tesorería (0.84% UIT Vigente - S/ 46.50) y portafolio de evidencias.', 'Jefatura de Unidad Académica', 15, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-13', 'Traslado Interno', 'Requisitos: Solicitud en FUT, vacante en carrera, Resolución Directoral (5.61% UIT Vigente - S/ 309.00).', 'Secretaría Académica', 10, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-14', 'Traslado Externo', 'Requisitos: Solicitud en FUT dirigida al Director, vacante en carrera, Resolución Directoral (7.48% UIT Vigente - S/ 412.00).', 'Dirección General', 15, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-15', 'Reserva de Matrícula - Ingresantes', 'Requisitos: Pago en Tesorería (1.20% UIT Vigente - S/ 66.00) y Resolución Directoral de Secretaría Académica.', 'Secretaría Académica', 5, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-16', 'Licencia de Estudios - Estudiantes Antiguos', 'Requisitos: Pago en Tesorería (1.20% UIT Vigente - S/ 66.00) y Resolución Directoral de Secretaría Académica.', 'Secretaría Académica', 5, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-17', 'Derecho de Reincorporación (Reingreso)', 'Requisitos: Pago en el Área de Tesorería (S/ 300.00) y FUT dirigido a Dirección.', 'Secretaría Académica', 10, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-18', 'Examen de Recuperación / Subsanación con Jurado', 'Requisitos: Resolución Directoral, pago en Tesorería (0.60% UIT Vigente - S/ 33.00 a 1.27% UIT Vigente - S/ 70.00).', 'Jefatura de Unidad Académica', 5, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-19', 'Evaluación Extraordinaria', 'Requisitos: Pago en Tesorería (1.27% a 1.68% UIT Vigente - S/ 70.00 a S/ 93.00) según RM 069.', 'Jefatura de Unidad Académica', 7, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-20', 'Prueba de Suficiencia Académica', 'Requisitos: Resolución Directoral, pago en Tesorería (1.90% UIT Vigente - S/ 105.00).', 'Jefatura de Unidad Académica', 10, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE),
+('TUPA-21', 'Devolución de Expediente', 'Requisitos: Pago del derecho en Tesorería (0.37% UIT Vigente - S/ 21.00) y FUT de solicitud.', 'Mesa de Partes', 3, 'POSITIVO', 'TUO Ley N° 27444', TRUE),
+('TUPA-22', 'Acceso a la Información Pública', 'Requisitos: Solicitud dirigida a Dirección en FUT (Costo de reproducción: 0.19% UIT Vigente - S/ 10.50).', 'Dirección General', 10, 'POSITIVO', 'Ley N° 27806', TRUE),
+('TUPA-23', 'Búsqueda y Duplicados de Boletas / Sílabos', 'Requisitos: Pago del derecho en Tesorería (0.19% UIT Vigente - S/ 10.50).', 'Secretaría Académica', 3, 'POSITIVO', 'Ley N° 28693', TRUE)
+ON CONFLICT (codigo) DO UPDATE SET
+    denominacion = EXCLUDED.denominacion,
+    descripcion = EXCLUDED.descripcion,
+    unidad_organica = EXCLUDED.unidad_organica,
+    plazo_dias = EXCLUDED.plazo_dias,
+    silencio_administrativo = EXCLUDED.silencio_administrativo,
+    base_legal = EXCLUDED.base_legal,
+    vigente = EXCLUDED.vigente;
 
