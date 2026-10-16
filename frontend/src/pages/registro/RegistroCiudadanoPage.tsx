@@ -8,10 +8,10 @@ import { apiClient } from "../../api/client";
 export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleNaturalSubmit = async (data: Natural) => {
-    console.log("POST /api/v1/auth/registro-ciudadano", data);
-
+    setErrorMessage(null);
     const partesApellidos = data.apellidos.trim().split(/\s+/);
     const apellidoPaterno = partesApellidos[0] || "PATERNO";
     const apellidoMaterno = partesApellidos.slice(1).join(" ") || "MATERNO";
@@ -38,7 +38,12 @@ export default function RegistroCiudadanoPage() {
     try {
       await apiClient.post("/api/v1/auth/registro-ciudadano", payload);
     } catch (err) {
-      console.warn("[RegistroCiudadano] Fallo de llamada a API en registro natural:", err);
+      setErrorMessage(
+        err instanceof Error
+          ? `No se pudo completar el registro. ${err.message}`
+          : "No se pudo completar el registro. Intente nuevamente.",
+      );
+      return;
     }
 
     setSuccessMessage(
@@ -47,8 +52,7 @@ export default function RegistroCiudadanoPage() {
   };
 
   const handleJuridicaSubmit = async (data: Juridical) => {
-    console.log("POST /api/v1/auth/registro-ciudadano", data);
-
+    setErrorMessage(null);
     const celularValido = /^9[0-9]{8}$/.test(data.celularContacto) ? data.celularContacto : "961234567";
     const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
       ? (data.domicilio.distritoCodigo as string)
@@ -73,7 +77,12 @@ export default function RegistroCiudadanoPage() {
     try {
       await apiClient.post("/api/v1/auth/registro-persona-juridica", payload);
     } catch (err) {
-      console.warn("[RegistroCiudadano] Fallo de llamada a API en registro jurídica:", err);
+      setErrorMessage(
+        err instanceof Error
+          ? `No se pudo completar el registro. ${err.message}`
+          : "No se pudo completar el registro. Intente nuevamente.",
+      );
+      return;
     }
 
     setSuccessMessage(
@@ -113,6 +122,7 @@ export default function RegistroCiudadanoPage() {
             onClick={() => {
               setActiveTab("NATURAL");
               setSuccessMessage(null);
+              setErrorMessage(null);
             }}
             className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-[#006EC7] focus:ring-offset-2 ${
               activeTab === "NATURAL"
@@ -130,6 +140,7 @@ export default function RegistroCiudadanoPage() {
             onClick={() => {
               setActiveTab("JURIDICA");
               setSuccessMessage(null);
+              setErrorMessage(null);
             }}
             className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-[#006EC7] focus:ring-offset-2 ${
               activeTab === "JURIDICA"
@@ -162,6 +173,16 @@ export default function RegistroCiudadanoPage() {
             <PersonaJuridicaForm onSubmit={handleJuridicaSubmit} />
           )}
         </div>
+
+        {errorMessage && (
+          <div
+            className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm"
+            role="alert"
+            aria-live="assertive"
+          >
+            {errorMessage}
+          </div>
+        )}
 
         {successMessage && (
           <div
