@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import TupaVersionComparator from "../components/TupaVersionComparator";
 import {
   mensajeError,
   tupaApi,
@@ -71,7 +72,7 @@ function TramiteEditor({ token, versionId, tramite, onSaved, onError }: TramiteE
   }
 
   return (
-    <article className="rounded-lg border border-slate-200 p-4">
+    <article className="sigd-card rounded-lg border border-slate-200 p-4">
       <div>
         <p className="font-mono text-xs text-blue-700">{tramite.codigo}</p>
         <h3 className="mt-1 font-semibold">{tramite.denominacion}</h3>
@@ -244,7 +245,7 @@ export default function TupaGestionPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
+    <main className="sigd-tupa-management mx-auto min-h-screen max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
       <header className="mb-6">
         <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">Administración TUPA</p>
         <h1 className="mt-1 text-3xl font-bold">Gestión de versiones</h1>
@@ -279,7 +280,7 @@ export default function TupaGestionPage() {
                     <button className={`w-full rounded-lg border p-3 text-left ${version.version_id === versionId ? "border-blue-400 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`} onClick={() => void manejarOperacion(() => seleccionarVersion(token, version.version_id), "Versión cargada.")} type="button">
                       <span className="block font-mono text-xs">{version.codigo}</span>
                       <span className="mt-1 block text-sm font-semibold">{version.nombre}</span>
-                      <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${version.estado === "VIGENTE" ? "bg-green-100 text-green-800" : version.estado === "BORRADOR" ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-700"}`}>{version.estado}</span>
+                      <span className={`sigd-badge mt-2 ${version.estado === "VIGENTE" ? "sigd-badge-vigente" : version.estado === "BORRADOR" ? "sigd-badge-borrador" : "sigd-badge-supersedida"}`}>{version.estado}</span>
                     </button>
                   </li>
                 ))}
@@ -312,13 +313,14 @@ export default function TupaGestionPage() {
           </aside>
 
           <section className="min-w-0 space-y-5">
+            <TupaVersionComparator token={token} versiones={versiones} />
             {versionId ? (
               <>
                 {(() => {
                   const version = versiones.find((item) => item.version_id === versionId);
                   if (!version) return null;
                   return (
-                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <section className="sigd-card rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div><p className="font-mono text-xs text-blue-700">{version.codigo}</p><h2 className="mt-1 text-xl font-bold">{version.nombre}</h2><p className="mt-1 text-sm text-slate-600">Estado: {version.estado} · {tramites.length} trámites</p></div>
                         {version.tiene_resolucion && <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => void descargarPdf(version.version_id, version.codigo)} type="button">Descargar resolución PDF</button>}
@@ -348,7 +350,7 @@ export default function TupaGestionPage() {
                     </section>
                   );
                 })()}
-                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <section className="sigd-card rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h2 className="text-lg font-bold">Trámites de la versión</h2>
                   {tramites.length === 0 ? <p className="mt-3 text-sm text-slate-600">Esta versión todavía no tiene trámites.</p> : (
                     <div className="mt-4 space-y-3">
@@ -368,7 +370,7 @@ export default function TupaGestionPage() {
                     </div>
                   )}
                 </section>
-                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <section className="sigd-card rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h2 className="text-lg font-bold">Bitácora inmutable</h2>
                   {bitacora.length === 0 ? <p className="mt-3 text-sm text-slate-600">Sin eventos registrados.</p> : (
                     <ol className="mt-3 space-y-3">
@@ -384,9 +386,9 @@ export default function TupaGestionPage() {
         </div>
       )}
 
-      {mensaje && <p className="mt-5 rounded-lg bg-green-50 p-3 text-sm text-green-900" role="status">{mensaje}</p>}
-      {error && <p className="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</p>}
-      {cargando && token && <p className="mt-3 text-sm text-slate-500">Procesando operación…</p>}
+      {mensaje && <p className="sigd-alert-info mt-5 text-sm" role="status">{mensaje}</p>}
+      {error && <p className="sigd-alert-error mt-5 text-sm" role="alert">{error}</p>}
+      {cargando && token && <p className="sigd-loading mt-3 text-sm">Procesando operación…</p>}
     </main>
   );
 }
