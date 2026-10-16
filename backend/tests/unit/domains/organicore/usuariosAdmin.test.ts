@@ -24,10 +24,10 @@ const SEDE_ID = '33333333-3333-4333-8333-333333333333';
 const ROL_ID = '44444444-4444-4444-8444-444444444444';
 
 const usuarioMock: UsuarioDirectorio = {
-  id: 1,
+  id: '55555555-5555-4555-8555-555555555555',
   nombre: 'Leonardo Rodriguez Rodriguez',
   dni: '74851201',
-  correo: 'leonardo@iestpsuiza.edu.pe',
+  correo: 'leonardo@iestp-suiza.edu.pe',
   sede: 'Sede Principal',
   area: 'Administración',
   cargo: 'Administrador',
@@ -43,11 +43,11 @@ const usuarioMock: UsuarioDirectorio = {
 describe('correoInstitucionalSchema', () => {
   it('acepta correos del dominio institucional', () => {
     const resultado = correoInstitucionalSchema.parse(
-      'leonardo@iestpsuiza.edu.pe',
+      'leonardo@iestp-suiza.edu.pe',
     );
 
     expect(resultado).toBe(
-      'leonardo@iestpsuiza.edu.pe',
+      'leonardo@iestp-suiza.edu.pe',
     );
   });
 
@@ -61,11 +61,11 @@ describe('correoInstitucionalSchema', () => {
 
   it('elimina espacios al inicio y al final', () => {
     const resultado = correoInstitucionalSchema.parse(
-      '  leonardo@iestpsuiza.edu.pe  ',
+      '  leonardo@iestp-suiza.edu.pe  ',
     );
 
     expect(resultado).toBe(
-      'leonardo@iestpsuiza.edu.pe',
+      'leonardo@iestp-suiza.edu.pe',
     );
   });
 
@@ -186,7 +186,7 @@ describe('crearUsuarioAdminSchema', () => {
     apellidoPaterno: 'Rodriguez',
     apellidoMaterno: 'Rodriguez',
     telefono: '999999999',
-    correo: 'leonardo@iestpsuiza.edu.pe',
+    correo: 'leonardo@iestp-suiza.edu.pe',
     username: 'leonardo.rodriguez',
     passwordInicial: 'ClaveSegura2026!',
     puestoLaboralId: PUESTO_ID,
@@ -204,7 +204,7 @@ describe('crearUsuarioAdminSchema', () => {
     );
 
     expect(resultado.correo).toBe(
-      'leonardo@iestpsuiza.edu.pe',
+      'leonardo@iestp-suiza.edu.pe',
     );
   });
 
@@ -282,11 +282,11 @@ describe('actualizarUsuarioAdminSchema', () => {
   it('acepta actualización de correo institucional', () => {
     const resultado =
       actualizarUsuarioAdminSchema.parse({
-        correo: 'nuevo@iestpsuiza.edu.pe',
+        correo: 'nuevo@iestp-suiza.edu.pe',
       });
 
     expect(resultado.correo).toBe(
-      'nuevo@iestpsuiza.edu.pe',
+      'nuevo@iestp-suiza.edu.pe',
     );
   });
 
@@ -777,7 +777,7 @@ describe('crearUsuariosAdminService', () => {
       crearUsuariosAdminService(mockPool);
 
     const total =
-      await service.revocarSesionesUsuario(15);
+      await service.revocarSesionesUsuario('55555555-5555-4555-8555-555555555555');
 
     expect(
       mockQuery,
@@ -801,7 +801,7 @@ describe('crearUsuariosAdminService', () => {
       crearUsuariosAdminService(mockPool);
 
     const total =
-      await service.revocarSesionesUsuario(15);
+      await service.revocarSesionesUsuario('55555555-5555-4555-8555-555555555555');
 
     expect(total).toBe(0);
   });
@@ -831,7 +831,7 @@ describe('crearUsuariosAdminService', () => {
         apellidoPaterno: 'Rodriguez',
         apellidoMaterno: null,
         telefono: null,
-        correo: 'leonardo@iestpsuiza.edu.pe',
+        correo: 'leonardo@iestp-suiza.edu.pe',
         username: 'leonardo.rodriguez',
         passwordInicial: 'ClaveSegura2026!',
         puestoLaboralId: PUESTO_ID,
@@ -869,7 +869,7 @@ describe('crearUsuariosAdminService', () => {
         apellidoPaterno: 'Rodriguez',
         apellidoMaterno: null,
         telefono: null,
-        correo: 'leonardo@iestpsuiza.edu.pe',
+        correo: 'leonardo@iestp-suiza.edu.pe',
         username: 'leonardo.rodriguez',
         passwordInicial: 'ClaveSegura2026!',
         puestoLaboralId: PUESTO_ID,
@@ -901,7 +901,7 @@ describe('crearUsuariosAdminService', () => {
         apellidoPaterno: 'Rodriguez',
         apellidoMaterno: null,
         telefono: null,
-        correo: 'leonardo@iestpsuiza.edu.pe',
+        correo: 'leonardo@iestp-suiza.edu.pe',
         username: 'leonardo.rodriguez',
         passwordInicial: 'ClaveSegura2026!',
         puestoLaboralId: PUESTO_ID,

@@ -10,7 +10,7 @@ import { z } from "zod";
  * - T-BE-OC-07: Validación de correo institucional
  */
 
-const DOMINIO_INSTITUCIONAL = "@iestpsuiza.edu.pe";
+const DOMINIO_INSTITUCIONAL = "@iestp-suiza.edu.pe";
 
 /**
  * Estados funcionales del usuario.
@@ -40,7 +40,7 @@ export const correoInstitucionalSchema = z
       correo.toLowerCase().endsWith(DOMINIO_INSTITUCIONAL),
     {
       message:
-        "El correo debe pertenecer al dominio institucional @iestpsuiza.edu.pe",
+        "El correo debe pertenecer al dominio institucional @iestp-suiza.edu.pe",
     },
   );
 
@@ -221,16 +221,12 @@ export const actualizarUsuarioAdminSchema =
 /**
  * Parámetro :id del usuario.
  *
- * Actualmente:
- * sigd_auth.cuenta_usuario.id = BIGSERIAL
- *
- * Por eso el identificador se valida como entero positivo.
+ * `sigd_auth.cuenta_usuario.id_usuario` es UUID en el DDL vigente, igual que
+ * `sigd_auth.persona`, `sigd_org.asignacion_personal` y `sigd_org.usuario_rol`.
+ * Por eso el identificador se valida como UUID y no como entero.
  */
 export const usuarioIdParamSchema = z.object({
-  id: z.coerce
-    .number()
-    .int("El ID del usuario debe ser un número entero")
-    .positive("El ID del usuario debe ser mayor que cero"),
+  id: z.string().uuid("El ID del usuario no es un UUID válido"),
 });
 
 /* =========================================================

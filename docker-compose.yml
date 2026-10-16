@@ -19,7 +19,7 @@ services:
 
   # 2. Almacenamiento de Objetos Compatible con Amazon S3
   minio:
-    image: minio/minio:latest
+    image: elestio/minio:latest
     container_name: sigd_minio
     command: server /data --console-address ":9001"
     environment:

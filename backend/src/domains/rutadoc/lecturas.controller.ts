@@ -8,8 +8,9 @@ import type { ServicioSlaRutaDoc } from './sla.service.js';
 import type { ServicioTrazabilidadRutaDoc } from './trazabilidad.service.js';
 import type { ActorRutaDoc } from './rutadoc.types.js';
 import { esIdExpediente } from './rutadoc.cursor.js';
+import { ROLES_PERSONAL } from '../../shared/domain/roles.js';
 
-const ROLES_CCD = new Set(['DOCENTE', 'DIRECTOR', 'MESA_PARTES', 'SUPER_ADMIN']);
+const ROLES_CCD = ROLES_PERSONAL;
 
 export function crearControladorLecturasRutaDoc(
   actorProvider: ActorProviderRutaDoc,

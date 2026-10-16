@@ -23,6 +23,7 @@ import type { Pool } from 'pg';
 import { z } from 'zod';
 import { firmarTokenAcceso, extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
 import { AppError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import { normalizarRol } from '../../shared/domain/roles.js';
 import { Argon2Service } from './argon2.service.js';
 
 const loginSchema = z.object({
@@ -49,7 +50,7 @@ export function crearRouterAuth(pool: Pool): Router {
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
              c.password_hash, c.activo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
+             COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo,
              p.area_id
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
@@ -86,7 +87,7 @@ export function crearRouterAuth(pool: Pool): Router {
       });
     }
 
-    const rol = usuario.rol_codigo ?? 'ESTUDIANTE';
+    const rol = normalizarRol(usuario.rol_codigo) ?? 'CIUDADANO';
     const accessToken = firmarTokenAcceso({
       sub: usuario.id_usuario,
       roles: [rol],
@@ -205,7 +206,7 @@ export function crearRouterAuth(pool: Pool): Router {
     const query = `
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
+             COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo,
              p.area_id, p.cargo_id, p.telefono
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona

@@ -3,6 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import PlantillaResolucionEditor from "../../components/flujos/PlantillaResolucionEditor";
 import type { ResolucionDirectoral } from "../../types/resolucionAcademica";
 
+async function calcularHashSHA256(contenido: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(contenido);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export default function ProyectorResolucionesPage() {
   const navigate = useNavigate();
   const [alerta, setAlerta] = useState<string | null>(null);
@@ -17,7 +26,12 @@ export default function ProyectorResolucionesPage() {
     }
   }
 
-  function handleProcederFirma(resolucion: ResolucionDirectoral) {
+  async function handleProcederFirma(resolucion: ResolucionDirectoral) {
+    // Generar el contenido del PDF para calcular el hash real
+    const contenidoPDF = generarContenidoPDF(resolucion);
+    const hashSha256 = await calcularHashSHA256(contenidoPDF);
+    const tamanoBytes = new Blob([contenidoPDF]).size;
+
     // Redirigir a la pasarela de firma digital con el documento proyectado
     navigate("/flujo-validez-legal/firma", {
       state: {
@@ -27,11 +41,21 @@ export default function ProyectorResolucionesPage() {
           tipo: "RESOLUCION_DIRECTORAL",
           numeroDocumento: resolucion.numeroResolucion,
           asunto: resolucion.asunto,
-          tamanoBytes: 245760,
-          hashSha256: "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+          tamanoBytes,
+          hashSha256,
         },
       },
     });
+  }
+
+  function generarContenidoPDF(resolucion: ResolucionDirectoral): string {
+    // Genera el mismo contenido que el PDF exportado (simplificado para hash)
+    return [
+      "VICTO Y CONSIDERANDO",
+      resolucion.asunto,
+      ...resolucion.considerandos,
+      ...resolucion.articulos.map((a) => `${a.numero}. ${a.texto}`),
+    ].join("\n\n");
   }
 
   return (

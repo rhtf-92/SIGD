@@ -2,8 +2,9 @@ import { ForbiddenError, NotFoundError } from '../../shared/domain/errors/index.
 import { ESTADOS_POR_PESTANA, type ActorRutaDoc, type ContadoresRutaDoc, type FiltrosRutaDoc, type ResultadoBandeja } from './rutadoc.types.js';
 import { codificarCursor, decodificarCursor } from './rutadoc.cursor.js';
 import type { RepositorioRutaDoc } from './rutadoc.repository.js';
+import { ROLES_PERSONAL } from '../../shared/domain/roles.js';
 
-const ROLES_BANDEJA = new Set(['DOCENTE', 'DIRECTOR', 'MESA_PARTES', 'SUPER_ADMIN']);
+const ROLES_BANDEJA = ROLES_PERSONAL;
 
 export class ServicioRutaDoc {
   constructor(private readonly repositorio: RepositorioRutaDoc) {}

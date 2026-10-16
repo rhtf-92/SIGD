@@ -21,7 +21,7 @@ import TramitePage from "../pages/tramite/TramitePage";
 import ConsultaPublicaPage from "../pages/tramite/ConsultaPublicaPage";
 import ProyectorResolucionesPage from "../pages/flujos/ProyectorResolucionesPage";
 import AdminRoutes from "./AdminRoutes";
-import ProtectedRoute from "./ProtectedRoute";
+import ModuloGuard from "./ModuloGuard";
 
 export default function AppRouter() {
   return (
@@ -33,17 +33,46 @@ export default function AppRouter() {
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
 
-      <Route path="/casilla" element={<CasillaElectronicaPage />} />
+      <Route
+        path="/casilla"
+        element={
+          <ModuloGuard moduloId="casilla">
+            <CasillaElectronicaPage />
+          </ModuloGuard>
+        }
+      />
       <Route
         path="/casilla-electronica"
-        element={<CasillaElectronicaPage />}
+        element={
+          <ModuloGuard moduloId="casilla">
+            <CasillaElectronicaPage />
+          </ModuloGuard>
+        }
       />
-      <Route path="/registro" element={<RegistroCiudadanoPage />} />
+      <Route
+        path="/registro"
+        element={
+          <ModuloGuard moduloId="registro">
+            <RegistroCiudadanoPage />
+          </ModuloGuard>
+        }
+      />
 
-      <Route path="/tramite" element={<TramitePage />} />
+      <Route
+        path="/tramite"
+        element={
+          <ModuloGuard moduloId="mesa-partes">
+            <TramitePage />
+          </ModuloGuard>
+        }
+      />
       <Route
         path="/tramite/mesa-partes-virtual"
-        element={<MesaPartesVirtualPage />}
+        element={
+          <ModuloGuard moduloId="mesa-partes">
+            <MesaPartesVirtualPage />
+          </ModuloGuard>
+        }
       />
       <Route
         path="/tramite/mesa-partes"
@@ -51,42 +80,88 @@ export default function AppRouter() {
       />
       <Route
         path="/mesa-partes"
-        element={<MesaPartesVirtualPage />}
+        element={
+          <ModuloGuard moduloId="mesa-partes">
+            <MesaPartesVirtualPage />
+          </ModuloGuard>
+        }
       />
       <Route
         path="/tramite/ventanilla-presencial"
-        element={<VentanillaPresencialPage />}
+        element={
+          <ModuloGuard moduloId="ventanilla">
+            <VentanillaPresencialPage />
+          </ModuloGuard>
+        }
       />
       <Route
         path="/ventanilla"
-        element={<VentanillaPresencialPage />}
+        element={
+          <ModuloGuard moduloId="ventanilla">
+            <VentanillaPresencialPage />
+          </ModuloGuard>
+        }
       />
-      <Route path="/administracion/seguridad" element={<SeguridadPage />} />
-      <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
-      <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
       <Route
-        path="/flujos/proyector-resoluciones"
-        element={<ProyectorResolucionesPage />}
+        path="/administracion/seguridad"
+        element={
+          <ModuloGuard moduloId="administracion">
+            <SeguridadPage />
+          </ModuloGuard>
+        }
+      />
+      <Route
+        path="/flujo-validez-legal"
+        element={
+          <ModuloGuard moduloId="validez-legal">
+            <FlujoValidezLegalPage />
+          </ModuloGuard>
+        }
+      />
+      <Route
+        path="/flujos/titulacion"
+        element={
+          <ModuloGuard moduloId="titulacion">
+            <WorkflowAcademicoPage />
+          </ModuloGuard>
+        }
+      />
+      <Route
+        path="/flujo-validez-legal/proyector"
+        element={
+          <ModuloGuard moduloId="resoluciones">
+            <ProyectorResolucionesPage />
+          </ModuloGuard>
+        }
       />
       <Route
         path="/flujo-validez-legal/firma"
-        element={<PasarelaFirmaPage />}
+        element={
+          <ModuloGuard moduloId="validez-legal">
+            <PasarelaFirmaPage />
+          </ModuloGuard>
+        }
       />
       <Route
         path="/flujo-validez-legal/visor-cvd"
-        element={<VisorCvdPage />}
+        element={
+          <ModuloGuard moduloId="validez-legal">
+            <VisorCvdPage />
+          </ModuloGuard>
+        }
       />
-      <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
-
+      <Route
+        path="/validador-cvd"
+        element={
+          <ModuloGuard moduloId="validador-cvd">
+            <ValidadorPublicoCvdPage />
+          </ModuloGuard>
+        }
+      />
 
       <Route
         path="/administracion"
-        element={
-          <ProtectedRoute
-            requiredModule="Administración"
-            requiredAction="ver"
-          />
-        }
+        element={<ModuloGuard moduloId="administracion" />}
       >
         {AdminRoutes()}
       </Route>
@@ -95,14 +170,41 @@ export default function AppRouter() {
         element={<Navigate to="/administracion" replace />}
       />
 
-      <Route path="/expedientes" element={<BandejaExpedientesPage />} />
-      <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
+      <Route
+        path="/expedientes"
+        element={
+          <ModuloGuard moduloId="expedientes">
+            <BandejaExpedientesPage />
+          </ModuloGuard>
+        }
+      />
+      <Route
+        path="/expedientes/:id"
+        element={
+          <ModuloGuard moduloId="expedientes">
+            <ExpedienteDetallePage />
+          </ModuloGuard>
+        }
+      />
 
-      <Route path="/reportes" element={<DashboardEjecutivoPage />} />
-      <Route path="/reportes/dashboard" element={<DashboardEjecutivoPage />} />
+      <Route
+        path="/reportes"
+        element={
+          <ModuloGuard moduloId="reportes">
+            <DashboardEjecutivoPage />
+          </ModuloGuard>
+        }
+      />
+      <Route
+        path="/reportes/dashboard"
+        element={
+          <ModuloGuard moduloId="reportes">
+            <DashboardEjecutivoPage />
+          </ModuloGuard>
+        }
+      />
 
       <Route path="*" element={<Navigate to="/" replace />} />
-
     </Routes>
   );
 }

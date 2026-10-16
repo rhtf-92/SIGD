@@ -59,6 +59,7 @@ import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
 import { verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { ETIQUETAS_ROL, ROLES_CANONICOS } from './shared/domain/roles.js';
 
 export interface AppOptions {
   busSse?: BusSse;
@@ -293,13 +294,10 @@ export function construirApp(
       res.json({ roles });
     } catch {
       res.json({
-        roles: [
-          { codigo: 'SUPER_ADMIN', nombre: 'Super Administrador' },
-          { codigo: 'DIRECTOR', nombre: 'Director General' },
-          { codigo: 'DOCENTE', nombre: 'Docente Titular' },
-          { codigo: 'MESA_PARTES', nombre: 'Operador de Mesa de Partes' },
-          { codigo: 'ESTUDIANTE', nombre: 'Estudiante / Administrado' },
-        ],
+        roles: ROLES_CANONICOS.map((codigo) => ({
+          codigo,
+          nombre: ETIQUETAS_ROL[codigo],
+        })),
       });
     }
   });

@@ -66,10 +66,17 @@ export function generarUrlPresigned(
   const ruta = `/${codificarSegmentoRuta(config.bucket)}/${codificarSegmentoRuta(clave)}`;
   const uri = config.forcePathStyle ? ruta : `/${codificarSegmentoRuta(clave)}`;
 
+  // Cabeceras que el cliente DEBE reenviar exactamente para que la firma valide.
+  // Solo `host` (que el navegador siempre envia) y `content-type`, que el cliente
+  // declara al subir el archivo.
+  //
+  // `x-amz-date` y `x-amz-content-sha256` quedan deliberadamente FUERA de
+  // SignedHeaders: ambas viajan ya en la cadena de consulta (X-Amz-Date) y en el
+  // hash del payload canonico (UNSIGNED-PAYLOAD), de modo que exigirlas como
+  // cabecera obligaba al cliente a construirlas y toda carga presigned fallaba
+  // con "There were headers present in the request which were not signed".
   const cabecerasFirmadas: Record<string, string> = {
     host,
-    'x-amz-content-sha256': PAYLOAD_SIN_FIRMA,
-    'x-amz-date': amzFecha,
   };
   if (opciones.contentType) {
     cabecerasFirmadas['content-type'] = opciones.contentType;
@@ -153,6 +160,51 @@ export async function headObject(
       nombreOperacion: `headObject(${clave})`,
     },
   );
+}
+
+/**
+ * Crea el bucket de almacenamiento si no existe.
+ *
+ * MinIO arranca con el almacen vacio, a diferencia de AWS S3 o el Ceph de
+ * produccion. Sin este paso, toda carga presigned falla con `NoSuchBucket` y el
+ * modulo de tramite queda inutilizable en desarrollo.
+ *
+ * Es idempotente y nunca falla el arranque: si el almacen no esta disponible,
+ * se registra el motivo y la plataforma sigue operando con PostgreSQL, que es
+ * su fuente de verdad.
+ */
+export async function asegurarBucket(
+  config: ConfiguracionS3,
+  opciones: { senal?: AbortSignal } = {},
+): Promise<boolean> {
+  // Se usa el SDK oficial en lugar de firmar a mano: la firma de CreateBucket
+  // difiere de la de objeto (no lleva payload ni SignedHeaders de contenido) y
+  // hacerlo a mano era una fuente de errores fragile.
+  const { S3Client, CreateBucketCommand, HeadBucketCommand } = await import('@aws-sdk/client-s3');
+
+  const cliente = new S3Client({
+    region: config.region,
+    endpoint: config.endpoint,
+    forcePathStyle: config.forcePathStyle,
+    credentials: { accessKeyId: config.accessKey, secretAccessKey: config.secretKey },
+  });
+
+  try {
+    await cliente.send(new HeadBucketCommand({ Bucket: config.bucket }), { abortSignal: opciones.senal });
+    return true;
+  } catch {
+    // El bucket no existe todavia: se crea.
+  }
+
+  try {
+    await cliente.send(new CreateBucketCommand({ Bucket: config.bucket }), { abortSignal: opciones.senal });
+    return true;
+  } catch (error) {
+    const nombre = (error as { name?: string }).name;
+    if (nombre === 'BucketAlreadyOwnedByYou' || nombre === 'BucketAlreadyExists') return true;
+    console.warn(`[S3] No se pudo crear el bucket ${config.bucket}: ${(error as Error).message}`);
+    return false;
+  }
 }
 
 export const MAGIC_BYTES_PDF = Buffer.from('%PDF-');

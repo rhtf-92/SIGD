@@ -9,62 +9,6 @@ import type {
 } from "../../types/firmaDigital";
 import { apiClient } from "../../api/client";
 
-const DOCUMENTOS_INICIALES: DocumentoOficial[] = [
-  {
-    idDocumento: 1,
-    idTramite: 412,
-    tipoActo: "RD",
-    numeroCorrelativo: "RD N.° 0412-2026-DG-IESTP-SUIZA",
-    anio: 2026,
-    asunto:
-      "Confiere Título Profesional Técnico en Desarrollo de Sistemas de Información al administrado Carlos Mendoza Ríos.",
-    urlPdfOriginal: "/pdfs/rd-0412-2026.pdf",
-    hashSha256:
-      "a3f2c1e9b8d74f6a0c5e8b2d91f7a4c3e6b0d5f2a8c1e7b4d9f6a3c0e5b8d2f7",
-    estadoFirma: "PENDIENTE",
-    fechaGeneracion: "2026-09-05T11:42:15-05:00",
-  },
-  {
-    idDocumento: 2,
-    idTramite: 413,
-    tipoActo: "ACTA",
-    numeroCorrelativo: "ACT-DSI-2026-2-007",
-    anio: 2026,
-    asunto: "Acta consolidada de evaluación semestral 2026-2 de la Unidad Didáctica Taller de Programación Web.",
-    urlPdfOriginal: "/pdfs/act-dsi-2026-2-007.pdf",
-    hashSha256:
-      "7d1b4c9e2a8f6d3b5c0e7a4f9b2d1c8e6f3a5d7b0c2e9f4a1b8d6c3e5f0a7b9d",
-    estadoFirma: "PENDIENTE",
-    fechaGeneracion: "2026-09-05T12:10:00-05:00",
-  },
-  {
-    idDocumento: 3,
-    idTramite: 414,
-    tipoActo: "ACTA",
-    numeroCorrelativo: "ACT-DSI-2026-2-008",
-    anio: 2026,
-    asunto: "Acta consolidada de evaluación semestral 2026-2 de la Unidad Didáctica Base de Datos.",
-    urlPdfOriginal: "/pdfs/act-dsi-2026-2-008.pdf",
-    hashSha256:
-      "9f0e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8",
-    estadoFirma: "PENDIENTE",
-    fechaGeneracion: "2026-09-05T12:11:00-05:00",
-  },
-  {
-    idDocumento: 4,
-    idTramite: 415,
-    tipoActo: "CERTIFICADO",
-    numeroCorrelativo: "CER-2026-000318",
-    anio: 2026,
-    asunto: "Certificado oficial de estudios modulares del egresado Luis Alberto Sánchez Tello.",
-    urlPdfOriginal: "/pdfs/cer-2026-000318.pdf",
-    hashSha256:
-      "2b6a8c4e0f3d7b1a9c5e8d6f4a2b0c1e7f9d3a5b8c0e2f4a6b8d0c2e4f6a8b0d",
-    estadoFirma: "PENDIENTE",
-    fechaGeneracion: "2026-09-05T13:05:00-05:00",
-  },
-];
-
 const INSIGNIA_ESTADO: Record<DocumentoOficial["estadoFirma"], string> = {
   PENDIENTE: "border-amber-200 bg-amber-50 text-amber-700",
   FIRMADO: "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -78,9 +22,7 @@ const ETIQUETA_ESTADO: Record<DocumentoOficial["estadoFirma"], string> = {
 };
 
 export default function PasarelaFirmaPage() {
-  const [documentos, setDocumentos] = useState<DocumentoOficial[]>(
-    DOCUMENTOS_INICIALES,
-  );
+  const [documentos, setDocumentos] = useState<DocumentoOficial[]>([]);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [documentoActivo, setDocumentoActivo] = useState<DocumentoOficial | null>(
     null,
@@ -109,9 +51,9 @@ export default function PasarelaFirmaPage() {
           }));
           setDocumentos(mapeados);
         }
-      })
+        })
       .catch(() => {
-        // Preserva datos iniciales si la cola no tiene registros activos
+        // Sin datos iniciales falsos: la lista se muestra vacía hasta que haya trámites reales en cola
       });
     return () => {
       activo = false;

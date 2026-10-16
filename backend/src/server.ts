@@ -10,6 +10,8 @@ import { ejecutarMigraciones } from './db/migrate.js';
 import { OutboxWorker } from './audit/outbox-worker.js';
 import { crearDespachadorPorDefecto } from './audit/despachador-notificaciones.js';
 import { BridgeNotificacion } from './core/realtime/bridge-notificacion.js';
+import { asegurarBucket } from './core/storage/s3-storage.service.js';
+import { obtenerConfiguracionS3 } from './config/s3.config.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
@@ -21,6 +23,11 @@ const busSse = new BusSse();
 if (process.env.MIGRATE_ON_BOOT !== 'false') {
   await ejecutarMigraciones(pool);
 }
+
+// El almacenamiento de objetos arranca vacio en MinIO: sin crear el bucket, toda
+// carga presigned responde NoSuchBucket y el modulo de tramite no opera.
+const bucketListo = await asegurarBucket(obtenerConfiguracionS3());
+console.log(bucketListo ? '[S3] Bucket de expedientes disponible.' : '[S3] Bucket no disponible; se operara solo con PostgreSQL.');
 
 const app = construirApp(pool, busSse);
 const servidor = app.listen(port, () => {

@@ -20,15 +20,18 @@ interface LoginCredentials {
 // ProtectedRoute y la matriz `permisosIniciales` encuentren su fila.
 const ROL_CANONICO: Record<string, UsuarioPerfil['rol']> = {
   ADMINISTRADOR: 'SUPER_ADMIN',
+  SUPER_ADMIN: 'SUPER_ADMIN',
   DIRECTOR: 'DIRECTOR',
-  MESA_PARTES: 'MESA_PARTES',
+  DOCENTE: 'DOCENTE',
   SECRETARIO: 'DOCENTE',
   ESPECIALISTA: 'DOCENTE',
+  MESA_PARTES: 'MESA_PARTES',
+  ESTUDIANTE: 'ESTUDIANTE',
   CIUDADANO: 'ESTUDIANTE',
 };
 
 function normalizarRol(rol: string): UsuarioPerfil['rol'] {
-  return ROL_CANONICO[rol] ?? 'ESTUDIANTE';
+  return ROL_CANONICO[rol?.toUpperCase()] ?? 'ESTUDIANTE';
 }
 
 export interface AuthState {

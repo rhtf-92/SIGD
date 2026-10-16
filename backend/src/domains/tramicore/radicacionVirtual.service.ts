@@ -46,13 +46,12 @@ interface FilaExpediente {
 }
 
 interface FilaTramiteTupa {
-  id_tipo_tramite_tupa: string;
-  activo: boolean;
+  tipo_tramite_id: string;
+  vigente: boolean;
 }
 
 interface FilaPersona {
-  id: string;
-  estado: boolean;
+  id_persona: string;
 }
 
 /** Origen del calendario de feriados. Inyectable para poder testear sin BD. */
@@ -119,9 +118,9 @@ export class RadicacionVirtualService {
 
   private async verificarTipoTramite(cliente: PoolClient, idTipoTramiteTupa: string): Promise<void> {
     const resultado = await cliente.query<FilaTramiteTupa>(
-      `SELECT id_tipo_tramite_tupa, activo
+      `SELECT tipo_tramite_id, vigente
          FROM sigd_doc.tipo_tramite_tupa
-        WHERE id_tipo_tramite_tupa = $1`,
+        WHERE tipo_tramite_id = $1::uuid`,
       [idTipoTramiteTupa],
     );
     const tipo = resultado.rows[0];
@@ -132,7 +131,7 @@ export class RadicacionVirtualService {
         ],
       });
     }
-    if (!tipo.activo) {
+    if (!tipo.vigente) {
       throw new ValidationError({
         invalidParams: [
           { name: 'idTipoTramiteTupa', reason: 'TIPO_TRAMITE_INACTIVO: el tramite ya no admite nuevas radicaciones.' },
@@ -141,9 +140,9 @@ export class RadicacionVirtualService {
     }
   }
 
-  private async verificarAdministrado(cliente: PoolClient, idPersona: number): Promise<void> {
+  private async verificarAdministrado(cliente: PoolClient, idPersona: string): Promise<void> {
     const resultado = await cliente.query<FilaPersona>(
-      'SELECT id::text AS id, estado FROM sigd_auth.persona WHERE id = $1',
+      'SELECT id_persona::text AS id_persona FROM sigd_auth.persona WHERE id_persona = $1::uuid',
       [idPersona],
     );
     const persona = resultado.rows[0];
@@ -151,13 +150,6 @@ export class RadicacionVirtualService {
       throw new ValidationError({
         invalidParams: [
           { name: 'idPersona', reason: 'ADMINISTRADO_NO_REGISTRADO: el UUID no corresponde a una persona del padron.' },
-        ],
-      });
-    }
-    if (!persona.estado) {
-      throw new ValidationError({
-        invalidParams: [
-          { name: 'idPersona', reason: 'ADMINISTRADO_INACTIVO: la persona esta desactivada y no puede radicar.' },
         ],
       });
     }
@@ -169,24 +161,57 @@ export class RadicacionVirtualService {
     cut: string,
     horario: ResultadoHorarioCorte,
   ): Promise<FilaExpediente> {
+    // `sigd_tra.expediente` es la tabla CANONICA: posee el CUT, el asiento de
+    // registro y la foliacion. `sigd_doc.expediente` es su contrapartida documental
+    // (tipo de tramite, asunto, requisitos y adjuntos) y comparte el mismo
+    // `expediente_id`, de modo que un unico identificador atraviesa todo el
+    // dominio. Se escriben ambas filas en la misma transaccion.
     const resultado = await cliente.query<FilaExpediente>(
       `INSERT INTO sigd_tra.expediente
-         (cut, id_persona, id_tipo_tramite_tupa, nombre_solicitante,
-          correo_notificacion, asunto, canal_recepcion,
-          estado_tramite, total_folios, fecha_envio_real, fecha_radicacion_legal,
-          fuera_de_horario)
-       VALUES ($1, $2, $3, $4, $5, $6, 'MESA_VIRTUAL', 'REGISTRADO', $7, $8, $9, $10)
-       RETURNING expediente_id, cut, fecha_envio_real, fecha_radicacion_legal, fuera_de_horario`,
+         (codigo_expediente, numero, dni_solicitante, tipo_documental_id,
+          solicitante_id, estado, fecha_radicacion, fecha_limite,
+          id_tipo_tramite_tupa, asunto, nombre_solicitante, correo_notificacion,
+          canal_recepcion, total_folios, fecha_envio_real, fuera_de_horario)
+       VALUES (
+         $1,
+         $1,
+         COALESCE(
+           (SELECT id_documento FROM sigd_auth.persona
+             WHERE id_persona = $2::uuid AND id_documento ~ '^[0-9]{8}$'),
+           NULL),
+         COALESCE(
+           (SELECT tipo_documental_id FROM sigd_doc.tipo_documento
+             WHERE codigo = 'EXPEDIENTE' AND vigente LIMIT 1),
+           (SELECT tipo_documental_id FROM sigd_doc.tipo_documento
+             WHERE vigente ORDER BY codigo LIMIT 1)),
+         $2::uuid,
+         'REGISTRADO',
+         $3,
+         $4,
+         $5::uuid,
+         $6,
+         $7,
+         $8,
+         'MESA_VIRTUAL',
+         $9,
+         $10,
+         $11)
+       RETURNING expediente_id,
+                 codigo_expediente AS cut,
+                 fecha_envio_real,
+                 fecha_radicacion   AS fecha_radicacion_legal,
+                 fuera_de_horario`,
       [
         cut,
         datos.idPersona,
+        horario.radicacionLegal,
+        null,
         datos.idTipoTramiteTupa,
+        datos.asunto,
         datos.nombreSolicitante,
         datos.correo,
-        datos.asunto,
         datos.totalFolios,
         horario.envioReal,
-        horario.radicacionLegal,
         horario.requiereProyeccion,
       ],
     );
@@ -194,6 +219,24 @@ export class RadicacionVirtualService {
     if (!expediente) {
       throw new Error('La insercion del expediente no devolvio fila.');
     }
+
+    // Contrapartida documental. Su estado usa un vocabulario propio y mas corto.
+    await cliente.query(
+      `INSERT INTO sigd_doc.expediente
+         (expediente_id, tipo_tramite_id, codigo_expediente, asunto,
+          solicitante_id, estado, fecha_registro, fecha_limite)
+       VALUES ($1, $2::uuid, $3, $4, $5::uuid, 'REGISTRADO', $6, $7)`,
+      [
+        expediente.expediente_id,
+        datos.idTipoTramiteTupa,
+        cut,
+        datos.asunto,
+        datos.idPersona,
+        horario.radicacionLegal,
+        null,
+      ],
+    );
+
     return expediente;
   }
 
@@ -202,18 +245,36 @@ export class RadicacionVirtualService {
     expedienteId: string,
     datos: RadicacionVirtualInput,
   ): Promise<void> {
+    // El bucket y la clave S3 se derivan de `storagePath`. Cuando el cliente ya
+    // subió el archivo por presigned URL, `storagePath` trae "bucket/clave";
+    // si no, se toma la clave completa y el bucket por defecto de la plataforma.
+    const bucketPorDefecto = process.env.S3_BUCKET ?? 'sigd-expedientes';
+
     for (const documento of datos.documentos) {
+      const separador = (documento.storagePath ?? '').indexOf('/');
+      const bucket = separador > 0 ? documento.storagePath!.slice(0, separador) : bucketPorDefecto;
+      const clave = separador > 0 ? documento.storagePath!.slice(separador + 1) : documento.storagePath;
+
       await cliente.query(
-        `INSERT INTO sigd_tra.documento_adjunto
-           (expediente_id, nombre_archivo, content_type, tamano_bytes, hash_sha256, storage_path)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO sigd_doc.documento_adjunto
+           (expediente_id, tipo_documental_id, nombre_archivo,
+            s3_bucket, s3_key, sha256, tamano_bytes, mime_type)
+         VALUES (
+           $1::uuid,
+           COALESCE(
+             (SELECT tipo_documental_id FROM sigd_doc.tipo_documento
+               WHERE codigo = 'ADJUNTO' AND vigente LIMIT 1),
+             (SELECT tipo_documental_id FROM sigd_doc.tipo_documento
+               WHERE vigente ORDER BY codigo LIMIT 1)),
+           $2, $3, $4, $5, $6, $7)`,
         [
           expedienteId,
           documento.nombreArchivo,
-          documento.contentType,
-          documento.tamanoBytes,
+          bucket,
+          clave,
           documento.hashSha256.toLowerCase(),
-          documento.storagePath ?? null,
+          documento.tamanoBytes,
+          documento.contentType,
         ],
       );
     }

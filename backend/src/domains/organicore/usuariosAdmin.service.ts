@@ -10,6 +10,7 @@ import type {
   CrearUsuarioAdminDTO,
   ActualizarUsuarioAdminDTO,
 } from "./dto/usuarioAdmin.dto.js";
+import { Argon2Service } from "../identicore/argon2.service.js";
 
 /**
  * OrganiCore - Servicio de administración de usuarios
@@ -24,10 +25,10 @@ import type {
  */
 
 export interface UsuarioDirectorio {
-  id: number;
+  id: string;
   nombre: string;
-  dni: string;
-  correo: string;
+  dni: string | null;
+  correo: string | null;
   sede: string | null;
   area: string | null;
   cargo: string | null;
@@ -92,22 +93,25 @@ export function crearUsuariosAdminService(pool: Pool) {
         busqueda.trim(),
       );
 
+      // `sigd_auth.persona` solo guarda el documento; el nombre vive en
+      // `persona_natural` (nombres + apellidos) o en `persona_juridica`
+      // (razon_social). El indice GIN se apoya en el nombre completo.
       condiciones.push(`
         (
           to_tsvector(
             'spanish',
-            COALESCE(p.nombres, '') || ' ' ||
-            COALESCE(p.apellido_paterno, '') || ' ' ||
-            COALESCE(p.apellido_materno, '') || ' ' ||
-            COALESCE(p.numero_documento, '')
+            COALESCE(pn.nombre_completo, pj.razon_social, '') || ' ' ||
+            COALESCE(p.id_documento, '')
           )
           @@ websearch_to_tsquery(
             'spanish',
             ${posicion}
           )
-          OR p.numero_documento
+          OR p.id_documento
              ILIKE '%' || ${posicion} || '%'
-          OR cu.email_login
+          OR cu.correo
+             ILIKE '%' || ${posicion} || '%'
+          OR cu.usuario
              ILIKE '%' || ${posicion} || '%'
         )
       `);
@@ -117,7 +121,7 @@ export function crearUsuariosAdminService(pool: Pool) {
       const posicion = agregarParametro(areaId);
 
       condiciones.push(
-        `pl.id_area = ${posicion}`,
+        `COALESCE(pl.area_id, ap.area_id, ur.area_id) = ${posicion}::uuid`,
       );
     }
 
@@ -125,7 +129,7 @@ export function crearUsuariosAdminService(pool: Pool) {
       const posicion = agregarParametro(sedeId);
 
       condiciones.push(
-        `pl.sede_id = ${posicion}`,
+        `pl.sede_id = ${posicion}::uuid`,
       );
     }
 
@@ -133,32 +137,29 @@ export function crearUsuariosAdminService(pool: Pool) {
       const posicion = agregarParametro(rolId);
 
       condiciones.push(
-        `ur.rol_id = ${posicion}`,
+        `ur.rol_id = ${posicion}::uuid`,
       );
     }
 
     if (estado) {
       if (estado === "ACTIVO") {
         condiciones.push(`
-          cu.estado = TRUE
-          AND (
-            cu.bloqueado_hasta IS NULL
-            OR cu.bloqueado_hasta <= now()
-          )
+          cu.activo = TRUE
         `);
       }
 
       if (estado === "INACTIVO") {
         condiciones.push(`
-          cu.estado = FALSE
+          cu.activo = FALSE
         `);
       }
 
       if (estado === "BLOQUEADO") {
+        // No existe columna de bloqueo en `cuenta_usuario`: una cuenta bloqueada
+        // es una cuenta inactiva con una sesion revocada. Se informa del estado
+        // real disponible en el DDL vigente.
         condiciones.push(`
-          cu.estado = TRUE
-          AND cu.bloqueado_hasta IS NOT NULL
-          AND cu.bloqueado_hasta > now()
+          cu.activo = FALSE
         `);
       }
     }
@@ -179,18 +180,13 @@ export function crearUsuariosAdminService(pool: Pool) {
 
     const sqlDatos = `
       SELECT DISTINCT
-        cu.id AS id,
+        cu.id_usuario::text AS id,
 
-        concat_ws(
-          ' ',
-          p.nombres,
-          p.apellido_paterno,
-          p.apellido_materno
-        ) AS nombre,
+        COALESCE(pn.nombre_completo, pj.razon_social, cu.usuario) AS nombre,
 
-        p.numero_documento AS dni,
+        p.id_documento AS dni,
 
-        cu.email_login AS correo,
+        cu.correo AS correo,
 
         s.nombre AS sede,
 
@@ -201,13 +197,7 @@ export function crearUsuariosAdminService(pool: Pool) {
         rs.nombre AS rol,
 
         CASE
-          WHEN cu.estado = FALSE
-            THEN 'INACTIVO'
-
-          WHEN cu.bloqueado_hasta IS NOT NULL
-               AND cu.bloqueado_hasta > now()
-            THEN 'BLOQUEADO'
-
+          WHEN cu.activo = FALSE THEN 'INACTIVO'
           ELSE 'ACTIVO'
         END AS estado,
 
@@ -216,44 +206,41 @@ export function crearUsuariosAdminService(pool: Pool) {
       FROM sigd_auth.cuenta_usuario AS cu
 
       INNER JOIN sigd_auth.persona AS p
-        ON p.id = cu.persona_id
+        ON p.id_persona = cu.id_persona
 
-      /*
-       * Contrato intermodular pendiente:
-       *
-       * sigd_auth.cuenta_usuario.id = BIGINT
-       * sigd_org.asignacion_personal.cuenta_id = UUID
-       *
-       * Los casts existentes se conservan temporalmente
-       * para no modificar contratos pertenecientes a
-       * otros módulos.
-       */
+      LEFT JOIN sigd_auth.persona_natural AS pn
+        ON pn.id_persona = p.id_persona
+
+      LEFT JOIN sigd_auth.persona_juridica AS pj
+        ON pj.id_persona = p.id_persona
+
       LEFT JOIN sigd_org.asignacion_personal AS ap
-        ON ap.cuenta_id::text = cu.id::text
-        AND ap.activo = TRUE
-        AND ap.vigencia @> now()
+        ON ap.id_usuario = cu.id_usuario
+        AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
 
       LEFT JOIN sigd_org.puesto_laboral AS pl
-        ON pl.puesto_laboral_id =
-           ap.puesto_laboral_id
+        ON pl.puesto_laboral_id = ap.puesto_laboral_id
         AND pl.activo = TRUE
 
       LEFT JOIN sigd_org.sede AS s
         ON s.sede_id = pl.sede_id
+        AND s.activo = TRUE
 
       LEFT JOIN sigd_org.area AS a
-        ON a.id_area = pl.id_area
+        ON a.area_id = COALESCE(pl.area_id, ap.area_id)
+        AND a.vigente = TRUE
 
       LEFT JOIN sigd_org.cargo AS c
-        ON c.cargo_id = pl.cargo_id
+        ON c.cargo_id = COALESCE(pl.cargo_id, ap.cargo_id)
+        AND c.vigente = TRUE
 
       LEFT JOIN sigd_org.usuario_rol AS ur
-        ON ur.cuenta_id::text = cu.id::text
-        AND ur.vigencia @> now()
+        ON ur.id_usuario = cu.id_usuario
+        AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
 
       LEFT JOIN sigd_org.rol_sistema AS rs
         ON rs.rol_id = ur.rol_id
-        AND rs.activo = TRUE
+        AND rs.vigente = TRUE
 
       ${where}
 
@@ -272,26 +259,30 @@ export function crearUsuariosAdminService(pool: Pool) {
 
     const sqlConteo = `
       SELECT
-        COUNT(DISTINCT cu.id)::int AS total
+        COUNT(DISTINCT cu.id_usuario)::int AS total
 
       FROM sigd_auth.cuenta_usuario AS cu
 
       INNER JOIN sigd_auth.persona AS p
-        ON p.id = cu.persona_id
+        ON p.id_persona = cu.id_persona
+
+      LEFT JOIN sigd_auth.persona_natural AS pn
+        ON pn.id_persona = p.id_persona
+
+      LEFT JOIN sigd_auth.persona_juridica AS pj
+        ON pj.id_persona = p.id_persona
 
       LEFT JOIN sigd_org.asignacion_personal AS ap
-        ON ap.cuenta_id::text = cu.id::text
-        AND ap.activo = TRUE
-        AND ap.vigencia @> now()
+        ON ap.id_usuario = cu.id_usuario
+        AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
 
       LEFT JOIN sigd_org.puesto_laboral AS pl
-        ON pl.puesto_laboral_id =
-           ap.puesto_laboral_id
+        ON pl.puesto_laboral_id = ap.puesto_laboral_id
         AND pl.activo = TRUE
 
       LEFT JOIN sigd_org.usuario_rol AS ur
-        ON ur.cuenta_id::text = cu.id::text
-        AND ur.vigencia @> now()
+        ON ur.id_usuario = cu.id_usuario
+        AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
 
       ${where};
     `;
@@ -379,82 +370,259 @@ export function crearUsuariosAdminService(pool: Pool) {
   /**
    * POST /api/v1/admin/usuarios
    *
-   * El DTO y la validación funcional perteneciente
-   * a OrganiCore están implementados.
-   *
-   * La persistencia completa queda protegida mientras
-   * exista la incompatibilidad de identificadores:
-   *
-   * sigd_auth.cuenta_usuario.id = BIGINT
-   * sigd_org.asignacion_personal.cuenta_id = UUID
-   * sigd_org.usuario_rol.cuenta_id = UUID
-   *
-   * No se modifican contratos de IdentiCore ni
-   * de otros integrantes desde B_LEONARDO.
+   * Alta institucional completa y persistida. El contrato intermodular que
+   * antes bloqueaba la operacion ya no existe: `sigd_auth.cuenta_usuario`,
+   * `sigd_auth.persona`, `sigd_org.asignacion_personal` y `sigd_org.usuario_rol`
+   * comparten el mismo UUID, de modo que la cuenta, su persona y sus dos
+   * relaciones organizativas se escriben en una sola transaccion.
    */
   async function crearUsuario(
     datos: CrearUsuarioAdminDTO,
-  ): Promise<never> {
-    await validarPuestoLaboralActivo(
-      datos.puestoLaboralId,
-    );
+  ): Promise<UsuarioDirectorio> {
+    await validarPuestoLaboralActivo(datos.puestoLaboralId);
 
-    throw new AppError({
-      status: 503,
-      code: "CONTRATO_INTERMODULAR_PENDIENTE",
-      message:
-        "No se puede completar el alta institucional hasta unificar los identificadores entre IdentiCore y OrganiCore.",
-      detail:
-        "sigd_auth.cuenta_usuario.id utiliza BIGINT, mientras sigd_org.asignacion_personal.cuenta_id y sigd_org.usuario_rol.cuenta_id utilizan UUID.",
-    });
+    // El tipo documental se persiste como el `tipo` de la persona. La tabla
+    // `sigd_auth.tipos_documento` es la fuente; RUC significa persona juridica.
+    const tipoDocumento = await pool.query<{ codigo: string }>(
+      `SELECT codigo FROM sigd_auth.tipos_documento
+        WHERE id_tipo_documento = $1 AND vigente = TRUE`,
+      [datos.tipoDocumentoId],
+    );
+    const codigoTipo = tipoDocumento.rows[0]?.codigo;
+    if (!codigoTipo) {
+      throw new AppError({
+        status: 422,
+        code: "TIPO_DOCUMENTO_DESCONOCIDO",
+        message: "El tipo de documento indicado no existe o no esta vigente.",
+      });
+    }
+
+    const duplicado = await pool.query<{ id_usuario: string }>(
+      `SELECT cu.id_usuario
+         FROM sigd_auth.cuenta_usuario cu
+         JOIN sigd_auth.persona p ON p.id_persona = cu.id_persona
+        WHERE lower(cu.usuario) = lower($1)
+           OR lower(cu.correo) = lower($2)
+           OR p.id_documento = $3`,
+      [datos.username, datos.correo, datos.numeroDocumento],
+    );
+    if (duplicado.rowCount && duplicado.rowCount > 0) {
+      throw new AppError({
+        status: 409,
+        code: "USUARIO_DUPLICADO",
+        message: "Ya existe una cuenta con ese usuario, correo o documento.",
+      });
+    }
+
+    const hash = await Argon2Service.hash(datos.passwordInicial);
+    const tipoPersona = codigoTipo === "RUC" ? "JURIDICA" : "NATURAL";
+
+    const cliente = await pool.connect();
+    try {
+      await cliente.query("BEGIN");
+
+      const persona = await cliente.query<{ id_persona: string }>(
+        `INSERT INTO sigd_auth.persona (tipo, id_documento)
+         VALUES ($1, $2)
+         RETURNING id_persona`,
+        [tipoPersona, datos.numeroDocumento],
+      );
+      const idPersona = persona.rows[0].id_persona;
+
+      const apellidos = [datos.apellidoPaterno, datos.apellidoMaterno]
+        .filter((apellido): apellido is string => Boolean(apellido))
+        .join(" ");
+      const nombreCompleto = `${datos.nombres} ${apellidos}`.trim();
+
+      await cliente.query(
+        `INSERT INTO sigd_auth.persona_natural
+           (id_persona, nombres, apellidos, nombre_completo, telefono, correo)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [idPersona, datos.nombres, apellidos, nombreCompleto, datos.telefono ?? null, datos.correo],
+      );
+
+      const cuenta = await cliente.query<{ id_usuario: string }>(
+        `INSERT INTO sigd_auth.cuenta_usuario
+           (id_persona, usuario, correo, password_hash, activo)
+         VALUES ($1, $2, $3, $4, TRUE)
+         RETURNING id_usuario`,
+        [idPersona, datos.username, datos.correo, hash],
+      );
+      const idUsuario = cuenta.rows[0].id_usuario;
+
+      await cliente.query(
+        `INSERT INTO sigd_org.asignacion_personal
+           (id_usuario, puesto_laboral_id, cargo_id, area_id, vigente_desde)
+         SELECT $1, pl.puesto_laboral_id, pl.cargo_id, pl.area_id, now()
+           FROM sigd_org.puesto_laboral pl
+          WHERE pl.puesto_laboral_id = $2::uuid`,
+        [idUsuario, datos.puestoLaboralId],
+      );
+
+      await cliente.query(
+        `INSERT INTO sigd_org.usuario_rol
+           (id_usuario, rol_id, area_id, vigente_desde)
+         SELECT $1, $2::uuid,
+                (SELECT area_id FROM sigd_org.puesto_laboral
+                  WHERE puesto_laboral_id = $3::uuid),
+                now()
+         WHERE EXISTS (SELECT 1 FROM sigd_org.rol_sistema
+                        WHERE rol_id = $2::uuid AND vigente = TRUE)`,
+        [idUsuario, datos.rolId, datos.puestoLaboralId],
+      );
+
+      await cliente.query("COMMIT");
+
+      const directorio = await listarUsuarios({ pagina: 1, limite: 100 });
+      const creado = directorio.datos.find((u) => u.id === idUsuario);
+      if (creado) return creado;
+      return {
+        id: idUsuario,
+        nombre: nombreCompleto,
+        dni: datos.numeroDocumento,
+        correo: datos.correo,
+        sede: null,
+        area: null,
+        cargo: null,
+        rol: null,
+        estado: "ACTIVO",
+        ultimoAcceso: null,
+      };
+    } catch (error) {
+      await cliente.query("ROLLBACK");
+      throw error;
+    } finally {
+      cliente.release();
+    }
   }
 
   /**
    * PUT /api/v1/admin/usuarios/:id
    *
-   * Comprueba primero que la cuenta exista.
-   *
-   * Si se solicita una reasignación de puesto,
-   * también se valida que el nuevo puesto esté activo.
-   *
-   * La vinculación final con OrganiCore queda
-   * protegida por el contrato intermodular pendiente.
+   * Actualización real de la cuenta. Si se desactiva o se cambia de rol, se
+   * revocan las sesiones activas: una baja administrativa debe cortar el acceso
+   * de inmediato (T-BE-OC-08), no esperar a que expire el token.
    */
   async function actualizarUsuario(
-    usuarioId: number,
+    usuarioId: string,
     datos: ActualizarUsuarioAdminDTO,
-  ): Promise<never> {
-    const resultadoUsuario =
-      await pool.query<{ id: number }>(
-        `
-          SELECT id
-          FROM sigd_auth.cuenta_usuario
-          WHERE id = $1
-        `,
-        [usuarioId],
-      );
-
+  ): Promise<UsuarioDirectorio> {
+    const resultadoUsuario = await pool.query<{ id_usuario: string }>(
+      `SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1::uuid`,
+      [usuarioId],
+    );
     if (!resultadoUsuario.rows[0]) {
-      throw new NotFoundError({
-        message:
-          "El usuario indicado no existe.",
-      });
+      throw new NotFoundError({ message: "El usuario indicado no existe." });
     }
 
     if (datos.puestoLaboralId) {
-      await validarPuestoLaboralActivo(
-        datos.puestoLaboralId,
-      );
+      await validarPuestoLaboralActivo(datos.puestoLaboralId);
     }
 
-    throw new AppError({
-      status: 503,
-      code: "CONTRATO_INTERMODULAR_PENDIENTE",
-      message:
-        "No se puede completar la actualización institucional hasta unificar los identificadores entre IdentiCore y OrganiCore.",
-      detail:
-        "La cuenta de IdentiCore utiliza BIGINT y las relaciones de usuario de OrganiCore utilizan UUID.",
-    });
+    const activo = datos.estado === "ACTIVO" ? true : datos.estado === "INACTIVO" ? false : undefined;
+
+    const cliente = await pool.connect();
+    try {
+      await cliente.query("BEGIN");
+
+      const cuenta: string[] = [];
+      const valores: unknown[] = [];
+      const param = (valor: unknown): string => {
+        valores.push(valor);
+        return `$${valores.length}`;
+      };
+
+      if (datos.correo !== undefined) {
+        cuenta.push(`correo = ${param(datos.correo)}`);
+      }
+      if (activo !== undefined) {
+        cuenta.push(`activo = ${param(activo)}`);
+      }
+      if (cuenta.length > 0) {
+        valores.push(usuarioId);
+        await cliente.query(
+          `UPDATE sigd_auth.cuenta_usuario SET ${cuenta.join(", ")}
+            WHERE id_usuario = $${valores.length}::uuid`,
+          valores,
+        );
+      }
+
+      const nombres = datos.nombres ?? null;
+      const apellidoPaterno = datos.apellidoPaterno ?? null;
+      const apellidoMaterno = datos.apellidoMaterno ?? null;
+      if (nombres || apellidoPaterno || apellidoMaterno !== null) {
+        await cliente.query(
+          `UPDATE sigd_auth.persona_natural
+              SET nombres            = COALESCE($1, nombres),
+                  apellidos          = COALESCE(trim(both ' ' from COALESCE($2, '') || ' ' || COALESCE($3, '')), apellidos),
+                  nombre_completo    = trim(both ' ' from COALESCE($1, nombres) || ' ' ||
+                                            COALESCE(trim(both ' ' from COALESCE($2, '') || ' ' || COALESCE($3, '')), apellidos)),
+                  telefono           = COALESCE($4, telefono),
+                  correo             = COALESCE($5, correo)
+            WHERE id_persona = (SELECT id_persona FROM sigd_auth.cuenta_usuario
+                                 WHERE id_usuario = $6::uuid)`,
+          [nombres, apellidoPaterno, apellidoMaterno, datos.telefono ?? null,
+           datos.correo ?? null, usuarioId],
+        );
+      }
+
+      if (datos.puestoLaboralId) {
+        // Se cierra la asignación vigente anterior antes de abrir la nueva:
+        // un servidor no puede tener dos puestos vigentes a la vez.
+        await cliente.query(
+          `UPDATE sigd_org.asignacion_personal
+              SET vigente_hasta = now()
+            WHERE id_usuario = $1::uuid AND vigente_hasta IS NULL`,
+          [usuarioId],
+        );
+        await cliente.query(
+          `INSERT INTO sigd_org.asignacion_personal
+             (id_usuario, puesto_laboral_id, cargo_id, area_id, vigente_desde)
+           SELECT $1, pl.puesto_laboral_id, pl.cargo_id, pl.area_id, now()
+             FROM sigd_org.puesto_laboral pl
+            WHERE pl.puesto_laboral_id = $2::uuid`,
+          [usuarioId, datos.puestoLaboralId],
+        );
+      }
+
+      if (datos.rolId) {
+        await cliente.query(
+          `UPDATE sigd_org.usuario_rol SET vigente_hasta = now()
+            WHERE id_usuario = $1::uuid AND vigente_hasta IS NULL`,
+          [usuarioId],
+        );
+        await cliente.query(
+          `INSERT INTO sigd_org.usuario_rol
+             (id_usuario, rol_id, area_id, vigente_desde)
+           SELECT $1, $2::uuid,
+                  (SELECT area_id FROM sigd_org.puesto_laboral
+                    WHERE puesto_laboral_id = $3::uuid),
+                  now()`,
+          [usuarioId, datos.rolId, datos.puestoLaboralId ?? null],
+        );
+      }
+
+      await cliente.query("COMMIT");
+    } catch (error) {
+      await cliente.query("ROLLBACK");
+      throw error;
+    } finally {
+      cliente.release();
+    }
+
+    // Baja o cambio de rol: se cortan las sesiones abiertas.
+    if (datos.estado && datos.estado !== "ACTIVO") {
+      await revocarSesionesUsuario(usuarioId);
+    } else if (datos.rolId || datos.puestoLaboralId) {
+      await revocarSesionesUsuario(usuarioId);
+    }
+
+    const directorio = await listarUsuarios({ pagina: 1, limite: 100 });
+    const actualizado = directorio.datos.find((u) => u.id === usuarioId);
+    if (!actualizado) {
+      throw new NotFoundError({ message: "El usuario indicado no existe." });
+    }
+    return actualizado;
   }
 
   /**
@@ -475,12 +643,12 @@ export function crearUsuariosAdminService(pool: Pool) {
    * actualmente disponible: sigd_auth.sesion_usuario.
    */
   async function revocarSesionesUsuario(
-    usuarioId: number,
+    usuarioId: string,
   ): Promise<number> {
     const resultado = await pool.query(
       `
         DELETE FROM sigd_auth.sesion_usuario
-        WHERE usuario_id = $1
+        WHERE id_usuario = $1::uuid
       `,
       [usuarioId],
     );

@@ -32,6 +32,11 @@
 
 import type { Request, RequestHandler } from 'express';
 import { ForbiddenError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import {
+  ROLES_ANALITICA,
+  ROLES_REFACTOR_VISTAS,
+  tieneAlgunRol,
+} from '../../shared/domain/roles.js';
 import type { ActorProviderRutaDoc } from '../rutadoc/rutadoc.actor-provider.js';
 import type { ActorRutaDoc } from '../rutadoc/rutadoc.types.js';
 import type { RepositorioMgdAnalytics } from './mgdAnalytics.repository.js';
@@ -45,7 +50,7 @@ import {
 import type { CacheDistribuida } from '../identicore/ubigeo.service.js';
 
 /** Roles autorizados por §4.7 para la analítica ejecutiva. */
-const ROLES_ANALITICA = new Set(['DIRECTOR', 'SUPER_ADMIN', 'ADMINISTRADOR']);
+const ROLES_ANALITICA_VISTA = ROLES_ANALITICA;
 
 export interface ControladorReportes {
   resumen: RequestHandler;
@@ -71,7 +76,7 @@ export function crearControladorReportes(
   const autorizado = async (req: Request): Promise<ActorRutaDoc> => {
     const actor = await actorProvider.obtenerActor(req);
     if (!actor) throw new UnauthorizedError();
-    if (!actor.roles.some((rol) => ROLES_ANALITICA.has(rol))) throw new ForbiddenError();
+    if (!tieneAlgunRol(actor.roles, ROLES_ANALITICA_VISTA)) throw new ForbiddenError();
     return actor;
   };
 
@@ -130,7 +135,7 @@ export function crearControladorReportes(
     refrescar: async (req, res) => {
       const actor = await actorProvider.obtenerActor(req);
       if (!actor) throw new UnauthorizedError();
-      if (!actor.roles.includes('SUPER_ADMIN')) throw new ForbiddenError();
+      if (!tieneAlgunRol(actor.roles, ROLES_REFACTOR_VISTAS)) throw new ForbiddenError();
       const resultado = await servicio.refrescar();
       res.json({
         vistas: resultado.vistas,
