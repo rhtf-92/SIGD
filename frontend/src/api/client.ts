@@ -77,8 +77,12 @@ apiClient.interceptors.response.use(
   async (error: unknown) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+      const esSolicitudLogin = originalRequest.url?.includes("/auth/login");
 
-      if (!(originalRequest.url?.includes("/auth/refresh") || originalRequest._retry)) {
+      if (
+        !esSolicitudLogin &&
+        !(originalRequest.url?.includes("/auth/refresh") || originalRequest._retry)
+      ) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             pendingQueue.push({
@@ -107,7 +111,7 @@ apiClient.interceptors.response.use(
           useAuthStore.getState().logout();
           isRefreshing = false;
         }
-      } else {
+      } else if (originalRequest.url?.includes("/auth/refresh")) {
         useAuthStore.getState().logout();
       }
     }
@@ -148,6 +152,7 @@ apiClient.interceptors.response.use(
 
       const code =
         (typeof responseData?.code === "string" && responseData.code) ||
+        error.code ||
         `ERR_HTTP_${status}`;
 
       const retryable =

@@ -37,10 +37,21 @@ export default function AppRouter() {
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
 
-      <Route path="/casilla" element={<CasillaElectronicaPage />} />
+      <Route
+        path="/casilla"
+        element={
+          <ProtectedRoute>
+            <CasillaElectronicaPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/casilla-electronica"
-        element={<CasillaElectronicaPage />}
+        element={
+          <ProtectedRoute>
+            <CasillaElectronicaPage />
+          </ProtectedRoute>
+        }
       />
       <Route path="/registro" element={<RegistroCiudadanoPage />} />
 

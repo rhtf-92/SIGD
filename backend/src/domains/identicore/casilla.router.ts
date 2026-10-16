@@ -16,7 +16,7 @@ import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
-import { NotFoundError } from '../../shared/domain/errors/index.js';
+import { NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 
 const consultaPaginadaSchema = z
   .object({
@@ -155,13 +155,13 @@ export function crearRouterCasilla(pool: Pool): Router {
   function obtenerUsuarioId(req: Request): string {
     const token = extraerTokenBearer(req.get('authorization'));
     if (!token) {
-      return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
+      throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
     }
     try {
       const claims = verificarTokenAcceso(token);
       return claims.sub;
     } catch {
-      return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
+      throw new UnauthorizedError({ detail: 'Token de acceso inválido o caducado.' });
     }
   }
 

@@ -1,7 +1,9 @@
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../stores/authStore";
 
 export default function HeaderInstitucional() {
   const navigate = useNavigate();
+  const { isAuthenticated, usuario, logout } = useAuthStore();
 
   return (
     <header className="header-sigd bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-md print:hidden">
@@ -29,6 +31,20 @@ export default function HeaderInstitucional() {
         </div>
 
         <nav className="flex items-center gap-3 text-xs font-semibold">
+          {isAuthenticated && (
+            <>
+              <span className="hidden text-blue-100 sm:inline">
+                {usuario?.nombreCompleto ?? "Sesión iniciada"}
+              </span>
+              <button
+                type="button"
+                onClick={logout}
+                className="rounded-lg bg-white/10 px-3 py-1.5 text-white transition hover:bg-white/20"
+              >
+                Cerrar sesión
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => navigate("/tupa")}
