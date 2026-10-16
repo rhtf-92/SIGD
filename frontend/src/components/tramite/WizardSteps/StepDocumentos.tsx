@@ -19,6 +19,7 @@
  */
 
 import React, { useId, useMemo, useRef, useState } from 'react';
+import { TRAMITES_TUPA_MOCK } from '../../../mocks/tramitesTupaMock';
 import type {
   DocumentosData,
   ArchivoTramite,
@@ -38,38 +39,24 @@ export interface StepDocumentosProps {
   isSubmitting?: boolean;
 }
 
-const CATALOGO_TUPA_INSTITUCIONAL = [
-  {
-    id: 'TUPA-01',
-    nombre: 'Certificado Oficial de Estudios (Por Semestre o Ciclo Completo)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-02',
-    nombre: 'Constancia de Matrícula, Egresado y No Adeudo',
-    unidad: 'Dirección de Asuntos Académicos',
-  },
-  {
-    id: 'TUPA-03',
-    nombre: 'Expedición de Título Profesional Técnico a Nombre de la Nación',
-    unidad: 'Área de Titulación y Grados',
-  },
-  {
-    id: 'TUPA-04',
-    nombre: 'Rectificación de Matrícula o Reserva de Vacante Temporal',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-05',
-    nombre: 'Convalidación y Homologación de Unidades Didácticas (Módulos)',
-    unidad: 'Coordinación de Programas de Estudio',
-  },
-  {
-    id: 'LIBRE-01',
-    nombre: 'Solicitud Formal General / Trámite Libre Institucional',
-    unidad: 'Mesa de Partes General',
-  },
-] as const;
+/**
+ * Catálogo institucional unificado (T-FE-MPV-15):
+ * - Procedimientos académicos TUPA 2026 (48).
+ * - Servicios productivos y venta de bienes del IESTP "Suiza" 2026 (PP-01…).
+ * - Trámite libre institucional.
+ */
+const CATALOGO_TUPA_INSTITUCIONAL = TRAMITES_TUPA_MOCK.filter((t) => t.esTupa).map((t) => ({
+  id: t.id,
+  nombre: t.nombre,
+  unidad: t.unidadOrganica,
+  grupo: t.id.includes("PP-") ? "Servicios productivos y venta de bienes 2026" : "Procedimientos académicos TUPA 2026",
+})) as { id: string; nombre: string; unidad: string; grupo: string }[];
+
+const TRAMITE_LIBRE = {
+  id: 'LIBRE-01',
+  nombre: 'Solicitud Formal General / Trámite Libre Institucional',
+  unidad: 'Mesa de Partes General',
+} as const;
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
@@ -270,11 +257,23 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             } disabled:bg-slate-100`}
           >
             <option value="">-- Seleccione un procedimiento oficial --</option>
-            {CATALOGO_TUPA_INSTITUCIONAL.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id} — {t.nombre} ({t.unidad})
-              </option>
-            ))}
+            <optgroup label="Procedimientos académicos TUPA 2026">
+              {CATALOGO_TUPA_INSTITUCIONAL.filter((t) => !t.grupo.includes("productivos")).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.id} — {t.nombre} ({t.unidad})
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Servicios productivos y venta de bienes 2026">
+              {CATALOGO_TUPA_INSTITUCIONAL.filter((t) => t.grupo.includes("productivos")).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.id} — {t.nombre} ({t.unidad})
+                </option>
+              ))}
+            </optgroup>
+            <option value={TRAMITE_LIBRE.id}>
+              {TRAMITE_LIBRE.id} — {TRAMITE_LIBRE.nombre} ({TRAMITE_LIBRE.unidad})
+            </option>
           </select>
           {touched.tipoTramiteId && errors.tipoTramiteId && (
             <p

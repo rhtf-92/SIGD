@@ -20,6 +20,7 @@ import {
 } from "../types/tramiteWizard";
 import { type SelectOption } from "../components/common/SearchableSelect";
 import { PROCEDIMIENTOS_TUPA_2026 } from "../data/tupaPasco2026";
+import { PROCEDIMIENTOS_PRODUCTIVOS_TUPA } from "../data/tupaSuiza2026";
 
 /**
  * Lista canónica y oficial de las 11 Carreras Profesionales del IESTP "Suiza".
@@ -50,36 +51,50 @@ const TODOS_LOS_PROGRAMAS = PROGRAMAS_ESTUDIO_CATALOGO.map(
   ({ value }) => value
 );
 
-export const TRAMITES_TUPA_MOCK: readonly TramiteTupaMockItem[] = [
-  ...PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => {
-    const dependencia = procedimiento.dependencia ?? "Mesa de Partes";
-    const datosDescripcion = [
-      procedimiento.derechoPago
-        ? `Derecho de pago: ${procedimiento.derechoPago}`
-        : undefined,
-      procedimiento.tiempoMaximo
-        ? `Tiempo máximo: ${procedimiento.tiempoMaximo}`
-        : undefined,
-      ...(procedimiento.detalleTarifas ?? []),
-      procedimiento.nota,
-    ].filter((dato): dato is string => Boolean(dato));
+function aMockItem(
+  procedimiento: {
+    codigo: string;
+    nombre: string;
+    dependencia?: string;
+    derechoPago?: string;
+    tiempoMaximo?: string;
+    detalleTarifas?: readonly string[];
+    nota?: string;
+  },
+  prefijoId: string,
+): TramiteTupaMockItem {
+  const dependencia = procedimiento.dependencia ?? "Mesa de Partes";
+  const datosDescripcion = [
+    procedimiento.derechoPago
+      ? `Derecho de pago: ${procedimiento.derechoPago}`
+      : undefined,
+    procedimiento.tiempoMaximo
+      ? `Tiempo máximo: ${procedimiento.tiempoMaximo}`
+      : undefined,
+    ...(procedimiento.detalleTarifas ?? []),
+    procedimiento.nota,
+  ].filter((dato): dato is string => Boolean(dato));
 
-    return {
-      id: `TUPA-${procedimiento.codigo}`,
-      codigo: procedimiento.codigo,
-      nombre: procedimiento.nombre,
-      esTupa: true,
-      unidadOrganica: dependencia,
-      unidadId: dependencia
-        .split(" / ")[0]
-        .toUpperCase()
-        .replaceAll(" ", "_"),
-      derechoPago: procedimiento.derechoPago,
-      tiempoMaximo: procedimiento.tiempoMaximo,
-      descripcion: datosDescripcion.join(" • "),
-      carrerasAplica: TODOS_LOS_PROGRAMAS,
-    };
-  }),
+  return {
+    id: `${prefijoId}-${procedimiento.codigo}`,
+    codigo: procedimiento.codigo,
+    nombre: procedimiento.nombre,
+    esTupa: true,
+    unidadOrganica: dependencia,
+    unidadId: dependencia
+      .split(" / ")[0]
+      .toUpperCase()
+      .replaceAll(" ", "_"),
+    derechoPago: procedimiento.derechoPago,
+    tiempoMaximo: procedimiento.tiempoMaximo,
+    descripcion: datosDescripcion.join(" • "),
+    carrerasAplica: TODOS_LOS_PROGRAMAS,
+  };
+}
+
+export const TRAMITES_TUPA_MOCK: readonly TramiteTupaMockItem[] = [
+  ...PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => aMockItem(procedimiento, "TUPA")),
+  ...PROCEDIMIENTOS_PRODUCTIVOS_TUPA.map((procedimiento) => aMockItem(procedimiento, "TUPA")),
   {
     id: "LIBRE",
     codigo: "LIBRE",
