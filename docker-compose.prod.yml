@@ -9,11 +9,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=${BACKEND_PORT:-3000}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - S3_ENDPOINT=${S3_ENDPOINT}
       - S3_REGION=${S3_REGION}

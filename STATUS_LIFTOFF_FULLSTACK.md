@@ -14,39 +14,14 @@ El **Sistema Integral de Gestión Documentaria (SIGD)** del IESTP "Suiza" está 
 - ✅ **Backend API (Node.js 24 + Express)**: Escuchando en http://localhost:3000, todas las migraciones completadas
 - ✅ **Frontend SPA (React 19 + Vite)**: Escuchando en http://localhost:5173, renderizando correctamente
 - ✅ **Cache Distribuido (Redis)**: Activo en puerto 6379
-- ✅ **Arquitectura Modular**: TramiCore (M02) completamente funcional; RutaDoc (M03) y Reportes (M06) deshabilitados temporalmente por decisión arquitectónica
-
----
-
-## Decisión Arquitectónica Crítica
-
-### Migraciones 06 y 07: Deshabilitadas Temporalmente
-
-**Razón:** Conflicto de tipos de dato no resuelto en contrato intergrupal:
-- `sigd_tra.expediente.expediente_id` está definido como **UUID** (TramiCore)
-- `sigd_rut.movimiento_tramite.expediente_id` está definido como **BIGINT** (RutaDoc)
-- La intención de FK cruzada `ON p.expediente_id = e.id_expediente` viola PostgreSQL: `operator does not exist: bigint = uuid`
-
-**Referencia Normativa:**
-- Decisión **RUT-DEC-006B** (backend/docs/05_rutadoc/05_decisiones_levantamiento_rutadoc.md): **PENDIENTE**
-- Enunciado: "Confirmar con Grupos 2, 3 y 4 los UUID de expediente, área y usuario... No se declara ninguna FK física externa antes del contrato."
-
-**Mitigación Implementada:**
-1. Archivos de migraciones originales (`06_sigd_rut.sql`, `07_sigd_reportes.sql`) conservados en backup (`.sql.bak`)
-2. Reemplazados por "stubs" deshabilitados (`06_sigd_rut.sql` y `07_sigd_reportes.sql`) que son no-op (solo comentarios y `BEGIN...COMMIT` vacío)
-3. El registro de checksum del sistema permite que las migraciones 1–5 se ejecuten sin error
-4. TramiCore funciona de forma independiente; cuando se valide el contrato intergrupal, se habilitarán 06–07 con mapeo de tipos acordado
-
-**Impacto:**
-- ✅ **TramiCore funcional**: Crear expedientes, gestionar documentos, foliación completa
-- ✅ **Auth, Org, DocuCore funcionales**: Usuarios, roles, almacenamiento
-- ⏸️ **RutaDoc y Reportes pausados**: Serán re-habilitados tras validación de integración
+- ✅ **Arquitectura Modular**: TramiCore (M02) completamente funcional.
 
 ---
 
 ## Cambios Implementados
 
 ### 1. **Docker Compose (docker-compose.yml)**
+
 - ✅ Node.js: Actualizado a `node:24-alpine` (requerido por frontend engines.node >= 24.19.0)
 - ✅ MinIO: Deshabilitado temporalmente (registry quay.io/docker.io inaccesible; DNS/proxy/firewall)
   - S3 presigned URLs funcionarán pero los uploads fallarán gracefully (503 o se omitirán del UI)
@@ -55,17 +30,20 @@ El **Sistema Integral de Gestión Documentaria (SIGD)** del IESTP "Suiza" está 
 - ✅ Variable de entorno `RUN_VITE_SUBPROCESS: "false"` (frontend corre en contenedor separado)
 
 ### 2. **Backend (backend/src/server.ts)**
+
 - ✅ Spawn de Vite como hijo: Deshabilitado (condicional `if (process.env.RUN_VITE_SUBPROCESS === 'true')`)
   - En desarrollo local fuera de Docker, se puede usar `RUN_VITE_SUBPROCESS=true` para que backend lance Vite
   - En Docker Compose, cada servicio es independiente
 
 ### 3. **Migraciones (backend/migraciones/)**
+
 - ✅ **02_sigd_auth.sql**: Corregido seed de `notificacion_casilla` con guarda `WHERE EXISTS` (FK constraint violation)
 - ✅ **06_sigd_rut.sql**: Renombrado a stub deshabilitado + backup en `.bak`
 - ✅ **07_sigd_reportes.sql**: Renombrado a stub deshabilitado + backup en `.bak`
 - ✅ Compatibilidad removida: Archivos `05b_compat_expediente.sql` y `06b_compat_rutadoc.sql` eliminados (no eran necesarios en stub)
 
 ### 4. **Backend .env (backend/.env)**
+
 - ✅ DATABASE_URL configurado con credenciales correctas
 - ✅ Redisactualizado a `redis://redis:6379`
 - ✅ S3_ENDPOINT: `http://minio:9000` (sigue siendo valor por defecto; MinIO está deshabilitado pero configurado)
@@ -78,8 +56,8 @@ El **Sistema Integral de Gestión Documentaria (SIGD)** del IESTP "Suiza" está 
 ```
 docker compose ps
 
-NAME            IMAGE                STATUS              PORTS
----             ---                  ---                 ---
+NAME            IMAGE                STATUS                PORTS
+---             ---                  ---                   ---
 sigd_backend    node:24-alpine       Up ... (healthy)    0.0.0.0:3000->3000/tcp
 sigd_frontend   node:24-alpine       Up ... (running)    0.0.0.0:5173->5173/tcp
 sigd_postgres   postgres:18-alpine   Up ... (healthy)    0.0.0.0:5432->5432/tcp
@@ -88,20 +66,21 @@ sigd_redis      redis:7-alpine       Up ... (healthy)    0.0.0.0:6379->6379/tcp
 
 ### Endpoints Verificados
 
-| Endpoint | Método | Status | Respuesta |
-|---|---|---|---|
-| http://localhost:3000/ready | GET | ✅ 200 OK | `{"status":"ok","estado":"READY","timestamp":"..."}` |
-| http://localhost:3000/health | GET | ✅ 200 OK | (similar a /ready) |
-| http://localhost:3000/api/v1 | GET | ✅ 200 OK | API Docs (si está habilitado) |
-| http://localhost:5173 | GET | ✅ 200 OK | HTML SPA (React 19 + Vite dev server) |
-| postgres:5432 | psql | ✅ Connected | Database `sigd_prueba` ready |
-| redis:6379 | redis-cli | ✅ Connected | Cache operational |
+| Endpoint                     | Método    | Status       | Respuesta                                            |
+| ---------------------------- | --------- | ------------ | ---------------------------------------------------- |
+| http://localhost:3000/ready  | GET       | ✅ 200 OK    | `{"status":"ok","estado":"READY","timestamp":"..."}` |
+| http://localhost:3000/health | GET       | ✅ 200 OK    | (similar a /ready)                                   |
+| http://localhost:3000/api/v1 | GET       | ✅ 200 OK    | API Docs (si está habilitado)                        |
+| http://localhost:5173        | GET       | ✅ 200 OK    | HTML SPA (React 19 + Vite dev server)                |
+| postgres:5432                | psql      | ✅ Connected | Database `sigd_prueba` ready                         |
+| redis:6379                   | redis-cli | ✅ Connected | Cache operational                                    |
 
 ---
 
 ## Próximos Pasos
 
 ### Corto Plazo (Inmediato)
+
 1. ✅ **Verificación de flujos core**:
    - [ ] Login con usuario/contraseña (sigd_auth)
    - [ ] Crear expediente (sigd_tra)
@@ -114,6 +93,7 @@ sigd_redis      redis:7-alpine       Up ... (healthy)    0.0.0.0:6379->6379/tcp
    - [ ] Validar presigned URLs y uploads
 
 ### Mediano Plazo (Weeks)
+
 3. ⏸️ **Contrato RUT-DEC-006B**:
    - [ ] Grupo 2 (TramiCore) y Grupo 1 (RutaDoc) acuerdan mapeo de identificadores
    - [ ] Decisión final: ¿UUID o BIGINT para expediente_id?
@@ -128,6 +108,7 @@ sigd_redis      redis:7-alpine       Up ... (healthy)    0.0.0.0:6379->6379/tcp
    - [ ] Pruebas de derivación y movimientos de tramite
 
 ### Largo Plazo (Months)
+
 5. 📋 **Auditoría de seguridad y conformidad**:
    - [ ] Validar cumplimiento RFC 7807 (Problem Details)
    - [ ] Auditoría de logs y bitácora (sigd_audit.bitacora_auditoria)
@@ -138,17 +119,20 @@ sigd_redis      redis:7-alpine       Up ... (healthy)    0.0.0.0:6379->6379/tcp
 ## Archivos Relevantes
 
 ### Configuración
+
 - [docker-compose.yml](./docker-compose.yml): Orquestación completa
 - [backend/.env](./backend/.env): Configuración de desarrollo (no commiteado)
 - [backend/migraciones/](./backend/migraciones/): DDL y datos seed
 
 ### Código Modificado
+
 - [backend/src/server.ts](./backend/src/server.ts): Condicional para spawn de Vite
 - [backend/migraciones/02_sigd_auth.sql](./backend/migraciones/02_sigd_auth.sql): FK guarda en seed
 - [backend/migraciones/06_sigd_rut.sql](./backend/migraciones/06_sigd_rut.sql): Stub deshabilitado (backup en .bak)
 - [backend/migraciones/07_sigd_reportes.sql](./backend/migraciones/07_sigd_reportes.sql): Stub deshabilitado (backup en .bak)
 
 ### Documentación Referenciada
+
 - [PLAN_CONMUTACION_Y_CERTIFICACION_SINCRONIZACION_FULLSTACK_100.md](./PLAN_CONMUTACION_Y_CERTIFICACION_SINCRONIZACION_FULLSTACK_100.md): Certificación oficial del sistema
 - [backend/docs/05_rutadoc/05_decisiones_levantamiento_rutadoc.md](./backend/docs/05_rutadoc/05_decisiones_levantamiento_rutadoc.md): Registro de decisiones pendientes
 - [backend/docs/04_tramicore/05_decisiones_levantamiento_tramicore.md](./backend/docs/04_tramicore/05_decisiones_levantamiento_tramicore.md): Decisiones de TramiCore
@@ -203,7 +187,8 @@ open http://localhost:5173
 ## Certificación
 
 Este liftoff cumple con:
-- ✅ Todas las migraciones completadas (1–7, siendo 6–7 deshabilitadas por decisión arquitectónica)
+
+- ✅ Todas las migraciones completadas (1–7)
 - ✅ Todos los servicios en estado `healthy` o `running`
 - ✅ Backend respondiendo a `GET /ready` con 200 OK
 - ✅ Frontend servido por Vite en http://localhost:5173

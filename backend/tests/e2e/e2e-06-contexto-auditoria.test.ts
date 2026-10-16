@@ -3,7 +3,7 @@ import { obtenerAgente, limpiarAmbiente, cerrarAmbiente } from '../helpers/app.h
 import { obtenerPool } from '../helpers/database.helper.js';
 import { payloadRadicacionValido, correlationIdFijo } from '../helpers/payloads.helper.js';
 
-describe('E2E-06 Â· Captura automÃ¡tica de contexto en la bitÃ¡cora', () => {
+describe('E2E-06 · Captura automática de contexto en la bitácora', () => {
   beforeAll(async () => {
     await limpiarAmbiente();
   });
@@ -12,7 +12,7 @@ describe('E2E-06 Â· Captura automÃ¡tica de contexto en la bitÃ¡cora', () =
     await cerrarAmbiente();
   });
 
-  it('registra usuario_id, ip_origen y correlation_id sin pasarlos en el cÃ³digo de negocio', async () => {
+  it('registra usuario_id, ip_origen y correlation_id sin pasarlos en el código de negocio', async () => {
     const pool = obtenerPool();
     const cuenta = await pool.query(
       'INSERT INTO sigd_auth.cuenta_usuario DEFAULT VALUES RETURNING id_usuario AS id',
