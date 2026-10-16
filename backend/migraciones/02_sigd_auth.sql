@@ -201,20 +201,32 @@ CREATE INDEX IF NOT EXISTS idx_notif_casilla_cut
 CREATE INDEX IF NOT EXISTS idx_notif_casilla_fecha
     ON sigd_auth.notificacion_casilla (fecha_deposito DESC);
 
--- Semilla inicial determinista para pruebas y desarrollo
-INSERT INTO sigd_auth.notificacion_casilla (
-    id, usuario_id, cut, asunto, tipo_acto, numero_documento,
-    estado, fecha_deposito, hash_sha256, cvd
-) VALUES (
-    '00000000-0000-0000-0000-000000000101',
-    '00000000-0000-0000-0000-000000000001',
-    'EXP-2026-000142',
-    'Notificación de Resolución Directoral de Matrícula',
-    'Resolución Directoral',
-    'RD N.° 0142-2026-DG-IESTP-SUIZA',
-    'NO_LEIDO',
-    now(),
-    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    'CVD-2026-RD-000142-A4F2'
-) ON CONFLICT (id) DO NOTHING;
+-- Semilla inicial determinista para pruebas y desarrollo (idempotente, tolerante a FK)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sigd_auth.persona WHERE id_persona = '00000000-0000-0000-0000-000000000002') THEN
+    INSERT INTO sigd_auth.persona (id_persona, tipo, id_documento)
+    VALUES ('00000000-0000-0000-0000-000000000002', 'NATURAL', '00000001');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM sigd_auth.cuenta_usuario WHERE id_usuario = '00000000-0000-0000-0000-000000000001') THEN
+    INSERT INTO sigd_auth.cuenta_usuario (id_usuario, id_persona, usuario, correo, password_hash)
+    VALUES ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', 'seed_sigd', 'seed@iestpsuiza.edu.pe', '$argon2id$v=19$m=65536,t=3,p=4$seedseedseedseedseed01$hashseedplaceholder00000000000000000000000000');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM sigd_auth.notificacion_casilla WHERE id = '00000000-0000-0000-0000-000000000101') THEN
+    INSERT INTO sigd_auth.notificacion_casilla (
+        id, usuario_id, cut, asunto, tipo_acto, numero_documento,
+        estado, fecha_deposito, hash_sha256, cvd
+    ) VALUES (
+        '00000000-0000-0000-0000-000000000101',
+        '00000000-0000-0000-0000-000000000001',
+        'EXP-2026-000142',
+        'Notificación de Resolución Directoral de Matrícula',
+        'Resolución Directoral',
+        'RD N.° 0142-2026-DG-IESTP-SUIZA',
+        'NO_LEIDO',
+        now(),
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        'CVD-2026-RD-000142-A4F2'
+    );
+  END IF;
+END $$;
 

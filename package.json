@@ -1,0 +1,27 @@
+{
+  "name": "sigd",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema Integral de Gestión Documentaria (SIGD) — IESTP Suiza. Orquestador raíz frontend + backend.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently --names \"backend,frontend\" --prefix-colors \"magenta,cyan\" \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "cross-env SKIP_FRONTEND_AUTOSTART=true npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:full-auto": "npm --prefix backend run dev",
+    "dev:backend-only": "npm --prefix backend run dev",
+    "dev:frontend-only": "npm --prefix frontend run dev",
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
+    "typecheck": "npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "test": "npm --prefix backend run test:unit && npm --prefix frontend run test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3"
+  }
+}

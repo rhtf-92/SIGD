@@ -8,7 +8,7 @@
 -- Contenido : bitacora_auditoria (append-only) y evento_outbox (Outbox)
 -- =============================================================================
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+DO $$ BEGIN BEGIN CREATE EXTENSION IF NOT EXISTS pgcrypto; EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'pgcrypto omitido (PG18 nativo gen_random_uuid), %', SQLERRM; END; END $$;
 
 CREATE SCHEMA IF NOT EXISTS sigd_audit;
 

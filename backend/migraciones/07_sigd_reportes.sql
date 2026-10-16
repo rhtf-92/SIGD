@@ -31,11 +31,11 @@ CREATE SCHEMA IF NOT EXISTS sigd_tra;
 CREATE MATERIALIZED VIEW IF NOT EXISTS sigd_tra.mv_kpis_mgd_mensual AS
 WITH cierre AS (
     SELECT
-        m.expediente_id,
-        m.fecha_movimiento,
-        ROW_NUMBER() OVER (PARTITION BY m.expediente_id ORDER BY m.fecha_movimiento) AS orden
+        m.expediente_id::text AS expediente_id,
+        m.fecha_hora AS fecha_movimiento,
+        ROW_NUMBER() OVER (PARTITION BY m.expediente_id ORDER BY m.fecha_hora) AS orden
     FROM sigd_rut.movimiento_tramite m
-    WHERE m.estado_destino IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
+    WHERE m.estado_nuevo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
 ),
 base AS (
     SELECT
@@ -43,18 +43,18 @@ base AS (
         e.expediente_id,
         e.fecha_radicacion,
         e.fecha_limite,
-        a.estado_codigo,
+        a.estado_nuevo AS estado_codigo,
         a.area_actual_id,
         ar.fecha_ingreso,
         c.fecha_movimiento AS fecha_cierre
     FROM sigd_tra.expediente e
-    LEFT JOIN sigd_rut.estado_actual_tramite a
-           ON a.expediente_id = e.expediente_id
+    LEFT JOIN sigd_rut.estado_actual_expediente a
+           ON a.expediente_id::text = e.expediente_id::text
     LEFT JOIN sigd_tra.asiento_registro ar
            ON ar.expediente_id = e.expediente_id
           AND NOT ar.anulado
     LEFT JOIN cierre c
-           ON c.expediente_id = e.expediente_id
+           ON c.expediente_id = e.expediente_id::text
           AND c.orden = 1
 )
 SELECT
@@ -128,23 +128,23 @@ SELECT
     COALESCE(ar.nombre, 'Sin área asignada')                                  AS area,
     e.estado                                                                     AS estado,
     COUNT(*)::int                                                                AS expedientes,
-    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_estado)) / 3600)::numeric, 2)::float8
-                                                                                 AS horas_promedio,
-    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_estado)) / 86400)::numeric, 2)::float8
-                                                                                 AS dias_promedio,
-    ROUND(MAX(EXTRACT(EPOCH FROM (now() - a.fecha_estado)) / 86400)::numeric, 2)::float8
-                                                                                 AS dias_maximo,
+    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 3600)::numeric, 2)::float8
+                                                                                  AS horas_promedio,
+    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 86400)::numeric, 2)::float8
+                                                                                  AS dias_promedio,
+    ROUND(MAX(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 86400)::numeric, 2)::float8
+                                                                                  AS dias_maximo,
     COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite < now())::int
-                                                                                 AS vencidos,
-    COUNT(*) FILTER (WHERE a.semaforo_sla = 'ROJO')::int                         AS semaforo_rojo,
-    COUNT(*) FILTER (WHERE a.semaforo_sla = 'AMARILLO')::int                     AS semaforo_amarillo,
-    COUNT(*) FILTER (WHERE a.semaforo_sla = 'VERDE')::int                        AS semaforo_verde
-FROM sigd_rut.estado_actual_tramite a
+                                                                                  AS vencidos,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite < now())::int AS semaforo_rojo,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite >= now() AND e.fecha_limite < now() + interval '5 days')::int AS semaforo_amarillo,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NULL OR e.fecha_limite >= now() + interval '5 days')::int AS semaforo_verde
+FROM sigd_rut.estado_actual_expediente a
 JOIN sigd_tra.expediente e
-  ON e.expediente_id = a.expediente_id
+  ON e.expediente_id::text = a.expediente_id::text
 LEFT JOIN sigd_org.area ar
-  ON ar.area_id = a.area_actual_id
-WHERE a.estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
+  ON ar.area_id::text = a.area_actual_id
+WHERE a.estado_nuevo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
 GROUP BY 1, 2, 3
 WITH DATA;
 
