@@ -71,6 +71,8 @@ services:
       S3_BUCKET: sigd-expedientes
       REDIS_URL: redis://redis:6379
       OUTBOX_POLL_INTERVAL_MS: 5000
+      MIGRATE_ON_BOOT: "true"
+      SIGD_MIGRATION_PROFILE: BASELINE_2026_V1
     ports:
       - "3000:3000"
     depends_on:
