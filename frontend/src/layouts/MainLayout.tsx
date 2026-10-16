@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import AsistenteIA from "../components/asistente/AsistenteIA";
 import HeaderInstitucional from "../components/HeaderInstitucional";
 
 interface MainLayoutProps {
@@ -18,6 +19,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <span>© 2026</span>
         </div>
       </footer>
+
+      <AsistenteIA />
     </div>
   );
 }

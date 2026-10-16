@@ -1,75 +1,15 @@
-import { Link } from "react-router-dom";
-
-const secciones = [
-  {
-    titulo: "Flujo y Validez Legal",
-    subtitulo: "MOD-04 / Firma Digital",
-    descripcion:
-      "Tramitación con plena validez legal: firma digital, re-firma, workflow académico y verificación pública de documentos (CVD).",
-    ruta: "/flujo-validez-legal",
-    destacado: true,
-  },
-  {
-    titulo: "Casilla Electrónica",
-    subtitulo: "ENT-M01-03",
-    descripcion:
-      "Consulta y recepción de notificaciones electrónicas institucionales con plena validez legal.",
-    ruta: "/casilla",
-    destacado: true,
-  },
-  {
-    titulo: "Mesa de Partes Virtual",
-    subtitulo: "ENT-M02 / TUPA",
-    descripcion:
-      "Presentación y radicación de trámites digitales, requisitos TUPA y anexos documentales.",
-    ruta: "/tramite",
-    destacado: true,
-  },
-  {
-    titulo: "Registro Ciudadano",
-    subtitulo: "ENT-M01-01 / ENT-M01-02",
-    descripcion:
-      "Registro de personas naturales y jurídicas con validación RENIEC / SUNAT y Ubigeo Ucayali.",
-    ruta: "/registro",
-  },
-  {
-    titulo: "Bandeja de Expedientes",
-    subtitulo: "ENT-M05",
-    descripcion:
-      "Gestiona y consulta el estado, trazabilidad, providencias y foliado de expedientes.",
-    ruta: "/expedientes",
-  },
-  {
-    titulo: "Validador CVD",
-    subtitulo: "MOD-04 / Verificación",
-    descripcion:
-      "Valida la autenticidad e integridad de documentos firmados digitalmente mediante el Código de Verificación de Documentos.",
-    ruta: "/validador-cvd",
-  },
-  {
-    titulo: "Panel de Administración",
-    subtitulo: "ENT-M05-01 / RBAC",
-    descripcion:
-      "Gestión de usuarios, roles, permisos, auditoría, tablas maestras y calendario laboral.",
-    ruta: "/administracion",
-  },
-  {
-    titulo: "Iniciar Sesión",
-    subtitulo: "Acceso Institucional",
-    descripcion:
-      "Ingreso al sistema SIGD con credenciales y verificación de perfil asignado.",
-    ruta: "/login",
-  },
-  {
-    titulo: "Reportes y Tableros de Control",
-    subtitulo: "06_reportes-tablero-control",
-    descripcion:
-      "Consulta indicadores ejecutivos, tendencias, distribución de expedientes y áreas con cuellos de botella.",
-    ruta: "/reportes/dashboard",
-  },
-];
+import { Link, useNavigate } from "react-router-dom";
+import {
+  filtrarModulosPorRol,
+  useSesion,
+} from "../config/accesoModulos";
+import { useAuthStore } from "../stores/authStore";
 
 export default function HomePage() {
+  const { rol, autenticado } = useSesion();
+  const logout = useAuthStore((s) => s.logout);
+  const navigate = useNavigate();
+  const secciones = filtrarModulosPorRol(rol, autenticado);
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6 py-12 text-slate-900">
       <div className="text-center space-y-2 max-w-2xl">
@@ -85,6 +25,43 @@ export default function HomePage() {
         <p className="text-sm text-slate-500">
           Plataforma Institucional y Notificación Electrónica con Validez Legal
         </p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold">
+          {autenticado && rol ? (
+            <>
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">
+                Sesión activa: {rol} · {secciones.length} módulo{secciones.length === 1 ? "" : "s"} asignado{secciones.length === 1 ? "" : "s"}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate("/login");
+                }}
+                className="rounded-full border border-slate-300 bg-white px-3 py-1 text-slate-700 hover:bg-slate-100"
+              >
+                Cerrar sesión
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">
+                Sin sesión: solo módulos públicos
+              </span>
+              <Link
+                to="/login"
+                className="rounded-full bg-blue-700 px-3 py-1 text-white hover:bg-blue-800"
+              >
+                Iniciar sesión para ver tus módulos
+              </Link>
+            </>
+          )}
+        </div>
+        {autenticado && rol && (
+          <p className="mt-3 text-xs font-medium text-slate-500">
+            Mostrando únicamente los módulos correspondientes a su rol (<span className="font-bold">{rol}</span>),
+            según la base de datos institucional SIGD.
+          </p>
+        )}
       </div>
 
       <div className="mt-10 grid w-full max-w-4xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
