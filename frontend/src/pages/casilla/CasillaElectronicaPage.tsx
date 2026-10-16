@@ -38,7 +38,7 @@ export default function CasillaElectronicaPage() {
   } = useCasilla();
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="sigd-casilla min-h-screen bg-slate-100 text-slate-900">
       {/* ==================================================================== */}
       {/* CABECERA INSTITUCIONAL DE LA CASILLA ELECTRÓNICA                     */}
       {/* ==================================================================== */}
@@ -148,7 +148,7 @@ export default function CasillaElectronicaPage() {
           {/* No Leídos */}
           <div
             onClick={() => setEstado("NO_LEIDO")}
-            className="cursor-pointer rounded-2xl border border-amber-200 bg-amber-50/40 p-4.5 shadow-xs transition hover:shadow-md hover:bg-amber-50"
+            className="sigd-unread-metric cursor-pointer rounded-2xl border border-amber-200 bg-amber-50/40 p-4.5 shadow-xs transition hover:shadow-md hover:bg-amber-50"
             role="button"
             tabIndex={0}
           >

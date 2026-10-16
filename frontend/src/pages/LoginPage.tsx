@@ -103,8 +103,20 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-900">
-      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+    <main className="sigd-auth-page flex min-h-screen items-center justify-center bg-slate-100 px-4 py-8 text-slate-900">
+      <div className="sigd-auth-shell">
+        <aside aria-hidden="true" className="sigd-auth-visual">
+          <img alt="" height={720} loading="lazy" src="/img/entrada.jpg" width={480} />
+        </aside>
+        <section className="sigd-auth-card w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8">
+        <img
+          alt="Escudo del Instituto Suiza"
+          className="sigd-brand-logo sigd-auth-form-logo"
+          height={44}
+          loading="lazy"
+          src="/img/logo.jpg"
+          width={44}
+        />
         <Link
           to="/"
           className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
@@ -118,7 +130,7 @@ export default function LoginPage() {
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={iniciarSesion} noValidate>
-          <div>
+          <div className="sigd-field">
             <label htmlFor="identificador" className="mb-2 block text-sm font-semibold">
               Usuario o correo
             </label>
@@ -134,7 +146,7 @@ export default function LoginPage() {
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
             />
           </div>
-          <div>
+          <div className="sigd-field">
             <label htmlFor="password" className="mb-2 block text-sm font-semibold">
               Contraseña
             </label>
@@ -158,7 +170,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={cargando}
-            className="w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="sigd-button sigd-button-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cargando ? "Ingresando..." : "Iniciar sesión"}
           </button>
@@ -191,6 +203,7 @@ export default function LoginPage() {
           </div>
         )}
       </section>
+      </div>
     </main>
   );
 }

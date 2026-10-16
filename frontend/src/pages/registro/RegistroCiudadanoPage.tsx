@@ -93,8 +93,20 @@ export default function RegistroCiudadanoPage() {
   const handleClearSuccess = () => setSuccessMessage(null);
 
   return (
-    <div className="min-h-screen bg-[#F3F4F6] flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-sm max-w-2xl w-full p-8">
+    <div className="sigd-registration min-h-screen flex items-center justify-center p-4">
+      <div className="sigd-auth-shell">
+        <aside aria-hidden="true" className="sigd-auth-visual">
+          <img alt="" height={720} loading="lazy" src="/img/entrada.jpg" width={480} />
+        </aside>
+        <div className="sigd-registration-card max-w-2xl w-full bg-white rounded-lg p-8">
+        <img
+          alt="Escudo del Instituto Suiza"
+          className="sigd-brand-logo sigd-auth-form-logo"
+          height={44}
+          loading="lazy"
+          src="/img/logo.jpg"
+          width={44}
+        />
         <Link
           to="/"
           className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
@@ -200,6 +212,7 @@ export default function RegistroCiudadanoPage() {
             </button>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

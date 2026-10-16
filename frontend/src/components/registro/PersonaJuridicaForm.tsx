@@ -83,7 +83,7 @@ export default function PersonaJuridicaForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="space-y-6"
+      className="sigd-form space-y-6"
       noValidate
     >
       {/* RUC y Razón Social */}

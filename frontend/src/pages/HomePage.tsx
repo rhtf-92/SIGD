@@ -1,132 +1,161 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import Skeleton from "../components/Skeleton";
+import { tupaApi, type TupaVersion } from "../services/tupaApi";
 
-const secciones = [
+const accesos = [
   {
-    titulo: "Flujo y Validez Legal",
-    subtitulo: "MOD-04 / Firma Digital",
-    descripcion:
-      "Tramitación con plena validez legal: firma digital, re-firma, workflow académico y verificación pública de documentos (CVD).",
-    ruta: "/flujo-validez-legal",
-    destacado: true,
-  },
-  {
-    titulo: "Casilla Electrónica",
-    subtitulo: "ENT-M01-03",
-    descripcion:
-      "Consulta y recepción de notificaciones electrónicas institucionales con plena validez legal.",
-    ruta: "/casilla",
-    destacado: true,
-  },
-  {
+    ruta: "/tramite/mesa-partes-virtual",
     titulo: "Mesa de Partes Virtual",
-    subtitulo: "ENT-M02 / TUPA",
-    descripcion:
-      "Presentación y radicación de trámites digitales, requisitos TUPA y anexos documentales.",
-    ruta: "/tramite",
-    destacado: true,
+    descripcion: "Presenta documentación mediante la mesa de partes digital.",
+    icono: "documento",
   },
   {
-    titulo: "TUPA vigente",
-    subtitulo: "Consulta pública",
-    descripcion:
-      "Busca trámites, derechos, plazos, requisitos y la información de la versión vigente del TUPA institucional.",
+    ruta: "/consulta",
+    titulo: "Consultar expediente",
+    descripcion: "Revisa el estado de un expediente con su CUT.",
+    icono: "busqueda",
+  },
+  {
+    ruta: "/casilla",
+    titulo: "Casilla Electrónica",
+    descripcion: "Revisa las notificaciones disponibles en tu casilla.",
+    icono: "casilla",
+    protegida: true,
+  },
+  {
     ruta: "/tupa",
-    destacado: true,
+    titulo: "TUPA vigente",
+    descripcion: "Consulta trámites, derechos, requisitos y plazos publicados.",
+    icono: "tupa",
   },
   {
-    titulo: "Gestión de versiones TUPA",
-    subtitulo: "Administración",
-    descripcion:
-      "Crea borradores, edita fichas, carga resoluciones y publica nuevas versiones con bitácora inmutable.",
-    ruta: "/tupa/gestion",
-  },
-  {
-    titulo: "Registro Ciudadano",
-    subtitulo: "ENT-M01-01 / ENT-M01-02",
-    descripcion:
-      "Registro de personas naturales y jurídicas con validación RENIEC / SUNAT y Ubigeo Ucayali.",
     ruta: "/registro",
-  },
-  {
-    titulo: "Bandeja de Expedientes",
-    subtitulo: "ENT-M05",
-    descripcion:
-      "Gestiona y consulta el estado, trazabilidad, providencias y foliado de expedientes.",
-    ruta: "/expedientes",
-  },
-  {
-    titulo: "Validador CVD",
-    subtitulo: "MOD-04 / Verificación",
-    descripcion:
-      "Valida la autenticidad e integridad de documentos firmados digitalmente mediante el Código de Verificación de Documentos.",
-    ruta: "/validador-cvd",
-  },
-  {
-    titulo: "Panel de Administración",
-    subtitulo: "ENT-M05-01 / RBAC",
-    descripcion:
-      "Gestión de usuarios, roles, permisos, auditoría, tablas maestras y calendario laboral.",
-    ruta: "/administracion",
-  },
-  {
-    titulo: "Iniciar Sesión",
-    subtitulo: "Acceso Institucional",
-    descripcion:
-      "Ingreso al sistema SIGD con credenciales y verificación de perfil asignado.",
-    ruta: "/login",
-  },
-  {
-    titulo: "Reportes y Tableros de Control",
-    subtitulo: "06_reportes-tablero-control",
-    descripcion:
-      "Consulta indicadores ejecutivos, tendencias, distribución de expedientes y áreas con cuellos de botella.",
-    ruta: "/reportes/dashboard",
+    titulo: "Registrarme",
+    descripcion: "Crea un registro ciudadano en el sistema.",
+    icono: "registro",
   },
 ];
 
-export default function HomePage() {
+function AccesoIcono({ tipo }: { tipo: string }) {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6 py-12 text-slate-900">
-      <div className="text-center space-y-2 max-w-2xl">
-        <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800">
-          IESTP &quot;Suiza&quot; — Pucallpa
-        </div>
-        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-          SIGD
-        </h1>
-        <p className="text-lg font-medium text-slate-700">
-          Sistema Integral de Gestión Documentaria
-        </p>
-        <p className="text-sm text-slate-500">
-          Plataforma Institucional y Notificación Electrónica con Validez Legal
-        </p>
-      </div>
+    <span aria-hidden="true" className="sigd-home-icon">
+      <svg className="h-7 w-7" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+        {tipo === "casilla" ? (
+          <><path d="M3 5h18v14H3z" /><path d="m3 7 9 6 9-6" /></>
+        ) : tipo === "tupa" ? (
+          <><path d="M6 3h9l4 4v14H6z" /><path d="M15 3v5h5M9 12h7M9 16h7" /></>
+        ) : tipo === "busqueda" ? (
+          <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>
+        ) : tipo === "registro" ? (
+          <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0M19 8v6m-3-3h6" /></>
+        ) : (
+          <><path d="M4 4h16v16H4z" /><path d="M8 8h8M8 12h8M8 16h5" /></>
+        )}
+      </svg>
+    </span>
+  );
+}
 
-      <div className="mt-10 grid w-full max-w-4xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {secciones.map((seccion) => (
-          <Link
-            key={seccion.ruta}
-            to={seccion.ruta}
-            className={`group rounded-xl border p-6 shadow-sm transition duration-200 ease-out hover:shadow-md motion-safe:hover:-translate-y-1 motion-reduce:transition-none ${
-              seccion.destacado
-                ? "border-blue-300 bg-blue-50/50 hover:border-blue-400"
-                : "border-slate-200 bg-white hover:border-slate-300"
-            }`}
-          >
-            {seccion.subtitulo && (
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600">
-                {seccion.subtitulo}
-              </span>
-            )}
-            <h2 className="mt-1 text-lg font-bold text-slate-900 group-hover:text-blue-700">
-              {seccion.titulo}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              {seccion.descripcion}
-            </p>
-          </Link>
-        ))}
-      </div>
+export default function HomePage() {
+  const navigate = useNavigate();
+  const [busqueda, setBusqueda] = useState("");
+  const [version, setVersion] = useState<TupaVersion | null>(null);
+  const [totalTramites, setTotalTramites] = useState<number | null>(null);
+  const [cargandoDatos, setCargandoDatos] = useState(true);
+
+  useEffect(() => {
+    let activo = true;
+    Promise.all([tupaApi.vigente(), tupaApi.listarVigente({ q: "", rubro: "", pagina: 1 })])
+      .then(([versionActual, respuesta]) => {
+        if (!activo) return;
+        setVersion(versionActual);
+        setTotalTramites(respuesta.total);
+      })
+      .catch(() => {
+        if (activo) {
+          setVersion(null);
+          setTotalTramites(null);
+        }
+      })
+      .finally(() => {
+        if (activo) setCargandoDatos(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  function buscar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const consulta = busqueda.trim();
+    if (!consulta) return;
+    navigate(`/tupa?q=${encodeURIComponent(consulta)}`);
+  }
+
+  return (
+    <main className="sigd-home">
+      <section className="sigd-home-hero">
+        <div className="sigd-home-hero-content">
+          <form className="sigd-home-search" onSubmit={buscar} role="search">
+            <h1>Bienvenido al SIGD</h1>
+            <p className="sigd-home-lead">Sistema Integral de Gestión Documentaria para consultar y realizar trámites institucionales.</p>
+            <label htmlFor="sigd-home-search-input">Busca un trámite del TUPA</label>
+            <div>
+              <input
+                id="sigd-home-search-input"
+                onChange={(evento) => setBusqueda(evento.target.value)}
+                placeholder="Ejemplo: certificado de estudios"
+                value={busqueda}
+              />
+              <button className="sigd-button sigd-button-primary" disabled={!busqueda.trim()} type="submit">Buscar</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      {cargandoDatos ? (
+        <div aria-label="Cargando datos del TUPA vigente" aria-busy="true" className="sigd-home-metrics-skeleton">
+          <Skeleton variant="line" className="h-10 w-full" />
+          <Skeleton variant="line" className="h-10 w-full" />
+        </div>
+      ) : version && totalTramites !== null ? (
+        <section aria-label="Datos del TUPA vigente" className="sigd-home-metrics">
+          <div><strong>{totalTramites}</strong><span>trámites en el TUPA vigente</span></div>
+          <div><strong>{version.codigo}</strong><span>{version.nombre}</span></div>
+        </section>
+      ) : null}
+
+      <section className="sigd-home-access">
+        <div className="sigd-home-section-heading">
+          <div><p>ACCESO DIRECTO</p><h2>¿Qué necesitas hacer?</h2></div>
+          <Link to="/tupa">Consultar todos los trámites</Link>
+        </div>
+        <div className="sigd-home-access-grid">
+          {accesos.map((acceso) => (
+            <Link className="sigd-home-card" key={acceso.ruta} to={acceso.ruta}>
+              <div className="sigd-home-card-head">
+                <AccesoIcono tipo={acceso.icono} />
+                {acceso.protegida ? <span className="sigd-home-card-badge">Requiere iniciar sesión</span> : null}
+              </div>
+              <h3>{acceso.titulo}</h3>
+              <p>{acceso.descripcion}</p>
+              <span className="sigd-home-card-arrow">Ir al servicio <span aria-hidden="true">→</span></span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="sigd-home-how">
+        <div className="sigd-home-section-heading">
+          <div><p>En pocos pasos</p><h2>Cómo funciona</h2></div>
+        </div>
+        <ol>
+          <li><span>1</span><div><h3>Regístrate</h3><p>Completa tu registro ciudadano para usar los servicios del sistema.</p><Link to="/registro">Ir a Registro</Link></div></li>
+          <li><span>2</span><div><h3>Presenta tu trámite</h3><p>Revisa los requisitos del TUPA y presenta la documentación por Mesa de Partes Virtual.</p><Link to="/tramite/mesa-partes-virtual">Ir a Mesa de Partes Virtual</Link></div></li>
+          <li><span>3</span><div><h3>Sigue tu expediente y recibe notificaciones en tu Casilla</h3><p>Consulta el estado de tu expediente y revisa las notificaciones en tu Casilla Electrónica.</p><div className="sigd-home-step-links"><Link to="/consulta">Consultar expediente</Link><Link to="/casilla">Abrir Casilla</Link></div></div></li>
+        </ol>
+      </section>
     </main>
   );
 }
