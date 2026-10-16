@@ -44,6 +44,13 @@ jobs:
       - name: Ejecutar pruebas unitarias
         run: npm exec -- vitest run --config vitest.unit.config.ts --configLoader bundle
 
+      - name: Pruebas E2E (Omitidas temporalmente)
+        run: echo "::warning title=E2E Pausadas::Las 10 suites E2E están omitidas hasta la integración del PR 167 (Autenticación) según coordinación."
+
+      - name: Validar y construir imágenes Docker de Producción
+        working-directory: .
+        run: docker compose -f docker-compose.prod.yml build
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
