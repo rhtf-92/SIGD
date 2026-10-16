@@ -78,7 +78,7 @@ export default function PersonaNaturalForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="space-y-6"
+      className="sigd-form space-y-6"
       noValidate
     >
       {/* Tipo de Documento y Número de Documento */}
