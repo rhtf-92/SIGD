@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
-import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
+import { LISTA_PROYECTOS_PRODUCTIVOS } from "../../data/datos_de_proyectos_productivos";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
@@ -43,15 +43,15 @@ export default function VentanillaPresencialPage() {
   const [cantidadFolios, setCantidadFolios] = useState(1);
   const [cargoGenerado, setCargoGenerado] = useState<CargoOficialTramite | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
-  const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_2026.find(
-    (procedimiento) => procedimiento.codigo === procedimientoTupa,
+  const categoriaSeleccionada = LISTA_PROYECTOS_PRODUCTIVOS.find(
+    (categoria) => categoria.rubro === procedimientoTupa,
   );
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
-    const asuntoFinal = procedimientoSeleccionado
-      ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
+    const asuntoFinal = categoriaSeleccionada
+      ? `${categoriaSeleccionada.rubro}${categoriaSeleccionada.subRubro ? ` - ${categoriaSeleccionada.subRubro}` : ''} - ${asunto}`
       : asunto;
 
     const dniValido = /^[0-9]{8}$/.test(numeroDoc) ? numeroDoc : "74561238";
@@ -315,9 +315,9 @@ export default function VentanillaPresencialPage() {
               >
                 <option value="">Seleccione un procedimiento o servicio</option>
                 <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
-                {PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => (
-                  <option key={procedimiento.codigo} value={procedimiento.codigo}>
-                    {procedimiento.codigo} - {procedimiento.nombre}
+                {LISTA_PROYECTOS_PRODUCTIVOS.map((categoria) => (
+                  <option key={categoria.rubro} value={categoria.rubro}>
+                    {categoria.rubro}{categoria.subRubro ? ` - ${categoria.subRubro}` : ''}
                   </option>
                 ))}
               </select>
@@ -355,90 +355,41 @@ export default function VentanillaPresencialPage() {
                 onChange={(e) => setCantidadFolios(Number(e.target.value))}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
               />
-            </div>
-          </div>
-
-          {procedimientoSeleccionado && (
+</div>
+           {categoriaSeleccionada && (
             <section
-              aria-labelledby="detalle-tupa-heading"
+              aria-labelledby="detalle-categoria-heading"
               className="rounded-lg border border-blue-200 bg-blue-50/60 p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-200 pb-3">
                 <div>
-                  <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
-                    TUPA {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
+                  <h3 id="detalle-categoria-heading" className="text-sm font-bold text-slate-900">
+                    {categoriaSeleccionada.rubro}{categoriaSeleccionada.subRubro ? ` - ${categoriaSeleccionada.subRubro}` : ''}
                   </h3>
-                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Pasco</p>
+                  <p className="mt-1 text-xs text-slate-600">Base legal: {categoriaSeleccionada.baseLegal}</p>
+                  {categoriaSeleccionada.cuentaBancaria && (
+                    <p className="mt-1 text-xs text-slate-600">Cuenta: {categoriaSeleccionada.cuentaBancaria}</p>
+                  )}
                 </div>
-                {procedimientoSeleccionado.derechoPago && (
-                  <p className="max-w-xl text-sm font-semibold text-slate-800">
-                    Derecho de pago: {procedimientoSeleccionado.derechoPago}
-                  </p>
-                )}
               </div>
 
-              {procedimientoSeleccionado.requisitos && (
-                <div className="mt-3">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold uppercase text-slate-700">Requisitos documentarios</h4>
-                    <span className="text-xs text-slate-600">
-                      {requisitosRecibidos.size} de {procedimientoSeleccionado.requisitos.length} verificados
-                    </span>
-                  </div>
-                  <ul className="grid gap-2 sm:grid-cols-2">
-                    {procedimientoSeleccionado.requisitos.map((requisito, index) => (
-                      <li key={`${procedimientoSeleccionado.codigo}-${index}`}>
-                        <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={requisitosRecibidos.has(index)}
-                            onChange={(event) => {
-                              setRequisitosRecibidos((actuales) => {
-                                const siguientes = new Set(actuales);
-                                if (event.target.checked) siguientes.add(index);
-                                else siguientes.delete(index);
-                                return siguientes;
-                              });
-                            }}
-                            className="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-                          />
-                          <span>{requisito}</span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {procedimientoSeleccionado.detalleTarifas && (
-                <div className="mt-3">
-                  <h4 className="mb-2 text-xs font-bold uppercase text-slate-700">Servicios y tarifas</h4>
-                  <ul className="grid gap-1 text-sm text-slate-700 sm:grid-cols-2">
-                    {procedimientoSeleccionado.detalleTarifas.map((tarifa) => (
-                      <li key={tarifa}>{tarifa}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {(procedimientoSeleccionado.dependencia || procedimientoSeleccionado.autoridad || procedimientoSeleccionado.tiempoMaximo) && (
-                <dl className="mt-3 grid gap-2 border-t border-blue-200 pt-3 text-xs sm:grid-cols-3">
-                  {procedimientoSeleccionado.dependencia && (
-                    <div><dt className="font-bold text-slate-700">Dependencia</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.dependencia}</dd></div>
-                  )}
-                  {procedimientoSeleccionado.autoridad && (
-                    <div><dt className="font-bold text-slate-700">Autoridad</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.autoridad}</dd></div>
-                  )}
-                  {procedimientoSeleccionado.tiempoMaximo && (
-                    <div><dt className="font-bold text-slate-700">Tiempo máximo</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.tiempoMaximo}</dd></div>
-                  )}
-                </dl>
-              )}
-              {procedimientoSeleccionado.nota && (
-                <p className="mt-3 text-xs text-slate-600">{procedimientoSeleccionado.nota}</p>
-              )}
+              <div className="mt-3">
+                <h4 className="mb-2 text-xs font-bold uppercase text-slate-700">Servicios</h4>
+                <ul className="grid gap-2">
+                  {categoriaSeleccionada.items.map((item, idx) => (
+                    <li key={`${categoriaSeleccionada.rubro}-${idx}`} className="border p-2 rounded">
+                      <p className="font-semibold">{item.concepto} - S/ {item.monto}</p>
+                      <ul className="list-disc list-inside text-sm text-slate-600">
+                        {item.descripcion.map((d, i) => (<li key={i}>{d}</li>))}
+                      </ul>
+                      {item.observacionPrecio && (<p className="text-xs text-slate-500 mt-1">{item.observacionPrecio}</p>)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </section>
           )}
+</div>
 
           <div>
             <label htmlFor="asunto-input" className="block text-xs font-semibold text-slate-700 mb-1">
