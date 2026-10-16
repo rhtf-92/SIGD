@@ -24,6 +24,10 @@ import type {
   ArchivoTramite,
   WizardAction,
 } from '../../../types/tramiteWizardState';
+import { PROCEDIMIENTOS_TUPA_2026 } from '../../../data/tupaPasco2026';
+import { SearchableSelect } from '../../common/SearchableSelect';
+import type { SelectOption } from '../../common/SearchableSelect';
+import { validatePdfMagicBytes } from '../../../utils/fileValidation';
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
@@ -175,6 +179,42 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [fileError, setFileError] = useState<string | null>(null);
 
+  const tupaOptions: SelectOption[] = useMemo(() => {
+    return CATALOGO_TUPA_INSTITUCIONAL.map((item) => ({
+      value: item.id,
+      label: `${item.id} — ${item.nombre}`,
+      description: item.unidad ? `Área: ${item.unidad}` : undefined,
+    }));
+  }, []);
+
+  const infoTupaSeleccionado = useMemo(() => {
+    if (!data.tipoTramiteId) return null;
+    if (data.tipoTramiteId === 'LIBRE-01') {
+      return {
+        esLibre: true,
+        nombre: 'Solicitud Formal General / Trámite Libre Institucional',
+        dependencia: 'Mesa de Partes General',
+        plazo: '30 días hábiles (TUO Ley N° 27444)',
+        costo: 'Gratuito',
+        requisitos: [
+          'FUT o solicitud formal firmada dirigida a la institución',
+          'Documentos sustentatorios que fundamenten el petitorio en formato PDF'
+        ]
+      };
+    }
+    const cod = data.tipoTramiteId.replace('TUPA-', '');
+    const proc = PROCEDIMIENTOS_TUPA_2026.find((p) => p.codigo === cod);
+    if (!proc) return null;
+    return {
+      esLibre: false,
+      nombre: proc.nombre,
+      dependencia: proc.dependencia || 'Secretaría Académica / Dirección',
+      plazo: proc.tiempoMaximo || '30 días hábiles',
+      costo: proc.derechoPago || 'Gratuito',
+      requisitos: proc.requisitos && proc.requisitos.length > 0 ? proc.requisitos : ['FUT debidamente llenado y firmado']
+    };
+  }, [data.tipoTramiteId]);
+
   // ===========================================================================
   // VALIDACIÓN REACTIVA EN TIEMPO REAL
   // ===========================================================================
@@ -244,6 +284,12 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
         ).toFixed(2)} MB).`
       );
       if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const esPdfReal = await validatePdfMagicBytes(file);
+    if (!esPdfReal) {
+      setFileError('El archivo no tiene una estructura binaria PDF válida (%PDF-). No se admiten archivos renombrados.');
       return;
     }
 
@@ -330,52 +376,59 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       </header>
 
       <div className="space-y-5">
-        {/* 1. Selección de Procedimiento TUPA */}
-        <div>
-          <label
-            htmlFor={`${formId}-tipoTramiteId`}
-            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
-          >
-            Procedimiento Institucional o Trámite TUPA <span className="text-red-600">*</span>
-          </label>
-          <select
+        {/* 1. Tipo de Procedimiento / Trámite TUPA */}
+        <div onBlur={() => markTouched('tipoTramiteId')}>
+          <SearchableSelect
             id={`${formId}-tipoTramiteId`}
-            name="tipoTramiteId"
-            required
-            aria-required="true"
-            aria-invalid={touched.tipoTramiteId && Boolean(errors.tipoTramiteId)}
-            aria-describedby={
-              touched.tipoTramiteId && errors.tipoTramiteId
-                ? `${formId}-tipoTramiteId-error`
-                : undefined
-            }
+            label="Tipo de Procedimiento / Trámite TUPA *"
+            placeholder="Buscar por código, trámite o área responsable..."
+            options={tupaOptions}
             value={data.tipoTramiteId}
-            onChange={(e) => handleFieldChange('tipoTramiteId', e.target.value)}
-            onBlur={() => markTouched('tipoTramiteId')}
+            onChange={(val) => {
+              handleFieldChange('tipoTramiteId', val);
+              markTouched('tipoTramiteId');
+            }}
+            error={touched.tipoTramiteId ? errors.tipoTramiteId : undefined}
+            helperText="Seleccione el trámite específico o elija Solicitud Formal General para trámites libres."
+            clearable={false}
             disabled={isSubmitting}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer ${
-              touched.tipoTramiteId && errors.tipoTramiteId
-                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
-            } disabled:bg-slate-100`}
-          >
-            <option value="">-- Seleccione un procedimiento oficial --</option>
-            {CATALOGO_TUPA_INSTITUCIONAL.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id} — {t.nombre} ({t.unidad})
-              </option>
-            ))}
-          </select>
-          {touched.tipoTramiteId && errors.tipoTramiteId && (
-            <p
-              id={`${formId}-tipoTramiteId-error`}
-              role="alert"
-              className="mt-1.5 text-xs text-red-600 font-medium"
-            >
-              {errors.tipoTramiteId}
-            </p>
-          )}
+          />
         </div>
+
+        {infoTupaSeleccionado && (
+          <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs transition-all animate-fadeIn">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 mb-2">
+              <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                📋 Ficha Oficial del Trámite ({data.tipoTramiteId})
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-100 text-blue-800">
+                {infoTupaSeleccionado.costo}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-slate-600 mb-2.5">
+              <div>
+                <span className="font-medium text-slate-700">Área Responsable: </span>
+                {infoTupaSeleccionado.dependencia}
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">Plazo Estimado: </span>
+                {infoTupaSeleccionado.plazo}
+              </div>
+            </div>
+
+            <div>
+              <span className="font-medium text-slate-700 block mb-1">
+                Requisitos documentarios obligatorios:
+              </span>
+              <ul className="list-disc list-inside space-y-0.5 text-slate-600 pl-1">
+                {infoTupaSeleccionado.requisitos.map((req, idx) => (
+                  <li key={idx}>{req}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         {/* 2. Asunto / Petitorio Sucinto */}
         <div>
@@ -566,12 +619,25 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                     </span>
                     <div className="truncate">
                       <p className="font-semibold text-slate-900 truncate">
-                        {archivo.nombre}
+                        {archivo.nombre}{' '}
+                        <span className="text-slate-400 font-normal">
+                          ({(archivo.peso / 1024).toFixed(1)} KB)
+                        </span>
                       </p>
-                      <p className="text-slate-400 font-mono text-[10px] truncate">
-                        SHA-256: {archivo.hashSha256.substring(0, 24)}... •{' '}
-                        {(archivo.peso / 1024).toFixed(1)} KB
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-700 border border-slate-200" title={archivo.hashSha256}>
+                          <span className="text-emerald-600 font-bold">🔒 SHA-256:</span>
+                          <span>{archivo.hashSha256.substring(0, 16)}...{archivo.hashSha256.substring(archivo.hashSha256.length - 8)}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(archivo.hashSha256)}
+                          className="text-[10px] text-[#006EC7] hover:text-[#005ba3] font-semibold underline cursor-pointer"
+                          title="Copiar hash SHA-256 completo de 64 caracteres"
+                        >
+                          Copiar hash
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <button

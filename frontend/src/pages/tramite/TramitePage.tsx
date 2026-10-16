@@ -19,9 +19,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import TramiteWizard from "../../components/tramite/TramiteWizard";
+import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 
 export default function TramitePage() {
   const [ultimoCut, setUltimoCut] = useState<string | null>(null);
+  const horario = useHorarioCorte();
+  const fechaLegalFormateada = new Date(horario.legalTimestamp).toLocaleDateString("es-PE");
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -53,10 +56,34 @@ export default function TramitePage() {
               >
                 ← Volver al inicio
               </Link>
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-xs">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Ventanilla Virtual Abierta
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-xs transition-colors ${
+                    horario.isHorarioHabil
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                      : 'border-amber-200 bg-amber-50 text-amber-800'
+                  }`}
+                  title={
+                    horario.isHorarioHabil
+                      ? 'Ventanilla dentro de horario de atención oficial (08:00 - 16:30 hrs)'
+                      : `Recepción extemporánea. Su registro formal se computará el ${fechaLegalFormateada} a las 08:00 hrs (Art. 138 Ley N° 27444)`
+                  }
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      horario.isHorarioHabil ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                    }`}
+                  />
+                  {horario.isHorarioHabil
+                    ? 'Ventanilla Abierta · Recepción Hoy'
+                    : 'Ventanilla 24/7 · Cómputo diferido'}
+                </span>
+                {!horario.isHorarioHabil && (
+                  <span className="text-[10px] text-amber-700 font-medium">
+                    Ingreso formal: {fechaLegalFormateada} (08:00 hrs)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </header>
