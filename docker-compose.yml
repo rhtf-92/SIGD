@@ -32,7 +32,8 @@ services:
     volumes:
       - s3data:/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8888/ || exit 1"]
+      test:
+        ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8888/ || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -66,7 +67,7 @@ services:
     environment:
       PORT: 3000
       NODE_ENV: development
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER es obligatorio}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB es obligatorio}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET es obligatorio}
       CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
       S3_ENDPOINT: http://s3:8333
@@ -90,7 +91,8 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/ready"]
+      test:
+        ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/ready"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -110,14 +112,26 @@ services:
     environment:
       VITE_API_BASE_URL: http://localhost:3000/api/v1
       VITE_ENABLE_MOCKS: "false"
-    command: ["npm", "exec", "--", "vite", "--host", "0.0.0.0", "--port", "5173", "--strictPort"]
+    command:
+      [
+        "npm",
+        "exec",
+        "--",
+        "vite",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "5173",
+        "--strictPort",
+      ]
     ports:
       - "5173:5173"
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/login"]
+      test:
+        ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/login"]
       interval: 10s
       timeout: 5s
       retries: 10
