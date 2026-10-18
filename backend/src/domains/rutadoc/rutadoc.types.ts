@@ -47,7 +47,7 @@ export interface UltimoMovimiento {
 }
 
 export interface ExpedienteDetalle extends ExpedienteResumen {
-  /** TramiCore sólo publica fk_remitente; el nombre requiere IdentiCore. */
+  /** UUID de sigd_tra.expediente.solicitante_id; el nombre requiere IdentiCore. */
   solicitanteId: string | null;
   resumenDocumentos: { cantidadDocumentos: number; totalFolios: number } | null;
   ultimoMovimiento: UltimoMovimiento | null;
