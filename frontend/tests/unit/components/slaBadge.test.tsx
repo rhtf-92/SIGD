@@ -5,6 +5,13 @@ import SlaBadge from "../../../src/components/expedientes/SlaBadge";
 import { addBusinessDays } from "../../../src/utils/slaCalculator";
 
 describe("Suite de Pruebas de Componente SlaBadge (ENT-M03-02)", () => {
+  it("identifica el plazo por defecto como referencia técnica sin atribuirle carácter legal", () => {
+    render(<SlaBadge fechaIngreso={new Date(2026, 5, 1)} fechaReferencia={new Date(2026, 5, 2)} />);
+    expect(screen.getByLabelText(/Referencia:.*plazo administrativo no verificado/i)).toBeInTheDocument();
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Fecha calculada (referencial):");
+    expect(screen.getByRole("tooltip")).not.toHaveTextContent("Vencimiento legal:");
+  });
+
   it("renderiza correctamente el estado NORMAL (Verde / Al día)", () => {
     const inicio = new Date(2026, 5, 1);
     const hoy = addBusinessDays(inicio, 5); // 25 días restantes

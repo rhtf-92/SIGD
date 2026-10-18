@@ -11,16 +11,28 @@
 
 import crypto from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
+import { z } from 'zod';
 import { TicketTermicoUtil } from './ticketTermico.util.js';
 import { AppError, ValidationError } from '../../shared/domain/errors/index.js';
+import { validarDni } from '../identicore/modulo11.validator.js';
 
-export interface DatosRecepcionFisica {
-  dniSolicitante: string;
-  datosRemitente: string;
+export const identidadNaturalVentanillaSchema = z.object({
+  tipoPersona: z.literal('NATURAL'),
+  tipoDocumento: z.literal('DNI'),
+  dniSolicitante: z.string().refine((dni) => validarDni(dni).valido, 'El DNI debe contener exactamente 8 dígitos.'),
+  nombres: z.string({ required_error: 'Indique los nombres.' }).trim().min(1, 'Indique los nombres.').max(120),
+  apellidos: z.string({ required_error: 'Indique los apellidos.' }).trim().min(1, 'Indique los apellidos.').max(120),
+  correo: z.string().trim().email().max(160).optional(),
+  telefono: z.string().trim().min(1).max(20).optional(),
+});
+
+export interface DatosRecepcionFisica extends z.infer<typeof identidadNaturalVentanillaSchema> {
   asunto: string;
   foliosTotales: number;
   idOperadorVentanilla?: string;
   areaDestinoId?: string;
+  // El transporte aún lo declara opcional; el registro exige un UUID vigente
+  // de sigd_doc.tipo_documento. No se deduce del DNI ni de un código de React.
   tipoDocumentalId?: string;
 }
 
@@ -49,11 +61,15 @@ export class VentanillaPresencialService {
     datos: DatosRecepcionFisica,
     clienteTransaccional?: PoolClient,
   ): Promise<ResultadoVentanilla> {
-    if (!/^[0-9]{8}$/.test(datos.dniSolicitante)) {
+    const validacionIdentidad = identidadNaturalVentanillaSchema.safeParse(datos);
+    if (!validacionIdentidad.success) {
       throw new ValidationError({
-        invalidParams: [{ name: 'dniSolicitante', reason: 'El DNI debe contener exactamente 8 dígitos.' }],
+        invalidParams: validacionIdentidad.error.issues.map((issue) => ({ name: issue.path.join('.'), reason: issue.message })),
       });
     }
+    const solicitante = validacionIdentidad.data;
+    // Orden existente en IdentiCore: nombres seguidos de los apellidos explícitos.
+    const nombreCompleto = [solicitante.nombres, solicitante.apellidos].join(' ');
 
     if (!datos.asunto || datos.asunto.trim().length < 5) {
       throw new ValidationError({
@@ -67,11 +83,41 @@ export class VentanillaPresencialService {
       });
     }
 
+    const validacionTipoDocumental = z.string().uuid().safeParse(datos.tipoDocumentalId);
+    if (!validacionTipoDocumental.success) {
+      throw new ValidationError({
+        invalidParams: [{
+          name: 'tipoDocumentalId',
+          reason: 'Indique el UUID de un tipo documental vigente del catálogo sigd_doc.tipo_documento.',
+        }],
+      });
+    }
+    const tipoDocumentalId = validacionTipoDocumental.data;
+
     const cliente = clienteTransaccional ?? (await this.pool.connect());
     const debeManejarTx = !clienteTransaccional;
 
     try {
       if (debeManejarTx) await cliente.query('BEGIN');
+
+      // Validar antes de generar el CUT (su función escribe en la secuencia)
+      // o registrar identidades. El bloqueo conserva la vigencia hasta el cierre
+      // de la transacción; no reemplaza la FK que debe garantizar PostgreSQL.
+      const tipoDocumental = await cliente.query<{ tipo_documental_id: string }>(
+        `SELECT tipo_documental_id
+           FROM sigd_doc.tipo_documento
+          WHERE tipo_documental_id = $1::uuid AND vigente = TRUE
+          FOR SHARE;`,
+        [tipoDocumentalId],
+      );
+      if (!tipoDocumental.rows[0]) {
+        throw new ValidationError({
+          invalidParams: [{
+            name: 'tipoDocumentalId',
+            reason: 'El tipo documental no existe o no está vigente en sigd_doc.tipo_documento. Seleccione un tipo válido del catálogo institucional.',
+          }],
+        });
+      }
 
       const anioActual = new Date().getFullYear();
 
@@ -90,30 +136,60 @@ export class VentanillaPresencialService {
         });
       }
 
-      // 2. Resolver o registrar persona solicitante
-      let solicitanteId: string;
-      const personaExistente = await cliente.query<{ id_persona: string }>(
-        'SELECT id_persona FROM sigd_auth.persona_natural WHERE dni = $1 LIMIT 1',
-        [datos.dniSolicitante],
+      // 2. Resolver la identidad V2. El contrato actual admite solo DNI.
+      const buscarPersona = () => cliente.query<{
+        id_persona: string;
+        id_persona_natural: string | null;
+        nombre_completo: string | null;
+      }>(
+        `SELECT p.id_persona, pn.id_persona AS id_persona_natural, pn.nombre_completo
+           FROM sigd_auth.persona p
+           LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+          WHERE p.tipo = $1 AND p.id_documento = $2`,
+        [solicitante.tipoPersona, solicitante.dniSolicitante],
       );
 
-      if (personaExistente.rows[0]) {
-        solicitanteId = personaExistente.rows[0].id_persona;
-      } else {
-        const nuevaPersona = await cliente.query<{ id_persona: string }>(
-          `INSERT INTO sigd_auth.persona (tipo_persona, estado)
-           VALUES ('NATURAL', TRUE)
+      let persona = (await buscarPersona()).rows[0];
+      if (!persona) {
+        const base = await cliente.query<{ id_persona: string }>(
+          `INSERT INTO sigd_auth.persona (tipo, id_documento)
+           VALUES ($1, $2)
+           ON CONFLICT (tipo, id_documento) DO NOTHING
            RETURNING id_persona;`,
+          [solicitante.tipoPersona, solicitante.dniSolicitante],
         );
-        solicitanteId = nuevaPersona.rows[0].id_persona;
-
-        await cliente.query(
-          `INSERT INTO sigd_auth.persona_natural (id_persona, dni, nombres, apellido_paterno, ubigeo_distrito)
-           VALUES ($1, $2, $3, 'REGISTRADO', '250101')
-           ON CONFLICT DO NOTHING;`,
-          [solicitanteId, datos.dniSolicitante, datos.datosRemitente],
-        );
+        if (base.rowCount === 0) {
+          // Otra transacción pudo registrar el mismo documento: releer, sin actualizarlo.
+          persona = (await buscarPersona()).rows[0];
+        } else {
+          const idPersona = base.rows[0]?.id_persona;
+          if (base.rowCount !== 1 || !idPersona) {
+            throw new AppError({ status: 500, code: 'IDENTITY_CREATION_FAILED', message: 'No se pudo registrar la identidad del solicitante.' });
+          }
+          const extension = await cliente.query<{ id_persona: string }>(
+            `INSERT INTO sigd_auth.persona_natural
+               (id_persona, nombres, apellidos, nombre_completo, correo, telefono)
+             VALUES ($1::uuid, $2, $3, $4, $5, $6)
+             RETURNING id_persona;`,
+            [idPersona, solicitante.nombres, solicitante.apellidos, nombreCompleto, solicitante.correo ?? null, solicitante.telefono ?? null],
+          );
+          if (extension.rowCount !== 1 || extension.rows[0]?.id_persona !== idPersona) {
+            throw new AppError({ status: 500, code: 'IDENTITY_CREATION_FAILED', message: 'No se pudo completar la identidad del solicitante.' });
+          }
+          persona = { id_persona: idPersona, id_persona_natural: extension.rows[0].id_persona, nombre_completo: nombreCompleto };
+        }
       }
+      if (!persona?.id_persona_natural || !persona.nombre_completo?.trim()) {
+        throw new ValidationError({
+          message: 'La identidad del solicitante está incompleta.',
+          invalidParams: [{
+            name: 'dniSolicitante',
+            reason: 'La persona existe, pero no tiene una extensión persona_natural registrada. IdentiCore debe completarla con datos legítimos antes de continuar.',
+          }],
+        });
+      }
+      const solicitanteId = persona.id_persona;
+      const nombreRemitente = persona.nombre_completo;
 
       // 3. Insertar expediente formal en sigd_tra.expediente
       const ahora = new Date();
@@ -131,7 +207,7 @@ export class VentanillaPresencialService {
            $1,
            $1,
            $2,
-           COALESCE($3::uuid, '00000000-0000-0000-0000-000000000001'::uuid),
+           $3::uuid,
            $4,
            $5::uuid,
            'RECEPCIONADO',
@@ -140,7 +216,7 @@ export class VentanillaPresencialService {
         [
           cut,
           datos.dniSolicitante,
-          datos.tipoDocumentalId ?? null,
+          tipoDocumentalId,
           solicitanteId,
           datos.areaDestinoId ?? null,
           ahora,
@@ -151,29 +227,19 @@ export class VentanillaPresencialService {
       // 4. Asentar en libro de registro institucional inmutable
       await cliente.query(
         `INSERT INTO sigd_tra.asiento_registro (
-           numero_asiento,
-           tipo_libro,
-           anio_fiscal,
-           cut,
-           remitente,
-           remitente_documento,
+           expediente_id,
+           fecha_ingreso,
+           canal_ingreso,
            asunto,
-           folios,
-           canal_recepcion,
-           fecha_asiento
+           remitente_id
          ) VALUES (
-           $1,
-           'ENTRADA',
+           $1::uuid,
            $2,
-           $1,
+           'MESA_PRESENCIAL',
            $3,
-           $4,
-           $5,
-           $6,
-           'VENTANILLA_PRESENCIAL',
-           $7
-         ) ON CONFLICT (numero_asiento, anio_fiscal) DO NOTHING;`,
-        [cut, anioActual, datos.datosRemitente, datos.dniSolicitante, datos.asunto, datos.foliosTotales, ahora],
+           $4::uuid
+         );`,
+        [expedienteId, ahora, datos.asunto, solicitanteId],
       );
 
       if (debeManejarTx) await cliente.query('COMMIT');
@@ -202,7 +268,7 @@ export class VentanillaPresencialService {
         ticketImpresion,
         cargo: {
           cut,
-          remitente: datos.datosRemitente,
+          remitente: nombreRemitente,
           dni: datos.dniSolicitante,
           asunto: datos.asunto,
           folios: datos.foliosTotales,

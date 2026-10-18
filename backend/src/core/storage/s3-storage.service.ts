@@ -66,11 +66,10 @@ export function generarUrlPresigned(
   const ruta = `/${codificarSegmentoRuta(config.bucket)}/${codificarSegmentoRuta(clave)}`;
   const uri = config.forcePathStyle ? ruta : `/${codificarSegmentoRuta(clave)}`;
 
-  const cabecerasFirmadas: Record<string, string> = {
-    host,
-    'x-amz-content-sha256': PAYLOAD_SIN_FIRMA,
-    'x-amz-date': amzFecha,
-  };
+  const cabecerasFirmadas: Record<string, string> = { host };
+  // En una URL prefirmada, la fecha viaja en la query y UNSIGNED-PAYLOAD
+  // ocupa el campo del payload canónico. Una descarga del navegador no
+  // incorpora cabeceras x-amz adicionales.
   if (opciones.contentType) {
     cabecerasFirmadas['content-type'] = opciones.contentType;
   }

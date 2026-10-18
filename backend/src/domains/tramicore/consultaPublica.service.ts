@@ -81,12 +81,6 @@ interface FilaDocumento {
   hash_sha256: string;
 }
 
-interface FilaProveido {
-  numero: string;
-  fecha_emision: Date;
-  resumen: string;
-}
-
 /** Ancho de la ventana visible al_redondear. */
 const VENTANA_ENMASCARADO = 2;
 
@@ -145,30 +139,56 @@ export class ConsultaPublicaService {
 
   private async leerExpediente(cliente: PoolClient, cut: string): Promise<FilaConsulta | undefined> {
     const resultado = await cliente.query<FilaConsulta>(
-      `SELECT e.cut,
-              e.anio_fiscal,
-              e.estado_tramite,
+      `SELECT e.codigo_expediente AS cut,
+              EXTRACT(YEAR FROM e.fecha_registro)::integer AS anio_fiscal,
+              te.estado AS estado_tramite,
               tt.denominacion   AS tipo_tramite,
               e.asunto,
-              e.fecha_envio_real,
-              e.fecha_radicacion_legal,
-              e.fuera_de_horario,
-              e.canal_recepcion,
-              e.total_folios,
+              e.fecha_registro AS fecha_envio_real,
+              te.fecha_radicacion AS fecha_radicacion_legal,
+              (te.fecha_radicacion::date > e.fecha_registro::date) AS fuera_de_horario,
+              COALESCE(a.canal_ingreso, 'MESA_VIRTUAL') AS canal_recepcion,
+              COALESCE(f.total_folios, 0)::integer AS total_folios,
               td.nombre         AS tipo_documento,
-              p.numero_documento,
-              p.nombres,
-              p.apellido_paterno,
-              p.apellido_materno
-         FROM sigd_tra.expediente e
+              p.id_documento AS numero_documento,
+              COALESCE(pn.nombres, pj.razon_social) AS nombres,
+              pn.apellidos AS apellido_paterno,
+              NULL::text AS apellido_materno
+         FROM sigd_doc.expediente e
+         JOIN sigd_tra.expediente te
+           ON te.expediente_id = e.expediente_id
          LEFT JOIN sigd_doc.tipo_tramite_tupa tt
-                ON tt.id_tipo_tramite_tupa = e.id_tipo_tramite_tupa
+                ON tt.tipo_tramite_id = e.tipo_tramite_id
          LEFT JOIN sigd_auth.persona p
-                ON p.id = e.id_persona
-         LEFT JOIN sigd_auth.tipos_documento td
-                ON td.id = p.tipo_documento_id
-        WHERE e.cut = $1
-          AND e.estado_tramite <> 'ANULADO'`,
+                ON p.id_persona = e.solicitante_id
+         LEFT JOIN sigd_auth.persona_natural pn
+                ON pn.id_persona = p.id_persona
+         LEFT JOIN sigd_auth.persona_juridica pj
+                ON pj.id_persona = p.id_persona
+         LEFT JOIN LATERAL (
+              SELECT da.tipo_documental_id
+                FROM sigd_doc.documento_adjunto da
+               WHERE da.expediente_id = e.expediente_id
+               ORDER BY da.creado_en, da.documento_adjunto_id
+               LIMIT 1
+         ) primer_documento ON TRUE
+         LEFT JOIN sigd_doc.tipo_documento td
+                ON td.tipo_documental_id = primer_documento.tipo_documental_id
+         LEFT JOIN LATERAL (
+              SELECT MAX(df.folio_fin) AS total_folios
+                FROM sigd_tra.expediente_documento_folio df
+               WHERE df.expediente_id = te.expediente_id
+         ) f ON TRUE
+         LEFT JOIN LATERAL (
+              SELECT ar.canal_ingreso
+                FROM sigd_tra.asiento_registro ar
+               WHERE ar.expediente_id = te.expediente_id
+                 AND ar.anulado = FALSE
+               ORDER BY ar.fecha_ingreso DESC, ar.numero_registro DESC
+               LIMIT 1
+         ) a ON TRUE
+        WHERE e.codigo_expediente = $1
+          AND te.estado <> 'ANULADO'`,
       [cut],
     );
     return resultado.rows[0];
@@ -176,11 +196,13 @@ export class ConsultaPublicaService {
 
   private async leerDocumentos(cliente: PoolClient, cut: string): Promise<DtoDocumentoPublico[]> {
     const resultado = await cliente.query<FilaDocumento>(
-      `SELECT da.nombre_archivo, da.content_type, da.hash_sha256
-         FROM sigd_tra.documento_adjunto da
-         JOIN sigd_tra.expediente e ON e.expediente_id = da.expediente_id
-        WHERE e.cut = $1
-        ORDER BY da.nombre_archivo`,
+      `SELECT da.nombre_archivo,
+              da.mime_type AS content_type,
+              da.sha256 AS hash_sha256
+         FROM sigd_doc.documento_adjunto da
+         JOIN sigd_doc.expediente e ON e.expediente_id = da.expediente_id
+        WHERE e.codigo_expediente = $1
+        ORDER BY da.nombre_archivo, da.documento_adjunto_id`,
       [cut],
     );
     return resultado.rows.map((fila) => ({
@@ -191,20 +213,11 @@ export class ConsultaPublicaService {
   }
 
   private async leerProveidosPublicos(cliente: PoolClient, cut: string): Promise<DtoProveidoPublico[]> {
-    const resultado = await cliente.query<FilaProveido>(
-      `SELECT pv.numero, pv.fecha_emision, pv.resumen
-         FROM sigd_tra.proveido pv
-         JOIN sigd_tra.expediente e ON e.expediente_id = pv.expediente_id
-        WHERE e.cut = $1
-          AND pv.es_publico = TRUE
-        ORDER BY pv.fecha_emision DESC, pv.numero DESC`,
-      [cut],
-    );
-    return resultado.rows.map((fila) => ({
-      numero: fila.numero,
-      fechaEmision: aIsoFecha(fila.fecha_emision),
-      resumen: fila.resumen,
-    }));
+    // El esquema vigente no define una tabla de proveídos ni un indicador de
+    // publicación. No se infieren proveídos públicos desde movimientos internos.
+    void cliente;
+    void cut;
+    return [];
   }
 }
 
@@ -252,9 +265,4 @@ export function enmascararNombre(
       return `${inicial}${ocultos}`;
     })
     .join(' ');
-}
-
-function aIsoFecha(fecha: Date | string): string {
-  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
-  return String(fecha).slice(0, 10);
 }

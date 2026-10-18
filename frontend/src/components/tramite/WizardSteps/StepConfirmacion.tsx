@@ -18,7 +18,7 @@
  * ==============================================================================
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type {
   TramiteWizardState,
   WizardAction,
@@ -27,6 +27,9 @@ import type {
 } from '../../../types/tramiteWizardState';
 import QrCodeView from '../../common/QrCodeView';
 import { apiClient } from '../../../api/client';
+import { useAuthStore } from '../../../stores/authStore';
+import { ApiHttpError } from '../../../types/api';
+import { Link, useLocation } from 'react-router-dom';
 
 interface RadicacionVirtualResponse {
   expedienteId: string;
@@ -45,6 +48,40 @@ interface RadicacionVirtualResponse {
   mensajeLegal: string;
 }
 
+interface TipoTramiteFormal {
+  id: string;
+  codigo: string;
+  denominacion: string;
+  descripcion?: string | null;
+  vigente: true;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function validarCatalogoFormal(data: unknown): TipoTramiteFormal[] | null {
+  if (!Array.isArray(data)) return null;
+  const resultado: TipoTramiteFormal[] = [];
+  const ids = new Set<string>();
+  const codigos = new Set<string>();
+  for (const item of data) {
+    if (
+      typeof item !== 'object' || item === null ||
+      !('id' in item) || typeof item.id !== 'string' || !UUID_RE.test(item.id) ||
+      !('codigo' in item) || typeof item.codigo !== 'string' || !item.codigo.trim() ||
+      !('denominacion' in item) || typeof item.denominacion !== 'string' || !item.denominacion.trim() ||
+      !('vigente' in item) || item.vigente !== true ||
+      ('descripcion' in item && item.descripcion !== null && typeof item.descripcion !== 'string')
+    ) return null;
+    const id = item.id.toLowerCase();
+    const codigo = item.codigo.trim();
+    if (ids.has(id) || codigos.has(codigo)) return null;
+    ids.add(id);
+    codigos.add(codigo);
+    resultado.push({ id: item.id, codigo, denominacion: item.denominacion, descripcion: 'descripcion' in item ? item.descripcion as string | null : undefined, vigente: true });
+  }
+  return resultado;
+}
+
 
 export interface StepConfirmacionProps {
   /** Estado global canónico del asistente */
@@ -59,6 +96,19 @@ export interface StepConfirmacionProps {
   onSuccess?: (cargo: CargoDigitalResponse, cutGenerado: string) => void;
 }
 
+function EnlaceInicioSesionParaRetomar(): React.ReactElement {
+  const location = useLocation();
+  return (
+    <Link
+      to="/login"
+      state={{ from: { pathname: location.pathname, search: location.search, hash: location.hash } }}
+      className="font-bold underline"
+    >
+      Iniciar sesion y volver a la solicitud
+    </Link>
+  );
+}
+
 export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   state,
   dispatch,
@@ -67,6 +117,9 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   onSuccess,
 }) => {
   const [copiado, setCopiado] = useState(false);
+  const [tiposFormales, setTiposFormales] = useState<TipoTramiteFormal[]>([]);
+  const [estadoCatalogo, setEstadoCatalogo] = useState<'cargando' | 'disponible' | 'error'>('cargando');
+  const [intentoCatalogo, setIntentoCatalogo] = useState(0);
   const {
     identificacion,
     documentos,
@@ -75,6 +128,32 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
     isSubmitting,
     error,
   } = state;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setEstadoCatalogo('cargando');
+    apiClient.get<unknown>('/api/v1/tramites/tipos', { signal: controller.signal })
+      .then((respuesta) => {
+        if (controller.signal.aborted) return;
+        const tipos = validarCatalogoFormal(respuesta.data);
+        if (!tipos) {
+          setTiposFormales([]);
+          setEstadoCatalogo('error');
+          return;
+        }
+        setTiposFormales(tipos);
+        setEstadoCatalogo('disponible');
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setTiposFormales([]);
+          setEstadoCatalogo('error');
+        }
+      });
+    return () => controller.abort();
+  }, [intentoCatalogo]);
+
+  const tipoSeleccionado = tiposFormales.find((tipo) => tipo.id === documentos.tipoTramiteId);
 
   const navigateToStep = useCallback(
     (step: WizardStep) => {
@@ -105,90 +184,71 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
   const handleRadicar = async () => {
     if (isSubmitting) return;
+    if (!useAuthStore.getState().accessToken) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: 'Inicie sesion con una cuenta vinculada a una persona para radicar la solicitud.',
+      });
+      return;
+    }
 
+    if (estadoCatalogo !== 'disponible') {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: 'No se pudo verificar el catálogo formal vigente. No se envió la radicación; vuelva al paso anterior e inténtelo nuevamente.',
+      });
+      return;
+    }
+
+    if (!UUID_RE.test(documentos.tipoTramiteId) || !tipoSeleccionado) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: 'La selección guardada no tiene un vínculo UUID único con un tipo formal vigente. Vuelva al paso 2 y seleccione nuevamente; no se resolvieron códigos antiguos por semejanza.',
+      });
+      return;
+    }
+
+    if (documentos.archivos.length === 0 || documentos.archivos.some((a) =>
+      !a.storageUrl || !/^expedientes\/\d{4}\/[0-9a-f-]+\.pdf$/i.test(a.storageUrl) ||
+      !/^[0-9a-f]{64}$/i.test(a.hashSha256) || !Number.isInteger(a.peso) || a.peso <= 0
+    )) {
+      dispatch({ type: 'SET_ERROR', payload: 'Debe volver al paso 2 y subir los documentos al almacenamiento institucional antes de radicar.' });
+      return;
+    }
+    const nombreCompleto =
+        identificacion.tipoDocumento === 'RUC'
+          ? identificacion.nombres.trim()
+          : `${identificacion.nombres} ${identificacion.apellidos}`.trim();
+    const asuntoFinal = documentos.asunto.trim();
+    const correo = identificacion.correo.trim().toLowerCase();
+    if (asuntoFinal.length < 10 || asuntoFinal.length > 500 || nombreCompleto.length < 2 || nombreCompleto.length > 120
+        || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo) || correo.length > 150
+        || !identificacion.numeroDocumento.trim() || identificacion.numeroDocumento.length > 20
+        || !Number.isInteger(documentos.numeroFolios) || documentos.numeroFolios < 1 || documentos.numeroFolios > 5000) {
+      dispatch({ type: 'SET_ERROR', payload: 'Revise la identificación, el correo, el asunto y los folios en los pasos anteriores. No se sustituirán datos faltantes para enviar la solicitud.' });
+      return;
+    }
     dispatch({ type: 'SET_SUBMITTING', payload: true });
     try {
-      const nombreCompleto =
-        identificacion.tipoDocumento === 'RUC'
-          ? identificacion.nombres
-          : `${identificacion.nombres} ${identificacion.apellidos}`.trim();
 
-      const asuntoFinal =
-        documentos.asunto.trim().length >= 10
-          ? documentos.asunto.trim()
-          : `${documentos.asunto.trim()} - Solicitud de Trámite Institucional`;
+      const idTipoTramite = tipoSeleccionado.id;
 
-      let idTipoTramite = documentos.tipoTramiteId;
-      if (
-        !idTipoTramite ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite) ||
-        idTipoTramite === '00000000-0000-0000-0000-000000000001'
-      ) {
-        try {
-          const respTipos = await apiClient.get<Array<{ id: string; codigo?: string; id_tipo_tramite?: string }>>(
-            '/api/v1/tramites/tipos',
-          );
-          if (Array.isArray(respTipos?.data) && respTipos.data.length > 0) {
-            const encontrado = respTipos.data.find(
-              (t) => t.codigo === documentos.tipoTramiteId || t.id === documentos.tipoTramiteId,
-            );
-            const resId = (encontrado ? (encontrado.id || encontrado.id_tipo_tramite) : (respTipos.data[0].id || respTipos.data[0].id_tipo_tramite));
-            if (resId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resId)) {
-              idTipoTramite = resId;
-            }
-          }
-        } catch {
-          // Fallback defensivo si el endpoint no está disponible en entorno aislado
-        }
-      }
-      if (!idTipoTramite || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite)) {
-        idTipoTramite = '00000000-0000-0000-0000-000000000001';
-      }
-
-      let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
-      try {
-        if (identificacion.numeroDocumento) {
-          const respPersona = await apiClient.get<{ persona?: { id: number | string } }>(
-            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(identificacion.numeroDocumento)}`
-          );
-          if (respPersona?.data?.persona?.id) {
-            idPersonaNum = Number(respPersona.data.persona.id);
-          }
-        }
-      } catch {
-        // Fallback defensivo
-      }
-
-      const archivosPayload =
-        documentos.archivos.length > 0
-          ? documentos.archivos.map((a) => ({
+      const archivosPayload = documentos.archivos.map((a) => ({
               nombreArchivo: a.nombre,
               contentType: 'application/pdf',
-              tamanoBytes: Number(a.peso) || 1024,
-              hashSha256:
-                a.hashSha256 && /^[0-9a-f]{64}$/i.test(a.hashSha256)
-                  ? a.hashSha256.toLowerCase()
-                  : 'a'.repeat(64),
-            }))
-          : [
-              {
-                nombreArchivo: 'documento_principal.pdf',
-                contentType: 'application/pdf',
-                tamanoBytes: 2048,
-                hashSha256: 'a'.repeat(64),
-              },
-            ];
+              tamanoBytes: a.peso,
+              hashSha256: a.hashSha256.toLowerCase(),
+              storagePath: a.storageUrl,
+            }));
 
       const payload = {
         asunto: asuntoFinal,
         idTipoTramiteTupa: idTipoTramite,
-        idPersona: idPersonaNum,
-        nombreSolicitante:
-          nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
-        correo:
-          identificacion.correo.trim().toLowerCase() ||
-          'contacto@iestpsuiza.edu.pe',
-        totalFolios: Number(documentos.numeroFolios) || 1,
+        tipoDocumento: identificacion.tipoDocumento,
+        numeroDocumento: identificacion.numeroDocumento,
+        nombreSolicitante: nombreCompleto,
+        correo,
+        totalFolios: documentos.numeroFolios,
         documentos: archivosPayload,
       };
 
@@ -198,14 +258,16 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       );
 
       const serverData = res.data;
+      if (typeof serverData.cargoDigital?.hashSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(serverData.cargoDigital.hashSha256)) {
+        throw new Error('La respuesta no contiene la huella del cargo digital.');
+      }
       const cargoEmitido: CargoDigitalResponse = {
         cut: serverData.cut,
         fechaRadicacion: serverData.fechaRadicacionLegal,
         fechaRecepcionOficial: serverData.fechaEnvioReal,
         asunto: documentos.asunto,
         remitente: nombreCompleto,
-        hashTransaccion:
-          serverData.cargoDigital?.hashSha256 || 'a'.repeat(64),
+        hashTransaccion: serverData.cargoDigital.hashSha256,
         qrValidationUrl: serverData.qrSeguimientoUrl,
       };
 
@@ -216,10 +278,18 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       }
     } catch (err: unknown) {
       console.error('[StepConfirmacion] Error en la radicación formal:', err);
+      const status = err instanceof ApiHttpError
+        ? err.status
+        : (err as { status?: number; response?: { status?: number } })?.status ??
+          (err as { response?: { status?: number } })?.response?.status;
       dispatch({
         type: 'SET_ERROR',
         payload:
-          'No se pudo radicar formalmente el expediente en la sede digital. Verifique su conexión y requisitos.',
+          status === 401
+            ? 'Inicie sesion con una cuenta vinculada a una persona para radicar la solicitud.'
+            : status === 403
+              ? 'La cuenta no esta habilitada para radicar o los datos declarados no coinciden con su identidad.'
+              : 'No se pudo radicar formalmente el expediente en la sede digital. Verifique su conexión y requisitos.',
       });
     }
   };
@@ -368,7 +438,12 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           aria-live="polite"
           className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-800 flex items-center justify-between"
         >
-          <span>⚠️ {error}</span>
+          <span className="space-y-2">
+            <span className="block">⚠️ {error}</span>
+            {error.toLocaleLowerCase('es-PE').includes('inicie sesion') && (
+              <span className="block"><EnlaceInicioSesionParaRetomar /></span>
+            )}
+          </span>
         </div>
       )}
 
@@ -426,8 +501,21 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
             </button>
           </div>
           <p className="text-sm font-bold text-slate-900">
-            {documentos.tipoTramiteId || 'Procedimiento General Institucional'}
+            {tipoSeleccionado
+              ? `${tipoSeleccionado.codigo} — ${tipoSeleccionado.denominacion}`
+              : 'Selección formal pendiente de revalidación'}
           </p>
+          {estadoCatalogo === 'cargando' && <p role="status" className="text-xs text-slate-500">Verificando el catálogo formal vigente…</p>}
+          {estadoCatalogo === 'disponible' && tipoSeleccionado && <p role="status" className="text-xs text-slate-500">El tipo coincide con un UUID marcado vigente por el catálogo backend.</p>}
+          {estadoCatalogo === 'disponible' && !tipoSeleccionado && <p role="alert" className="text-xs text-red-700">El procedimiento guardado no está en el catálogo vigente. Vuelva al paso 2 para revisar la selección.</p>}
+          {estadoCatalogo === 'error' && <p role="alert" className="text-xs text-red-700">No fue posible verificar el catálogo formal. No se puede radicar hasta reintentar la verificación.</p>}
+          {estadoCatalogo === 'error' && <button type="button" className="text-xs font-bold underline" onClick={() => setIntentoCatalogo(valor => valor + 1)} disabled={isSubmitting}>Reintentar verificación</button>}
+          {tipoSeleccionado && (
+            <div className="space-y-1 text-xs text-slate-600">
+              {tipoSeleccionado.descripcion && <p>{tipoSeleccionado.descripcion}</p>}
+              <p>La API disponible no informa los requisitos documentales ni su obligatoriedad para este procedimiento. La descripción no constituye una lista de adjuntos exigibles.</p>
+            </div>
+          )}
           <p className="text-xs text-slate-600">
             <span className="font-semibold">Folios:</span>{' '}
             <span className="font-mono">{documentos.numeroFolios}</span>

@@ -12,18 +12,20 @@
  *
  * Características:
  * - Validación reactiva de obligatoriedad, longitud mínima de asunto y archivos PDF.
- * - Validación de tamaño máximo de archivo (límite 25 MB según directiva LPAG).
+ * - Validación de tamaño máximo de archivo (20 MiB según el contrato de radicación).
  * - Accesibilidad WCAG 2.1 AA con contraste reforzado y alertas de error en rojo.
  * - Cero 'any', 100% tipado estricto con contratos de tramiteWizardState.ts.
  * ==============================================================================
  */
 
-import React, { useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type {
   DocumentosData,
   ArchivoTramite,
   WizardAction,
 } from '../../../types/tramiteWizardState';
+import { apiClient } from '../../../api/client';
+import { usePresignedUpload } from '../../../hooks/usePresignedUpload';
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
@@ -38,6 +40,7 @@ export interface StepDocumentosProps {
   isSubmitting?: boolean;
 }
 
+// Referencias heredadas solo para rotular borradores antiguos; no se ofrecen para nuevas selecciones.
 const CATALOGO_TUPA_INSTITUCIONAL = [
   {
     id: 'TUPA-01',
@@ -71,7 +74,52 @@ const CATALOGO_TUPA_INSTITUCIONAL = [
   },
 ] as const;
 
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // Límite del contrato de radicación.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+interface TipoTramiteFormal {
+  id: string;
+  codigo: string;
+  denominacion: string;
+  unidad_organica: string | null;
+  descripcion?: string | null;
+  vigente: true;
+}
+
+function validarTiposFormales(data: unknown): TipoTramiteFormal[] | null {
+  if (!Array.isArray(data)) return null;
+  const tipos: TipoTramiteFormal[] = [];
+  const ids = new Set<string>();
+  const codigos = new Set<string>();
+
+  for (const item of data) {
+    if (
+      typeof item !== 'object' || item === null ||
+      !('id' in item) || typeof item.id !== 'string' || !UUID_RE.test(item.id) ||
+      !('codigo' in item) || typeof item.codigo !== 'string' || !item.codigo.trim() ||
+      !('denominacion' in item) || typeof item.denominacion !== 'string' || !item.denominacion.trim() ||
+      !('vigente' in item) || item.vigente !== true ||
+      !('unidad_organica' in item) ||
+      (item.unidad_organica !== null && typeof item.unidad_organica !== 'string') ||
+      ('descripcion' in item && item.descripcion !== null && typeof item.descripcion !== 'string')
+    ) return null;
+
+    const id = item.id.toLowerCase();
+    const codigo = item.codigo.trim();
+    if (ids.has(id) || codigos.has(codigo)) return null;
+    ids.add(id);
+    codigos.add(codigo);
+    tipos.push({
+      id: item.id,
+      codigo,
+      denominacion: item.denominacion.trim(),
+      unidad_organica: item.unidad_organica,
+      descripcion: 'descripcion' in item ? item.descripcion as string | null : undefined,
+      vigente: true,
+    });
+  }
+  return tipos;
+}
 
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   data,
@@ -84,6 +132,42 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [fileError, setFileError] = useState<string | null>(null);
+  const subida = usePresignedUpload({ diferirRegistroAdjunto: true });
+  const cargandoArchivo = !['idle', 'success', 'cancelled', 'error'].includes(subida.status);
+  useEffect(() => () => subida.cancel(), [subida.cancel]);
+  const [tiposFormales, setTiposFormales] = useState<TipoTramiteFormal[]>([]);
+  const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
+  const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null);
+  const [intentoCatalogo, setIntentoCatalogo] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setCargandoCatalogo(true);
+    setErrorCatalogo(null);
+
+    apiClient.get<unknown>('/api/v1/tramites/tipos', { signal: controller.signal })
+      .then((respuesta) => {
+        if (controller.signal.aborted) return;
+        const tipos = validarTiposFormales(respuesta.data);
+        if (!tipos) {
+          setTiposFormales([]);
+          setErrorCatalogo('El catálogo formal devolvió datos incompletos o ambiguos. No se puede seleccionar un procedimiento para radicar.');
+          return;
+        }
+        setTiposFormales(tipos);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setTiposFormales([]);
+          setErrorCatalogo('No se pudo consultar el catálogo formal de trámites. Reintente antes de continuar.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCargandoCatalogo(false);
+      });
+
+    return () => controller.abort();
+  }, [intentoCatalogo]);
 
   // ===========================================================================
   // VALIDACIÓN REACTIVA EN TIEMPO REAL
@@ -92,8 +176,12 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     const errs: Record<string, string> = {};
 
     // 1. Procedimiento Institucional
-    if (!data.tipoTramiteId.trim()) {
+    if (cargandoCatalogo || errorCatalogo) {
+      errs.tipoTramiteId = 'Debe verificarse el catálogo formal antes de continuar.';
+    } else if (!data.tipoTramiteId.trim()) {
       errs.tipoTramiteId = 'Debe seleccionar un procedimiento institucional o trámite TUPA.';
+    } else if (!tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId)) {
+      errs.tipoTramiteId = 'La selección guardada no pertenece al catálogo formal vigente. Seleccione nuevamente un tipo disponible.';
     }
 
     // 2. Asunto / Petitorio sucinto
@@ -102,24 +190,33 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       errs.asunto = 'El asunto o petitorio sucinto es obligatorio.';
     } else if (asuntoTrim.length < 10) {
       errs.asunto = `El asunto debe contener al menos 10 caracteres (actual: ${asuntoTrim.length}).`;
+    } else if (asuntoTrim.length > 500) {
+      errs.asunto = 'El asunto no puede superar los 500 caracteres.';
     }
 
     // 3. Cantidad de Folios
-    if (!data.numeroFolios || data.numeroFolios < 1) {
+    if (!Number.isInteger(data.numeroFolios) || data.numeroFolios < 1) {
       errs.numeroFolios = 'La cantidad de folios debe ser al menos 1 folio útil.';
-    } else if (data.numeroFolios > 500) {
-      errs.numeroFolios = 'La cantidad máxima estimada por expediente es de 500 folios.';
+    } else if (data.numeroFolios > 5000) {
+      errs.numeroFolios = 'La cantidad máxima por expediente es de 5000 folios.';
     }
 
     // 4. Archivos adjuntos obligatorios
     if (data.archivos.length === 0) {
-      errs.archivos = 'Debe adjuntar al menos un documento probatorio principal en formato PDF.';
+      errs.archivos = 'El contrato de envío requiere al menos un archivo PDF.';
+    } else if (data.archivos.some((archivo) =>
+      !archivo.storageUrl || !/^expedientes\/\d{4}\/[0-9a-f-]+\.pdf$/i.test(archivo.storageUrl) ||
+      !/^[0-9a-f]{64}$/i.test(archivo.hashSha256) ||
+      !Number.isInteger(archivo.peso) || archivo.peso <= 0 || archivo.peso > MAX_FILE_SIZE_BYTES
+    )) {
+      errs.archivos = 'Hay archivos sin una referencia de almacenamiento válida. Retire los archivos locales o de demostración y cargue el documento antes de continuar.';
     }
 
     return errs;
-  }, [data]);
+  }, [data, cargandoCatalogo, errorCatalogo, tiposFormales]);
 
   const isValid = Object.keys(errors).length === 0;
+  const tipoSeleccionado = tiposFormales.find((tipo) => tipo.id === data.tipoTramiteId);
 
   const markTouched = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -134,6 +231,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
 
   // Carga y validación binaria de archivos PDF con SHA-256
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (cargandoArchivo) return;
     setFileError(null);
     const file = e.target.files?.[0];
     if (!file) return;
@@ -145,10 +243,10 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       return;
     }
 
-    // Validación de tamaño máximo (25 MB)
+    // Validación de tamaño máximo del endpoint de radicación (20 MiB).
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setFileError(
-        `El archivo excede el tamaño máximo permitido de 25 MB (tamaño actual: ${(
+        `El archivo excede el tamaño máximo permitido de 20 MB (tamaño actual: ${(
           file.size /
           (1024 * 1024)
         ).toFixed(2)} MB).`
@@ -158,16 +256,14 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     }
 
     try {
-      const buffer = await file.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+      const archivoSubido = await subida.upload(file);
+      if (!archivoSubido) return;
 
       const nuevoArchivo: ArchivoTramite = {
         nombre: file.name,
         peso: file.size,
-        hashSha256: hashHex,
-        storageUrl: URL.createObjectURL(file),
+        hashSha256: archivoSubido.sha256,
+        storageUrl: archivoSubido.s3Key,
       };
 
       dispatch({
@@ -176,8 +272,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           archivos: [...data.archivos, nuevoArchivo],
         },
       });
-    } catch {
-      setFileError('No se pudo calcular la huella criptográfica SHA-256 del archivo seleccionado.');
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : 'No se pudo completar la carga del archivo seleccionado. Reintente antes de continuar.');
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -215,7 +311,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       archivos: true,
     });
 
-    if (isValid && !isSubmitting) {
+    if (isValid && !isSubmitting && !cargandoArchivo) {
       onNext();
     }
   };
@@ -269,13 +365,39 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
             } disabled:bg-slate-100`}
           >
-            <option value="">-- Seleccione un procedimiento oficial --</option>
-            {CATALOGO_TUPA_INSTITUCIONAL.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id} — {t.nombre} ({t.unidad})
+            <option value="">{cargandoCatalogo ? 'Cargando tipos formales…' : '-- Seleccione un tipo disponible --'}</option>
+            {data.tipoTramiteId && !tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId) && (
+              <option value={data.tipoTramiteId} disabled>
+                Selección guardada pendiente de revalidación: {CATALOGO_TUPA_INSTITUCIONAL.find((tipo) => tipo.id === data.tipoTramiteId)?.nombre ?? data.tipoTramiteId}
+              </option>
+            )}
+            {tiposFormales.map((tipo) => (
+              <option key={tipo.id} value={tipo.id}>
+                {tipo.codigo} — {tipo.denominacion}{tipo.unidad_organica ? ` (${tipo.unidad_organica})` : ''}
               </option>
             ))}
           </select>
+          <p className="mt-1.5 text-xs text-slate-600">
+            Se muestran los procedimientos vigentes del catálogo formal del backend. Los 75 conceptos informativos de Ventanilla no constituyen automáticamente trámites radicables ni acreditan aprobación institucional.
+          </p>
+          {tipoSeleccionado && (
+            <div className="mt-2 space-y-1 text-xs text-slate-600">
+              {tipoSeleccionado.descripcion && <p>{tipoSeleccionado.descripcion}</p>}
+              <p>La API disponible no informa los requisitos documentales ni su obligatoriedad para este procedimiento. La descripción no constituye una lista de adjuntos exigibles.</p>
+            </div>
+          )}
+          {cargandoCatalogo && <p role="status" className="mt-1 text-xs text-slate-500">Consultando tipos formales…</p>}
+          {!cargandoCatalogo && !errorCatalogo && tiposFormales.length === 0 && (
+            <p role="status" className="mt-1 text-xs text-slate-600">El backend no informa tipos formales vigentes disponibles.</p>
+          )}
+          {errorCatalogo && (
+            <div role="alert" className="mt-1.5 text-xs text-red-700">
+              <p>{errorCatalogo}</p>
+              <button type="button" className="mt-1 font-bold underline" onClick={() => setIntentoCatalogo((valor) => valor + 1)} disabled={cargandoCatalogo}>
+                Reintentar consulta
+              </button>
+            </div>
+          )}
           {touched.tipoTramiteId && errors.tipoTramiteId && (
             <p
               id={`${formId}-tipoTramiteId-error`}
@@ -352,7 +474,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             name="numeroFolios"
             type="number"
             min={1}
-            max={500}
+            max={5000}
             required
             aria-required="true"
             aria-invalid={touched.numeroFolios && Boolean(errors.numeroFolios)}
@@ -363,7 +485,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             }
             value={data.numeroFolios}
             onChange={(e) =>
-              handleFieldChange('numeroFolios', parseInt(e.target.value, 10) || 1)
+              handleFieldChange('numeroFolios', Number(e.target.value))
             }
             onBlur={() => markTouched('numeroFolios')}
             disabled={isSubmitting}
@@ -393,16 +515,16 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Documentación Sustentatoria Principal en PDF <span className="text-red-600">*</span>
+                Archivos adjuntos en PDF <span className="text-red-600">*</span>
               </h3>
               <p className="text-xs text-slate-500">
-                Suba su solicitud o formulario formal en formato PDF (máximo 25 MB por archivo).
+                El envío requiere al menos un archivo PDF (máximo 20 MB por archivo). Esta exigencia técnica no determina qué documentos son requisitos institucionales del procedimiento.
               </p>
             </div>
             <button
               type="button"
               onClick={handleSimularArchivoPrueba}
-              disabled={isSubmitting}
+              disabled={isSubmitting || cargandoArchivo}
               className="text-xs font-bold text-[#006EC7] hover:underline self-start sm:self-auto cursor-pointer"
             >
               + Cargar PDF de prueba
@@ -441,19 +563,20 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               accept=".pdf,application/pdf"
               className="sr-only"
               onChange={handleFileChange}
-              disabled={isSubmitting}
+              disabled={isSubmitting || cargandoArchivo}
             />
           </label>
 
           {/* Error de archivo */}
-          {fileError && (
+          {cargandoArchivo && <p role="status">Subiendo archivo: {subida.progress}%</p>}
+          {(fileError || subida.error) && (
             <p role="alert" className="text-xs font-semibold text-red-600">
-              ⚠️ {fileError}
+              ⚠️ {fileError ?? subida.error?.message}
             </p>
           )}
 
           {/* Alerta si no hay archivos y el paso fue tocado */}
-          {touched.archivos && errors.archivos && (
+          {(touched.archivos || data.archivos.length > 0) && errors.archivos && (
             <p role="alert" className="text-xs font-semibold text-red-600">
               ⚠️ {errors.archivos}
             </p>
@@ -504,7 +627,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
         <button
           type="button"
           onClick={onBack}
-          disabled={isSubmitting}
+          disabled={isSubmitting || cargandoArchivo}
           className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 cursor-pointer"
         >
           ← Anterior
@@ -512,7 +635,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
 
         <button
           type="submit"
-          disabled={!isValid || isSubmitting}
+          disabled={!isValid || isSubmitting || cargandoArchivo}
           className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold text-white shadow-xs transition ${
             isValid && !isSubmitting
               ? 'bg-[#006EC7] hover:bg-[#005ba3] cursor-pointer'

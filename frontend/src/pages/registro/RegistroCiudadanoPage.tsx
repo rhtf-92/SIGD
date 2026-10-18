@@ -4,21 +4,35 @@ import PersonaNaturalForm from "../../components/registro/PersonaNaturalForm";
 import PersonaJuridicaForm from "../../components/registro/PersonaJuridicaForm";
 import type { Natural, Juridical } from "../../types/registroCiudadano";
 import { apiClient } from "../../api/client";
+import { ApiHttpError } from "../../types/api";
 
 export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+
+  const mostrarErrorRegistro = (error: unknown) => {
+    setErrorMessage(
+      error instanceof ApiHttpError && error.status === 409
+        ? "Ya existe un registro con ese documento o correo. Revise sus datos o inicie sesión."
+        : error instanceof ApiHttpError && (error.status === 400 || error.status === 422)
+          ? "No se pudo completar el registro. Revise los datos ingresados e inténtelo nuevamente."
+          : "No se pudo confirmar el registro. Sus datos se conservan; inténtelo nuevamente cuando el servicio esté disponible.",
+    );
+  };
 
   const handleNaturalSubmit = async (data: Natural) => {
-    console.log("POST /api/v1/auth/registro-ciudadano", data);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    if (password.length < 8 || password.length > 128) {
+      setErrorMessage("Ingrese una contraseña de entre 8 y 128 caracteres para su cuenta.");
+      return;
+    }
 
     const partesApellidos = data.apellidos.trim().split(/\s+/);
-    const apellidoPaterno = partesApellidos[0] || "PATERNO";
-    const apellidoMaterno = partesApellidos.slice(1).join(" ") || "MATERNO";
-    const celularValido = /^9[0-9]{8}$/.test(data.celular) ? data.celular : "961234567";
-    const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
-      ? (data.domicilio.distritoCodigo as string)
-      : "250101";
+    const apellidoPaterno = partesApellidos[0];
+    const apellidoMaterno = partesApellidos.slice(1).join(" ");
 
     const payload = {
       tipoPersona: "NATURAL" as const,
@@ -27,32 +41,33 @@ export default function RegistroCiudadanoPage() {
       apellidoPaterno,
       apellidoMaterno,
       correo: data.correo.trim().toLowerCase(),
-      celular: celularValido,
-      ubigeoDistrito: ubigeoValido,
-      direccion: data.domicilio?.direccionExacta?.trim() || "Dirección institucional",
-      password: `Clave*${data.numeroDocumento}`,
-      consentimientoDatos: true as const,
-      aceptaNotificaciones: true,
+      celular: data.celular.trim(),
+      ubigeoDistrito: data.domicilio.distritoCodigo,
+      direccion: data.domicilio.direccionExacta.trim(),
+      password,
+      consentimientoDatos: data.consentimientoLey29733,
+      aceptaNotificaciones: data.consentimientoLey29733,
     };
 
     try {
-      await apiClient.post("/api/v1/auth/registro-ciudadano", payload);
+      const respuesta = await apiClient.post<{ idPersona: string; mensaje: string }>("/api/v1/auth/registro-ciudadano", payload);
+      if (respuesta.status !== 201 || typeof respuesta.data?.idPersona !== "string" || !respuesta.data.idPersona.trim()) {
+        mostrarErrorRegistro(null);
+        return;
+      }
+      setSuccessMessage("Registro completado. Ya puede iniciar sesión con su cuenta.");
     } catch (err) {
-      console.warn("[RegistroCiudadano] Fallo de llamada a API en registro natural:", err);
+      mostrarErrorRegistro(err);
     }
-
-    setSuccessMessage(
-      `Registro completado. Tu casilla electrónica ha sido creada: ${data.numeroDocumento}@casilla.iestpsuiza.edu.pe`
-    );
   };
 
   const handleJuridicaSubmit = async (data: Juridical) => {
-    console.log("POST /api/v1/auth/registro-ciudadano", data);
-
-    const celularValido = /^9[0-9]{8}$/.test(data.celularContacto) ? data.celularContacto : "961234567";
-    const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
-      ? (data.domicilio.distritoCodigo as string)
-      : "250101";
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    if (password.length < 8 || password.length > 128) {
+      setErrorMessage("Ingrese una contraseña de entre 8 y 128 caracteres para su cuenta.");
+      return;
+    }
 
     const payload = {
       tipoPersona: "JURIDICA" as const,
@@ -62,23 +77,24 @@ export default function RegistroCiudadanoPage() {
       dniRepresentante: data.representanteLegal.numeroDocumento,
       nombreRepresentante: `${data.representanteLegal.nombres} ${data.representanteLegal.apellidos}`.trim(),
       correo: data.correoCorporativo.trim().toLowerCase(),
-      celular: celularValido,
-      ubigeoDistrito: ubigeoValido,
-      direccion: data.domicilio?.direccionExacta?.trim() || "Dirección institucional",
-      password: `Clave*${data.ruc.slice(-8)}`,
-      consentimientoDatos: true as const,
-      aceptaNotificaciones: true,
+      celular: data.celularContacto.trim(),
+      ubigeoDistrito: data.domicilio.distritoCodigo,
+      direccion: data.domicilio.direccionExacta.trim(),
+      password,
+      consentimientoDatos: data.consentimientoLey29733,
+      aceptaNotificaciones: data.consentimientoLey29733,
     };
 
     try {
-      await apiClient.post("/api/v1/auth/registro-persona-juridica", payload);
+      const respuesta = await apiClient.post<{ idPersona: string; mensaje: string }>("/api/v1/auth/registro-persona-juridica", payload);
+      if (respuesta.status !== 201 || typeof respuesta.data?.idPersona !== "string" || !respuesta.data.idPersona.trim()) {
+        mostrarErrorRegistro(null);
+        return;
+      }
+      setSuccessMessage("Registro completado. Ya puede iniciar sesión con su cuenta.");
     } catch (err) {
-      console.warn("[RegistroCiudadano] Fallo de llamada a API en registro jurídica:", err);
+      mostrarErrorRegistro(err);
     }
-
-    setSuccessMessage(
-      `Registro completado. Tu casilla electrónica ha sido creada: ${data.ruc}@casilla.iestpsuiza.edu.pe`
-    );
   };
 
   const handleClearSuccess = () => setSuccessMessage(null);
@@ -113,6 +129,7 @@ export default function RegistroCiudadanoPage() {
             onClick={() => {
               setActiveTab("NATURAL");
               setSuccessMessage(null);
+              setErrorMessage(null);
             }}
             className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-[#006EC7] focus:ring-offset-2 ${
               activeTab === "NATURAL"
@@ -130,6 +147,7 @@ export default function RegistroCiudadanoPage() {
             onClick={() => {
               setActiveTab("JURIDICA");
               setSuccessMessage(null);
+              setErrorMessage(null);
             }}
             className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-[#006EC7] focus:ring-offset-2 ${
               activeTab === "JURIDICA"
@@ -139,6 +157,26 @@ export default function RegistroCiudadanoPage() {
           >
             Persona Jurídica
           </button>
+        </div>
+
+        <div className="mb-6">
+          <label htmlFor="registro-password" className="block text-sm font-medium text-gray-700 mb-1">
+            Contraseña para su cuenta *
+          </label>
+          <input
+            id="registro-password"
+            type="password"
+            autoComplete="new-password"
+            minLength={8}
+            maxLength={128}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            aria-describedby="registro-password-ayuda"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          />
+          <p id="registro-password-ayuda" className="text-sm text-gray-600 mt-1">
+            Use entre 8 y 128 caracteres. Esta contraseña se utilizará para iniciar sesión.
+          </p>
         </div>
 
         <div
@@ -162,6 +200,12 @@ export default function RegistroCiudadanoPage() {
             <PersonaJuridicaForm onSubmit={handleJuridicaSubmit} />
           )}
         </div>
+
+        {errorMessage && (
+          <div role="alert" className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">
+            {errorMessage}
+          </div>
+        )}
 
         {successMessage && (
           <div

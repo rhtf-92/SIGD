@@ -46,7 +46,7 @@ const ESTILOS_ESTADO: Record<
 
 export default function SlaBadge({
   fechaIngreso,
-  plazoMaximoDiasHabiles = 30,
+  plazoMaximoDiasHabiles,
   fechaReferencia,
   mostrarTooltip = true,
   className = "",
@@ -72,15 +72,22 @@ export default function SlaBadge({
   } = slaResult;
 
   const estilo = ESTILOS_ESTADO[estado];
+  const esReferencial = plazoMaximoDiasHabiles === undefined;
+  const mensaje = esReferencial
+    ? `Estimación técnica de ${maxDias} días hábiles; plazo administrativo no verificado.`
+    : mensajeExplicativo;
 
-  const etiquetaTexto = estaVencido
+  const etiquetaCalculada = estaVencido
     ? `Vencido (${Math.abs(diasHabilesRestantes)}d hábiles)`
     : `${diasHabilesRestantes}d hábiles [${estilo.etiquetaTexto}]`;
+  const etiquetaTexto = esReferencial
+    ? `Referencia: ${etiquetaCalculada}`
+    : etiquetaCalculada;
 
   const badgeContent = (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold tracking-tight transition-colors ${estilo.contenedor} ${className}`}
-      aria-label={`${etiquetaTexto} - ${mensajeExplicativo}`}
+      aria-label={`${etiquetaTexto} - ${mensaje}`}
     >
       <span
         className={`h-2 w-2 rounded-full ${estilo.puntoIndicador}`}
@@ -96,7 +103,8 @@ export default function SlaBadge({
 
   return (
     <SlaIndicatorTooltip
-      mensaje={mensajeExplicativo}
+      mensaje={mensaje}
+      esReferencial={esReferencial}
       diasConsumidos={diasHabilesConsumidos}
       diasRestantes={diasHabilesRestantes}
       plazoMaximo={maxDias}

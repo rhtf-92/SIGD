@@ -48,6 +48,7 @@ export class UploadError extends Error {
       | "hash"
       | "presigned-url"
       | "upload"
+      | "confirmation"
       | "cancelled",
   ) {
     super(message);
@@ -58,6 +59,8 @@ export class UploadError extends Error {
 interface UsePresignedUploadOptions {
   categoria?: string;
   demoMode?: boolean;
+  /** La radicación registra los metadatos dentro de su transacción, cuando existe el expediente. */
+  diferirRegistroAdjunto?: boolean;
 }
 
 interface UploadResult {
@@ -182,6 +185,11 @@ export function usePresignedUpload(
               { signal: controller.signal },
             );
             presigned = response.data;
+            if (!presigned || typeof presigned.uploadUrl !== 'string' ||
+                typeof presigned.s3Key !== 'string' ||
+                !/^expedientes\/\d{4}\/[0-9a-f-]+\.pdf$/i.test(presigned.s3Key)) {
+              throw new Error('El almacenamiento no devolvió una referencia válida para el archivo.');
+            }
           } catch (cause) {
             if (controller.signal.aborted) {
               throw new UploadError("La carga fue cancelada.", "cancelled");
@@ -238,16 +246,26 @@ export function usePresignedUpload(
           );
         }
 
-        if (!options.demoMode) {
+        if (!options.demoMode && !options.diferirRegistroAdjunto) {
           try {
-            await apiClient.post("/api/v1/storage/confirmar-carga", {
-              s3Key: presigned.s3Key,
-              sha256Hash: sha256,
-            });
-          } catch (confirmError) {
-            console.warn(
-              "[usePresignedUpload] Aviso al confirmar carga en almacenamiento:",
-              confirmError,
+            const confirmation = await apiClient.post<{ confirmado?: unknown }>(
+              "/api/v1/storage/confirmar-carga",
+              {
+                s3Key: presigned.s3Key,
+                sha256Hash: sha256,
+              },
+              { signal: controller.signal },
+            );
+            if (confirmation.data?.confirmado !== true) {
+              throw new UploadError(
+                "El servidor no confirmó el registro del documento.",
+                "confirmation",
+              );
+            }
+          } catch {
+            throw new UploadError(
+              "La subida terminó, pero no se pudo confirmar el registro del documento. El objeto puede permanecer en almacenamiento.",
+              controller.signal.aborted ? "cancelled" : "confirmation",
             );
           }
         }
@@ -269,7 +287,7 @@ export function usePresignedUpload(
         controllerRef.current = null;
       }
     },
-    [options.categoria, options.demoMode],
+    [options.categoria, options.demoMode, options.diferirRegistroAdjunto],
   );
 
   return { upload, cancel, status, progress, error, result };

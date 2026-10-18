@@ -86,14 +86,8 @@ export const radicacionVirtualSchema = z
         (valor) => valor !== '00000000-0000-0000-0000-000000000000',
         'El tipo de tramite no puede ser el UUID nulo.',
       ),
-    // `sigd_auth.persona.id` es BIGSERIAL en el DDL canonico de IdentiCore, de
-    // modo que el identificador del solicitante llega como entero. Se acepta
-    // tambien string porque las variables de ruta y los formularios del
-    // frontend serializan todo como texto.
-    idPersona: z.coerce
-      .number()
-      .int('El administrado debe ser un identificador entero.')
-      .positive('El administrado debe ser un identificador entero positivo.'),
+    tipoDocumento: z.enum(['DNI', 'CE', 'RUC']),
+    numeroDocumento: z.string().trim().min(1).max(20),
     // T-BE-TC-02 exige certificar los datos completos del solicitante y
     // rechazar los correos invalidos. Se capturan en el acto de la radicacion
     // porque el cargo digital y las notificaciones de seguimiento se dirigen a

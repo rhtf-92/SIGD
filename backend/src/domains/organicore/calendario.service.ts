@@ -552,7 +552,7 @@ export interface FilaCalendario {
 }
 
 const SELECCION = `
-    c.id_calendario,
+  SELECT c.id_calendario,
     to_char(c.fecha, 'YYYY-MM-DD') AS fecha,
     c.anio,
     c.tipo_feriado,

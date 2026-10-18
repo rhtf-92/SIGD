@@ -28,21 +28,94 @@
 
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { TramiteWizard } from '@/components/tramite/TramiteWizard';
+import { StepConfirmacion } from '@/components/tramite/WizardSteps/StepConfirmacion';
+import { StepDocumentos } from '@/components/tramite/WizardSteps/StepDocumentos';
 import { TRAMITE_WIZARD_STORAGE_KEY } from '@/hooks/useTramiteWizardReducer';
 import { apiClient } from '@/api/client';
+import { ApiHttpError } from '@/types/api';
+import { useAuthStore } from '@/stores/authStore';
+import { INITIAL_WIZARD_STATE } from '@/types/tramiteWizardState';
+
+const ARCHIVO_SUBIDO = {
+  nombre: 'solicitud.pdf', peso: 128, hashSha256: 'a'.repeat(64),
+  storageUrl: 'expedientes/2026/11111111-1111-4111-8111-111111111111.pdf',
+};
+vi.mock('@/hooks/usePresignedUpload', () => ({
+  usePresignedUpload: () => ({
+    upload: async (file: File) => ({ file, sha256: ARCHIVO_SUBIDO.hashSha256, s3Key: ARCHIVO_SUBIDO.storageUrl }),
+    cancel: () => {}, status: 'idle', progress: 0, error: null,
+  }),
+}));
+
+const TIPOS_FORMALES = [
+  {
+    id: '3443d0c0-ebaf-48d2-a4d0-2c32ec1fc6dd',
+    codigo: 'SUZ26-035',
+    denominacion: 'Certificado de Estudios Superiores (6 semestres)',
+    descripcion: 'Descripción del PDF: pago del derecho en Tesorería; comprobante de pago.',
+    unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL',
+    vigente: true,
+  },
+  {
+    id: 'a778cedf-c565-4d07-b74d-012550d110c2',
+    codigo: 'SUZ26-034',
+    denominacion: 'Expedición de Título',
+    descripcion: null,
+    unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL',
+    vigente: true,
+  },
+  {
+    id: '36186535-00c2-43f2-b0cc-f657886ad8b5',
+    codigo: 'SUZ26-068',
+    denominacion: 'Acceso a la Información Pública',
+    descripcion: 'El PDF indica solicitud dirigida a Dirección en FUT y pago del derecho en Tesorería.',
+    unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL',
+    vigente: true,
+  },
+];
 
 describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    useAuthStore.setState({ accessToken: 'access-test', refreshToken: 'refresh-test', isAuthenticated: true });
     vi.restoreAllMocks();
+    vi.spyOn(apiClient, 'get').mockResolvedValue({ data: TIPOS_FORMALES } as never);
   });
 
   afterEach(() => {
     sessionStorage.clear();
+    useAuthStore.setState({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false });
     vi.restoreAllMocks();
+  });
+
+  it.skipIf(!process.env.SIGD_TUPA_LIVE_URL)('consulta el catálogo real y conserva su UUID sin radicar ni subir archivos', async () => {
+    const destino = process.env.SIGD_TUPA_LIVE_URL!;
+    expect(new URL(destino).origin).toBe('http://localhost:3000');
+    vi.mocked(apiClient.get).mockRestore();
+    const baseAnterior = apiClient.defaults.baseURL;
+    const post = vi.spyOn(apiClient, 'post');
+    apiClient.defaults.baseURL = destino;
+    try {
+      const respuesta = await apiClient.get('/api/v1/tramites/tipos');
+      expect(respuesta.data).toHaveLength(19);
+      const procedimiento = respuesta.data.find((tipo: { codigo: string }) => tipo.codigo === 'SUZ26-035');
+      expect(procedimiento.id).toMatch(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i);
+      const dispatch = vi.fn();
+      render(<StepDocumentos data={INITIAL_WIZARD_STATE.documentos}
+        dispatch={dispatch} onNext={vi.fn()} onBack={vi.fn()} />);
+      await screen.findByRole('option', { name: /SUZ26-035 — Certificado de Estudios Superiores/i });
+      const selector = screen.getByRole('combobox');
+      expect(within(selector).getAllByRole('option').filter(opcion => opcion.textContent?.startsWith('SUZ26-'))).toHaveLength(19);
+      fireEvent.change(selector, { target: { value: procedimiento.id } });
+      expect(dispatch).toHaveBeenCalledWith({ type: 'UPDATE_DOCUMENTOS', payload: { tipoTramiteId: procedimiento.id } });
+      expect(post).not.toHaveBeenCalled();
+    } finally {
+      apiClient.defaults.baseURL = baseAnterior;
+    }
   });
 
   /**
@@ -97,24 +170,24 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     }
   ) => {
     const data = {
-      tipoTramiteId: 'TUPA-01',
+      tipoTramiteId: TIPOS_FORMALES[0].id,
       asunto: 'Solicitud formal de certificado oficial de estudios concluidos',
       folios: '4',
       ...overrides,
     };
 
-    await user.selectOptions(
-      screen.getByLabelText(/Procedimiento Institucional/i),
-      data.tipoTramiteId
-    );
+    const selector = screen.getByLabelText(/Procedimiento Institucional/i);
+    await waitFor(() => expect(Array.from((selector as HTMLSelectElement).options).some((option) => option.value === data.tipoTramiteId)).toBe(true));
+    await user.selectOptions(selector, data.tipoTramiteId);
     await user.type(screen.getByLabelText(/Asunto o Petitorio Sucinto \*/i), data.asunto);
     const inputFolios = screen.getByLabelText(/Folios/i);
     await user.clear(inputFolios);
     await user.type(inputFolios, data.folios);
 
     // Cargar archivo PDF de prueba requerido para validación
-    const btnCargarPdf = screen.getByRole('button', { name: /\+ Cargar PDF de prueba/i });
-    await user.click(btnCargarPdf);
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await user.upload(input, new File(['%PDF-1.7 prueba'], 'solicitud.pdf', { type: 'application/pdf' }));
+    await screen.findByText('solicitud.pdf');
   };
 
   /**
@@ -129,6 +202,23 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     );
     await user.click(checkVeracidad);
     await user.click(checkTerminos);
+  };
+
+  const llegarAConfirmacion = async (
+    user: ReturnType<typeof userEvent.setup>,
+    tipoTramiteId = TIPOS_FORMALES[0].id,
+    conRouter = false,
+  ) => {
+    render(conRouter
+      ? <MemoryRouter initialEntries={['/tramite/mesa-partes-virtual']}><TramiteWizard /></MemoryRouter>
+      : <TramiteWizard />);
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso2(user, { tipoTramiteId });
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    return screen.findByRole('button', { name: /Radicar Trámite/i });
   };
 
   // ===========================================================================
@@ -241,7 +331,8 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
 
     // Seleccionar TUPA pero sin asunto
     const selectTupa = screen.getByLabelText(/Procedimiento Institucional/i);
-    await user.selectOptions(selectTupa, 'TUPA-01');
+    await screen.findByRole('option', { name: /SUZ26-035 — Certificado de Estudios Superiores/i });
+    await user.selectOptions(selectTupa, TIPOS_FORMALES[0].id);
     expect(btnSiguiente).toBeDisabled();
 
     // Asunto muy corto (menos de 10 caracteres)
@@ -261,11 +352,43 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     // Todavía deshabilitado por requerir archivo probatorio PDF
     expect(btnSiguiente).toBeDisabled();
 
-    // Cargar archivo probatorio PDF
+    // La demostración no acredita persistencia ni debe habilitar el envío.
     const btnCargarPdf = screen.getByRole('button', { name: /\+ Cargar PDF de prueba/i });
     await user.click(btnCargarPdf);
-
+    expect(btnSiguiente).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /^Eliminar$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, new File(['%PDF-1.7 prueba'], 'solicitud.pdf', { type: 'application/pdf' }));
     expect(btnSiguiente).not.toBeDisabled();
+  });
+
+  it.each([undefined, 'blob:archivo-local', 'https://externo.invalid/solicitud.pdf'])
+  ('no avanza desde documentos con una referencia no persistente: %s', async storageUrl => {
+    const siguiente = vi.fn();
+    render(<StepDocumentos data={{
+      ...INITIAL_WIZARD_STATE.documentos,
+      tipoTramiteId: TIPOS_FORMALES[0].id,
+      asunto: 'Solicitud con archivo pendiente de almacenamiento',
+      archivos: [{ ...ARCHIVO_SUBIDO, storageUrl }],
+    }} dispatch={vi.fn()} onNext={siguiente} onBack={vi.fn()} />);
+    await screen.findByRole('option', { name: /SUZ26-035 — Certificado de Estudios Superiores/i });
+    const boton = screen.getByRole('button', { name: /^Siguiente/i });
+    expect(boton).toBeDisabled();
+    expect(screen.getByText(/Hay archivos sin una referencia de almacenamiento válida/i)).toBeInTheDocument();
+    fireEvent.click(boton);
+    expect(siguiente).not.toHaveBeenCalled();
+  });
+
+  it.each([501, 5000])('conserva el límite de folios admitido por radicación: %s', async numeroFolios => {
+    render(<StepDocumentos data={{
+      ...INITIAL_WIZARD_STATE.documentos,
+      tipoTramiteId: TIPOS_FORMALES[0].id,
+      asunto: 'Solicitud con folios dentro del contrato vigente',
+      numeroFolios,
+      archivos: [ARCHIVO_SUBIDO],
+    }} dispatch={vi.fn()} onNext={vi.fn()} onBack={vi.fn()} />);
+    await screen.findByRole('option', { name: /SUZ26-035 — Certificado de Estudios Superiores/i });
+    expect(screen.getByRole('button', { name: /^Siguiente/i })).toBeEnabled();
   });
 
   // ===========================================================================
@@ -366,8 +489,8 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
 
     await fillPaso2(user, {
-      tipoTramiteId: 'TUPA-02',
-      asunto: 'Expedición de Constancia de Egresado y No Adeudo Institucional',
+      tipoTramiteId: TIPOS_FORMALES[1].id,
+      asunto: 'Expedición de Título Profesional Técnico',
       folios: '5',
     });
     await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
@@ -387,11 +510,11 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(screen.getByText('942123456')).toBeInTheDocument();
 
     // 2. Resumen Procedimiento
-    expect(screen.getByText('TUPA-02')).toBeInTheDocument();
+    expect(screen.getByText(/SUZ26-034 — Expedición de Título/i)).toBeInTheDocument();
     expect(screen.getByText(/Folios:/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/Constancia de Egresado y No Adeudo Institucional/i)
-    ).toBeInTheDocument();
+      screen.getAllByText(/Expedición de Título Profesional Técnico/i).length
+    ).toBeGreaterThan(0);
 
     // 3. Resumen Conformidad Legal
     expect(screen.getByText(/Veracidad Jurada \(Art\. 51 LPAG\)/i)).toBeInTheDocument();
@@ -433,9 +556,304 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(screen.getByLabelText(/Apellidos Completos \*/i)).toHaveValue('Torres Mori');
   });
 
+  it('no permite avanzar si el catálogo formal devuelve registros ambiguos o mal formados', async () => {
+    const user = userEvent.setup();
+    const mockGet = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+      data: [{ id: 'SUZ26-034', codigo: 'TUPA-02', denominacion: 'Expedición de Título', vigente: true }],
+    } as never);
+    render(<TramiteWizard />);
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/datos incompletos o ambiguos/i);
+    expect(mockGet).toHaveBeenCalledWith('/api/v1/tramites/tipos', expect.any(Object));
+    expect(screen.getByRole('button', { name: /^Siguiente/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Reintentar consulta/i })).toBeInTheDocument();
+  });
+
+  it('no permite radicar con una selección antigua guardada por código en vez de UUID', async () => {
+    const mockPost = vi.spyOn(apiClient, 'post');
+    const dispatch = vi.fn();
+    const state = {
+      ...INITIAL_WIZARD_STATE,
+      currentStep: 4 as const,
+      identificacion: {
+        ...INITIAL_WIZARD_STATE.identificacion,
+        numeroDocumento: '74123456',
+        nombres: 'María Elena',
+        apellidos: 'Vargas Paredes',
+        correo: 'maria.vargas@iestpsuiza.edu.pe',
+      },
+      documentos: {
+        ...INITIAL_WIZARD_STATE.documentos,
+        tipoTramiteId: 'TUPA-02',
+        asunto: 'Solicitud de trámite institucional válida',
+        archivos: [ARCHIVO_SUBIDO],
+      },
+    };
+    render(<StepConfirmacion state={state} dispatch={dispatch} onBack={vi.fn()} />);
+    await screen.findByText(/El procedimiento guardado no está en el catálogo vigente/i);
+    await userEvent.click(screen.getByRole('button', { name: /Radicar Trámite/i }));
+
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'SET_ERROR',
+      payload: expect.stringMatching(/vuelva al paso 2/i),
+    }));
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('muestra una lista vacía sin inventar tipos ni permitir avanzar', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: [] } as never);
+    render(<TramiteWizard />);
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/no informa tipos formales/i);
+    expect(screen.getByRole('button', { name: /^Siguiente/i })).toBeDisabled();
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+  });
+
+  it('bloquea el envío si no se pudo cargar el catálogo formal', async () => {
+    const mockGet = vi.spyOn(apiClient, 'get').mockRejectedValueOnce(new Error('catálogo no disponible'));
+    const mockPost = vi.spyOn(apiClient, 'post');
+    const user = userEvent.setup();
+    render(<TramiteWizard />);
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo consultar el catálogo formal/i);
+    expect(mockGet).toHaveBeenCalledWith('/api/v1/tramites/tipos', expect.any(Object));
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('no radica un borrador con archivo local blob ni emite cargo', async () => {
+    const dispatch = vi.fn();
+    const post = vi.spyOn(apiClient, 'post');
+    render(<StepConfirmacion state={{
+      ...INITIAL_WIZARD_STATE,
+      documentos: { ...INITIAL_WIZARD_STATE.documentos, tipoTramiteId: TIPOS_FORMALES[0].id,
+        archivos: [{ ...ARCHIVO_SUBIDO, storageUrl: 'blob:archivo-local' }] },
+    }} dispatch={dispatch} onBack={vi.fn()} />);
+    await screen.findByText(/SUZ26-035 — Certificado de Estudios Superiores/i);
+    await userEvent.click(screen.getByRole('button', { name: /Radicar Trámite/i }));
+    expect(post).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_ERROR', payload: expect.stringContaining('subir los documentos') });
+    expect(dispatch.mock.calls.some(([action]) => action.type === 'SET_CARGO')).toBe(false);
+  });
+
+  it('envía el UUID exacto seleccionado y vuelve a verificar que siga vigente', async () => {
+    const user = userEvent.setup();
+    const uuid = TIPOS_FORMALES[0].id;
+    const state = {
+      ...INITIAL_WIZARD_STATE,
+      currentStep: 4 as const,
+      identificacion: {
+        ...INITIAL_WIZARD_STATE.identificacion,
+        numeroDocumento: '74123456',
+        nombres: 'María Elena',
+        apellidos: 'Vargas Paredes',
+        correo: 'maria.vargas@iestpsuiza.edu.pe',
+      },
+      documentos: {
+        ...INITIAL_WIZARD_STATE.documentos,
+        tipoTramiteId: uuid,
+        asunto: 'Solicitud de trámite institucional válida',
+        archivos: [ARCHIVO_SUBIDO],
+      },
+    };
+    const mockGet = vi.spyOn(apiClient, 'get');
+    const mockPost = vi.spyOn(apiClient, 'post').mockRejectedValue(new Error('respuesta de prueba'));
+
+    render(
+      <StepConfirmacion
+        state={state}
+        dispatch={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    );
+    await screen.findByText(/SUZ26-035 — Certificado de Estudios Superiores/i);
+    await user.click(screen.getByRole('button', { name: /Radicar Trámite/i }));
+
+    await waitFor(() => {
+      expect(mockGet.mock.calls.some(([url]) => url === '/api/v1/tramites/tipos')).toBe(true);
+      expect(mockPost).toHaveBeenCalledWith(
+        '/api/v1/tramites/radicacion-virtual',
+        expect.objectContaining({
+          idTipoTramiteTupa: uuid,
+          documentos: [expect.objectContaining({ storagePath: ARCHIVO_SUBIDO.storageUrl, hashSha256: ARCHIVO_SUBIDO.hashSha256, tamanoBytes: ARCHIVO_SUBIDO.peso })],
+          tipoDocumento: 'DNI',
+          numeroDocumento: '74123456',
+          nombreSolicitante: 'María Elena Vargas Paredes',
+          correo: 'maria.vargas@iestpsuiza.edu.pe',
+        }),
+      );
+      expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('idPersona');
+      expect(Object.keys(mockPost.mock.calls[0]?.[1] as object).sort()).toEqual([
+        'asunto', 'idTipoTramiteTupa', 'tipoDocumento', 'numeroDocumento',
+        'nombreSolicitante', 'correo', 'totalFolios', 'documentos',
+      ].sort());
+    });
+  });
+
+  it('ofrece login tras 401, conserva el borrador y no emite un cargo', async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({ accessToken: 'access-test', refreshToken: 'refresh-test', isAuthenticated: true });
+    const mockPost = vi.spyOn(apiClient, 'post').mockRejectedValueOnce(new ApiHttpError({
+      type: 'about:blank',
+      title: 'Unauthorized',
+      status: 401,
+      detail: 'Debe iniciar sesión para radicar.',
+      instance: '/api/v1/tramites/radicacion-virtual',
+      code: 'UNAUTHORIZED',
+      category: 'Security',
+      correlationId: 'test-correlation-id',
+      retryable: false,
+    }));
+    const button = await llegarAConfirmacion(user, TIPOS_FORMALES[0].id, true);
+    await user.click(button);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/inicie sesion/i);
+    expect(screen.getByRole('link', { name: /Iniciar sesion y volver/ })).toHaveAttribute('href', '/login');
+    expect(mockPost).toHaveBeenCalledWith('/api/v1/tramites/radicacion-virtual', expect.objectContaining({
+      tipoDocumento: 'DNI',
+      numeroDocumento: '74123456',
+      nombreSolicitante: 'María Elena Vargas Paredes',
+    }));
+    const borrador = JSON.parse(sessionStorage.getItem(TRAMITE_WIZARD_STORAGE_KEY)!);
+    expect(borrador.identificacion.numeroDocumento).toBe('74123456');
+    expect(borrador.documentos.tipoTramiteId).toBe(TIPOS_FORMALES[0].id);
+    expect(borrador.cargoEmitido).toBeNull();
+  });
+
+  it('no envia al backend cuando falta la sesión y conserva la solicitud', async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({ accessToken: null, refreshToken: null, isAuthenticated: false });
+    const mockGet = vi.spyOn(apiClient, 'get');
+    const mockPost = vi.spyOn(apiClient, 'post');
+    const button = await llegarAConfirmacion(user, TIPOS_FORMALES[0].id, true);
+    await user.click(button);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/inicie sesion/i);
+    expect(screen.getByRole('link', { name: /Iniciar sesion y volver/ })).toHaveAttribute('href', '/login');
+    expect(mockGet).toHaveBeenCalledWith('/api/v1/tramites/tipos', expect.any(Object));
+    expect(mockPost).not.toHaveBeenCalled();
+    const borrador = JSON.parse(sessionStorage.getItem(TRAMITE_WIZARD_STORAGE_KEY)!);
+    expect(borrador.identificacion.numeroDocumento).toBe('74123456');
+    expect(borrador.documentos.tipoTramiteId).toBe(TIPOS_FORMALES[0].id);
+    expect(borrador.cargoEmitido).toBeNull();
+  });
+
   // ===========================================================================
   // TEST 9
   // ===========================================================================
+  const estadoConfirmacionValido = () => ({
+    ...INITIAL_WIZARD_STATE,
+    currentStep: 4 as const,
+    identificacion: { ...INITIAL_WIZARD_STATE.identificacion, numeroDocumento: '74123456',
+      nombres: 'María Elena', apellidos: 'Vargas Paredes', correo: 'maria.vargas@iestpsuiza.edu.pe' },
+    documentos: { ...INITIAL_WIZARD_STATE.documentos, tipoTramiteId: TIPOS_FORMALES[0].id,
+      asunto: 'Solicitud de trámite institucional válida', archivos: [ARCHIVO_SUBIDO] },
+  });
+
+  it('muestra la descripción del procedimiento seleccionado sin inventar requisitos ni obligatoriedad', async () => {
+    const user = userEvent.setup();
+    const dispatch = vi.fn();
+    const data = estadoConfirmacionValido().documentos;
+    const { rerender } = render(<StepDocumentos data={data} dispatch={dispatch} onNext={vi.fn()} onBack={vi.fn()} />);
+    expect(await screen.findByText(TIPOS_FORMALES[0].descripcion!)).toBeInTheDocument();
+    expect(screen.getByText(/La API disponible no informa los requisitos documentales/)).toBeInTheDocument();
+    expect(screen.getByText(/Esta exigencia técnica no determina qué documentos son requisitos institucionales/)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByText(/permanecen en versión BORRADOR/)).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox'), TIPOS_FORMALES[2].id);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'UPDATE_DOCUMENTOS', payload: { tipoTramiteId: TIPOS_FORMALES[2].id } });
+    rerender(<StepDocumentos data={{ ...data, tipoTramiteId: TIPOS_FORMALES[2].id }} dispatch={dispatch} onNext={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByRole('combobox')).toHaveValue(TIPOS_FORMALES[2].id);
+    expect(screen.getByText(TIPOS_FORMALES[2].descripcion!)).toBeInTheDocument();
+    expect(screen.queryByText(TIPOS_FORMALES[0].descripcion!)).not.toBeInTheDocument();
+  });
+
+  it.each([2, 4])('conserva la advertencia de datos administrativos no especificados en el paso %s', async (paso) => {
+    const descripcion = 'Plazo de atención: no especificado en la fuente. Silencio administrativo: no especificado en la fuente. Los defaults técnicos no constituyen valores administrativos oficiales.';
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [{
+      ...TIPOS_FORMALES[0], descripcion, plazo_dias: 30, plazo_dias_habiles: 30,
+      silencio_administrativo: 'POSITIVO', calificacion: 'POSITIVO',
+    }] } as never);
+    const state = estadoConfirmacionValido();
+    if (paso === 2) {
+      render(<StepDocumentos data={state.documentos} dispatch={vi.fn()} onNext={vi.fn()} onBack={vi.fn()} />);
+    } else {
+      render(<StepConfirmacion state={state} dispatch={vi.fn()} onBack={vi.fn()} onGoToStep={vi.fn()} />);
+    }
+    expect(await screen.findByText(descripcion)).toBeInTheDocument();
+    expect(screen.queryByText(/30 días hábiles/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/silencio administrativo:\s*positivo/i)).not.toBeInTheDocument();
+  });
+
+  it('conserva el UUID y los documentos al avanzar al paso 3 y volver al selector', async () => {
+    const user = userEvent.setup();
+    const state = { ...estadoConfirmacionValido(), currentStep: 2 };
+    sessionStorage.setItem(TRAMITE_WIZARD_STORAGE_KEY, JSON.stringify(state));
+    render(<TramiteWizard />);
+    const next = screen.getByRole('button', { name: /^Siguiente/i });
+    await waitFor(() => expect(next).toBeEnabled());
+    await user.click(next);
+    await user.click(screen.getByRole('button', { name: /Anterior/i }));
+    await screen.findByRole('option', { name: /SUZ26-035/ });
+    expect(screen.getByRole('combobox')).toHaveValue(TIPOS_FORMALES[0].id);
+    expect(screen.getByText(ARCHIVO_SUBIDO.nombre)).toBeInTheDocument();
+    expect(JSON.parse(sessionStorage.getItem(TRAMITE_WIZARD_STORAGE_KEY)!).documentos.tipoTramiteId).toBe(TIPOS_FORMALES[0].id);
+  });
+
+  it.each([{ numeroFolios: 1.5 }, { asunto: 'x'.repeat(501) }])('bloquea datos de documentos incompatibles con las validaciones: %j', async cambios => {
+    const onNext = vi.fn();
+    render(<StepDocumentos data={{ ...estadoConfirmacionValido().documentos, ...cambios }} dispatch={vi.fn()} onNext={onNext} onBack={vi.fn()} />);
+    await screen.findByRole('option', { name: /SUZ26-035/ });
+    expect(screen.getByRole('button', { name: /^Siguiente/i })).toBeDisabled();
+    expect(onNext).not.toHaveBeenCalled();
+  });
+
+  it('rechaza códigos duplicados en confirmación y permite reintentar el GET sin sustituir el UUID', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: [TIPOS_FORMALES[0], { ...TIPOS_FORMALES[1], codigo: TIPOS_FORMALES[0].codigo }] } as never);
+    const user = userEvent.setup();
+    const mockPost = vi.spyOn(apiClient, 'post');
+    const state = estadoConfirmacionValido();
+    render(<StepConfirmacion state={state} dispatch={vi.fn()} onBack={vi.fn()} />);
+    await screen.findByText(/No fue posible verificar el catálogo formal/);
+    expect(screen.queryByText(/El tipo coincide con un UUID/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Reintentar verificación/ }));
+    expect(await screen.findByText(/SUZ26-035 — Certificado de Estudios Superiores/)).toBeInTheDocument();
+    expect(screen.getByText(TIPOS_FORMALES[0].descripcion!)).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(state.documentos.tipoTramiteId).toBe(TIPOS_FORMALES[0].id);
+  });
+
+  it.each(['correo', 'nombre', 'asunto', 'folios'])('no sustituye %s faltante por datos ficticios en confirmación', async campo => {
+    const state = estadoConfirmacionValido();
+    if (campo === 'correo') state.identificacion.correo = '';
+    if (campo === 'nombre') { state.identificacion.nombres = ''; state.identificacion.apellidos = ''; }
+    if (campo === 'asunto') state.documentos.asunto = 'corto';
+    if (campo === 'folios') state.documentos.numeroFolios = 0;
+    const dispatch = vi.fn();
+    const mockPost = vi.spyOn(apiClient, 'post');
+    render(<StepConfirmacion state={state} dispatch={dispatch} onBack={vi.fn()} />);
+    await screen.findByText(/El tipo coincide con un UUID/);
+    await userEvent.click(screen.getByRole('button', { name: /Radicar Trámite/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_ERROR', payload: expect.stringContaining('No se sustituirán datos faltantes') });
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('no fabrica un hash ni muestra cargo si falta la huella en la respuesta simulada', async () => {
+    const dispatch = vi.fn();
+    vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ data: { cargoDigital: {} }, status: 201 } as never);
+    render(<StepConfirmacion state={estadoConfirmacionValido()} dispatch={dispatch} onBack={vi.fn()} />);
+    await screen.findByText(/El tipo coincide con un UUID/);
+    await userEvent.click(screen.getByRole('button', { name: /Radicar Trámite/i }));
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'SET_ERROR' }));
+    expect(dispatch.mock.calls.some(([action]) => action.type === 'SET_CARGO')).toBe(false);
+  });
+
   it('Test 9: Disparo y bloqueo del botón "Radicar Trámite" mostrando estado de carga', async () => {
     const user = userEvent.setup();
 
@@ -445,7 +863,6 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
       resolverPromesa = resolve;
     });
     vi.spyOn(apiClient, 'post').mockImplementation(() => mockPostPromise as any);
-
     render(<TramiteWizard />);
 
     await fillPaso1(user);
@@ -518,7 +935,6 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
       },
       status: 201,
     } as any);
-
     render(<TramiteWizard />);
 
     await fillPaso1(user);

@@ -155,21 +155,24 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     clave: 'tipos_tramite',
     esquema: 'sigd_doc',
     tabla: 'tipo_tramite_tupa',
-    descripcion: 'Tipos de trámite del TUPA con su calificación y plazo legal en días hábiles.',
+    descripcion: 'Tipos de trámite del TUPA con datos y observaciones de su fuente documental. Los defaults técnicos no acreditan plazos ni calificaciones oficiales.',
     soloActivos: true,
     sql: `
-      SELECT t.codigo_tupa     AS codigo,
+      SELECT t.codigo          AS codigo,
              t.denominacion    AS nombre,
-             t.base_legal      AS descripcion,
+             CASE WHEN t.codigo LIKE 'SUZ26-%'
+                  THEN concat_ws(E'\n', t.base_legal, t.descripcion)
+                  ELSE t.base_legal
+              END              AS descripcion,
              jsonb_build_object(
-                 'es_tupa', t.es_tupa,
-                 'calificacion_administrativa', t.calificacion_administrativa,
-                 'plazo_max_dias_habiles', t.plazo_max_dias_habiles,
-                 'costo', t.costo,
-                 'unidad_organica_responsable', t.unidad_organica_responsable
+                 'es_tupa', TRUE,
+                 'calificacion_administrativa', NULL::text,
+                 'plazo_max_dias_habiles', t.plazo_dias,
+                 'costo', NULL::numeric,
+                 'unidad_organica_responsable', t.unidad_organica
              ) AS extra
         FROM sigd_doc.tipo_tramite_tupa AS t
-       WHERE ($1 = FALSE OR t.activo = TRUE)
+       WHERE ($1 = FALSE OR t.vigente = TRUE)
        ORDER BY t.denominacion`,
   },
   {
