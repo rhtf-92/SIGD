@@ -1,4 +1,11 @@
-# Etapa 1: Construcción (Build Vite)
+# Etapa 1: Desarrollo (Vite para entorno local)
+FROM node:24.19-alpine AS development
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+
+# Etapa 2: Construcción (Build para producción)
 FROM node:24.19-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
@@ -6,7 +13,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Etapa 2: Producción (Servidor estático Nginx no-root)
+# Etapa 3: Producción (Servidor estático Nginx no-root)
 FROM nginxinc/nginx-unprivileged:alpine
 # Copiar el build generado en la etapa anterior
 COPY --from=builder /app/dist /usr/share/nginx/html
