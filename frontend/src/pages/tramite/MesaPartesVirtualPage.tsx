@@ -14,6 +14,18 @@ import type {
 
 const FERIADOS_CONFIGURADOS: string[] = [];
 
+const tarjetaGlass =
+  "rounded-3xl border border-white/15 bg-white/10 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-7";
+
+const etiquetaPaso =
+  "inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-[11px] font-black tracking-widest text-cyan-300 uppercase";
+
+const campoEntrada =
+  "mt-1.5 w-full rounded-xl border border-white/40 bg-white/95 px-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40";
+
+const etiquetaCampo =
+  "block text-sm font-semibold text-blue-100";
+
 function formatStatus(status: UploadStatus): string {
   const labels: Record<UploadStatus, string> = {
     idle: "Pendiente de archivo",
@@ -55,86 +67,100 @@ export default function MesaPartesVirtualPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 sm:px-6">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <header className="rounded-2xl bg-slate-900 p-6 text-white shadow-lg">
+    <main className="relative min-h-screen overflow-hidden bg-[#070b19] px-4 py-8 text-white sm:px-6">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-32 -left-24 h-96 w-96 rounded-full bg-blue-600/25 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/3 -right-32 h-96 w-96 rounded-full bg-cyan-500/15 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-40 left-1/4 h-96 w-96 rounded-full bg-fuchsia-600/10 blur-3xl"
+      />
+
+      <div className="relative mx-auto max-w-6xl space-y-6">
+        <header className={tarjetaGlass}>
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-300">
+            <div className="min-w-0">
+              <span className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-[11px] font-black tracking-[0.2em] text-cyan-300 uppercase">
                 SIGD · Demostración Módulo 2
-              </p>
-              <h1 className="mt-2 text-3xl font-bold">
+              </span>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
                 Mesa de Partes Virtual — SIGD
               </h1>
-              <p className="mt-2 max-w-3xl text-slate-300">
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-100/85 sm:text-base">
                 Pantalla única para demostrar carga documentaria segura y
                 control de horario legal LPAG.
               </p>
             </div>
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-500 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
-            >
-              ← Volver al inicio
-            </Link>
-            <span className="rounded-full border border-amber-300/50 bg-amber-300/10 px-3 py-2 text-xs font-semibold text-amber-200">
-              API DE PRESIGNED URL REQUERIDA
-            </span>
+
+            <div className="flex flex-col items-start gap-3 sm:items-end">
+              <Link
+                to="/"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+              >
+                ← Volver al inicio
+              </Link>
+              <span className="rounded-full border border-amber-300/40 bg-amber-300/15 px-3 py-2 text-xs font-semibold text-amber-200">
+                API DE PRESIGNED URL REQUERIDA
+              </span>
+            </div>
           </div>
         </header>
 
-        <section className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+        <section className="rounded-2xl border border-blue-400/30 bg-blue-400/10 p-4 text-sm leading-6 text-blue-100 backdrop-blur">
           Magic Bytes y SHA-256 se calculan en el navegador. La carga solicita
           POST /v1/storage/presigned-url al backend y transfiere el PDF
           directamente a la URL firmada devuelta por el servicio.
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
-              1 · Datos del trámite
-            </p>
-            <h2 className="mt-1 text-xl font-semibold">
+        <section className={tarjetaGlass}>
+          <div className="mb-5">
+            <p className={etiquetaPaso}>1 · Datos del trámite</p>
+            <h2 className="mt-3 text-xl font-bold text-white sm:text-2xl">
               Identificación de la solicitud
             </h2>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="text-sm font-medium">
+            <label className={etiquetaCampo}>
               Solicitante
               <input
                 value={solicitante}
                 onChange={(event) => setSolicitante(event.target.value)}
                 placeholder="Nombre del administrado"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className={campoEntrada}
               />
             </label>
-            <label className="text-sm font-medium">
+            <label className={etiquetaCampo}>
               Asunto
               <input
                 value={asunto}
                 onChange={(event) => setAsunto(event.target.value)}
                 placeholder="Descripción breve del trámite"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className={campoEntrada}
               />
             </label>
           </div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
-                2 · Carga documentaria
-              </p>
-              <h2 className="mt-1 text-xl font-semibold">
+          <section className={tarjetaGlass}>
+            <div className="mb-5">
+              <p className={etiquetaPaso}>2 · Carga documentaria</p>
+              <h2 className="mt-3 text-xl font-bold text-white sm:text-2xl">
                 Magic Bytes, SHA-256 y MinIO/S3
               </h2>
             </div>
-            <FileUploadDropzone
-              categoria="EXPEDIENTE_INGRESO"
-              onUploaded={setUploaded}
-              onStatusChange={handleUploadStatus}
-            />
+            <div className="rounded-2xl border border-white/25 bg-white/95 p-4 text-slate-900 shadow-inner">
+              <FileUploadDropzone
+                categoria="EXPEDIENTE_INGRESO"
+                onUploaded={setUploaded}
+                onStatusChange={handleUploadStatus}
+              />
+            </div>
             <div className="mt-5 grid gap-2 sm:grid-cols-2">
               <EvidenceItem
                 label="Firma binaria %PDF"
@@ -148,39 +174,34 @@ export default function MesaPartesVirtualPage() {
                 label="URL PUT prefirmada"
                 complete={Boolean(uploaded?.s3Key)}
               />
-              <EvidenceItem
-                label="AbortController disponible"
-                complete
-              />
+              <EvidenceItem label="AbortController disponible" complete />
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
-                3 · Control de horario LPAG
-              </p>
-              <h2 className="mt-1 text-xl font-semibold">
+          <section className={tarjetaGlass}>
+            <div className="mb-5">
+              <p className={etiquetaPaso}>3 · Control de horario LPAG</p>
+              <h2 className="mt-3 text-xl font-bold text-white sm:text-2xl">
                 Recepción legal
               </h2>
             </div>
-            <label className="block text-sm font-medium">
-              Fecha y hora de simulación
+            <label className={etiquetaCampo}>
+              <span className="block">Fecha y hora de simulación</span>
               <input
                 type="datetime-local"
                 value={simulationTime}
                 onChange={(event) => setSimulationTime(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className={campoEntrada}
               />
             </label>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-blue-200/80">
               Zona horaria oficial: <strong>America/Lima</strong> · Corte:
               <strong> 16:30</strong>
             </p>
             {simulationTime && (
               <button
                 type="button"
-                className="mt-3 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="mt-3 rounded-xl border border-white/30 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
                 onClick={() => setSimulationTime("")}
               >
                 Usar hora actual
@@ -189,7 +210,7 @@ export default function MesaPartesVirtualPage() {
             <div className="mt-4">
               <HorarioCorteNotice horario={horario} />
             </div>
-            <dl className="mt-4 space-y-2 text-sm">
+            <dl className="mt-4 grid gap-2">
               <SummaryRow
                 label="Condición"
                 value={
@@ -207,12 +228,10 @@ export default function MesaPartesVirtualPage() {
           </section>
         </div>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
-              4 · Resultado de radicación
-            </p>
-            <h2 className="mt-1 text-xl font-semibold">
+        <section className={tarjetaGlass}>
+          <div className="mb-5">
+            <p className={etiquetaPaso}>4 · Resultado de radicación</p>
+            <h2 className="mt-3 text-xl font-bold text-white sm:text-2xl">
               Evidencia de la demostración
             </h2>
           </div>
@@ -234,19 +253,31 @@ export default function MesaPartesVirtualPage() {
             <SummaryRow label="Asunto" value={asunto || "No ingresado"} />
           </div>
           {uploaded && (
-            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <div className="mt-4 rounded-2xl border border-emerald-400/40 bg-emerald-400/15 p-4 text-sm text-emerald-100">
               <strong>Documento cargado:</strong> el archivo{" "}
-              <code>{uploaded.file.name}</code> pasó Magic Bytes, generó
-              SHA-256 y obtuvo una clave del almacenamiento{" "}
-              <code>{uploaded.s3Key}</code>.
+              <code className="rounded bg-white/10 px-1.5 py-0.5 text-[11px]">
+                {uploaded.file.name}
+              </code>{" "}
+              pasó Magic Bytes, generó SHA-256 y obtuvo una clave del
+              almacenamiento{" "}
+              <code className="rounded bg-white/10 px-1.5 py-0.5 text-[11px]">
+                {uploaded.s3Key}
+              </code>
+              .
             </div>
           )}
         </section>
 
-        <footer className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
+        <footer className="rounded-2xl border border-white/10 bg-white/5 p-4 text-xs leading-6 text-blue-100/75 backdrop-blur">
           <strong>Evidencia / estado de pruebas:</strong> suite M2 disponible
-          en <code>tests/unit</code> y <code>tests/integration/m2</code>. Ejecuta <code>npm test</code> para
-          verificar Magic Bytes, SHA-256, cancelación y casos 16:29, 16:30,
+          en <code className="rounded bg-white/10 px-1.5 py-0.5">tests/unit</code>{" "}
+          y{" "}
+          <code className="rounded bg-white/10 px-1.5 py-0.5">
+            tests/integration/m2
+          </code>
+          . Ejecuta{" "}
+          <code className="rounded bg-white/10 px-1.5 py-0.5">npm test</code>{" "}
+          para verificar Magic Bytes, SHA-256, cancelación y casos 16:29, 16:30,
           posterior y día inhábil.
         </footer>
       </div>
@@ -262,10 +293,10 @@ function EvidenceItem({
   complete: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+    <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-blue-100">
       <span
         aria-hidden="true"
-        className={complete ? "text-emerald-600" : "text-slate-400"}
+        className={complete ? "text-emerald-300" : "text-blue-200/60"}
       >
         {complete ? "✓" : "○"}
       </span>
@@ -276,11 +307,13 @@ function EvidenceItem({
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 p-3">
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className="rounded-xl border border-white/15 bg-white/5 p-3.5">
+      <dt className="text-[11px] font-bold tracking-wider text-blue-200/80 uppercase">
         {label}
       </dt>
-      <dd className="mt-1 break-words font-medium text-slate-900">{value}</dd>
+      <dd className="mt-1 break-words text-sm font-semibold text-white">
+        {value}
+      </dd>
     </div>
   );
 }
