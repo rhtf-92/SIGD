@@ -4,10 +4,26 @@ import PersonaNaturalForm from "../../components/registro/PersonaNaturalForm";
 import PersonaJuridicaForm from "../../components/registro/PersonaJuridicaForm";
 import type { Natural, Juridical } from "../../types/registroCiudadano";
 import { apiClient } from "../../api/client";
+import { TRAMITE_WIZARD_STORAGE_KEY } from "../../hooks/useTramiteWizardReducer";
 
 export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const mergeIdPersonaToWizardDraft = (idPersona: string) => {
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    try {
+      const raw = window.sessionStorage.getItem(TRAMITE_WIZARD_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      parsed.identificacion = {
+        ...(parsed.identificacion ?? {}),
+        idPersona,
+      };
+      window.sessionStorage.setItem(TRAMITE_WIZARD_STORAGE_KEY, JSON.stringify(parsed));
+    } catch (err) {
+      console.warn('[RegistroCiudadano] No se pudo fusionar idPersona en el borrador del wizard:', err);
+    }
+  };
 
   const handleNaturalSubmit = async (data: Natural) => {
     console.log("POST /api/v1/auth/registro-ciudadano", data);
@@ -36,7 +52,11 @@ export default function RegistroCiudadanoPage() {
     };
 
     try {
-      await apiClient.post("/api/v1/auth/registro-ciudadano", payload);
+      const res = await apiClient.post("/api/v1/auth/registro-ciudadano", payload);
+      const idPersona = res.data?.idPersona;
+      if (idPersona) {
+        mergeIdPersonaToWizardDraft(idPersona);
+      }
     } catch (err) {
       console.warn("[RegistroCiudadano] Fallo de llamada a API en registro natural:", err);
     }
@@ -71,7 +91,11 @@ export default function RegistroCiudadanoPage() {
     };
 
     try {
-      await apiClient.post("/api/v1/auth/registro-persona-juridica", payload);
+      const res = await apiClient.post("/api/v1/auth/registro-persona-juridica", payload);
+      const idPersona = res.data?.idPersona;
+      if (idPersona) {
+        mergeIdPersonaToWizardDraft(idPersona);
+      }
     } catch (err) {
       console.warn("[RegistroCiudadano] Fallo de llamada a API en registro jurídica:", err);
     }

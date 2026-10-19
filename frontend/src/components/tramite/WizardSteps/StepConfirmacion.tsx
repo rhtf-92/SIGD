@@ -27,6 +27,7 @@ import type {
 } from '../../../types/tramiteWizardState';
 import QrCodeView from '../../common/QrCodeView';
 import { apiClient } from '../../../api/client';
+import { esRegistroVersionIdValido, esUuidCanonico } from '../../../types/procedimientoTupa';
 
 interface RadicacionVirtualResponse {
   expedienteId: string;
@@ -36,6 +37,7 @@ interface RadicacionVirtualResponse {
   fechaRadicacionLegal: string;
   diferidoPorCorte: boolean;
   totalFolios: number;
+  registroVersionId: string | null;
   qrSeguimientoUrl: string;
   cargoDigital: {
     codigo: string;
@@ -113,82 +115,51 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           ? identificacion.nombres
           : `${identificacion.nombres} ${identificacion.apellidos}`.trim();
 
-      const asuntoFinal =
-        documentos.asunto.trim().length >= 10
-          ? documentos.asunto.trim()
-          : `${documentos.asunto.trim()} - Solicitud de Trámite Institucional`;
+      const asuntoFinal = documentos.asunto.trim();
 
-      let idTipoTramite = documentos.tipoTramiteId;
-      if (
-        !idTipoTramite ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite) ||
-        idTipoTramite === '00000000-0000-0000-0000-000000000001'
-      ) {
-        try {
-          const respTipos = await apiClient.get<Array<{ id: string; codigo?: string; id_tipo_tramite?: string }>>(
-            '/api/v1/tramites/tipos',
-          );
-          if (Array.isArray(respTipos?.data) && respTipos.data.length > 0) {
-            const encontrado = respTipos.data.find(
-              (t) => t.codigo === documentos.tipoTramiteId || t.id === documentos.tipoTramiteId,
-            );
-            const resId = (encontrado ? (encontrado.id || encontrado.id_tipo_tramite) : (respTipos.data[0].id || respTipos.data[0].id_tipo_tramite));
-            if (resId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resId)) {
-              idTipoTramite = resId;
-            }
-          }
-        } catch {
-          // Fallback defensivo si el endpoint no está disponible en entorno aislado
-        }
-      }
-      if (!idTipoTramite || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite)) {
-        idTipoTramite = '00000000-0000-0000-0000-000000000001';
+      // Identificador técnico real del procedimiento (registroVersionId).
+      // Sin fallback a UUID fijo y sin auto-seleccionar la primera fila.
+      const registroVersionId = documentos.tipoTramiteId;
+      if (!esRegistroVersionIdValido(registroVersionId)) {
+        dispatch({
+          type: 'SET_ERROR',
+          payload:
+            'Debe seleccionar un procedimiento TUPA válido del catálogo oficial antes de radicar el expediente.',
+        });
+        dispatch({ type: 'SET_SUBMITTING', payload: false });
+        return;
       }
 
-      let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
-      try {
-        if (identificacion.numeroDocumento) {
-          const respPersona = await apiClient.get<{ persona?: { id: number | string } }>(
-            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(identificacion.numeroDocumento)}`
-          );
-          if (respPersona?.data?.persona?.id) {
-            idPersonaNum = Number(respPersona.data.persona.id);
-          }
-        }
-      } catch {
-        // Fallback defensivo
+      const idPersona = identificacion.idPersona;
+      if (!esUuidCanonico(idPersona)) {
+        dispatch({
+          type: 'SET_ERROR',
+          payload: 'No se dispone del UUID real de la persona registrada. Vuelva a identificarse antes de radicar.',
+        });
+        dispatch({ type: 'SET_SUBMITTING', payload: false });
+        return;
       }
 
-      const archivosPayload =
-        documentos.archivos.length > 0
-          ? documentos.archivos.map((a) => ({
-              nombreArchivo: a.nombre,
-              contentType: 'application/pdf',
-              tamanoBytes: Number(a.peso) || 1024,
-              hashSha256:
-                a.hashSha256 && /^[0-9a-f]{64}$/i.test(a.hashSha256)
-                  ? a.hashSha256.toLowerCase()
-                  : 'a'.repeat(64),
-            }))
-          : [
-              {
-                nombreArchivo: 'documento_principal.pdf',
-                contentType: 'application/pdf',
-                tamanoBytes: 2048,
-                hashSha256: 'a'.repeat(64),
-              },
-            ];
+      if (documentos.archivos.length === 0 || documentos.archivos.some((a) => !/^[0-9a-f]{64}$/i.test(a.hashSha256))) {
+        dispatch({ type: 'SET_ERROR', payload: 'Los documentos deben incluir una huella SHA-256 válida.' });
+        dispatch({ type: 'SET_SUBMITTING', payload: false });
+        return;
+      }
+
+      const archivosPayload = documentos.archivos.map((a) => ({
+        nombreArchivo: a.nombre,
+        contentType: 'application/pdf',
+        tamanoBytes: Number(a.peso),
+        hashSha256: a.hashSha256.toLowerCase(),
+      }));
 
       const payload = {
         asunto: asuntoFinal,
-        idTipoTramiteTupa: idTipoTramite,
-        idPersona: idPersonaNum,
-        nombreSolicitante:
-          nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
-        correo:
-          identificacion.correo.trim().toLowerCase() ||
-          'contacto@iestpsuiza.edu.pe',
-        totalFolios: Number(documentos.numeroFolios) || 1,
+        registroVersionId,
+        idPersona,
+        nombreSolicitante: nombreCompleto,
+        correo: identificacion.correo.trim().toLowerCase(),
+        totalFolios: Number(documentos.numeroFolios),
         documentos: archivosPayload,
       };
 
@@ -426,7 +397,11 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
             </button>
           </div>
           <p className="text-sm font-bold text-slate-900">
-            {documentos.tipoTramiteId || 'Procedimiento General Institucional'}
+            {documentos.tipoTramiteCodigo
+              ? `TUPA ${documentos.tipoTramiteCodigo}: ${documentos.tipoTramiteDenominacion ?? ''}`
+              : documentos.tipoTramiteDenominacion ||
+                documentos.tipoTramiteId ||
+                'Procedimiento General Institucional'}
           </p>
           <p className="text-xs text-slate-600">
             <span className="font-semibold">Folios:</span>{' '}

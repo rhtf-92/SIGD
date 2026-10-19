@@ -24,6 +24,13 @@ import type {
   ArchivoTramite,
   WizardAction,
 } from '../../../types/tramiteWizardState';
+import { useProcedimientosTupa } from '../../../hooks/useProcedimientosTupa';
+import {
+  TupaCatalogoCargando,
+  TupaCatalogoError,
+  TupaCatalogoVacio,
+} from '../TupaCatalogEstados';
+import TupaDetalleProcedimiento from '../TupaDetalleProcedimiento';
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
@@ -38,39 +45,6 @@ export interface StepDocumentosProps {
   isSubmitting?: boolean;
 }
 
-const CATALOGO_TUPA_INSTITUCIONAL = [
-  {
-    id: 'TUPA-01',
-    nombre: 'Certificado Oficial de Estudios (Por Semestre o Ciclo Completo)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-02',
-    nombre: 'Constancia de Matrícula, Egresado y No Adeudo',
-    unidad: 'Dirección de Asuntos Académicos',
-  },
-  {
-    id: 'TUPA-03',
-    nombre: 'Expedición de Título Profesional Técnico a Nombre de la Nación',
-    unidad: 'Área de Titulación y Grados',
-  },
-  {
-    id: 'TUPA-04',
-    nombre: 'Rectificación de Matrícula o Reserva de Vacante Temporal',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-05',
-    nombre: 'Convalidación y Homologación de Unidades Didácticas (Módulos)',
-    unidad: 'Coordinación de Programas de Estudio',
-  },
-  {
-    id: 'LIBRE-01',
-    nombre: 'Solicitud Formal General / Trámite Libre Institucional',
-    unidad: 'Mesa de Partes General',
-  },
-] as const;
-
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
@@ -84,6 +58,22 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [fileError, setFileError] = useState<string | null>(null);
+
+  // Catálogo TUPA versionado publicado por el backend definitivo.
+  const {
+    procedimientos,
+    cargando,
+    error: errorCatalogo,
+    estaVacio,
+    recargar,
+  } = useProcedimientosTupa();
+
+  const procedimientoSeleccionado = useMemo(
+    () => procedimientos.find((p) => p.registroVersionId === data.tipoTramiteId),
+    [procedimientos, data.tipoTramiteId],
+  );
+
+  const catalogoNoDisponible = cargando || Boolean(errorCatalogo) || estaVacio;
 
   // ===========================================================================
   // VALIDACIÓN REACTIVA EN TIEMPO REAL
@@ -129,6 +119,19 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     dispatch({
       type: 'UPDATE_DOCUMENTOS',
       payload: { [field]: value },
+    });
+  };
+
+  // El valor enviado SIEMPRE es el registroVersionId real devuelto por la API.
+  const handleSeleccionProcedimiento = (registroVersionId: string) => {
+    const seleccion = procedimientos.find((p) => p.registroVersionId === registroVersionId);
+    dispatch({
+      type: 'UPDATE_DOCUMENTOS',
+      payload: {
+        tipoTramiteId: registroVersionId,
+        tipoTramiteCodigo: seleccion?.codigo,
+        tipoTramiteDenominacion: seleccion?.denominacion,
+      },
     });
   };
 
@@ -260,23 +263,30 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 : undefined
             }
             value={data.tipoTramiteId}
-            onChange={(e) => handleFieldChange('tipoTramiteId', e.target.value)}
+            onChange={(e) => handleSeleccionProcedimiento(e.target.value)}
             onBlur={() => markTouched('tipoTramiteId')}
-            disabled={isSubmitting}
+            disabled={isSubmitting || catalogoNoDisponible}
             className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer ${
               touched.tipoTramiteId && errors.tipoTramiteId
                 ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
                 : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
-            } disabled:bg-slate-100`}
+            } disabled:bg-slate-100 disabled:cursor-not-allowed`}
           >
             <option value="">-- Seleccione un procedimiento oficial --</option>
-            {CATALOGO_TUPA_INSTITUCIONAL.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id} — {t.nombre} ({t.unidad})
+            {procedimientos.map((t) => (
+              <option key={t.registroVersionId} value={t.registroVersionId}>
+                {t.codigo ? `${t.codigo} — ${t.denominacion}` : t.denominacion}
               </option>
             ))}
           </select>
-          {touched.tipoTramiteId && errors.tipoTramiteId && (
+
+          {cargando && <TupaCatalogoCargando />}
+          {!cargando && errorCatalogo && (
+            <TupaCatalogoError error={errorCatalogo} onRetry={recargar} />
+          )}
+          {estaVacio && <TupaCatalogoVacio />}
+
+          {touched.tipoTramiteId && errors.tipoTramiteId && !catalogoNoDisponible && (
             <p
               id={`${formId}-tipoTramiteId-error`}
               role="alert"
@@ -284,6 +294,12 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             >
               {errors.tipoTramiteId}
             </p>
+          )}
+
+          {procedimientoSeleccionado && (
+            <div className="mt-3">
+              <TupaDetalleProcedimiento procedimiento={procedimientoSeleccionado} />
+            </div>
           )}
         </div>
 
