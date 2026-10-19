@@ -9,7 +9,7 @@ import type { MovimientoObjetivo } from '../../../../src/domains/rutadoc/rutadoc
 
 const clave = 'd29a4a94-e773-4c8e-9470-f32f180caf7c';
 const comando = { movimientoObjetivoId: '2', motivo: 'Corrección administrativa documentada', claveIdempotencia: clave };
-const actor: ActorRutaDoc = { id: '7', roles: ['MESA_PARTES'], puedeVerExpediente: () => true };
+const actor: ActorRutaDoc = { id: 'a3401043-807f-41f3-9de8-a042e4b312d4', roles: ['MESA_PARTES'], puedeVerExpediente: () => true };
 const objetivo: MovimientoObjetivo = {
   idMovimiento: 'cc423832-82c7-4e30-803f-6a637e40b8f6', expedienteId: '42', secuencia: '2',
   fechaHora: new Date('2026-09-24T10:00:00.000Z'), estadoAnterior: 'RECEPCIONADO',
@@ -121,7 +121,7 @@ describe('Reversión administrativa RutaDoc', () => {
     const resultado = await servicio.revertir('42', comando, actor, 'corr-1');
     expect(repo.insertar).toHaveBeenCalledOnce();
     expect(repo.insertar.mock.calls[0][1]).toMatchObject({ objetivo,
-      usuarioOperadorId: '7', correlationId: 'corr-1' });
+      usuarioOperadorId: actor.id, correlationId: 'corr-1' });
     expect(resultado).toMatchObject({ expedienteId: '42', movimientoRevertidoId: '2',
       movimientoCompensatorioId: '3', estadoAntesDeReversion: 'EN_CALIFICACION',
       estadoRestaurado: 'RECEPCIONADO', compensacionFolios: { estado: 'PENDIENTE' } });
