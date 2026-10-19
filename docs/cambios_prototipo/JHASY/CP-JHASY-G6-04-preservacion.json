@@ -1,0 +1,124 @@
+{
+  "purpose": "Pre-fast-forward preservation inventory of all existing modified and untracked project files",
+  "created_utc": "2026-10-16T22:37:12.519436+00:00",
+  "root": "C:\\Users\\Jhass\\Desktop\\SIGD-B_JHASY",
+  "branch": "B_JHASY",
+  "head_before": "6b6f18619a763b73dfe6f6afde51db5cef4d60bb",
+  "target": "4e06e512fe08d01712bc0b6feb33e95ca28c1b10",
+  "files": [
+    {
+      "path": "frontend/package-lock.json",
+      "status": " M",
+      "bytes": 197289,
+      "sha256": "38ce68d10ebdc0aa53f6d6a29eab6e5e3f0b538e68c7de899c9f71a20ab5cf15"
+    },
+    {
+      "path": "frontend/src/components/expedientes/BandejaTabFilter.tsx",
+      "status": " M",
+      "bytes": 653,
+      "sha256": "e2c6d8f4b2ddbefcd4a2d28607a2abb208374c24a4aeef870bc98f0e6593095c"
+    },
+    {
+      "path": "frontend/src/components/expedientes/ExpedienteTable.tsx",
+      "status": " M",
+      "bytes": 887,
+      "sha256": "98e4528cf57d1810f56a1906932f2d9b6181b5759d26f746b2e14b01305e7f0d"
+    },
+    {
+      "path": "frontend/src/hooks/useBandejaExpedientes.ts",
+      "status": " M",
+      "bytes": 399,
+      "sha256": "5df11c5ebdd44f916c68ab8477ed181be3e2bed862e632e0311a12d5629f7f5e"
+    },
+    {
+      "path": "frontend/src/hooks/useExpedienteTimeline.ts",
+      "status": " M",
+      "bytes": 355,
+      "sha256": "37ae0a7291a1329f9699e582dfebaf9de49c8eac0727c49202e2671634de9012"
+    },
+    {
+      "path": "frontend/src/pages/expedientes/BandejaExpedientesPage.tsx",
+      "status": " M",
+      "bytes": 3222,
+      "sha256": "90211abb8eed5f560121cc9742121326a6e35b194a2d1c9e3d9e8b081dce08dd"
+    },
+    {
+      "path": "frontend/src/pages/expedientes/ExpedienteDetallePage.tsx",
+      "status": " M",
+      "bytes": 4424,
+      "sha256": "f52c10642cb0cbc9da6989a284a0047b64d1bd8b4dd0fb0107decbfcb54f2c4b"
+    },
+    {
+      "path": "frontend/src/utils/foliadoValidator.test.ts",
+      "status": " M",
+      "bytes": 1085,
+      "sha256": "f3a7e882a89cdc2d33fd81f72ba5edba02d67e6039e05b57e1033bec6c4342d3"
+    },
+    {
+      "path": "docs/cambios_prototipo/JHASY/CP-JHASY-G6-04-frontend.md",
+      "status": "??",
+      "bytes": 15699,
+      "sha256": "26f135e8ccb2ff0d01598af3a6a6ff2c0ebf160fded8d8e517866a00bb340732"
+    },
+    {
+      "path": "frontend/src/pages/expedientes/rutadoc/RutaDocEstado.tsx",
+      "status": "??",
+      "bytes": 1124,
+      "sha256": "1158e0169d802b8430ec9b61fd05bfe46b953272c690c712937f1147fa74b913"
+    },
+    {
+      "path": "frontend/src/pages/expedientes/rutadoc/RutaDocFoliacion.tsx",
+      "status": "??",
+      "bytes": 502,
+      "sha256": "d84b45df4e90fc80ea73aecdf8f52e351498641b818181d5192d2ab96c9babf3"
+    },
+    {
+      "path": "frontend/src/pages/expedientes/rutadoc/RutaDocSla.tsx",
+      "status": "??",
+      "bytes": 927,
+      "sha256": "319b2d1a1cab379ba68e886d3d654e227b3cdb5ae346d00974ece58ba1bc1ec7"
+    },
+    {
+      "path": "frontend/src/pages/expedientes/rutadoc/RutaDocTimeline.tsx",
+      "status": "??",
+      "bytes": 832,
+      "sha256": "d02139c0e50aa38edb549a567b5087e74cec3408724c573dacd1c4f4ab44ec5f"
+    },
+    {
+      "path": "frontend/src/pages/expedientes/rutadoc/rutadoc.adapters.ts",
+      "status": "??",
+      "bytes": 936,
+      "sha256": "12eb24d1d361082cd37d9661b331b48ea970f487326d8f311fec7eecb48bf1bb"
+    },
+    {
+      "path": "frontend/src/pages/expedientes/rutadoc/rutadoc.dto.ts",
+      "status": "??",
+      "bytes": 3837,
+      "sha256": "61cc1c260ce24aec2f697e76d82d9c2e9798ee33b400420799b42abf3058d649"
+    },
+    {
+      "path": "frontend/src/pages/expedientes/rutadoc/rutadoc.service.ts",
+      "status": "??",
+      "bytes": 1633,
+      "sha256": "b07bf2793d28244aa2f8ab7456ef5a1035dc3555b4fce772277d11bb03dde0f9"
+    },
+    {
+      "path": "frontend/src/pages/expedientes/rutadoc/useRutaDocDetalle.ts",
+      "status": "??",
+      "bytes": 685,
+      "sha256": "334e79b382d2c599d876e7d884dc37c26295b215fbcdfb92c325ed5bf7ca20b9"
+    },
+    {
+      "path": "frontend/tests/integration/expedientes/rutadoc-g6-04.test.tsx",
+      "status": "??",
+      "bytes": 18234,
+      "sha256": "621811705b01ae5040e70b938a9e09f22aae81c3726e9d9d60b96779736d1b04"
+    },
+    {
+      "path": "frontend/tests/unit/pages/expedientes/rutadoc.adapters.test.ts",
+      "status": "??",
+      "bytes": 3234,
+      "sha256": "15162c3052e764c61768741a99a4a8bd75688aa872af0f33b2982699af878922"
+    }
+  ]
+}

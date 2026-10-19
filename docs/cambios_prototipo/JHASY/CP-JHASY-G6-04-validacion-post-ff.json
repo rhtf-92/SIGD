@@ -1,0 +1,202 @@
+{
+  "recorded_utc": "2026-10-16T22:55:22.221877+00:00",
+  "branch": "B_JHASY",
+  "head": "4e06e512fe08d01712bc0b6feb33e95ca28c1b10",
+  "update_method": "merge --ff-only 4e06e512fe08d01712bc0b6feb33e95ca28c1b10",
+  "staged_for_update_only": [
+    "frontend/package-lock.json"
+  ],
+  "new_commit_created": false,
+  "preservation_immediately_after_ff": {
+    "checked": 19,
+    "preserved": 19,
+    "files": [
+      {
+        "path": "frontend/package-lock.json",
+        "before_sha256": "38ce68d10ebdc0aa53f6d6a29eab6e5e3f0b538e68c7de899c9f71a20ab5cf15",
+        "after_sha256": "38ce68d10ebdc0aa53f6d6a29eab6e5e3f0b538e68c7de899c9f71a20ab5cf15",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/components/expedientes/BandejaTabFilter.tsx",
+        "before_sha256": "e2c6d8f4b2ddbefcd4a2d28607a2abb208374c24a4aeef870bc98f0e6593095c",
+        "after_sha256": "e2c6d8f4b2ddbefcd4a2d28607a2abb208374c24a4aeef870bc98f0e6593095c",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/components/expedientes/ExpedienteTable.tsx",
+        "before_sha256": "98e4528cf57d1810f56a1906932f2d9b6181b5759d26f746b2e14b01305e7f0d",
+        "after_sha256": "98e4528cf57d1810f56a1906932f2d9b6181b5759d26f746b2e14b01305e7f0d",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/hooks/useBandejaExpedientes.ts",
+        "before_sha256": "5df11c5ebdd44f916c68ab8477ed181be3e2bed862e632e0311a12d5629f7f5e",
+        "after_sha256": "5df11c5ebdd44f916c68ab8477ed181be3e2bed862e632e0311a12d5629f7f5e",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/hooks/useExpedienteTimeline.ts",
+        "before_sha256": "37ae0a7291a1329f9699e582dfebaf9de49c8eac0727c49202e2671634de9012",
+        "after_sha256": "37ae0a7291a1329f9699e582dfebaf9de49c8eac0727c49202e2671634de9012",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/pages/expedientes/BandejaExpedientesPage.tsx",
+        "before_sha256": "90211abb8eed5f560121cc9742121326a6e35b194a2d1c9e3d9e8b081dce08dd",
+        "after_sha256": "90211abb8eed5f560121cc9742121326a6e35b194a2d1c9e3d9e8b081dce08dd",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/pages/expedientes/ExpedienteDetallePage.tsx",
+        "before_sha256": "f52c10642cb0cbc9da6989a284a0047b64d1bd8b4dd0fb0107decbfcb54f2c4b",
+        "after_sha256": "f52c10642cb0cbc9da6989a284a0047b64d1bd8b4dd0fb0107decbfcb54f2c4b",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/utils/foliadoValidator.test.ts",
+        "before_sha256": "f3a7e882a89cdc2d33fd81f72ba5edba02d67e6039e05b57e1033bec6c4342d3",
+        "after_sha256": "f3a7e882a89cdc2d33fd81f72ba5edba02d67e6039e05b57e1033bec6c4342d3",
+        "preserved": true
+      },
+      {
+        "path": "docs/cambios_prototipo/JHASY/CP-JHASY-G6-04-frontend.md",
+        "before_sha256": "26f135e8ccb2ff0d01598af3a6a6ff2c0ebf160fded8d8e517866a00bb340732",
+        "after_sha256": "26f135e8ccb2ff0d01598af3a6a6ff2c0ebf160fded8d8e517866a00bb340732",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/pages/expedientes/rutadoc/RutaDocEstado.tsx",
+        "before_sha256": "1158e0169d802b8430ec9b61fd05bfe46b953272c690c712937f1147fa74b913",
+        "after_sha256": "1158e0169d802b8430ec9b61fd05bfe46b953272c690c712937f1147fa74b913",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/pages/expedientes/rutadoc/RutaDocFoliacion.tsx",
+        "before_sha256": "d84b45df4e90fc80ea73aecdf8f52e351498641b818181d5192d2ab96c9babf3",
+        "after_sha256": "d84b45df4e90fc80ea73aecdf8f52e351498641b818181d5192d2ab96c9babf3",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/pages/expedientes/rutadoc/RutaDocSla.tsx",
+        "before_sha256": "319b2d1a1cab379ba68e886d3d654e227b3cdb5ae346d00974ece58ba1bc1ec7",
+        "after_sha256": "319b2d1a1cab379ba68e886d3d654e227b3cdb5ae346d00974ece58ba1bc1ec7",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/pages/expedientes/rutadoc/RutaDocTimeline.tsx",
+        "before_sha256": "d02139c0e50aa38edb549a567b5087e74cec3408724c573dacd1c4f4ab44ec5f",
+        "after_sha256": "d02139c0e50aa38edb549a567b5087e74cec3408724c573dacd1c4f4ab44ec5f",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/pages/expedientes/rutadoc/rutadoc.adapters.ts",
+        "before_sha256": "12eb24d1d361082cd37d9661b331b48ea970f487326d8f311fec7eecb48bf1bb",
+        "after_sha256": "12eb24d1d361082cd37d9661b331b48ea970f487326d8f311fec7eecb48bf1bb",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/pages/expedientes/rutadoc/rutadoc.dto.ts",
+        "before_sha256": "61cc1c260ce24aec2f697e76d82d9c2e9798ee33b400420799b42abf3058d649",
+        "after_sha256": "61cc1c260ce24aec2f697e76d82d9c2e9798ee33b400420799b42abf3058d649",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/pages/expedientes/rutadoc/rutadoc.service.ts",
+        "before_sha256": "b07bf2793d28244aa2f8ab7456ef5a1035dc3555b4fce772277d11bb03dde0f9",
+        "after_sha256": "b07bf2793d28244aa2f8ab7456ef5a1035dc3555b4fce772277d11bb03dde0f9",
+        "preserved": true
+      },
+      {
+        "path": "frontend/src/pages/expedientes/rutadoc/useRutaDocDetalle.ts",
+        "before_sha256": "334e79b382d2c599d876e7d884dc37c26295b215fbcdfb92c325ed5bf7ca20b9",
+        "after_sha256": "334e79b382d2c599d876e7d884dc37c26295b215fbcdfb92c325ed5bf7ca20b9",
+        "preserved": true
+      },
+      {
+        "path": "frontend/tests/integration/expedientes/rutadoc-g6-04.test.tsx",
+        "before_sha256": "621811705b01ae5040e70b938a9e09f22aae81c3726e9d9d60b96779736d1b04",
+        "after_sha256": "621811705b01ae5040e70b938a9e09f22aae81c3726e9d9d60b96779736d1b04",
+        "preserved": true
+      },
+      {
+        "path": "frontend/tests/unit/pages/expedientes/rutadoc.adapters.test.ts",
+        "before_sha256": "15162c3052e764c61768741a99a4a8bd75688aa872af0f33b2982699af878922",
+        "after_sha256": "15162c3052e764c61768741a99a4a8bd75688aa872af0f33b2982699af878922",
+        "preserved": true
+      }
+    ]
+  },
+  "frontend_validation": {
+    "command": "npm.cmd test -- tests/unit/pages/expedientes/rutadoc.adapters.test.ts tests/integration/expedientes/rutadoc-g6-04.test.tsx src/utils/foliadoValidator.test.ts tests/unit/pages/BandejaExpedientesPage.test.tsx src/components/expedientes/BandejaExpedientesPage.test.tsx tests/unit/components/ExpedienteTimeline.test.tsx tests/unit/components/FoliadoDocumentoViewer.test.tsx tests/unit/components/slaBadge.test.tsx tests/unit/hooks/useExpedienteActions.test.tsx tests/unit/api/expedienteActions.test.ts src/api/ccdFoliado.test.ts src/components/expedientes/RegistroFoliado.test.tsx",
+    "cwd": "frontend",
+    "exit_code": 0,
+    "suite_count": 12,
+    "tests_passed": 122,
+    "tests_failed": 0,
+    "typecheck": {
+      "command": "npm.cmd run typecheck",
+      "exit_code": 0
+    },
+    "suite_sha256": [
+      {
+        "path": "frontend/tests/unit/pages/expedientes/rutadoc.adapters.test.ts",
+        "sha256": "15162c3052e764c61768741a99a4a8bd75688aa872af0f33b2982699af878922"
+      },
+      {
+        "path": "frontend/tests/integration/expedientes/rutadoc-g6-04.test.tsx",
+        "sha256": "621811705b01ae5040e70b938a9e09f22aae81c3726e9d9d60b96779736d1b04"
+      },
+      {
+        "path": "frontend/src/utils/foliadoValidator.test.ts",
+        "sha256": "f3a7e882a89cdc2d33fd81f72ba5edba02d67e6039e05b57e1033bec6c4342d3"
+      },
+      {
+        "path": "frontend/tests/unit/pages/BandejaExpedientesPage.test.tsx",
+        "sha256": "a03efc1b67e07c81332d3f71328c148ff4d7ba8ada7325d277431e913c676ef2"
+      },
+      {
+        "path": "frontend/src/components/expedientes/BandejaExpedientesPage.test.tsx",
+        "sha256": "c75991c83787f727104e1226cf50c220558d7340214494c3b80c236176f1a7cc"
+      },
+      {
+        "path": "frontend/tests/unit/components/ExpedienteTimeline.test.tsx",
+        "sha256": "3a7597baf86d1bbb6342a0034790cf8680de6d233a6f0c6474d105580f8a6801"
+      },
+      {
+        "path": "frontend/tests/unit/components/FoliadoDocumentoViewer.test.tsx",
+        "sha256": "b24dce2c336d613157a4ae57e6b2a65752ccf822a5844c1a184a033790cda5fe"
+      },
+      {
+        "path": "frontend/tests/unit/components/slaBadge.test.tsx",
+        "sha256": "7bf4dc91c6f22a51977f5327b12a8c0af2e219b7de3d225e400b5f3b9ab5c601"
+      },
+      {
+        "path": "frontend/tests/unit/hooks/useExpedienteActions.test.tsx",
+        "sha256": "bb274a2a61cb0bae8dfd3aa35f55649a0641f3329231e0df76d1d0d169eed193"
+      },
+      {
+        "path": "frontend/tests/unit/api/expedienteActions.test.ts",
+        "sha256": "e5995669f5fee7e5dd2d0f06eb0bf9724e6fc89cea17474234f93b9e049d33c0"
+      },
+      {
+        "path": "frontend/src/api/ccdFoliado.test.ts",
+        "sha256": "206654631a3d4c18a10a928e484b24a6e6d9dace1f09c1de75f760e5dd3dd06e"
+      },
+      {
+        "path": "frontend/src/components/expedientes/RegistroFoliado.test.tsx",
+        "sha256": "d98e49ef975ab1d0339e4fe203de4cccafde313a15868dea2ffd7327d6aab4c2"
+      }
+    ]
+  },
+  "working_tree_original_worktree_head": "6b6f18619a763b73dfe6f6afde51db5cef4d60bb",
+  "final_preservation": {
+    "checked_utc": "2026-10-16T22:57:31.211926+00:00",
+    "unchanged_original_paths": 18,
+    "failures": [],
+    "report_updated_as_authorized": true,
+    "report_original_copy": "docs/cambios_prototipo/JHASY/CP-JHASY-G6-04-frontend-antes-ff.md",
+    "report_original_sha256_preserved": true,
+    "report_current_sha256": "9769eabc95e2dd7038af84fc8feee1fce1f3dbacce2f2267c829489cdc53c8a5"
+  }
+}

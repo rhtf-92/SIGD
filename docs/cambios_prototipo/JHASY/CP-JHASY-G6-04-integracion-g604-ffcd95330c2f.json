@@ -1,0 +1,305 @@
+{
+  "run": "g604-ffcd95330c2f",
+  "started_utc": "2026-10-16T22:54:24.818004+00:00",
+  "checks": [
+    {
+      "check": "exact_branch_target",
+      "pass": true
+    },
+    {
+      "check": "fresh_net",
+      "pass": true
+    },
+    {
+      "check": "fresh_work",
+      "pass": true
+    },
+    {
+      "check": "fresh_pg",
+      "pass": true
+    },
+    {
+      "check": "fresh_api",
+      "pass": true
+    },
+    {
+      "check": "empty_new_database_not_demo",
+      "pass": true
+    },
+    {
+      "check": "postgres_tmpfs_no_volume",
+      "pass": true
+    },
+    {
+      "check": "backend_manifests_unchanged",
+      "pass": true
+    },
+    {
+      "check": "baseline_ledger_seven_scripts",
+      "pass": true
+    },
+    {
+      "check": "real_operator_login",
+      "pass": true
+    },
+    {
+      "check": "real_citizen_login",
+      "pass": true
+    },
+    {
+      "check": "http_401_no_token",
+      "pass": true
+    },
+    {
+      "check": "http_403_bandeja_role",
+      "pass": true
+    },
+    {
+      "check": "http_400_invalid_uuid",
+      "pass": true
+    },
+    {
+      "check": "http_404_missing_uuid",
+      "pass": true
+    },
+    {
+      "check": "first_page_real",
+      "pass": true
+    },
+    {
+      "check": "opaque_cursor_distinct_pages",
+      "pass": true
+    },
+    {
+      "check": "detail_uuid_0",
+      "pass": true
+    },
+    {
+      "check": "history_isolation_0",
+      "pass": true
+    },
+    {
+      "check": "folios_isolation_0",
+      "pass": true
+    },
+    {
+      "check": "real_sla_0",
+      "pass": true
+    },
+    {
+      "check": "detail_uuid_1",
+      "pass": true
+    },
+    {
+      "check": "history_isolation_1",
+      "pass": true
+    },
+    {
+      "check": "folios_isolation_1",
+      "pass": true
+    },
+    {
+      "check": "real_sla_1",
+      "pass": true
+    },
+    {
+      "check": "edge_available",
+      "pass": true
+    },
+    {
+      "check": "frontend_browser_real_API",
+      "pass": true
+    }
+  ],
+  "resources": {
+    "database": "g604_ffcd95330c2f",
+    "postgres": "g604-ffcd95330c2f-pg",
+    "backend": "g604-ffcd95330c2f-api",
+    "network": "g604-ffcd95330c2f-net",
+    "dependency_volume": "g604-ffcd95330c2f-work",
+    "postgres_storage": "new tmpfs",
+    "reused_existing_resources": false,
+    "images": [
+      "postgres:18-alpine",
+      "node:24.19-bookworm-slim"
+    ]
+  },
+  "cleanup": [
+    {
+      "kind": "container",
+      "name": "g604-ffcd95330c2f-api",
+      "removed": true
+    },
+    {
+      "kind": "container",
+      "name": "g604-ffcd95330c2f-pg",
+      "removed": true
+    },
+    {
+      "kind": "volume",
+      "name": "g604-ffcd95330c2f-work",
+      "removed": true
+    },
+    {
+      "kind": "network",
+      "name": "g604-ffcd95330c2f-net",
+      "removed": true
+    }
+  ],
+  "status": "PASS",
+  "branch": "B_JHASY",
+  "head": "4e06e512fe08d01712bc0b6feb33e95ca28c1b10",
+  "postgres_storage_evidence": {
+    "tmpfs": {
+      "/var/lib/postgresql": "rw"
+    },
+    "mount_types": []
+  },
+  "backend_dependencies_exit": 0,
+  "api_origin": "http://127.0.0.1:56015",
+  "ledger": [
+    "01_sigd_audit.sql",
+    "02_sigd_auth.sql",
+    "03_sigd_org.sql",
+    "04_sigd_doc.sql",
+    "05_sigd_tra.sql",
+    "08_sigd_tupa_acoplamiento.sql",
+    "BASELINE_2026_V1.sql"
+  ],
+  "fixture_uuids": [
+    "c85829ff-bec9-484e-8162-7484e456cfc6",
+    "d5069ba4-e757-4003-8c9d-2e5fb23e7a20"
+  ],
+  "browser": {
+    "status": "PASS",
+    "checks": [
+      {
+        "check": "browser_bandeja_real",
+        "pass": true
+      },
+      {
+        "check": "browser_paginacion_real",
+        "pass": true
+      },
+      {
+        "check": "browser_aislamiento_0",
+        "pass": true
+      },
+      {
+        "check": "browser_acciones_bloqueadas_0",
+        "pass": true
+      },
+      {
+        "check": "browser_sla_literal_0",
+        "pass": true
+      },
+      {
+        "check": "browser_aislamiento_1",
+        "pass": true
+      },
+      {
+        "check": "browser_acciones_bloqueadas_1",
+        "pass": true
+      },
+      {
+        "check": "browser_sla_literal_1",
+        "pass": true
+      },
+      {
+        "check": "browser_sin_escrituras",
+        "pass": true
+      }
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes/c85829ff-bec9-484e-8162-7484e456cfc6"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes/c85829ff-bec9-484e-8162-7484e456cfc6"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes/c85829ff-bec9-484e-8162-7484e456cfc6/foliacion"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes/c85829ff-bec9-484e-8162-7484e456cfc6/sla-status"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes/c85829ff-bec9-484e-8162-7484e456cfc6/trazabilidad"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes/c85829ff-bec9-484e-8162-7484e456cfc6/foliacion"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes/c85829ff-bec9-484e-8162-7484e456cfc6/sla-status"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes/c85829ff-bec9-484e-8162-7484e456cfc6/trazabilidad"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes/d5069ba4-e757-4003-8c9d-2e5fb23e7a20"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes/d5069ba4-e757-4003-8c9d-2e5fb23e7a20"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes/d5069ba4-e757-4003-8c9d-2e5fb23e7a20/foliacion"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes/d5069ba4-e757-4003-8c9d-2e5fb23e7a20/sla-status"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/expedientes/d5069ba4-e757-4003-8c9d-2e5fb23e7a20/trazabilidad"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes/d5069ba4-e757-4003-8c9d-2e5fb23e7a20/foliacion"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes/d5069ba4-e757-4003-8c9d-2e5fb23e7a20/sla-status"
+      },
+      {
+        "method": "OPTIONS",
+        "path": "/api/v1/expedientes/d5069ba4-e757-4003-8c9d-2e5fb23e7a20/trazabilidad"
+      }
+    ]
+  },
+  "finished_utc": "2026-10-16T22:55:06.631851+00:00"
+}
