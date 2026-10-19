@@ -224,33 +224,33 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     descripcion: 'Unidades orgánicas del IESTP "Suiza" con su nivel jerárquico.',
     soloActivos: true,
     sql: `
-      SELECT a.sigla        AS codigo,
+      SELECT a.codigo       AS codigo,
              a.nombre       AS nombre,
              NULL::text     AS descripcion,
              jsonb_build_object(
-                 'id_area', a.id_area,
-                 'nivel_organizacional', a.nivel_organizacional
+                 'id_area', a.area_id,
+                 'nivel_organizacional', a.nivel
              ) AS extra
         FROM sigd_org.area AS a
-       WHERE ($1 = FALSE OR a.activo = TRUE)
-       ORDER BY a.nivel_organizacional, a.nombre`,
+       WHERE ($1 = FALSE OR a.vigente = TRUE)
+       ORDER BY a.nivel, a.nombre`,
   },
   {
     clave: 'unidades_organicas_ltree',
     esquema: 'sigd_org',
-    tabla: 'unidad_organica',
+    tabla: 'area',
     descripcion: 'Unidades orgánicas del esquema v6.3 con ruta jerárquica ltree.',
     soloActivos: true,
     sql: `
-      SELECT u.sigla  AS codigo,
+      SELECT u.codigo AS codigo,
              u.nombre AS nombre,
              NULL::text AS descripcion,
              jsonb_build_object(
-                 'id', u.id,
+                 'id', u.area_id,
                  'path', u.path::text
              ) AS extra
-        FROM sigd_org.unidad_organica AS u
-       WHERE ($1 = FALSE OR u.estado = TRUE)
+        FROM sigd_org.area AS u
+       WHERE ($1 = FALSE OR u.vigente = TRUE)
        ORDER BY u.path`,
   },
   {
@@ -265,7 +265,7 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
              c.descripcion AS descripcion,
              '{}'::jsonb AS extra
         FROM sigd_org.cargo AS c
-       WHERE ($1 = FALSE OR c.activo = TRUE)
+       WHERE ($1 = FALSE OR c.vigente = TRUE)
        ORDER BY c.nombre`,
   },
   {
@@ -280,7 +280,7 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
              r.descripcion AS descripcion,
              '{}'::jsonb   AS extra
         FROM sigd_org.rol_sistema AS r
-       WHERE ($1 = FALSE OR r.activo = TRUE)
+       WHERE ($1 = FALSE OR r.vigente = TRUE)
        ORDER BY r.codigo`,
   },
   {
@@ -292,10 +292,9 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     sql: `
       SELECT p.codigo      AS codigo,
              p.codigo      AS nombre,
-             p.descripcion AS descripcion,
-             jsonb_build_object('alcance_predeterminado', p.alcance_predeterminado) AS extra
+             NULL::text AS descripcion,
+             jsonb_build_object('ambito', p.ambito) AS extra
         FROM sigd_org.permiso_sistema AS p
-       WHERE ($1 = FALSE OR p.activo = TRUE)
        ORDER BY p.codigo`,
   },
   {
@@ -352,9 +351,9 @@ async function consultarCatalogo(
   };
 
   try {
-    const resultado = await pool.query<ItemCatalogo>(definicion.sql, [
-      soloActivos && definicion.soloActivos,
-    ]);
+    const resultado = definicion.sql.includes('$1')
+      ? await pool.query<ItemCatalogo>(definicion.sql, [soloActivos && definicion.soloActivos])
+      : await pool.query<ItemCatalogo>(definicion.sql);
     return {
       ...base,
       disponible: true,
