@@ -85,15 +85,32 @@ export const radicacionVirtualSchema = z
       .refine(
         (valor) => valor !== '00000000-0000-0000-0000-000000000000',
         'El tipo de tramite no puede ser el UUID nulo.',
-      ),
-    // `sigd_auth.persona.id` es BIGSERIAL en el DDL canonico de IdentiCore, de
-    // modo que el identificador del solicitante llega como entero. Se acepta
-    // tambien string porque las variables de ruta y los formularios del
-    // frontend serializan todo como texto.
-    idPersona: z.coerce
-      .number()
-      .int('El administrado debe ser un identificador entero.')
-      .positive('El administrado debe ser un identificador entero positivo.'),
+      )
+      .optional()
+      .nullable(),
+    // El padron canonico usa sigd_auth.persona.id_persona UUID (02_sigd_auth.sql:26).
+    // El identificador del administrado llega como UUID string, igual que el
+    // expediente; no se aceptan enteros ni conversiones desde BIGINT.
+    idPersona: z
+      .string()
+      .trim()
+      .uuid('El administrado debe ser un UUID valido del padron (sigd_auth.persona.id_persona).'),
+    // Columna NOT NULL de sigd_tra.expediente (05_sigd_tra.sql:96). Se admite opcional
+    // para resolver por omisión el tipo documental activo institucional si no se envía.
+    tipoDocumentalId: z
+      .string()
+      .trim()
+      .uuid('El tipo documental debe ser un UUID valido de sigd_doc.tipo_documento.')
+      .optional(),
+    // Identificador de la version TUPA APROBADA publicada en
+    // sigd_doc.tupa_registro_version. Obligatorio si el usuario selecciona TUPA;
+    // ausente o null para flujo libre.
+    registroVersionId: z
+      .string()
+      .trim()
+      .uuid('registroVersionId debe ser un UUID valido de sigd_doc.tupa_registro_version.')
+      .optional()
+      .nullable(),
     // T-BE-TC-02 exige certificar los datos completos del solicitante y
     // rechazar los correos invalidos. Se capturan en el acto de la radicacion
     // porque el cargo digital y las notificaciones de seguimiento se dirigen a
@@ -155,3 +172,15 @@ export const consultaPublicaParamsSchema = z
 export type AdjuntoRadicacionInput = z.infer<typeof adjuntoRadicacionSchema>;
 export type RadicacionVirtualInput = z.infer<typeof radicacionVirtualSchema>;
 export type ConsultaPublicaParams = z.infer<typeof consultaPublicaParamsSchema>;
+
+/** Parametro de ruta para lecturas de contexto TUPA por expediente (UUID canonico). */
+export const expedienteTupaParamsSchema = z
+  .object({
+    expedienteId: z
+      .string()
+      .trim()
+      .uuid('El identificador del expediente debe ser un UUID valido.'),
+  })
+  .strict();
+
+export type ExpedienteTupaParams = z.infer<typeof expedienteTupaParamsSchema>;

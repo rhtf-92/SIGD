@@ -5,8 +5,13 @@ import { z } from 'zod';
 import { ConsultaPublicaService } from './consultaPublica.service.js';
 import { RadicacionVirtualService, type ProveedorFeriados } from './radicacionVirtual.service.js';
 import { VentanillaPresencialService } from './ventanillaPresencial.service.js';
+import { TupaVersionadoService } from './tupaVersionado.service.js';
 import { TicketTermicoUtil } from './ticketTermico.util.js';
-import { consultaPublicaParamsSchema, radicacionVirtualSchema } from './tramites.schemas.js';
+import {
+  consultaPublicaParamsSchema,
+  expedienteTupaParamsSchema,
+  radicacionVirtualSchema,
+} from './tramites.schemas.js';
 import { NotFoundError } from '../../shared/domain/errors/index.js';
 
 const ventanillaPresencialSchema = z.object({
@@ -16,16 +21,20 @@ const ventanillaPresencialSchema = z.object({
   foliosTotales: z.coerce.number().int().positive(),
   areaDestinoId: z.string().uuid().optional(),
   tipoDocumentalId: z.string().uuid().optional(),
+  registroVersionId: z.string().uuid('registroVersionId debe ser un UUID valido.').optional().nullable(),
 });
 
 /**
- * Endpoints del dominio TramiCore (Grupo 2 - OE2)
+ * Endpoints del dominio TramiCore (Grupo 2 - OE2 / Integración TUPA 2026)
  *
  *   * #14 `POST /api/v1/tramites/radicacion-virtual` — radicación ciudadana en Mesa de Partes Virtual
  *   * #15 `POST /api/v1/tramites/ventanilla-presencial` — radicación física en ventanilla y ticket térmico
- *   * #15-Cat `GET /api/v1/tramites/tipos` / `/tramites/tupa` — catálogo de procedimientos TUPA
+ *   * `GET  /api/v1/tramites/tupa` — catálogo canónico TUPA versionado (sigd_doc.tupa_registro_version)
+ *   * `GET  /api/v1/tramites/tipos` — catálogo legado (sigd_doc.tipo_tramite_tupa) por compatibilidad
  *   * #16 `GET  /api/v1/tramites/consulta-publica/:cut` — consulta pública del estado procesal
  *   * #20 `GET  /api/v1/tramites/ventanilla/cargo/:cut` — datos del cargo de recepción física para impresión
+ *   * `GET  /api/v1/tramites/expedientes/:expedienteId` — detalle del expediente con contexto TUPA
+ *   * `GET  /api/v1/tramites/expedientes/:expedienteId/tupa` — contexto TUPA persistido del expediente
  */
 export function crearRouterTramites(
   pool: Pool,
@@ -35,6 +44,7 @@ export function crearRouterTramites(
   const radicacionService = new RadicacionVirtualService(pool, obtenerFeriados);
   const ventanillaService = new VentanillaPresencialService(pool);
   const consultaService = new ConsultaPublicaService(pool);
+  const tupaService = new TupaVersionadoService(pool);
 
   // #14 — Radicación virtual (Mesa de Partes Virtual 24x7)
   router.post('/tramites/radicacion-virtual', async (req: Request, res: Response) => {
@@ -48,6 +58,7 @@ export function crearRouterTramites(
       fechaRadicacionLegal: radicacion.fechaRadicacionLegal,
       diferidoPorCorte: radicacion.fueraDeHorario,
       totalFolios: radicacion.totalFolios,
+      registroVersionId: radicacion.registroVersionId ?? null,
       qrSeguimientoUrl: radicacion.cargoDigital.qrContenido,
       cargoDigital: radicacion.cargoDigital,
       mensajeLegal: radicacion.mensajeLegal,
@@ -57,11 +68,20 @@ export function crearRouterTramites(
   // #15 — Radicación física en Ventanilla Presencial
   router.post('/tramites/ventanilla-presencial', async (req: Request, res: Response) => {
     const datos = ventanillaPresencialSchema.parse(req.body);
-    const resultado = await ventanillaService.registrarExpedienteVentanilla(datos);
+    const resultado = await ventanillaService.registrarExpedienteVentanilla({
+      ...datos,
+      registroVersionId: datos.registroVersionId ?? undefined,
+    });
     res.status(201).json(resultado);
   });
 
-  // #15 en catálogo — Catálogo de tipos de trámite TUPA y trámites internos
+  // Catálogo TUPA versionado 2026 (sigd_doc.tupa_registro_version)
+  router.get('/tramites/tupa', async (_req: Request, res: Response) => {
+    const catalogo = await tupaService.listarAprobados();
+    res.status(200).json(catalogo);
+  });
+
+  // Catálogo legado (sigd_doc.tipo_tramite_tupa) por compatibilidad
   const handlerTiposTupa = async (_req: Request, res: Response) => {
     const query = `
       SELECT tipo_tramite_id AS id,
@@ -85,7 +105,6 @@ export function crearRouterTramites(
   };
 
   router.get('/tramites/tipos', handlerTiposTupa);
-  router.get('/tramites/tupa', handlerTiposTupa);
 
   // #16 — Consulta pública por CUT
   router.get('/tramites/consulta-publica/:cut', async (req: Request, res: Response) => {
@@ -133,6 +152,26 @@ export function crearRouterTramites(
       ticketTermicoTexto: ticketImpresion,
     });
   });
+
+  // Detalle del expediente con contexto TUPA
+  const handlerDetalleExpediente = async (req: Request, res: Response) => {
+    const params = expedienteTupaParamsSchema.parse(req.params);
+    const detalle = await radicacionService.obtenerDetalleExpediente(params.expedienteId);
+    res.status(200).json(detalle);
+  };
+
+  router.get('/tramites/expedientes/:expedienteId', handlerDetalleExpediente);
+  router.get('/tramites/expediente/:expedienteId', handlerDetalleExpediente);
+
+  // Contexto TUPA persistido del expediente
+  const handlerContextoTupa = async (req: Request, res: Response) => {
+    const params = expedienteTupaParamsSchema.parse(req.params);
+    const contexto = await tupaService.obtenerContextoExpediente(params.expedienteId);
+    res.status(200).json(contexto);
+  };
+
+  router.get('/tramites/expedientes/:expedienteId/tupa', handlerContextoTupa);
+  router.get('/tramites/expediente/:expedienteId/tupa', handlerContextoTupa);
 
   return router;
 }
