@@ -1,212 +1,412 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ChevronDown,
-  LayoutDashboard,
-  LogIn,
-  LogOut,
-  Settings,
-  ShieldCheck,
-} from "lucide-react";
-
+import { filtrarModulosPorRol, useSesion } from "../config/accesoModulos";
 import { useAuthStore } from "../stores/authStore";
-import { useAutenticado, useRolActual } from "../hooks/useModulosVisibles";
-import { puedeAcceder } from "../config/modulos";
-import { ETIQUETA_ROL } from "../utils/etiquetaRol";
-import { inicialesNombre } from "../utils/iniciales";
-import AjustesUsuarioModal from "./ajustes/AjustesUsuarioModal";
+
+type ModalPerfil = null | "info" | "datos";
+
+function iniciales(nombre?: string | null, rol?: string | null): string {
+  if (nombre) {
+    const partes = nombre.trim().split(/\s+/).filter(Boolean);
+    if (partes.length >= 2) return `${partes[0][0]}${partes[1][0]}`.toUpperCase();
+    if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  }
+  if (rol) return rol.slice(0, 2).toUpperCase();
+  return "?";
+}
 
 export default function HeaderInstitucional() {
   const navigate = useNavigate();
-  const autenticado = useAutenticado();
-  const rol = useRolActual();
-  const usuario = useAuthStore((state) => state.usuario);
-  const cerrarSesion = useAuthStore((state) => state.logout);
+  const { rol, autenticado } = useSesion();
+  const usuario = useAuthStore((s) => s.usuario);
+  const logout = useAuthStore((s) => s.logout);
   const [menuAbierto, setMenuAbierto] = useState(false);
-  const [ajustesAbierto, setAjustesAbierto] = useState(false);
+  const [perfilAbierto, setPerfilAbierto] = useState(false);
+  const [modal, setModal] = useState<ModalPerfil>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const perfilRef = useRef<HTMLDivElement>(null);
+  // Solo los módulos correspondientes al rol autenticado (filtrado estricto por BD/RBAC).
+  // Sin sesión: únicamente módulos públicos.
+  const visibles = filtrarModulosPorRol(rol, autenticado);
 
+  // Cerrar menús con Escape y con clic fuera.
   useEffect(() => {
-    if (!menuAbierto) return;
-
-    function handleClickExterno(evento: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(evento.target as Node)) {
+    if (!menuAbierto && !perfilAbierto && !modal) return;
+    const onTecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
         setMenuAbierto(false);
+        setPerfilAbierto(false);
+        setModal(null);
       }
+    };
+    const onClicFuera = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(t)) setMenuAbierto(false);
+      if (perfilRef.current && !perfilRef.current.contains(t)) setPerfilAbierto(false);
+    };
+    document.addEventListener("keydown", onTecla);
+    document.addEventListener("mousedown", onClicFuera);
+    return () => {
+      document.removeEventListener("keydown", onTecla);
+      document.removeEventListener("mousedown", onClicFuera);
+    };
+  }, [menuAbierto, perfilAbierto, modal]);
+
+  const irA = (ruta: string) => {
+    setMenuAbierto(false);
+    setPerfilAbierto(false);
+    navigate(ruta);
+  };
+
+  const abrirAyuda = () => {
+    setPerfilAbierto(false);
+    try {
+      window.dispatchEvent(new Event("sigd:abrir-ayuda"));
+    } catch {
+      // entorno sin DOM (tests)
     }
+  };
 
-    document.addEventListener("mousedown", handleClickExterno);
-    return () => document.removeEventListener("mousedown", handleClickExterno);
-  }, [menuAbierto]);
-
-  const administraSeguridad = puedeAcceder(rol, "administracion");
-  const etiquetaRol = rol ? ETIQUETA_ROL[rol] : "Sesión activa";
+  const nombreMostrar = usuario?.nombreCompleto ?? (autenticado ? rol ?? "Usuario" : "Invitado");
 
   return (
-    <header className="header-sigd sticky top-0 z-40 bg-[#0A1128]/95 backdrop-blur-xl text-white border-b border-white/[0.08] shadow-[0_4px_25px_-4px_rgba(10,17,40,0.4)] print:hidden">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        {/* Brand identity & emblem */}
+    <header className="header-sigd bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-md print:hidden">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
         <div
-          className="group flex cursor-pointer items-center gap-3.5 transition-opacity hover:opacity-95"
+          className="flex cursor-pointer items-center gap-3"
           onClick={() => navigate("/")}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") navigate("/");
-          }}
-          aria-label="Ir al inicio de SIGD Suiza"
         >
-          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 p-0.5 shadow-lg shadow-blue-500/20 ring-1 ring-white/20 transition-transform duration-200 group-hover:scale-105">
-            {/* Custom SVG Shield Emblem with Swiss Cross */}
-            <svg
-              className="h-6 w-6 text-white drop-shadow-sm"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <path d="M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3zm1 14h-2v-3H8v-2h3V8h2v3h3v2h-3v3z" />
-            </svg>
-            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0A1128] bg-emerald-400" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-blue-800 font-black text-base shadow-sm">
+            S
           </div>
-
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold tracking-wider text-white text-base leading-none">
-                SIGD <span className="text-blue-400">SUIZA</span>
+              <span className="text-sm font-black tracking-wider uppercase text-white">
+                SIGD SUIZA
               </span>
-              <span className="rounded-full bg-blue-500/20 border border-blue-400/30 px-2 py-0.5 font-mono text-[10px] font-bold text-blue-300">
+              <span className="rounded bg-blue-600/60 px-1.5 py-0.2 font-mono text-[10px] font-bold text-blue-100">
                 v1.0
               </span>
-              <span className="hidden items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-400/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 lg:inline-flex">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                LPAG Ley 27444
-              </span>
             </div>
-            <p className="mt-1 text-xs text-slate-300 font-medium">
-              Instituto de Educación Superior Tecnológico Público &quot;Suiza&quot;
+            <p className="text-xs text-blue-100 font-medium">
+              Instituto de Educación Superior Tecnológico Público "Suiza"
             </p>
           </div>
         </div>
 
-        {/* User navigation & actions */}
-        <nav className="flex items-center gap-3 text-xs font-semibold">
-          {autenticado ? (
-            <div ref={menuRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setMenuAbierto((previo) => !previo)}
-                aria-haspopup="menu"
-                aria-expanded={menuAbierto}
-                className="flex items-center gap-2.5 rounded-full border border-white/15 bg-white/5 py-1.5 pl-1.5 pr-3 text-white backdrop-blur-sm transition-all duration-200 hover:border-white/30 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+        <div className="flex items-center gap-2">
+          {/* Menú de módulos */}
+          <div ref={menuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setMenuAbierto((v) => !v);
+                setPerfilAbierto(false);
+              }}
+              aria-haspopup="menu"
+              aria-expanded={menuAbierto}
+              className="flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/60"
+            >
+              <span aria-hidden="true" className="text-sm leading-none">
+                {menuAbierto ? "✕" : "☰"}
+              </span>
+              Menú
+              <span aria-hidden="true" className={`text-[10px] transition-transform ${menuAbierto ? "rotate-180" : ""}`}>
+                ▼
+              </span>
+            </button>
+
+            {menuAbierto && (
+              <nav
+                aria-label="Módulos del sistema"
+                className="absolute right-0 z-50 mt-2 w-[min(92vw,340px)] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xl"
               >
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-xs font-black text-white shadow-sm ring-1 ring-white/30">
-                  {inicialesNombre(usuario?.nombreCompleto)}
-                </span>
-                <div className="hidden text-left sm:block">
-                  <span className="block max-w-[9rem] truncate text-xs font-semibold leading-none text-white">
-                    {usuario?.nombreCompleto ?? "Mi cuenta"}
-                  </span>
-                  <span className="mt-0.5 block text-[10px] font-medium text-blue-300 leading-none">
-                    {etiquetaRol}
-                  </span>
-                </div>
-                <ChevronDown
-                  className={`h-3.5 w-3.5 text-slate-300 transition-transform duration-200 ${
-                    menuAbierto ? "rotate-180" : ""
-                  }`}
-                  aria-hidden="true"
-                />
-              </button>
-
-              {menuAbierto ? (
-                <div
-                  role="menu"
-                  className="absolute right-0 mt-2.5 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 text-slate-800 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
-                >
-                  <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3.5">
-                    <p className="truncate text-sm font-bold text-slate-900">
-                      {usuario?.nombreCompleto ?? "Usuario"}
-                    </p>
-                    <p className="truncate text-xs text-slate-500">
-                      {usuario?.correo}
-                    </p>
-                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
-                      <ShieldCheck className="h-3 w-3" />
-                      {etiquetaRol}
-                    </div>
-                  </div>
-
-                  <div className="p-1.5">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setMenuAbierto(false);
-                        setAjustesAbierto(true);
-                      }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100/80"
-                    >
-                      <Settings className="h-4 w-4 text-slate-500" aria-hidden="true" />
-                      Mis preferencias
-                    </button>
-
-                    {administraSeguridad ? (
+                <p className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  {autenticado && rol ? `Módulos · ${rol}` : "Módulos públicos"}
+                </p>
+                <ul className="max-h-[60vh] overflow-y-auto py-1">
+                  {visibles.map((m) => (
+                    <li key={m.id}>
                       <button
                         type="button"
                         role="menuitem"
+                        title={m.descripcion}
+                        onClick={() => irA(m.ruta)}
+                        className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-[13px] font-semibold hover:bg-blue-50 hover:text-blue-800"
+                      >
+                        <span>
+                          {m.subtitulo && (
+                            <span className="mr-1.5 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
+                              {m.subtitulo}
+                            </span>
+                          )}
+                          {m.titulo}
+                        </span>
+                        <span aria-hidden="true" className="text-slate-400">→</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-4 py-2.5">
+                  {autenticado && rol ? (
+                    <>
+                      <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
+                        {rol}
+                      </span>
+                      <button
+                        type="button"
                         onClick={() => {
                           setMenuAbierto(false);
-                          navigate("/administracion");
+                          logout();
+                          navigate("/login");
                         }}
-                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100/80"
+                        className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition"
                       >
-                        <LayoutDashboard
-                          className="h-4 w-4 text-slate-500"
-                          aria-hidden="true"
-                        />
-                        Panel de Administración
+                        Salir
                       </button>
-                    ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[11px] font-medium text-slate-500">
+                        Sin sesión
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => irA("/login")}
+                        className="rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-800 transition"
+                      >
+                        Ingresar
+                      </button>
+                    </>
+                  )}
+                </div>
+              </nav>
+            )}
+          </div>
 
-                    <div className="my-1 border-t border-slate-100" />
+          {/* Perfil del usuario */}
+          <div ref={perfilRef} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setPerfilAbierto((v) => !v);
+                setMenuAbierto(false);
+              }}
+              aria-haspopup="menu"
+              aria-expanded={perfilAbierto}
+              aria-label={autenticado ? `Perfil de ${nombreMostrar}` : "Perfil de invitado"}
+              className="flex items-center gap-2 rounded-full bg-white/10 py-1 pl-1 pr-3 text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/60"
+            >
+              <span
+                aria-hidden="true"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-black text-blue-800"
+              >
+                {iniciales(usuario?.nombreCompleto, rol)}
+              </span>
+              <span className="hidden max-w-32 truncate text-left text-xs font-bold leading-tight sm:block">
+                {nombreMostrar}
+                <span className="block text-[10px] font-medium text-blue-100">
+                  {autenticado && rol ? rol : "Invitado"}
+                </span>
+              </span>
+              <span aria-hidden="true" className={`text-[10px] transition-transform ${perfilAbierto ? "rotate-180" : ""}`}>
+                ▼
+              </span>
+            </button>
 
+            {perfilAbierto && (
+              <nav
+                aria-label="Menú del perfil"
+                className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xl"
+              >
+                <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-700 text-sm font-black text-white"
+                  >
+                    {iniciales(usuario?.nombreCompleto, rol)}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold">{nombreMostrar}</p>
+                    <p className="truncate text-[11px] font-medium text-slate-500">
+                      {autenticado && rol ? rol : "Sin sesión iniciada"}
+                    </p>
+                  </div>
+                </div>
+                <ul className="py-1">
+                  <li>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => irA("/")}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-semibold hover:bg-blue-50 hover:text-blue-800"
+                    >
+                      <span aria-hidden="true">🏠</span> Inicio
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={abrirAyuda}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-semibold hover:bg-blue-50 hover:text-blue-800"
+                    >
+                      <span aria-hidden="true">❓</span> Ayuda
+                    </button>
+                  </li>
+                  <li>
                     <button
                       type="button"
                       role="menuitem"
                       onClick={() => {
-                        setMenuAbierto(false);
-                        cerrarSesion();
+                        setPerfilAbierto(false);
+                        setModal("info");
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-semibold hover:bg-blue-50 hover:text-blue-800"
                     >
-                      <LogOut className="h-4 w-4" aria-hidden="true" />
+                      <span aria-hidden="true">ℹ️</span> Información
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setPerfilAbierto(false);
+                        setModal("datos");
+                      }}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-semibold hover:bg-blue-50 hover:text-blue-800"
+                    >
+                      <span aria-hidden="true">👤</span> Datos del usuario
+                    </button>
+                  </li>
+                </ul>
+                <div className="border-t border-slate-100 bg-slate-50 px-4 py-2.5">
+                  {autenticado ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPerfilAbierto(false);
+                        logout();
+                        navigate("/login");
+                      }}
+                      className="w-full rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition"
+                    >
                       Cerrar sesión
                     </button>
-                  </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => irA("/login")}
+                      className="w-full rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-800 transition"
+                    >
+                      Iniciar sesión
+                    </button>
+                  )}
                 </div>
-              ) : null}
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => navigate("/login")}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 font-bold text-white shadow-md shadow-blue-500/20 transition-all duration-200 hover:from-blue-500 hover:to-indigo-500 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95"
-            >
-              <LogIn className="h-4 w-4" />
-              <span>Iniciar sesión</span>
-            </button>
-          )}
-        </nav>
+              </nav>
+            )}
+          </div>
+        </div>
       </div>
+      <div className="h-1 w-full bg-gradient-to-r from-blue-400 via-rose-500 to-amber-400" />
 
-      {/* Modern micro-ribbon border in IESTP Suiza institutional colors */}
-      <div 
-        className="header-bar h-[2.5px] w-full bg-gradient-to-r from-blue-500 via-rose-500 via-50% to-amber-400" 
-      />
+      {/* Modal Información del sistema */}
+      {modal === "info" && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Información del sistema"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="w-full max-w-sm overflow-hidden rounded-2xl bg-white text-slate-800 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-blue-800 to-blue-900 px-5 py-4 text-white">
+              <p className="text-sm font-black tracking-wider">ℹ️ INFORMACIÓN</p>
+              <p className="text-[11px] text-blue-100">Sistema Integral de Gestión Documentaria</p>
+            </div>
+            <div className="space-y-2 px-5 py-4 text-[13px] leading-6">
+              <p><span className="font-bold">Sistema:</span> SIGD v1.0</p>
+              <p><span className="font-bold">Institución:</span> IESTP Público "Suiza" · Pucallpa</p>
+              <p><span className="font-bold">Módulos:</span> Mesa de Partes, Casilla Electrónica, Expedientes, Validador CVD, Firma Digital, Titulación, Administración y Reportes.</p>
+              <p><span className="font-bold">Validez legal:</span> Ley N.º 27269 de Firmas y Certificados Digitales y TUO de la Ley N.º 27444.</p>
+            </div>
+            <div className="flex justify-end bg-slate-50 px-5 py-3">
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="rounded-lg bg-blue-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-800"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      <AjustesUsuarioModal
-        isOpen={ajustesAbierto}
-        onClose={() => setAjustesAbierto(false)}
-      />
+      {/* Modal Datos del usuario */}
+      {modal === "datos" && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Datos del usuario"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="w-full max-w-sm overflow-hidden rounded-2xl bg-white text-slate-800 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 bg-gradient-to-r from-blue-800 to-blue-900 px-5 py-4 text-white">
+              <span
+                aria-hidden="true"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sm font-black text-blue-800"
+              >
+                {iniciales(usuario?.nombreCompleto, rol)}
+              </span>
+              <div>
+                <p className="text-sm font-black">👤 DATOS DEL USUARIO</p>
+                <p className="text-[11px] text-blue-100">{autenticado ? "Sesión activa" : "Sin sesión"}</p>
+              </div>
+            </div>
+            <div className="space-y-2 px-5 py-4 text-[13px] leading-6">
+              <p><span className="font-bold">Nombre:</span> {usuario?.nombreCompleto ?? nombreMostrar}</p>
+              <p><span className="font-bold">Correo:</span> {usuario?.correo ?? "—"}</p>
+              <p><span className="font-bold">Rol:</span> {usuario?.rol ?? rol ?? "—"}</p>
+              {usuario?.areaId && <p><span className="font-bold">Área:</span> {usuario.areaId}</p>}
+              {!autenticado && (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-800 ring-1 ring-amber-200">
+                  No ha iniciado sesión. Inicie sesión para ver sus módulos y su casilla.
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 bg-slate-50 px-5 py-3">
+              {!autenticado && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModal(null);
+                    navigate("/login");
+                  }}
+                  className="rounded-lg bg-blue-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-800"
+                >
+                  Iniciar sesión
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="rounded-lg border border-slate-300 px-4 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

@@ -94,15 +94,22 @@ export function crearRouterTramites(
     res.status(200).json(consulta);
   });
 
-  // #20 — Cargo de recepción física para impresión térmica
+  // #20 — Cargo de recepción física para impresión térmica (DDL real 05_sigd_tra.sql:
+  // expediente(codigo_expediente) + asiento_registro(expediente_id, canal_ingreso)).
   router.get('/tramites/ventanilla/cargo/:cut', async (req: Request, res: Response) => {
     const cut = String(req.params.cut).trim().toUpperCase();
 
     const query = `
-      SELECT a.numero_asiento, a.anio_fiscal, a.cut, a.remitente,
-             a.remitente_documento, a.asunto, a.folios, a.fecha_asiento
-        FROM sigd_tra.asiento_registro a
-       WHERE a.cut = $1
+      SELECT e.codigo_expediente AS cut,
+             COALESCE(pn.nombre_completo, 'Ciudadano Administrado') AS remitente,
+             e.dni_solicitante AS dni,
+             a.asunto AS asunto,
+             a.fecha_ingreso AS fecha_recepcion,
+             a.numero_registro AS numero_registro
+        FROM sigd_tra.expediente e
+        LEFT JOIN sigd_tra.asiento_registro a ON a.expediente_id = e.expediente_id
+        LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = e.solicitante_id
+       WHERE e.codigo_expediente = $1
        LIMIT 1;
     `;
 
@@ -117,8 +124,8 @@ export function crearRouterTramites(
 
     const ticketImpresion = TicketTermicoUtil.generarTicketVentanilla({
       cut: asiento.cut,
-      timestamp: new Date(asiento.fecha_asiento),
-      folios: Number(asiento.folios),
+      timestamp: new Date(asiento.fecha_recepcion),
+      folios: 1,
       hashSha256: crypto.createHash('sha256').update(asiento.cut).digest('hex'),
       qrUrlSeguimiento: `https://sigd.iestp-suiza.edu.pe/consulta/${encodeURIComponent(asiento.cut)}`,
     });
@@ -126,10 +133,10 @@ export function crearRouterTramites(
     res.status(200).json({
       cut: asiento.cut,
       remitente: asiento.remitente,
-      dni: asiento.remitente_documento,
+      dni: (asiento.dni ?? '').toString().trim(),
       asunto: asiento.asunto,
-      folios: Number(asiento.folios),
-      fechaRecepcion: asiento.fecha_asiento,
+      folios: 1,
+      fechaRecepcion: asiento.fecha_recepcion,
       ticketTermicoTexto: ticketImpresion,
     });
   });

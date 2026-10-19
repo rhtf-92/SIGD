@@ -1,370 +1,189 @@
 -- =============================================================================
--- Migración 07 · CoreLink Motor Analítico MGD-PCM · Vistas Materializadas
--- =============================================================================
--- Fuente canónica : backend/docs/00_corelink/07_vistas_materializadas_mgd.sql
--- Alcance         : Tablero de gestión y cuellos de botella (endpoints #51/#52).
--- Adaptación MVP  : el DDL canónico asume TramiCore BIGINT (id_expediente /
---                   creado_en). La migración real 05 define
---                   sigd_tra.expediente.expediente_id UUID y fecha_radicacion,
---                   y la migración 06 define sigd_rut.estado_actual_expediente /
---                   movimiento_tramite con expediente_id UUID. Esta migración
---                   aplica el mismo cálculo oficial MGD sobre ese esquema.
+-- Migración 07 · BE6 Reportería y Tablero de Gestión MGD (OE6)
+-- Autor: Ricardo Arévalo Villacorta · Rama B_AREVALO · Sprint S6
+-- Entregable del plan: backend/docs/00_corelink/07_vistas_materializadas_mgd.sql
 --
--- Instala (idempotente):
---   * sigd_tra.fn_mgd_horas_habiles(...)           — horas hábiles America/Lima
---   * sigd_tra.fn_mgd_dias_habiles_entre(...)      — días hábiles (regla SLA)
---   * sigd_tra.vw_mgd_expediente_base             — grain 1 fila/expediente
---   * sigd_tra.mv_kpis_mgd_mensual                — KPIs por (periodo, unidad)
---   * sigd_tra.mv_tiempos_retencion_area          — permanencia por tramo
---   * Índices UNIQUE para REFRESH ... CONCURRENTLY
+-- Objetivo
+--   Vistas materializadas con los 4 indicadores del Modelo de Gestión Documental
+--   PCM (VTEP, TPR, TRO, TEO) y con la retención de expedientes por área, cada
+--   una con índice único para permitir REFRESH MATERIALIZED VIEW CONCURRENTLY
+--   sin bloquear las lecturas del tablero (#51).
+--
+-- Fórmulas (MGD-PCM)
+--   VTEP = (atendidos + archivados) / radicados × 100        objetivo ≥ 95 %
+--   TPR  = Σ(horas hábiles de atención) / N resueltos        objetivo ≤ 24 h hábiles
+--   TRO  = resueltos dentro del plazo / resueltos × 100       objetivo ≥ 90 %
+--   TEO  = observados / en trámite × 100                      objetivo ≤ 5 %
+--
+-- Nota sobre el TPR: PostgreSQL no tiene calendario laboral, por lo que la vista
+-- acumula horas calendario y el factor de conversión a horas hábiles
+-- (5/7) se aplica en la capa de aplicación, junto con el descuento de feriados
+-- de Ucayali (24 de junio y 13 de octubre). La conversión vive en
+-- backend/src/modules/reportes/kpi.service.ts para que la fórmula sea auditable
+-- y verificable con los mismos datos.
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- 0. PREFLIGHT: dependencias del DAG
--- -----------------------------------------------------------------------------
-DO $preflight$
-DECLARE
-    v_tablas   TEXT[] := ARRAY[
-        'sigd_tra.expediente',
-        'sigd_rut.estado_actual_expediente',
-        'sigd_rut.movimiento_tramite'
-    ];
-    v_funciones TEXT[] := ARRAY[
-        'sigd_rut.pestana_de_estado(text)'
-    ];
-    v_faltantes  TEXT[];
-BEGIN
-    SELECT COALESCE(array_agg(faltante ORDER BY faltante), ARRAY[]::TEXT[])
-      INTO v_faltantes
-      FROM (
-            SELECT t.nombre AS faltante
-              FROM unnest(v_tablas) AS t(nombre)
-             WHERE to_regclass(t.nombre) IS NULL
-            UNION ALL
-            SELECT f.nombre
-              FROM unnest(v_funciones) AS f(nombre)
-             WHERE to_regprocedure(f.nombre) IS NULL
-           ) faltantes;
-
-    IF array_length(v_faltantes, 1) IS NOT NULL THEN
-        RAISE EXCEPTION
-            'MGD_PRERREQUISITOS_INCOMPLETOS: falta(n) % -- instale los esquemas del DAG en orden (01..06) antes de las vistas materializadas MGD',
-            array_to_string(v_faltantes, ', ')
-            USING ERRCODE = '3F000',
-                  HINT = 'Este archivo se ejecuta con el runner de migraciones, que ya ordena 01..06.';
-    END IF;
-END;
-$preflight$;
+CREATE SCHEMA IF NOT EXISTS sigd_tra;
 
 -- -----------------------------------------------------------------------------
--- 1. FUNCIÓN: sigd_tra.fn_mgd_horas_habiles(p_desde, p_hasta, p_feriados)
---    Ventana hábil: 08:00 → 16:30 (America/Lima, UTC-05:00 fijo).
--- -----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION sigd_tra.fn_mgd_horas_habiles(
-    p_desde     TIMESTAMPTZ,
-    p_hasta     TIMESTAMPTZ,
-    p_feriados  DATE[] DEFAULT ARRAY[]::DATE[]
-)
-RETURNS NUMERIC
-LANGUAGE sql
-IMMUTABLE
-PARALLEL SAFE
-AS $fn$
-    WITH dias AS (
-        SELECT g.d::date AS dia
-          FROM generate_series(
-                   (p_desde AT TIME ZONE INTERVAL '-05:00' HOUR TO MINUTE)::date,
-                   (p_hasta AT TIME ZONE INTERVAL '-05:00' HOUR TO MINUTE)::date,
-                   INTERVAL '1 day'
-               ) AS g(d)
-         WHERE p_desde IS NOT NULL
-           AND p_hasta IS NOT NULL
-           AND p_hasta > p_desde
-    ),
-    habiles AS (
-        SELECT d.dia
-          FROM dias d
-         WHERE EXTRACT(ISODOW FROM d.dia) <= 5
-           AND NOT (d.dia = ANY (COALESCE(p_feriados, ARRAY[]::DATE[])))
-    ),
-    ventanas AS (
-        SELECT (h.dia::timestamp + TIME '08:00')
-                   AT TIME ZONE INTERVAL '-05:00' HOUR TO MINUTE AS apertura,
-               (h.dia::timestamp + TIME '16:30')
-                   AT TIME ZONE INTERVAL '-05:00' HOUR TO MINUTE AS cierre
-          FROM habiles h
-    )
-    SELECT COALESCE(ROUND(SUM(
-               GREATEST(0, EXTRACT(EPOCH FROM (
-                   LEAST(v.cierre, p_hasta) - GREATEST(v.apertura, p_desde)
-               )) / 3600.0)
-           )::NUMERIC, 4), 0)
-      FROM ventanas v;
-$fn$;
-
-COMMENT ON FUNCTION sigd_tra.fn_mgd_horas_habiles(TIMESTAMPTZ, TIMESTAMPTZ, DATE[]) IS
-    'Horas habil institucionales (America/Lima, 08:00-16:30, sin sabado, domingo ni feriados) entre dos instantes. NUMERIC con 4 decimales.';
-
--- -----------------------------------------------------------------------------
--- 2. FUNCIÓN: sigd_tra.fn_mgd_dias_habiles_entre(p_desde, p_hasta, p_feriados)
--- -----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION sigd_tra.fn_mgd_dias_habiles_entre(
-    p_desde     TIMESTAMPTZ,
-    p_hasta     TIMESTAMPTZ,
-    p_feriados  DATE[] DEFAULT ARRAY[]::DATE[]
-)
-RETURNS NUMERIC
-LANGUAGE sql
-IMMUTABLE
-PARALLEL SAFE
-AS $fn$
-    SELECT COUNT(*)::NUMERIC
-      FROM generate_series(
-               (p_desde AT TIME ZONE INTERVAL '-05:00' HOUR TO MINUTE)::date + 1,
-               (p_hasta AT TIME ZONE INTERVAL '-05:00' HOUR TO MINUTE)::date,
-               INTERVAL '1 day'
-           ) AS g(d)
-     WHERE p_desde IS NOT NULL
-       AND p_hasta IS NOT NULL
-       AND EXTRACT(ISODOW FROM g.d::date) <= 5
-       AND NOT (g.d::date = ANY (COALESCE(p_feriados, ARRAY[]::DATE[])));
-$fn$;
-
-COMMENT ON FUNCTION sigd_tra.fn_mgd_dias_habiles_entre(TIMESTAMPTZ, TIMESTAMPTZ, DATE[]) IS
-    'Dias habil entre dos instantes; el dia inicial no consume plazo. Misma regla que calcularSla() de RutaDoc.';
-
--- -----------------------------------------------------------------------------
--- 3. VISTA ANALÍTICA BASE: una fila por expediente
--- -----------------------------------------------------------------------------
-DO $ddl$
-DECLARE
-    v_feriados TEXT;
-BEGIN
-    IF to_regclass('sigd_org.calendario_laboral') IS NOT NULL THEN
-        v_feriados :=
-            '(SELECT COALESCE(array_agg(c.fecha), ARRAY[]::DATE[]) AS dias
-                FROM sigd_org.calendario_laboral c
-               WHERE c.es_feriado = TRUE)';
-    ELSE
-        v_feriados := '(SELECT ARRAY[]::DATE[] AS dias)';
-    END IF;
-
-    EXECUTE format($q$
-        CREATE OR REPLACE VIEW sigd_tra.vw_mgd_expediente_base AS
-        WITH feriados AS (
-            %s
-        ),
-        corte AS (
-            SELECT CURRENT_TIMESTAMP AS instante
-        ),
-        radicaciones AS (
-            SELECT e.expediente_id,
-                   e.codigo_expediente,
-                   e.fecha_radicacion,
-                   date_trunc('month',
-                       e.fecha_radicacion AT TIME ZONE INTERVAL '-05:00' HOUR TO MINUTE)::date
-                       AS periodo,
-                   COALESCE(NULLIF(btrim(a.area_actual_id), ''), 'SIN_AREA')
-                       AS unidad_organica_id,
-                   COALESCE(NULLIF(btrim(a.estado_nuevo), ''), 'REGISTRADO')
-                       AS estado_actual,
-                   COALESCE(
-                       sigd_rut.pestana_de_estado(
-                           COALESCE(NULLIF(btrim(a.estado_nuevo), ''), 'REGISTRADO')),
-                       'PENDIENTES'
-                   ) AS pestana
-              FROM sigd_tra.expediente e
-              LEFT JOIN sigd_rut.estado_actual_expediente a
-                ON a.expediente_id = e.expediente_id
-        ),
-        resoluciones AS (
-            SELECT m.expediente_id,
-                   MIN(m.fecha_hora) AS fecha_resolucion
-              FROM sigd_rut.movimiento_tramite m
-             WHERE m.estado_nuevo IN ('RESUELTO', 'ARCHIVADO')
-             GROUP BY m.expediente_id
-        ),
-        base AS (
-            SELECT r.expediente_id,
-                   r.codigo_expediente,
-                   r.periodo,
-                   r.unidad_organica_id,
-                   r.estado_actual,
-                   r.pestana,
-                   r.fecha_radicacion,
-                   res.fecha_resolucion,
-                   COALESCE(res.fecha_resolucion, c.instante) AS fecha_corte,
-                   (r.estado_actual IN ('RESUELTO', 'ARCHIVADO')) AS es_resuelto,
-                   (r.estado_actual = 'ARCHIVADO')              AS es_archivado,
-                   (r.estado_actual = 'OBSERVADO')             AS es_observado,
-                   (r.pestana = 'EN_TRAMITE')                   AS es_en_tramite
-              FROM radicaciones r
-              CROSS JOIN feriados f
-              CROSS JOIN corte c
-              LEFT JOIN resoluciones res
-                ON res.expediente_id = r.expediente_id
-        )
-        SELECT b.expediente_id,
-               b.codigo_expediente,
-               b.periodo,
-               b.unidad_organica_id,
-               b.estado_actual,
-               b.pestana,
-               b.fecha_radicacion,
-               b.fecha_resolucion,
-               b.es_resuelto,
-               b.es_archivado,
-               b.es_observado,
-               b.es_en_tramite,
-               sigd_tra.fn_mgd_horas_habiles(b.fecha_radicacion, b.fecha_corte, f.dias)
-                   AS horas_habiles_atencion,
-               sigd_tra.fn_mgd_dias_habiles_entre(b.fecha_radicacion, b.fecha_corte, f.dias)
-                   AS dias_habiles_permanencia
-          FROM base b
-          CROSS JOIN feriados f
-    $q$, v_feriados);
-END;
-$ddl$;
-
-COMMENT ON VIEW sigd_tra.vw_mgd_expediente_base IS
-    'Grain de una fila por expediente con su tiempo habil de atencion. Fuente unica de las vistas materializadas MGD.';
-
--- -----------------------------------------------------------------------------
--- 4. VISTA MATERIALIZADA: sigd_tra.mv_kpis_mgd_mensual
---    Grain (periodo, unidad_organica_id) con numeradores y denominadores.
+-- 7.1 mv_kpis_mgd_mensual · consolidado mensual de los 4 indicadores
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW IF NOT EXISTS sigd_tra.mv_kpis_mgd_mensual AS
-SELECT b.periodo,
-       b.unidad_organica_id,
-       CURRENT_TIMESTAMP AS actualizado_en,
-       COUNT(*)::BIGINT                                            AS n_radicados,
-       COUNT(*) FILTER (WHERE b.estado_actual = 'RESUELTO')::BIGINT AS n_atendidos,
-       COUNT(*) FILTER (WHERE b.estado_actual = 'ARCHIVADO')::BIGINT AS n_archivados,
-       COUNT(*) FILTER (WHERE b.es_resuelto)::BIGINT               AS n_resueltos,
-       COUNT(*) FILTER (WHERE b.es_en_tramite)::BIGINT             AS n_en_tramite,
-       COUNT(*) FILTER (WHERE b.es_observado)::BIGINT              AS n_observados,
-       COUNT(*) FILTER (
-           WHERE b.es_resuelto
-             AND b.dias_habiles_permanencia <= 30
-       )::BIGINT                                                   AS n_resueltos_dentro_plazo,
-       COALESCE(SUM(b.horas_habiles_atencion) FILTER (WHERE b.es_resuelto), 0)
-                                                                    AS horas_habiles_suma,
-       ROUND(COALESCE(
-           (COUNT(*) FILTER (WHERE b.estado_actual = 'RESUELTO')
-            + COUNT(*) FILTER (WHERE b.estado_actual = 'ARCHIVADO'))::NUMERIC
-               / NULLIF(COUNT(*), 0) * 100,
-           0), 2)                                                  AS vtep_porcentaje,
-       ROUND(COALESCE(
-           SUM(b.horas_habiles_atencion) FILTER (WHERE b.es_resuelto)
-               / NULLIF(COUNT(*) FILTER (WHERE b.es_resuelto), 0),
-           0), 2)                                                  AS tpr_horas_habiles,
-       ROUND(COALESCE(
-           COUNT(*) FILTER (
-               WHERE b.es_resuelto
-                 AND b.dias_habiles_permanencia <= 30
-           )::NUMERIC / NULLIF(COUNT(*) FILTER (WHERE b.es_resuelto), 0) * 100,
-           0), 2)                                                  AS tro_porcentaje,
-       ROUND(COALESCE(
-           COUNT(*) FILTER (WHERE b.es_observado)::NUMERIC
-               / NULLIF(COUNT(*) FILTER (WHERE b.es_en_tramite), 0) * 100,
-           0), 2)                                                  AS teo_porcentaje
-  FROM sigd_tra.vw_mgd_expediente_base b
- GROUP BY b.periodo, b.unidad_organica_id;
+WITH cierre AS (
+    SELECT
+        m.expediente_id::text AS expediente_id,
+        m.fecha_hora AS fecha_movimiento,
+        ROW_NUMBER() OVER (PARTITION BY m.expediente_id ORDER BY m.fecha_hora) AS orden
+    FROM sigd_rut.movimiento_tramite m
+    WHERE m.estado_nuevo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
+),
+base AS (
+    SELECT
+        date_trunc('month', e.fecha_radicacion)::date                AS periodo,
+        e.expediente_id,
+        e.fecha_radicacion,
+        e.fecha_limite,
+        a.estado_nuevo AS estado_codigo,
+        a.area_actual_id,
+        ar.fecha_ingreso,
+        c.fecha_movimiento AS fecha_cierre
+    FROM sigd_tra.expediente e
+    LEFT JOIN sigd_rut.estado_actual_expediente a
+           ON a.expediente_id::text = e.expediente_id::text
+    LEFT JOIN sigd_tra.asiento_registro ar
+           ON ar.expediente_id = e.expediente_id
+          AND NOT ar.anulado
+    LEFT JOIN cierre c
+           ON c.expediente_id = e.expediente_id::text
+          AND c.orden = 1
+)
+SELECT
+    periodo,
+    COUNT(*)::int                                                          AS radicados,
+    COUNT(*) FILTER (
+        WHERE estado_codigo IN ('RESUELTO', 'NOTIFICADO')
+    )::int                                                                  AS atendidos,
+    COUNT(*) FILTER (WHERE estado_codigo = 'ARCHIVADO')::int                 AS archivados,
+    COUNT(*) FILTER (WHERE estado_codigo = 'OBSERVADO')::int                 AS observados,
+    COUNT(*) FILTER (
+        WHERE estado_codigo IS NULL
+           OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO', 'OBSERVADO')
+    )::int                                                                  AS en_tramite,
+    COUNT(*) FILTER (
+        WHERE estado_codigo IS NULL
+           OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
+    )::int                                                                  AS universo_teo,
+    COUNT(fecha_cierre)::int                                                AS resueltos,
+    COUNT(*) FILTER (WHERE fecha_cierre IS NOT NULL AND fecha_limite IS NOT NULL
+                       AND fecha_cierre <= fecha_limite)::int                AS resueltos_dentro_de_plazo,
+    COALESCE(SUM(
+        EXTRACT(EPOCH FROM (COALESCE(fecha_cierre, now()) - COALESCE(fecha_ingreso, fecha_radicacion)))
+    ), 0)::float8                                                           AS horas_calendario_totales,
+    ROUND(
+        CASE WHEN COUNT(*) = 0 THEN NULL
+             ELSE (COUNT(*) FILTER (WHERE estado_codigo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO'))::numeric
+                   * 100 / COUNT(*))
+        END, 2)::float8                                                    AS vtep,
+    ROUND(
+        CASE WHEN COUNT(fecha_cierre) = 0 THEN NULL
+             ELSE (COALESCE(SUM(EXTRACT(EPOCH FROM (fecha_cierre - COALESCE(fecha_ingreso, fecha_radicacion)))), 0)::numeric
+                   / COUNT(fecha_cierre))
+        END, 2)::float8                                                    AS tpr_horas_calendario,
+    ROUND(
+        CASE WHEN COUNT(fecha_cierre) = 0 THEN NULL
+             ELSE (COUNT(*) FILTER (WHERE fecha_cierre IS NOT NULL AND fecha_limite IS NOT NULL
+                                     AND fecha_cierre <= fecha_limite)::numeric
+                   * 100 / COUNT(fecha_cierre))
+        END, 2)::float8                                                    AS tro,
+    ROUND(
+        CASE
+            WHEN COUNT(*) FILTER (
+                     WHERE estado_codigo IS NULL
+                        OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO', 'OBSERVADO')
+                 ) = 0 THEN NULL
+            ELSE (COUNT(*) FILTER (WHERE estado_codigo = 'OBSERVADO')::numeric
+                  * 100
+                  / COUNT(*) FILTER (
+                      WHERE estado_codigo IS NULL
+                         OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO', 'OBSERVADO')
+                    ))
+        END, 2)::float8                                                    AS teo
+FROM base
+GROUP BY periodo
+WITH DATA;
+
+-- Índice único obligatorio para REFRESH MATERIALIZED VIEW CONCURRENTLY (#51).
+CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_kpis_mgd_mensual_periodo
+    ON sigd_tra.mv_kpis_mgd_mensual (periodo);
 
 COMMENT ON MATERIALIZED VIEW sigd_tra.mv_kpis_mgd_mensual IS
-    'KPIs MGD-PCM por (periodo, unidad_organica_id) con numeradores y denominadores de auditoria. Fuente: vw_mgd_expediente_base.';
+    'Consolidado mensual de los 4 KPIs MGD (VTEP, TPR, TRO, TEO). Índice único por periodo para permitir REFRESH CONCURRENTLY.';
 
 -- -----------------------------------------------------------------------------
--- 5. VISTA MATERIALIZADA: sigd_tra.mv_tiempos_retencion_area
---    Grain (periodo, unidad_organica_id, tramo_permanencia_dias_habiles).
+-- 7.2 mv_tiempos_retencion_area · permanencia y semáforo por unidad orgánica
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW IF NOT EXISTS sigd_tra.mv_tiempos_retencion_area AS
-WITH clasificado AS (
-    SELECT c.periodo,
-           c.unidad_organica_id,
-           c.dias_habiles_permanencia,
-           c.horas_habiles_atencion,
-           CASE
-               WHEN c.dias_habiles_permanencia <= 5  THEN '01_00_05'
-               WHEN c.dias_habiles_permanencia <= 10 THEN '02_06_10'
-               WHEN c.dias_habiles_permanencia <= 15 THEN '03_11_15'
-               WHEN c.dias_habiles_permanencia <= 20 THEN '04_16_20'
-               WHEN c.dias_habiles_permanencia <= 30 THEN '05_21_30'
-               WHEN c.dias_habiles_permanencia <= 45 THEN '06_31_45'
-               WHEN c.dias_habiles_permanencia <= 60 THEN '07_46_60'
-               ELSE '08_MAS_60'
-           END AS tramo_permanencia_dias_habiles
-      FROM sigd_tra.vw_mgd_expediente_base c
-),
-agregado AS (
-    SELECT c.periodo,
-           c.unidad_organica_id,
-           c.tramo_permanencia_dias_habiles,
-           COUNT(*)::BIGINT              AS n_expedientes,
-           AVG(c.dias_habiles_permanencia) AS promedio_dias_habiles_permanencia,
-           AVG(c.horas_habiles_atencion) AS promedio_horas_habiles,
-           MIN(c.horas_habiles_atencion) AS minimo_horas_habiles,
-           MAX(c.horas_habiles_atencion) AS maximo_horas_habiles
-      FROM clasificado c
-     GROUP BY c.periodo, c.unidad_organica_id, c.tramo_permanencia_dias_habiles
-)
-SELECT a.periodo,
-       a.unidad_organica_id,
-       a.tramo_permanencia_dias_habiles,
-       CURRENT_TIMESTAMP                            AS actualizado_en,
-       a.n_expedientes,
-       ROUND(a.promedio_dias_habiles_permanencia, 4) AS promedio_dias_habiles_permanencia,
-       ROUND(a.promedio_horas_habiles, 4)          AS promedio_horas_habiles,
-       ROUND(a.minimo_horas_habiles, 4)             AS minimo_horas_habiles,
-       ROUND(a.maximo_horas_habiles, 4)             AS maximo_horas_habiles,
-       ROUND(COALESCE(
-           a.n_expedientes::NUMERIC * 100
-               / NULLIF(SUM(a.n_expedientes) OVER (
-                   PARTITION BY a.periodo, a.unidad_organica_id), 0),
-           0), 2)                                  AS porcentaje_del_area
-  FROM agregado a;
+SELECT
+    COALESCE(ar.area_id, e.area_destino_id)                                   AS area_id,
+    COALESCE(ar.nombre, 'Sin área asignada')                                  AS area,
+    e.estado                                                                     AS estado,
+    COUNT(*)::int                                                                AS expedientes,
+    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 3600)::numeric, 2)::float8
+                                                                                  AS horas_promedio,
+    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 86400)::numeric, 2)::float8
+                                                                                  AS dias_promedio,
+    ROUND(MAX(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 86400)::numeric, 2)::float8
+                                                                                  AS dias_maximo,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite < now())::int
+                                                                                  AS vencidos,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite < now())::int AS semaforo_rojo,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite >= now() AND e.fecha_limite < now() + interval '5 days')::int AS semaforo_amarillo,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NULL OR e.fecha_limite >= now() + interval '5 days')::int AS semaforo_verde
+FROM sigd_rut.estado_actual_expediente a
+JOIN sigd_tra.expediente e
+  ON e.expediente_id::text = a.expediente_id::text
+LEFT JOIN sigd_org.area ar
+  ON ar.area_id::text = a.area_actual_id
+WHERE a.estado_nuevo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
+GROUP BY 1, 2, 3
+WITH DATA;
+
+-- La clave única combina área y estado: un área puede tener varios estados
+-- vigentes y el refresco concurrente no admite duplicados.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_tiempos_retencion_area_clave
+    ON sigd_tra.mv_tiempos_retencion_area (COALESCE(area_id, '00000000-0000-0000-0000-000000000000'::uuid), estado);
+
+CREATE INDEX IF NOT EXISTS ix_mv_tiempos_retencion_area_dias
+    ON sigd_tra.mv_tiempos_retencion_area (dias_promedio DESC);
 
 COMMENT ON MATERIALIZED VIEW sigd_tra.mv_tiempos_retencion_area IS
-    'Distribucion de permanencia en dias habiles por (periodo, unidad_organica_id, tramo). Base del analisis de cuellos de botella.';
+    'Expedientes en trámite por área y estado, con permanencia promedio y semáforo SLA. Base del ranking de cuellos de botella (#51/#52).';
 
 -- -----------------------------------------------------------------------------
--- 6. ÍNDICES UNIQUE (requisito de REFRESH ... CONCURRENTLY) + índices de acceso
+-- 7.3 Función de refresco transaccional para el endpoint administrativo #51
 -- -----------------------------------------------------------------------------
-CREATE UNIQUE INDEX IF NOT EXISTS uq_mv_kpis_mgd_mensual
-    ON sigd_tra.mv_kpis_mgd_mensual (periodo, unidad_organica_id);
+CREATE OR REPLACE FUNCTION sigd_tra.refrescar_vistas_mgd()
+RETURNS TABLE(vista TEXT, duracion_ms NUMERIC)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_inicio TIMESTAMPTZ := clock_timestamp();
+    v_fin    TIMESTAMPTZ;
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY sigd_tra.mv_kpis_mgd_mensual;
+    v_fin := clock_timestamp();
+    vista := 'sigd_tra.mv_kpis_mgd_mensual';
+    duracion_ms := EXTRACT(EPOCH FROM (v_fin - v_inicio)) * 1000;
+    RETURN NEXT;
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_mv_tiempos_retencion_area
-    ON sigd_tra.mv_tiempos_retencion_area
-       (periodo, unidad_organica_id, tramo_permanencia_dias_habiles);
+    v_inicio := clock_timestamp();
+    REFRESH MATERIALIZED VIEW CONCURRENTLY sigd_tra.mv_tiempos_retencion_area;
+    v_fin := clock_timestamp();
+    vista := 'sigd_tra.mv_tiempos_retencion_area';
+    duracion_ms := EXTRACT(EPOCH FROM (v_fin - v_inicio)) * 1000;
+    RETURN NEXT;
+END;
+$$;
 
-CREATE INDEX IF NOT EXISTS ix_mv_kpis_mgd_mensual_unidad
-    ON sigd_tra.mv_kpis_mgd_mensual (unidad_organica_id, periodo);
-
-CREATE INDEX IF NOT EXISTS ix_mv_tiempos_retencion_area_unidad
-    ON sigd_tra.mv_tiempos_retencion_area (unidad_organica_id, periodo);
-
--- -----------------------------------------------------------------------------
--- 7. COMENTARIOS DE COLUMNA PARA AUDITORÍA
--- -----------------------------------------------------------------------------
-COMMENT ON COLUMN sigd_tra.mv_kpis_mgd_mensual.n_radicados IS
-    'Denominador de VTEP: total de expedientes radicados en el periodo y area.';
-COMMENT ON COLUMN sigd_tra.mv_kpis_mgd_mensual.n_atendidos IS
-    'Numerador de VTEP: estado_nuevo = RESUELTO (pestana ATENDIDOS).';
-COMMENT ON COLUMN sigd_tra.mv_kpis_mgd_mensual.n_archivados IS
-    'Numerador de VTEP: estado_nuevo = ARCHIVADO (pestana ARCHIVADOS).';
-COMMENT ON COLUMN sigd_tra.mv_kpis_mgd_mensual.n_resueltos IS
-    'Denominador de TPR y de TRO: expedientes con RESUELTO o ARCHIVADO.';
-COMMENT ON COLUMN sigd_tra.mv_kpis_mgd_mensual.n_resueltos_dentro_plazo IS
-    'Numerador de TRO: resueltos con permanencia de 30 dias habiles o menos.';
-COMMENT ON COLUMN sigd_tra.mv_kpis_mgd_mensual.horas_habiles_suma IS
-    'Numerador de TPR: suma de horas habil de atencion de los expedientes resueltos.';
-COMMENT ON COLUMN sigd_tra.mv_kpis_mgd_mensual.n_en_tramite IS
-    'Denominador de TEO: pestana EN_TRAMITE (EN_REVISION + OBSERVADO + SUBSANADO).';
-COMMENT ON COLUMN sigd_tra.mv_kpis_mgd_mensual.n_observados IS
-    'Numerador de TEO: estado_nuevo = OBSERVADO.';
-COMMENT ON COLUMN sigd_tra.mv_tiempos_retencion_area.tramo_permanencia_dias_habiles IS
-    'Tramo de permanencia en dias habiles: 01_00_05, 02_06_10, 03_11_15, 04_16_20, 05_21_30, 06_31_45, 07_46_60, 08_MAS_60.';
-COMMENT ON COLUMN sigd_tra.mv_tiempos_retencion_area.n_expedientes IS
-    'Expedientes del tramo; peso para consolidar la permanencia promedio del area.';
-COMMENT ON COLUMN sigd_tra.mv_tiempos_retencion_area.promedio_dias_habiles_permanencia IS
-    'Permanencia promedio del tramo en dias habiles. Ponderada por n_expedientes da la permanencia promedio del area.';
+COMMENT ON FUNCTION sigd_tra.refrescar_vistas_mgd() IS
+    'Refresco concurrente de las vistas MGD sin bloquear lecturas (#51). El endpoint administrativo la invoca sobre su propia conexión, fuera de la transacción de negocio.';

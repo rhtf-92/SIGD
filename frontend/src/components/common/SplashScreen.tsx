@@ -1,22 +1,39 @@
 import { useEffect, useState } from "react";
 
-const DURACION_MS = 1800;
+const DURACION_MS = 900;
+const CLAVE_VISTO = "sigd_splash_visto";
+
+function yaVisto(): boolean {
+  try {
+    return window.sessionStorage.getItem(CLAVE_VISTO) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export default function SplashScreen() {
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(() => !yaVisto());
   const [saliendo, setSaliendo] = useState(false);
   const [progreso, setProgreso] = useState(0);
 
   useEffect(() => {
+    if (!visible) return;
     const t0 = window.setTimeout(() => setProgreso(100), 60);
-    const t1 = window.setTimeout(() => setSaliendo(true), DURACION_MS - 400);
-    const t2 = window.setTimeout(() => setVisible(false), DURACION_MS);
+    const t1 = window.setTimeout(() => setSaliendo(true), DURACION_MS - 250);
+    const t2 = window.setTimeout(() => {
+      setVisible(false);
+      try {
+        window.sessionStorage.setItem(CLAVE_VISTO, "1");
+      } catch {
+        // sin storage, solo se oculta
+      }
+    }, DURACION_MS);
     return () => {
       window.clearTimeout(t0);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, []);
+  }, [visible]);
 
   if (!visible) return null;
 
@@ -56,6 +73,13 @@ export default function SplashScreen() {
         Sistema Integral de Gestión Documentaria
       </p>
       <p className="mt-0.5 text-[11px] text-blue-200">IESTP “Suiza” · Pucallpa</p>
+      <button
+        type="button"
+        onClick={() => setVisible(false)}
+        className="mt-4 rounded-full border border-white/30 px-4 py-1 text-[11px] font-semibold text-blue-100 hover:bg-white/10"
+      >
+        Omitir
+      </button>
 
       {/* barra con rayas en movimiento + brillo */}
       <div

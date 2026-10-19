@@ -21,9 +21,9 @@ const MODULOS: TarjetaModulo[] = [
     codigo: "ENT-M04-02",
     titulo: "Proyectos y Resoluciones Académicas",
     descripcion:
-      "Gestión de expedientes de proyectos y resoluciones del Director General (proyector, correlativo, WYSIWYG).",
+      "Bandeja de proyectos de resolución del Director General: correlativo anual, estados, revisión y pase a firma digital.",
     responsables: "Isaí (R)",
-    ruta: "/flujo-validez-legal/proyector",
+    ruta: "/flujos/proyector-resoluciones",
   },
   {
     codigo: "ENT-M04-03",

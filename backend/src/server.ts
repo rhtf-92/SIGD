@@ -70,12 +70,19 @@ const apagar = (senal: string): void => {
 };
 
 // En desarrollo, iniciar concurrentemente el servidor Vite del Frontend en el puerto 5173
+// Se puede desactivar con SKIP_FRONTEND_AUTOSTART=true (útil cuando el orquestador
+// raíz ya lanza `frontend` por separado con `concurrently` y así evitar doble Vite).
+const SKIP_FRONTEND_AUTOSTART =
+  (process.env.SKIP_FRONTEND_AUTOSTART ?? '').toLowerCase() === 'true' ||
+  process.env.SKIP_FRONTEND_AUTOSTART === '1';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDir = path.resolve(__dirname, '../../frontend');
 const viteBin = path.resolve(frontendDir, 'node_modules/vite/bin/vite.js');
 
 let viteProc: ReturnType<typeof spawn> | null = null;
+if (!SKIP_FRONTEND_AUTOSTART) {
 try {
   viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
     cwd: frontendDir,
@@ -105,6 +112,7 @@ try {
 } catch (e) {
   console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
 }
+} // fin if (!SKIP_FRONTEND_AUTOSTART)
 
 process.on('SIGINT', () => {
   if (viteProc) viteProc.kill();

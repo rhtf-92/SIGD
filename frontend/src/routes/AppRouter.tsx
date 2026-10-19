@@ -3,7 +3,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
 
-import SeguridadPage from "../pages/administracion/SeguridadPage";
 import DashboardEjecutivoPage from "../pages/DashboardEjecutivoPage";
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
 import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
@@ -21,7 +20,7 @@ import TramitePage from "../pages/tramite/TramitePage";
 import ConsultaPublicaPage from "../pages/tramite/ConsultaPublicaPage";
 import ProyectorResolucionesPage from "../pages/flujos/ProyectorResolucionesPage";
 import AdminRoutes from "./AdminRoutes";
-import ModuloGuard from "./ModuloGuard";
+import ProtectedRoute from "./ProtectedRoute";
 
 export default function AppRouter() {
   return (
@@ -33,45 +32,58 @@ export default function AppRouter() {
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
 
+      {/* Públicas sin sesión */}
+      <Route path="/registro" element={<RegistroCiudadanoPage />} />
+      <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
+
+      {/* Privadas: solo su rol. Si escribes la URL sin el rol, vas a /acceso-denegado */}
       <Route
         path="/casilla"
         element={
-          <ModuloGuard moduloId="casilla">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE", "MESA_PARTES", "ESTUDIANTE"]}
+            requiredModule="Documentos"
+            requiredAction="ver"
+          >
             <CasillaElectronicaPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/casilla-electronica"
         element={
-          <ModuloGuard moduloId="casilla">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE", "MESA_PARTES", "ESTUDIANTE"]}
+            requiredModule="Documentos"
+            requiredAction="ver"
+          >
             <CasillaElectronicaPage />
-          </ModuloGuard>
-        }
-      />
-      <Route
-        path="/registro"
-        element={
-          <ModuloGuard moduloId="registro">
-            <RegistroCiudadanoPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/tramite"
         element={
-          <ModuloGuard moduloId="mesa-partes">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "MESA_PARTES", "ESTUDIANTE"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
             <TramitePage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/tramite/mesa-partes-virtual"
         element={
-          <ModuloGuard moduloId="mesa-partes">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "MESA_PARTES", "ESTUDIANTE"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
             <MesaPartesVirtualPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
@@ -81,87 +93,110 @@ export default function AppRouter() {
       <Route
         path="/mesa-partes"
         element={
-          <ModuloGuard moduloId="mesa-partes">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "MESA_PARTES", "ESTUDIANTE"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
             <MesaPartesVirtualPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/tramite/ventanilla-presencial"
         element={
-          <ModuloGuard moduloId="ventanilla">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "MESA_PARTES"]}
+            requiredModule="Expedientes"
+            requiredAction="crear"
+          >
             <VentanillaPresencialPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/ventanilla"
         element={
-          <ModuloGuard moduloId="ventanilla">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "MESA_PARTES"]}
+            requiredModule="Expedientes"
+            requiredAction="crear"
+          >
             <VentanillaPresencialPage />
-          </ModuloGuard>
-        }
-      />
-      <Route
-        path="/administracion/seguridad"
-        element={
-          <ModuloGuard moduloId="administracion">
-            <SeguridadPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/flujo-validez-legal"
         element={
-          <ModuloGuard moduloId="validez-legal">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE"]}
+            requiredModule="Documentos"
+            requiredAction="ver"
+          >
             <FlujoValidezLegalPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/flujos/titulacion"
         element={
-          <ModuloGuard moduloId="titulacion">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
             <WorkflowAcademicoPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
-        path="/flujo-validez-legal/proyector"
+        path="/flujos/proyector-resoluciones"
         element={
-          <ModuloGuard moduloId="resoluciones">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE"]}
+            requiredModule="Documentos"
+            requiredAction="ver"
+          >
             <ProyectorResolucionesPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/flujo-validez-legal/firma"
         element={
-          <ModuloGuard moduloId="validez-legal">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE"]}
+            requiredModule="Documentos"
+            requiredAction="crear"
+          >
             <PasarelaFirmaPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/flujo-validez-legal/visor-cvd"
         element={
-          <ModuloGuard moduloId="validez-legal">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE"]}
+            requiredModule="Documentos"
+            requiredAction="ver"
+          >
             <VisorCvdPage />
-          </ModuloGuard>
-        }
-      />
-      <Route
-        path="/validador-cvd"
-        element={
-          <ModuloGuard moduloId="validador-cvd">
-            <ValidadorPublicoCvdPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
 
+
       <Route
         path="/administracion"
-        element={<ModuloGuard moduloId="administracion" />}
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
+            requiredModule="Administración"
+            requiredAction="ver"
+          />
+        }
       >
         {AdminRoutes()}
       </Route>
@@ -173,38 +208,55 @@ export default function AppRouter() {
       <Route
         path="/expedientes"
         element={
-          <ModuloGuard moduloId="expedientes">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE", "MESA_PARTES"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
             <BandejaExpedientesPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/expedientes/:id"
         element={
-          <ModuloGuard moduloId="expedientes">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE", "MESA_PARTES"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
             <ExpedienteDetallePage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/reportes"
         element={
-          <ModuloGuard moduloId="reportes">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
+            requiredModule="Auditoría"
+            requiredAction="ver"
+          >
             <DashboardEjecutivoPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/reportes/dashboard"
         element={
-          <ModuloGuard moduloId="reportes">
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
+            requiredModule="Auditoría"
+            requiredAction="ver"
+          >
             <DashboardEjecutivoPage />
-          </ModuloGuard>
+          </ProtectedRoute>
         }
       />
 
       <Route path="*" element={<Navigate to="/" replace />} />
+
     </Routes>
   );
 }

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { apiClient } from "../api/client";
+import { notificarCambioSesion } from "../config/accesoModulos";
 import { permisosIniciales } from "../hooks/useRbacConfig";
 
 export interface UsuarioPerfil {
@@ -131,6 +132,7 @@ function createStore() {
             window.localStorage.setItem("sigd_permisos", JSON.stringify(permisosIniciales));
           }
         }
+        notificarCambioSesion();
       } catch {
         // Ignore storage errors
       }
@@ -145,16 +147,12 @@ function createStore() {
           window.localStorage.removeItem("sigd_permisos");
           window.localStorage.removeItem(STORAGE_KEY);
         }
+        notificarCambioSesion();
       } catch {
         // Ignore storage errors
       }
-      try {
-        if (typeof window !== "undefined" && window.location) {
-          window.location.href = "/login";
-        }
-      } catch {
-        // Ignore navigation error in test environments
-      }
+      // Sin window.location.href: la navegación la hace el llamador con
+      // navigate("/login") para evitar recarga completa de página.
     },
     setToken: (accessToken: string, refreshToken: string | null = null) => {
       set((s) => ({
@@ -167,6 +165,7 @@ function createStore() {
           window.localStorage.setItem("sigd_token", accessToken);
           window.localStorage.setItem("token", accessToken);
         }
+        notificarCambioSesion();
       } catch {
         // Ignore storage errors
       }
