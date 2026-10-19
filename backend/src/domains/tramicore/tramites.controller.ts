@@ -9,14 +9,17 @@ import { TicketTermicoUtil } from './ticketTermico.util.js';
 import { consultaPublicaParamsSchema, radicacionVirtualSchema } from './tramites.schemas.js';
 import { NotFoundError } from '../../shared/domain/errors/index.js';
 
-const ventanillaPresencialSchema = z.object({
-  dniSolicitante: z.string().regex(/^[0-9]{8}$/, 'DNI debe contener exactamente 8 dígitos'),
-  datosRemitente: z.string().min(3),
-  asunto: z.string().min(5).max(500),
-  foliosTotales: z.coerce.number().int().positive(),
-  areaDestinoId: z.string().uuid().optional(),
-  tipoDocumentalId: z.string().uuid().optional(),
-});
+const ventanillaPresencialSchema = z
+  .object({
+    dniSolicitante: z.string().trim().regex(/^[0-9]{8}$/, 'DNI debe contener exactamente 8 dígitos'),
+    datosRemitente: z.string().trim().min(3).max(200),
+    asunto: z.string().trim().min(5).max(500),
+    foliosTotales: z.coerce.number().int().positive(),
+    correo: z.string().trim().toLowerCase().email().max(150),
+    idTipoTramiteTupa: z.string().trim().uuid(),
+    nombreSolicitante: z.string().trim().min(2).max(120).optional(),
+  })
+  .strict();
 
 /**
  * Endpoints del dominio TramiCore (Grupo 2 - OE2)
@@ -64,21 +67,22 @@ export function crearRouterTramites(
   // #15 en catálogo — Catálogo de tipos de trámite TUPA y trámites internos
   const handlerTiposTupa = async (_req: Request, res: Response) => {
     const query = `
-      SELECT tipo_tramite_id AS id,
-             tipo_tramite_id AS id_tipo_tramite,
-             codigo,
+      SELECT id_tipo_tramite_tupa AS id,
+             id_tipo_tramite_tupa AS id_tipo_tramite,
+             codigo_tupa AS codigo,
              denominacion,
-             descripcion,
-             unidad_organica,
-             plazo_dias,
-             plazo_dias AS plazo_dias_habiles,
-             silencio_administrativo,
-             silencio_administrativo AS calificacion,
+             es_tupa,
+             calificacion_administrativa,
+             calificacion_administrativa AS calificacion,
+             plazo_max_dias_habiles,
+             plazo_max_dias_habiles AS plazo_dias,
+             costo,
+             unidad_organica_responsable AS unidad_organica,
              base_legal,
-             vigente
+             activo AS vigente
         FROM sigd_doc.tipo_tramite_tupa
-       WHERE vigente = TRUE
-       ORDER BY codigo ASC;
+       WHERE activo = TRUE
+       ORDER BY codigo_tupa ASC;
     `;
     const resultado = await pool.query(query);
     res.status(200).json(resultado.rows);
@@ -99,10 +103,15 @@ export function crearRouterTramites(
     const cut = String(req.params.cut).trim().toUpperCase();
 
     const query = `
-      SELECT a.numero_asiento, a.anio_fiscal, a.cut, a.remitente,
-             a.remitente_documento, a.asunto, a.folios, a.fecha_asiento
-        FROM sigd_tra.asiento_registro a
-       WHERE a.cut = $1
+      SELECT e.cut,
+             e.nombre_solicitante,
+             e.asunto,
+             e.total_folios,
+             e.fecha_envio_real,
+             p.numero_documento
+        FROM sigd_tra.expediente e
+        LEFT JOIN sigd_auth.persona p ON p.id = e.id_persona
+       WHERE e.cut = $1
        LIMIT 1;
     `;
 
@@ -115,21 +124,26 @@ export function crearRouterTramites(
       });
     }
 
+    const hashSha256 = crypto.createHash('sha256').update(asiento.cut).digest('hex');
+    const qrUrlSeguimiento = `https://sigd.iestp-suiza.edu.pe/api/v1/tramites/consulta-publica/${encodeURIComponent(asiento.cut)}`;
+
     const ticketImpresion = TicketTermicoUtil.generarTicketVentanilla({
       cut: asiento.cut,
-      timestamp: new Date(asiento.fecha_asiento),
-      folios: Number(asiento.folios),
-      hashSha256: crypto.createHash('sha256').update(asiento.cut).digest('hex'),
-      qrUrlSeguimiento: `https://sigd.iestp-suiza.edu.pe/consulta/${encodeURIComponent(asiento.cut)}`,
+      timestamp: new Date(asiento.fecha_envio_real),
+      folios: Number(asiento.total_folios),
+      hashSha256,
+      qrUrlSeguimiento,
     });
 
     res.status(200).json({
       cut: asiento.cut,
-      remitente: asiento.remitente,
-      dni: asiento.remitente_documento,
+      remitente: asiento.nombre_solicitante,
+      dni: asiento.numero_documento,
       asunto: asiento.asunto,
-      folios: Number(asiento.folios),
-      fechaRecepcion: asiento.fecha_asiento,
+      folios: Number(asiento.total_folios),
+      fechaRecepcion: asiento.fecha_envio_real,
+      hashSha256,
+      qrSeguimientoUrl: qrUrlSeguimiento,
       ticketTermicoTexto: ticketImpresion,
     });
   });
