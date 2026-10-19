@@ -20,6 +20,13 @@ const statusLabel: Record<DashboardKpiMetric["status"], string> = {
   neutral: "Estable",
 };
 
+const statusColor: Record<DashboardKpiMetric["status"], string> = {
+  positive: "#059669",
+  warning: "#f59e0b",
+  critical: "#d62828",
+  neutral: "#006ec7",
+};
+
 function buildSparklinePath(values: number[]) {
   if (values.length === 0) {
     return "";
@@ -42,6 +49,8 @@ export default function ExecutiveKpiCard({ metric }: ExecutiveKpiCardProps) {
   const sparklinePath = buildSparklinePath(metric.sparkline);
   const deltaPositive = metric.delta >= 0;
   const tone = statusTone[metric.status];
+  const color = statusColor[metric.status];
+  const gradientId = `spark-${metric.id}`;
 
   return (
     <StatCard
@@ -59,14 +68,36 @@ export default function ExecutiveKpiCard({ metric }: ExecutiveKpiCardProps) {
       }
       children={
         sparklinePath ? (
-          <svg
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            className="h-14 w-full rounded-xl bg-slate-50 p-1"
-            aria-hidden="true"
+          <div
+            className="relative h-14 w-full overflow-hidden rounded-xl"
+            style={{ background: `color-mix(in srgb, ${color} 8%, #ffffff)` }}
           >
-            <path d={sparklinePath} fill="none" stroke="#006ec7" strokeWidth="3" strokeLinecap="round" />
-          </svg>
+            <svg
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              className="h-full w-full"
+              aria-hidden="true"
+            >
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+                  <stop offset="100%" stopColor={color} stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path
+                d={`${sparklinePath} L100,100 L0,100 Z`}
+                fill={`url(#${gradientId})`}
+                stroke="none"
+              />
+              <path
+                d={sparklinePath}
+                fill="none"
+                stroke={color}
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
         ) : null
       }
       footer={

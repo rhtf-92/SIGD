@@ -111,9 +111,19 @@ export interface ArchivoTramite {
 
 /**
  * Datos correspondientes al Paso 2: Documentos del Trámite.
+ *
+ * IMPORTANTE (integración TUPA / BLOCKED):
+ * `tipoTramiteId` almacena ahora el identificador técnico real `registroVersionId`
+ * del procedimiento seleccionado desde la API. No se usa índice de array, código
+ * ni UUID fijo. Los campos `tipoTramiteCodigo` y `tipoTramiteDenominacion` son
+ * solo para visualización.
  */
 export interface DocumentosData {
   tipoTramiteId: string;
+  /** Código oficial del procedimiento seleccionado (solo visualización). */
+  tipoTramiteCodigo?: string;
+  /** Denominación oficial del procedimiento seleccionado (solo visualización). */
+  tipoTramiteDenominacion?: string;
   asunto: string;
   numeroFolios: number;
   archivos: ArchivoTramite[];

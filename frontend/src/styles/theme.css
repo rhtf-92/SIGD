@@ -1,18 +1,51 @@
 /*
-  Sistema visual base del SIGD.
+  Sistema de componentes visuales del SIGD.
   Todas las clases son consumidas por JSX existente: NO se renombran.
   Los valores se apoyan en los tokens declarados en src/index.css (@theme).
 */
 
 @layer components {
-  /* ── Cabecera institucional ─────────────────────────────────────────── */
-  .header-sigd {
-    background: var(--color-sigd-blue);
-    color: #ffffff;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+  /* ── Foco accesible unificado ───────────────────────────────────────── */
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--color-sigd-blue);
+    outline-offset: 2px;
   }
 
-  /* Barra de acento sólida (sin degradados) */
+  /* ── Enlace "saltar al contenido" (accesibilidad teclado) ───────────── */
+  .skip-link {
+    position: absolute;
+    left: 0.75rem;
+    top: -3rem;
+    z-index: 100;
+    border-radius: var(--radius-control);
+    background: var(--color-sigd-blue-dark);
+    color: #ffffff;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: var(--shadow-card-hover);
+    transition: top 0.15s ease;
+  }
+
+  .skip-link:focus {
+    top: 0.75rem;
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+  }
+
+  /* ── Cabecera institucional ─────────────────────────────────────────── */
+  .header-sigd {
+    background: linear-gradient(
+      120deg,
+      var(--color-sigd-navy) 0%,
+      var(--color-sigd-blue-deep) 100%
+    );
+    color: #ffffff;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset,
+      0 2px 10px rgba(10, 37, 64, 0.18);
+  }
+
+  /* Barra de acento superior (usada como franja decorativa en tarjetas) */
   .header-bar {
     display: block;
     width: 100%;
@@ -28,7 +61,7 @@
     box-shadow: var(--shadow-card);
   }
 
-  /* ── Títulos de sección ─────────────────────────────────────────────── */
+  /* ── Títulos de sección (mantenido por compatibilidad) ──────────────── */
   .section-title {
     font-size: 1rem;
     font-weight: 700;
@@ -37,28 +70,18 @@
     color: var(--color-sigd-blue);
   }
 
-  @media (min-width: 640px) {
-    .section-title {
-      font-size: 1.125rem;
-    }
-  }
-
-  /* ── Controles de formulario ────────────────────────────────────────── */
+  /* ── Entradas de texto ──────────────────────────────────────────────── */
   .input-sigd {
+    display: block;
     width: 100%;
     min-height: 2.5rem;
     border-radius: var(--radius-control);
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--color-sigd-line-strong);
     background: #ffffff;
-    padding: 0.5rem 0.875rem;
+    padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
-    line-height: 1.25rem;
-    color: #0f172a;
+    color: var(--color-sigd-text);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  }
-
-  .input-sigd::placeholder {
-    color: #94a3b8;
   }
 
   .input-sigd:hover:not(:disabled) {
@@ -73,30 +96,32 @@
 
   .input-sigd:disabled {
     cursor: not-allowed;
-    background: #f1f5f9;
+    background: var(--color-sigd-surface-muted);
     color: #94a3b8;
   }
 
   /* ── Botones ────────────────────────────────────────────────────────── */
   .btn-primary,
-  .btn-secondary {
+  .btn-secondary,
+  .btn-accent {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     min-height: 2.5rem;
     border-radius: var(--radius-control);
+    border: 1px solid transparent;
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     font-weight: 600;
     line-height: 1.25rem;
+    white-space: nowrap;
     cursor: pointer;
     transition: background-color 0.15s ease, border-color 0.15s ease,
-      color 0.15s ease;
+      color 0.15s ease, box-shadow 0.15s ease;
   }
 
   .btn-primary {
-    border: 1px solid transparent;
     background: var(--color-sigd-blue);
     color: #ffffff;
   }
@@ -105,29 +130,38 @@
     background: var(--color-sigd-blue-dark);
   }
 
-  .btn-primary:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.3);
-  }
-
   .btn-secondary {
-    border: 1px solid #cbd5e1;
+    border-color: var(--color-sigd-line-strong);
     background: #ffffff;
     color: #334155;
   }
 
   .btn-secondary:hover:not(:disabled) {
     border-color: var(--color-sigd-blue);
-    color: var(--color-sigd-blue);
+    color: var(--color-sigd-blue-dark);
+    background: #f8fafc;
   }
 
-  .btn-secondary:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.2);
+  /* Acción destacada (acento amarillo institucional, texto oscuro) */
+  .btn-accent {
+    background: var(--color-sigd-yellow-deep);
+    color: var(--color-sigd-navy);
+  }
+
+  .btn-accent:hover:not(:disabled) {
+    background: #e6b800;
+  }
+
+  .btn-primary:focus-visible,
+  .btn-secondary:focus-visible,
+  .btn-accent:focus-visible {
+    outline: 2px solid var(--color-sigd-blue);
+    outline-offset: 2px;
   }
 
   .btn-primary:disabled,
-  .btn-secondary:disabled {
+  .btn-secondary:disabled,
+  .btn-accent:disabled {
     cursor: not-allowed;
     opacity: 0.6;
   }
@@ -146,14 +180,154 @@
   .badge-sigd {
     display: inline-flex;
     align-items: center;
+    gap: 0.25rem;
     border-radius: 9999px;
     border: 1px solid #bae6fd;
     background: #f0f9ff;
     padding: 0.25rem 0.6rem;
     font-size: 0.65rem;
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--color-sigd-blue-dark);
+  }
+
+  /* ── Acentos discretos por categoría ────────────────────────────────── */
+  .cat-doc {
+    --accent: var(--color-sigd-cat-doc);
+  }
+
+  .cat-legal {
+    --accent: var(--color-sigd-cat-legal);
+  }
+
+  .cat-admin {
+    --accent: var(--color-sigd-cat-admin);
+  }
+
+  /* Encabezado de categoría */
+  .group-dot {
+    display: inline-block;
+    height: 0.5rem;
+    width: 0.5rem;
+    border-radius: 9999px;
+    background: var(--accent);
+  }
+
+  /* ── Tarjeta de módulo (catálogo) ───────────────────────────────────── */
+  .module-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-sigd-line);
+    background: #ffffff;
+    padding: 1.5rem;
+    box-shadow: var(--shadow-card);
+    transition: transform 0.2s ease, box-shadow 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .module-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: linear-gradient(
+      90deg,
+      var(--accent) 0%,
+      color-mix(in srgb, var(--accent) 30%, transparent) 100%
+    );
+  }
+
+  .module-card:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 22px 45px -18px color-mix(in srgb, var(--accent) 65%, transparent);
+  }
+
+  .module-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .module-icon {
+    display: inline-flex;
+    height: 3rem;
+    width: 3rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.9rem;
+    background: color-mix(in srgb, var(--accent) 12%, #ffffff);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+    transition: background-color 0.2s ease, color 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .module-card:hover .module-icon {
+    background: var(--accent);
+    color: #ffffff;
+    transform: scale(1.06);
+  }
+
+  .module-code {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-sigd-muted);
+  }
+
+  .module-code::before {
+    content: "";
+    height: 0.375rem;
+    width: 0.375rem;
+    border-radius: 9999px;
+    background: var(--accent);
+  }
+
+  .module-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  /* ── Tarjeta clicable genérica ──────────────────────────────────────── */
+  .card-interactive {
+    transition: transform 0.18s ease, box-shadow 0.18s ease,
+      border-color 0.18s ease;
+  }
+
+  .card-interactive:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-sigd-line-strong);
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  .card-interactive:focus-visible {
+    outline: 2px solid var(--color-sigd-blue);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .module-card,
+    .module-icon,
+    .card-interactive,
+    .skip-link {
+      transition: none;
+    }
+
+    .module-card:hover,
+    .card-interactive:hover {
+      transform: none;
+    }
   }
 }

@@ -27,6 +27,7 @@ import type {
 } from '../../../types/tramiteWizardState';
 import QrCodeView from '../../common/QrCodeView';
 import { apiClient } from '../../../api/client';
+import { esRegistroVersionIdValido } from '../../../types/procedimientoTupa';
 
 interface RadicacionVirtualResponse {
   expedienteId: string;
@@ -118,31 +119,16 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           ? documentos.asunto.trim()
           : `${documentos.asunto.trim()} - Solicitud de Trámite Institucional`;
 
-      let idTipoTramite = documentos.tipoTramiteId;
-      if (
-        !idTipoTramite ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite) ||
-        idTipoTramite === '00000000-0000-0000-0000-000000000001'
-      ) {
-        try {
-          const respTipos = await apiClient.get<Array<{ id: string; codigo?: string; id_tipo_tramite?: string }>>(
-            '/api/v1/tramites/tipos',
-          );
-          if (Array.isArray(respTipos?.data) && respTipos.data.length > 0) {
-            const encontrado = respTipos.data.find(
-              (t) => t.codigo === documentos.tipoTramiteId || t.id === documentos.tipoTramiteId,
-            );
-            const resId = (encontrado ? (encontrado.id || encontrado.id_tipo_tramite) : (respTipos.data[0].id || respTipos.data[0].id_tipo_tramite));
-            if (resId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resId)) {
-              idTipoTramite = resId;
-            }
-          }
-        } catch {
-          // Fallback defensivo si el endpoint no está disponible en entorno aislado
-        }
-      }
-      if (!idTipoTramite || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite)) {
-        idTipoTramite = '00000000-0000-0000-0000-000000000001';
+      // Identificador técnico real del procedimiento (registroVersionId).
+      // Sin fallback a UUID fijo y sin auto-seleccionar la primera fila.
+      const registroVersionId = documentos.tipoTramiteId;
+      if (!esRegistroVersionIdValido(registroVersionId)) {
+        dispatch({
+          type: 'SET_ERROR',
+          payload:
+            'Debe seleccionar un procedimiento TUPA válido del catálogo oficial antes de radicar el expediente.',
+        });
+        return;
       }
 
       let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
@@ -179,9 +165,11 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
               },
             ];
 
+      // NOTA (PROVISIONAL/BLOCKED): el nombre exacto del campo debe confirmarse
+      // con el contrato de Christian. El valor enviado es siempre registroVersionId.
       const payload = {
         asunto: asuntoFinal,
-        idTipoTramiteTupa: idTipoTramite,
+        idTipoTramiteTupa: registroVersionId,
         idPersona: idPersonaNum,
         nombreSolicitante:
           nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
@@ -426,7 +414,11 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
             </button>
           </div>
           <p className="text-sm font-bold text-slate-900">
-            {documentos.tipoTramiteId || 'Procedimiento General Institucional'}
+            {documentos.tipoTramiteCodigo
+              ? `TUPA ${documentos.tipoTramiteCodigo}: ${documentos.tipoTramiteDenominacion ?? ''}`
+              : documentos.tipoTramiteDenominacion ||
+                documentos.tipoTramiteId ||
+                'Procedimiento General Institucional'}
           </p>
           <p className="text-xs text-slate-600">
             <span className="font-semibold">Folios:</span>{' '}

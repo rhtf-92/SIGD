@@ -34,10 +34,39 @@ import { TramiteWizard } from '@/components/tramite/TramiteWizard';
 import { TRAMITE_WIZARD_STORAGE_KEY } from '@/hooks/useTramiteWizardReducer';
 import { apiClient } from '@/api/client';
 
+/**
+ * Catálogo TUPA simulado que reemplaza al hardcode legado en el flujo activo.
+ * Los `registroVersionId` son el único identificador técnico válido.
+ */
+const REGISTRO_VERSION_CERTIFICADO = '11111111-1111-4111-8111-111111111111';
+const REGISTRO_VERSION_CONVALIDACION = '22222222-2222-4222-8222-222222222222';
+
+const CATALOGO_TUPA_API = [
+  {
+    registroVersionId: REGISTRO_VERSION_CERTIFICADO,
+    codigo: '01',
+    denominacion: 'Certificado de estudios',
+    requisitos: ['Solicitud FUT', 'Constancia de No Adeudar'],
+    monto: 'S/. 11.00 por semestre',
+    fuente: 'TUPA 2026',
+    version: 'v1',
+    vigencia: '2026',
+  },
+  {
+    registroVersionId: REGISTRO_VERSION_CONVALIDACION,
+    codigo: '02',
+    denominacion: 'Convalidación de estudios',
+    requisitos: [],
+    monto: 'S/. 25.00',
+    fuente: 'TUPA 2026',
+  },
+];
+
 describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', () => {
   beforeEach(() => {
     sessionStorage.clear();
     vi.restoreAllMocks();
+    vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { data: CATALOGO_TUPA_API } } as never);
   });
 
   afterEach(() => {
@@ -97,12 +126,14 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     }
   ) => {
     const data = {
-      tipoTramiteId: 'TUPA-01',
+      tipoTramiteId: REGISTRO_VERSION_CERTIFICADO,
       asunto: 'Solicitud formal de certificado oficial de estudios concluidos',
       folios: '4',
       ...overrides,
     };
 
+    // Espera a que el catálogo TUPA (API simulada) cargue las opciones reales
+    await screen.findByRole('option', { name: /01 .* Certificado de estudios/i });
     await user.selectOptions(
       screen.getByLabelText(/Procedimiento Institucional/i),
       data.tipoTramiteId
@@ -241,7 +272,8 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
 
     // Seleccionar TUPA pero sin asunto
     const selectTupa = screen.getByLabelText(/Procedimiento Institucional/i);
-    await user.selectOptions(selectTupa, 'TUPA-01');
+    await screen.findByRole('option', { name: /01 .* Certificado de estudios/i });
+    await user.selectOptions(selectTupa, REGISTRO_VERSION_CERTIFICADO);
     expect(btnSiguiente).toBeDisabled();
 
     // Asunto muy corto (menos de 10 caracteres)
@@ -366,8 +398,8 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
 
     await fillPaso2(user, {
-      tipoTramiteId: 'TUPA-02',
-      asunto: 'Expedición de Constancia de Egresado y No Adeudo Institucional',
+      tipoTramiteId: REGISTRO_VERSION_CONVALIDACION,
+      asunto: 'Expedición de constancia de convalidación de estudios',
       folios: '5',
     });
     await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
@@ -386,12 +418,12 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(screen.getByText(/valeria\.rios@iestpsuiza\.edu\.pe/i)).toBeInTheDocument();
     expect(screen.getByText('942123456')).toBeInTheDocument();
 
-    // 2. Resumen Procedimiento
-    expect(screen.getByText('TUPA-02')).toBeInTheDocument();
-    expect(screen.getByText(/Folios:/i)).toBeInTheDocument();
+    // 2. Resumen Procedimiento (se muestra el código y la denominación del catálogo real;
+    //    el identificador técnico enviado es el registroVersionId, no el código)
     expect(
-      screen.getByText(/Constancia de Egresado y No Adeudo Institucional/i)
+      screen.getByText(/TUPA 02: Convalidación de estudios/i)
     ).toBeInTheDocument();
+    expect(screen.getByText(/Folios:/i)).toBeInTheDocument();
 
     // 3. Resumen Conformidad Legal
     expect(screen.getByText(/Veracidad Jurada \(Art\. 51 LPAG\)/i)).toBeInTheDocument();
@@ -567,5 +599,95 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(
       within(modalDialog).getByRole('button', { name: /Finalizar y Cerrar/i })
     ).toBeInTheDocument();
+  });
+
+  // ===========================================================================
+  // TEST 11 — Caso 6 (TUPA): envío del registroVersionId real
+  // ===========================================================================
+  it('Test 11: Radicación envía el registroVersionId del catálogo real como identificador técnico', async () => {
+    const user = userEvent.setup();
+    const mockPost = vi.spyOn(apiClient, 'post').mockResolvedValue({
+      data: {
+        expedienteId: '00000000-0000-0000-0000-000000000001',
+        cut: 'EXP-2026-556677',
+        anioFiscal: 2026,
+        fechaRadicacionLegal: '25 de Septiembre de 2026, 16:30 hrs',
+        fechaEnvioReal: '25 de Septiembre de 2026, 16:30 hrs',
+        diferidoPorCorte: false,
+        totalFolios: 4,
+        qrSeguimientoUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-556677',
+        cargoDigital: {
+          codigo: 'EXP-2026-556677',
+          hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          qrContenido: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-556677',
+        },
+        mensajeLegal: 'Trámite radicado formalmente.',
+      },
+      status: 201,
+    } as never);
+
+    render(<TramiteWizard />);
+
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso2(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    const btnRadicar = await screen.findByRole('button', { name: /Radicar Trámite/i });
+    await user.click(btnRadicar);
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/tramites/radicacion-virtual',
+      expect.objectContaining({ idTipoTramiteTupa: REGISTRO_VERSION_CERTIFICADO })
+    );
+  });
+
+  // ===========================================================================
+  // TEST 12 — Caso 7 (TUPA): NO existe fallback al UUID fijo legado
+  // ===========================================================================
+  it('Test 12: Rechaza la radicación cuando el identificador es el UUID fijo prohibido (sin fallback)', async () => {
+    const user = userEvent.setup();
+    const mockPost = vi.spyOn(apiClient, 'post');
+
+    // Borrador con un identificador técnico inválido (UUID legado prohibido)
+    sessionStorage.setItem(
+      TRAMITE_WIZARD_STORAGE_KEY,
+      JSON.stringify({
+        currentStep: 4,
+        identificacion: {
+          tipoDocumento: 'DNI',
+          numeroDocumento: '74123456',
+          nombres: 'María Elena',
+          apellidos: 'Vargas Paredes',
+          correo: 'maria.vargas@iestpsuiza.edu.pe',
+          telefono: '961987654',
+          direccion: '',
+        },
+        documentos: {
+          tipoTramiteId: '00000000-0000-0000-0000-000000000001',
+          asunto: 'Solicitud de certificado de estudios concluidos',
+          numeroFolios: 4,
+          archivos: [],
+        },
+        declaracionJurada: {
+          aceptaTerminos: true,
+          declaraVeracidad: true,
+          autorizaNotificacionCasilla: true,
+        },
+        cargoEmitido: null,
+      })
+    );
+
+    render(<TramiteWizard />);
+
+    const btnRadicar = await screen.findByRole('button', { name: /Radicar Trámite/i });
+    await user.click(btnRadicar);
+
+    expect(
+      await screen.findByText(/Debe seleccionar un procedimiento TUPA válido/i)
+    ).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalled();
   });
 });

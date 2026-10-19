@@ -42,17 +42,20 @@ export default function AdminBreadcrumbs() {
   return (
     <nav
       aria-label="Migajas de pan de administración"
-      className="mb-4 flex flex-wrap items-center gap-1 text-xs font-medium text-slate-500"
+      className="flex flex-wrap items-center gap-1 text-xs font-medium text-sigd-muted"
     >
       {migas.map((miga, indice) => (
         <span key={miga.ruta} className="flex items-center gap-1">
-          {indice > 0 && <span className="text-slate-300">/</span>}
+          {indice > 0 && <span className="text-sigd-line-strong">/</span>}
           {miga.actual ? (
-            <span aria-current="page" className="text-blue-700">
+            <span aria-current="page" className="font-semibold text-sigd-blue-deep">
               {miga.etiqueta}
             </span>
           ) : (
-            <Link to={miga.ruta} className="hover:text-blue-700 hover:underline">
+            <Link
+              to={miga.ruta}
+              className="rounded transition hover:text-sigd-blue focus-ring"
+            >
               {miga.etiqueta}
             </Link>
           )}

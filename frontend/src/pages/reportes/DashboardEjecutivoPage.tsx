@@ -169,7 +169,8 @@ export default function DashboardEjecutivoPage() {
         <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1.7fr_1fr]">
           <section className="card-sigd p-4" aria-labelledby="trend-title">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 id="trend-title" className="text-lg font-semibold text-slate-900">
+              <h2 id="trend-title" className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                <span className="h-4 w-1 rounded-full bg-sigd-blue" aria-hidden="true" />
                 Tendencia de radicados y resueltos
               </h2>
               <Badge tone="info">{trend.length} periodos</Badge>
@@ -200,6 +201,30 @@ export default function DashboardEjecutivoPage() {
                     />
                   );
                 })}
+                <defs>
+                  <linearGradient id="areaRadicados" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#006ec7" stopOpacity="0.28" />
+                    <stop offset="100%" stopColor="#006ec7" stopOpacity="0" />
+                  </linearGradient>
+                  <linearGradient id="areaResueltos" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#059669" stopOpacity="0.24" />
+                    <stop offset="100%" stopColor="#059669" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d={`M${trendChart[0].x},${CHART.padTop + PLOT_HEIGHT} ${trendChart
+                    .map((point) => `L${point.x},${point.yRadicados}`)
+                    .join(" ")} L${trendChart[trendChart.length - 1].x},${CHART.padTop + PLOT_HEIGHT} Z`}
+                  fill="url(#areaRadicados)"
+                  stroke="none"
+                />
+                <path
+                  d={`M${trendChart[0].x},${CHART.padTop + PLOT_HEIGHT} ${trendChart
+                    .map((point) => `L${point.x},${point.yResueltos}`)
+                    .join(" ")} L${trendChart[trendChart.length - 1].x},${CHART.padTop + PLOT_HEIGHT} Z`}
+                  fill="url(#areaResueltos)"
+                  stroke="none"
+                />
                 <path
                   d={trendChart.map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.yRadicados}`).join(" ")}
                   fill="none"
@@ -250,7 +275,8 @@ export default function DashboardEjecutivoPage() {
           </section>
 
           <section className="card-sigd p-4" aria-labelledby="estado-title">
-            <h2 id="estado-title" className="mb-4 text-lg font-semibold text-slate-900">
+            <h2 id="estado-title" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+              <span className="h-4 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
               Distribución por estado
             </h2>
             {estados.length === 0 ? (
@@ -293,7 +319,8 @@ export default function DashboardEjecutivoPage() {
         </div>
 
         <section className="card-sigd p-4" aria-labelledby="bottleneck-title">
-          <h2 id="bottleneck-title" className="mb-4 text-lg font-semibold text-slate-900">
+          <h2 id="bottleneck-title" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <span className="h-4 w-1 rounded-full bg-sigd-amber" aria-hidden="true" />
             Cuellos de botella
           </h2>
           <div className="table-sigd overflow-x-auto">

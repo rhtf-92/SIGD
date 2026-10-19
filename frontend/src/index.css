@@ -2,28 +2,78 @@
 @import "./styles/theme.css";
 
 /*
-  Tokens visuales del SIGD (Tailwind CSS 4).
-  `static` garantiza que las variables existan siempre, incluidas las que
-  referencian los componentes de src/styles/theme.css.
-  Paleta derivada de los colores ya existentes en tailwind.config.ts.
+  Sistema de diseño del SIGD (Tailwind CSS 4).
+  Fuente única de verdad para color, radio y sombra. Los nombres de token
+  existentes se conservan para no romper utilidades ya usadas en el código.
+  Paleta institucional (azul / amarillo / fucsia / marrón) derivada de
+  tailwind.config.ts, complementada con neutros y acentos de categoría
+  discretos. `static` garantiza que las variables existan siempre.
 */
 @theme static {
+  /* ── Tipografía ──────────────────────────────────────────────────── */
   --font-sans: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   --font-display: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 
+  /* ── Marca institucional ─────────────────────────────────────────── */
   --color-sigd-blue: #006ec7;
   --color-sigd-blue-dark: #0059a8;
   --color-sigd-blue-deep: #004b8f;
+  --color-sigd-navy: #0a2540;
   --color-sigd-fuchsia: #e6007e;
   --color-sigd-yellow: #f9e000;
+  --color-sigd-yellow-deep: #f2c200;
+  --color-sigd-amber: #f59e0b;
   --color-sigd-red: #d62828;
+  --color-sigd-brown: #8b5a2b;
   --color-sigd-ink: #111111;
-  --color-sigd-surface: #f1f5f9;
-  --color-sigd-line: #e2e8f0;
 
+  /* Superficies y bordes */
+  --color-sigd-surface: #f6f8fb;
+  --color-sigd-surface-muted: #eef2f7;
+  --color-sigd-line: #e2e8f0;
+  --color-sigd-line-strong: #cbd5e1;
+
+  /* Texto */
+  --color-sigd-text: #0f172a;
+  --color-sigd-muted: #64748b;
+
+  /* Acentos discretos por categoría */
+  --color-sigd-cat-doc: #006ec7;
+  --color-sigd-cat-legal: #a21caf;
+  --color-sigd-cat-admin: #0f766e;
+
+  /* Radios */
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
+  --radius-lg: 1rem;
 
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-card-hover: 0 6px 16px rgba(15, 23, 42, 0.08);
+  /* Sombras */
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06),
+    0 1px 3px rgba(15, 23, 42, 0.05);
+  --shadow-card-hover: 0 10px 28px rgba(10, 37, 64, 0.12);
+  --shadow-elevated: 0 16px 40px rgba(10, 37, 64, 0.16);
+}
+
+/* ── Animación de entrada (se desactiva con prefers-reduced-motion) ──── */
+@keyframes sigd-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer utilities {
+  .rise-in {
+    animation: sigd-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation: none;
+  }
 }

@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Users,
   ShieldCheck,
@@ -53,47 +53,51 @@ const ADMIN_ROUTES = [
 export default function AdminSidebarNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [colapsado, setColapsado] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const guardado = window.localStorage.getItem("adminSidebarColapsado");
-      if (guardado) {
-        setColapsado(guardado === "true");
-      }
-    }
-  }, []);
+  const [colapsado, setColapsado] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("adminSidebarColapsado") === "true";
+  });
 
   const toggleColapsado = () => {
-    setColapsado((prev) => {
-      const nuevo = !prev;
+    setColapsado((estadoActual) => {
+      const siguiente = !estadoActual;
       if (typeof window !== "undefined") {
-        window.localStorage.setItem("adminSidebarColapsado", String(nuevo));
+        window.localStorage.setItem("adminSidebarColapsado", String(siguiente));
       }
-      return nuevo;
+      return siguiente;
     });
   };
 
   return (
     <nav
-      className={`flex h-full flex-col border-r border-slate-200 bg-white shadow-sm transition-all duration-200 ease-out ${
+      className={`flex flex-col border-r border-sigd-line bg-white shadow-sm transition-[width] duration-200 ease-out ${
         colapsado ? "w-16" : "w-72"
       }`}
       aria-label="Navegación lateral de administración"
     >
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
+      <div className="flex items-center justify-between gap-2 border-b border-sigd-line px-4 py-4">
         {!colapsado && (
-          <div>
-            <h2 className="text-base font-bold text-slate-900">
-              Administración
-            </h2>
-            <p className="text-xs text-slate-500">Panel de configuración</p>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sigd-blue text-sm font-black text-white"
+              aria-hidden="true"
+            >
+              S
+            </span>
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-bold text-sigd-text">
+                Administración
+              </h2>
+              <p className="truncate text-xs text-sigd-muted">
+                Panel de configuración
+              </p>
+            </div>
           </div>
         )}
         <button
           type="button"
           onClick={toggleColapsado}
-          className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+          className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-sigd-line-strong bg-white text-sigd-muted transition hover:border-sigd-blue hover:text-sigd-blue focus-ring"
           aria-label={colapsado ? "Expandir menú lateral" : "Colapsar menú lateral"}
           aria-expanded={!colapsado}
         >
@@ -115,17 +119,25 @@ export default function AdminSidebarNav() {
               <button
                 type="button"
                 onClick={() => navigate(rutaItem.ruta)}
-                className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 ${
+                className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition focus-ring ${
                   esActiva
-                    ? "bg-blue-50 text-blue-700 shadow-sm"
-                    : "text-slate-700 hover:bg-slate-50"
+                    ? "bg-sigd-blue/10 text-sigd-blue-deep"
+                    : "text-slate-700 hover:bg-sigd-surface-muted"
                 }`}
                 aria-current={esActiva ? "page" : undefined}
                 title={colapsado ? rutaItem.titulo : undefined}
               >
+                {esActiva && (
+                  <span
+                    className="absolute left-0 top-2 bottom-2 w-1 rounded-full bg-sigd-blue"
+                    aria-hidden="true"
+                  />
+                )}
                 <Icono
                   className={`h-5 w-5 shrink-0 ${
-                    esActiva ? "text-blue-700" : "text-slate-500"
+                    esActiva
+                      ? "text-sigd-blue-deep"
+                      : "text-sigd-muted group-hover:text-sigd-blue"
                   }`}
                   aria-hidden="true"
                 />
@@ -134,7 +146,7 @@ export default function AdminSidebarNav() {
                     <span className="truncate font-semibold">
                       {rutaItem.titulo}
                     </span>
-                    <span className="truncate text-xs text-slate-500">
+                    <span className="truncate text-xs text-sigd-muted">
                       {rutaItem.descripcion}
                     </span>
                   </div>

@@ -20,6 +20,13 @@ const toneClasses: Record<StatCardTone, string> = {
   error: "text-red-700",
 };
 
+const railClasses: Record<StatCardTone, string> = {
+  default: "bg-sigd-blue",
+  positive: "bg-emerald-500",
+  warning: "bg-amber-500",
+  error: "bg-red-500",
+};
+
 export default function StatCard({
   label,
   value,
@@ -34,12 +41,16 @@ export default function StatCard({
 }: StatCardProps) {
   return (
     <article
-      className={`card-sigd flex min-w-0 flex-col justify-between gap-4 p-4 transition-shadow duration-200 hover:shadow-card-hover ${className}`}
+      className={`card-sigd relative flex min-w-0 flex-col justify-between gap-4 overflow-hidden p-4 pl-5 transition-shadow duration-200 hover:shadow-card-hover ${className}`}
       {...rest}
     >
+      <span
+        aria-hidden="true"
+        className={`absolute inset-y-0 left-0 w-1 ${railClasses[valueTone]}`}
+      />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-sigd-muted">{label}</p>
           <p className={`mt-3 break-words text-3xl font-bold ${toneClasses[valueTone]}`} aria-live="polite">
             {value}
             {unit ? <span className="ml-1 text-sm font-medium text-slate-500">{unit}</span> : null}

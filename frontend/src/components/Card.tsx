@@ -1,9 +1,13 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
-interface CardProps {
+interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
 }
 
-export default function Card({ children }: CardProps) {
-  return <div className="card-sigd">{children}</div>;
+export default function Card({ children, className = "", ...rest }: CardProps) {
+  return (
+    <div className={`card-sigd ${className}`} {...rest}>
+      {children}
+    </div>
+  );
 }

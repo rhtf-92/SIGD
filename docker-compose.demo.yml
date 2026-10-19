@@ -1,0 +1,89 @@
+# SIGD - Entorno de demostracion (Fase 2/3)
+# - Sin MinIO: la imagen oficial minio/minio fue retirada de Docker Hub (HTTP 404).
+#   Los endpoints que usan S3 (storage/docucore) no estaran disponibles.
+# - node:24-alpine para cumplir el engine del frontend (>=24.19.0 <25).
+# - node_modules aislado con volumen anonimo para no mezclar binarios de Windows con Linux.
+# - Puertos host alternos para no chocar con el entorno nativo (3000/5173/5432 ocupados).
+# - No reemplaza docker-compose.yml (se mantiene intacto).
+
+services:
+  # 1. Base de datos relacional + extensiones
+  postgres:
+    image: postgres:18-alpine
+    container_name: sigd_demo_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_DB: sigd_prueba
+    # Nota: 55432 cae en el rango excluido de Windows (55384-55483); no se expone al host.
+    expose:
+      - "5432"
+    volumes:
+      - pgdata_demo:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sigd_prueba"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 2. Cache / sesiones
+  redis:
+    image: redis:7-alpine
+    container_name: sigd_demo_redis
+    expose:
+      - "6379"
+    volumes:
+      - redisdata_demo:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # 3. API backend (ejecuta migraciones al boot: MIGRATE_ON_BOOT=true)
+  backend:
+    image: node:24-alpine
+    container_name: sigd_demo_backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: sh -c "npm ci && mkdir -p /tmp/migrademo && cp /app/migraciones/*.sql /tmp/migrademo/ && rm -f /tmp/migrademo/07_sigd_reportes.sql && npm run dev"
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      MIGRATE_ON_BOOT: "true"
+      MIGRATIONS_DIR: /tmp/migrademo
+      DATABASE_URL: postgres://postgres:postgres_password@postgres:5432/sigd_prueba
+      REDIS_URL: redis://redis:6379
+      OUTBOX_POLL_INTERVAL_MS: 5000
+    ports:
+      - "3080:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 4. Frontend SPA (Vite dev server)
+  frontend:
+    image: node:24-alpine
+    container_name: sigd_demo_frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    # --no-package-lock: el lock del frontend esta desincronizado; no se reescribe el del host.
+    # Si node_modules ya existe (volumen anonimo), se salta npm install para reinicios rapidos.
+    command: sh -c "[ -d node_modules/vite ] || npm install --no-package-lock; node node_modules/vite/bin/vite.js --host 0.0.0.0 --port 5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:3080/api/v1
+      VITE_ENABLE_MOCKS: "false"
+    ports:
+      - "5273:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata_demo:
+  redisdata_demo:
