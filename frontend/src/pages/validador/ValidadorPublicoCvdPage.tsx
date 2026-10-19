@@ -3,6 +3,7 @@
  * Portal 100% público y anónimo (/validador-cvd): sin login, sin JWT.
  * Máscara guiada CVD-YYYY-RD-XXXXXX-XXXX, escaneo QR con cámara web,
  * carga de PDF y dictamen formal CvdIntegrityReport (D.S. N° 070-2013-PCM).
+ * Maquillado: glassmorphism / neón — consistente con el prototipo SIGD.
  */
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -21,6 +22,14 @@ import {
 } from "../../utils/cvdValidator";
 
 const PATRON_CVD = /CVD-\d{2,4}-[A-Z]{2,6}-\d{4,6}-[A-F0-9]{4}/;
+
+/* ─── KPIs estáticos del validador ─── */
+const KPI_DATA = [
+  { label: "Documentos validados", valor: "12 847", icono: "🗂️", color: "from-blue-600 to-indigo-700" },
+  { label: "Válidos hoy", valor: "218", icono: "✅", color: "from-emerald-500 to-teal-600" },
+  { label: "Alertas detectadas", valor: "4", icono: "⚠️", color: "from-amber-500 to-orange-600" },
+  { label: "Tiempo promedio", valor: "0.8 s", icono: "⚡", color: "from-violet-500 to-purple-700" },
+];
 
 export default function ValidadorPublicoCvdPage() {
   const [codigo, setCodigo] = useState("");
@@ -92,7 +101,6 @@ export default function ValidadorPublicoCvdPage() {
       });
       streamRef.current = stream;
       setCamaraActiva(true);
-      // Espera al siguiente tick para que el <video> exista en el DOM
       requestAnimationFrame(() => {
         const video = videoRef.current;
         if (video) {
@@ -145,37 +153,75 @@ export default function ValidadorPublicoCvdPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-4xl px-6 py-5">
+    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 text-slate-100">
+
+      {/* ── Barra de acento institucional ── */}
+      <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
+
+      {/* ── Header glassmorphism ── */}
+      <header className="border-b border-white/10 bg-white/5 backdrop-blur-md">
+        <div className="mx-auto max-w-5xl px-6 py-5">
           <Link
             to="/"
-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-slate-200 backdrop-blur-sm transition hover:bg-white/20 hover:text-white"
           >
             ← Volver al inicio
           </Link>
-          <p className="text-sm font-bold text-blue-700">
-            ENT-M04-05 · Adriano David Espinoza Ramírez · Acceso público y anónimo (sin login)
-          </p>
-          <h1 className="text-2xl font-bold">
-            Verificador público de Códigos de Verificación Digital (CVD)
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <span className="rounded-full border border-blue-400/40 bg-blue-500/20 px-3 py-1 text-xs font-bold uppercase tracking-widest text-blue-300">
+              ENT-M04-05 · Acceso público y anónimo
+            </span>
+            <span className="rounded-full border border-violet-400/30 bg-violet-500/15 px-3 py-1 text-xs font-semibold text-violet-300">
+              D.S. N° 070-2013-PCM
+            </span>
+          </div>
+          <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+            <span className="bg-gradient-to-r from-blue-300 to-violet-300 bg-clip-text text-transparent">
+              Validador CVD
+            </span>{" "}
+            — Verificación Digital Institucional
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Empleadores y entidades externas pueden contrastar la autenticidad de resoluciones
-            impresas sin apersonarse a Pucallpa · D.S. N° 070-2013-PCM.
+          <p className="mt-1 text-sm text-slate-400">
+            Empleadores y entidades externas pueden contrastar la autenticidad de
+            resoluciones impresas · IESTP Suiza — Pucallpa
           </p>
         </div>
       </header>
 
-      <section className="mx-auto max-w-4xl px-6 py-8">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <label htmlFor="codigo-cvd" className="text-sm font-bold text-slate-700">
-            Código CVD del documento
-          </label>
-          <p className="mt-1 text-xs text-slate-500">
-            Máscara guiada: <code className="font-mono font-bold">{CVD_INPUT_MASK_HINT}</code>
-          </p>
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+      <div className="mx-auto max-w-5xl space-y-8 px-6 py-8">
+
+        {/* ── KPIs superiores ── */}
+        <section aria-label="Indicadores del validador CVD" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {KPI_DATA.map((kpi) => (
+            <article
+              key={kpi.label}
+              className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg backdrop-blur-sm transition hover:bg-white/10"
+            >
+              {/* fondo neón sutil */}
+              <div className={`absolute -right-4 -top-4 h-20 w-20 rounded-full bg-gradient-to-br ${kpi.color} opacity-20 blur-2xl`} />
+              <span className="text-2xl" aria-hidden="true">{kpi.icono}</span>
+              <p className="mt-2 text-2xl font-extrabold text-white">{kpi.valor}</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-400">{kpi.label}</p>
+            </article>
+          ))}
+        </section>
+
+        {/* ── Panel principal de verificación ── */}
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md">
+          <div className="mb-5 flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-lg shadow-lg shadow-blue-500/30">
+              🔍
+            </span>
+            <div>
+              <h2 className="text-base font-bold text-white">Ingresar código CVD</h2>
+              <p className="text-xs text-slate-400">
+                Máscara guiada:{" "}
+                <code className="font-mono font-bold text-blue-300">{CVD_INPUT_MASK_HINT}</code>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row">
             <input
               id="codigo-cvd"
               type="text"
@@ -191,27 +237,35 @@ export default function ValidadorPublicoCvdPage() {
               spellCheck={false}
               autoComplete="off"
               maxLength={26}
+              aria-label="Código CVD del documento"
               aria-describedby="ayuda-cvd"
               aria-invalid={mensaje ? true : undefined}
-              className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-2.5 font-mono text-sm uppercase placeholder:font-sans placeholder:normal-case focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+              className="min-w-0 flex-1 rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-mono text-sm uppercase text-white placeholder:font-sans placeholder:normal-case placeholder:text-slate-500 backdrop-blur-sm transition focus:border-blue-400 focus:ring-2 focus:ring-blue-400/30 focus:outline-none"
             />
             <button
               type="button"
+              id="btn-verificar-cvd"
               onClick={() => verificarCodigo()}
               disabled={isValidando}
-              className="rounded-lg bg-blue-700 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-7 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition hover:from-blue-500 hover:to-indigo-500 focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {isValidando ? "Verificando..." : "Verificar"}
+              {isValidando ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Verificando…
+                </span>
+              ) : (
+                "Verificar CVD"
+              )}
             </button>
           </div>
-          <p id="ayuda-cvd" className="mt-1 text-xs text-slate-400">
+          <p id="ayuda-cvd" className="mt-1.5 text-xs text-slate-500">
             El código está impreso en la estampa lateral marginal del documento físico.
           </p>
 
+          {/* ejemplos y cámara */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
-              Ejemplos:
-            </span>
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Ejemplos:</span>
             {[CVD_VALIDO, CVD_ALTERADO].map((ejemplo) => (
               <button
                 key={ejemplo}
@@ -220,42 +274,45 @@ export default function ValidadorPublicoCvdPage() {
                   setCodigo(ejemplo);
                   verificarCodigo(ejemplo);
                 }}
-                className="rounded-full border border-slate-300 px-3 py-1 font-mono text-xs text-slate-600 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
+                className="rounded-full border border-white/20 bg-white/5 px-3 py-1 font-mono text-xs text-slate-300 transition hover:border-blue-400/50 hover:bg-blue-500/10 hover:text-blue-300"
               >
                 {ejemplo}
               </button>
             ))}
             <button
               type="button"
+              id="btn-camara-qr"
               onClick={camaraActiva ? detenerCamara : iniciarCamara}
-              className="rounded-full border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+              className="rounded-full border border-violet-400/40 bg-violet-500/10 px-3 py-1 text-xs font-bold text-violet-300 transition hover:bg-violet-500/20 hover:text-violet-200"
             >
-              {camaraActiva ? "■ Detener cámara" : "◉ Escanear QR con cámara"}
+              {camaraActiva ? "■ Detener cámara" : "◉ Escanear QR"}
             </button>
           </div>
 
+          {/* vista de cámara */}
           {camaraActiva && (
-            <div className="mt-4 rounded-xl border border-blue-200 bg-slate-950 p-3">
+            <div className="mt-4 overflow-hidden rounded-2xl border border-violet-500/30 bg-black/50 p-3 shadow-lg shadow-violet-500/10">
               <video
                 ref={videoRef}
                 muted
                 playsInline
-                className="h-56 w-full rounded-lg object-cover"
+                className="h-56 w-full rounded-xl object-cover"
                 aria-label="Vista previa de la cámara para escanear el QR del documento"
               />
-              <p className="mt-2 text-center text-xs text-slate-300">
+              <p className="mt-2 text-center text-xs text-slate-400">
                 Apunte la cámara al código QR del documento impreso…
               </p>
             </div>
           )}
           {camaraError && (
-            <p role="status" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <p role="status" className="mt-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-300">
               {camaraError}
             </p>
           )}
 
-          <div className="mt-5 border-t border-slate-100 pt-5">
-            <p className="text-sm font-bold text-slate-700">¿Posee el PDF oficial? Arrástrelo aquí</p>
+          {/* carga PDF */}
+          <div className="mt-6 border-t border-white/10 pt-5">
+            <p className="text-sm font-bold text-white">¿Posee el PDF oficial? Arrástrelo aquí</p>
             <label
               role="button"
               tabIndex={0}
@@ -265,12 +322,12 @@ export default function ValidadorPublicoCvdPage() {
                   entradaArchivoRef.current?.click();
                 }
               }}
-              className="mt-3 flex cursor-pointer items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-sm text-slate-500 transition hover:border-blue-400 hover:bg-blue-50"
+              className="mt-3 flex cursor-pointer items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-white/20 bg-white/5 px-6 py-8 text-sm text-slate-400 transition hover:border-blue-400/50 hover:bg-blue-500/5 hover:text-slate-200"
             >
-              <span aria-hidden="true" className="text-2xl">⬆</span>
+              <span aria-hidden="true" className="text-2xl">📄</span>
               <span>
-                Seleccionar o soltar el documento <b>.PDF</b> — el sistema extraerá automáticamente
-                el CVD de su firma PAdES y lo validará.
+                Seleccionar o soltar el documento <b className="text-white">.PDF</b> — el sistema
+                extraerá automáticamente el CVD de su firma PAdES y lo validará.
               </span>
               <input
                 ref={entradaArchivoRef}
@@ -286,58 +343,67 @@ export default function ValidadorPublicoCvdPage() {
             </label>
           </div>
 
+          {/* mensajes */}
           {mensaje && (
-            <p role="status" className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            <p role="status" className="mt-4 rounded-xl border border-blue-400/30 bg-blue-500/10 p-3 text-sm text-blue-300">
               {mensaje}
             </p>
           )}
 
-          {isValidando && (
-            <div role="status" className="mt-5 flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
-              Consultando validador institucional…
-            </div>
-          )}
-
           {error && (
-            <div role="alert" className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <div role="alert" className="mt-5 rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-300">
               <p className="font-bold">{error.titulo}</p>
-              <p className="mt-1">{error.detalle}</p>
-              <p className="mt-2 text-xs opacity-70">Referencia interna: HTTP {error.codigoEstado}</p>
+              <p className="mt-1 opacity-80">{error.detalle}</p>
+              <p className="mt-2 text-xs opacity-50">Referencia: HTTP {error.codigoEstado}</p>
             </div>
           )}
+        </section>
 
-          {resultado && !isValidando && (
-            <div className="mt-5">
-              <CvdIntegrityReport resultado={resultado} />
-            </div>
-          )}
-        </div>
+        {/* ── Resultado de verificación ── */}
+        {resultado && !isValidando && (
+          <section className="animate-fade-in">
+            <CvdIntegrityReport resultado={resultado} />
+          </section>
+        )}
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="text-sm font-bold text-slate-800">¿Qué es el CVD?</h2>
-            <p className="mt-2 text-sm leading-5 text-slate-600">
-              El Código de Verificación Digital es el identificador único que el IESTP Suiza estampa
-              sobre todo documento electrónico suscrito. Resuelto contra el repositorio
+        {/* ── Información normativa ── */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-white">
+              <span className="text-base">📋</span> ¿Qué es el CVD?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              El Código de Verificación Digital es el identificador único que el IESTP Suiza
+              estampa sobre todo documento electrónico suscrito. Resuelto contra el repositorio
               institucional, permite comprobar autenticidad, integridad y vigencia, identidad de
               firmantes y sello de tiempo TSA.
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="text-sm font-bold text-slate-800">Marco normativo aplicable</h2>
-            <ul className="mt-2 list-inside list-disc space-y-1 text-sm leading-5 text-slate-600">
-              <li>Ley N° 27269 — Firmas y Certificados Digitales.</li>
-              <li>D.S. N° 070-2013-PCM — Representación impresa y CVD.</li>
-              <li>Ley N° 27444 — Ley del Procedimiento Administrativo General.</li>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-white">
+              <span className="text-base">⚖️</span> Marco normativo aplicable
+            </h2>
+            <ul className="mt-2 space-y-2 text-sm text-slate-400">
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />
+                Ley N° 27269 — Firmas y Certificados Digitales.
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 shrink-0" />
+                D.S. N° 070-2013-PCM — Representación impresa y CVD.
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-400 shrink-0" />
+                Ley N° 27444 — Ley del Procedimiento Administrativo General.
+              </li>
             </ul>
           </div>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
+        <p className="text-center text-xs text-slate-600">
           Validador CVD · ENT-M04-05 · Módulo 04 · Consulta anónima: no se solicitan credenciales
         </p>
-      </section>
+      </div>
     </main>
   );
 }
