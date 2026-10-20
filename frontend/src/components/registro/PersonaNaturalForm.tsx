@@ -78,7 +78,7 @@ export default function PersonaNaturalForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="space-y-6"
+      className="registration-form space-y-6"
       noValidate
     >
       {/* Tipo de Documento y Número de Documento */}
@@ -252,6 +252,7 @@ export default function PersonaNaturalForm({
         initialProvinciaId={domicilioValue.provinciaCodigo}
         initialDistritoId={domicilioValue.distritoCodigo}
         onChange={handleUbigeoChange}
+        className="registration-location"
       />
 
       {/* Dirección Exacta */}
