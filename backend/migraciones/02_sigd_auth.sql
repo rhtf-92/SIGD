@@ -201,6 +201,25 @@ CREATE INDEX IF NOT EXISTS idx_notif_casilla_cut
 CREATE INDEX IF NOT EXISTS idx_notif_casilla_fecha
     ON sigd_auth.notificacion_casilla (fecha_deposito DESC);
 
+-- Semilla determinista de identidad de sistema (referenciada por la casilla
+-- electrónica y por los fallbacks de los routers en desarrollo/pruebas).
+INSERT INTO sigd_auth.persona (id_persona, tipo, id_documento) VALUES (
+    '00000000-0000-0000-0000-0000000000aa',
+    'NATURAL',
+    '00000000'
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO sigd_auth.cuenta_usuario (
+    id_usuario, id_persona, usuario, correo, password_hash, activo
+) VALUES (
+    '00000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-0000000000aa',
+    'sistema',
+    'sistema@sigd.gob.pe',
+    '$argon2id$v=19$m=65536,t=3,p=4$c2lnZF9hdXRoX3NhbHRfMQ$951YaDkH0Om0O6Jzgn2kaYkbwDmPgccFpmYU2xhwrS4',
+    TRUE
+) ON CONFLICT (id_usuario) DO NOTHING;
+
 -- Semilla inicial determinista para pruebas y desarrollo
 INSERT INTO sigd_auth.notificacion_casilla (
     id, usuario_id, cut, asunto, tipo_acto, numero_documento,

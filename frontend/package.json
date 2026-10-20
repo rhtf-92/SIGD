@@ -5,7 +5,7 @@
   "description": "Estructura base del frontend académico del SIGD del Instituto Suiza.",
   "type": "module",
   "scripts": {
-    "dev": "vite --open /tramite/mesa-partes-virtual",
+    "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
