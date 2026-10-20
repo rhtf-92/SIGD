@@ -19,7 +19,7 @@ services:
 
   # 2. Almacenamiento de Objetos Compatible con Amazon S3
   minio:
-    image: minio/minio:latest
+    image: elestio/minio:latest
     container_name: sigd_minio
     command: server /data --console-address ":9001"
     environment:
@@ -35,6 +35,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # 2b. Inicialización del bucket S3 (one-shot)
+  minio-init:
+    image: elestio/minio:latest
+    container_name: sigd_minio_init
+    entrypoint: []
+    command: ["/bin/sh", "-c", "mc alias set local http://minio:9000 minioadmin minioadminpassword && mc mb --ignore-existing local/sigd-expedientes"]
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
 
   # 3. Almacén Clave-Valor en Memoria para Cache y Sesiones
   redis:
@@ -57,7 +68,7 @@ services:
     working_dir: /app
     volumes:
       - ./backend:/app
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "apk add --no-cache python3 make g++ && npm install && npm run dev"
     environment:
       PORT: 3000
       NODE_ENV: development
@@ -68,6 +79,7 @@ services:
       S3_BUCKET: sigd-expedientes
       REDIS_URL: redis://redis:6379
       OUTBOX_POLL_INTERVAL_MS: 5000
+      SIGD_DISABLE_VITE: "true"
     ports:
       - "3000:3000"
     depends_on:
