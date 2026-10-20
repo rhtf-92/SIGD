@@ -24,6 +24,11 @@ export interface SolicitudObservacion {
   readonly motivo: string;
 }
 
+export interface SolicitudSubsanacion {
+  readonly expediente: ExpedienteAccionReferencia;
+  readonly motivo: string;
+}
+
 export interface SolicitudAcumulacion {
   readonly principal: ExpedienteAccionReferencia;
   readonly conexos: readonly ExpedienteAccionReferencia[];
@@ -33,6 +38,7 @@ export interface SolicitudAcumulacion {
 /** Formas de respuesta documentadas en el plan, verificadas en tiempo de ejecución. */
 export interface ResultadoDerivacion { derivacionId: string; nuevoEstado: string }
 export interface ResultadoObservacion { estado: "OBSERVADO"; slaPaused: true }
+export interface ResultadoSubsanacion { estado: "EN_TRAMITE"; expedienteId: string; motivo: string }
 
 export type TipoErrorAccion = "http" | "red" | "integracion" | "respuesta" | "concurrencia";
 
@@ -46,6 +52,7 @@ export class ErrorAccionExpediente extends Error {
 export interface ServicioExpedienteActions {
   derivar?: (entrada: SolicitudDerivacion) => Promise<ResultadoDerivacion>;
   observar?: (entrada: SolicitudObservacion) => Promise<ResultadoObservacion>;
+  subsanar?: (entrada: SolicitudSubsanacion) => Promise<ResultadoSubsanacion>;
   /** Adaptador futuro: solo resuelve cuando el servidor confirma la operación. */
   acumular?: (entrada: SolicitudAcumulacion) => Promise<void>;
 }

@@ -10,11 +10,13 @@ import RutaDocSla from "./rutadoc/RutaDocSla";
 import RutaDocTupa from "./rutadoc/RutaDocTupa";
 import DerivacionModal from "../../components/expedientes/DerivacionModal";
 import ObservacionModal from "../../components/expedientes/ObservacionModal";
+import SubsanacionModal from "../../components/expedientes/SubsanacionModal";
 import AcumulacionModal from "../../components/expedientes/AcumulacionModal";
 import ExpedienteActionToast from "../../components/expedientes/ExpedienteActionToast";
 import { useExpedienteActions } from "../../hooks/useExpedienteActions";
 import { servicioExpedienteActionsReal } from "../../api/expedienteActions";
 import { useAuthStore } from "../../stores/authStore";
+import { obtenerPermisosAlmacenados, permisosIniciales } from "../../hooks/useRbacConfig";
 import type { BusquedaExpedientes, ExpedienteAccionReferencia, UnidadDestino } from "../../types/expedienteActions";
 
 const UNIDADES_ORGANICAS_DEFAULT: readonly UnidadDestino[] = [
@@ -48,7 +50,7 @@ export default function ExpedienteDetallePage() {
   const timeline = useExpedienteTimeline(id);
   const tupa = useContextoTupa(id);
   const usuario = useAuthStore((s) => s.usuario);
-  const [modal, setModal] = useState<"derivacion" | "observacion" | "acumulacion" | null>(null);
+  const [modal, setModal] = useState<"derivacion" | "observacion" | "subsanacion" | "acumulacion" | null>(null);
 
   const acciones = useExpedienteActions({
     servicio: servicioExpedienteActionsReal,
@@ -65,6 +67,11 @@ export default function ExpedienteDetallePage() {
   });
 
   const puedeOperar = usuario ? usuario.rol !== "ESTUDIANTE" : true;
+  const permisos = obtenerPermisosAlmacenados() ?? permisosIniciales;
+  const puedeEditarExpedientes = Boolean(usuario && permisos[usuario.rol]?.some(
+    (permiso) => permiso.modulo === "Expedientes" && permiso.editar,
+  ));
+  const puedeSubsanar = puedeEditarExpedientes && detalle.data?.estadoActual === "OBSERVADO";
 
   const refExpediente: ExpedienteAccionReferencia = {
     id: detalle.data?.idExpediente ?? id ?? "",
@@ -88,6 +95,16 @@ export default function ExpedienteDetallePage() {
         ? "Registrar pliego de observaciones para el administrado."
         : "No cuenta con permisos para observar este expediente.",
       habilitado: puedeOperar,
+    },
+    {
+      nombre: "Subsanar",
+      tipo: "subsanacion" as const,
+      ayuda: !puedeEditarExpedientes
+        ? "No cuenta con permisos para subsanar este expediente."
+        : detalle.data?.estadoActual !== "OBSERVADO"
+          ? "Solo se pueden subsanar expedientes en estado OBSERVADO."
+          : "Registrar la corrección de las observaciones del expediente.",
+      habilitado: puedeSubsanar,
     },
     {
       nombre: "Acumular",
@@ -154,6 +171,12 @@ export default function ExpedienteDetallePage() {
         onClose={() => setModal(null)}
         expediente={refExpediente}
         accion={acciones.observacion}
+      />
+      <SubsanacionModal
+        open={modal === "subsanacion" && puedeSubsanar}
+        onClose={() => setModal(null)}
+        expediente={refExpediente}
+        accion={acciones.subsanacion}
       />
       <AcumulacionModal
         open={modal === "acumulacion"}

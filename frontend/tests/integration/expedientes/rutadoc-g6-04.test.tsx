@@ -228,6 +228,101 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("habilita Subsanar solo en OBSERVADO para usuario con permiso, confirma y actualiza las vistas", async () => {
+    act(() => useAuthStore.setState({
+      accessToken: "mock-token", refreshToken: null, isAuthenticated: true,
+      usuario: { id: "operador-1", correo: "mesa@institucion.edu.pe", rol: "MESA_PARTES", nombreCompleto: "Mesa de Partes" },
+    }));
+    instalar(async url => {
+      const { id, sufijo } = endpoint(url);
+      return respuesta(sufijo === "" ? { ...detalle(id), estadoActual: "OBSERVADO" } : recurso(id, sufijo));
+    });
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {
+      ok: true, expedienteId: A, motivo: "Documentos corregidos", estado: "EN_TRAMITE",
+    } } as AxiosResponse);
+    montar();
+    const acciones = await screen.findByRole("region", { name: "Acciones del expediente" });
+    const boton = within(acciones).getByRole("button", { name: "Subsanar" });
+    expect(boton).toBeEnabled();
+    fireEvent.click(boton);
+    const dialogo = await screen.findByRole("dialog");
+    expect(post).not.toHaveBeenCalled();
+    fireEvent.change(within(dialogo).getByRole("textbox"), { target: { value: "  Documentos   corregidos  " } });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Confirmar subsanación" }));
+    expect(post).not.toHaveBeenCalled();
+    fireEvent.click(within(dialogo).getByRole("checkbox"));
+    const invalidar = vi.spyOn(clientes[0], "invalidateQueries");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Confirmar subsanación" }));
+    await waitFor(() => expect(post).toHaveBeenCalledOnce());
+    expect(post).toHaveBeenCalledWith(
+      expect.stringContaining(`/api/v1/expedientes/${A}/movimientos/subsanar`),
+      { motivo: "Documentos corregidos" },
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent("La subsanación fue registrada correctamente.");
+    for (const key of [["rutadoc", A, "detalle"], ["rutadoc", A, "trazabilidad"], ["rutadoc", A, "sla"], ["rutadoc", "bandeja"]]) {
+      expect(invalidar).toHaveBeenCalledWith({ queryKey: key, exact: true }, { throwOnError: true });
+    }
+  });
+
+  it("mantiene Subsanar deshabilitado fuera de OBSERVADO o sin permiso", async () => {
+    instalar(normal);
+    montar();
+    const acciones = await screen.findByRole("region", { name: "Acciones del expediente" });
+    const boton = within(acciones).getByRole("button", { name: "Subsanar" });
+    expect(boton).toBeDisabled();
+    expect(boton).toHaveAccessibleDescription(/No cuenta con permisos/);
+    act(() => useAuthStore.setState({
+      accessToken: "mock-token", refreshToken: null, isAuthenticated: true,
+      usuario: { id: "operador-1", correo: "mesa@institucion.edu.pe", rol: "MESA_PARTES", nombreCompleto: "Mesa de Partes" },
+    }));
+    expect(boton).toBeDisabled();
+    await waitFor(() => expect(boton).toHaveAccessibleDescription(/estado OBSERVADO/));
+  });
+
+  it("no ofrece Subsanar a ESTUDIANTE aunque el expediente esté OBSERVADO", async () => {
+    useAuthStore.setState({
+      accessToken: "mock-token", refreshToken: null, isAuthenticated: true,
+      usuario: { id: "est-1", correo: "estudiante@institucion.edu.pe", rol: "ESTUDIANTE", nombreCompleto: "Estudiante" },
+    });
+    instalar(async url => {
+      const { id, sufijo } = endpoint(url);
+      return respuesta(sufijo === "" ? { ...detalle(id), estadoActual: "OBSERVADO" } : recurso(id, sufijo));
+    });
+    const post = vi.spyOn(apiClient, "post");
+    montar();
+    const boton = await screen.findByRole("button", { name: "Subsanar" });
+    expect(boton).toBeDisabled();
+    expect(boton).toHaveAccessibleDescription(/No cuenta con permisos/);
+    fireEvent.click(boton);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("conserva el modal Subsanar y muestra error RFC 9457 sin reenvío automático", async () => {
+    useAuthStore.setState({
+      accessToken: "mock-token", refreshToken: null, isAuthenticated: true,
+      usuario: { id: "operador-1", correo: "mesa@institucion.edu.pe", rol: "MESA_PARTES", nombreCompleto: "Mesa de Partes" },
+    });
+    instalar(async url => {
+      const { id, sufijo } = endpoint(url);
+      return respuesta(sufijo === "" ? { ...detalle(id), estadoActual: "OBSERVADO" } : recurso(id, sufijo));
+    });
+    const post = vi.spyOn(apiClient, "post").mockRejectedValue(new ApiHttpError({
+      type: "about:blank", title: "Conflicto", status: 409, detail: "Detalle privado",
+      instance: `/expedientes/${A}`, code: "ESTADO_INVALIDO", category: "Conflict", correlationId: C, retryable: false,
+    }));
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Subsanar" }));
+    const dialogo = await screen.findByRole("dialog");
+    fireEvent.change(within(dialogo).getByRole("textbox"), { target: { value: "Solicitud corregida" } });
+    fireEvent.click(within(dialogo).getByRole("checkbox"));
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Confirmar subsanación" }));
+    expect(await within(dialogo).findByRole("alert")).toHaveTextContent(/estado actual/);
+    expect(within(dialogo).getByRole("alert")).not.toHaveTextContent("Detalle privado");
+    expect(within(dialogo).getByRole("textbox")).toHaveValue("Solicitud corregida");
+    expect(post).toHaveBeenCalledOnce();
+  });
+
   it("confirmación de derivación exitosa ejecuta POST y muestra notificación de éxito", async () => {
     instalar(normal);
     const postSpy = vi.spyOn(apiClient, "post").mockResolvedValueOnce({

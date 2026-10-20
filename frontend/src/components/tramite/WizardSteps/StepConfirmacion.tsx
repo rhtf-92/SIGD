@@ -119,8 +119,9 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
       // Identificador técnico real del procedimiento (registroVersionId).
       // Sin fallback a UUID fijo y sin auto-seleccionar la primera fila.
+      const esTramiteLibre = documentos.tipoTramiteId === 'NO_TUPA';
       const registroVersionId = documentos.tipoTramiteId;
-      if (!esRegistroVersionIdValido(registroVersionId)) {
+      if (!esTramiteLibre && !esRegistroVersionIdValido(registroVersionId)) {
         dispatch({
           type: 'SET_ERROR',
           payload:
@@ -155,7 +156,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
       const payload = {
         asunto: asuntoFinal,
-        registroVersionId,
+        ...(esTramiteLibre ? {} : { registroVersionId }),
         idPersona,
         nombreSolicitante: nombreCompleto,
         correo: identificacion.correo.trim().toLowerCase(),

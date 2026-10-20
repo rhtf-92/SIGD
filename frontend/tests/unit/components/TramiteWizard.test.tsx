@@ -163,7 +163,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     };
 
     // Espera a que el catálogo TUPA (API simulada) cargue las opciones reales
-    await screen.findByRole('option', { name: /01 .* Certificado de estudios/i });
+    await screen.findByRole('option', { name: /^Certificado de estudios$/i });
     await user.selectOptions(
       screen.getByLabelText(/Procedimiento Institucional/i),
       data.tipoTramiteId
@@ -302,7 +302,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
 
     // Seleccionar TUPA pero sin asunto
     const selectTupa = screen.getByLabelText(/Procedimiento Institucional/i);
-    await screen.findByRole('option', { name: /01 .* Certificado de estudios/i });
+    await screen.findByRole('option', { name: /^Certificado de estudios$/i });
     await user.selectOptions(selectTupa, REGISTRO_VERSION_CERTIFICADO);
     expect(btnSiguiente).toBeDisabled();
 
@@ -675,6 +675,35 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
       })
     );
     expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('idTipoTramiteTupa');
+  });
+
+  it('Radicación libre conserva idPersona y omite registroVersionId', async () => {
+    const user = userEvent.setup();
+    const mockPost = vi.spyOn(apiClient, 'post').mockResolvedValue({
+      data: {
+        cut: 'EXP-2026-556678',
+        fechaRadicacionLegal: '2026-10-20T12:00:00Z',
+        fechaEnvioReal: '2026-10-20T12:00:00Z',
+        qrSeguimientoUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-556678',
+        cargoDigital: { hashSha256: 'a'.repeat(64) },
+      },
+      status: 201,
+    } as never);
+
+    render(<TramiteWizard />);
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso2(user, { tipoTramiteId: 'NO_TUPA' });
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await user.click(await screen.findByRole('button', { name: /Radicar Trámite/i }));
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/tramites/radicacion-virtual',
+      expect.objectContaining({ idPersona: ID_PERSONA }),
+    );
+    expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('registroVersionId');
   });
 
   // ===========================================================================

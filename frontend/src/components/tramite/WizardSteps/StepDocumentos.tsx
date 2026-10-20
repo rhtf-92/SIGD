@@ -84,6 +84,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     // 1. Procedimiento Institucional
     if (!data.tipoTramiteId.trim()) {
       errs.tipoTramiteId = 'Debe seleccionar un procedimiento institucional o trámite TUPA.';
+    } else if (data.tipoTramiteId !== 'NO_TUPA' && !procedimientoSeleccionado) {
+      errs.tipoTramiteId = 'Seleccione un procedimiento vigente del catálogo oficial.';
     }
 
     // 2. Asunto / Petitorio sucinto
@@ -107,7 +109,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     }
 
     return errs;
-  }, [data]);
+  }, [data, procedimientoSeleccionado]);
 
   const isValid = Object.keys(errors).length === 0;
 
@@ -122,7 +124,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     });
   };
 
-  // El valor enviado SIEMPRE es el registroVersionId real devuelto por la API.
+  // El valor TUPA es el registroVersionId real; NO_TUPA solo identifica el flujo libre en la UI.
   const handleSeleccionProcedimiento = (registroVersionId: string) => {
     const seleccion = procedimientos.find((p) => p.registroVersionId === registroVersionId);
     dispatch({
@@ -130,7 +132,9 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       payload: {
         tipoTramiteId: registroVersionId,
         tipoTramiteCodigo: seleccion?.codigo,
-        tipoTramiteDenominacion: seleccion?.denominacion,
+        tipoTramiteDenominacion: registroVersionId === 'NO_TUPA'
+          ? 'Trámite no TUPA / documentación general'
+          : seleccion?.denominacion,
       },
     });
   };
@@ -265,7 +269,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             value={data.tipoTramiteId}
             onChange={(e) => handleSeleccionProcedimiento(e.target.value)}
             onBlur={() => markTouched('tipoTramiteId')}
-            disabled={isSubmitting || catalogoNoDisponible}
+            disabled={isSubmitting}
             className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer ${
               touched.tipoTramiteId && errors.tipoTramiteId
                 ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
@@ -273,9 +277,10 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             } disabled:bg-slate-100 disabled:cursor-not-allowed`}
           >
             <option value="">-- Seleccione un procedimiento oficial --</option>
+            <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
             {procedimientos.map((t) => (
               <option key={t.registroVersionId} value={t.registroVersionId}>
-                {t.codigo ? `${t.codigo} — ${t.denominacion}` : t.denominacion}
+                {t.denominacion}
               </option>
             ))}
           </select>

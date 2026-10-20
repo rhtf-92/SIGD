@@ -110,6 +110,7 @@ services:
     command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
     environment:
       VITE_API_BASE_URL: http://localhost:3000/api/v1
+      VITE_API_PROXY_TARGET: http://backend:3000
       VITE_ENABLE_MOCKS: "false"
     ports:
       - "5173:5173"

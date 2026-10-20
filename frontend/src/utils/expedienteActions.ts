@@ -1,5 +1,6 @@
 import axios from "axios";
 import { ErrorAccionExpediente } from "../types/expedienteActions";
+import { ApiHttpError } from "../types/api";
 import type { ExpedienteAccionReferencia, UnidadDestino } from "../types/expedienteActions";
 
 /** Conserva párrafos y saltos de línea del proveído o pliego. */
@@ -29,11 +30,11 @@ function esObjeto(valor: unknown): valor is Record<string, unknown> {
 /** Adapta RFC 7807 sin mostrar detail, title ni invalid_params del servidor. */
 export function adaptarErrorAccion(error: unknown): ErrorAccionExpediente {
   if (error instanceof ErrorAccionExpediente) return error;
-  if (!axios.isAxiosError<unknown>(error) || !error.response) {
+  if (!(error instanceof ApiHttpError) && (!axios.isAxiosError<unknown>(error) || !error.response)) {
     return new ErrorAccionExpediente("No se pudo confirmar la operación. Compruebe su conexión y el estado del expediente antes de reintentar.", "red");
   }
-  const problema = error.response.data;
-  const statusHttp = error.response.status;
+  const problema = error instanceof ApiHttpError ? error.problemDetails : error.response?.data;
+  const statusHttp = error instanceof ApiHttpError ? error.status : error.response?.status;
   const status = statusHttp || (esObjeto(problema) && typeof problema.status === "number" ? problema.status : 0);
   const mensajes: Readonly<Record<number, string>> = {
     400: "Revise los datos ingresados. La solicitud no es válida.",
