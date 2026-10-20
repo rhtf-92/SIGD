@@ -4,6 +4,7 @@ import { Route } from "react-router-dom";
 
 import AdministracionPage from "../pages/administracion/AdministracionPage";
 import AuditoriaPage from "../pages/administracion/AuditoriaPage";
+import CalendarizacionInstitucionalPage from "../pages/administracion/CalendarizacionInstitucionalPage";
 import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
 import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
@@ -33,6 +34,7 @@ export default function AdminRoutes() {
       <Route path="auditoria" element={<AuditoriaPage />} />
       <Route path="tablas-maestras" element={<TablasMaestrasPage />} />
       <Route path="calendario-laboral" element={<CalendarioLaboralPage />} />
+      <Route path="calendarizacion-institucional" element={<CalendarizacionInstitucionalPage />} />
       <Route path="seguridad" element={<SeguridadPage />} />
     </>
   );

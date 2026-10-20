@@ -82,4 +82,25 @@ describe('App Routing & Health Verification', () => {
     const res = await request(app).get('/api/v1/firmas/cola-firmantes');
     expect([401, 403]).toContain(res.status);
   });
+
+  it('GET /api/v1/admin/calendarizacion-institucional responde 200 con las 23 actividades de 2026', async () => {
+    const res = await request(app).get('/api/v1/admin/calendarizacion-institucional');
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(23);
+    expect(Array.isArray(res.body.actividades)).toBe(true);
+    expect(res.body.fuente.nombre).toBe('Calendarización Institucional 2026');
+    expect(res.body.fuente.anio).toBe(2026);
+  });
+
+  it('GET /api/v1/admin/calendarizacion-institucional/actividades/1 responde con la actividad 1', async () => {
+    const res = await request(app).get('/api/v1/admin/calendarizacion-institucional/actividades/1');
+    expect(res.status).toBe(200);
+    expect(res.body.numero).toBe(1);
+    expect(res.body.actividad).toBe('Reincorporación, Traslados Internos y Externos');
+  });
+
+  it('GET /api/v1/admin/calendarizacion-institucional/actividades/999 responde 404', async () => {
+    const res = await request(app).get('/api/v1/admin/calendarizacion-institucional/actividades/999');
+    expect(res.status).toBe(404);
+  });
 });

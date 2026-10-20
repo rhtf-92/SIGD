@@ -9,6 +9,7 @@ import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
 import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
 import VisorCvdPage from "../pages/flujos/VisorCvdPage";
 import WorkflowAcademicoPage from "../pages/flujos/WorkflowAcademicoPage";
+import CalendarizacionInstitucionalPage from "../pages/administracion/CalendarizacionInstitucionalPage";
 import ValidadorPublicoCvdPage from "../pages/validador/ValidadorPublicoCvdPage";
 import LoginPage from "../pages/LoginPage";
 import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
@@ -77,6 +78,8 @@ export default function AppRouter() {
         element={<VisorCvdPage />}
       />
       <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
+      <Route path="/calendarizacion-institucional" element={<CalendarizacionInstitucionalPage />} />
+      <Route path="/institucional/calendarizacion" element={<CalendarizacionInstitucionalPage />} />
 
 
       <Route
