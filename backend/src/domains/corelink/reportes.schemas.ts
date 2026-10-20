@@ -34,16 +34,49 @@ const anio = z.coerce.number().int().min(2000).max(2100);
  */
 const diasLimite = z.coerce.number().int().min(0).max(365).default(5);
 
-/** Filtros del tablero consolidado (#50). */
-export const filtrosResumenSchema = z.object({
+const filtrosPeriodoShape = z.object({
   periodo: periodo.optional(),
-}).strict();
+  periodoDesde: periodo.optional(),
+  periodoHasta: periodo.optional(),
+});
+
+function validarRangoPeriodo(
+  filtros: { periodo?: string; periodoDesde?: string; periodoHasta?: string },
+  contexto: z.RefinementCtx,
+): void {
+  if (Boolean(filtros.periodoDesde) !== Boolean(filtros.periodoHasta)) {
+    contexto.addIssue({
+      code: 'custom',
+      message: 'Los períodos de inicio y fin deben enviarse juntos.',
+      path: [filtros.periodoDesde ? 'periodoHasta' : 'periodoDesde'],
+    });
+  }
+
+  if (filtros.periodo && (filtros.periodoDesde || filtros.periodoHasta)) {
+    contexto.addIssue({
+      code: 'custom',
+      message: 'Use un período puntual o un rango, no ambos.',
+      path: ['periodo'],
+    });
+  }
+
+  if (filtros.periodoDesde && filtros.periodoHasta && filtros.periodoDesde > filtros.periodoHasta) {
+    contexto.addIssue({
+      code: 'custom',
+      message: 'El período inicial no puede ser posterior al período final.',
+      path: ['periodoDesde'],
+    });
+  }
+}
+
+/** Filtros del tablero consolidado (#50). */
+export const filtrosResumenSchema = filtrosPeriodoShape.strict().superRefine(validarRangoPeriodo);
 
 /** Filtros del ranking de cuellos de botella (#51). */
-export const filtrosCuellosBotellaSchema = z.object({
-  periodo: periodo.optional(),
-  diasLimite,
-}).strict();
+export const filtrosCuellosBotellaSchema = filtrosPeriodoShape
+  .extend({ diasLimite })
+  .strict()
+  .superRefine(validarRangoPeriodo);
 
 /** Filtros de la serie mensual de tendencias (#52). */
 export const filtrosTendenciasSchema = z.object({
