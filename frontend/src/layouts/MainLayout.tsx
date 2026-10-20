@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import AnimatedUniverseBackground from "../components/common/AnimatedUniverseBackground";
 import LogoSIGD3D from "../components/common/LogoSIGD3D";
 import HeaderInstitucional from "../components/HeaderInstitucional";
+import AsistenteVirtualWidget from "../components/asistente/AsistenteVirtualWidget";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -38,6 +39,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         </footer>
       </div>
+      <AsistenteVirtualWidget />
     </AnimatedUniverseBackground>
   );
 }

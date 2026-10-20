@@ -57,6 +57,10 @@ import { crearRouterCasilla } from './domains/identicore/casilla.router.js';
 // Módulo Almacenamiento S3 MinIO
 import { crearRouterStorage } from './core/storage/storage.router.js';
 
+// Módulo Asistente Virtual Institucional (AsistenteCore)
+import { crearRouterAsistente } from './domains/asistente/asistente.router.js';
+import { AuditAsistentePg } from './domains/asistente/asistente.audit.js';
+
 // Módulo Firma Pendientes (#56)
 import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/firma.routes.js';
 
@@ -148,6 +152,15 @@ export function construirApp(
   app.use('/api/v1/auth/login', loginRateLimit);
   app.use('/api/v1/auth/refresh', refreshRateLimit);
   app.use('/api/v1/auth/registro-ciudadano', registroCiudadanoRateLimit);
+
+  // Asistente Virtual: control de tasa para evitar abuso del endpoint de consulta
+  const asistenteRateLimit = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use('/api/v1/asistente/consulta', asistenteRateLimit);
 
   app.use(crearRouterSalud(pool));
 
@@ -289,6 +302,12 @@ export function construirApp(
    * CoreLink - Streaming reactivo Server-Sent Events (SSE) (#55)
    */
   app.use('/api/v1/realtime', crearRouterRealtime(busSse));
+
+  /*
+   * Asistente Virtual Institucional (AsistenteCore)
+   * POST /api/v1/asistente/consulta · GET /api/v1/asistente/sugerencias · GET /api/v1/asistente/estado
+   */
+  app.use('/api/v1', crearRouterAsistente({ audit: new AuditAsistentePg(pool) }));
 
   /*
    * DocuCore / Módulo de Firma - Cola de Pendientes para Firma (#56)
