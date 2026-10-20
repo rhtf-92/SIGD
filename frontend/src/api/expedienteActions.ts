@@ -45,3 +45,43 @@ export function crearServicioExpedienteActions(contratos: ContratosExpedienteAct
   if (acumulacion) servicio.acumular = acumulacion;
   return servicio;
 }
+
+/**
+ * Contratos canónicos verificados contra BASELINE_2026_V1 y endpoints de RutaDoc.
+ */
+export const contratosRealesExpedienteActions: ContratosExpedienteActions = {
+  derivacion: {
+    construirPayload: (entrada) => ({
+      destinos: [
+        {
+          area_destino_id: entrada.unidadDestinoId,
+          es_copia: false,
+        },
+      ],
+      proveido: entrada.proveido,
+    }),
+  },
+  observacion: {
+    construirPayload: (entrada) => ({
+      motivo: entrada.motivo,
+      observacion: entrada.motivo,
+    }),
+  },
+  acumulacion: async (entrada) => {
+    const { apiClient } = await import("./client");
+    const idPrincipal = entrada.principal.id;
+    const accesorioId = entrada.conexos[0]?.id;
+    if (!accesorioId) {
+      throw new ErrorAccionExpediente("Debe seleccionar al menos un expediente conexo para acumular.", "integracion");
+    }
+    const base = new URL(apiClient.defaults.baseURL ?? "/", window.location.origin);
+    const url = new URL(`/api/v1/expedientes/${encodeURIComponent(idPrincipal)}/movimientos/acumular`, base).href;
+    await apiClient.post(url, {
+      expedienteAccesorioId: accesorioId,
+      actoResolutivo: entrada.motivo,
+      conexos: entrada.conexos.map((c) => ({ id: c.id, codigo: c.codigo })),
+    });
+  },
+};
+
+export const servicioExpedienteActionsReal = crearServicioExpedienteActions(contratosRealesExpedienteActions);

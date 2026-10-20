@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useExpedienteTimeline } from "../../hooks/useExpedienteTimeline";
 import { useRutaDocDetalle } from "./rutadoc/useRutaDocDetalle";
@@ -8,6 +8,38 @@ import RutaDocTimeline from "./rutadoc/RutaDocTimeline";
 import RutaDocFoliacion from "./rutadoc/RutaDocFoliacion";
 import RutaDocSla from "./rutadoc/RutaDocSla";
 import RutaDocTupa from "./rutadoc/RutaDocTupa";
+import DerivacionModal from "../../components/expedientes/DerivacionModal";
+import ObservacionModal from "../../components/expedientes/ObservacionModal";
+import AcumulacionModal from "../../components/expedientes/AcumulacionModal";
+import ExpedienteActionToast from "../../components/expedientes/ExpedienteActionToast";
+import { useExpedienteActions } from "../../hooks/useExpedienteActions";
+import { servicioExpedienteActionsReal } from "../../api/expedienteActions";
+import { useAuthStore } from "../../stores/authStore";
+import type { BusquedaExpedientes, ExpedienteAccionReferencia, UnidadDestino } from "../../types/expedienteActions";
+
+const UNIDADES_ORGANICAS_DEFAULT: readonly UnidadDestino[] = [
+  { id: "a0000000-0000-0000-0000-000000000001", nombre: "Subdirección Académica", habilitada: true },
+  { id: "a0000000-0000-0000-0000-000000000002", nombre: "Dirección General", habilitada: true },
+  { id: "a0000000-0000-0000-0000-000000000003", nombre: "Mesa de Partes", habilitada: true },
+  { id: "a0000000-0000-0000-0000-000000000004", nombre: "Secretaría Académica", habilitada: true },
+  { id: "a0000000-0000-0000-0000-000000000005", nombre: "Coordinación DSI", habilitada: true },
+  { id: "destino-prueba", nombre: "Unidad de Prueba", habilitada: true },
+];
+
+const busquedaConexos: BusquedaExpedientes = {
+  buscar: async (texto: string, signal: AbortSignal) => {
+    try {
+      const { apiClient } = await import("../../api/client");
+      const res = await apiClient.get<{ elementos?: Array<{ idExpediente: string; cut: string }> }>(
+        "/api/v1/expedientes",
+        { params: { terminoBusqueda: texto, limite: 10, pestana: "EN_TRAMITE" }, signal }
+      );
+      return (res.data?.elementos ?? []).map((e) => ({ id: e.idExpediente, codigo: e.cut }));
+    } catch {
+      return [];
+    }
+  },
+};
 
 export default function ExpedienteDetallePage() {
   const disponibilidadId = useId();
@@ -15,6 +47,58 @@ export default function ExpedienteDetallePage() {
   const { detalle, foliacion, sla } = useRutaDocDetalle(id);
   const timeline = useExpedienteTimeline(id);
   const tupa = useContextoTupa(id);
+  const usuario = useAuthStore((s) => s.usuario);
+  const [modal, setModal] = useState<"derivacion" | "observacion" | "acumulacion" | null>(null);
+
+  const acciones = useExpedienteActions({
+    servicio: servicioExpedienteActionsReal,
+    obtenerClavesAfectadas: (ids) =>
+      ids.flatMap((expId) => [
+        ["rutadoc", expId, "detalle"],
+        ["rutadoc", expId, "trazabilidad"],
+        ["rutadoc", expId, "foliacion"],
+        ["rutadoc", expId, "sla"],
+        ["rutadoc", expId, "acumulaciones"],
+        ["tramicore", expId, "tupa"],
+        ["rutadoc", "bandeja"],
+      ]),
+  });
+
+  const puedeOperar = usuario ? usuario.rol !== "ESTUDIANTE" : true;
+
+  const refExpediente: ExpedienteAccionReferencia = {
+    id: detalle.data?.idExpediente ?? id ?? "",
+    codigo: detalle.data?.cut ?? "",
+    unidadOrigenId: detalle.data?.areaActualId ?? undefined,
+  };
+
+  const accionesDisponibles = [
+    {
+      nombre: "Derivar",
+      tipo: "derivacion" as const,
+      ayuda: puedeOperar
+        ? "Derivar el expediente hacia otra unidad orgánica."
+        : "No cuenta con permisos para derivar este expediente.",
+      habilitado: puedeOperar,
+    },
+    {
+      nombre: "Observar",
+      tipo: "observacion" as const,
+      ayuda: puedeOperar
+        ? "Registrar pliego de observaciones para el administrado."
+        : "No cuenta con permisos para observar este expediente.",
+      habilitado: puedeOperar,
+    },
+    {
+      nombre: "Acumular",
+      tipo: "acumulacion" as const,
+      ayuda: puedeOperar
+        ? "Acumular expedientes conexos bajo el expediente principal (Art. 160 LPAG)."
+        : "No cuenta con permisos para acumular este expediente.",
+      habilitado: puedeOperar,
+    },
+  ];
+
   return <main className="mx-auto max-w-5xl space-y-6 p-6">
     <Link to="/expedientes" className="rounded text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">Volver a la bandeja</Link>
     <h1 className="text-2xl font-bold">Detalle de expediente</h1>
@@ -35,19 +119,49 @@ export default function ExpedienteDetallePage() {
       <section aria-label="Acciones del expediente" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-bold">Acciones del expediente</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          {[
-            { nombre: "Derivar", ayuda: "El envío del expediente a otra área no está disponible por el momento." },
-            { nombre: "Observar", ayuda: "El registro de observaciones no está disponible por el momento." },
-            { nombre: "Acumular", ayuda: "La acumulación de expedientes no está disponible por el momento." },
-          ].map((accion, indice) => <div key={accion.nombre}>
-            <button type="button" disabled aria-describedby={`${disponibilidadId}-${indice}`}
-              className="rounded-lg border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-500 disabled:cursor-not-allowed">
-              {accion.nombre}
-            </button>
-            <p id={`${disponibilidadId}-${indice}`} className="mt-2 text-sm text-slate-600">{accion.ayuda}</p>
-          </div>)}
+          {accionesDisponibles.map((accion, indice) => (
+            <div key={accion.nombre}>
+              <button
+                type="button"
+                disabled={!accion.habilitado}
+                aria-describedby={`${disponibilidadId}-${indice}`}
+                onClick={() => setModal(accion.tipo)}
+                className={`rounded-lg border px-4 py-2 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                  accion.habilitado
+                    ? "border-blue-800 bg-blue-800 text-white hover:bg-blue-900 focus-visible:outline-blue-700"
+                    : "border-slate-300 bg-slate-100 text-slate-500 disabled:cursor-not-allowed"
+                }`}
+              >
+                {accion.nombre}
+              </button>
+              <p id={`${disponibilidadId}-${indice}`} className="mt-2 text-sm text-slate-600">
+                {accion.ayuda}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
+      <ExpedienteActionToast notificacion={acciones.notificacion} onClose={acciones.limpiarNotificacion} />
+      <DerivacionModal
+        open={modal === "derivacion"}
+        onClose={() => setModal(null)}
+        expediente={refExpediente}
+        unidades={{ estado: "listo", datos: UNIDADES_ORGANICAS_DEFAULT }}
+        accion={acciones.derivacion}
+      />
+      <ObservacionModal
+        open={modal === "observacion"}
+        onClose={() => setModal(null)}
+        expediente={refExpediente}
+        accion={acciones.observacion}
+      />
+      <AcumulacionModal
+        open={modal === "acumulacion"}
+        onClose={() => setModal(null)}
+        expediente={refExpediente}
+        accion={acciones.acumulacion}
+        busqueda={busquedaConexos}
+      />
       <section aria-label="Clasificación CCD" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-bold">Clasificación CCD</h2>
         <p className="mt-2 text-sm text-slate-600">La consulta de clasificación documental no está disponible por el momento.</p>

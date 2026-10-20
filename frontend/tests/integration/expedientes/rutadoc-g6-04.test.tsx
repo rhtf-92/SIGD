@@ -9,6 +9,7 @@ import Bandeja from "../../../src/pages/expedientes/BandejaExpedientesPage";
 import Detalle from "../../../src/pages/expedientes/ExpedienteDetallePage";
 import BandejaTabFilter from "../../../src/components/expedientes/BandejaTabFilter";
 import { FechaRutaDoc } from "../../../src/pages/expedientes/rutadoc/RutaDocEstado";
+import { useAuthStore } from "../../../src/stores/authStore";
 
 const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -74,7 +75,10 @@ function montar(path = "/expedientes/" + A) {
     <Routes><Route path="/expedientes" element={<Bandeja />} /><Route path="/expedientes/:id" element={<Detalle />} /></Routes>
   </MemoryRouter></QueryClientProvider>);
 }
-beforeEach(() => vi.restoreAllMocks());
+beforeEach(() => {
+  vi.restoreAllMocks();
+  useAuthStore.setState({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false });
+});
 afterEach(() => { clientes.forEach(c => c.clear()); clientes = []; });
 function normal(url: string) {
   const { id, sufijo } = endpoint(url);
@@ -160,9 +164,9 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     expect(screen.queryByText("Nombre no disponible")).not.toBeInTheDocument();
   });
 
-  it.each([A, B])("muestra las cinco capacidades sin habilitar escrituras para %s y conserva las lecturas", async id => {
+  it.each([A, B])("muestra las cinco capacidades con acciones habilitadas para operador en %s y conserva las lecturas", async id => {
     const get = instalar(normal);
-    const errorEscritura = new Error("La página no debe enviar escrituras");
+    const errorEscritura = new Error("La página no debe enviar escrituras sin confirmación");
     const escrituras = [
       vi.spyOn(apiClient, "post").mockRejectedValue(errorEscritura),
       vi.spyOn(apiClient, "put").mockRejectedValue(errorEscritura),
@@ -176,9 +180,13 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     for (const nombre of ["Derivar", "Observar", "Acumular"]) {
       const boton = within(acciones).getByRole("button", { name: nombre });
       expect(boton).toBeVisible();
-      expect(boton).toBeDisabled();
-      expect(boton).toHaveAccessibleDescription(/no está disponible por el momento/);
+      expect(boton).toBeEnabled();
       fireEvent.click(boton);
+      const dialogo = await screen.findByRole("dialog");
+      expect(dialogo).toBeInTheDocument();
+      const botonCerrar = within(dialogo).getByRole("button", { name: "Cancelar" });
+      fireEvent.click(botonCerrar);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     }
     const ccd = screen.getByRole("region", { name: "Clasificación CCD" });
     expect(ccd).toBeVisible();
@@ -198,6 +206,89 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     ].sort());
     escrituras.forEach(escritura => expect(escritura).not.toHaveBeenCalled());
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("usuario sin permiso (ESTUDIANTE) visualiza las acciones deshabilitadas y no puede ejecutar", async () => {
+    useAuthStore.setState({
+      accessToken: "mock-token",
+      refreshToken: "mock-refresh",
+      usuario: { id: "est-1", correo: "estudiante@institucion.edu.pe", rol: "ESTUDIANTE", nombreCompleto: "Estudiante Prueba" },
+      isAuthenticated: true,
+    });
+    instalar(normal);
+    montar("/expedientes/" + A);
+    const acciones = await screen.findByRole("region", { name: "Acciones del expediente" });
+    for (const nombre of ["Derivar", "Observar", "Acumular"]) {
+      const boton = within(acciones).getByRole("button", { name: nombre });
+      expect(boton).toBeVisible();
+      expect(boton).toBeDisabled();
+      expect(boton).toHaveAccessibleDescription(/No cuenta con permisos/);
+      fireEvent.click(boton);
+    }
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("confirmación de derivación exitosa ejecuta POST y muestra notificación de éxito", async () => {
+    instalar(normal);
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValueOnce({
+      data: { derivacionId: "der-uuid-1234", nuevoEstado: "DERIVADO" },
+    } as AxiosResponse);
+    montar("/expedientes/" + A);
+    const acciones = await screen.findByRole("region", { name: "Acciones del expediente" });
+    const botonDerivar = within(acciones).getByRole("button", { name: "Derivar" });
+    fireEvent.click(botonDerivar);
+    const dialogo = await screen.findByRole("dialog");
+    expect(dialogo).toBeInTheDocument();
+
+    const selectDestino = screen.getByLabelText(/Unidad de destino/i);
+    fireEvent.change(selectDestino, { target: { value: "a0000000-0000-0000-0000-000000000001" } });
+
+    const textareaProveido = screen.getByLabelText(/Proveído motivado/i);
+    fireEvent.change(textareaProveido, { target: { value: "Derivación formal para evaluación técnica" } });
+
+    const botonConfirmar = within(dialogo).getByRole("button", { name: "Confirmar derivación" });
+    fireEvent.click(botonConfirmar);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    expect(postSpy).toHaveBeenCalledTimes(1);
+    expect(postSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`/api/v1/expedientes/${A}/movimientos/derivar`),
+      {
+        destinos: [{ area_destino_id: "a0000000-0000-0000-0000-000000000001", es_copia: false }],
+        proveido: "Derivación formal para evaluación técnica",
+      }
+    );
+
+    const toast = await screen.findByRole("status");
+    expect(toast).toHaveTextContent("La derivación fue registrada correctamente.");
+  });
+
+  it("error de API en derivación se expone como alerta sin cerrar el modal", async () => {
+    instalar(normal);
+    vi.spyOn(apiClient, "post").mockRejectedValueOnce(
+      new Error("Error de validación o rechazo del servidor")
+    );
+    montar("/expedientes/" + A);
+    const acciones = await screen.findByRole("region", { name: "Acciones del expediente" });
+    fireEvent.click(within(acciones).getByRole("button", { name: "Derivar" }));
+    const dialogo = await screen.findByRole("dialog");
+    expect(dialogo).toBeInTheDocument();
+
+    const selectDestino = screen.getByLabelText(/Unidad de destino/i);
+    fireEvent.change(selectDestino, { target: { value: "a0000000-0000-0000-0000-000000000001" } });
+
+    const textareaProveido = screen.getByLabelText(/Proveído motivado/i);
+    fireEvent.change(textareaProveido, { target: { value: "Pase con error simulado" } });
+
+    const botonConfirmar = within(dialogo).getByRole("button", { name: "Confirmar derivación" });
+    fireEvent.click(botonConfirmar);
+
+    const alerta = await within(dialogo).findByRole("alert");
+    expect(alerta).toBeVisible();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
   it("advierte el calendario provisional sin cambiar los valores SLA del backend", async () => {
     const recibido = Object.freeze(sla(A));

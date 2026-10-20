@@ -3,7 +3,13 @@ import type { Pool } from 'pg';
 import { DerivarExpedienteSchema } from './dto/derivarExpediente.dto.js';
 import { AtenderExpedienteSchema } from './dto/atenderExpediente.dto.js';
 import { ArchivarExpedienteSchema } from './dto/archivarExpediente.dto.js';
-import { derivarExpediente, atenderExpediente, archivarExpediente } from './derivaciones.service.js';
+import {
+  derivarExpediente,
+  atenderExpediente,
+  archivarExpediente,
+  observarExpediente,
+  subsanarExpediente,
+} from './derivaciones.service.js';
 import { NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
 
 export function crearRouterDerivaciones(pool: Pool): Router {
@@ -25,6 +31,20 @@ export function crearRouterDerivaciones(pool: Pool): Router {
 
         // 3. Ejecución de la lógica de negocio
         await derivarExpediente(cliente, expedienteId, datos);
+
+        // Sincronización en sigd_tra.expediente para reflejar área de destino y estado
+        const areaDestinoId = datos.destinos[0]?.area_destino_id;
+        if (areaDestinoId) {
+          await cliente.query(
+            `UPDATE sigd_tra.expediente SET estado = 'DERIVADO', area_destino_id = $2::uuid WHERE expediente_id = $1::uuid`,
+            [expedienteId, areaDestinoId],
+          );
+        } else {
+          await cliente.query(
+            `UPDATE sigd_tra.expediente SET estado = 'DERIVADO' WHERE expediente_id = $1::uuid`,
+            [expedienteId],
+          );
+        }
 
         // 4. Confirmar transacción
         await cliente.query('COMMIT');
@@ -160,15 +180,7 @@ export function crearRouterDerivaciones(pool: Pool): Router {
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        const resultado = await cliente.query(
-          `UPDATE sigd_tra.expediente SET estado = 'OBSERVADO' WHERE expediente_id = $1::uuid`,
-          [expedienteId],
-        );
-
-        if (resultado.rowCount === 0) {
-          throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
-        }
-
+        await observarExpediente(cliente, expedienteId, motivo);
         await cliente.query('COMMIT');
 
         res.status(200).json({
@@ -202,15 +214,7 @@ export function crearRouterDerivaciones(pool: Pool): Router {
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        const resultado = await cliente.query(
-          `UPDATE sigd_tra.expediente SET estado = 'EN_TRAMITE' WHERE expediente_id = $1::uuid`,
-          [expedienteId],
-        );
-
-        if (resultado.rowCount === 0) {
-          throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
-        }
-
+        await subsanarExpediente(cliente, expedienteId, motivo);
         await cliente.query('COMMIT');
 
         res.status(200).json({
@@ -233,6 +237,42 @@ export function crearRouterDerivaciones(pool: Pool): Router {
 
   router.post('/:id/subsanar', handlerSubsanar);
   router.post('/:id/movimientos/subsanar', handlerSubsanar);
+
+  // Consulta de Acumulaciones (Art. 160 LPAG)
+  const handlerListarAcumulaciones = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      const resultado = await pool.query(`
+        SELECT
+          a.id_acumulacion,
+          a.expediente_principal,
+          ep.codigo_expediente AS codigo_principal,
+          a.expediente_accesorio,
+          ea.codigo_expediente AS codigo_accesorio,
+          a.acto_resolutivo,
+          a.estado,
+          a.fecha_acumulacion,
+          a.fecha_desacumulacion
+        FROM sigd_tra.expediente_acumulacion a
+        JOIN sigd_tra.expediente ep ON ep.expediente_id = a.expediente_principal
+        JOIN sigd_tra.expediente ea ON ea.expediente_id = a.expediente_accesorio
+        WHERE (a.expediente_principal = $1::uuid OR a.expediente_accesorio = $1::uuid)
+          AND a.estado = 'ACUMULADO'
+        ORDER BY a.fecha_acumulacion DESC
+      `, [expedienteId]);
+
+      res.status(200).json({
+        ok: true,
+        acumulaciones: resultado.rows,
+        total: resultado.rowCount,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  router.get('/:id/acumulaciones', handlerListarAcumulaciones);
+  router.get('/:id/movimientos/acumulaciones', handlerListarAcumulaciones);
 
   return router;
 }
