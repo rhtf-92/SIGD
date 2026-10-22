@@ -40,15 +40,20 @@ async function getArgon2Module(): Promise<Argon2NativeModule | null> {
 }
 
 /**
- * Servicio Criptográfico Centralizado IdentiCore (Tarea T-BE-IC-02).
- * Proporciona hashing y verificación con Argon2id nativo y fallback defensivo a scrypt
- * para entornos Windows con directivas WDAC / AppLocker que bloquean módulos .node.
+ * Servicio Criptográfico Centralizado IdentiCore (Tarea T-BE-IC-02 / Remediación SEC-04).
+ *
+ * Política de Hashing Institucional:
+ * 1. En producción (NODE_ENV=production): El módulo nativo Argon2id es estrictamente OBLIGATORIO.
+ *    Si el binario nativo no está disponible, el servicio falla de forma inmediata (fail-fast).
+ * 2. En entornos de desarrollo/test: Si el módulo nativo no está presente (p. ej. directivas WDAC en Windows),
+ *    se permite un algoritmo alternativo scrypt explícitamente identificado como `$sigd_scrypt$v=1$...`,
+ *    quedando TERMINANTEMENTE PROHIBIDO fingir la firma de `$argon2id$`.
+ * 3. Compatibilidad de lectura: El método `verify` valida hashes nativos `$argon2id$`, hashes de fallback
+ *    `$sigd_scrypt$v=1$`, y hashes de fallback históricos para no invalidar credenciales ya emitidas.
  */
 export class Argon2Service {
   /**
    * Hashea una contraseña plana.
-   * Utiliza Argon2id nativo si está disponible; de lo contrario recurre a scrypt formateado
-   * bajo el estándar $argon2id$v=19$m=65536,t=3,p=4$<salt>$<hash> requerido por PostgreSQL.
    */
   static async hash(password: string, options?: Argon2Options): Promise<string> {
     const mergedOptions: Required<Argon2Options> = { ...DEFAULT_OPTIONS, ...options };
@@ -64,6 +69,12 @@ export class Argon2Service {
       }
     } catch {
       // Bloqueo WDAC o falla de enlace nativo en runtime
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'ARGON2_NATIVE_REQUIRED_IN_PRODUCTION: Módulo nativo Argon2id obligatorio en producción. Se prohíbe el uso de algoritmos degradados.',
+      );
     }
 
     return Argon2Service.generateFallbackHash(password, mergedOptions);
@@ -87,30 +98,42 @@ export class Argon2Service {
     // Inversión defensiva si los parámetros fueron suministrados como (password, hash)
     let hash = hashAlmacenado;
     let password = passwordPlana;
-    if (password.startsWith('$argon2id$') && !hash.startsWith('$argon2id$')) {
+    if (
+      (password.startsWith('$argon2id$') || password.startsWith('$sigd_scrypt$') || password.startsWith('$scrypt$')) &&
+      !hash.startsWith('$argon2id$') && !hash.startsWith('$sigd_scrypt$') && !hash.startsWith('$scrypt$')
+    ) {
       const temp = hash;
       hash = password;
       password = temp;
     }
 
-    // Intento con Argon2 nativo
-    try {
-      const argon2 = await getArgon2Module();
-      if (argon2 && typeof argon2.verify === 'function') {
-        const resultado = await argon2.verify(hash, password);
-        if (resultado) return true;
+    // Si es hash Argon2id nativo
+    if (hash.startsWith('$argon2id$')) {
+      try {
+        const argon2 = await getArgon2Module();
+        if (argon2 && typeof argon2.verify === 'function') {
+          const resultado = await argon2.verify(hash, password);
+          if (resultado) return true;
+        }
+      } catch {
+        // Falla nativa o hash producido por fallback legacy
       }
-    } catch {
-      // Falla nativa o hash producido por fallback
+      // Si falló el nativo, comprobar si es un hash de fallback legacy generado con prefijo falso previo
+      return Argon2Service.verifyFallback(hash, password);
     }
 
-    // Fallback criptográfico scrypt con comparación de tiempo constante
-    return Argon2Service.verifyFallback(hash, password);
+    // Hashes explícitos de fallback scrypt ($sigd_scrypt$ o $scrypt$)
+    if (hash.startsWith('$sigd_scrypt$') || hash.startsWith('$scrypt$')) {
+      return Argon2Service.verifyFallback(hash, password);
+    }
+
+    return false;
   }
 
   /**
-   * Genera un hash determinista mediante scrypt formateado para cumplir el CHECK constraint:
-   * $argon2id$v=19$m=65536,t=3,p=4$<salt>$<hash>
+   * Genera un hash determinista mediante scrypt utilizando su identificador propio inequívoco:
+   * $sigd_scrypt$v=1$m=65536,t=3,p=4$<salt>$<hash>
+   * (NUNCA declara falsamente $argon2id$).
    */
   static generateFallbackHash(password: string, options?: Argon2Options): string {
     const hashLength = options?.hashLength ?? DEFAULT_OPTIONS.hashLength;
@@ -120,12 +143,12 @@ export class Argon2Service {
 
     const salt = crypto.randomBytes(16).toString('hex');
     const hash = crypto.scryptSync(password, salt, hashLength).toString('hex');
-    return `$argon2id$v=19$m=${memoryCost},t=${timeCost},p=${parallelism}$${salt}$${hash}`;
+    return `$sigd_scrypt$v=1$m=${memoryCost},t=${timeCost},p=${parallelism}$${salt}$${hash}`;
   }
 
   /**
    * Valida un hash scrypt garantizando resistencia a timing attacks mediante timingSafeEqual.
-   * Realiza validación estricta de estructura, parámetros, sal y hash esperado.
+   * Admite formato canónico `$sigd_scrypt$v=1$` y compatibilidad con formato legacy `$argon2id$v=19$m=`.
    */
   static verifyFallback(hashAlmacenado: string, passwordPlana: string): boolean {
     if (
@@ -140,7 +163,16 @@ export class Argon2Service {
     try {
       const partes = hashAlmacenado.split('$');
       if (partes.length !== 6) return false;
-      if (partes[1] !== 'argon2id' || partes[2] !== 'v=19') return false;
+
+      const alg = partes[1];
+      const ver = partes[2];
+
+      const esSigdScrypt = (alg === 'sigd_scrypt' || alg === 'scrypt') && ver === 'v=1';
+      const esLegacyArgon2idFallback = alg === 'argon2id' && ver === 'v=19';
+
+      if (!esSigdScrypt && !esLegacyArgon2idFallback) {
+        return false;
+      }
 
       // Parámetros criptográficos m=...,t=...,p=...
       const paramPairs = partes[3].split(',');
@@ -167,7 +199,7 @@ export class Argon2Service {
         return false;
       }
 
-      // Hash esperado: hex válido, mínimo 32 caracteres hex (16 bytes), alineado a bloques de 16 bytes (32 hex)
+      // Hash esperado: hex válido, mínimo 32 caracteres hex (16 bytes), alineado a bloques de 16 bytes
       if (
         !hashEsperado ||
         hashEsperado.length < 32 ||

@@ -34,7 +34,7 @@ const PERFIL_BASELINE = 'BASELINE_2026_V1';
 const MANIFIESTO_BASELINE = [
   '01_sigd_audit.sql', '02_sigd_auth.sql', '03_sigd_org.sql',
   '04_sigd_doc.sql', '05_sigd_tra.sql', 'BASELINE_2026_V1.sql',
-  '08_sigd_tupa_acoplamiento.sql',
+  '08_sigd_tupa_acoplamiento.sql', '09_sigd_seguridad_remediacion.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }

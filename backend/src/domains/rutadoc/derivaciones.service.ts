@@ -2,7 +2,7 @@ import type { PoolClient } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { getRequestContext } from '../../shared/request-context/request-context.js';
 import { insertarEvento } from '../../audit/evento-outbox.repository.js';
-import { UnauthorizedError, NotFoundError, DomainError, ForbiddenError } from '../../shared/domain/errors/index.js';
+import { UnauthorizedError, NotFoundError, DomainError, ForbiddenError, ConflictError } from '../../shared/domain/errors/index.js';
 import type { DerivarExpedienteDTO } from './dto/derivarExpediente.dto.js';
 import type { ArchivarExpedienteDTO } from './dto/archivarExpediente.dto.js';
 import type { AtenderExpedienteDTO } from './dto/atenderExpediente.dto.js';
@@ -59,10 +59,11 @@ export async function derivarExpediente(
   const estadoActual = resEstadoActual.rows[0].estado_actual_id;
   const areaOrigenId = resEstadoActual.rows[0].area_contexto_id;
 
-  if (estadoActual === 'ARCHIVADO') {
+  const estadosPermitidosDerivacion = ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'SUBSANADO'];
+  if (!estadosPermitidosDerivacion.includes(estadoActual)) {
     throw new DomainError({
       code: 'ESTADO_INVALIDO',
-      message: 'El expediente se encuentra archivado y no puede ser derivado.',
+      message: `El expediente en estado ${estadoActual} no puede ser derivado.`,
     });
   }
 
@@ -378,7 +379,8 @@ export async function observarExpediente(
   const estadoActual = resEstadoActual.rows[0].estado_actual_id;
   const areaOrigenId = resEstadoActual.rows[0].area_contexto_id;
 
-  if (estadoActual === 'ARCHIVADO' || estadoActual === 'RESUELTO') {
+  const estadosPermitidosObservacion = ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION'];
+  if (!estadosPermitidosObservacion.includes(estadoActual)) {
     throw new DomainError({
       code: 'ESTADO_INVALIDO',
       message: `El expediente en estado ${estadoActual} no puede ser observado.`,
@@ -455,10 +457,19 @@ export async function observarExpediente(
 
   const movimientoId = resMovimiento.rows[0].movimiento_id;
 
-  await cliente.query(
-    `UPDATE sigd_tra.expediente SET estado = 'OBSERVADO' WHERE expediente_id = $1::uuid`,
+  const updateRes = await cliente.query(
+    `UPDATE sigd_tra.expediente
+        SET estado = 'OBSERVADO'
+      WHERE expediente_id = $1::uuid
+        AND estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION')`,
     [expedienteId],
   );
+  if ((updateRes?.rowCount ?? 0) !== 1) {
+    throw new ConflictError({
+      code: 'CONCURRENCY_CONFLICT_EXPEDIENTE_MUTATION',
+      message: `No se pudo actualizar el estado a OBSERVADO para el expediente ${expedienteId}.`,
+    });
+  }
 
   await insertarEvento(cliente, {
     agregado: 'Expediente',
@@ -546,10 +557,19 @@ export async function subsanarExpediente(
 
   const movimientoId = resMov.rows[0].movimiento_id;
 
-  await cliente.query(
-    `UPDATE sigd_tra.expediente SET estado = 'EN_TRAMITE' WHERE expediente_id = $1::uuid`,
+  const updateRes = await cliente.query(
+    `UPDATE sigd_tra.expediente
+        SET estado = 'EN_TRAMITE'
+      WHERE expediente_id = $1::uuid
+        AND estado = 'OBSERVADO'`,
     [expedienteId],
   );
+  if ((updateRes?.rowCount ?? 0) !== 1) {
+    throw new ConflictError({
+      code: 'CONCURRENCY_CONFLICT_EXPEDIENTE_MUTATION',
+      message: `No se pudo actualizar el estado a EN_TRAMITE para el expediente ${expedienteId}.`,
+    });
+  }
 
   await insertarEvento(cliente, {
     agregado: 'Expediente',

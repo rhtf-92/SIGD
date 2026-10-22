@@ -10,10 +10,23 @@ import {
   observarExpediente,
   subsanarExpediente,
 } from './derivaciones.service.js';
-import { NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
+import { insertarEvento } from '../../audit/evento-outbox.repository.js';
+import type { ActorProviderRutaDoc } from './rutadoc.actor-provider.js';
+import type { ActorRutaDoc } from './rutadoc.types.js';
 
-export function crearRouterDerivaciones(pool: Pool): Router {
+export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProviderRutaDoc): Router {
   const router = Router();
+
+  async function resolverActor(req: Request): Promise<ActorRutaDoc | null> {
+    if ((req as any).actor) {
+      return (req as any).actor as ActorRutaDoc;
+    }
+    if (proveedorActor) {
+      return await proveedorActor.obtenerActor(req);
+    }
+    return null;
+  }
 
   // Endpoint #24 (T-BE-RD-06) - Derivación Documentaria
   // Prefijo esperado en app.ts: /api/v1/expedientes
@@ -34,16 +47,30 @@ export function crearRouterDerivaciones(pool: Pool): Router {
 
         // Sincronización en sigd_tra.expediente para reflejar área de destino y estado
         const areaDestinoId = datos.destinos[0]?.area_destino_id;
+        let updateRes;
         if (areaDestinoId) {
-          await cliente.query(
-            `UPDATE sigd_tra.expediente SET estado = 'DERIVADO', area_destino_id = $2::uuid WHERE expediente_id = $1::uuid`,
+          updateRes = await cliente.query(
+            `UPDATE sigd_tra.expediente
+                SET estado = 'DERIVADO', area_destino_id = $2::uuid
+              WHERE expediente_id = $1::uuid
+                AND estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'SUBSANADO')`,
             [expedienteId, areaDestinoId],
           );
         } else {
-          await cliente.query(
-            `UPDATE sigd_tra.expediente SET estado = 'DERIVADO' WHERE expediente_id = $1::uuid`,
+          updateRes = await cliente.query(
+            `UPDATE sigd_tra.expediente
+                SET estado = 'DERIVADO'
+              WHERE expediente_id = $1::uuid
+                AND estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'SUBSANADO')`,
             [expedienteId],
           );
+        }
+
+        if ((updateRes?.rowCount ?? 0) !== 1) {
+          throw new ConflictError({
+            code: 'CONCURRENCY_CONFLICT_EXPEDIENTE_MUTATION',
+            message: `No se pudo actualizar el estado de expediente ${expedienteId}. Verifique concurrencia o existencia.`,
+          });
         }
 
         // 4. Confirmar transacción
@@ -138,6 +165,21 @@ export function crearRouterDerivaciones(pool: Pool): Router {
         });
       }
 
+      const actor = await resolverActor(req);
+      if (actor?.puedeVerExpediente) {
+        const [puedePrincipal, puedeAccesorio] = await Promise.all([
+          actor.puedeVerExpediente(expedientePrincipalId),
+          actor.puedeVerExpediente(accesorioId),
+        ]);
+        if (!puedePrincipal || !puedeAccesorio) {
+          throw new ForbiddenError({
+            detail: !puedePrincipal
+              ? `No tiene autorización sobre el expediente principal ${expedientePrincipalId}.`
+              : `No tiene autorización sobre el expediente accesorio ${accesorioId}.`,
+          });
+        }
+      }
+
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
@@ -145,6 +187,20 @@ export function crearRouterDerivaciones(pool: Pool): Router {
           'SELECT sigd_tra.acumular_expediente($1::uuid, $2::uuid, $3::text) AS id_acumulacion',
           [expedientePrincipalId, accesorioId, actoResolutivo],
         );
+        const idAcumulacion = resultado.rows[0]?.id_acumulacion;
+
+        // DAT-04: Outbox transaccional para acumulación formal de expedientes
+        await insertarEvento(cliente, {
+          agregado: 'Expediente',
+          tipo_evento: 'ExpedienteAcumulado',
+          payload: {
+            expediente_principal_id: expedientePrincipalId,
+            expediente_accesorio_id: accesorioId,
+            acto_resolutivo: actoResolutivo,
+            id_acumulacion: idAcumulacion,
+          },
+        });
+
         await cliente.query('COMMIT');
 
         res.status(200).json({
@@ -242,6 +298,16 @@ export function crearRouterDerivaciones(pool: Pool): Router {
   const handlerListarAcumulaciones = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const expedienteId = String(req.params.id);
+      const actor = await resolverActor(req);
+      if (actor?.puedeVerExpediente) {
+        const autorizado = await actor.puedeVerExpediente(expedienteId);
+        if (!autorizado) {
+          throw new ForbiddenError({
+            detail: `No tiene autorización para ver las acumulaciones del expediente ${expedienteId}.`,
+          });
+        }
+      }
+
       const resultado = await pool.query(`
         SELECT
           a.id_acumulacion,

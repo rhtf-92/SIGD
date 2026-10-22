@@ -75,7 +75,7 @@ describe('App Routing & Health Verification', () => {
 
   it('POST /api/v1/storage/presigned-url responde con error de validacion si faltan datos', async () => {
     const res = await request(app).post('/api/v1/storage/presigned-url').send({});
-    expect([400, 422]).toContain(res.status);
+    expect([400, 401, 422]).toContain(res.status);
   });
 
   it('GET /api/v1/firmas/cola-firmantes responde protegiendo acceso sin autenticacion', async () => {

@@ -24,6 +24,7 @@ import { z } from 'zod';
 import { firmarTokenAcceso, extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
 import { AppError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 import { Argon2Service } from './argon2.service.js';
+import { loginRateLimiter } from '../../middleware/rate-limiter.middleware.js';
 
 const loginSchema = z.object({
   identificador: z.string().min(3).max(100),
@@ -38,11 +39,15 @@ async function verificarHashPassword(passwordPlana: string, hashAlmacenado: stri
   return Argon2Service.verify(hashAlmacenado, passwordPlana);
 }
 
+function hashRefreshToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 export function crearRouterAuth(pool: Pool): Router {
   const router = Router();
 
-  // #1 — POST /auth/login
-  router.post('/auth/login', async (req: Request, res: Response) => {
+  // #1 — POST /auth/login (con rate limiting contra ataques de fuerza bruta SEC-10)
+  router.post('/auth/login', loginRateLimiter, async (req: Request, res: Response) => {
     const datos = loginSchema.parse(req.body);
 
     const query = `
@@ -94,15 +99,16 @@ export function crearRouterAuth(pool: Pool): Router {
     });
 
     const refreshToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = hashRefreshToken(refreshToken);
     const expiraEn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 días
 
-    // Registrar sesión en base de datos con propagación y registro explícito de errores
+    // Registrar sesión en base de datos almacenando el digest hash (SEC-05) con propagación y registro explícito de errores
     try {
       await pool.query(
         `INSERT INTO sigd_auth.sesion_usuario (id_usuario, refresh_token, ip_origen, user_agent, expira_en)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (refresh_token) DO NOTHING;`,
-        [usuario.id_usuario, refreshToken, req.ip ?? null, req.get('user-agent') ?? null, expiraEn],
+        [usuario.id_usuario, tokenHash, req.ip ?? null, req.get('user-agent') ?? null, expiraEn],
       );
     } catch (error) {
       console.error('[AUTH] Error al persistir sesión de usuario en sigd_auth.sesion_usuario:', error);
@@ -125,13 +131,14 @@ export function crearRouterAuth(pool: Pool): Router {
   // #2 — POST /auth/logout
   router.post('/auth/logout', async (req: Request, res: Response) => {
     const { refreshToken } = refreshSchema.parse(req.body);
+    const tokenHash = hashRefreshToken(refreshToken);
 
     try {
       await pool.query(
         `UPDATE sigd_auth.sesion_usuario
             SET revocado_en = now()
-          WHERE refresh_token = $1 AND revocado_en IS NULL;`,
-        [refreshToken],
+          WHERE (refresh_token = $1 OR refresh_token = $2) AND revocado_en IS NULL;`,
+        [tokenHash, refreshToken],
       );
     } catch (error) {
       console.error('[AUTH] Error al revocar sesión en sigd_auth.sesion_usuario:', error);
@@ -144,53 +151,69 @@ export function crearRouterAuth(pool: Pool): Router {
   // #3 — POST /auth/refresh
   router.post('/auth/refresh', async (req: Request, res: Response) => {
     const { refreshToken } = refreshSchema.parse(req.body);
+    const tokenHash = hashRefreshToken(refreshToken);
 
-    const query = `
-      SELECT s.id_usuario, s.expira_en, s.revocado_en,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo
-        FROM sigd_auth.sesion_usuario s
-        LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
-        LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
-       WHERE s.refresh_token = $1
-       LIMIT 1;
-    `;
+    const cliente = await pool.connect();
+    try {
+      await cliente.query('BEGIN');
 
-    const resultado = await pool.query(query, [refreshToken]);
-    const sesion = resultado.rows[0];
+      const query = `
+        SELECT s.id_usuario, s.expira_en, s.revocado_en,
+               COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo
+          FROM sigd_auth.sesion_usuario s
+          LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+          LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+         WHERE (s.refresh_token = $1 OR s.refresh_token = $2)
+         FOR UPDATE OF s
+         LIMIT 1;
+      `;
 
-    if (!sesion || sesion.revocado_en !== null || new Date(sesion.expira_en) < new Date()) {
-      throw new UnauthorizedError({
-        detail: 'El token de refresco es inválido o ha expirado. Inicie sesión nuevamente.',
+      const resultado = await cliente.query(query, [tokenHash, refreshToken]);
+      const sesion = resultado.rows[0];
+
+      if (!sesion || sesion.revocado_en !== null || new Date(sesion.expira_en) < new Date()) {
+        await cliente.query('ROLLBACK');
+        throw new UnauthorizedError({
+          detail: 'El token de refresco es inválido o ha expirado. Inicie sesión nuevamente.',
+        });
+      }
+
+      const nuevoAccessToken = firmarTokenAcceso({
+        sub: sesion.id_usuario,
+        roles: [sesion.rol_codigo],
+        expiraSegundos: 900,
       });
+
+      const nuevoRefreshToken = crypto.randomBytes(32).toString('hex');
+      const nuevoHash = hashRefreshToken(nuevoRefreshToken);
+      const nuevaExpira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      // Rotación atómica de refresh token bajo lock exclusivo (SEC-07)
+      await cliente.query(
+        `UPDATE sigd_auth.sesion_usuario
+            SET revocado_en = now()
+          WHERE (refresh_token = $1 OR refresh_token = $2);`,
+        [tokenHash, refreshToken],
+      );
+
+      await cliente.query(
+        `INSERT INTO sigd_auth.sesion_usuario (id_usuario, refresh_token, ip_origen, user_agent, expira_en)
+         VALUES ($1, $2, $3, $4, $5);`,
+        [sesion.id_usuario, nuevoHash, req.ip ?? null, req.get('user-agent') ?? null, nuevaExpira],
+      );
+
+      await cliente.query('COMMIT');
+
+      res.status(200).json({
+        accessToken: nuevoAccessToken,
+        refreshToken: nuevoRefreshToken,
+      });
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      cliente.release();
     }
-
-    const nuevoAccessToken = firmarTokenAcceso({
-      sub: sesion.id_usuario,
-      roles: [sesion.rol_codigo],
-      expiraSegundos: 900,
-    });
-
-    const nuevoRefreshToken = crypto.randomBytes(32).toString('hex');
-    const nuevaExpira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    // Rotación atómica de refresh token
-    await pool.query(
-      `UPDATE sigd_auth.sesion_usuario
-          SET revocado_en = now()
-        WHERE refresh_token = $1;`,
-      [refreshToken],
-    );
-
-    await pool.query(
-      `INSERT INTO sigd_auth.sesion_usuario (id_usuario, refresh_token, ip_origen, user_agent, expira_en)
-       VALUES ($1, $2, $3, $4, $5);`,
-      [sesion.id_usuario, nuevoRefreshToken, req.ip ?? null, req.get('user-agent') ?? null, nuevaExpira],
-    );
-
-    res.status(200).json({
-      accessToken: nuevoAccessToken,
-      refreshToken: nuevoRefreshToken,
-    });
   });
 
   // #4 — GET /auth/me & alias /auth/perfil

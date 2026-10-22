@@ -133,6 +133,59 @@ describe('T-BE-RD-06: derivaciones.service.ts', () => {
       expect(query).not.toMatch(/\bDELETE\b/);
     }
   });
+
+  it('5. FSM-01: debe permitir derivación desde cada uno de los estados permitidos por la FSM', async () => {
+    const estadosPermitidos = ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'SUBSANADO'];
+    const dto: DerivarExpedienteDTO = {
+      destinos: [{ area_destino_id: 'area-dest-1', es_copia: false }],
+      proveido: 'Pase reglamentario'
+    };
+
+    for (const estado of estadosPermitidos) {
+      vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
+      mockQuery.mockReset();
+      // 1. SELECT estado actual
+      mockQuery.mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ estado_actual_id: estado, area_contexto_id: 'area-origen-1' }]
+      });
+      // 2. Si requiere pasos intermedios, simular INSERTs de transición
+      if (estado === 'REGISTRADO') {
+        mockQuery.mockResolvedValueOnce({}); // RECEPCION
+        mockQuery.mockResolvedValueOnce({}); // INICIAR_CALIFICACION
+      } else if (estado === 'RECEPCIONADO') {
+        mockQuery.mockResolvedValueOnce({}); // INICIAR_CALIFICACION
+      } else if (estado === 'DERIVADO') {
+        mockQuery.mockResolvedValueOnce({}); // RECEPCION
+      } else if (estado === 'SUBSANADO') {
+        mockQuery.mockResolvedValueOnce({}); // INICIAR_REVISION
+      }
+      // 3. INSERT movimiento de derivación
+      mockQuery.mockResolvedValueOnce({ rows: [{ movimiento_id: 'mov-1' }] });
+
+      await expect(derivarExpediente(mockCliente, mockExpedienteId, dto)).resolves.not.toThrow();
+    }
+  });
+
+  it('6. FSM-01: debe rechazar derivación desde cada uno de los estados prohibidos por la FSM', async () => {
+    const estadosProhibidos = ['ARCHIVADO', 'RESUELTO', 'EN_FIRMA', 'OBSERVADO'];
+    const dto: DerivarExpedienteDTO = {
+      destinos: [{ area_destino_id: 'area-dest-1', es_copia: false }],
+      proveido: 'Pase indebido'
+    };
+
+    for (const estado of estadosProhibidos) {
+      vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
+      mockQuery.mockReset();
+      mockQuery.mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ estado_actual_id: estado, area_contexto_id: 'area-origen-1' }]
+      });
+
+      await expect(derivarExpediente(mockCliente, mockExpedienteId, dto))
+        .rejects.toThrow(DomainError);
+    }
+  });
 });
 
 describe('T-BE-RD-07: Atención Resolutiva', () => {
@@ -321,15 +374,19 @@ describe('RutaDoc FSM: Observación y Subsanación Formal', () => {
         .rejects.toThrow(NotFoundError);
     });
 
-    it('debe rechazar si el expediente está ARCHIVADO o RESUELTO', async () => {
-      vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
-      mockQuery.mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ estado_actual_id: 'ARCHIVADO', area_contexto_id: 'area-1' }]
-      });
+    it('FSM-01: debe rechazar observación desde cada uno de los estados prohibidos por la FSM', async () => {
+      const estadosProhibidos = ['ARCHIVADO', 'RESUELTO', 'EN_FIRMA', 'OBSERVADO', 'SUBSANADO'];
+      for (const estado of estadosProhibidos) {
+        vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
+        mockQuery.mockReset();
+        mockQuery.mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ estado_actual_id: estado, area_contexto_id: 'area-1' }]
+        });
 
-      await expect(observarExpediente(mockCliente, mockExpedienteId, 'Falta firma'))
-        .rejects.toThrow(DomainError);
+        await expect(observarExpediente(mockCliente, mockExpedienteId, 'Falta firma'))
+          .rejects.toThrow(DomainError);
+      }
     });
 
     it('debe procesar observación desde EN_CALIFICACION y emitir al Outbox con slaPaused: true', async () => {
@@ -342,7 +399,7 @@ describe('RutaDoc FSM: Observación y Subsanación Formal', () => {
       mockQuery.mockResolvedValueOnce({
         rows: [{ movimiento_id: 'mov-obs-1' }]
       });
-      mockQuery.mockResolvedValueOnce({}); // UPDATE sigd_tra.expediente
+      mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE sigd_tra.expediente
 
       await observarExpediente(mockCliente, mockExpedienteId, 'Requisitos incompletos');
 
@@ -353,6 +410,22 @@ describe('RutaDoc FSM: Observación y Subsanación Formal', () => {
           datos_especificos: { motivo: 'Requisitos incompletos', slaPaused: true }
         })
       }));
+    });
+
+    it('FSM-01: debe lanzar ConflictError si UPDATE sigd_tra.expediente no afecta filas (concurrencia)', async () => {
+      vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
+      mockQuery.mockReset();
+      mockQuery.mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ estado_actual_id: 'EN_CALIFICACION', area_contexto_id: 'area-1' }]
+      });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ movimiento_id: 'mov-obs-1' }]
+      });
+      mockQuery.mockResolvedValueOnce({ rowCount: 0 }); // Concurrency conflict: 0 rows affected
+
+      await expect(observarExpediente(mockCliente, mockExpedienteId, 'Requisitos incompletos'))
+        .rejects.toThrow('No se pudo actualizar el estado a OBSERVADO para el expediente');
     });
   });
 
@@ -380,7 +453,7 @@ describe('RutaDoc FSM: Observación y Subsanación Formal', () => {
       mockQuery.mockResolvedValueOnce({
         rows: [{ movimiento_id: 'mov-sub-1' }]
       }); // INSERT INICIAR_REVISION -> EN_REVISION
-      mockQuery.mockResolvedValueOnce({}); // UPDATE sigd_tra.expediente
+      mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE sigd_tra.expediente
 
       await subsanarExpediente(mockCliente, mockExpedienteId, 'Documentos adjuntados');
 
@@ -391,6 +464,21 @@ describe('RutaDoc FSM: Observación y Subsanación Formal', () => {
           datos_especificos: { motivo: 'Documentos adjuntados' }
         })
       }));
+    });
+
+    it('FSM-01: debe lanzar ConflictError si UPDATE sigd_tra.expediente no afecta filas (concurrencia)', async () => {
+      vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
+      mockQuery.mockReset();
+      mockQuery.mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ estado_actual_id: 'OBSERVADO', area_contexto_id: 'area-1' }]
+      });
+      mockQuery.mockResolvedValueOnce({});
+      mockQuery.mockResolvedValueOnce({ rows: [{ movimiento_id: 'mov-sub-1' }] });
+      mockQuery.mockResolvedValueOnce({ rowCount: 0 }); // Concurrency conflict: 0 rows affected
+
+      await expect(subsanarExpediente(mockCliente, mockExpedienteId, 'Documentos adjuntados'))
+        .rejects.toThrow('No se pudo actualizar el estado a EN_TRAMITE para el expediente');
     });
   });
 });

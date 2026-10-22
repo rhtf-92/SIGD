@@ -27,7 +27,7 @@ import type {
   PoliticaReversionRutaDoc,
   PrepararCompensacionFolios,
 } from './domains/rutadoc/rutadoc.reversion.types.js';
-import type { ActorProviderRutaDoc } from './domains/rutadoc/rutadoc.actor-provider.js';
+import { crearJwtActorProvider, type ActorProviderRutaDoc } from './domains/rutadoc/rutadoc.actor-provider.js';
 import type { CalendarioLaboralPort } from './domains/rutadoc/sla.types.js';
 import type { ClasificadorCcdPort } from './domains/rutadoc/ccd.types.js';
 import type { DocumentoMetadataPort } from './domains/rutadoc/foliacion.types.js';
@@ -53,11 +53,13 @@ import { crearRouterCasilla } from './domains/identicore/casilla.router.js';
 
 // Módulo Almacenamiento S3 MinIO
 import { crearRouterStorage } from './core/storage/storage.router.js';
+import type { S3Client } from '@aws-sdk/client-s3';
 
 // Módulo Firma Pendientes (#56)
 import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/firma.routes.js';
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
+import { securityHeadersMiddleware } from './middleware/security-headers.middleware.js';
 import { verificarTokenAcceso } from './core/auth/jwt.service.js';
 
 export interface AppOptions {
@@ -75,6 +77,7 @@ export interface AppOptions {
   porcentajeAmarilloSlaRutaDocDesde?: number;
   /** Proveedor de identidad de la analítica ejecutiva; sin él, falla cerrado. */
   actorProviderReportes?: ActorProviderRutaDoc;
+  s3Client?: S3Client;
 }
 
 export function construirApp(
@@ -101,6 +104,7 @@ export function construirApp(
 
   const app = express();
   app.disable('x-powered-by');
+  app.use(securityHeadersMiddleware);
 
   app.use(corsMiddleware);
   app.use(express.json());
@@ -139,10 +143,16 @@ export function construirApp(
   if (process.env.REDIS_URL) {
     try {
       sesiones = RedisFirmaSessionStore.desdeEntorno();
-    } catch {
+    } catch (error) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(`REDIS_REQUIRED_IN_PRODUCTION: No se pudo inicializar RedisFirmaSessionStore: ${(error as Error).message}`);
+      }
       sesiones = new InMemoryFirmaSessionStore();
     }
   } else {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('REDIS_REQUIRED_IN_PRODUCTION: REDIS_URL es obligatoria en entorno de producción para el almacenamiento distribuido de sesiones de firma (DOC-01).');
+    }
     sesiones = new InMemoryFirmaSessionStore();
   }
 
@@ -150,26 +160,7 @@ export function construirApp(
   const servicio = new ServicioFirmaService({ sesiones, almacen, pasarela });
 
   // Rutas
-  const jwtActorProvider: ActorProviderRutaDoc = {
-    obtenerActor: (req) => {
-      const auth = req.headers.authorization;
-      if (auth && auth.startsWith('Bearer ')) {
-        const token = auth.slice(7).trim();
-        try {
-          const claims = verificarTokenAcceso(token);
-          return {
-            id: claims.sub,
-            roles: claims.roles ?? [],
-            unidadOrganicaId: null,
-            puedeVerExpediente: () => true,
-          };
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    },
-  };
+  const jwtActorProvider: ActorProviderRutaDoc = crearJwtActorProvider(pool);
 
   const actorProviderRutaDocEfectivo =
     opts.actorProviderRutaDoc ??
@@ -181,7 +172,7 @@ export function construirApp(
   app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
   app.use('/api/v1', crearRouterAuth(pool));
   app.use('/api/v1', crearRouterCasilla(pool));
-  app.use('/api/v1', crearRouterStorage(pool));
+  app.use('/api/v1', crearRouterStorage(pool, opts.s3Client));
   app.use('/api/v1', crearRouterTramites(pool));
   app.use(
     '/api/v1',

@@ -12,6 +12,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
     let capturedQuery = '';
     let capturedParams: any[] = [];
     let sessionInsertExecuted = false;
+    let sessionInsertParams: any[] = [];
 
     const fakePool = {
       query: vi.fn(async (queryText: string, params?: any[]) => {
@@ -37,6 +38,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
         }
         if (queryText.includes('INSERT INTO sigd_auth.sesion_usuario')) {
           sessionInsertExecuted = true;
+          sessionInsertParams = params ?? [];
           return { rows: [], rowCount: 1 };
         }
         return { rows: [], rowCount: 0 };
@@ -78,6 +80,12 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
     expect(capturedQuery).not.toContain('ur.estado');
     expect(capturedQuery).toContain('(c.usuario = $1 OR c.correo = $1)');
     expect(sessionInsertExecuted).toBe(true);
+
+    // SEC-05: El token persistido en DB NUNCA es texto plano, sino su hash SHA-256 (64 hex chars)
+    const rawRefreshToken = res.body.refreshToken;
+    const storedHash = sessionInsertParams[1];
+    expect(storedHash).not.toBe(rawRefreshToken);
+    expect(storedHash).toHaveLength(64);
   });
 
   it('POST /api/v1/auth/login propaga error 500 si falla la insercion de sesion (no swallow)', async () => {
@@ -119,12 +127,14 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
     expect(res.status).toBe(500);
   });
 
-  it('POST /api/v1/auth/refresh ejecuta query alineada a rol_id y vigente_hasta', async () => {
+  it('POST /api/v1/auth/refresh ejecuta query alineada a rol_id y vigente_hasta bajo transaccion atomica con FOR UPDATE (SEC-07)', async () => {
     let capturedQuery = '';
+    const executedQueries: string[] = [];
     const expiraEn = new Date(Date.now() + 3600 * 1000).toISOString();
 
-    const fakePool = {
-      query: vi.fn(async (queryText: string) => {
+    const fakeClient = {
+      query: vi.fn(async (queryText: string, params?: any[]) => {
+        executedQueries.push(queryText);
         if (queryText.includes('FROM sigd_auth.sesion_usuario s')) {
           capturedQuery = queryText;
           return {
@@ -141,6 +151,12 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
         }
         return { rows: [], rowCount: 1 };
       }),
+      release: vi.fn(),
+    };
+
+    const fakePool = {
+      query: vi.fn(),
+      connect: vi.fn(async () => fakeClient),
     } as unknown as Pool;
 
     const app = construirApp(fakePool);
@@ -155,8 +171,14 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
 
     expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
     expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
+    expect(capturedQuery).toContain('FOR UPDATE OF s');
     expect(capturedQuery).not.toContain('ur.estado');
     expect(capturedQuery).not.toContain('r.id_rol');
+
+    // Validar aislamiento transaccional atómico
+    expect(executedQueries).toContain('BEGIN');
+    expect(executedQueries).toContain('COMMIT');
+    expect(fakeClient.release).toHaveBeenCalled();
   });
 
   it('GET /api/v1/auth/me retorna usuario con correo y usuario alineados', async () => {

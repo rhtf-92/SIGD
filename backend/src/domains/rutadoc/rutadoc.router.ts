@@ -53,13 +53,18 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
   router.post('/expedientes/:id/revertir-actuacion', controlador.revertir);
   const derivaciones = Router();
   derivaciones.use(async (req, _res, next) => {
-    const actor = await proveedorActor.obtenerActor(req);
-    if (!actor) throw new UnauthorizedError();
-    setUsuarioId(actor.id);
-    setUnidadOrganicaId(actor.unidadOrganicaId ?? null);
-    next();
+    try {
+      const actor = await proveedorActor.obtenerActor(req);
+      if (!actor) throw new UnauthorizedError();
+      setUsuarioId(actor.id);
+      setUnidadOrganicaId(actor.unidadOrganicaId ?? null);
+      (req as any).actor = actor;
+      next();
+    } catch (err) {
+      next(err);
+    }
   });
-  derivaciones.use(crearRouterDerivaciones(pool));
+  derivaciones.use(crearRouterDerivaciones(pool, proveedorActor));
   router.use('/expedientes', derivaciones);
   return router;
 }
