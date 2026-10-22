@@ -145,20 +145,6 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         idTipoTramite = '00000000-0000-0000-0000-000000000001';
       }
 
-      let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
-      try {
-        if (identificacion.numeroDocumento) {
-          const respPersona = await apiClient.get<{ persona?: { id: number | string } }>(
-            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(identificacion.numeroDocumento)}`
-          );
-          if (respPersona?.data?.persona?.id) {
-            idPersonaNum = Number(respPersona.data.persona.id);
-          }
-        }
-      } catch {
-        // Fallback defensivo
-      }
-
       const archivosPayload =
         documentos.archivos.length > 0
           ? documentos.archivos.map((a) => ({
@@ -182,7 +168,6 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       const payload = {
         asunto: asuntoFinal,
         idTipoTramiteTupa: idTipoTramite,
-        idPersona: idPersonaNum,
         nombreSolicitante:
           nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
         correo:
