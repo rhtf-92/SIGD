@@ -18,6 +18,20 @@ const statusLabel: Record<DashboardKpiMetric["status"], string> = {
   neutral: "Estable",
 };
 
+const accentClasses: Record<DashboardKpiMetric["status"], string> = {
+  positive: "border-t-emerald-500",
+  warning: "border-t-amber-500",
+  critical: "border-t-red-500",
+  neutral: "border-t-blue-600",
+};
+
+const sparklineColors: Record<DashboardKpiMetric["status"], string> = {
+  positive: "#059669",
+  warning: "#d97706",
+  critical: "#dc2626",
+  neutral: "#2563eb",
+};
+
 function buildSparklinePath(values: number[]) {
   if (values.length === 0) {
     return "";
@@ -38,12 +52,13 @@ function buildSparklinePath(values: number[]) {
 
 export default function ExecutiveKpiCard({ metric }: ExecutiveKpiCardProps) {
   const sparklinePath = buildSparklinePath(metric.sparkline);
+  const showsDelta = metric.deltaLabel.startsWith("+") || metric.deltaLabel.startsWith("-");
   const deltaPositive = metric.delta >= 0;
 
   return (
     <article
-      className="flex min-h-[220px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500"
-      aria-label={`${metric.title}: ${metric.value.toFixed(1)} ${metric.unit}, variación ${metric.deltaLabel}`}
+      className={`flex min-h-[220px] flex-col justify-between rounded-2xl border border-t-4 border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500 ${accentClasses[metric.status]}`}
+      aria-label={`${metric.title}: ${metric.value.toFixed(1)} ${metric.unit}, ${metric.deltaLabel}`}
       tabIndex={0}
     >
       <div className="flex items-start justify-between gap-3">
@@ -57,13 +72,13 @@ export default function ExecutiveKpiCard({ metric }: ExecutiveKpiCardProps) {
           </p>
         </div>
         <div className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusClasses[metric.status]}`}>
-          <span aria-hidden="true">{deltaPositive ? "▲" : "▼"}</span>
+          {showsDelta && <span aria-hidden="true">{deltaPositive ? "▲" : "▼"}</span>}
           {metric.deltaLabel}
         </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <span className="text-sm font-medium text-slate-600">Δ vs. período anterior</span>
+        <span className="text-sm font-medium text-slate-600">{showsDelta ? "vs. período anterior" : "Indicador MGD"}</span>
         <span className={`rounded-full px-2 py-1 text-xs font-semibold ring-1 ${statusClasses[metric.status]}`}>
           {statusLabel[metric.status]}
         </span>
@@ -75,7 +90,7 @@ export default function ExecutiveKpiCard({ metric }: ExecutiveKpiCardProps) {
         className="mt-4 h-14 w-full rounded-xl bg-slate-50 p-1"
         aria-hidden="true"
       >
-        <path d={sparklinePath} fill="none" stroke="#1E40AF" strokeWidth="3" strokeLinecap="round" />
+        <path d={sparklinePath} fill="none" stroke={sparklineColors[metric.status]} strokeWidth="3" strokeLinecap="round" />
       </svg>
 
       <p className="mt-3 text-sm text-slate-600">{metric.description}</p>

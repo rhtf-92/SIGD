@@ -78,8 +78,8 @@ export function crearControladorReportes(
   return {
     resumen: async (req, res) => {
       await autorizado(req);
-      const { periodo } = filtrosResumenSchema.parse(req.query ?? {});
-      const resumen = await servicio.resumen(periodo ?? null);
+      const { periodo, periodoDesde, periodoHasta } = filtrosResumenSchema.parse(req.query ?? {});
+      const resumen = await servicio.resumen(periodo ?? null, periodoDesde ?? null, periodoHasta ?? null);
       // `periodo` y `actualizadoEn` son metadatos de la lectura; el contrato de
       // §4.7 define los seis campos de primer nivel, pero sin ellos el frontend no
       // puede distinguir "0 %" de "sin datos" ni saber de cuándo es el dato.
@@ -88,9 +88,15 @@ export function crearControladorReportes(
 
     cuellosBotella: async (req, res) => {
       await autorizado(req);
-      const { periodo, diasLimite } = filtrosCuellosBotellaSchema.parse(req.query ?? {});
+      const { periodo, periodoDesde, periodoHasta, diasLimite } = filtrosCuellosBotellaSchema.parse(req.query ?? {});
       const nombres = await repositorio.obtenerNombresUnidades();
-      res.json(await servicio.cuellosBotella(periodo ?? null, diasLimite, nombres));
+      res.json(await servicio.cuellosBotella(
+        periodo ?? null,
+        diasLimite,
+        nombres,
+        periodoDesde ?? null,
+        periodoHasta ?? null,
+      ));
     },
 
     tendencias: async (req, res) => {
