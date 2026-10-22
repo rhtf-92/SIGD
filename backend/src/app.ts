@@ -50,6 +50,7 @@ import { crearRouterRealtime } from './modules/corelink/realtime.routes.js';
 // Módulos IdentiCore Auth y Casilla
 import { crearRouterAuth } from './domains/identicore/auth.router.js';
 import { crearRouterCasilla } from './domains/identicore/casilla.router.js';
+import { crearRouterTupa } from './domains/tupa/tupa.router.js';
 
 // Módulo Almacenamiento S3 MinIO
 import { crearRouterStorage } from './core/storage/storage.router.js';
@@ -181,6 +182,7 @@ export function construirApp(
   app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
   app.use('/api/v1', crearRouterAuth(pool));
   app.use('/api/v1', crearRouterCasilla(pool));
+  app.use('/api/v1', crearRouterTupa(pool));
   app.use('/api/v1', crearRouterStorage(pool));
   app.use('/api/v1', crearRouterTramites(pool));
   app.use(
@@ -268,9 +270,9 @@ export function construirApp(
       const limite = Math.min(Number(req.query.limite ?? 50), 100);
       const offset = Number(req.query.offset ?? 0);
       const { rows } = await pool.query(
-        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, creado_en
+        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, fecha_hora AS creado_en
          FROM sigd_audit.bitacora_auditoria
-         ORDER BY creado_en DESC
+         ORDER BY fecha_hora DESC
          LIMIT $1 OFFSET $2`,
         [limite, offset],
       );

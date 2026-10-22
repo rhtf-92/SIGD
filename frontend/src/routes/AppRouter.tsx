@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
+import NotFoundPage from "../pages/NotFoundPage";
 
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import DashboardEjecutivoPage from "../pages/DashboardEjecutivoPage";
@@ -22,6 +23,8 @@ import ConsultaPublicaPage from "../pages/tramite/ConsultaPublicaPage";
 import ProyectorResolucionesPage from "../pages/flujos/ProyectorResolucionesPage";
 import AdminRoutes from "./AdminRoutes";
 import ProtectedRoute from "./ProtectedRoute";
+import TupaVigentePage from "../pages/TupaVigentePage";
+import TupaGestionPage from "../pages/TupaGestionPage";
 
 export default function AppRouter() {
   return (
@@ -29,14 +32,27 @@ export default function AppRouter() {
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
+      <Route path="/tupa" element={<TupaVigentePage />} />
+      <Route path="/tupa/gestion" element={<TupaGestionPage />} />
 
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
 
-      <Route path="/casilla" element={<CasillaElectronicaPage />} />
+      <Route
+        path="/casilla"
+        element={
+          <ProtectedRoute>
+            <CasillaElectronicaPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/casilla-electronica"
-        element={<CasillaElectronicaPage />}
+        element={
+          <ProtectedRoute>
+            <CasillaElectronicaPage />
+          </ProtectedRoute>
+        }
       />
       <Route path="/registro" element={<RegistroCiudadanoPage />} />
 
@@ -101,7 +117,7 @@ export default function AppRouter() {
       <Route path="/reportes" element={<DashboardEjecutivoPage />} />
       <Route path="/reportes/dashboard" element={<DashboardEjecutivoPage />} />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
 
     </Routes>
   );

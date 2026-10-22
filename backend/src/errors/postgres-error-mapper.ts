@@ -11,9 +11,11 @@ export interface MapeoErrorPg {
 }
 
 const MATRIZ_PG: Record<string, MapeoErrorPg> = {
+  '23001': { status: 409, code: 'INMUTABLE_RESOURCE', detail: 'El recurso ya no se puede modificar en su estado actual.' },
   '23505': { status: 409, code: 'DUPLICATE_KEY', detail: 'El registro ya se encuentra registrado.' },
   '23503': { status: 400, code: 'FOREIGN_KEY_VIOLATION', detail: 'El recurso referenciado no es válido.' },
   '23502': { status: 400, code: 'NOT_NULL_VIOLATION', detail: 'Un campo obligatorio no fue proporcionado.' },
+  '23514': { status: 422, code: 'CHECK_VIOLATION', detail: 'Los datos enviados incumplen una regla de validación.' },
   P0001: { status: 422, code: 'DOMAIN_RULE', detail: 'Regla de negocio incumplida.' },
 };
 
