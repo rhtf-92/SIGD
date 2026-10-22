@@ -127,7 +127,7 @@ function ArbolCcd({ fondos, seleccion, onSeleccionar, disabled = false, permitir
       </li>;
     });
   }
-  return <section className="m03 m03-panel" aria-labelledby={`${id}-titulo`}>
+  return <section className="m03 m03-panel bandeja-ccd" aria-labelledby={`${id}-titulo`}>
     <h2 id={`${id}-titulo`} className="m03-heading">Cuadro de Clasificación Documental</h2>
     <p id={`${id}-ayuda`} className="m03-help">Seleccione una serie documental. Use las flechas para recorrer y expandir el árbol, y Enter para seleccionar.</p>
     <ul role="tree" className="m03-tree" aria-labelledby={`${id}-titulo`} aria-describedby={`${id}-ayuda`} aria-disabled={disabled || undefined}>{renderizar(entradas)}</ul>

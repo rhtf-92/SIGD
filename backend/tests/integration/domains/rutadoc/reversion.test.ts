@@ -13,7 +13,9 @@ import type { ActorRutaDoc } from '../../../../src/domains/rutadoc/rutadoc.types
 const actor: ActorRutaDoc = { id: '7', roles: ['SUPER_ADMIN'], puedeVerExpediente: () => true };
 const AREA_ORIGEN = 'e203345b-1e6a-4743-803b-c886c32e4d77';
 const AREA_DESTINO = '30cc4c31-09ac-4ec1-a7fb-083348ad2d01';
-const ruta = (id: number) => `/api/v1/expedientes/${id}/revertir-actuacion`;
+const SOLICITANTE = '86e5b7ea-af4a-4c9c-bcaa-f45f7d1ea8b0';
+const expedienteUuid = (id: number) => `00000000-0000-4000-8000-${String(id).padStart(12, '0')}`;
+const ruta = (id: number) => `/api/v1/expedientes/${expedienteUuid(id)}/revertir-actuacion`;
 const cuerpo = (movimientoObjetivoId = '2', claveIdempotencia = randomUUID()) => ({
   movimientoObjetivoId, motivo: 'Se corrige una actuación administrativa.', claveIdempotencia,
 });
@@ -22,18 +24,19 @@ let contenedor: StartedPostgreSqlContainer;
 let pool: Pool;
 
 async function crearExpediente(id: number) {
-  await pool.query('INSERT INTO sigd_tra.tramite (id_tramite, asunto, fk_remitente) VALUES ($1, $2, 80)',
-    [id, `Asunto ${id}`]);
   await pool.query(`INSERT INTO sigd_tra.expediente
-    (id_expediente, codigo_expediente, fk_tramite, creado_en)
-    VALUES ($1, $2, $1, '2026-09-24T09:00:00Z')`, [id, `EXP-${id}`]);
+    (expediente_id, codigo_expediente, fecha_radicacion, solicitante_id)
+    VALUES ($1, $2, '2026-09-24T09:00:00Z', $3)`,
+  [expedienteUuid(id), `EXP-2026-${String(id).padStart(6, '0')}`, SOLICITANTE]);
+  await pool.query('INSERT INTO sigd_tra.tramite (expediente_id, asunto) VALUES ($1, $2)',
+    [expedienteUuid(id), `Asunto ${id}`]);
   await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
     (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora, datos)
     VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7, '2026-09-24T10:00:00.123Z', '{}'::jsonb),
            ($1, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7,
             '2026-09-24T10:01:00.456Z',
-            CASE WHEN $1 = 107 THEN jsonb_build_object('areaId', $2::text) ELSE '{}'::jsonb END)`,
-  [id, AREA_ORIGEN]);
+            CASE WHEN $3 = 107 THEN jsonb_build_object('areaId', $2::text) ELSE '{}'::jsonb END)`,
+  [expedienteUuid(id), AREA_ORIGEN, id]);
 }
 
 async function cantidades(id: number) {
@@ -41,7 +44,8 @@ async function cantidades(id: number) {
     SELECT (SELECT count(*)::integer FROM sigd_rut.movimiento_tramite WHERE expediente_id = $1) normales,
            (SELECT count(*)::integer FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = $1) compensatorios,
            (SELECT count(*)::integer FROM sigd_rut.movimiento_identidad WHERE expediente_id = $1) identidades,
-           (SELECT ultima_secuencia::text FROM sigd_rut.movimiento_secuencia WHERE expediente_id = $1) secuencia`, [id]);
+           (SELECT ultima_secuencia::text FROM sigd_rut.movimiento_secuencia WHERE expediente_id = $1) secuencia`,
+  [expedienteUuid(id)]);
   return resultado.rows[0];
 }
 
@@ -57,20 +61,20 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
     contenedor = await new PostgreSqlContainer('postgres:18-alpine')
       .withDatabase('sigd_rutadoc_reversion').start();
     pool = new Pool({ connectionString: contenedor.getConnectionUri(), max: 10 });
-    await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
     // Contrato externo mínimo sólo en el contenedor efímero.
     await pool.query(`CREATE SCHEMA sigd_tra;
-      CREATE TABLE sigd_tra.tramite (
-        id_tramite BIGINT PRIMARY KEY, asunto TEXT NOT NULL, fk_remitente BIGINT NOT NULL);
       CREATE TABLE sigd_tra.expediente (
-        id_expediente BIGINT PRIMARY KEY, codigo_expediente TEXT NOT NULL,
-        fk_tramite BIGINT NOT NULL, creado_en TIMESTAMPTZ NOT NULL)`);
+        expediente_id UUID PRIMARY KEY, codigo_expediente TEXT NOT NULL UNIQUE,
+        fecha_radicacion TIMESTAMPTZ NOT NULL, area_destino_id UUID, solicitante_id UUID NOT NULL);
+      CREATE TABLE sigd_tra.tramite (
+        expediente_id UUID PRIMARY KEY REFERENCES sigd_tra.expediente (expediente_id) ON DELETE RESTRICT,
+        asunto TEXT NOT NULL)`);
     await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
     for (const id of [101, 102, 103, 104, 105, 106, 107, 108, 109, 110]) await crearExpediente(id);
     await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, datos)
-      VALUES (107, 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', 7,
-              jsonb_build_object('areaId', $1::text))`, [AREA_DESTINO]);
+      VALUES ($2, 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', 7,
+              jsonb_build_object('areaId', $1::text))`, [AREA_DESTINO, expedienteUuid(107)]);
   });
 
   afterAll(async () => {
@@ -80,7 +84,7 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
 
   it('adquiere advisory lock transaccional en el mismo cliente y no bloquea otro expediente', async () => {
     const repo = new RepositorioReversionRutaDoc(pool);
-    await repo.conBloqueo('101', async (cliente) => {
+    await repo.conBloqueo(expedienteUuid(101), async (cliente) => {
       const bloqueo = await cliente.query<{ bloqueado: boolean; transaccion: string }>(`
         SELECT EXISTS(SELECT 1 FROM pg_locks WHERE pid = pg_backend_pid()
           AND locktype = 'advisory' AND mode = 'ExclusiveLock' AND granted) bloqueado,
@@ -90,25 +94,27 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
       const otro = await pool.connect();
       try {
         const intento = await otro.query<{ disponible: boolean }>(
-          "SELECT pg_try_advisory_xact_lock(hashtext('exp_' || $1::text)) disponible", ['102']);
+          "SELECT pg_try_advisory_xact_lock(hashtext('exp_' || $1::text)) disponible", [expedienteUuid(102)]);
         expect(intento.rows[0].disponible).toBe(true);
         const mismo = await otro.query<{ disponible: boolean }>(
-          "SELECT pg_try_advisory_xact_lock(hashtext('exp_' || $1::text)) disponible", ['101']);
+          "SELECT pg_try_advisory_xact_lock(hashtext('exp_' || $1::text)) disponible", [expedienteUuid(101)]);
         expect(mismo.rows[0].disponible).toBe(false);
       } finally { otro.release(); }
     });
   });
 
   it('inserta un asiento inmutable con actor, milisegundos y referencia; conserva el original', async () => {
-    const antes = await pool.query('SELECT * FROM sigd_rut.movimiento_tramite WHERE expediente_id = 101 ORDER BY secuencia');
+    const antes = await pool.query(`SELECT * FROM sigd_rut.movimiento_tramite
+      WHERE expediente_id = '${expedienteUuid(101)}' ORDER BY secuencia`);
     const correlationId = randomUUID();
     const respuesta = await request(app()).post(ruta(101)).set('x-correlation-id', correlationId).send(cuerpo());
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toMatchObject({ expedienteId: '101', movimientoRevertidoId: '2',
+    expect(respuesta.body).toMatchObject({ expedienteId: expedienteUuid(101), movimientoRevertidoId: '2',
       movimientoCompensatorioId: '3', estadoAntesDeReversion: 'EN_CALIFICACION',
       estadoRestaurado: 'RECEPCIONADO', correlationId,
       compensacionFolios: { estado: 'PENDIENTE', rangoAfectado: null } });
-    const despues = await pool.query('SELECT * FROM sigd_rut.movimiento_tramite WHERE expediente_id = 101 ORDER BY secuencia');
+    const despues = await pool.query(`SELECT * FROM sigd_rut.movimiento_tramite
+      WHERE expediente_id = '${expedienteUuid(101)}' ORDER BY secuencia`);
     expect(despues.rows).toEqual(antes.rows);
     expect(await cantidades(101)).toEqual({ normales: 2, compensatorios: 1, identidades: 3, secuencia: '3' });
     const asiento = await pool.query(`SELECT c.evento, c.usuario_operador_id::text actor,
@@ -117,7 +123,7 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
       m.id_movimiento AS original_id
       FROM sigd_rut.movimiento_compensatorio c JOIN sigd_rut.movimiento_tramite m
       ON m.fecha_hora = c.movimiento_objetivo_fecha_hora AND m.id_movimiento = c.movimiento_objetivo_id
-      WHERE c.expediente_id = 101`);
+      WHERE c.expediente_id = '${expedienteUuid(101)}'`);
     expect(asiento.rows[0]).toMatchObject({ evento: 'REVERSION_ADMINISTRATIVA', actor: '7',
       estado_anterior: 'EN_CALIFICACION', estado_nuevo: 'RECEPCIONADO',
       motivo: respuesta.body.motivo, correlation_id: correlationId,
@@ -128,19 +134,19 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
       estadoAntesDeReversion: 'EN_CALIFICACION', estadoRestaurado: 'RECEPCIONADO' });
     const precision = await pool.query<{ milisegundos: boolean }>(`
       SELECT fecha_hora = date_trunc('milliseconds', fecha_hora) milisegundos
-      FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = 101`);
+      FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = '${expedienteUuid(101)}'`);
     expect(precision.rows[0].milisegundos).toBe(true);
     const solicitud = await pool.query(`SELECT expediente_id::text, movimiento_original_id,
       movimiento_compensatorio_id, motivo, actor_id::text, correlation_id,
       clave_idempotencia::text, estado, id_evento_outbox
-      FROM sigd_rut.solicitud_compensacion_folios WHERE expediente_id = 101`);
+      FROM sigd_rut.solicitud_compensacion_folios WHERE expediente_id = '${expedienteUuid(101)}'`);
     expect(solicitud.rows).toHaveLength(1);
-    expect(solicitud.rows[0]).toMatchObject({ expediente_id: '101',
+    expect(solicitud.rows[0]).toMatchObject({ expediente_id: expedienteUuid(101),
       movimiento_original_id: asiento.rows[0].original_id,
       movimiento_compensatorio_id: respuesta.body.movimientoCompensatorioUuid,
       motivo: respuesta.body.motivo, actor_id: '7', correlation_id: correlationId,
       estado: 'PENDIENTE', id_evento_outbox: null });
-    const detalle = await request(app()).get('/api/v1/expedientes/101');
+    const detalle = await request(app()).get(`/api/v1/expedientes/${expedienteUuid(101)}`);
     expect(detalle.status).toBe(200);
     expect(detalle.body).toMatchObject({ estadoActual: 'RECEPCIONADO',
       ultimoMovimiento: { evento: 'REVERSION_ADMINISTRATIVA', estadoNuevo: 'RECEPCIONADO' } });
@@ -156,7 +162,7 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
     expect(segundo.body).toEqual(primero.body);
     expect((await cantidades(102)).compensatorios).toBe(1);
     const solicitudes = await pool.query<{ total: number }>(
-      'SELECT count(*)::integer total FROM sigd_rut.solicitud_compensacion_folios WHERE expediente_id = 102');
+      `SELECT count(*)::integer total FROM sigd_rut.solicitud_compensacion_folios WHERE expediente_id = '${expedienteUuid(102)}'`);
     expect(solicitudes.rows[0].total).toBe(1);
     const conflicto = await request(app()).post(ruta(102)).send({ ...comando, motivo: 'Un motivo distinto para la misma clave.' });
     expect(conflicto.status).toBe(409);
@@ -170,10 +176,10 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
   it('GET de bandeja, detalle y seis contadores leen la secuencia total tras revertir', async () => {
     const antes = await request(app()).get('/api/v1/expedientes').query({ pestana: 'DERIVADOS' });
     expect(antes.status).toBe(200);
-    expect(antes.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente)).toContain('107');
+    expect(antes.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente)).toContain(expedienteUuid(107));
     const areaAntes = await request(app()).get('/api/v1/expedientes')
       .query({ pestana: 'DERIVADOS', areaId: AREA_DESTINO });
-    expect(areaAntes.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente)).toContain('107');
+    expect(areaAntes.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente)).toContain(expedienteUuid(107));
     const respuesta = await request(app()).post(ruta(107)).send(cuerpo('3'));
     expect(respuesta.status).toBe(200);
     expect(respuesta.body).toMatchObject({ movimientoCompensatorioId: '4',
@@ -183,10 +189,10 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
     expect(pendientes.status).toBe(200);
     expect(derivados.status).toBe(200);
     expect(pendientes.body.elementos).toContainEqual(expect.objectContaining({
-      idExpediente: '107', estadoActual: 'EN_CALIFICACION',
+      idExpediente: expedienteUuid(107), estadoActual: 'EN_CALIFICACION',
     }));
     expect(derivados.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente))
-      .not.toContain('107');
+      .not.toContain(expedienteUuid(107));
     expect(Object.keys(pendientes.body.contadores).sort()).toEqual([
       'ARCHIVADOS', 'ATENDIDOS', 'DERIVADOS', 'EN_TRAMITE', 'PENDIENTES', 'POR_FIRMAR',
     ]);
@@ -197,21 +203,21 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
     const areaRestaurada = await request(app()).get('/api/v1/expedientes')
       .query({ pestana: 'PENDIENTES', areaId: AREA_ORIGEN });
     expect(areaRestaurada.body.elementos).toContainEqual(expect.objectContaining({
-      idExpediente: '107', areaActualId: AREA_ORIGEN, estadoActual: 'EN_CALIFICACION',
+      idExpediente: expedienteUuid(107), areaActualId: AREA_ORIGEN, estadoActual: 'EN_CALIFICACION',
     }));
     const areaAnterior = await request(app()).get('/api/v1/expedientes')
       .query({ pestana: 'DERIVADOS', areaId: AREA_DESTINO });
     expect(areaAnterior.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente))
-      .not.toContain('107');
-    const detalle = await request(app()).get('/api/v1/expedientes/107');
+      .not.toContain(expedienteUuid(107));
+    const detalle = await request(app()).get(`/api/v1/expedientes/${expedienteUuid(107)}`);
     expect(detalle.status).toBe(200);
     expect(detalle.body).toMatchObject({ estadoActual: 'EN_CALIFICACION',
       ultimoMovimiento: { evento: 'REVERSION_ADMINISTRATIVA', estadoNuevo: 'EN_CALIFICACION' } });
     const historial = await pool.query<{ secuencia: string; tipo: string }>(`
       SELECT secuencia::text, tipo FROM (
-        SELECT secuencia, 'NORMAL'::text tipo FROM sigd_rut.movimiento_tramite WHERE expediente_id = 107
+        SELECT secuencia, 'NORMAL'::text tipo FROM sigd_rut.movimiento_tramite WHERE expediente_id = '${expedienteUuid(107)}'
         UNION ALL
-        SELECT secuencia, 'COMPENSATORIA'::text tipo FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = 107
+        SELECT secuencia, 'COMPENSATORIA'::text tipo FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = '${expedienteUuid(107)}'
       ) h ORDER BY secuencia`);
     expect(historial.rows).toEqual([
       { secuencia: '1', tipo: 'NORMAL' }, { secuencia: '2', tipo: 'NORMAL' },
@@ -253,10 +259,11 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
       expect(await cantidades(105)).toEqual({ normales: 2, compensatorios: 0, identidades: 2, secuencia: '2' });
       const clavePersistida = await pool.query<{ total: number }>(`
         SELECT count(*)::integer total FROM sigd_rut.movimiento_identidad
-        WHERE expediente_id = 105 AND clave_idempotencia = $1`, [comando.claveIdempotencia]);
+        WHERE expediente_id = $2 AND clave_idempotencia = $1`,
+      [comando.claveIdempotencia, expedienteUuid(105)]);
       expect(clavePersistida.rows[0].total).toBe(0);
       const solicitudes = await pool.query<{ total: number }>(
-        'SELECT count(*)::integer total FROM sigd_rut.solicitud_compensacion_folios WHERE expediente_id = 105');
+        `SELECT count(*)::integer total FROM sigd_rut.solicitud_compensacion_folios WHERE expediente_id = '${expedienteUuid(105)}'`);
       expect(solicitudes.rows[0].total).toBe(0);
     } finally {
       await pool.query('DROP TRIGGER tr_fallo_prueba_reversion ON sigd_rut.movimiento_compensatorio');
@@ -268,9 +275,10 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
   });
 
   it('rechaza UPDATE, DELETE y TRUNCATE del asiento y deja intacta la historia', async () => {
-    await expect(pool.query("UPDATE sigd_rut.movimiento_compensatorio SET motivo = 'Cambio posterior' WHERE expediente_id = 101"))
+    await expect(pool.query(`UPDATE sigd_rut.movimiento_compensatorio SET motivo = 'Cambio posterior'
+      WHERE expediente_id = '${expedienteUuid(101)}'`))
       .rejects.toMatchObject({ code: '23001' });
-    await expect(pool.query('DELETE FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = 101'))
+    await expect(pool.query(`DELETE FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = '${expedienteUuid(101)}'`))
       .rejects.toMatchObject({ code: '23001' });
     await expect(pool.query('TRUNCATE sigd_rut.movimiento_compensatorio'))
       .rejects.toMatchObject({ code: '0A000' });
@@ -303,7 +311,7 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
     const inicial = await request(app()).post(ruta(106)).send(cuerpo('1'));
     await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-      VALUES (106, 'EN_CALIFICACION', 'INICIAR_REVISION', 'EN_REVISION', 7)`);
+      VALUES ($1, 'EN_CALIFICACION', 'INICIAR_REVISION', 'EN_REVISION', 7)`, [expedienteUuid(106)]);
     const desactualizado = await request(app()).post(ruta(106)).send(cuerpo('2'));
     expect([expediente.status, movimiento.status, inicial.status, desactualizado.status])
       .toEqual([404, 404, 422, 409]);
@@ -321,7 +329,8 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
     expect(await cantidades(109)).toEqual({ normales: 2, compensatorios: 0, identidades: 2, secuencia: '2' });
     const pendientes = await pool.query<{ total: number }>(`
       SELECT count(*)::integer total FROM sigd_rut.solicitud_compensacion_folios
-      WHERE expediente_id = 109 OR clave_idempotencia = $1`, [comando.claveIdempotencia]);
+      WHERE expediente_id = $2 OR clave_idempotencia = $1`,
+    [comando.claveIdempotencia, expedienteUuid(109)]);
     expect(pendientes.rows[0].total).toBe(0);
     const retry = await request(app()).post(ruta(109)).send(comando);
     expect(retry.status).toBe(200);
@@ -348,10 +357,10 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
     expect(eventos.rows[0]).toMatchObject({ correlation_id: correlationId,
       agregado: 'RutaDoc', tipo_evento: 'CompensacionFoliosSolicitada',
       estado: 'PENDIENTE', payload: {
-        expedienteId: '108', movimientoCompensatorioId: primera.body.movimientoCompensatorioUuid,
+        expedienteId: expedienteUuid(108), movimientoCompensatorioId: primera.body.movimientoCompensatorioUuid,
         claveIdempotencia: comando.claveIdempotencia, actorId: '7' } });
     const solicitud = await pool.query(`SELECT estado, id_evento_outbox
-      , id_solicitud FROM sigd_rut.solicitud_compensacion_folios WHERE expediente_id = 108`);
+      , id_solicitud FROM sigd_rut.solicitud_compensacion_folios WHERE expediente_id = '${expedienteUuid(108)}'`);
     expect(solicitud.rows).toEqual([{ estado: 'PENDIENTE',
       id_evento_outbox: eventos.rows[0].id_evento, id_solicitud: expect.any(String) }]);
     const cliente = await pool.connect();
@@ -363,7 +372,8 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
       await port.registrarEstado(cliente, solicitud.rows[0].id_solicitud, 'FALLIDO');
       await port.registrarEstado(cliente, solicitud.rows[0].id_solicitud, 'PROCESANDO');
       await port.registrarEstado(cliente, solicitud.rows[0].id_solicitud, 'COMPLETADO');
-      const final = await cliente.query('SELECT estado FROM sigd_rut.solicitud_compensacion_folios WHERE expediente_id = 108');
+      const final = await cliente.query(`SELECT estado FROM sigd_rut.solicitud_compensacion_folios
+        WHERE expediente_id = '${expedienteUuid(108)}'`);
       expect(final.rows[0].estado).toBe('COMPLETADO');
     } finally { cliente.release(); }
   });
@@ -380,11 +390,13 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
       expect(JSON.stringify(fallido.body)).not.toContain('fallo outbox');
       expect(await cantidades(110)).toEqual({ normales: 2, compensatorios: 0, identidades: 2, secuencia: '2' });
       const estado = await pool.query<{ secuencia: string; estado_nuevo: string }>(`
-        SELECT secuencia::text, estado_nuevo FROM sigd_rut.estado_actual_expediente WHERE expediente_id = 110`);
+        SELECT secuencia::text, estado_nuevo FROM sigd_rut.estado_actual_expediente
+        WHERE expediente_id = '${expedienteUuid(110)}'`);
       expect(estado.rows).toEqual([{ secuencia: '2', estado_nuevo: 'EN_CALIFICACION' }]);
       const solicitud = await pool.query<{ total: number }>(`
         SELECT count(*)::integer total FROM sigd_rut.solicitud_compensacion_folios
-        WHERE expediente_id = 110 OR clave_idempotencia = $1`, [comando.claveIdempotencia]);
+        WHERE expediente_id = $2 OR clave_idempotencia = $1`,
+      [comando.claveIdempotencia, expedienteUuid(110)]);
       expect(solicitud.rows[0].total).toBe(0);
     } finally {
       await pool.query('DROP TRIGGER tr_fallo_outbox_prueba ON sigd_audit.evento_outbox');

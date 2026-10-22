@@ -55,46 +55,46 @@ export default function MesaPartesVirtualPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 sm:px-6">
+    <main className="min-h-screen bg-amber-50/50 px-4 py-6 text-amber-950 sm:px-6">
       <div className="mx-auto max-w-6xl space-y-6">
-        <header className="rounded-2xl bg-slate-900 p-6 text-white shadow-lg">
+        <header className="rounded-2xl border-t-4 border-t-amber-700 bg-amber-50 p-6 text-amber-950 shadow-lg">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-300">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-800">
                 SIGD · Demostración Módulo 2
               </p>
               <h1 className="mt-2 text-3xl font-bold">
                 Mesa de Partes Virtual — SIGD
               </h1>
-              <p className="mt-2 max-w-3xl text-slate-300">
+              <p className="mt-2 max-w-3xl text-amber-800">
                 Pantalla única para demostrar carga documentaria segura y
                 control de horario legal LPAG.
               </p>
             </div>
             <Link
               to="/"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-500 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
+              className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
             >
               ← Volver al inicio
             </Link>
-            <span className="rounded-full border border-amber-300/50 bg-amber-300/10 px-3 py-2 text-xs font-semibold text-amber-200">
+            <span className="rounded-full border border-amber-200 bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900">
               API DE PRESIGNED URL REQUERIDA
             </span>
           </div>
         </header>
 
-        <section className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           Magic Bytes y SHA-256 se calculan en el navegador. La carga solicita
           POST /v1/storage/presigned-url al backend y transfiere el PDF
           directamente a la URL firmada devuelta por el servicio.
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
           <div className="mb-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
               1 · Datos del trámite
             </p>
-            <h2 className="mt-1 text-xl font-semibold">
+            <h2 className="mt-1 text-xl font-semibold text-amber-950">
               Identificación de la solicitud
             </h2>
           </div>
@@ -105,7 +105,7 @@ export default function MesaPartesVirtualPage() {
                 value={solicitante}
                 onChange={(event) => setSolicitante(event.target.value)}
                 placeholder="Nombre del administrado"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950"
               />
             </label>
             <label className="text-sm font-medium">
@@ -114,19 +114,19 @@ export default function MesaPartesVirtualPage() {
                 value={asunto}
                 onChange={(event) => setAsunto(event.target.value)}
                 placeholder="Descripción breve del trámite"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950"
               />
             </label>
           </div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
             <div className="mb-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
                 2 · Carga documentaria
               </p>
-              <h2 className="mt-1 text-xl font-semibold">
+              <h2 className="mt-1 text-xl font-semibold text-amber-950">
                 Magic Bytes, SHA-256 y MinIO/S3
               </h2>
             </div>
@@ -155,12 +155,12 @@ export default function MesaPartesVirtualPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
             <div className="mb-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
                 3 · Control de horario LPAG
               </p>
-              <h2 className="mt-1 text-xl font-semibold">
+              <h2 className="mt-1 text-xl font-semibold text-amber-950">
                 Recepción legal
               </h2>
             </div>
@@ -170,17 +170,17 @@ export default function MesaPartesVirtualPage() {
                 type="datetime-local"
                 value={simulationTime}
                 onChange={(event) => setSimulationTime(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950"
               />
             </label>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-amber-800">
               Zona horaria oficial: <strong>America/Lima</strong> · Corte:
               <strong> 16:30</strong>
             </p>
             {simulationTime && (
               <button
                 type="button"
-                className="mt-3 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
                 onClick={() => setSimulationTime("")}
               >
                 Usar hora actual
@@ -207,12 +207,12 @@ export default function MesaPartesVirtualPage() {
           </section>
         </div>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
           <div className="mb-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
               4 · Resultado de radicación
             </p>
-            <h2 className="mt-1 text-xl font-semibold">
+            <h2 className="mt-1 text-xl font-semibold text-amber-950">
               Evidencia de la demostración
             </h2>
           </div>
@@ -234,7 +234,7 @@ export default function MesaPartesVirtualPage() {
             <SummaryRow label="Asunto" value={asunto || "No ingresado"} />
           </div>
           {uploaded && (
-            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
               <strong>Documento cargado:</strong> el archivo{" "}
               <code>{uploaded.file.name}</code> pasó Magic Bytes, generó
               SHA-256 y obtuvo una clave del almacenamiento{" "}
@@ -243,7 +243,7 @@ export default function MesaPartesVirtualPage() {
           )}
         </section>
 
-        <footer className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
+        <footer className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800">
           <strong>Evidencia / estado de pruebas:</strong> suite M2 disponible
           en <code>tests/unit</code> y <code>tests/integration/m2</code>. Ejecuta <code>npm test</code> para
           verificar Magic Bytes, SHA-256, cancelación y casos 16:29, 16:30,
@@ -262,10 +262,10 @@ function EvidenceItem({
   complete: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+    <div className="flex items-center gap-2 rounded-lg border border-amber-200 px-3 py-2 text-sm">
       <span
         aria-hidden="true"
-        className={complete ? "text-emerald-600" : "text-slate-400"}
+        className={complete ? "text-amber-900" : "text-amber-800"}
       >
         {complete ? "✓" : "○"}
       </span>
@@ -276,11 +276,11 @@ function EvidenceItem({
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 p-3">
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className="rounded-lg bg-amber-50 p-3">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-amber-800">
         {label}
       </dt>
-      <dd className="mt-1 break-words font-medium text-slate-900">{value}</dd>
+      <dd className="mt-1 break-words font-medium text-amber-950">{value}</dd>
     </div>
   );
 }

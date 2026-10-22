@@ -9,14 +9,27 @@ import { ESTADOS_RUTADOC, EVENTOS_RUTADOC, TRANSICIONES_RUTADOC } from '../../..
 let contenedor: StartedPostgreSqlContainer;
 let cliente: Client;
 
+function expedienteUuid(id: number): string {
+  return `00000000-0000-4000-8000-${String(id).padStart(12, '0')}`;
+}
+
+async function asegurarExpediente(id: number): Promise<void> {
+  await cliente.query(`
+    INSERT INTO sigd_tra.expediente (expediente_id, codigo_expediente, fecha_radicacion)
+    VALUES ($1::uuid, $2, '2026-01-01T00:00:00Z')
+    ON CONFLICT (expediente_id) DO NOTHING
+  `, [expedienteUuid(id), `EXP-2026-${String(id).padStart(6, '0')}`]);
+}
+
 async function insertar(expediente: number, fecha: string, clave?: string): Promise<{ particion: string; secuencia: string; fecha_hora: Date }> {
+  await asegurarExpediente(expediente);
   const resultado = await cliente.query<{ particion: string; secuencia: string; fecha_hora: Date }>(
     `INSERT INTO sigd_rut.movimiento_tramite
        (id_movimiento, expediente_id, estado_anterior, evento, estado_nuevo,
         usuario_operador_id, fecha_hora, clave_idempotencia)
      VALUES ($1, $2, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7, $3, $4)
      RETURNING tableoid::regclass::text AS particion, secuencia, fecha_hora`,
-    [randomUUID(), expediente, fecha, clave ?? null],
+    [randomUUID(), expedienteUuid(expediente), fecha, clave ?? null],
   );
   return resultado.rows[0];
 }
@@ -28,6 +41,15 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
       .start();
     cliente = new Client({ connectionString: contenedor.getConnectionUri() });
     await cliente.connect();
+    await cliente.query(`CREATE SCHEMA sigd_tra;
+      CREATE TABLE sigd_tra.expediente (
+        expediente_id UUID PRIMARY KEY,
+        codigo_expediente VARCHAR(20) NOT NULL UNIQUE,
+        fecha_radicacion TIMESTAMPTZ NOT NULL,
+        fecha_limite TIMESTAMPTZ,
+        area_destino_id UUID,
+        estado VARCHAR(30) NOT NULL DEFAULT 'REGISTRADO'
+      )`);
   });
 
   afterAll(async () => {
@@ -84,6 +106,7 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
   });
 
   it('rechaza estados, eventos y transiciones inexistentes mediante FK locales', async () => {
+    await asegurarExpediente(200);
     for (const [anterior, evento, nuevo] of [
       ['INEXISTENTE', 'RECEPCION', 'RECEPCIONADO'],
       ['REGISTRADO', 'INEXISTENTE', 'RECEPCIONADO'],
@@ -93,29 +116,30 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
       await expect(cliente.query(
         `INSERT INTO sigd_rut.movimiento_tramite
           (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora)
-         VALUES (200, $1, $2, $3, 7, '2026-07-01T00:00:00Z')`,
-        [anterior, evento, nuevo],
+         VALUES ($4::uuid, $1, $2, $3, 7, '2026-07-01T00:00:00Z')`,
+        [anterior, evento, nuevo, expedienteUuid(200)],
       )).rejects.toMatchObject({ code: '23503' });
     }
   });
 
   it('mantiene identidad e idempotencia únicas entre años', async () => {
+    await asegurarExpediente(300);
     const id = randomUUID();
     await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (id_movimiento, expediente_id, estado_anterior, evento, estado_nuevo,
        usuario_operador_id, fecha_hora, clave_idempotencia)
-      VALUES ($1, 300, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7,
-              '2026-09-01T00:00:00Z', 'orden-300')`, [id]);
+      VALUES ($1, $2::uuid, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7,
+              '2026-09-01T00:00:00Z', 'orden-300')`, [id, expedienteUuid(300)]);
     await expect(cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (id_movimiento, expediente_id, estado_anterior, evento, estado_nuevo,
        usuario_operador_id, fecha_hora)
-      VALUES ($1, 300, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7,
-              '2027-09-01T00:00:00Z')`, [id])).rejects.toMatchObject({ code: '23505' });
+      VALUES ($1, $2::uuid, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7,
+              '2027-09-01T00:00:00Z')`, [id, expedienteUuid(300)])).rejects.toMatchObject({ code: '23505' });
     await expect(insertar(300, '2027-09-01T00:00:00Z', 'orden-300'))
       .rejects.toMatchObject({ code: '23505' });
   });
 
-  it('instala los índices B-Tree y ninguna FK hacia otros esquemas', async () => {
+  it('instala índices y FKs UUID restrictivas a TramiCore', async () => {
     const indices = await cliente.query<{ indexname: string; indexdef: string }>(
       `SELECT indexname, indexdef FROM pg_indexes
        WHERE schemaname = 'sigd_rut' AND tablename = 'movimiento_tramite'`);
@@ -130,22 +154,36 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
       JOIN pg_class r ON r.oid = c.confrelid
       JOIN pg_namespace rn ON rn.oid = r.relnamespace
       WHERE c.contype = 'f' AND n.nspname = 'sigd_rut' AND rn.nspname <> 'sigd_rut'`);
-    expect(externas.rows[0].total).toBe('0');
+    expect(Number(externas.rows[0].total)).toBeGreaterThanOrEqual(6);
+    const tipos = await cliente.query<{ cantidad: string }>(`
+      SELECT count(*)::text AS cantidad
+        FROM pg_attribute a
+        JOIN pg_class t ON t.oid = a.attrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+       WHERE n.nspname = 'sigd_rut'
+         AND t.relname IN ('movimiento_secuencia', 'movimiento_identidad',
+           'movimiento_tramite', 'movimiento_compensatorio',
+           'solicitud_compensacion_folios', 'estado_actual_expediente')
+         AND a.attname = 'expediente_id'
+         AND format_type(a.atttypid, a.atttypmod) = 'uuid'
+         AND NOT a.attisdropped`);
+    expect(Number(tipos.rows[0].cantidad)).toBe(6);
   });
 
   it('mantiene proyección del último estado y la reconstruye sin duplicar al repetir DDL', async () => {
     const antes = await cliente.query<{ secuencia: string; estado_nuevo: string }>(`
       SELECT secuencia::text, estado_nuevo FROM sigd_rut.estado_actual_expediente
-      WHERE expediente_id = 105`);
+      WHERE expediente_id = $1::uuid`, [expedienteUuid(105)]);
     expect(antes.rows).toEqual([{ secuencia: '2', estado_nuevo: 'RECEPCIONADO' }]);
     await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-      VALUES (105, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7)`);
+      VALUES ($1::uuid, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7)`,
+    [expedienteUuid(105)]);
     const sql = readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8');
     await cliente.query(sql);
     const despues = await cliente.query<{ secuencia: string; estado_nuevo: string }>(`
       SELECT secuencia::text, estado_nuevo FROM sigd_rut.estado_actual_expediente
-      WHERE expediente_id = 105`);
+      WHERE expediente_id = $1::uuid`, [expedienteUuid(105)]);
     expect(despues.rows).toEqual([{ secuencia: '3', estado_nuevo: 'EN_CALIFICACION' }]);
     const indices = await cliente.query<{ indexname: string }>(`
       SELECT indexname FROM pg_indexes WHERE schemaname = 'sigd_rut'
@@ -164,8 +202,9 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
     await insertar(777, '2026-09-25T09:00:00.123Z');
     await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-      VALUES (777, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7),
-             (777, 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', 7)`);
+      VALUES ($1::uuid, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7),
+             ($1::uuid, 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', 7)`,
+    [expedienteUuid(777)]);
     const despues = await leer();
     const porPestana = Object.fromEntries(despues.map((fila) => [fila.pestana, Number(fila.cantidad)]));
     const conteoReal = await cliente.query<{ pestana: string; cantidad: number }>(`
@@ -198,7 +237,8 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
       await Promise.all([a, b].map((conexion, indice) => conexion.query(`
         INSERT INTO sigd_rut.movimiento_tramite
           (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-        VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7)`, [779 + indice])));
+        VALUES ($1::uuid, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7)`,
+      [expedienteUuid(779 + indice)])));
       expect(await contar()).toBe(inicial + 2);
     } finally {
       await Promise.all([a.end(), b.end()]);

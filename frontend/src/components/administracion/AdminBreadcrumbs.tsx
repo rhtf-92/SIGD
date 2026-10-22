@@ -1,5 +1,6 @@
 // Breadcrumbs reactivos del Hub de Administración (ENT-M05-01)
 import { Link, useLocation } from "react-router-dom";
+import { Home, ChevronRight } from "lucide-react";
 
 export const ETIQUETAS_ADMIN: Record<string, string> = {
   administracion: "Panel de Administración",
@@ -42,17 +43,32 @@ export default function AdminBreadcrumbs() {
   return (
     <nav
       aria-label="Migajas de pan de administración"
-      className="mb-4 flex flex-wrap items-center gap-1 text-xs font-medium text-slate-500"
+      className="mb-4 flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-400"
     >
-      {migas.map((miga, indice) => (
-        <span key={miga.ruta} className="flex items-center gap-1">
-          {indice > 0 && <span className="text-slate-300">/</span>}
+      <Link
+        to="/"
+        className="inline-flex items-center gap-1 text-slate-400 hover:text-cyan-300 transition-colors"
+        title="Ir al Portal Institucional"
+      >
+        <Home className="h-3.5 w-3.5" />
+        <span className="sr-only">Inicio</span>
+      </Link>
+
+      {migas.map((miga) => (
+        <span key={miga.ruta} className="flex items-center gap-1.5">
+          <ChevronRight className="h-3 w-3 text-slate-600" aria-hidden="true" />
           {miga.actual ? (
-            <span aria-current="page" className="text-blue-700">
+            <span
+              aria-current="page"
+              className="text-cyan-300 font-semibold drop-shadow-[0_0_6px_rgba(6,182,212,0.4)]"
+            >
               {miga.etiqueta}
             </span>
           ) : (
-            <Link to={miga.ruta} className="hover:text-blue-700 hover:underline">
+            <Link
+              to={miga.ruta}
+              className="hover:text-cyan-300 hover:underline transition-colors"
+            >
               {miga.etiqueta}
             </Link>
           )}

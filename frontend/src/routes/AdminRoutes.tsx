@@ -2,6 +2,7 @@
 // Se anidan bajo el path "/administracion" protegido en AppRouter.tsx
 import { Route } from "react-router-dom";
 
+import AdminLayout from "../layouts/AdminLayout";
 import AdministracionPage from "../pages/administracion/AdministracionPage";
 import AuditoriaPage from "../pages/administracion/AuditoriaPage";
 import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
@@ -13,7 +14,7 @@ import ProtectedRoute from "./ProtectedRoute";
 
 export default function AdminRoutes() {
   return (
-    <>
+    <Route element={<AdminLayout />}>
       <Route index element={<AdministracionPage />} />
       {/* DoD ENT-M05-02: el directorio de personal solo es accesible para
           SUPER_ADMIN y DIRECTOR mediante guarda de ruta activa. */}
@@ -34,6 +35,6 @@ export default function AdminRoutes() {
       <Route path="tablas-maestras" element={<TablasMaestrasPage />} />
       <Route path="calendario-laboral" element={<CalendarioLaboralPage />} />
       <Route path="seguridad" element={<SeguridadPage />} />
-    </>
+    </Route>
   );
 }

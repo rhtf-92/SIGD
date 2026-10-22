@@ -23,6 +23,11 @@ export interface AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
   setToken: (accessToken: string, refreshToken?: string | null) => void;
+  setSession: (
+    accessToken: string,
+    usuario: UsuarioPerfil,
+    refreshToken?: string | null
+  ) => void;
 }
 
 type SetStateFn = (
@@ -142,6 +147,56 @@ function createStore() {
         if (typeof window !== "undefined" && window.localStorage) {
           window.localStorage.setItem("sigd_token", accessToken);
           window.localStorage.setItem("token", accessToken);
+        }
+      } catch {
+        // Ignore storage errors
+      }
+    },
+    setSession: (
+      accessToken: string,
+      usuario: UsuarioPerfil,
+      refreshToken: string | null = null,
+    ) => {
+      set({
+        accessToken,
+        refreshToken,
+        usuario,
+        isAuthenticated: true,
+      });
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          window.localStorage.setItem("sigd_token", accessToken);
+          window.localStorage.setItem("token", accessToken);
+          if (typeof refreshToken === "string") {
+            window.localStorage.setItem("sigd_refresh", refreshToken);
+            window.localStorage.setItem("sigd_refresh_token", refreshToken);
+          } else {
+            window.localStorage.removeItem("sigd_refresh");
+            window.localStorage.removeItem("sigd_refresh_token");
+          }
+          window.localStorage.setItem("sigd_rol", usuario.rol ?? "");
+
+          // Garantiza que la matriz RBAC contenga permisos para el rol que
+          // acaba de iniciar sesión. Si ya existe una matriz personalizada se
+          // conserva y solo se completa el rol faltante, evitando que una
+          // sesión previo bloquee el acceso por permisos obsoletos.
+          const matrizCruda = window.localStorage.getItem("sigd_permisos");
+          let matriz: Record<string, unknown> = {};
+          if (matrizCruda) {
+            try {
+              matriz = JSON.parse(matrizCruda) as Record<string, unknown>;
+            } catch {
+              matriz = {};
+            }
+          }
+          if (!matriz[usuario.rol]) {
+            matriz[usuario.rol] =
+              permisosIniciales[usuario.rol] ?? permisosIniciales.SUPER_ADMIN;
+            window.localStorage.setItem(
+              "sigd_permisos",
+              JSON.stringify(matriz),
+            );
+          }
         }
       } catch {
         // Ignore storage errors

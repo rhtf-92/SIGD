@@ -102,6 +102,32 @@ CREATE TABLE IF NOT EXISTS sigd_auth.cuenta_usuario (
     CONSTRAINT chk_cuenta_usuario_algoritmo CHECK (password_hash LIKE '$argon2id$%')
 );
 
+-- Cuentas demo compatibles con el esquema institucional y su verificador Argon2id.
+INSERT INTO sigd_auth.persona (id_persona, tipo, id_documento)
+VALUES
+    ('00000000-0000-0000-0000-000000000011', 'NATURAL', 'DEMO000001'),
+    ('00000000-0000-0000-0000-000000000012', 'NATURAL', 'DEMO000002'),
+    ('00000000-0000-0000-0000-000000000013', 'NATURAL', 'DEMO000003')
+ON CONFLICT (id_persona) DO NOTHING;
+
+INSERT INTO sigd_auth.persona_natural (
+    id_persona, nombres, apellidos, nombre_completo, correo
+)
+VALUES
+    ('00000000-0000-0000-0000-000000000011', 'Administrador', 'Demo', 'Administrador Demo', 'admin.demo@iestp-suiza.edu.pe'),
+    ('00000000-0000-0000-0000-000000000012', 'Operador', 'Demo', 'Operador Demo', 'mesa.demo@iestp-suiza.edu.pe'),
+    ('00000000-0000-0000-0000-000000000013', 'Ciudadano', 'Demo', 'Ciudadano Demo', 'estudiante.demo@iestp-suiza.edu.pe')
+ON CONFLICT (id_persona) DO NOTHING;
+
+INSERT INTO sigd_auth.cuenta_usuario (
+    id_usuario, id_persona, usuario, correo, password_hash
+)
+VALUES
+    ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'admin.demo', 'admin.demo@iestp-suiza.edu.pe', '$argon2id$v=19$m=65536,t=3,p=4$b5a78d37958896f381d05504850efb9c$02caf44cfdc7fa3cffa26ff44b199532a48c8ed83a552e16fcaf73ec9ee976268a611eee5a8bcac79b8412ff7554fdd2e1c9eeb3bfec5f49efed54219365d7c1'),
+    ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000012', 'mesa.demo', 'mesa.demo@iestp-suiza.edu.pe', '$argon2id$v=19$m=65536,t=3,p=4$551e872a14cf8c3fb0728fb0a5c20ca7$81761a4e022aa3b9b6dd51542015767f7f7d969252b3acb87e5efe5155df08c65c4bd9cd9db2df67c01bb6276bc945edc5bd97ff2410681be1573f1c437f5ceb'),
+    ('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000013', 'estudiante.demo', 'estudiante.demo@iestp-suiza.edu.pe', '$argon2id$v=19$m=65536,t=3,p=4$fadae3b4ef8c4e9fb82d8b9445cd0901$3b9c8a740983284116ec55682390cee16630381ad2702ef105642eb0d3c6e42bc7632b41a1073710aa03286f5af1382461ed32261e81590c68f23d4731a140ce')
+ON CONFLICT (id_usuario) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS sigd_auth.sesion_usuario (
     id_sesion        UUID        NOT NULL DEFAULT gen_random_uuid()
                                  CONSTRAINT pk_sesion_usuario PRIMARY KEY,
@@ -170,6 +196,7 @@ CREATE TABLE IF NOT EXISTS sigd_auth.notificacion_casilla (
     id                    UUID         NOT NULL DEFAULT gen_random_uuid()
                                        CONSTRAINT pk_notificacion_casilla PRIMARY KEY,
     usuario_id            UUID         NULL
+                                       CONSTRAINT notificacion_casilla_usuario_id_fkey
                                        REFERENCES sigd_auth.cuenta_usuario (id_usuario) ON DELETE CASCADE,
     correo_destinatario   VARCHAR(160) NULL,
     cut                   VARCHAR(20)  NULL,
@@ -191,6 +218,30 @@ CREATE TABLE IF NOT EXISTS sigd_auth.notificacion_casilla (
     CONSTRAINT chk_notificacion_casilla_estado
         CHECK (estado IN ('NO_LEIDO', 'LEIDO', 'PENDIENTE', 'NOTIFICADO'))
 );
+
+-- Elimina únicamente notificaciones huérfanas heredadas antes de reinstalar la FK.
+DO $migration$
+BEGIN
+    IF to_regclass('sigd_auth.notificacion_casilla') IS NOT NULL THEN
+        EXECUTE '
+            DELETE FROM sigd_auth.notificacion_casilla AS n
+             WHERE n.usuario_id IS NOT NULL
+               AND NOT EXISTS (
+                   SELECT 1
+                     FROM sigd_auth.cuenta_usuario AS c
+                    WHERE c.id_usuario = n.usuario_id
+               )';
+    END IF;
+END
+$migration$;
+
+ALTER TABLE sigd_auth.notificacion_casilla
+    DROP CONSTRAINT IF EXISTS notificacion_casilla_usuario_id_fkey;
+ALTER TABLE sigd_auth.notificacion_casilla
+    ADD CONSTRAINT notificacion_casilla_usuario_id_fkey
+    FOREIGN KEY (usuario_id)
+    REFERENCES sigd_auth.cuenta_usuario (id_usuario)
+    ON DELETE CASCADE;
 
 CREATE INDEX IF NOT EXISTS idx_notif_casilla_usuario
     ON sigd_auth.notificacion_casilla (usuario_id);
@@ -217,4 +268,3 @@ INSERT INTO sigd_auth.notificacion_casilla (
     'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     'CVD-2026-RD-000142-A4F2'
 ) ON CONFLICT (id) DO NOTHING;
-

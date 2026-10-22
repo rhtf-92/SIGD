@@ -1,6 +1,27 @@
 @layer theme, base, components, utilities;
 @import "../../styles/theme.css";
 
+@property --bandeja-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes bandeja-border-cycle {
+  to { --bandeja-border-angle: 360deg; }
+}
+
+.bandeja-neon-shell {
+  border: 1px solid transparent;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgb(245 158 11 / .08), transparent 28%),
+    radial-gradient(ellipse at 100% 0%, rgb(37 99 235 / .08), transparent 30%),
+    repeating-linear-gradient(135deg, rgb(255 255 255 / .012) 0 1px, transparent 1px 5px),
+    linear-gradient(145deg, rgb(8 20 31 / .97), rgb(5 14 25 / .96)) padding-box,
+    conic-gradient(from var(--bandeja-border-angle), #f59e0b, #22d3ee, #e879f9, #f59e0b) border-box;
+  animation: bandeja-border-cycle 10s linear infinite;
+}
+
 .m03 { color: #0f172a; min-width: 0; overflow-wrap: anywhere; }
 .m03 :is(button, input, select, textarea, a, [tabindex]):focus-visible {
   outline: 3px solid #0059a8; outline-offset: 3px;
@@ -48,5 +69,16 @@
 .m03-timeline-details dd { margin: .2rem 0 0; color: #0f172a; }
 .m03-timeline-details a { color: #0059a8; text-decoration: underline; }
 .m03-timeline-hash { border-top: 1px solid #e2e8f0; padding-top: .75rem; }
+.bandeja-ccd.m03-panel { border-color: rgb(245 158 11 / .28); background: rgb(8 20 31 / .88); color: #e2e8f0; box-shadow: 0 12px 32px rgb(0 0 0 / .28); }
+.bandeja-ccd .m03-heading { color: #fef3c7; }
+.bandeja-ccd .m03-help { color: #cbd5e1; }
+.bandeja-ccd .m03-alert { border-color: rgb(251 113 133 / .38); background: rgb(76 5 25 / .55); color: #fecdd3; }
+.bandeja-ccd .m03-notice { border-color: rgb(245 158 11 / .25); background: rgb(120 53 15 / .2); color: #fde68a; }
+.bandeja-ccd .m03-tree-label { color: #cbd5e1; }
+.bandeja-ccd .m03-tree-label:hover { background: rgb(245 158 11 / .12); color: #fde68a; }
+.bandeja-ccd .m03-tree [aria-selected=true] > .m03-tree-label { color: #fff; background: linear-gradient(110deg, #b45309, #c2410c); box-shadow: 0 0 14px rgb(245 158 11 / .28); }
+.bandeja-ccd .m03-tree [aria-disabled=true] > .m03-tree-label { color: #64748b; }
+.bandeja-ccd :is(button, input, select, textarea, a, [tabindex]):focus-visible { outline-color: #fbbf24; }
+@media (prefers-reduced-motion: reduce) { .bandeja-neon-shell { animation: none; } }
 @media (min-width: 640px) { .m03-timeline-details { grid-template-columns: repeat(2, minmax(0, 1fr)); } .m03-timeline-hash { grid-column: 1 / -1; } }
 @media (max-width: 480px) { .m03-actions > button { width: 100%; } .m03-result { flex-wrap: wrap; } }

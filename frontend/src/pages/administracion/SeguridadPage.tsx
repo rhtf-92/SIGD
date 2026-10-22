@@ -1,6 +1,23 @@
 import { useState } from "react";
+import {
+  Lock,
+  Shield,
+  ShieldAlert,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  UserCheck,
+  Save,
+  KeyRound,
+  X,
+  History,
+} from "lucide-react";
 
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
+import GlassCard from "../../components/administracion/common/GlassCard";
+import KpiCard from "../../components/administracion/common/KpiCard";
+import StatusBadge from "../../components/administracion/common/StatusBadge";
+import { PrimaryButton, SecondaryButton } from "../../components/administracion/common/Buttons";
 import { useSeguridadPolicies } from "../../hooks/useSeguridadPolicies";
 
 export default function SeguridadPage() {
@@ -25,225 +42,344 @@ export default function SeguridadPage() {
   );
   const [justificacion, setJustificacion] = useState("");
 
+  const cuentaSeleccionada = cuentasBloqueadas.find(
+    (c) => c.id === cuentaEnDesbloqueo,
+  );
+
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-full">
       <AdminPageHeader
         title="Seguridad"
-        description="Control de accesos, bloqueos e intentos fallidos de autenticación."
+        description="Políticas de acceso, control de intentos fallidos de autenticación y supervisión forense de cuentas bloqueadas."
+        icon={Lock}
+        badge="Protección y Accesos"
       />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="grid gap-4 md:grid-cols-3">
-          <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Cuentas bloqueadas</p>
-            <p className="mt-2 text-3xl font-bold">{cuentasBloqueadas.length}</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Intentos fallidos visibles</p>
-            <p className="mt-2 text-3xl font-bold">{intentosFallidos}</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Sesión configurada</p>
-            <p className="mt-2 text-3xl font-bold">{minutosSesion} min</p>
-          </article>
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* 3 Top KPIs */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <KpiCard
+            title="Cuentas Bloqueadas"
+            value={cuentasBloqueadas.length}
+            subtitle="Acceso temporalmente revocado"
+            icon={ShieldAlert}
+            badge={{
+              text: cuentasBloqueadas.length > 0 ? "Atención" : "Limpio",
+              variant: cuentasBloqueadas.length > 0 ? "danger" : "positive",
+            }}
+            color="rose"
+          />
+          <KpiCard
+            title="Intentos Fallidos"
+            value={intentosFallidos}
+            subtitle="En el ciclo de monitoreo"
+            icon={AlertTriangle}
+            badge={{ text: "Monitoreo", variant: "warning" }}
+            color="gold"
+          />
+          <KpiCard
+            title="Tiempo de Sesión"
+            value={`${minutosSesion} min`}
+            subtitle="Expiración de tokens JWT"
+            icon={Clock}
+            badge={{ text: "Configurado", variant: "neutral" }}
+            color="cyan"
+          />
         </div>
 
+        {/* Feedback Message */}
         {mensaje && (
-          <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {mensaje}
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-950/40 px-4 py-3 text-sm font-medium text-emerald-300 backdrop-blur-md shadow-lg shadow-emerald-950/40"
+          >
+            <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
+            <span>{mensaje}</span>
           </div>
         )}
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold">Políticas de acceso</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Parámetros de demostración para su futura integración con
-              autenticación JWT.
-            </p>
-
-            <div className="mt-5 space-y-4">
+        {/* 2-Column Grid */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Left Column: Políticas de Acceso */}
+          <GlassCard glow="cyan">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 mb-5">
               <div>
-                <label className="mb-1.5 block text-sm font-semibold">
-                  Máximo de intentos fallidos
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={maxIntentos}
-                  onChange={(event) => setMaxIntentos(Number(event.target.value))}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                />
+                <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-cyan-400" />
+                  <span>Políticas Globales de Acceso</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Reglas de defensa contra ataques por fuerza bruta y gestión de tokens.
+                </p>
               </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold">
-                  Duración del bloqueo (minutos)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={minutosBloqueo}
-                  onChange={(event) =>
-                    setMinutosBloqueo(Number(event.target.value))
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold">
-                  Tiempo de sesión (minutos)
-                </label>
-                <input
-                  type="number"
-                  min={5}
-                  value={minutosSesion}
-                  onChange={(event) =>
-                    setMinutosSesion(Number(event.target.value))
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={guardarPoliticas}
-                className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
-              >
-                Guardar políticas
-              </button>
             </div>
-          </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold">Cuentas bloqueadas</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              El desbloqueo exige justificación forense obligatoria.
-            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold tracking-wider uppercase text-slate-400">
+                  Máximo de intentos fallidos permitidos
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={1}
+                    value={maxIntentos}
+                    onChange={(event) => setMaxIntentos(Number(event.target.value))}
+                    className="w-full rounded-xl border border-slate-700/80 bg-slate-950/60 px-3.5 py-2.5 font-mono text-sm text-slate-100 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                  />
+                  <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                    intentos
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Tras este límite, la cuenta queda bloqueada automáticamente.
+                </p>
+              </div>
 
-            <div className="mt-5 space-y-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold tracking-wider uppercase text-slate-400">
+                  Duración de suspensión (minutos)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={1}
+                    value={minutosBloqueo}
+                    onChange={(event) =>
+                      setMinutosBloqueo(Number(event.target.value))
+                    }
+                    className="w-full rounded-xl border border-slate-700/80 bg-slate-950/60 px-3.5 py-2.5 font-mono text-sm text-slate-100 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                  />
+                  <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                    minutos
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold tracking-wider uppercase text-slate-400">
+                  Tiempo de validez de sesión (minutos)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={5}
+                    value={minutosSesion}
+                    onChange={(event) =>
+                      setMinutosSesion(Number(event.target.value))
+                    }
+                    className="w-full rounded-xl border border-slate-700/80 bg-slate-950/60 px-3.5 py-2.5 font-mono text-sm text-slate-100 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                  />
+                  <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                    minutos
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <PrimaryButton
+                  onClick={guardarPoliticas}
+                  icon={Save}
+                  size="md"
+                >
+                  Guardar políticas
+                </PrimaryButton>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* Right Column: Cuentas Bloqueadas */}
+          <GlassCard glow="rose">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 mb-5">
+              <div>
+                <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-rose-400" />
+                  <span>Cuentas con Bloqueo Activo</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  El desbloqueo exige justificación forense obligatoria.
+                </p>
+              </div>
+              <span className="font-mono text-xs text-rose-400">
+                {cuentasBloqueadas.length} bloqueos
+              </span>
+            </div>
+
+            <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
               {cuentasBloqueadas.length === 0 ? (
-                <div className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700">
-                  No hay cuentas bloqueadas en la vista actual.
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-5 text-center">
+                  <CheckCircle className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-emerald-300">
+                    Sin cuentas bloqueadas
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Todas las cuentas institucionales se encuentran en estado normal.
+                  </p>
                 </div>
               ) : (
                 cuentasBloqueadas.map((cuenta) => (
                   <div
                     key={cuenta.id}
-                    className="rounded-lg border border-slate-200 p-4"
+                    className="rounded-xl border border-rose-500/30 bg-slate-900/60 p-4 transition hover:bg-slate-850"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <p className="font-semibold">{cuenta.usuario}</p>
-                        <p className="text-xs text-slate-500">{cuenta.correo}</p>
-                        <p className="mt-2 text-sm text-slate-600">
-                          {cuenta.motivo}
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]" />
+                          <p className="font-bold text-sm text-white">
+                            {cuenta.usuario}
+                          </p>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {cuenta.correo}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {cuenta.fecha}
+                        <p className="mt-2 text-xs font-medium text-rose-300 bg-rose-950/40 border border-rose-500/20 px-2.5 py-1 rounded-lg">
+                          Motivo: {cuenta.motivo}
+                        </p>
+                        <p className="mt-1.5 font-mono text-[11px] text-slate-500">
+                          Bloqueado el: {cuenta.fecha}
                         </p>
                       </div>
-                      <button
-                        type="button"
+
+                      <PrimaryButton
+                        size="sm"
                         onClick={() => {
                           setMensaje("");
                           setJustificacion("");
                           setCuentaEnDesbloqueo(cuenta.id);
                         }}
-                        className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                        className="self-start text-xs bg-gradient-to-r from-blue-600 to-cyan-600"
                       >
                         Desbloquear
-                      </button>
+                      </PrimaryButton>
                     </div>
                   </div>
                 ))
               )}
             </div>
-          </section>
+          </GlassCard>
         </div>
 
-        <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
-            <h2 className="font-bold">Últimos intentos de acceso</h2>
+        {/* Últimos Intentos de Acceso Table */}
+        <div className="overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/60 backdrop-blur-xl shadow-xl">
+          <div className="border-b border-slate-800/80 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-cyan-400" />
+              <h3 className="font-bold text-white text-base tracking-tight">
+                Bitácora de Últimos Intentos de Autenticación
+              </h3>
+            </div>
+            <span className="font-mono text-xs text-slate-400">
+              {intentosIniciales.length} eventos registrados
+            </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] text-left">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <table className="w-full min-w-[700px] text-left">
+              <thead className="border-b border-slate-800/80 bg-slate-950/60 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 <tr>
-                  <th className="px-6 py-3">Fecha</th>
-                  <th className="px-6 py-3">Usuario</th>
-                  <th className="px-6 py-3">IP</th>
-                  <th className="px-6 py-3">Resultado</th>
+                  <th className="px-6 py-3.5">Fecha y Hora</th>
+                  <th className="px-6 py-3.5">Identificador / Usuario</th>
+                  <th className="px-6 py-3.5">IP de Conexión</th>
+                  <th className="px-6 py-3.5 text-right">Resultado</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-800/60">
                 {intentosIniciales.map((intento) => (
-                  <tr key={intento.id}>
-                    <td className="px-6 py-4 text-sm">{intento.fecha}</td>
-                    <td className="px-6 py-4 text-sm">{intento.usuario}</td>
-                    <td className="px-6 py-4 font-mono text-xs">
+                  <tr
+                    key={intento.id}
+                    className="hover:bg-slate-800/40 transition-colors"
+                  >
+                    <td className="px-6 py-3.5 font-mono text-xs text-slate-300">
+                      {intento.fecha}
+                    </td>
+                    <td className="px-6 py-3.5 text-sm font-semibold text-white">
+                      {intento.usuario}
+                    </td>
+                    <td className="px-6 py-3.5 font-mono text-xs text-slate-400">
                       {intento.ip}
                     </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          intento.resultado === "Correcto"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {intento.resultado}
-                      </span>
+                    <td className="px-6 py-3.5 text-right">
+                      <StatusBadge status={intento.resultado} size="sm" />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </section>
+        </div>
       </section>
 
+      {/* Modal de Desbloqueo Supervisado */}
       {cuentaEnDesbloqueo !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-xl font-bold">Desbloqueo supervisado</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Registra la justificación forense obligatoria de esta acción.
-            </p>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-cyan-500/30 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-2xl text-slate-100">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
+                  <UserCheck className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white tracking-tight">
+                    Desbloqueo Supervisado
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Cuenta: {cuentaSeleccionada?.usuario} ({cuentaSeleccionada?.correo})
+                  </p>
+                </div>
+              </div>
 
-            <textarea
-              value={justificacion}
-              onChange={(event) => setJustificacion(event.target.value)}
-              placeholder="Motivo del desbloqueo (será registrado en auditoría WORM)"
-              rows={4}
-              className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600"
-            />
-
-            <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setCuentaEnDesbloqueo(null)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
+                className="rounded-xl border border-slate-800 bg-slate-800/60 p-2 text-slate-400 hover:text-white transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 p-3 text-xs text-amber-300 mb-4 flex items-start gap-2.5">
+              <Shield className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+              <span>
+                Esta acción restablece el acceso y queda asentada en la bitácora inmutable de auditoría forense (WORM).
+              </span>
+            </div>
+
+            <label className="mb-1.5 block text-xs font-semibold tracking-wider uppercase text-slate-400">
+              Justificación forense obligatoria *
+            </label>
+            <textarea
+              value={justificacion}
+              onChange={(event) => setJustificacion(event.target.value)}
+              placeholder="Indique el motivo o ticket de solicitud del desbloqueo (ej. Solicitud presencial verificada con DNI)..."
+              rows={4}
+              className="w-full rounded-xl border border-slate-700/80 bg-slate-950/60 p-3 text-xs text-slate-100 placeholder-slate-500 focus:border-cyan-400 focus:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+            />
+
+            <div className="mt-5 flex justify-end gap-3 border-t border-slate-800 pt-4">
+              <SecondaryButton
+                onClick={() => setCuentaEnDesbloqueo(null)}
               >
                 Cancelar
-              </button>
-              <button
-                type="button"
+              </SecondaryButton>
+              <PrimaryButton
                 disabled={!justificacion.trim()}
                 onClick={() => {
                   desbloquearCuenta(cuentaEnDesbloqueo, justificacion);
                   setCuentaEnDesbloqueo(null);
                 }}
-                className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Confirmar desbloqueo
-              </button>
+              </PrimaryButton>
             </div>
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
