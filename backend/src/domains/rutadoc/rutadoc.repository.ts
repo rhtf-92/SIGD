@@ -3,7 +3,7 @@ import type { EstadoRutaDoc } from './rutadoc.fsm.js';
 import type { ContadoresRutaDoc, ExpedienteDetalle, ExpedienteResumen, FiltrosRutaDoc, PosicionCursor, UltimoMovimiento } from './rutadoc.types.js';
 
 interface FilaBandeja {
-  expediente_id: string;
+  id_expediente: string;
   cut: string;
   asunto: string;
   fecha_radicacion: Date;
@@ -34,8 +34,10 @@ export interface RepositorioRutaDoc {
 }
 
 /**
- * TramiCore identifica cada expediente con su PK UUID y relaciona el trámite
- * mediante sigd_tra.tramite.expediente_id.
+ * Contrato de lectura externo: sigd_tra.expediente y tramite del DDL canónico
+ * (expediente_id UUID). fecha_radicacion es la columna real. El área sólo está
+ * disponible si el escritor del último movimiento aporta datos.areaId.
+ * Solicitante legible y SLA no están disponibles en los contratos actuales.
  */
 const BASE = `
   FROM sigd_tra.expediente e
@@ -45,13 +47,13 @@ const BASE = `
 
 const FILTROS = `
   WHERE ($1::text IS NULL OR position(lower($1::text) in lower(e.codigo_expediente || ' ' || t.asunto)) > 0)
-    AND ($2::text IS NULL OR ultimo.area_actual_id = $2::text)
+    AND ($2::uuid IS NULL OR ultimo.area_actual_id = $2::uuid)
     AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
     AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
 
 export const SQL_LISTAR_RUTADOC = `
-  SELECT e.expediente_id::text, e.codigo_expediente AS cut, t.asunto,
-         e.fecha_radicacion,
+  SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut, t.asunto,
+         e.fecha_radicacion AS fecha_radicacion,
          COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
          ultimo.area_actual_id
   ${BASE} ${FILTROS}
@@ -81,7 +83,7 @@ export const SQL_CONTADORES_SIN_TERMINO_RUTADOC = `
   FROM sigd_tra.expediente e
   LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
   WHERE $1::text IS NULL
-    AND ($2::text IS NULL OR ultimo.area_actual_id = $2::text)
+    AND ($2::uuid IS NULL OR ultimo.area_actual_id = $2::uuid)
     AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
     AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
 
@@ -96,7 +98,7 @@ export const SQL_CONTADORES_LOCALES_RUTADOC = `
 export const SQL_BANDEJA_LOCAL_RUTADOC = `
   WITH elementos AS MATERIALIZED (${SQL_LISTAR_RUTADOC})
   SELECT COALESCE((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.fecha_radicacion DESC,
-                        p.expediente_id::uuid DESC) FROM elementos p), '[]'::jsonb) AS elementos,
+                        p.id_expediente DESC) FROM elementos p), '[]'::jsonb) AS elementos,
          CASE WHEN EXISTS (
            SELECT 1 FROM pg_catalog.pg_trigger
             WHERE tgrelid = to_regclass('sigd_tra.expediente')
@@ -119,7 +121,7 @@ export const SQL_BANDEJA_LOCAL_RUTADOC = `
 
 function mapearResumen(fila: FilaBandeja): ExpedienteResumen {
   return {
-    idExpediente: fila.expediente_id,
+    idExpediente: fila.id_expediente,
     cut: fila.cut,
     asunto: fila.asunto,
     fechaRadicacion: new Date(fila.fecha_radicacion).toISOString(),
@@ -166,8 +168,8 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
 
   async obtener(idExpediente: string): Promise<ExpedienteDetalle | null> {
     const fila = await this.pool.query<FilaDetalle>(`
-      SELECT e.expediente_id::text, e.codigo_expediente AS cut, t.asunto,
-             e.fecha_radicacion,
+      SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut, t.asunto,
+             e.fecha_radicacion AS fecha_radicacion,
              COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
              ultimo.area_actual_id,
              e.solicitante_id::text AS solicitante_id,
@@ -184,7 +186,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
     if (existeFoliacion.rows[0].existe) {
       const folios = await this.pool.query<{ cantidad: number; total: number }>(`
         SELECT count(DISTINCT id_documento)::integer AS cantidad,
-               COALESCE(sum(total_folios), 0)::integer AS total
+               COALESCE(sum(folio_fin - folio_inicio + 1), 0)::integer AS total
           FROM sigd_tra.expediente_documento_folio
          WHERE expediente_id = $1::uuid`, [idExpediente]);
       resumenDocumentos = {

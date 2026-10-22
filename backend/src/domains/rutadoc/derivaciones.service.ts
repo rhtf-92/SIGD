@@ -47,10 +47,10 @@ async function obtenerEstado(
   };
 }
 
-function obtenerActorId(): string {
-  const actorId = getRequestContext()?.usuario_id;
+function obtenerActorId(contexto = getRequestContext()): string {
+  const actorId = contexto?.usuario_id;
   if (typeof actorId !== 'string' || !esIdMovimiento(actorId)) {
-    throw new UnauthorizedError({ detail: 'El operador no tiene un identificador BIGINT válido.' });
+    throw new UnauthorizedError({ detail: 'El operador no tiene un identificador UUID válido.' });
   }
   return actorId;
 }
@@ -64,7 +64,7 @@ async function registrarMovimiento(entrada: RegistroMovimiento): Promise<{
     INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo,
        usuario_operador_id, datos)
-    VALUES ($1::uuid, $2, $3, $4, $5::bigint, $6::jsonb)
+    VALUES ($1::uuid, $2, $3, $4, $5::uuid, $6::jsonb)
     RETURNING id_movimiento::text
   `, [
     entrada.expedienteId,
@@ -94,32 +94,39 @@ export async function derivarExpediente(
     throw new NotFoundError({ detail: 'Una o más áreas de destino no existen o no están vigentes.' });
   }
 
-  const destinoPrincipal = datos.destinos[0].area_destino_id;
-  const movimiento = await registrarMovimiento({
-    cliente,
-    expedienteId,
-    estado: expediente.estado,
-    evento: 'DERIVACION',
-    actorId,
-    datos: {
-      areaId: destinoPrincipal,
-      proveido: datos.proveido,
-      destinos: datos.destinos,
-    },
-  });
-  await insertarEvento(cliente, {
-    agregado: 'Expediente',
-    tipo_evento: 'ExpedienteDerivado',
-    payload: {
-      identidad: { expediente_id: expedienteId, movimiento_id: movimiento.idMovimiento },
-      contexto: {
-        usuario_actor_id: actorId,
-        area_origen_id: expediente.areaActualId,
-        area_destino_id: destinoPrincipal,
+  for (const destino of datos.destinos) {
+    const movimiento = await registrarMovimiento({
+      cliente,
+      expedienteId,
+      estado: expediente.estado,
+      evento: 'DERIVACION',
+      actorId,
+      datos: {
+        areaId: destino.area_destino_id,
+        areaOrigenId: expediente.areaActualId,
+        proveido: datos.proveido,
+        esCopia: destino.es_copia,
+        usuarioAsignadoId: destino.usuario_asignado_id ?? null,
       },
-      datos_especificos: { motivo: datos.proveido, destinos: datos.destinos },
-    },
-  });
+    });
+    await insertarEvento(cliente, {
+      agregado: 'Expediente',
+      tipo_evento: 'ExpedienteDerivado',
+      payload: {
+        identidad: { expediente_id: expedienteId, movimiento_id: movimiento.idMovimiento },
+        contexto: {
+          usuario_actor_id: actorId,
+          area_origen_id: expediente.areaActualId,
+          area_destino_id: destino.area_destino_id,
+        },
+        datos_especificos: {
+          motivo: datos.proveido,
+          es_copia: destino.es_copia,
+          usuario_asignado_id: destino.usuario_asignado_id,
+        },
+      },
+    });
+  }
 }
 
 export async function atenderExpediente(
@@ -128,7 +135,7 @@ export async function atenderExpediente(
   datos: AtenderExpedienteDTO,
 ): Promise<void> {
   const contexto = getRequestContext();
-  const actorId = obtenerActorId();
+  const actorId = obtenerActorId(contexto);
   const expediente = await obtenerEstado(cliente, expedienteId);
   if (contexto?.unidad_organica_id !== expediente.areaActualId) {
     throw new ForbiddenError({ detail: 'El usuario no pertenece al área donde se encuentra el expediente.' });

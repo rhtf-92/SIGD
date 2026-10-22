@@ -455,9 +455,14 @@ export class ServicioMgdAnalytics {
    * disponible. Los KPIs se recalculan desde los contadores crudos, nunca se suman
    * los porcentajes por área.
    */
-  async resumen(periodo: string | null): Promise<ResumenKpisMgd> {
-    return this.deCache(CACHE_RESUMEN(periodo), async () => {
-      const filas = await this.repositorio.obtenerContadores(periodo);
+  async resumen(
+    periodo: string | null,
+    periodoDesde: string | null = null,
+    periodoHasta: string | null = null,
+  ): Promise<ResumenKpisMgd> {
+    const periodoConsulta = periodo ?? (periodoDesde && periodoHasta ? `${periodoDesde}:${periodoHasta}` : null);
+    return this.deCache(CACHE_RESUMEN(periodoConsulta), async () => {
+      const filas = await this.repositorio.obtenerContadores(periodo, periodoDesde, periodoHasta);
       const contadores = sumarContadores(...filas.map((fila) => fila.contadores));
       const base = calcularIndicadoresMgd(contadores);
       const actualizaciones = filas
@@ -465,7 +470,7 @@ export class ServicioMgdAnalytics {
         .filter((valor): valor is string => typeof valor === 'string');
       return {
         ...base,
-        periodo,
+        periodo: periodo ?? (periodoDesde && periodoHasta ? `${periodoDesde} — ${periodoHasta}` : null),
         // La marca de refresco más reciente es la que gobierna la vista.
         actualizadoEn: actualizaciones.length > 0
           ? actualizaciones.reduce((max, valor) => (valor > max ? valor : max))
@@ -514,11 +519,14 @@ export class ServicioMgdAnalytics {
     periodo: string | null,
     diasLimite: number,
     nombres: ReadonlyMap<string, { nombre: string; sigla: string | null }>,
+    periodoDesde: string | null = null,
+    periodoHasta: string | null = null,
   ): Promise<CuelloBotellaArea[]> {
     const limiteAplicado = alinearUmboloATramo(diasLimite);
-    return this.deCache(CACHE_CUELLOS(periodo, diasLimite), async () => {
+    const periodoConsulta = periodo ?? (periodoDesde && periodoHasta ? `${periodoDesde}:${periodoHasta}` : null);
+    return this.deCache(CACHE_CUELLOS(periodoConsulta, diasLimite), async () => {
       const porArea = new Map<string, TramoAcumulado>();
-      for (const tramo of await this.repositorio.obtenerRetencion(periodo)) {
+      for (const tramo of await this.repositorio.obtenerRetencion(periodo, periodoDesde, periodoHasta)) {
         const id = tramo.unidadOrganicaId;
         const acumulado = porArea.get(id) ?? {
           nExpedientes: 0,

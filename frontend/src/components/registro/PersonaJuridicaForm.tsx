@@ -83,7 +83,7 @@ export default function PersonaJuridicaForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="space-y-6"
+      className="registration-form space-y-6"
       noValidate
     >
       {/* RUC y Razón Social */}
@@ -328,6 +328,7 @@ export default function PersonaJuridicaForm({
         initialProvinciaId={domicilioValue.provinciaCodigo}
         initialDistritoId={domicilioValue.distritoCodigo}
         onChange={handleUbigeoChange}
+        className="registration-location"
       />
 
       {/* Dirección Exacta */}

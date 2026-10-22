@@ -20,7 +20,7 @@ export class FolioCompensationPostgres implements FolioCompensationPort {
       (id_solicitud, expediente_id, movimiento_original_id, movimiento_compensatorio_id,
        rango_afectado, motivo, actor_id, correlation_id, clave_idempotencia, estado)
       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::jsonb, $6,
-              $7::bigint, $8, $9::uuid, 'PENDIENTE')`,
+              $7::uuid, $8, $9::uuid, 'PENDIENTE')`,
     [referencia, expedienteId, movimientoOriginal.idMovimiento, movimientoCompensatorioId,
       rangoAfectado ? JSON.stringify(rangoAfectado) : null, motivo, actor.id,
       correlationId, claveIdempotencia]);

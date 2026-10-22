@@ -1,7 +1,6 @@
 services:
-  # 1. Base de Datos Relacional
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: sigd_postgres
     environment:
       POSTGRES_USER: postgres
@@ -10,14 +9,13 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d sigd_prueba"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # 2. Almacenamiento S3 Alternativo (Libre de restricciones)
   minio:
     image: cgr.dev/chainguard/minio:latest
     container_name: sigd_minio
@@ -30,7 +28,6 @@ services:
     volumes:
       - miniodata:/data
 
-  # 3. Almacén Clave-Valor en Memoria para Cache y Sesiones
   redis:
     image: redis:7-alpine
     container_name: sigd_redis
@@ -44,9 +41,8 @@ services:
       timeout: 3s
       retries: 5
 
-  # 4. API Backend
   backend:
-    image: node:20
+    image: node:24-alpine
     container_name: sigd_backend
     working_dir: /app
     volumes:
@@ -65,13 +61,15 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - postgres
-      - minio
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
 
-  # 5. Frontend Single Page Application (React + Vite)
   frontend:
-    image: node:20
+    image: node:24-alpine
     container_name: sigd_frontend
     working_dir: /app
     volumes:

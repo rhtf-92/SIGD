@@ -140,7 +140,7 @@ export class RepositorioReversionRutaDoc {
          correlation_id, clave_idempotencia, movimiento_objetivo_fecha_hora,
          movimiento_objetivo_id, movimiento_objetivo_secuencia, huella_comando,
          motivo, compensacion_folios, datos)
-      VALUES ($1::uuid, $2, $3, $4::bigint, $5, $6, $7, $8::uuid,
+      VALUES ($1::uuid, $2, $3, $4::uuid, $5, $6, $7, $8::uuid,
               $9::bigint, $10, $11, $12::jsonb, $13::jsonb)
       RETURNING id_movimiento::text, expediente_id::text, secuencia::text,
                 estado_anterior, estado_nuevo, fecha_hora, motivo, correlation_id,

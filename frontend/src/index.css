@@ -1,1 +1,211 @@
 @import "tailwindcss";
+
+@keyframes sigd-dashboard-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sigd-dashboard-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dashboard-enter {
+  animation: sigd-dashboard-enter 480ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.dashboard-enter-delay-1 {
+  animation-delay: 90ms;
+}
+
+.dashboard-enter-delay-2 {
+  animation-delay: 180ms;
+}
+
+.dashboard-enter-delay-3 {
+  animation-delay: 270ms;
+}
+
+.dashboard-orbit {
+  animation: sigd-dashboard-orbit 36s linear infinite;
+}
+
+.dashboard-stagger > * {
+  animation: sigd-dashboard-enter 480ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.dashboard-stagger > :nth-child(2) {
+  animation-delay: 70ms;
+}
+
+.dashboard-stagger > :nth-child(3) {
+  animation-delay: 140ms;
+}
+
+.dashboard-stagger > :nth-child(4) {
+  animation-delay: 210ms;
+}
+
+@keyframes registration-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes registration-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.registration-card {
+  animation: registration-card-enter 560ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.registration-panel-enter:not([hidden]) {
+  animation: registration-panel-enter 360ms ease-out both;
+}
+
+.registration-form > * {
+  animation: registration-panel-enter 420ms ease-out both;
+}
+
+.registration-form > :nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.registration-form > :nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.registration-form > :nth-child(4) {
+  animation-delay: 135ms;
+}
+
+.registration-form > :nth-child(5) {
+  animation-delay: 180ms;
+}
+
+.registration-form label:not(.flex) {
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.registration-form input:not([type="checkbox"]),
+.registration-form select {
+  min-height: 44px;
+  border-color: #c4b5fd;
+  border-radius: 0.65rem;
+  background-color: #f5f3ff;
+  color: #1e40af;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.registration-form input:not([type="checkbox"])::placeholder {
+  color: #6481b8;
+  opacity: 1;
+}
+
+.registration-form label.flex,
+.registration-form label.flex span {
+  color: #1e3a8a;
+}
+
+.registration-form input:not([type="checkbox"]):hover,
+.registration-form select:not(:disabled):hover {
+  border-color: #a78bfa;
+  background-color: #ede9fe;
+}
+
+.registration-form input:not([type="checkbox"]):focus,
+.registration-form select:focus {
+  border-color: #7c3aed;
+  background-color: #faf5ff;
+  box-shadow: 0 0 0 3px rgb(124 58 237 / 18%);
+}
+
+.registration-form input[type="checkbox"] {
+  accent-color: #0284c7;
+}
+
+.registration-form input.border-red-500 {
+  border-color: #ef4444;
+  background-color: #fff7f7;
+}
+
+.registration-form input.border-red-500:focus {
+  box-shadow: 0 0 0 3px rgb(239 68 68 / 15%);
+}
+
+.registration-form select:disabled {
+  background-color: #ede9fe;
+  border-color: #c4b5fd;
+  color: #475569;
+}
+
+.registration-location {
+  border-color: #c4b5fd;
+  background: linear-gradient(135deg, #f5f3ff 0%, #faf5ff 58%, #f3e8ff 100%);
+  box-shadow: 0 8px 24px rgb(109 40 217 / 8%);
+}
+
+.registration-location h3 {
+  color: #1e3a8a;
+}
+
+.registration-location h3 svg {
+  color: #2563eb;
+}
+
+.registration-location > div:first-child > span {
+  border: 1px solid #c4b5fd;
+  background-color: #ede9fe;
+  color: #1d4ed8;
+}
+
+.registration-form > div.space-y-4 {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, #f8fafc, #eff6ff);
+  padding: 1rem;
+}
+
+.registration-form button[type="submit"]:not(:disabled) {
+  background-image: linear-gradient(100deg, #1d4ed8, #0284c7 58%, #0891b2);
+  box-shadow: 0 8px 18px rgb(2 132 199 / 20%);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.registration-form button[type="submit"]:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgb(2 132 199 / 28%);
+  filter: saturate(1.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-enter,
+  .dashboard-orbit,
+  .dashboard-stagger > *,
+  .registration-card,
+  .registration-panel-enter,
+  .registration-form > * {
+    animation: none;
+  }
+}

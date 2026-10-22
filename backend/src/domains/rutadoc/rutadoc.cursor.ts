@@ -2,14 +2,19 @@ import { createHash } from 'node:crypto';
 import { ValidationError } from '../../shared/domain/errors/validation-error.js';
 import type { FiltrosRutaDoc, PosicionCursor } from './rutadoc.types.js';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_BIGINT = 9223372036854775807n;
 
 export function esIdExpediente(valor: unknown): valor is string {
-  return typeof valor === 'string' &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(valor);
+  return typeof valor === 'string' && UUID.test(valor);
 }
 
 export function esIdMovimiento(valor: unknown): valor is string {
+  return typeof valor === 'string' && UUID.test(valor);
+}
+
+/** Identificadores numéricos del modelo legado conservados como BIGINT (secuencia, etc.). */
+export function esNumeroIdentificador(valor: unknown): valor is string {
   return typeof valor === 'string' && /^[1-9]\d{0,18}$/.test(valor) && BigInt(valor) <= MAX_BIGINT;
 }
 
@@ -30,9 +35,9 @@ function cursorInvalido(): ValidationError {
 /** Base64url de JSON v1. No contiene credenciales ni concede visibilidad. */
 export function codificarCursor(posicion: PosicionCursor, filtros: FiltrosRutaDoc): string {
   return Buffer.from(JSON.stringify({
-    v: 2,
+    v: 1,
     fecha_radicacion: posicion.fechaRadicacion,
-    expediente_id: posicion.idExpediente,
+    id_expediente: posicion.idExpediente,
     filtros: huellaFiltros(filtros),
   })).toString('base64url');
 }
@@ -46,13 +51,13 @@ export function decodificarCursor(valor: string, filtros: FiltrosRutaDoc): Posic
     if (!dato || typeof dato !== 'object' || Array.isArray(dato)) throw cursorInvalido();
     const fila = dato as Record<string, unknown>;
     const fecha = fila.fecha_radicacion;
-    if (fila.v !== 2 || typeof fecha !== 'string' ||
+    if (fila.v !== 1 || typeof fecha !== 'string' ||
         !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(fecha) ||
         !Number.isFinite(Date.parse(fecha)) || new Date(fecha).toISOString() !== fecha ||
-        !esIdExpediente(fila.expediente_id) || fila.filtros !== huellaFiltros(filtros)) {
+        !esIdExpediente(fila.id_expediente) || fila.filtros !== huellaFiltros(filtros)) {
       throw cursorInvalido();
     }
-    return { fechaRadicacion: fecha, idExpediente: fila.expediente_id };
+    return { fechaRadicacion: fecha, idExpediente: fila.id_expediente };
   } catch {
     throw cursorInvalido();
   }

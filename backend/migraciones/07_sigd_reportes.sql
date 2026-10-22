@@ -32,10 +32,10 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS sigd_tra.mv_kpis_mgd_mensual AS
 WITH cierre AS (
     SELECT
         m.expediente_id,
-        m.fecha_hora,
+        m.fecha_hora AS fecha_movimiento,
         ROW_NUMBER() OVER (PARTITION BY m.expediente_id ORDER BY m.fecha_hora) AS orden
     FROM sigd_rut.movimiento_tramite m
-    WHERE m.estado_nuevo IN ('RESUELTO', 'ARCHIVADO')
+    WHERE m.estado_nuevo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
 ),
 base AS (
     SELECT
@@ -46,7 +46,7 @@ base AS (
         a.estado_nuevo AS estado_codigo,
         a.area_actual_id,
         ar.fecha_ingreso,
-        c.fecha_hora AS fecha_cierre
+        c.fecha_movimiento AS fecha_cierre
     FROM sigd_tra.expediente e
     LEFT JOIN sigd_rut.estado_actual_expediente a
            ON a.expediente_id = e.expediente_id
@@ -60,16 +60,18 @@ base AS (
 SELECT
     periodo,
     COUNT(*)::int                                                          AS radicados,
-    COUNT(*) FILTER (WHERE estado_codigo = 'RESUELTO')::int                 AS atendidos,
+    COUNT(*) FILTER (
+        WHERE estado_codigo IN ('RESUELTO', 'NOTIFICADO')
+    )::int                                                                  AS atendidos,
     COUNT(*) FILTER (WHERE estado_codigo = 'ARCHIVADO')::int                 AS archivados,
     COUNT(*) FILTER (WHERE estado_codigo = 'OBSERVADO')::int                 AS observados,
     COUNT(*) FILTER (
         WHERE estado_codigo IS NULL
-           OR estado_codigo NOT IN ('RESUELTO', 'ARCHIVADO', 'OBSERVADO')
+           OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO', 'OBSERVADO')
     )::int                                                                  AS en_tramite,
     COUNT(*) FILTER (
         WHERE estado_codigo IS NULL
-           OR estado_codigo NOT IN ('RESUELTO', 'ARCHIVADO')
+           OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
     )::int                                                                  AS universo_teo,
     COUNT(fecha_cierre)::int                                                AS resueltos,
     COUNT(*) FILTER (WHERE fecha_cierre IS NOT NULL AND fecha_limite IS NOT NULL
@@ -79,7 +81,7 @@ SELECT
     ), 0)::float8                                                           AS horas_calendario_totales,
     ROUND(
         CASE WHEN COUNT(*) = 0 THEN NULL
-             ELSE (COUNT(*) FILTER (WHERE estado_codigo IN ('RESUELTO', 'ARCHIVADO'))::numeric
+             ELSE (COUNT(*) FILTER (WHERE estado_codigo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO'))::numeric
                    * 100 / COUNT(*))
         END, 2)::float8                                                    AS vtep,
     ROUND(
@@ -97,13 +99,13 @@ SELECT
         CASE
             WHEN COUNT(*) FILTER (
                      WHERE estado_codigo IS NULL
-                        OR estado_codigo NOT IN ('RESUELTO', 'ARCHIVADO', 'OBSERVADO')
+                        OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO', 'OBSERVADO')
                  ) = 0 THEN NULL
             ELSE (COUNT(*) FILTER (WHERE estado_codigo = 'OBSERVADO')::numeric
                   * 100
                   / COUNT(*) FILTER (
                       WHERE estado_codigo IS NULL
-                         OR estado_codigo NOT IN ('RESUELTO', 'ARCHIVADO', 'OBSERVADO')
+                         OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO', 'OBSERVADO')
                     ))
         END, 2)::float8                                                    AS teo
 FROM base
@@ -124,22 +126,28 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS sigd_tra.mv_tiempos_retencion_area AS
 SELECT
     COALESCE(ar.area_id, e.area_destino_id)                                   AS area_id,
     COALESCE(ar.nombre, 'Sin área asignada')                                  AS area,
-    COALESCE(a.estado_nuevo, e.estado)                                         AS estado,
+    e.estado                                                                     AS estado,
     COUNT(*)::int                                                                AS expedientes,
-    ROUND(AVG(EXTRACT(EPOCH FROM (now() - COALESCE(a.fecha_hora, e.fecha_radicacion))) / 3600)::numeric, 2)::float8
+    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 3600)::numeric, 2)::float8
                                                                                  AS horas_promedio,
-    ROUND(AVG(EXTRACT(EPOCH FROM (now() - COALESCE(a.fecha_hora, e.fecha_radicacion))) / 86400)::numeric, 2)::float8
+    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 86400)::numeric, 2)::float8
                                                                                  AS dias_promedio,
-    ROUND(MAX(EXTRACT(EPOCH FROM (now() - COALESCE(a.fecha_hora, e.fecha_radicacion))) / 86400)::numeric, 2)::float8
+    ROUND(MAX(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 86400)::numeric, 2)::float8
                                                                                  AS dias_maximo,
     COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite < now())::int
-                                                                                 AS vencido
-FROM sigd_tra.expediente e
-LEFT JOIN sigd_rut.estado_actual_expediente a
+                                                                                 AS vencidos,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite < now())::int
+                                                                                 AS semaforo_rojo,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite >= now()
+                       AND e.fecha_limite < now() + interval '2 days')::int      AS semaforo_amarillo,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NULL
+                        OR e.fecha_limite >= now() + interval '2 days')::int     AS semaforo_verde
+FROM sigd_rut.estado_actual_expediente a
+JOIN sigd_tra.expediente e
   ON e.expediente_id = a.expediente_id
 LEFT JOIN sigd_org.area ar
-  ON ar.area_id::text = a.area_actual_id
-WHERE COALESCE(a.estado_nuevo, e.estado) NOT IN ('RESUELTO', 'ARCHIVADO', 'ANULADO')
+  ON ar.area_id = a.area_actual_id
+WHERE a.estado_nuevo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
 GROUP BY 1, 2, 3
 WITH DATA;
 

@@ -151,27 +151,27 @@ base AS (
         SELECT m.fecha_hora AS fecha_cierre
           FROM sigd_rut.movimiento_tramite m
          WHERE m.expediente_id = e.expediente_id
-           AND m.estado_nuevo IN ('RESUELTO', 'ARCHIVADO')
+           AND m.estado_nuevo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
          ORDER BY m.fecha_hora
          LIMIT 1
     ) cierre ON TRUE
     WHERE e.fecha_radicacion >= r.desde
       AND e.fecha_radicacion < (r.hasta + 1)
-      AND ($3::uuid IS NULL OR COALESCE(a.area_actual_id, e.area_destino_id::text) = $3::text)
+      AND ($3::uuid IS NULL OR COALESCE(a.area_actual_id, e.area_destino_id) = $3::uuid)
 )
 SELECT
     COUNT(*)::int AS radicados,
-    COUNT(*) FILTER (WHERE estado_codigo = 'RESUELTO')::int AS atendidos,
+    COUNT(*) FILTER (WHERE estado_codigo IN ('RESUELTO', 'NOTIFICADO'))::int AS atendidos,
     COUNT(*) FILTER (WHERE estado_codigo = 'ARCHIVADO')::int AS archivados,
     COUNT(*) FILTER (WHERE estado_codigo = 'OBSERVADO')::int AS observados,
     COUNT(*) FILTER (
         WHERE estado_codigo IS NULL
-           OR estado_codigo NOT IN ('RESUELTO', 'ARCHIVADO', 'ANULADO')
+           OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
     )::int AS en_tramite,
     COUNT(*) FILTER (
         WHERE fecha_limite IS NOT NULL
           AND fecha_limite < now()
-          AND (estado_codigo IS NULL OR estado_codigo NOT IN ('RESUELTO', 'ARCHIVADO', 'ANULADO'))
+          AND (estado_codigo IS NULL OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO'))
     )::int AS vencidos,
     COUNT(fecha_cierre)::int AS resueltos,
     COUNT(*) FILTER (WHERE fecha_cierre IS NOT NULL AND fecha_limite IS NOT NULL
@@ -255,7 +255,7 @@ WITH serie AS (
         date_trunc($3, e.fecha_radicacion)::date AS periodo,
         COUNT(*)::int AS radicados,
         COUNT(*) FILTER (
-            WHERE a.estado_nuevo IN ('RESUELTO', 'ARCHIVADO')
+            WHERE a.estado_nuevo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
         )::int AS atendidos,
         COUNT(*) FILTER (WHERE a.estado_nuevo = 'OBSERVADO')::int AS observados
     FROM sigd_tra.expediente e
@@ -317,14 +317,17 @@ SELECT
     horas_promedio,
     dias_promedio,
     dias_maximo,
-    vencido
+    vencidos,
+    semaforo_rojo,
+    semaforo_amarillo,
+    semaforo_verde
 FROM sigd_tra.mv_tiempos_retencion_area
 ORDER BY dias_promedio DESC NULLS LAST, expedientes DESC
 LIMIT $1
 `;
 
-function nivelAlerta(diasPromedio: number, vencido: number): 'ALTO' | 'MEDIO' | 'BAJO' {
-  if (vencido > 0 || diasPromedio >= 15) return 'ALTO';
+function nivelAlerta(diasPromedio: number, vencido: number, rojo: number): 'ALTO' | 'MEDIO' | 'BAJO' {
+  if (vencido > 0 || rojo > 0 || diasPromedio >= 15) return 'ALTO';
   if (diasPromedio >= 7) return 'MEDIO';
   return 'BAJO';
 }
@@ -341,7 +344,10 @@ export async function obtenerCuellosBotella(
     horas_promedio: number | null;
     dias_promedio: number | null;
     dias_maximo: number | null;
-    vencido: number;
+    vencidos: number;
+    semaforo_rojo: number;
+    semaforo_amarillo: number;
+    semaforo_verde: number;
   }>(SQL_CUELLOS, [parametros.limite]);
 
   const total = resultado.rows.reduce((suma, fila) => suma + fila.expedientes, 0);
@@ -358,8 +364,8 @@ export async function obtenerCuellosBotella(
         horasPromedio: fila.horas_promedio ?? 0,
         diasPromedio: dias,
         diasMaximo: fila.dias_maximo ?? 0,
-        vencido: fila.vencido,
-        nivelAlerta: nivelAlerta(dias, fila.vencido),
+        vencido: fila.vencidos,
+        nivelAlerta: nivelAlerta(dias, fila.vencidos, fila.semaforo_rojo),
         proporcion: total === 0 ? 0 : redondear((fila.expedientes / total) * 100, 2),
       };
     }),

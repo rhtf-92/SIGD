@@ -10,11 +10,12 @@ import { SQL_LISTAR_RUTADOC } from '../../../../src/domains/rutadoc/rutadoc.repo
 import type { ActorRutaDoc } from '../../../../src/domains/rutadoc/rutadoc.types.js';
 import { actorProviderDePrueba } from '../../../support/rutadoc-actor-provider.js';
 
+const USUARIO = 'a3401043-807f-41f3-9de8-a042e4b312d4';
+const SOLICITANTE = 'b0000000-0000-4000-8000-000000000080';
 const AREA = 'da7aa251-a027-47f3-8bfd-4cc94df486d1';
-const SOLICITANTE = '86e5b7ea-af4a-4c9c-bcaa-f45f7d1ea8b0';
-const actor: ActorRutaDoc = { id: 'operador', roles: ['MESA_PARTES'], puedeVerExpediente: () => true };
+const actor: ActorRutaDoc = { id: USUARIO, roles: ['MESA_PARTES'], puedeVerExpediente: () => true };
+const uuidExpediente = (id: number): string => `00000000-0000-4000-8000-${String(id).padStart(12, '0')}`;
 type TransicionTupla = readonly [estadoAnterior: string, evento: string, estadoNuevo: string];
-const expedienteUuid = (id: number) => `00000000-0000-4000-8000-${String(id).padStart(12, '0')}`;
 const destinos: ReadonlyArray<TransicionTupla | null> = [
   null,
   ['REGISTRADO', 'RECEPCION', 'RECEPCIONADO'],
@@ -36,45 +37,47 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
     contenedor = await new PostgreSqlContainer('postgres:18-alpine')
       .withDatabase('sigd_rutadoc_consulta').start();
     pool = new Pool({ connectionString: contenedor.getConnectionUri() });
-    // Fixture efímero del contrato documental de TramiCore; no se publica DDL externo.
+    await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
+    // Contrato documental canónico efímero; no se publica DDL externo.
     await pool.query(`
       CREATE SCHEMA sigd_tra;
       CREATE TABLE sigd_tra.expediente (
-        expediente_id UUID PRIMARY KEY, codigo_expediente TEXT NOT NULL UNIQUE,
-        fecha_radicacion TIMESTAMPTZ NOT NULL, area_destino_id UUID, solicitante_id UUID NOT NULL);
+        expediente_id UUID PRIMARY KEY, codigo_expediente TEXT NOT NULL,
+        numero TEXT NOT NULL, tipo_documental_id UUID, solicitante_id UUID,
+        area_destino_id UUID, estado TEXT,
+        fecha_radicacion TIMESTAMPTZ NOT NULL, fecha_limite TIMESTAMPTZ);
       CREATE TABLE sigd_tra.tramite (
-        expediente_id UUID PRIMARY KEY REFERENCES sigd_tra.expediente (expediente_id) ON DELETE RESTRICT,
-        asunto TEXT NOT NULL);
+        expediente_id UUID PRIMARY KEY REFERENCES sigd_tra.expediente (expediente_id),
+        asunto TEXT NOT NULL, estado TEXT);
       CREATE TABLE sigd_tra.expediente_documento_folio (
-        expediente_id UUID NOT NULL REFERENCES sigd_tra.expediente (expediente_id) ON DELETE RESTRICT,
-        id_documento UUID NOT NULL, folio_inicio INT NOT NULL, folio_fin INT NOT NULL);
+        expediente_id UUID NOT NULL REFERENCES sigd_tra.expediente (expediente_id),
+        id_documento BIGINT NOT NULL, folio_inicio INT NOT NULL,
+        folio_fin INT NOT NULL, total_folios INT NOT NULL);
     `);
     await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
     for (let id = 1; id <= 12; id += 1) {
       const fecha = id >= 11 ? '2026-09-24T10:00:00.000Z' :
         `2026-09-${String(id).padStart(2, '0')}T10:00:00.000Z`;
-      const expedienteId = expedienteUuid(id);
       await pool.query(`INSERT INTO sigd_tra.expediente
-        (expediente_id, codigo_expediente, fecha_radicacion, area_destino_id, solicitante_id)
-        VALUES ($1, $2, $3, $4, $5)`,
-      [expedienteId, `EXP-2026-${String(id).padStart(6, '0')}`, fecha,
-        id === 2 ? AREA : null, SOLICITANTE]);
-      await pool.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto)
-        VALUES ($1, $2)`, [expedienteId, id === 2 ? 'Solicitud de beca' : `Asunto ${id}`]);
+        (expediente_id, codigo_expediente, numero, solicitante_id, estado, fecha_radicacion)
+        VALUES ($1, $2, $3, $4, 'RECEPCIONADO', $5)`,
+      [uuidExpediente(id), `EXP-2026-${String(id).padStart(6, '0')}`,
+        String(id).padStart(4, '0'), SOLICITANTE, fecha]);
+      await pool.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto, estado)
+        VALUES ($1, $2, 'EN_TRAMITE')`,
+      [uuidExpediente(id), id === 2 ? 'Solicitud de beca' : `Asunto ${id}`]);
       const transicion = destinos[id - 1];
       if (transicion) {
         await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
           (expediente_id, estado_anterior, evento, estado_nuevo,
            usuario_operador_id, fecha_hora, datos)
-          VALUES ($1, $2, $3, $4, 7, '2026-09-25T10:00:00Z', $5::jsonb)`,
-        [expedienteId, ...transicion, JSON.stringify(id === 2 ? { areaId: AREA } : {})]);
+          VALUES ($1, $2, $3, $4, $5, '2026-09-25T10:00:00Z', $6::jsonb)`,
+        [uuidExpediente(id), ...transicion, USUARIO,
+          JSON.stringify(id === 2 ? { areaId: AREA } : {})]);
       }
     }
-    await pool.query(`INSERT INTO sigd_tra.expediente_documento_folio
-      (expediente_id, id_documento, folio_inicio, folio_fin) VALUES
-      ($1, $2, 1, 3), ($1, $3, 4, 5)`,
-    [expedienteUuid(2), '00000000-0000-4000-8000-000000000501',
-      '00000000-0000-4000-8000-000000000502']);
+    await pool.query(`INSERT INTO sigd_tra.expediente_documento_folio VALUES
+      ($1, 501, 1, 3, 3), ($1, 502, 4, 5, 2)`, [uuidExpediente(2)]);
   });
 
   afterAll(async () => {
@@ -109,76 +112,96 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
       .query({ pestana: 'PENDIENTES' })).body.contadores as Record<string, number>;
     const antes = await contar();
     await pool.query(`INSERT INTO sigd_tra.expediente
-      VALUES ($1, 'EXP-2026-000013', '2026-09-24T09:00:00Z', NULL, $2)`,
-    [expedienteUuid(13), SOLICITANTE]);
-    await pool.query('INSERT INTO sigd_tra.tramite VALUES ($1, $2)',
-      [expedienteUuid(13), 'Alta de prueba']);
+      (expediente_id, codigo_expediente, numero, fecha_radicacion)
+      VALUES ($1, 'EXP-2026-000013', '0013', '2026-09-24T09:00:00Z')`, [uuidExpediente(13)]);
+    await pool.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto, estado)
+      VALUES ($1, 'Alta de prueba', 'EN_TRAMITE')`, [uuidExpediente(13)]);
     expect((await contar()).PENDIENTES).toBe(antes.PENDIENTES + 1);
     await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-      VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7),
-             ($1, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7),
-             ($1, 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', 7)`, [expedienteUuid(13)]);
+      VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', $2),
+             ($1, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', $2),
+             ($1, 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', $2)`,
+    [uuidExpediente(13), USUARIO]);
     expect((await contar()).DERIVADOS).toBe(antes.DERIVADOS + 1);
-    await expect(pool.query('DELETE FROM sigd_tra.expediente WHERE expediente_id = $1',
-      [expedienteUuid(13)])).rejects.toMatchObject({ code: '23503' });
+    const conexion = await pool.connect();
+    try {
+      await conexion.query('BEGIN');
+      await conexion.query('DELETE FROM sigd_tra.tramite WHERE expediente_id = $1', [uuidExpediente(13)]);
+      await conexion.query('DELETE FROM sigd_tra.expediente WHERE expediente_id = $1', [uuidExpediente(13)]);
+      const temporal = await conexion.query<{ cantidad: string }>(`
+        SELECT cantidad::text FROM sigd_rut.contador_pestana_local
+        WHERE pestana = 'DERIVADOS'`);
+      expect(Number(temporal.rows[0].cantidad)).toBe(antes.DERIVADOS);
+      await conexion.query('ROLLBACK');
+    } finally {
+      conexion.release();
+    }
+    expect((await contar()).DERIVADOS).toBe(antes.DERIVADOS + 1);
+    await pool.query('DELETE FROM sigd_tra.tramite WHERE expediente_id = $1', [uuidExpediente(13)]);
+    await pool.query('DELETE FROM sigd_tra.expediente WHERE expediente_id = $1', [uuidExpediente(13)]);
+    expect((await contar()).DERIVADOS).toBe(antes.DERIVADOS);
+    await pool.query(`INSERT INTO sigd_tra.expediente
+      (expediente_id, codigo_expediente, numero, fecha_radicacion)
+      VALUES ($1, 'EXP-2026-000013', '0013', '2026-09-24T09:00:00Z')`, [uuidExpediente(13)]);
+await pool.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto, estado)
+      VALUES ($1, 'Alta de prueba', 'EN_TRAMITE')`, [uuidExpediente(13)]);
     expect((await contar()).DERIVADOS).toBe(antes.DERIVADOS + 1);
     const completo = await pool.query<{ total: number }>(`
       SELECT count(*)::integer total FROM sigd_tra.expediente e
       LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
       WHERE COALESCE(u.estado_nuevo, 'REGISTRADO') = 'DERIVADO'`);
     expect((await contar()).DERIVADOS).toBe(completo.rows[0].total);
-    await Promise.all([14, 15].map(async (id) => {
-      await pool.query(`INSERT INTO sigd_tra.expediente
-        VALUES ($1, $2, '2026-09-24T09:00:00Z', NULL, $3)`,
-      [expedienteUuid(id), `EXP-2026-${String(id).padStart(6, '0')}`, SOLICITANTE]);
-      await pool.query('INSERT INTO sigd_tra.tramite VALUES ($1, $2)',
-        [expedienteUuid(id), `Alta concurrente ${id}`]);
-    }));
+    await Promise.all([14, 15].map((id) => pool.query(`INSERT INTO sigd_tra.expediente
+      (expediente_id, codigo_expediente, numero, fecha_radicacion)
+      VALUES ($1, $2, $3, '2026-09-24T09:00:00Z')`,
+    [uuidExpediente(id), `EXP-2026-${String(id).padStart(6, '0')}`, String(id)])));
+    await pool.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto, estado) VALUES
+      ($1, 'Alta concurrente 14', 'EN_TRAMITE'), ($2, 'Alta concurrente 15', 'EN_TRAMITE')`,
+    [uuidExpediente(14), uuidExpediente(15)]);
     expect((await contar()).PENDIENTES).toBe(antes.PENDIENTES + 2);
     await pool.query('DELETE FROM sigd_tra.tramite WHERE expediente_id IN ($1, $2)',
-      [expedienteUuid(14), expedienteUuid(15)]);
+      [uuidExpediente(14), uuidExpediente(15)]);
     await pool.query('DELETE FROM sigd_tra.expediente WHERE expediente_id IN ($1, $2)',
-      [expedienteUuid(14), expedienteUuid(15)]);
+      [uuidExpediente(14), uuidExpediente(15)]);
     expect((await contar()).PENDIENTES).toBe(antes.PENDIENTES);
-    await expect(pool.query(`INSERT INTO sigd_rut.movimiento_tramite
+    await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-      VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7)`, [expedienteUuid(16)]))
-      .rejects.toMatchObject({ code: '23503' });
+      VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', $2)`,
+    [uuidExpediente(16), USUARIO]);
     expect((await contar()).PENDIENTES).toBe(antes.PENDIENTES);
     await pool.query(`INSERT INTO sigd_tra.expediente
-      VALUES ($1, 'EXP-2026-000016', '2026-09-24T09:00:00Z', NULL, $2)`,
-    [expedienteUuid(16), SOLICITANTE]);
-    await pool.query('INSERT INTO sigd_tra.tramite VALUES ($1, $2)',
-      [expedienteUuid(16), 'Alta posterior']);
+      (expediente_id, codigo_expediente, numero, fecha_radicacion)
+      VALUES ($1, 'EXP-2026-000016', '0016', '2026-09-24T09:00:00Z')`, [uuidExpediente(16)]);
+    await pool.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto, estado)
+      VALUES ($1, 'Alta posterior', 'EN_TRAMITE')`, [uuidExpediente(16)]);
     expect((await contar()).PENDIENTES).toBe(antes.PENDIENTES + 1);
-    await pool.query('DELETE FROM sigd_tra.tramite WHERE expediente_id = $1', [expedienteUuid(16)]);
-    await pool.query('DELETE FROM sigd_tra.expediente WHERE expediente_id = $1', [expedienteUuid(16)]);
+    await pool.query('DELETE FROM sigd_tra.tramite WHERE expediente_id = $1', [uuidExpediente(16)]);
+    await pool.query('DELETE FROM sigd_tra.expediente WHERE expediente_id = $1', [uuidExpediente(16)]);
     expect((await contar()).PENDIENTES).toBe(antes.PENDIENTES);
   });
 
   it('usa conteo exacto de respaldo si falta el adaptador de altas externas', async () => {
     await pool.query('DROP TRIGGER tr_rutadoc_contador_expediente ON sigd_tra.expediente');
     await pool.query(`INSERT INTO sigd_tra.expediente
-      VALUES ($1, 'EXP-2026-000017', '2026-09-24T09:00:00Z', NULL, $2)`,
-    [expedienteUuid(17), SOLICITANTE]);
-    await pool.query('INSERT INTO sigd_tra.tramite VALUES ($1, $2)',
-      [expedienteUuid(17), 'Sin adaptador']);
+      (expediente_id, codigo_expediente, numero, fecha_radicacion)
+      VALUES ($1, 'EXP-2026-000017', '0017', '2026-09-24T09:00:00Z')`, [uuidExpediente(17)]);
+    await pool.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto, estado)
+      VALUES ($1, 'Sin adaptador', 'EN_TRAMITE')`, [uuidExpediente(17)]);
     const consulta = async () => (await request(app()).get('/api/v1/expedientes')
       .query({ pestana: 'PENDIENTES' })).body.contadores.PENDIENTES as number;
     expect(await consulta()).toBe(6);
     await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
     expect(await consulta()).toBe(6);
-    await pool.query('DELETE FROM sigd_tra.tramite WHERE expediente_id = $1', [expedienteUuid(17)]);
-    await pool.query('DELETE FROM sigd_tra.expediente WHERE expediente_id = $1', [expedienteUuid(17)]);
+    await pool.query('DELETE FROM sigd_tra.tramite WHERE expediente_id = $1', [uuidExpediente(17)]);
+    await pool.query('DELETE FROM sigd_tra.expediente WHERE expediente_id = $1', [uuidExpediente(17)]);
     expect(await consulta()).toBe(5);
   });
 
   it('filtra por término literal, sin ejecutar fragmentos SQL del usuario', async () => {
     const normal = await request(app()).get('/api/v1/expedientes').query({ pestana: 'PENDIENTES', terminoBusqueda: 'beca' });
     expect(normal.status).toBe(200);
-    expect(normal.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente))
-      .toEqual([expedienteUuid(2)]);
+    expect(normal.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente)).toEqual([uuidExpediente(2)]);
     const inyeccion = await request(app()).get('/api/v1/expedientes')
       .query({ pestana: 'PENDIENTES', terminoBusqueda: "' OR 1=1 --" });
     expect(inyeccion.status).toBe(200);
@@ -188,14 +211,12 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
   it('filtra por área y fecha de radicación', async () => {
     const area = await request(app()).get('/api/v1/expedientes').query({ pestana: 'PENDIENTES', areaId: AREA });
     expect(area.status).toBe(200);
-    expect(area.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente))
-      .toEqual([expedienteUuid(2)]);
+    expect(area.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente)).toEqual([uuidExpediente(2)]);
     const fecha = await request(app()).get('/api/v1/expedientes').query({
       pestana: 'PENDIENTES', fechaDesde: '2026-09-02', fechaHasta: '2026-09-02',
     });
     expect(fecha.status).toBe(200);
-    expect(fecha.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente))
-      .toEqual([expedienteUuid(2)]);
+    expect(fecha.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente)).toEqual([uuidExpediente(2)]);
   });
 
   it('pagina con orden estable y sin duplicados cuando hay fechas iguales', async () => {
@@ -209,18 +230,18 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
       ids.push(...respuesta.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente));
       cursor = respuesta.body.siguienteCursor;
     } while (cursor);
-    expect(ids).toEqual([12, 11, 3, 2, 1].map(expedienteUuid));
+    expect(ids).toEqual([12, 11, 3, 2, 1].map(uuidExpediente));
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('devuelve detalle disponible y 404 para expediente inexistente', async () => {
-    const existente = await request(app()).get(`/api/v1/expedientes/${expedienteUuid(2)}`);
+    const existente = await request(app()).get(`/api/v1/expedientes/${uuidExpediente(2)}`);
     expect(existente.status).toBe(200);
-    expect(existente.body).toMatchObject({ idExpediente: expedienteUuid(2), cut: 'EXP-2026-000002',
+    expect(existente.body).toMatchObject({ idExpediente: uuidExpediente(2), cut: 'EXP-2026-000002',
       asunto: 'Solicitud de beca', estadoActual: 'RECEPCIONADO', areaActualId: AREA,
       solicitanteId: SOLICITANTE, resumenDocumentos: { cantidadDocumentos: 2, totalFolios: 5 }, sla: null });
-    expect(existente.body.ultimoMovimiento).toMatchObject({ evento: 'RECEPCION', usuarioOperadorId: '7' });
-    const ausente = await request(app()).get(`/api/v1/expedientes/${expedienteUuid(999)}`);
+    expect(existente.body.ultimoMovimiento).toMatchObject({ evento: 'RECEPCION', usuarioOperadorId: USUARIO });
+    const ausente = await request(app()).get(`/api/v1/expedientes/${uuidExpediente(999)}`);
     expect(ausente.status).toBe(404);
     expect(ausente.body).toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
@@ -242,7 +263,7 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
     expect(sinAuth.status).toBe(401);
     const fallido = construirApp({ query: async () => { throw new Error('secret-sql-details'); } } as unknown as Pool,
       { obtenerActorRutaDoc: () => actor });
-    const respuesta = await request(fallido).get(`/api/v1/expedientes/${expedienteUuid(2)}`);
+    const respuesta = await request(fallido).get(`/api/v1/expedientes/${uuidExpediente(2)}`);
     expect(respuesta.status).toBe(500);
     expect(JSON.stringify(respuesta.body)).not.toContain('secret-sql-details');
     expect(respuesta.body.correlation_id).toBeTruthy();
@@ -255,33 +276,35 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
     expect(rolInvalido.status).toBe(403);
     const ausente = await request(construirApp(pool, {
       actorProviderRutaDoc: actorProviderDePrueba(null),
-    })).get(`/api/v1/expedientes/${expedienteUuid(2)}`).set('x-usuario-id', '7');
+    })).get(`/api/v1/expedientes/${uuidExpediente(2)}`).set('x-usuario-id', '7');
     expect(ausente.status).toBe(401);
   });
 
   it('mide EXPLAIN ANALYZE de la bandeja con 10 000 expedientes adicionales', async () => {
     await pool.query('DROP INDEX IF EXISTS sigd_tra.ix_rutadoc_expediente_fecha_id');
     await pool.query(`INSERT INTO sigd_tra.expediente
+      (expediente_id, codigo_expediente, numero, fecha_radicacion)
       SELECT ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
              'EXP-2026-' || lpad(n::text, 6, '0'),
-             '2026-09-01T00:00:00Z'::timestamptz + n * interval '1 second',
-             NULL, $1::uuid
-        FROM generate_series(1000, 10999) AS n`, [SOLICITANTE]);
-    await pool.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto)
-      SELECT ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid, 'Solicitud de laboratorio'
+             lpad(n::text, 6, '0'),
+             '2026-09-01T00:00:00Z'::timestamptz + n * interval '1 second'
+        FROM generate_series(1000, 10999) AS n`);
+    await pool.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto, estado)
+      SELECT ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
+             'Solicitud de laboratorio', 'EN_TRAMITE'
         FROM generate_series(1000, 10999) AS n`);
     await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora)
       SELECT ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
-             'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7,
+             'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', $1,
              '2026-09-25T10:00:00Z'::timestamptz
-        FROM generate_series(1000, 10999) AS n`);
+        FROM generate_series(1000, 10999) AS n`, [USUARIO]);
     await pool.query('ANALYZE sigd_tra.expediente');
     await pool.query('ANALYZE sigd_rut.movimiento_tramite');
     const resultado = await pool.query<{ 'QUERY PLAN': Array<{ 'Execution Time': number; Plan: unknown }> }>(
       `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${SQL_LISTAR_RUTADOC}`,
       [null, null, null, null, ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION'],
-        '2026-09-24T10:00:00.000Z', expedienteUuid(12), 21]);
+        '2026-09-24T10:00:00.000Z', uuidExpediente(12), 21]);
     const plan = resultado.rows[0]['QUERY PLAN'][0];
     expect(plan['Execution Time']).toBeGreaterThan(0);
     const indices = [...JSON.stringify(plan.Plan).matchAll(/"Index Name":"([^"]+)"/g)].map((m) => m[1]);
@@ -296,7 +319,7 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
     const conIndice = await pool.query<{ 'QUERY PLAN': Array<{ 'Execution Time': number; Plan: unknown }> }>(
       `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${SQL_LISTAR_RUTADOC}`,
       [null, null, null, null, ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION'],
-        '2026-09-24T10:00:00.000Z', expedienteUuid(12), 21]);
+        '2026-09-24T10:00:00.000Z', uuidExpediente(12), 21]);
     const planIndexado = conIndice.rows[0]['QUERY PLAN'][0];
     const indicesIndexados = [...JSON.stringify(planIndexado.Plan).matchAll(/"Index Name":"([^"]+)"/g)].map((m) => m[1]);
     const indice = await pool.query<{ existe: string | null }>(
@@ -315,22 +338,24 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
   it('GET trazabilidad une particiones históricas en orden de secuencia y mide duración entre estaciones', async () => {
     await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora, datos)
-      VALUES ($2, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7,
-        '2027-01-02T10:00:00Z', jsonb_build_object('areaId', $1::text))`, [AREA, expedienteUuid(2)]);
+      VALUES ($1, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', $2,
+              '2027-01-02T10:00:00Z', jsonb_build_object('areaId', $3::text))`,
+    [uuidExpediente(2), USUARIO, AREA]);
     const movimientoObjetivo = await pool.query<{ fecha_hora: Date; id_movimiento: string }>(`
       SELECT fecha_hora, id_movimiento::text FROM sigd_rut.movimiento_tramite
-       WHERE expediente_id = $1 AND secuencia = 2`, [expedienteUuid(2)]);
+       WHERE expediente_id = $1 AND secuencia = 2`, [uuidExpediente(2)]);
     await pool.query(`INSERT INTO sigd_rut.movimiento_compensatorio
       (expediente_id, estado_anterior, estado_nuevo, usuario_operador_id, fecha_hora,
        correlation_id, clave_idempotencia, movimiento_objetivo_fecha_hora,
        movimiento_objetivo_id, movimiento_objetivo_secuencia, huella_comando,
        motivo, compensacion_folios, datos)
-      VALUES ($4, 'EN_CALIFICACION', 'RECEPCIONADO', 7, '2027-01-03T10:00:00Z',
-       'integration-correlation', 'integration-idempotency', $1, $2::uuid, 2,
+      VALUES ($1, 'EN_CALIFICACION', 'RECEPCIONADO', $2, '2027-01-03T10:00:00Z',
+       'integration-correlation', 'integration-idempotency', $3, $4::uuid, 2,
        'integration-fingerprint', 'Reversión aprobada para probar lectura', '{}'::jsonb,
-       jsonb_build_object('areaId', $3::text))`,
-    [movimientoObjetivo.rows[0].fecha_hora, movimientoObjetivo.rows[0].id_movimiento, AREA, expedienteUuid(2)]);
-    const respuesta = await request(app()).get(`/api/v1/expedientes/${expedienteUuid(2)}/trazabilidad`);
+       jsonb_build_object('areaId', $5::text))`,
+    [uuidExpediente(2), USUARIO, movimientoObjetivo.rows[0].fecha_hora,
+      movimientoObjetivo.rows[0].id_movimiento, AREA]);
+    const respuesta = await request(app()).get(`/api/v1/expedientes/${uuidExpediente(2)}/trazabilidad`);
     expect(respuesta.status).toBe(200);
     expect(respuesta.body.actuaciones.map((fila: { secuencia: string }) => fila.secuencia)).toEqual(['1', '2', '3']);
     expect(respuesta.body.actuaciones.map((fila: { fechaHora: string }) => fila.fechaHora)).toEqual([
@@ -347,12 +372,12 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
   it('GET foliación ordena estrictamente, presenta rangos y conserva metadata ausente como null', async () => {
     const respuesta = await request(construirApp(pool, {
       actorProviderRutaDoc: actorProviderDePrueba(actor),
-    })).get(`/api/v1/expedientes/${expedienteUuid(2)}/foliacion`);
+    })).get(`/api/v1/expedientes/${uuidExpediente(2)}/foliacion`);
     expect(respuesta.status).toBe(200);
     expect(respuesta.body.map((fila: { folioInicio: number }) => fila.folioInicio)).toEqual([1, 4]);
-    expect(respuesta.body[0]).toMatchObject({ idDocumento: '00000000-0000-4000-8000-000000000501', cantidadFolios: 3,
+    expect(respuesta.body[0]).toMatchObject({ idDocumento: '501', cantidadFolios: 3,
       rango: 'F. 0001 a F. 0003', nombre: null, tipo: null, checksumSha256: null });
-    const ausente = await request(app()).get(`/api/v1/expedientes/${expedienteUuid(999)}/foliacion`);
+    const ausente = await request(app()).get(`/api/v1/expedientes/${uuidExpediente(999)}/foliacion`);
     expect(ausente.status).toBe(404);
   });
 
@@ -360,9 +385,9 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
     const respuesta = await request(construirApp(pool, {
       actorProviderRutaDoc: actorProviderDePrueba(actor),
       documentoMetadataRutaDoc: { obtenerMetadataDocumento: async (id: string) => ({
-        checksumSha256: id === '00000000-0000-4000-8000-000000000501' ? 'b'.repeat(64) : null, nombre: 'anexo.pdf', tipo: 'ANEXO',
+        checksumSha256: id === '501' ? 'b'.repeat(64) : null, nombre: 'anexo.pdf', tipo: 'ANEXO',
       }) },
-    })).get(`/api/v1/expedientes/${expedienteUuid(2)}/foliacion`);
+    })).get(`/api/v1/expedientes/${uuidExpediente(2)}/foliacion`);
     expect(respuesta.status).toBe(200);
     expect(respuesta.body[0]).toMatchObject({ checksumSha256: 'b'.repeat(64), nombre: 'anexo.pdf', tipo: 'ANEXO' });
   });
@@ -375,14 +400,14 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
         rangoConsultado = [desde, hasta];
         return ['2026-09-28'];
       } },
-    })).get(`/api/v1/expedientes/${expedienteUuid(2)}/sla-status`);
+    })).get(`/api/v1/expedientes/${uuidExpediente(2)}/sla-status`);
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body.fechaInicio).toBe('2026-09-24');
+    expect(respuesta.body.fechaInicio).toBe('2026-09-02');
     expect(respuesta.body).toEqual(expect.objectContaining({ fechaCalculo: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       fechaLimite: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       diasHabilesTranscurridos: expect.any(Number), diasHabilesRestantes: expect.any(Number),
       porcentaje: expect.any(Number), estado: expect.stringMatching(/^(VERDE|AMARILLO|ROJO)$/) }));
-    expect(rangoConsultado?.[0]).toBe('2026-09-24');
+    expect(rangoConsultado?.[0]).toBe('2026-09-02');
   });
 
   it('GET CCD serializa el árbol del port institucional sin sembrar datos productivos', async () => {

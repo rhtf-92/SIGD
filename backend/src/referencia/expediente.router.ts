@@ -1,10 +1,12 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Pool } from 'pg';
 import { insertarEvento } from '../audit/evento-outbox.repository.js';
 import { registrarMutacion } from '../audit/bitacora-auditoria.repository.js';
 import { getRequestContext, setUsuarioId } from '../shared/request-context/request-context.js';
 import {
+  DomainError,
   ForbiddenError,
   NotFoundError,
   UnauthorizedError,
@@ -141,10 +143,44 @@ export function crearRouterReferencia(pool: Pool): Router {
         throw new NotFoundError({ detail: 'El área de destino no existe.' });
       }
 
+      const estado = await cliente.query<{ estado_nuevo: string | null; estado_expediente: string }>(
+        `SELECT p.estado_nuevo, e.estado AS estado_expediente
+           FROM sigd_tra.expediente e
+           LEFT JOIN sigd_rut.estado_actual_expediente p ON p.expediente_id = e.expediente_id
+          WHERE e.expediente_id = $1::uuid`,
+        [datos.expediente_id],
+      );
+      if (!estado.rowCount || estado.rowCount === 0) {
+        throw new NotFoundError({ detail: 'El expediente no existe.' });
+      }
+      const estadoAnterior = estado.rows[0].estado_nuevo ?? estado.rows[0].estado_expediente;
+
+      const transicion = await cliente.query<{ estado_nuevo: string }>(
+        `SELECT estado_nuevo FROM sigd_rut.transicion_estado_tramite
+          WHERE estado_anterior = $1 AND evento = 'DERIVACION'`,
+        [estadoAnterior],
+      );
+      if (!transicion.rowCount || transicion.rowCount === 0) {
+        throw new DomainError({
+          code: 'ESTADO_INVALIDO',
+          message: 'El estado actual del expediente no permite la derivación.',
+        });
+      }
+
       await cliente.query(
-        `INSERT INTO sigd_rut.movimiento_tramite (expediente_id, area_destino_id, fecha_movimiento)
-         VALUES ($1, $2, now())`,
-        [datos.expediente_id, datos.area_destino_id],
+        `INSERT INTO sigd_rut.movimiento_tramite
+           (expediente_id, estado_anterior, evento, estado_nuevo,
+            usuario_operador_id, correlation_id, clave_idempotencia, datos)
+         VALUES ($1::uuid, $2, 'DERIVACION', $3, $4::uuid, $5, $6, $7::jsonb)`,
+        [
+          datos.expediente_id,
+          estadoAnterior,
+          transicion.rows[0].estado_nuevo,
+          getRequestContext()?.usuario_id ?? '00000000-0000-0000-0000-000000000001',
+          getRequestContext()?.correlation_id ?? null,
+          randomUUID(),
+          JSON.stringify({ areaId: datos.area_destino_id }),
+        ],
       );
 
       await registrarMutacion(cliente, {

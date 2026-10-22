@@ -12,7 +12,6 @@ interface FileUploadDropzoneProps {
   demoMode?: boolean;
   onStatusChange?: (status: UploadStatus) => void;
 }
-
 export default function FileUploadDropzone({
   onUploaded,
   categoria,
@@ -49,8 +48,8 @@ export default function FileUploadDropzone({
         disabled={isBusy}
         className={`w-full rounded-xl border-2 border-dashed p-8 text-center transition-colors disabled:cursor-wait disabled:opacity-70 ${
           isDragging
-            ? "border-blue-600 bg-blue-50"
-            : "border-slate-300 bg-slate-50 hover:border-blue-500"
+            ? "border-blue-600 bg-blue-100 ring-2 ring-blue-500/40 shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
+            : "border-blue-400 bg-blue-50/80 text-slate-800 hover:border-blue-500 hover:bg-blue-100/70"
         }`}
         onClick={() => inputRef.current?.click()}
         onDragEnter={(event) => {
@@ -69,12 +68,12 @@ export default function FileUploadDropzone({
           void handleFile(event.dataTransfer.files[0]);
         }}
       >
-        <strong className="block">Arrastre un PDF o seleccione un archivo</strong>
-        <span id="pdf-dropzone-description" className="mt-1 block text-sm text-slate-500">
+        <strong className="block text-lg font-bold text-slate-900">Arrastre un PDF o seleccione un archivo</strong>
+        <span id="pdf-dropzone-description" className="mt-1 block text-sm text-slate-600">
           PDF de hasta 25 MB. Use Enter o Espacio para seleccionar un archivo.
         </span>
         {demoMode && (
-          <span className="mt-3 inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
+          <span className="mt-3 inline-block rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white">
             Modo demostración: almacenamiento simulado
           </span>
         )}
