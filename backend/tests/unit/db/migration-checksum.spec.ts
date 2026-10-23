@@ -50,6 +50,7 @@ describe('Auditoría de Integridad y Checksums Migratorios (§12 / Codex)', () =
       '08_sigd_tupa_acoplamiento.sql',
       '09_sigd_seguridad_remediacion.sql',
       '10_sigd_seguridad_fix_integridad.sql',
+      '11_sigd_fix_post_auditoria_codex.sql',
     ];
 
     for (const archivo of manifiesto) {
@@ -72,5 +73,82 @@ describe('Auditoría de Integridad y Checksums Migratorios (§12 / Codex)', () =
     // F-08: Comprobar que anula contraseñas estáticas DDL
     expect(contenido).toContain('ALTER ROLE sigd_app WITH PASSWORD NULL;');
     expect(contenido).toContain('ALTER ROLE sigd_worker WITH PASSWORD NULL;');
+  });
+
+  it('H-09/H-10: valida que la migración 11 y su rollback sincronizan el estado FSM legacy', () => {
+    const ruta11 = path.join(migracionesDir, '11_sigd_fix_post_auditoria_codex.sql');
+    const contenido11 = fs.readFileSync(ruta11, 'utf8');
+    expect(contenido11).toContain("UPDATE sigd_tra.expediente");
+    expect(contenido11).toContain("SET estado = 'EN_REVISION'");
+    expect(contenido11).toContain("FROM sigd_rut.estado_actual_expediente");
+    expect(contenido11).toContain("AND e.estado = 'EN_TRAMITE'");
+    expect(contenido11).toContain("AND u.estado_nuevo = 'EN_REVISION'");
+
+    const rutaRollback11 = path.join(migracionesDir, 'rollbacks', '11_sigd_fix_post_auditoria_codex_rollback.sql');
+    expect(fs.existsSync(rutaRollback11)).toBe(true);
+    const contenidoRollback = fs.readFileSync(rutaRollback11, 'utf8');
+    expect(contenidoRollback).toContain("SET estado = 'EN_TRAMITE'");
+  });
+
+  it('H-03: algoritmo de prefijo ordenado estricto rechaza saltos, desorden y checksums corruptos', () => {
+    const manifiestoFake = [
+      { nombre: '01.sql', contenido: 'SELECT 1;', checksum: 'hash1' },
+      { nombre: '02.sql', contenido: 'SELECT 2;', checksum: 'hash2' },
+      { nombre: '03.sql', contenido: 'SELECT 3;', checksum: 'hash3' },
+    ];
+
+    function validarPrefijo(registros: Array<{ nombre_script: string; checksum_sha256: string }>) {
+      if (registros.length > manifiestoFake.length) {
+        throw new Error('la base de datos contiene más migraciones que el manifiesto');
+      }
+      for (let i = 0; i < registros.length; i++) {
+        const reg = registros[i];
+        const script = manifiestoFake[i];
+        if (reg.nombre_script !== script.nombre) {
+          throw new Error(`secuencia rota en ${i + 1}`);
+        }
+        if (reg.checksum_sha256 !== script.checksum) {
+          throw new Error(`checksum distinto en ${i + 1}`);
+        }
+      }
+      return registros.length === manifiestoFake.length ? 'COMPLETE' : 'PENDING';
+    }
+
+    // Prefijo válido parcial (PENDING)
+    expect(validarPrefijo([
+      { nombre_script: '01.sql', checksum_sha256: 'hash1' },
+    ])).toBe('PENDING');
+
+    // Prefijo completo (COMPLETE)
+    expect(validarPrefijo([
+      { nombre_script: '01.sql', checksum_sha256: 'hash1' },
+      { nombre_script: '02.sql', checksum_sha256: 'hash2' },
+      { nombre_script: '03.sql', checksum_sha256: 'hash3' },
+    ])).toBe('COMPLETE');
+
+    // Desorden (02 antes de 01) -> rechaza
+    expect(() => validarPrefijo([
+      { nombre_script: '02.sql', checksum_sha256: 'hash2' },
+      { nombre_script: '01.sql', checksum_sha256: 'hash1' },
+    ])).toThrow(/secuencia rota/);
+
+    // Salto de migración (01 y 03, saltando 02) -> rechaza
+    expect(() => validarPrefijo([
+      { nombre_script: '01.sql', checksum_sha256: 'hash1' },
+      { nombre_script: '03.sql', checksum_sha256: 'hash3' },
+    ])).toThrow(/secuencia rota/);
+
+    // Checksum alterado -> rechaza
+    expect(() => validarPrefijo([
+      { nombre_script: '01.sql', checksum_sha256: 'hash_corrupto' },
+    ])).toThrow(/checksum distinto/);
+
+    // Más migraciones que el manifiesto -> rechaza
+    expect(() => validarPrefijo([
+      { nombre_script: '01.sql', checksum_sha256: 'hash1' },
+      { nombre_script: '02.sql', checksum_sha256: 'hash2' },
+      { nombre_script: '03.sql', checksum_sha256: 'hash3' },
+      { nombre_script: '04.sql', checksum_sha256: 'hash4' },
+    ])).toThrow(/más migraciones/);
   });
 });

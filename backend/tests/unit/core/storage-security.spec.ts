@@ -60,9 +60,14 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
         return { rows: [] };
       }
 
+      // Consulta de tipo documento para confirmar-carga
+      if (sqlStr.includes('sigd_doc.tipo_documento')) {
+        return { rows: [{ tipo_documental_id: 'a373f0c7-8d3e-4328-aec1-78409b539131' }] };
+      }
+
       // Consulta de documento adjunto para download
-      if (sqlStr.includes('sigd_doc.documento_adjunto') && sqlStr.includes('da.s3_key = $1')) {
-        const keyParam = params?.[0];
+      if (sqlStr.includes('sigd_doc.documento_adjunto') && sqlStr.includes('da.s3_bucket = $1 AND da.s3_key = $2')) {
+        const keyParam = params?.[1];
         if (keyParam === 'expedientes/2026/inexistente.pdf') {
           return { rows: [] };
         }
@@ -77,7 +82,15 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
 
       // Inserción en documento_adjunto
       if (sqlStr.includes('INSERT INTO sigd_doc.documento_adjunto')) {
-        return { rows: [], rowCount: 1 };
+        return {
+          rows: [
+            {
+              documento_adjunto_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              sha256: String(params?.[6] ?? 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
+            },
+          ],
+          rowCount: 1,
+        };
       }
 
       return { rows: [], rowCount: 0 };
@@ -238,5 +251,66 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
 
     expect(res.status).toBe(403);
     expect(res.body).not.toHaveProperty('downloadUrl');
+  });
+
+  it('H-01 FAIL-CLOSED: confirmar-carga sin pool de conexión -> 403 Forbidden', async () => {
+    const appSinPool = construirApp(undefined as unknown as Pool);
+
+    const res = await request(appSinPool)
+      .post('/api/v1/storage/confirmar-carga')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({
+        s3Key: 'expedientes/2026/test.pdf',
+        sha256Hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        idExpediente: ID_EXPEDIENTE,
+      });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('H-02 FAIL-CLOSED: presigned-url con expediente y sin pool de conexión -> 403 Forbidden', async () => {
+    const appSinPool = construirApp(undefined as unknown as Pool);
+
+    const res = await request(appSinPool)
+      .post('/api/v1/storage/presigned-url')
+      .set('Authorization', `Bearer ${tokenPropietario}`)
+      .send({
+        ...payloadPresignedValido,
+        idExpediente: ID_EXPEDIENTE,
+      });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('H-01: confirmar-carga exitoso con S3 y DB -> 201 Created con documentoId', async () => {
+    const { Readable } = await import('node:stream');
+    const pdfContenido = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF');
+    const pdfHash = (await import('node:crypto')).createHash('sha256').update(pdfContenido).digest('hex');
+
+    const fakeS3 = {
+      send: async () => ({
+        Body: Readable.from([pdfContenido]),
+      }),
+    };
+
+    const { crearRouterStorage } = await import('../../../src/core/storage/storage.router.js');
+    const express = (await import('express')).default;
+    const testApp = express();
+    testApp.use(express.json());
+    testApp.use('/api/v1', crearRouterStorage(mockPool, fakeS3 as any));
+
+    const res = await request(testApp)
+      .post('/api/v1/storage/confirmar-carga')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({
+        s3Key: 'expedientes/2026/real.pdf',
+        sha256Hash: pdfHash,
+        idExpediente: ID_EXPEDIENTE,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveProperty('documentoId');
+    expect(res.body).toHaveProperty('confirmado', true);
+    expect(res.body.sha256).toBe(pdfHash);
   });
 });

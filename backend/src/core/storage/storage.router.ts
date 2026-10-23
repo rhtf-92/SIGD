@@ -40,6 +40,8 @@ const confirmarInputSchema = z.object({
   s3Key: z.string().min(3),
   sha256Hash: z.string().length(64).regex(/^[a-fA-F0-9]{64}$/),
   idExpediente: z.string().uuid().optional(),
+  tipoDocumentalId: z.string().uuid().optional(),
+  nombreArchivo: z.string().min(1).max(255).optional(),
 });
 
 function autenticarActorStorage(req: Request): ClaimsJwt {
@@ -60,10 +62,10 @@ async function validarAccesoExpediente(
   roles: string[],
   idExpediente: string,
 ): Promise<boolean> {
-  if (roles.some((r) => ['ADMINISTRADOR', 'SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'MESA_PARTES'].includes(r))) {
+  if (roles.some((r) => ['ADMINISTRADOR', 'SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'MESA_PARTES'].includes(r.toUpperCase()))) {
     return true;
   }
-  if (!pool) return true;
+  if (!pool) return false;
 
   try {
     const resUser = await pool.query<{ id_persona: string | null; area_id: string | null }>(
@@ -76,8 +78,12 @@ async function validarAccesoExpediente(
     const idPersona = resUser.rows[0]?.id_persona;
     const areaId = resUser.rows[0]?.area_id;
 
-    const resExp = await pool.query<{ solicitante_id: string | null; area_destino_id: string | null }>(
-      `SELECT solicitante_id::text AS solicitante_id, area_destino_id::text AS area_destino_id
+    const resExp = await pool.query<{ solicitante_id: string | null; area_actual_id: string | null }>(
+      `SELECT solicitante_id::text AS solicitante_id, area_actual_id::text AS area_actual_id
+         FROM sigd_doc.expediente
+        WHERE expediente_id = $1::uuid
+        UNION ALL
+       SELECT solicitante_id::text AS solicitante_id, area_destino_id::text AS area_actual_id
          FROM sigd_tra.expediente
         WHERE expediente_id = $1::uuid`,
       [idExpediente],
@@ -87,7 +93,7 @@ async function validarAccesoExpediente(
     const exp = resExp.rows[0];
 
     if (idPersona && exp.solicitante_id === idPersona) return true;
-    if (areaId && exp.area_destino_id === areaId) return true;
+    if (areaId && exp.area_actual_id === areaId) return true;
 
     return false;
   } catch {
@@ -138,6 +144,12 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
   router.post('/storage/confirmar-carga', async (req: Request, res: Response) => {
     const claims = autenticarActorStorage(req);
     const datos = confirmarInputSchema.parse(req.body);
+
+    if (!pool) {
+      throw new ForbiddenError({
+        detail: 'No es posible registrar ni verificar el almacenamiento sin conexión a la base de datos.',
+      });
+    }
 
     if (datos.idExpediente) {
       const autorizado = await validarAccesoExpediente(
@@ -237,22 +249,63 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
     }
 
     const idAdjunto = crypto.randomUUID();
+    const expedienteId = datos.idExpediente ?? crypto.randomUUID();
 
-    if (pool) {
-      // Registrar en sigd_doc.documento_adjunto. Si la base de datos falla, el error
-      // debe propagarse hacia el middleware de errores RFC 7807/9457 sin responder 201 Created.
-      await pool.query(
-        `INSERT INTO sigd_doc.documento_adjunto
-           (id_documento_adjunto, s3_bucket, s3_key, sha256_hash, creado_en)
-         VALUES ($1, $2, $3, $4, now())
-         ON CONFLICT DO NOTHING;`,
-        [idAdjunto, config.bucket, datos.s3Key, datos.sha256Hash.toLowerCase()],
+    // Resolver tipo documental si no fue provisto
+    let tipoDocId = datos.tipoDocumentalId;
+    if (!tipoDocId) {
+      const resTipo = await pool.query<{ tipo_documental_id: string }>(
+        `SELECT tipo_documental_id::text AS tipo_documental_id
+           FROM sigd_doc.tipo_documento
+          WHERE vigente = TRUE
+          ORDER BY codigo ASC
+          LIMIT 1;`,
       );
+      tipoDocId = resTipo.rows[0]?.tipo_documental_id ?? crypto.randomUUID();
     }
 
+    const nombreArchivo = datos.nombreArchivo || datos.s3Key.split('/').pop() || 'documento.pdf';
+    const magicHex = primerChunk.subarray(0, 4).toString('hex').toUpperCase();
+
+    // Registrar en sigd_doc.documento_adjunto con DDL real
+    const insertRes = await pool.query<{ documento_adjunto_id: string; sha256: string }>(
+      `INSERT INTO sigd_doc.documento_adjunto (
+         documento_adjunto_id,
+         expediente_id,
+         tipo_documental_id,
+         nombre_archivo,
+         s3_bucket,
+         s3_key,
+         sha256,
+         tamano_bytes,
+         mime_type,
+         magic_bytes,
+         subido_por,
+         creado_en
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+       RETURNING documento_adjunto_id::text, sha256;`,
+      [
+        idAdjunto,
+        expedienteId,
+        tipoDocId,
+        nombreArchivo,
+        config.bucket,
+        datos.s3Key,
+        datos.sha256Hash.toLowerCase(),
+        totalBytes,
+        'application/pdf',
+        magicHex,
+        claims.sub,
+      ],
+    );
+
+    const filaGuardada = insertRes.rows[0];
+
     res.status(201).json({
-      idDocumentoAdjunto: idAdjunto,
+      documentoId: filaGuardada?.documento_adjunto_id ?? idAdjunto,
+      idDocumentoAdjunto: filaGuardada?.documento_adjunto_id ?? idAdjunto,
       s3Key: datos.s3Key,
+      sha256: filaGuardada?.sha256 ?? datos.sha256Hash.toLowerCase(),
       confirmado: true,
       mensaje: 'Documento PDF verificado y registrado en el almacenamiento institucional.',
     });
@@ -297,9 +350,9 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
     const resDoc = await pool.query<{ solicitante_id: string | null }>(
       `SELECT e.solicitante_id::text AS solicitante_id
          FROM sigd_doc.documento_adjunto da
-         JOIN sigd_tra.expediente e ON e.expediente_id = da.expediente_id
-        WHERE da.s3_key = $1`,
-      [key],
+         JOIN sigd_doc.expediente e ON e.expediente_id = da.expediente_id
+        WHERE da.s3_bucket = $1 AND da.s3_key = $2`,
+      [bucket, key],
     );
 
     if (resDoc.rows.length === 0) {

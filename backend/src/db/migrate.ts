@@ -36,6 +36,7 @@ const MANIFIESTO_BASELINE = [
   '04_sigd_doc.sql', '05_sigd_tra.sql', 'BASELINE_2026_V1.sql',
   '08_sigd_tupa_acoplamiento.sql', '09_sigd_seguridad_remediacion.sql',
   '10_sigd_seguridad_fix_integridad.sql',
+  '11_sigd_fix_post_auditoria_codex.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }
@@ -78,7 +79,7 @@ async function clasificarDestino(cliente: PoolClient, manifiesto: ScriptMigracio
   }
   const registros = ledger.rows[0]?.existe
     ? (await cliente.query<Pick<RegistroMigracion, 'nombre_script' | 'checksum_sha256'>>(
-      'SELECT nombre_script, checksum_sha256 FROM public.sigd_migraciones')).rows
+      'SELECT nombre_script, checksum_sha256 FROM public.sigd_migraciones ORDER BY id ASC')).rows
     : [];
   if (registros.length === 0) {
     const objetos = await cliente.query<{ total: string }>(`
@@ -103,18 +104,24 @@ async function clasificarDestino(cliente: PoolClient, manifiesto: ScriptMigracio
     if (Number(objetos.rows[0]?.total) === 0) return 'FRESH';
     throw new Error('BASELINE_2026_V1 rechazado: el destino no está vacío.');
   }
-  const ledgerValido = registros.every((registro) =>
-    manifiesto.some((script) =>
-      script.nombre === registro.nombre_script && checksumsCoinciden(script.contenido, registro.checksum_sha256)
-    )
-  );
-  if (!ledgerValido || registros.length > manifiesto.length) {
-    throw new Error('BASELINE_2026_V1 rechazado: ledger parcial, desconocido o checksum distinto.');
+
+  if (registros.length > manifiesto.length) {
+    throw new Error('BASELINE_2026_V1 rechazado: la base de datos contiene más migraciones que el manifiesto.');
   }
-  if (registros.length < manifiesto.length) {
-    return 'PENDING_INCREMENTAL';
+
+  for (let i = 0; i < registros.length; i++) {
+    const reg = registros[i];
+    const script = manifiesto[i];
+    if (reg.nombre_script !== script.nombre) {
+      throw new Error(`BASELINE_2026_V1 rechazado: secuencia de migraciones rota en posición ${i + 1} (se esperaba '${script.nombre}', se encontró '${reg.nombre_script}').`);
+    }
+    if (!checksumsCoinciden(script.contenido, reg.checksum_sha256)) {
+      throw new Error(`BASELINE_2026_V1 rechazado: discrepancia de checksum en '${reg.nombre_script}' (posición ${i + 1}).`);
+    }
   }
-  const contrato = await cliente.query<{ valido: boolean }>(`
+
+  if (registros.length >= 6) {
+    const contrato = await cliente.query<{ valido: boolean }>(`
     SELECT
       (SELECT count(*) = 11 FROM (VALUES
         ('sigd_tra.expediente'), ('sigd_rut.movimiento_tramite'),
@@ -155,17 +162,23 @@ async function clasificarDestino(cliente: PoolClient, manifiesto: ScriptMigracio
             to_regclass('sigd_tra.mv_kpis_mgd_mensual'),
             to_regclass('sigd_tra.mv_tiempos_retencion_area')))
       AS valido`);
-  if (!contrato.rows[0]?.valido) {
-    throw new Error('BASELINE_2026_V1 rechazado: falta parte del contrato físico.');
+    if (!contrato.rows[0]?.valido) {
+      throw new Error('BASELINE_2026_V1 rechazado: falta parte del contrato físico.');
+    }
+    const catalogos = await cliente.query<{ valido: boolean }>(`
+      SELECT (SELECT count(*) = 10 FROM sigd_rut.estado_tramite)
+         AND (SELECT count(*) = 13 FROM sigd_rut.transicion_estado_tramite)
+         AND (SELECT es_terminal FROM sigd_rut.estado_tramite WHERE codigo = 'ARCHIVADO')
+         AND (SELECT count(*) = 6 FROM sigd_rut.contador_pestana_local) AS valido`);
+    if (!catalogos.rows[0]?.valido) {
+      throw new Error('BASELINE_2026_V1 rechazado: catálogos o contadores incompletos.');
+    }
   }
-  const catalogos = await cliente.query<{ valido: boolean }>(`
-    SELECT (SELECT count(*) = 10 FROM sigd_rut.estado_tramite)
-       AND (SELECT count(*) = 13 FROM sigd_rut.transicion_estado_tramite)
-       AND (SELECT es_terminal FROM sigd_rut.estado_tramite WHERE codigo = 'ARCHIVADO')
-       AND (SELECT count(*) = 6 FROM sigd_rut.contador_pestana_local) AS valido`);
-  if (!catalogos.rows[0]?.valido) {
-    throw new Error('BASELINE_2026_V1 rechazado: catálogos o contadores incompletos.');
+
+  if (registros.length < manifiesto.length) {
+    return 'PENDING_INCREMENTAL';
   }
+
   return 'COMPLETE_BASELINE';
 }
 

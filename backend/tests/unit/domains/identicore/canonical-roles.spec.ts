@@ -3,10 +3,15 @@ import request from 'supertest';
 import type { Pool } from 'pg';
 import { construirApp } from '../../../../src/app.js';
 import { Argon2Service } from '../../../../src/domains/identicore/argon2.service.js';
-import { verificarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
+import { verificarTokenAcceso, firmarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
 
-describe('Alineación Canónica de Roles F-09 (§9 / Codex)', () => {
+describe('Alineación Canónica de Roles F-09 (§9 / Codex) & H-08', () => {
   const hashValido = Argon2Service.generateFallbackHash('PasswordValida123!');
+  const tokenAdmin = firmarTokenAcceso({
+    sub: '11111111-1111-1111-1111-111111111111',
+    roles: ['ADMINISTRADOR'],
+    expiraSegundos: 300,
+  });
 
   it('asigna rol canónico CIUDADANO por defecto en token cuando un usuario no tiene rol_codigo en BD', async () => {
     let queryEjecutada = '';
@@ -63,27 +68,45 @@ describe('Alineación Canónica de Roles F-09 (§9 / Codex)', () => {
     expect(claims.roles).toEqual(['CIUDADANO']);
   });
 
-  it('GET /api/v1/admin/roles-permisos devuelve catálogo canónico completo con ADMINISTRADOR y CIUDADANO en fallback', async () => {
+  it('H-08: GET /api/v1/admin/roles-permisos propaga 500 y NO usa arreglos sintéticos cuando falla la BD', async () => {
     const fakePool = {
-      query: vi.fn().mockRejectedValue(new Error('DB_DOWN_FALLBACK_TEST')),
+      query: vi.fn().mockRejectedValue(new Error('DB_DOWN_FAIL_CLOSED_TEST')),
       connect: vi.fn(),
     } as unknown as Pool;
 
     const app = construirApp(fakePool);
 
-    const res = await request(app).get('/api/v1/admin/roles-permisos');
+    const res = await request(app)
+      .get('/api/v1/admin/roles-permisos')
+      .set('Authorization', `Bearer ${tokenAdmin}`);
+
+    // H-08: Debe propagar el error 500 a next(err) y no devolver 200 con fallbacks hardcodeados
+    expect(res.status).toBe(500);
+    expect(res.body.title || res.body.detail || res.body.type).toBeDefined();
+  });
+
+  it('H-08: GET /api/v1/admin/roles-permisos devuelve roles reales desde DB cuando la consulta es exitosa', async () => {
+    const fakePool = {
+      query: vi.fn().mockResolvedValue({
+        rows: [
+          { rol_id: 'r1', codigo: 'ADMINISTRADOR', nombre: 'Administrador' },
+          { rol_id: 'r2', codigo: 'DIRECTOR', nombre: 'Director' },
+          { rol_id: 'r3', codigo: 'CIUDADANO', nombre: 'Ciudadano' },
+        ],
+        rowCount: 3,
+      }),
+      connect: vi.fn(),
+    } as unknown as Pool;
+
+    const app = construirApp(fakePool);
+
+    const res = await request(app)
+      .get('/api/v1/admin/roles-permisos')
+      .set('Authorization', `Bearer ${tokenAdmin}`);
 
     expect(res.status).toBe(200);
     expect(res.body.roles).toBeDefined();
-
-    const codigosRoles = res.body.roles.map((r: { codigo: string }) => r.codigo);
-    expect(codigosRoles).toContain('ADMINISTRADOR');
-    expect(codigosRoles).toContain('DIRECTOR');
-    expect(codigosRoles).toContain('SECRETARIO');
-    expect(codigosRoles).toContain('ESPECIALISTA');
-    expect(codigosRoles).toContain('MESA_PARTES');
-    expect(codigosRoles).toContain('CIUDADANO');
-    expect(codigosRoles).not.toContain('DOCENTE');
-    expect(codigosRoles).not.toContain('ESTUDIANTE');
+    const codigos = res.body.roles.map((r: { codigo: string }) => r.codigo);
+    expect(codigos).toEqual(['ADMINISTRADOR', 'DIRECTOR', 'CIUDADANO']);
   });
 });

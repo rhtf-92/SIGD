@@ -117,4 +117,35 @@ describe("F-05: TablasMaestrasPage — Read-Only Official Catalog Integration", 
     expect(await screen.findByText("Solicitud del Administrado")).toBeInTheDocument();
     expect(screen.getByText("Pendiente DDL")).toBeInTheDocument();
   });
+
+  it("H-06: muestra estado de error y NUNCA fixtures cuando la API falla", async () => {
+    get.mockImplementation((url: string) => {
+      if (url === "/api/v1/admin/tablas-maestras") {
+        return Promise.reject(new Error("Network Error"));
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    renderConRouter();
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Error al consultar el catálogo institucional.")).toBeInTheDocument();
+    // Jamás debe mostrar fixtures sintéticos de fallback
+    expect(screen.queryByText("Campus central de Pucallpa (Av. Centenario Km 3.5).")).not.toBeInTheDocument();
+    expect(screen.queryByText("SED-001")).not.toBeInTheDocument();
+  });
+
+  it("H-06: muestra estado vacío explícito cuando la API devuelve catálogos vacíos", async () => {
+    get.mockImplementation((url: string) => {
+      if (url === "/api/v1/admin/tablas-maestras") {
+        return Promise.resolve({ data: { catalogos: [] } });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    renderConRouter();
+
+    expect(await screen.findByText("No se encontraron registros coincidentes.")).toBeInTheDocument();
+    expect(screen.queryByText("Sede Principal Pucallpa")).not.toBeInTheDocument();
+  });
 });

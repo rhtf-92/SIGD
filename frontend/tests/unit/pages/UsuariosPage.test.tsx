@@ -1,22 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import UsuariosPage from "@/pages/administracion/UsuariosPage";
-import { ApiHttpError } from "@/types/api";
 import { DEBOUNCE_BUSQUEDA_MS, type Usuario } from "@/types/usuarioAdmin";
 
 const get = vi.fn();
-const put = vi.fn();
-const patch = vi.fn();
 
 vi.mock("@/api/client", () => ({
   apiClient: {
     get: (...args: unknown[]) => get(...args),
-    put: (...args: unknown[]) => put(...args),
-    patch: (...args: unknown[]) => patch(...args),
   },
 }));
 
@@ -61,36 +56,17 @@ function montarConProvider() {
   );
 }
 
-function problemaDuplicado(campo: string, motivo: string) {
-  return new ApiHttpError({
-    type: "https://sigd.iestpsuiza.edu.pe/errors/conflict",
-    title: "Conflicto de unicidad institucional",
-    status: 409,
-    detail: "Ya existe un usuario registrado con el mismo valor.",
-    instance: "/api/v1/admin/usuarios/1",
-    code: "ERR_USUARIO_DUPLICADO",
-    category: "Conflict",
-    correlationId: "9f1c3a52-0d8e-4c1a-9c3b-7d2e5a6b8c40",
-    invalidParams: [{ name: campo, reason: motivo }],
-    retryable: false,
-  });
-}
-
-describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usuarios)", () => {
+describe("UsuariosPage — H-04 / H-05: Directorio de Usuarios (Solo Lectura)", () => {
   beforeEach(() => {
     get.mockResolvedValue({ data: { data: USUARIOS } });
-    put.mockResolvedValue({ data: USUARIOS[0] });
-    patch.mockResolvedValue({ data: { ...USUARIOS[0], estado: "Inactivo" } });
   });
 
   afterEach(() => {
-    // Se restauran los temporizadores reales aunque un caso falle, para no
-    // arrastrar la falsificación de timers a los casos siguientes.
     vi.useRealTimers();
     vi.clearAllMocks();
   });
 
-  it("renderiza los usuarios devueltos por GET /api/v1/usuarios", async () => {
+  it("renderiza los usuarios devueltos por GET /api/v1/admin/usuarios", async () => {
     montarConProvider();
 
     expect(
@@ -103,17 +79,29 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     );
   });
 
-  it("expone los filtros de servidor por unidad orgánica, sede, rol y estado", async () => {
+  it("presenta explícitamente el encabezado de solo lectura y no expone botones de mutación simulada", async () => {
+    montarConProvider();
+    await screen.findByText("Juan Carlos Pérez");
+
+    expect(screen.getByText("Directorio de Usuarios (Solo Lectura)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /administrar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /conmutar estado/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Acciones")).not.toBeInTheDocument();
+  });
+
+  it("expone los filtros de servidor por unidad orgánica, rol y estado con sede deshabilitada", async () => {
     montarConProvider();
     await screen.findByText("Juan Carlos Pérez");
 
     expect(screen.getByLabelText("Unidad orgánica")).toBeInTheDocument();
-    expect(screen.getByLabelText("Sede")).toBeInTheDocument();
     expect(screen.getByLabelText("Rol asignado")).toBeInTheDocument();
     expect(screen.getByLabelText("Estado")).toBeInTheDocument();
+    const selectSede = screen.getByLabelText(/sede/i);
+    expect(selectSede).toBeInTheDocument();
+    expect(selectSede).toBeDisabled();
   });
 
-  it("aplica el filtro de estado sin volver a escribir código de filtrado local", async () => {
+  it("aplica el filtro de estado sin código de filtrado ficticio", async () => {
     const usuario = userEvent.setup();
     montarConProvider();
     await screen.findByText("Juan Carlos Pérez");
@@ -132,8 +120,6 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     montarConProvider();
     await screen.findByText("Juan Carlos Pérez");
 
-    // Los temporizadores falsos se activan solo tras el primer render para
-    // que la resolución de la consulta inicial no quede congelada.
     vi.useFakeTimers();
 
     const llamadasIniciales = get.mock.calls.length;
@@ -141,7 +127,6 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
       target: { value: "Pérez" },
     });
 
-    // La pulsación no debe disparar peticiones de forma inmediata.
     expect(get.mock.calls.length).toBe(llamadasIniciales);
 
     await act(async () => {
@@ -152,103 +137,5 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
       params: Record<string, unknown>;
     };
     expect(ultimaLlamada.params.busqueda).toBe("Pérez");
-  });
-
-  it("abre el modal de administración con los datos del usuario seleccionado", async () => {
-    const usuario = userEvent.setup();
-    montarConProvider();
-    await screen.findByText("Juan Carlos Pérez");
-
-    const fila = screen.getByText("Juan Carlos Pérez").closest("tr");
-    expect(fila).not.toBeNull();
-    await usuario.click(within(fila as HTMLElement).getByRole("button", { name: "Administrar" }));
-
-    const dialogo = await screen.findByRole("dialog");
-    expect(within(dialogo).getByLabelText("Correo institucional")).toHaveValue(
-      "jperez@iestpsuiza.edu.pe",
-    );
-    expect(within(dialogo).getByLabelText("Cargo")).toHaveValue(
-      "Asistente Administrativo",
-    );
-  });
-
-  it("persiste la edición con PUT /api/v1/usuarios/:id y refresca la tabla sin F5", async () => {
-    const usuario = userEvent.setup();
-    montarConProvider();
-    await screen.findByText("Juan Carlos Pérez");
-
-    const fila = screen.getByText("Juan Carlos Pérez").closest("tr");
-    await usuario.click(within(fila as HTMLElement).getByRole("button", { name: "Administrar" }));
-
-    const dialogo = await screen.findByRole("dialog");
-    await usuario.clear(within(dialogo).getByLabelText("Cargo"));
-    await usuario.type(within(dialogo).getByLabelText("Cargo"), "Jefe de Mesa de Partes");
-    await usuario.click(within(dialogo).getByRole("button", { name: "Guardar cambios" }));
-
-    await waitFor(() => {
-      expect(put).toHaveBeenCalledWith(
-        "/api/v1/admin/usuarios/1",
-        expect.objectContaining({ cargo: "Jefe de Mesa de Partes" }),
-      );
-    });
-
-    expect(
-      await screen.findByText(
-        "Los cambios fueron registrados correctamente.",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("expone el error RFC 7807 en el campo infractor ante un 409 Conflict de correo duplicado", async () => {
-    put.mockRejectedValueOnce(
-      problemaDuplicado(
-        "correo",
-        "Ya existe una cuenta institucional registrada con este correo.",
-      ),
-    );
-
-    const usuario = userEvent.setup();
-    montarConProvider();
-    await screen.findByText("Juan Carlos Pérez");
-
-    const fila = screen.getByText("Juan Carlos Pérez").closest("tr");
-    await usuario.click(within(fila as HTMLElement).getByRole("button", { name: "Administrar" }));
-
-    const dialogo = await screen.findByRole("dialog");
-    const campoCorreo = within(dialogo).getByLabelText("Correo institucional");
-    // Correo del dominio institucional: la validación de cliente lo acepta y
-    // el conflicto de duplicidad lo devuelve el servidor como 409.
-    await usuario.clear(campoCorreo);
-    await usuario.type(campoCorreo, "jperez@iestpsuiza.edu.pe");
-    await usuario.click(within(dialogo).getByRole("button", { name: "Guardar cambios" }));
-
-    expect(
-      await within(dialogo).findByText(
-        "Ya existe una cuenta institucional registrada con este correo.",
-      ),
-    ).toBeInTheDocument();
-    expect(campoCorreo).toHaveAttribute("aria-invalid", "true");
-  });
-
-  it("rechaza en cliente un correo fuera del dominio institucional y no llama a la API", async () => {
-    const usuario = userEvent.setup();
-    montarConProvider();
-    await screen.findByText("Juan Carlos Pérez");
-
-    const fila = screen.getByText("Juan Carlos Pérez").closest("tr");
-    await usuario.click(within(fila as HTMLElement).getByRole("button", { name: "Administrar" }));
-
-    const dialogo = await screen.findByRole("dialog");
-    const campoCorreo = within(dialogo).getByLabelText("Correo institucional");
-    await usuario.clear(campoCorreo);
-    await usuario.type(campoCorreo, "jperez@gmail.com");
-    await usuario.click(within(dialogo).getByRole("button", { name: "Guardar cambios" }));
-
-    expect(
-      await within(dialogo).findByText(
-        "El correo debe pertenecer al dominio @iestpsuiza.edu.pe.",
-      ),
-    ).toBeInTheDocument();
-    expect(put).not.toHaveBeenCalled();
   });
 });

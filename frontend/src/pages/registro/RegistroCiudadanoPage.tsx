@@ -54,10 +54,17 @@ export default function RegistroCiudadanoPage() {
 
     try {
       const res = await apiClient.post("/api/v1/auth/registro-ciudadano", payload);
-      const idPersona = res.data?.idPersona;
-      if (idPersona) {
-        mergeIdPersonaToWizardDraft(idPersona);
+      const idPersona = res.data?.idPersona ?? res.data?.personaId;
+
+      if (res.status !== 201 || !idPersona || typeof idPersona !== "string" || idPersona.trim().length === 0) {
+        throw new Error(
+          res.data?.detail ||
+          res.data?.message ||
+          "El servidor no devolvió una confirmación válida con idPersona para el registro ciudadano."
+        );
       }
+
+      mergeIdPersonaToWizardDraft(idPersona.trim());
       setErrorMessage(null);
       setSuccessMessage(
         `Registro completado. Tu casilla electrónica ha sido creada: ${data.numeroDocumento}@casilla.iestpsuiza.edu.pe`
@@ -96,10 +103,17 @@ export default function RegistroCiudadanoPage() {
 
     try {
       const res = await apiClient.post("/api/v1/auth/registro-persona-juridica", payload);
-      const idPersona = res.data?.idPersona;
-      if (idPersona) {
-        mergeIdPersonaToWizardDraft(idPersona);
+      const idPersona = res.data?.idPersona ?? res.data?.personaId;
+
+      if (res.status !== 201 || !idPersona || typeof idPersona !== "string" || idPersona.trim().length === 0) {
+        throw new Error(
+          res.data?.detail ||
+          res.data?.message ||
+          "El servidor no devolvió una confirmación válida con idPersona para el registro de persona jurídica."
+        );
       }
+
+      mergeIdPersonaToWizardDraft(idPersona.trim());
       setErrorMessage(null);
       setSuccessMessage(
         `Registro completado. Tu casilla electrónica ha sido creada: ${data.ruc}@casilla.iestpsuiza.edu.pe`

@@ -60,7 +60,38 @@ import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
 import { securityHeadersMiddleware } from './middleware/security-headers.middleware.js';
-import { verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { UnauthorizedError, ForbiddenError } from './shared/domain/errors/index.js';
+
+export const ROLES_ADMIN_PERMITIDOS = ['ADMINISTRADOR', 'SUPER_ADMIN'] as const;
+
+/**
+ * Middleware de guarda de administración institucional (H-08).
+ * Exige Bearer Token válido con rol ADMINISTRADOR o SUPER_ADMIN.
+ */
+export function requireAdminRole(req: express.Request, _res: express.Response, next: express.NextFunction): void {
+  const token = extraerTokenBearer(req.get('authorization'));
+  if (!token) {
+    throw new UnauthorizedError({
+      detail: 'Debe autenticarse con Authorization: Bearer <jwt> para acceder a recursos administrativos.',
+    });
+  }
+
+  const claims = verificarTokenAcceso(token);
+
+  const tieneRol = claims.roles?.some((r) =>
+    (ROLES_ADMIN_PERMITIDOS as readonly string[]).includes(r.toUpperCase()),
+  );
+
+  if (!tieneRol) {
+    throw new ForbiddenError({
+      message: 'Acceso denegado.',
+      detail: 'Se requiere rol administrativo (ADMINISTRADOR o SUPER_ADMIN) para esta operación.',
+    });
+  }
+
+  next();
+}
 
 export interface AppOptions {
   busSse?: BusSse;
@@ -213,8 +244,8 @@ export function construirApp(
    * OrganiCore - Tablas Maestras y Calendario Laboral (Feriados Ucayali) (#47, #48, #49)
    */
   const routerAdminMaestras = crearRouterAdminMaestras(pool);
-  app.use('/api/v1/admin', routerAdminMaestras);
-  app.get('/api/v1/admin/calendario/feriados', (req, res, next) => {
+  app.use('/api/v1/admin', requireAdminRole, routerAdminMaestras);
+  app.get('/api/v1/admin/calendario/feriados', requireAdminRole, (req, res, next) => {
     req.url = '/calendario-laboral';
     routerAdminMaestras(req, res, next);
   });
@@ -223,10 +254,10 @@ export function construirApp(
    * OrganiCore - Organigrama y Áreas Jerárquicas ltree (#44, #45)
    */
   const organigramaCtrl = crearControladorOrganigrama(new OrganigramaService(pool));
-  app.get('/api/v1/admin/organigrama', organigramaCtrl.getOrganigrama);
-  app.get('/api/v1/admin/organigrama/arbol', organigramaCtrl.getOrganigrama);
-  app.post('/api/v1/admin/organigrama/areas', organigramaCtrl.crearUnidad);
-  app.put('/api/v1/admin/organigrama/areas/:id', organigramaCtrl.actualizarUnidad);
+  app.get('/api/v1/admin/organigrama', requireAdminRole, organigramaCtrl.getOrganigrama);
+  app.get('/api/v1/admin/organigrama/arbol', requireAdminRole, organigramaCtrl.getOrganigrama);
+  app.post('/api/v1/admin/organigrama/areas', requireAdminRole, organigramaCtrl.crearUnidad);
+  app.put('/api/v1/admin/organigrama/areas/:id', requireAdminRole, organigramaCtrl.actualizarUnidad);
 
   /*
    * DocuCore - Foliación continua AGN, Callback Refirma y Validador CVD/QR (#31, #35, #36)
@@ -257,7 +288,7 @@ export function construirApp(
   /*
    * OrganiCore / CoreLink - Auditoría Bitácora WORM (#46), Roles RBAC (#45) y Maestras
    */
-  app.get('/api/v1/admin/auditoria/bitacora', async (req, res, next) => {
+  app.get('/api/v1/admin/auditoria/bitacora', requireAdminRole, async (req, res, next) => {
     try {
       const limite = Math.min(Number(req.query.limite ?? 50), 100);
       const offset = Number(req.query.offset ?? 0);
@@ -274,33 +305,23 @@ export function construirApp(
     }
   });
 
-  app.get('/api/v1/admin/roles-permisos', async (_req, res, next) => {
+  app.get('/api/v1/admin/roles-permisos', requireAdminRole, async (_req, res, next) => {
     try {
       const { rows: roles } = await pool.query(
-        `SELECT r.id, r.codigo, r.nombre, r.descripcion,
+        `SELECT r.rol_id AS id, r.codigo, r.nombre, r.descripcion,
                 COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
          FROM sigd_org.rol_sistema r
-         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.id
-         LEFT JOIN sigd_org.permiso_sistema p ON p.id = rp.permiso_id
-         GROUP BY r.id, r.codigo, r.nombre, r.descripcion`,
+         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
+         LEFT JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+         GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion`,
       );
       res.json({ roles });
-    } catch {
-      res.json({
-        roles: [
-          { codigo: 'ADMINISTRADOR', nombre: 'Administrador del Sistema' },
-          { codigo: 'SUPER_ADMIN', nombre: 'Super Administrador' },
-          { codigo: 'DIRECTOR', nombre: 'Director General' },
-          { codigo: 'SECRETARIO', nombre: 'Secretario' },
-          { codigo: 'ESPECIALISTA', nombre: 'Especialista' },
-          { codigo: 'MESA_PARTES', nombre: 'Operador de Mesa de Partes' },
-          { codigo: 'CIUDADANO', nombre: 'Ciudadano / Administrado' },
-        ],
-      });
+    } catch (err) {
+      next(err);
     }
   });
 
-  app.get('/api/v1/admin/maestras/sede', (_req, res) => {
+  app.get('/api/v1/admin/maestras/sede', requireAdminRole, (_req, res) => {
     res.json({
       sedes: [
         { id: '1', codigo: 'SEDE_CENTRAL', nombre: 'Sede Central Pucallpa - Av. Túpac Amaru Km. 4.5' },
@@ -309,23 +330,17 @@ export function construirApp(
     });
   });
 
-  app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
+  app.get('/api/v1/admin/maestras/tipo-documento', requireAdminRole, async (_req, res, next) => {
     try {
       const { rows } = await pool.query(
-        `SELECT id, codigo, nombre, descripcion, dias_atencion_legal, vigente
+        `SELECT tipo_documental_id AS id, codigo, nombre, extension, mime_type, tamano_maximo_mb, exige_firma, vigente
          FROM sigd_doc.tipo_documento
          WHERE vigente = TRUE
          ORDER BY nombre ASC`,
       );
       res.json(rows);
-    } catch {
-      res.json([
-        { codigo: 'SOLICITUD', nombre: 'Solicitud' },
-        { codigo: 'OFICIO', nombre: 'Oficio' },
-        { codigo: 'MEMORANDO', nombre: 'Memorando' },
-        { codigo: 'INFORME', nombre: 'Informe Técnico' },
-        { codigo: 'RESOLUCION', nombre: 'Resolución Directoral' },
-      ]);
+    } catch (err) {
+      next(err);
     }
   });
 

@@ -13,6 +13,8 @@ export default function TablasMaestrasPage() {
     setBusqueda,
     mensaje,
     isLoading,
+    estadoCarga,
+    errorCarga,
   } = useTablasMaestras();
 
   return (
@@ -26,6 +28,16 @@ export default function TablasMaestrasPage() {
         {mensaje && (
           <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
             {mensaje}
+          </div>
+        )}
+
+        {errorCarga && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {errorCarga}
           </div>
         )}
 
@@ -115,7 +127,14 @@ export default function TablasMaestrasPage() {
                     </td>
                   </tr>
                 )}
-                {!isLoading && registros.length === 0 && (
+                {!isLoading && estadoCarga === "error" && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-red-600 font-semibold">
+                      Error al consultar el catálogo institucional.
+                    </td>
+                  </tr>
+                )}
+                {!isLoading && estadoCarga !== "error" && registros.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
                       No se encontraron registros coincidentes.

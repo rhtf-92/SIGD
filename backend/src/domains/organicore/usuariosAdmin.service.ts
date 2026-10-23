@@ -117,15 +117,7 @@ export function crearUsuariosAdminService(pool: Pool) {
       const posicion = agregarParametro(areaId);
 
       condiciones.push(
-        `(ap.area_id = ${posicion}::uuid OR a.area_id = ${posicion}::uuid /* pl.id_area = ${posicion} */)`,
-      );
-    }
-
-    if (sedeId) {
-      const posicion = agregarParametro(sedeId);
-
-      condiciones.push(
-        `(1=1 /* pl.sede_id = ${posicion} */)`,
+        `(ap.area_id = ${posicion}::uuid OR a.area_id = ${posicion}::uuid)`,
       );
     }
 
@@ -133,7 +125,7 @@ export function crearUsuariosAdminService(pool: Pool) {
       const posicion = agregarParametro(rolId);
 
       condiciones.push(
-        `(ur.rol_id = ${posicion}::uuid /* ur.rol_id = ${posicion} */)`,
+        `(ur.rol_id = ${posicion}::uuid OR rs.rol_id = ${posicion}::uuid)`,
       );
     }
 

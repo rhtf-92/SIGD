@@ -1,14 +1,10 @@
-import { useState } from "react";
-
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
-import UserEditModal from "../../components/administracion/UserEditModal";
 import {
   CATALOGO_AREAS,
   CATALOGO_ROLES_USUARIOS,
   CATALOGO_SEDES,
   useUsuariosAdmin,
 } from "../../hooks/useUsuariosAdmin";
-import type { ApiHttpError } from "../../types/api";
 import type { EstadoUsuario } from "../../types/usuarioAdmin";
 
 function estiloEstado(estado: EstadoUsuario) {
@@ -18,9 +14,6 @@ function estiloEstado(estado: EstadoUsuario) {
 }
 
 export default function UsuariosPage() {
-  const [mensaje, setMensaje] = useState("");
-  const [errorServidor, setErrorServidor] = useState("");
-
   const {
     usuarios,
     totalUsuarios,
@@ -34,57 +27,29 @@ export default function UsuariosPage() {
     setRol,
     estado,
     setEstado,
-    usuarioEditando,
-    setUsuarioEditando,
-    actualizarUsuario,
-    conmutarEstado,
     isLoading,
     isFetching,
     error,
-    guardarPendiente,
   } = useUsuariosAdmin();
-
-  async function guardar(usuarioActualizado: Parameters<typeof actualizarUsuario>[0]) {
-    setErrorServidor("");
-    try {
-      await actualizarUsuario(usuarioActualizado);
-      setUsuarioEditando(null);
-      setMensaje("Los cambios fueron registrados correctamente.");
-    } catch (error) {
-      // El error se propaga para que el modal mapee los `invalidParams` de
-      // RFC 7807 al campo infractor; aquí solo se informa el fallo global.
-      setMensaje("");
-      setErrorServidor(
-        "No se pudo guardar la modificación. Revise los campos marcados e intente nuevamente.",
-      );
-      throw error;
-    }
-  }
-
-  async function alternarEstado(id: string | number) {
-    setErrorServidor("");
-    try {
-      await conmutarEstado(id);
-      setMensaje("El estado operativo fue actualizado.");
-    } catch {
-      setMensaje("");
-      setErrorServidor("No se pudo conmutar el estado del usuario.");
-    }
-  }
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <AdminPageHeader
-        title="Gestión de Usuarios"
-        description="Administración de cuentas, áreas, cargos, roles y estados."
+        title="Directorio de Usuarios (Solo Lectura)"
+        description="Consulta oficial del directorio institucional de cuentas, unidades orgánicas, cargos y roles."
       />
 
       <section className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <p className="text-sm text-slate-600">
-            Directorio institucional de {totalUsuarios} cuentas registradas.
-            Búsqueda en tiempo real y filtro por estado operativo.
-          </p>
+          <div>
+            <p className="text-sm text-slate-600">
+              Directorio institucional de {totalUsuarios} cuentas registradas.
+              Búsqueda en tiempo real y filtro por estado operativo (Solo lectura).
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              La creación y modificación de usuarios institucionales se gestiona exclusivamente a través de los procedimientos administrativos y control de personal.
+            </p>
+          </div>
           {isFetching && !isLoading && (
             <span
               role="status"
@@ -95,26 +60,6 @@ export default function UsuariosPage() {
             </span>
           )}
         </div>
-
-        {mensaje && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
-          >
-            {mensaje}
-          </div>
-        )}
-
-        {errorServidor && (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-          >
-            {errorServidor}
-          </div>
-        )}
 
         {error && (
           <div
@@ -161,16 +106,18 @@ export default function UsuariosPage() {
             </div>
 
             <div>
-              <label htmlFor="sede" className="mb-2 block text-sm font-semibold">
-                Sede
+              <label htmlFor="sede" className="mb-2 block text-sm font-semibold text-slate-500">
+                Sede (No filtrable)
               </label>
               <select
                 id="sede"
                 value={sede}
                 onChange={(event) => setSede(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                disabled
+                title="El directorio institucional no aplica filtro por sede"
+                className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
               >
-                <option value="">Todas</option>
+                <option value="">Todas las sedes</option>
                 {CATALOGO_SEDES.map((item) => (
                   <option key={item} value={item}>
                     {item}
@@ -229,7 +176,7 @@ export default function UsuariosPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-left">
+            <table className="w-full min-w-[1000px] text-left">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
                   <th className="px-6 py-3">Usuario</th>
@@ -239,14 +186,13 @@ export default function UsuariosPage() {
                   <th className="px-6 py-3">Rol</th>
                   <th className="px-6 py-3">Estado</th>
                   <th className="px-6 py-3">Último acceso</th>
-                  <th className="px-6 py-3">Acciones</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-slate-100" aria-busy={isLoading}>
                 {isLoading && (
                   <tr>
-                    <td colSpan={8} className="px-6 py-10 text-center">
+                    <td colSpan={7} className="px-6 py-10 text-center">
                       <span className="sr-only">
                         Cargando directorio institucional de usuarios...
                       </span>
@@ -264,7 +210,7 @@ export default function UsuariosPage() {
 
                 {!isLoading && usuarios.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-6 py-10 text-center">
+                    <td colSpan={7} className="px-6 py-10 text-center">
                       <div className="rounded-lg bg-blue-50 px-6 py-8 text-blue-600">
                         <p className="font-semibold">
                           No se registran usuarios institucionales
@@ -306,30 +252,6 @@ export default function UsuariosPage() {
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {usuario.ultimoAcceso}
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMensaje("");
-                              setErrorServidor("");
-                              setUsuarioEditando({ ...usuario });
-                            }}
-                            className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                          >
-                            Administrar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void alternarEstado(usuario.id)}
-                            disabled={guardarPendiente}
-                            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-60"
-                            title="Conmutar estado (Activo → Inactivo → Bloqueado)"
-                          >
-                            Conmutar estado
-                          </button>
-                        </div>
-                      </td>
                     </tr>
                   ))}
               </tbody>
@@ -337,27 +259,6 @@ export default function UsuariosPage() {
           </div>
         </section>
       </section>
-
-      {usuarioEditando && (
-        <UserEditModal
-          usuario={usuarioEditando}
-          areas={CATALOGO_AREAS}
-          sedes={CATALOGO_SEDES}
-          roles={CATALOGO_ROLES_USUARIOS}
-          onClose={() => {
-            setMensaje("");
-            setUsuarioEditando(null);
-          }}
-          onSave={guardar}
-          onServerError={(err: ApiHttpError) => {
-            if (err?.correlationId) {
-              setErrorServidor(
-                `Operación rechazada por el servidor. Código de correlación: ${err.correlationId}.`,
-              );
-            }
-          }}
-        />
-      )}
     </main>
   );
 }
