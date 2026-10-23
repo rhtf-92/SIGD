@@ -209,21 +209,6 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
        ORDER BY a.codigo`,
   },
   {
-    clave: 'tipos_relacion_movimiento',
-    esquema: 'sigd_rut',
-    tabla: 'tipo_relacion_movimiento',
-    descripcion: 'Relaciones semánticas entre movimientos de trámite.',
-    soloActivos: true,
-    sql: `
-      SELECT r.codigo      AS codigo,
-             r.nombre      AS nombre,
-             r.descripcion AS descripcion,
-             '{}'::jsonb   AS extra
-        FROM sigd_rut.tipo_relacion_movimiento AS r
-       WHERE ($1::boolean = FALSE OR r.activo = TRUE)
-       ORDER BY r.nombre`,
-  },
-  {
     clave: 'unidades_organicas',
     esquema: 'sigd_org',
     tabla: 'area',
@@ -241,24 +226,6 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
         FROM sigd_org.area AS a
        WHERE ($1::boolean = FALSE OR a.vigente = TRUE)
        ORDER BY a.nivel, a.nombre`,
-  },
-  {
-    clave: 'unidades_organicas_ltree',
-    esquema: 'sigd_org',
-    tabla: 'unidad_organica',
-    descripcion: 'Unidades orgánicas del esquema v6.3 con ruta jerárquica ltree.',
-    soloActivos: true,
-    sql: `
-      SELECT u.sigla  AS codigo,
-             u.nombre AS nombre,
-             NULL::text AS descripcion,
-             jsonb_build_object(
-                 'id', u.id,
-                 'path', u.path::text
-             ) AS extra
-        FROM sigd_org.unidad_organica AS u
-       WHERE ($1::boolean = FALSE OR u.estado = TRUE)
-       ORDER BY u.path`,
   },
   {
     clave: 'cargos',

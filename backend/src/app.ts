@@ -288,11 +288,13 @@ export function construirApp(
     } catch {
       res.json({
         roles: [
+          { codigo: 'ADMINISTRADOR', nombre: 'Administrador del Sistema' },
           { codigo: 'SUPER_ADMIN', nombre: 'Super Administrador' },
           { codigo: 'DIRECTOR', nombre: 'Director General' },
-          { codigo: 'DOCENTE', nombre: 'Docente Titular' },
+          { codigo: 'SECRETARIO', nombre: 'Secretario' },
+          { codigo: 'ESPECIALISTA', nombre: 'Especialista' },
           { codigo: 'MESA_PARTES', nombre: 'Operador de Mesa de Partes' },
-          { codigo: 'ESTUDIANTE', nombre: 'Estudiante / Administrado' },
+          { codigo: 'CIUDADANO', nombre: 'Ciudadano / Administrado' },
         ],
       });
     }

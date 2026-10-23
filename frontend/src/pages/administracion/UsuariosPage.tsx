@@ -61,7 +61,7 @@ export default function UsuariosPage() {
     }
   }
 
-  async function alternarEstado(id: number) {
+  async function alternarEstado(id: string | number) {
     setErrorServidor("");
     try {
       await conmutarEstado(id);

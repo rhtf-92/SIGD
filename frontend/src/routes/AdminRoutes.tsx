@@ -22,7 +22,7 @@ export default function AdminRoutes() {
         path="usuarios"
         element={
           <ProtectedRoute
-            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
+            requiredRoles={["ADMINISTRADOR", "SUPER_ADMIN", "DIRECTOR"]}
             requiredModule="Administración"
             requiredAction="editar"
           >

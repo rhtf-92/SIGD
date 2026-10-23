@@ -71,7 +71,10 @@ export const listarUsuariosQuerySchema = z.object({
     .uuid("El ID del rol no es válido")
     .optional(),
 
-  estado: estadoUsuarioSchema.optional(),
+  estado: z.preprocess(
+    (val) => (typeof val === "string" ? val.toUpperCase() : val),
+    estadoUsuarioSchema.optional(),
+  ),
 
   pagina: z.coerce
     .number()
@@ -200,7 +203,10 @@ const actualizarUsuarioAdminBaseSchema = z.object({
     .uuid("El ID del rol no es válido")
     .optional(),
 
-  estado: estadoUsuarioSchema.optional(),
+  estado: z.preprocess(
+    (val) => (typeof val === "string" ? val.toUpperCase() : val),
+    estadoUsuarioSchema.optional(),
+  ),
 });
 
 /**

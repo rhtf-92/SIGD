@@ -66,7 +66,7 @@ export default function ExpedienteDetallePage() {
       ]),
   });
 
-  const puedeOperar = usuario ? usuario.rol !== "ESTUDIANTE" : true;
+  const puedeOperar = usuario ? usuario.rol !== "ESTUDIANTE" && usuario.rol !== "CIUDADANO" : true;
   const permisos = obtenerPermisosAlmacenados() ?? permisosIniciales;
   const puedeEditarExpedientes = Boolean(usuario && permisos[usuario.rol]?.some(
     (permiso) => permiso.modulo === "Expedientes" && permiso.editar,

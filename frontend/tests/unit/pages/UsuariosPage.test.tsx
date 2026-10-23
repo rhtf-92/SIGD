@@ -22,7 +22,7 @@ vi.mock("@/api/client", () => ({
 
 const USUARIOS: Usuario[] = [
   {
-    id: 1,
+    id: "1",
     nombre: "Juan Carlos Pérez",
     dni: "71234567",
     correo: "jperez@iestpsuiza.edu.pe",
@@ -34,7 +34,7 @@ const USUARIOS: Usuario[] = [
     ultimoAcceso: "29/08/2026 09:42",
   },
   {
-    id: 2,
+    id: "2",
     nombre: "María Fernanda López",
     dni: "74561238",
     correo: "mlopez@iestpsuiza.edu.pe",

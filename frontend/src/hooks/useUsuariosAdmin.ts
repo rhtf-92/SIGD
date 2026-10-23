@@ -88,8 +88,8 @@ export function useUsuariosAdmin() {
     });
   }
 
-  function conmutarEstado(id: number) {
-    const usuario = usuarios.find((item) => item.id === id);
+  function conmutarEstado(id: string | number) {
+    const usuario = usuarios.find((item) => String(item.id) === String(id));
     if (!usuario) return undefined;
 
     return mutacionEstado.mutateAsync({

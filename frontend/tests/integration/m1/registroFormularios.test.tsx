@@ -11,6 +11,7 @@ import PersonaJuridicaForm from "../../../src/components/registro/PersonaJuridic
 import { DeclaracionJuradaCheckbox } from "../../../src/components/registro/DeclaracionJuradaCheckbox";
 import { ConsentimientoLey29733Modal } from "../../../src/components/registro/ConsentimientoLey29733Modal";
 import { consentimientoLey29733Schema } from "../../../src/schemas/consentimiento.schema";
+import { apiClient } from "../../../src/api/client";
 
 describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / ENT-M01-04 / ENT-M01-05)", () => {
   it("a) RegistroCiudadanoPage: el conmutador role=\"tablist\" alterna entre Persona Natural y Persona Jurídica sin recargar, y cambia los campos visibles", async () => {
@@ -261,6 +262,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
 
   it("h) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Natural y muestra la casilla creada", async () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({ data: { idPersona: "pers-sergio-001" }, status: 201 } as any);
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -336,6 +338,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     expect(payload.domicilio.direccionExacta).not.toBe("");
 
     consoleSpy.mockRestore();
+    postSpy.mockRestore();
 
     // Cerrar mensaje de éxito
     const botonCerrarExito = screen.getByLabelText(/Cerrar mensaje de éxito/i);
@@ -346,6 +349,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
   }, 30_000);
 
   it("i) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Jurídica y muestra la casilla creada", async () => {
+    const postSpyJuridica = vi.spyOn(apiClient, "post").mockResolvedValue({ data: { idPersona: "pers-empresa-001" }, status: 201 } as any);
+    void postSpyJuridica;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const user = userEvent.setup();
     render(

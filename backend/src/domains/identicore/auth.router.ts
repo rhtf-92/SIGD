@@ -54,7 +54,7 @@ export function crearRouterAuth(pool: Pool): Router {
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
              c.password_hash, c.activo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
+             COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo,
              p.area_id
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
@@ -91,7 +91,7 @@ export function crearRouterAuth(pool: Pool): Router {
       });
     }
 
-    const rol = usuario.rol_codigo ?? 'ESTUDIANTE';
+    const rol = usuario.rol_codigo ?? 'CIUDADANO';
     const accessToken = firmarTokenAcceso({
       sub: usuario.id_usuario,
       roles: [rol],
@@ -159,7 +159,7 @@ export function crearRouterAuth(pool: Pool): Router {
 
       const query = `
         SELECT s.id_usuario, s.expira_en, s.revocado_en,
-               COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo
+               COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo
           FROM sigd_auth.sesion_usuario s
           LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
           LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
@@ -228,7 +228,7 @@ export function crearRouterAuth(pool: Pool): Router {
     const query = `
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
+             COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo,
              p.area_id, p.cargo_id, p.telefono
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona

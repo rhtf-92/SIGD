@@ -62,6 +62,10 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
 
       // Consulta de documento adjunto para download
       if (sqlStr.includes('sigd_doc.documento_adjunto') && sqlStr.includes('da.s3_key = $1')) {
+        const keyParam = params?.[0];
+        if (keyParam === 'expedientes/2026/inexistente.pdf') {
+          return { rows: [] };
+        }
         return {
           rows: [
             {
@@ -190,5 +194,49 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
     expect(res.status).toBe(500);
     expect(res.body).not.toHaveProperty('confirmado');
     expect(res.body.title).toBeDefined();
+  });
+
+  it('F-02 FAIL-CLOSED: documento inexistente en DB (0 rows) -> 404 Not Found, nunca genera URL', async () => {
+    const res = await request(app)
+      .get('/api/v1/storage/download/sigd-expedientes/expedientes%2F2026%2Finexistente.pdf')
+      .set('Authorization', `Bearer ${tokenAdmin}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body).not.toHaveProperty('downloadUrl');
+  });
+
+  it('F-02 FAIL-CLOSED: error DB inducido en consulta de documento -> 5xx, nunca URL', async () => {
+    const poolConFallo = {
+      query: async (sql: string) => {
+        if (sql.includes('sigd_doc.documento_adjunto')) {
+          throw new Error('DATABASE_CONNECTION_LOST');
+        }
+        return { rows: [] };
+      },
+      connect: async () => ({
+        query: async () => ({ rows: [] }),
+        release: () => undefined,
+      }),
+    } as unknown as Pool;
+
+    const appFallo = construirApp(poolConFallo);
+
+    const res = await request(appFallo)
+      .get('/api/v1/storage/download/sigd-expedientes/expedientes%2F2026%2Ftest.pdf')
+      .set('Authorization', `Bearer ${tokenAdmin}`);
+
+    expect(res.status).toBe(500);
+    expect(res.body).not.toHaveProperty('downloadUrl');
+  });
+
+  it('F-02 FAIL-CLOSED: sin pool de conexión -> 403 Forbidden', async () => {
+    const appSinPool = construirApp(undefined as unknown as Pool);
+
+    const res = await request(appSinPool)
+      .get('/api/v1/storage/download/sigd-expedientes/expedientes%2F2026%2Ftest.pdf')
+      .set('Authorization', `Bearer ${tokenAdmin}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body).not.toHaveProperty('downloadUrl');
   });
 });

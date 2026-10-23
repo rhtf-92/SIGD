@@ -283,29 +283,40 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
       });
     }
 
-    // Validar autorización del actor sobre el documento
-    if (pool && !claims.roles.some((r) => ['SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'MESA_PARTES'].includes(r))) {
-      try {
-        const resDoc = await pool.query<{ solicitante_id: string | null }>(
-          `SELECT e.solicitante_id::text AS solicitante_id
-             FROM sigd_doc.documento_adjunto da
-             JOIN sigd_tra.expediente e ON e.expediente_id = da.expediente_id
-            WHERE da.s3_key = $1`,
-          [key],
-        );
-        if (resDoc.rows.length > 0) {
-          const doc = resDoc.rows[0];
-          const resUser = await pool.query<{ id_persona: string | null }>(
-            `SELECT id_persona::text AS id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1`,
-            [claims.sub],
-          );
-          const idPersona = resUser.rows[0]?.id_persona;
-          if (!idPersona || doc.solicitante_id !== idPersona) {
-            throw new ForbiddenError({ detail: 'No tiene permisos para descargar documentos de este expediente.' });
-          }
-        }
-      } catch (err) {
-        if (err instanceof ForbiddenError) throw err;
+    // Validar autorización del actor sobre el documento (FAIL-CLOSED)
+    if (!pool) {
+      throw new ForbiddenError({
+        detail: 'No es posible verificar la autorización documental sin conexión a la base de datos.',
+      });
+    }
+
+    const esPersonalAutorizado = claims.roles.some((r) =>
+      ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES', 'SECRETARIO', 'ESPECIALISTA', 'SUPER_ADMIN', 'ADMIN'].includes(r.toUpperCase()),
+    );
+
+    const resDoc = await pool.query<{ solicitante_id: string | null }>(
+      `SELECT e.solicitante_id::text AS solicitante_id
+         FROM sigd_doc.documento_adjunto da
+         JOIN sigd_tra.expediente e ON e.expediente_id = da.expediente_id
+        WHERE da.s3_key = $1`,
+      [key],
+    );
+
+    if (resDoc.rows.length === 0) {
+      throw new NotFoundError({
+        detail: 'El documento solicitado no existe o no se encuentra asociado a un expediente válido.',
+      });
+    }
+
+    if (!esPersonalAutorizado) {
+      const doc = resDoc.rows[0];
+      const resUser = await pool.query<{ id_persona: string | null }>(
+        `SELECT id_persona::text AS id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1`,
+        [claims.sub],
+      );
+      const idPersona = resUser.rows[0]?.id_persona;
+      if (!idPersona || doc.solicitante_id !== idPersona) {
+        throw new ForbiddenError({ detail: 'No tiene permisos para descargar documentos de este expediente.' });
       }
     }
 

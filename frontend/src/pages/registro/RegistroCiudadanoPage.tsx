@@ -64,15 +64,9 @@ export default function RegistroCiudadanoPage() {
       );
     } catch (err: any) {
       console.warn("[RegistroCiudadano] Fallo de llamada a API en registro natural:", err);
-      if (err.response && err.response.status >= 400) {
-        const msg = err.response.data?.detail || err.response.data?.message || "Error al procesar el registro en el servidor.";
-        setErrorMessage(msg);
-        return;
-      }
-      setErrorMessage(null);
-      setSuccessMessage(
-        `Registro completado. Tu casilla electrónica ha sido creada: ${data.numeroDocumento}@casilla.iestpsuiza.edu.pe`
-      );
+      setSuccessMessage(null);
+      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || "Error al procesar el registro en el servidor. Verifique su conexión.";
+      setErrorMessage(msg);
     }
   };
 
@@ -112,15 +106,9 @@ export default function RegistroCiudadanoPage() {
       );
     } catch (err: any) {
       console.warn("[RegistroCiudadano] Fallo de llamada a API en registro jurídica:", err);
-      if (err.response && err.response.status >= 400) {
-        const msg = err.response.data?.detail || err.response.data?.message || "Error al procesar el registro en el servidor.";
-        setErrorMessage(msg);
-        return;
-      }
-      setErrorMessage(null);
-      setSuccessMessage(
-        `Registro completado. Tu casilla electrónica ha sido creada: ${data.ruc}@casilla.iestpsuiza.edu.pe`
-      );
+      setSuccessMessage(null);
+      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || "Error al procesar el registro en el servidor. Verifique su conexión.";
+      setErrorMessage(msg);
     }
   };
 

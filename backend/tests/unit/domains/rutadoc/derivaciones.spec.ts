@@ -478,7 +478,7 @@ describe('RutaDoc FSM: Observación y Subsanación Formal', () => {
       mockQuery.mockResolvedValueOnce({ rowCount: 0 }); // Concurrency conflict: 0 rows affected
 
       await expect(subsanarExpediente(mockCliente, mockExpedienteId, 'Documentos adjuntados'))
-        .rejects.toThrow('No se pudo actualizar el estado a EN_TRAMITE para el expediente');
+        .rejects.toThrow('No se pudo actualizar el estado a EN_REVISION para el expediente');
     });
   });
 });

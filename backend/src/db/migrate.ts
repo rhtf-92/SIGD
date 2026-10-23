@@ -35,6 +35,7 @@ const MANIFIESTO_BASELINE = [
   '01_sigd_audit.sql', '02_sigd_auth.sql', '03_sigd_org.sql',
   '04_sigd_doc.sql', '05_sigd_tra.sql', 'BASELINE_2026_V1.sql',
   '08_sigd_tupa_acoplamiento.sql', '09_sigd_seguridad_remediacion.sql',
+  '10_sigd_seguridad_fix_integridad.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }
@@ -58,7 +59,7 @@ function cargarManifiesto(directorio: string): ScriptMigracion[] {
 }
 
 /** Se ejecuta bajo el mismo advisory lock y antes de crear el ledger. */
-async function clasificarDestino(cliente: PoolClient, manifiesto: ScriptMigracion[]): Promise<'FRESH' | 'COMPLETE_BASELINE'> {
+async function clasificarDestino(cliente: PoolClient, manifiesto: ScriptMigracion[]): Promise<'FRESH' | 'COMPLETE_BASELINE' | 'PENDING_INCREMENTAL'> {
   const ledger = await cliente.query<{ existe: string | null }>(
     "SELECT to_regclass('public.sigd_migraciones')::text AS existe");
   if (ledger.rows[0]?.existe) {
@@ -102,10 +103,16 @@ async function clasificarDestino(cliente: PoolClient, manifiesto: ScriptMigracio
     if (Number(objetos.rows[0]?.total) === 0) return 'FRESH';
     throw new Error('BASELINE_2026_V1 rechazado: el destino no está vacío.');
   }
-  if (registros.length !== manifiesto.length ||
-      registros.some((registro) => !manifiesto.some((script) =>
-        script.nombre === registro.nombre_script && checksumsCoinciden(script.contenido, registro.checksum_sha256)))) {
+  const ledgerValido = registros.every((registro) =>
+    manifiesto.some((script) =>
+      script.nombre === registro.nombre_script && checksumsCoinciden(script.contenido, registro.checksum_sha256)
+    )
+  );
+  if (!ledgerValido || registros.length > manifiesto.length) {
     throw new Error('BASELINE_2026_V1 rechazado: ledger parcial, desconocido o checksum distinto.');
+  }
+  if (registros.length < manifiesto.length) {
+    return 'PENDING_INCREMENTAL';
   }
   const contrato = await cliente.query<{ valido: boolean }>(`
     SELECT
