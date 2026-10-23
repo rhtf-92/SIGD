@@ -60,7 +60,7 @@ async function validarAccesoExpediente(
   roles: string[],
   idExpediente: string,
 ): Promise<boolean> {
-  if (roles.some((r) => ['SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'MESA_PARTES'].includes(r))) {
+  if (roles.some((r) => ['ADMINISTRADOR', 'SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'MESA_PARTES'].includes(r))) {
     return true;
   }
   if (!pool) return true;

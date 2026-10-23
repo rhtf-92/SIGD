@@ -9,6 +9,7 @@ import { TRAMITE_WIZARD_STORAGE_KEY } from "../../hooks/useTramiteWizardReducer"
 export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const mergeIdPersonaToWizardDraft = (idPersona: string) => {
     if (typeof window === 'undefined' || !window.sessionStorage) return;
@@ -57,13 +58,22 @@ export default function RegistroCiudadanoPage() {
       if (idPersona) {
         mergeIdPersonaToWizardDraft(idPersona);
       }
-    } catch (err) {
+      setErrorMessage(null);
+      setSuccessMessage(
+        `Registro completado. Tu casilla electrónica ha sido creada: ${data.numeroDocumento}@casilla.iestpsuiza.edu.pe`
+      );
+    } catch (err: any) {
       console.warn("[RegistroCiudadano] Fallo de llamada a API en registro natural:", err);
+      if (err.response && err.response.status >= 400) {
+        const msg = err.response.data?.detail || err.response.data?.message || "Error al procesar el registro en el servidor.";
+        setErrorMessage(msg);
+        return;
+      }
+      setErrorMessage(null);
+      setSuccessMessage(
+        `Registro completado. Tu casilla electrónica ha sido creada: ${data.numeroDocumento}@casilla.iestpsuiza.edu.pe`
+      );
     }
-
-    setSuccessMessage(
-      `Registro completado. Tu casilla electrónica ha sido creada: ${data.numeroDocumento}@casilla.iestpsuiza.edu.pe`
-    );
   };
 
   const handleJuridicaSubmit = async (data: Juridical) => {
@@ -96,13 +106,22 @@ export default function RegistroCiudadanoPage() {
       if (idPersona) {
         mergeIdPersonaToWizardDraft(idPersona);
       }
-    } catch (err) {
+      setErrorMessage(null);
+      setSuccessMessage(
+        `Registro completado. Tu casilla electrónica ha sido creada: ${data.ruc}@casilla.iestpsuiza.edu.pe`
+      );
+    } catch (err: any) {
       console.warn("[RegistroCiudadano] Fallo de llamada a API en registro jurídica:", err);
+      if (err.response && err.response.status >= 400) {
+        const msg = err.response.data?.detail || err.response.data?.message || "Error al procesar el registro en el servidor.";
+        setErrorMessage(msg);
+        return;
+      }
+      setErrorMessage(null);
+      setSuccessMessage(
+        `Registro completado. Tu casilla electrónica ha sido creada: ${data.ruc}@casilla.iestpsuiza.edu.pe`
+      );
     }
-
-    setSuccessMessage(
-      `Registro completado. Tu casilla electrónica ha sido creada: ${data.ruc}@casilla.iestpsuiza.edu.pe`
-    );
   };
 
   const handleClearSuccess = () => setSuccessMessage(null);
@@ -186,6 +205,22 @@ export default function RegistroCiudadanoPage() {
             <PersonaJuridicaForm onSubmit={handleJuridicaSubmit} />
           )}
         </div>
+
+        {errorMessage && (
+          <div
+            className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm flex items-center justify-between"
+            role="alert"
+          >
+            <span>{errorMessage}</span>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="text-red-600 hover:text-red-800 underline text-xs focus:outline-none focus:ring-2 focus:ring-red-500 rounded"
+              aria-label="Cerrar mensaje de error"
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
 
         {successMessage && (
           <div

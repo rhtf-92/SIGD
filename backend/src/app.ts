@@ -119,15 +119,6 @@ export function construirApp(
     });
   });
 
-  app.get('/ready', async (_req, res) => {
-    try {
-      await pool.query('SELECT 1');
-      res.json({ status: 'ok', estado: 'READY', timestamp: new Date().toISOString() });
-    } catch {
-      res.status(503).json({ status: 'error', estado: 'NOT_READY' });
-    }
-  });
-
   // Configuración de Pasarela y Sesiones de Firma (DocuCore - B_VALENTIN)
   const hostsPermitidos = (process.env.REFIRMA_HOSTS_PERMITIDOS ?? 'sigd.iestp-suiza.edu.pe')
     .split(',')
@@ -158,6 +149,18 @@ export function construirApp(
 
   const almacen = new InMemoryAlmacenDocumentosFirmables(sesiones);
   const servicio = new ServicioFirmaService({ sesiones, almacen, pasarela });
+
+  app.get('/ready', async (_req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      if (sesiones instanceof RedisFirmaSessionStore) {
+        await sesiones.ping();
+      }
+      res.json({ status: 'ok', estado: 'READY', timestamp: new Date().toISOString() });
+    } catch {
+      res.status(503).json({ status: 'error', estado: 'NOT_READY' });
+    }
+  });
 
   // Rutas
   const jwtActorProvider: ActorProviderRutaDoc = crearJwtActorProvider(pool);

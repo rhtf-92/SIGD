@@ -9,7 +9,7 @@ import type { ServicioTrazabilidadRutaDoc } from './trazabilidad.service.js';
 import type { ActorRutaDoc } from './rutadoc.types.js';
 import { esIdExpediente } from './rutadoc.cursor.js';
 
-const ROLES_CCD = new Set(['DOCENTE', 'DIRECTOR', 'MESA_PARTES', 'SUPER_ADMIN']);
+const ROLES_CCD = new Set(['ADMINISTRADOR', 'DIRECTOR', 'ESPECIALISTA', 'SECRETARIO', 'MESA_PARTES', 'DOCENTE', 'SUPER_ADMIN']);
 
 export function crearControladorLecturasRutaDoc(
   actorProvider: ActorProviderRutaDoc,

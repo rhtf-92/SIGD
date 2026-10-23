@@ -379,7 +379,7 @@ export async function observarExpediente(
   const estadoActual = resEstadoActual.rows[0].estado_actual_id;
   const areaOrigenId = resEstadoActual.rows[0].area_contexto_id;
 
-  const estadosPermitidosObservacion = ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION'];
+  const estadosPermitidosObservacion = ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'EN_TRAMITE'];
   if (!estadosPermitidosObservacion.includes(estadoActual)) {
     throw new DomainError({
       code: 'ESTADO_INVALIDO',
@@ -421,6 +421,8 @@ export async function observarExpediente(
     `, [expedienteId, operadorId, JSON.stringify({ detalle: 'Recepción previa a observación' })]);
 
     estadoPrevioObservacion = 'EN_REVISION';
+  } else if (estadoActual === 'EN_TRAMITE') {
+    estadoPrevioObservacion = 'EN_REVISION';
   }
 
   const datosMovimiento = {
@@ -461,7 +463,7 @@ export async function observarExpediente(
     `UPDATE sigd_tra.expediente
         SET estado = 'OBSERVADO'
       WHERE expediente_id = $1::uuid
-        AND estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION')`,
+        AND estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'EN_TRAMITE')`,
     [expedienteId],
   );
   if ((updateRes?.rowCount ?? 0) !== 1) {

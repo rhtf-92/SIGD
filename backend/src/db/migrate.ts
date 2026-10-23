@@ -39,6 +39,14 @@ const MANIFIESTO_BASELINE = [
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }
 
+function checksumsCoinciden(contenido: string, checksumRegistrado: string): boolean {
+  if (crypto.createHash('sha256').update(contenido).digest('hex') === checksumRegistrado) return true;
+  const lf = crypto.createHash('sha256').update(contenido.replace(/\r\n/g, '\n')).digest('hex');
+  if (lf === checksumRegistrado) return true;
+  const crlf = crypto.createHash('sha256').update(contenido.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n')).digest('hex');
+  return crlf === checksumRegistrado;
+}
+
 function cargarManifiesto(directorio: string): ScriptMigracion[] {
   return MANIFIESTO_BASELINE.map((nombre) => {
     const ruta = nombre === PERFIL_BASELINE + '.sql'
@@ -96,7 +104,7 @@ async function clasificarDestino(cliente: PoolClient, manifiesto: ScriptMigracio
   }
   if (registros.length !== manifiesto.length ||
       registros.some((registro) => !manifiesto.some((script) =>
-        script.nombre === registro.nombre_script && script.checksum === registro.checksum_sha256))) {
+        script.nombre === registro.nombre_script && checksumsCoinciden(script.contenido, registro.checksum_sha256)))) {
     throw new Error('BASELINE_2026_V1 rechazado: ledger parcial, desconocido o checksum distinto.');
   }
   const contrato = await cliente.query<{ valido: boolean }>(`
@@ -203,7 +211,7 @@ async function esperarCandado(cliente: PoolClient, lockId: number, timeoutMs: nu
 }
 
 export async function ejecutarMigraciones(pool: Pool, opciones: { timeoutLockMs?: number } = {}): Promise<string[]> {
-  const perfil = process.env.SIGD_MIGRATION_PROFILE;
+  const perfil = process.env.SIGD_MIGRATION_PROFILE ?? PERFIL_BASELINE;
   if (perfil !== undefined && perfil !== PERFIL_BASELINE) {
     throw new Error('SIGD_MIGRATION_PROFILE no reconocido.');
   }
@@ -262,7 +270,7 @@ export async function ejecutarMigraciones(pool: Pool, opciones: { timeoutLockMs?
       );
 
       if (existentes.rowCount && existentes.rowCount > 0) {
-        if (existentes.rows[0].checksum_sha256 !== checksum) {
+        if (!checksumsCoinciden(contenido, existentes.rows[0].checksum_sha256)) {
           throw new Error(
             `Error de Integridad DDL: ${archivo} fue alterado tras su ejecución. ` +
               `Checksum registrado: ${existentes.rows[0].checksum_sha256}, actual: ${checksum}`,
