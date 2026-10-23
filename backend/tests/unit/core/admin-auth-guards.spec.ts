@@ -102,11 +102,11 @@ describe('H-08: Admin Auth Guards & No Synthetic Fallback (§12 / Codex)', () =>
       expect([200, 304]).toContain(res.status);
     });
 
-    it(`SUPER_ADMIN sobre ${ruta} -> acceso concedido (no 401 ni 403)`, async () => {
+    it(`SUPER_ADMIN (rol legado / no canónico) sobre ${ruta} -> 403 Forbidden`, async () => {
       const res = await request(app)
         .get(ruta)
         .set('Authorization', `Bearer ${tokenSuperAdmin}`);
-      expect([200, 304]).toContain(res.status);
+      expect(res.status).toBe(403);
     });
   }
 

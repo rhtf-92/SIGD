@@ -262,7 +262,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
 
   it("h) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Natural y muestra la casilla creada", async () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({ data: { idPersona: "pers-sergio-001" }, status: 201 } as any);
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({ data: { idPersona: "a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d" }, status: 201 } as any);
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -349,7 +349,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
   }, 30_000);
 
   it("i) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Jurídica y muestra la casilla creada", async () => {
-    const postSpyJuridica = vi.spyOn(apiClient, "post").mockResolvedValue({ data: { idPersona: "pers-empresa-001" }, status: 201 } as any);
+    const postSpyJuridica = vi.spyOn(apiClient, "post").mockResolvedValue({ data: { idPersona: "b2c3d4e5-f6a7-4b2c-8d3e-4f5a6b7c8d9e" }, status: 201 } as any);
     void postSpyJuridica;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const user = userEvent.setup();

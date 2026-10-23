@@ -1,13 +1,16 @@
-// Hook de administración del Directorio de Usuarios (ENT-M05-02 / T-FE-ADM-01)
-// Desacoplado del mock `usuariosIniciales`: delega la carga en
-// `adminUsuariosService` (TanStack Query) y aplica debounce de 300 ms al
-// buscador para evitar peticiones redundantes al servidor.
+// Hook de administración del Directorio de Usuarios (ENT-M05-02 / T-FE-ADM-01 / H-05)
+// Desacoplado del mock: consulta /api/v1/admin/usuarios con areaId y rolId canónicos (UUID),
+// y carga dinámicamente los catálogos reales de roles y áreas del servidor.
 import { useEffect, useMemo, useState } from "react";
 
 import {
   useActualizarUsuarioMutation,
   useConmutarEstadoMutation,
+  useOrganigramaAreasQuery,
+  useRolesPermisosQuery,
   useUsuariosQuery,
+  type AreaCatalogo,
+  type RolCatalogo,
 } from "../services/adminUsuariosService";
 import {
   DEBOUNCE_BUSQUEDA_MS,
@@ -16,24 +19,6 @@ import {
   type FiltrosUsuarios,
   type Usuario,
 } from "../types/usuarioAdmin";
-
-export const CATALOGO_ROLES_USUARIOS = [
-  "Administrador",
-  "Responsable de Área",
-  "Operador",
-  "Consulta",
-];
-
-export const CATALOGO_AREAS = [
-  "Dirección General",
-  "Secretaría Académica",
-  "Mesa de Partes",
-  "Administración",
-  "Archivo Central",
-  "Coordinación DSI",
-];
-
-export const CATALOGO_SEDES = ["Sede Principal"];
 
 function siguienteEstado(estado: EstadoUsuario): EstadoUsuario {
   if (estado === "Activo") return "Inactivo";
@@ -46,13 +31,19 @@ export function useUsuariosAdmin() {
   const [busquedaAplicada, setBusquedaAplicada] = useState(
     FILTROS_USUARIOS_INICIALES.busqueda,
   );
-  const [area, setArea] = useState(FILTROS_USUARIOS_INICIALES.area);
-  const [sede, setSede] = useState(FILTROS_USUARIOS_INICIALES.sede);
-  const [rol, setRol] = useState(FILTROS_USUARIOS_INICIALES.rol);
+  const [areaId, setAreaId] = useState<string | undefined>(FILTROS_USUARIOS_INICIALES.areaId);
+  const [rolId, setRolId] = useState<string | undefined>(FILTROS_USUARIOS_INICIALES.rolId);
   const [estado, setEstado] = useState<EstadoUsuario | "Todos">(
     FILTROS_USUARIOS_INICIALES.estado,
   );
   const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
+
+  // Consultas a catálogos relacionales canónicos
+  const rolesQuery = useRolesPermisosQuery();
+  const areasQuery = useOrganigramaAreasQuery();
+
+  const roles = useMemo<RolCatalogo[]>(() => rolesQuery.data ?? [], [rolesQuery.data]);
+  const areas = useMemo<AreaCatalogo[]>(() => areasQuery.data ?? [], [areasQuery.data]);
 
   // Debounce de 300 ms: el texto tecleado no dispara peticiones hasta 300 ms
   // después de la última pulsación, reduciendo el tráfico hacia el backend.
@@ -66,8 +57,8 @@ export function useUsuariosAdmin() {
   }, [busqueda, busquedaAplicada]);
 
   const filtros = useMemo<FiltrosUsuarios>(
-    () => ({ busqueda: busquedaAplicada, area, sede, rol, estado }),
-    [busquedaAplicada, area, sede, rol, estado],
+    () => ({ busqueda: busquedaAplicada, areaId, rolId, estado }),
+    [busquedaAplicada, areaId, rolId, estado],
   );
 
   const consulta = useUsuariosQuery(filtros);
@@ -103,14 +94,22 @@ export function useUsuariosAdmin() {
     totalUsuarios: usuarios.length,
     busqueda,
     setBusqueda,
-    area,
-    setArea,
-    sede,
-    setSede,
-    rol,
-    setRol,
+    areaId,
+    setAreaId,
+    area: areaId ?? "",
+    setArea: (v: string) => setAreaId(v || undefined),
+    rolId,
+    setRolId,
+    rol: rolId ?? "",
+    setRol: (v: string) => setRolId(v || undefined),
+    sede: "",
+    setSede: (_: string) => {},
     estado,
     setEstado,
+    roles,
+    areas,
+    isLoadingRoles: rolesQuery.isLoading,
+    isLoadingAreas: areasQuery.isLoading,
     usuarioEditando,
     setUsuarioEditando,
     actualizarUsuario,

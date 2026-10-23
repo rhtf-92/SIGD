@@ -62,7 +62,7 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
       }
 
       const esAdminOInstitucional = roles.some((r) =>
-        ['ADMINISTRADOR', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'].includes(r),
+        ['ADMINISTRADOR', 'DIRECTOR'].includes(r),
       );
 
       const puedeVerExpediente = async (idExpediente: string): Promise<boolean> => {
@@ -96,7 +96,7 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
           }
 
           // Si es rol exclusivo de administrado y no es el solicitante -> denegar acceso
-          if (roles.includes('CIUDADANO') || roles.includes('ESTUDIANTE')) {
+          if (roles.includes('CIUDADANO')) {
             return false;
           }
 

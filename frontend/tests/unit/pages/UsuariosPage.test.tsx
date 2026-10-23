@@ -15,6 +15,9 @@ vi.mock("@/api/client", () => ({
   },
 }));
 
+const ID_ROL_ADMIN = "34b04cf1-09d3-4460-8b05-80c6b244f42d";
+const ID_AREA_DG = "c1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c";
+
 const USUARIOS: Usuario[] = [
   {
     id: "1",
@@ -58,7 +61,33 @@ function montarConProvider() {
 
 describe("UsuariosPage — H-04 / H-05: Directorio de Usuarios (Solo Lectura)", () => {
   beforeEach(() => {
-    get.mockResolvedValue({ data: { data: USUARIOS } });
+    get.mockImplementation((url: string) => {
+      if (url.includes("/api/v1/admin/roles-permisos")) {
+        return Promise.resolve({
+          data: {
+            roles: [
+              {
+                id: ID_ROL_ADMIN,
+                codigo: "ADMINISTRADOR",
+                nombre: "Administrador del Sistema",
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes("/api/v1/admin/organigrama")) {
+        return Promise.resolve({
+          data: [
+            {
+              id: ID_AREA_DG,
+              sigla: "DG",
+              nombre: "Dirección General",
+            },
+          ],
+        });
+      }
+      return Promise.resolve({ data: { data: USUARIOS } });
+    });
   });
 
   afterEach(() => {
@@ -101,6 +130,53 @@ describe("UsuariosPage — H-04 / H-05: Directorio de Usuarios (Solo Lectura)", 
     expect(selectSede).toBeDisabled();
   });
 
+  it("aplica los filtros por areaId y rolId con UUIDs canónicos del servidor", async () => {
+    const usuario = userEvent.setup();
+    montarConProvider();
+    await screen.findByText("Juan Carlos Pérez");
+
+    // Seleccionar área real (UUID)
+    await usuario.selectOptions(screen.getByLabelText("Unidad orgánica"), ID_AREA_DG);
+
+    await waitFor(() => {
+      const llamadas = get.mock.calls.filter((c) => c[0] === "/api/v1/admin/usuarios");
+      const ultimaLlamada = llamadas.at(-1)?.[1] as { params: Record<string, unknown> };
+      expect(ultimaLlamada.params.areaId).toBe(ID_AREA_DG);
+      expect(ultimaLlamada.params).not.toHaveProperty("area");
+    });
+
+    // Seleccionar rol real (UUID)
+    await usuario.selectOptions(screen.getByLabelText("Rol asignado"), ID_ROL_ADMIN);
+
+    await waitFor(() => {
+      const llamadas = get.mock.calls.filter((c) => c[0] === "/api/v1/admin/usuarios");
+      const ultimaLlamada = llamadas.at(-1)?.[1] as { params: Record<string, unknown> };
+      expect(ultimaLlamada.params.rolId).toBe(ID_ROL_ADMIN);
+      expect(ultimaLlamada.params).not.toHaveProperty("rol");
+      expect(ultimaLlamada.params).not.toHaveProperty("sede");
+      expect(ultimaLlamada.params).not.toHaveProperty("sedeId");
+    });
+  });
+
+  it("deshabilita los selectores de área y rol cuando los catálogos están vacíos", async () => {
+    get.mockImplementation((url: string) => {
+      if (url.includes("/api/v1/admin/roles-permisos")) {
+        return Promise.resolve({ data: { roles: [] } });
+      }
+      if (url.includes("/api/v1/admin/organigrama")) {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({ data: { data: USUARIOS } });
+    });
+
+    montarConProvider();
+    await screen.findByText("Juan Carlos Pérez");
+
+    expect(screen.getByLabelText("Unidad orgánica")).toBeDisabled();
+    expect(screen.getByLabelText("Rol asignado")).toBeDisabled();
+    expect(screen.getByLabelText(/sede/i)).toBeDisabled();
+  });
+
   it("aplica el filtro de estado sin código de filtrado ficticio", async () => {
     const usuario = userEvent.setup();
     montarConProvider();
@@ -109,7 +185,8 @@ describe("UsuariosPage — H-04 / H-05: Directorio de Usuarios (Solo Lectura)", 
     await usuario.selectOptions(screen.getByLabelText("Estado"), "Inactivo");
 
     await waitFor(() => {
-      const ultimaLlamada = get.mock.calls.at(-1)?.[1] as {
+      const llamadas = get.mock.calls.filter((c) => c[0] === "/api/v1/admin/usuarios");
+      const ultimaLlamada = llamadas.at(-1)?.[1] as {
         params: Record<string, unknown>;
       };
       expect(ultimaLlamada.params.estado).toBe("Inactivo");
@@ -122,18 +199,21 @@ describe("UsuariosPage — H-04 / H-05: Directorio de Usuarios (Solo Lectura)", 
 
     vi.useFakeTimers();
 
-    const llamadasIniciales = get.mock.calls.length;
+    const llamadasUsuarios = () => get.mock.calls.filter((c) => c[0] === "/api/v1/admin/usuarios").length;
+    const llamadasIniciales = llamadasUsuarios();
+
     fireEvent.change(screen.getByLabelText("Buscar usuario"), {
       target: { value: "Pérez" },
     });
 
-    expect(get.mock.calls.length).toBe(llamadasIniciales);
+    expect(llamadasUsuarios()).toBe(llamadasIniciales);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(DEBOUNCE_BUSQUEDA_MS);
     });
 
-    const ultimaLlamada = get.mock.calls.at(-1)?.[1] as {
+    const llamadas = get.mock.calls.filter((c) => c[0] === "/api/v1/admin/usuarios");
+    const ultimaLlamada = llamadas.at(-1)?.[1] as {
       params: Record<string, unknown>;
     };
     expect(ultimaLlamada.params.busqueda).toBe("Pérez");

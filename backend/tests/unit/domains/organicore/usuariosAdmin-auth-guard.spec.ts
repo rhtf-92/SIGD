@@ -76,7 +76,7 @@ describe('F-01 Guard: requireAdminUsuarios', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
-  it('permite el acceso cuando el usuario tiene rol SUPER_ADMIN', () => {
+  it('rechaza con 403 ForbiddenError cuando el usuario tiene rol legado / no canónico SUPER_ADMIN', () => {
     const token = firmarTokenAcceso({
       sub: 'usr-superadmin-001',
       roles: ['SUPER_ADMIN'],
@@ -85,7 +85,7 @@ describe('F-01 Guard: requireAdminUsuarios', () => {
     const req = crearMockReq(token);
     const next = vi.fn();
 
-    requireAdminUsuarios(req, resMock, next);
-    expect(next).toHaveBeenCalledTimes(1);
+    expect(() => requireAdminUsuarios(req, resMock, next)).toThrow(ForbiddenError);
+    expect(next).not.toHaveBeenCalled();
   });
 });

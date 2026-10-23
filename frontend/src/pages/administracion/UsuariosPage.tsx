@@ -1,10 +1,5 @@
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
-import {
-  CATALOGO_AREAS,
-  CATALOGO_ROLES_USUARIOS,
-  CATALOGO_SEDES,
-  useUsuariosAdmin,
-} from "../../hooks/useUsuariosAdmin";
+import { useUsuariosAdmin } from "../../hooks/useUsuariosAdmin";
 import type { EstadoUsuario } from "../../types/usuarioAdmin";
 
 function estiloEstado(estado: EstadoUsuario) {
@@ -19,14 +14,16 @@ export default function UsuariosPage() {
     totalUsuarios,
     busqueda,
     setBusqueda,
-    area,
-    setArea,
-    sede,
-    setSede,
-    rol,
-    setRol,
+    areaId,
+    setAreaId,
+    rolId,
+    setRolId,
     estado,
     setEstado,
+    roles,
+    areas,
+    isLoadingRoles,
+    isLoadingAreas,
     isLoading,
     isFetching,
     error,
@@ -92,14 +89,15 @@ export default function UsuariosPage() {
               </label>
               <select
                 id="area"
-                value={area}
-                onChange={(event) => setArea(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                value={areaId ?? ""}
+                onChange={(event) => setAreaId(event.target.value || undefined)}
+                disabled={areas.length === 0 || isLoadingAreas}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
               >
                 <option value="">Todas</option>
-                {CATALOGO_AREAS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                {areas.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.sigla ? `${item.sigla} - ${item.nombre}` : item.nombre}
                   </option>
                 ))}
               </select>
@@ -107,22 +105,16 @@ export default function UsuariosPage() {
 
             <div>
               <label htmlFor="sede" className="mb-2 block text-sm font-semibold text-slate-500">
-                Sede (No filtrable)
+                Sede (No disponible)
               </label>
               <select
                 id="sede"
-                value={sede}
-                onChange={(event) => setSede(event.target.value)}
+                value=""
                 disabled
-                title="El directorio institucional no aplica filtro por sede"
+                title="Catálogo de sedes no implementado en el esquema relacional canónico."
                 className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
               >
-                <option value="">Todas las sedes</option>
-                {CATALOGO_SEDES.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
+                <option value="">No disponible</option>
               </select>
             </div>
 
@@ -132,14 +124,15 @@ export default function UsuariosPage() {
               </label>
               <select
                 id="rol"
-                value={rol}
-                onChange={(event) => setRol(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                value={rolId ?? ""}
+                onChange={(event) => setRolId(event.target.value || undefined)}
+                disabled={roles.length === 0 || isLoadingRoles}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
               >
                 <option value="">Todos</option>
-                {CATALOGO_ROLES_USUARIOS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                {roles.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.nombre || item.codigo}
                   </option>
                 ))}
               </select>

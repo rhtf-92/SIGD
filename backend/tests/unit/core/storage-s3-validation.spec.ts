@@ -8,9 +8,12 @@ import { construirApp } from '../../../src/app.js';
 import { firmarTokenAcceso } from '../../../src/core/auth/jwt.service.js';
 
 describe('SEC-02: Storage S3 Real Object Validation en confirmar-carga', () => {
+  const ID_EXPEDIENTE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const ID_TIPO_DOC = 'a373f0c7-8d3e-4328-aec1-78409b539131';
+
   const token = firmarTokenAcceso({
     sub: '11111111-1111-1111-1111-111111111111',
-    roles: ['ADMIN'],
+    roles: ['ADMINISTRADOR'],
     expiraSegundos: 300,
   });
 
@@ -18,7 +21,33 @@ describe('SEC-02: Storage S3 Real Object Validation en confirmar-carga', () => {
   const hashValido = crypto.createHash('sha256').update(pdfBufferValido).digest('hex');
 
   const fakePool = {
-    query: vi.fn(async () => ({ rows: [], rowCount: 1 })),
+    query: vi.fn(async (sql: string) => {
+      const sqlStr = String(sql);
+      if (sqlStr.includes('sigd_doc.expediente')) {
+        return {
+          rows: [
+            {
+              expediente_id: ID_EXPEDIENTE,
+              solicitante_id: '11111111-1111-1111-1111-111111111111',
+              area_actual_id: null,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      if (sqlStr.includes('sigd_doc.tipo_documento')) {
+        return {
+          rows: [
+            {
+              tipo_documental_id: ID_TIPO_DOC,
+              vigente: true,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      return { rows: [], rowCount: 1 };
+    }),
     connect: vi.fn(async () => ({
       query: vi.fn(async () => ({ rows: [], rowCount: 1 })),
       release: vi.fn(),
@@ -43,6 +72,8 @@ describe('SEC-02: Storage S3 Real Object Validation en confirmar-carga', () => {
       .send({
         s3Key: 'expedientes/2026/archivo-inexistente.pdf',
         sha256Hash: hashValido,
+        idExpediente: ID_EXPEDIENTE,
+        tipoDocumentalId: ID_TIPO_DOC,
       });
 
     expect(res.status).toBe(404);
@@ -67,6 +98,8 @@ describe('SEC-02: Storage S3 Real Object Validation en confirmar-carga', () => {
       .send({
         s3Key: 'expedientes/2026/fake.pdf',
         sha256Hash: maliciousHash,
+        idExpediente: ID_EXPEDIENTE,
+        tipoDocumentalId: ID_TIPO_DOC,
       });
 
     expect([400, 422]).toContain(res.status);
@@ -88,6 +121,8 @@ describe('SEC-02: Storage S3 Real Object Validation en confirmar-carga', () => {
       .send({
         s3Key: 'expedientes/2026/tampered.pdf',
         sha256Hash: '0000000000000000000000000000000000000000000000000000000000000000',
+        idExpediente: ID_EXPEDIENTE,
+        tipoDocumentalId: ID_TIPO_DOC,
       });
 
     expect([400, 422]).toContain(res.status);
@@ -98,8 +133,41 @@ describe('SEC-02: Storage S3 Real Object Validation en confirmar-carga', () => {
     let insertedInDb = false;
     const testPool = {
       query: vi.fn(async (sql: string) => {
-        if (sql.includes('INSERT INTO sigd_doc.documento_adjunto')) {
+        const sqlStr = String(sql);
+        if (sqlStr.includes('sigd_doc.expediente')) {
+          return {
+            rows: [
+              {
+                expediente_id: ID_EXPEDIENTE,
+                solicitante_id: '11111111-1111-1111-1111-111111111111',
+                area_actual_id: null,
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+        if (sqlStr.includes('sigd_doc.tipo_documento')) {
+          return {
+            rows: [
+              {
+                tipo_documental_id: ID_TIPO_DOC,
+                vigente: true,
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+        if (sqlStr.includes('INSERT INTO sigd_doc.documento_adjunto')) {
           insertedInDb = true;
+          return {
+            rows: [
+              {
+                documento_adjunto_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+                sha256: hashValido,
+              },
+            ],
+            rowCount: 1,
+          };
         }
         return { rows: [], rowCount: 1 };
       }),
@@ -123,6 +191,8 @@ describe('SEC-02: Storage S3 Real Object Validation en confirmar-carga', () => {
       .send({
         s3Key: 'expedientes/2026/valido.pdf',
         sha256Hash: hashValido,
+        idExpediente: ID_EXPEDIENTE,
+        tipoDocumentalId: ID_TIPO_DOC,
       });
 
     expect(res.status).toBe(201);

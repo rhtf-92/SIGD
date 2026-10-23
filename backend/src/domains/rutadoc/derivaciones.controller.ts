@@ -321,12 +321,12 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
 
       // 4. Autorización específica de rol y custodia para OBSERVAR
       const esAdminOInstitucional = actor.roles.some((r) =>
-        ['ADMINISTRADOR', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'].includes(r),
+        ['ADMINISTRADOR', 'DIRECTOR'].includes(r),
       );
 
       if (!esAdminOInstitucional) {
         const esAdministrado = actor.roles.some((r) =>
-          ['CIUDADANO', 'ESTUDIANTE'].includes(r),
+          ['CIUDADANO'].includes(r),
         );
         if (esAdministrado) {
           throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para observar expedientes.' });
@@ -411,7 +411,7 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
 
       // 4. Autorización específica de titularidad / rol institucional para SUBSANAR
       const esAdminOInstitucional = actor.roles.some((r) =>
-        ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES', 'SUPER_ADMIN', 'ADMIN'].includes(r),
+        ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES'].includes(r),
       );
 
       if (!esAdminOInstitucional) {

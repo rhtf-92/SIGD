@@ -87,7 +87,8 @@ describe('Auditoría de Integridad y Checksums Migratorios (§12 / Codex)', () =
     const rutaRollback11 = path.join(migracionesDir, 'rollbacks', '11_sigd_fix_post_auditoria_codex_rollback.sql');
     expect(fs.existsSync(rutaRollback11)).toBe(true);
     const contenidoRollback = fs.readFileSync(rutaRollback11, 'utf8');
-    expect(contenidoRollback).toContain("SET estado = 'EN_TRAMITE'");
+    expect(contenidoRollback).toContain("MIGRACIÓN 11 ES FORWARD-ONLY E IRREVERSIBLE");
+    expect(contenidoRollback).toContain("RAISE EXCEPTION");
   });
 
   it('H-03: algoritmo de prefijo ordenado estricto rechaza saltos, desorden y checksums corruptos', () => {

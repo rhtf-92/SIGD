@@ -17,11 +17,11 @@ import { UnauthorizedError, ForbiddenError } from "../../shared/domain/errors/in
  * PUT  /api/v1/admin/usuarios/:id
  */
 
-export const ROLES_ADMIN_USUARIOS_PERMITIDOS = ['ADMINISTRADOR', 'SUPER_ADMIN'] as const;
+export const ROLES_ADMIN_USUARIOS_PERMITIDOS = ['ADMINISTRADOR'] as const;
 
 /**
- * Middleware de guarda: autenticación y autorización para administración de usuarios.
- * Exige Bearer Token válido con rol institucional ADMINISTRADOR (o SUPER_ADMIN).
+ * Middleware de guarda: autenticación y autorización para administración de usuarios (N-01).
+ * Exige Bearer Token válido con rol institucional canónico ADMINISTRADOR.
  */
 export function requireAdminUsuarios(req: Request, _res: Response, next: NextFunction): void {
   const token = extraerTokenBearer(req.get("authorization"));

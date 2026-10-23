@@ -6,6 +6,8 @@ import type { Natural, Juridical } from "../../types/registroCiudadano";
 import { apiClient } from "../../api/client";
 import { TRAMITE_WIZARD_STORAGE_KEY } from "../../hooks/useTramiteWizardReducer";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -56,11 +58,16 @@ export default function RegistroCiudadanoPage() {
       const res = await apiClient.post("/api/v1/auth/registro-ciudadano", payload);
       const idPersona = res.data?.idPersona ?? res.data?.personaId;
 
-      if (res.status !== 201 || !idPersona || typeof idPersona !== "string" || idPersona.trim().length === 0) {
+      if (
+        res.status !== 201 ||
+        !idPersona ||
+        typeof idPersona !== "string" ||
+        !UUID_REGEX.test(idPersona.trim())
+      ) {
         throw new Error(
           res.data?.detail ||
           res.data?.message ||
-          "El servidor no devolvió una confirmación válida con idPersona para el registro ciudadano."
+          "El servidor no devolvió una confirmación válida con idPersona canónico (UUID) para el registro ciudadano."
         );
       }
 
@@ -105,11 +112,16 @@ export default function RegistroCiudadanoPage() {
       const res = await apiClient.post("/api/v1/auth/registro-persona-juridica", payload);
       const idPersona = res.data?.idPersona ?? res.data?.personaId;
 
-      if (res.status !== 201 || !idPersona || typeof idPersona !== "string" || idPersona.trim().length === 0) {
+      if (
+        res.status !== 201 ||
+        !idPersona ||
+        typeof idPersona !== "string" ||
+        !UUID_REGEX.test(idPersona.trim())
+      ) {
         throw new Error(
           res.data?.detail ||
           res.data?.message ||
-          "El servidor no devolvió una confirmación válida con idPersona para el registro de persona jurídica."
+          "El servidor no devolvió una confirmación válida con idPersona canónico (UUID) para el registro de persona jurídica."
         );
       }
 

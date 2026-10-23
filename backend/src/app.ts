@@ -63,11 +63,11 @@ import { securityHeadersMiddleware } from './middleware/security-headers.middlew
 import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.service.js';
 import { UnauthorizedError, ForbiddenError } from './shared/domain/errors/index.js';
 
-export const ROLES_ADMIN_PERMITIDOS = ['ADMINISTRADOR', 'SUPER_ADMIN'] as const;
+export const ROLES_ADMIN_PERMITIDOS = ['ADMINISTRADOR'] as const;
 
 /**
- * Middleware de guarda de administración institucional (H-08).
- * Exige Bearer Token válido con rol ADMINISTRADOR o SUPER_ADMIN.
+ * Middleware de guarda de administración institucional (H-08 / N-01).
+ * Exige Bearer Token válido con rol canónico ADMINISTRADOR.
  */
 export function requireAdminRole(req: express.Request, _res: express.Response, next: express.NextFunction): void {
   const token = extraerTokenBearer(req.get('authorization'));
@@ -86,7 +86,7 @@ export function requireAdminRole(req: express.Request, _res: express.Response, n
   if (!tieneRol) {
     throw new ForbiddenError({
       message: 'Acceso denegado.',
-      detail: 'Se requiere rol administrativo (ADMINISTRADOR o SUPER_ADMIN) para esta operación.',
+      detail: 'Se requiere rol administrativo (ADMINISTRADOR) para esta operación.',
     });
   }
 
@@ -323,10 +323,9 @@ export function construirApp(
 
   app.get('/api/v1/admin/maestras/sede', requireAdminRole, (_req, res) => {
     res.json({
-      sedes: [
-        { id: '1', codigo: 'SEDE_CENTRAL', nombre: 'Sede Central Pucallpa - Av. Túpac Amaru Km. 4.5' },
-        { id: '2', codigo: 'SEDE_FILIAL', nombre: 'Filial Yarinacocha' },
-      ],
+      disponible: false,
+      sedes: [],
+      mensaje: 'Catálogo de sedes no implementado en el esquema relacional canónico.',
     });
   });
 

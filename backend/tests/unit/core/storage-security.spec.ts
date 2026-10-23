@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import type { Pool } from 'pg';
+import { Readable } from 'node:stream';
+import crypto from 'node:crypto';
 import { construirApp } from '../../../src/app.js';
 import { firmarTokenAcceso } from '../../../src/core/auth/jwt.service.js';
 
@@ -12,6 +14,7 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
   const ID_PERSONA_AJENO = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
   const ID_EXPEDIENTE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const ID_TIPO_DOC = 'a373f0c7-8d3e-4328-aec1-78409b539131';
 
   const tokenPropietario = firmarTokenAcceso({
     sub: ID_USUARIO_PROPIETARIO,
@@ -25,7 +28,7 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
 
   const tokenAdmin = firmarTokenAcceso({
     sub: '55555555-5555-4555-8555-555555555555',
-    roles: ['SUPER_ADMIN'],
+    roles: ['ADMINISTRADOR'],
   });
 
   const mockPool = {
@@ -44,25 +47,36 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
         return { rows: [] };
       }
 
-      // Consulta de expediente
-      if (sqlStr.includes('sigd_tra.expediente') && sqlStr.includes('WHERE expediente_id = $1')) {
+      // Consulta de expediente (en sigd_doc.expediente o sigd_tra.expediente)
+      if (sqlStr.includes('expediente') && sqlStr.includes('expediente_id = $1')) {
         const expId = params?.[0];
         if (expId === ID_EXPEDIENTE) {
           return {
             rows: [
               {
+                expediente_id: ID_EXPEDIENTE,
                 solicitante_id: ID_PERSONA_PROPIETARIO,
                 area_destino_id: null,
+                area_actual_id: null,
               },
             ],
+            rowCount: 1,
           };
         }
-        return { rows: [] };
+        return { rows: [], rowCount: 0 };
       }
 
       // Consulta de tipo documento para confirmar-carga
       if (sqlStr.includes('sigd_doc.tipo_documento')) {
-        return { rows: [{ tipo_documental_id: 'a373f0c7-8d3e-4328-aec1-78409b539131' }] };
+        return {
+          rows: [
+            {
+              tipo_documental_id: ID_TIPO_DOC,
+              vigente: true,
+            },
+          ],
+          rowCount: 1,
+        };
       }
 
       // Consulta de documento adjunto para download
@@ -159,7 +173,7 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
     expect(res.body).toHaveProperty('s3Key');
   });
 
-  it('actor autorizado (SUPER_ADMIN) descarga documento institucional -> 200 OK', async () => {
+  it('actor institucional autorizado (ADMINISTRADOR) descarga documento institucional -> 200 OK', async () => {
     const res = await request(app)
       .get('/api/v1/storage/download/sigd-expedientes/expedientes%2F2026%2Ftest.pdf')
       .set('Authorization', `Bearer ${tokenAdmin}`);
@@ -178,9 +192,43 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
   });
 
   it('SEC-03: si pool.query falla en confirmar-carga, propaga error 5xx con RFC 9457 y NO responde 201', async () => {
+    const pdfContenido = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF');
+    const pdfHash = crypto.createHash('sha256').update(pdfContenido).digest('hex');
+
+    const fakeS3 = {
+      send: async () => ({
+        Body: Readable.from([pdfContenido]),
+      }),
+    };
+
     const poolConFallo = {
       query: async (sql: string) => {
-        if (sql.includes('INSERT INTO sigd_doc.documento_adjunto')) {
+        const sqlStr = String(sql);
+        if (sqlStr.includes('sigd_doc.expediente') || sqlStr.includes('sigd_tra.expediente')) {
+          return {
+            rows: [
+              {
+                expediente_id: ID_EXPEDIENTE,
+                solicitante_id: ID_PERSONA_PROPIETARIO,
+                area_destino_id: null,
+                area_actual_id: null,
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+        if (sqlStr.includes('sigd_doc.tipo_documento')) {
+          return {
+            rows: [
+              {
+                tipo_documental_id: ID_TIPO_DOC,
+                vigente: true,
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+        if (sqlStr.includes('INSERT INTO sigd_doc.documento_adjunto')) {
           throw new Error('FATAL: disk full or database connection broken');
         }
         return { rows: [] };
@@ -191,12 +239,13 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
       }),
     } as unknown as Pool;
 
-    const appFallo = construirApp(poolConFallo);
+    const appFallo = construirApp(poolConFallo, { s3Client: fakeS3 as any });
 
     const payloadConfirmar = {
       s3Key: 'expedientes/2026/test.pdf',
-      sha256Hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      sha256Hash: pdfHash,
       idExpediente: ID_EXPEDIENTE,
+      tipoDocumentalId: ID_TIPO_DOC,
     };
 
     const res = await request(appFallo)
@@ -263,6 +312,7 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
         s3Key: 'expedientes/2026/test.pdf',
         sha256Hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
         idExpediente: ID_EXPEDIENTE,
+        tipoDocumentalId: ID_TIPO_DOC,
       });
 
     expect(res.status).toBe(403);
@@ -283,9 +333,8 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
   });
 
   it('H-01: confirmar-carga exitoso con S3 y DB -> 201 Created con documentoId', async () => {
-    const { Readable } = await import('node:stream');
     const pdfContenido = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF');
-    const pdfHash = (await import('node:crypto')).createHash('sha256').update(pdfContenido).digest('hex');
+    const pdfHash = crypto.createHash('sha256').update(pdfContenido).digest('hex');
 
     const fakeS3 = {
       send: async () => ({
@@ -306,6 +355,7 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
         s3Key: 'expedientes/2026/real.pdf',
         sha256Hash: pdfHash,
         idExpediente: ID_EXPEDIENTE,
+        tipoDocumentalId: ID_TIPO_DOC,
       });
 
     expect(res.status).toBe(201);

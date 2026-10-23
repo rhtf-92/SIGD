@@ -45,7 +45,7 @@ import {
 import type { CacheDistribuida } from '../identicore/ubigeo.service.js';
 
 /** Roles autorizados por §4.7 para la analítica ejecutiva. */
-const ROLES_ANALITICA = new Set(['DIRECTOR', 'ADMINISTRADOR', 'SUPER_ADMIN']);
+const ROLES_ANALITICA = new Set(['DIRECTOR', 'ADMINISTRADOR']);
 
 export interface ControladorReportes {
   resumen: RequestHandler;
@@ -130,7 +130,7 @@ export function crearControladorReportes(
     refrescar: async (req, res) => {
       const actor = await actorProvider.obtenerActor(req);
       if (!actor) throw new UnauthorizedError();
-      if (!actor.roles.includes('SUPER_ADMIN') && !actor.roles.includes('ADMINISTRADOR')) throw new ForbiddenError();
+      if (!actor.roles.includes('ADMINISTRADOR')) throw new ForbiddenError();
       const resultado = await servicio.refrescar();
       res.json({
         vistas: resultado.vistas,

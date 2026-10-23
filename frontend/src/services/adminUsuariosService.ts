@@ -90,11 +90,7 @@ export async function listarUsuarios(
     params: {
       busqueda: filtros.busqueda || undefined,
       areaId: filtros.areaId || undefined,
-      sedeId: filtros.sedeId || undefined,
       rolId: filtros.rolId || undefined,
-      area: filtros.area || undefined,
-      sede: filtros.sede || undefined,
-      rol: filtros.rol || undefined,
       estado: filtros.estado === "Todos" ? undefined : filtros.estado,
     },
     signal,
@@ -246,4 +242,79 @@ export function extraerInvalidParams(error: unknown): InvalidParamDetail[] {
     return error.problemDetails.invalidParams ?? [];
   }
   return [];
+}
+
+// Catálogos reales del servidor (H-05 / Codex)
+export interface RolCatalogo {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
+  permisos?: string[];
+}
+
+export interface AreaCatalogo {
+  id: string;
+  sigla: string;
+  nombre: string;
+  padre_id?: string | null;
+  path?: string;
+  estado?: boolean;
+}
+
+export async function listarRolesPermisos(signal?: AbortSignal): Promise<RolCatalogo[]> {
+  const res = await apiClient.get<{ roles?: RolCatalogo[] }>("/api/v1/admin/roles-permisos", { signal });
+  if (Array.isArray(res.data?.roles)) {
+    return res.data.roles;
+  }
+  if (Array.isArray(res.data)) {
+    return res.data as unknown as RolCatalogo[];
+  }
+  return [];
+}
+
+function aplanarOrganigrama(nodos: any[]): AreaCatalogo[] {
+  const resultado: AreaCatalogo[] = [];
+  function recorrer(nodo: any) {
+    if (!nodo) return;
+    const id = String(nodo.id ?? nodo.area_id ?? nodo.areaId ?? "");
+    const nombre = String(nodo.nombre ?? "");
+    const sigla = String(nodo.sigla ?? nodo.codigo ?? "");
+    if (id && nombre) {
+      resultado.push({ id, sigla, nombre });
+    }
+    if (Array.isArray(nodo.children)) {
+      for (const hijo of nodo.children) {
+        recorrer(hijo);
+      }
+    }
+  }
+  for (const n of nodos) {
+    recorrer(n);
+  }
+  return resultado;
+}
+
+export async function listarOrganigramaAreas(signal?: AbortSignal): Promise<AreaCatalogo[]> {
+  const res = await apiClient.get<any[]>("/api/v1/admin/organigrama", { signal });
+  if (Array.isArray(res.data)) {
+    return aplanarOrganigrama(res.data);
+  }
+  return [];
+}
+
+export function useRolesPermisosQuery() {
+  return useQuery({
+    queryKey: ["admin", "roles-permisos"],
+    queryFn: ({ signal }) => listarRolesPermisos(signal),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useOrganigramaAreasQuery() {
+  return useQuery({
+    queryKey: ["admin", "organigrama-areas"],
+    queryFn: ({ signal }) => listarOrganigramaAreas(signal),
+    staleTime: 5 * 60 * 1000,
+  });
 }

@@ -125,7 +125,7 @@ export function crearUsuariosAdminService(pool: Pool) {
       const posicion = agregarParametro(rolId);
 
       condiciones.push(
-        `(ur.rol_id = ${posicion}::uuid OR rs.rol_id = ${posicion}::uuid)`,
+        `ur.rol_id = ${posicion}::uuid`,
       );
     }
 
@@ -259,6 +259,10 @@ export function crearUsuariosAdminService(pool: Pool) {
       LEFT JOIN sigd_org.usuario_rol AS ur
         ON ur.id_usuario = cu.id_usuario
         AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+
+      LEFT JOIN sigd_org.rol_sistema AS rs
+        ON rs.rol_id = ur.rol_id
+        AND rs.vigente = TRUE
 
       ${where};
     `;

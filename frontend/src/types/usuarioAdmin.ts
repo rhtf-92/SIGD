@@ -30,26 +30,18 @@ export interface UpdateEstadoDTO {
 
 export type UsuarioDetailDTO = Usuario;
 
-// Filtros de servidor: búsqueda por texto, unidad orgánica (areaId), sede (sedeId), rol (rolId) y estado.
+// Filtros de servidor: búsqueda por texto, unidad orgánica (areaId), rol (rolId) y estado.
 export interface FiltrosUsuarios {
   busqueda: string;
   areaId?: string;
-  sedeId?: string;
   rolId?: string;
-  area: string;
-  sede: string;
-  rol: string;
   estado: EstadoUsuario | "Todos";
 }
 
 export const FILTROS_USUARIOS_INICIALES: FiltrosUsuarios = {
   busqueda: "",
   areaId: undefined,
-  sedeId: undefined,
   rolId: undefined,
-  area: "",
-  sede: "",
-  rol: "",
   estado: "Todos",
 };
 

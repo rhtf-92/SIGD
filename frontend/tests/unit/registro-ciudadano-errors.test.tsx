@@ -35,7 +35,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
   it("201 Created -> éxito: muestra mensaje con la casilla institucional creada", async () => {
     vi.spyOn(apiClient, "post").mockResolvedValueOnce({
-      data: { idPersona: "pers-001" },
+      data: { idPersona: "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
       status: 201,
     } as any);
 
@@ -205,6 +205,33 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
     const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(alertBanner).toHaveTextContent("timeout of 10000ms exceeded");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  }, 15000);
+
+  it.each([
+    ["abc", "abc"],
+    ["123", "123"],
+    ["string vacío", ""],
+    ["null", null],
+    ["identificador sintético no UUID", "pers-sergio-001"],
+  ])("H-07: rechaza 201 si idPersona no es UUID canónico (%s) y muestra error", async (_nombre, idInvalido) => {
+    vi.spyOn(apiClient, "post").mockResolvedValueOnce({
+      data: { idPersona: idInvalido },
+      status: 201,
+    } as any);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <RegistroCiudadanoPage />
+      </MemoryRouter>,
+    );
+
+    await llenarFormularioNatural(user);
+    await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+
+    const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
+    expect(alertBanner).toHaveTextContent(/idPersona canónico \(UUID\)/i);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   }, 15000);
 });

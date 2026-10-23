@@ -39,8 +39,8 @@ const presignedInputSchema = z.preprocess(
 const confirmarInputSchema = z.object({
   s3Key: z.string().min(3),
   sha256Hash: z.string().length(64).regex(/^[a-fA-F0-9]{64}$/),
-  idExpediente: z.string().uuid().optional(),
-  tipoDocumentalId: z.string().uuid().optional(),
+  idExpediente: z.string().uuid({ message: 'idExpediente es obligatorio y debe ser un UUID válido.' }),
+  tipoDocumentalId: z.string().uuid({ message: 'tipoDocumentalId es obligatorio y debe ser un UUID válido.' }),
   nombreArchivo: z.string().min(1).max(255).optional(),
 });
 
@@ -62,7 +62,7 @@ async function validarAccesoExpediente(
   roles: string[],
   idExpediente: string,
 ): Promise<boolean> {
-  if (roles.some((r) => ['ADMINISTRADOR', 'SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'MESA_PARTES'].includes(r.toUpperCase()))) {
+  if (roles.some((r) => ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES'].includes(r.toUpperCase()))) {
     return true;
   }
   if (!pool) return false;
@@ -81,10 +81,6 @@ async function validarAccesoExpediente(
     const resExp = await pool.query<{ solicitante_id: string | null; area_actual_id: string | null }>(
       `SELECT solicitante_id::text AS solicitante_id, area_actual_id::text AS area_actual_id
          FROM sigd_doc.expediente
-        WHERE expediente_id = $1::uuid
-        UNION ALL
-       SELECT solicitante_id::text AS solicitante_id, area_destino_id::text AS area_actual_id
-         FROM sigd_tra.expediente
         WHERE expediente_id = $1::uuid`,
       [idExpediente],
     );
@@ -151,16 +147,51 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
       });
     }
 
-    if (datos.idExpediente) {
-      const autorizado = await validarAccesoExpediente(
-        pool,
-        claims.sub,
-        claims.roles ?? [],
-        datos.idExpediente,
-      );
-      if (!autorizado) {
-        throw new ForbiddenError({ detail: 'No tiene autorización sobre el expediente indicado.' });
-      }
+    // N-04: Validar existencia de expediente en sigd_doc.expediente (FK obligatoria)
+    const resExpediente = await pool.query<{ expediente_id: string }>(
+      `SELECT expediente_id::text AS expediente_id
+         FROM sigd_doc.expediente
+        WHERE expediente_id = $1::uuid;`,
+      [datos.idExpediente],
+    );
+    if (resExpediente.rows.length === 0) {
+      throw new NotFoundError({
+        detail: `El expediente ${datos.idExpediente} no existe en el registro institucional.`,
+      });
+    }
+
+    const autorizado = await validarAccesoExpediente(
+      pool,
+      claims.sub,
+      claims.roles ?? [],
+      datos.idExpediente,
+    );
+    if (!autorizado) {
+      throw new ForbiddenError({ detail: 'No tiene autorización sobre el expediente indicado.' });
+    }
+
+    // N-04: Validar existencia y vigencia de tipo documental en sigd_doc.tipo_documento (FK obligatoria)
+    const resTipo = await pool.query<{ tipo_documental_id: string; vigente: boolean }>(
+      `SELECT tipo_documental_id::text AS tipo_documental_id, vigente
+         FROM sigd_doc.tipo_documento
+        WHERE tipo_documental_id = $1::uuid;`,
+      [datos.tipoDocumentalId],
+    );
+    if (resTipo.rows.length === 0) {
+      throw new NotFoundError({
+        detail: `El tipo documental ${datos.tipoDocumentalId} no existe en el catálogo institucional.`,
+      });
+    }
+    if (!resTipo.rows[0].vigente) {
+      throw new ValidationError({
+        message: 'El tipo documental seleccionado no está vigente.',
+        invalidParams: [
+          {
+            name: 'tipoDocumentalId',
+            reason: 'El tipo documental se encuentra inactivo o no vigente en el catálogo.',
+          },
+        ],
+      });
     }
 
     // SEC-02: Verificación criptográfica y estructural real del objeto en S3 antes de persistir
@@ -249,25 +280,10 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
     }
 
     const idAdjunto = crypto.randomUUID();
-    const expedienteId = datos.idExpediente ?? crypto.randomUUID();
-
-    // Resolver tipo documental si no fue provisto
-    let tipoDocId = datos.tipoDocumentalId;
-    if (!tipoDocId) {
-      const resTipo = await pool.query<{ tipo_documental_id: string }>(
-        `SELECT tipo_documental_id::text AS tipo_documental_id
-           FROM sigd_doc.tipo_documento
-          WHERE vigente = TRUE
-          ORDER BY codigo ASC
-          LIMIT 1;`,
-      );
-      tipoDocId = resTipo.rows[0]?.tipo_documental_id ?? crypto.randomUUID();
-    }
-
     const nombreArchivo = datos.nombreArchivo || datos.s3Key.split('/').pop() || 'documento.pdf';
     const magicHex = primerChunk.subarray(0, 4).toString('hex').toUpperCase();
 
-    // Registrar en sigd_doc.documento_adjunto con DDL real
+    // Registrar en sigd_doc.documento_adjunto con DDL real y FKs obligatorias validadas
     const insertRes = await pool.query<{ documento_adjunto_id: string; sha256: string }>(
       `INSERT INTO sigd_doc.documento_adjunto (
          documento_adjunto_id,
@@ -286,8 +302,8 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
        RETURNING documento_adjunto_id::text, sha256;`,
       [
         idAdjunto,
-        expedienteId,
-        tipoDocId,
+        datos.idExpediente,
+        datos.tipoDocumentalId,
         nombreArchivo,
         config.bucket,
         datos.s3Key,
@@ -344,7 +360,7 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
     }
 
     const esPersonalAutorizado = claims.roles.some((r) =>
-      ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES', 'SECRETARIO', 'ESPECIALISTA', 'SUPER_ADMIN', 'ADMIN'].includes(r.toUpperCase()),
+      ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES', 'SECRETARIO', 'ESPECIALISTA'].includes(r.toUpperCase()),
     );
 
     const resDoc = await pool.query<{ solicitante_id: string | null }>(
