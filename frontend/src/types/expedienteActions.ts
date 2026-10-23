@@ -35,10 +35,9 @@ export interface SolicitudAcumulacion {
   readonly motivo: string;
 }
 
-/** Formas de respuesta documentadas en el plan, verificadas en tiempo de ejecución. */
 export interface ResultadoDerivacion { derivacionId: string; nuevoEstado: string }
 export interface ResultadoObservacion { estado: "OBSERVADO"; slaPaused: true }
-export interface ResultadoSubsanacion { estado: "EN_TRAMITE"; expedienteId: string; motivo: string }
+export interface ResultadoSubsanacion { estado: "EN_REVISION" | "EN_TRAMITE"; expedienteId: string; motivo: string; estadoRutaDoc?: string; pestana?: string }
 
 export type TipoErrorAccion = "http" | "red" | "integracion" | "respuesta" | "concurrencia";
 

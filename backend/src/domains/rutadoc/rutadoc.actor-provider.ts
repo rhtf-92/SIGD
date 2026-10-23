@@ -62,7 +62,7 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
       }
 
       const esAdminOInstitucional = roles.some((r) =>
-        ['SUPER_ADMIN', 'ADMIN', 'DIRECTOR'].includes(r),
+        ['ADMINISTRADOR', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'].includes(r),
       );
 
       const puedeVerExpediente = async (idExpediente: string): Promise<boolean> => {
@@ -142,6 +142,7 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
 
       return {
         id: usuarioId,
+        idPersona,
         roles,
         unidadOrganicaId: areaId,
         puedeVerExpediente,

@@ -46,8 +46,14 @@ export function crearServicioExpedienteActions(contratos: ContratosExpedienteAct
   if (subsanacion) servicio.subsanar = async (entrada): Promise<ResultadoSubsanacion> => {
     const { apiClient } = await import("./client");
     const { data } = await apiClient.post<unknown>(urlMovimiento(entrada.expediente.id, "subsanar", apiClient.defaults.baseURL), subsanacion.construirPayload(entrada));
-    if (!esObjeto(data) || data.ok !== true || data.estado !== "EN_TRAMITE" || data.expedienteId !== entrada.expediente.id || typeof data.motivo !== "string") respuestaNoConfirmada();
-    return { estado: "EN_TRAMITE", expedienteId: data.expedienteId, motivo: data.motivo };
+    if (!esObjeto(data) || data.ok !== true || (data.estado !== "EN_REVISION" && data.estado !== "EN_TRAMITE") || data.expedienteId !== entrada.expediente.id || typeof data.motivo !== "string") respuestaNoConfirmada();
+    return {
+      estado: data.estado as "EN_REVISION" | "EN_TRAMITE",
+      expedienteId: data.expedienteId,
+      motivo: data.motivo,
+      estadoRutaDoc: typeof data.estadoRutaDoc === "string" ? data.estadoRutaDoc : undefined,
+      pestana: typeof data.pestana === "string" ? data.pestana : undefined,
+    };
   };
   if (acumulacion) servicio.acumular = acumulacion;
   return servicio;
