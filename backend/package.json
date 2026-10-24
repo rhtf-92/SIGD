@@ -23,7 +23,8 @@
     "load:derivacion": "k6 run k6/escenario-2-derivacion.js",
     "worker:outbox": "tsx src/audit/worker/outbox-worker.ts",
     "migrate": "tsx src/db/migrate-cli.ts",
-    "smoke:conmutation": "tsx tests/smoke_conmutation_test.ts"
+    "smoke:conmutation": "tsx tests/smoke_conmutation_test.ts",
+    "seed:lab": "tsx src/tools/seed-lab.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1143.0",

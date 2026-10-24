@@ -3,15 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuthStore } from "../stores/authStore";
 import { ApiHttpError } from "../types/api";
-
-const DESTINO_POR_ROL: Record<string, string> = {
-  ADMINISTRADOR: "/administracion",
-  CIUDADANO: "/tramite",
-  DIRECTOR: "/reportes",
-  ESPECIALISTA: "/expedientes",
-  MESA_PARTES: "/tramite/ventanilla-presencial",
-  SECRETARIO: "/expedientes",
-};
+import { DESTINO_POR_ROL, type RolCanonica } from "../config/navigation.config";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -31,7 +23,7 @@ export default function LoginPage() {
       await login({ identificador: identificador.trim(), password });
       const rol = useAuthStore.getState().usuario?.rol;
       const destinoPrevio = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
-      navigate(destinoPrevio || DESTINO_POR_ROL[rol ?? ""] || "/", { replace: true });
+      navigate(destinoPrevio || (rol ? DESTINO_POR_ROL[rol as RolCanonica] : undefined) || "/", { replace: true });
     } catch (cause) {
       setError(cause instanceof ApiHttpError
         ? cause.problemDetails.detail || "No fue posible iniciar sesión."

@@ -86,4 +86,55 @@ describe('radicación virtual: identidad autenticada', () => {
     expect(response.status).toBe(400);
     expect(query.mock.calls[0][0]).toContain('sigd_org.usuario_rol');
   });
+
+  describe('mis-expedientes: protección BOLA y resolución por JWT', () => {
+    it('rechaza consulta de mis-expedientes sin JWT con 401', async () => {
+      const response = await request(app).get('/api/v1/tramites/mis-expedientes');
+      expect(response.status).toBe(401);
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('rechaza consulta con inyección de idPersona en query (BOLA fail-closed)', async () => {
+      const token = firmarTokenAcceso({ sub: USUARIO_A, roles: ['CIUDADANO'] });
+      const response = await request(app)
+        .get(`/api/v1/tramites/mis-expedientes?idPersona=${PERSONA_B}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(response.status).toBe(403);
+    });
+
+    it('retorna lista de expedientes del usuario autenticado resuelto por sub', async () => {
+      query
+        .mockResolvedValueOnce({ rows: [{ id_persona: PERSONA_A, activo: true }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              expediente_id: 'a0000000-0000-0000-0000-000000000099',
+              cut: 'EXP-2026-000001',
+              codigo_expediente: 'EXP-2026-000001',
+              numero: 'EXP-2026-000001',
+              asunto: 'Solicitud de certificado',
+              tipo_documento: 'SOLICITUD',
+              tipo_tramite: 'Emisión de Constancia',
+              estado: 'EN_TRAMITE',
+              fecha_radicacion: new Date('2026-10-24T10:00:00Z'),
+              canal_ingreso: 'MESA_VIRTUAL',
+              total_folios: 3,
+            },
+          ],
+        });
+
+      const token = firmarTokenAcceso({ sub: USUARIO_A, roles: ['CIUDADANO'] });
+      const response = await request(app)
+        .get('/api/v1/tramites/mis-expedientes')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].cut).toBe('EXP-2026-000001');
+      expect(response.body[0].asunto).toBe('Solicitud de certificado');
+      expect(response.body[0].totalFolios).toBe(3);
+      expect(query.mock.calls[1][1]).toEqual([PERSONA_A]);
+    });
+  });
 });

@@ -92,6 +92,107 @@ export function crearRouterTramites(
   });
 
   // #15 — Radicación física en Ventanilla Presencial
+  // #14b — Mis expedientes (Ciudadano autenticado - consulta estricta de trámites propios con BOLA protection)
+  router.get('/tramites/mis-expedientes', async (req: Request, res: Response) => {
+    const queryInyectado = req.query as Record<string, unknown> | undefined;
+    if (
+      queryInyectado?.idPersona ||
+      queryInyectado?.id_persona ||
+      queryInyectado?.personaId ||
+      queryInyectado?.solicitanteId
+    ) {
+      throw new ForbiddenError({ detail: 'No está permitido especificar el identificador de persona en la consulta.' });
+    }
+
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) {
+      throw new UnauthorizedError({ detail: 'Debe iniciar sesión para consultar sus expedientes.' });
+    }
+    const claims = verificarTokenAcceso(token);
+    if (!z.uuid().safeParse(claims.sub).success) {
+      throw new UnauthorizedError({ detail: 'El token no identifica una cuenta válida.' });
+    }
+    const cuenta = await pool.query<{ id_persona: string | null; activo: boolean }>(
+      `SELECT id_persona::text AS id_persona, activo
+         FROM sigd_auth.cuenta_usuario
+        WHERE id_usuario = $1::uuid`,
+      [claims.sub],
+    );
+    const actor = cuenta.rows[0];
+    if (!actor?.activo) {
+      throw new UnauthorizedError({ detail: 'La cuenta no existe o está deshabilitada.' });
+    }
+    if (!actor.id_persona) {
+      throw new ForbiddenError({ detail: 'La cuenta no tiene una persona asociada para consultar expedientes.' });
+    }
+
+    const resultado = await pool.query<{
+      expediente_id: string;
+      cut: string;
+      codigo_expediente: string;
+      numero: string;
+      asunto: string;
+      tipo_documento: string;
+      tipo_tramite: string | null;
+      estado: string;
+      fecha_radicacion: Date | string;
+      canal_ingreso: string;
+      total_folios: number;
+    }>(
+      `SELECT e.expediente_id,
+              e.codigo_expediente AS cut,
+              e.codigo_expediente,
+              e.numero,
+              COALESCE(tr.asunto, '') AS asunto,
+              COALESCE(td.nombre, 'SOLICITUD') AS tipo_documento,
+              tv.denominacion_original AS tipo_tramite,
+              COALESCE(rut.estado_nuevo, e.estado) AS estado,
+              e.fecha_radicacion,
+              COALESCE(ar.canal_ingreso, 'MESA_VIRTUAL') AS canal_ingreso,
+              COALESCE((SELECT MAX(f.folio_fin) FROM sigd_tra.expediente_documento_folio f
+                         WHERE f.expediente_id = e.expediente_id), 0)::int AS total_folios
+         FROM sigd_tra.expediente e
+         LEFT JOIN sigd_tra.tramite tr ON tr.expediente_id = e.expediente_id
+         LEFT JOIN sigd_doc.tipo_documento td ON td.tipo_documental_id = e.tipo_documental_id
+         LEFT JOIN sigd_rut.estado_actual_expediente rut ON rut.expediente_id = e.expediente_id
+         LEFT JOIN LATERAL (
+           SELECT a.canal_ingreso
+             FROM sigd_tra.asiento_registro a
+            WHERE a.expediente_id = e.expediente_id
+            ORDER BY a.fecha_ingreso ASC LIMIT 1
+         ) ar ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT v.denominacion_original
+             FROM sigd_doc.expediente_tupa_vinculo x
+             JOIN sigd_doc.tupa_registro_version v ON v.registro_version_id = x.registro_version_id
+            WHERE x.expediente_id = e.expediente_id
+            ORDER BY x.vinculado_en DESC LIMIT 1
+         ) tv ON TRUE
+        WHERE e.solicitante_id = $1::uuid
+          AND e.estado <> 'ANULADO'
+        ORDER BY e.fecha_radicacion DESC`,
+      [actor.id_persona],
+    );
+
+    const expedientes = resultado.rows.map((row) => ({
+      expedienteId: row.expediente_id,
+      cut: row.cut,
+      codigoExpediente: row.codigo_expediente,
+      numero: row.numero,
+      asunto: row.asunto,
+      tipoDocumento: row.tipo_documento,
+      tipoTramite: row.tipo_tramite,
+      estado: row.estado,
+      fechaRadicacion: row.fecha_radicacion instanceof Date
+        ? row.fecha_radicacion.toISOString()
+        : String(row.fecha_radicacion),
+      canalIngreso: row.canal_ingreso,
+      totalFolios: Number(row.total_folios),
+    }));
+
+    res.status(200).json(expedientes);
+  });
+
   router.post('/tramites/ventanilla-presencial', async (req: Request, res: Response) => {
     const token = extraerTokenBearer(req.get('authorization'));
     if (!token) throw new UnauthorizedError({ detail: 'Debe iniciar sesión para registrar una recepción presencial.' });

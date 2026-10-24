@@ -2,19 +2,11 @@ import { Link } from "react-router-dom";
 
 const secciones = [
   {
-    titulo: "Flujo y Validez Legal",
-    subtitulo: "MOD-04 / Firma Digital",
+    titulo: "Consulta Pública por CUT",
+    subtitulo: "Seguimiento 24x7",
     descripcion:
-      "Consulta de la verificación pública de documentos (CVD).",
-    ruta: "/flujo-validez-legal",
-    destacado: true,
-  },
-  {
-    titulo: "Casilla Electrónica",
-    subtitulo: "ENT-M01-03",
-    descripcion:
-      "Consulta y recepción de notificaciones electrónicas institucionales con plena validez legal.",
-    ruta: "/casilla",
+      "Consulta el estado procesal y trazabilidad de tu trámite en tiempo real sin requerir inicio de sesión.",
+    ruta: "/consulta",
     destacado: true,
   },
   {
@@ -26,25 +18,60 @@ const secciones = [
     destacado: true,
   },
   {
-    titulo: "Registro Ciudadano",
-    subtitulo: "ENT-M01-01 / ENT-M01-02",
+    titulo: "Mis Expedientes",
+    subtitulo: "Portal Ciudadano",
     descripcion:
-      "Registro de personas naturales y jurídicas con validación RENIEC / SUNAT y Ubigeo Ucayali.",
-    ruta: "/registro",
+      "Consulta centralizada y seguimiento exclusivo de los trámites y expedientes de tu autoría.",
+    ruta: "/mis-expedientes",
+    destacado: true,
   },
   {
-    titulo: "Bandeja de Expedientes",
-    subtitulo: "ENT-M05",
+    titulo: "Casilla Electrónica",
+    subtitulo: "ENT-M01-03",
     descripcion:
-      "Gestiona y consulta el estado, trazabilidad, providencias y foliado de expedientes.",
-    ruta: "/expedientes",
+      "Consulta y recepción de notificaciones electrónicas institucionales con plena validez legal.",
+    ruta: "/casilla",
+    destacado: false,
+  },
+  {
+    titulo: "Flujo y Validez Legal",
+    subtitulo: "MOD-04 / Firma Digital",
+    descripcion:
+      "Demostración técnica del flujo de firma digital e integridad criptográfica.",
+    ruta: "/flujo-validez-legal",
+    destacado: false,
   },
   {
     titulo: "Validador CVD",
     subtitulo: "MOD-04 / Verificación",
     descripcion:
-      "Valida la autenticidad e integridad de documentos firmados digitalmente mediante el Código de Verificación de Documentos.",
+      "Valida la autenticidad e integridad de documentos firmados digitalmente mediante el Código de Verificación.",
     ruta: "/validador-cvd",
+    destacado: false,
+  },
+  {
+    titulo: "Registro Ciudadano",
+    subtitulo: "ENT-M01-01 / ENT-M01-02",
+    descripcion:
+      "Registro de personas naturales y jurídicas con validación RENIEC / SUNAT y Ubigeo Ucayali.",
+    ruta: "/registro",
+    destacado: false,
+  },
+  {
+    titulo: "Bandeja de Expedientes",
+    subtitulo: "ENT-M05 / Institucional",
+    descripcion:
+      "Gestiona y consulta el estado, trazabilidad, providencias y foliado de expedientes institucionales.",
+    ruta: "/expedientes",
+    destacado: false,
+  },
+  {
+    titulo: "Ventanilla Presencial",
+    subtitulo: "Mesa de Partes Física",
+    descripcion:
+      "Recepción física de documentos en ventanilla y emisión de ticket térmico correlativo.",
+    ruta: "/tramite/ventanilla-presencial",
+    destacado: false,
   },
   {
     titulo: "Panel de Administración",
@@ -52,20 +79,23 @@ const secciones = [
     descripcion:
       "Gestión de usuarios, roles, permisos, auditoría, tablas maestras y calendario laboral.",
     ruta: "/administracion",
+    destacado: false,
   },
   {
     titulo: "Iniciar Sesión",
-    subtitulo: "Acceso Institucional",
+    subtitulo: "Acceso Institucional y Ciudadano",
     descripcion:
       "Ingreso al sistema SIGD con credenciales y verificación de perfil asignado.",
     ruta: "/login",
+    destacado: false,
   },
   {
     titulo: "Reportes y Tableros de Control",
     subtitulo: "06_reportes-tablero-control",
     descripcion:
-      "Consulta indicadores ejecutivos, tendencias, distribución de expedientes y áreas con cuellos de botella.",
+      "Consulta indicadores ejecutivos, tendencias, distribución de expedientes y cuellos de botella.",
     ruta: "/reportes/dashboard",
+    destacado: false,
   },
 ];
 
