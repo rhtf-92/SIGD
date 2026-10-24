@@ -90,9 +90,20 @@ export async function ejecutarSeedLab(poolParam?: Pool): Promise<void> {
     }
   }
 
-  const databaseUrl =
-    process.env.DATABASE_URL || 'postgres://postgres:postgres_password@172.20.157.19:5432/sigd_prueba';
-  const pool = poolParam ?? new Pool({ connectionString: databaseUrl });
+  let pool: Pool;
+  if (poolParam) {
+    pool = poolParam;
+  } else {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl?.trim()) {
+      throw new Error(
+        'Falta definir DATABASE_URL para ejecutar el seed de laboratorio.',
+      );
+    }
+    pool = new Pool({
+      connectionString: databaseUrl,
+    });
+  }
 
   console.log('--- Iniciando Seed LAB SIGD 2026 ---');
 

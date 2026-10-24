@@ -16,6 +16,7 @@ describe('seed-lab: salvaguardas y comportamiento', () => {
 
   beforeEach(() => {
     delete process.env.NODE_ENV;
+    delete process.env.DATABASE_URL;
     for (const v of ENV_VARS_LAB) {
       delete process.env[v];
     }
@@ -32,7 +33,7 @@ describe('seed-lab: salvaguardas y comportamiento', () => {
     );
   });
 
-  it('falla con mensaje claro si falta alguna variable de entorno de password', async () => {
+  it('falla con mensaje claro si falta alguna variable de entorno de password (fail-closed)', async () => {
     // Solo definimos una variable y dejamos las demás vacías
     process.env.LAB_CIUDADANO_PASSWORD = 'TestPassword123#';
     await expect(ejecutarSeedLab({} as unknown as Pool)).rejects.toThrow(
@@ -40,10 +41,22 @@ describe('seed-lab: salvaguardas y comportamiento', () => {
     );
   });
 
-  it('procesa las 6 cuentas cuando las variables de entorno están provistas', async () => {
+  it('falla con error claro si no se proporciona poolParam y falta DATABASE_URL', async () => {
     for (const v of ENV_VARS_LAB) {
       process.env[v] = 'MockSecretPassword#2026';
     }
+    delete process.env.DATABASE_URL;
+
+    await expect(ejecutarSeedLab()).rejects.toThrow(
+      'Falta definir DATABASE_URL para ejecutar el seed de laboratorio.',
+    );
+  });
+
+  it('no requiere DATABASE_URL si se provee un poolParam inyectado por tests', async () => {
+    for (const v of ENV_VARS_LAB) {
+      process.env[v] = 'MockSecretPassword#2026';
+    }
+    delete process.env.DATABASE_URL;
 
     const mockQuery = vi.fn().mockImplementation((queryText: string) => {
       if (queryText.includes('INSERT INTO sigd_auth.persona (')) {
