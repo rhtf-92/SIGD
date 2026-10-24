@@ -1,0 +1,174 @@
+/* ============================================================
+   SIGD · Pantalla de error 404 / sin conexión
+   Estructura base: .page_404 + .four_zero_four_bg
+   Ilustraciones: src/assets/error-404-bg.svg (fondo) y
+   src/assets/error-404-caveman.svg (personaje)
+   ============================================================ */
+
+@layer theme, base, components, utilities;
+@layer components {
+
+  /* ---------- estructura base ---------- */
+
+  .page_404 {
+    background: #fff;
+    font-family: "Arvo", Georgia, "Times New Roman", serif;
+    position: relative;
+    overflow: hidden;
+  }
+  .page_404_unificado {
+    border-radius: 1.2rem;
+  }
+  .page_404 img {
+    width: 100%;
+    display: block;
+  }
+  .page_404_escena {
+    position: relative;
+    width: 100%;
+    line-height: 0;
+  }
+  .page_404_escena_img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1200 / 400;
+    object-fit: cover;
+  }
+  .four_zero_four_bg {
+    display: none;
+  }
+
+  /* ---------- refinamientos para el shell del SIGD ---------- */
+
+  .page_404_contenido_fusion {
+    position: relative;
+    margin-top: -10%;
+    background: radial-gradient(120% 120% at 50% 0%, transparent 0%, rgba(255,255,255,0.9) 40%, #fff 100%);
+    padding: 8% 1.5rem 2.75rem;
+  }
+
+  .page_404_contenido {
+    max-width: 46rem;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .page_404_codigo {
+    margin: 0 0 0.5rem;
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: #b8912a;
+  }
+
+  .page_404_titulo {
+    margin: 0;
+    font-size: clamp(1.6rem, 4.2vw, 2.6rem);
+    font-weight: 700;
+    line-height: 1.18;
+    color: #20160d;
+  }
+
+  .page_404_texto {
+    margin: 0.9rem auto 0;
+    max-width: 38rem;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    font-weight: 500;
+    line-height: 1.7;
+    color: #5b6577;
+  }
+
+  .page_404_acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 1.75rem;
+  }
+
+  /* Estado "reconectando": la acción principal muestra el avance. */
+  .page_404_acciones .btn-primary[aria-busy="true"] {
+    opacity: 0.75;
+    pointer-events: none;
+  }
+
+  /* ---------- destello de la descarga eléctrica ---------- */
+
+  /* Réplica en DOM de los destellos que ocurren dentro del SVG, para que el
+     fogonazo cubra también el texto de la tarjeta. La animación se activa
+     desde el componente, cuando la ilustración ya está pintada, para que
+     coincida con los destellos de la descarga. */
+  .page_404_destello {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    pointer-events: none;
+    background: #eaf6ff;
+    opacity: 0;
+    animation: none;
+  }
+
+  @keyframes page-404-destello {
+    0%,
+    30% {
+      opacity: 0;
+    }
+    32% {
+      opacity: 0.45;
+    }
+    34% {
+      opacity: 0;
+    }
+    36% {
+      opacity: 0.62;
+    }
+    38% {
+      opacity: 0.15;
+    }
+    40%,
+    41.6% {
+      opacity: 0.7;
+    }
+    43.5% {
+      opacity: 0;
+    }
+    45.6% {
+      opacity: 0.4;
+    }
+    47%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .page_404_destello {
+      animation: none !important;
+      opacity: 0;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .page_404_contenido_fusion {
+      margin-top: -16%;
+      padding: 14% 1rem 2rem;
+    }
+  }
+
+  @media (max-height: 960px) {
+    .page_404_contenido_fusion {
+      margin-top: -12%;
+      padding: 10% 1.5rem 2.25rem;
+    }
+  }
+
+  @media (max-height: 700px) {
+    .page_404_contenido_fusion {
+      margin-top: -18%;
+      padding: 16% 1rem 1.75rem;
+    }
+  }
+}

@@ -1,0 +1,458 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="600" height="360" preserveAspectRatio="xMidYMid meet">
+  <title>El cavernícola desenchufando el cable: estira el cable, recibe la descarga eléctrica y termina sentado con el letrero 404</title>
+
+  <!--
+    Secuencia animada de 4,8 s (una sola vez) con estas fases:
+      0,00 s – 1,60 s  FASE 1  estira el cable (tres tirones y el enchufe salta)
+      1,60 s – 2,70 s  FASE 2  descarga eléctrica (chispas, relámpago, convulsión y destellos)
+      2,70 s – 3,20 s  FASE 3  cae y queda sentado en el suelo
+      3,20 s – 4,80 s  FASE 4  cae el letrero "404" y el cavernícola queda mareado
+    Todas las animaciones comparten la misma línea de tiempo (4,8 s) para que
+    la secuencia se reproduzca de forma sincronizada.
+  -->
+
+  <style>
+    /* Todas las piezas comparten la misma línea de tiempo (4,8 s) para que la
+       secuencia se reproduzca de forma sincronizada. */
+    .superior-a, .cable, .enchufe, .enchufe-giro, .cuerpo-a, .pose-a,
+    .cara-shock, .chispas, .rayo, .destello, .led, .pose-b, .polvo, .letrero {
+      animation-duration: 4.8s;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-iteration-count: 1;
+    }
+
+    /* ---------- FASE 1: estirar el cable ---------- */
+    .superior-a {
+      transform-box: view-box;
+      transform-origin: 345px 250px;
+      animation-name: pulling;
+    }
+    @keyframes pulling {
+      0%, 4%    { transform: translate(0, 0) rotate(0deg); }
+      8%        { transform: translate(-1px, 0) rotate(-1deg); }
+      12%       { transform: translate(2px, -1px) rotate(1.6deg); }
+      16%       { transform: translate(-1px, 0) rotate(-0.6deg); }
+      20%       { transform: translate(3px, -1px) rotate(2.2deg); }
+      24%       { transform: translate(-1px, 1px) rotate(-1deg); }
+      28%       { transform: translate(3px, -1px) rotate(2.4deg); }
+      32%       { transform: translate(-1px, 0) rotate(-0.6deg); }
+      33.3%     { transform: translate(4px, -2px) rotate(3.2deg); }
+      36%       { transform: translate(2px, 3px) rotate(1deg); }
+      40%       { transform: translate(-4px, 4px) rotate(-2.4deg); }
+      44%       { transform: translate(5px, 3px) rotate(3deg); }
+      48%       { transform: translate(-4px, 2px) rotate(-2.4deg); }
+      52%       { transform: translate(3px, 0) rotate(1.6deg); }
+      56.25%    { transform: translate(0, 0) rotate(0deg); }
+      100%      { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    .cable {
+      animation-name: cable-tendido;
+    }
+    @keyframes cable-tendido {
+      0%        { d: path("M136 203 C 190 232, 260 256, 328 248"); }
+      33.3%     { d: path("M136 203 C 196 216, 262 240, 328 248"); }
+      36%       { d: path("M136 203 C 198 218, 262 241, 328 248"); }
+      42%       { d: path("M140 209 C 200 222, 262 242, 328 248"); }
+      56%       { d: path("M142 215 C 202 228, 264 243, 328 248"); }
+      64%       { d: path("M144 224 C 200 292, 250 312, 300 306"); }
+      100%      { d: path("M146 223 C 196 312, 250 324, 305 322"); }
+    }
+
+    .enchufe {
+      transform-box: view-box;
+      transform-origin: 136px 203px;
+      animation-name: enchufe-sale;
+    }
+    @keyframes enchufe-sale {
+      0%, 33.3% { transform: translate(136px, 194px); }
+      36%       { transform: translate(137px, 196px); }
+      42%       { transform: translate(140px, 200px); }
+      56%       { transform: translate(142px, 206px); }
+      100%      { transform: translate(146px, 214px); }
+    }
+    .enchufe-giro {
+      transform-box: fill-box;
+      transform-origin: 100% 50%;
+      animation-name: enchufe-cuelga;
+    }
+    @keyframes enchufe-cuelga {
+      0%, 33.3% { transform: rotate(0deg); }
+      36%       { transform: rotate(-22deg); }
+      42%       { transform: rotate(-64deg); }
+      56%       { transform: rotate(-74deg); }
+      100%      { transform: rotate(-80deg); }
+    }
+
+    /* ---------- FASE 2: descarga eléctrica ---------- */
+    .cuerpo-a {
+      transform-box: view-box;
+      transform-origin: 345px 330px;
+      animation-name: caida;
+    }
+    @keyframes caida {
+      0%, 56.25% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+      60%        { transform: translate(-6px, 8px) rotate(-9deg); opacity: 1; }
+      63.5%      { transform: translate(-15px, 30px) rotate(-24deg); opacity: 0.96; }
+      67%        { transform: translate(-22px, 48px) rotate(-36deg); opacity: 0; }
+      100%       { transform: translate(-22px, 48px) rotate(-36deg); opacity: 0; }
+    }
+
+    .pose-a {
+      transform-box: view-box;
+      transform-origin: 345px 330px;
+      animation-name: convulsion;
+    }
+    @keyframes convulsion {
+      0%, 33.3%  { transform: translate(0, 0) rotate(0deg); }
+      34.5%      { transform: translate(-3px, 2px) rotate(-1.6deg); }
+      36%        { transform: translate(4px, -2px) rotate(2.2deg); }
+      37.5%      { transform: translate(-5px, 1px) rotate(-2.6deg); }
+      39%        { transform: translate(5px, -3px) rotate(3.2deg); }
+      40.5%      { transform: translate(-4px, 2px) rotate(-2.2deg); }
+      42%        { transform: translate(6px, -1px) rotate(3.2deg); }
+      43.5%      { transform: translate(-5px, -2px) rotate(-3.2deg); }
+      45%        { transform: translate(4px, 3px) rotate(2.2deg); }
+      46.5%      { transform: translate(-3px, 0) rotate(-1.6deg); }
+      48%        { transform: translate(5px, -2px) rotate(2.6deg); }
+      50%        { transform: translate(-4px, 1px) rotate(-2.2deg); }
+      52%        { transform: translate(2px, 2px) rotate(1.2deg); }
+      54%        { transform: translate(-2px, -1px) rotate(-1.2deg); }
+      56.25%     { transform: translate(0, 0) rotate(0deg); }
+      100%       { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    .cara-shock {
+      animation-name: cara-shock;
+    }
+    @keyframes cara-shock {
+      0%, 33.4%  { opacity: 0; }
+      34.6%      { opacity: 1; }
+      53%        { opacity: 1; }
+      56.25%     { opacity: 0; }
+      100%       { opacity: 0; }
+    }
+
+    .chispas {
+      transform-box: view-box;
+      transform-origin: 120px 205px;
+      animation-name: chispas;
+    }
+    @keyframes chispas {
+      0%, 33.2%  { opacity: 0; transform: scale(0.5); }
+      34.2%      { opacity: 1; transform: scale(1); }
+      36%        { opacity: 0.9; transform: scale(1.2); }
+      37.6%      { opacity: 0; }
+      38.8%      { opacity: 1; transform: scale(0.9); }
+      40.4%      { opacity: 0; }
+      41.8%      { opacity: 1; transform: scale(1.1); }
+      43.4%      { opacity: 0; }
+      44.8%      { opacity: 1; transform: scale(1); }
+      46.6%      { opacity: 0; }
+      100%       { opacity: 0; }
+    }
+
+    .rayo {
+      animation-name: rayo;
+    }
+    @keyframes rayo {
+      0%, 33.4%  { opacity: 0; }
+      34.6%      { opacity: 1; }
+      35.6%      { opacity: 0; }
+      38%        { opacity: 1; }
+      39.2%      { opacity: 0; }
+      42%        { opacity: 1; }
+      43.2%      { opacity: 0; }
+      46%        { opacity: 1; }
+      47.4%      { opacity: 0; }
+      100%       { opacity: 0; }
+    }
+
+    .destello {
+      animation-name: destello;
+    }
+    @keyframes destello {
+      0%, 33.3%  { opacity: 0; }
+      34.3%      { opacity: 0.9; }
+      35.6%      { opacity: 0; }
+      37.8%      { opacity: 0.78; }
+      39.2%      { opacity: 0; }
+      41.6%      { opacity: 0.88; }
+      43%        { opacity: 0; }
+      45.6%      { opacity: 0.7; }
+      47.4%      { opacity: 0; }
+      100%       { opacity: 0; }
+    }
+
+    .led {
+      animation-name: led;
+    }
+    @keyframes led {
+      0%, 22%     { fill: #6df1ff; }
+      26%         { fill: #6df1ff; }
+      31%         { fill: #ff9f1c; }
+      33.3%       { fill: #ff3b30; }
+      44%         { fill: #ff3b30; }
+      52%         { fill: #7a1f14; }
+      60%, 100%   { fill: #3a2318; }
+    }
+
+    /* ---------- FASE 3: cae al suelo ---------- */
+    .pose-b {
+      transform-box: view-box;
+      transform-origin: 300px 330px;
+      animation-name: aparecer-sentado;
+    }
+    @keyframes aparecer-sentado {
+      0%, 62%     { opacity: 0; transform: scale(0.88); }
+      65%         { opacity: 1; transform: scale(1.05); }
+      68%         { opacity: 1; transform: scale(0.97); }
+      71%, 100%   { opacity: 1; transform: scale(1); }
+    }
+
+    .polvo {
+      transform-box: view-box;
+      transform-origin: 300px 328px;
+      animation-name: polvo-caida;
+    }
+    @keyframes polvo-caida {
+      0%, 63%     { opacity: 0; transform: scale(0.2); }
+      66%         { opacity: 0.9; transform: scale(0.8); }
+      72%         { opacity: 0.5; transform: scale(1.4); }
+      82%, 100%   { opacity: 0; transform: scale(1.9); }
+    }
+
+    /* ---------- FASE 4: letrero 404 ---------- */
+    .letrero {
+      transform-box: view-box;
+      transform-origin: 300px 96px;
+      animation-name: cae-letrero;
+    }
+    @keyframes cae-letrero {
+      0%, 69%     { transform: translateY(-180px) rotate(-3deg); opacity: 0; }
+      70.5%       { transform: translateY(-180px) rotate(-3deg); opacity: 1; }
+      78%         { transform: translateY(0px) rotate(-6deg); opacity: 1; }
+      80.5%       { transform: translateY(-16px) rotate(-3deg); opacity: 1; }
+      83%         { transform: translateY(0px) rotate(-6deg); opacity: 1; }
+      100%        { transform: translateY(0px) rotate(-6deg); opacity: 1; }
+    }
+
+    .estrellas {
+      transform-box: view-box;
+      transform-origin: 300px 168px;
+      animation: girar-estrellas 3.6s linear infinite;
+      animation-delay: 3.1s;
+      animation-fill-mode: both;
+    }
+    @keyframes girar-estrellas {
+      0%          { opacity: 0; transform: rotate(0deg); }
+      8%          { opacity: 1; }
+      100%        { opacity: 1; transform: rotate(360deg); }
+    }
+
+    .respirar {
+      transform-box: view-box;
+      transform-origin: 300px 330px;
+      animation: respirar 3.2s ease-in-out infinite;
+      animation-delay: 3.4s;
+    }
+    @keyframes respirar {
+      0%, 100%  { transform: scaleY(1) translateY(0); }
+      50%       { transform: scaleY(1.015) translateY(-1.5px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .superior-a, .cable, .enchufe, .enchufe-giro, .cuerpo-a, .pose-a,
+      .cara-shock, .chispas, .rayo, .destello, .polvo, .letrero, .pose-b {
+        animation: none !important;
+      }
+      .cuerpo-a { display: none; }
+      .pose-b { opacity: 1; }
+      .cara-shock { opacity: 0; }
+      .letrero { opacity: 1; }
+      .estrellas, .respirar { animation: none !important; opacity: 1; }
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="rocaEnchufe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6b4a28"/>
+      <stop offset="1" stop-color="#3a2714"/>
+    </linearGradient>
+    <linearGradient id="rocaLosa" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a6338"/>
+      <stop offset="1" stop-color="#4a3118"/>
+    </linearGradient>
+    <radialGradient id="resplandorChispa" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff6c9" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffd166" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ============ suelo de la cueva ============ -->
+  <g>
+    <path d="M0 318 Q 150 300, 300 312 Q 450 324, 600 306 L600 360 L0 360 Z" fill="#1b1108"/>
+    <path d="M0 318 Q 150 300, 300 312 Q 450 324, 600 306" fill="none" stroke="#6b4a28" stroke-width="2.5" opacity="0.55"/>
+    <ellipse cx="320" cy="326" rx="150" ry="16" fill="#0d0805" opacity="0.5"/>
+  </g>
+
+  <!-- ============ bloque de roca con el tomacorriente ============ -->
+  <g id="roca-enchufe">
+    <path d="M18 150 L104 138 L120 196 L112 300 L30 312 L14 236 Z" fill="url(#rocaEnchufe)" stroke="#241708" stroke-width="4"/>
+    <path d="M30 162 L96 152 L106 200 L100 288 L40 296 L26 230 Z" fill="#5c3f24" opacity="0.85"/>
+    <rect x="66" y="176" width="62" height="66" rx="9" fill="#7a5433" stroke="#2b1c0f" stroke-width="4"/>
+    <rect x="78" y="194" width="16" height="18" rx="3" fill="#17100a"/>
+    <rect x="100" y="194" width="16" height="18" rx="3" fill="#17100a"/>
+    <circle class="led" cx="78" cy="186" r="5"/>
+    <path d="M36 176 L60 172" stroke="#3a2714" stroke-width="3" opacity="0.8"/>
+    <path d="M44 250 L86 244" stroke="#3a2714" stroke-width="3" opacity="0.7"/>
+  </g>
+
+  <!-- ============ enchufe RJ45 ============ -->
+  <g class="enchufe">
+    <g class="enchufe-giro">
+      <path d="M-16 0 L0 -6 L0 24 L-16 18 Z" fill="#3b2c1b" stroke="#241708" stroke-width="3" stroke-linejoin="round"/>
+      <rect x="-46" y="-1" width="32" height="26" rx="4" fill="#c9cdd1" stroke="#5c6773" stroke-width="3"/>
+      <rect x="-60" y="3" width="16" height="20" rx="3" fill="#6df1ff" stroke="#2b3440" stroke-width="3" opacity="0.92"/>
+      <path d="M-56 8 v4 M-51 8 v4 M-46 8 v4" stroke="#d9fbff" stroke-width="2"/>
+      <path d="M-40 3 v8 M-34 3 v8" stroke="#8d9aa7" stroke-width="2"/>
+    </g>
+  </g>
+
+  <!-- ============ cable de red ============ -->
+  <path class="cable" d="M136 203 C 190 232, 260 256, 328 248" fill="none" stroke="#241708" stroke-width="11" stroke-linecap="round"/>
+  <path class="cable" d="M136 203 C 190 232, 260 256, 328 248" fill="none" stroke="#4a3520" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- ============ FASE 1 y 2: cavernícola de pie ============ -->
+  <g class="cuerpo-a">
+    <g class="pose-a">
+      <!-- piernas -->
+      <path d="M332 238 L320 318" stroke="#e0a473" stroke-width="23" stroke-linecap="round" fill="none"/>
+      <path d="M358 238 L372 318" stroke="#e0a473" stroke-width="23" stroke-linecap="round" fill="none"/>
+      <ellipse cx="313" cy="322" rx="21" ry="9" fill="#c07f4e"/>
+      <ellipse cx="379" cy="322" rx="21" ry="9" fill="#c07f4e"/>
+
+      <g class="superior-a">
+        <!-- torso -->
+        <path d="M318 252 C 306 214, 310 188, 322 172 L 370 172 C 382 188, 386 216, 374 252 Z"
+              fill="#e0a473" stroke="#c07f4e" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M340 176 C 344 200, 344 228, 338 250" stroke="#c07f4e" stroke-width="3" fill="none" opacity="0.55"/>
+        <!-- taparrabo -->
+        <path d="M313 224 L 379 224 L 373 262 L 319 262 Z" fill="#8d9aa7" stroke="#5c6773" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M320 232 L 372 232" stroke="#5c6773" stroke-width="3" opacity="0.7"/>
+        <!-- brazo trasero (el que sujeta el cable) -->
+        <path d="M324 186 Q 298 214, 296 242" stroke="#c07f4e" stroke-width="19" stroke-linecap="round" fill="none"/>
+        <circle cx="295" cy="243" r="12" fill="#e0a473" stroke="#c07f4e" stroke-width="3"/>
+        <!-- brazo delantero -->
+        <path d="M368 188 Q 352 216, 330 244" stroke="#e0a473" stroke-width="19" stroke-linecap="round" fill="none"/>
+        <circle cx="329" cy="247" r="12" fill="#e0a473" stroke="#c07f4e" stroke-width="3"/>
+
+        <!-- cabeza -->
+        <circle cx="345" cy="140" r="34" fill="#e0a473" stroke="#c07f4e" stroke-width="4"/>
+        <path d="M311 128 Q 316 92, 345 95 Q 374 92, 379 128 L 373 112 Q 345 100, 317 112 Z" fill="#4a3520"/>
+        <circle cx="345" cy="92" r="10" fill="#4a3520"/>
+        <path d="M314 142 Q 318 182, 345 190 L 345 168 Q 328 164, 321 146 Z" fill="#4a3520"/>
+        <path d="M376 142 Q 372 182, 345 190 L 345 168 Q 362 164, 369 146 Z" fill="#4a3520"/>
+        <ellipse cx="331" cy="136" rx="5" ry="6" fill="#241708"/>
+        <ellipse cx="359" cy="136" rx="5" ry="6" fill="#241708"/>
+        <circle cx="333" cy="134" r="1.8" fill="#fff8e7"/>
+        <circle cx="361" cy="134" r="1.8" fill="#fff8e7"/>
+        <path d="M324 126 L 338 123" stroke="#4a3520" stroke-width="4" stroke-linecap="round"/>
+        <path d="M366 126 L 352 123" stroke="#4a3520" stroke-width="4" stroke-linecap="round"/>
+        <path d="M336 162 Q 345 169, 354 162" stroke="#7a3b21" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M345 140 L 340 152 L 350 152 Z" fill="#c07f4e"/>
+
+        <!-- cara de descarga eléctrica (ojos en X, boca abierta, pelo de punta) -->
+        <g class="cara-shock">
+          <path d="M325 130 L 337 142 M337 130 L 325 142" stroke="#241708" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M353 130 L 365 142 M365 130 L 353 142" stroke="#241708" stroke-width="4.5" stroke-linecap="round"/>
+          <ellipse cx="345" cy="166" rx="11" ry="13" fill="#7a3b21"/>
+          <path d="M311 116 L 305 96 M345 84 L 345 60 M379 116 L 385 96" stroke="#4a3520" stroke-width="5" stroke-linecap="round"/>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- ============ FASE 3: cavernícola sentado en el suelo ============ -->
+  <g class="pose-b">
+    <g class="respirar">
+      <!-- piernas dobladas -->
+      <path d="M300 296 L 252 302" stroke="#e0a473" stroke-width="23" stroke-linecap="round" fill="none"/>
+      <path d="M252 302 L 246 324" stroke="#e0a473" stroke-width="20" stroke-linecap="round" fill="none"/>
+      <ellipse cx="238" cy="326" rx="20" ry="9" fill="#c07f4e"/>
+      <!-- torso recostado -->
+      <path d="M282 306 C 272 284, 274 258, 288 244 L 322 248 C 332 264, 332 288, 322 306 Z"
+            fill="#e0a473" stroke="#c07f4e" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M284 232 L 328 236 L 322 262 L 278 258 Z" fill="#8d9aa7" stroke="#5c6773" stroke-width="3" stroke-linejoin="round"/>
+      <!-- brazos caídos -->
+      <path d="M286 264 Q 274 296, 268 318" stroke="#c07f4e" stroke-width="17" stroke-linecap="round" fill="none"/>
+      <circle cx="267" cy="320" r="11" fill="#e0a473" stroke="#c07f4e" stroke-width="3"/>
+      <path d="M320 262 Q 316 294, 306 316" stroke="#e0a473" stroke-width="17" stroke-linecap="round" fill="none"/>
+      <circle cx="305" cy="318" r="11" fill="#e0a473" stroke="#c07f4e" stroke-width="3"/>
+      <!-- cabeza mareada -->
+      <g transform="rotate(-12 296 214)">
+        <circle cx="296" cy="214" r="32" fill="#e0a473" stroke="#c07f4e" stroke-width="4"/>
+        <path d="M264 202 Q 268 170, 296 173 Q 324 170, 328 202 L 322 186 Q 296 174, 270 186 Z" fill="#4a3520"/>
+        <path d="M266 216 Q 270 252, 296 260 L 296 240 Q 280 236, 273 220 Z" fill="#4a3520"/>
+        <path d="M326 216 Q 322 252, 296 260 L 296 240 Q 312 236, 319 220 Z" fill="#4a3520"/>
+        <path d="M280 212 L 292 222 M292 212 L 280 222" stroke="#241708" stroke-width="4" stroke-linecap="round"/>
+        <path d="M302 212 L 314 222 M314 212 L 302 222" stroke="#241708" stroke-width="4" stroke-linecap="round"/>
+        <ellipse cx="297" cy="238" rx="9" ry="6" fill="#7a3b21"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- ============ chispas en el tomacorriente ============ -->
+  <g class="chispas">
+    <circle cx="120" cy="205" r="46" fill="url(#resplandorChispa)"/>
+    <g stroke="#ffd166" stroke-width="4" stroke-linecap="round" fill="none">
+      <path d="M120 205 L 152 176"/>
+      <path d="M120 205 L 92 168"/>
+      <path d="M120 205 L 160 214"/>
+      <path d="M120 205 L 96 240"/>
+      <path d="M120 205 L 140 246"/>
+    </g>
+    <g fill="#fff6c9">
+      <circle cx="152" cy="176" r="4"/>
+      <circle cx="92" cy="168" r="3.4"/>
+      <circle cx="160" cy="214" r="3.6"/>
+      <circle cx="96" cy="240" r="3"/>
+      <circle cx="140" cy="246" r="3.2"/>
+    </g>
+  </g>
+
+  <!-- ============ relámpago que recorre el cable ============ -->
+  <g class="rayo" fill="none" stroke="#eaf9ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M104 200 L 138 226 L 126 240 L 168 224 L 158 244 L 206 232 L 198 252 L 248 240 L 242 256 L 296 244"/>
+  </g>
+
+  <!-- ============ polvo de la caída ============ -->
+  <g class="polvo" fill="#c9a97a">
+    <circle cx="262" cy="322" r="12" opacity="0.55"/>
+    <circle cx="300" cy="326" r="15" opacity="0.5"/>
+    <circle cx="340" cy="320" r="11" opacity="0.45"/>
+    <circle cx="380" cy="326" r="9" opacity="0.4"/>
+  </g>
+
+  <!-- ============ estrellas de mareo ============ -->
+  <g class="estrellas" fill="#ffd166">
+    <path d="M300 140 L 306 158 L 324 164 L 306 170 L 300 188 L 294 170 L 276 164 L 294 158 Z"/>
+    <path d="M262 150 L 266 162 L 278 166 L 266 170 L 262 182 L 258 170 L 246 166 L 258 162 Z"/>
+    <path d="M338 150 L 342 162 L 354 166 L 342 170 L 338 182 L 334 170 L 322 166 L 334 162 Z"/>
+  </g>
+
+  <!-- ============ letrero 404 ============ -->
+  <g class="letrero">
+    <path d="M244 30 L 356 22 L 360 88 L 248 96 Z" fill="url(#rocaLosa)" stroke="#241708" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M252 38 L 348 31" stroke="#a8794a" stroke-width="3" opacity="0.6"/>
+    <text x="300" y="84" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif"
+          font-size="56" font-weight="bold" letter-spacing="4"
+          fill="#f3e9d2" stroke="#241708" stroke-width="3" paint-order="stroke">404</text>
+    <circle cx="256" cy="34" r="3.4" fill="#c9a227"/>
+    <circle cx="348" cy="28" r="3.4" fill="#c9a227"/>
+  </g>
+
+  <!-- ============ destello de la descarga ============ -->
+  <rect class="destello" width="600" height="360" fill="#eaf6ff" opacity="0"/>
+</svg>

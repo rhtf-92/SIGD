@@ -2,8 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
+import PaginaNoEncontrada from "../pages/PaginaNoEncontrada";
 
-import SeguridadPage from "../pages/administracion/SeguridadPage";
 import DashboardEjecutivoPage from "../pages/DashboardEjecutivoPage";
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
 import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
@@ -33,17 +33,59 @@ export default function AppRouter() {
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
 
-      <Route path="/casilla" element={<CasillaElectronicaPage />} />
+      {/* Públicas sin sesión */}
+      <Route path="/registro" element={<RegistroCiudadanoPage />} />
+      <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
+
+      {/* Privadas: solo su rol. Si escribes la URL sin el rol, vas a /acceso-denegado */}
+      <Route
+        path="/casilla"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE", "MESA_PARTES", "ESTUDIANTE"]}
+            requiredModule="Documentos"
+            requiredAction="ver"
+          >
+            <CasillaElectronicaPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/casilla-electronica"
-        element={<CasillaElectronicaPage />}
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE", "MESA_PARTES", "ESTUDIANTE"]}
+            requiredModule="Documentos"
+            requiredAction="ver"
+          >
+            <CasillaElectronicaPage />
+          </ProtectedRoute>
+        }
       />
-      <Route path="/registro" element={<RegistroCiudadanoPage />} />
 
-      <Route path="/tramite" element={<TramitePage />} />
+      <Route
+        path="/tramite"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "MESA_PARTES", "ESTUDIANTE"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
+            <TramitePage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/tramite/mesa-partes-virtual"
-        element={<MesaPartesVirtualPage />}
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "MESA_PARTES", "ESTUDIANTE"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
+            <MesaPartesVirtualPage />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/tramite/mesa-partes"
@@ -51,38 +93,107 @@ export default function AppRouter() {
       />
       <Route
         path="/mesa-partes"
-        element={<MesaPartesVirtualPage />}
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "MESA_PARTES", "ESTUDIANTE"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
+            <MesaPartesVirtualPage />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/tramite/ventanilla-presencial"
-        element={<VentanillaPresencialPage />}
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "MESA_PARTES"]}
+            requiredModule="Expedientes"
+            requiredAction="crear"
+          >
+            <VentanillaPresencialPage />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/ventanilla"
-        element={<VentanillaPresencialPage />}
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "MESA_PARTES"]}
+            requiredModule="Expedientes"
+            requiredAction="crear"
+          >
+            <VentanillaPresencialPage />
+          </ProtectedRoute>
+        }
       />
-      <Route path="/administracion/seguridad" element={<SeguridadPage />} />
-      <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
-      <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
+      <Route
+        path="/flujo-validez-legal"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE"]}
+            requiredModule="Documentos"
+            requiredAction="ver"
+          >
+            <FlujoValidezLegalPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/flujos/titulacion"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
+            <WorkflowAcademicoPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/flujos/proyector-resoluciones"
-        element={<ProyectorResolucionesPage />}
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE"]}
+            requiredModule="Documentos"
+            requiredAction="ver"
+          >
+            <ProyectorResolucionesPage />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/flujo-validez-legal/firma"
-        element={<PasarelaFirmaPage />}
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE"]}
+            requiredModule="Documentos"
+            requiredAction="crear"
+          >
+            <PasarelaFirmaPage />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/flujo-validez-legal/visor-cvd"
-        element={<VisorCvdPage />}
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE"]}
+            requiredModule="Documentos"
+            requiredAction="ver"
+          >
+            <VisorCvdPage />
+          </ProtectedRoute>
+        }
       />
-      <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
 
 
       <Route
         path="/administracion"
         element={
           <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
             requiredModule="Administración"
             requiredAction="ver"
           />
@@ -95,13 +206,57 @@ export default function AppRouter() {
         element={<Navigate to="/administracion" replace />}
       />
 
-      <Route path="/expedientes" element={<BandejaExpedientesPage />} />
-      <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
+      <Route
+        path="/expedientes"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE", "MESA_PARTES"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
+            <BandejaExpedientesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/expedientes/:id"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR", "DOCENTE", "MESA_PARTES"]}
+            requiredModule="Expedientes"
+            requiredAction="ver"
+          >
+            <ExpedienteDetallePage />
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/reportes" element={<DashboardEjecutivoPage />} />
-      <Route path="/reportes/dashboard" element={<DashboardEjecutivoPage />} />
+      <Route
+        path="/reportes"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
+            requiredModule="Auditoría"
+            requiredAction="ver"
+          >
+            <DashboardEjecutivoPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reportes/dashboard"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
+            requiredModule="Auditoría"
+            requiredAction="ver"
+          >
+            <DashboardEjecutivoPage />
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<PaginaNoEncontrada />} />
 
     </Routes>
   );

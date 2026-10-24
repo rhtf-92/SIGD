@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" preserveAspectRatio="xMidYMid slice">
+  <title>Cueva unificada - Sin conexión</title>
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#140d07"/>
+      <stop offset="0.4" stop-color="#241708"/>
+      <stop offset="0.8" stop-color="#1a1208"/>
+      <stop offset="1" stop-color="#110b06"/>
+    </linearGradient>
+    <linearGradient id="pared" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6f4f2a"/>
+      <stop offset="0.6" stop-color="#4a3219"/>
+      <stop offset="1" stop-color="#2f2112"/>
+    </linearGradient>
+    <linearGradient id="suelo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#26180c"/>
+      <stop offset="1" stop-color="#140d07"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#ffb347" stop-opacity="0.24"/>
+      <stop offset="0.5" stop-color="#ff7a18" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#ff7a18" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vineta" cx="0.5" cy="0.5" r="0.7">
+      <stop offset="0.5" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.5"/>
+    </radialGradient>
+    <filter id="grano">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="1" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.06"/>
+      </feComponentTransfer>
+    </filter>
+    <filter id="suave">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+  <style>
+    .llama{transform-box:fill-box;transform-origin:50% 100%;animation:llama .38s ease-in-out infinite alternate;}
+    .llama2{animation-delay:-.16s}
+    .llama3{animation-delay:-.28s}
+    .halo{transform-box:fill-box;transform-origin:50% 50%;animation:halo 2.4s ease-in-out infinite;}
+    .halo2{animation-delay:-1.2s}
+    .brasa{transform-box:fill-box;transform-origin:50% 50%;animation:subir 3.2s ease-out infinite;}
+    .brasa2{animation-delay:.6s}.brasa3{animation-delay:1.2s}.brasa4{animation-delay:1.8s}.brasa5{animation-delay:2.4s}
+    .estrella{transform-box:fill-box;transform-origin:50% 50%;animation:girar 6s linear infinite;opacity:.8}
+    .estrella2{animation-duration:8s;animation-direction:reverse}
+    .respirar{transform-box:fill-box;transform-origin:50% 90%;animation:respirar 3.6s ease-in-out infinite}
+    .cable{transform-box:fill-box;transform-origin:30% 40%;animation:cable .9s ease-in-out infinite alternate}
+    .chispa{transform-box:fill-box;transform-origin:50% 50%;animation:chispa 2.8s ease-out infinite;opacity:0}
+    .chispa2{animation-delay:1.4s}
+    .luz{animation:luz 2.2s ease-in-out infinite}
+    @keyframes llama{0%{transform:scaleY(1) scaleX(1) skewX(-1deg);opacity:.95}100%{transform:scaleY(1.18) scaleX(.9) skewX(2deg);opacity:.72}}
+    @keyframes halo{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:.8;transform:scale(1.09)}}
+    @keyframes subir{0%{opacity:0;transform:translateY(0) scale(.4)}15%{opacity:1}100%{opacity:0;transform:translateY(-70px) scale(.25)}}
+    @keyframes girar{0%{transform:rotate(0deg) translateY(0)}50%{transform:rotate(180deg) translateY(-2px)}100%{transform:rotate(360deg) translateY(0)}}
+    @keyframes respirar{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.01)}}
+    @keyframes cable{0%{transform:rotate(-1deg)}100%{transform:rotate(1deg)}}
+    @keyframes chispa{0%{opacity:0;transform:translateY(0) scale(.3)}10%{opacity:1}40%{opacity:.4}100%{opacity:0;transform:translateY(-26px) scale(.2)}}
+    @keyframes luz{0%,100%{opacity:.16}40%{opacity:.28}70%{opacity:.18}}
+    @media(prefers-reduced-motion:reduce){.llama,.llama2,.llama3,.halo,.halo2,.brasa,.brasa2,.brasa3,.brasa4,.brasa5,.estrella,.estrella2,.respirar,.cable,.chispa,.chispa2,.luz{animation:none!important}}
+  </style>
+  <rect width="1200" height="400" fill="url(#fondo)"/>
+  <path d="M0 0 H150 L125 70 L165 140 L110 210 L150 280 L95 350 L130 400 H0 Z" fill="url(#pared)" opacity=".95"/>
+  <path d="M1200 0 H1050 L1075 70 L1035 140 L1090 210 L1050 280 L1105 350 L1070 400 H1200 Z" fill="url(#pared)" opacity=".95"/>
+  <g fill="#2b1c0d" opacity=".9">
+    <path d="M200 0 L225 0 L215 68 L202 42 Z"/>
+    <path d="M290 0 L330 0 L316 96 L298 56 Z"/>
+    <path d="M390 0 L414 0 L408 52 L396 32 Z"/>
+    <path d="M820 0 L844 0 L838 50 L826 30 Z"/>
+    <path d="M900 0 L942 0 L926 100 L908 58 Z"/>
+    <path d="M1020 0 L1044 0 L1038 64 L1026 38 Z"/>
+  </g>
+  <ellipse class="halo" cx="160" cy="310" rx="200" ry="150" fill="url(#glow)"/>
+  <ellipse class="halo halo2" cx="1040" cy="310" rx="200" ry="150" fill="url(#glow)"/>
+  <g transform="translate(160 310)">
+    <path d="M-26 10 L26 10 L18 36 L-18 36 Z" fill="#1c1208"/>
+    <path class="llama" d="M0 -8 C14 -26 18 -48 8 -68 C4 -52 -2 -46 -8 -60 C-18 -40 -14 -18 0 -8 Z" fill="#ff9f1c"/>
+    <path class="llama llama2" d="M0 -6 C10 -20 12 -34 4 -46 C2 -34 -2 -30 -6 -38 C-12 -24 -10 -14 0 -6 Z" fill="#ffd166"/>
+    <path class="llama llama3" d="M0 -4 C6 -12 6 -22 2 -28 C0 -20 -2 -18 -4 -24 C-6 -16 -6 -8 0 -4 Z" fill="#fff3b0" opacity=".8"/>
+  </g>
+  <g transform="translate(1040 310)">
+    <path d="M-26 10 L26 10 L18 36 L-18 36 Z" fill="#1c1208"/>
+    <path class="llama" d="M0 -8 C14 -26 18 -48 8 -68 C4 -52 -2 -46 -8 -60 C-18 -40 -14 -18 0 -8 Z" fill="#ff9f1c"/>
+    <path class="llama llama2" d="M0 -6 C10 -20 12 -34 4 -46 C2 -34 -2 -30 -6 -38 C-12 -24 -10 -14 0 -6 Z" fill="#ffd166"/>
+    <path class="llama llama3" d="M0 -4 C6 -12 6 -22 2 -28 C0 -20 -2 -18 -4 -24 C-6 -16 -6 -8 0 -4 Z" fill="#fff3b0" opacity=".8"/>
+  </g>
+  <g>
+    <circle class="brasa" cx="140" cy="322" r="2"/>
+    <circle class="brasa brasa2" cx="172" cy="326" r="1.8"/>
+    <circle class="brasa brasa3" cx="156" cy="328" r="1.6"/>
+    <circle class="brasa brasa4" cx="1020" cy="322" r="2"/>
+    <circle class="brasa brasa5" cx="1060" cy="326" r="1.8"/>
+  </g>
+  <ellipse cx="600" cy="350" rx="520" ry="70" fill="url(#suelo)"/>
+  <g class="respirar">
+    <g class="cable">
+      <path d="M760 210 C700 190 640 210 600 240 C560 270 520 290 500 310" fill="none" stroke="#3a2a16" stroke-width="10" stroke-linecap="round"/>
+      <path d="M760 210 C700 190 640 210 600 240 C560 270 520 290 500 310" fill="none" stroke="#7a5a2f" stroke-width="4" stroke-linecap="round"/>
+    </g>
+    <ellipse cx="500" cy="316" rx="42" ry="10" fill="#120b06" opacity=".6" filter="url(#suave)"/>
+    <path d="M520 270 C500 250 470 250 450 270 C440 290 440 320 450 340 L520 340 C530 320 530 290 520 270 Z" fill="#8a6a3a"/>
+    <path d="M465 275 C450 285 445 305 450 325 L480 325 C475 305 480 285 495 275 Z" fill="#b08a48"/>
+    <ellipse cx="485" cy="300" rx="16" ry="22" fill="#c9a15a"/>
+    <circle cx="482" cy="298" r="2" fill="#1a1208"/>
+    <path d="M478 306 Q485 310 492 306" stroke="#1a1208" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M470 288 C475 282 495 282 500 288 L498 292 L472 292 Z" fill="#6a4a26"/>
+    <g class="luz">
+      <ellipse cx="485" cy="300" rx="38" ry="46" fill="url(#glow)"/>
+    </g>
+  </g>
+  <g class="estrella">
+    <path d="M790 150 L794 162 L806 162 L796 170 L800 182 L790 174 L780 182 L784 170 L774 162 L786 162 Z" fill="#ffd166"/>
+  </g>
+  <g class="estrella estrella2">
+    <path d="M820 138 L823 148 L833 148 L825 154 L828 164 L820 158 L812 164 L815 154 L807 148 L817 148 Z" fill="#fff3b0"/>
+  </g>
+  <g>
+    <circle class="chispa" cx="510" cy="300" r="2"/>
+    <circle class="chispa chispa2" cx="520" cy="296" r="1.6"/>
+  </g>
+  <rect width="1200" height="400" fill="url(#vineta)"/>
+  <rect width="1200" height="400" filter="url(#grano)" opacity=".4"/>
+</svg>

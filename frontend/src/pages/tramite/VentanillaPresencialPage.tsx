@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
 import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
+import { PROCEDIMIENTOS_PRODUCTIVOS_TUPA } from "../../data/tupaSuiza2026";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
@@ -43,15 +44,20 @@ export default function VentanillaPresencialPage() {
   const [cantidadFolios, setCantidadFolios] = useState(1);
   const [cargoGenerado, setCargoGenerado] = useState<CargoOficialTramite | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
-  const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_2026.find(
-    (procedimiento) => procedimiento.codigo === procedimientoTupa,
-  );
+  const procedimientoSeleccionado =
+    PROCEDIMIENTOS_TUPA_2026.find(
+      (procedimiento) => procedimiento.codigo === procedimientoTupa,
+    ) ??
+    PROCEDIMIENTOS_PRODUCTIVOS_TUPA.find(
+      (procedimiento) => procedimiento.codigo === procedimientoTupa,
+    );
+  const esServicioProductivo = procedimientoTupa.startsWith("PP-");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
     const asuntoFinal = procedimientoSeleccionado
-      ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
+      ? `${procedimientoTupa.startsWith("PP-") ? "Servicio productivo" : "TUPA"} ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
       : asunto;
 
     const dniValido = /^[0-9]{8}$/.test(numeroDoc) ? numeroDoc : "74561238";
@@ -103,7 +109,9 @@ export default function VentanillaPresencialPage() {
       setModalAbierto(true);
     } catch (error) {
       console.error("[VentanillaPresencial] Error al radicar en ventanilla:", error);
-      alert("Error al conectar con el servidor de radicación de ventanilla. Intente nuevamente.");
+      const detail =
+        error instanceof Error ? error.message : "Error desconocido al radicar.";
+      alert(`No se pudo registrar el trámite en ventanilla.\n${detail}`);
     }
   }
 
@@ -315,11 +323,20 @@ export default function VentanillaPresencialPage() {
               >
                 <option value="">Seleccione un procedimiento o servicio</option>
                 <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
-                {PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => (
-                  <option key={procedimiento.codigo} value={procedimiento.codigo}>
-                    {procedimiento.codigo} - {procedimiento.nombre}
-                  </option>
-                ))}
+                <optgroup label="Procedimientos académicos TUPA 2026">
+                  {PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => (
+                    <option key={procedimiento.codigo} value={procedimiento.codigo}>
+                      {procedimiento.codigo} - {procedimiento.nombre}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Servicios productivos y venta de bienes — IESTP Suiza 2026">
+                  {PROCEDIMIENTOS_PRODUCTIVOS_TUPA.map((procedimiento) => (
+                    <option key={procedimiento.codigo} value={procedimiento.codigo}>
+                      {procedimiento.codigo} - {procedimiento.nombre} ({procedimiento.derechoPago})
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
 
@@ -366,9 +383,13 @@ export default function VentanillaPresencialPage() {
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-200 pb-3">
                 <div>
                   <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
-                    TUPA {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
+                    {esServicioProductivo ? "Servicio productivo" : "TUPA"} {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
                   </h3>
-                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Pasco</p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Fuente: {esServicioProductivo
+                      ? "Proyectos Productivos y Venta de Servicios — IESTP Suiza 2026 (UIT S/. 5,500.00)"
+                      : "TUPA académico 2026 — IESTP Suiza"}
+                  </p>
                 </div>
                 {procedimientoSeleccionado.derechoPago && (
                   <p className="max-w-xl text-sm font-semibold text-slate-800">
