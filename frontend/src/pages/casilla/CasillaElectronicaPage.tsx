@@ -63,10 +63,13 @@ export default function CasillaElectronicaPage() {
                 Recepción oficial de actos administrativos, cédulas y resoluciones
                 con validez legal plena.
               </p>
+              <div className="mt-2.5 rounded-lg border border-blue-200 bg-blue-50/80 p-2 text-xs text-blue-900 flex items-start gap-2">
+                <span>🔔 <strong>Aviso legal:</strong> Las comunicaciones de esta casilla pueden corresponder a actuaciones administrativas. Revise su contenido, fecha de emisión y las indicaciones del documento.</span>
+              </div>
             </div>
 
             {/* Ficha del Administrado y Dirección de Casilla */}
-            <div className="flex items-center gap-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="flex items-center gap-3.5 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-3.5 shadow-xs">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-700 font-bold text-white shadow-sm">
                   SP
@@ -103,7 +106,7 @@ export default function CasillaElectronicaPage() {
       {/* ==================================================================== */}
       {/* CONTENIDO PRINCIPAL                                                  */}
       {/* ==================================================================== */}
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-7">
+      <div className="mx-auto max-w-7xl px-3.5 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-7">
         {/* Banner Legal Normativo (Ley N° 27444) */}
         <section className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-blue-50/40 p-4.5 shadow-xs text-xs sm:text-sm text-slate-700">
           <div className="flex items-start gap-3">

@@ -187,7 +187,7 @@ export default function VentanillaPresencialPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-5xl px-3.5 py-6 sm:px-6 sm:py-8">
         {esCorteSuperado && (
           <div
             role="note"
@@ -203,11 +203,14 @@ export default function VentanillaPresencialPage() {
 
         <form
           onSubmit={handleSubmit}
-          className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
+          className="space-y-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8"
         >
           <h2 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-3">
             Datos de Recepción en Ventanilla
           </h2>
+          <div className="rounded-lg border border-amber-200 bg-amber-50/90 p-2.5 text-xs text-amber-900 flex items-start gap-2">
+            <span>⚠️ <strong>Aviso para ventanilla:</strong> Verifique los datos del administrado y los requisitos antes de registrar la recepción.</span>
+          </div>
 
           {/* Tipo de Persona */}
           <div className="flex gap-4">

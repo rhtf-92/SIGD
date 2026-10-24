@@ -78,7 +78,7 @@ export default function MisExpedientesPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8 text-slate-900">
+    <main className="min-h-screen bg-slate-50 py-6 px-3.5 sm:px-6 sm:py-8 lg:px-8 text-slate-900">
       <div className="mx-auto max-w-6xl space-y-6">
         {/* Cabecera del Portal Ciudadano */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
@@ -89,14 +89,14 @@ export default function MisExpedientesPage() {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
               Mis Expedientes
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-xs sm:text-sm text-slate-500">
               Bienvenido(a), <span className="font-semibold text-slate-700">{usuario?.nombreCompleto || "Ciudadano"}</span>. Aquí puedes consultar y dar seguimiento a todos tus trámites registrados.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
             <Link
               to="/casilla"
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
             >
               Casilla Electrónica
             </Link>

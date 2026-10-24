@@ -150,8 +150,8 @@ export default function RegistroCiudadanoPage() {
   const handleClearSuccess = () => setSuccessMessage(null);
 
   return (
-    <div className="min-h-screen bg-[#F3F4F6] flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-sm max-w-2xl w-full p-8">
+    <div className="min-h-screen bg-[#F3F4F6] flex items-center justify-center p-3.5 sm:p-6 lg:p-8">
+      <div className="bg-white rounded-xl shadow-sm max-w-2xl w-full p-4 sm:p-8">
         <Link
           to="/"
           className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
@@ -161,10 +161,14 @@ export default function RegistroCiudadanoPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
           Registro de Usuario Externo
         </h1>
-        <p className="text-sm text-gray-600 mb-8">
+        <p className="text-sm text-gray-600 mb-4">
           Complete sus datos para crear su cuenta y Casilla Electrónica
           Institucional
         </p>
+
+        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50/80 p-3 text-xs text-blue-900 flex items-start gap-2">
+          <span>ℹ️ <strong>Tratamiento de Datos Personales:</strong> Los datos proporcionados serán tratados por el IESTP Suiza para fines de identificación, gestión documentaria y comunicaciones institucionales, en ejercicio de sus funciones públicas y conforme a la Ley N.° 29733 y su Reglamento (D.S. N.° 016-2024-JUS).</span>
+        </div>
 
         <div
           role="tablist"

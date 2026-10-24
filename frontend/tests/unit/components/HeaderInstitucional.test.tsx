@@ -198,4 +198,28 @@ describe('HeaderInstitucional — Segmentación Modular y Menús por Rol', () =>
     expect(screen.getByText('Calendario Laboral')).toBeInTheDocument();
     expect(screen.getByText('ADMINISTRADOR')).toBeInTheDocument();
   });
+
+  it('mobile: permite desplegar y colapsar el menú hamburguesa accesible', async () => {
+    const userEventModule = await import('@testing-library/user-event');
+    const user = userEventModule.default.setup();
+
+    render(
+      <MemoryRouter>
+        <HeaderInstitucional />
+      </MemoryRouter>
+    );
+
+    const botonHamburguesa = screen.getByLabelText(/Abrir menú/i);
+    expect(botonHamburguesa).toBeInTheDocument();
+    expect(botonHamburguesa).toHaveAttribute('aria-expanded', 'false');
+
+    // Al abrir el menú móvil
+    await user.click(botonHamburguesa);
+    expect(screen.getByLabelText(/Cerrar menú/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Menú móvil/i)).toBeInTheDocument();
+
+    // Al cerrar el menú móvil
+    await user.click(screen.getByLabelText(/Cerrar menú/i));
+    expect(screen.queryByLabelText(/Menú móvil/i)).not.toBeInTheDocument();
+  });
 });
