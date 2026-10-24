@@ -62,6 +62,20 @@ describe("Suite de Pruebas de Cliente API con Interceptores RFC 7807 y Correlaci
     );
   });
 
+  it("no intenta refresh ni redirige ante credenciales inválidas en login", async () => {
+    const rutas: string[] = [];
+    apiClient.defaults.adapter = async (config) => {
+      rutas.push(config.url ?? "");
+      throw new axios.AxiosError("Credenciales inválidas", "ERR_BAD_REQUEST", config, {}, {
+        status: 401, statusText: "Unauthorized", headers: {}, config,
+        data: { title: "Unauthorized", detail: "Credenciales inválidas", status: 401 },
+      });
+    };
+    await expect(apiClient.post("/api/v1/auth/login", { identificador: "x", password: "incorrecta" }))
+      .rejects.toMatchObject({ status: 401 });
+    expect(rutas).toEqual(["/api/v1/auth/login"]);
+  });
+
   it("captura errores HTTP y los normaliza tipadamente a ApiHttpError bajo RFC 7807", async () => {
     apiClient.defaults.adapter = async (config) => {
       const err = new axios.AxiosError(

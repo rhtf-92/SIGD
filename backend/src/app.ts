@@ -64,6 +64,17 @@ import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.servic
 import { UnauthorizedError, ForbiddenError } from './shared/domain/errors/index.js';
 
 export const ROLES_ADMIN_PERMITIDOS = ['ADMINISTRADOR'] as const;
+const ROLES_INSTITUCIONALES = ['ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES'] as const;
+
+export function requireInstitutionalRole(req: express.Request, _res: express.Response, next: express.NextFunction): void {
+  const token = extraerTokenBearer(req.get('authorization'));
+  if (!token) throw new UnauthorizedError({ detail: 'Debe autenticarse para consultar las unidades institucionales.' });
+  const claims = verificarTokenAcceso(token);
+  if (!claims.roles?.some((rol) => (ROLES_INSTITUCIONALES as readonly string[]).includes(rol.toUpperCase()))) {
+    throw new ForbiddenError({ detail: 'Se requiere un rol institucional vigente.' });
+  }
+  next();
+}
 
 /**
  * Middleware de guarda de administración institucional (H-08 / N-01).
@@ -256,6 +267,17 @@ export function construirApp(
   const organigramaCtrl = crearControladorOrganigrama(new OrganigramaService(pool));
   app.get('/api/v1/admin/organigrama', requireAdminRole, organigramaCtrl.getOrganigrama);
   app.get('/api/v1/admin/organigrama/arbol', requireAdminRole, organigramaCtrl.getOrganigrama);
+  app.get('/api/v1/organigrama/areas-activas', requireInstitutionalRole, async (_req, res, next) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT area_id::text AS id, nombre, vigente AS habilitada
+           FROM sigd_org.area WHERE vigente = TRUE ORDER BY nombre, area_id`,
+      );
+      res.json(rows);
+    } catch (error) {
+      next(error);
+    }
+  });
   app.post('/api/v1/admin/organigrama/areas', requireAdminRole, organigramaCtrl.crearUnidad);
   app.put('/api/v1/admin/organigrama/areas/:id', requireAdminRole, organigramaCtrl.actualizarUnidad);
 
@@ -293,9 +315,9 @@ export function construirApp(
       const limite = Math.min(Number(req.query.limite ?? 50), 100);
       const offset = Number(req.query.offset ?? 0);
       const { rows } = await pool.query(
-        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, creado_en
+        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, fecha_hora
          FROM sigd_audit.bitacora_auditoria
-         ORDER BY creado_en DESC
+         ORDER BY fecha_hora DESC
          LIMIT $1 OFFSET $2`,
         [limite, offset],
       );

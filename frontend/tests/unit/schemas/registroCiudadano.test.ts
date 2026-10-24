@@ -20,6 +20,8 @@ type PersonaNatural = {
   fechaNacimiento: string;
   correo: string;
   celular: string;
+  password: string;
+  confirmarPassword: string;
   domicilio: Ubigeo;
   tipoDocumento: "DNI" | "CE";
   numeroDocumento: string;
@@ -43,6 +45,8 @@ type PersonaJuridica = {
   partidaSunarp: string;
   correoCorporativo: string;
   celularContacto: string;
+  password: string;
+  confirmarPassword: string;
   domicilio: Ubigeo;
   declaracionJuradaAceptada: boolean;
   consentimientoLey29733: boolean;
@@ -78,6 +82,8 @@ const personaNaturalBase = {
   fechaNacimiento: fechaHaceAnos(30),
   correo: "juan.perez@example.com",
   celular: "912345678",
+  password: "MiClaveSegura#2026",
+  confirmarPassword: "MiClaveSegura#2026",
   domicilio: crearUbigeo(),
   tipoDocumento: "DNI" as const,
   numeroDocumento: "12345678",
@@ -108,6 +114,8 @@ const personaJuridicaBase = {
   partidaSunarp: "20123456789",
   correoCorporativo: "contacto@institutosuiza.com",
   celularContacto: "987654321",
+  password: "MiClaveSegura#2026",
+  confirmarPassword: "MiClaveSegura#2026",
   domicilio: crearUbigeo(),
   declaracionJuradaAceptada: true,
   consentimientoLey29733: true,

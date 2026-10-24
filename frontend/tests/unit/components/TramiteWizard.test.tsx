@@ -33,6 +33,12 @@ import userEvent from '@testing-library/user-event';
 import { TramiteWizard } from '@/components/tramite/TramiteWizard';
 import { TRAMITE_WIZARD_STORAGE_KEY } from '@/hooks/useTramiteWizardReducer';
 import { apiClient } from '@/api/client';
+import { createHash } from 'node:crypto';
+
+const mockUpload = vi.hoisted(() => vi.fn());
+vi.mock('@/hooks/usePresignedUpload', () => ({
+  usePresignedUpload: () => ({ upload: mockUpload, status: 'idle', progress: 0 }),
+}));
 
 /**
  * Catálogo TUPA simulado que reemplaza al hardcode legado en el flujo activo.
@@ -41,6 +47,16 @@ import { apiClient } from '@/api/client';
 const REGISTRO_VERSION_CERTIFICADO = '11111111-1111-4111-8111-111111111111';
 const REGISTRO_VERSION_CONVALIDACION = '22222222-2222-4222-8222-222222222222';
 const ID_PERSONA = '33333333-3333-4333-8333-333333333333';
+
+async function cargarPdf(user: ReturnType<typeof userEvent.setup>) {
+  const bytes = new TextEncoder().encode('%PDF-1.4\n%%EOF\n');
+  const archivo = new File([bytes], 'solicitud.pdf', { type: 'application/pdf' });
+  Object.defineProperty(archivo, 'arrayBuffer', { value: async () => bytes.buffer });
+  vi.spyOn(crypto.subtle, 'digest').mockResolvedValueOnce(
+    Uint8Array.from(Buffer.from(createHash('sha256').update(bytes).digest('hex'), 'hex')).buffer,
+  );
+  await user.upload(document.querySelector('input[type="file"]') as HTMLInputElement, archivo);
+}
 
 const metadatos = (pagina: number, referenciaFila: string) => ({
   fuente: {
@@ -96,7 +112,44 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
       JSON.stringify({ identificacion: { idPersona: ID_PERSONA } }),
     );
     vi.restoreAllMocks();
+    mockUpload.mockReset().mockImplementation(async (file: File) => ({
+      file,
+      sha256: createHash('sha256').update('%PDF-1.4\n%%EOF\n').digest('hex'),
+      s3Key: 'expedientes/2026/archivo-confirmado.pdf',
+    }));
     vi.spyOn(apiClient, 'get').mockResolvedValue({ data: CATALOGO_TUPA_API } as never);
+  });
+
+  it('si falla la confirmación Storage, no muestra cargo y reintenta sobre el mismo expediente', async () => {
+    const user = userEvent.setup();
+    const post = vi.spyOn(apiClient, 'post').mockResolvedValue({
+      status: 201,
+      data: {
+        expedienteId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        tipoDocumentalId: 'a373f0c7-8d3e-4328-aec1-78409b539131',
+        cut: 'EXP-2026-778899',
+        fechaRadicacionLegal: '2026-10-24T12:00:00Z',
+        fechaEnvioReal: '2026-10-24T12:00:00Z',
+        qrSeguimientoUrl: '/consulta/EXP-2026-778899',
+        cargoDigital: { hashSha256: 'a'.repeat(64) },
+      },
+    } as never);
+    mockUpload.mockRejectedValueOnce(new Error('MinIO no confirmó el PDF'));
+    render(<TramiteWizard />);
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso2(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    const button = await screen.findByRole('button', { name: /Radicar Trámite/i });
+    await user.click(button);
+    expect(await screen.findByText(/Se creó el expediente.*carga documental no terminó/i)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(button);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(mockUpload).toHaveBeenCalledTimes(2);
   });
 
   afterEach(() => {
@@ -174,8 +227,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     await user.type(inputFolios, data.folios);
 
     // Cargar archivo PDF de prueba requerido para validación
-    const btnCargarPdf = screen.getByRole('button', { name: /\+ Cargar PDF de prueba/i });
-    await user.click(btnCargarPdf);
+    await cargarPdf(user);
   };
 
   /**
@@ -324,8 +376,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(btnSiguiente).toBeDisabled();
 
     // Cargar archivo probatorio PDF
-    const btnCargarPdf = screen.getByRole('button', { name: /\+ Cargar PDF de prueba/i });
-    await user.click(btnCargarPdf);
+    await cargarPdf(user);
 
     expect(btnSiguiente).not.toBeDisabled();
   });
@@ -562,6 +613,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     vi.spyOn(apiClient, 'post').mockResolvedValue({
       data: {
         expedienteId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        tipoDocumentalId: 'a373f0c7-8d3e-4328-aec1-78409b539131',
         cut: 'EXP-2026-778899',
         anioFiscal: 2026,
         fechaRadicacionLegal: '25 de Septiembre de 2026, 16:30 hrs',
@@ -602,6 +654,10 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     // CUT visible dentro del modal
     const cutElements = within(modalDialog).getAllByText('EXP-2026-778899');
     expect(cutElements.length).toBeGreaterThan(0);
+    expect(mockUpload).toHaveBeenCalledWith(expect.any(File), expect.objectContaining({
+      idExpediente: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      origenExpediente: 'TRA',
+    }), true);
 
     // Verificación de contenido institucional
     expect(
@@ -750,6 +806,29 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(
       await screen.findByText(/Debe seleccionar un procedimiento TUPA válido/i)
     ).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('no radica tras recargar si solo persiste metadata y falta el File real', async () => {
+    const user = userEvent.setup();
+    const mockPost = vi.spyOn(apiClient, 'post');
+    sessionStorage.setItem(TRAMITE_WIZARD_STORAGE_KEY, JSON.stringify({
+      currentStep: 4,
+      identificacion: {
+        idPersona: ID_PERSONA, tipoDocumento: 'DNI', numeroDocumento: '74123456',
+        nombres: 'María Elena', apellidos: 'Vargas Paredes',
+        correo: 'maria.vargas@iestpsuiza.edu.pe', telefono: '961987654',
+      },
+      documentos: {
+        tipoTramiteId: 'NO_TUPA', asunto: 'Solicitud de documentación general', numeroFolios: 1,
+        archivos: [{ nombre: 'solicitud.pdf', peso: 21, hashSha256: 'a'.repeat(64) }],
+      },
+      declaracionJurada: { aceptaTerminos: true, declaracionVeracidad: true, autorizaNotificacionCasilla: true },
+      cargoEmitido: null,
+    }));
+    render(<TramiteWizard />);
+    await user.click(await screen.findByRole('button', { name: /Radicar Trámite/i }));
+    expect(await screen.findByText(/Vuelva a seleccionar el PDF/i)).toBeInTheDocument();
     expect(mockPost).not.toHaveBeenCalled();
   });
 });

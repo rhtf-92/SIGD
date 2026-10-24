@@ -40,6 +40,8 @@ export default function PersonaJuridicaForm({
       partidaSunarp: "",
       correoCorporativo: "",
       celularContacto: "",
+      password: "",
+      confirmarPassword: "",
       domicilio: {
         departamentoCodigo: "",
         provinciaCodigo: "",
@@ -150,7 +152,6 @@ export default function PersonaJuridicaForm({
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] focus:border-[#006EC7] outline-none"
           >
             <option value="DNI">DNI</option>
-            <option value="CE">CE</option>
           </select>
           {errors.representanteLegal?.tipoDocumento && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -320,6 +321,21 @@ export default function PersonaJuridicaForm({
               {errors.celularContacto.message}
             </p>
           )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="passwordJuridica" className="block text-sm font-medium text-gray-700 mb-1">Contraseña *</label>
+          <input id="passwordJuridica" type="password" autoComplete="new-password" {...register('password')}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md" />
+          {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
+        </div>
+        <div>
+          <label htmlFor="confirmarPasswordJuridica" className="block text-sm font-medium text-gray-700 mb-1">Confirmar contraseña *</label>
+          <input id="confirmarPasswordJuridica" type="password" autoComplete="new-password" {...register('confirmarPassword')}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md" />
+          {errors.confirmarPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmarPassword.message}</p>}
         </div>
       </div>
 

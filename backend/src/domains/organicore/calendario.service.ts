@@ -449,11 +449,11 @@ export const esquemaAnio = z.coerce
   .max(2999, 'El año es fuera del rango admitido.');
 
 export const esquemaTipoFeriado = z.enum(TIPOS_FERIADO, {
-  errorMap: () => ({ message: 'El tipo de feriado no es válido.' }),
+  error: 'El tipo de feriado no es válido.',
 });
 
 export const esquemaUnidadTerritorial = z.enum(UNIDADES_TERRITORIALES, {
-  errorMap: () => ({ message: 'La unidad territorial no es válida.' }),
+  error: 'La unidad territorial no es válida.',
 });
 
 /**
@@ -552,7 +552,7 @@ export interface FilaCalendario {
 }
 
 const SELECCION = `
-    c.id_calendario,
+  SELECT c.id_calendario,
     to_char(c.fecha, 'YYYY-MM-DD') AS fecha,
     c.anio,
     c.tipo_feriado,

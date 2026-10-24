@@ -8,6 +8,15 @@ import { TRAMITE_WIZARD_STORAGE_KEY } from "../../hooks/useTramiteWizardReducer"
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function validarCamposObligatorios(celular: string, ubigeo: string, direccion: string, password: string, confirmarPassword: string): string | null {
+  if (!/^9[0-9]{8}$/.test(celular)) return 'Ingrese un celular real de nueve dígitos que empiece en 9.';
+  if (!/^25[0-9]{4}$/.test(ubigeo)) return 'Seleccione un distrito válido de Ucayali.';
+  if (direccion.trim().length < 5) return 'Ingrese una dirección real de al menos cinco caracteres.';
+  if (password.length < 8 || password.length > 128) return 'La contraseña debe tener entre 8 y 128 caracteres.';
+  if (password !== confirmarPassword) return 'La confirmación de contraseña no coincide.';
+  return null;
+}
+
 export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -29,29 +38,30 @@ export default function RegistroCiudadanoPage() {
   };
 
   const handleNaturalSubmit = async (data: Natural) => {
-    console.log("POST /api/v1/auth/registro-ciudadano", data);
-
     const partesApellidos = data.apellidos.trim().split(/\s+/);
-    const apellidoPaterno = partesApellidos[0] || "PATERNO";
-    const apellidoMaterno = partesApellidos.slice(1).join(" ") || "MATERNO";
-    const celularValido = /^9[0-9]{8}$/.test(data.celular) ? data.celular : "961234567";
-    const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
-      ? (data.domicilio.distritoCodigo as string)
-      : "250101";
+    const errorCampos = validarCamposObligatorios(data.celular, data.domicilio?.distritoCodigo ?? '', data.domicilio?.direccionExacta ?? '', data.password, data.confirmarPassword);
+    if (errorCampos || partesApellidos.length < 2) {
+      setSuccessMessage(null);
+      setErrorMessage(errorCampos ?? 'Ingrese ambos apellidos para completar el registro.');
+      return;
+    }
+    const apellidoPaterno = partesApellidos[0];
+    const apellidoMaterno = partesApellidos.slice(1).join(' ');
 
     const payload = {
       tipoPersona: "NATURAL" as const,
-      dni: data.numeroDocumento,
+      tipoDocumento: data.tipoDocumento,
+      ...(data.tipoDocumento === 'CE' ? { ce: data.numeroDocumento } : { dni: data.numeroDocumento }),
       nombres: data.nombres.trim(),
       apellidoPaterno,
       apellidoMaterno,
       correo: data.correo.trim().toLowerCase(),
-      celular: celularValido,
-      ubigeoDistrito: ubigeoValido,
-      direccion: data.domicilio?.direccionExacta?.trim() || "Dirección institucional",
-      password: `Clave*${data.numeroDocumento}`,
+      celular: data.celular,
+      ubigeoDistrito: data.domicilio.distritoCodigo,
+      direccion: data.domicilio.direccionExacta.trim(),
+      password: data.password,
       consentimientoDatos: true as const,
-      aceptaNotificaciones: true,
+      aceptaNotificaciones: false,
     };
 
     try {
@@ -73,11 +83,8 @@ export default function RegistroCiudadanoPage() {
 
       mergeIdPersonaToWizardDraft(idPersona.trim());
       setErrorMessage(null);
-      setSuccessMessage(
-        `Registro completado. Tu casilla electrónica ha sido creada: ${data.numeroDocumento}@casilla.iestpsuiza.edu.pe`
-      );
+      setSuccessMessage('Registro completado. Ya puede iniciar sesión con la contraseña que eligió.');
     } catch (err: any) {
-      console.warn("[RegistroCiudadano] Fallo de llamada a API en registro natural:", err);
       setSuccessMessage(null);
       const msg = err.response?.data?.detail || err.response?.data?.message || err.message || "Error al procesar el registro en el servidor. Verifique su conexión.";
       setErrorMessage(msg);
@@ -85,12 +92,17 @@ export default function RegistroCiudadanoPage() {
   };
 
   const handleJuridicaSubmit = async (data: Juridical) => {
-    console.log("POST /api/v1/auth/registro-ciudadano", data);
-
-    const celularValido = /^9[0-9]{8}$/.test(data.celularContacto) ? data.celularContacto : "961234567";
-    const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
-      ? (data.domicilio.distritoCodigo as string)
-      : "250101";
+    if (data.representanteLegal.tipoDocumento !== 'DNI') {
+      setSuccessMessage(null);
+      setErrorMessage('El representante legal debe identificarse con DNI según el contrato actual.');
+      return;
+    }
+    const errorCampos = validarCamposObligatorios(data.celularContacto, data.domicilio?.distritoCodigo ?? '', data.domicilio?.direccionExacta ?? '', data.password, data.confirmarPassword);
+    if (errorCampos) {
+      setSuccessMessage(null);
+      setErrorMessage(errorCampos);
+      return;
+    }
 
     const payload = {
       tipoPersona: "JURIDICA" as const,
@@ -100,12 +112,12 @@ export default function RegistroCiudadanoPage() {
       dniRepresentante: data.representanteLegal.numeroDocumento,
       nombreRepresentante: `${data.representanteLegal.nombres} ${data.representanteLegal.apellidos}`.trim(),
       correo: data.correoCorporativo.trim().toLowerCase(),
-      celular: celularValido,
-      ubigeoDistrito: ubigeoValido,
-      direccion: data.domicilio?.direccionExacta?.trim() || "Dirección institucional",
-      password: `Clave*${data.ruc.slice(-8)}`,
+      celular: data.celularContacto,
+      ubigeoDistrito: data.domicilio.distritoCodigo,
+      direccion: data.domicilio.direccionExacta.trim(),
+      password: data.password,
       consentimientoDatos: true as const,
-      aceptaNotificaciones: true,
+      aceptaNotificaciones: false,
     };
 
     try {
@@ -127,11 +139,8 @@ export default function RegistroCiudadanoPage() {
 
       mergeIdPersonaToWizardDraft(idPersona.trim());
       setErrorMessage(null);
-      setSuccessMessage(
-        `Registro completado. Tu casilla electrónica ha sido creada: ${data.ruc}@casilla.iestpsuiza.edu.pe`
-      );
+      setSuccessMessage('Registro completado. Ya puede iniciar sesión con la contraseña que eligió.');
     } catch (err: any) {
-      console.warn("[RegistroCiudadano] Fallo de llamada a API en registro jurídica:", err);
       setSuccessMessage(null);
       const msg = err.response?.data?.detail || err.response?.data?.message || err.message || "Error al procesar el registro en el servidor. Verifique su conexión.";
       setErrorMessage(msg);

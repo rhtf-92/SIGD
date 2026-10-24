@@ -18,19 +18,23 @@
  * ==============================================================================
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import type {
   TramiteWizardState,
   WizardAction,
   WizardStep,
   CargoDigitalResponse,
+  RadicacionPendiente,
 } from '../../../types/tramiteWizardState';
 import QrCodeView from '../../common/QrCodeView';
 import { apiClient } from '../../../api/client';
 import { esRegistroVersionIdValido, esUuidCanonico } from '../../../types/procedimientoTupa';
+import { useAuthStore } from '../../../stores/authStore';
+import { usePresignedUpload } from '../../../hooks/usePresignedUpload';
 
 interface RadicacionVirtualResponse {
   expedienteId: string;
+  tipoDocumentalId: string;
   cut: string;
   anioFiscal: number;
   fechaEnvioReal: string;
@@ -69,6 +73,10 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   onSuccess,
 }) => {
   const [copiado, setCopiado] = useState(false);
+  const radicacionPendiente = useRef<RadicacionPendiente | null>(state.radicacionPendiente);
+  const hashesConfirmados = useRef<Set<string>>(new Set());
+  const { upload, status: uploadStatus, progress: uploadProgress } = usePresignedUpload();
+  const idPersonaSesion = useAuthStore((auth) => auth.usuario?.idPersona);
   const {
     identificacion,
     documentos,
@@ -80,6 +88,10 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
   const navigateToStep = useCallback(
     (step: WizardStep) => {
+      if (radicacionPendiente.current && step !== 2) {
+        dispatch({ type: 'SET_ERROR', payload: 'El expediente ya tiene CUT. Complete la carga documental antes de iniciar otro trámite.' });
+        return;
+      }
       if (onGoToStep) {
         onGoToStep(step);
       } else {
@@ -131,7 +143,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         return;
       }
 
-      const idPersona = identificacion.idPersona;
+      const idPersona = idPersonaSesion ?? identificacion.idPersona;
       if (!esUuidCanonico(idPersona)) {
         dispatch({
           type: 'SET_ERROR',
@@ -144,6 +156,14 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       if (documentos.archivos.length === 0 || documentos.archivos.some((a) => !/^[0-9a-f]{64}$/i.test(a.hashSha256))) {
         dispatch({ type: 'SET_ERROR', payload: 'Los documentos deben incluir una huella SHA-256 válida.' });
         dispatch({ type: 'SET_SUBMITTING', payload: false });
+        return;
+      }
+
+      if (documentos.archivos.some((a) => typeof File === 'undefined' || !(a.file instanceof File))) {
+        dispatch({
+          type: 'SET_ERROR',
+          payload: 'Vuelva a seleccionar el PDF antes de radicar. El archivo no se conserva al recargar la página.',
+        });
         return;
       }
 
@@ -164,12 +184,33 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         documentos: archivosPayload,
       };
 
-      const res = await apiClient.post<RadicacionVirtualResponse>(
-        '/api/v1/tramites/radicacion-virtual',
-        payload,
-      );
+      if (!radicacionPendiente.current) {
+        const res = await apiClient.post<RadicacionVirtualResponse>(
+          '/api/v1/tramites/radicacion-virtual',
+          payload,
+        );
+        if (res.status !== 201 || !esUuidCanonico(res.data?.expedienteId) ||
+            !esUuidCanonico(res.data?.tipoDocumentalId) || !res.data?.cut) {
+          throw new Error('La radicación no devolvió un expediente y tipo documental válidos.');
+        }
+        radicacionPendiente.current = res.data;
+        dispatch({ type: 'SET_RADICACION_PENDIENTE', payload: res.data });
+      }
 
-      const serverData = res.data;
+      const serverData = radicacionPendiente.current;
+      for (const archivo of documentos.archivos) {
+        if (hashesConfirmados.current.has(archivo.hashSha256)) continue;
+        const result = await upload(archivo.file as File, {
+          idExpediente: serverData.expedienteId,
+          tipoDocumentalId: serverData.tipoDocumentalId,
+          origenExpediente: 'TRA',
+        }, true);
+        if (!result || result.sha256.toLowerCase() !== archivo.hashSha256.toLowerCase()) {
+          throw new Error(`No se confirmó el archivo ${archivo.nombre} con su SHA-256 esperado.`);
+        }
+        hashesConfirmados.current.add(archivo.hashSha256);
+      }
+
       const cargoEmitido: CargoDigitalResponse = {
         cut: serverData.cut,
         fechaRadicacion: serverData.fechaRadicacionLegal,
@@ -190,8 +231,9 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       console.error('[StepConfirmacion] Error en la radicación formal:', err);
       dispatch({
         type: 'SET_ERROR',
-        payload:
-          'No se pudo radicar formalmente el expediente en la sede digital. Verifique su conexión y requisitos.',
+        payload: radicacionPendiente.current
+          ? `Se creó el expediente ${radicacionPendiente.current.cut}, pero la carga documental no terminó. Reintente sin crear otro expediente. ${err instanceof Error ? err.message : ''}`
+          : `No se pudo radicar formalmente el expediente. ${err instanceof Error ? err.message : 'Verifique su conexión y requisitos.'}`,
       });
     }
   };
@@ -497,6 +539,11 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
               <span>Radicar Trámite</span>
             )}
           </button>
+          {isSubmitting && (uploadStatus === 'requesting-url' || uploadStatus === 'uploading') && (
+            <p role="status" className="mt-2 text-xs text-emerald-900">
+              Almacenando PDF en MinIO: {uploadProgress}%
+            </p>
+          )}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import type { Pool } from 'pg';
 import { Readable } from 'node:stream';
@@ -30,6 +30,10 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
     sub: '55555555-5555-4555-8555-555555555555',
     roles: ['ADMINISTRADOR'],
   });
+  const tokenEspecialistaSinArea = firmarTokenAcceso({
+    sub: ID_USUARIO_AJENO,
+    roles: ['ESPECIALISTA'],
+  });
 
   const mockPool = {
     query: async (sql: string, params?: unknown[]) => {
@@ -48,7 +52,8 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
       }
 
       // Consulta de expediente (en sigd_doc.expediente o sigd_tra.expediente)
-      if (sqlStr.includes('expediente') && sqlStr.includes('expediente_id = $1')) {
+      if ((sqlStr.includes('FROM sigd_doc.expediente') || sqlStr.includes('FROM sigd_tra.expediente')) &&
+          sqlStr.includes('expediente_id = $1')) {
         const expId = params?.[0];
         if (expId === ID_EXPEDIENTE) {
           return {
@@ -88,6 +93,7 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
         return {
           rows: [
             {
+              expediente_id: ID_EXPEDIENTE,
               solicitante_id: ID_PERSONA_PROPIETARIO,
             },
           ],
@@ -100,7 +106,7 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
           rows: [
             {
               documento_adjunto_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-              sha256: String(params?.[6] ?? 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
+              sha256: String(params?.[7] ?? 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
             },
           ],
           rowCount: 1,
@@ -180,6 +186,23 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('downloadUrl');
+  });
+
+  it('no preautoriza un expediente inexistente por tener rol ADMINISTRADOR', async () => {
+    const res = await request(app)
+      .post('/api/v1/storage/presigned-url')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({ ...payloadPresignedValido, idExpediente: '99999999-9999-4999-8999-999999999999' });
+    expect(res.status).toBe(403);
+    expect(res.body).not.toHaveProperty('uploadUrl');
+  });
+
+  it('no permite a un ESPECIALISTA sin custodia descargar un documento ajeno', async () => {
+    const res = await request(app)
+      .get('/api/v1/storage/download/sigd-expedientes/expedientes%2F2026%2Ftest.pdf')
+      .set('Authorization', `Bearer ${tokenEspecialistaSinArea}`);
+    expect(res.status).toBe(403);
+    expect(res.body).not.toHaveProperty('downloadUrl');
   });
 
   it('rechaza descarga cuando se solicita un bucket arbitrario no institucional -> 400 Validation Error', async () => {
@@ -362,5 +385,98 @@ describe('SEC-02 & SEC-03: Seguridad y Consistencia en Storage S3', () => {
     expect(res.body).toHaveProperty('documentoId');
     expect(res.body).toHaveProperty('confirmado', true);
     expect(res.body.sha256).toBe(pdfHash);
+  });
+
+  it('asocia el PDF al expediente canónico TRA sin confundir un UUID duplicado en DOC', async () => {
+    const pdf = Buffer.from('%PDF-1.4\n%%EOF');
+    const hash = crypto.createHash('sha256').update(pdf).digest('hex');
+    const queries: string[] = [];
+    const insert = vi.fn().mockResolvedValue({
+      rows: [{ documento_adjunto_id: ID_EXPEDIENTE, sha256: hash }], rowCount: 1,
+    });
+    const poolTra = {
+      query: async (sql: string, params?: unknown[]) => {
+        queries.push(sql);
+        if (sql.includes('INSERT INTO sigd_doc.documento_adjunto')) return insert(sql, params);
+        if (sql.includes('FROM sigd_tra.expediente')) {
+          return { rows: [{ expediente_id: ID_EXPEDIENTE, solicitante_id: ID_PERSONA_PROPIETARIO, area_actual_id: null }] };
+        }
+        if (sql.includes('FROM sigd_doc.expediente')) {
+          return { rows: [{ expediente_id: ID_EXPEDIENTE, solicitante_id: ID_PERSONA_AJENO, area_actual_id: null }] };
+        }
+        if (sql.includes('sigd_auth.cuenta_usuario')) {
+          return { rows: [{ id_persona: params?.[0] === ID_USUARIO_PROPIETARIO ? ID_PERSONA_PROPIETARIO : ID_PERSONA_AJENO, area_id: null }] };
+        }
+        if (sql.includes('sigd_doc.tipo_documento')) return { rows: [{ tipo_documental_id: ID_TIPO_DOC, vigente: true }] };
+        if (sql.includes('sigd_doc.documento_adjunto') && sql.includes('da.s3_bucket')) {
+          return { rows: [{ expediente_id: ID_EXPEDIENTE, origen_expediente: 'TRA' }] };
+        }
+        return { rows: [] };
+      },
+    } as unknown as Pool;
+    const fakeS3 = { send: async () => ({ Body: Readable.from([pdf]) }) };
+    const { crearRouterStorage } = await import('../../../src/core/storage/storage.router.js');
+    const express = (await import('express')).default;
+    const { errorMiddleware } = await import('../../../src/middleware/error-middleware.js');
+    const testApp = express();
+    testApp.use(express.json());
+    testApp.use('/api/v1', crearRouterStorage(poolTra, fakeS3 as any));
+    testApp.use(errorMiddleware);
+
+    const payload = {
+      s3Key: 'expedientes/2026/tra.pdf', sha256Hash: hash,
+      idExpediente: ID_EXPEDIENTE, tipoDocumentalId: ID_TIPO_DOC,
+      origenExpediente: 'TRA',
+    };
+    const own = await request(testApp).post('/api/v1/storage/confirmar-carga')
+      .set('Authorization', `Bearer ${tokenPropietario}`).send(payload);
+    expect(own.status).toBe(201);
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert.mock.calls[0][0]).toContain('expediente_tra_id');
+    expect(queries.some((sql) => sql.includes('FROM sigd_doc.expediente'))).toBe(false);
+
+    const foreign = await request(testApp)
+      .get('/api/v1/storage/download/sigd-expedientes/expedientes%2F2026%2Ftra.pdf')
+      .set('Authorization', `Bearer ${tokenAjeno}`);
+    expect(foreign.status).toBe(403);
+    expect(foreign.body).not.toHaveProperty('downloadUrl');
+  });
+
+  it('reintentar confirmación del mismo SHA y expediente devuelve el adjunto existente sin duplicarlo', async () => {
+    const hash = 'a'.repeat(64);
+    const insert = vi.fn();
+    const poolRetry = {
+      query: async (sql: string, params?: unknown[]) => {
+        if (sql.includes('FROM sigd_tra.expediente')) {
+          return { rows: [{ expediente_id: ID_EXPEDIENTE, solicitante_id: ID_PERSONA_PROPIETARIO, area_actual_id: null }] };
+        }
+        if (sql.includes('sigd_auth.cuenta_usuario')) {
+          return { rows: [{ id_persona: ID_PERSONA_PROPIETARIO, area_id: null }] };
+        }
+        if (sql.includes('sigd_doc.tipo_documento')) return { rows: [{ tipo_documental_id: ID_TIPO_DOC, vigente: true }] };
+        if (sql.includes('SELECT documento_adjunto_id') && sql.includes('sigd_doc.documento_adjunto')) {
+          expect(params).toContain(ID_EXPEDIENTE);
+          return { rows: [{ documento_adjunto_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', s3_key: 'original.pdf', sha256: hash }] };
+        }
+        if (sql.includes('INSERT INTO sigd_doc.documento_adjunto')) return insert();
+        return { rows: [] };
+      },
+    } as unknown as Pool;
+    const s3Send = vi.fn();
+    const { crearRouterStorage } = await import('../../../src/core/storage/storage.router.js');
+    const express = (await import('express')).default;
+    const { errorMiddleware } = await import('../../../src/middleware/error-middleware.js');
+    const appRetry = express();
+    appRetry.use(express.json());
+    appRetry.use('/api/v1', crearRouterStorage(poolRetry, { send: s3Send } as any));
+    appRetry.use(errorMiddleware);
+    const response = await request(appRetry).post('/api/v1/storage/confirmar-carga')
+      .set('Authorization', `Bearer ${tokenPropietario}`)
+      .send({ s3Key: 'retry.pdf', sha256Hash: hash, idExpediente: ID_EXPEDIENTE,
+        tipoDocumentalId: ID_TIPO_DOC, origenExpediente: 'TRA' });
+    expect(response.status).toBe(200);
+    expect(response.body.documentoId).toBe('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+    expect(insert).not.toHaveBeenCalled();
+    expect(s3Send).not.toHaveBeenCalled();
   });
 });

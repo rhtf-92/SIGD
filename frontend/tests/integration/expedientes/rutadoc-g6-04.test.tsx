@@ -50,7 +50,10 @@ function recurso(id: string, sufijo: string) {
 const respuesta = (data: unknown) => ({ data } as AxiosResponse);
 type Handler = (url: string, config?: AxiosRequestConfig) => Promise<AxiosResponse>;
 function instalar(handler: Handler) {
-  return vi.spyOn(apiClient, "get").mockImplementation(handler as typeof apiClient.get);
+  return vi.spyOn(apiClient, "get").mockImplementation(((url: string, config?: AxiosRequestConfig) =>
+    url.includes("/organigrama/areas-activas")
+      ? Promise.resolve(respuesta([{ id: "a0000000-0000-0000-0000-000000000001", nombre: "Unidad vigente", habilitada: true }]))
+      : handler(url, config)) as typeof apiClient.get);
 }
 function parametrosUltimaLlamada(get: ReturnType<typeof instalar>) {
   const params = get.mock.calls.at(-1)?.[1]?.params;
@@ -77,7 +80,8 @@ function montar(path = "/expedientes/" + A) {
 }
 beforeEach(() => {
   vi.restoreAllMocks();
-  useAuthStore.setState({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false });
+  useAuthStore.setState({ accessToken: "token-operador", refreshToken: null,
+    usuario: { id: C, nombreCompleto: "Operador", correo: "operador@example.test", rol: "ESPECIALISTA" }, isAuthenticated: true });
 });
 afterEach(() => { clientes.forEach(c => c.clear()); clientes = []; });
 function normal(url: string) {
@@ -199,7 +203,7 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     expect(await screen.findByText(id === A ? "EVENTO_A · NORMAL" : "EVENTO_B · NORMAL")).toBeInTheDocument();
     expect(await screen.findByText(id === A ? "F. 0001 a F. 0003 · 3 folios" : "F. 0001 a F. 0007 · 7 folios")).toBeInTheDocument();
     expect(await within(screen.getByRole("region", { name: "SLA" })).findByText(id === A ? "VERDE" : "ROJO")).toBeInTheDocument();
-    expect(get.mock.calls.map(([url]) => new URL(url).pathname).sort()).toEqual([
+    expect(get.mock.calls.map(([url]) => new URL(url, "http://localhost").pathname).filter((ruta) => ruta !== "/api/v1/organigrama/areas-activas").sort()).toEqual([
       `/api/v1/expedientes/${id}`, `/api/v1/expedientes/${id}/trazabilidad`,
       `/api/v1/expedientes/${id}/foliacion`, `/api/v1/expedientes/${id}/sla-status`,
       `/api/v1/tramites/expedientes/${id}/tupa`,
@@ -212,7 +216,7 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     useAuthStore.setState({
       accessToken: "mock-token",
       refreshToken: "mock-refresh",
-      usuario: { id: "est-1", correo: "estudiante@institucion.edu.pe", rol: "ESTUDIANTE", nombreCompleto: "Estudiante Prueba" },
+      usuario: { id: "est-1", correo: "estudiante@institucion.edu.pe", rol: "CIUDADANO", nombreCompleto: "Estudiante Prueba" },
       isAuthenticated: true,
     });
     instalar(normal);
@@ -265,6 +269,7 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
   });
 
   it("mantiene Subsanar deshabilitado fuera de OBSERVADO o sin permiso", async () => {
+    useAuthStore.setState({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false });
     instalar(normal);
     montar();
     const acciones = await screen.findByRole("region", { name: "Acciones del expediente" });
@@ -282,7 +287,7 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
   it("no ofrece Subsanar a ESTUDIANTE aunque el expediente esté OBSERVADO", async () => {
     useAuthStore.setState({
       accessToken: "mock-token", refreshToken: null, isAuthenticated: true,
-      usuario: { id: "est-1", correo: "estudiante@institucion.edu.pe", rol: "ESTUDIANTE", nombreCompleto: "Estudiante" },
+      usuario: { id: "est-1", correo: "estudiante@institucion.edu.pe", rol: "CIUDADANO", nombreCompleto: "Estudiante" },
     });
     instalar(async url => {
       const { id, sufijo } = endpoint(url);
@@ -296,6 +301,21 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     fireEvent.click(boton);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(post).not.toHaveBeenCalled();
+  });
+
+  it("ofrece Subsanar al ciudadano titular observado, pero no al especialista ajeno", async () => {
+    useAuthStore.setState({ accessToken: 'token-ciudadano', refreshToken: null, isAuthenticated: true,
+      usuario: { id: C, idPersona: B, correo: 'titular@example.test', rol: 'CIUDADANO', nombreCompleto: 'Titular' } });
+    instalar(async url => {
+      const { id, sufijo } = endpoint(url);
+      return respuesta(sufijo === '' ? { ...detalle(id), solicitanteId: B, estadoActual: 'OBSERVADO' } : recurso(id, sufijo));
+    });
+    montar();
+    const boton = await screen.findByRole('button', { name: 'Subsanar' });
+    expect(boton).toBeEnabled();
+    act(() => useAuthStore.setState({ accessToken: 'token-especialista', refreshToken: null, isAuthenticated: true,
+      usuario: { id: C, correo: 'especialista@example.test', rol: 'ESPECIALISTA', nombreCompleto: 'Especialista' } }));
+    await waitFor(() => expect(boton).toBeDisabled());
   });
 
   it("conserva el modal Subsanar y muestra error RFC 9457 sin reenvío automático", async () => {
@@ -336,6 +356,7 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     expect(dialogo).toBeInTheDocument();
 
     const selectDestino = screen.getByLabelText(/Unidad de destino/i);
+    await within(dialogo).findByRole("option", { name: "Unidad vigente" });
     fireEvent.change(selectDestino, { target: { value: "a0000000-0000-0000-0000-000000000001" } });
 
     const textareaProveido = screen.getByLabelText(/Proveído motivado/i);
@@ -373,6 +394,7 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     expect(dialogo).toBeInTheDocument();
 
     const selectDestino = screen.getByLabelText(/Unidad de destino/i);
+    await within(dialogo).findByRole("option", { name: "Unidad vigente" });
     fireEvent.change(selectDestino, { target: { value: "a0000000-0000-0000-0000-000000000001" } });
 
     const textareaProveido = screen.getByLabelText(/Proveído motivado/i);

@@ -1,5 +1,5 @@
 export interface DatosRegistro {
-  tipoDocumento: 'DNI' | 'RUC';
+  tipoDocumento: 'DNI' | 'CE' | 'RUC';
   numeroDocumento: string;
   correo: string;
   celular: string;

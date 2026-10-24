@@ -31,6 +31,7 @@ import type { DtoContextoTupa } from './tupaVersionado.service.js';
 
 export interface ResultadoRadicacion {
   expedienteId: string;
+  tipoDocumentalId: string;
   cut: string;
   anio: number;
   fechaEnvioReal: string;
@@ -156,6 +157,7 @@ export class RadicacionVirtualService {
 
       return {
         expedienteId: expediente.expediente_id,
+        tipoDocumentalId: tipoDocId,
         cut,
         anio,
         fechaEnvioReal: horario.envioReal.toISOString(),

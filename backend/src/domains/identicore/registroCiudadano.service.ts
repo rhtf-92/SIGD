@@ -44,15 +44,18 @@ export class RegistroCiudadanoService {
   ) {}
 
   async registrarCiudadano(datos: RegistroCiudadanoInput, ipAddress: string | null): Promise<RegistroResult> {
-    const validacion = validarDni(datos.dni);
-    if (!validacion.valido) {
+    const numeroDocumento = datos.tipoDocumento === 'CE' ? datos.ce : datos.dni;
+    const validacion = datos.tipoDocumento === 'CE'
+      ? { valido: /^[A-Z0-9]{9,12}$/.test(numeroDocumento ?? '') }
+      : validarDni(numeroDocumento ?? '');
+    if (!validacion.valido || !numeroDocumento) {
       throw new ValidationError({
         invalidParams: [{ name: 'dni', reason: 'DNI_FORMATO_INVALIDO: debe contener 8 dígitos.' }],
       });
     }
     return this.registrarPersona({
-      tipoDocumento: 'DNI',
-      numeroDocumento: datos.dni,
+      tipoDocumento: datos.tipoDocumento,
+      numeroDocumento,
       correo: datos.correo,
       celular: datos.celular,
       direccion: datos.direccion,
@@ -62,6 +65,7 @@ export class RegistroCiudadanoService {
       apellidoPaterno: datos.apellidoPaterno,
       apellidoMaterno: datos.apellidoMaterno,
       aceptaNotificaciones: datos.aceptaNotificaciones,
+      consentimientoDatos: datos.consentimientoDatos,
       ipAddress,
       tipoPersona: 'NATURAL',
       partidaRegistral: null,
@@ -98,13 +102,14 @@ export class RegistroCiudadanoService {
       documentoRepresentante: datos.dniRepresentante,
       nombreRepresentante: datos.nombreRepresentante,
       aceptaNotificaciones: datos.aceptaNotificaciones,
+      consentimientoDatos: datos.consentimientoDatos,
       ipAddress,
       partidaRegistral: datos.partidaRegistral ? BigInt(datos.partidaRegistral).toString() : null,
     });
   }
 
   private async registrarPersona(datos: {
-    tipoDocumento: 'DNI' | 'RUC';
+    tipoDocumento: 'DNI' | 'CE' | 'RUC';
     numeroDocumento: string;
     correo: string;
     celular: string;
@@ -115,6 +120,7 @@ export class RegistroCiudadanoService {
     apellidoPaterno: string | null;
     apellidoMaterno: string | null;
     aceptaNotificaciones: boolean;
+    consentimientoDatos: boolean;
     ipAddress: string | null;
     tipoPersona: 'NATURAL' | 'JURIDICA';
     razonSocial?: string;
@@ -171,10 +177,10 @@ export class RegistroCiudadanoService {
 
       const persona = await cliente.query<IdResult>(
         `INSERT INTO sigd_auth.persona
-           (tipo, id_documento)
-         VALUES ($1, $2)
+           (tipo, id_documento, direccion, ubigeo_distrito)
+         VALUES ($1, $2, $3, $4)
          RETURNING id_persona::text AS id`,
-        [datos.tipoPersona, datos.numeroDocumento],
+        [datos.tipoPersona, datos.numeroDocumento, datos.direccion, datos.ubigeoDistrito],
       );
       const personaId = persona.rows[0]?.id;
       if (!personaId) throw new Error('La inserción de persona no devolvió su identificador.');
@@ -231,10 +237,10 @@ export class RegistroCiudadanoService {
 
         const juridica = await cliente.query<IdResult>(
           `INSERT INTO sigd_auth.persona_juridica
-             (id_persona, razon_social, nombre_comercial, representante_legal, direccion)
-           VALUES ($1, $2, $3, $4, $5)
+             (id_persona, razon_social, nombre_comercial, representante_legal, direccion, partida_registral_sunarp)
+           VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id_persona::text AS id`,
-          [personaId, datos.razonSocial, datos.nombreComercial, nombreRepresentante, datos.direccion],
+          [personaId, datos.razonSocial, datos.nombreComercial, nombreRepresentante, datos.direccion, datos.partidaRegistral],
         );
         const personaJuridicaId = juridica.rows[0]?.id;
         if (!personaJuridicaId) throw new Error('La inserción de persona jurídica no devolvió su identificador.');
@@ -257,13 +263,25 @@ export class RegistroCiudadanoService {
       const usuarioId = cuenta.rows[0]?.id;
       if (!usuarioId) throw new Error('La inserción de cuenta no devolvió su identificador.');
 
+      const rolCiudadano = await cliente.query<IdResult>(
+        `INSERT INTO sigd_org.usuario_rol (id_usuario, rol_id)
+         SELECT $1::uuid, rol_id FROM sigd_org.rol_sistema
+          WHERE codigo = 'CIUDADANO' AND vigente = TRUE
+         RETURNING id_usuario::text AS id`,
+        [usuarioId],
+      );
+      if (!rolCiudadano.rows[0]?.id) {
+        throw new AppError({ status: 500, code: 'CITIZEN_ROLE_NOT_CONFIGURED',
+          message: 'No está configurado el rol canónico CIUDADANO.' });
+      }
+
       await cliente.query(
         `INSERT INTO sigd_auth.consentimiento_datos
            (id_persona, ip_origen, version_politica,
             finalidade, aceptado, fecha_aceptacion)
          VALUES ($1, $2, 'v1.0', 'registro_ciudadano', $3,
                  CASE WHEN $3 THEN now() ELSE NULL END)`,
-        [personaId, datos.ipAddress, datos.aceptaNotificaciones],
+        [personaId, datos.ipAddress, datos.consentimientoDatos],
       );
 
       await cliente.query('COMMIT');

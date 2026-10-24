@@ -15,7 +15,7 @@ const MODULOS: TarjetaModulo[] = [
     descripcion:
       "Workflow de 5 etapas de la Secretaría Académica para titulación, grados, certificaciones, convalidaciones y trabajos de investigación (verificación, revisión de requisitos, observaciones, subsanación y emisión de resolución).",
     responsables: "Adriano D. Espinoza (R/A)",
-    ruta: "/flujos/titulacion",
+    ruta: null,
   },
   {
     codigo: "ENT-M04-02",
@@ -31,7 +31,7 @@ const MODULOS: TarjetaModulo[] = [
     descripcion:
       "Invocación del agente local refirma://, secuencia PAdES-BES + TSA y firma de documentos en lote desde la Secretaría Académica.",
     responsables: "Adriano D. Espinoza (R/A) · Mayra (R)",
-    ruta: "/flujo-validez-legal/firma",
+    ruta: null,
   },
   {
     codigo: "ENT-M04-04",
@@ -39,7 +39,7 @@ const MODULOS: TarjetaModulo[] = [
     descripcion:
       "Renderizado de copias auténticas A4 con estampa lateral CVD de 20mm y QR de cotejo (D.S. 070-2013-PCM).",
     responsables: "Mayra (R)",
-    ruta: "/flujo-validez-legal/visor-cvd",
+    ruta: null,
   },
   {
     codigo: "ENT-M04-05",

@@ -33,6 +33,7 @@ const presignedInputSchema = z.preprocess(
     mimeType: z.literal('application/pdf'),
     sha256Hash: z.string().length(64).regex(/^[a-fA-F0-9]{64}$/),
     idExpediente: z.string().uuid().optional(),
+    origenExpediente: z.enum(['DOC', 'TRA']).default('DOC'),
   }),
 );
 
@@ -42,6 +43,7 @@ const confirmarInputSchema = z.object({
   idExpediente: z.string().uuid({ message: 'idExpediente es obligatorio y debe ser un UUID válido.' }),
   tipoDocumentalId: z.string().uuid({ message: 'tipoDocumentalId es obligatorio y debe ser un UUID válido.' }),
   nombreArchivo: z.string().min(1).max(255).optional(),
+  origenExpediente: z.enum(['DOC', 'TRA']).default('DOC'),
 });
 
 function autenticarActorStorage(req: Request): ClaimsJwt {
@@ -61,13 +63,24 @@ async function validarAccesoExpediente(
   usuarioId: string,
   roles: string[],
   idExpediente: string,
+  origenExpediente: 'DOC' | 'TRA',
 ): Promise<boolean> {
-  if (roles.some((r) => ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES'].includes(r.toUpperCase()))) {
-    return true;
-  }
   if (!pool) return false;
 
   try {
+    const tabla = origenExpediente === 'TRA' ? 'sigd_tra.expediente' : 'sigd_doc.expediente';
+    const columnaArea = origenExpediente === 'TRA' ? 'area_destino_id' : 'area_actual_id';
+    const resExp = await pool.query<{ solicitante_id: string | null; area_actual_id: string | null }>(
+      `SELECT solicitante_id::text AS solicitante_id, ${columnaArea}::text AS area_actual_id
+         FROM ${tabla}
+        WHERE expediente_id = $1::uuid`,
+      [idExpediente],
+    );
+
+    if (resExp.rows.length === 0) return false;
+    if (roles.some((r) => ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES'].includes(r.toUpperCase()))) {
+      return true;
+    }
     const resUser = await pool.query<{ id_persona: string | null; area_id: string | null }>(
       `SELECT u.id_persona::text AS id_persona, p.area_id::text AS area_id
          FROM sigd_auth.cuenta_usuario u
@@ -77,15 +90,6 @@ async function validarAccesoExpediente(
     );
     const idPersona = resUser.rows[0]?.id_persona;
     const areaId = resUser.rows[0]?.area_id;
-
-    const resExp = await pool.query<{ solicitante_id: string | null; area_actual_id: string | null }>(
-      `SELECT solicitante_id::text AS solicitante_id, area_actual_id::text AS area_actual_id
-         FROM sigd_doc.expediente
-        WHERE expediente_id = $1::uuid`,
-      [idExpediente],
-    );
-
-    if (resExp.rows.length === 0) return false;
     const exp = resExp.rows[0];
 
     if (idPersona && exp.solicitante_id === idPersona) return true;
@@ -112,6 +116,7 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
         claims.sub,
         claims.roles ?? [],
         datos.idExpediente,
+        datos.origenExpediente,
       );
       if (!autorizado) {
         throw new ForbiddenError({ detail: 'No tiene autorización para cargar documentos en este expediente.' });
@@ -147,10 +152,11 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
       });
     }
 
-    // N-04: Validar existencia de expediente en sigd_doc.expediente (FK obligatoria)
+    // La tabla padre se elige de forma explícita: el mismo UUID puede existir en DOC y TRA.
+    const tablaExpediente = datos.origenExpediente === 'TRA' ? 'sigd_tra.expediente' : 'sigd_doc.expediente';
     const resExpediente = await pool.query<{ expediente_id: string }>(
       `SELECT expediente_id::text AS expediente_id
-         FROM sigd_doc.expediente
+         FROM ${tablaExpediente}
         WHERE expediente_id = $1::uuid;`,
       [datos.idExpediente],
     );
@@ -165,6 +171,7 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
       claims.sub,
       claims.roles ?? [],
       datos.idExpediente,
+      datos.origenExpediente,
     );
     if (!autorizado) {
       throw new ForbiddenError({ detail: 'No tiene autorización sobre el expediente indicado.' });
@@ -192,6 +199,30 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
           },
         ],
       });
+    }
+
+    // Reintento seguro: una confirmación ya persistida para este expediente y SHA
+    // conserva el documento original y evita duplicar metadatos.
+    const columnaExpediente = datos.origenExpediente === 'TRA' ? 'expediente_tra_id' : 'expediente_id';
+    const adjuntoExistente = await pool.query<{
+      documento_adjunto_id: string; s3_key: string; sha256: string;
+    }>(
+      `SELECT documento_adjunto_id::text, s3_key, sha256
+         FROM sigd_doc.documento_adjunto
+        WHERE ${columnaExpediente} = $1::uuid AND sha256 = $2 AND s3_bucket = $3`,
+      [datos.idExpediente, datos.sha256Hash.toLowerCase(), config.bucket],
+    );
+    if (adjuntoExistente.rows[0]) {
+      const existente = adjuntoExistente.rows[0];
+      res.status(200).json({
+        documentoId: existente.documento_adjunto_id,
+        idDocumentoAdjunto: existente.documento_adjunto_id,
+        s3Key: existente.s3_key,
+        sha256: existente.sha256.trim(),
+        confirmado: true,
+        mensaje: 'Documento PDF previamente verificado y registrado.',
+      });
+      return;
     }
 
     // SEC-02: Verificación criptográfica y estructural real del objeto en S3 antes de persistir
@@ -288,6 +319,7 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
       `INSERT INTO sigd_doc.documento_adjunto (
          documento_adjunto_id,
          expediente_id,
+         expediente_tra_id,
          tipo_documental_id,
          nombre_archivo,
          s3_bucket,
@@ -298,11 +330,12 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
          magic_bytes,
          subido_por,
          creado_en
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
        RETURNING documento_adjunto_id::text, sha256;`,
       [
         idAdjunto,
-        datos.idExpediente,
+        datos.origenExpediente === 'DOC' ? datos.idExpediente : null,
+        datos.origenExpediente === 'TRA' ? datos.idExpediente : null,
         datos.tipoDocumentalId,
         nombreArchivo,
         config.bucket,
@@ -359,14 +392,10 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
       });
     }
 
-    const esPersonalAutorizado = claims.roles.some((r) =>
-      ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES', 'SECRETARIO', 'ESPECIALISTA'].includes(r.toUpperCase()),
-    );
-
-    const resDoc = await pool.query<{ solicitante_id: string | null }>(
-      `SELECT e.solicitante_id::text AS solicitante_id
+    const resDoc = await pool.query<{ expediente_id: string; origen_expediente: 'DOC' | 'TRA' }>(
+      `SELECT COALESCE(da.expediente_tra_id, da.expediente_id)::text AS expediente_id,
+              CASE WHEN da.expediente_tra_id IS NOT NULL THEN 'TRA' ELSE 'DOC' END AS origen_expediente
          FROM sigd_doc.documento_adjunto da
-         JOIN sigd_doc.expediente e ON e.expediente_id = da.expediente_id
         WHERE da.s3_bucket = $1 AND da.s3_key = $2`,
       [bucket, key],
     );
@@ -377,16 +406,12 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
       });
     }
 
-    if (!esPersonalAutorizado) {
-      const doc = resDoc.rows[0];
-      const resUser = await pool.query<{ id_persona: string | null }>(
-        `SELECT id_persona::text AS id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1`,
-        [claims.sub],
-      );
-      const idPersona = resUser.rows[0]?.id_persona;
-      if (!idPersona || doc.solicitante_id !== idPersona) {
-        throw new ForbiddenError({ detail: 'No tiene permisos para descargar documentos de este expediente.' });
-      }
+    const autorizado = await validarAccesoExpediente(
+      pool, claims.sub, claims.roles ?? [], resDoc.rows[0].expediente_id,
+      resDoc.rows[0].origen_expediente ?? 'DOC',
+    );
+    if (!autorizado) {
+      throw new ForbiddenError({ detail: 'No tiene permisos para descargar documentos de este expediente.' });
     }
 
     const configBucket = { ...config, bucket: config.bucket };

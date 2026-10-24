@@ -3,12 +3,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
 
-import SeguridadPage from "../pages/administracion/SeguridadPage";
 import DashboardEjecutivoPage from "../pages/DashboardEjecutivoPage";
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
-import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
-import VisorCvdPage from "../pages/flujos/VisorCvdPage";
-import WorkflowAcademicoPage from "../pages/flujos/WorkflowAcademicoPage";
 import CalendarizacionInstitucionalPage from "../pages/administracion/CalendarizacionInstitucionalPage";
 import ValidadorPublicoCvdPage from "../pages/validador/ValidadorPublicoCvdPage";
 import LoginPage from "../pages/LoginPage";
@@ -16,11 +12,9 @@ import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
 import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
 import ExpedienteDetallePage from "../pages/expedientes/ExpedienteDetallePage";
-import MesaPartesVirtualPage from "../pages/tramite/MesaPartesVirtualPage";
 import VentanillaPresencialPage from "../pages/tramite/VentanillaPresencialPage";
 import TramitePage from "../pages/tramite/TramitePage";
 import ConsultaPublicaPage from "../pages/tramite/ConsultaPublicaPage";
-import ProyectorResolucionesPage from "../pages/flujos/ProyectorResolucionesPage";
 import AdminRoutes from "./AdminRoutes";
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -34,17 +28,17 @@ export default function AppRouter() {
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
 
-      <Route path="/casilla" element={<CasillaElectronicaPage />} />
+      <Route path="/casilla" element={<ProtectedRoute><CasillaElectronicaPage /></ProtectedRoute>} />
       <Route
         path="/casilla-electronica"
-        element={<CasillaElectronicaPage />}
+        element={<ProtectedRoute><CasillaElectronicaPage /></ProtectedRoute>}
       />
       <Route path="/registro" element={<RegistroCiudadanoPage />} />
 
-      <Route path="/tramite" element={<TramitePage />} />
+      <Route path="/tramite" element={<ProtectedRoute><TramitePage /></ProtectedRoute>} />
       <Route
         path="/tramite/mesa-partes-virtual"
-        element={<MesaPartesVirtualPage />}
+        element={<Navigate to="/tramite" replace />}
       />
       <Route
         path="/tramite/mesa-partes"
@@ -52,43 +46,26 @@ export default function AppRouter() {
       />
       <Route
         path="/mesa-partes"
-        element={<MesaPartesVirtualPage />}
+        element={<Navigate to="/tramite" replace />}
       />
       <Route
         path="/tramite/ventanilla-presencial"
-        element={<VentanillaPresencialPage />}
+        element={<ProtectedRoute requiredRoles={["MESA_PARTES", "ADMINISTRADOR"]}><VentanillaPresencialPage /></ProtectedRoute>}
       />
       <Route
         path="/ventanilla"
-        element={<VentanillaPresencialPage />}
+        element={<ProtectedRoute requiredRoles={["MESA_PARTES", "ADMINISTRADOR"]}><VentanillaPresencialPage /></ProtectedRoute>}
       />
-      <Route path="/administracion/seguridad" element={<SeguridadPage />} />
       <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
-      <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
-      <Route
-        path="/flujos/proyector-resoluciones"
-        element={<ProyectorResolucionesPage />}
-      />
-      <Route
-        path="/flujo-validez-legal/firma"
-        element={<PasarelaFirmaPage />}
-      />
-      <Route
-        path="/flujo-validez-legal/visor-cvd"
-        element={<VisorCvdPage />}
-      />
       <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
-      <Route path="/calendarizacion-institucional" element={<CalendarizacionInstitucionalPage />} />
-      <Route path="/institucional/calendarizacion" element={<CalendarizacionInstitucionalPage />} />
+      <Route path="/calendarizacion-institucional" element={<ProtectedRoute requiredRoles={["ADMINISTRADOR"]}><CalendarizacionInstitucionalPage /></ProtectedRoute>} />
+      <Route path="/institucional/calendarizacion" element={<ProtectedRoute requiredRoles={["ADMINISTRADOR"]}><CalendarizacionInstitucionalPage /></ProtectedRoute>} />
 
 
       <Route
         path="/administracion"
         element={
-          <ProtectedRoute
-            requiredModule="Administración"
-            requiredAction="ver"
-          />
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR"]} />
         }
       >
         {AdminRoutes()}
@@ -98,11 +75,11 @@ export default function AppRouter() {
         element={<Navigate to="/administracion" replace />}
       />
 
-      <Route path="/expedientes" element={<BandejaExpedientesPage />} />
-      <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
+      <Route path="/expedientes" element={<ProtectedRoute><BandejaExpedientesPage /></ProtectedRoute>} />
+      <Route path="/expedientes/:id" element={<ProtectedRoute><ExpedienteDetallePage /></ProtectedRoute>} />
 
-      <Route path="/reportes" element={<DashboardEjecutivoPage />} />
-      <Route path="/reportes/dashboard" element={<DashboardEjecutivoPage />} />
+      <Route path="/reportes" element={<ProtectedRoute requiredRoles={["DIRECTOR", "ADMINISTRADOR"]}><DashboardEjecutivoPage /></ProtectedRoute>} />
+      <Route path="/reportes/dashboard" element={<ProtectedRoute requiredRoles={["DIRECTOR", "ADMINISTRADOR"]}><DashboardEjecutivoPage /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
 

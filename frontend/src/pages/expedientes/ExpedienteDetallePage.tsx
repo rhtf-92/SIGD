@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { useExpedienteTimeline } from "../../hooks/useExpedienteTimeline";
 import { useRutaDocDetalle } from "./rutadoc/useRutaDocDetalle";
@@ -16,17 +17,8 @@ import ExpedienteActionToast from "../../components/expedientes/ExpedienteAction
 import { useExpedienteActions } from "../../hooks/useExpedienteActions";
 import { servicioExpedienteActionsReal } from "../../api/expedienteActions";
 import { useAuthStore } from "../../stores/authStore";
-import { obtenerPermisosAlmacenados, permisosIniciales } from "../../hooks/useRbacConfig";
+import { apiClient } from "../../api/client";
 import type { BusquedaExpedientes, ExpedienteAccionReferencia, UnidadDestino } from "../../types/expedienteActions";
-
-const UNIDADES_ORGANICAS_DEFAULT: readonly UnidadDestino[] = [
-  { id: "a0000000-0000-0000-0000-000000000001", nombre: "Subdirección Académica", habilitada: true },
-  { id: "a0000000-0000-0000-0000-000000000002", nombre: "Dirección General", habilitada: true },
-  { id: "a0000000-0000-0000-0000-000000000003", nombre: "Mesa de Partes", habilitada: true },
-  { id: "a0000000-0000-0000-0000-000000000004", nombre: "Secretaría Académica", habilitada: true },
-  { id: "a0000000-0000-0000-0000-000000000005", nombre: "Coordinación DSI", habilitada: true },
-  { id: "destino-prueba", nombre: "Unidad de Prueba", habilitada: true },
-];
 
 const busquedaConexos: BusquedaExpedientes = {
   buscar: async (texto: string, signal: AbortSignal) => {
@@ -51,6 +43,17 @@ export default function ExpedienteDetallePage() {
   const tupa = useContextoTupa(id);
   const usuario = useAuthStore((s) => s.usuario);
   const [modal, setModal] = useState<"derivacion" | "observacion" | "subsanacion" | "acumulacion" | null>(null);
+  const puedeOperar = Boolean(usuario && ["ADMINISTRADOR", "DIRECTOR", "ESPECIALISTA", "SECRETARIO", "MESA_PARTES"].includes(usuario.rol));
+  const unidadesQuery = useQuery({
+    queryKey: ["organigrama", "areas-activas"],
+    queryFn: async ({ signal }) => {
+      const { data } = await apiClient.get<UnidadDestino[]>("/api/v1/organigrama/areas-activas", { signal });
+      if (!Array.isArray(data)) throw new Error("Respuesta de unidades inválida.");
+      return data;
+    },
+    enabled: puedeOperar && modal === "derivacion",
+    staleTime: 60_000,
+  });
 
   const acciones = useExpedienteActions({
     servicio: servicioExpedienteActionsReal,
@@ -66,12 +69,10 @@ export default function ExpedienteDetallePage() {
       ]),
   });
 
-  const puedeOperar = usuario ? usuario.rol !== "ESTUDIANTE" && usuario.rol !== "CIUDADANO" : true;
-  const permisos = obtenerPermisosAlmacenados() ?? permisosIniciales;
-  const puedeEditarExpedientes = Boolean(usuario && permisos[usuario.rol]?.some(
-    (permiso) => permiso.modulo === "Expedientes" && permiso.editar,
-  ));
-  const puedeSubsanar = puedeEditarExpedientes && detalle.data?.estadoActual === "OBSERVADO";
+  const esTitular = Boolean(usuario?.idPersona && usuario.idPersona === detalle.data?.solicitanteId);
+  const rolSubsanacionInstitucional = Boolean(usuario && ["ADMINISTRADOR", "DIRECTOR", "MESA_PARTES"].includes(usuario.rol));
+  const tienePermisoSubsanacion = esTitular || rolSubsanacionInstitucional;
+  const puedeSubsanar = tienePermisoSubsanacion && detalle.data?.estadoActual === "OBSERVADO";
 
   const refExpediente: ExpedienteAccionReferencia = {
     id: detalle.data?.idExpediente ?? id ?? "",
@@ -99,7 +100,7 @@ export default function ExpedienteDetallePage() {
     {
       nombre: "Subsanar",
       tipo: "subsanacion" as const,
-      ayuda: !puedeEditarExpedientes
+      ayuda: !tienePermisoSubsanacion
         ? "No cuenta con permisos para subsanar este expediente."
         : detalle.data?.estadoActual !== "OBSERVADO"
           ? "Solo se pueden subsanar expedientes en estado OBSERVADO."
@@ -163,7 +164,11 @@ export default function ExpedienteDetallePage() {
         open={modal === "derivacion"}
         onClose={() => setModal(null)}
         expediente={refExpediente}
-        unidades={{ estado: "listo", datos: UNIDADES_ORGANICAS_DEFAULT }}
+        unidades={unidadesQuery.isError
+          ? { estado: "error", mensaje: "No se pudieron consultar las unidades vigentes." }
+          : unidadesQuery.isSuccess
+            ? { estado: "listo", datos: unidadesQuery.data }
+            : { estado: "cargando" }}
         accion={acciones.derivacion}
       />
       <ObservacionModal

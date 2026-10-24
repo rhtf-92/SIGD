@@ -12,7 +12,8 @@ import {
   expedienteTupaParamsSchema,
   radicacionVirtualSchema,
 } from './tramites.schemas.js';
-import { NotFoundError } from '../../shared/domain/errors/index.js';
+import { ForbiddenError, NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
 
 const ventanillaPresencialSchema = z.object({
   dniSolicitante: z.string().regex(/^[0-9]{8}$/, 'DNI debe contener exactamente 8 dígitos'),
@@ -48,10 +49,35 @@ export function crearRouterTramites(
 
   // #14 — Radicación virtual (Mesa de Partes Virtual 24x7)
   router.post('/tramites/radicacion-virtual', async (req: Request, res: Response) => {
-    const datos = radicacionVirtualSchema.parse(req.body);
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) {
+      throw new UnauthorizedError({ detail: 'Debe iniciar sesión para radicar un trámite virtual.' });
+    }
+    const claims = verificarTokenAcceso(token);
+    if (!z.uuid().safeParse(claims.sub).success) {
+      throw new UnauthorizedError({ detail: 'El token no identifica una cuenta válida.' });
+    }
+    const cuenta = await pool.query<{ id_persona: string | null; activo: boolean }>(
+      `SELECT id_persona::text AS id_persona, activo
+         FROM sigd_auth.cuenta_usuario
+        WHERE id_usuario = $1::uuid`,
+      [claims.sub],
+    );
+    const actor = cuenta.rows[0];
+    if (!actor?.activo) {
+      throw new UnauthorizedError({ detail: 'La cuenta no existe o está deshabilitada.' });
+    }
+    if (!actor.id_persona) {
+      throw new ForbiddenError({ detail: 'La cuenta no tiene una persona asociada para radicar.' });
+    }
+    if (req.body?.idPersona !== undefined && req.body.idPersona !== actor.id_persona) {
+      throw new ForbiddenError({ detail: 'No puede radicar un expediente a nombre de otra persona.' });
+    }
+    const datos = radicacionVirtualSchema.parse({ ...req.body, idPersona: actor.id_persona });
     const radicacion = await radicacionService.radicar(datos);
     res.status(201).json({
       expedienteId: radicacion.expedienteId,
+      tipoDocumentalId: radicacion.tipoDocumentalId,
       cut: radicacion.cut,
       anioFiscal: radicacion.anio,
       fechaEnvioReal: radicacion.fechaEnvioReal,
@@ -67,6 +93,26 @@ export function crearRouterTramites(
 
   // #15 — Radicación física en Ventanilla Presencial
   router.post('/tramites/ventanilla-presencial', async (req: Request, res: Response) => {
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) throw new UnauthorizedError({ detail: 'Debe iniciar sesión para registrar una recepción presencial.' });
+    const claims = verificarTokenAcceso(token);
+    if (!z.uuid().safeParse(claims.sub).success) {
+      throw new UnauthorizedError({ detail: 'El token no identifica una cuenta válida.' });
+    }
+    const autorizado = await pool.query<{ permitido: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM sigd_auth.cuenta_usuario c
+         JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario
+           AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+         JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+        WHERE c.id_usuario = $1::uuid AND c.activo = true
+          AND r.codigo IN ('MESA_PARTES', 'ADMINISTRADOR')
+       ) AS permitido`,
+      [claims.sub],
+    );
+    if (!autorizado.rows[0]?.permitido) {
+      throw new ForbiddenError({ detail: 'Se requiere rol vigente de Mesa de Partes o Administrador.' });
+    }
     const datos = ventanillaPresencialSchema.parse(req.body);
     const resultado = await ventanillaService.registrarExpedienteVentanilla({
       ...datos,

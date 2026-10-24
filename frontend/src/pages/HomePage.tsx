@@ -5,7 +5,7 @@ const secciones = [
     titulo: "Flujo y Validez Legal",
     subtitulo: "MOD-04 / Firma Digital",
     descripcion:
-      "Tramitación con plena validez legal: firma digital, re-firma, workflow académico y verificación pública de documentos (CVD).",
+      "Consulta de la verificación pública de documentos (CVD).",
     ruta: "/flujo-validez-legal",
     destacado: true,
   },

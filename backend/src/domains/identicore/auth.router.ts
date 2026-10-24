@@ -63,6 +63,10 @@ export function crearRouterAuth(pool: Pool): Router {
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
        WHERE (c.usuario = $1 OR c.correo = $1)
+       ORDER BY CASE r.codigo
+         WHEN 'ADMINISTRADOR' THEN 1 WHEN 'DIRECTOR' THEN 2
+         WHEN 'SECRETARIO' THEN 3 WHEN 'ESPECIALISTA' THEN 4
+         WHEN 'MESA_PARTES' THEN 5 WHEN 'CIUDADANO' THEN 6 ELSE 7 END
        LIMIT 1;
     `;
 
@@ -120,6 +124,7 @@ export function crearRouterAuth(pool: Pool): Router {
       refreshToken,
       usuario: {
         id: usuario.id_usuario,
+        idPersona: usuario.id_persona,
         nombreCompleto: usuario.nombre_completo,
         correo: usuario.correo ?? `${usuario.usuario}@iestp-suiza.edu.pe`,
         rol: rol,
@@ -164,6 +169,10 @@ export function crearRouterAuth(pool: Pool): Router {
           LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
           LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
          WHERE (s.refresh_token = $1 OR s.refresh_token = $2)
+         ORDER BY CASE r.codigo
+           WHEN 'ADMINISTRADOR' THEN 1 WHEN 'DIRECTOR' THEN 2
+           WHEN 'SECRETARIO' THEN 3 WHEN 'ESPECIALISTA' THEN 4
+           WHEN 'MESA_PARTES' THEN 5 WHEN 'CIUDADANO' THEN 6 ELSE 7 END
          FOR UPDATE OF s
          LIMIT 1;
       `;
@@ -237,6 +246,10 @@ export function crearRouterAuth(pool: Pool): Router {
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
        WHERE c.id_usuario = $1
+       ORDER BY CASE r.codigo
+         WHEN 'ADMINISTRADOR' THEN 1 WHEN 'DIRECTOR' THEN 2
+         WHEN 'SECRETARIO' THEN 3 WHEN 'ESPECIALISTA' THEN 4
+         WHEN 'MESA_PARTES' THEN 5 WHEN 'CIUDADANO' THEN 6 ELSE 7 END
        LIMIT 1;
     `;
 
@@ -249,6 +262,7 @@ export function crearRouterAuth(pool: Pool): Router {
 
     res.status(200).json({
       id: usuario.id_usuario,
+      idPersona: usuario.id_persona,
       usuario: usuario.usuario,
       username: usuario.usuario,
       nombreCompleto: usuario.nombre_completo,

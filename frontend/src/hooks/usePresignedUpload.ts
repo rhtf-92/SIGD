@@ -13,6 +13,8 @@ export interface PresignedUrlRequest {
   checksumSha256: string;
   sha256Hash?: string;
   categoria: string;
+  idExpediente?: string;
+  origenExpediente?: 'DOC' | 'TRA';
 }
 
 export interface PresignedUrlResponse {
@@ -48,6 +50,7 @@ export class UploadError extends Error {
       | "hash"
       | "presigned-url"
       | "upload"
+      | "confirm"
       | "cancelled",
   ) {
     super(message);
@@ -58,7 +61,12 @@ export class UploadError extends Error {
 interface UsePresignedUploadOptions {
   categoria?: string;
   demoMode?: boolean;
+  idExpediente?: string;
+  tipoDocumentalId?: string;
+  origenExpediente?: 'DOC' | 'TRA';
 }
+
+type UploadContext = Pick<UsePresignedUploadOptions, 'idExpediente' | 'tipoDocumentalId' | 'origenExpediente'>;
 
 interface UploadResult {
   file: File;
@@ -102,7 +110,8 @@ export function usePresignedUpload(
   }, []);
 
   const upload = useCallback(
-    async (file: File): Promise<UploadResult | null> => {
+    async (file: File, context?: UploadContext, throwOnError = false): Promise<UploadResult | null> => {
+      const config = { ...options, ...context };
       const controller = new AbortController();
       controllerRef.current = controller;
       setStatus("validating");
@@ -111,6 +120,9 @@ export function usePresignedUpload(
       setResult(null);
 
       try {
+        if (!config.demoMode && (!config.idExpediente || !config.tipoDocumentalId)) {
+          throw new UploadError("Se requiere expediente y tipo documental para registrar el PDF.", "invalid-file");
+        }
         if (file.size === 0) {
           throw new UploadError(
             "Seleccione un archivo PDF no vacío.",
@@ -149,7 +161,7 @@ export function usePresignedUpload(
 
         setStatus("requesting-url");
         let presigned: PresignedUrlResponse;
-        if (options.demoMode) {
+        if (config.demoMode) {
           await new Promise<void>((resolve, reject) => {
             const timeout = window.setTimeout(resolve, 350);
             controller.signal.addEventListener(
@@ -177,7 +189,9 @@ export function usePresignedUpload(
                 tamanoBytes: file.size,
                 checksumSha256: sha256,
                 sha256Hash: sha256,
-                categoria: options.categoria ?? "EXPEDIENTE_INGRESO",
+                categoria: config.categoria ?? "EXPEDIENTE_INGRESO",
+                idExpediente: config.idExpediente,
+                origenExpediente: config.origenExpediente ?? 'DOC',
               } satisfies PresignedUrlRequest,
               { signal: controller.signal },
             );
@@ -197,7 +211,7 @@ export function usePresignedUpload(
 
         setStatus("uploading");
         try {
-          if (options.demoMode) {
+          if (config.demoMode) {
             await new Promise<void>((resolve, reject) => {
               let currentProgress = 0;
               const interval = window.setInterval(() => {
@@ -238,16 +252,20 @@ export function usePresignedUpload(
           );
         }
 
-        if (!options.demoMode) {
+        if (!config.demoMode) {
           try {
             await apiClient.post("/api/v1/storage/confirmar-carga", {
               s3Key: presigned.s3Key,
               sha256Hash: sha256,
+              idExpediente: config.idExpediente,
+              tipoDocumentalId: config.tipoDocumentalId,
+              origenExpediente: config.origenExpediente ?? 'DOC',
+              nombreArchivo: file.name,
             });
           } catch (confirmError) {
-            console.warn(
-              "[usePresignedUpload] Aviso al confirmar carga en almacenamiento:",
-              confirmError,
+            throw new UploadError(
+              confirmError instanceof Error ? confirmError.message : "No se pudo confirmar el PDF en PostgreSQL.",
+              "confirm",
             );
           }
         }
@@ -264,12 +282,13 @@ export function usePresignedUpload(
             : new UploadError("La operación de carga falló.", "upload");
         setError(uploadError);
         setStatus(uploadError.kind === "cancelled" ? "cancelled" : "error");
+        if (throwOnError) throw uploadError;
         return null;
       } finally {
         controllerRef.current = null;
       }
     },
-    [options.categoria, options.demoMode],
+    [options.categoria, options.demoMode, options.idExpediente, options.tipoDocumentalId, options.origenExpediente],
   );
 
   return { upload, cancel, status, progress, error, result };

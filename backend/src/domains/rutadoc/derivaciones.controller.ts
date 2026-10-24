@@ -390,12 +390,18 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
   const handlerSubsanar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const expedienteId = String(req.params.id);
-      const motivo = req.body.motivo || req.body.detalle || 'Subsanación de observaciones presentada por el administrado';
 
       // 1. Autenticación y resolución del actor
       const actor = await resolverActor(req);
       if (!actor) {
         throw new UnauthorizedError({ detail: 'Autenticación requerida para subsanar el expediente.' });
+      }
+      const motivoCrudo: unknown = req.body?.motivo ?? req.body?.detalle;
+      const motivo = typeof motivoCrudo === 'string' ? motivoCrudo.trim() : '';
+      if (motivo.length < 3) {
+        throw new ValidationError({
+          invalidParams: [{ name: 'motivo', reason: 'La subsanación requiere un motivo de al menos tres caracteres.' }],
+        });
       }
 
       // 2. Obtener contexto del expediente (valida existencia)

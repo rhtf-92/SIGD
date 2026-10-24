@@ -7,7 +7,6 @@ import AuditoriaPage from "../pages/administracion/AuditoriaPage";
 import CalendarizacionInstitucionalPage from "../pages/administracion/CalendarizacionInstitucionalPage";
 import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
 import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
-import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosPage from "../pages/administracion/UsuariosPage";
 import ProtectedRoute from "./ProtectedRoute";
@@ -22,9 +21,7 @@ export default function AdminRoutes() {
         path="usuarios"
         element={
           <ProtectedRoute
-            requiredRoles={["ADMINISTRADOR", "SUPER_ADMIN", "DIRECTOR"]}
-            requiredModule="Administración"
-            requiredAction="editar"
+            requiredRoles={["ADMINISTRADOR"]}
           >
             <UsuariosPage />
           </ProtectedRoute>
@@ -35,7 +32,6 @@ export default function AdminRoutes() {
       <Route path="tablas-maestras" element={<TablasMaestrasPage />} />
       <Route path="calendario-laboral" element={<CalendarioLaboralPage />} />
       <Route path="calendarizacion-institucional" element={<CalendarizacionInstitucionalPage />} />
-      <Route path="seguridad" element={<SeguridadPage />} />
     </>
   );
 }

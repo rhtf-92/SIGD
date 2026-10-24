@@ -6,7 +6,7 @@ const modulos = [
   {
     titulo: "Usuarios",
     descripcion:
-      "Administra cuentas existentes, estado, área, cargo y rol asignado.",
+      "Consulta cuentas existentes, estado, área y rol asignado.",
     ruta: "/administracion/usuarios",
     icono: (
       <>
@@ -18,7 +18,7 @@ const modulos = [
   {
     titulo: "Roles y Permisos",
     descripcion:
-      "Define qué puede ver y hacer cada rol dentro de los módulos del SIGD.",
+      "Consulta los permisos registrados para cada rol del SIGD.",
     ruta: "/administracion/roles-permisos",
     icono: (
       <>
@@ -43,7 +43,7 @@ const modulos = [
   {
     titulo: "Tablas Maestras",
     descripcion:
-      "Configura sedes, áreas, organigrama y tipos documentales institucionales.",
+      "Consulta catálogos y su disponibilidad en PostgreSQL.",
     ruta: "/administracion/tablas-maestras",
     icono: (
       <>
@@ -55,24 +55,12 @@ const modulos = [
   {
     titulo: "Calendario Laboral",
     descripcion:
-      "Configura días hábiles, horario, corte LPAG y feriados de Ucayali.",
+      "Consulta los días y feriados registrados en el calendario institucional.",
     ruta: "/administracion/calendario-laboral",
     icono: (
       <>
         <rect x="3" y="5" width="18" height="16" rx="2" />
         <path d="M8 3v4m8-4v4M3 11h18M7 15h2m3 0h2m3 0h1M7 18h2m3 0h2" />
-      </>
-    ),
-  },
-  {
-    titulo: "Seguridad",
-    descripcion:
-      "Gestiona bloqueos, intentos fallidos y políticas básicas de acceso.",
-    ruta: "/administracion/seguridad",
-    icono: (
-      <>
-        <rect x="4" y="10" width="16" height="11" rx="2" />
-        <path d="M8 10V7a4 4 0 0 1 8 0v3M12 15v2" />
       </>
     ),
   },

@@ -332,6 +332,15 @@ describe('SEC-01 / BOLA & FSM: Control de Acceso, Roles Reales y FSM Canónica e
   });
 
   describe('4. BOLA, ROLES Y FSM CANÓNICA EN SUBSANAR EXPEDIENTE', () => {
+    it('rechaza una subsanación sin motivo antes de abrir transacción', async () => {
+      estadoExpediente = 'OBSERVADO';
+      const res = await request(app)
+        .post(`/api/v1/expedientes/${ID_EXPEDIENTE}/movimientos/subsanar`)
+        .set('Authorization', `Bearer ${tokenTitular}`)
+        .send({});
+      expect(res.status).toBe(400);
+      expect(tracker.beginCount).toBe(0);
+    });
     it('permite con 200 OK al CIUDADANO TITULAR cuando está OBSERVADO y devuelve EN_REVISION', async () => {
       estadoExpediente = 'OBSERVADO';
       const res = await request(app)

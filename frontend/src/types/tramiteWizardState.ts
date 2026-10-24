@@ -109,6 +109,8 @@ export interface ArchivoTramite {
   peso: number;
   hashSha256: string;
   storageUrl?: string;
+  /** Referencia binaria solo en memoria; nunca se guarda en sessionStorage. */
+  file?: File;
 }
 
 /**
@@ -155,6 +157,17 @@ export interface CargoDigitalResponse {
   qrValidationUrl: string;
 }
 
+/** Radicación ya asentada cuyo PDF sigue pendiente de confirmación en Storage. */
+export interface RadicacionPendiente {
+  expedienteId: string;
+  tipoDocumentalId: string;
+  cut: string;
+  fechaEnvioReal: string;
+  fechaRadicacionLegal: string;
+  qrSeguimientoUrl: string;
+  cargoDigital: { hashSha256: string };
+}
+
 /**
  * Estado global inmutable de la máquina de estados del TramiteWizard.
  */
@@ -164,6 +177,7 @@ export interface TramiteWizardState {
   documentos: DocumentosData;
   declaracionJurada: DeclaracionJuradaData;
   cargoEmitido: CargoDigitalResponse | null;
+  radicacionPendiente: RadicacionPendiente | null;
   isSubmitting: boolean;
   error: string | null;
 }
@@ -177,6 +191,7 @@ export type WizardAction =
   | { type: 'UPDATE_DOCUMENTOS'; payload: Partial<DocumentosData> }
   | { type: 'UPDATE_DECLARACION'; payload: Partial<DeclaracionJuradaData> }
   | { type: 'SET_CARGO'; payload: CargoDigitalResponse }
+  | { type: 'SET_RADICACION_PENDIENTE'; payload: RadicacionPendiente }
   | { type: 'SET_SUBMITTING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'RESET' };
@@ -222,6 +237,7 @@ export const INITIAL_WIZARD_STATE: TramiteWizardState = {
   documentos: INITIAL_DOCUMENTOS,
   declaracionJurada: INITIAL_DECLARACION,
   cargoEmitido: null,
+  radicacionPendiente: null,
   isSubmitting: false,
   error: null,
 };

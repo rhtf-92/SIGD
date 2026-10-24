@@ -51,6 +51,9 @@ describe('Auditoría de Integridad y Checksums Migratorios (§12 / Codex)', () =
       '09_sigd_seguridad_remediacion.sql',
       '10_sigd_seguridad_fix_integridad.sql',
       '11_sigd_fix_post_auditoria_codex.sql',
+      '12_sigd_documento_expediente_tra.sql',
+      '13_sigd_documento_sha_por_expediente.sql',
+      '14_sigd_registro_ubigeo.sql',
     ];
 
     for (const archivo of manifiesto) {

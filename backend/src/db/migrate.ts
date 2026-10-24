@@ -37,6 +37,9 @@ const MANIFIESTO_BASELINE = [
   '08_sigd_tupa_acoplamiento.sql', '09_sigd_seguridad_remediacion.sql',
   '10_sigd_seguridad_fix_integridad.sql',
   '11_sigd_fix_post_auditoria_codex.sql',
+  '12_sigd_documento_expediente_tra.sql',
+  '13_sigd_documento_sha_por_expediente.sql',
+  '14_sigd_registro_ubigeo.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }
@@ -208,6 +211,65 @@ async function validarContratosFisicosPorHito(cliente: PoolClient, cantidadRegis
     `);
     if (!res.rows[0]?.valido) {
       throw new Error('Contrato físico inválido en Hito 10 (11 FSM): existen expedientes desalineados con estado EN_TRAMITE.');
+    }
+  }
+
+  // Hito 11 (después de 12_sigd_documento_expediente_tra.sql)
+  if (cantidadRegistros >= 11) {
+    const res = await cliente.query<{ valido: boolean }>(`
+      SELECT EXISTS (
+               SELECT 1 FROM pg_attribute
+                WHERE attrelid = 'sigd_doc.documento_adjunto'::regclass
+                  AND attname = 'expediente_tra_id' AND NOT attisdropped
+                  AND atttypid = 'uuid'::regtype
+             )
+         AND EXISTS (
+               SELECT 1 FROM pg_constraint
+                WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
+                  AND conname = 'fk_documento_adjunto_expediente_tra'
+                  AND confrelid = 'sigd_tra.expediente'::regclass
+             )
+         AND EXISTS (
+               SELECT 1 FROM pg_constraint
+                WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
+                  AND conname = 'chk_documento_adjunto_expediente_unico'
+             ) AS valido;
+    `);
+    if (!res.rows[0]?.valido) {
+      throw new Error('Contrato físico inválido en Hito 11 (12 Storage): falta la FK exclusiva hacia sigd_tra.expediente.');
+    }
+  }
+
+  // Hito 12: la unicidad del hash pertenece a cada expediente, no a todo el bucket.
+  if (cantidadRegistros >= 12) {
+    const res = await cliente.query<{ valido: boolean }>(`
+      SELECT NOT EXISTS (
+               SELECT 1 FROM pg_constraint
+                WHERE conrelid = 'sigd_doc.documento_adjunto'::regclass
+                  AND conname = 'uq_documento_adjunto_sha'
+             )
+         AND to_regclass('sigd_doc.uq_documento_adjunto_sha_doc') IS NOT NULL
+         AND to_regclass('sigd_doc.uq_documento_adjunto_sha_tra') IS NOT NULL
+         AS valido;
+    `);
+    if (!res.rows[0]?.valido) {
+      throw new Error('Contrato físico inválido en Hito 12 (13 Storage): unicidad SHA por expediente incompleta.');
+    }
+  }
+
+  // Hito 13: el registro ciudadano debe disponer del catálogo geográfico físico.
+  if (cantidadRegistros >= 13) {
+    const res = await cliente.query<{ valido: boolean }>(`
+      SELECT to_regclass('sigd_auth.provincia_ubigeo') IS NOT NULL
+         AND to_regclass('sigd_auth.distrito_ubigeo') IS NOT NULL
+         AND (SELECT count(*) = 4 FROM sigd_auth.provincia_ubigeo WHERE codigo LIKE '25%')
+         AND (SELECT count(*) = 17 FROM sigd_auth.distrito_ubigeo WHERE provincia_codigo LIKE '25%')
+         AND EXISTS (SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'sigd_auth' AND table_name = 'persona' AND column_name = 'ubigeo_distrito')
+         AS valido;
+    `);
+    if (!res.rows[0]?.valido) {
+      throw new Error('Contrato físico inválido en Hito 13 (14 Registro): catálogo Ucayali incompleto.');
     }
   }
 }

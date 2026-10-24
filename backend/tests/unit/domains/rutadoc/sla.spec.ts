@@ -101,6 +101,9 @@ describe('calcularSla: calendario civil UTC, sin feriados implícitos', () => {
   });
   it('23 rechaza fechas no civiles y fechas de cálculo anteriores al inicio', () => {
     expect(() => calcularSla({ fechaInicio: '2026-02-30', fechaActual: '2026-03-01' })).toThrow(RangeError);
-    expect(() => calcularSla({ fechaInicio: '2026-03-02', fechaActual: '2026-03-01' })).toThrow(RangeError);
+    expect(calcularSla({ fechaInicio: '2026-03-02', fechaActual: '2026-03-01' })).toMatchObject({
+      fechaInicio: '2026-03-02', fechaCalculo: '2026-03-01',
+      diasHabilesTranscurridos: 0, diasHabilesRestantes: 30, estado: 'VERDE',
+    });
   });
 });

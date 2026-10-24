@@ -51,11 +51,11 @@ export const esquemaConsultaTablasMaestras = z
     solo_activos: z
       .enum(['true', 'false'])
       .transform((valor) => valor === 'true')
-      .default('true'),
+      .default(true),
     recargar: z
       .enum(['true', 'false'])
       .transform((valor) => valor === 'true')
-      .default('false'),
+      .default(false),
   })
   .strict();
 

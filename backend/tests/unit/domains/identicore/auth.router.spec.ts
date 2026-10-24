@@ -63,6 +63,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
     expect(res.body).toHaveProperty('refreshToken');
     expect(res.body.usuario).toMatchObject({
       id: '11111111-1111-1111-1111-111111111111',
+      idPersona: '22222222-2222-2222-2222-222222222222',
       nombreCompleto: 'Administrador General',
       correo: 'admin@iestp-suiza.edu.pe',
       rol: 'ADMINISTRADOR',
@@ -79,6 +80,8 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
     expect(capturedQuery).not.toContain('r.id_rol');
     expect(capturedQuery).not.toContain('ur.estado');
     expect(capturedQuery).toContain('(c.usuario = $1 OR c.correo = $1)');
+    expect(capturedQuery).toContain("WHEN 'ADMINISTRADOR' THEN 1");
+    expect(capturedQuery).toContain("WHEN 'CIUDADANO' THEN 6");
     expect(sessionInsertExecuted).toBe(true);
 
     // SEC-05: El token persistido en DB NUNCA es texto plano, sino su hash SHA-256 (64 hex chars)

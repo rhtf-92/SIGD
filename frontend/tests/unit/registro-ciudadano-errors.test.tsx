@@ -21,6 +21,8 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
     await user.type(screen.getByLabelText(/Fecha de Nacimiento \*/i), "1998-05-15");
     await user.type(screen.getByLabelText(/Correo Electrónico \*/i), "sergio@example.com");
     await user.type(screen.getByLabelText(/Celular \*/i), "961234567");
+    await user.type(screen.getByLabelText(/^Contraseña \*/i), "MiClaveSegura#2026");
+    await user.type(screen.getByLabelText(/^Confirmar contraseña \*/i), "MiClaveSegura#2026");
 
     await user.selectOptions(
       screen.getByLabelText(/Seleccionar Provincia de Ucayali/i),
@@ -50,7 +52,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
 
     const statusBanner = await screen.findByRole("status", {}, { timeout: 4000 });
-    expect(statusBanner).toHaveTextContent("74561238@casilla.iestpsuiza.edu.pe");
+    expect(statusBanner).toHaveTextContent("Registro completado");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   }, 15000);
 

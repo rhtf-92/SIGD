@@ -45,7 +45,7 @@ export class RegistroRepository {
     }
   }
 
-  private async buscarTipoDocumento(cliente: PoolClient, codigo: 'DNI' | 'RUC'): Promise<string> {
+  private async buscarTipoDocumento(cliente: PoolClient, codigo: DatosRegistro['tipoDocumento']): Promise<string> {
     const resultado = await cliente.query<IdResult>(
       `SELECT id::text AS id FROM sigd_auth.tipos_documento
         WHERE codigo = $1 AND estado = TRUE`,

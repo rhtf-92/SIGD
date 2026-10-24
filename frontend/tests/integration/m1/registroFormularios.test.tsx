@@ -277,6 +277,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     await user.type(screen.getByLabelText(/Fecha de Nacimiento \*/i), "1998-05-15");
     await user.type(screen.getByLabelText(/Correo Electrónico \*/i), "sergio@example.com");
     await user.type(screen.getByLabelText(/Celular \*/i), "961234567");
+    await user.type(screen.getByLabelText(/^Contraseña \*/i), "MiClaveSegura#2026");
+    await user.type(screen.getByLabelText(/^Confirmar contraseña \*/i), "MiClaveSegura#2026");
 
     // Seleccionar Ubigeo
     await user.selectOptions(
@@ -312,30 +314,17 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "74561238@casilla.iestpsuiza.edu.pe",
-    );
+    expect(mensajeExito).toHaveTextContent("Registro completado");
 
     // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
+    expect(postSpy).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-ciudadano",
       expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
+        direccion: "Jr. Tarapacá N° 645",
+        password: "MiClaveSegura#2026",
       }),
     );
-
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
-    );
-    expect(postCall).toBeDefined();
-    if (!postCall) {
-      throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
-    }
-    const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
+    expect(consoleSpy).not.toHaveBeenCalled();
 
     consoleSpy.mockRestore();
     postSpy.mockRestore();
@@ -378,6 +367,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       "contacto@amazonassoft.pe",
     );
     await user.type(screen.getByLabelText(/Celular de Contacto \*/i), "961234567");
+    await user.type(screen.getByLabelText(/^Contraseña \*/i), "MiClaveSegura#2026");
+    await user.type(screen.getByLabelText(/^Confirmar contraseña \*/i), "MiClaveSegura#2026");
 
     // Seleccionar Ubigeo
     await user.selectOptions(
@@ -413,30 +404,17 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "20131312955@casilla.iestpsuiza.edu.pe",
-    );
+    expect(mensajeExito).toHaveTextContent("Registro completado");
 
     // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
+    expect(postSpyJuridica).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-persona-juridica",
       expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
+        direccion: "Jr. Tarapacá N° 645",
+        password: "MiClaveSegura#2026",
       }),
     );
-
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
-    );
-    expect(postCall).toBeDefined();
-    if (!postCall) {
-      throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
-    }
-    const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
+    expect(consoleSpy).not.toHaveBeenCalled();
 
     consoleSpy.mockRestore();
     // FIX estabilidad (F_ADRIANO): idem test h) — flujo largo de user-event.

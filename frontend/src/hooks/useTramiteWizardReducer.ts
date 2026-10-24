@@ -84,7 +84,11 @@ export function getPersistedWizardState(): TramiteWizardState {
         ...INITIAL_DOCUMENTOS,
         ...(parsed.documentos ?? {}),
         archivos: Array.isArray(parsed.documentos?.archivos)
-          ? parsed.documentos.archivos
+          ? parsed.documentos.archivos.map((archivo) => ({
+              nombre: archivo.nombre,
+              peso: archivo.peso,
+              hashSha256: archivo.hashSha256,
+            }))
           : [],
       },
       declaracionJurada: {
@@ -92,6 +96,7 @@ export function getPersistedWizardState(): TramiteWizardState {
         ...(parsed.declaracionJurada ?? {}),
       },
       cargoEmitido: parsed.cargoEmitido ?? null,
+      radicacionPendiente: parsed.radicacionPendiente ?? null,
       isSubmitting: false, // Estados transitorios se reinician siempre
       error: null,
     };
@@ -165,6 +170,9 @@ export function wizardReducer(
         error: null,
       };
 
+    case 'SET_RADICACION_PENDIENTE':
+      return { ...state, radicacionPendiente: action.payload };
+
     case 'SET_SUBMITTING':
       return {
         ...state,
@@ -214,6 +222,14 @@ export function useTramiteWizardReducer() {
       // No persistir estados transitorios
       const toPersist: TramiteWizardState = {
         ...state,
+        documentos: {
+          ...state.documentos,
+          archivos: state.documentos.archivos.map((archivo) => ({
+            nombre: archivo.nombre,
+            peso: archivo.peso,
+            hashSha256: archivo.hashSha256,
+          })),
+        },
         isSubmitting: false,
         error: null,
       };

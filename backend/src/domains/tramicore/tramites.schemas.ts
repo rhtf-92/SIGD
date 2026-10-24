@@ -22,8 +22,8 @@ export const TIPOS_ARCHIVO_ACEPTADOS = [
   'application/vnd.oasis.opendocument.text',
 ] as const;
 
-/** Tope por archivo: 20 MiB. El limite lo aplica el gateway S3 (B_RIQUELMER). */
-export const TAMANO_MAXIMO_BYTES = 20 * 1024 * 1024;
+/** Mismo tope por archivo que wizard y Storage: 25 MiB. */
+export const TAMANO_MAXIMO_BYTES = 25 * 1024 * 1024;
 
 /** Longitudes de la mascara de un hash SHA-256 en hexadecimal. */
 const LONGITUD_HASH = 64;
@@ -63,7 +63,7 @@ export const adjuntoRadicacionSchema = z
         },
       ),
     tamanoBytes: z.number().int().positive().max(TAMANO_MAXIMO_BYTES, {
-      message: 'El archivo supera el maximo permitido de 20 MiB.',
+      message: 'El archivo supera el maximo permitido de 25 MiB.',
     }),
     hashSha256,
     storagePath: z.string().trim().max(512).optional(),
