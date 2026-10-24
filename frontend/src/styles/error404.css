@@ -31,7 +31,7 @@
   .page_404_escena_img {
     width: 100%;
     height: auto;
-    aspect-ratio: 1200 / 400;
+    aspect-ratio: 600 / 360;
     object-fit: cover;
   }
   .four_zero_four_bg {
@@ -106,39 +106,71 @@
     inset: 0;
     z-index: 30;
     pointer-events: none;
-    background: #eaf6ff;
+    background: radial-gradient(120% 80% at 50% 30%, rgba(234, 246, 255, 0.9) 0%, rgba(165, 215, 255, 0.6) 25%, rgba(100, 170, 255, 0.25) 55%, transparent 100%);
+    mix-blend-mode: screen;
     opacity: 0;
     animation: none;
+    filter: saturate(1.4) brightness(1.1);
   }
 
   @keyframes page-404-destello {
     0%,
+    22% {
+      opacity: 0;
+    }
+    24% {
+      opacity: 0.55;
+    }
+    26% {
+      opacity: 0.12;
+    }
+    28% {
+      opacity: 0.72;
+    }
     30% {
-      opacity: 0;
+      opacity: 0.18;
     }
-    32% {
-      opacity: 0.45;
-    }
+    32%,
     34% {
-      opacity: 0;
+      opacity: 0.85;
     }
     36% {
-      opacity: 0.62;
+      opacity: 0.16;
     }
     38% {
-      opacity: 0.15;
+      opacity: 0.52;
     }
-    40%,
-    41.6% {
-      opacity: 0.7;
+    40% {
+      opacity: 0.08;
     }
-    43.5% {
+    42% {
+      opacity: 0.78;
+    }
+    44% {
+      opacity: 0.22;
+    }
+    46% {
+      opacity: 0.48;
+    }
+    48% {
       opacity: 0;
     }
-    45.6% {
-      opacity: 0.4;
+    52% {
+      opacity: 0.36;
     }
-    47%,
+    54% {
+      opacity: 0.09;
+    }
+    56% {
+      opacity: 0.64;
+    }
+    58% {
+      opacity: 0.14;
+    }
+    60% {
+      opacity: 0.32;
+    }
+    62%,
     100% {
       opacity: 0;
     }

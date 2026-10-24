@@ -38,7 +38,9 @@ export default function EscenaErrorConexion({
 
     const encender = () => {
       if (cancelado) return;
-      destello.style.animation = "page-404-destello 4.8s linear both";
+      destello.style.animation = "none";
+      void destello.offsetWidth;
+      destello.style.animation = "page-404-destello 5.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both";
     };
 
     const alPintar = () => {
@@ -68,9 +70,9 @@ export default function EscenaErrorConexion({
           ref={imagenRef}
           className="page_404_escena_img"
           src={escenaUnificada}
-          alt="Cueva prehistórica con antorchas y personaje desconectado"
-          width={1200}
-          height={400}
+          alt="Cueva prehistórica con cavernícola desenchufando el cable y recibiendo descarga eléctrica"
+          width={600}
+          height={360}
         />
       </div>
       <div ref={destelloRef} className="page_404_destello" aria-hidden="true" />
