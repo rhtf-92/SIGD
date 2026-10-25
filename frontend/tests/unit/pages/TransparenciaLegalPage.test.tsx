@@ -59,56 +59,18 @@ describe('TransparenciaLegalPage — Transparencia, Legalidad y Catálogo TUPA',
     expect(screen.getAllByText(/Ley N.° 27806/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('muestra el catálogo completo TUPA 2026 con las 72 entradas y permite filtrar', async () => {
-    const user = userEvent.setup();
+  it('en la pestaña de TUPA muestra el panel de acceso restringido y no expone el catálogo completo de forma anónima', async () => {
     renderTransparencia('/transparencia/tupa');
 
-    expect(screen.getByText(/Catálogo Integral TUPA 2026 \(72 Entradas Oficiales\)/i)).toBeInTheDocument();
-    expect(screen.getByText('18 Aprobados')).toBeInTheDocument();
-    expect(screen.getByText('54 Pendientes')).toBeInTheDocument();
+    expect(screen.getByText(/Acceso Restringido al Documento TUPA Institucional/i)).toBeInTheDocument();
+    expect(screen.getByText(/Para consultar el documento TUPA institucional completo se requiere una solicitud de acceso/i)).toBeInTheDocument();
 
-    // Verificación de entradas aprobadas y pendientes
-    expect(screen.getByText(/Certificado Modular \(I, II, III y IV\) Por cada Módulo/i)).toBeInTheDocument();
-    expect(screen.getByText(/Alquiler del Galpón Agrícola/i)).toBeInTheDocument();
+    // Botón de solicitar acceso
+    const linkSolicitud = screen.getByRole('link', { name: /Solicitar Acceso al Catálogo TUPA/i });
+    expect(linkSolicitud).toHaveAttribute('href', '/solicitud-acceso-tupa');
 
-    // Filtro por texto
-    const inputBusqueda = screen.getByPlaceholderText(/Buscar por denominación/i);
-    await user.type(inputBusqueda, 'Inglés');
-
-    expect(screen.getByText('Certificado de Inglés')).toBeInTheDocument();
-    expect(screen.queryByText(/Alquiler del Galpón Agrícola/i)).not.toBeInTheDocument();
-  });
-
-  it('exhibe los 10 campos requeridos por entrada y permite filtrar por categoría y radicación', async () => {
-    const user = userEvent.setup();
-    renderTransparencia('/transparencia/tupa');
-
-    // Encabezados de los 10 campos
-    expect(screen.getByText('Código / Ref')).toBeInTheDocument();
-    expect(screen.getByText('Denominación y Requisitos')).toBeInTheDocument();
-    expect(screen.getByText('Categoría')).toBeInTheDocument();
-    expect(screen.getByText('Estado Validación')).toBeInTheDocument();
-    expect(screen.getByText('Derecho Pago')).toBeInTheDocument();
-    expect(screen.getByText('Plazo')).toBeInTheDocument();
-    expect(screen.getByText('Unidad Responsable')).toBeInTheDocument();
-    expect(screen.getByText('Base Legal')).toBeInTheDocument();
-    expect(screen.getByText('Radica SIGD')).toBeInTheDocument();
-
-    // Filtro por categoría PROCEDIMIENTO_PENDIENTE
-    const selectCategoria = screen.getByLabelText(/Categoría:/i);
-    await user.selectOptions(selectCategoria, 'PROCEDIMIENTO_PENDIENTE');
-
-    expect(screen.getByText(/Derecho de duplicado de Título/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Acceso a la Información Pública/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText(/Certificado de Inglés/i)).not.toBeInTheDocument();
-
-    // Filtro por radicación SI
-    await user.selectOptions(selectCategoria, 'TODAS');
-    const selectRadicacion = screen.getByLabelText(/¿Admite Radicación SIGD\?:/i);
-    await user.selectOptions(selectRadicacion, 'SI');
-
-    // Debe mostrar los aprobados radicables y no mostrar los comerciales
-    expect(screen.getByText('Certificado de Inglés')).toBeInTheDocument();
+    // Confirmar que el catálogo de 72 entradas NO está expuesto públicamente aquí
+    expect(screen.queryByText(/Catálogo Integral TUPA 2026 \(72 Entradas Oficiales\)/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Alquiler del Galpón Agrícola/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Venta de Mangos/i)).not.toBeInTheDocument();
   });

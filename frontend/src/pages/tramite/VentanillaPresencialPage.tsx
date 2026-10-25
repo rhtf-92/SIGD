@@ -173,8 +173,8 @@ export default function VentanillaPresencialPage() {
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
                   enJornada && !esCorteSuperado
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-300"
-                    : "bg-amber-50 text-amber-900 border border-amber-300"
+                    ? "border border-emerald-200/80 bg-gradient-to-b from-white/95 via-emerald-50/80 to-teal-50/60 text-emerald-950 shadow-[0_2px_6px_rgba(16,185,129,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)]"
+                    : "border border-amber-200/80 bg-gradient-to-b from-white/95 via-amber-50/80 to-orange-50/60 text-amber-950 shadow-[0_2px_6px_rgba(245,158,11,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)]"
                 }`}
               >
                 <span className="h-2 w-2 rounded-full bg-current" />
@@ -208,7 +208,7 @@ export default function VentanillaPresencialPage() {
           <h2 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-3">
             Datos de Recepción en Ventanilla
           </h2>
-          <div className="rounded-lg border border-amber-200 bg-amber-50/90 p-2.5 text-xs text-amber-900 flex items-start gap-2">
+          <div className="rounded-xl border border-amber-200/80 bg-gradient-to-br from-white/95 via-amber-50/70 to-orange-50/40 p-3 text-xs text-amber-950 flex items-start gap-2.5 shadow-[0_2px_8px_rgba(245,158,11,0.08)] ring-1 ring-amber-100/70">
             <span>⚠️ <strong>Aviso para ventanilla:</strong> Verifique los datos del administrado y los requisitos antes de registrar la recepción.</span>
           </div>
 

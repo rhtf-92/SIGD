@@ -63,18 +63,18 @@ export default function MisExpedientesPage() {
   const getBadgeEstado = (estado: string) => {
     const norm = estado.toUpperCase();
     if (norm.includes("REGISTRADO") || norm.includes("INICIADO")) {
-      return "bg-blue-100 text-blue-800 border-blue-200";
+      return "bg-gradient-to-b from-white via-blue-50/80 to-blue-100/60 text-blue-900 border-blue-200/80 shadow-[0_1px_3px_rgba(59,130,246,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)]";
     }
     if (norm.includes("TRAMITE") || norm.includes("REVISION") || norm.includes("DERIVADO")) {
-      return "bg-amber-100 text-amber-800 border-amber-200";
+      return "bg-gradient-to-b from-white via-amber-50/80 to-amber-100/60 text-amber-900 border-amber-200/80 shadow-[0_1px_3px_rgba(245,158,11,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)]";
     }
     if (norm.includes("ATENDIDO") || norm.includes("FINALIZADO") || norm.includes("CONCLUIDO")) {
-      return "bg-emerald-100 text-emerald-800 border-emerald-200";
+      return "bg-gradient-to-b from-white via-emerald-50/80 to-emerald-100/60 text-emerald-900 border-emerald-200/80 shadow-[0_1px_3px_rgba(16,185,129,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)]";
     }
     if (norm.includes("OBSERVADO")) {
-      return "bg-rose-100 text-rose-800 border-rose-200";
+      return "bg-gradient-to-b from-white via-rose-50/80 to-rose-100/60 text-rose-900 border-rose-200/80 shadow-[0_1px_3px_rgba(244,63,94,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)]";
     }
-    return "bg-slate-100 text-slate-800 border-slate-200";
+    return "bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-800 border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,0.9)]";
   };
 
   return (
@@ -83,7 +83,7 @@ export default function MisExpedientesPage() {
         {/* Cabecera del Portal Ciudadano */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200 mb-1">
+            <div className="inline-flex items-center gap-2 rounded-full border border-sky-200/80 bg-gradient-to-b from-white via-sky-50/80 to-blue-50/60 px-3 py-1 text-xs font-bold text-sky-950 shadow-[0_2px_6px_rgba(14,165,233,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)] mb-1">
               Portal del Ciudadano
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
@@ -159,7 +159,7 @@ export default function MisExpedientesPage() {
                 </div>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="relative overflow-hidden rounded-2xl border border-sky-200/70 bg-white/90 shadow-[0_4px_20px_-4px_rgba(14,165,233,0.08)] backdrop-blur-xs before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm text-slate-600">
                     <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase font-semibold text-slate-700">

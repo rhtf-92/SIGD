@@ -82,10 +82,10 @@ export default function ConsultaPublicaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen min-h-dvh bg-gradient-to-br from-slate-50 via-cyan-50/25 to-teal-50/15 py-10 px-4 sm:px-6 lg:px-8 text-slate-900">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Cabecera Institucional */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8">
+        <section className="relative overflow-hidden rounded-3xl border border-white/80 bg-gradient-to-br from-white/90 via-cyan-50/40 to-teal-50/25 p-6 sm:p-8 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),inset_0_-1px_2px_0_rgba(6,182,212,0.06),0_16px_48px_-8px_rgba(6,182,212,0.14),0_2px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-cyan-200/50 backdrop-blur-md space-y-6 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent after:pointer-events-none after:absolute after:-top-24 after:-right-24 after:h-48 after:w-48 after:rounded-full after:bg-cyan-300/15 after:blur-2xl">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 pb-6 mb-6">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">
@@ -97,7 +97,7 @@ export default function ConsultaPublicaPage() {
             </div>
             <Link
               to="/"
-              className="text-sm font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-4 py-2 rounded-lg transition"
+              className="text-xs font-semibold text-cyan-900 bg-white/90 border border-cyan-200/80 px-4 py-2 rounded-xl shadow-2xs hover:bg-cyan-50/80 hover:border-cyan-300 transition shrink-0"
             >
               ← Volver al Portal
             </Link>
@@ -115,13 +115,13 @@ export default function ConsultaPublicaPage() {
                 placeholder="Ejemplo: EXP-2026-000104"
                 value={cutInput}
                 onChange={(e) => setCutInput(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-800 placeholder-slate-400 font-mono text-base uppercase"
+                className="w-full px-4.5 py-3 rounded-2xl border border-cyan-200/90 bg-white/95 text-slate-800 placeholder-slate-400 font-mono text-base uppercase shadow-[inset_0_2px_4px_rgba(0,0,0,0.03),0_2px_6px_rgba(6,182,212,0.06)] focus:border-cyan-500 focus:ring-4 focus:ring-cyan-200/50 focus:outline-none transition"
               />
             </div>
             <button
               type="submit"
               disabled={cargando}
-              className="px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2"
+              className="px-7 py-3 rounded-2xl bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 hover:from-teal-700 hover:via-cyan-700 hover:to-sky-700 text-white font-bold shadow-[0_4px_16px_rgba(6,182,212,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] transition hover:shadow-[0_6px_20px_rgba(6,182,212,0.45)] disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
             >
               {cargando ? 'Buscando...' : 'Consultar Estado'}
             </button>
@@ -132,7 +132,7 @@ export default function ConsultaPublicaPage() {
               {error}
             </div>
           )}
-        </div>
+        </section>
 
         {/* Detalle del Expediente */}
         {resultado && (
@@ -240,6 +240,6 @@ export default function ConsultaPublicaPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

@@ -29,16 +29,16 @@ export const TupaDetalleProcedimiento: React.FC<TupaDetalleProcedimientoProps> =
     monto.trim().toLowerCase() === 'gratuito';
 
   return (
-    <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 space-y-3">
+    <div className="relative overflow-hidden rounded-2xl border border-cyan-300/80 bg-gradient-to-br from-cyan-50/60 via-white/85 to-teal-50/40 p-4 sm:p-5 space-y-3.5 shadow-[0_8px_30px_-6px_rgba(6,182,212,0.15)] ring-1 ring-cyan-400/20 backdrop-blur-xs before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-cyan-300/80 before:to-transparent">
       {/* Aviso contextual oficial TUPA */}
-      <div className="rounded-lg border border-blue-200 bg-white/90 p-2.5 text-xs text-blue-900 flex items-start gap-2 shadow-xs">
-        <Info className="h-4 w-4 text-blue-700 shrink-0 mt-0.5" />
+      <div className="rounded-xl border border-cyan-300/80 bg-gradient-to-r from-cyan-50/80 to-white/90 p-3 text-xs text-cyan-950 flex items-start gap-2 shadow-2xs backdrop-blur-xs">
+        <Info className="h-4 w-4 text-cyan-700 shrink-0 mt-0.5" />
         <span>
           <strong>Aviso al administrado:</strong> Consulta requisitos, costos y condiciones oficiales antes de presentar tu solicitud.
         </span>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border-b border-blue-200 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border-b border-cyan-200/60 pb-3">
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">
@@ -81,7 +81,7 @@ export const TupaDetalleProcedimiento: React.FC<TupaDetalleProcedimientoProps> =
               Gratuito
             </span>
           ) : (
-            <p className="mt-0.5 text-base font-extrabold text-blue-900">
+            <p className="mt-0.5 text-base font-extrabold text-cyan-950">
               {monto} <span className="text-xs font-medium text-slate-600">(PEN)</span>
             </p>
           )}
@@ -91,10 +91,10 @@ export const TupaDetalleProcedimiento: React.FC<TupaDetalleProcedimientoProps> =
       {mostrarRequisitos && requisitos.length > 0 && (
         <div className="mt-2">
           <h4 className="mb-1.5 text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5 text-blue-700" />
+            <ShieldCheck className="h-3.5 w-3.5 text-cyan-700" />
             Requisitos documentarios obligatorios
           </h4>
-          <ul className="grid gap-1.5 text-xs text-slate-700 sm:grid-cols-2 bg-white/70 p-3 rounded-lg border border-blue-100">
+          <ul className="grid gap-1.5 text-xs text-slate-700 sm:grid-cols-2 bg-white/80 p-3 rounded-xl border border-cyan-100 shadow-2xs">
             {requisitos.map((requisito, index) => (
               <li key={`${procedimiento.registroVersionId}-req-${index}`} className="flex items-start gap-1.5">
                 <span className="text-blue-600 font-bold">•</span>

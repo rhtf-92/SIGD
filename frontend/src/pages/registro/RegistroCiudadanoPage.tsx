@@ -150,14 +150,26 @@ export default function RegistroCiudadanoPage() {
   const handleClearSuccess = () => setSuccessMessage(null);
 
   return (
-    <div className="min-h-screen bg-[#F3F4F6] flex items-center justify-center p-3.5 sm:p-6 lg:p-8">
-      <div className="bg-white rounded-xl shadow-sm max-w-2xl w-full p-4 sm:p-8">
+    <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50/30 to-teal-50/20 flex items-center justify-center p-3.5 sm:p-6 lg:p-8">
+      {/* Halo ambiental suave estilo Aqua / Glass */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      >
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 h-96 w-96 rounded-full bg-cyan-200/25 blur-3xl" />
+      </div>
+
+      <div className="relative overflow-hidden bg-gradient-to-br from-white/92 via-cyan-50/40 to-sky-50/25 rounded-3xl border border-white/85 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),inset_0_-1px_2px_0_rgba(6,182,212,0.06),0_16px_48px_-8px_rgba(6,182,212,0.14),0_2px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-cyan-200/50 backdrop-blur-md max-w-2xl w-full p-5 sm:p-8 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent after:pointer-events-none after:absolute after:-top-24 after:-right-24 after:h-48 after:w-48 after:rounded-full after:bg-cyan-300/15 after:blur-2xl">
         <Link
           to="/"
-          className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+          className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-cyan-200/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-cyan-50/80 hover:border-cyan-300 transition"
         >
           ← Volver al inicio
         </Link>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+          <span className="text-xs font-bold uppercase tracking-wider text-cyan-800">IESTP &quot;Suiza&quot;</span>
+        </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
           Registro de Usuario Externo
         </h1>
@@ -166,14 +178,14 @@ export default function RegistroCiudadanoPage() {
           Institucional
         </p>
 
-        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50/80 p-3 text-xs text-blue-900 flex items-start gap-2">
+        <div className="mb-6 rounded-xl border border-cyan-300/80 bg-gradient-to-r from-cyan-50/70 to-teal-50/50 p-3.5 text-xs text-cyan-950 flex items-start gap-2 shadow-2xs backdrop-blur-xs">
           <span>ℹ️ <strong>Tratamiento de Datos Personales:</strong> Los datos proporcionados serán tratados por el IESTP Suiza para fines de identificación, gestión documentaria y comunicaciones institucionales, en ejercicio de sus funciones públicas y conforme a la Ley N.° 29733 y su Reglamento (D.S. N.° 016-2024-JUS).</span>
         </div>
 
         <div
           role="tablist"
           aria-label="Tipo de persona"
-          className="flex gap-1 mb-8 border-b border-gray-200"
+          className="flex gap-1 mb-8 border-b border-cyan-100"
         >
           <button
             role="tab"
@@ -184,10 +196,10 @@ export default function RegistroCiudadanoPage() {
               setActiveTab("NATURAL");
               setSuccessMessage(null);
             }}
-            className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-[#006EC7] focus:ring-offset-2 ${
+            className={`px-5 py-2.5 text-sm font-semibold rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 ${
               activeTab === "NATURAL"
-                ? "text-[#006EC7] border-b-2 border-[#006EC7]"
-                : "text-gray-500 hover:text-gray-700 border-b-2 border-transparent"
+                ? "text-cyan-900 border-b-2 border-cyan-600 bg-cyan-50/50"
+                : "text-slate-500 hover:text-slate-700 border-b-2 border-transparent"
             }`}
           >
             Persona Natural
@@ -201,10 +213,10 @@ export default function RegistroCiudadanoPage() {
               setActiveTab("JURIDICA");
               setSuccessMessage(null);
             }}
-            className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-[#006EC7] focus:ring-offset-2 ${
+            className={`px-5 py-2.5 text-sm font-semibold rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 ${
               activeTab === "JURIDICA"
-                ? "text-[#006EC7] border-b-2 border-[#006EC7]"
-                : "text-gray-500 hover:text-gray-700 border-b-2 border-transparent"
+                ? "text-cyan-900 border-b-2 border-cyan-600 bg-cyan-50/50"
+                : "text-slate-500 hover:text-slate-700 border-b-2 border-transparent"
             }`}
           >
             Persona Jurídica

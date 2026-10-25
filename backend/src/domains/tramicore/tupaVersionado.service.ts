@@ -47,8 +47,8 @@ export interface DtoRegistroTupaVersionado {
   vigenciaDesde: string | null;
   vigenciaHasta: string | null;
   version: DtoVersionTupa;
-  estadoValidacion: 'APROBADO';
-  estado: 'APROBADO';
+  estadoValidacion: 'APROBADO' | 'PENDIENTE_VALIDACION' | string;
+  estado: 'APROBADO' | 'PENDIENTE_VALIDACION' | string;
   referenciaAprobacion: string;
   // Alias de presentación conservados para compatibilidad genérica.
   id: string;
@@ -121,6 +121,22 @@ export class TupaVersionadoService {
          FROM sigd_doc.tupa_registro_version
         WHERE estado_validacion = 'APROBADO'
         ORDER BY fuente_nombre ASC, pagina ASC, referencia_fila ASC, revision ASC`,
+    );
+    return resultado.rows.map(mapearVersion);
+  }
+
+  /**
+   * Publica el catálogo completo institucional autorizado (72/72 entradas físicas).
+   * Solo accesible por usuarios con rol institucional o ciudadano con solicitud aprobada.
+   */
+  async listarCompletoAutorizado(): Promise<DtoRegistroTupaVersionado[]> {
+    const resultado = await this.pool.query<FilaVersion>(
+      `SELECT registro_version_id, codigo_externo, denominacion_original,
+              requisitos_original, monto_original, fuente_nombre, documento_sha256,
+              pagina, referencia_fila, version_fuente, revision,
+              vigencia_desde, vigencia_hasta, estado_validacion, referencia_aprobacion
+         FROM sigd_doc.tupa_registro_version
+        ORDER BY pagina ASC, referencia_fila ASC, revision ASC`,
     );
     return resultado.rows.map(mapearVersion);
   }
@@ -305,8 +321,8 @@ function mapearVersion(fila: FilaVersion): DtoRegistroTupaVersionado {
       vigenciaDesde: desde,
       vigenciaHasta: hasta,
     },
-    estadoValidacion: 'APROBADO',
-    estado: 'APROBADO',
+    estadoValidacion: fila.estado_validacion,
+    estado: fila.estado_validacion,
     referenciaAprobacion: fila.referencia_aprobacion ?? '',
     id: fila.registro_version_id,
   };

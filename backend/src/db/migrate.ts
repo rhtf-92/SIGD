@@ -40,6 +40,7 @@ const MANIFIESTO_BASELINE = [
   '12_sigd_documento_expediente_tra.sql',
   '13_sigd_documento_sha_por_expediente.sql',
   '14_sigd_registro_ubigeo.sql',
+  '15_sigd_tupa_acceso_solicitudes.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }

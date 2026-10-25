@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
 import TransparenciaLegalPage from "../pages/transparencia/TransparenciaLegalPage";
+import SolicitudAccesoTupaPage from "../pages/tramite/SolicitudAccesoTupaPage";
+import CatalogoTupaPage from "../pages/tramite/CatalogoTupaPage";
 
 import DashboardEjecutivoPage from "../pages/DashboardEjecutivoPage";
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
@@ -42,6 +44,8 @@ export default function AppRouter() {
       <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
       <Route path="/transparencia" element={<TransparenciaLegalPage />} />
       <Route path="/transparencia/:seccion" element={<TransparenciaLegalPage />} />
+      <Route path="/solicitud-acceso-tupa" element={<SolicitudAccesoTupaPage />} />
+      <Route path="/tupa" element={<CatalogoTupaPage />} />
 
       {/* 2. Módulos del Ciudadano Autenticado */}
       <Route
