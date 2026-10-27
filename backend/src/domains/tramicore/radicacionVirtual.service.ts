@@ -270,8 +270,8 @@ export class RadicacionVirtualService {
     await cliente.query(
       `INSERT INTO sigd_auth.notificacion_casilla
          (usuario_id, cut, asunto, tipo_acto, cuerpo)
-       VALUES ($1, $2, $3, 'Radizacion Virtual', $4::jsonb)`,
-      [idUsuario, cut, 'Constancia de presentacion de tramite', JSON.stringify(cuerpo)],
+       VALUES ($1, $2, $3, 'Constancia de presentación', $4::jsonb)`,
+      [idUsuario, cut, 'Constancia de presentación de trámite', JSON.stringify(cuerpo)],
     );
   }
 
