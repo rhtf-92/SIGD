@@ -18,6 +18,20 @@ import type {
   Notificacion,
   NotificacionesResponse,
 } from "../types/casilla";
+import { registrarErrorApi } from "../utils/apiError";
+
+async function ejecutarCasilla<T>(
+  operacion: string,
+  contexto: Record<string, unknown>,
+  peticion: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await peticion();
+  } catch (error) {
+    registrarErrorApi("casillaService", error, { operacion, ...contexto });
+    throw error;
+  }
+}
 
 // ===========================================================================
 // CONSTANTES DE ENDPOINTS (Fácilmente editables según documentación del backend)
@@ -80,43 +94,62 @@ export const casillaService = {
   async getNotificaciones(
     filtros: FiltrosCasilla,
   ): Promise<NotificacionesResponse> {
-    const response = await apiClient.get<NotificacionesResponse>(
-      CASILLA_ENDPOINTS.LISTAR_NOTIFICACIONES,
-      {
-        params: {
-          page: filtros.page,
-          limit: filtros.limit,
-          tipo: filtros.tipo !== "TODOS" ? filtros.tipo : undefined,
-          estado: filtros.estado !== "TODOS" && filtros.estado !== undefined
-            ? filtros.estado
-            : undefined,
-          fechaInicio: filtros.fechaInicio || undefined,
-          fechaFin: filtros.fechaFin || undefined,
-          busqueda: filtros.busqueda || undefined,
-        },
+    const params = {
+      page: filtros.page,
+      limit: filtros.limit,
+      tipo: filtros.tipo !== "TODOS" ? filtros.tipo : undefined,
+      estado:
+        filtros.estado !== "TODOS" && filtros.estado !== undefined
+          ? filtros.estado
+          : undefined,
+      fechaInicio: filtros.fechaInicio || undefined,
+      fechaFin: filtros.fechaFin || undefined,
+      busqueda: filtros.busqueda || undefined,
+    };
+
+    return ejecutarCasilla(
+      "getNotificaciones",
+      { endpoint: CASILLA_ENDPOINTS.LISTAR_NOTIFICACIONES, params },
+      async () => {
+        const response = await apiClient.get<NotificacionesResponse>(
+          CASILLA_ENDPOINTS.LISTAR_NOTIFICACIONES,
+          { params },
+        );
+        return response.data;
       },
     );
-    return response.data;
   },
 
   /**
    * Obtiene una notificación por su identificador
    */
   async getNotificacionById(id: string): Promise<Notificacion> {
-    const response = await apiClient.get<Notificacion>(
-      CASILLA_ENDPOINTS.DETALLE_NOTIFICACION(id),
+    return ejecutarCasilla(
+      "getNotificacionById",
+      { endpoint: CASILLA_ENDPOINTS.DETALLE_NOTIFICACION(id), id },
+      async () => {
+        const response = await apiClient.get<Notificacion>(
+          CASILLA_ENDPOINTS.DETALLE_NOTIFICACION(id),
+        );
+        return response.data;
+      },
     );
-    return response.data;
   },
 
   /**
    * Marca una notificación como LEÍDA tras su apertura en el modal
    */
   async marcarComoLeido(id: string): Promise<Notificacion> {
-    const response = await apiClient.patch<Notificacion>(
-      CASILLA_ENDPOINTS.MARCAR_LEIDO(id),
+    return ejecutarCasilla(
+      "marcarComoLeido",
+      { endpoint: CASILLA_ENDPOINTS.MARCAR_LEIDO(id), id },
+      async () => {
+        const response = await apiClient.patch<Notificacion>(
+          CASILLA_ENDPOINTS.MARCAR_LEIDO(id),
+        );
+        return response.data;
+      },
     );
-    return response.data;
   },
 
   /**
@@ -128,29 +161,46 @@ export const casillaService = {
     notificacionId: string,
     payload?: Partial<GenerarAcuseRequest>,
   ): Promise<GenerarAcuseResponse> {
-    const response = await apiClient.post<GenerarAcuseResponse>(
-      CASILLA_ENDPOINTS.GENERAR_ACUSE(notificacionId),
+    const cuerpo = {
+      notificacionId,
+      confirmacionAdministrado: true,
+      metadataCliente: {
+        navegador: navigator.userAgent,
+        zonaHoraria: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        ...payload?.metadataCliente,
+      },
+    };
+
+    return ejecutarCasilla(
+      "generarAcuseLegal",
       {
+        endpoint: CASILLA_ENDPOINTS.GENERAR_ACUSE(notificacionId),
         notificacionId,
-        confirmacionAdministrado: true,
-        metadataCliente: {
-          navegador: navigator.userAgent,
-          zonaHoraria: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          ...payload?.metadataCliente,
-        },
+      },
+      async () => {
+        const response = await apiClient.post<GenerarAcuseResponse>(
+          CASILLA_ENDPOINTS.GENERAR_ACUSE(notificacionId),
+          cuerpo,
+        );
+        return response.data;
       },
     );
-    return response.data;
   },
 
   /**
    * Obtiene estadísticas de la casilla del usuario
    */
   async getEstadisticas(): Promise<EstadisticasCasilla> {
-    const response = await apiClient.get<EstadisticasCasilla>(
-      CASILLA_ENDPOINTS.ESTADISTICAS,
+    return ejecutarCasilla(
+      "getEstadisticas",
+      { endpoint: CASILLA_ENDPOINTS.ESTADISTICAS },
+      async () => {
+        const response = await apiClient.get<EstadisticasCasilla>(
+          CASILLA_ENDPOINTS.ESTADISTICAS,
+        );
+        return response.data;
+      },
     );
-    return response.data;
   },
 
   /**

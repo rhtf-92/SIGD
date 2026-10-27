@@ -13,12 +13,15 @@ const CLAVE_PERMISOS = "sigd_permisos";
 const PASSWORD_DEMO = "123";
 
 /** Usuario semilla por rol (coincide con migración 08_usuarios_demo.sql en BD SIGD). */
+/** Destino único tras autenticarse: panel principal de módulos por rol. */
+const DESTINO_POST_LOGIN = "/accesos";
+
 export const ROLES_CANONICOS = [
-  { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", usuario: "superadmin", destino: "/administracion", requierePassword: true },
-  { id: "DIRECTOR", label: "DIRECTOR — Director General", usuario: "director", destino: "/administracion", requierePassword: true },
-  { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", usuario: "docente", destino: "/flujos/titulacion", requierePassword: true },
-  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", usuario: "mesa_partes", destino: "/tramite/ventanilla-presencial", requierePassword: true },
-  { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", usuario: "estudiante", destino: "/casilla", requierePassword: false },
+  { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", usuario: "superadmin", destino: DESTINO_POST_LOGIN, requierePassword: true },
+  { id: "DIRECTOR", label: "DIRECTOR — Director General", usuario: "director", destino: DESTINO_POST_LOGIN, requierePassword: true },
+  { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", usuario: "docente", destino: DESTINO_POST_LOGIN, requierePassword: true },
+  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", usuario: "mesa_partes", destino: DESTINO_POST_LOGIN, requierePassword: true },
+  { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", usuario: "estudiante", destino: DESTINO_POST_LOGIN, requierePassword: false },
 ];
 
 export default function LoginPage() {

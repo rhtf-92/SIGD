@@ -200,6 +200,7 @@ export default function CasillaElectronicaPage() {
               hasActiveFilters={casilla.hasActiveFilters}
               isLoading={casilla.isLoading}
               isError={casilla.isError}
+              error={casilla.error}
               onSelectNotificacion={seleccionarNotificacion}
               onSetTipo={casilla.setTipo}
               onSetEstado={(estado) => {

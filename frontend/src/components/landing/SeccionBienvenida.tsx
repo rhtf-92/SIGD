@@ -1,7 +1,7 @@
 import { Award, Check, ChevronDown, ExternalLink } from "lucide-react";
 import { useState } from "react";
 
-import { PREGUNTAS_FRECUENTES, imagenPlaceholder } from "../../data/landingInstitucional";
+import { PREGUNTAS_FRECUENTES } from "../../data/landingInstitucional";
 
 const COMPROMISOS = [
   "Mesa de partes y casilla electrónica integradas.",
@@ -53,12 +53,19 @@ export default function SeccionBienvenida() {
 
           <div className="relative">
             <div aria-hidden="true" className="absolute -inset-3 rounded-3xl bg-gradient-to-br from-[#006EC7]/15 to-[#E6007E]/10" />
-            <img
-              src={imagenPlaceholder("SIGD - Gestión Documental", 900, 620)}
-              alt="Vista referencial del sistema de gestión documental SIGD"
-              className="relative aspect-[4/3] w-full rounded-2xl object-cover shadow-xl"
-              loading="lazy"
-            />
+            <video
+              src="/images/carrusel/SIGD/SIGD.mp4"
+              aria-label="Video del sistema de gestión documental SIGD"
+              className="relative aspect-video w-full rounded-2xl bg-slate-950 object-contain shadow-xl"
+              controls
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+            >
+              Tu navegador no admite la reproducción de video.
+            </video>
             <div className="absolute -bottom-5 left-4 flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-xl sm:left-6">
               <span className="grid h-11 w-11 place-items-center rounded-lg bg-[#F9E000]/25 text-[#8a7a00]">
                 <Award aria-hidden="true" className="h-5 w-5" />

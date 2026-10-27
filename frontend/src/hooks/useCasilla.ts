@@ -171,6 +171,7 @@ export function useCasilla() {
       hasPreviousPage: false,
     },
     isLoading: notificacionesQuery.isLoading,
+    isFetching: notificacionesQuery.isFetching,
     isError: notificacionesQuery.isError,
     error: notificacionesQuery.error,
     refetch: notificacionesQuery.refetch,
@@ -184,6 +185,9 @@ export function useCasilla() {
       urgentes: 0,
     },
     isLoadingStats: statsQuery.isLoading,
+    isErrorStats: statsQuery.isError,
+    statsError: statsQuery.error,
+    refetchStats: statsQuery.refetch,
 
     // Modal de Detalle
     isModalOpen,

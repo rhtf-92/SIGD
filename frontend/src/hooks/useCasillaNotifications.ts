@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CASILLA_QUERY_KEYS } from "./useCasilla";
 import { env } from "../config/env";
+import { useAuthStore } from "../stores/authStore";
 
 const NOMBRES_EVENTO_NOTIFICACION = ["casilla_notificacion", "NOTIFICACION_DEPOSITADA"] as const;
 
@@ -22,6 +23,7 @@ export function useCasillaNotifications() {
 
   useEffect(() => {
     const token =
+      useAuthStore.getState().accessToken ||
       (typeof localStorage !== "undefined" &&
         (localStorage.getItem("sigd_token") || localStorage.getItem("token"))) ||
       undefined;

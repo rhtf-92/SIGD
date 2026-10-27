@@ -328,7 +328,7 @@ export function tieneAccesoModulo(
 
 /**
  * ¿Este acceso es visible para este usuario?
- * - Sin sesión: solo lo público.
+ * - Sin sesión: modo invitado bloqueado, no se expone ningún módulo.
  * - Con sesión: lo público + lo privado cuyo `roles` incluya su rol
  *   (si no declara `roles`, es para todo autenticado) + el permiso RBAC
  *   exigido en `modulo`/`accion` cuando se declara.
@@ -338,7 +338,7 @@ export function esVisibleParaRol(
   rol: string,
   isAuthenticated: boolean,
 ): boolean {
-  if (!isAuthenticated) return acceso.publico;
+  if (!isAuthenticated) return false;
   if (acceso.publico) return true;
   if (acceso.roles && !acceso.roles.includes(rol)) return false;
   if (acceso.modulo && acceso.accion && !tieneAccesoModulo(rol, acceso.modulo, acceso.accion)) {

@@ -6,15 +6,18 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { useSesion } from "../../config/accesoModulos";
 import {
   MODULOS_SIGD,
   imagenPlaceholder,
 } from "../../data/landingInstitucional";
 
-/** Accesos directos: módulos públicos que no requieren sesión. */
-const ACCESOS_PUBLICOS = MODULOS_SIGD.filter((m) => m.publico);
+/** Accesos directos a servicios del SIGD (requieren sesión). */
+const ACCESOS_SIGD = MODULOS_SIGD.filter((m) => m.publico);
 
 export default function SeccionPlataformas() {
+  const { autenticado } = useSesion();
+
   return (
     <section id="plataformas" className="scroll-mt-24 bg-slate-50 py-14 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -32,14 +35,14 @@ export default function SeccionPlataformas() {
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
                 <Link
-                  to="/tramite"
+                  to={autenticado ? "/tramite" : "/login"}
                   className="inline-flex items-center gap-2 rounded-lg bg-[#F9E000] px-5 py-2.5 text-sm font-black text-[#003366] transition hover:bg-[#e6cf00]"
                 >
                   Ir a Mesa de Partes
                   <ExternalLink aria-hidden="true" className="h-4 w-4" />
                 </Link>
                 <Link
-                  to="/consulta"
+                  to={autenticado ? "/consulta" : "/login"}
                   className="inline-flex items-center gap-2 rounded-lg border border-white/30 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
                 >
                   Consultar por CUT
@@ -58,17 +61,17 @@ export default function SeccionPlataformas() {
         <div className="mt-14">
           <div className="max-w-2xl">
             <span className="text-[11px] font-black uppercase tracking-[0.22em] text-[#E6007E]">Accesos directos</span>
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-[#003366] sm:text-3xl">Servicios públicos del SIGD</h2>
+            <h2 className="mt-2 text-2xl font-black tracking-tight text-[#003366] sm:text-3xl">Servicios del SIGD</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Servicios disponibles sin iniciar sesión.
+              Inicia sesión para abrir estos servicios y módulos del SIGD.
             </p>
           </div>
 
           <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {ACCESOS_PUBLICOS.map((modulo) => (
+            {ACCESOS_SIGD.map((modulo) => (
               <Link
                 key={modulo.id}
-                to={modulo.ruta}
+                to={autenticado ? modulo.ruta : "/login"}
                 className="group block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-[#006EC7]/40 hover:shadow-lg"
               >
                 <div className="flex items-start justify-between gap-2">

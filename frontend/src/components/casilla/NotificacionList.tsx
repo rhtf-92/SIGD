@@ -11,6 +11,7 @@ import type {
   PaginationMeta,
   TipoNotificacion,
 } from "../../types/casilla";
+import { obtenerDetalleErrorApi } from "../../utils/apiError";
 
 interface NotificationListProps {
   notificaciones: Notificacion[];
@@ -19,6 +20,7 @@ interface NotificationListProps {
   hasActiveFilters: boolean;
   isLoading: boolean;
   isError: boolean;
+  error?: unknown;
   onSelectNotificacion: (notificacion: Notificacion) => void;
   onSetTipo: (tipo: TipoNotificacion | "TODOS") => void;
   onSetEstado: (estado: EstadoNotificacion | "TODOS") => void;
@@ -162,6 +164,7 @@ export default function NotificationList({
   hasActiveFilters,
   isLoading,
   isError,
+  error,
   onSelectNotificacion,
   onSetTipo,
   onSetEstado,
@@ -173,6 +176,15 @@ export default function NotificationList({
   onResetFiltros,
   onRetry,
 }: NotificationListProps) {
+  const detalleError = isError && error ? obtenerDetalleErrorApi(error) : null;
+  const mensajeError = detalleError?.esErrorDeRed
+    ? "No se pudo conectar con el backend de la Casilla Electrónica. Verifique que el servidor esté activo y que la URL de la API sea correcta."
+    : detalleError?.estado === 401 || detalleError?.estado === 403
+      ? "La sesión no es válida o expiró. Vuelva a iniciar sesión para consultar su casilla."
+      : detalleError?.estado === 404
+        ? "El endpoint de notificaciones no está disponible en el servidor. Verifique la ruta /api/v1/casilla/notificaciones."
+        : "No se pudieron recuperar las notificaciones. Verifique su conexión o reintente.";
+
   return (
     <section className="space-y-6">
       {/* ==================================================================== */}
@@ -412,10 +424,27 @@ export default function NotificationList({
           <h3 className="mt-3 text-base font-bold text-red-900">
             Error al consultar la Casilla Electrónica
           </h3>
-          <p className="mt-1 text-sm text-red-700">
-            No se pudieron recuperar las notificaciones. Por favor, verifica tu
-            conexión o reintenta.
+          <p className="mx-auto mt-1 max-w-xl text-sm text-red-700">
+            {mensajeError}
           </p>
+
+          {detalleError && (
+            <details className="mx-auto mt-4 max-w-2xl rounded-xl border border-red-200 bg-white/70 p-3 text-left">
+              <summary className="cursor-pointer text-xs font-bold text-red-900">
+                Detalle técnico para soporte
+              </summary>
+              <div className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-red-800">
+                <p>Código: {detalleError.codigo}</p>
+                {detalleError.estado !== null && <p>HTTP: {detalleError.estado}</p>}
+                {detalleError.endpoint && <p>Endpoint: {detalleError.endpoint}</p>}
+                {detalleError.correlacionId && (
+                  <p>Correlación: {detalleError.correlacionId}</p>
+                )}
+                <p className="break-words">{detalleError.mensaje}</p>
+              </div>
+            </details>
+          )}
+
           <button
             type="button"
             onClick={onRetry}

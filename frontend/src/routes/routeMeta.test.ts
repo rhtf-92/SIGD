@@ -12,12 +12,10 @@ afterEach(() => {
 });
 
 describe("módulos por rol (routeMeta)", () => {
-  it("sin sesión solo muestra lo público", () => {
+  it("sin sesión no expone ningún módulo", () => {
     const secciones = seccionesVisiblesPara("", false);
     const rutas = secciones.flatMap((s) => s.accesos.map((a) => a.to));
-    expect(rutas).toContain("/tramite");
-    expect(rutas).not.toContain("/casilla");
-    expect(rutas).not.toContain("/administracion");
+    expect(rutas).toEqual([]);
   });
 
   it("ESTUDIANTE no ve administración ni reportes ni ventanilla", () => {

@@ -2,9 +2,11 @@ import { ArrowRight, ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react"
 import { useRef } from "react";
 import { Link } from "react-router-dom";
 
+import { useSesion } from "../../config/accesoModulos";
 import { MODULOS_DESTACADOS, MODULOS_SIGD } from "../../data/landingInstitucional";
 
 export default function SeccionProgramas() {
+  const { autenticado } = useSesion();
   const pistaRef = useRef<HTMLDivElement>(null);
 
   const desplazar = (direccion: number) => {
@@ -72,7 +74,7 @@ export default function SeccionProgramas() {
               </h3>
               <p className="mt-1 flex-1 text-xs leading-relaxed text-slate-500">{modulo.descripcion}</p>
               <Link
-                to={modulo.ruta}
+                to={autenticado ? modulo.ruta : "/login"}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[#E6007E] transition hover:gap-2.5"
               >
                 Abrir módulo

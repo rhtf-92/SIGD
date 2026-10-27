@@ -33,7 +33,7 @@ describe("DockInferiorSigd", () => {
     renderizarDock();
     const nav = screen.getByRole("navigation", { name: "Accesos rápidos a módulos" });
     expect(nav).toBeDefined();
-    expect(screen.getByTitle("Mesa de Partes Virtual")).toBeDefined();
+    expect(screen.queryByTitle("Mesa de Partes Virtual")).toBeNull();
     expect(screen.getByTitle("Iniciar sesión")).toBeDefined();
     expect(screen.queryByTitle("Casilla Electrónica")).toBeNull();
     expect(screen.queryByTitle("Administración")).toBeNull();

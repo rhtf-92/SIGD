@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import NotificationList from "../../components/casilla/NotificacionList";
 import NotificacionDetailModal from "../../components/casilla/NotificacionDetailModal";
 import { useCasilla } from "../../hooks/useCasilla";
+import { obtenerDetalleErrorApi } from "../../utils/apiError";
 
 export default function CasillaElectronicaPage() {
   const {
@@ -26,9 +27,13 @@ export default function CasillaElectronicaPage() {
     meta,
     isLoading,
     isError,
+    error,
     refetch,
     stats,
     isLoadingStats,
+    isErrorStats,
+    statsError,
+    refetchStats,
     isModalOpen,
     selectedNotificacion,
     openDetalle,
@@ -36,6 +41,9 @@ export default function CasillaElectronicaPage() {
     generarAcuse,
     isGenerandoAcuse,
   } = useCasilla();
+
+  const detalleStatsError =
+    isErrorStats && statsError ? obtenerDetalleErrorApi(statsError) : null;
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -243,6 +251,27 @@ export default function CasillaElectronicaPage() {
           </div>
         </section>
 
+        {isErrorStats && (
+          <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p>
+                No se pudieron cargar los contadores de la casilla
+                {detalleStatsError?.correlacionId
+                  ? ` (correlación: ${detalleStatsError.correlacionId})`
+                  : ""}
+                . Los valores mostrados pueden estar incompletos.
+              </p>
+              <button
+                type="button"
+                onClick={() => void refetchStats()}
+                className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-900 transition hover:bg-amber-100"
+              >
+                Reintentar contadores
+              </button>
+            </div>
+          </section>
+        )}
+
         {/* Listado Paginado de Notificaciones */}
         <NotificationList
           notificaciones={notificaciones}
@@ -251,6 +280,7 @@ export default function CasillaElectronicaPage() {
           hasActiveFilters={hasActiveFilters}
           isLoading={isLoading}
           isError={isError}
+          error={error}
           onSelectNotificacion={openDetalle}
           onSetTipo={setTipo}
           onSetEstado={setEstado}

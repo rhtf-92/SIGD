@@ -45,10 +45,12 @@ apiClient.interceptors.request.use(
 
     // Inyección de token JWT si existe en almacenamiento local o de sesión
     const token =
+      useAuthStore.getState().accessToken ||
       (typeof localStorage !== "undefined" &&
         (localStorage.getItem("sigd_token") || localStorage.getItem("token"))) ||
       (typeof sessionStorage !== "undefined" &&
-        (sessionStorage.getItem("sigd_token") || sessionStorage.getItem("token")));
+        (sessionStorage.getItem("sigd_token") || sessionStorage.getItem("token"))) ||
+      undefined;
 
     if (token && !config.headers["Authorization"]) {
       config.headers["Authorization"] = `Bearer ${token}`;
@@ -77,8 +79,14 @@ apiClient.interceptors.response.use(
   async (error: unknown) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+      const urlSolicitud = originalRequest.url ?? "";
+      const esRutaDeAutenticacion =
+        urlSolicitud.includes("/auth/refresh") ||
+        urlSolicitud.includes("/auth/login") ||
+        urlSolicitud.includes("/auth/register") ||
+        urlSolicitud.includes("/auth/registro");
 
-      if (!(originalRequest.url?.includes("/auth/refresh") || originalRequest._retry)) {
+      if (!esRutaDeAutenticacion && !originalRequest._retry) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             pendingQueue.push({
@@ -107,12 +115,13 @@ apiClient.interceptors.response.use(
           useAuthStore.getState().logout();
           isRefreshing = false;
         }
-      } else {
+      } else if (originalRequest._retry) {
         useAuthStore.getState().logout();
       }
     }
 
     if (axios.isAxiosError(error)) {
+      const esErrorDeRed = !error.response;
       const status = error.response?.status ?? 500;
       const responseData = error.response?.data as Record<string, unknown> | undefined;
 
@@ -138,7 +147,10 @@ apiClient.interceptors.response.use(
       const detail =
         (typeof responseData?.detail === "string" && responseData.detail) ||
         (typeof responseData?.message === "string" && responseData.message) ||
-        error.message ||
+        (esErrorDeRed
+          ? `No se pudo conectar con el servidor (${error.config?.baseURL ?? env.apiBaseUrl}). ` +
+            "Verifique que el backend esté activo, la URL de la API y la conectividad de red."
+          : error.message) ||
         "Ha ocurrido una incidencia al procesar la solicitud.";
 
       const instance =
@@ -148,7 +160,7 @@ apiClient.interceptors.response.use(
 
       const code =
         (typeof responseData?.code === "string" && responseData.code) ||
-        `ERR_HTTP_${status}`;
+        (esErrorDeRed ? "ERR_NETWORK" : `ERR_HTTP_${status}`);
 
       const retryable =
         typeof responseData?.retryable === "boolean"

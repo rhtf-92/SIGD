@@ -72,7 +72,7 @@ describe("Secuencia animada del cavernícola", () => {
 
   it("6. Cambiar la secuencia remonta la ilustración para repetir la animación", () => {
     const { container, rerender } = renderEscena(0);
-    const antes = container.querySelector("img.page_404_ilustracion");
+    const antes = container.querySelector("img.page_404_escena_img");
     expect(antes).not.toBeNull();
 
     rerender(
@@ -84,7 +84,7 @@ describe("Secuencia animada del cavernícola", () => {
       />,
     );
 
-    const despues = container.querySelector("img.page_404_ilustracion");
+    const despues = container.querySelector("img.page_404_escena_img");
     expect(despues).not.toBeNull();
     // Nodo nuevo: la animación del SVG arranca de cero.
     expect(despues).not.toBe(antes);

@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
+import AccesosSistemaPage from "../pages/AccesosSistemaPage";
 import HomePage from "../pages/HomePage";
 import PaginaNoEncontrada from "../pages/PaginaNoEncontrada";
 
@@ -27,15 +28,39 @@ export default function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/accesos" element={<AccesosSistemaPage />} />
+      <Route path="/dashboard" element={<Navigate to="/accesos" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
 
-      <Route path="/consulta" element={<ConsultaPublicaPage />} />
-      <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
+      {/* Módulos bloqueados en modo invitado: piden inicio de sesión. */}
+      <Route
+        path="/consulta"
+        element={
+          <ProtectedRoute>
+            <ConsultaPublicaPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/consulta/:cut"
+        element={
+          <ProtectedRoute>
+            <ConsultaPublicaPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/validador-cvd"
+        element={
+          <ProtectedRoute>
+            <ValidadorPublicoCvdPage />
+          </ProtectedRoute>
+        }
+      />
 
-      {/* Públicas sin sesión */}
+      {/* Alta de cuenta abierta para que el invitado pueda registrarse. */}
       <Route path="/registro" element={<RegistroCiudadanoPage />} />
-      <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
 
       {/* Privadas: solo su rol. Si escribes la URL sin el rol, vas a /acceso-denegado */}
       <Route

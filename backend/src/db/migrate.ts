@@ -40,6 +40,13 @@ function resolverLockId(): number {
   return valor;
 }
 
+function permiteReconciliarChecksums(): boolean {
+  if (process.env.MIGRATE_CHECKSUM_ESTRICTO === 'true') return false;
+  if (process.env.MIGRATE_RECONCILIAR_CHECKSUMS === 'true') return true;
+  if (process.env.MIGRATE_RECONCILIAR_CHECKSUMS === 'false') return false;
+  return process.env.NODE_ENV !== 'production';
+}
+
 function directorioMigraciones(): string {
   if (process.env.MIGRATIONS_DIR) {
     return path.resolve(process.env.MIGRATIONS_DIR);
@@ -83,6 +90,7 @@ export async function ejecutarMigraciones(pool: Pool, opciones: { timeoutLockMs?
   const timeoutLockMs = opciones.timeoutLockMs ?? 60_000;
   const cliente = await pool.connect();
   const aplicadas: string[] = [];
+  const reconciliadas: string[] = [];
 
   try {
     await esperarCandado(cliente, lockId, timeoutLockMs);
@@ -118,10 +126,24 @@ export async function ejecutarMigraciones(pool: Pool, opciones: { timeoutLockMs?
 
       if (existentes.rowCount && existentes.rowCount > 0) {
         if (existentes.rows[0].checksum_sha256 !== checksum) {
-          throw new Error(
+          const mensaje =
             `Error de Integridad DDL: ${archivo} fue alterado tras su ejecución. ` +
-              `Checksum registrado: ${existentes.rows[0].checksum_sha256}, actual: ${checksum}`,
+            `Checksum registrado: ${existentes.rows[0].checksum_sha256}, actual: ${checksum}`;
+
+          if (!permiteReconciliarChecksums()) {
+            throw new Error(mensaje);
+          }
+
+          console.warn(
+            `[MIGRATE] ${mensaje}. ` +
+              'Se reconcilia el checksum sin volver a ejecutar el script (modo desarrollo). ' +
+              'Use MIGRATE_CHECKSUM_ESTRICTO=true para exigir integridad total.',
           );
+          await cliente.query(
+            'UPDATE public.sigd_migraciones SET checksum_sha256 = $1 WHERE nombre_script = $2',
+            [checksum, archivo],
+          );
+          reconciliadas.push(archivo);
         }
         continue;
       }
@@ -137,6 +159,12 @@ export async function ejecutarMigraciones(pool: Pool, opciones: { timeoutLockMs?
 
     await cliente.query('COMMIT');
     console.log(`[MIGRATE] Pipeline DDL completado. Migraciones aplicadas en esta ejecución: ${aplicadas.length}`);
+    if (reconciliadas.length > 0) {
+      console.warn(
+        `[MIGRATE] Checksums reconciliados en esta ejecución: ${reconciliadas.join(', ')}. ` +
+          'Verifique que el esquema de la base de datos coincida con los scripts actuales.',
+      );
+    }
     return aplicadas;
   } catch (error) {
     await cliente.query('ROLLBACK').catch(() => undefined);

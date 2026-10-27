@@ -28,10 +28,10 @@ describe("Página 404 del SIGD", () => {
     ).toBeInTheDocument();
   });
 
-  it("2. Conserva la estructura base: .page_404 y .four_zero_four_bg", () => {
+  it("2. Conserva la estructura base: .page_404 y .page_404_escena", () => {
     const { container } = renderPagina();
     expect(container.querySelector(".page_404")).not.toBeNull();
-    expect(container.querySelector(".four_zero_four_bg")).not.toBeNull();
+    expect(container.querySelector(".page_404_escena")).not.toBeNull();
   });
 
   it("3. Expone la ilustración del cavernícola con texto alternativo", () => {

@@ -86,7 +86,7 @@ describe("Pantalla de sin conexión", () => {
     ).toBeInTheDocument();
   });
 
-  it("3. Conserva la estructura base: .page_404 y .four_zero_four_bg", async () => {
+  it("3. Conserva la estructura base: .page_404 y .page_404_escena", async () => {
     const { container } = renderPantalla();
 
     perderConexion();
@@ -94,7 +94,7 @@ describe("Pantalla de sin conexión", () => {
     await waitFor(() => {
       expect(container.querySelector(".page_404")).not.toBeNull();
     });
-    expect(container.querySelector(".four_zero_four_bg")).not.toBeNull();
+    expect(container.querySelector(".page_404_escena")).not.toBeNull();
   });
 
   it("4. Se cierra al recuperar la conexión", async () => {
@@ -138,7 +138,7 @@ describe("Pantalla de sin conexión", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
-    const primera = container.querySelector("img.page_404_ilustracion");
+    const primera = container.querySelector("img.page_404_escena_img");
     expect(primera).not.toBeNull();
 
     await recuperarConexion();
@@ -152,7 +152,7 @@ describe("Pantalla de sin conexión", () => {
     });
 
     // La ilustración se vuelve a montar: la secuencia arranca de nuevo.
-    const segunda = container.querySelector("img.page_404_ilustracion");
+    const segunda = container.querySelector("img.page_404_escena_img");
     expect(segunda).not.toBeNull();
     expect(segunda).not.toBe(primera);
   });

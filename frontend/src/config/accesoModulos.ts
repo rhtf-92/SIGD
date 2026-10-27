@@ -39,7 +39,7 @@ export interface DefinicionModulo {
 // Tabla única de verdad: qué módulo ve cada cuenta.
 // Ordenado por flujo documental: ingreso -> gestión -> notificación ->
 // verificación -> firma -> gobierno.
-// - Sin sesión: solo publico === true.
+// - Sin sesión: modo invitado bloqueado, no se expone ningún módulo.
 // - Con sesión: publico === true O rol incluido en rolesPermitidos.
 export const MODULOS_VISIBLES: DefinicionModulo[] = [
   {
@@ -234,7 +234,7 @@ function leerSesionSeguro(): { rol: RolCanonico | null; autenticado: boolean } {
 }
 
 /** ¿Este rol autenticado puede ver el módulo?
- *  Sin sesión: solo módulos públicos.
+ *  Sin sesión: modo invitado bloqueado, no se expone ningún módulo.
  *  Con sesión: SOLO los módulos correspondientes a su rol.
  *  (Si rolesPermitidos está vacío = visible para todo autenticado, ej. Consulta/Validador).
  */
@@ -243,7 +243,7 @@ export function puedeVerModulo(
   rol: RolCanonico | null,
   autenticado: boolean,
 ): boolean {
-  if (!autenticado || !rol) return modulo.publico;
+  if (!autenticado || !rol) return false;
   if (modulo.rolesPermitidos.length === 0) return true;
   return modulo.rolesPermitidos.includes(rol);
 }
