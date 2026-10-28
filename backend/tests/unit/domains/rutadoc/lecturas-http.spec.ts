@@ -38,21 +38,21 @@ describe('endpoints de lectura RutaDoc', () => {
   });
 
   it('resuelve la ruta CCD estática antes de /expedientes/:id y devuelve el catálogo predeterminado', async () => {
-    const response = await request(app({ id: '8', roles: ['SUPER_ADMIN'] })).get('/api/v1/expedientes/clasificador-ccd');
+    const response = await request(app({ id: '8', roles: ['ADMINISTRADOR'] })).get('/api/v1/expedientes/clasificador-ccd');
     expect(response.status).toBe(200);
     expect(response.body.elementos[0]).toMatchObject({ tipo: 'SERIE', codigo: 'DEMO-01' });
     expect(response.body.elementos[0].hijos[0]).toMatchObject({ tipo: 'SUBSERIE', codigo: 'DEMO-01.01' });
   });
 
   it('sla-status responde con el calendario predeterminado sin requerir un port externo', async () => {
-    const response = await request(app({ id: '8', roles: ['SUPER_ADMIN'], puedeVerExpediente: async () => true }))
+    const response = await request(app({ id: '8', roles: ['ADMINISTRADOR'], puedeVerExpediente: async () => true }))
       .get(`/api/v1/expedientes/${expedienteId}/sla-status`);
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ diasHabilesTranscurridos: 0, estado: 'VERDE' });
   });
 
   it.each(['12', 'uuid-malformado'])('sla-status rechaza ID de expediente no UUID: %s', async (id) => {
-    const response = await request(app({ id: '8', roles: ['SUPER_ADMIN'], puedeVerExpediente: async () => true }))
+    const response = await request(app({ id: '8', roles: ['ADMINISTRADOR'], puedeVerExpediente: async () => true }))
       .get(`/api/v1/expedientes/${id}/sla-status`);
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({ status: 400, correlation_id: expect.any(String) });

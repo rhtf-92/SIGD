@@ -1,12 +1,22 @@
 import { useNavigate } from "react-router-dom";
 
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
+import { useAuthStore } from "../../stores/authStore";
+import type { RolCanonica } from "../../config/navigation.config";
 
-const modulos = [
+interface ModuloAdmin {
+  titulo: string;
+  descripcion: string;
+  ruta: string;
+  icono: React.ReactNode;
+  rolesPermitidos?: readonly RolCanonica[];
+}
+
+const modulos: ModuloAdmin[] = [
   {
     titulo: "Usuarios",
     descripcion:
-      "Administra cuentas existentes, estado, área, cargo y rol asignado.",
+      "Consulta cuentas existentes, estado, área y rol asignado.",
     ruta: "/administracion/usuarios",
     icono: (
       <>
@@ -18,7 +28,7 @@ const modulos = [
   {
     titulo: "Roles y Permisos",
     descripcion:
-      "Define qué puede ver y hacer cada rol dentro de los módulos del SIGD.",
+      "Consulta los permisos registrados para cada rol del SIGD.",
     ruta: "/administracion/roles-permisos",
     icono: (
       <>
@@ -43,7 +53,7 @@ const modulos = [
   {
     titulo: "Tablas Maestras",
     descripcion:
-      "Configura sedes, áreas, organigrama y tipos documentales institucionales.",
+      "Consulta catálogos y su disponibilidad en PostgreSQL.",
     ruta: "/administracion/tablas-maestras",
     icono: (
       <>
@@ -55,7 +65,7 @@ const modulos = [
   {
     titulo: "Calendario Laboral",
     descripcion:
-      "Configura días hábiles, horario, corte LPAG y feriados de Ucayali.",
+      "Consulta los días y feriados registrados en el calendario institucional.",
     ruta: "/administracion/calendario-laboral",
     icono: (
       <>
@@ -65,14 +75,17 @@ const modulos = [
     ),
   },
   {
-    titulo: "Seguridad",
+    titulo: "Gestión TUPA",
     descripcion:
-      "Gestiona bloqueos, intentos fallidos y políticas básicas de acceso.",
-    ruta: "/administracion/seguridad",
+      "Versiones, procedimientos, publicación e histórico del TUPA.",
+    ruta: "/administracion/tupa",
+    rolesPermitidos: ["ADMINISTRADOR"],
     icono: (
       <>
-        <rect x="4" y="10" width="16" height="11" rx="2" />
-        <path d="M8 10V7a4 4 0 0 1 8 0v3M12 15v2" />
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
       </>
     ),
   },
@@ -80,6 +93,15 @@ const modulos = [
 
 export default function AdministracionPage() {
   const navigate = useNavigate();
+  const usuario = useAuthStore((state) => state.usuario);
+  const rol = usuario?.rol as RolCanonica | undefined;
+
+  const modulosVisibles = modulos.filter((modulo) => {
+    if (modulo.rolesPermitidos) {
+      return rol && modulo.rolesPermitidos.includes(rol);
+    }
+    return true;
+  });
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -94,7 +116,7 @@ export default function AdministracionPage() {
         </p>
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {modulos.map((modulo) => (
+          {modulosVisibles.map((modulo) => (
             <article
               key={modulo.titulo}
               className="group rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition duration-200 ease-out hover:shadow-md motion-safe:hover:-translate-y-1 motion-reduce:transition-none"

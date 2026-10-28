@@ -40,6 +40,8 @@ export const naturalSchema = z
       .regex(/^9[0-9]{8}$/, {
         message: "Celular debe tener exactamente 9 dígitos empezando en 9",
       }),
+    password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
+    confirmarPassword: z.string().min(8, 'Confirme la contraseña'),
     domicilio: z.object({
       departamentoCodigo: z.string(),
       provinciaCodigo: z.string(),
@@ -55,15 +57,7 @@ export const naturalSchema = z
       referencia: z.string().max(200).optional(),
     }),
     tipoDocumento: z.enum(["DNI", "CE"]),
-    numeroDocumento: z
-      .string()
-      .refine(
-        (val) => /^[0-9]{8}$/.test(val) || /^[A-Z0-9]{9,12}$/.test(val),
-        {
-          message:
-            "DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos",
-        }
-      ),
+    numeroDocumento: z.string().min(1),
     declaracionJuradaAceptada: z.boolean().refine((val) => val === true, {
       message: "Debe aceptar la declaración jurada",
     }),
@@ -75,6 +69,12 @@ export const naturalSchema = z
     fechaAceptacion: z.string().datetime({
       message: "fechaAceptacion debe ser un string en formato ISO 8601 válido",
     }),
+  }).refine((data) => data.password === data.confirmarPassword, {
+    path: ['confirmarPassword'], message: 'Las contraseñas no coinciden',
+  }).refine((data) => data.tipoDocumento === 'DNI'
+    ? /^[0-9]{8}$/.test(data.numeroDocumento)
+    : /^[A-Z0-9]{9,12}$/.test(data.numeroDocumento), {
+    path: ['numeroDocumento'], message: 'DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos',
   });
 
 /* --- Persona Jurídica --- */
@@ -102,15 +102,7 @@ const validateRucModulo11 = (ruc: string): boolean => {
 const juridicalDocumentSchema = z
   .object({
     tipoDocumento: z.enum(["DNI", "CE"]),
-    numeroDocumento: z
-      .string()
-      .refine(
-        (val) => /^[0-9]{8}$/.test(val) || /^[A-Z0-9]{9,12}$/.test(val),
-        {
-          message:
-            "DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos",
-        }
-      ),
+    numeroDocumento: z.string().min(1),
     nombres: z
       .string()
       .regex(/^[A-Za-zÁÉÍÓÚáéíóúñÑ\s]{2,80}$/, {
@@ -125,6 +117,10 @@ const juridicalDocumentSchema = z
       .string()
       .min(2, "Cargo debe tener mínimo 2 caracteres")
       .max(100, "Cargo debe tener máximo 100 caracteres"),
+  }).refine((data) => data.tipoDocumento === 'DNI'
+    ? /^[0-9]{8}$/.test(data.numeroDocumento)
+    : /^[A-Z0-9]{9,12}$/.test(data.numeroDocumento), {
+    path: ['numeroDocumento'], message: 'DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos',
   });
 
 /* Schema persona jurídica */
@@ -152,6 +148,8 @@ export const juridicalSchema = z
       .regex(/^9[0-9]{8}$/, {
         message: "Celular contacto debe tener exactamente 9 dígitos empezando en 9",
       }),
+    password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
+    confirmarPassword: z.string().min(8, 'Confirme la contraseña'),
     domicilio: z.object({
       departamentoCodigo: z.string(),
       provinciaCodigo: z.string(),
@@ -177,6 +175,8 @@ export const juridicalSchema = z
     fechaAceptacion: z.string().datetime({
       message: "fechaAceptacion debe ser un string en formato ISO 8601 válido",
     }),
+  }).refine((data) => data.password === data.confirmarPassword, {
+    path: ['confirmarPassword'], message: 'Las contraseñas no coinciden',
   });
 
 /* --- Unión discriminada RegistroCiudadanoRequest --- */

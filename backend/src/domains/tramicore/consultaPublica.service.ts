@@ -12,8 +12,8 @@ import type { ConsultaPublicaParams } from './tramites.schemas.js';
  * personal del estudiante. Este servicio devuelve un DTO cerrado: si un campo
  * sensible no esta en la lista, no sale.
  *
- * Se expone el estado procesal y unicamente los proveidos marcados como
- * publicos por el area correspondiente.
+ * Se expone el estado procesal. El esquema vigente no clasifica proveidos
+ * publicos, por lo que esa coleccion permanece vacia.
  *
  * Desviacion consciente respecto del plan: la especificacion ilustra el
  * enmascarado del telefono como `961***456`. Aqui el telefono se OMITE en lugar
@@ -68,23 +68,10 @@ interface FilaConsulta {
   fuera_de_horario: boolean;
   canal_recepcion: string;
   total_folios: number;
-  tipo_documento: string | null;
   numero_documento: string | null;
   nombres: string | null;
   apellido_paterno: string | null;
   apellido_materno: string | null;
-}
-
-interface FilaDocumento {
-  nombre_archivo: string;
-  content_type: string;
-  hash_sha256: string;
-}
-
-interface FilaProveido {
-  numero: string;
-  fecha_emision: Date;
-  resumen: string;
 }
 
 /** Ancho de la ventana visible al_redondear. */
@@ -145,66 +132,60 @@ export class ConsultaPublicaService {
 
   private async leerExpediente(cliente: PoolClient, cut: string): Promise<FilaConsulta | undefined> {
     const resultado = await cliente.query<FilaConsulta>(
-      `SELECT e.cut,
-              e.anio_fiscal,
-              e.estado_tramite,
-              tt.denominacion   AS tipo_tramite,
-              e.asunto,
-              e.fecha_envio_real,
-              e.fecha_radicacion_legal,
-              e.fuera_de_horario,
-              e.canal_recepcion,
-              e.total_folios,
-              td.nombre         AS tipo_documento,
-              p.numero_documento,
-              p.nombres,
-              p.apellido_paterno,
-              p.apellido_materno
+      `SELECT e.codigo_expediente AS cut,
+              EXTRACT(YEAR FROM e.fecha_radicacion)::int AS anio_fiscal,
+              COALESCE(rut.estado_nuevo, e.estado) AS estado_tramite,
+              tv.denominacion_original AS tipo_tramite,
+              tr.asunto,
+              COALESCE(ar.fecha_ingreso, e.fecha_radicacion) AS fecha_envio_real,
+              e.fecha_radicacion AS fecha_radicacion_legal,
+              (ar.fecha_ingreso IS NOT NULL AND ar.fecha_ingreso < e.fecha_radicacion) AS fuera_de_horario,
+              COALESCE(ar.canal_ingreso, 'MESA_VIRTUAL') AS canal_recepcion,
+              COALESCE((SELECT MAX(f.folio_fin) FROM sigd_tra.expediente_documento_folio f
+                         WHERE f.expediente_id = e.expediente_id), 0)::int AS total_folios,
+              p.id_documento AS numero_documento,
+              pn.nombres,
+              split_part(pn.apellidos, ' ', 1) AS apellido_paterno,
+              NULLIF(substring(pn.apellidos FROM position(' ' IN pn.apellidos) + 1), pn.apellidos) AS apellido_materno
          FROM sigd_tra.expediente e
-         LEFT JOIN sigd_doc.tipo_tramite_tupa tt
-                ON tt.id_tipo_tramite_tupa = e.id_tipo_tramite_tupa
-         LEFT JOIN sigd_auth.persona p
-                ON p.id = e.id_persona
-         LEFT JOIN sigd_auth.tipos_documento td
-                ON td.id = p.tipo_documento_id
-        WHERE e.cut = $1
-          AND e.estado_tramite <> 'ANULADO'`,
+         JOIN sigd_tra.tramite tr ON tr.expediente_id = e.expediente_id
+         JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
+         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+         LEFT JOIN sigd_rut.estado_actual_expediente rut ON rut.expediente_id = e.expediente_id
+         LEFT JOIN LATERAL (
+           SELECT a.fecha_ingreso, a.canal_ingreso, a.anulado
+             FROM sigd_tra.asiento_registro a
+            WHERE a.expediente_id = e.expediente_id
+            ORDER BY a.fecha_ingreso ASC LIMIT 1
+         ) ar ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT v.denominacion_original
+             FROM sigd_doc.expediente_tupa_vinculo x
+             JOIN sigd_doc.tupa_registro_version v ON v.registro_version_id = x.registro_version_id
+            WHERE x.expediente_id = e.expediente_id
+            ORDER BY x.vinculado_en DESC LIMIT 1
+         ) tv ON TRUE
+        WHERE e.codigo_expediente = $1
+          AND e.estado <> 'ANULADO'
+          AND COALESCE(ar.anulado, FALSE) = FALSE`,
       [cut],
     );
     return resultado.rows[0];
   }
 
   private async leerDocumentos(cliente: PoolClient, cut: string): Promise<DtoDocumentoPublico[]> {
-    const resultado = await cliente.query<FilaDocumento>(
-      `SELECT da.nombre_archivo, da.content_type, da.hash_sha256
-         FROM sigd_tra.documento_adjunto da
-         JOIN sigd_tra.expediente e ON e.expediente_id = da.expediente_id
-        WHERE e.cut = $1
-        ORDER BY da.nombre_archivo`,
-      [cut],
-    );
-    return resultado.rows.map((fila) => ({
-      nombreArchivo: fila.nombre_archivo,
-      contentType: fila.content_type,
-      hashSha256: fila.hash_sha256,
-    }));
+    void cliente;
+    void cut;
+    // No existe una FK documental hacia sigd_tra.expediente en el DDL vigente.
+    // Un nombre/hash declarado al radicar no prueba que el binario esté persistido.
+    return [];
   }
 
   private async leerProveidosPublicos(cliente: PoolClient, cut: string): Promise<DtoProveidoPublico[]> {
-    const resultado = await cliente.query<FilaProveido>(
-      `SELECT pv.numero, pv.fecha_emision, pv.resumen
-         FROM sigd_tra.proveido pv
-         JOIN sigd_tra.expediente e ON e.expediente_id = pv.expediente_id
-        WHERE e.cut = $1
-          AND pv.es_publico = TRUE
-        ORDER BY pv.fecha_emision DESC, pv.numero DESC`,
-      [cut],
-    );
-    return resultado.rows.map((fila) => ({
-      numero: fila.numero,
-      fechaEmision: aIsoFecha(fila.fecha_emision),
-      resumen: fila.resumen,
-    }));
+    void cliente;
+    void cut;
+    // El esquema vigente no tiene proveídos con clasificación pública.
+    return [];
   }
 }
 
@@ -252,9 +233,4 @@ export function enmascararNombre(
       return `${inicial}${ocultos}`;
     })
     .join(' ');
-}
-
-function aIsoFecha(fecha: Date | string): string {
-  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
-  return String(fecha).slice(0, 10);
 }

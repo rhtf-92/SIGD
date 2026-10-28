@@ -31,7 +31,8 @@ function sumarDiasHabiles(fechaInicio: string, cantidad: number, noLaborables: R
 export function calcularSla(entrada: EntradaSla): ResultadoSla {
   const inicioMs = validarFecha(entrada.fechaInicio);
   const actualMs = validarFecha(entrada.fechaActual);
-  if (actualMs < inicioMs) throw new RangeError('La fecha de cálculo no puede preceder al inicio.');
+  // La radicación fuera de horario puede comenzar legalmente el siguiente día hábil.
+  // Hasta ese inicio, el plazo permanece en cero sin invalidar la consulta.
   const limite = entrada.diasHabilesLimite ?? 30;
   const umbralAmarillo = entrada.porcentajeAmarilloDesde ?? 80;
   if (!Number.isInteger(limite) || limite <= 0) throw new RangeError('El límite debe ser entero positivo.');

@@ -5,10 +5,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { conexo, crearAccionPrueba, diferida, expediente, otroConexo, unidades } from "../../fixtures/expedientesFixtures";
 import { ErrorAccionExpediente } from "../../../src/types/expedienteActions";
-import type { ResultadoDerivacion, ResultadoObservacion, SolicitudAcumulacion, SolicitudDerivacion, SolicitudObservacion } from "../../../src/types/expedienteActions";
+import type { ResultadoDerivacion, ResultadoObservacion, ResultadoSubsanacion, SolicitudAcumulacion, SolicitudDerivacion, SolicitudObservacion, SolicitudSubsanacion } from "../../../src/types/expedienteActions";
 import AcumulacionModal from "../../../src/components/expedientes/AcumulacionModal";
 import DerivacionModal from "../../../src/components/expedientes/DerivacionModal";
 import ObservacionModal from "../../../src/components/expedientes/ObservacionModal";
+import SubsanacionModal from "../../../src/components/expedientes/SubsanacionModal";
 import ExpedienteActionToast from "../../../src/components/expedientes/ExpedienteActionToast";
 
 describe("DerivacionModal", () => {
@@ -129,6 +130,46 @@ describe("ObservacionModal", () => {
     expect(screen.getByText(/Observación no disponible/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(cerrar).toHaveBeenCalledOnce();
+  });
+});
+
+describe("SubsanacionModal", () => {
+  it("exige motivo y confirmación antes de escribir, y muestra carga", async () => {
+    const user = userEvent.setup();
+    const pendiente = diferida<boolean>();
+    const ejecutar = vi.fn(() => pendiente.promesa);
+    const cerrar = vi.fn();
+    render(<SubsanacionModal open onClose={cerrar} expediente={expediente} accion={crearAccionPrueba<SolicitudSubsanacion, ResultadoSubsanacion>({ ejecutar })} />);
+    await user.click(screen.getByRole("button", { name: "Confirmar subsanación" }));
+    expect(screen.getByText("El motivo de subsanación es obligatorio.")).toBeInTheDocument();
+    expect(ejecutar).not.toHaveBeenCalled();
+    await user.type(screen.getByRole("textbox"), "  Adjuntar   expediente corregido.  ");
+    await user.click(screen.getByRole("button", { name: "Confirmar subsanación" }));
+    expect(ejecutar).not.toHaveBeenCalled();
+    expect(screen.getByRole("checkbox")).toHaveFocus();
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Confirmar subsanación" }));
+    expect(ejecutar).toHaveBeenCalledWith({ expediente, motivo: "Adjuntar expediente corregido." });
+    expect(screen.getByRole("button", { name: "Procesando…" })).toBeDisabled();
+    expect(screen.getByRole("textbox")).toBeDisabled();
+    await act(async () => { pendiente.resolver(true); });
+    expect(cerrar).toHaveBeenCalledOnce();
+  });
+
+  it("muestra el error adaptado y conserva los datos para corregir", async () => {
+    const user = userEvent.setup();
+    const cerrar = vi.fn();
+    const accion = crearAccionPrueba<SolicitudSubsanacion, ResultadoSubsanacion>({
+      ejecutar: async () => false,
+      error: new ErrorAccionExpediente("El expediente cambió de estado.", "http", 409),
+    });
+    render(<SubsanacionModal open onClose={cerrar} expediente={expediente} accion={accion} />);
+    await user.type(screen.getByRole("textbox"), "Corrección presentada");
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Confirmar subsanación" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("El expediente cambió de estado.");
+    expect(screen.getByRole("textbox")).toHaveValue("Corrección presentada");
+    expect(cerrar).not.toHaveBeenCalled();
   });
 });
 

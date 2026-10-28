@@ -80,6 +80,9 @@ export interface FirmaSessionStore {
 
   /** Libera los recursos de conexion. */
   cerrar(): Promise<void>;
+
+  /** Verifica conectividad activa (ping/pong) con el almacén. */
+  ping?(): Promise<boolean>;
 }
 
 /** Genera un token opaco de 256 bits en hexadecimal. */
@@ -115,6 +118,7 @@ export interface ClienteRedisMinimo {
   exists(clave: string): Promise<number>;
   del(...claves: string[]): Promise<number>;
   quit(): Promise<unknown>;
+  ping(): Promise<string>;
 }
 
 /**
@@ -141,8 +145,22 @@ export class RedisFirmaSessionStore implements FirmaSessionStore {
         "Falta la variable de entorno REDIS_URL para el almacen de sesiones de firma.",
       );
     }
-    const opciones: RedisOptions = { maxRetriesPerRequest: 2, enableReadyCheck: true };
-    return new RedisFirmaSessionStore(new Redis(url, opciones) as ClienteRedisMinimo);
+    const opciones: RedisOptions = {
+      maxRetriesPerRequest: 1,
+      connectTimeout: 3000,
+      enableReadyCheck: true,
+      lazyConnect: false,
+    };
+    const cliente = new Redis(url, opciones);
+    cliente.on("error", () => {
+      // Capturar evento para evitar caídas no controladas del proceso
+    });
+    return new RedisFirmaSessionStore(cliente as unknown as ClienteRedisMinimo);
+  }
+
+  async ping(): Promise<boolean> {
+    const respuesta = await this.redis.ping();
+    return respuesta === "PONG";
   }
 
   async crear(sesion: SesionFirma, ttlSegundos = TTL_SESION_FIRMA_SEGUNDOS): Promise<boolean> {
@@ -240,5 +258,9 @@ export class InMemoryFirmaSessionStore implements FirmaSessionStore {
 
   async cerrar(): Promise<void> {
     this.sesiones.clear();
+  }
+
+  async ping(): Promise<boolean> {
+    return true;
   }
 }

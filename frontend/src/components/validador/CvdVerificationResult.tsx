@@ -163,6 +163,19 @@ export default function CvdVerificationResult({
     );
   }
 
+  if (resultado.esValido && resultado.evidencia) {
+    return <section aria-live="polite" className="rounded-xl border border-emerald-200 bg-white p-6 shadow-sm">
+      <h2 className="text-lg font-bold text-emerald-900">CVD registrado con firma vigente</h2>
+      <p className="mt-2 text-sm text-slate-700">{resultado.mensajeSeguridad}</p>
+      <dl className="mt-5 space-y-3 text-sm">
+        <div><dt className="font-semibold">CVD</dt><dd className="font-mono">{resultado.cvd}</dd></div>
+        <div><dt className="font-semibold">SHA-256 registrado</dt><dd className="break-all font-mono">{resultado.evidencia.hashSha256}</dd></div>
+        {resultado.evidencia.firmante && <div><dt className="font-semibold">Firmante registrado</dt><dd>{resultado.evidencia.firmante}</dd></div>}
+        {resultado.evidencia.fechaSelloTsa && <div><dt className="font-semibold">Fecha de sello registrada</dt><dd>{formatoFecha(resultado.evidencia.fechaSelloTsa)}</dd></div>}
+      </dl>
+    </section>;
+  }
+
   return (
     <section
       aria-live="polite"

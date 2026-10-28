@@ -6,7 +6,6 @@ import {
   ClipboardList,
   Database,
   Calendar,
-  Lock,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -16,7 +15,7 @@ const ADMIN_ROUTES = [
     titulo: "Usuarios",
     ruta: "/administracion/usuarios",
     icono: Users,
-    descripcion: "Gestión de cuentas y asignación de roles",
+    descripcion: "Consulta de cuentas y roles registrados",
   },
   {
     titulo: "Roles y Permisos",
@@ -40,13 +39,7 @@ const ADMIN_ROUTES = [
     titulo: "Calendario Laboral",
     ruta: "/administracion/calendario-laboral",
     icono: Calendar,
-    descripcion: "Feriados, días hábiles y horario de corte",
-  },
-  {
-    titulo: "Seguridad",
-    ruta: "/administracion/seguridad",
-    icono: Lock,
-    descripcion: "Políticas y bloqueos de acceso",
+    descripcion: "Consulta de feriados y días hábiles registrados",
   },
 ];
 

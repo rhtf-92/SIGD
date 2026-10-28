@@ -61,25 +61,27 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
     if (state.currentStep < 4) {
       dispatch({
         type: "SET_STEP",
-        payload: (state.currentStep + 1) as WizardStep,
+        payload: state.radicacionPendiente ? 4 : (state.currentStep + 1) as WizardStep,
       });
     }
-  }, [state.currentStep, dispatch]);
+  }, [state.currentStep, state.radicacionPendiente, dispatch]);
 
   const handleBack = useCallback(() => {
+    if (state.radicacionPendiente && state.currentStep <= 2) return;
     if (state.currentStep > 1) {
       dispatch({
         type: "SET_STEP",
         payload: (state.currentStep - 1) as WizardStep,
       });
     }
-  }, [state.currentStep, dispatch]);
+  }, [state.currentStep, state.radicacionPendiente, dispatch]);
 
   const handleGoToStep = useCallback(
     (step: WizardStep) => {
+      if (state.radicacionPendiente && step !== 2) return;
       dispatch({ type: "SET_STEP", payload: step });
     },
-    [dispatch],
+    [dispatch, state.radicacionPendiente],
   );
 
   const handleSuccess = useCallback(
@@ -113,6 +115,7 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
             onNext={handleNext}
             onBack={handleBack}
             isSubmitting={state.isSubmitting}
+            radicacionPendiente={Boolean(state.radicacionPendiente)}
           />
         )}
 

@@ -24,6 +24,13 @@ import type {
   ArchivoTramite,
   WizardAction,
 } from '../../../types/tramiteWizardState';
+import { useProcedimientosTupa } from '../../../hooks/useProcedimientosTupa';
+import {
+  TupaCatalogoCargando,
+  TupaCatalogoError,
+  TupaCatalogoVacio,
+} from '../TupaCatalogEstados';
+import TupaDetalleProcedimiento from '../TupaDetalleProcedimiento';
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
@@ -36,40 +43,8 @@ export interface StepDocumentosProps {
   onBack: () => void;
   /** Indicador de procesamiento asíncrono o bloqueo de formulario */
   isSubmitting?: boolean;
+  radicacionPendiente?: boolean;
 }
-
-const CATALOGO_TUPA_INSTITUCIONAL = [
-  {
-    id: 'TUPA-01',
-    nombre: 'Certificado Oficial de Estudios (Por Semestre o Ciclo Completo)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-02',
-    nombre: 'Constancia de Matrícula, Egresado y No Adeudo',
-    unidad: 'Dirección de Asuntos Académicos',
-  },
-  {
-    id: 'TUPA-03',
-    nombre: 'Expedición de Título Profesional Técnico a Nombre de la Nación',
-    unidad: 'Área de Titulación y Grados',
-  },
-  {
-    id: 'TUPA-04',
-    nombre: 'Rectificación de Matrícula o Reserva de Vacante Temporal',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-05',
-    nombre: 'Convalidación y Homologación de Unidades Didácticas (Módulos)',
-    unidad: 'Coordinación de Programas de Estudio',
-  },
-  {
-    id: 'LIBRE-01',
-    nombre: 'Solicitud Formal General / Trámite Libre Institucional',
-    unidad: 'Mesa de Partes General',
-  },
-] as const;
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
@@ -79,11 +54,28 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   onNext,
   onBack,
   isSubmitting = false,
+  radicacionPendiente = false,
 }) => {
   const formId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [fileError, setFileError] = useState<string | null>(null);
+
+  // Catálogo TUPA versionado publicado por el backend definitivo.
+  const {
+    procedimientos,
+    cargando,
+    error: errorCatalogo,
+    estaVacio,
+    recargar,
+  } = useProcedimientosTupa();
+
+  const procedimientoSeleccionado = useMemo(
+    () => procedimientos.find((p) => p.registroVersionId === data.tipoTramiteId),
+    [procedimientos, data.tipoTramiteId],
+  );
+
+  const catalogoNoDisponible = cargando || Boolean(errorCatalogo) || estaVacio;
 
   // ===========================================================================
   // VALIDACIÓN REACTIVA EN TIEMPO REAL
@@ -94,6 +86,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     // 1. Procedimiento Institucional
     if (!data.tipoTramiteId.trim()) {
       errs.tipoTramiteId = 'Debe seleccionar un procedimiento institucional o trámite TUPA.';
+    } else if (data.tipoTramiteId !== 'NO_TUPA' && !procedimientoSeleccionado) {
+      errs.tipoTramiteId = 'Seleccione un procedimiento vigente del catálogo oficial.';
     }
 
     // 2. Asunto / Petitorio sucinto
@@ -117,7 +111,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     }
 
     return errs;
-  }, [data]);
+  }, [data, procedimientoSeleccionado]);
 
   const isValid = Object.keys(errors).length === 0;
 
@@ -126,9 +120,26 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   };
 
   const handleFieldChange = (field: keyof DocumentosData, value: unknown) => {
+    if (radicacionPendiente) return;
     dispatch({
       type: 'UPDATE_DOCUMENTOS',
       payload: { [field]: value },
+    });
+  };
+
+  // El valor TUPA es el registroVersionId real; NO_TUPA solo identifica el flujo libre en la UI.
+  const handleSeleccionProcedimiento = (registroVersionId: string) => {
+    if (radicacionPendiente) return;
+    const seleccion = procedimientos.find((p) => p.registroVersionId === registroVersionId);
+    dispatch({
+      type: 'UPDATE_DOCUMENTOS',
+      payload: {
+        tipoTramiteId: registroVersionId,
+        tipoTramiteCodigo: seleccion?.codigo,
+        tipoTramiteDenominacion: registroVersionId === 'NO_TUPA'
+          ? 'Trámite no TUPA / documentación general'
+          : seleccion?.denominacion,
+      },
     });
   };
 
@@ -167,13 +178,25 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
         nombre: file.name,
         peso: file.size,
         hashSha256: hashHex,
-        storageUrl: URL.createObjectURL(file),
+        file,
       };
+
+      if (radicacionPendiente && !data.archivos.some((archivo) =>
+        archivo.hashSha256 === hashHex && archivo.peso === file.size && archivo.nombre === file.name)) {
+        setFileError('El expediente ya fue creado. Seleccione exactamente el PDF original para reintentar la carga.');
+        return;
+      }
+      if (!radicacionPendiente && data.archivos.some((archivo) => archivo.hashSha256 === hashHex)) {
+        setFileError('Este PDF ya está adjunto. Seleccione un documento diferente.');
+        return;
+      }
 
       dispatch({
         type: 'UPDATE_DOCUMENTOS',
         payload: {
-          archivos: [...data.archivos, nuevoArchivo],
+          archivos: radicacionPendiente
+            ? data.archivos.map((archivo) => archivo.hashSha256 === hashHex && archivo.nombre === file.name ? nuevoArchivo : archivo)
+            : [...data.archivos, nuevoArchivo],
         },
       });
     } catch {
@@ -186,24 +209,12 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   };
 
   const handleRemoveArchivo = (indexToRemove: number) => {
+    if (radicacionPendiente) return;
     const filtrados = data.archivos.filter((_, idx) => idx !== indexToRemove);
     dispatch({
       type: 'UPDATE_DOCUMENTOS',
       payload: { archivos: filtrados },
     });
-  };
-
-  const handleSimularArchivoPrueba = () => {
-    const dummy: ArchivoTramite = {
-      nombre: 'solicitud_firmada_estudios_2026.pdf',
-      peso: 154230,
-      hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    };
-    dispatch({
-      type: 'UPDATE_DOCUMENTOS',
-      payload: { archivos: [...data.archivos, dummy] },
-    });
-    setFileError(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -260,23 +271,31 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 : undefined
             }
             value={data.tipoTramiteId}
-            onChange={(e) => handleFieldChange('tipoTramiteId', e.target.value)}
+            onChange={(e) => handleSeleccionProcedimiento(e.target.value)}
             onBlur={() => markTouched('tipoTramiteId')}
-            disabled={isSubmitting}
+            disabled={isSubmitting || radicacionPendiente}
             className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer ${
               touched.tipoTramiteId && errors.tipoTramiteId
                 ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
                 : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
-            } disabled:bg-slate-100`}
+            } disabled:bg-slate-100 disabled:cursor-not-allowed`}
           >
             <option value="">-- Seleccione un procedimiento oficial --</option>
-            {CATALOGO_TUPA_INSTITUCIONAL.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id} — {t.nombre} ({t.unidad})
+            <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
+            {procedimientos.map((t) => (
+              <option key={t.registroVersionId} value={t.registroVersionId}>
+                {t.denominacion}
               </option>
             ))}
           </select>
-          {touched.tipoTramiteId && errors.tipoTramiteId && (
+
+          {cargando && <TupaCatalogoCargando />}
+          {!cargando && errorCatalogo && (
+            <TupaCatalogoError error={errorCatalogo} onRetry={recargar} />
+          )}
+          {estaVacio && <TupaCatalogoVacio />}
+
+          {touched.tipoTramiteId && errors.tipoTramiteId && !catalogoNoDisponible && (
             <p
               id={`${formId}-tipoTramiteId-error`}
               role="alert"
@@ -284,6 +303,12 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             >
               {errors.tipoTramiteId}
             </p>
+          )}
+
+          {procedimientoSeleccionado && (
+            <div className="mt-3">
+              <TupaDetalleProcedimiento procedimiento={procedimientoSeleccionado} />
+            </div>
           )}
         </div>
 
@@ -320,8 +345,9 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             placeholder="Describa claramente su solicitud dirigida a la Dirección del Instituto de Educación Superior Tecnológico Público Suiza..."
             value={data.asunto}
             onChange={(e) => handleFieldChange('asunto', e.target.value)}
+            readOnly={radicacionPendiente}
             onBlur={() => markTouched('asunto')}
-            disabled={isSubmitting}
+            disabled={isSubmitting || radicacionPendiente}
             className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition ${
               touched.asunto && errors.asunto
                 ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
@@ -399,14 +425,6 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 Suba su solicitud o formulario formal en formato PDF (máximo 25 MB por archivo).
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleSimularArchivoPrueba}
-              disabled={isSubmitting}
-              className="text-xs font-bold text-[#006EC7] hover:underline self-start sm:self-auto cursor-pointer"
-            >
-              + Cargar PDF de prueba
-            </button>
           </div>
 
           {/* Zona de Drop / Carga de Archivo */}
@@ -487,7 +505,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                   <button
                     type="button"
                     onClick={() => handleRemoveArchivo(index)}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || radicacionPendiente}
                     className="ml-3 shrink-0 rounded px-2 py-1 font-bold text-red-600 hover:bg-red-50 cursor-pointer"
                   >
                     Eliminar
@@ -504,7 +522,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
         <button
           type="button"
           onClick={onBack}
-          disabled={isSubmitting}
+          disabled={isSubmitting || radicacionPendiente}
           className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 cursor-pointer"
         >
           ← Anterior

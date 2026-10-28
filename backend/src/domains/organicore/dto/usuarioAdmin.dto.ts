@@ -71,7 +71,10 @@ export const listarUsuariosQuerySchema = z.object({
     .uuid("El ID del rol no es válido")
     .optional(),
 
-  estado: estadoUsuarioSchema.optional(),
+  estado: z.preprocess(
+    (val) => (typeof val === "string" ? val.toUpperCase() : val),
+    estadoUsuarioSchema.optional(),
+  ),
 
   pagina: z.coerce
     .number()
@@ -200,7 +203,10 @@ const actualizarUsuarioAdminBaseSchema = z.object({
     .uuid("El ID del rol no es válido")
     .optional(),
 
-  estado: estadoUsuarioSchema.optional(),
+  estado: z.preprocess(
+    (val) => (typeof val === "string" ? val.toUpperCase() : val),
+    estadoUsuarioSchema.optional(),
+  ),
 });
 
 /**
@@ -227,10 +233,10 @@ export const actualizarUsuarioAdminSchema =
  * Por eso el identificador se valida como entero positivo.
  */
 export const usuarioIdParamSchema = z.object({
-  id: z.coerce
+  id: z.union([z.string().uuid("El ID del usuario debe ser un UUID válido"), z.coerce
     .number()
     .int("El ID del usuario debe ser un número entero")
-    .positive("El ID del usuario debe ser mayor que cero"),
+    .positive("El ID del usuario debe ser mayor que cero")]),
 });
 
 /* =========================================================

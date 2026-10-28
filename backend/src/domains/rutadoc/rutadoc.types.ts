@@ -64,6 +64,7 @@ export interface ResultadoBandeja {
 
 export interface ActorRutaDoc {
   id: string;
+  idPersona?: string | null;
   roles: readonly string[];
   /** Unidad derivada por el proveedor de identidad verificado, si está disponible. */
   unidadOrganicaId?: string | null;

@@ -24,7 +24,7 @@ import type {
  */
 
 export interface UsuarioDirectorio {
-  id: number;
+  id: string | number;
   nombre: string;
   dni: string;
   correo: string;
@@ -96,18 +96,18 @@ export function crearUsuariosAdminService(pool: Pool) {
         (
           to_tsvector(
             'spanish',
-            COALESCE(p.nombres, '') || ' ' ||
-            COALESCE(p.apellido_paterno, '') || ' ' ||
-            COALESCE(p.apellido_materno, '') || ' ' ||
-            COALESCE(p.numero_documento, '')
+            COALESCE(pn.nombre_completo, '') || ' ' ||
+            COALESCE(pn.nombres, '') || ' ' ||
+            COALESCE(pn.apellidos, '') || ' ' ||
+            COALESCE(p.id_documento, '')
           )
           @@ websearch_to_tsquery(
             'spanish',
             ${posicion}
           )
-          OR p.numero_documento
+          OR p.id_documento
              ILIKE '%' || ${posicion} || '%'
-          OR cu.email_login
+          OR cu.correo
              ILIKE '%' || ${posicion} || '%'
         )
       `);
@@ -117,15 +117,7 @@ export function crearUsuariosAdminService(pool: Pool) {
       const posicion = agregarParametro(areaId);
 
       condiciones.push(
-        `pl.id_area = ${posicion}`,
-      );
-    }
-
-    if (sedeId) {
-      const posicion = agregarParametro(sedeId);
-
-      condiciones.push(
-        `pl.sede_id = ${posicion}`,
+        `(ap.area_id = ${posicion}::uuid OR a.area_id = ${posicion}::uuid)`,
       );
     }
 
@@ -133,32 +125,26 @@ export function crearUsuariosAdminService(pool: Pool) {
       const posicion = agregarParametro(rolId);
 
       condiciones.push(
-        `ur.rol_id = ${posicion}`,
+        `ur.rol_id = ${posicion}::uuid`,
       );
     }
 
     if (estado) {
       if (estado === "ACTIVO") {
         condiciones.push(`
-          cu.estado = TRUE
-          AND (
-            cu.bloqueado_hasta IS NULL
-            OR cu.bloqueado_hasta <= now()
-          )
+          (cu.activo = TRUE /* cu.estado = TRUE AND (cu.bloqueado_hasta IS NULL OR cu.bloqueado_hasta <= now()) */)
         `);
       }
 
       if (estado === "INACTIVO") {
         condiciones.push(`
-          cu.estado = FALSE
+          (cu.activo = FALSE /* cu.estado = FALSE */)
         `);
       }
 
       if (estado === "BLOQUEADO") {
         condiciones.push(`
-          cu.estado = TRUE
-          AND cu.bloqueado_hasta IS NOT NULL
-          AND cu.bloqueado_hasta > now()
+          (cu.activo = FALSE /* cu.estado = TRUE AND cu.bloqueado_hasta IS NOT NULL AND cu.bloqueado_hasta > now() */)
         `);
       }
     }
@@ -179,20 +165,19 @@ export function crearUsuariosAdminService(pool: Pool) {
 
     const sqlDatos = `
       SELECT DISTINCT
-        cu.id AS id,
+        cu.id_usuario AS id,
 
-        concat_ws(
-          ' ',
-          p.nombres,
-          p.apellido_paterno,
-          p.apellido_materno
+        COALESCE(
+          pn.nombre_completo,
+          concat_ws(' ', pn.nombres, pn.apellidos),
+          cu.usuario
         ) AS nombre,
 
-        p.numero_documento AS dni,
+        p.id_documento AS dni,
 
-        cu.email_login AS correo,
+        cu.correo AS correo,
 
-        s.nombre AS sede,
+        NULL::text AS sede,
 
         a.nombre AS area,
 
@@ -201,13 +186,8 @@ export function crearUsuariosAdminService(pool: Pool) {
         rs.nombre AS rol,
 
         CASE
-          WHEN cu.estado = FALSE
+          WHEN cu.activo = FALSE
             THEN 'INACTIVO'
-
-          WHEN cu.bloqueado_hasta IS NOT NULL
-               AND cu.bloqueado_hasta > now()
-            THEN 'BLOQUEADO'
-
           ELSE 'ACTIVO'
         END AS estado,
 
@@ -216,44 +196,30 @@ export function crearUsuariosAdminService(pool: Pool) {
       FROM sigd_auth.cuenta_usuario AS cu
 
       INNER JOIN sigd_auth.persona AS p
-        ON p.id = cu.persona_id
+        ON p.id_persona = cu.id_persona
 
-      /*
-       * Contrato intermodular pendiente:
-       *
-       * sigd_auth.cuenta_usuario.id = BIGINT
-       * sigd_org.asignacion_personal.cuenta_id = UUID
-       *
-       * Los casts existentes se conservan temporalmente
-       * para no modificar contratos pertenecientes a
-       * otros módulos.
-       */
+      LEFT JOIN sigd_auth.persona_natural AS pn
+        ON pn.id_persona = p.id_persona
+
       LEFT JOIN sigd_org.asignacion_personal AS ap
-        ON ap.cuenta_id::text = cu.id::text
-        AND ap.activo = TRUE
-        AND ap.vigencia @> now()
-
-      LEFT JOIN sigd_org.puesto_laboral AS pl
-        ON pl.puesto_laboral_id =
-           ap.puesto_laboral_id
-        AND pl.activo = TRUE
-
-      LEFT JOIN sigd_org.sede AS s
-        ON s.sede_id = pl.sede_id
+        ON ap.id_usuario = cu.id_usuario
+        AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
 
       LEFT JOIN sigd_org.area AS a
-        ON a.id_area = pl.id_area
+        ON a.area_id = ap.area_id
+        AND a.vigente = TRUE
 
       LEFT JOIN sigd_org.cargo AS c
-        ON c.cargo_id = pl.cargo_id
+        ON c.cargo_id = ap.cargo_id
+        AND c.vigente = TRUE
 
       LEFT JOIN sigd_org.usuario_rol AS ur
-        ON ur.cuenta_id::text = cu.id::text
-        AND ur.vigencia @> now()
+        ON ur.id_usuario = cu.id_usuario
+        AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
 
       LEFT JOIN sigd_org.rol_sistema AS rs
         ON rs.rol_id = ur.rol_id
-        AND rs.activo = TRUE
+        AND rs.vigente = TRUE
 
       ${where}
 
@@ -272,26 +238,31 @@ export function crearUsuariosAdminService(pool: Pool) {
 
     const sqlConteo = `
       SELECT
-        COUNT(DISTINCT cu.id)::int AS total
+        COUNT(DISTINCT cu.id_usuario)::int AS total
 
       FROM sigd_auth.cuenta_usuario AS cu
 
       INNER JOIN sigd_auth.persona AS p
-        ON p.id = cu.persona_id
+        ON p.id_persona = cu.id_persona
+
+      LEFT JOIN sigd_auth.persona_natural AS pn
+        ON pn.id_persona = p.id_persona
 
       LEFT JOIN sigd_org.asignacion_personal AS ap
-        ON ap.cuenta_id::text = cu.id::text
-        AND ap.activo = TRUE
-        AND ap.vigencia @> now()
+        ON ap.id_usuario = cu.id_usuario
+        AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
 
-      LEFT JOIN sigd_org.puesto_laboral AS pl
-        ON pl.puesto_laboral_id =
-           ap.puesto_laboral_id
-        AND pl.activo = TRUE
+      LEFT JOIN sigd_org.area AS a
+        ON a.area_id = ap.area_id
+        AND a.vigente = TRUE
 
       LEFT JOIN sigd_org.usuario_rol AS ur
-        ON ur.cuenta_id::text = cu.id::text
-        AND ur.vigencia @> now()
+        ON ur.id_usuario = cu.id_usuario
+        AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+
+      LEFT JOIN sigd_org.rol_sistema AS rs
+        ON rs.rol_id = ur.rol_id
+        AND rs.vigente = TRUE
 
       ${where};
     `;
@@ -421,16 +392,16 @@ export function crearUsuariosAdminService(pool: Pool) {
    * protegida por el contrato intermodular pendiente.
    */
   async function actualizarUsuario(
-    usuarioId: number,
+    usuarioId: string | number,
     datos: ActualizarUsuarioAdminDTO,
   ): Promise<never> {
+    const idParam = String(usuarioId);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam);
     const resultadoUsuario =
-      await pool.query<{ id: number }>(
-        `
-          SELECT id
-          FROM sigd_auth.cuenta_usuario
-          WHERE id = $1
-        `,
+      await pool.query<{ id: string }>(
+        isUuid
+          ? `SELECT cu.id_usuario AS id FROM sigd_auth.cuenta_usuario AS cu WHERE cu.id_usuario = $1::uuid`
+          : `SELECT cu.id_usuario AS id FROM sigd_auth.cuenta_usuario AS cu WHERE cu.id_usuario::text = $1`,
         [usuarioId],
       );
 
@@ -475,13 +446,14 @@ export function crearUsuariosAdminService(pool: Pool) {
    * actualmente disponible: sigd_auth.sesion_usuario.
    */
   async function revocarSesionesUsuario(
-    usuarioId: number,
+    usuarioId: string | number,
   ): Promise<number> {
+    const idParam = String(usuarioId);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam);
     const resultado = await pool.query(
-      `
-        DELETE FROM sigd_auth.sesion_usuario
-        WHERE usuario_id = $1
-      `,
+      isUuid
+        ? `DELETE FROM sigd_auth.sesion_usuario WHERE id_usuario = $1::uuid`
+        : `DELETE FROM sigd_auth.sesion_usuario WHERE id_usuario::text = $1`,
       [usuarioId],
     );
 

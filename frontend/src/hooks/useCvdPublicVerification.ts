@@ -108,7 +108,17 @@ async function consultarMock(codigoCvd: string): Promise<ValidacionCVDResult> {
 
 async function consultarApi(codigoCvd: string): Promise<ValidacionCVDResult> {
   const normalizado = normalizarCvd(codigoCvd);
-  const { data } = await apiClient.get<any>(
+  const { data } = await apiClient.get<{
+    esValido?: boolean;
+    valido?: boolean;
+    cvd?: string;
+    documento?: ValidacionCVDResult['documento'];
+    selloTiempoTsa?: string | null;
+    fecha_sello_tsa?: string | null;
+    sha256_firmado?: string;
+    firmante?: string | null;
+    mensajeSeguridad?: string;
+  }>(
     `/api/v1/validador/cvd/${encodeURIComponent(normalizado)}`,
   );
   const esValido = Boolean(data.esValido ?? data.valido);
@@ -116,35 +126,18 @@ async function consultarApi(codigoCvd: string): Promise<ValidacionCVDResult> {
     data.selloTiempoTsa ??
     (data.fecha_sello_tsa ? new Date(data.fecha_sello_tsa).toISOString() : null);
 
-  let documento = data.documento ?? null;
-  if (!documento && esValido) {
-    documento = {
-      numeroDocumento: `RD N.° ${normalizado.slice(-6)}-2026-DG-IESTP-SUIZA`,
-      tipo: "RD" as const,
-      asunto: "Documento Oficial con Firma Digital Verificada - IESTP Suiza",
-      fechaEmision: selloTiempoTsa ?? new Date().toISOString(),
-      firmantes: [
-        {
-          nombre: data.firmante || "Dirección General IESTP Suiza",
-          cargo: "Director General",
-          fechaFirma: selloTiempoTsa ?? new Date().toISOString(),
-          entidadCertificadora: "RENIEC / PKI Estado Peruano",
-        },
-      ],
-      hashIntegridadSha256: data.sha256_firmado || "",
-      urlDescargaAutentica: data.descarga_copia_certificada || "",
-    };
-  }
-
   return {
     esValido,
     cvd: data.cvd ?? normalizado,
-    documento,
+    documento: data.documento ?? null,
     selloTiempoTsa,
+    evidencia: esValido && data.sha256_firmado
+      ? { firmante: data.firmante ?? null, hashSha256: data.sha256_firmado, fechaSelloTsa: selloTiempoTsa }
+      : undefined,
     mensajeSeguridad:
       data.mensajeSeguridad ??
       (esValido
-        ? "Documento íntegro y verificado conforme al marco legal D.S. N° 070-2013-PCM."
+        ? "Existe un registro de firma digital vigente para este CVD en SIGD."
         : "El documento ingresado no coincide con ningún registro institucional legítimo o su contenido ha sido alterado tras la emisión."),
   };
 }

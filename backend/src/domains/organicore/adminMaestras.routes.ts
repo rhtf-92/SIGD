@@ -34,6 +34,11 @@ import {
   type DependenciasController,
 } from './adminMaestras.controller.js';
 
+import {
+  CalendarizacionInstitucionalService,
+  FUENTE_CALENDARIZACION_INSTITUCIONAL_2026,
+} from './calendarizacion.service.js';
+
 export function crearRouterAdminMaestras(pool: Pool): Router {
   const router = Router();
   const deps: DependenciasController = {
@@ -41,9 +46,41 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
     tablasMaestras: new TablasMaestrasService(pool),
   };
 
+  const calendarizacionService = new CalendarizacionInstitucionalService();
+
   router.get('/tablas-maestras', listarTablasMaestras(deps));
   router.get('/calendario-laboral', listarCalendario(deps));
   router.post('/calendario-laboral/feriado-excepcional', registrarFeriadoExcepcional(deps));
+
+  router.get('/calendarizacion-institucional', (req, res) => {
+    const anio = req.query.anio !== undefined ? Number(req.query.anio) : undefined;
+    const desde = typeof req.query.desde === 'string' ? req.query.desde : undefined;
+    const hasta = typeof req.query.hasta === 'string' ? req.query.hasta : undefined;
+    try {
+      const actividades = calendarizacionService.listar({ anio, desde, hasta });
+      res.status(200).json({
+        fuente: FUENTE_CALENDARIZACION_INSTITUCIONAL_2026,
+        total: actividades.length,
+        actividades,
+      });
+    } catch (err: unknown) {
+      if (err instanceof RangeError) {
+        res.status(400).json({ error: err.message });
+      } else {
+        res.status(500).json({ error: 'Error al consultar la calendarización institucional' });
+      }
+    }
+  });
+
+  router.get('/calendarizacion-institucional/actividades/:numero', (req, res) => {
+    const numero = Number(req.params.numero);
+    const actividad = calendarizacionService.obtenerPorNumero(numero);
+    if (!actividad) {
+      res.status(404).json({ error: `Actividad ${numero} no encontrada.` });
+      return;
+    }
+    res.status(200).json(actividad);
+  });
 
   return router;
 }

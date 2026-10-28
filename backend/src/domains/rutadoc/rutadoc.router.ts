@@ -22,44 +22,73 @@ import type { ClasificadorCcdPort } from './ccd.types.js';
 import type { DocumentoMetadataPort } from './foliacion.types.js';
 
 /** Montar en /api/v1. Sin IdentiCore, la resolución predeterminada deniega acceso. */
-export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDoc,
-  politicaReversion?: PoliticaReversionRutaDoc, prepararFolios?: PrepararCompensacionFolios,
+export function crearRouterRutaDoc(
+  pool: Pool,
+  obtenerActor?: ObtenerActorRutaDoc,
+  politicaReversion?: PoliticaReversionRutaDoc,
+  prepararFolios?: PrepararCompensacionFolios,
   actorProvider: ActorProviderRutaDoc = actorProviderNoConfigurado,
   folioPort?: FolioCompensationPort,
-  lecturas: { calendarioLaboral?: CalendarioLaboralPort; clasificadorCcd?: ClasificadorCcdPort;
-    documentoMetadata?: DocumentoMetadataPort; porcentajeAmarilloSlaDesde?: number } = {}): Router {
+  lecturas: {
+    calendarioLaboral?: CalendarioLaboralPort;
+    clasificadorCcd?: ClasificadorCcdPort;
+    documentoMetadata?: DocumentoMetadataPort;
+    porcentajeAmarilloSlaDesde?: number;
+  } = {},
+): Router {
   const router = Router();
   const servicio = new ServicioRutaDoc(new RepositorioPostgresRutaDoc(pool));
   const reversion = new ServicioReversionRutaDoc(
-    new RepositorioReversionRutaDoc(pool), politicaReversion, prepararFolios, folioPort);
+    new RepositorioReversionRutaDoc(pool),
+    politicaReversion,
+    prepararFolios,
+    folioPort,
+  );
   const proveedorActor = obtenerActor ? { obtenerActor } : actorProvider;
-  const controlador = crearControladorRutaDoc(servicio, reversion,
-    proveedorActor);
   const repositoriosLectura = crearRepositoriosLecturaRutaDoc(pool);
+  const servicioSla = new ServicioSlaRutaDoc(
+    new RepositorioSlaRutaDoc(pool),
+    lecturas.calendarioLaboral ?? calendarioLaboralPredeterminadoRutaDoc,
+    undefined,
+    { porcentajeAmarilloDesde: lecturas.porcentajeAmarilloSlaDesde ?? 80 },
+  );
+
+  const controlador = crearControladorRutaDoc(servicio, reversion, proveedorActor, {
+    sla: servicioSla,
+    pool,
+  });
+
   const controladorLecturas = crearControladorLecturasRutaDoc(proveedorActor, {
     trazabilidad: new ServicioTrazabilidadRutaDoc(repositoriosLectura.trazabilidad),
     foliacion: new ServicioFoliacionRutaDoc(repositoriosLectura.foliacion, lecturas.documentoMetadata),
-    sla: new ServicioSlaRutaDoc(new RepositorioSlaRutaDoc(pool),
-      lecturas.calendarioLaboral ?? calendarioLaboralPredeterminadoRutaDoc,
-      undefined, { porcentajeAmarilloDesde: lecturas.porcentajeAmarilloSlaDesde ?? 80 }),
+    sla: servicioSla,
     ccd: new ServicioCcdRutaDoc(lecturas.clasificadorCcd ?? clasificadorCcdPredeterminadoRutaDoc),
   });
+
   router.get('/expedientes', controlador.listar);
   router.get('/expedientes/clasificador-ccd', controladorLecturas.ccd);
+  router.get('/expedientes/:id/resumen', controlador.resumen);
   router.get('/expedientes/:id/trazabilidad', controladorLecturas.trazabilidad);
   router.get('/expedientes/:id/foliacion', controladorLecturas.foliacion);
   router.get('/expedientes/:id/sla-status', controladorLecturas.sla);
   router.get('/expedientes/:id', controlador.obtener);
   router.post('/expedientes/:id/revertir-actuacion', controlador.revertir);
+
   const derivaciones = Router();
   derivaciones.use(async (req, _res, next) => {
-    const actor = await proveedorActor.obtenerActor(req);
-    if (!actor) throw new UnauthorizedError();
-    setUsuarioId(actor.id);
-    setUnidadOrganicaId(actor.unidadOrganicaId ?? null);
-    next();
+    try {
+      const actor = await proveedorActor.obtenerActor(req);
+      if (!actor) throw new UnauthorizedError();
+      setUsuarioId(actor.id);
+      setUnidadOrganicaId(actor.unidadOrganicaId ?? null);
+      (req as any).actor = actor;
+      next();
+    } catch (err) {
+      next(err);
+    }
   });
-  derivaciones.use(crearRouterDerivaciones(pool));
+  derivaciones.use(crearRouterDerivaciones(pool, proveedorActor));
   router.use('/expedientes', derivaciones);
+
   return router;
 }

@@ -10,6 +10,8 @@ interface FileUploadDropzoneProps {
   onUploaded?: (file: UploadedFile) => void;
   categoria?: string;
   demoMode?: boolean;
+  idExpediente?: string;
+  tipoDocumentalId?: string;
   onStatusChange?: (status: UploadStatus) => void;
 }
 
@@ -17,13 +19,15 @@ export default function FileUploadDropzone({
   onUploaded,
   categoria,
   demoMode = false,
+  idExpediente,
+  tipoDocumentalId,
   onStatusChange,
 }: FileUploadDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const { upload, cancel, status, progress, error, result } =
-    usePresignedUpload({ categoria, demoMode });
+    usePresignedUpload({ categoria, demoMode, idExpediente, tipoDocumentalId });
   const isBusy =
     status === "validating" ||
     status === "hashing" ||

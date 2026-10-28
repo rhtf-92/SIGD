@@ -42,11 +42,22 @@ const camposComunes = {
 const ciudadanoSchema = z.object({
   ...camposComunes,
   tipoPersona: z.literal('NATURAL'),
-  dni: z.string().regex(/^[0-9]{8}$/),
+  tipoDocumento: z.enum(['DNI', 'CE']).optional().default('DNI'),
+  dni: z.string().optional(),
+  ce: z.string().optional(),
   nombres: z.string().trim().min(2).max(120),
   apellidoPaterno: z.string().trim().min(2).max(120),
   apellidoMaterno: z.string().trim().min(2).max(120),
-}).strict();
+}).strict().superRefine((datos, ctx) => {
+  const campo = datos.tipoDocumento === 'CE' ? 'ce' : 'dni';
+  const valor = datos[campo];
+  const valido = datos.tipoDocumento === 'CE'
+    ? /^[A-Z0-9]{9,12}$/.test(valor ?? '')
+    : /^[0-9]{8}$/.test(valor ?? '');
+  if (!valido || datos[datos.tipoDocumento === 'CE' ? 'dni' : 'ce']) {
+    ctx.addIssue({ code: 'custom', path: [campo], message: 'Documento de identidad inválido.' });
+  }
+});
 
 const personaJuridicaSchema = z.object({
   ...camposComunes,
@@ -79,7 +90,7 @@ export const validarDocumentoQuerySchema = z.preprocess(
     return query;
   },
   z.object({
-    tipoDocumento: z.enum(['DNI', 'RUC']),
+    tipoDocumento: z.enum(['DNI', 'CE', 'RUC']),
     numeroDocumento: z.string().min(1).max(20),
   }).strict(),
 );

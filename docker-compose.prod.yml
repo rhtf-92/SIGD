@@ -1,0 +1,33 @@
+# ==============================================================================
+# SIGD 2026 — CONFIGURACIÓN PRODUCTIVA FAIL-CLOSED (OPS-02)
+# Archivo: docker-compose.prod.yml
+# Propósito:
+#   Sobrescribir variables de desarrollo con directivas de obligatoriedad (:?required).
+#   Impide el despliegue de contenedores si no se proveen secretos vía entorno o .env.
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ==============================================================================
+
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Variable POSTGRES_USER requerida en produccion}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Variable POSTGRES_PASSWORD requerida en produccion}
+      POSTGRES_DB: ${POSTGRES_DB:?Variable POSTGRES_DB requerida en produccion}
+
+  minio:
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Variable MINIO_ROOT_USER requerida en produccion}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Variable MINIO_ROOT_PASSWORD requerida en produccion}
+
+  backend:
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Variable DATABASE_URL requerida en produccion}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Variable POSTGRES_PASSWORD requerida en produccion}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Variable MINIO_ROOT_USER requerida en produccion}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Variable MINIO_ROOT_PASSWORD requerida en produccion}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Variable S3_ACCESS_KEY requerida en produccion}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?Variable S3_SECRET_KEY requerida en produccion}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Variable AUTH_JWT_SECRET requerida en produccion}
+      REDIS_URL: ${REDIS_URL:?Variable REDIS_URL requerida en produccion}

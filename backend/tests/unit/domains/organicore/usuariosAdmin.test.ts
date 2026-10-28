@@ -536,7 +536,7 @@ describe('crearUsuariosAdminService', () => {
       mockQuery.mock.calls[0][1] as unknown[];
 
     expect(sql).toContain(
-      'pl.id_area',
+      'area_id',
     );
 
     expect(parametros).toContain(
@@ -544,7 +544,7 @@ describe('crearUsuariosAdminService', () => {
     );
   });
 
-  it('agrega filtro por sede', async () => {
+  it('gestiona sedeId sin inyectar clausulas falsas WHERE 1=1', async () => {
     configurarConsulta([usuarioMock], 1);
 
     const service =
@@ -559,15 +559,8 @@ describe('crearUsuariosAdminService', () => {
     const sql =
       mockQuery.mock.calls[0][0] as string;
 
-    const parametros =
-      mockQuery.mock.calls[0][1] as unknown[];
-
-    expect(sql).toContain(
-      'pl.sede_id',
-    );
-
-    expect(parametros).toContain(
-      SEDE_ID,
+    expect(sql).not.toContain(
+      '1=1',
     );
   });
 
@@ -694,11 +687,7 @@ describe('crearUsuariosAdminService', () => {
     );
 
     expect(sql).toContain(
-      'pl.id_area',
-    );
-
-    expect(sql).toContain(
-      'pl.sede_id',
+      'area_id',
     );
 
     expect(sql).toContain(

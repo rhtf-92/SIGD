@@ -1,10 +1,55 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
-import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
+import { obtenerCatalogoTupaCompleto, type RegistroTupaCompleto } from "../../services/procedimientosTupa.service";
+import { obtenerDefinicionTupa } from "../../data/tupaFormulariosConfig";
+import TupaDynamicFormModal from "../../components/tramite/TupaDynamicFormModal";
+import { useAuthStore } from "../../stores/authStore";
+
+export function mapearEtiquetaHumanaTipo(tipo?: string | null): string {
+  if (!tipo) return 'Trámite general';
+  switch (tipo.toUpperCase()) {
+    case 'ACTUACION_INTERNA':
+      return 'Actuación interna';
+    case 'PROCEDIMIENTO_APROBADO':
+      return 'Procedimiento administrativo';
+    case 'PROCEDIMIENTO_PENDIENTE':
+      return 'Procedimiento en revisión';
+    case 'SERVICIO_ACADEMICO':
+      return 'Servicio académico';
+    case 'SERVICIO_COMERCIAL':
+      return 'Servicio comercial';
+    case 'BIEN_PRODUCTIVO':
+      return 'Venta de bien / Bien productivo';
+    case 'OTRO_NO_RADICABLE':
+      return 'Otro servicio';
+    default:
+      return tipo
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .replace(/^\w/, (c) => c.toUpperCase());
+  }
+}
+
+export function normalizarParaBusqueda(texto: string): string {
+  return texto
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+interface OpcionComboboxTupa {
+  id: string;
+  codigoRef: string;
+  denominacion: string;
+  categoriaHumana: string;
+  monto: string;
+  esNoTupa?: boolean;
+}
 
 interface VentanillaPresencialResultado {
   expedienteId: string;
@@ -25,6 +70,8 @@ interface VentanillaPresencialResultado {
 }
 
 export default function VentanillaPresencialPage() {
+  const rol = useAuthStore((state) => state.usuario?.rol);
+  const puedeRadicarCut = rol === 'MESA_PARTES' || rol === 'ADMINISTRADOR';
   const { isAfterCutoff, requiresProjection, legalDate } = useHorarioCorte();
   const esCorteSuperado = isAfterCutoff || requiresProjection;
   const enJornada = !requiresProjection;
@@ -37,42 +84,185 @@ export default function VentanillaPresencialPage() {
   const [correo, setCorreo] = useState("");
   const [telefono, setTelefono] = useState("");
   const [procedimientoTupa, setProcedimientoTupa] = useState("");
+  const [busquedaTupa, setBusquedaTupa] = useState("");
+  const [procedimientos, setProcedimientos] = useState<RegistroTupaCompleto[]>([]);
+  const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
+  const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null);
+  const [intentoCatalogo, setIntentoCatalogo] = useState(0);
+  const [enviando, setEnviando] = useState(false);
+  const [modalDinamicoAbierto, setModalDinamicoAbierto] = useState(false);
   const [requisitosRecibidos, setRequisitosRecibidos] = useState<Set<number>>(new Set());
   const [tipoDocumento, setTipoDocumento] = useState("SOLICITUD");
   const [asunto, setAsunto] = useState("");
   const [cantidadFolios, setCantidadFolios] = useState(1);
   const [cargoGenerado, setCargoGenerado] = useState<CargoOficialTramite | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
-  const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_2026.find(
-    (procedimiento) => procedimiento.codigo === procedimientoTupa,
+  const [comboboxAbierto, setComboboxAbierto] = useState(false);
+  const [indiceActivo, setIndiceActivo] = useState(0);
+  const comboboxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (comboboxRef.current && !comboboxRef.current.contains(event.target as Node)) {
+        setComboboxAbierto(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setCargandoCatalogo(true);
+    setErrorCatalogo(null);
+    obtenerCatalogoTupaCompleto(controller.signal).then((registros) => {
+      if (controller.signal.aborted) return;
+      if (registros.length !== 72 || registros[0]?.fuente.referenciaFila !== 'p1-fila-01'
+        || registros[71]?.fuente.referenciaFila !== 'p6-fila-07'
+        || registros.some((r) => !obtenerDefinicionTupa(r.fuente.referenciaFila))) {
+        throw new Error('El catálogo institucional no contiene las 72 entradas esperadas.');
+      }
+      setProcedimientos(registros);
+    }).catch((cause: unknown) => {
+      if (!controller.signal.aborted) setErrorCatalogo(cause instanceof Error ? cause.message : 'No se pudo cargar el TUPA.');
+    }).finally(() => {
+      if (!controller.signal.aborted) setCargandoCatalogo(false);
+    });
+    return () => controller.abort();
+  }, [intentoCatalogo]);
+
+  const procedimientoSeleccionado = procedimientos.find(
+    (procedimiento) => procedimiento.registroVersionId === procedimientoTupa,
   );
+  const definicionSeleccionada = procedimientoSeleccionado
+    ? obtenerDefinicionTupa(procedimientoSeleccionado.fuente.referenciaFila) : undefined;
+
+  const terminosBusqueda = useMemo(() => {
+    return normalizarParaBusqueda(busquedaTupa).split(/\s+/).filter(Boolean);
+  }, [busquedaTupa]);
+
+  const procedimientosFiltrados = useMemo(() => {
+    if (terminosBusqueda.length === 0) return procedimientos;
+    return procedimientos.filter((procedimiento) => {
+      const def = obtenerDefinicionTupa(procedimiento.fuente.referenciaFila);
+      const etiquetaHumana = mapearEtiquetaHumanaTipo(def?.categoria);
+      const texto = normalizarParaBusqueda([
+        procedimiento.fuente.referenciaFila,
+        procedimiento.denominacion,
+        def?.categoria ?? '',
+        etiquetaHumana,
+        def?.tipoFormulario ?? '',
+        procedimiento.monto ?? '',
+      ].join(' '));
+      return terminosBusqueda.every((termino) => texto.includes(termino));
+    });
+  }, [procedimientos, terminosBusqueda]);
+
+  const opcionesCombobox: OpcionComboboxTupa[] = useMemo(() => {
+    const lista: OpcionComboboxTupa[] = [];
+    const coincideNoTupa = terminosBusqueda.length === 0 || terminosBusqueda.every((t) =>
+      normalizarParaBusqueda('trámite no tupa documentación general').includes(t)
+    );
+    if (coincideNoTupa) {
+      lista.push({
+        id: 'NO_TUPA',
+        codigoRef: 'GENERAL',
+        denominacion: 'Trámite no TUPA / documentación general',
+        categoriaHumana: 'Trámite general',
+        monto: 'Sin costo',
+        esNoTupa: true,
+      });
+    }
+
+    for (const p of procedimientosFiltrados) {
+      const def = obtenerDefinicionTupa(p.fuente.referenciaFila);
+      lista.push({
+        id: p.registroVersionId,
+        codigoRef: p.fuente.referenciaFila,
+        denominacion: p.denominacion,
+        categoriaHumana: mapearEtiquetaHumanaTipo(def?.categoria),
+        monto: p.monto ?? 'Gratuito',
+      });
+    }
+    return lista;
+  }, [terminosBusqueda, procedimientosFiltrados]);
+
+  function handleSeleccionarProcedimiento(id: string) {
+    setProcedimientoTupa(id);
+    setRequisitosRecibidos(new Set());
+    setComboboxAbierto(false);
+  }
+
+  function handleInputKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!comboboxAbierto) {
+        setComboboxAbierto(true);
+        setIndiceActivo(0);
+      } else {
+        setIndiceActivo((prev) => Math.min(prev + 1, Math.max(0, opcionesCombobox.length - 1)));
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (comboboxAbierto) {
+        setIndiceActivo((prev) => Math.max(prev - 1, 0));
+      }
+    } else if (e.key === "Enter") {
+      if (comboboxAbierto && opcionesCombobox.length > 0) {
+        e.preventDefault();
+        const seleccionado = opcionesCombobox[indiceActivo];
+        if (seleccionado) {
+          handleSeleccionarProcedimiento(seleccionado.id);
+        }
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setComboboxAbierto(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (definicionSeleccionada && !definicionSeleccionada.generaExpediente) {
+      setModalDinamicoAbierto(true);
+      return;
+    }
+    if (!puedeRadicarCut) {
+      alert('Solo Mesa de Partes o Administración pueden emitir un cargo CUT presencial.');
+      return;
+    }
 
-    const asuntoFinal = procedimientoSeleccionado
-      ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
-      : asunto;
+    const etiquetaProcedimiento = procedimientoSeleccionado
+      ? `${procedimientoSeleccionado.fuente.referenciaFila}: ${procedimientoSeleccionado.denominacion}`
+      : null;
+    const asuntoFinal = etiquetaProcedimiento ? `${etiquetaProcedimiento} - ${asunto}` : asunto;
 
-    const dniValido = /^[0-9]{8}$/.test(numeroDoc) ? numeroDoc : "74561238";
+    if (!/^[0-9]{8}$/.test(numeroDoc) || nombre.trim().length < 2 || asuntoFinal.trim().length < 5) {
+      alert("Complete DNI, remitente y asunto con valores válidos antes de radicar.");
+      return;
+    }
 
     try {
+      setEnviando(true);
       const res = await apiClient.post<VentanillaPresencialResultado>(
         "/api/v1/tramites/ventanilla-presencial",
         {
-          dniSolicitante: dniValido,
-          datosRemitente: nombre.trim() || "Ciudadano Administrado",
-          asunto: asuntoFinal.trim() || "Solicitud de trámite presencial",
-          foliosTotales: Number(cantidadFolios) || 1,
+          dniSolicitante: numeroDoc,
+          datosRemitente: nombre.trim(),
+          asunto: asuntoFinal.trim(),
+          foliosTotales: Number(cantidadFolios),
+          ...(procedimientoSeleccionado
+            ? { registroVersionId: procedimientoSeleccionado.registroVersionId }
+            : {}),
         },
       );
 
       const serverData = res.data;
       const cargoServer = serverData.cargo;
-      const fechaRecepcion = cargoServer?.fechaRecepcion || serverData.fechaRadicacion || new Date().toISOString();
+      const fechaRecepcion = cargoServer.fechaRecepcion;
 
       const nuevoCargo: CargoOficialTramite = {
-        codigoExpediente: cargoServer?.cut || serverData.cut,
+        codigoExpediente: cargoServer.cut,
         fechaRecepcionIso: fechaRecepcion,
         fechaIngresoFormalIso: esCorteSuperado ? proximoDiaHabil : fechaRecepcion,
         horaRecepcion: new Date(fechaRecepcion).toLocaleTimeString("es-PE", {
@@ -92,11 +282,11 @@ export default function VentanillaPresencialPage() {
         },
         asunto: asuntoFinal,
         documentoPrincipalTipo: tipoDocumento,
-        cantidadFolios: Number(cantidadFolios) || 1,
+        cantidadFolios: Number(cantidadFolios),
         hashSha256Recepcion: cargoServer.hashSha256,
         horaCorteAplicada: "16:30",
         radicadoDiaSiguiente: esCorteSuperado,
-        urlSeguimiento: cargoServer?.qrSeguimientoUrl || `https://sigd.iestpsuiza.edu.pe/tramite?cut=${serverData.cut}`,
+        urlSeguimiento: cargoServer.qrSeguimientoUrl,
       };
 
       setCargoGenerado(nuevoCargo);
@@ -104,6 +294,8 @@ export default function VentanillaPresencialPage() {
     } catch (error) {
       console.error("[VentanillaPresencial] Error al radicar en ventanilla:", error);
       alert("Error al conectar con el servidor de radicación de ventanilla. Intente nuevamente.");
+    } finally {
+      setEnviando(false);
     }
   }
 
@@ -113,6 +305,7 @@ export default function VentanillaPresencialPage() {
     setCorreo("");
     setTelefono("");
     setProcedimientoTupa("");
+    setBusquedaTupa("");
     setRequisitosRecibidos(new Set());
     setAsunto("");
     setCantidadFolios(1);
@@ -148,8 +341,8 @@ export default function VentanillaPresencialPage() {
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
                   enJornada && !esCorteSuperado
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-300"
-                    : "bg-amber-50 text-amber-900 border border-amber-300"
+                    ? "border border-emerald-200/80 bg-gradient-to-b from-white/95 via-emerald-50/80 to-teal-50/60 text-emerald-950 shadow-[0_2px_6px_rgba(16,185,129,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)]"
+                    : "border border-amber-200/80 bg-gradient-to-b from-white/95 via-amber-50/80 to-orange-50/60 text-amber-950 shadow-[0_2px_6px_rgba(245,158,11,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)]"
                 }`}
               >
                 <span className="h-2 w-2 rounded-full bg-current" />
@@ -162,7 +355,7 @@ export default function VentanillaPresencialPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-5xl px-3.5 py-6 sm:px-6 sm:py-8">
         {esCorteSuperado && (
           <div
             role="note"
@@ -178,11 +371,14 @@ export default function VentanillaPresencialPage() {
 
         <form
           onSubmit={handleSubmit}
-          className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
+          className="space-y-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8"
         >
           <h2 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-3">
             Datos de Recepción en Ventanilla
           </h2>
+          <div className="rounded-xl border border-amber-200/80 bg-gradient-to-br from-white/95 via-amber-50/70 to-orange-50/40 p-3 text-xs text-amber-950 flex items-start gap-2.5 shadow-[0_2px_8px_rgba(245,158,11,0.08)] ring-1 ring-amber-100/70">
+            <span>⚠️ <strong>Aviso para ventanilla:</strong> Verifique los datos del administrado y los requisitos antes de registrar la recepción.</span>
+          </div>
 
           {/* Tipo de Persona */}
           <div className="flex gap-4">
@@ -269,7 +465,7 @@ export default function VentanillaPresencialPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="correo-input" className="block text-xs font-semibold text-slate-700 mb-1">
-                Correo Electrónico para Notificación *
+                Correo Electrónico de Contacto *
               </label>
               <input
                 id="correo-input"
@@ -298,31 +494,219 @@ export default function VentanillaPresencialPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="procedimiento-tupa-select" className="block text-xs font-semibold text-slate-700 mb-1">
-                Procedimiento TUPA 2026 *
-              </label>
-              <select
-                id="procedimiento-tupa-select"
-                required
-                value={procedimientoTupa}
-                onChange={(e) => {
-                  setProcedimientoTupa(e.target.value);
-                  setRequisitosRecibidos(new Set());
-                }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
-              >
-                <option value="">Seleccione un procedimiento o servicio</option>
-                <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
-                {PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => (
-                  <option key={procedimiento.codigo} value={procedimiento.codigo}>
-                    {procedimiento.codigo} - {procedimiento.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Selector y Buscador Combobox TUPA 2026 */}
+          <div className="space-y-3">
+            {/* Control accesible y sincrónico para lectores de pantalla y compatibilidad */}
+            <label
+              htmlFor="procedimiento-tupa-select"
+              className="sr-only"
+            >
+              Procedimiento TUPA 2026 *
+            </label>
+            <select
+              id="procedimiento-tupa-select"
+              required
+              value={procedimientoTupa}
+              onChange={(e) => {
+                setProcedimientoTupa(e.target.value);
+                setRequisitosRecibidos(new Set());
+              }}
+              disabled={cargandoCatalogo || Boolean(errorCatalogo)}
+              className="sr-only"
+              tabIndex={-1}
+            >
+              <option value="">Seleccione un procedimiento o servicio</option>
+              <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
+              {procedimientosFiltrados.map((procedimiento) => (
+                <option
+                  key={procedimiento.registroVersionId}
+                  value={procedimiento.registroVersionId}
+                >
+                  {procedimiento.fuente.referenciaFila} — {procedimiento.denominacion} — {obtenerDefinicionTupa(procedimiento.fuente.referenciaFila)?.categoria} — {procedimiento.monto ?? 'Monto no indicado'}
+                </option>
+              ))}
+            </select>
 
+            {/* Combobox Moderno y Filtrable (cuando no hay selección o al pulsar Cambiar) */}
+            {!procedimientoTupa ? (
+              <div ref={comboboxRef} className="relative">
+                <label
+                  htmlFor="tupa-combobox-input"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
+                >
+                  Búsqueda y Selección en Catálogo TUPA 2026
+                </label>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    id="tupa-combobox-input"
+                    type="search"
+                    role="combobox"
+                    aria-expanded={comboboxAbierto}
+                    aria-controls="tupa-combobox-listbox"
+                    aria-autocomplete="list"
+                    aria-activedescendant={indiceActivo >= 0 ? `tupa-opcion-${indiceActivo}` : undefined}
+                    aria-label="Buscar TUPA por nombre, código o categoría"
+                    placeholder="Buscar: mango, p2-fila-09, certificado, tipo..."
+                    value={busquedaTupa}
+                    onChange={(event) => {
+                      setBusquedaTupa(event.target.value);
+                      setComboboxAbierto(true);
+                      setIndiceActivo(0);
+                    }}
+                    onFocus={() => setComboboxAbierto(true)}
+                    onKeyDown={handleInputKeyDown}
+                    disabled={cargandoCatalogo || Boolean(errorCatalogo)}
+                    className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white pl-9 pr-12 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 disabled:bg-slate-100"
+                  />
+                  {busquedaTupa && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBusquedaTupa("");
+                        setIndiceActivo(0);
+                      }}
+                      className="absolute inset-y-0 right-7 flex items-center pr-1 text-slate-400 hover:text-slate-600 min-h-[44px] w-6 justify-center"
+                      aria-label="Limpiar búsqueda"
+                    >
+                      ✕
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setComboboxAbierto((prev) => !prev)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 min-h-[44px]"
+                    aria-label="Desplegar catálogo de procedimientos"
+                    tabIndex={-1}
+                  >
+                    <svg className={`h-4 w-4 transition-transform duration-200 ${comboboxAbierto ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Dropdown de Opciones Filtradas */}
+                {comboboxAbierto && !cargandoCatalogo && !errorCatalogo && (
+                  <ul
+                    id="tupa-combobox-listbox"
+                    role="listbox"
+                    aria-label="Resultados de procedimientos TUPA 2026"
+                    className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl ring-1 ring-black/5"
+                  >
+                    {opcionesCombobox.length === 0 ? (
+                      <li className="px-4 py-4 text-center text-xs text-slate-500">
+                        No se encontraron procedimientos para &ldquo;{busquedaTupa}&rdquo;
+                      </li>
+                    ) : (
+                      opcionesCombobox.map((opc, idx) => {
+                        const activo = idx === indiceActivo;
+                        return (
+                          <li
+                            key={opc.id}
+                            id={`tupa-opcion-${idx}`}
+                            role="option"
+                            aria-selected={opc.id === procedimientoTupa}
+                            onClick={() => handleSeleccionarProcedimiento(opc.id)}
+                            onMouseEnter={() => setIndiceActivo(idx)}
+                            className={`cursor-pointer px-4 py-2.5 text-left transition ${
+                              activo ? 'bg-blue-50 text-blue-900' : 'hover:bg-slate-50 text-slate-900'
+                            }`}
+                          >
+                            <div className="font-semibold text-sm leading-snug">
+                              {opc.denominacion}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                              <span className="rounded bg-blue-100 px-1.5 py-0.5 font-mono font-bold text-blue-800">
+                                {opc.codigoRef}
+                              </span>
+                              <span>·</span>
+                              <span className="font-medium text-slate-700">
+                                {opc.categoriaHumana}
+                              </span>
+                              <span>·</span>
+                              <span className={opc.monto && opc.monto !== 'Gratuito' && opc.monto !== 'Sin costo' ? 'font-semibold text-emerald-700' : 'text-slate-600'}>
+                                {opc.monto}
+                              </span>
+                            </div>
+                          </li>
+                        );
+                      })
+                    )}
+                  </ul>
+                )}
+
+                {cargandoCatalogo && <p role="status" className="mt-1 text-xs text-slate-500">Cargando catálogo TUPA…</p>}
+                {errorCatalogo && !cargandoCatalogo && (
+                  <div role="alert" className="mt-1 text-xs text-red-600">
+                    {errorCatalogo}{" "}
+                    <button type="button" onClick={() => setIntentoCatalogo((n) => n + 1)} className="font-semibold underline ml-1">
+                      Reintentar
+                    </button>
+                  </div>
+                )}
+                {!cargandoCatalogo && !errorCatalogo && (
+                  <p className="mt-1 text-xs text-slate-600">
+                    {procedimientos.length} entradas TUPA disponibles (18 CUT, 49 SOL, 5 internas).
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* Tarjeta Resumen del Procedimiento Seleccionado */
+              <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/70 via-white to-slate-50 p-4 shadow-sm ring-1 ring-blue-100">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 font-mono text-xs font-bold text-blue-800">
+                        {procedimientoSeleccionado ? procedimientoSeleccionado.fuente.referenciaFila : 'GENERAL'}
+                      </span>
+                      <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        {procedimientoSeleccionado ? mapearEtiquetaHumanaTipo(definicionSeleccionada?.categoria) : 'Trámite general'}
+                      </span>
+                      <span className="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                        {procedimientoSeleccionado ? (procedimientoSeleccionado.monto ?? 'Gratuito') : 'Sin costo'}
+                      </span>
+                      {definicionSeleccionada?.plazo && (
+                        <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                          Plazo: {definicionSeleccionada.plazo}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 leading-snug break-words">
+                      {procedimientoSeleccionado ? procedimientoSeleccionado.denominacion : 'Trámite no TUPA / documentación general'}
+                    </h3>
+                    <p className="text-xs text-slate-600">
+                      {procedimientoSeleccionado ? (
+                        <>
+                          Código: <strong className="font-mono text-slate-800">{procedimientoSeleccionado.fuente.referenciaFila}</strong> · Tipo: <strong className="text-slate-800">{mapearEtiquetaHumanaTipo(definicionSeleccionada?.categoria)}</strong> · Costo: <strong className="text-slate-800">{procedimientoSeleccionado.monto ?? 'Gratuito'}</strong> · Plazo: <strong className="text-slate-800">{definicionSeleccionada?.plazo ?? '15 días'}</strong>
+                        </>
+                      ) : (
+                        'Recepción de documentación libre, petitorio general o documentos no tabulados en TUPA.'
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProcedimientoTupa('');
+                      setBusquedaTupa('');
+                      setComboboxAbierto(true);
+                      setIndiceActivo(0);
+                    }}
+                    className="inline-flex shrink-0 items-center justify-center min-h-[44px] rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    aria-label="Cambiar procedimiento"
+                  >
+                    Cambiar procedimiento
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="tipo-documento-select" className="block text-xs font-semibold text-slate-700 mb-1">
                 Tipo de Documento Presentado *
@@ -331,7 +715,7 @@ export default function VentanillaPresencialPage() {
                 id="tipo-documento-select"
                 value={tipoDocumento}
                 onChange={(e) => setTipoDocumento(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               >
                 <option value="SOLICITUD">Solicitud Simple / Formato Único</option>
                 <option value="OFICIO">Oficio Institucional</option>
@@ -353,90 +737,54 @@ export default function VentanillaPresencialPage() {
                 required
                 value={cantidadFolios}
                 onChange={(e) => setCantidadFolios(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
+                className="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
               />
             </div>
           </div>
 
           {procedimientoSeleccionado && (
-            <section
-              aria-labelledby="detalle-tupa-heading"
-              className="rounded-lg border border-blue-200 bg-blue-50/60 p-4"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-200 pb-3">
-                <div>
-                  <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
-                    TUPA {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Pasco</p>
-                </div>
-                {procedimientoSeleccionado.derechoPago && (
-                  <p className="max-w-xl text-sm font-semibold text-slate-800">
-                    Derecho de pago: {procedimientoSeleccionado.derechoPago}
-                  </p>
+            <section aria-label="Detalle del procedimiento TUPA seleccionado">
+              <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm">
+                <h3 className="font-semibold">{procedimientoSeleccionado.denominacion}</h3>
+                <p>{procedimientoSeleccionado.fuente.referenciaFila} · {definicionSeleccionada?.tipoFormulario} · {definicionSeleccionada?.generaExpediente ? 'CUT' : definicionSeleccionada?.bloqueadoParaCiudadano ? 'INTERNO' : 'SOL'}</p>
+                <p>Monto TUPA: {procedimientoSeleccionado.monto ?? 'No indicado'}</p>
+                <p>Fuente: {procedimientoSeleccionado.fuente.nombre}, página {procedimientoSeleccionado.fuente.pagina}, revisión {procedimientoSeleccionado.revision}</p>
+                {(procedimientoSeleccionado.vigenciaDesde || procedimientoSeleccionado.vigenciaHasta) &&
+                  <p>Vigencia: {procedimientoSeleccionado.vigenciaDesde ?? 'sin inicio'} a {procedimientoSeleccionado.vigenciaHasta ?? 'sin fin'}</p>}
+                <p>Estado de validación: {procedimientoSeleccionado.estadoValidacion}</p>
+                {procedimientoSeleccionado.requisitos.length > 0 && (
+                  <div className="mt-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-xs font-bold uppercase text-slate-700">Requisitos documentarios</h4>
+                      <span className="text-xs text-slate-600">
+                        {requisitosRecibidos.size} de {procedimientoSeleccionado.requisitos.length} verificados
+                      </span>
+                    </div>
+                    <ul className="grid gap-2 sm:grid-cols-2">
+                      {procedimientoSeleccionado.requisitos.map((requisito, index) => (
+                        <li key={`${procedimientoSeleccionado.registroVersionId}-${index}`}>
+                          <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={requisitosRecibidos.has(index)}
+                              onChange={(event) => {
+                                setRequisitosRecibidos((actuales) => {
+                                  const siguientes = new Set(actuales);
+                                  if (event.target.checked) siguientes.add(index);
+                                  else siguientes.delete(index);
+                                  return siguientes;
+                                });
+                              }}
+                              className="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
+                            />
+                            <span>{requisito}</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
-
-              {procedimientoSeleccionado.requisitos && (
-                <div className="mt-3">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold uppercase text-slate-700">Requisitos documentarios</h4>
-                    <span className="text-xs text-slate-600">
-                      {requisitosRecibidos.size} de {procedimientoSeleccionado.requisitos.length} verificados
-                    </span>
-                  </div>
-                  <ul className="grid gap-2 sm:grid-cols-2">
-                    {procedimientoSeleccionado.requisitos.map((requisito, index) => (
-                      <li key={`${procedimientoSeleccionado.codigo}-${index}`}>
-                        <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={requisitosRecibidos.has(index)}
-                            onChange={(event) => {
-                              setRequisitosRecibidos((actuales) => {
-                                const siguientes = new Set(actuales);
-                                if (event.target.checked) siguientes.add(index);
-                                else siguientes.delete(index);
-                                return siguientes;
-                              });
-                            }}
-                            className="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-                          />
-                          <span>{requisito}</span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {procedimientoSeleccionado.detalleTarifas && (
-                <div className="mt-3">
-                  <h4 className="mb-2 text-xs font-bold uppercase text-slate-700">Servicios y tarifas</h4>
-                  <ul className="grid gap-1 text-sm text-slate-700 sm:grid-cols-2">
-                    {procedimientoSeleccionado.detalleTarifas.map((tarifa) => (
-                      <li key={tarifa}>{tarifa}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {(procedimientoSeleccionado.dependencia || procedimientoSeleccionado.autoridad || procedimientoSeleccionado.tiempoMaximo) && (
-                <dl className="mt-3 grid gap-2 border-t border-blue-200 pt-3 text-xs sm:grid-cols-3">
-                  {procedimientoSeleccionado.dependencia && (
-                    <div><dt className="font-bold text-slate-700">Dependencia</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.dependencia}</dd></div>
-                  )}
-                  {procedimientoSeleccionado.autoridad && (
-                    <div><dt className="font-bold text-slate-700">Autoridad</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.autoridad}</dd></div>
-                  )}
-                  {procedimientoSeleccionado.tiempoMaximo && (
-                    <div><dt className="font-bold text-slate-700">Tiempo máximo</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.tiempoMaximo}</dd></div>
-                  )}
-                </dl>
-              )}
-              {procedimientoSeleccionado.nota && (
-                <p className="mt-3 text-xs text-slate-600">{procedimientoSeleccionado.nota}</p>
-              )}
             </section>
           )}
 
@@ -456,18 +804,23 @@ export default function VentanillaPresencialPage() {
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+            {!puedeRadicarCut && (!definicionSeleccionada || definicionSeleccionada.generaExpediente) &&
+              <p className="text-xs text-amber-800">La emisión de CUT presencial requiere Mesa de Partes o Administración.</p>}
             <button
               type="button"
               onClick={handleNuevoRegistro}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              className="inline-flex min-h-[44px] items-center rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
             >
               Limpiar Campos
             </button>
             <button
-              type="submit"
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-800 transition"
+              type={definicionSeleccionada && !definicionSeleccionada.generaExpediente ? 'button' : 'submit'}
+              onClick={definicionSeleccionada && !definicionSeleccionada.generaExpediente
+                ? () => setModalDinamicoAbierto(true) : undefined}
+              disabled={((!definicionSeleccionada || definicionSeleccionada.generaExpediente) && !puedeRadicarCut) || enviando}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-800 transition"
             >
-              ✓ Registrar y Emitir Cargo CUT
+              {definicionSeleccionada && !definicionSeleccionada.generaExpediente ? 'Abrir formulario específico' : '✓ Registrar y Emitir Cargo CUT'}
             </button>
           </div>
         </form>
@@ -480,6 +833,10 @@ export default function VentanillaPresencialPage() {
           cargo={cargoGenerado}
         />
       )}
+      <TupaDynamicFormModal key={definicionSeleccionada?.codigoRef} isOpen={modalDinamicoAbierto} codigoInicial={definicionSeleccionada?.codigoRef}
+        solicitanteInicial={{ tipoPersona, numeroDocumento: numeroDoc, correo }}
+        codigosDisponibles={procedimientos.map((registro) => registro.fuente.referenciaFila)}
+        onClose={() => setModalDinamicoAbierto(false)} />
     </main>
   );
 }

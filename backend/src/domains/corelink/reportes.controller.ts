@@ -19,7 +19,7 @@
  * consumidores: `useAreaBottlenecks.ts` llama a `dashboard/cuellos-botella` y
  * `kpiCalculator.service.ts` documenta `dashboard/resumen`.
  *
- * Autorización: `DIRECTOR` y `SUPER_ADMIN`, según §4.7. Es una vista de conjunto
+ * Autorización: `DIRECTOR` y `ADMINISTRADOR`. Es una vista de conjunto
  * institucional — consolidado, retención por área y calidad de la tabla — que
  * ningún rol académico debe poder leer. La denegación es la ausencia de esos dos
  * roles, nunca una condición que se pueda invertir por configuración.
@@ -45,7 +45,7 @@ import {
 import type { CacheDistribuida } from '../identicore/ubigeo.service.js';
 
 /** Roles autorizados por §4.7 para la analítica ejecutiva. */
-const ROLES_ANALITICA = new Set(['DIRECTOR', 'SUPER_ADMIN']);
+const ROLES_ANALITICA = new Set(['DIRECTOR', 'ADMINISTRADOR']);
 
 export interface ControladorReportes {
   resumen: RequestHandler;
@@ -123,14 +123,14 @@ export function crearControladorReportes(
      * Refresco concurrente de las vistas materializadas (#51 según §20).
      *
      * Es una operación de plataforma, no de consulta: además de los dos roles del
-     * tablero exige `SUPER_ADMIN`. Permitir que un `DIRECTOR` dispare un refresco que
+     * tablero exige `ADMINISTRADOR`. Permitir que un `DIRECTOR` dispare un refresco que
      * compite con el refresco programado del planificador sólo introduce
      * contención; el director consulta el dato, el administrador lo materializa.
      */
     refrescar: async (req, res) => {
       const actor = await actorProvider.obtenerActor(req);
       if (!actor) throw new UnauthorizedError();
-      if (!actor.roles.includes('SUPER_ADMIN')) throw new ForbiddenError();
+      if (!actor.roles.includes('ADMINISTRADOR')) throw new ForbiddenError();
       const resultado = await servicio.refrescar();
       res.json({
         vistas: resultado.vistas,

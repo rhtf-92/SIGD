@@ -26,7 +26,8 @@
  *     del alcance, por lo que aquí no se aplica control de acceso alguno.
  */
 
-import { gzipSync } from 'node:zlib';
+import { promisify } from 'node:util';
+import { gzip } from 'node:zlib';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import {
@@ -42,6 +43,8 @@ import {
 } from './tablasMaestras.service.js';
 import { getRequestContext } from '../../shared/request-context/request-context.js';
 
+const gzipAsync = promisify(gzip);
+
 /** Umbral a partir del cual se comprime la respuesta. */
 const UMBRAL_COMPRESION_BYTES = 1024;
 
@@ -51,11 +54,11 @@ export const esquemaConsultaTablasMaestras = z
     solo_activos: z
       .enum(['true', 'false'])
       .transform((valor) => valor === 'true')
-      .default('true'),
+      .default(true),
     recargar: z
       .enum(['true', 'false'])
       .transform((valor) => valor === 'true')
-      .default('false'),
+      .default(false),
   })
   .strict();
 
@@ -129,17 +132,15 @@ export function listarTablasMaestras(deps: DependenciasController) {
     res.setHeader('Cache-Control', CACHE_CONTROL_TABLAS_MAESTRAS);
     res.setHeader('Vary', 'Accept-Encoding');
     res.setHeader('X-Cache-TTL', String(TTL_TABLAS_MAESTRAS_SEGUNDOS));
-    escribirRespuestaComprimida(req, res, payload);
+    await escribirRespuestaComprimida(req, res, payload);
   };
 }
 
 /**
- * Comprime con gzip (zlib nativo, sin dependencias nuevas) cuando el cliente lo
- * acepta y el cuerpo supera el umbral. El proyecto no tiene middleware global
- * de compresión, por lo que limitarla a este endpoint evita afectar las
- * respuestas ya contratadas de los demás routers.
+ * Comprime con gzip (zlib asíncrono nativo) cuando el cliente lo
+ * acepta y el cuerpo supera el umbral.
  */
-function escribirRespuestaComprimida(req: Request, res: Response, payload: unknown): void {
+async function escribirRespuestaComprimida(req: Request, res: Response, payload: unknown): Promise<void> {
   const aceptaGzip = (req.get('accept-encoding') ?? '').toLowerCase().includes('gzip');
   const cuerpo = JSON.stringify(payload);
   const bytes = Buffer.byteLength(cuerpo);
@@ -149,6 +150,7 @@ function escribirRespuestaComprimida(req: Request, res: Response, payload: unkno
     return;
   }
 
+  const comprimido = await gzipAsync(cuerpo);
   res.setHeader('Content-Encoding', 'gzip');
-  res.type('application/json').send(gzipSync(cuerpo));
+  res.type('application/json').send(comprimido);
 }

@@ -27,7 +27,7 @@ import type {
   PoliticaReversionRutaDoc,
   PrepararCompensacionFolios,
 } from './domains/rutadoc/rutadoc.reversion.types.js';
-import type { ActorProviderRutaDoc } from './domains/rutadoc/rutadoc.actor-provider.js';
+import { crearJwtActorProvider, type ActorProviderRutaDoc } from './domains/rutadoc/rutadoc.actor-provider.js';
 import type { CalendarioLaboralPort } from './domains/rutadoc/sla.types.js';
 import type { ClasificadorCcdPort } from './domains/rutadoc/ccd.types.js';
 import type { DocumentoMetadataPort } from './domains/rutadoc/foliacion.types.js';
@@ -53,12 +53,58 @@ import { crearRouterCasilla } from './domains/identicore/casilla.router.js';
 
 // Módulo Almacenamiento S3 MinIO
 import { crearRouterStorage } from './core/storage/storage.router.js';
+import type { S3Client } from '@aws-sdk/client-s3';
 
 // Módulo Firma Pendientes (#56)
 import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/firma.routes.js';
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
-import { verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { securityHeadersMiddleware } from './middleware/security-headers.middleware.js';
+import { responseTimeMiddleware } from './middleware/observability.middleware.js';
+import { obtenerMetricasPool } from './database.js';
+import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { UnauthorizedError, ForbiddenError } from './shared/domain/errors/index.js';
+
+export const ROLES_ADMIN_PERMITIDOS = ['ADMINISTRADOR'] as const;
+const ROLES_INSTITUCIONALES = ['ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES'] as const;
+
+export function requireInstitutionalRole(req: express.Request, _res: express.Response, next: express.NextFunction): void {
+  const token = extraerTokenBearer(req.get('authorization'));
+  if (!token) throw new UnauthorizedError({ detail: 'Debe autenticarse para consultar las unidades institucionales.' });
+  const claims = verificarTokenAcceso(token);
+  if (!claims.roles?.some((rol) => (ROLES_INSTITUCIONALES as readonly string[]).includes(rol.toUpperCase()))) {
+    throw new ForbiddenError({ detail: 'Se requiere un rol institucional vigente.' });
+  }
+  next();
+}
+
+/**
+ * Middleware de guarda de administración institucional (H-08 / N-01).
+ * Exige Bearer Token válido con rol canónico ADMINISTRADOR.
+ */
+export function requireAdminRole(req: express.Request, _res: express.Response, next: express.NextFunction): void {
+  const token = extraerTokenBearer(req.get('authorization'));
+  if (!token) {
+    throw new UnauthorizedError({
+      detail: 'Debe autenticarse con Authorization: Bearer <jwt> para acceder a recursos administrativos.',
+    });
+  }
+
+  const claims = verificarTokenAcceso(token);
+
+  const tieneRol = claims.roles?.some((r) =>
+    (ROLES_ADMIN_PERMITIDOS as readonly string[]).includes(r.toUpperCase()),
+  );
+
+  if (!tieneRol) {
+    throw new ForbiddenError({
+      message: 'Acceso denegado.',
+      detail: 'Se requiere rol administrativo (ADMINISTRADOR) para esta operación.',
+    });
+  }
+
+  next();
+}
 
 export interface AppOptions {
   busSse?: BusSse;
@@ -75,6 +121,7 @@ export interface AppOptions {
   porcentajeAmarilloSlaRutaDocDesde?: number;
   /** Proveedor de identidad de la analítica ejecutiva; sin él, falla cerrado. */
   actorProviderReportes?: ActorProviderRutaDoc;
+  s3Client?: S3Client;
 }
 
 export function construirApp(
@@ -101,27 +148,22 @@ export function construirApp(
 
   const app = express();
   app.disable('x-powered-by');
+  app.use(responseTimeMiddleware);
+  app.use(securityHeadersMiddleware);
 
   app.use(corsMiddleware);
   app.use(express.json());
   app.use(contextMiddleware);
 
   app.get('/health', (_req, res) => {
+    const poolStats = obtenerMetricasPool(pool);
     res.json({
       status: 'ok',
       estado: 'UP',
       servicio: 'SIGD Backend',
       timestamp: new Date().toISOString(),
+      pool: poolStats,
     });
-  });
-
-  app.get('/ready', async (_req, res) => {
-    try {
-      await pool.query('SELECT 1');
-      res.json({ status: 'ok', estado: 'READY', timestamp: new Date().toISOString() });
-    } catch {
-      res.status(503).json({ status: 'error', estado: 'NOT_READY' });
-    }
   });
 
   // Configuración de Pasarela y Sesiones de Firma (DocuCore - B_VALENTIN)
@@ -139,37 +181,36 @@ export function construirApp(
   if (process.env.REDIS_URL) {
     try {
       sesiones = RedisFirmaSessionStore.desdeEntorno();
-    } catch {
+    } catch (error) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(`REDIS_REQUIRED_IN_PRODUCTION: No se pudo inicializar RedisFirmaSessionStore: ${(error as Error).message}`);
+      }
       sesiones = new InMemoryFirmaSessionStore();
     }
   } else {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('REDIS_REQUIRED_IN_PRODUCTION: REDIS_URL es obligatoria en entorno de producción para el almacenamiento distribuido de sesiones de firma (DOC-01).');
+    }
     sesiones = new InMemoryFirmaSessionStore();
   }
 
   const almacen = new InMemoryAlmacenDocumentosFirmables(sesiones);
   const servicio = new ServicioFirmaService({ sesiones, almacen, pasarela });
 
-  // Rutas
-  const jwtActorProvider: ActorProviderRutaDoc = {
-    obtenerActor: (req) => {
-      const auth = req.headers.authorization;
-      if (auth && auth.startsWith('Bearer ')) {
-        const token = auth.slice(7).trim();
-        try {
-          const claims = verificarTokenAcceso(token);
-          return {
-            id: claims.sub,
-            roles: claims.roles ?? [],
-            unidadOrganicaId: null,
-            puedeVerExpediente: () => true,
-          };
-        } catch {
-          return null;
-        }
+  app.get('/ready', async (_req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      if (sesiones instanceof RedisFirmaSessionStore) {
+        await sesiones.ping();
       }
-      return null;
-    },
-  };
+      res.json({ status: 'ok', estado: 'READY', timestamp: new Date().toISOString() });
+    } catch {
+      res.status(503).json({ status: 'error', estado: 'NOT_READY' });
+    }
+  });
+
+  // Rutas
+  const jwtActorProvider: ActorProviderRutaDoc = crearJwtActorProvider(pool);
 
   const actorProviderRutaDocEfectivo =
     opts.actorProviderRutaDoc ??
@@ -181,8 +222,8 @@ export function construirApp(
   app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
   app.use('/api/v1', crearRouterAuth(pool));
   app.use('/api/v1', crearRouterCasilla(pool));
-  app.use('/api/v1', crearRouterStorage(pool));
-  app.use('/api/v1', crearRouterTramites(pool));
+  app.use('/api/v1', crearRouterStorage(pool, opts.s3Client));
+  app.use('/api/v1', crearRouterTramites(pool, undefined, opts.s3Client));
   app.use(
     '/api/v1',
     crearRouterRutaDoc(
@@ -219,8 +260,8 @@ export function construirApp(
    * OrganiCore - Tablas Maestras y Calendario Laboral (Feriados Ucayali) (#47, #48, #49)
    */
   const routerAdminMaestras = crearRouterAdminMaestras(pool);
-  app.use('/api/v1/admin', routerAdminMaestras);
-  app.get('/api/v1/admin/calendario/feriados', (req, res, next) => {
+  app.use('/api/v1/admin', requireAdminRole, routerAdminMaestras);
+  app.get('/api/v1/admin/calendario/feriados', requireAdminRole, (req, res, next) => {
     req.url = '/calendario-laboral';
     routerAdminMaestras(req, res, next);
   });
@@ -229,10 +270,21 @@ export function construirApp(
    * OrganiCore - Organigrama y Áreas Jerárquicas ltree (#44, #45)
    */
   const organigramaCtrl = crearControladorOrganigrama(new OrganigramaService(pool));
-  app.get('/api/v1/admin/organigrama', organigramaCtrl.getOrganigrama);
-  app.get('/api/v1/admin/organigrama/arbol', organigramaCtrl.getOrganigrama);
-  app.post('/api/v1/admin/organigrama/areas', organigramaCtrl.crearUnidad);
-  app.put('/api/v1/admin/organigrama/areas/:id', organigramaCtrl.actualizarUnidad);
+  app.get('/api/v1/admin/organigrama', requireAdminRole, organigramaCtrl.getOrganigrama);
+  app.get('/api/v1/admin/organigrama/arbol', requireAdminRole, organigramaCtrl.getOrganigrama);
+  app.get('/api/v1/organigrama/areas-activas', requireInstitutionalRole, async (_req, res, next) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT area_id::text AS id, nombre, vigente AS habilitada
+           FROM sigd_org.area WHERE vigente = TRUE ORDER BY nombre, area_id`,
+      );
+      res.json(rows);
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.post('/api/v1/admin/organigrama/areas', requireAdminRole, organigramaCtrl.crearUnidad);
+  app.put('/api/v1/admin/organigrama/areas/:id', requireAdminRole, organigramaCtrl.actualizarUnidad);
 
   /*
    * DocuCore - Foliación continua AGN, Callback Refirma y Validador CVD/QR (#31, #35, #36)
@@ -263,14 +315,14 @@ export function construirApp(
   /*
    * OrganiCore / CoreLink - Auditoría Bitácora WORM (#46), Roles RBAC (#45) y Maestras
    */
-  app.get('/api/v1/admin/auditoria/bitacora', async (req, res, next) => {
+  app.get('/api/v1/admin/auditoria/bitacora', requireAdminRole, async (req, res, next) => {
     try {
       const limite = Math.min(Number(req.query.limite ?? 50), 100);
       const offset = Number(req.query.offset ?? 0);
       const { rows } = await pool.query(
-        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, creado_en
+        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, fecha_hora
          FROM sigd_audit.bitacora_auditoria
-         ORDER BY creado_en DESC
+         ORDER BY fecha_hora DESC
          LIMIT $1 OFFSET $2`,
         [limite, offset],
       );
@@ -280,56 +332,41 @@ export function construirApp(
     }
   });
 
-  app.get('/api/v1/admin/roles-permisos', async (_req, res, next) => {
+  app.get('/api/v1/admin/roles-permisos', requireAdminRole, async (_req, res, next) => {
     try {
       const { rows: roles } = await pool.query(
-        `SELECT r.id, r.codigo, r.nombre, r.descripcion,
+        `SELECT r.rol_id AS id, r.codigo, r.nombre, r.descripcion,
                 COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
          FROM sigd_org.rol_sistema r
-         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.id
-         LEFT JOIN sigd_org.permiso_sistema p ON p.id = rp.permiso_id
-         GROUP BY r.id, r.codigo, r.nombre, r.descripcion`,
+         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
+         LEFT JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+         GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion`,
       );
       res.json({ roles });
-    } catch {
-      res.json({
-        roles: [
-          { codigo: 'SUPER_ADMIN', nombre: 'Super Administrador' },
-          { codigo: 'DIRECTOR', nombre: 'Director General' },
-          { codigo: 'DOCENTE', nombre: 'Docente Titular' },
-          { codigo: 'MESA_PARTES', nombre: 'Operador de Mesa de Partes' },
-          { codigo: 'ESTUDIANTE', nombre: 'Estudiante / Administrado' },
-        ],
-      });
+    } catch (err) {
+      next(err);
     }
   });
 
-  app.get('/api/v1/admin/maestras/sede', (_req, res) => {
+  app.get('/api/v1/admin/maestras/sede', requireAdminRole, (_req, res) => {
     res.json({
-      sedes: [
-        { id: '1', codigo: 'SEDE_CENTRAL', nombre: 'Sede Central Pucallpa - Av. Túpac Amaru Km. 4.5' },
-        { id: '2', codigo: 'SEDE_FILIAL', nombre: 'Filial Yarinacocha' },
-      ],
+      disponible: false,
+      sedes: [],
+      mensaje: 'Catálogo de sedes no implementado en el esquema relacional canónico.',
     });
   });
 
-  app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
+  app.get('/api/v1/admin/maestras/tipo-documento', requireAdminRole, async (_req, res, next) => {
     try {
       const { rows } = await pool.query(
-        `SELECT id, codigo, nombre, descripcion, dias_atencion_legal, vigente
+        `SELECT tipo_documental_id AS id, codigo, nombre, extension, mime_type, tamano_maximo_mb, exige_firma, vigente
          FROM sigd_doc.tipo_documento
          WHERE vigente = TRUE
          ORDER BY nombre ASC`,
       );
       res.json(rows);
-    } catch {
-      res.json([
-        { codigo: 'SOLICITUD', nombre: 'Solicitud' },
-        { codigo: 'OFICIO', nombre: 'Oficio' },
-        { codigo: 'MEMORANDO', nombre: 'Memorando' },
-        { codigo: 'INFORME', nombre: 'Informe Técnico' },
-        { codigo: 'RESOLUCION', nombre: 'Resolución Directoral' },
-      ]);
+    } catch (err) {
+      next(err);
     }
   });
 
@@ -337,7 +374,7 @@ export function construirApp(
    * Alias de Interoperabilidad Frontend-Backend (Plan Maestro §4.1)
    */
   // #14: POST /api/v1/tramite/radicacion -> /api/v1/tramites/radicacion-virtual
-  const routerTramites = crearRouterTramites(pool);
+  const routerTramites = crearRouterTramites(pool, undefined, opts.s3Client);
   app.post('/api/v1/tramite/radicacion', (req, res, next) => {
     req.url = '/tramites/radicacion-virtual';
     routerTramites(req, res, next);

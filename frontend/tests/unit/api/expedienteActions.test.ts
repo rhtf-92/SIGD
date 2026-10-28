@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { expediente } from "../../fixtures/expedientesFixtures";
-import { crearServicioExpedienteActions } from "../../../src/api/expedienteActions";
+import { crearServicioExpedienteActions, contratosRealesExpedienteActions } from "../../../src/api/expedienteActions";
 import { apiClient } from "../../../src/api/client";
 
 vi.mock("../../../src/api/client", () => ({ apiClient: { post: vi.fn(), defaults: { baseURL: "https://sigd.example/api" } } }));
@@ -29,6 +29,22 @@ describe("servicio de acciones y frontera de contratos pendientes", () => {
     expect(apiClient.post).toHaveBeenCalledWith(`https://sigd.example/api/v1/expedientes/${expediente.id}/movimientos/observar`, payloadPrueba);
     vi.mocked(apiClient.post).mockResolvedValueOnce({ data: { estado: "OBSERVADO", slaPaused: false } });
     await expect(servicio.observar?.({ expediente, motivo: "Pliego" })).rejects.toMatchObject({ tipo: "respuesta" });
+  });
+  it("envía Subsanar al contrato general RutaDoc con motivo y valida la confirmación", async () => {
+    const servicio = crearServicioExpedienteActions(contratosRealesExpedienteActions);
+    const entrada = { expediente, motivo: "Documentos corregidos" };
+    vi.mocked(apiClient.post).mockResolvedValueOnce({ data: {
+      ok: true, expedienteId: expediente.id, motivo: entrada.motivo, estado: "EN_TRAMITE",
+    } });
+    await expect(servicio.subsanar?.(entrada)).resolves.toEqual({
+      expedienteId: expediente.id, motivo: entrada.motivo, estado: "EN_TRAMITE",
+    });
+    expect(apiClient.post).toHaveBeenCalledWith(
+      `https://sigd.example/api/v1/expedientes/${expediente.id}/movimientos/subsanar`,
+      { motivo: entrada.motivo },
+    );
+    vi.mocked(apiClient.post).mockResolvedValueOnce({ data: { ok: true, estado: "SUBSANADO" } });
+    await expect(servicio.subsanar?.(entrada)).rejects.toMatchObject({ tipo: "respuesta" });
   });
   it.each([null, {}, { derivacionId: "", nuevoEstado: "X" }, { derivacionId: "id", nuevoEstado: "" }])("rechaza respuestas de derivación no confirmadas: %s", async (data) => {
     vi.mocked(apiClient.post).mockResolvedValueOnce({ data });

@@ -3,7 +3,7 @@ import { ESTADOS_POR_PESTANA, type ActorRutaDoc, type ContadoresRutaDoc, type Fi
 import { codificarCursor, decodificarCursor } from './rutadoc.cursor.js';
 import type { RepositorioRutaDoc } from './rutadoc.repository.js';
 
-const ROLES_BANDEJA = new Set(['DOCENTE', 'DIRECTOR', 'MESA_PARTES', 'SUPER_ADMIN']);
+const ROLES_BANDEJA = new Set(['ADMINISTRADOR', 'DIRECTOR', 'ESPECIALISTA', 'SECRETARIO', 'MESA_PARTES']);
 
 export class ServicioRutaDoc {
   constructor(private readonly repositorio: RepositorioRutaDoc) {}

@@ -5,7 +5,7 @@ const esquema = z.object({
   S3_REGION: z.string().min(2).default('us-east-1'),
   S3_BUCKET: z.string().min(3).default('sigd-expedientes'),
   S3_ACCESS_KEY: z.string().min(1).default('minioadmin'),
-  S3_SECRET_KEY: z.string().min(1).default('minioadmin'),
+  S3_SECRET_KEY: z.string().min(1).default('minioadminpassword'),
   S3_FORCE_PATH_STYLE: z
     .enum(['true', 'false'])
     .default('true')
@@ -25,11 +25,11 @@ export interface ConfiguracionS3 {
 
 export function obtenerConfiguracionS3(env: NodeJS.ProcessEnv = process.env): ConfiguracionS3 {
   const parseado = esquema.parse({
-    S3_ENDPOINT: env.S3_ENDPOINT,
-    S3_REGION: env.S3_REGION,
-    S3_BUCKET: env.S3_BUCKET,
-    S3_ACCESS_KEY: env.S3_ACCESS_KEY,
-    S3_SECRET_KEY: env.S3_SECRET_KEY,
+    S3_ENDPOINT: env.S3_ENDPOINT ?? env.MINIO_ENDPOINT,
+    S3_REGION: env.S3_REGION ?? env.AWS_REGION,
+    S3_BUCKET: env.S3_BUCKET ?? env.MINIO_BUCKET_NAME,
+    S3_ACCESS_KEY: env.S3_ACCESS_KEY ?? env.MINIO_ACCESS_KEY ?? env.MINIO_ROOT_USER,
+    S3_SECRET_KEY: env.S3_SECRET_KEY ?? env.MINIO_SECRET_KEY ?? env.MINIO_ROOT_PASSWORD,
     S3_FORCE_PATH_STYLE: env.S3_FORCE_PATH_STYLE,
     S3_PRESIGN_EXPIRATION_SEGUNDOS: env.S3_PRESIGN_EXPIRATION_SEGUNDOS,
   });

@@ -11,6 +11,7 @@ import PersonaJuridicaForm from "../../../src/components/registro/PersonaJuridic
 import { DeclaracionJuradaCheckbox } from "../../../src/components/registro/DeclaracionJuradaCheckbox";
 import { ConsentimientoLey29733Modal } from "../../../src/components/registro/ConsentimientoLey29733Modal";
 import { consentimientoLey29733Schema } from "../../../src/schemas/consentimiento.schema";
+import { apiClient } from "../../../src/api/client";
 
 describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / ENT-M01-04 / ENT-M01-05)", () => {
   it("a) RegistroCiudadanoPage: el conmutador role=\"tablist\" alterna entre Persona Natural y Persona Jurídica sin recargar, y cambia los campos visibles", async () => {
@@ -261,6 +262,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
 
   it("h) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Natural y muestra la casilla creada", async () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({ data: { idPersona: "a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d" }, status: 201 } as any);
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -275,6 +277,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     await user.type(screen.getByLabelText(/Fecha de Nacimiento \*/i), "1998-05-15");
     await user.type(screen.getByLabelText(/Correo Electrónico \*/i), "sergio@example.com");
     await user.type(screen.getByLabelText(/Celular \*/i), "961234567");
+    await user.type(screen.getByLabelText(/^Contraseña \*/i), "MiClaveSegura#2026");
+    await user.type(screen.getByLabelText(/^Confirmar contraseña \*/i), "MiClaveSegura#2026");
 
     // Seleccionar Ubigeo
     await user.selectOptions(
@@ -310,32 +314,20 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "74561238@casilla.iestpsuiza.edu.pe",
-    );
+    expect(mensajeExito).toHaveTextContent("Registro completado");
 
     // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
+    expect(postSpy).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-ciudadano",
       expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
+        direccion: "Jr. Tarapacá N° 645",
+        password: "MiClaveSegura#2026",
       }),
     );
-
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
-    );
-    expect(postCall).toBeDefined();
-    if (!postCall) {
-      throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
-    }
-    const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
+    expect(consoleSpy).not.toHaveBeenCalled();
 
     consoleSpy.mockRestore();
+    postSpy.mockRestore();
 
     // Cerrar mensaje de éxito
     const botonCerrarExito = screen.getByLabelText(/Cerrar mensaje de éxito/i);
@@ -346,6 +338,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
   }, 30_000);
 
   it("i) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Jurídica y muestra la casilla creada", async () => {
+    const postSpyJuridica = vi.spyOn(apiClient, "post").mockResolvedValue({ data: { idPersona: "b2c3d4e5-f6a7-4b2c-8d3e-4f5a6b7c8d9e" }, status: 201 } as any);
+    void postSpyJuridica;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const user = userEvent.setup();
     render(
@@ -373,6 +367,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       "contacto@amazonassoft.pe",
     );
     await user.type(screen.getByLabelText(/Celular de Contacto \*/i), "961234567");
+    await user.type(screen.getByLabelText(/^Contraseña \*/i), "MiClaveSegura#2026");
+    await user.type(screen.getByLabelText(/^Confirmar contraseña \*/i), "MiClaveSegura#2026");
 
     // Seleccionar Ubigeo
     await user.selectOptions(
@@ -408,30 +404,17 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "20131312955@casilla.iestpsuiza.edu.pe",
-    );
+    expect(mensajeExito).toHaveTextContent("Registro completado");
 
     // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
+    expect(postSpyJuridica).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-persona-juridica",
       expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
+        direccion: "Jr. Tarapacá N° 645",
+        password: "MiClaveSegura#2026",
       }),
     );
-
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
-    );
-    expect(postCall).toBeDefined();
-    if (!postCall) {
-      throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
-    }
-    const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
+    expect(consoleSpy).not.toHaveBeenCalled();
 
     consoleSpy.mockRestore();
     // FIX estabilidad (F_ADRIANO): idem test h) — flujo largo de user-event.
