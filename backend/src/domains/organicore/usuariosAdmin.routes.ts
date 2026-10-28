@@ -52,7 +52,7 @@ export function crearUsuariosAdminRouter(pool: Pool): Router {
 
   const service = crearUsuariosAdminService(pool);
 
-  const controller = crearUsuariosAdminController(service);
+  const controller = crearUsuariosAdminController(service, pool);
 
   // Guarda estricta aplicada a todas las rutas de administración de usuarios
   router.use(requireAdminUsuarios);
@@ -66,7 +66,15 @@ export function crearUsuariosAdminRouter(pool: Pool): Router {
   );
 
   /**
-   * Alta de usuario institucional.
+   * Alta segura de usuario institucional (+ Nuevo usuario).
+   */
+  router.post(
+    "/institucional",
+    controller.crearUsuarioInstitucional,
+  );
+
+  /**
+   * Alta de usuario institucional (contrato intermodular).
    */
   router.post(
     "/",

@@ -9,6 +9,7 @@ export interface OpcionesPresign {
   contentType?: string;
   expiraSegundos?: number;
   ahora?: Date;
+  ifNoneMatch?: boolean;
 }
 
 const FIRMA_V4 = 'AWS4-HMAC-SHA256';
@@ -71,6 +72,9 @@ export function generarUrlPresigned(
   };
   if (opciones.contentType) {
     cabecerasFirmadas['content-type'] = opciones.contentType;
+  }
+  if (opciones.ifNoneMatch) {
+    cabecerasFirmadas['if-none-match'] = '*';
   }
 
   const nombresCabeceras = Object.keys(cabecerasFirmadas).sort();

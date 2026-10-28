@@ -22,6 +22,8 @@ export interface TupaDynamicFormModalProps {
   onClose: () => void;
   codigoInicial?: string;
   onExito?: (codigoSolicitud: string) => void;
+  solicitanteInicial?: { tipoPersona: 'NATURAL' | 'JURIDICA'; numeroDocumento: string; correo: string };
+  codigosDisponibles?: readonly string[];
 }
 
 export default function TupaDynamicFormModal({
@@ -29,9 +31,12 @@ export default function TupaDynamicFormModal({
   onClose,
   codigoInicial,
   onExito,
+  solicitanteInicial,
+  codigosDisponibles,
 }: TupaDynamicFormModalProps) {
   const usuario = useAuthStore((s) => s.usuario);
   const esCiudadano = usuario?.rol === 'CIUDADANO' || !usuario?.rol;
+  const puedeRadicarCut = esCiudadano || usuario?.rol === 'MESA_PARTES' || usuario?.rol === 'ADMINISTRADOR';
 
   const [codigoSeleccionado, setCodigoSeleccionado] = useState<string>(
     codigoInicial || TUPA_FORMULARIOS_CONFIG[0]?.codigoRef || 'p1-fila-05'
@@ -40,12 +45,18 @@ export default function TupaDynamicFormModal({
   const definicionActual: TupaFormDefinition = useMemo(() => {
     return obtenerDefinicionTupa(codigoSeleccionado) || TUPA_FORMULARIOS_CONFIG[0];
   }, [codigoSeleccionado]);
+  const definicionesDisponibles = codigosDisponibles
+    ? TUPA_FORMULARIOS_CONFIG.filter((def) => codigosDisponibles.includes(def.codigoRef))
+    : TUPA_FORMULARIOS_CONFIG;
 
   // Estado dinámico del formulario
-  const [valoresForm, setValoresForm] = useState<Record<string, any>>({});
+  const [valoresForm, setValoresForm] = useState<Record<string, string | number>>({});
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
   const [solicitudGenerada, setSolicitudGenerada] = useState<string | null>(null);
+  const [solicitante, setSolicitante] = useState(solicitanteInicial ?? {
+    tipoPersona: 'NATURAL' as const, numeroDocumento: '', correo: '',
+  });
 
   // Cálculo dinámico de importe
   const importeCalculado = useMemo(() => {
@@ -63,7 +74,7 @@ export default function TupaDynamicFormModal({
 
   if (!isOpen) return null;
 
-  const handleCampoChange = (nombre: string, valor: any) => {
+  const handleCampoChange = (nombre: string, valor: string) => {
     setValoresForm((prev) => ({ ...prev, [nombre]: valor }));
   };
 
@@ -76,8 +87,17 @@ export default function TupaDynamicFormModal({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (definicionActual.generaExpediente) {
+      setErrorEnvio('Este procedimiento requiere radicación formal con CUT. Use Mesa de Partes.');
+      return;
+    }
     if (definicionActual.bloqueadoParaCiudadano && esCiudadano) {
       setErrorEnvio('Gestión interna institucional. Los ciudadanos externos no pueden iniciar este trámite.');
+      return;
+    }
+    if (!esCiudadano && !definicionActual.bloqueadoParaCiudadano
+      && (!/^[A-Za-z0-9]{8,12}$/.test(solicitante.numeroDocumento.trim()) || !solicitante.correo.includes('@'))) {
+      setErrorEnvio('Identifique al solicitante real y su correo antes de registrar la solicitud.');
       return;
     }
 
@@ -100,6 +120,7 @@ export default function TupaDynamicFormModal({
           datosFormulario: valoresForm,
           telefono: valoresForm.telefonoContacto ?? undefined,
           observacion: valoresForm.observacionesComerciales ?? valoresForm.observacionesUso ?? valoresForm.asuntoPetitorio,
+          ...(!esCiudadano && !definicionActual.bloqueadoParaCiudadano ? { solicitante } : {}),
         }),
       });
 
@@ -108,14 +129,15 @@ export default function TupaDynamicFormModal({
         throw new Error(errorData.detail || errorData.error || 'Error al procesar la solicitud.');
       }
 
-      const data = await res.json();
+      const data: unknown = await res.json();
+      if (typeof data !== 'object' || data === null || !('codigoSolicitud' in data)
+        || typeof data.codigoSolicitud !== 'string' || !/^SOL-\d{4}-\d{6}$/.test(data.codigoSolicitud)) {
+        throw new Error('El servidor no devolvió un código de solicitud válido.');
+      }
       setSolicitudGenerada(data.codigoSolicitud);
       if (onExito) onExito(data.codigoSolicitud);
-    } catch (err: any) {
-      // Simulación defensiva offline en caso de mock
-      const codigoMock = `SOL-2026-${Math.floor(Math.random() * 900000 + 100000)}`;
-      setSolicitudGenerada(codigoMock);
-      if (onExito) onExito(codigoMock);
+    } catch (err: unknown) {
+      setErrorEnvio(err instanceof Error ? err.message : 'No se pudo registrar la solicitud. Intente nuevamente.');
     } finally {
       setEnviando(false);
     }
@@ -217,7 +239,7 @@ export default function TupaDynamicFormModal({
                 onChange={(e) => handleCambiarProcedimiento(e.target.value)}
                 className="w-full text-xs sm:text-sm rounded-2xl border border-cyan-200/90 bg-white/95 px-3.5 py-2.5 text-slate-800 shadow-xs focus:border-cyan-500 focus:ring-4 focus:ring-cyan-200/40 focus:outline-none transition"
               >
-                {TUPA_FORMULARIOS_CONFIG.map((def) => (
+                {definicionesDisponibles.map((def) => (
                   <option key={def.codigoRef} value={def.codigoRef}>
                     [{def.codigoRef}] {def.denominacion} — {def.montoTexto} ({def.tipoFormulario})
                   </option>
@@ -274,10 +296,28 @@ export default function TupaDynamicFormModal({
               </div>
             )}
 
+            {!esCiudadano && !definicionActual.bloqueadoParaCiudadano && (
+              <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-3 rounded-xl border border-cyan-200 p-3">
+                <legend className="text-xs font-bold">Solicitante real (verificado en el registro institucional)</legend>
+                <label className="text-xs">Tipo de persona
+                  <select value={solicitante.tipoPersona} onChange={(e) => setSolicitante((prev) => ({ ...prev, tipoPersona: e.target.value as 'NATURAL' | 'JURIDICA' }))}
+                    className="mt-1 w-full rounded border p-2"><option value="NATURAL">Natural</option><option value="JURIDICA">Jurídica</option></select>
+                </label>
+                <label className="text-xs">Documento de identidad o RUC
+                  <input required value={solicitante.numeroDocumento} onChange={(e) => setSolicitante((prev) => ({ ...prev, numeroDocumento: e.target.value }))}
+                    className="mt-1 w-full rounded border p-2" />
+                </label>
+                <label className="text-xs">Correo de contacto
+                  <input required type="email" value={solicitante.correo} onChange={(e) => setSolicitante((prev) => ({ ...prev, correo: e.target.value }))}
+                    className="mt-1 w-full rounded border p-2" />
+                </label>
+              </fieldset>
+            )}
+            {esCiudadano && <p className="text-xs text-slate-600">Solicitante: {usuario?.nombreCompleto}. La identidad se toma de su sesión.</p>}
             {/* 2. Campos dinámicos del formulario */}
             <div className="space-y-4 pt-1">
               <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Datos del Formulario ({definicionActual.tipoFormulario})
+                Datos del Formulario ({definicionActual.tipoFormulario}) — datos operativos del sistema
               </h5>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -361,13 +401,19 @@ export default function TupaDynamicFormModal({
               >
                 Cancelar
               </button>
-              <button
-                type="submit"
-                disabled={enviando || (definicionActual.bloqueadoParaCiudadano && esCiudadano)}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 hover:from-teal-700 hover:via-cyan-700 hover:to-sky-700 text-white font-bold text-xs shadow-xs hover:shadow-cyan-600/30 disabled:opacity-50 transition"
-              >
-                {enviando ? 'Procesando...' : definicionActual.generaExpediente ? 'Radicar Expediente SIGD' : 'Registrar Solicitud'}
-              </button>
+              {definicionActual.generaExpediente && puedeRadicarCut ? (
+                <a href={esCiudadano ? '/tramite' : '/tramite/ventanilla-presencial'}
+                  className="px-6 py-2.5 rounded-xl bg-cyan-700 text-white font-bold text-xs">
+                  Ir a radicación CUT
+                </a>
+              ) : definicionActual.generaExpediente ? (
+                <p className="text-xs text-amber-800">La emisión de CUT requiere Mesa de Partes o Administración.</p>
+              ) : (
+                <button type="submit" disabled={enviando || (definicionActual.bloqueadoParaCiudadano && esCiudadano)}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 hover:from-teal-700 hover:via-cyan-700 hover:to-sky-700 text-white font-bold text-xs shadow-xs hover:shadow-cyan-600/30 disabled:opacity-50 transition">
+                  {enviando ? 'Procesando...' : 'Registrar Solicitud'}
+                </button>
+              )}
             </div>
           </form>
         )}

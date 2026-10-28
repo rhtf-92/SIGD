@@ -32,7 +32,9 @@ describe('SolicitudAccesoTupaPage — Acceso Restringido al TUPA y Solicitudes C
     expect(screen.getByText(/Acceso al Catálogo Integral TUPA 2026/i)).toBeInTheDocument();
     expect(screen.getByText(/Para consultar el documento TUPA institucional completo/i)).toBeInTheDocument();
     expect(screen.getByText(/Identificación de Usuario Requerida/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Iniciar Sesión/i })).toBeInTheDocument();
+    const loginLink = screen.getByRole('link', { name: /Iniciar Sesión/i });
+    expect(loginLink).toBeInTheDocument();
+    expect(loginLink).toHaveAttribute('href', '/login?intent=SOLICITAR_ACCESO_TUPA&from=/solicitud-acceso-tupa');
     expect(screen.getByRole('link', { name: /Registrarse como Ciudadano/i })).toBeInTheDocument();
   });
 

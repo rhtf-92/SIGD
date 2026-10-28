@@ -21,11 +21,15 @@ describe('App Routing & Health Verification', () => {
 
   const app = construirApp(fakePool);
 
-  it('GET /health responde 200 con estado UP', async () => {
+  it('GET /health responde 200 con estado UP y metricas de pool', async () => {
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
     expect(res.body.estado).toBe('UP');
     expect(res.body).toHaveProperty('timestamp');
+    expect(res.body).toHaveProperty('pool');
+    expect(res.body.pool).toHaveProperty('totalConexiones');
+    expect(res.headers).toHaveProperty('x-response-time');
+    expect(res.headers['x-response-time']).toMatch(/^[0-9.]+ms$/);
   });
 
   it('GET /ready responde 200 con estado READY', async () => {

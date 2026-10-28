@@ -103,7 +103,7 @@ export function adaptarProcedimientoTupa(raw: unknown): ProcedimientoTupa | null
   if (!esCadenaONull(raw.vigenciaDesde) || !esCadenaONull(raw.vigenciaHasta)) return null;
   if (raw.estadoValidacion !== 'APROBADO' || raw.estado !== 'APROBADO') return null;
   if (typeof raw.referenciaAprobacion !== 'string' || typeof raw.id !== 'string') return null;
-  if (raw.id !== raw.registroVersionId || raw.codigo !== raw.codigoExterno) return null;
+  if (raw.id !== raw.registroVersionId && raw.id !== raw.codigoRef && raw.id !== raw.codigo) return null;
 
   const vigencia = raw.vigencia.desde === null && raw.vigencia.hasta === null
     ? null

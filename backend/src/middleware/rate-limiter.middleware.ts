@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import { rateLimitDistributed } from '../core/cache/redis.service.js';
 
 interface IntentosRegistro {
   count: number;
@@ -33,20 +34,18 @@ export function extraerIpCliente(req: Request): string {
 }
 
 /**
- * Rate Limiter en memoria con protección dual:
+ * Rate Limiter con protección dual:
  * 1. Límite estricto por IP + Identificador (ej. 5 intentos / 15 min) contra fuerza bruta dirigida.
  * 2. Límite global por IP (ej. 25 intentos / 15 min) contra Password Spraying horizontal.
  *
- * NOTA DE ARQUITECTURA (SEC-10):
- * Este limitador opera en la memoria del proceso (Map con TTL y limpieza periódica), diseñado
- * para despliegues de un solo nodo. En clústeres multi-pod con escalamiento horizontal,
- * el estado debe respaldarse en Redis (ioredis) utilizando comandos atómicos INCR + EXPIRE.
+ * En entornos distribuidos con Redis configurado, respalda en Redis (ioredis) con comandos
+ * atómicos INCR + EXPIRE, con fallback automático a memoria local si Redis no está disponible.
  */
 export function crearRateLimiter(options: RateLimiterOptions) {
   const registro = new Map<string, IntentosRegistro>();
   const maxPorIp = options.maxIntentosPorIp ?? Math.max(options.maxIntentos * 5, 20);
 
-  // Limpieza periódica de entradas expiradas para evitar fugas de memoria
+  // Limpieza periódica de entradas expiradas en memoria para evitar fugas de memoria
   const intervalo = setInterval(() => {
     const ahora = Date.now();
     for (const [clave, datos] of registro.entries()) {
@@ -60,21 +59,20 @@ export function crearRateLimiter(options: RateLimiterOptions) {
     intervalo.unref();
   }
 
-  const middleware = (req: Request, res: Response, next: NextFunction): void => {
-    // Si estamos en suite de pruebas y se solicita explícitamente bypass condicional
-    if (process.env.NODE_ENV === 'test' && req.headers['x-skip-rate-limit'] === 'true') {
-      return next();
-    }
-
-    const ip = extraerIpCliente(req);
-    const identificador = req.body?.identificador ? String(req.body.identificador).trim().toLowerCase() : 'anon';
+  const procesarMemoria = (
+    ip: string,
+    identificador: string,
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): void => {
     const claveIpGlobal = `ip_global:${ip}`;
     const claveUsuario = `user:${ip}:${identificador}`;
     const ahora = Date.now();
 
     // 1. Verificación global por IP (Mitigación de Password Spraying horizontal)
     const actualIp = registro.get(claveIpGlobal);
-    if (actualIp && (ahora - actualIp.primeraPeticion <= options.windowMs) && actualIp.count >= maxPorIp) {
+    if (actualIp && ahora - actualIp.primeraPeticion <= options.windowMs && actualIp.count >= maxPorIp) {
       const tiempoRestanteMs = options.windowMs - (ahora - actualIp.primeraPeticion);
       const segundosRestantes = Math.max(1, Math.ceil(tiempoRestanteMs / 1000));
 
@@ -91,7 +89,11 @@ export function crearRateLimiter(options: RateLimiterOptions) {
 
     // 2. Verificación por IP + Identificador (Fuerza bruta dirigida a cuenta específica)
     const actualUsuario = registro.get(claveUsuario);
-    if (actualUsuario && (ahora - actualUsuario.primeraPeticion <= options.windowMs) && actualUsuario.count >= options.maxIntentos) {
+    if (
+      actualUsuario &&
+      ahora - actualUsuario.primeraPeticion <= options.windowMs &&
+      actualUsuario.count >= options.maxIntentos
+    ) {
       const tiempoRestanteMs = options.windowMs - (ahora - actualUsuario.primeraPeticion);
       const segundosRestantes = Math.max(1, Math.ceil(tiempoRestanteMs / 1000));
 
@@ -101,26 +103,99 @@ export function crearRateLimiter(options: RateLimiterOptions) {
         title: 'Too Many Requests',
         status: 429,
         code: 'RATE_LIMIT_EXCEEDED',
-        detail: options.message || `Demasiados intentos de autenticación fallidos. Intente nuevamente en ${segundosRestantes} segundos.`,
+        detail:
+          options.message ||
+          `Demasiados intentos de autenticación fallidos. Intente nuevamente en ${segundosRestantes} segundos.`,
       });
       return;
     }
 
     // Registrar / incrementar contador IP global
-    if (!actualIp || (ahora - actualIp.primeraPeticion > options.windowMs)) {
+    if (!actualIp || ahora - actualIp.primeraPeticion > options.windowMs) {
       registro.set(claveIpGlobal, { count: 1, primeraPeticion: ahora });
     } else {
       actualIp.count += 1;
     }
 
     // Registrar / incrementar contador por cuenta
-    if (!actualUsuario || (ahora - actualUsuario.primeraPeticion > options.windowMs)) {
+    if (!actualUsuario || ahora - actualUsuario.primeraPeticion > options.windowMs) {
       registro.set(claveUsuario, { count: 1, primeraPeticion: ahora });
     } else {
       actualUsuario.count += 1;
     }
 
     return next();
+  };
+
+  const middleware = (req: Request, res: Response, next: NextFunction): void => {
+    // Si estamos en suite de pruebas y se solicita explícitamente bypass condicional
+    if (process.env.NODE_ENV === 'test' && req.headers['x-skip-rate-limit'] === 'true') {
+      return next();
+    }
+
+    const ip = extraerIpCliente(req);
+    const identificador = req.body?.identificador
+      ? String(req.body.identificador).trim().toLowerCase()
+      : 'anon';
+
+    // En ambiente de pruebas unitarias puras, operar directamente en memoria de proceso
+    if (process.env.NODE_ENV === 'test') {
+      return procesarMemoria(ip, identificador, req, res, next);
+    }
+
+    // En ejecución regular, intentar Redis distribuido con fallback a memoria
+    const windowSeconds = Math.max(1, Math.ceil(options.windowMs / 1000));
+    void (async () => {
+      try {
+        const redisIp = await rateLimitDistributed(`ratelimit:ip:${ip}`, windowSeconds, maxPorIp);
+        if (redisIp && !redisIp.allowed) {
+          res.setHeader('Retry-After', redisIp.retryAfter);
+          res.status(429).json({
+            type: 'https://datatracker.ietf.org/doc/html/rfc9457',
+            title: 'Too Many Requests',
+            status: 429,
+            code: 'RATE_LIMIT_IP_EXCEEDED',
+            detail: `Demasiados intentos de autenticación globales desde esta IP. Bloqueo temporal por mitigación de password spraying (SEC-10). Reintente en ${redisIp.retryAfter} segundos.`,
+          });
+          return;
+        }
+
+        const redisUser = await rateLimitDistributed(
+          `ratelimit:user:${ip}:${identificador}`,
+          windowSeconds,
+          options.maxIntentos,
+        );
+        if (redisUser && !redisUser.allowed) {
+          res.setHeader('Retry-After', redisUser.retryAfter);
+          res.status(429).json({
+            type: 'https://datatracker.ietf.org/doc/html/rfc9457',
+            title: 'Too Many Requests',
+            status: 429,
+            code: 'RATE_LIMIT_EXCEEDED',
+            detail:
+              options.message ||
+              `Demasiados intentos de autenticación fallidos. Intente nuevamente en ${redisUser.retryAfter} segundos.`,
+          });
+          return;
+        }
+
+        // Si Redis no está disponible o falla, evaluar en memoria de forma estricta (Fail-Safe)
+        if (!redisIp || !redisUser) {
+          console.warn(
+            `[RateLimiter] Redis no disponible o sin respuesta (ip=${Boolean(redisIp)}, user=${Boolean(redisUser)}). Activando fallback estricto a memoria local para IP ${ip} (Fail-Safe).`
+          );
+          return procesarMemoria(ip, identificador, req, res, next);
+        }
+
+        return next();
+      } catch (err) {
+        console.warn(
+          `[RateLimiter] Error de comunicación con Redis para IP ${ip}. Activando fallback estricto a memoria local (Fail-Safe):`,
+          err
+        );
+        return procesarMemoria(ip, identificador, req, res, next);
+      }
+    })();
   };
 
   middleware.reset = () => {

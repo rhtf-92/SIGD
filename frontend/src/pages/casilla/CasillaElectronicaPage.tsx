@@ -93,10 +93,10 @@ export default function CasillaElectronicaPage() {
                 </div>
               </div>
               <Link
-                to="/"
+                to="/tramite"
                 className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
               >
-                ← Volver al inicio
+                ← Volver
               </Link>
             </div>
           </div>

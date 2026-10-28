@@ -9,6 +9,7 @@ export const ETIQUETAS_ADMIN: Record<string, string> = {
   "tablas-maestras": "Tablas Maestras",
   "calendario-laboral": "Calendario Laboral",
   seguridad: "Seguridad",
+  tupa: "Gestión del TUPA",
 };
 
 interface Miga {

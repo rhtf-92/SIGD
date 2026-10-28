@@ -146,10 +146,10 @@ export default function SolicitudAccesoTupaPage() {
               </h1>
             </div>
             <Link
-              to="/"
+              to="/tramite"
               className="text-xs font-semibold text-cyan-900 bg-white/90 border border-cyan-200/80 px-4 py-2 rounded-xl shadow-2xs hover:bg-cyan-50 transition shrink-0"
             >
-              ← Volver al Inicio
+              ← Volver
             </Link>
           </div>
 
@@ -220,7 +220,8 @@ export default function SolicitudAccesoTupaPage() {
                   Acceda con su documento de identidad y contraseña para solicitar acceso inmediato.
                 </p>
                 <Link
-                  to="/login?returnUrl=/solicitud-acceso-tupa"
+                  to="/login?intent=SOLICITAR_ACCESO_TUPA&from=/solicitud-acceso-tupa"
+                  state={{ from: '/solicitud-acceso-tupa', intent: 'SOLICITAR_ACCESO_TUPA' }}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 text-white font-bold text-xs shadow-xs hover:shadow-cyan-600/30"
                 >
                   Iniciar Sesión <ArrowRight className="h-3.5 w-3.5" />
@@ -236,6 +237,7 @@ export default function SolicitudAccesoTupaPage() {
                 </p>
                 <Link
                   to="/registro?returnUrl=/solicitud-acceso-tupa"
+                  state={{ from: '/solicitud-acceso-tupa', intent: 'SOLICITAR_ACCESO_TUPA' }}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-cyan-300 bg-white text-cyan-950 font-bold text-xs hover:bg-cyan-50"
                 >
                   Registrarse como Ciudadano <ArrowRight className="h-3.5 w-3.5" />

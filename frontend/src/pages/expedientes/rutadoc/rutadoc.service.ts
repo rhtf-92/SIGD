@@ -23,6 +23,28 @@ export const rutaDoc = {
     if (dato.idExpediente.toLowerCase() !== id.toLowerCase()) throw new RespuestaRutaDocInvalida();
     return dato;
   },
+  resumen: async (id: string, signal?: AbortSignal) => {
+    const data = await leer(`${rutaId(id)}/resumen`, signal);
+    return data as {
+      expediente: ReturnType<typeof detalleSchema.parse>;
+      estado: string;
+      slaResumen: {
+        estado: "VERDE" | "AMARILLO" | "ROJO";
+        diasHabilesRestantes: number;
+        porcentaje: number;
+        fechaLimite: string;
+      } | null;
+      foliacionResumen: { cantidadDocumentos: number; totalFolios: number };
+      tupaResumen: {
+        registroVersionId: string;
+        codigo: string;
+        denominacion: string;
+        clasificacion: string;
+        plazoDias: number;
+        costo: number;
+      } | null;
+    };
+  },
   trazabilidad: async (id: string, signal?: AbortSignal) =>
     adaptarTrazabilidad(await leer(`${rutaId(id)}/trazabilidad`, signal), id),
   foliacion: async (id: string, signal?: AbortSignal) =>

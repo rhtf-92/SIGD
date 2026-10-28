@@ -1,10 +1,17 @@
+import { Link } from "react-router-dom";
+import { FileText, ArrowRight } from "lucide-react";
+
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
 import OrganigramaTreeView from "../../components/administracion/OrganigramaTreeView";
 import { useTablasMaestras } from "../../hooks/useTablasMaestras";
 import AdminSidebarNav from "../../components/admin/AdminSidebarNav";
 import AdminBreadcrumbs from "../../components/administracion/AdminBreadcrumbs";
+import { useAuthStore } from "../../stores/authStore";
 
 export default function TablasMaestrasPage() {
+  const usuario = useAuthStore((state) => state.usuario);
+  const puedeGestionarTupa = usuario?.rol === "ADMINISTRADOR";
+
   const {
     tipos,
     registros,
@@ -54,12 +61,55 @@ export default function TablasMaestrasPage() {
                   {tipo}
                 </button>
               ))}
+              {puedeGestionarTupa && (
+                <Link
+                  to="/administracion/tupa"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300 bg-cyan-50 px-3.5 py-2 text-sm font-semibold text-cyan-900 hover:bg-cyan-100 transition shadow-2xs"
+                >
+                  <FileText className="h-4 w-4 text-cyan-700" />
+                  Gestión TUPA
+                </Link>
+              )}
             </div>
 
             <span className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
               Catálogo Oficial (Solo Lectura)
             </span>
           </div>
+
+          {/* Tarjeta de Acceso Visible: Gestión TUPA */}
+          {puedeGestionarTupa && (
+            <section
+              aria-label="Acceso a Gestión TUPA"
+              className="mb-6 overflow-hidden rounded-2xl border border-cyan-200/90 bg-gradient-to-br from-white via-cyan-50/40 to-teal-50/30 p-5 sm:p-6 shadow-sm transition hover:border-cyan-300 hover:shadow-md"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 via-cyan-600 to-sky-600 text-white shadow-xs">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-bold text-slate-900">Gestión TUPA</h2>
+                      <span className="rounded-full bg-cyan-100 px-2.5 py-0.5 text-xs font-semibold text-cyan-800 border border-cyan-200">
+                        Módulo Oficial
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Versiones, procedimientos, publicación e histórico del TUPA.
+                    </p>
+                  </div>
+                </div>
+
+                <Link
+                  to="/administracion/tupa"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 hover:from-teal-700 hover:via-cyan-700 hover:to-sky-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:shadow-cyan-600/30 shrink-0 active:scale-[0.99]"
+                >
+                  Acceder a Gestión TUPA <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </section>
+          )}
 
           {tipoActivo === "Áreas" && (
             <section className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

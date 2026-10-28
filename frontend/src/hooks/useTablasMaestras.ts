@@ -45,7 +45,15 @@ export function useTablasMaestras() {
 
   const [tipoActivo, setTipoActivo] = useState<TipoTabla>("Sedes");
   const [busqueda, setBusqueda] = useState("");
+  const [busquedaDebounced, setBusquedaDebounced] = useState("");
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setBusquedaDebounced(busqueda);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [busqueda]);
   const [codigo, setCodigo] = useState("");
   const [nombre, setNombre] = useState("");
   const [detalle, setDetalle] = useState("");
@@ -118,45 +126,47 @@ export function useTablasMaestras() {
         setErrorCarga(msg);
       });
 
-    // Consulta de organigrama
-    apiClient
-      .get<
-        Array<{
-          id?: string | number;
-          area_id?: string;
-          codigo?: string;
-          sigla?: string;
-          nombre: string;
-          ruta_jerarquica?: string;
-          path?: string;
-        }>
-      >("/api/v1/admin/organigrama")
-      .then((res) => {
-        if (!montado || !Array.isArray(res.data) || res.data.length === 0) {
+    // Consulta de organigrama: solo bajo demanda cuando la pestaña activa es "Áreas"
+    if (tipoActivo === "Áreas" && areasOrganicas.length === 0) {
+      apiClient
+        .get<
+          Array<{
+            id?: string | number;
+            area_id?: string;
+            codigo?: string;
+            sigla?: string;
+            nombre: string;
+            ruta_jerarquica?: string;
+            path?: string;
+          }>
+        >("/api/v1/admin/organigrama")
+        .then((res) => {
+          if (!montado || !Array.isArray(res.data) || res.data.length === 0) {
+            if (montado) setAreasOrganicas([]);
+            return;
+          }
+          const mapped: AreaOrganica[] = res.data.map((item, index) => ({
+            id: typeof item.id === "number" ? item.id : index + 1,
+            codigo: item.codigo ?? item.sigla ?? `ARE-${String(index + 1).padStart(3, "0")}`,
+            nombre: item.nombre,
+            ruta: item.ruta_jerarquica ?? item.path ?? `01.${String(index + 1).padStart(2, "0")}`,
+            detalle: `Unidad orgánica institucional (${item.sigla ?? item.nombre})`,
+            estado: "Activo" as const,
+          }));
+          setAreasOrganicas(mapped);
+        })
+        .catch(() => {
           if (montado) setAreasOrganicas([]);
-          return;
-        }
-        const mapped: AreaOrganica[] = res.data.map((item, index) => ({
-          id: typeof item.id === "number" ? item.id : index + 1,
-          codigo: item.codigo ?? item.sigla ?? `ARE-${String(index + 1).padStart(3, "0")}`,
-          nombre: item.nombre,
-          ruta: item.ruta_jerarquica ?? item.path ?? `01.${String(index + 1).padStart(2, "0")}`,
-          detalle: `Unidad orgánica institucional (${item.sigla ?? item.nombre})`,
-          estado: "Activo" as const,
-        }));
-        setAreasOrganicas(mapped);
-      })
-      .catch(() => {
-        if (montado) setAreasOrganicas([]);
-      });
+        });
+    }
 
     return () => {
       montado = false;
     };
-  }, []);
+  }, [tipoActivo, areasOrganicas.length]);
 
   const filtrados = useMemo(() => {
-    const texto = busqueda.trim().toLowerCase();
+    const texto = busquedaDebounced.trim().toLowerCase();
 
     return registros.filter(
       (registro) =>
@@ -166,11 +176,12 @@ export function useTablasMaestras() {
           registro.nombre.toLowerCase().includes(texto) ||
           registro.detalle.toLowerCase().includes(texto)),
     );
-  }, [busqueda, registros, tipoActivo]);
+  }, [busquedaDebounced, registros, tipoActivo]);
 
   function cambiarTipo(tipo: TipoTabla) {
     setTipoActivo(tipo);
     setBusqueda("");
+    setBusquedaDebounced("");
     setMostrarFormulario(false);
     setMensaje("");
   }

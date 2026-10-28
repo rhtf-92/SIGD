@@ -80,17 +80,11 @@ export class SolicitudDinamicaRepository {
    * Genera el siguiente correlativo canónico SOL-2026-XXXXXX a partir de la secuencia.
    */
   async generarCodigoCorrelativo(): Promise<string> {
-    try {
-      const res = await this.pool.query<{ val: string }>(
-        "SELECT nextval('sigd_doc.secuencia_solicitud_dinamica_2026')::text AS val;"
-      );
-      const correlativo = (res.rows[0]?.val ?? '1').padStart(6, '0');
-      return `SOL-2026-${correlativo}`;
-    } catch {
-      // Fallback defensivo si la secuencia estuviera ausente en entorno de test mock
-      const random = Math.floor(Math.random() * 900000 + 100000);
-      return `SOL-2026-${random}`;
-    }
+    const res = await this.pool.query<{ val: string }>(
+      "SELECT nextval('sigd_doc.secuencia_solicitud_dinamica_2026')::text AS val;"
+    );
+    if (!res.rows[0]?.val) throw new Error('La secuencia de solicitudes no devolvió un correlativo.');
+    return `SOL-2026-${res.rows[0].val.padStart(6, '0')}`;
   }
 
   /**

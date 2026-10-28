@@ -142,8 +142,10 @@ describe('CatalogoTupaPage — Catálogo TUPA Protegido y Formulario Dinámico',
     const inputBusqueda = screen.getByLabelText(/Buscar por denominación o código:/i);
     await user.type(inputBusqueda, 'Inglés');
 
-    expect(screen.getByText('Certificado de Inglés')).toBeInTheDocument();
-    expect(screen.queryByText(/Alquiler del Galpón Agrícola/i)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Certificado de Inglés')).toBeInTheDocument();
+      expect(screen.queryByText(/Alquiler del Galpón Agrícola/i)).not.toBeInTheDocument();
+    });
 
     // Limpiar filtro
     await user.clear(inputBusqueda);
@@ -152,8 +154,10 @@ describe('CatalogoTupaPage — Catálogo TUPA Protegido y Formulario Dinámico',
     const selectCategoria = screen.getByLabelText(/Filtrar por Categoría:/i);
     await user.selectOptions(selectCategoria, 'BIEN_PRODUCTIVO');
 
-    expect(screen.getByText(/Venta de Mangos/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Certificado de Inglés/i)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Venta de Mangos/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Certificado de Inglés/i)).not.toBeInTheDocument();
+    });
   });
 
   it('abre el modal dinámico con el procedimiento seleccionado al pulsar Iniciar trámite', async () => {
@@ -185,11 +189,18 @@ describe('CatalogoTupaPage — Catálogo TUPA Protegido y Formulario Dinámico',
     const inputBusqueda = screen.getByLabelText(/Buscar por denominación o código:/i);
     await user.type(inputBusqueda, 'Galpón');
 
+    await waitFor(() => {
+      const botones = screen.getAllByRole('button', { name: /Iniciar Trámite/i });
+      expect(botones.length).toBe(1);
+    });
+
     const botonIniciar = screen.getByRole('button', { name: /Iniciar Trámite/i });
     await user.click(botonIniciar);
 
     // Modal debe abrirse
-    expect(screen.getByText(/Motor de Formularios Dinámicos TUPA 2026/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Alquiler del Galpón Agrícola/i).length).toBeGreaterThanOrEqual(1);
+    await waitFor(() => {
+      expect(screen.getByText(/Motor de Formularios Dinámicos TUPA 2026/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Alquiler del Galpón Agrícola/i).length).toBeGreaterThanOrEqual(1);
+    });
   });
 });

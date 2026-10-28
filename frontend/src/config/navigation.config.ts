@@ -23,6 +23,87 @@ export const DESTINO_POR_ROL: Record<RolCanonica, string> = {
   ADMINISTRADOR: '/administracion',
 };
 
+export const ROLES_INSTITUCIONALES: readonly RolCanonica[] = [
+  'MESA_PARTES', 'ESPECIALISTA', 'SECRETARIO', 'DIRECTOR', 'ADMINISTRADOR',
+];
+
+export const ROLES_VENTANILLA: readonly RolCanonica[] = ROLES_INSTITUCIONALES;
+export const ROLES_REPORTES: readonly RolCanonica[] = ['DIRECTOR', 'ADMINISTRADOR'];
+export const ROLES_ADMIN: readonly RolCanonica[] = ['ADMINISTRADOR'];
+export const ROLES_CIUDADANO: readonly RolCanonica[] = ['CIUDADANO'];
+
+export const RUTAS_PERSONALES_CIUDADANO = [
+  '/mis-expedientes',
+  '/casilla',
+  '/casilla-electronica',
+] as const;
+
+export function normalizarRuta(pathname: string): string {
+  if (!pathname) return '/';
+  const sinQuery = pathname.split('?')[0].split('#')[0];
+  const normalizada = sinQuery.replace(/\/+$/, '');
+  return normalizada.length === 0 ? '/' : normalizada;
+}
+
+export function esRutaPersonalCiudadano(pathname: string): boolean {
+  const ruta = normalizarRuta(pathname);
+  return (
+    ruta === '/mis-expedientes' || ruta.startsWith('/mis-expedientes/') ||
+    ruta === '/casilla' || ruta.startsWith('/casilla/') ||
+    ruta === '/casilla-electronica' || ruta.startsWith('/casilla-electronica/')
+  );
+}
+
+/** Las rutas privadas comparten estas reglas con AppRouter y el redirect de login. */
+export function rolesPermitidosParaRuta(pathname: string): readonly RolCanonica[] | null {
+  const ruta = normalizarRuta(pathname);
+  if (ruta === '/tramite/ventanilla-presencial' || ruta === '/ventanilla') return ROLES_VENTANILLA;
+  if (
+    esRutaPersonalCiudadano(ruta) ||
+    ruta === '/tramite' ||
+    ruta === '/tramite/mesa-partes-virtual' ||
+    ruta === '/tramite/mesa-partes' ||
+    ruta === '/mesa-partes'
+  ) {
+    return ROLES_CIUDADANO;
+  }
+  if (ruta === '/expedientes' || ruta.startsWith('/expedientes/')) return ROLES_INSTITUCIONALES;
+  if (ruta === '/reportes' || ruta.startsWith('/reportes/')) return ROLES_REPORTES;
+  if (
+    ruta === '/administracion' ||
+    ruta.startsWith('/administracion/') ||
+    ruta === '/admin' ||
+    ruta === '/calendarizacion-institucional' ||
+    ruta === '/institucional/calendarizacion'
+  ) {
+    return ROLES_ADMIN;
+  }
+  return null;
+}
+
+export function canAccessRoute(rol: RolCanonica, pathname: string): boolean {
+  const ruta = normalizarRuta(pathname);
+
+  // 1. Aislamiento estricto de vistas personales ciudadanas (mis expedientes, casilla electrónica)
+  if (esRutaPersonalCiudadano(ruta)) {
+    return rol === 'CIUDADANO';
+  }
+
+  // 2. ADMINISTRADOR: rol institucional superior. Acceso irrestricto a todos los módulos institucionales y públicos.
+  // Queda excluido de la creación ciudadana en /tramite (el administrador utiliza Ventanilla Presencial).
+  if (rol === 'ADMINISTRADOR') {
+    if (ruta === '/tramite' || ruta === '/tramite/mesa-partes-virtual' || ruta === '/tramite/mesa-partes' || ruta === '/mesa-partes') {
+      return false;
+    }
+    return true;
+  }
+
+  // 3. Demás roles: verificar lista canónica de permitidos
+  const permitidos = rolesPermitidosParaRuta(ruta);
+  if (permitidos === null) return true;
+  return permitidos.includes(rol);
+}
+
 /**
  * Menú de navegación pública para usuarios no autenticados.
  */
@@ -40,35 +121,46 @@ export const NAV_ITEMS_PUBLICOS: readonly NavItem[] = [
  */
 export const NAV_ITEMS_POR_ROL: Record<RolCanonica, readonly NavItem[]> = {
   CIUDADANO: [
-    { etiqueta: 'Nuevo Trámite', ruta: '/tramite' },
+    { etiqueta: 'Inicio', ruta: '/' },
+    { etiqueta: 'Nuevo Trámite', ruta: '/solicitud-acceso-tupa' },
     { etiqueta: 'Mis Expedientes', ruta: '/mis-expedientes' },
     { etiqueta: 'Casilla Electrónica', ruta: '/casilla' },
     { etiqueta: 'Consulta CUT', ruta: '/consulta' },
   ],
   MESA_PARTES: [
+    { etiqueta: 'Inicio', ruta: '/' },
     { etiqueta: 'Ventanilla Presencial', ruta: '/tramite/ventanilla-presencial' },
     { etiqueta: 'Bandeja de Expedientes', ruta: '/expedientes' },
+    { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
     { etiqueta: 'Consulta CUT', ruta: '/consulta' },
   ],
   ESPECIALISTA: [
+    { etiqueta: 'Inicio', ruta: '/' },
     { etiqueta: 'Bandeja de Expedientes', ruta: '/expedientes' },
+    { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
     { etiqueta: 'Consulta CUT', ruta: '/consulta' },
   ],
   SECRETARIO: [
+    { etiqueta: 'Inicio', ruta: '/' },
     { etiqueta: 'Bandeja de Expedientes', ruta: '/expedientes' },
+    { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
     { etiqueta: 'Consulta CUT', ruta: '/consulta' },
   ],
   DIRECTOR: [
+    { etiqueta: 'Inicio', ruta: '/' },
     { etiqueta: 'Reportes y Tableros', ruta: '/reportes/dashboard' },
     { etiqueta: 'Bandeja de Expedientes', ruta: '/expedientes' },
+    { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
     { etiqueta: 'Validador CVD', ruta: '/validador-cvd' },
   ],
   ADMINISTRADOR: [
+    { etiqueta: 'Inicio', ruta: '/' },
     { etiqueta: 'Administración', ruta: '/administracion' },
     { etiqueta: 'Bandeja de Expedientes', ruta: '/expedientes' },
     { etiqueta: 'Ventanilla Presencial', ruta: '/tramite/ventanilla-presencial' },
     { etiqueta: 'Reportes', ruta: '/reportes/dashboard' },
     { etiqueta: 'Calendario Laboral', ruta: '/calendarizacion-institucional' },
+    { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
   ],
 };
 
@@ -230,7 +322,7 @@ export const MODULOS_HOME_INSTITUCIONAL: readonly ModuloHomeItem[] = [
     badge: 'Requiere rol institucional',
     ctaPublico: 'Acceso con rol asignado',
     ctaAutenticado: 'Abrir ventanilla presencial',
-    rolesPermitidos: ['MESA_PARTES', 'ADMINISTRADOR'],
+    rolesPermitidos: ROLES_VENTANILLA,
   },
   {
     id: 'panel-administracion',

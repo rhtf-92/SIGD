@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from '../../../src/routes/ProtectedRoute';
 import { useAuthStore } from '../../../src/stores/authStore';
+import { ROLES_VENTANILLA } from '../../../src/config/navigation.config';
 
 function montar() {
   render(<MemoryRouter initialEntries={['/administracion']}><Routes>
@@ -39,13 +40,13 @@ describe('ruta administrativa', () => {
   });
 
   it.each([
-    ['CIUDADANO', false], ['MESA_PARTES', true], ['ESPECIALISTA', false],
-    ['SECRETARIO', false], ['DIRECTOR', false], ['ADMINISTRADOR', true],
+    ['CIUDADANO', false], ['MESA_PARTES', true], ['ESPECIALISTA', true],
+    ['SECRETARIO', true], ['DIRECTOR', true], ['ADMINISTRADOR', true],
   ] as const)('ventanilla presencial: rol %s tiene acceso %s', (rol, permitido) => {
     useAuthStore.setState({ accessToken: 'jwt', refreshToken: null, isAuthenticated: true,
       usuario: { id: 'u-lab', nombreCompleto: 'Prueba', correo: 'lab@example.test', rol } });
     render(<MemoryRouter initialEntries={['/ventanilla']}><Routes>
-      <Route path="/ventanilla" element={<ProtectedRoute requiredRoles={['MESA_PARTES', 'ADMINISTRADOR']}><p>Ventanilla</p></ProtectedRoute>} />
+      <Route path="/ventanilla" element={<ProtectedRoute requiredRoles={ROLES_VENTANILLA}><p>Ventanilla</p></ProtectedRoute>} />
       <Route path="/acceso-denegado" element={<p>Acceso denegado</p>} />
     </Routes></MemoryRouter>);
     expect(screen.getByText(permitido ? 'Ventanilla' : 'Acceso denegado')).toBeInTheDocument();

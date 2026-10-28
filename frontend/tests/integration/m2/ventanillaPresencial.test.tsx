@@ -8,44 +8,26 @@ import VentanillaPresencialPage from "../../../src/pages/tramite/VentanillaPrese
 import CargoDigitalModal from "../../../src/components/tramite/CargoDigitalModal";
 import type { CargoOficialTramite } from "../../../src/types/cargoOficial";
 import { apiClient } from "@/api/client";
+import { useAuthStore } from "../../../src/stores/authStore";
+import { TUPA_SUIZA_2026_COMPLETO } from "../../../src/data/tupaSuiza2026CatalogoCompleto";
 
 /**
  * Catálogo TUPA simulado servido por la API real (reemplaza al hardcode legado
  * `PROCEDIMIENTOS_TUPA_2026`). Solo `registroVersionId` es un identificador válido.
  */
-const REGISTRO_VERSION_CERTIFICADO = "11111111-1111-4111-8111-111111111111";
+const REGISTRO_VERSION_CERTIFICADO = "00000000-0000-4000-8000-000000000006";
 
-const CATALOGO_TUPA_API = [
-  {
-    registroVersionId: REGISTRO_VERSION_CERTIFICADO,
-    codigoExterno: null,
-    codigo: null,
-    denominacion: "Certificado de estudios",
-    requisitos: null,
-    monto: "S/. 11.00 por semestre",
-    fuente: {
-      nombre: "TUPA_2026_IESTP_Suiza.pdf",
-      documentoSha256: "377DD8E14B8806F2030B5374120AB9B4FE17640BB98086E10C1A9A4431A33622",
-      pagina: 5,
-      referenciaFila: "p5-fila-20",
-    },
-    pagina: 5,
-    revision: 1,
-    vigencia: { desde: null, hasta: null },
-    vigenciaDesde: null,
-    vigenciaHasta: null,
-    version: {
-      etiqueta: "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
-      revision: 1,
-      vigenciaDesde: null,
-      vigenciaHasta: null,
-    },
-    estadoValidacion: "APROBADO",
-    estado: "APROBADO",
-    referenciaAprobacion: "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
-    id: REGISTRO_VERSION_CERTIFICADO,
-  },
-];
+const CATALOGO_TUPA_API = TUPA_SUIZA_2026_COMPLETO.map((item, index) => ({
+  registroVersionId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+  denominacion: item.denominacion,
+  requisitos: item.requisitos,
+  monto: item.monto,
+  fuente: { nombre: 'TUPA_2026_IESTP_Suiza.pdf', pagina: item.pagina, referenciaFila: item.referenciaFila },
+  revision: 1,
+  vigenciaDesde: null,
+  vigenciaHasta: null,
+  estadoValidacion: item.estadoValidacion,
+}));
 
 const mockRespuestaVentanilla = {
   data: {
@@ -94,6 +76,8 @@ const cargoMuestra: CargoOficialTramite = {
 describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-05)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    useAuthStore.setState({ accessToken: 'jwt-mesa', refreshToken: null, isAuthenticated: true,
+      usuario: { id: 'u-mesa', nombreCompleto: 'Operador', correo: 'mesa@example.test', rol: 'MESA_PARTES' } });
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: CATALOGO_TUPA_API } as any);
     vi.spyOn(apiClient, "post").mockResolvedValue(mockRespuestaVentanilla as any);
   });
@@ -114,7 +98,7 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     expect(screen.getByRole("option", { name: /Trámite no TUPA \/ documentación general/i })).toBeInTheDocument();
     // La opción proviene del catálogo real servido por la API simulada
     expect(
-      await screen.findByRole("option", { name: /^Certificado de estudios$/i }),
+      await screen.findByRole("option", { name: /p1-fila-06.*Certificado de Inglés/i }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/Cantidad de Folios Físicos \*/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /✓ Registrar y Emitir Cargo CUT/i })).toBeInTheDocument();
@@ -130,16 +114,15 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     );
 
     // Espera a que el catálogo (API simulada) cargue y selecciona por registroVersionId
-    await screen.findByRole("option", { name: /^Certificado de estudios$/i });
+    await screen.findByRole("option", { name: /p1-fila-06.*Certificado de Inglés/i });
     await user.selectOptions(
       screen.getByLabelText(/Procedimiento TUPA 2026/i),
       REGISTRO_VERSION_CERTIFICADO,
     );
 
-    expect(screen.queryByText(/Constancia de No Adeudar/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/S\/. 11\.00 por semestre/i)).toBeInTheDocument();
+    expect(screen.getByText(/Monto TUPA: S\/ 100\.00/i)).toBeInTheDocument();
     expect(screen.getByText(/TUPA_2026_IESTP_Suiza\.pdf/i)).toBeInTheDocument();
-    expect(screen.getByText(/p5-fila-20/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/p1-fila-06/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Vigencia/i)).not.toBeInTheDocument();
 
     // Caso 8: ninguna ruta activa debe exponer la marca hardcodeada legada
@@ -174,9 +157,9 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
 
     await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
     await user.type(screen.getByLabelText(/Apellidos y Nombres \*/i), "Sergio Serruche");
-    await user.type(screen.getByLabelText(/Correo Electrónico para Notificación \*/i), "sergio@correo.pe");
+    await user.type(screen.getByLabelText(/Correo Electrónico de Contacto \*/i), "sergio@correo.pe");
     await user.type(screen.getByLabelText(/Teléfono \/ Celular de Contacto \*/i), "961234567");
-    await screen.findByRole("option", { name: /^Certificado de estudios$/i });
+    await screen.findByRole("option", { name: /p1-fila-06.*Certificado de Inglés/i });
     await user.selectOptions(
       screen.getByLabelText(/Procedimiento TUPA 2026/i),
       REGISTRO_VERSION_CERTIFICADO,
@@ -204,7 +187,7 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
 
     await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
     await user.type(screen.getByLabelText(/Apellidos y Nombres \*/i), "Sergio Serruche");
-    await user.type(screen.getByLabelText(/Correo Electrónico para Notificación \*/i), "sergio@correo.pe");
+    await user.type(screen.getByLabelText(/Correo Electrónico de Contacto \*/i), "sergio@correo.pe");
     await user.type(screen.getByLabelText(/Teléfono \/ Celular de Contacto \*/i), "961234567");
     await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "NO_TUPA");
     await user.type(screen.getByLabelText(/Asunto \/ Petitorio Concreto \*/i), "Solicitud documentaria general");

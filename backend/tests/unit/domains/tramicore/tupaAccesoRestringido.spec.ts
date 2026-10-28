@@ -25,7 +25,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
   let tokenSecretario: string;
 
   beforeEach(() => {
-    process.env.AUTH_JWT_SECRET = 'clave_secreta_super_segura_de_al_menos_32_caracteres_sigd';
+    process.env.AUTH_JWT_SECRET = 'unit-test-secret-not-for-production-min32chars';
 
     tokenCiudadano = firmarTokenAcceso({
       sub: idUsuarioCiudadano,
@@ -244,6 +244,56 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
     expect(res.body.idPersona).toBe(idPersonaCiudadano);
   });
 
+  it('5b. POST /api/v1/tramites/tupa/acceso/solicitar rechaza cuentas institucionales con TUPA_ACCESS_ALREADY_GRANTED_BY_ROLE', async () => {
+    mockPool.query.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
+        return {
+          rows: [{ id_persona: idPersonaMesaPartes, activo: true, correo: 'staff@iestpsuiza.edu.pe', nombre_completo: 'Personal' }],
+          rowCount: 1,
+        };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const tokensInstitucionales = [
+      { rol: 'MESA_PARTES', token: tokenMesaPartes },
+      { rol: 'ADMINISTRADOR', token: tokenAdministrador },
+      { rol: 'DIRECTOR', token: tokenDirector },
+      { rol: 'SECRETARIO', token: tokenSecretario },
+      { rol: 'ESPECIALISTA', token: tokenEspecialista },
+    ];
+
+    for (const item of tokensInstitucionales) {
+      // Probar en /solicitar
+      const resSolicitar = await request(app)
+        .post('/api/v1/tramites/tupa/acceso/solicitar')
+        .set('Authorization', `Bearer ${item.token}`)
+        .send({
+          motivo: 'Intento de solicitud desde rol ' + item.rol,
+          correo: 'staff@iestpsuiza.edu.pe',
+          aceptaTratamientoDatos: true,
+        });
+
+      expect(resSolicitar.status).toBe(400);
+      expect(resSolicitar.body.code).toBe('TUPA_ACCESS_ALREADY_GRANTED_BY_ROLE');
+      expect(resSolicitar.body.message).toBe('La cuenta posee acceso institucional al catálogo TUPA.');
+
+      // Probar en alias /solicitudes
+      const resSolicitudes = await request(app)
+        .post('/api/v1/tramites/tupa/acceso/solicitudes')
+        .set('Authorization', `Bearer ${item.token}`)
+        .send({
+          motivo: 'Intento de solicitud desde rol ' + item.rol,
+          correo: 'staff@iestpsuiza.edu.pe',
+          aceptaTratamientoDatos: true,
+        });
+
+      expect(resSolicitudes.status).toBe(400);
+      expect(resSolicitudes.body.code).toBe('TUPA_ACCESS_ALREADY_GRANTED_BY_ROLE');
+      expect(resSolicitudes.body.message).toBe('La cuenta posee acceso institucional al catálogo TUPA.');
+    }
+  });
+
   // ─── 6. Aprobación por Mesa de Partes ───────────────────────────────────────
 
   it('6. PATCH /api/v1/tramites/tupa/acceso/admin/solicitudes/:id aprueba solicitud', async () => {
@@ -291,6 +341,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
 
   it('7. POST /api/v1/tramites/solicitudes-dinamicas genera código SOL-2026-XXXXXX y calcula importe', async () => {
     mockPool.query.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM sigd_doc.tupa_solicitud_acceso') && sql.includes("estado = 'APROBADA'")) return { rows: [{ one: 1 }], rowCount: 1 };
       if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
         return {
           rows: [{ id_persona: idPersonaCiudadano, activo: true, correo: 'juan@prueba.pe', nombre_completo: 'Juan Pérez' }],
@@ -305,7 +356,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
               denominacion_original: 'Venta de Mangos (Ciento)',
               monto_original: 'S/ 15.00',
               estado_validacion: 'PENDIENTE_VALIDACION',
-              referencia_fila: 'p4-fila-27',
+              referencia_fila: 'p2-fila-09',
             },
           ],
           rowCount: 1,
@@ -346,7 +397,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
       .set('Authorization', `Bearer ${tokenCiudadano}`)
       .send({
         tipoFormulario: 'VENTA_BIEN',
-        codigoTupa: 'p4-fila-27',
+        codigoTupa: 'p2-fila-09',
         denominacion: 'Venta de Mangos (Ciento)',
         montoTotal: 30.0,
         datosFormulario: {
@@ -368,6 +419,10 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
 
   it('8. POST /api/v1/tramites/solicitudes-dinamicas con ACTUACION_INTERNA deniega ciudadano (403) y permite institucional', async () => {
     mockPool.query.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM sigd_doc.tupa_registro_version')) return { rows: [{
+        registro_version_id: '88888888-8888-4888-8888-888888888888', denominacion_original: 'Prácticas Iniciales',
+        monto_original: 'S/ 35.00', estado_validacion: 'PENDIENTE_VALIDACION', referencia_fila: 'p1-fila-01',
+      }], rowCount: 1 };
       if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
         return {
           rows: [{ id_persona: idPersonaCiudadano, activo: true, correo: 'juan@prueba.pe', nombre_completo: 'Juan Pérez' }],
@@ -393,6 +448,10 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
 
     // Con rol Mesa de Partes
     mockPool.query.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM sigd_doc.tupa_registro_version')) return { rows: [{
+        registro_version_id: '88888888-8888-4888-8888-888888888888', denominacion_original: 'Prácticas Iniciales',
+        monto_original: 'S/ 35.00', estado_validacion: 'PENDIENTE_VALIDACION', referencia_fila: 'p1-fila-01',
+      }], rowCount: 1 };
       if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
         return {
           rows: [{ id_persona: idPersonaMesaPartes, activo: true, correo: 'mp@iestpsuiza.edu.pe', nombre_completo: 'Operador MP' }],
@@ -445,6 +504,44 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
   });
 
   // ─── 9. Anti-BOLA: Ciudadano A no puede consultar solicitudes de Ciudadano B ─
+
+  it('ventanilla atribuye SOL al solicitante registrado, no al operador; ciudadano no suplanta', async () => {
+    let insertParams: unknown[] | null = null;
+    mockPool.query.mockImplementation(async (sql: string, params: unknown[]) => {
+      if (sql.includes('FROM sigd_auth.cuenta_usuario')) return { rows: [{
+        id_persona: idPersonaMesaPartes, activo: true, correo: 'mesa@example.test', nombre_completo: 'Operador',
+      }], rowCount: 1 };
+      if (sql.includes('FROM sigd_doc.tupa_registro_version')) return { rows: [{
+        registro_version_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', denominacion_original: 'Venta de Mangos (Ciento)',
+        monto_original: 'S/ 15.00', estado_validacion: 'PENDIENTE_VALIDACION', referencia_fila: 'p2-fila-09',
+      }], rowCount: 1 };
+      if (sql.includes('FROM sigd_auth.persona p')) return { rows: [{ id_persona: idPersonaCiudadanoB, nombre: 'Solicitante B' }], rowCount: 1 };
+      if (sql.includes('nextval')) return { rows: [{ val: '55' }], rowCount: 1 };
+      if (sql.includes('INSERT INTO sigd_doc.solicitud_tramite_dinamico')) {
+        insertParams = params;
+        return { rows: [{
+          id_solicitud: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', codigo_solicitud: 'SOL-2026-000055',
+          tipo_formulario: params[1], codigo_tupa: params[2], denominacion: params[3], id_persona: params[4],
+          nombre_solicitante: params[5], correo: params[6], telefono: params[7], monto_total: params[8],
+          datos_formulario: JSON.parse(String(params[9])), estado: 'SOLICITADO', observacion: params[10],
+          fecha_solicitud: new Date(), fecha_actualizacion: new Date(),
+        }], rowCount: 1 };
+      }
+      if (sql.includes('FROM sigd_doc.tupa_solicitud_acceso')) return { rows: [{ one: 1 }], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    });
+    const payload = { tipoFormulario: 'VENTA_BIEN', codigoTupa: 'p2-fila-09', denominacion: 'Manipulada',
+      montoTotal: 1, datosFormulario: { cantidad: 2 },
+      solicitante: { tipoPersona: 'NATURAL', numeroDocumento: '12345678', correo: 'solicitante@example.test' } };
+    const mesa = await request(app).post('/api/v1/tramites/solicitudes-dinamicas')
+      .set('Authorization', `Bearer ${tokenMesaPartes}`).send(payload);
+    expect(mesa.status).toBe(201);
+    expect(insertParams?.[4]).toBe(idPersonaCiudadanoB);
+    expect(insertParams?.[8]).toBe(30);
+    const ciudadano = await request(app).post('/api/v1/tramites/solicitudes-dinamicas')
+      .set('Authorization', `Bearer ${tokenCiudadano}`).send(payload);
+    expect(ciudadano.status).toBe(403);
+  });
 
   it('9. GET /api/v1/tramites/solicitudes-dinamicas/:codigo bloquea acceso cruzado entre ciudadanos (Anti-BOLA)', async () => {
     mockPool.query.mockImplementation(async (sql: string, params: any[]) => {
@@ -665,7 +762,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
               denominacion_original: 'Venta de Mangos (Ciento)',
               monto_original: 'S/ 15.00',
               estado_validacion: 'PENDIENTE_VALIDACION',
-              referencia_fila: 'p4-fila-27',
+              referencia_fila: 'p2-fila-09',
             },
           ],
           rowCount: 1,
@@ -679,14 +776,14 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
       .set('Authorization', `Bearer ${tokenCiudadano}`)
       .send({
         tipoFormulario: 'DOCUMENTARIO',
-        codigoTupa: 'p4-fila-27',
+        codigoTupa: 'p2-fila-09',
         denominacion: 'Venta de Mangos (Ciento)',
         montoTotal: 15.0,
         datosFormulario: { cantidad: 1 },
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.invalidParams?.[0]?.reason).toMatch(/Naturaleza oficial: VENTA_BIEN/i);
+    expect(res.body.invalidParams?.[0]?.reason).toMatch(/clasificación institucional/i);
   });
 
   // ─── 15. Recálculo Mandatorio Server-Side del Monto ─────────────────────────
@@ -695,6 +792,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
     let montoRegistradoEnBD: number | null = null;
 
     mockPool.query.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM sigd_doc.tupa_solicitud_acceso') && sql.includes("estado = 'APROBADA'")) return { rows: [{ one: 1 }], rowCount: 1 };
       if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
         return {
           rows: [{ id_persona: idPersonaCiudadano, activo: true, correo: 'juan@prueba.pe', nombre_completo: 'Juan Pérez' }],
@@ -709,7 +807,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
               denominacion_original: 'Venta de Mangos (Ciento)',
               monto_original: 'S/ 15.00',
               estado_validacion: 'PENDIENTE_VALIDACION',
-              referencia_fila: 'p4-fila-27',
+              referencia_fila: 'p2-fila-09',
             },
           ],
           rowCount: 1,
@@ -750,7 +848,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
       .set('Authorization', `Bearer ${tokenCiudadano}`)
       .send({
         tipoFormulario: 'VENTA_BIEN',
-        codigoTupa: 'p4-fila-27',
+        codigoTupa: 'p2-fila-09',
         denominacion: 'Venta de Mangos (Ciento)',
         montoTotal: 0.01,
         datosFormulario: { cantidad: 3, unidad: 'Ciento' },
@@ -765,6 +863,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
 
   it('16. POST /api/v1/tramites/solicitudes-dinamicas rechaza alquiler con horaInicio >= horaFin', async () => {
     mockPool.query.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM sigd_doc.tupa_solicitud_acceso') && sql.includes("estado = 'APROBADA'")) return { rows: [{ one: 1 }], rowCount: 1 };
       if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
         return {
           rows: [{ id_persona: idPersonaCiudadano, activo: true, correo: 'juan@prueba.pe', nombre_completo: 'Juan Pérez' }],
@@ -779,7 +878,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
               denominacion_original: 'Alquiler de Auditorio',
               monto_original: 'S/ 300.00',
               estado_validacion: 'PENDIENTE_VALIDACION',
-              referencia_fila: 'p5-fila-10',
+              referencia_fila: 'p2-fila-06',
             },
           ],
           rowCount: 1,
@@ -793,7 +892,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
       .set('Authorization', `Bearer ${tokenCiudadano}`)
       .send({
         tipoFormulario: 'ALQUILER',
-        codigoTupa: 'p5-fila-10',
+        codigoTupa: 'p2-fila-06',
         denominacion: 'Alquiler de Auditorio',
         montoTotal: 300.0,
         datosFormulario: {
@@ -814,6 +913,11 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
     let jsonbGuardado: any = null;
 
     mockPool.query.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM sigd_doc.tupa_solicitud_acceso') && sql.includes("estado = 'APROBADA'")) return { rows: [{ one: 1 }], rowCount: 1 };
+      if (sql.includes('FROM sigd_doc.tupa_registro_version')) return { rows: [{
+        registro_version_id: '77777777-7777-4777-8777-777777777777', denominacion_original: 'Venta de Mangos (Ciento)',
+        monto_original: 'S/ 15.00', estado_validacion: 'PENDIENTE_VALIDACION', referencia_fila: 'p2-fila-09',
+      }], rowCount: 1 };
       if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
         return {
           rows: [{ id_persona: idPersonaCiudadano, activo: true, correo: 'juan@prueba.pe', nombre_completo: 'Juan Pérez' }],
@@ -854,7 +958,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
       .set('Authorization', `Bearer ${tokenCiudadano}`)
       .send({
         tipoFormulario: 'VENTA_BIEN',
-        codigoTupa: 'p4-fila-27',
+        codigoTupa: 'p2-fila-09',
         denominacion: 'Venta de Mangos (Ciento)',
         montoTotal: 15.0,
         datosFormulario: {
@@ -883,6 +987,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
     let montoInsertado: number | null = null;
 
     mockPool.query.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM sigd_doc.tupa_solicitud_acceso') && sql.includes("estado = 'APROBADA'")) return { rows: [{ one: 1 }], rowCount: 1 };
       if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
         return {
           rows: [{ id_persona: idPersonaCiudadano, activo: true, correo: 'juan@prueba.pe', nombre_completo: 'Juan Pérez' }],
@@ -897,7 +1002,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
               denominacion_original: 'Alquiler de Auditorio Central',
               monto_original: 'S/ 300.00',
               estado_validacion: 'PENDIENTE_VALIDACION',
-              referencia_fila: 'p5-fila-12',
+              referencia_fila: 'p2-fila-06',
             },
           ],
           rowCount: 1,
@@ -937,7 +1042,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
       .set('Authorization', `Bearer ${tokenCiudadano}`)
       .send({
         tipoFormulario: 'ALQUILER',
-        codigoTupa: 'p5-fila-12',
+        codigoTupa: 'p2-fila-06',
         denominacion: 'Alquiler de Auditorio Central',
         montoTotal: 0.0,
         datosFormulario: {
@@ -958,6 +1063,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
 
   it('19. POST /api/v1/tramites/solicitudes-dinamicas para ACADEMICO registra solicitud SOL', async () => {
     mockPool.query.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM sigd_doc.tupa_solicitud_acceso') && sql.includes("estado = 'APROBADA'")) return { rows: [{ one: 1 }], rowCount: 1 };
       if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
         return {
           rows: [{ id_persona: idPersonaCiudadano, activo: true, correo: 'juan@prueba.pe', nombre_completo: 'Juan Pérez' }],
@@ -972,7 +1078,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
               denominacion_original: 'Matrícula Regular',
               monto_original: 'S/ 25.00',
               estado_validacion: 'PENDIENTE_VALIDACION',
-              referencia_fila: 'p2-fila-03',
+              referencia_fila: 'p5-fila-01',
             },
           ],
           rowCount: 1,
@@ -1011,7 +1117,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
       .set('Authorization', `Bearer ${tokenCiudadano}`)
       .send({
         tipoFormulario: 'ACADEMICO',
-        codigoTupa: 'p2-fila-03',
+        codigoTupa: 'p5-fila-01',
         denominacion: 'Matrícula Regular',
         montoTotal: 25.0,
         datosFormulario: {
@@ -1030,6 +1136,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
 
   it('20. POST /api/v1/tramites/solicitudes-dinamicas para SERVICIO registra solicitud SOL', async () => {
     mockPool.query.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM sigd_doc.tupa_solicitud_acceso') && sql.includes("estado = 'APROBADA'")) return { rows: [{ one: 1 }], rowCount: 1 };
       if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
         return {
           rows: [{ id_persona: idPersonaCiudadano, activo: true, correo: 'juan@prueba.pe', nombre_completo: 'Juan Pérez' }],
@@ -1044,7 +1151,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
               denominacion_original: 'Servicio de Empadre de Ganado',
               monto_original: 'S/ 50.00',
               estado_validacion: 'PENDIENTE_VALIDACION',
-              referencia_fila: 'p4-fila-15',
+              referencia_fila: 'p3-fila-08',
             },
           ],
           rowCount: 1,
@@ -1083,7 +1190,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
       .set('Authorization', `Bearer ${tokenCiudadano}`)
       .send({
         tipoFormulario: 'SERVICIO',
-        codigoTupa: 'p4-fila-15',
+        codigoTupa: 'p3-fila-08',
         denominacion: 'Servicio de Empadre de Ganado',
         montoTotal: 50.0,
         datosFormulario: {
@@ -1100,6 +1207,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
 
   it('21. POST /api/v1/tramites/solicitudes-dinamicas para OTRO registra solicitud SOL', async () => {
     mockPool.query.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM sigd_doc.tupa_solicitud_acceso') && sql.includes("estado = 'APROBADA'")) return { rows: [{ one: 1 }], rowCount: 1 };
       if (sql.includes('FROM sigd_auth.cuenta_usuario')) {
         return {
           rows: [{ id_persona: idPersonaCiudadano, activo: true, correo: 'juan@prueba.pe', nombre_completo: 'Juan Pérez' }],
@@ -1114,7 +1222,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
               denominacion_original: 'Solicitud General FUT',
               monto_original: 'Gratuito',
               estado_validacion: 'PENDIENTE_VALIDACION',
-              referencia_fila: 'p6-fila-01',
+              referencia_fila: 'p4-fila-01',
             },
           ],
           rowCount: 1,
@@ -1153,7 +1261,7 @@ describe('TramiCore — Acceso Restringido al TUPA y Motor de Formularios Dinám
       .set('Authorization', `Bearer ${tokenCiudadano}`)
       .send({
         tipoFormulario: 'OTRO',
-        codigoTupa: 'p6-fila-01',
+        codigoTupa: 'p4-fila-01',
         denominacion: 'Solicitud General FUT',
         montoTotal: 0.0,
         datosFormulario: {

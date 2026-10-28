@@ -1,9 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppRouter from '../../../src/routes/AppRouter';
 import { useAuthStore } from '../../../src/stores/authStore';
+import { apiClient } from '../../../src/api/client';
+
+beforeEach(() => {
+  vi.spyOn(apiClient, 'get').mockResolvedValue({ data: [] });
+  vi.spyOn(apiClient, 'post').mockResolvedValue({ data: {} });
+});
 
 function renderWithProviders(initialEntry: string) {
   const queryClient = new QueryClient({
@@ -53,14 +59,14 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
       expect(screen.getByText(/Consulta Pública de Trámite/i)).toBeInTheDocument();
     });
 
-    it('ruta pública /validador-cvd se renderiza sin requerir sesión', () => {
+    it('ruta pública /validador-cvd se renderiza sin requerir sesión', async () => {
       renderWithProviders('/validador-cvd');
-      expect(screen.getByText(/Verificador público de Códigos de Verificación Digital/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Verificador público de Códigos de Verificación Digital/i)).toBeInTheDocument();
     });
 
-    it('ruta pública /flujo-validez-legal se renderiza sin requerir sesión', () => {
+    it('ruta pública /flujo-validez-legal se renderiza sin requerir sesión', async () => {
       renderWithProviders('/flujo-validez-legal');
-      expect(screen.getByText(/Módulo 04 · Flujo y Validez Legal de Documentos Digitales/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Módulo 04 · Flujo y Validez Legal de Documentos Digitales/i)).toBeInTheDocument();
     });
 
     it('ruta pública /acceso-denegado se renderiza sin requerir sesión', () => {
@@ -100,20 +106,20 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
       });
     });
 
-    it('permite acceso a /tramite (Mesa de Partes Virtual)', () => {
+    it('permite acceso a /tramite (Mesa de Partes Virtual)', async () => {
       renderWithProviders('/tramite');
-      expect(screen.getByText(/Identificación del Solicitante/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Identificación del Solicitante/i)).toBeInTheDocument();
     });
 
-    it('permite acceso a /mis-expedientes', () => {
+    it('permite acceso a /mis-expedientes', async () => {
       renderWithProviders('/mis-expedientes');
-      expect(screen.getByText(/Portal del Ciudadano/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Portal del Ciudadano/i)).toBeInTheDocument();
       expect(screen.getByText(/Mis Expedientes/i)).toBeInTheDocument();
     });
 
-    it('permite acceso a /casilla', () => {
+    it('permite acceso a /casilla', async () => {
       renderWithProviders('/casilla');
-      expect(screen.getByText(/Bandeja de Casilla Electrónica Ciudadana/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Bandeja de Casilla Electrónica Ciudadana/i)).toBeInTheDocument();
     });
 
     it.each([
@@ -143,14 +149,14 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
       });
     });
 
-    it('permite acceso a /tramite/ventanilla-presencial', () => {
+    it('permite acceso a /tramite/ventanilla-presencial', async () => {
       renderWithProviders('/tramite/ventanilla-presencial');
-      expect(screen.getByText(/Ventanilla Presencial de Atención al Ciudadano/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Ventanilla Presencial de Atención al Ciudadano/i)).toBeInTheDocument();
     });
 
-    it('permite acceso a /expedientes', () => {
+    it('permite acceso a /expedientes', async () => {
       renderWithProviders('/expedientes');
-      expect(screen.getByText(/Bandeja de expedientes/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Bandeja de expedientes/i)).toBeInTheDocument();
     });
 
     it.each(['/tramite', '/mis-expedientes', '/administracion', '/reportes/dashboard'])(
@@ -165,7 +171,7 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
   describe('5. ESPECIALISTA y SECRETARIO: Bandeja de expedientes', () => {
     it.each(['ESPECIALISTA', 'SECRETARIO'] as const)(
       'rol %s accede a /expedientes y es bloqueado en /administracion y /tramite',
-      (rol) => {
+      async (rol) => {
         useAuthStore.setState({
           accessToken: `jwt-${rol}`,
           refreshToken: null,
@@ -179,7 +185,7 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
         });
 
         const { unmount } = renderWithProviders('/expedientes');
-        expect(screen.getByText(/Bandeja de expedientes/i)).toBeInTheDocument();
+        expect(await screen.findByText(/Bandeja de expedientes/i)).toBeInTheDocument();
         unmount();
 
         renderWithProviders('/administracion');
@@ -203,14 +209,14 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
       });
     });
 
-    it('permite acceso a /reportes/dashboard', () => {
+    it('permite acceso a /reportes/dashboard', async () => {
       renderWithProviders('/reportes/dashboard');
-      expect(screen.getAllByText(/Tablero Directivo Ejecutivo/i).length).toBeGreaterThan(0);
+      expect((await screen.findAllByText(/Tablero Directivo Ejecutivo/i)).length).toBeGreaterThan(0);
     });
 
-    it('permite acceso a /expedientes', () => {
+    it('permite acceso a /expedientes', async () => {
       renderWithProviders('/expedientes');
-      expect(screen.getByText(/Bandeja de expedientes/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Bandeja de expedientes/i)).toBeInTheDocument();
     });
 
     it('bloquea acceso a /administracion y /tramite', () => {
@@ -234,24 +240,24 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
       });
     });
 
-    it('permite acceso a /administracion', () => {
+    it('permite acceso a /administracion', async () => {
       renderWithProviders('/administracion');
-      expect(screen.getAllByText(/Panel de Administración/i).length).toBeGreaterThan(0);
+      expect((await screen.findAllByText(/Panel de Administración/i)).length).toBeGreaterThan(0);
     });
 
-    it('permite acceso a /calendarizacion-institucional', () => {
+    it('permite acceso a /calendarizacion-institucional', async () => {
       renderWithProviders('/calendarizacion-institucional');
-      expect(screen.getAllByText(/Calendarización Institucional/i).length).toBeGreaterThan(0);
+      expect((await screen.findAllByText(/Calendarización Institucional/i)).length).toBeGreaterThan(0);
     });
 
-    it('permite acceso a /reportes/dashboard', () => {
+    it('permite acceso a /reportes/dashboard', async () => {
       renderWithProviders('/reportes/dashboard');
-      expect(screen.getAllByText(/Tablero Directivo Ejecutivo/i).length).toBeGreaterThan(0);
+      expect((await screen.findAllByText(/Tablero Directivo Ejecutivo/i)).length).toBeGreaterThan(0);
     });
 
-    it('permite acceso a /expedientes', () => {
+    it('permite acceso a /expedientes', async () => {
       renderWithProviders('/expedientes');
-      expect(screen.getByText(/Bandeja de expedientes/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Bandeja de expedientes/i)).toBeInTheDocument();
     });
   });
 });

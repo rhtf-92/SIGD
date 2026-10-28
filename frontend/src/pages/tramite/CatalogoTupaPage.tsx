@@ -5,12 +5,15 @@ import {
   CheckCircle2,
   Lock,
   ArrowRight,
+  Database,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import {
   TUPA_FORMULARIOS_CONFIG,
+  obtenerDefinicionTupa,
 } from '../../data/tupaFormulariosConfig';
 import type { CategoriaTupa } from '../../data/tupaSuiza2026CatalogoCompleto';
+import type { TupaFormDefinition } from '../../types/tupaFormulario.types';
 import { CapsuleBadge } from '../../components/common/GlassPanel';
 import TupaDynamicFormModal from '../../components/tramite/TupaDynamicFormModal';
 
@@ -26,12 +29,26 @@ export default function CatalogoTupaPage() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [codigoModal, setCodigoModal] = useState<string>('p1-fila-05');
 
+  // Datos vivos desde la API PostgreSQL
+  const [procedimientosDb, setProcedimientosDb] = useState<TupaFormDefinition[] | null>(null);
+  const [versionActiva, setVersionActiva] = useState<{ codigo: string; anio: number } | null>(null);
+  const [origenDatos, setOrigenDatos] = useState<'BASE_DE_DATOS' | 'CATALOGO_CANONICO'>('CATALOGO_CANONICO');
+
   // Filtros
   const [busqueda, setBusqueda] = useState('');
+  const [busquedaDebounced, setBusquedaDebounced] = useState('');
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<CategoriaTupa | 'TODAS'>('TODAS');
   const [filtroRadicacion, setFiltroRadicacion] = useState<'TODOS' | 'SI' | 'NO'>('TODOS');
 
-  // Verificar autorización
+  // Debounce de 250ms en la búsqueda de procedimientos
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setBusquedaDebounced(busqueda);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [busqueda]);
+
+  // 1. Verificar autorización de acceso
   useEffect(() => {
     let activo = true;
     async function verificar() {
@@ -60,8 +77,7 @@ export default function CatalogoTupaPage() {
           if (activo) setAutorizado(false);
         }
       } catch {
-        // En caso de entorno de test / offline
-        if (activo) setAutorizado(true);
+        if (activo) setAutorizado(false);
       } finally {
         if (activo) setCargando(false);
       }
@@ -72,11 +88,122 @@ export default function CatalogoTupaPage() {
     };
   }, [token, esInstitucional]);
 
+  // 2. Cargar catálogo Data-Driven desde backend si está autorizado
+  useEffect(() => {
+    if (!autorizado) return;
+    let activo = true;
+
+    async function cargarTupaApi() {
+      try {
+        const res = await fetch('/api/v1/tramites/tupa', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!activo) return;
+
+        interface RawTupaItem {
+          id?: string;
+          id_procedimiento?: string;
+          codigo?: string;
+          codigoRef?: string;
+          denominacion?: string;
+          categoria?: string;
+          clasificacion?: string;
+          requisitos?: string[];
+          monto?: number | string;
+          costoSoles?: number;
+          plazoDiasHabiles?: number;
+          plazo_dias_habiles?: number;
+          autoridadCompetente?: string;
+          autoridad_competente?: string;
+          admiteRadicacionSigd?: boolean;
+          admite_radicacion_sigd?: boolean;
+          generaExpediente?: boolean;
+        }
+
+        const rawList: RawTupaItem[] = Array.isArray(data) ? data : data.procedimientos || [];
+        if (rawList.length > 0) {
+          const mapeados: TupaFormDefinition[] = rawList.map((raw) => {
+            const codRef = raw.codigoRef || raw.codigo || raw.id || '';
+            const defBase = obtenerDefinicionTupa(codRef);
+
+            const montoNum = Number(raw.costoSoles ?? (typeof raw.monto === 'number' ? raw.monto : 0));
+            const montoTexto =
+              typeof raw.monto === 'string' && raw.monto.length > 0
+                ? raw.monto
+                : montoNum > 0
+                ? `S/ ${montoNum.toFixed(2)}`
+                : 'Gratuito';
+
+            const plazoNum = raw.plazoDiasHabiles ?? raw.plazo_dias_habiles;
+            const plazoTexto = plazoNum ? `${plazoNum} días hábiles` : defBase?.plazo || '30 días hábiles';
+            const reqs = Array.isArray(raw.requisitos) ? raw.requisitos : defBase?.requisitos || [];
+            const generaExp = Boolean(raw.generaExpediente ?? raw.admiteRadicacionSigd ?? raw.admite_radicacion_sigd ?? defBase?.generaExpediente ?? false);
+            const unidad = raw.autoridadCompetente || raw.autoridad_competente || defBase?.unidadResponsable || 'IESTP Suiza';
+            const cat = (raw.categoria || raw.clasificacion || defBase?.categoria || 'PROCEDIMIENTO_APROBADO') as CategoriaTupa;
+
+            if (defBase) {
+              return {
+                ...defBase,
+                denominacion: raw.denominacion || defBase.denominacion,
+                categoria: cat,
+                requisitos: reqs,
+                monto: montoNum,
+                montoTexto,
+                plazo: plazoTexto,
+                unidadResponsable: unidad,
+                generaExpediente: generaExp,
+              };
+            }
+
+            return {
+              codigoRef: codRef,
+              denominacion: raw.denominacion || 'Procedimiento sin denominación',
+              categoria: cat,
+              tipoFormulario: 'DOCUMENTARIO',
+              campos: [],
+              requisitos: reqs,
+              monto: montoNum,
+              montoTexto,
+              unidadCobro: 'Trámite',
+              generaExpediente: generaExp,
+              flujoDestino: '/tramite',
+              plazo: plazoTexto,
+              unidadResponsable: unidad,
+              baseLegal: '',
+              bloqueadoParaCiudadano: false,
+              observacion: '',
+            };
+          });
+
+          setProcedimientosDb(mapeados);
+          setOrigenDatos('BASE_DE_DATOS');
+          if (data.version) {
+            setVersionActiva({
+              codigo: data.version.codigo,
+              anio: Number(data.version.anio),
+            });
+          }
+        }
+      } catch {
+        // Fallback a catálogo canónico local
+      }
+    }
+
+    void cargarTupaApi();
+    return () => {
+      activo = false;
+    };
+  }, [autorizado, token]);
+
+  const catalogoBase = procedimientosDb || TUPA_FORMULARIOS_CONFIG;
+
   const tupaFiltrado = useMemo(() => {
-    return TUPA_FORMULARIOS_CONFIG.filter((item) => {
+    return catalogoBase.filter((item) => {
       // 1. Filtro por texto
-      if (busqueda.trim()) {
-        const q = busqueda.toLowerCase().trim();
+      if (busquedaDebounced.trim()) {
+        const q = busquedaDebounced.toLowerCase().trim();
         const coincideDenom = item.denominacion.toLowerCase().includes(q);
         const coincideCodigo = item.codigoRef.toLowerCase().includes(q);
         const coincideRequisitos = item.requisitos.some((r) => r.toLowerCase().includes(q));
@@ -94,7 +221,7 @@ export default function CatalogoTupaPage() {
 
       return true;
     });
-  }, [busqueda, categoriaSeleccionada, filtroRadicacion]);
+  }, [catalogoBase, busquedaDebounced, categoriaSeleccionada, filtroRadicacion]);
 
   const handleAbrirFormulario = (codigoRef: string) => {
     setCodigoModal(codigoRef);
@@ -161,10 +288,10 @@ export default function CatalogoTupaPage() {
               Solicitar Acceso al TUPA <ArrowRight className="h-3.5 w-3.5" />
             </Link>
             <Link
-              to="/"
+              to="/tramite"
               className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
-              Volver al Portal
+              ← Volver
             </Link>
           </div>
         </div>
@@ -180,25 +307,30 @@ export default function CatalogoTupaPage() {
         <section className="relative overflow-hidden rounded-3xl border border-white/80 bg-gradient-to-br from-white/90 via-cyan-50/40 to-teal-50/25 p-6 sm:p-8 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),0_16px_48px_-8px_rgba(6,182,212,0.14)] ring-1 ring-cyan-200/50 backdrop-blur-md space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
                 <CapsuleBadge variant="approved">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Acceso Autorizado (72 Entradas Completas)
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Acceso Autorizado ({catalogoBase.length} Entradas Completas)
                 </CapsuleBadge>
                 {esInstitucional && <CapsuleBadge variant="role">Rol: {usuario?.rol}</CapsuleBadge>}
+                {origenDatos === 'BASE_DE_DATOS' && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100/80 px-2.5 py-0.5 text-[10px] font-bold text-cyan-800 border border-cyan-300/60">
+                    <Database className="h-3 w-3" /> Datos en vivo (DB)
+                  </span>
+                )}
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Catálogo Integral TUPA 2026 — IESTP "Suiza"
+                Catálogo Integral {versionActiva ? versionActiva.codigo : 'TUPA 2026'} — IESTP &quot;Suiza&quot;
               </h1>
               <p className="text-xs sm:text-sm text-slate-600 max-w-3xl mt-1">
-                Catálogo institucional con las 72 entradas físicas oficiales debidamente clasificadas y habilitadas con
+                Catálogo institucional con las {catalogoBase.length} entradas físicas oficiales debidamente clasificadas y habilitadas con
                 el motor de formularios dinámicos especializados.
               </p>
             </div>
             <Link
-              to="/"
+              to="/tramite"
               className="text-xs font-semibold text-cyan-900 bg-white/90 border border-cyan-200/80 px-4 py-2 rounded-xl shadow-2xs hover:bg-cyan-50 transition shrink-0"
             >
-              ← Volver al Portal
+              ← Volver
             </Link>
           </div>
 
@@ -228,17 +360,15 @@ export default function CatalogoTupaPage() {
               <select
                 id="filtro-categoria-tupa"
                 value={categoriaSeleccionada}
-                onChange={(e) => setCategoriaSeleccionada(e.target.value as any)}
+                onChange={(e) => setCategoriaSeleccionada(e.target.value as CategoriaTupa | 'TODAS')}
                 className="w-full text-xs rounded-xl border border-cyan-200/90 px-3 py-2 bg-white shadow-2xs focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200/50"
               >
-                <option value="TODAS">Todas las categorías (72)</option>
-                <option value="PROCEDIMIENTO_APROBADO">PROCEDIMIENTO_APROBADO (18)</option>
-                <option value="PROCEDIMIENTO_PENDIENTE">PROCEDIMIENTO_PENDIENTE (5)</option>
-                <option value="SERVICIO_ACADEMICO">SERVICIO_ACADEMICO (17)</option>
-                <option value="SERVICIO_COMERCIAL">SERVICIO_COMERCIAL (8)</option>
-                <option value="BIEN_PRODUCTIVO">BIEN_PRODUCTIVO (16)</option>
-                <option value="ACTUACION_INTERNA">ACTUACION_INTERNA (4)</option>
-                <option value="OTRO_NO_RADICABLE">OTRO_NO_RADICABLE (4)</option>
+                <option value="TODAS">Todas las categorías ({catalogoBase.length})</option>
+                {(['PROCEDIMIENTO_APROBADO', 'PROCEDIMIENTO_PENDIENTE', 'SERVICIO_ACADEMICO', 'SERVICIO_COMERCIAL', 'BIEN_PRODUCTIVO', 'ACTUACION_INTERNA', 'OTRO_NO_RADICABLE'] as const).map((categoria) => (
+                  <option key={categoria} value={categoria}>
+                    {categoria} ({catalogoBase.filter((item) => item.categoria === categoria).length})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -249,12 +379,16 @@ export default function CatalogoTupaPage() {
               <select
                 id="filtro-radicacion-tupa"
                 value={filtroRadicacion}
-                onChange={(e) => setFiltroRadicacion(e.target.value as any)}
+                onChange={(e) => setFiltroRadicacion(e.target.value as 'TODOS' | 'SI' | 'NO')}
                 className="w-full text-xs rounded-xl border border-cyan-200/90 px-3 py-2 bg-white shadow-2xs focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200/50"
               >
-                <option value="TODOS">Todos los tipos (72)</option>
-                <option value="SI">Sí — Genera Expediente / CUT (18)</option>
-                <option value="NO">No — Solicitud no documentaria (54)</option>
+                <option value="TODOS">Todos los tipos ({catalogoBase.length})</option>
+                <option value="SI">
+                  Sí — Genera Expediente / CUT ({catalogoBase.filter((item) => item.generaExpediente).length})
+                </option>
+                <option value="NO">
+                  No — Servicios, bienes y trámites no radicables ({catalogoBase.filter((item) => !item.generaExpediente).length})
+                </option>
               </select>
             </div>
           </div>
@@ -299,6 +433,10 @@ export default function CatalogoTupaPage() {
                             <li key={rIdx}>{req}</li>
                           ))}
                         </ul>
+                      ) : def.bloqueadoParaCiudadano ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 text-rose-800 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold">
+                          Interno
+                        </span>
                       ) : (
                         <span className="text-[10px] text-slate-400 italic block mt-0.5">
                           Sin requisitos documentarios
@@ -367,6 +505,7 @@ export default function CatalogoTupaPage() {
 
       {/* Modal Dinámico TUPA */}
       <TupaDynamicFormModal
+        key={codigoModal}
         isOpen={modalAbierto}
         codigoInicial={codigoModal}
         onClose={() => setModalAbierto(false)}

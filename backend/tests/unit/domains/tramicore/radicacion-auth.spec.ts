@@ -134,7 +134,9 @@ describe('radicación virtual: identidad autenticada', () => {
       expect(response.body[0].cut).toBe('EXP-2026-000001');
       expect(response.body[0].asunto).toBe('Solicitud de certificado');
       expect(response.body[0].totalFolios).toBe(3);
-      expect(query.mock.calls[1][1]).toEqual([PERSONA_A]);
+      expect(query.mock.calls[1][1][0]).toBe(PERSONA_A);
+      expect(response.headers['x-page']).toBe('1');
+      expect(response.headers['x-limit']).toBe('20');
     });
   });
 });

@@ -65,16 +65,10 @@ function generarCamposPorTipo(tipo: TipoFormularioTupa, item: ItemTupaOficial): 
           ayuda: `Ingrese el número de ${unidad.toLowerCase()}s que desea adquirir.`,
         },
         {
-          nombre: 'lugarRetiro',
-          etiqueta: 'Lugar de retiro programado',
-          tipo: 'select',
-          obligatorio: true,
-          opciones: [
-            'Centro de Producción / Granja IESTP Suiza',
-            'Vivero Institucional Agropecuario',
-            'Almacén General del Instituto',
-          ],
-          valorPorDefecto: 'Centro de Producción / Granja IESTP Suiza',
+          nombre: 'preferenciaRetiro',
+          etiqueta: 'Preferencia de retiro (sujeta a confirmación)',
+          tipo: 'text',
+          obligatorio: false,
         },
         {
           nombre: 'telefonoContacto',
@@ -134,7 +128,6 @@ function generarCamposPorTipo(tipo: TipoFormularioTupa, item: ItemTupaOficial): 
           etiqueta: 'Número aproximado de asistentes',
           tipo: 'number',
           obligatorio: true,
-          valorPorDefecto: 50,
         },
         {
           nombre: 'observacionesUso',
@@ -170,7 +163,6 @@ function generarCamposPorTipo(tipo: TipoFormularioTupa, item: ItemTupaOficial): 
           tipo: 'text',
           obligatorio: true,
           placeholder: 'Ej. 2026-I / Ciclo IV',
-          valorPorDefecto: '2026-I',
         },
         {
           nombre: 'codigoEstudiante',
@@ -243,7 +235,6 @@ function generarCamposPorTipo(tipo: TipoFormularioTupa, item: ItemTupaOficial): 
           etiqueta: 'Área / Dependencia Solicitante',
           tipo: 'text',
           obligatorio: true,
-          valorPorDefecto: 'Área Académica / Dirección',
         },
         {
           nombre: 'motivoInterno',
@@ -251,6 +242,13 @@ function generarCamposPorTipo(tipo: TipoFormularioTupa, item: ItemTupaOficial): 
           tipo: 'textarea',
           obligatorio: true,
         },
+      ];
+
+    case 'OTRO':
+      return [
+        { nombre: 'asunto', etiqueta: 'Asunto', tipo: 'text', obligatorio: true },
+        { nombre: 'asuntoPetitorio', etiqueta: 'Petitorio', tipo: 'textarea', obligatorio: true },
+        { nombre: 'observaciones', etiqueta: 'Observaciones', tipo: 'textarea', obligatorio: false },
       ];
 
     default:

@@ -62,7 +62,7 @@ describe("useProcedimientosTupa - contrato TUPA versionado", () => {
     expect(result.current.estado).toBe("cargando");
     await waitFor(() => expect(result.current.estado).toBe("listo"));
 
-    expect(get).toHaveBeenCalledWith("/api/v1/tramites/tupa", {
+    expect(get).toHaveBeenCalledWith("/api/v1/tramites/tupa?aprobados=true", {
       signal: expect.any(AbortSignal),
     });
     expect(result.current.procedimientos).toEqual([

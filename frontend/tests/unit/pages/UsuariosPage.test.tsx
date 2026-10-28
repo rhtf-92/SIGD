@@ -218,4 +218,37 @@ describe("UsuariosPage — H-04 / H-05: Directorio de Usuarios (Solo Lectura)", 
     };
     expect(ultimaLlamada.params.busqueda).toBe("Pérez");
   });
+
+  it("muestra el botón + Nuevo usuario y abre modal cuando el usuario tiene rol ADMINISTRADOR", async () => {
+    const { useAuthStore } = await import("@/stores/authStore");
+    useAuthStore.setState({
+      usuario: { id: "admin-1", nombreCompleto: "Admin Sistema", correo: "admin@iestpsuiza.edu.pe", rol: "ADMINISTRADOR" },
+      isAuthenticated: true,
+      accessToken: "token-admin",
+    });
+
+    montarConProvider();
+    await screen.findByText("Juan Carlos Pérez");
+
+    const botonNuevo = screen.getByRole("button", { name: /\+ Nuevo usuario/i });
+    expect(botonNuevo).toBeInTheDocument();
+
+    fireEvent.click(botonNuevo);
+    expect(screen.getByText("Nuevo Usuario Institucional")).toBeInTheDocument();
+    expect(screen.getByLabelText(/DNI/i)).toBeInTheDocument();
+  });
+
+  it("no muestra el botón + Nuevo usuario cuando el rol es no-administrador", async () => {
+    const { useAuthStore } = await import("@/stores/authStore");
+    useAuthStore.setState({
+      usuario: { id: "user-1", nombreCompleto: "Ciudadano", correo: "user@test.pe", rol: "CIUDADANO" },
+      isAuthenticated: true,
+      accessToken: "token-user",
+    });
+
+    montarConProvider();
+    await screen.findByText("Juan Carlos Pérez");
+
+    expect(screen.queryByRole("button", { name: /\+ Nuevo usuario/i })).not.toBeInTheDocument();
+  });
 });

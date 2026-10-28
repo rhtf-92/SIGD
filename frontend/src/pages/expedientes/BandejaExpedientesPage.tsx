@@ -20,8 +20,17 @@ export default function BandejaExpedientesPage() {
       terminoBusqueda: texto("terminoBusqueda"), areaId: texto("areaId"),
       fechaDesde: texto("fechaDesde"), fechaHasta: texto("fechaHasta") });
   }
+
+  const handleVolver = () => {
+    if (typeof window !== "undefined" && window.history.length > 1 && window.history.state?.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
+
   return <main className="mx-auto max-w-7xl space-y-6 p-6">
-    <button type="button" className="rounded px-2 py-1 text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" onClick={() => navigate("/")}>Volver al inicio</button>
+    <button type="button" className="rounded px-2 py-1 text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" onClick={handleVolver}>← Volver</button>
     <h1 className="text-2xl font-bold">Bandeja de expedientes</h1>
     <form onSubmit={filtrar} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 [&_label]:flex [&_label]:min-w-0 [&_label]:flex-col [&_label]:gap-1 [&_input]:min-w-0 [&_input]:w-full [&_input]:rounded [&_input]:border [&_input]:border-slate-500 [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_select]:w-full [&_select]:rounded [&_select]:border [&_select]:border-slate-500 [&_select]:bg-white [&_select]:px-3 [&_select]:py-2 [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-blue-700 [&_select:focus-visible]:outline-2 [&_select:focus-visible]:outline-offset-2 [&_select:focus-visible]:outline-blue-700">
       <label>Buscar CUT o asunto<input name="terminoBusqueda" maxLength={100} type="search" /></label>

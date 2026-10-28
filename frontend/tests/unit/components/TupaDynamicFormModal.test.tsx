@@ -150,6 +150,27 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
     expect(mockOnExito).toHaveBeenCalledWith('SOL-2026-000042');
   });
 
+  it('no fabrica un SOL ni muestra éxito cuando el POST falla', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, json: () => Promise.resolve({ detail: 'Servicio no disponible' }) });
+    const onExito = vi.fn();
+    const actor = userEvent.setup();
+    render(<TupaDynamicFormModal isOpen codigoInicial="p2-fila-09" onClose={vi.fn()} onExito={onExito} />);
+    await actor.type(screen.getByLabelText(/Teléfono \/ WhatsApp/i), '961123456');
+    await actor.click(screen.getByRole('button', { name: /Registrar Solicitud/i }));
+    expect(await screen.findByText('Servicio no disponible')).toBeInTheDocument();
+    expect(screen.queryByText(/Solicitud Registrada con Éxito/i)).not.toBeInTheDocument();
+    expect(onExito).not.toHaveBeenCalled();
+  });
+
+  it('redirige el documentario aprobado al flujo CUT sin crear SOL', () => {
+    globalThis.fetch = vi.fn();
+    render(<TupaDynamicFormModal isOpen codigoInicial="p1-fila-06" onClose={vi.fn()} />);
+    expect(screen.getByText(/Datos del Formulario \(DOCUMENTARIO\)/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ir a radicación CUT/i })).toHaveAttribute('href', '/tramite');
+    expect(screen.queryByRole('button', { name: /Registrar Solicitud/i })).not.toBeInTheDocument();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('valida programáticamente la integridad de la matriz 72/72 y las 7 tipologías canónicas', async () => {
     const { TUPA_FORMULARIOS_CONFIG } = await import('../../../src/data/tupaFormulariosConfig');
     expect(TUPA_FORMULARIOS_CONFIG).toHaveLength(72);
@@ -173,6 +194,8 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
 
     expect(conGeneraExpTrue).toHaveLength(18);
     expect(conGeneraExpFalse).toHaveLength(54);
+    expect(conGeneraExpFalse.filter((c) => c.bloqueadoParaCiudadano)).toHaveLength(5);
+    expect(conGeneraExpFalse.filter((c) => !c.bloqueadoParaCiudadano)).toHaveLength(49);
 
     for (const item of TUPA_FORMULARIOS_CONFIG) {
       expect(item.codigoRef).toBeTruthy();
@@ -183,5 +206,21 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
       expect(item.unidadCobro).toBeTruthy();
       expect(typeof item.generaExpediente).toBe('boolean');
     }
+  });
+
+  it.each([
+    ['p1-fila-06', 'DOCUMENTARIO', true, 'asuntoPetitorio'],
+    ['p2-fila-09', 'VENTA_BIEN', false, 'cantidad'],
+    ['p2-fila-06', 'ALQUILER', false, 'fechaEvento'],
+    ['p5-fila-01', 'ACADEMICO', false, 'programaEstudios'],
+    ['p3-fila-08', 'SERVICIO', false, 'detalleServicio'],
+    ['p1-fila-01', 'ACTUACION_INTERNA', false, 'motivoInterno'],
+    ['p4-fila-01', 'OTRO', false, 'asuntoPetitorio'],
+  ] as const)('%s usa %s y el campo %s', async (codigo, tipo, generaCut, campo) => {
+    const { obtenerDefinicionTupa } = await import('../../../src/data/tupaFormulariosConfig');
+    const def = obtenerDefinicionTupa(codigo);
+    expect(def?.tipoFormulario).toBe(tipo);
+    expect(def?.generaExpediente).toBe(generaCut);
+    expect(def?.campos.some((actual) => actual.nombre === campo)).toBe(true);
   });
 });

@@ -29,4 +29,14 @@ describe('URLs prefirmadas compatibles con clientes HTTP y MinIO', () => {
     expect(head.searchParams.get('X-Amz-SignedHeaders')).toBe('host');
     expect(head.searchParams.get('X-Amz-Signature')).not.toBe(get.searchParams.get('X-Amz-Signature'));
   });
+
+  it('firma If-None-Match para impedir reusar la URL de la copia oficial sobre el mismo objeto', () => {
+    const ahora = new Date('2026-10-23T12:00:00.000Z');
+    const simple = new URL(generarUrlPresigned('tupa/2026/oficiales/carga/documento.pdf', config,
+      { metodo: 'PUT', contentType: 'application/pdf', ahora }));
+    const inmutable = new URL(generarUrlPresigned('tupa/2026/oficiales/carga/documento.pdf', config,
+      { metodo: 'PUT', contentType: 'application/pdf', ifNoneMatch: true, ahora }));
+    expect(inmutable.searchParams.get('X-Amz-SignedHeaders')).toBe('content-type;host;if-none-match');
+    expect(inmutable.searchParams.get('X-Amz-Signature')).not.toBe(simple.searchParams.get('X-Amz-Signature'));
+  });
 });

@@ -60,6 +60,8 @@ import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
 import { securityHeadersMiddleware } from './middleware/security-headers.middleware.js';
+import { responseTimeMiddleware } from './middleware/observability.middleware.js';
+import { obtenerMetricasPool } from './database.js';
 import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.service.js';
 import { UnauthorizedError, ForbiddenError } from './shared/domain/errors/index.js';
 
@@ -146,6 +148,7 @@ export function construirApp(
 
   const app = express();
   app.disable('x-powered-by');
+  app.use(responseTimeMiddleware);
   app.use(securityHeadersMiddleware);
 
   app.use(corsMiddleware);
@@ -153,11 +156,13 @@ export function construirApp(
   app.use(contextMiddleware);
 
   app.get('/health', (_req, res) => {
+    const poolStats = obtenerMetricasPool(pool);
     res.json({
       status: 'ok',
       estado: 'UP',
       servicio: 'SIGD Backend',
       timestamp: new Date().toISOString(),
+      pool: poolStats,
     });
   });
 
@@ -218,7 +223,7 @@ export function construirApp(
   app.use('/api/v1', crearRouterAuth(pool));
   app.use('/api/v1', crearRouterCasilla(pool));
   app.use('/api/v1', crearRouterStorage(pool, opts.s3Client));
-  app.use('/api/v1', crearRouterTramites(pool));
+  app.use('/api/v1', crearRouterTramites(pool, undefined, opts.s3Client));
   app.use(
     '/api/v1',
     crearRouterRutaDoc(
@@ -369,7 +374,7 @@ export function construirApp(
    * Alias de Interoperabilidad Frontend-Backend (Plan Maestro §4.1)
    */
   // #14: POST /api/v1/tramite/radicacion -> /api/v1/tramites/radicacion-virtual
-  const routerTramites = crearRouterTramites(pool);
+  const routerTramites = crearRouterTramites(pool, undefined, opts.s3Client);
   app.post('/api/v1/tramite/radicacion', (req, res, next) => {
     req.url = '/tramites/radicacion-virtual';
     routerTramites(req, res, next);

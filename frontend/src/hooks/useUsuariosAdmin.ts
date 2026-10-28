@@ -117,6 +117,7 @@ export function useUsuariosAdmin() {
     isLoading: consulta.isLoading,
     isFetching: consulta.isFetching,
     error: consulta.error,
+    refetch: consulta.refetch,
     guardarPendiente: mutacionActualizacion.isPending,
     estadoPendiente: mutacionEstado.isPending,
   };

@@ -1,5 +1,9 @@
+import { useState } from "react";
+import { UserPlus, CheckCircle2 } from "lucide-react";
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
+import NuevoUsuarioModal from "../../components/administracion/NuevoUsuarioModal";
 import { useUsuariosAdmin } from "../../hooks/useUsuariosAdmin";
+import { useAuthStore } from "../../stores/authStore";
 import type { EstadoUsuario } from "../../types/usuarioAdmin";
 
 function estiloEstado(estado: EstadoUsuario) {
@@ -9,6 +13,11 @@ function estiloEstado(estado: EstadoUsuario) {
 }
 
 export default function UsuariosPage() {
+  const usuarioActual = useAuthStore((state) => state.usuario);
+  const esAdmin = usuarioActual?.rol === "ADMINISTRADOR";
+  const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
+
   const {
     usuarios,
     totalUsuarios,
@@ -27,13 +36,18 @@ export default function UsuariosPage() {
     isLoading,
     isFetching,
     error,
+    refetch,
   } = useUsuariosAdmin();
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <AdminPageHeader
-        title="Directorio de Usuarios (Solo Lectura)"
-        description="Consulta oficial del directorio institucional de cuentas, unidades orgánicas, cargos y roles."
+        title={esAdmin ? "Directorio y Gestión de Usuarios" : "Directorio de Usuarios (Solo Lectura)"}
+        description={
+          esAdmin
+            ? "Gestión de cuentas institucionales, registro de nuevos colaboradores y asignación de roles."
+            : "Consulta oficial del directorio institucional de cuentas, unidades orgánicas, cargos y roles."
+        }
       />
 
       <section className="mx-auto max-w-7xl px-6 py-8">
@@ -41,22 +55,55 @@ export default function UsuariosPage() {
           <div>
             <p className="text-sm text-slate-600">
               Directorio institucional de {totalUsuarios} cuentas registradas.
-              Búsqueda en tiempo real y filtro por estado operativo (Solo lectura).
+              Búsqueda en tiempo real y filtro por estado operativo.
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              La creación y modificación de usuarios institucionales se gestiona exclusivamente a través de los procedimientos administrativos y control de personal.
+              {esAdmin
+                ? "Como Administrador puede dar de alta nuevos usuarios institucionales asignándoles rol y área correspondiente."
+                : "La creación y modificación de usuarios institucionales se gestiona exclusivamente a través de los procedimientos administrativos y control de personal."}
             </p>
           </div>
-          {isFetching && !isLoading && (
-            <span
-              role="status"
-              aria-live="polite"
-              className="rounded-lg bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700"
-            >
-              Consultando directorio institucional...
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {isFetching && !isLoading && (
+              <span
+                role="status"
+                aria-live="polite"
+                className="rounded-lg bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700"
+              >
+                Consultando directorio institucional...
+              </span>
+            )}
+            {esAdmin && (
+              <button
+                type="button"
+                onClick={() => setModalNuevoAbierto(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                <UserPlus className="h-4 w-4" />
+                + Nuevo usuario
+              </button>
+            )}
+          </div>
         </div>
+
+        {mensajeExito && (
+          <div
+            role="status"
+            className="mb-5 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm"
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+              <span>{mensajeExito}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMensajeExito(null)}
+              className="text-xs font-semibold text-emerald-700 hover:text-emerald-900"
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
 
         {error && (
           <div
@@ -252,6 +299,19 @@ export default function UsuariosPage() {
           </div>
         </section>
       </section>
+
+      {esAdmin && (
+        <NuevoUsuarioModal
+          isOpen={modalNuevoAbierto}
+          onClose={() => setModalNuevoAbierto(false)}
+          roles={roles}
+          areas={areas}
+          onSuccess={(nombre: string) => {
+            setMensajeExito(`Usuario institucional ${nombre} registrado exitosamente.`);
+            void refetch();
+          }}
+        />
+      )}
     </main>
   );
 }

@@ -1,8 +1,18 @@
 import { useNavigate } from "react-router-dom";
 
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
+import { useAuthStore } from "../../stores/authStore";
+import type { RolCanonica } from "../../config/navigation.config";
 
-const modulos = [
+interface ModuloAdmin {
+  titulo: string;
+  descripcion: string;
+  ruta: string;
+  icono: React.ReactNode;
+  rolesPermitidos?: readonly RolCanonica[];
+}
+
+const modulos: ModuloAdmin[] = [
   {
     titulo: "Usuarios",
     descripcion:
@@ -64,10 +74,34 @@ const modulos = [
       </>
     ),
   },
+  {
+    titulo: "Gestión TUPA",
+    descripcion:
+      "Versiones, procedimientos, publicación e histórico del TUPA.",
+    ruta: "/administracion/tupa",
+    rolesPermitidos: ["ADMINISTRADOR"],
+    icono: (
+      <>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+      </>
+    ),
+  },
 ];
 
 export default function AdministracionPage() {
   const navigate = useNavigate();
+  const usuario = useAuthStore((state) => state.usuario);
+  const rol = usuario?.rol as RolCanonica | undefined;
+
+  const modulosVisibles = modulos.filter((modulo) => {
+    if (modulo.rolesPermitidos) {
+      return rol && modulo.rolesPermitidos.includes(rol);
+    }
+    return true;
+  });
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -82,7 +116,7 @@ export default function AdministracionPage() {
         </p>
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {modulos.map((modulo) => (
+          {modulosVisibles.map((modulo) => (
             <article
               key={modulo.titulo}
               className="group rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition duration-200 ease-out hover:shadow-md motion-safe:hover:-translate-y-1 motion-reduce:transition-none"

@@ -31,6 +31,7 @@ function sla(id: string) {
     estado: id === A ? "VERDE" : "ROJO" };
 }
 function recurso(id: string, sufijo: string) {
+  if (sufijo === "/resumen") throw new ApiHttpError({ type: "about:blank", title: "Not Found", status: 404, detail: "Not found", instance: sufijo, code: "NOT_FOUND", category: "Business", correlationId: C, retryable: false });
   if (sufijo === "/tupa") return { tupa: null };
   if (sufijo === "") return detalle(id);
   if (sufijo === "/sla-status") return sla(id);
@@ -203,7 +204,7 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     expect(await screen.findByText(id === A ? "EVENTO_A · NORMAL" : "EVENTO_B · NORMAL")).toBeInTheDocument();
     expect(await screen.findByText(id === A ? "F. 0001 a F. 0003 · 3 folios" : "F. 0001 a F. 0007 · 7 folios")).toBeInTheDocument();
     expect(await within(screen.getByRole("region", { name: "SLA" })).findByText(id === A ? "VERDE" : "ROJO")).toBeInTheDocument();
-    expect(get.mock.calls.map(([url]) => new URL(url, "http://localhost").pathname).filter((ruta) => ruta !== "/api/v1/organigrama/areas-activas").sort()).toEqual([
+    expect(get.mock.calls.map(([url]) => new URL(url, "http://localhost").pathname).filter((ruta) => ruta !== "/api/v1/organigrama/areas-activas" && !ruta.endsWith("/resumen")).sort()).toEqual([
       `/api/v1/expedientes/${id}`, `/api/v1/expedientes/${id}/trazabilidad`,
       `/api/v1/expedientes/${id}/foliacion`, `/api/v1/expedientes/${id}/sla-status`,
       `/api/v1/tramites/expedientes/${id}/tupa`,
@@ -499,7 +500,7 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     const signals: AbortSignal[] = [];
     instalar((url, config) => {
       const { id, sufijo } = endpoint(url);
-      if (id === A) {
+      if (id === A && sufijo !== "/resumen") {
         if (config?.signal) signals.push(config.signal as AbortSignal);
         // Ignora deliberadamente AbortSignal: prueba también aislamiento por clave.
         return new Promise(resolve => pendientes.push(() => resolve(respuesta(recurso(A, sufijo)))));
