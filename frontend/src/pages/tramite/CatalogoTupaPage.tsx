@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search,
   CheckCircle2,
@@ -34,11 +34,22 @@ export default function CatalogoTupaPage() {
   const [versionActiva, setVersionActiva] = useState<{ codigo: string; anio: number } | null>(null);
   const [origenDatos, setOrigenDatos] = useState<'BASE_DE_DATOS' | 'CATALOGO_CANONICO'>('CATALOGO_CANONICO');
 
+  const [searchParams] = useSearchParams();
+  const paramProcedimiento = searchParams.get('procedimiento') || searchParams.get('search') || '';
+
   // Filtros
-  const [busqueda, setBusqueda] = useState('');
-  const [busquedaDebounced, setBusquedaDebounced] = useState('');
+  const [busqueda, setBusqueda] = useState(paramProcedimiento);
+  const [busquedaDebounced, setBusquedaDebounced] = useState(paramProcedimiento);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<CategoriaTupa | 'TODAS'>('TODAS');
   const [filtroRadicacion, setFiltroRadicacion] = useState<'TODOS' | 'SI' | 'NO'>('TODOS');
+
+  // Sincronizar con cambios en la URL (ej. navegación desde el Asistente Público)
+  useEffect(() => {
+    if (paramProcedimiento) {
+      setBusqueda(paramProcedimiento);
+      setBusquedaDebounced(paramProcedimiento);
+    }
+  }, [paramProcedimiento]);
 
   // Debounce de 250ms en la búsqueda de procedimientos
   useEffect(() => {
