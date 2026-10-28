@@ -6,13 +6,13 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_password
-      POSTGRES_DB: sigd_prueba
+      POSTGRES_DB: SIGD
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d sigd_prueba"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d SIGD"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -61,7 +61,7 @@ services:
     environment:
       PORT: 3000
       NODE_ENV: development
-      DATABASE_URL: postgres://postgres:postgres_password@postgres:5432/sigd_prueba
+      DATABASE_URL: postgres://postgres:postgres_password@postgres:5432/SIGD
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: minioadmin
       S3_SECRET_KEY: minioadminpassword
@@ -89,10 +89,6 @@ services:
     environment:
       VITE_API_BASE_URL: http://localhost:3000/api/v1
       VITE_ENABLE_MOCKS: "false"
-      # El bind mount del host (Windows) no emite eventos inotify hacia el
-      # contenedor: sin polling, Vite no invalida la caché y el navegador
-      # sigue viendo el diseño anterior.
-      VITE_WATCH_POLLING: "true"
     ports:
       - "5173:5173"
     depends_on:

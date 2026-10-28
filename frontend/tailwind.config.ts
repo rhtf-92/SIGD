@@ -1,11 +1,5 @@
 import type { Config } from "tailwindcss";
 
-// AVISO: Tailwind v4 (CSS-first) no carga este archivo salvo que se referencie
-// con `@config` desde el CSS. Los tokens del sistema de diseño institucional
-// ("Bóveda documental") viven en `src/styles/theme.css` dentro de `@theme`.
-// La paleta `suiza.*` de aquí se conserva como referencia de la identidad
-// original del IESTP Público "Suiza" (azul #006EC7, fucsia #E6007E,
-// ámbar #F9E000, tinta #0A192F, sepia #8B5A2B).
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {

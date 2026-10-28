@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiClient } from "../api/client";
-import SelloInstitucional from "../components/common/SelloInstitucional";
 import { notificarCambioSesion } from "../config/accesoModulos";
 import { permisosIniciales } from "../hooks/useRbacConfig";
 import { useAuthStore } from "../stores/authStore";
@@ -15,11 +14,11 @@ const PASSWORD_DEMO = "123";
 
 /** Usuario semilla por rol (coincide con migración 08_usuarios_demo.sql en BD SIGD). */
 export const ROLES_CANONICOS = [
-  { id: "SUPER_ADMIN", label: "SA", usuario: "superadmin", destino: "/administracion", requierePassword: true },
-  { id: "DIRECTOR", label: "Director General", usuario: "director", destino: "/administracion", requierePassword: true },
-  { id: "DOCENTE", label: "Docente", usuario: "docente", destino: "/flujos/titulacion", requierePassword: true },
-  { id: "MESA_PARTES", label: "Mesa de Partes", usuario: "mesa_partes", destino: "/tramite/ventanilla-presencial", requierePassword: true },
-  { id: "ESTUDIANTE", label: "Estudiante", usuario: "estudiante", destino: "/casilla", requierePassword: false },
+  { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", usuario: "superadmin", destino: "/administracion", requierePassword: true },
+  { id: "DIRECTOR", label: "DIRECTOR — Director General", usuario: "director", destino: "/administracion", requierePassword: true },
+  { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", usuario: "docente", destino: "/flujos/titulacion", requierePassword: true },
+  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", usuario: "mesa_partes", destino: "/tramite/ventanilla-presencial", requierePassword: true },
+  { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", usuario: "estudiante", destino: "/casilla", requierePassword: false },
 ];
 
 export default function LoginPage() {
@@ -45,14 +44,16 @@ export default function LoginPage() {
     event?.preventDefault();
     setError("");
 
-    if (pidePassword && !password.trim()) {
-      setError("Por favor, ingrese su contraseña.");
+    // 1) Validación local: todo el personal interno usa contraseña "123".
+    //    ESTUDIANTE ingresa directo (sin contraseña) por ser acceso ciudadano.
+    if (pidePassword && password !== PASSWORD_DEMO) {
+      setError("Contraseña incorrecta. El personal institucional ingresa con la clave “123”.");
       return;
     }
 
     setCargando(true);
     const identificador = rolActual.usuario;
-    const clave = pidePassword ? password : PASSWORD_DEMO;
+    const clave = pidePassword ? PASSWORD_DEMO : PASSWORD_DEMO;
 
     // 2) Intento real contra la base de datos SIGD (PostgreSQL / pgAdmin).
     try {
@@ -79,10 +80,6 @@ export default function LoginPage() {
         navigate(rolActual.destino, { replace: true });
         return;
       } catch {
-        if (pidePassword && password !== PASSWORD_DEMO) {
-          setError("Contraseña incorrecta. Inténtelo nuevamente.");
-          return;
-        }
         guardarSesionDemo("demo-jwt-" + Date.now(), rol);
         navigate(rolActual.destino, { replace: true });
       }
@@ -92,122 +89,100 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="lienzo-oficio flex min-h-screen items-center justify-center px-4 py-10 text-vault-tinta">
-      <section className="w-full max-w-md overflow-hidden rounded-xl border border-vault-papel-3 bg-white shadow-[var(--shadow-ficha)]">
-        {/* Identidad institucional */}
-        <header className="flex items-center gap-3 border-b border-vault-papel-2 bg-vault-papel px-7 py-6">
-          <span className="shrink-0 text-vault-azul">
-            <SelloInstitucional className="h-11 w-11" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-vault-azul-tinta">
-              IESTP Público “Suiza” · Pucallpa
-            </p>
-            <p className="mt-1 text-[13px] font-semibold leading-snug text-vault-tinta">
-              Sistema Integral de Gestión Documentaria
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-900">
+      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <Link
+          to="/"
+          className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+        >
+          ← Volver al inicio
+        </Link>
+        <p className="text-sm font-bold text-blue-700">SIGD IESTP "SUIZA"</p>
+        <h1 className="mt-1 text-2xl font-bold">Iniciar sesión</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Base de datos <span className="font-mono font-bold">SIGD</span> (PostgreSQL · pgAdmin).
+          Cada usuario solo verá sus módulos correspondientes.
+        </p>
+
+        <form onSubmit={iniciarSesion} className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="rol" className="mb-2 block text-sm font-semibold">
+              Rol institucional
+            </label>
+            <select
+              id="rol"
+              value={rol}
+              onChange={(event) => {
+                setRol(event.target.value);
+                setError("");
+                setPassword("");
+              }}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium"
+            >
+              {ROLES_CANONICOS.map((opcion) => (
+                <option key={opcion.id} value={opcion.id}>
+                  {opcion.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-slate-500">
+              Usuario BD: <span className="font-mono font-bold">{rolActual.usuario}</span>
+              {pidePassword ? (
+                <> · Clave institucional: <span className="font-mono font-bold">123</span></>
+              ) : (
+                <> · Acceso directo (sin contraseña)</>
+              )}
             </p>
           </div>
-        </header>
 
-        <div className="px-7 py-6">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 rounded-md border border-vault-papel-3 bg-white px-3 py-1.5 text-xs font-semibold text-tinta-600 transition hover:bg-vault-papel hover:text-vault-tinta"
-          >
-            ← Volver al inicio
-          </Link>
-
-          <h1 className="mt-5 text-xl font-extrabold tracking-tight text-vault-tinta">
-            Iniciar sesión
-          </h1>
-          <p className="mt-1.5 text-[13px] leading-5 text-tinta-500">
-            Sesiones validadas contra{" "}
-            <span className="font-mono text-[12px]">sigd_auth.cuenta_usuario</span>.
-            Cada usuario sólo verá sus módulos correspondientes.
-          </p>
-
-          <form onSubmit={iniciarSesion} className="mt-6 space-y-4">
+          {pidePassword ? (
             <div>
-              <label
-                htmlFor="rol"
-                className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-tinta-500"
-              >
-                Rol institucional
+              <label htmlFor="password" className="mb-2 block text-sm font-semibold">
+                Contraseña institucional
               </label>
-              <select
-                id="rol"
-                value={rol}
-                onChange={(event) => {
-                  setRol(event.target.value);
-                  setError("");
-                  setPassword("");
-                }}
-                className="input-sigd"
-              >
-                {ROLES_CANONICOS.map((opcion) => (
-                  <option key={opcion.id} value={opcion.id}>
-                    {opcion.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {pidePassword ? (
-              <div>
-                <label
-                  htmlFor="password"
-                  className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-tinta-500"
+              <div className="relative">
+                <input
+                  id="password"
+                  type={mostrar ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Ingrese 123"
+                  autoComplete="current-password"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-16 text-sm font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrar((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs font-bold text-slate-500 hover:text-blue-700"
                 >
-                  Contraseña institucional
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={mostrar ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Ingrese su contraseña"
-                    autoComplete="current-password"
-                    className="input-sigd pr-24"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setMostrar((v) => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[11px] font-bold text-tinta-500 transition hover:text-vault-azul-tinta"
-                  >
-                    {mostrar ? "Ocultar" : "Ver"}
-                  </button>
-                </div>
+                  {mostrar ? "Ocultar" : "Ver"}
+                </button>
               </div>
-            ) : (
-              <div className="rounded-lg border border-estado-ok/25 bg-estado-ok-lavado px-3 py-2.5 text-xs font-medium text-estado-ok">
-                Acceso de estudiante: ingreso inmediato a Mesa Virtual, Casilla,
-                Consulta y Validador.
-              </div>
-            )}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-800">
+              Acceso de estudiante: ingreso inmediato a Mesa Virtual, Casilla, Consulta y Validador.
+            </div>
+          )}
 
-            {error && (
-              <p
-                role="alert"
-                className="rounded-lg border border-estado-error/25 bg-estado-error-lavado px-3 py-2 text-xs font-semibold text-estado-error"
-              >
-                {error}
-              </p>
-            )}
+          {error && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+              {error}
+            </p>
+          )}
 
-            <button
-              type="submit"
-              disabled={cargando}
-              className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {cargando ? "Verificando en BD SIGD…" : "Ingresar al sistema"}
-            </button>
-          </form>
+          <button
+            type="submit"
+            disabled={cargando}
+            className="w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-50"
+          >
+            {cargando ? "Verificando en BD SIGD…" : "Ingresar al sistema"}
+          </button>
+        </form>
 
-          <p className="mt-4 border-t border-vault-papel-2 pt-3 text-center text-[10px] font-medium uppercase tracking-[0.1em] text-tinta-400">
-            Ley N.º 27444 · TUO · Ley N.º 27269
-          </p>
-        </div>
+        <p className="mt-4 text-center text-[11px] text-slate-400">
+          Sesiones validadas contra <span className="font-mono">sigd_auth.cuenta_usuario</span> · JWT 15 min
+        </p>
       </section>
     </main>
   );

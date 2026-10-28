@@ -1,27 +1,10 @@
-/* `source(none)` desactiva la detección automática de fuentes: el alcance se
-   declara de forma explícita para que el escáner no lea los propios CSS del
-   proyecto (de ahí salían utilidades fantasma como
-   `bg-[linear-gradient(90deg,#006EC7,#E6007E,#F9E000)]`). */
-@import "tailwindcss" source(none);
+@import "tailwindcss";
 @import "./styles/theme.css";
-
-@source "./**/*.{ts,tsx}";
-@source "../index.html";
 
 @layer base {
   :root {
-    /* Altura real de la banda institucional
-       (banda 60px + tira 30px + filete inferior 1px).
-       Se usa para anclar el rail lateral y calcular el alto útil del lienzo. */
-    --sigd-altura-cabecera: 91px;
-    --sigd-ancho-rail: 16.5rem;
-  }
-
-  @media (max-width: 767px) {
-    :root {
-      /* En móvil la tira de estado se oculta: banda 60px + filete 1px. */
-      --sigd-altura-cabecera: 61px;
-    }
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 
   html {
@@ -33,62 +16,54 @@
   }
 
   body {
-    background-color: var(--color-vault-papel);
-    color: var(--color-vault-tinta);
+    background-color: #f8fafc;
+    color: #0f172a;
     font-family: var(--font-sans);
   }
 
-  /* Foco visible y coherente con la paleta institucional. */
-  :focus-visible {
-    outline: 2px solid var(--color-vault-azul);
-    outline-offset: 2px;
-  }
-
-  /* Scrollbars discretas, en clave papel/tinta. */
+  /* Sleek modern scrollbars */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #c9c4b8;
+    background: #cbd5e1;
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #a8a294;
-  }
-
-  /* Los módulos de scroll internos (rail, paneles) usan tinta suave. */
-  .scroll-tinta {
-    scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
-    scrollbar-width: thin;
+    background: #94a3b8;
   }
 }
 
-/* Utilidades del sistema institucional */
+/* Institutional Design System Utilities */
 @layer utilities {
-  /* Malla de fondo para superficies overlays (modales, paneles). */
   .bg-mesh-pattern {
-    background-color: var(--color-vault-papel);
+    background-color: #f8fafc;
+    background-image: 
+      radial-gradient(at 10% 10%, rgba(0, 110, 199, 0.04) 0px, transparent 50%),
+      radial-gradient(at 90% 0%, rgba(230, 0, 126, 0.03) 0px, transparent 50%),
+      radial-gradient(at 90% 90%, rgba(5, 150, 105, 0.03) 0px, transparent 50%),
+      radial-gradient(at 10% 90%, rgba(0, 110, 199, 0.03) 0px, transparent 50%);
   }
 
   .glass-card {
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid var(--color-vault-papel-3);
-    box-shadow: var(--shadow-ficha);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
   }
 
   .glass-card-hover {
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .glass-card-hover:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-ficha-alta);
-    border-color: #c3bcac;
+    box-shadow: 0 12px 30px -4px rgba(0, 110, 199, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
+    border-color: rgba(0, 110, 199, 0.3);
   }
 
   .suiza-badge {
@@ -107,7 +82,7 @@
     position: relative;
   }
   .pulse-indicator::after {
-    content: "";
+    content: '';
     position: absolute;
     top: 0;
     left: 0;
@@ -127,11 +102,5 @@
       transform: scale(2.4);
       opacity: 0;
     }
-  }
-
-  /* Sello de agua monoespaciado (códigos de módulo, folios, versiones). */
-  .codigo-mono {
-    font-family: var(--font-mono);
-    font-variant-ligatures: none;
   }
 }
