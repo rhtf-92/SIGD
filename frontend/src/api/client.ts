@@ -78,7 +78,17 @@ apiClient.interceptors.response.use(
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-      if (!(originalRequest.url?.includes("/auth/refresh") || originalRequest._retry)) {
+      // Sesión local/demo (token creado por el fallback del LoginPage, sin JWT real
+      // del backend): no hay refresh token que rotar. En ese caso NO se destruye la
+      // sesión para no dejar al usuario "Invitado" dentro de un módulo protegido;
+      // el error 401 se propaga normalmente al componente que lo solicitó.
+      const tokenAlmacenado =
+        (typeof localStorage !== "undefined" && localStorage.getItem("sigd_token")) || "";
+      const esSesionDemo = !tokenAlmacenado || tokenAlmacenado.startsWith("demo-jwt-");
+
+      if (esSesionDemo) {
+        // Sin refresh ni logout: el módulo decide cómo degradar (fixtures/mensaje).
+      } else if (!(originalRequest.url?.includes("/auth/refresh") || originalRequest._retry)) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             pendingQueue.push({

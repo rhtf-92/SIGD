@@ -9,6 +9,8 @@ export interface UsuarioPerfil {
   correo: string;
   rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE';
   areaId?: string;
+  dni?: string;
+  numeroDocumento?: string;
 }
 
 interface LoginCredentials {

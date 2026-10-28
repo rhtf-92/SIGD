@@ -1,6 +1,7 @@
 // Fuente única de verdad de visibilidad de módulos por rol (RBAC de navegación).
 // Conforme a SIGD-DOC-ADMIN-SEGURIDAD-AUDITORIA-03 y ENT-M05-03.
 import type { RolCanonicoId } from "../types/rbacRoles";
+import type { FamiliaModulo } from "./taxonomiaModulos";
 
 export const TODOS_LOS_ROLES: RolCanonicoId[] = [
   "SUPER_ADMIN",
@@ -18,6 +19,8 @@ export interface ModuloSistema {
   descripcion: string;
   /** Ruta canónica de entrada al módulo. */
   ruta: string;
+  /** Familia de archivo a la que pertenece (agrupa el rail lateral). */
+  familia?: FamiliaModulo;
   /** Roles institucionales autorizados. SUPER_ADMIN siempre accede a todo. */
   roles: RolCanonicoId[];
   /** Accesible sin sesión iniciada (portal público). */
@@ -31,6 +34,7 @@ export interface ModuloSistema {
 export const MODULOS: ModuloSistema[] = [
   {
     id: "registro",
+    familia: "ingreso",
     titulo: "Registro Ciudadano",
     subtitulo: "ENT-M01-01 / ENT-M01-02",
     descripcion:
@@ -41,6 +45,7 @@ export const MODULOS: ModuloSistema[] = [
   },
   {
     id: "casilla",
+    familia: "gestion",
     titulo: "Casilla Electrónica",
     subtitulo: "ENT-M01-03",
     descripcion:
@@ -52,6 +57,7 @@ export const MODULOS: ModuloSistema[] = [
   },
   {
     id: "mesa-partes",
+    familia: "ingreso",
     titulo: "Mesa de Partes Virtual",
     subtitulo: "ENT-M02 / TUPA",
     descripcion:
@@ -63,6 +69,7 @@ export const MODULOS: ModuloSistema[] = [
   },
   {
     id: "ventanilla",
+    familia: "ingreso",
     titulo: "Ventanilla Presencial",
     subtitulo: "ENT-M02 / Atención en sede",
     descripcion:
@@ -72,6 +79,7 @@ export const MODULOS: ModuloSistema[] = [
   },
   {
     id: "expedientes",
+    familia: "gestion",
     titulo: "Bandeja de Expedientes",
     subtitulo: "ENT-M05",
     descripcion:
@@ -81,6 +89,7 @@ export const MODULOS: ModuloSistema[] = [
   },
   {
     id: "validez-legal",
+    familia: "validez",
     titulo: "Flujo y Validez Legal",
     subtitulo: "MOD-04 / Firma Digital",
     descripcion:
@@ -92,6 +101,7 @@ export const MODULOS: ModuloSistema[] = [
   },
   {
     id: "titulacion",
+    familia: "validez",
     titulo: "Workflow Académico",
     subtitulo: "MOD-05 / Titulación",
     descripcion:
@@ -101,6 +111,7 @@ export const MODULOS: ModuloSistema[] = [
   },
   {
     id: "resoluciones",
+    familia: "validez",
     titulo: "Proyector de Resoluciones",
     subtitulo: "MOD-04 / Actos resolutivos",
     descripcion:
@@ -110,6 +121,7 @@ export const MODULOS: ModuloSistema[] = [
   },
   {
     id: "reportes",
+    familia: "gobierno",
     titulo: "Reportes y Tableros de Control",
     subtitulo: "06_reportes-tablero-control",
     descripcion:
@@ -119,6 +131,7 @@ export const MODULOS: ModuloSistema[] = [
   },
   {
     id: "validador-cvd",
+    familia: "validez",
     titulo: "Validador CVD",
     subtitulo: "MOD-04 / Verificación",
     descripcion:
@@ -130,6 +143,7 @@ export const MODULOS: ModuloSistema[] = [
   },
   {
     id: "administracion",
+    familia: "gobierno",
     titulo: "Panel de Administración",
     subtitulo: "ENT-M05-01 / RBAC",
     descripcion:

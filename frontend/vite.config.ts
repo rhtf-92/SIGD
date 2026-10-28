@@ -13,6 +13,14 @@ export default defineConfig({
     },
   },
   server: {
+    // En Docker Desktop el frontend corre sobre un bind mount de Windows:
+    // los eventos inotify no llegan al contenedor, así que Vite seguía
+    // sirviendo la versión cacheada de los archivos y los cambios del host
+    // no se veían en el navegador. Con polling el watcher sí reacciona.
+    watch: {
+      usePolling: process.env.VITE_WATCH_POLLING === "true",
+      interval: 400,
+    },
     proxy: {
       "/api": {
         target: "http://localhost:3000",

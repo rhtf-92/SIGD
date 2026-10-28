@@ -1,93 +1,175 @@
 import { Link, useNavigate } from "react-router-dom";
-import {
-  filtrarModulosPorRol,
-  useSesion,
-} from "../config/accesoModulos";
+import { ArrowUpRight, ShieldCheck, UserRound } from "lucide-react";
+
+import TarjetaModulo from "../components/common/TarjetaModulo";
+import { filtrarModulosPorRol, useSesion } from "../config/accesoModulos";
 import { useAuthStore } from "../stores/authStore";
 
 export default function HomePage() {
   const { rol, autenticado } = useSesion();
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
-  const secciones = filtrarModulosPorRol(rol, autenticado);
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6 py-12 text-slate-900">
-      <div className="text-center space-y-2 max-w-2xl">
-        <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800">
-          IESTP &quot;Suiza&quot; — Pucallpa
-        </div>
-        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-          SIGD
-        </h1>
-        <p className="text-lg font-medium text-slate-700">
-          Sistema Integral de Gestión Documentaria
-        </p>
-        <p className="text-sm text-slate-500">
-          Plataforma Institucional y Notificación Electrónica con Validez Legal
-        </p>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold">
-          {autenticado && rol ? (
-            <>
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">
-                Sesión activa: {rol} · {secciones.length} módulo{secciones.length === 1 ? "" : "s"} asignado{secciones.length === 1 ? "" : "s"}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  logout();
-                  navigate("/login");
-                }}
-                className="rounded-full border border-slate-300 bg-white px-3 py-1 text-slate-700 hover:bg-slate-100"
-              >
-                Cerrar sesión
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">
-                Sin sesión: solo módulos públicos
-              </span>
-              <Link
-                to="/login"
-                className="rounded-full bg-blue-700 px-3 py-1 text-white hover:bg-blue-800"
-              >
-                Iniciar sesión para ver tus módulos
-              </Link>
-            </>
-          )}
-        </div>
-        {autenticado && rol && (
-          <p className="mt-3 text-xs font-medium text-slate-500">
-            Mostrando únicamente los módulos correspondientes a su rol (<span className="font-bold">{rol}</span>),
-            según la base de datos institucional SIGD.
-          </p>
-        )}
-      </div>
 
-      <div className="mt-10 grid w-full max-w-4xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {secciones.map((seccion) => (
-          <Link
-            key={seccion.ruta}
-            to={seccion.ruta}
-            className={`group rounded-xl border p-6 shadow-sm transition duration-200 ease-out hover:shadow-md motion-safe:hover:-translate-y-1 motion-reduce:transition-none ${
-              seccion.destacado
-                ? "border-blue-300 bg-blue-50/50 hover:border-blue-400"
-                : "border-slate-200 bg-white hover:border-slate-300"
-            }`}
-          >
-            {seccion.subtitulo && (
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600">
-                {seccion.subtitulo}
-              </span>
-            )}
-            <h2 className="mt-1 text-lg font-bold text-slate-900 group-hover:text-blue-700">
-              {seccion.titulo}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              {seccion.descripcion}
+  const secciones = filtrarModulosPorRol(rol, autenticado);
+  const publicos = secciones.filter((modulo) => modulo.publico).length;
+  const prioritarios = secciones.filter((modulo) => modulo.destacado).length;
+
+  return (
+    <main className="lienzo-oficio min-h-[calc(100vh_-_var(--sigd-altura-cabecera))]">
+      <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
+        {/* ------------------------------------------------------------------
+            Portada institucional
+        ------------------------------------------------------------------ */}
+        <section className="portada">
+          <div className="grid gap-8 p-6 sm:p-9 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:p-10">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-vault-azul-tinta">
+                IESTP Público “Suiza” · Pucallpa
+              </p>
+
+              <h1 className="mt-3 text-3xl font-extrabold leading-[1.15] tracking-tight text-vault-tinta sm:text-4xl lg:text-[2.6rem]">
+                Sistema Integral de
+                <span className="block">Gestión Documentaria</span>
+              </h1>
+
+              <p className="mt-4 max-w-xl text-sm leading-6 text-tinta-500">
+                Bandeja de expedientes, mesa de partes, casilla electrónica y
+                firma digital con plena validez legal.
+              </p>
+
+              {/* Estado de la sesión vigente */}
+              <div className="mt-6 flex flex-wrap items-center gap-2">
+                {autenticado && rol ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-estado-ok/25 bg-estado-ok-lavado px-2.5 py-1.5 text-[11px] font-semibold text-estado-ok">
+                      <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                      Sesión activa · {rol}
+                    </span>
+                    <span className="rounded-md border border-vault-papel-3 bg-white px-2.5 py-1.5 text-[11px] font-medium text-tinta-600">
+                      {secciones.length} módulos asignados
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        logout();
+                        navigate("/login");
+                      }}
+                      className="rounded-md border border-vault-papel-3 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-tinta-600 transition hover:border-tinta-300 hover:text-vault-tinta"
+                    >
+                      Cerrar sesión
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-estado-alerta/25 bg-estado-alerta-lavado px-2.5 py-1.5 text-[11px] font-semibold text-estado-alerta">
+                      <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
+                      Sin sesión: sólo módulos públicos
+                    </span>
+                    <Link
+                      to="/login"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-vault-azul px-4 py-2 text-[11px] font-bold uppercase tracking-[0.04em] text-white transition hover:bg-vault-azul-profundo"
+                    >
+                      Iniciar Sesión
+                      <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Link>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Datos de la institución */}
+            <div className="w-full lg:w-64">
+              <p className="border-b border-vault-papel-2 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-tinta-400">
+                Datos de la institución
+              </p>
+              <dl className="mt-1">
+                <div className="dato-institucion">
+                  <dt className="text-tinta-500">Sede</dt>
+                  <dd className="font-semibold text-vault-tinta">Pucallpa</dd>
+                </div>
+                <div className="dato-institucion">
+                  <dt className="text-tinta-500">Alcance</dt>
+                  <dd className="font-semibold text-vault-tinta">
+                    {autenticado ? "Interno" : "Ciudadano"}
+                  </dd>
+                </div>
+                <div className="dato-institucion">
+                  <dt className="text-tinta-500">Módulos</dt>
+                  <dd className="font-semibold text-vault-tinta">
+                    {String(secciones.length).padStart(2, "0")}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </section>
+
+        {/* ------------------------------------------------------------------
+            Resumen
+        ------------------------------------------------------------------ */}
+        <section
+          aria-label="Resumen del catálogo"
+          className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4"
+        >
+          <div className="dato-resumen">
+            <span className="dato-cifra">{String(secciones.length).padStart(2, "0")}</span>
+            <span className="dato-rotulo">Módulos habilitados</span>
+          </div>
+          <div className="dato-resumen">
+            <span className="dato-cifra">{String(publicos).padStart(2, "0")}</span>
+            <span className="dato-rotulo">Accesos públicos</span>
+          </div>
+          <div className="dato-resumen">
+            <span className="dato-cifra">{String(prioritarios).padStart(2, "0")}</span>
+            <span className="dato-rotulo">Accesos prioritarios</span>
+          </div>
+          <div className="dato-resumen">
+            <span className="text-[13px] font-bold uppercase tracking-wide text-vault-tinta">
+              {autenticado && rol ? rol : "Visitante"}
+            </span>
+            <span className="dato-rotulo">Perfil vigente</span>
+          </div>
+        </section>
+
+        {/* ------------------------------------------------------------------
+            Catálogo de módulos
+        ------------------------------------------------------------------ */}
+        <section className="mt-9">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-vault-papel-3 pb-3">
+            <div>
+              <h2 className="section-title">Catálogo de módulos</h2>
+              <p className="mt-1 text-xs leading-5 text-tinta-500">
+                Accesos disponibles para su perfil institucional.
+              </p>
+            </div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-tinta-400">
+              {secciones.length} accesos ·{" "}
+              {autenticado ? "orden por rol" : "acceso público"}
             </p>
-          </Link>
-        ))}
+          </div>
+
+          {secciones.length === 0 ? (
+            <p className="mt-5 rounded-xl border border-dashed border-vault-papel-3 bg-white/60 px-6 py-10 text-center text-sm text-tinta-500">
+              No hay módulos habilitados para su perfil institucional.
+            </p>
+          ) : (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {secciones.map((modulo, indice) => (
+                <TarjetaModulo
+                  key={modulo.id}
+                  modulo={modulo}
+                  indice={indice}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <p className="mt-9 border-t border-vault-papel-3 pt-4 text-[11px] leading-5 text-tinta-400">
+          La visibilidad de cada módulo se resuelve contra la matriz RBAC
+          institucional (ENT-M05-03). Al iniciar sesión se muestran únicamente
+          los módulos asignados a su rol.
+        </p>
       </div>
     </main>
   );

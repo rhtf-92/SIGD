@@ -81,6 +81,13 @@ export default function UserEditModal({
     });
   }, [usuario, reset]);
 
+  // Un usuario histórico puede tener un rol que ya no figura en el catálogo
+  // vigente. Se conserva como opción para que la edición no quede bloqueada.
+  const rolesDisponibles =
+    usuario.rol && !roles.includes(usuario.rol)
+      ? [usuario.rol, ...roles]
+      : roles;
+
   async function enviar(values: UsuarioAdminForm) {
     try {
       await onSave({ ...usuario, ...values, correo: values.correo.trim().toLowerCase() });
@@ -258,7 +265,7 @@ export default function UserEditModal({
               {...register("rol", { required: "Debe asignar un rol institucional." })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
             >
-              {roles.map((rol) => (
+              {rolesDisponibles.map((rol) => (
                 <option key={rol} value={rol}>
                   {rol}
                 </option>

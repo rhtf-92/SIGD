@@ -2,12 +2,28 @@ import { useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "../api/client";
 import { EXPEDIENTES_FIXTURE } from "../data/expedientesFixtures";
+import { ApiHttpError } from "../types/api";
 import type { EstadoFlujoExpediente, ExpedienteSGD } from "../types/expediente";
 
 /** Retardo de red simulado en modo mock, conforme al estándar de la arquitectura (300 ms). */
 const RETARDO_MOCK_MS = 300;
 
 const usarMocks = import.meta.env.VITE_ENABLE_MOCKS === "true";
+
+/**
+ * ¿La sesión actual es una sesión local/demo creada por el fallback del LoginPage
+ * (token `demo-jwt-…`) y no un JWT real del backend?
+ * Esas sesiones no pueden autenticar los endpoints que exigen un actor
+ * (p. ej. GET /api/v1/expedientes de RutaDoc responde 401).
+ */
+function esSesionLocalDemo(): boolean {
+  try {
+    const token = window.localStorage.getItem("sigd_token") ?? "";
+    return !token || token.startsWith("demo-jwt-");
+  } catch {
+    return false;
+  }
+}
 
 export interface FiltrosBandejaExpedientes {
   /** Pestaña activa. `undefined` trae todos los expedientes (usado para calcular contadores). */
@@ -22,8 +38,19 @@ async function obtenerExpedientesMock(): Promise<ExpedienteSGD[]> {
 }
 
 async function obtenerExpedientesApi(): Promise<ExpedienteSGD[]> {
-  const { data } = await apiClient.get<ExpedienteSGD[]>("/api/v1/expedientes");
-  return data;
+  try {
+    const { data } = await apiClient.get<ExpedienteSGD[]>("/api/v1/expedientes");
+    return data;
+  } catch (error) {
+    // GET /api/v1/expedientes exige un actor autenticado (RutaDoc). Si la sesión es
+    // local/demo no hay JWT real, el backend responde 401 y la bandeja se degrada a
+    // los fixtures locales para seguir siendo operativa sin perder el rol de sesión.
+    const errorHttp = error instanceof ApiHttpError ? error.status : 0;
+    if ((errorHttp === 401 || errorHttp === 403) && esSesionLocalDemo()) {
+      return EXPEDIENTES_FIXTURE;
+    }
+    throw error;
+  }
 }
 
 function aplicarFiltros(

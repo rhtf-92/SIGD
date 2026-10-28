@@ -10,6 +10,7 @@ import {
   useUsuariosQuery,
 } from "../services/adminUsuariosService";
 import {
+  CATALOGO_ROLES_USUARIOS,
   DEBOUNCE_BUSQUEDA_MS,
   FILTROS_USUARIOS_INICIALES,
   type EstadoUsuario,
@@ -17,12 +18,7 @@ import {
   type Usuario,
 } from "../types/usuarioAdmin";
 
-export const CATALOGO_ROLES_USUARIOS = [
-  "Administrador",
-  "Responsable de Área",
-  "Operador",
-  "Consulta",
-];
+export { CATALOGO_ROLES_USUARIOS };
 
 export const CATALOGO_AREAS = [
   "Dirección General",
@@ -118,6 +114,10 @@ export function useUsuariosAdmin() {
     isLoading: consulta.isLoading,
     isFetching: consulta.isFetching,
     error: consulta.error,
+    ultimaActualizacion: consulta.dataUpdatedAt,
+    refrescarDirectorio: () => {
+      void consulta.refetch();
+    },
     guardarPendiente: mutacionActualizacion.isPending,
     estadoPendiente: mutacionEstado.isPending,
   };

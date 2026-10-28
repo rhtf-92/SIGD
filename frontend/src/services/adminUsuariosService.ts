@@ -17,12 +17,15 @@ import {
 
 import { apiClient } from "../api/client";
 import { ApiHttpError, type InvalidParamDetail } from "../types/api";
-import type {
-  EstadoUsuario,
-  FiltrosUsuarios,
-  UpdateEstadoDTO,
-  UpdateUsuarioDTO,
-  Usuario,
+import {
+  CODIGOS_ROL_USUARIO,
+  etiquetaRolUsuario,
+  INTERVALO_ACTUALIZACION_USUARIOS_MS,
+  type EstadoUsuario,
+  type FiltrosUsuarios,
+  type UpdateEstadoDTO,
+  type UpdateUsuarioDTO,
+  type Usuario,
 } from "../types/usuarioAdmin";
 
 const RUTA_CANONICA_USUARIOS = "/api/v1/admin/usuarios";
@@ -30,7 +33,7 @@ const RUTA_CANONICA_USUARIOS = "/api/v1/admin/usuarios";
 export const usuariosAdminKeys = {
   todos: ["admin", "usuarios"] as const,
   lista: (filtros: FiltrosUsuarios) => ["admin", "usuarios", filtros] as const,
-  detalle: (id: number) => ["admin", "usuarios", "detalle", id] as const,
+  detalle: (id: string | number) => ["admin", "usuarios", "detalle", id] as const,
 };
 
 function toStringValue(value: unknown, porDefecto = ""): string {
@@ -70,7 +73,7 @@ function normalizarUsuario(valor: unknown): Usuario | null {
     sede: toStringValue(registro.sede),
     area: toStringValue(registro.area ?? registro.areaOrganica ?? registro.area_organica),
     cargo: toStringValue(registro.cargo),
-    rol: toStringValue(registro.rol),
+    rol: etiquetaRolUsuario(toStringValue(registro.rol)),
     estado: toEstadoUsuario(registro.estado),
     ultimoAcceso: toStringValue(registro.ultimoAcceso ?? registro.ultimo_acceso, "—"),
   };
@@ -82,6 +85,7 @@ function extraerUsuarios(payload: unknown): unknown[] {
   if (typeof payload === "object" && payload !== null) {
     const envuelto = payload as Record<string, unknown>;
     if (Array.isArray(envuelto.data)) return envuelto.data;
+    if (Array.isArray(envuelto.datos)) return envuelto.datos;
     if (Array.isArray(envuelto.usuarios)) return envuelto.usuarios;
     if (Array.isArray(envuelto.items)) return envuelto.items;
   }
@@ -97,8 +101,12 @@ export async function listarUsuarios(
       busqueda: filtros.busqueda || undefined,
       area: filtros.area || undefined,
       sede: filtros.sede || undefined,
-      rol: filtros.rol || undefined,
+      roles: filtros.rol
+        ? (CODIGOS_ROL_USUARIO[filtros.rol] ?? [filtros.rol]).join(",")
+        : undefined,
       estado: filtros.estado === "Todos" ? undefined : filtros.estado,
+      pagina: 1,
+      limite: 100,
     },
     signal,
   });
@@ -168,7 +176,9 @@ export function useUsuariosQuery(
     queryFn: ({ signal }) => listarUsuarios(filtros, signal),
     staleTime: 30_000,
     retry: 1,
-    refetchOnWindowFocus: false,
+    refetchInterval: INTERVALO_ACTUALIZACION_USUARIOS_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 }
 

@@ -14,13 +14,6 @@ import { inicialesNombre } from "../../utils/iniciales";
 import { ETIQUETA_ROL } from "../../utils/etiquetaRol";
 
 export default function CasillaElectronicaPage() {
-  const usuario = useAuthStore((state) => state.usuario);
-  const nombreMostrar = usuario?.nombreCompleto || "Sergio Serruche Panduro";
-  const inicialesMostrar = usuario ? inicialesNombre(usuario.nombreCompleto) : "SP";
-  const correoMostrar = usuario?.correo || "74561238@casilla.iestpsuiza.edu.pe";
-  const rolEtiqueta = usuario?.rol ? ETIQUETA_ROL[usuario.rol] : "Administrado";
-  const dniMatch = correoMostrar.match(/^(\d{8})/);
-  const docBadge = usuario ? (dniMatch ? `DNI ${dniMatch[1]}` : rolEtiqueta) : "DNI 74561238";
   const {
     filtros,
     hasActiveFilters,
@@ -46,6 +39,16 @@ export default function CasillaElectronicaPage() {
     generarAcuse,
     isGenerandoAcuse,
   } = useCasilla();
+
+  const usuario = useAuthStore((state) => state.usuario);
+
+  const nombreMostrar = usuario?.nombreCompleto || "Titular de casilla";
+  const inicialesMostrar = inicialesNombre(nombreMostrar);
+  const correoMostrar = usuario?.correo || "Sin correo vinculado";
+  const rolEtiqueta = usuario?.rol ? ETIQUETA_ROL[usuario.rol] : "Administrado";
+  const dniEnSesion = (usuario as any)?.dni || (usuario as any)?.numeroDocumento || "";
+  const dniSesionMatch = String(dniEnSesion).match(/(\d{8})/);
+  const docBadge = usuario && dniSesionMatch ? `DNI ${dniSesionMatch[1]}` : rolEtiqueta;
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">

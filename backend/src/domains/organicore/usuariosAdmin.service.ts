@@ -67,6 +67,7 @@ export function crearUsuariosAdminService(pool: Pool) {
       areaId,
       sedeId,
       rolId,
+      roles,
       estado,
       pagina,
       limite,
@@ -139,6 +140,21 @@ export function crearUsuariosAdminService(pool: Pool) {
       condiciones.push(
         `ur.rol_id = ${posicion}::uuid`,
       );
+    }
+
+    if (roles) {
+      const codigos = roles
+        .split(",")
+        .map((codigo) => codigo.trim().toUpperCase())
+        .filter((codigo) => codigo !== "");
+
+      if (codigos.length > 0) {
+        const posicion = agregarParametro(codigos);
+
+        condiciones.push(
+          `rs.codigo = ANY(${posicion}::text[])`,
+        );
+      }
     }
 
     if (estado) {
@@ -283,6 +299,10 @@ export function crearUsuariosAdminService(pool: Pool) {
       LEFT JOIN sigd_org.usuario_rol AS ur
         ON ur.id_usuario = cu.id_usuario
         AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+
+      LEFT JOIN sigd_org.rol_sistema AS rs
+        ON rs.rol_id = ur.rol_id
+        AND rs.vigente = TRUE
 
       ${where};
     `;
