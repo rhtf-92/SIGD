@@ -4,6 +4,7 @@ import type { JSX, ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import type { ClavePermiso, MatrizPermisos } from "../types/rbacRoles";
+import { MODULOS_VISIBLES, puedeVerModulo, useSesion } from "../config/accesoModulos";
 
 const CLAVE_TOKEN = "sigd_token";
 const CLAVE_ROL = "sigd_rol";
@@ -44,10 +45,13 @@ export default function ProtectedRoute({
   requiredAction = "ver",
 }: ProtectedRouteProps): JSX.Element {
   const location = useLocation();
+  // Sesión reactiva: si el token se pierde (logout, 401 con refresh fallido, etc.)
+  // este guardia se re-renderiza y redirige a /login, en lugar de dejar al usuario
+  // dentro del módulo con el encabezado en estado "Invitado".
+  const { rol, autenticado } = useSesion();
   const token = window.localStorage.getItem(CLAVE_TOKEN);
-  const rol = window.localStorage.getItem(CLAVE_ROL);
 
-  if (!token) {
+  if (!token || !autenticado) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
@@ -55,9 +59,19 @@ export default function ProtectedRoute({
     return <Navigate to="/acceso-denegado" replace />;
   }
 
-  if (requiredModule && !tienePermisoAlmacenado(requiredModule, requiredAction)) {
-    return <Navigate to="/acceso-denegado" replace />;
+  if (requiredModule) {
+    const permiso = tienePermisoAlmacenado(requiredModule, requiredAction);
+    if (!permiso) {
+      // Si no hay permisos almacenados, usar la visibilidad basada en roles
+      const moduloDef = MODULOS_VISIBLES.find((m) => m.moduloPermiso === requiredModule);
+      if (moduloDef && puedeVerModulo(moduloDef, rol, true)) {
+        // permiso implícito por rol, continuar
+      } else {
+        return <Navigate to="/acceso-denegado" replace />;
+      }
+    }
   }
+
 
   return <>{children ?? <Outlet />}</>;
 }

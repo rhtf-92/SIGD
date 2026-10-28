@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import type { FamiliaModulo } from "./taxonomiaModulos";
+
 // Roles canónicos institucionales (igual que LoginPage + authStore)
 export type RolCanonico =
   | "SUPER_ADMIN"
@@ -34,6 +36,8 @@ export interface DefinicionModulo {
   rolesPermitidos: RolCanonico[];
   /** Módulo de la matriz RBAC para doble chequeo de permiso "ver". Opcional. */
   moduloPermiso?: string;
+  /** Familia de archivo a la que pertenece (agrupa el rail lateral). */
+  familia?: FamiliaModulo;
 }
 
 // Tabla única de verdad: qué módulo ve cada cuenta.
@@ -44,6 +48,7 @@ export interface DefinicionModulo {
 export const MODULOS_VISIBLES: DefinicionModulo[] = [
   {
     id: "mesa-virtual",
+    familia: "ingreso",
     titulo: "Mesa de Partes Virtual",
     subtitulo: "ENT-M02 / TUPA",
     descripcion:
@@ -57,6 +62,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "ventanilla",
+    familia: "ingreso",
     titulo: "Ventanilla Presencial",
     subtitulo: "ENT-M02 / Presencial",
     descripcion:
@@ -69,6 +75,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "registro",
+    familia: "ingreso",
     titulo: "Registro Ciudadano",
     subtitulo: "ENT-M01-01 / ENT-M01-02",
     descripcion:
@@ -80,6 +87,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "expedientes",
+    familia: "gestion",
     titulo: "Bandeja de Expedientes",
     subtitulo: "ENT-M05",
     descripcion:
@@ -92,6 +100,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "casilla",
+    familia: "gestion",
     titulo: "Casilla Electrónica",
     subtitulo: "ENT-M01-03",
     descripcion:
@@ -105,6 +114,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "consulta",
+    familia: "ingreso",
     titulo: "Consulta Pública",
     subtitulo: "Seguimiento CUT",
     descripcion: "Consulta pública del estado de tu trámite con tu CUT.",
@@ -115,6 +125,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "validador",
+    familia: "validez",
     titulo: "Validador CVD",
     subtitulo: "MOD-04 / Verificación",
     descripcion:
@@ -126,6 +137,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "flujo-validez",
+    familia: "validez",
     titulo: "Flujo y Validez Legal",
     subtitulo: "MOD-04 / Firma Digital",
     descripcion:
@@ -139,6 +151,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "titulacion",
+    familia: "validez",
     titulo: "Workflow Titulación",
     subtitulo: "ENT-M04-01",
     descripcion:
@@ -151,6 +164,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "proyector",
+    familia: "validez",
     titulo: "Proyector de Resoluciones",
     subtitulo: "ENT-M04-02 · Isaí",
     descripcion:
@@ -163,6 +177,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "administracion",
+    familia: "gobierno",
     titulo: "Panel de Administración",
     subtitulo: "ENT-M05-01 / RBAC",
     descripcion:
@@ -175,6 +190,7 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
   },
   {
     id: "reportes",
+    familia: "gobierno",
     titulo: "Reportes y Tableros de Control",
     subtitulo: "06_reportes-tablero-control",
     descripcion:

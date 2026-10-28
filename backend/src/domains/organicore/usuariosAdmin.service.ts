@@ -67,12 +67,13 @@ export function crearUsuariosAdminService(pool: Pool) {
       areaId,
       sedeId,
       rolId,
+      roles,
       estado,
       pagina,
       limite,
     } = filtros;
 
-    const condiciones: string[] = [];
+    const condiciones: string[] = ["cu.eliminado = FALSE"];
     const parametros: unknown[] = [];
 
     function agregarParametro(valor: unknown): string {
@@ -139,6 +140,21 @@ export function crearUsuariosAdminService(pool: Pool) {
       condiciones.push(
         `ur.rol_id = ${posicion}::uuid`,
       );
+    }
+
+    if (roles) {
+      const codigos = roles
+        .split(",")
+        .map((codigo) => codigo.trim().toUpperCase())
+        .filter((codigo) => codigo !== "");
+
+      if (codigos.length > 0) {
+        const posicion = agregarParametro(codigos);
+
+        condiciones.push(
+          `rs.codigo = ANY(${posicion}::text[])`,
+        );
+      }
     }
 
     if (estado) {
@@ -283,6 +299,10 @@ export function crearUsuariosAdminService(pool: Pool) {
       LEFT JOIN sigd_org.usuario_rol AS ur
         ON ur.id_usuario = cu.id_usuario
         AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+
+      LEFT JOIN sigd_org.rol_sistema AS rs
+        ON rs.rol_id = ur.rol_id
+        AND rs.vigente = TRUE
 
       ${where};
     `;
@@ -656,11 +676,38 @@ export function crearUsuariosAdminService(pool: Pool) {
     return resultado.rowCount ?? 0;
   }
 
+  async function eliminarUsuario(
+    usuarioId: string,
+  ): Promise<void> {
+    const existe = await pool.query<{ id_usuario: string }>(
+      `SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1::uuid`,
+      [usuarioId],
+    );
+    if (!existe.rows[0]) {
+      throw new NotFoundError({ message: "El usuario indicado no existe." });
+    }
+
+    // Baja lógica definitiva: se marca como eliminado y se desactiva.
+    await pool.query(
+      `UPDATE sigd_auth.cuenta_usuario
+          SET activo = FALSE, eliminado = TRUE
+        WHERE id_usuario = $1::uuid`,
+      [usuarioId],
+    );
+    await pool.query(`DELETE FROM sigd_auth.sesion_usuario WHERE id_usuario = $1::uuid`, [usuarioId]);
+    await pool.query(
+      `UPDATE sigd_org.usuario_rol SET vigente_hasta = now()
+         WHERE id_usuario = $1::uuid AND vigente_hasta IS NULL`,
+      [usuarioId],
+    );
+  }
+
   return {
     listarUsuarios,
     validarPuestoLaboralActivo,
     crearUsuario,
     actualizarUsuario,
+    eliminarUsuario,
     revocarSesionesUsuario,
   };
 }

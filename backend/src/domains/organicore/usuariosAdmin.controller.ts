@@ -118,10 +118,25 @@ export function crearUsuariosAdminController(
     }
   }
 
+  async function eliminarUsuario(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { id } = usuarioIdParamSchema.parse(req.params);
+      await service.eliminarUsuario(id);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+
   return {
     listarUsuarios,
     crearUsuario,
     actualizarUsuario,
+    eliminarUsuario,
   };
 }
 

@@ -71,6 +71,12 @@ export const listarUsuariosQuerySchema = z.object({
     .uuid("El ID del rol no es válido")
     .optional(),
 
+  roles: z
+    .string()
+    .trim()
+    .max(300, "La lista de roles no puede superar los 300 caracteres")
+    .optional(),
+
   estado: estadoUsuarioSchema.optional(),
 
   pagina: z.coerce

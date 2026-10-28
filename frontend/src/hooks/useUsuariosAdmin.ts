@@ -10,6 +10,7 @@ import {
   useUsuariosQuery,
 } from "../services/adminUsuariosService";
 import {
+  CATALOGO_ROLES_USUARIOS,
   DEBOUNCE_BUSQUEDA_MS,
   FILTROS_USUARIOS_INICIALES,
   type EstadoUsuario,
@@ -17,12 +18,7 @@ import {
   type Usuario,
 } from "../types/usuarioAdmin";
 
-export const CATALOGO_ROLES_USUARIOS = [
-  "Administrador",
-  "Responsable de Área",
-  "Operador",
-  "Consulta",
-];
+export { CATALOGO_ROLES_USUARIOS };
 
 export const CATALOGO_AREAS = [
   "Dirección General",
@@ -37,7 +33,6 @@ export const CATALOGO_SEDES = ["Sede Principal"];
 
 function siguienteEstado(estado: EstadoUsuario): EstadoUsuario {
   if (estado === "Activo") return "Inactivo";
-  if (estado === "Inactivo") return "Bloqueado";
   return "Activo";
 }
 
@@ -88,7 +83,7 @@ export function useUsuariosAdmin() {
     });
   }
 
-  function conmutarEstado(id: number) {
+  function conmutarEstado(id: string | number) {
     const usuario = usuarios.find((item) => item.id === id);
     if (!usuario) return undefined;
 
@@ -118,6 +113,10 @@ export function useUsuariosAdmin() {
     isLoading: consulta.isLoading,
     isFetching: consulta.isFetching,
     error: consulta.error,
+    ultimaActualizacion: consulta.dataUpdatedAt,
+    refrescarDirectorio: () => {
+      void consulta.refetch();
+    },
     guardarPendiente: mutacionActualizacion.isPending,
     estadoPendiente: mutacionEstado.isPending,
   };

@@ -1,62 +1,455 @@
+/* ============================================================================
+   SIGD · SISTEMA DE DISEÑO INSTITUCIONAL
+   ----------------------------------------------------------------------------
+   Lenguaje sobrio de administración pública: papel, tinta y un único azul
+   institucional como color de acción. Sin degradados, sin cinta tricolor,
+   sin guilloché. El aire de archivo documental se infiere en la estructura
+   (rail, jerarquía, filetes) y no en la decoración.
+
+   Paleta base:
+     · Papel  #F5F3EE  · Papel 2 #ECEAE3  · Papel 3 #DDD9CF
+     · Tinta  #12202E  · Tinta 500 #5B6B7C · Tinta 400 #7C8896
+     · Azul institucional #006EC7 (único color de acción)
+   ========================================================================== */
+
+@theme {
+  /* --- Tipografías institucionales --- */
+  --font-sans:
+    "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
+
+  /* --- Tinta: texto y superficies oscuras --- */
+  --color-tinta-950: #0b1524;
+  --color-tinta-900: #12202e;
+  --color-tinta-800: #1d2c3b;
+  --color-tinta-700: #33465a;
+  --color-tinta-600: #44586d;
+  --color-tinta-500: #5b6b7c;
+  --color-tinta-400: #7c8896;
+  --color-tinta-300: #a3adb8;
+
+  /* --- Azul institucional: único color de acción --- */
+  --color-vault-azul: #006ec7;
+  --color-vault-azul-profundo: #00529a;
+  --color-vault-azul-tinta: #0b4b85;
+  --color-vault-azul-lavado: #eaf2fa;
+
+  /* --- Papel: superficies claras --- */
+  --color-vault-papel: #f5f3ee;
+  --color-vault-papel-2: #eceae3;
+  --color-vault-papel-3: #ddd9cf;
+  --color-vault-tinta: #1a2530;
+
+  /* --- Estados mínimos (éxito / atención / error) --- */
+  --color-estado-ok: #1f7a4d;
+  --color-estado-ok-lavado: #e9f3ee;
+  --color-estado-alerta: #8a5f08;
+  --color-estado-alerta-lavado: #faf1de;
+  --color-estado-error: #b3261e;
+  --color-estado-error-lavado: #fbeceb;
+
+  /* --- Elevaciones discretas --- */
+  --shadow-ficha:
+    0 1px 2px rgba(18, 32, 46, 0.04), 0 6px 18px -12px rgba(18, 32, 46, 0.22);
+  --shadow-ficha-alta:
+    0 2px 4px rgba(18, 32, 46, 0.05), 0 16px 32px -18px rgba(18, 32, 46, 0.3);
+  --shadow-sello: 0 8px 20px -12px rgba(18, 32, 46, 0.45);
+}
+
 @layer components {
+  /* ==========================================================================
+     1. BANDA INSTITUCIONAL (cabecera)
+     Cabecera blanca sobre el papel, separada por un filete. Sin color de fondo:
+     el color se reserva para la acción y para el rail.
+     ========================================================================== */
   .header-sigd {
-    background: linear-gradient(135deg, #0a1128 0%, #003875 100%);
+    position: relative;
+    background: #ffffff;
+    color: var(--color-vault-tinta);
+    border-bottom: 1px solid var(--color-vault-papel-3);
+  }
+
+  .banda-institucional {
+    height: 60px;
+  }
+
+  .tira-estado {
+    height: 30px;
+    background: var(--color-vault-papel-2);
+    border-top: 1px solid var(--color-vault-papel-3);
+    border-bottom: 1px solid var(--color-vault-papel-3);
+  }
+
+  /* ==========================================================================
+     2. LIENZO DE PAPEL
+     ========================================================================== */
+  .lienzo-oficio {
+    background-color: var(--color-vault-papel);
+    /* Rayado casi imperceptible: da textura de documento sin distraer. */
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        rgba(26, 37, 48, 0.022) 0 1px,
+        transparent 1px 32px
+      );
+  }
+
+  .papel-liso {
+    background-color: var(--color-vault-papel);
+  }
+
+  /* ==========================================================================
+     3. RAIL LATERAL DE MÓDULOS
+     La única superficie oscura del sistema: funciona como archivador y ancla
+     la navegación. Se conserva agrupado por familia.
+     ========================================================================== */
+  .rail-modulos {
+    background: #0f1c2c;
+    border-right: 1px solid #1e2f45;
+  }
+
+  .rail-familia {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.9rem 0.7rem 0.35rem;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(203, 213, 225, 0.45);
+  }
+
+  .rail-familia::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .rail-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    border-radius: 0.45rem;
+    padding: 0.5rem 0.65rem;
+    color: rgba(226, 232, 240, 0.7);
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .rail-item:hover {
+    background: rgba(255, 255, 255, 0.05);
     color: #ffffff;
-    box-shadow: 0 4px 20px -2px rgba(10, 17, 40, 0.15);
   }
 
-  .header-bar {
-    display: block;
-    width: 100%;
-    height: 3px;
-    background: linear-gradient(90deg, #006ec7 0%, #e6007e 50%, #f9e000 100%);
+  .rail-item[aria-current="page"] {
+    background: rgba(0, 110, 199, 0.2);
+    color: #ffffff;
   }
 
+  .rail-item[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    left: -0.35rem;
+    top: 10%;
+    bottom: 10%;
+    width: 2px;
+    border-radius: 9999px;
+    background: var(--color-vault-azul);
+  }
+
+  .rail-icono {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 0.4rem;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(226, 232, 240, 0.72);
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .rail-item:hover .rail-icono {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+
+  .rail-item[aria-current="page"] .rail-icono {
+    background: var(--color-vault-azul);
+    color: #ffffff;
+  }
+
+  .rail-numero {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: rgba(203, 213, 225, 0.4);
+  }
+
+  /* ==========================================================================
+     4. FICHAS DE CATÁLOGO (módulos)
+     ========================================================================== */
+  .ficha-modulo {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-vault-papel-3);
+    background: #ffffff;
+    box-shadow: var(--shadow-ficha);
+    transition:
+      transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .ficha-modulo:hover {
+    transform: translateY(-2px);
+    border-color: #c3bcac;
+    box-shadow: var(--shadow-ficha-alta);
+  }
+
+  /* Ficha destacada: un único filete azul en el canto superior. */
+  .ficha-modulo[data-destacado="1"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--color-vault-azul);
+  }
+
+  .ficha-icono {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 2.35rem;
+    height: 2.35rem;
+    border-radius: 0.5rem;
+    background: var(--color-vault-papel-2);
+    color: var(--color-tinta-700);
+    border: 1px solid var(--color-vault-papel-3);
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .ficha-modulo:hover .ficha-icono {
+    background: var(--color-vault-azul);
+    color: #ffffff;
+    border-color: transparent;
+  }
+
+  .ficha-codigo {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-tinta-400);
+  }
+
+  .ficha-titulo {
+    font-size: 0.98rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-vault-tinta);
+    transition: color 0.2s ease;
+  }
+
+  .ficha-modulo:hover .ficha-titulo {
+    color: var(--color-vault-azul-tinta);
+  }
+
+  .ficha-descripcion {
+    font-size: 0.8rem;
+    line-height: 1.55;
+    color: var(--color-tinta-500);
+  }
+
+  .ficha-sello {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-tinta-600);
+    background: var(--color-vault-papel-2);
+    border: 1px solid var(--color-vault-papel-3);
+    border-radius: 0.35rem;
+    padding: 0.15rem 0.45rem;
+  }
+
+  /* Separación entre bloques de una ficha. */
+  .ficha-division {
+    border-top: 1px solid var(--color-vault-papel-2);
+  }
+
+  /* Llamada a la acción de la ficha. */
+  .ficha-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-vault-azul-tinta);
+  }
+
+  /* Icono en pastilla neutra (panel de cabecera, listas). */
+  .icono-modulo {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 0.4rem;
+    background: var(--color-vault-papel-2);
+    color: var(--color-tinta-700);
+    border: 1px solid var(--color-vault-papel-3);
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .icono-modulo:hover {
+    background: var(--color-vault-azul);
+    color: #ffffff;
+    border-color: transparent;
+  }
+
+  /* Fila de menú con croma azul al pasar el cursor. */
+  .item-modulo {
+    transition: background-color 0.15s ease;
+  }
+
+  .item-modulo:hover {
+    background: var(--color-vault-azul-lavado);
+  }
+
+  /* ==========================================================================
+     5. PORTADA
+     ========================================================================== */
+  .portada {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.85rem;
+    border: 1px solid var(--color-vault-papel-3);
+    border-top: 3px solid var(--color-vault-azul);
+    background: #ffffff;
+    box-shadow: var(--shadow-ficha);
+  }
+
+  /* Datos institucionales de la portada. */
+  .dato-institucion {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-vault-papel-2);
+    font-size: 0.75rem;
+  }
+
+  .dato-institucion:last-child {
+    border-bottom: 0;
+  }
+
+  /* Resumen del catálogo. */
+  .dato-resumen {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--color-vault-papel-3);
+    background: #ffffff;
+    padding: 0.6rem 0.8rem;
+  }
+
+  .dato-cifra {
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-tinta-900);
+  }
+
+  .dato-rotulo {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-tinta-400);
+  }
+
+  /* ==========================================================================
+     6. PIE INSTITUCIONAL
+     ========================================================================== */
+  .footer-sigd {
+    background: #ffffff;
+    border-top: 1px solid var(--color-vault-papel-3);
+    color: var(--color-tinta-500);
+  }
+
+  /* ==========================================================================
+     7. COMPONENTES BASE HEREDADOS
+     ========================================================================== */
   .card-sigd {
-    border-radius: 1.25rem;
-    border: 1px solid rgba(226, 232, 240, 0.85);
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-vault-papel-3);
+    background: #ffffff;
+    box-shadow: var(--shadow-ficha);
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .card-sigd:hover {
-    box-shadow: 0 10px 25px -4px rgba(0, 110, 199, 0.08), 0 4px 10px -2px rgba(15, 23, 42, 0.03);
+    border-color: #c3bcac;
+    box-shadow: var(--shadow-ficha-alta);
   }
 
   .section-title {
-    font-size: 0.875rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #006ec7;
+    color: var(--color-vault-azul-tinta);
   }
 
   @media (min-width: 640px) {
     .section-title {
-      font-size: 1rem;
+      font-size: 0.78rem;
     }
   }
 
   .input-sigd {
     width: 100%;
-    border-radius: 0.75rem;
-    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-vault-papel-3);
     background: #ffffff;
-    padding: 0.75rem 1rem;
+    padding: 0.65rem 0.8rem;
     font-size: 0.875rem;
-    color: #0f172a;
-    transition: all 0.2s ease;
+    color: var(--color-vault-tinta);
+    transition: all 0.15s ease;
   }
 
   .input-sigd::placeholder {
-    color: #94a3b8;
+    color: var(--color-tinta-300);
   }
 
   .input-sigd:focus {
-    border-color: #006ec7;
+    border-color: var(--color-vault-azul);
     outline: none;
-    box-shadow: 0 0 0 4px rgba(0, 110, 199, 0.12);
+    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.12);
   }
 
   .btn-primary {
@@ -64,31 +457,28 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.75rem;
-    background: linear-gradient(135deg, #006ec7 0%, #0055a5 100%);
-    padding: 0.75rem 1.25rem;
-    font-size: 0.875rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    border-radius: 0.5rem;
+    background: var(--color-vault-azul);
+    padding: 0.65rem 1.1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
     color: #ffffff;
-    box-shadow: 0 4px 12px rgba(0, 110, 199, 0.25);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 1px 2px rgba(0, 110, 199, 0.24);
+    transition: all 0.15s ease;
     cursor: pointer;
   }
 
   .btn-primary:hover {
-    background: linear-gradient(135deg, #0059a8 0%, #004687 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(0, 110, 199, 0.35);
+    background: var(--color-vault-azul-profundo);
   }
 
   .btn-primary:active {
-    transform: translateY(0);
+    transform: translateY(1px);
   }
 
   .btn-primary:focus {
     outline: none;
-    box-shadow: 0 0 0 4px rgba(0, 110, 199, 0.25);
+    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.24);
   }
 
   .btn-secondary {
@@ -96,37 +486,34 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.75rem;
-    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-vault-papel-3);
     background: #ffffff;
-    padding: 0.75rem 1.25rem;
-    font-size: 0.875rem;
+    padding: 0.65rem 1.1rem;
+    font-size: 0.85rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
-    color: #334155;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    color: var(--color-tinta-700);
+    transition: all 0.15s ease;
     cursor: pointer;
   }
 
   .btn-secondary:hover {
-    border-color: #94a3b8;
-    background: #f8fafc;
-    color: #0f172a;
-    transform: translateY(-1px);
+    border-color: #c3bcac;
+    background: var(--color-vault-papel);
+    color: var(--color-tinta-900);
   }
 
   .btn-secondary:active {
-    transform: translateY(0);
+    transform: translateY(1px);
   }
 
   .table-sigd {
     width: 100%;
     overflow: hidden;
-    border-radius: 1rem;
-    border: 1px solid #e2e8f0;
+    border-radius: 0.6rem;
+    border: 1px solid var(--color-vault-papel-3);
     background: #ffffff;
-    box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.04);
+    box-shadow: 0 1px 3px rgba(18, 32, 46, 0.04);
   }
 
   .badge-sigd {
@@ -134,13 +521,13 @@
     align-items: center;
     gap: 0.375rem;
     border-radius: 9999px;
-    border: 1px solid rgba(230, 0, 126, 0.25);
-    background: #fdf2f8;
-    padding: 0.3rem 0.65rem;
+    border: 1px solid var(--color-vault-papel-3);
+    background: var(--color-vault-papel-2);
+    padding: 0.25rem 0.6rem;
     font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: #e6007e;
+    color: var(--color-tinta-700);
   }
 }

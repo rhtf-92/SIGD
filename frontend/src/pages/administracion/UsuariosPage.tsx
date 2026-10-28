@@ -2,14 +2,19 @@ import { useState } from "react";
 
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
 import UserEditModal from "../../components/administracion/UserEditModal";
+import UserCreateModal from "../../components/administracion/UserCreateModal";
 import {
   CATALOGO_AREAS,
   CATALOGO_ROLES_USUARIOS,
   CATALOGO_SEDES,
   useUsuariosAdmin,
 } from "../../hooks/useUsuariosAdmin";
+import { eliminarUsuario } from "../../services/adminUsuariosService";
 import type { ApiHttpError } from "../../types/api";
-import type { EstadoUsuario } from "../../types/usuarioAdmin";
+import {
+  INTERVALO_ACTUALIZACION_USUARIOS_MS,
+  type EstadoUsuario,
+} from "../../types/usuarioAdmin";
 
 function estiloEstado(estado: EstadoUsuario) {
   if (estado === "Activo") return "bg-emerald-100 text-emerald-700";
@@ -20,6 +25,7 @@ function estiloEstado(estado: EstadoUsuario) {
 export default function UsuariosPage() {
   const [mensaje, setMensaje] = useState("");
   const [errorServidor, setErrorServidor] = useState("");
+  const [mostrarCrear, setMostrarCrear] = useState(false);
 
   const {
     usuarios,
@@ -41,6 +47,8 @@ export default function UsuariosPage() {
     isLoading,
     isFetching,
     error,
+    ultimaActualizacion,
+    refrescarDirectorio,
     guardarPendiente,
   } = useUsuariosAdmin();
 
@@ -61,7 +69,7 @@ export default function UsuariosPage() {
     }
   }
 
-  async function alternarEstado(id: number) {
+  async function alternarEstado(id: string | number) {
     setErrorServidor("");
     try {
       await conmutarEstado(id);
@@ -85,15 +93,48 @@ export default function UsuariosPage() {
             Directorio institucional de {totalUsuarios} cuentas registradas.
             Búsqueda en tiempo real y filtro por estado operativo.
           </p>
-          {isFetching && !isLoading && (
-            <span
-              role="status"
-              aria-live="polite"
-              className="rounded-lg bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700"
-            >
-              Consultando directorio institucional...
+          <button
+            type="button"
+            onClick={() => setMostrarCrear(true)}
+            className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+          >
+            + Nuevo usuario
+          </button>
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800"
+          >
+            <span className="inline-flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className={`h-2 w-2 rounded-full ${
+                  isFetching ? "animate-pulse bg-blue-600" : "bg-emerald-500"
+                }`}
+              />
+              {isFetching
+                ? "Actualizando usuarios..."
+                : `En vivo · cada ${INTERVALO_ACTUALIZACION_USUARIOS_MS / 1000} s`}
             </span>
-          )}
+            {ultimaActualizacion > 0 && (
+              <span className="font-normal text-emerald-700">
+                Última actualización:{" "}
+                {new Date(ultimaActualizacion).toLocaleTimeString("es-PE", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={refrescarDirectorio}
+              disabled={isFetching}
+              className="rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Actualizar ahora
+            </button>
+          </div>
         </div>
 
         {mensaje && (
@@ -328,6 +369,15 @@ export default function UsuariosPage() {
                           >
                             Conmutar estado
                           </button>
+                          <button type="button" onClick={async () => {
+                            alert("CLICK ELIMINAR " + usuario.id);
+                            try {
+                              await eliminarUsuario(usuario.id);
+                              window.location.reload();
+                            } catch (e: any) {
+                              alert("Error: " + (e?.response?.status ?? e?.message ?? "desconocido"));
+                            }
+                          }} className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50">Eliminar</button>
                         </div>
                       </td>
                     </tr>
@@ -337,6 +387,13 @@ export default function UsuariosPage() {
           </div>
         </section>
       </section>
+
+      {mostrarCrear && (
+        <UserCreateModal
+          onClose={() => setMostrarCrear(false)}
+          onCreated={() => { setMensaje("Usuario creado correctamente."); window.location.reload(); }}
+        />
+      )}
 
       {usuarioEditando && (
         <UserEditModal

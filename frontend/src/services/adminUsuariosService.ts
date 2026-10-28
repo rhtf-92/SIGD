@@ -17,12 +17,15 @@ import {
 
 import { apiClient } from "../api/client";
 import { ApiHttpError, type InvalidParamDetail } from "../types/api";
-import type {
-  EstadoUsuario,
-  FiltrosUsuarios,
-  UpdateEstadoDTO,
-  UpdateUsuarioDTO,
-  Usuario,
+import {
+  CODIGOS_ROL_USUARIO,
+  etiquetaRolUsuario,
+  INTERVALO_ACTUALIZACION_USUARIOS_MS,
+  type EstadoUsuario,
+  type FiltrosUsuarios,
+  type UpdateEstadoDTO,
+  type UpdateUsuarioDTO,
+  type Usuario,
 } from "../types/usuarioAdmin";
 
 const RUTA_CANONICA_USUARIOS = "/api/v1/admin/usuarios";
@@ -30,7 +33,7 @@ const RUTA_CANONICA_USUARIOS = "/api/v1/admin/usuarios";
 export const usuariosAdminKeys = {
   todos: ["admin", "usuarios"] as const,
   lista: (filtros: FiltrosUsuarios) => ["admin", "usuarios", filtros] as const,
-  detalle: (id: number) => ["admin", "usuarios", "detalle", id] as const,
+  detalle: (id: string | number) => ["admin", "usuarios", "detalle", id] as const,
 };
 
 function toStringValue(value: unknown, porDefecto = ""): string {
@@ -56,8 +59,17 @@ function normalizarUsuario(valor: unknown): Usuario | null {
   const registro = valor as Record<string, unknown>;
 
   const idCrudo = registro.id ?? registro.idUsuario ?? registro.id_usuario;
-  const id = typeof idCrudo === "number" ? idCrudo : Number(idCrudo);
-  if (!Number.isFinite(id)) return null;
+  let id: string | number;
+  if (typeof idCrudo === "number") {
+    id = idCrudo;
+  } else if (typeof idCrudo === "string" && idCrudo.trim() !== "") {
+    const numero = Number(idCrudo);
+    id = Number.isFinite(numero) && String(numero) === idCrudo.trim() ? numero : idCrudo;
+  } else {
+    const numero = Number(idCrudo);
+    if (!Number.isFinite(numero)) return null;
+    id = numero;
+  }
 
   const nombre = toStringValue(registro.nombre ?? registro.nombreCompleto ?? registro.nombre_completo);
   if (nombre === "") return null;
@@ -70,7 +82,7 @@ function normalizarUsuario(valor: unknown): Usuario | null {
     sede: toStringValue(registro.sede),
     area: toStringValue(registro.area ?? registro.areaOrganica ?? registro.area_organica),
     cargo: toStringValue(registro.cargo),
-    rol: toStringValue(registro.rol),
+    rol: etiquetaRolUsuario(toStringValue(registro.rol)),
     estado: toEstadoUsuario(registro.estado),
     ultimoAcceso: toStringValue(registro.ultimoAcceso ?? registro.ultimo_acceso, "—"),
   };
@@ -82,6 +94,7 @@ function extraerUsuarios(payload: unknown): unknown[] {
   if (typeof payload === "object" && payload !== null) {
     const envuelto = payload as Record<string, unknown>;
     if (Array.isArray(envuelto.data)) return envuelto.data;
+    if (Array.isArray(envuelto.datos)) return envuelto.datos;
     if (Array.isArray(envuelto.usuarios)) return envuelto.usuarios;
     if (Array.isArray(envuelto.items)) return envuelto.items;
   }
@@ -97,8 +110,12 @@ export async function listarUsuarios(
       busqueda: filtros.busqueda || undefined,
       area: filtros.area || undefined,
       sede: filtros.sede || undefined,
-      rol: filtros.rol || undefined,
-      estado: filtros.estado === "Todos" ? undefined : filtros.estado,
+      roles: filtros.rol
+        ? (CODIGOS_ROL_USUARIO[filtros.rol] ?? [filtros.rol]).join(",")
+        : undefined,
+      estado: filtros.estado === "Todos" ? undefined : filtros.estado.toUpperCase(),
+      pagina: 1,
+      limite: 100,
     },
     signal,
   });
@@ -109,7 +126,7 @@ export async function listarUsuarios(
 }
 
 export async function actualizarUsuario(
-  id: number,
+  id: string | number,
   cambios: UpdateUsuarioDTO,
 ): Promise<Usuario> {
   const response = await apiClient.put(`${RUTA_CANONICA_USUARIOS}/${id}`, cambios);
@@ -133,7 +150,7 @@ export async function actualizarUsuario(
 }
 
 export async function conmutarEstadoUsuario(
-  id: number,
+  id: string | number,
   cambios: UpdateEstadoDTO,
 ): Promise<Usuario> {
   const estadoBackend = cambios.estado.toUpperCase();
@@ -168,11 +185,13 @@ export function useUsuariosQuery(
     queryFn: ({ signal }) => listarUsuarios(filtros, signal),
     staleTime: 30_000,
     retry: 1,
-    refetchOnWindowFocus: false,
+    refetchInterval: INTERVALO_ACTUALIZACION_USUARIOS_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 }
 
-type VariablesActualizacion = { id: number; cambios: UpdateUsuarioDTO };
+type VariablesActualizacion = { id: string | number; cambios: UpdateUsuarioDTO };
 
 // El snapshot guarda cada lista por su propia clave: la tabla vive en varias
 // claves (una por combinación de filtros) y revertir exige restaurarlas todas.
@@ -231,7 +250,7 @@ export function useActualizarUsuarioMutation(): UseMutationResult<
 export function useConmutarEstadoMutation(): UseMutationResult<
   Usuario,
   ApiHttpError,
-  { id: number; estado: EstadoUsuario }
+  { id: string | number; estado: EstadoUsuario }
 > {
   const queryClient = useQueryClient();
 
@@ -247,10 +266,33 @@ export function useConmutarEstadoMutation(): UseMutationResult<
   });
 }
 
+export function useEliminarUsuarioMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string | number) => eliminarUsuario(id),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: usuariosAdminKeys.todos });
+    },
+  });
+}
+
+export async function crearUsuario(datos: any): Promise<Usuario> {
+  const response = await apiClient.post(RUTA_CANONICA_USUARIOS, datos);
+  const normalizado = normalizarUsuario(response.data);
+  if (!normalizado) throw new ApiHttpError({ type: "about:blank", title: "Error", status: 502, detail: "Respuesta invalida", instance: RUTA_CANONICA_USUARIOS, code: "ERR", category: "System", correlationId: "", retryable: true });
+  return normalizado;
+}
+
 /**
  * Extrae los parámetros inválidos de una respuesta RFC 7807 / RFC 9457 para
  * mapearlos al campo infractor del formulario (plan maestro §3.2).
  */
+export async function eliminarUsuario(
+  id: string | number,
+): Promise<void> {
+  await apiClient.delete(`${RUTA_CANONICA_USUARIOS}/${id}`);
+}
+
 export function extraerInvalidParams(error: unknown): InvalidParamDetail[] {
   if (error instanceof ApiHttpError) {
     return error.problemDetails.invalidParams ?? [];

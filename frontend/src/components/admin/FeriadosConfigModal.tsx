@@ -29,7 +29,7 @@ export default function FeriadosConfigModal({ isOpen, onClose, onSave }: ModalPr
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl">
         <h2 className="text-xl font-bold text-gray-800 mb-4">Registrar Nuevo Feriado / Días No Laborables</h2>
         {error && <div className="mb-3 p-2 bg-red-100 text-red-700 text-sm rounded">{error}</div>}
