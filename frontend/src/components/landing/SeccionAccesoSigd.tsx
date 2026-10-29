@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 import {
-=======
-﻿import {
->>>>>>> Stashed changes
   ArrowRight,
   BarChart3,
   Building2,
@@ -358,7 +354,7 @@ export default function SeccionAccesoSigd() {
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               {autenticado && rol
-                ? `Mostrando los módulos asignados a tu rol ${rol} según la matriz de accesos institucional.`
+                 ? `Mostrando los módulos asignados a tu rol ${rol} según la matriz de accesos institucional.`
                 : "El modo invitado está limitado a la portada. Inicia sesión para abrir cualquier módulo del SIGD."}
             </p>
           </div>

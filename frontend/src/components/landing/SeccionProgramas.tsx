@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 import { ArrowRight, ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
-=======
-﻿import { ArrowRight, ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
->>>>>>> Stashed changes
 import { useRef } from "react";
 import { Link } from "react-router-dom";
 

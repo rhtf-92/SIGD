@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 import {
-=======
-﻿import {
->>>>>>> Stashed changes
   ArrowRight,
   BookOpen,
   ChevronDown,

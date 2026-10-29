@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 export interface DiapositivaPortada {
-=======
-﻿export interface DiapositivaPortada {
->>>>>>> Stashed changes
   id: string;
   src: string;
   titulo: string;

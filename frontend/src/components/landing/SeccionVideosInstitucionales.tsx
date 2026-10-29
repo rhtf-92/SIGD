@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 import { Maximize2, PlayCircle, Volume2, X } from "lucide-react";
-=======
-﻿import { Maximize2, PlayCircle, Volume2, X } from "lucide-react";
->>>>>>> Stashed changes
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
