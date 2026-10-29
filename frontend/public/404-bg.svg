@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" preserveAspectRatio="xMidYMid meet">
+  <title>Cueva prehistórica con el número 404 tallado en la roca</title>
+  <defs>
+    <linearGradient id="rocaFondo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#120b05"/>
+      <stop offset="0.45" stop-color="#241708"/>
+      <stop offset="1" stop-color="#3b2511"/>
+    </linearGradient>
+    <linearGradient id="rocaFrente" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6b4a28"/>
+      <stop offset="0.55" stop-color="#4a3118"/>
+      <stop offset="1" stop-color="#31200f"/>
+    </linearGradient>
+    <linearGradient id="piedraTallada" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a6338"/>
+      <stop offset="0.5" stop-color="#5c3f21"/>
+      <stop offset="1" stop-color="#3a2714"/>
+    </linearGradient>
+    <radialGradient id="resplandorHoguera" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffb347" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#e0741a" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#e0741a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vineta" cx="0.5" cy="0.5" r="0.62">
+      <stop offset="0.55" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.72"/>
+    </radialGradient>
+    <filter id="brilloTallado" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="9" result="desenfoque"/>
+      <feMerge>
+        <feMergeNode in="desenfoque"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <style>
+    .hoguera-llama {
+      transform-box: fill-box;
+      transform-origin: 50% 100%;
+      animation: titilar-llama 0.42s ease-in-out infinite alternate;
+    }
+    .hoguera-halo {
+      transform-box: fill-box;
+      transform-origin: 50% 50%;
+      animation: latido-halo 2.6s ease-in-out infinite;
+    }
+    .chispa {
+      transform-box: fill-box;
+      transform-origin: 50% 50%;
+      animation: saltar-chispa 2.2s ease-out infinite;
+    }
+    .chispa:nth-of-type(2) { animation-delay: 0.45s; }
+    .chispa:nth-of-type(3) { animation-delay: 0.9s; }
+    .chispa:nth-of-type(4) { animation-delay: 1.35s; }
+    .chispa:nth-of-type(5) { animation-delay: 1.7s; }
+    .polvo {
+      animation: flotar-polvo 9s linear infinite;
+    }
+    .tallado {
+      animation: respirar-tallado 4.5s ease-in-out infinite;
+    }
+    @keyframes titilar-llama {
+      0% { transform: scaleY(1) scaleX(1); opacity: 0.95; }
+      100% { transform: scaleY(1.16) scaleX(0.92); opacity: 0.75; }
+    }
+    @keyframes latido-halo {
+      0%, 100% { opacity: 0.55; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.08); }
+    }
+    @keyframes saltar-chispa {
+      0% { opacity: 0; transform: translateY(0) scale(0.4); }
+      25% { opacity: 1; transform: translateY(-14px) scale(1); }
+      100% { opacity: 0; transform: translateY(-58px) scale(0.3); }
+    }
+    @keyframes flotar-polvo {
+      0% { transform: translateY(0); opacity: 0; }
+      12% { opacity: 0.45; }
+      100% { transform: translateY(-70px); opacity: 0; }
+    }
+    @keyframes respirar-tallado {
+      0%, 100% { opacity: 0.88; }
+      50% { opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hoguera-llama, .hoguera-halo, .chispa, .polvo, .tallado {
+        animation: none !important;
+      }
+    }
+  </style>
+
+  <rect width="1200" height="400" fill="url(#rocaFondo)"/>
+  <path d="M0 0 H150 L120 60 L170 120 L110 190 L150 260 L90 330 L130 400 H0 Z" fill="url(#rocaFrente)" opacity="0.95"/>
+  <path d="M1200 0 H1050 L1080 60 L1030 120 L1090 190 L1050 260 L1110 330 L1070 400 H1200 Z" fill="url(#rocaFrente)" opacity="0.95"/>
+  <g fill="#2a1a0b">
+    <path d="M190 0 L215 0 L206 62 L196 40 Z"/>
+    <path d="M265 0 L300 0 L288 88 L274 52 Z"/>
+    <path d="M360 0 L382 0 L376 46 L366 30 Z"/>
+    <path d="M840 0 L862 0 L856 44 L846 26 Z"/>
+    <path d="M905 0 L944 0 L930 92 L916 54 Z"/>
+    <path d="M1010 0 L1032 0 L1026 58 L1016 34 Z"/>
+  </g>
+
+  <ellipse class="hoguera-halo" cx="135" cy="300" rx="230" ry="170" fill="url(#resplandorHoguera)"/>
+  <ellipse class="hoguera-halo" cx="1065" cy="300" rx="230" ry="170" fill="url(#resplandorHoguera)" style="animation-delay:-1.3s"/>
+
+  <g transform="translate(135 300)">
+    <path d="M-28 8 L28 8 L20 34 L-20 34 Z" fill="#1d1208"/>
+    <path class="hoguera-llama" d="M0 -6 C14 -22 18 -40 8 -58 C4 -44 -2 -40 -8 -52 C-18 -34 -14 -16 0 -6 Z" fill="#ff9f1c"/>
+    <path class="hoguera-llama" d="M0 -4 C8 -16 9 -28 3 -38 C1 -28 -3 -26 -6 -33 C-10 -22 -8 -12 0 -4 Z" fill="#ffd166" style="animation-delay:-0.2s"/>
+  </g>
+  <g transform="translate(1065 300)">
+    <path d="M-28 8 L28 8 L20 34 L-20 34 Z" fill="#1d1208"/>
+    <path class="hoguera-llama" d="M0 -6 C14 -22 18 -40 8 -58 C4 -44 -2 -40 -8 -52 C-18 -34 -14 -16 0 -6 Z" fill="#ff9f1c" style="animation-delay:-0.35s"/>
+    <path class="hoguera-llama" d="M0 -4 C8 -16 9 -28 3 -38 C1 -28 -3 -26 -6 -33 C-10 -22 -8 -12 0 -4 Z" fill="#ffd166" style="animation-delay:-0.5s"/>
+  </g>
+
+  <g>
+    <path d="M330 92 Q600 60 870 92 L900 316 Q600 356 300 316 Z" fill="url(#rocaFrente)" opacity="0.92"/>
+    <path d="M330 92 Q600 60 870 92" fill="none" stroke="#8a6338" stroke-width="3" opacity="0.5"/>
+    <path d="M370 130 Q520 108 660 124" fill="none" stroke="#3a2714" stroke-width="4" opacity="0.45"/>
+    <path d="M420 286 Q560 300 700 282" fill="none" stroke="#3a2714" stroke-width="4" opacity="0.4"/>
+    <path d="M760 150 L820 176 L786 214" fill="none" stroke="#3a2714" stroke-width="3" opacity="0.35"/>
+  </g>
+
+  <g class="tallado" filter="url(#brilloTallado)">
+    <path d="M485 150 L530 142 L530 234 L485 242 Z" fill="url(#piedraTallada)"/>
+    <path d="M495 156 L520 152 L520 228 L495 232 Z" fill="#7a5a32" opacity="0.45"/>
+    <ellipse cx="507.5" cy="192" rx="6" ry="22" fill="#b8955a" opacity="0.25"/>
+
+    <path d="M565 138 L620 130 L620 238 L565 246 Z" fill="url(#piedraTallada)"/>
+    <path d="M575 144 L610 138 L610 232 L575 238 Z" fill="#7a5a32" opacity="0.45"/>
+    <ellipse cx="592.5" cy="188" rx="10" ry="28" fill="#b8955a" opacity="0.22"/>
+    <circle cx="592.5" cy="188" r="14" fill="none" stroke="#b8955a" stroke-width="6" opacity="0.18"/>
+    <circle cx="592.5" cy="188" r="6" fill="#b8955a" opacity="0.16"/>
+
+    <path d="M655 136 L700 130 L700 238 L655 244 Z" fill="url(#piedraTallada)"/>
+    <path d="M665 142 L690 138 L690 232 L665 236 Z" fill="#7a5a32" opacity="0.45"/>
+    <ellipse cx="677.5" cy="190" rx="6" ry="24" fill="#b8955a" opacity="0.25"/>
+  </g>
+
+  <g fill="#ffd166">
+    <circle class="chispa" cx="470" cy="286" r="3.2"/>
+    <circle class="chispa" cx="560" cy="300" r="2.4"/>
+    <circle class="chispa" cx="700" cy="292" r="3"/>
+    <circle class="chispa" cx="770" cy="302" r="2.2"/>
+    <circle class="chispa" cx="640" cy="318" r="2.6"/>
+  </g>
+
+  <g fill="#f3d27a" opacity="0.35">
+    <circle class="polvo" cx="240" cy="250" r="2" style="animation-delay:-1s"/>
+    <circle class="polvo" cx="420" cy="180" r="1.6" style="animation-delay:-3.2s"/>
+    <circle class="polvo" cx="810" cy="220" r="1.8" style="animation-delay:-5.4s"/>
+    <circle class="polvo" cx="980" cy="160" r="1.5" style="animation-delay:-7.1s"/>
+  </g>
+
+  <path d="M0 340 Q300 322 600 340 Q900 358 1200 336 L1200 400 L0 400 Z" fill="#1b1108"/>
+  <path d="M0 340 Q300 322 600 340 Q900 358 1200 336" fill="none" stroke="#6b4a28" stroke-width="2" opacity="0.6"/>
+
+  <rect width="1200" height="400" fill="url(#vineta)"/>
+</svg>

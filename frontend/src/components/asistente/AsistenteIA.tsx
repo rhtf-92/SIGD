@@ -62,12 +62,26 @@ export default function AsistenteIA() {
     if (abierto) finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [mensajes.length, abierto, escribiendo]);
 
-  // El menú del perfil (Ayuda) puede abrir el chat con el evento "sigd:abrir-ayuda".
+  // El menú del perfil (Ayuda/Soporte) puede abrir el chat con el evento "sigd:abrir-ayuda".
   useEffect(() => {
     const abrir = () => setAbierto(true);
+    const abrirSoporte = () => {
+      setAbierto(true);
+      try {
+        setTimeout(() => {
+          if (typeof enviar === "function") {
+            enviar("Necesito soporte técnico: tengo un bug, error o la página se congeló. Por favor guíame paso a paso para solucionarlo.");
+          }
+        }, 250);
+      } catch {}
+    };
     window.addEventListener("sigd:abrir-ayuda", abrir);
-    return () => window.removeEventListener("sigd:abrir-ayuda", abrir);
-  }, []);
+    window.addEventListener("sigd:abrir-soporte", abrirSoporte as EventListener);
+    return () => {
+      window.removeEventListener("sigd:abrir-ayuda", abrir);
+      window.removeEventListener("sigd:abrir-soporte", abrirSoporte as EventListener);
+    };
+  }, [enviar]);
 
   const votar = (id: string, voto: "up" | "down") => {
     setFeedback((prev) => {
@@ -112,16 +126,16 @@ export default function AsistenteIA() {
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        aria-label={abierto ? "Cerrar asistente" : "Abrir asistente de ayuda"}
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-blue-700 text-2xl text-white shadow-xl transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 print:hidden"
+        aria-label={abierto ? "Cerrar asistente" : "Abrir asistente de ayuda y soporte"}
+        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-700 to-blue-900 text-2xl text-white shadow-xl transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 print:hidden"
       >
         {abierto ? "✕" : "🤖"}
       </button>
 
       {abierto && (
         <section
-          aria-label="Asistente virtual SIGD"
-          className="fixed right-5 z-50 flex h-[520px] max-h-[80vh] w-[min(94vw,380px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl print:hidden"
+          aria-label="Asistente virtual SIGD - Soporte y Ayuda"
+          className="fixed right-5 z-50 flex h-[560px] max-h-[85vh] w-[min(94vw,400px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl print:hidden"
           style={{ bottom: "5.5rem" }}
         >
           <header className="flex items-center justify-between gap-2 bg-gradient-to-r from-blue-800 to-blue-900 px-4 py-3 text-white">
@@ -131,7 +145,7 @@ export default function AsistenteIA() {
               </span>
               <div>
                 <p className="flex items-center gap-1.5 text-sm font-bold leading-tight">
-                  JARVIS · Asistente SIGD
+                  JARVIS • Soporte IA SIGD
                   <span
                     title={iaDisponible ? "IA en la nube disponible + respaldo local" : "Modo local (sin clave de IA)"}
                     className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${iaDisponible ? "bg-emerald-400/20 text-emerald-100" : "bg-white/15 text-blue-100"}`}
@@ -141,17 +155,17 @@ export default function AsistenteIA() {
                 </p>
                 <p className="flex items-center gap-1 text-[11px] text-emerald-200">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  {fuenteIA === "ia" ? "Última respuesta: nube IA" : "En línea · entiende lenguaje natural"}
+                  {fuenteIA === "ia" ? "Respuesta con IA en la nube" : "Soporte y orientación en tiempo real"}
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={limpiar}
-              title="Reiniciar conversación (borra historial)"
+              title="Reiniciar conversación"
               className="rounded-lg bg-white/10 px-2 py-1 text-xs font-semibold hover:bg-white/20"
             >
-              ↺
+              ↻
             </button>
           </header>
 

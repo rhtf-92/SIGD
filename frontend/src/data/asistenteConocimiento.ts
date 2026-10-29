@@ -175,17 +175,20 @@ export const BASE_CONOCIMIENTO: EntradaConocimiento[] = [
   },
   {
     id: "ayuda-general",
-    titulo: "Alcance del asistente",
-    palabrasClave: ["ayuda", "que puedes hacer", "que sabes", "opciones", "menu", "para que sirves", "quien eres", "funciones"],
+    titulo: "Alcance del asistente / Soporte",
+    palabrasClave: ["ayuda", "soporte", "tecnico", "bug", "error", "falla", "congela", "se cuelga", "no carga", "que puedes hacer", "que sabes", "opciones", "menu", "para que sirves", "quien eres", "funciones"],
     ejemplos: [
-      "¿qué puede hacer usted por mí?",
-      "¿en qué me puede asistir?",
-      "¿quién es usted?",
-      "no sé por dónde empezar",
+      "��quǸ puede hacer usted por m��?",
+      "��en quǸ me puede asistir?",
+      "��quiǸn es usted?",
+      "no sǸ por d��nde empezar",
       "necesito ayuda",
+      "tengo un error en la página",
+      "la página se congeló",
+      "no puedo avanzar",
     ],
     respuesta:
-      "Con todo gusto. Puedo orientarle de manera profesional sobre: (1) presentación de trámites en Mesa de Partes Virtual; (2) seguimiento de su expediente mediante el código CUT; (3) consulta de su Casilla Electrónica; (4) validación de autenticidad documental con código CVD; (5) registro y acceso a su cuenta; (6) titulación y resoluciones directorales; y (7) administración y reportes ejecutivos. Asimismo, puedo dirigirle directamente al módulo correspondiente si usted me lo solicita; por ejemplo: «llévame a mi casilla».",
+      "Con todo gusto. Soy su asistente de orientación y soporte del SIGD. Puedo guiarle paso a paso sobre: (1) tr�mites en Mesa de Partes Virtual; (2) seguimiento con código CUT; (3) Casilla Electrónica; (4) validación CVD; (5) registro y acceso; (6) Titulación y Resoluciones; (7) Administración/Reportes. Si tiene un bug o la página se congela: indíqueme qué módulo estaba usando, qué acción realizó y tome una captura de pantalla si es posible. También puedo mostrarle imágenes/güías con la solución. Puedo llevarle al módulo que necesite con: \"llévame a ...\".",
     enlaces: [
       { etiqueta: "Mesa de Partes", ruta: "/tramite" },
       { etiqueta: "Consulta con CUT", ruta: "/consulta" },
@@ -195,12 +198,13 @@ export const BASE_CONOCIMIENTO: EntradaConocimiento[] = [
   {
     id: "que-es-sigd",
     titulo: "Presentación del SIGD",
-    palabrasClave: ["sigd", "sistema", "instituto", "suiza", "para que sirve", "que es esta pagina", "plataforma"],
+    palabrasClave: ["sigd", "sistema", "instituto", "suiza", "para que sirve", "que es esta pagina", "plataforma", "informacion", "información", "presentacion", "presentación"],
     ejemplos: [
-      "¿qué es el SIGD?",
-      "¿para qué sirve esta plataforma?",
-      "información del sistema",
-      "¿qué es esto?",
+      "��qué es el SIGD?",
+      "��de qué trata esta plataforma?",
+      "para qué sirve este sistema",
+      "información sobre el instituto",
+      "explícame la plataforma",
     ],
     respuesta:
       "El SIGD es el Sistema Integral de Gestión Documentaria del Instituto de Educación Superior Tecnológico Público “Suiza” (Pucallpa, Ucayali). Constituye la plataforma oficial para la presentación de trámites, el seguimiento de expedientes con código CUT, la notificación electrónica con plena validez legal y la verificación pública de documentos mediante código CVD, en concordancia con el TUO de la Ley N.º 27444 y la Ley N.º 27269 de Firmas y Certificados Digitales.",
@@ -516,3 +520,75 @@ export const BASE_CONOCIMIENTO: EntradaConocimiento[] = [
     ],
   },
 ];
+
+export interface EnlaceAsistente {
+  etiqueta: string;
+  to: string;
+}
+
+export interface TemaAsistente {
+  id: string;
+  titulo: string;
+  claves: string[];
+  respuesta: string;
+  enlaces: EnlaceAsistente[];
+  sugerencias?: string[];
+}
+
+const IDS_COMPATIBLES: Record<string, string> = {
+  "mesa-partes-virtual": "mesa-partes",
+  "validador-cvd": "cvd",
+  "casilla-electronica": "casilla",
+};
+
+const TEMA_ERROR_NPM: TemaAsistente = {
+  id: "error-npm",
+  titulo: "Soluci�n de errores de npm",
+  claves: ["npm", "enoent", "package.json", "run dev", "node", "dependencias"],
+  respuesta:
+    "El error ENOENT indica que npm no encuentra el archivo package.json en la carpeta actual. Verifique que est� ubicado en la ra�z del proyecto frontend (donde se encuentra package.json) antes de ejecutar npm run dev o npm install. Si el archivo no existe, restaure el proyecto o solicite apoyo al equipo de desarrollo.",
+  enlaces: [],
+  sugerencias: ["npm run dev me da ENOENT package.json"],
+};
+
+export const TEMAS_ASISTENTE: TemaAsistente[] = [
+  ...BASE_CONOCIMIENTO.map((entrada) => ({
+    id: IDS_COMPATIBLES[entrada.id] ?? entrada.id,
+    titulo: entrada.titulo,
+    claves: entrada.palabrasClave,
+    respuesta: entrada.respuesta,
+    enlaces: (entrada.enlaces ?? []).map((enlace) => ({
+      etiqueta: enlace.etiqueta,
+      to:
+        entrada.id === "mesa-partes-virtual" && enlace.ruta === "/tramite"
+          ? "/tramite/mesa-partes-virtual"
+          : enlace.ruta,
+    })),
+    sugerencias: entrada.ejemplos.slice(0, 3),
+  })),
+  TEMA_ERROR_NPM,
+
+  {
+    id: "modulos-apartado",
+    titulo: "Apartado de Modulos - Guia visual",
+    claves: ["modulos", "apartado", "secciones", "inicio", "presentacion", "guia", "imagenes", "explicado"],
+    sugerencias: ["muestrame el apartado de modulos", "guia de modulos con imagenes", "explicame cada modulo"],
+    respuesta:
+      "Guia visual por modulos:\n\n1) INICIO / PRESENTACION\n   - Vista general y accesos segun rol.\n\n2) MESA DE PARTES VIRTUAL\n   - Radicacion TUPA, anexos y obtencion de CUT.\n\n3) CASILLA ELECTRONICA\n   - Notificaciones con validez legal.\n\n4) EXPEDIENTES\n   - Trazabilidad, derivaciones y providencias.\n\n5) VALIDADOR CVD\n   - Verificacion con codigo CVD o QR.\n\n6) FLUJO Y VALIDEZ LEGAL\n   - Firma digital y verificacion publica.\n\n7) TITULACION / RESOLUCIONES\n   - Seguimiento y proyeccion de resoluciones.\n\n8) ADMINISTRACION / REPORTES\n   - Usuarios, roles, permisos e indicadores.\n\nPara incidencias (bug/pagina congelada): indica modulo, accion realizada y captura si posible. El soporte IA te guia con imagenes explicativas.",
+    enlaces: [
+      { etiqueta: "Ir a Inicio", to: "/" },
+      { etiqueta: "Mesa de Partes", to: "/tramite" },
+      { etiqueta: "Casilla", to: "/casilla" },
+      { etiqueta: "Validador CVD", to: "/validador-cvd" },
+    ],
+  },
+];
+
+export const TEMA_POR_DEFECTO: TemaAsistente =
+  TEMAS_ASISTENTE.find((tema) => tema.id === "ayuda-general") ?? {
+    id: "ayuda-general",
+    titulo: "Alcance del asistente",
+    claves: [],
+    respuesta: RESPUESTA_POR_DEFECTO,
+    enlaces: [],
+  };
