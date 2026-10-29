@@ -263,12 +263,40 @@ INSERT INTO sigd_auth.persona (id_persona, tipo, id_documento) VALUES (
 INSERT INTO sigd_auth.cuenta_usuario (
     id_usuario, id_persona, usuario, correo, password_hash, activo
 ) VALUES (
-    '00000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000004',
     '00000000-0000-0000-0000-0000000000aa',
     'sistema',
     'sistema@sigd.gob.pe',
     '$argon2id$v=19$m=65536,t=3,p=4$c2lnZF9hdXRoX3NhbHRfMQ$951YaDkH0Om0O6Jzgn2kaYkbwDmPgccFpmYU2xhwrS4',
     TRUE
+ ) ON CONFLICT (id_usuario) DO NOTHING;
+
+-- Persona y cuenta de prueba requeridas por la semilla de notificaciones
+INSERT INTO sigd_auth.persona (id_persona, tipo, id_documento)
+VALUES (
+    '00000000-0000-0000-0000-000000000005',
+    'NATURAL',
+    '00000005'
+) ON CONFLICT (id_persona) DO NOTHING;
+
+INSERT INTO sigd_auth.persona_natural (
+    id_persona, nombres, apellidos, nombre_completo, correo
+) VALUES (
+    '00000000-0000-0000-0000-000000000005',
+    'Usuario',
+    'Prueba',
+    'Usuario Prueba',
+    'usuario.prueba@example.com'
+) ON CONFLICT (id_persona) DO NOTHING;
+
+INSERT INTO sigd_auth.cuenta_usuario (
+    id_usuario, id_persona, usuario, correo, password_hash
+) VALUES (
+    '00000000-0000-0000-0000-000000000005',
+    '00000000-0000-0000-0000-000000000005',
+    'usuario.prueba',
+    'usuario.prueba@example.com',
+    '$argon2id$v=19$m=65536,t=3,p=4$c2lnZF9hdXRoX3NhbHRfMQ$951YaDkH0Om0O6Jzgn2kaYkbwDmPgccFpmYU2xhwrS4'
 ) ON CONFLICT (id_usuario) DO NOTHING;
 
 -- Semilla inicial determinista para pruebas y desarrollo
