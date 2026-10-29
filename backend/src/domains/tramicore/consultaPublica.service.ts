@@ -31,6 +31,7 @@ export interface DtoConsultaPublica {
   anioFiscal: number;
   estadoTramite: string;
   tipoTramite: string | null;
+  unidadOrganica: string | null;
   asunto: string;
   fechaEnvioReal: string;
   fechaRadicacionLegal: string;
@@ -50,6 +51,7 @@ interface FilaConsulta {
   cut: string;
   estado_tramite: string;
   tipo_tramite: string | null;
+  unidad_organica: string | null;
   asunto: string | null;
   fecha_ingreso: Date | null;
   fecha_radicacion: Date;
@@ -106,6 +108,7 @@ export class ConsultaPublicaService {
         anioFiscal: Number(expediente.cut.slice(4, 8)) || 0,
         estadoTramite: expediente.estado_tramite,
         tipoTramite: expediente.tipo_tramite,
+        unidadOrganica: expediente.unidad_organica,
         asunto: expediente.asunto ?? '',
         fechaEnvioReal: fechaEnvioReal.toISOString(),
         fechaRadicacionLegal: expediente.fecha_radicacion.toISOString(),
@@ -137,6 +140,7 @@ export class ConsultaPublicaService {
       `SELECT e.codigo_expediente AS cut,
               e.estado AS estado_tramite,
               t.denominacion   AS tipo_tramite,
+              t.unidad_organica AS unidad_organica,
               a.asunto,
               a.fecha_ingreso,
               e.fecha_radicacion,
