@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 import { Link, useNavigate } from "react-router-dom";
+=======
+﻿import { Link, useNavigate } from "react-router-dom";
+>>>>>>> Stashed changes
 import {
   filtrarModulosPorRol,
   useSesion,
@@ -84,7 +88,11 @@ export default function DashboardHomePage() {
               {seccion.titulo}
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
+<<<<<<< Updated upstream
               {seccion.descripcion}
+=======
+              {seccion.description}
+>>>>>>> Stashed changes
             </p>
           </Link>
         ))}

@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 import { Award, Check, ChevronDown, ExternalLink } from "lucide-react";
+=======
+﻿import { Award, Check, ChevronDown, ExternalLink } from "lucide-react";
+>>>>>>> Stashed changes
 import { useState } from "react";
 
 import { PREGUNTAS_FRECUENTES } from "../../data/landingInstitucional";
