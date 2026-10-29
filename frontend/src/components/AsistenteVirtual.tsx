@@ -82,6 +82,15 @@ export default function AsistenteVirtual() {
         });
       } else if (resultado.tipo === "desconocida") {
         agregarMensaje({ autor: "asistente", texto: resultado.mensaje, acciones: accionesIniciales });
+      } else if (resultado.tipo === "conocimiento") {
+        for (const respuesta of resultado.respuestas) {
+          let texto = respuesta.texto;
+          texto += `\n\nFuente: ${respuesta.fuente}`;
+          if (!respuesta.validado) {
+            texto += "\nPendiente de validación por la dirección.";
+          }
+          agregarMensaje({ autor: "asistente", texto, acciones: accionesIniciales });
+        }
       } else if (resultado.tramites.length) {
         agregarMensaje({
           autor: "asistente",
