@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { crearPool } from '../src/database.js';
 
 const CODIGO_VERSION = 'TUPA-2026-v1.0';
-const FUENTE = 'TUPA 2026 del sistema';
-const VALIDADO = 'no';
+const FUENTE_DOCUMENTO = 'TUPA 2026 del sistema';
+const VALIDADO = false;
 const directorioActual = path.dirname(fileURLToPath(import.meta.url));
 const rutaSalida = path.resolve(directorioActual, '../../docs/ia/fuentes/tupa_2026_fichas.json');
 
@@ -36,14 +36,20 @@ interface TramiteFila {
   requisitos: RequisitoFila[];
 }
 
+interface FuenteConocimiento {
+  documento: string;
+  seccion?: string;
+  fecha?: string;
+}
+
 interface FichaConocimiento {
   id: string;
   tema: string;
   preguntas_ejemplo: string[];
   palabras_clave: string[];
   respuesta: string;
-  fuente: string;
-  validado: string;
+  fuente: FuenteConocimiento;
+  validado: boolean;
 }
 
 const PALABRAS_IGNORADAS = new Set([
@@ -233,7 +239,10 @@ function construirFicha(tramite: TramiteFila): FichaConocimiento {
     preguntas_ejemplo: construirPreguntas(tramite),
     palabras_clave: construirPalabrasClave(tramite),
     respuesta: construirRespuesta(tramite),
-    fuente: FUENTE,
+    fuente: {
+      documento: FUENTE_DOCUMENTO,
+      seccion: tramite.rubro,
+    },
     validado: VALIDADO,
   };
 }
