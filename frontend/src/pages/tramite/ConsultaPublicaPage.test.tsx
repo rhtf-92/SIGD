@@ -123,6 +123,7 @@ describe("LineaTiempoExpediente y ConsultaPublicaPage", () => {
       anioFiscal: 2026,
       estadoTramite: "REGISTRADO",
       tipoTramite: "Certificado Modular",
+      unidadOrganica: null,
       asunto: "Solicitud de Certificación",
       fechaEnvioReal: "2026-03-24T08:00:00.000Z",
       fechaRadicacionLegal: "2026-03-24T09:00:00.000Z",
@@ -186,5 +187,177 @@ describe("LineaTiempoExpediente y ConsultaPublicaPage", () => {
     expect(within(timelineList).getByText(/envío del trámite/i)).toBeInTheDocument();
     expect(within(timelineList).getByText(/radicación legal/i)).toBeInTheDocument();
     expect(within(timelineList).getByText(/proveído 001-2026-DIR/i)).toBeInTheDocument();
+  });
+
+  it('muestra fecha de envío y radicación legal en hora de Lima (día/mes/año hora:minuto), nunca el texto ISO', async () => {
+    const mock: DtoConsultaPublica = {
+      cut: 'EXP-2026-000201',
+      anioFiscal: 2026,
+      estadoTramite: 'REGISTRADO',
+      tipoTramite: 'Certificado Modular',
+      unidadOrganica: null,
+      asunto: 'Solicitud',
+      fechaEnvioReal: '2026-03-24T08:00:00.000Z',
+      fechaRadicacionLegal: '2026-03-24T09:00:00.000Z',
+      fueraDeHorario: false,
+      canalRecepcion: 'PRESENCIAL',
+      totalFolios: 1,
+      administrado: {
+        documentoEnmascarado: '45***123',
+        nombreEnmascarado: 'J*** P***',
+      },
+      documentos: [],
+      proveidos: [],
+      mensajeLegal: 'Información pública.',
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mock });
+    render(
+      <MemoryRouter initialEntries={['/consulta/EXP-2026-000201']}>
+        <Routes>
+          <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('EXP-2026-000201')).toBeInTheDocument());
+    // Nunca se muestra el texto ISO crudo
+    expect(screen.queryByText('2026-03-24T08:00:00.000Z')).not.toBeInTheDocument();
+    expect(screen.queryByText('2026-03-24T09:00:00.000Z')).not.toBeInTheDocument();
+    // Se muestra formato corto con día, mes, año y hora:minutos
+    expect(screen.getAllByText(/\d{2}\/\d{2}\/\d{4}/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/\d{2}:\d{2}/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('muestra "Mesa de Partes Virtual" cuando canalRecepcion es MESA_VIRTUAL', async () => {
+    const mock: DtoConsultaPublica = {
+      cut: 'EXP-2026-000202',
+      anioFiscal: 2026,
+      estadoTramite: 'REGISTRADO',
+      tipoTramite: 'Certificado Modular',
+      unidadOrganica: null,
+      asunto: 'Solicitud',
+      fechaEnvioReal: '2026-03-24T08:00:00.000Z',
+      fechaRadicacionLegal: '2026-03-24T09:00:00.000Z',
+      fueraDeHorario: false,
+      canalRecepcion: 'MESA_VIRTUAL',
+      totalFolios: 1,
+      administrado: {
+        documentoEnmascarado: '45***123',
+        nombreEnmascarado: 'J*** P***',
+      },
+      documentos: [],
+      proveidos: [],
+      mensajeLegal: 'Información pública.',
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mock });
+    render(
+      <MemoryRouter initialEntries={['/consulta/EXP-2026-000202']}>
+        <Routes>
+          <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('EXP-2026-000202')).toBeInTheDocument());
+    expect(screen.getByText('Mesa de Partes Virtual')).toBeInTheDocument();
+  });
+
+  it('muestra la línea de unidad responsable cuando unidadOrganica no es null', async () => {
+    const mockConUnidad: DtoConsultaPublica = {
+      cut: 'EXP-2026-000203',
+      anioFiscal: 2026,
+      estadoTramite: 'REGISTRADO',
+      tipoTramite: 'Certificado Modular',
+      unidadOrganica: 'Dirección General',
+      asunto: 'Solicitud',
+      fechaEnvioReal: '2026-03-24T08:00:00.000Z',
+      fechaRadicacionLegal: '2026-03-24T09:00:00.000Z',
+      fueraDeHorario: false,
+      canalRecepcion: 'PRESENCIAL',
+      totalFolios: 1,
+      administrado: {
+        documentoEnmascarado: '45***123',
+        nombreEnmascarado: 'J*** P***',
+      },
+      documentos: [],
+      proveidos: [],
+      mensajeLegal: 'Información pública.',
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockConUnidad });
+    render(
+      <MemoryRouter initialEntries={['/consulta/EXP-2026-000203']}>
+        <Routes>
+          <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('EXP-2026-000203')).toBeInTheDocument());
+    expect(screen.getByText('Unidad responsable (según catálogo)')).toBeInTheDocument();
+    expect(screen.getByText('Dirección General')).toBeInTheDocument();
+  });
+
+  it('no muestra la línea de unidad responsable cuando unidadOrganica es null', async () => {
+    const mockSinUnidad: DtoConsultaPublica = {
+      cut: 'EXP-2026-000204',
+      anioFiscal: 2026,
+      estadoTramite: 'REGISTRADO',
+      tipoTramite: 'Certificado Modular',
+      unidadOrganica: null,
+      asunto: 'Solicitud',
+      fechaEnvioReal: '2026-03-24T08:00:00.000Z',
+      fechaRadicacionLegal: '2026-03-24T09:00:00.000Z',
+      fueraDeHorario: false,
+      canalRecepcion: 'PRESENCIAL',
+      totalFolios: 1,
+      administrado: {
+        documentoEnmascarado: '45***123',
+        nombreEnmascarado: 'J*** P***',
+      },
+      documentos: [],
+      proveidos: [],
+      mensajeLegal: 'Información pública.',
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSinUnidad });
+    render(
+      <MemoryRouter initialEntries={['/consulta/EXP-2026-000204']}>
+        <Routes>
+          <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('EXP-2026-000204')).toBeInTheDocument());
+    expect(screen.queryByText('Unidad responsable (según catálogo)')).not.toBeInTheDocument();
+  });
+
+  it('muestra aviso de fuera de horario cuando fueraDeHorario es true', async () => {
+    const mock: DtoConsultaPublica = {
+      cut: 'EXP-2026-000205',
+      anioFiscal: 2026,
+      estadoTramite: 'REGISTRADO',
+      tipoTramite: 'Certificado Modular',
+      unidadOrganica: null,
+      asunto: 'Solicitud',
+      fechaEnvioReal: '2026-03-24T17:00:00.000Z',
+      fechaRadicacionLegal: '2026-03-24T09:00:00.000Z',
+      fueraDeHorario: true,
+      canalRecepcion: 'MESA_VIRTUAL',
+      totalFolios: 1,
+      administrado: {
+        documentoEnmascarado: '45***123',
+        nombreEnmascarado: 'J*** P***',
+      },
+      documentos: [],
+      proveidos: [],
+      mensajeLegal: 'Información pública.',
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mock });
+    render(
+      <MemoryRouter initialEntries={['/consulta/EXP-2026-000205']}>
+        <Routes>
+          <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('EXP-2026-000205')).toBeInTheDocument());
+    expect(screen.getByText(/16:30/)).toBeInTheDocument();
+    expect(screen.getByText(/siguiente día hábil/)).toBeInTheDocument();
   });
 });
