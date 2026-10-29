@@ -35,10 +35,17 @@ const PALABRAS_VACIAS = new Set([
   "favor", "por", "favor",
 ]);
 
-function palabrasSignificativas(texto: string): string[] {
+function palabrasLimpas(texto: string): string[] {
   return normalizarTexto(texto)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .split(/\s+/)
-    .filter((palabra) => palabra.length > 0 && !PALABRAS_VACIAS.has(palabra));
+    .filter((palabra) => palabra.length > 0);
+}
+
+function palabrasSignificativas(texto: string): string[] {
+  return palabrasLimpas(texto).filter(
+    (palabra) => !PALABRAS_VACIAS.has(palabra),
+  );
 }
 
 export function buscarConocimiento(
@@ -50,13 +57,11 @@ export function buscarConocimiento(
 
   const resultados = base.map((entrada) => {
     const palabrasEntrada = new Set(
-      normalizarTexto([
+      palabrasLimpas([
         entrada.tema,
         ...entrada.palabras_clave,
         ...entrada.preguntas_ejemplo,
-      ].join(" "))
-        .split(/\s+/)
-        .filter((palabra) => palabra.length > 0),
+      ].join(" ")),
     );
 
     let coincidencias = 0;

@@ -46,6 +46,15 @@ const basePrueba: ConocimientoEntrada[] = [
     fuente: { documento: "Manual del Usuario", seccion: "Acceso", fecha: "2026-01-15" },
     validado: true,
   },
+  {
+    id: "ent-prueba-003",
+    tema: "Costo del certificado de estudios",
+    preguntas_ejemplo: ["¿Cuánto cuesta el certificado de estudios?"],
+    palabras_clave: ["certificado", "estudios", "costo"],
+    respuesta: "El certificado de estudios cuesta S/ 25.00.",
+    fuente: { documento: "TUPA", seccion: "Certificados", fecha: "2026-01-01" },
+    validado: true,
+  },
 ];
 
 // TRES ENTRADAS QUE COINCIDEN CON "registro" (solo para probar el tope de 2 respuestas)
@@ -165,5 +174,32 @@ describe("conocimiento del asistente", () => {
   it("con la base real vacía, 'el instituto cuenta con biblioteca' no devuelve tipo conocimiento", async () => {
     const resultado = await resolverConsultaAsistente("el instituto cuenta con biblioteca");
     expect(resultado.tipo).not.toBe("conocimiento");
+  });
+
+  it("responde a 'cuanto cuesta el certificado' con ficha de certificado", () => {
+    const resultados = buscarConocimiento(
+      "cuanto cuesta el certificado",
+      basePrueba,
+    );
+    expect(resultados.length).toBeGreaterThan(0);
+    expect(resultados[0].entrada.id).toBe("ent-prueba-003");
+    expect(resultados[0].puntaje).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it("responde igual con comas y puntos pegados a las palabras", () => {
+    const resultados = buscarConocimiento(
+      "cuanto, cuesta el certificado.",
+      basePrueba,
+    );
+    expect(resultados.length).toBeGreaterThan(0);
+    expect(resultados[0].entrada.id).toBe("ent-prueba-003");
+  });
+
+  it("consulta fuera de tema no coincide con la ficha de certificado", () => {
+    const resultados = buscarConocimiento(
+      "xyzwq consulta inexistente nada",
+      basePrueba,
+    );
+    expect(resultados).toEqual([]);
   });
 });
