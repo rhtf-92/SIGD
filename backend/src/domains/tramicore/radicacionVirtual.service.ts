@@ -1,26 +1,26 @@
-﻿import { createHash, randomUUID } from 'node:crypto';
+﻿import { createHash } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { ValidationError } from '../../shared/domain/errors/index.js';
-import { CutService } from './cut.service.js';
 import { calcularHorarioCorte, type ResultadoHorarioCorte } from './horarioCorte.util.js';
 import type { RadicacionVirtualInput } from './tramites.schemas.js';
 
 /**
- * T-BE-TC-02 y T-BE-TC-03 Â· Logica de negocio de la radicacion virtual
+ * T-BE-TC-02 y T-BE-TC-03 · Logica de negocio de la radicacion virtual
  * (Mesa de Partes Virtual 24x7, endpoint #14).
  *
- * Garantias que ofrece este servicio:
- *   * La asignacion del CUT ocurre DENTRO de la misma transaccion que la
- *     escritura del expediente. Si algo posterior falla, el ROLLBACK libera el
- *     correlativo y no se quema un numero que el ciudadano nunca vio.
- *   * `fecha_envio_real` (metadato pericial) y `fecha_radicacion_legal`
- *     (inicio del computo de plazos) se persisten por separado, conforme al
- *     Art. 138 LPAG implementado en `horarioCorte.util.ts`.
- *   * La cabecera, los adjuntos y el cargo digital se escriben en una sola
- *     transaccion: es imposible que quede un expediente sin adjunto (el trigger
- *     diferido `trg_expediente_exigir_adjunto` lo revalida en el COMMIT).
+ * Esquema real: sigd_tra.expediente (expediente_id, codigo_expediente, numero,
+ * dni_solicitante, tipo_documental_id NOT NULL, solicitante_id NOT NULL,
+ * area_destino_id, estado, fecha_radicacion, fecha_limite) y
+ * sigd_tra.asiento_registro (numero_registro, expediente_id, fecha_ingreso,
+ * canal_ingreso, asunto, remitente_id). El trigger tr_tra_expediente_asignar_cut
+ * genera el CUT (EXP-YYYY-XXXXXX) con sigd_tra.generar_cut_expediente, la misma
+ * funcion que CutService invoca (fn_generar_cut es su alias), por lo que la base
+ * lo asigna al insertar sin codigo_expediente.
+ *
+ * No existen sigd_tra.cargo_digital ni sigd_tra.documento_adjunto; el cargo
+ * digital es un codigo determinista recalculable y los adjuntos no se persisten
+ * en esta etapa (ver TODO).
  */
-
 export interface ResultadoRadicacion {
   expedienteId: string;
   cut: string;
@@ -40,34 +40,41 @@ export interface ResultadoRadicacion {
 interface FilaExpediente {
   expediente_id: string;
   cut: string;
-  fecha_envio_real: Date;
   fecha_radicacion_legal: Date;
-  fuera_de_horario: boolean;
 }
 
-interface FilaTramiteTupa {
-  id_tipo_tramite_tupa: string;
-  activo: boolean;
+interface FilaTipoTramite {
+  tipo_tramite_id: string;
+  vigente: boolean;
+}
+
+interface FilaTipoDocumento {
+  tipo_documental_id: string;
 }
 
 interface FilaPersona {
-  id: string;
-  estado: boolean;
+  id_persona: string;
+  id_documento: string | null;
 }
 
 /** Origen del calendario de feriados. Inyectable para poder testear sin BD. */
 export type ProveedorFeriados = () => Promise<string[]>;
 
 export class RadicacionVirtualService {
-  private readonly cutService: CutService;
+  private readonly pool: Pool;
   private readonly obtenerFeriados: ProveedorFeriados;
 
-  constructor(private readonly pool: Pool, obtenerFeriados?: ProveedorFeriados) {
-    this.cutService = new CutService(pool);
+  constructor(pool: Pool, obtenerFeriados?: ProveedorFeriados) {
+    this.pool = pool;
     this.obtenerFeriados = obtenerFeriados ?? crearProveedorFeriados(pool);
   }
 
-  async radicar(datos: RadicacionVirtualInput, now: Date = new Date()): Promise<ResultadoRadicacion> {
+  async radicar(
+    datos: RadicacionVirtualInput,
+    idPersonaAutenticada: string,
+    idUsuario: string,
+    now: Date = new Date(),
+  ): Promise<ResultadoRadicacion> {
     const cliente = await this.pool.connect();
     let transaccionAbierta = false;
 
@@ -75,17 +82,27 @@ export class RadicacionVirtualService {
       await cliente.query('BEGIN');
       transaccionAbierta = true;
 
-      await this.verificarTipoTramite(cliente, datos.idTipoTramiteTupa);
-      await this.verificarAdministrado(cliente, datos.idPersona);
+      const tipoDocumentalId = await this.resolverTipoDocumental(cliente, datos.idTipoTramiteTupa);
+      await this.verificarAdministrado(cliente, idPersonaAutenticada);
 
-      const [{ cut, anio }, horario] = await Promise.all([
-        this.cutService.generar(anioDeRecepcion(now), cliente),
-        this.evaluarHorario(now),
-      ]);
+      const horario = await this.evaluarHorario(now);
+      const anio = anioDeRecepcion(now);
 
-      const expediente = await this.insertarExpediente(cliente, datos, cut, horario);
-      await this.insertarAdjuntos(cliente, expediente.expediente_id, datos);
-      const cargo = await this.emitirCargoDigital(cliente, expediente.expediente_id, datos, now);
+      const expediente = await this.insertarExpediente(
+        cliente,
+        datos,
+        tipoDocumentalId,
+        idPersonaAutenticada,
+        horario.radicacionLegal,
+      );
+      const cut = expediente.cut;
+      const anioFiscal = Number(cut.slice(4, 8));
+
+      await this.insertarAsiento(cliente, expediente.expediente_id, datos, horario.envioReal, idPersonaAutenticada);
+      await this.insertarConstanciaCasilla(cliente, idUsuario, cut, datos, horario.envioReal);
+      // Etapa 2b: integrar con sigd_doc.expediente y MinIO.
+      // Los adjuntos se validan en el DTO pero no se persisten en esta etapa.
+      const cargo = this.emitirCargoDigital(expediente.expediente_id, cut, datos, horario.envioReal);
 
       await cliente.query('COMMIT');
       transaccionAbierta = false;
@@ -93,8 +110,8 @@ export class RadicacionVirtualService {
       return {
         expedienteId: expediente.expediente_id,
         cut,
-        anio,
-        fechaEnvioReal: expediente.fecha_envio_real.toISOString(),
+        anio: anioFiscal,
+        fechaEnvioReal: horario.envioReal.toISOString(),
         fechaRadicacionLegal: expediente.fecha_radicacion_legal.toISOString(),
         fueraDeHorario: horario.requiereProyeccion,
         mensajeLegal: redactarMensajeLegal(horario),
@@ -103,9 +120,6 @@ export class RadicacionVirtualService {
       };
     } catch (error) {
       if (transaccionAbierta) await cliente.query('ROLLBACK');
-      // La traduccion de SQLSTATE a respuesta HTTP la hace el middleware de
-      // errores de la plataforma (23505 -> 409, 23503 -> 400, P0001 -> 422),
-      // de modo que aqui solo se garantiza que la transaccion no queda abierta.
       throw error;
     } finally {
       cliente.release();
@@ -117,11 +131,39 @@ export class RadicacionVirtualService {
     return calcularHorarioCorte(now, feriados);
   }
 
+  private async resolverTipoDocumental(
+    cliente: PoolClient,
+    idTipoTramiteTupa: string,
+  ): Promise<string> {
+    const resultado = await cliente.query<FilaTipoDocumento>(
+      `SELECT td.tipo_documental_id
+         FROM sigd_doc.tipo_documento td
+         JOIN sigd_doc.tipo_tramite_tupa t ON t.codigo = td.codigo
+        WHERE t.tipo_tramite_id = $1
+          AND td.vigente = TRUE
+          AND t.vigente = TRUE
+        LIMIT 1`,
+      [idTipoTramiteTupa],
+    );
+    const fila = resultado.rows[0];
+    if (!fila) {
+      throw new ValidationError({
+        invalidParams: [
+          {
+            name: 'idTipoTramiteTupa',
+            reason: 'TIPO_DOCUMENTAL_SIN_CONFIGURAR: no existe un tipo documental vinculado al tramite elegido.',
+          },
+        ],
+      });
+    }
+    return fila.tipo_documental_id;
+  }
+
   private async verificarTipoTramite(cliente: PoolClient, idTipoTramiteTupa: string): Promise<void> {
-    const resultado = await cliente.query<FilaTramiteTupa>(
-      `SELECT id_tipo_tramite_tupa, activo
+    const resultado = await cliente.query<FilaTipoTramite>(
+      `SELECT tipo_tramite_id, vigente
          FROM sigd_doc.tipo_tramite_tupa
-        WHERE id_tipo_tramite_tupa = $1`,
+        WHERE tipo_tramite_id = $1`,
       [idTipoTramiteTupa],
     );
     const tipo = resultado.rows[0];
@@ -132,7 +174,7 @@ export class RadicacionVirtualService {
         ],
       });
     }
-    if (!tipo.activo) {
+    if (!tipo.vigente) {
       throw new ValidationError({
         invalidParams: [
           { name: 'idTipoTramiteTupa', reason: 'TIPO_TRAMITE_INACTIVO: el tramite ya no admite nuevas radicaciones.' },
@@ -141,9 +183,9 @@ export class RadicacionVirtualService {
     }
   }
 
-  private async verificarAdministrado(cliente: PoolClient, idPersona: number): Promise<void> {
+  private async verificarAdministrado(cliente: PoolClient, idPersona: string): Promise<void> {
     const resultado = await cliente.query<FilaPersona>(
-      'SELECT id::text AS id, estado FROM sigd_auth.persona WHERE id = $1',
+      'SELECT id_persona, id_documento FROM sigd_auth.persona WHERE id_persona = $1',
       [idPersona],
     );
     const persona = resultado.rows[0];
@@ -154,94 +196,103 @@ export class RadicacionVirtualService {
         ],
       });
     }
-    if (!persona.estado) {
-      throw new ValidationError({
-        invalidParams: [
-          { name: 'idPersona', reason: 'ADMINISTRADO_INACTIVO: la persona esta desactivada y no puede radicar.' },
-        ],
-      });
-    }
   }
 
   private async insertarExpediente(
     cliente: PoolClient,
     datos: RadicacionVirtualInput,
-    cut: string,
-    horario: ResultadoHorarioCorte,
+    tipoDocumentalId: string,
+    idPersona: string,
+    fechaRadicacionLegal: Date,
   ): Promise<FilaExpediente> {
+    const idDocumento = await this.obtenerIdDocumentoPersona(cliente, idPersona);
+    const dniSolicitante = idDocumento && /^[0-9]{8}$/.test(idDocumento) ? idDocumento : null;
+
+    // numero es NOT NULL UNIQUE; el CUT lo genera el trigger y se asigna despues.
+    const numeroTemporal = `TMP-${createHash('sha256').update(String(Date.now())).digest('hex').slice(0, 12)}`;
+
     const resultado = await cliente.query<FilaExpediente>(
       `INSERT INTO sigd_tra.expediente
-         (cut, id_persona, id_tipo_tramite_tupa, nombre_solicitante,
-          correo_notificacion, asunto, canal_recepcion,
-          estado_tramite, total_folios, fecha_envio_real, fecha_radicacion_legal,
-          fuera_de_horario)
-       VALUES ($1, $2, $3, $4, $5, $6, 'MESA_VIRTUAL', 'REGISTRADO', $7, $8, $9, $10)
-       RETURNING expediente_id, cut, fecha_envio_real, fecha_radicacion_legal, fuera_de_horario`,
-      [
-        cut,
-        datos.idPersona,
-        datos.idTipoTramiteTupa,
-        datos.nombreSolicitante,
-        datos.correo,
-        datos.asunto,
-        datos.totalFolios,
-        horario.envioReal,
-        horario.radicacionLegal,
-        horario.requiereProyeccion,
-      ],
+         (numero, dni_solicitante, tipo_documental_id, solicitante_id,
+          area_destino_id, estado, fecha_radicacion, fecha_limite)
+       VALUES ($1, $2, $3, $4, NULL, 'REGISTRADO', $5, NULL)
+       RETURNING expediente_id, codigo_expediente AS cut, fecha_radicacion AS fecha_radicacion_legal`,
+      [numeroTemporal, dniSolicitante, tipoDocumentalId, idPersona, fechaRadicacionLegal],
     );
     const expediente = resultado.rows[0];
     if (!expediente) {
       throw new Error('La insercion del expediente no devolvio fila.');
     }
+
+    await cliente.query(`UPDATE sigd_tra.expediente SET numero = $1 WHERE expediente_id = $2`, [
+      expediente.cut,
+      expediente.expediente_id,
+    ]);
+
     return expediente;
   }
 
-  private async insertarAdjuntos(
-    cliente: PoolClient,
-    expedienteId: string,
-    datos: RadicacionVirtualInput,
-  ): Promise<void> {
-    for (const documento of datos.documentos) {
-      await cliente.query(
-        `INSERT INTO sigd_tra.documento_adjunto
-           (expediente_id, nombre_archivo, content_type, tamano_bytes, hash_sha256, storage_path)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          expedienteId,
-          documento.nombreArchivo,
-          documento.contentType,
-          documento.tamanoBytes,
-          documento.hashSha256.toLowerCase(),
-          documento.storagePath ?? null,
-        ],
-      );
-    }
+  private async obtenerIdDocumentoPersona(cliente: PoolClient, idPersona: string): Promise<string | null> {
+    const resultado = await cliente.query<{ id_documento: string | null }>(
+      'SELECT id_documento FROM sigd_auth.persona WHERE id_persona = $1',
+      [idPersona],
+    );
+    return resultado.rows[0]?.id_documento ?? null;
   }
 
-  private async emitirCargoDigital(
+  private async insertarAsiento(
     cliente: PoolClient,
     expedienteId: string,
     datos: RadicacionVirtualInput,
-    now: Date,
-  ): Promise<ResultadoRadicacion['cargoDigital']> {
-    const codigo = `CARGO-${randomUUID().slice(0, 8).toUpperCase()}`;
+    fechaEnvioReal: Date,
+    idPersona: string,
+  ): Promise<void> {
+    await cliente.query(
+      `INSERT INTO sigd_tra.asiento_registro
+         (expediente_id, fecha_ingreso, canal_ingreso, asunto, remitente_id)
+       VALUES ($1, $2, 'MESA_VIRTUAL', $3, $4)`,
+      [expedienteId, fechaEnvioReal, datos.asunto, idPersona],
+    );
+  }
+
+  private async insertarConstanciaCasilla(
+    cliente: PoolClient,
+    idUsuario: string,
+    cut: string,
+    datos: RadicacionVirtualInput,
+    fechaEnvioReal: Date,
+  ): Promise<void> {
+    const cuerpo = {
+      cut,
+      asunto: datos.asunto,
+      fechaRecepcionReal: fechaEnvioReal.toISOString(),
+    };
+    await cliente.query(
+      `INSERT INTO sigd_auth.notificacion_casilla
+         (usuario_id, cut, asunto, tipo_acto, cuerpo)
+       VALUES ($1, $2, $3, 'Constancia de presentación', $4::jsonb)`,
+      [idUsuario, cut, 'Constancia de presentación de trámite', JSON.stringify(cuerpo)],
+    );
+  }
+
+  private emitirCargoDigital(
+    expedienteId: string,
+    codigoExpediente: string,
+    datos: RadicacionVirtualInput,
+    fechaIngreso: Date,
+  ): ResultadoRadicacion['cargoDigital'] {
+    const input = `${expedienteId}|${codigoExpediente}|${fechaIngreso.toISOString()}`;
+    const hashCompleto = createHash('sha256').update(input).digest('hex');
+    const codigo = `CARGO-${hashCompleto.slice(0, 8).toUpperCase()}`;
     const contenido = JSON.stringify({
       codigo,
       expedienteId,
+      cut: codigoExpediente,
       totalFolios: datos.totalFolios,
-      emitidoEn: now.toISOString(),
+      emitidoEn: fechaIngreso.toISOString(),
     });
     const hashSha256 = createHash('sha256').update(contenido).digest('hex');
     const qrContenido = `SIGD://cargo/${codigo}?h=${hashSha256.slice(0, 16)}`;
-
-    await cliente.query(
-      `INSERT INTO sigd_tra.cargo_digital
-         (expediente_id, codigo_cargo, hash_sha256, qr_contenido, emitido_en)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [expedienteId, codigo, hashSha256, qrContenido, now],
-    );
-
     return { codigo, hashSha256, qrContenido };
   }
 }
@@ -253,7 +304,15 @@ export class RadicacionVirtualService {
  * arranque en enero.
  */
 function anioDeRecepcion(now: Date): number {
-  return CutService.anioFiscalCorriente(now);
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+  }).formatToParts(now);
+  const anio = Number(partes.find((parte) => parte.type === 'year')?.value);
+  if (!Number.isFinite(anio)) {
+    throw new Error('No se pudo determinar el anio fiscal corriente.');
+  }
+  return anio;
 }
 
 function redactarMensajeLegal(horario: ResultadoHorarioCorte): string {
@@ -290,5 +349,3 @@ export function crearProveedorFeriados(pool: Pool): ProveedorFeriados {
     }
   };
 }
-
-

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
+import InsigniaEstadoTramite from '../../components/tramite/InsigniaEstadoTramite';
+import LineaTiempoExpediente from '../../components/tramite/LineaTiempoExpediente';
 
 export interface DtoDocumentoPublico {
   nombreArchivo: string;
@@ -32,6 +34,21 @@ export interface DtoConsultaPublica {
   documentos: DtoDocumentoPublico[];
   proveidos: DtoProveidoPublico[];
   mensajeLegal: string;
+  unidadOrganica: string | null;
+}
+
+const FORMATO_LIMA: Intl.DateTimeFormatOptions = {
+  timeZone: 'America/Lima',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+};
+
+function formatoLima(fechaISO: string | null | undefined): string {
+  if (!fechaISO) return 'No registrado';
+  return new Intl.DateTimeFormat('es-PE', FORMATO_LIMA).format(new Date(fechaISO));
 }
 
 export default function ConsultaPublicaPage() {
@@ -39,40 +56,40 @@ export default function ConsultaPublicaPage() {
   const navigate = useNavigate();
   const [cutInput, setCutInput] = useState(cut ?? '');
   const [resultado, setResultado] = useState<DtoConsultaPublica | null>(null);
-  const [cargando, setCargando] = useState(false);
+  const [cargando, setCargando] = useState(() => Boolean(cut));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (cut) {
-      setCutInput(cut);
-      consultar(cut);
-    }
-  }, [cut]);
-
-  const consultar = async (codigoCut: string) => {
-    const trimmed = codigoCut.trim().toUpperCase();
+    const trimmed = (cut || '').trim().toUpperCase();
     if (!trimmed) {
-      setError('Por favor, ingrese un código CUT válido.');
       return;
     }
 
-    setCargando(true);
-    setError(null);
+    let activo = true;
+    apiClient
+      .get<DtoConsultaPublica>(`/api/v1/tramites/consulta-publica/${encodeURIComponent(trimmed)}`)
+      .then((res) => {
+        if (!activo) return;
+        setResultado(res.data);
+        setError(null);
+      })
+      .catch(() => {
+        if (!activo) return;
+        setResultado(null);
+        setError(
+          'No se encontró ningún expediente con el código CUT ingresado o ocurrió un error en la consulta.'
+        );
+      })
+      .finally(() => {
+        if (activo) {
+          setCargando(false);
+        }
+      });
 
-    try {
-      const res = await apiClient.get<DtoConsultaPublica>(
-        `/api/v1/tramites/consulta-publica/${encodeURIComponent(trimmed)}`
-      );
-      setResultado(res.data);
-    } catch (err: unknown) {
-      setResultado(null);
-      setError(
-        'No se encontró ningún expediente con el código CUT ingresado o ocurrió un error en la consulta.'
-      );
-    } finally {
-      setCargando(false);
-    }
-  };
+    return () => {
+      activo = false;
+    };
+  }, [cut]);
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,13 +161,11 @@ export default function ConsultaPublicaPage() {
                 </span>
                 <h2 className="text-2xl font-mono font-bold">{resultado.cut}</h2>
               </div>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                {resultado.estadoTramite}
-              </span>
+              <InsigniaEstadoTramite estado={resultado.estadoTramite} />
             </div>
 
             <div className="p-6 sm:p-8 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
                   <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     Asunto / Petitorio
@@ -176,14 +191,67 @@ export default function ConsultaPublicaPage() {
                 </div>
                 <div>
                   <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Total de Folios
+                  </h3>
+                  <p className="mt-1 text-slate-700 font-medium font-mono">
+                    {resultado.totalFolios}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Fecha de Envío
+                  </h3>
+                  <p className="mt-1 text-slate-700">
+                    {resultado.fechaEnvioReal
+                      ? formatoLima(resultado.fechaEnvioReal)
+                      : 'No registrado'}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     Fecha de Radicación Legal
                   </h3>
                   <p className="mt-1 text-slate-700">
                     {resultado.fechaRadicacionLegal
-                      ? new Date(resultado.fechaRadicacionLegal).toLocaleString('es-PE')
+                      ? formatoLima(resultado.fechaRadicacionLegal)
                       : 'En trámite'}
                   </p>
                 </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Canal de Recepción
+                  </h3>
+                  <p className="mt-1 text-slate-700 font-medium">
+                    {resultado.canalRecepcion === 'MESA_VIRTUAL' ? 'Mesa de Partes Virtual' : resultado.canalRecepcion}
+                  </p>
+                </div>
+                {resultado.unidadOrganica && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      Unidad responsable (según catálogo)
+                    </h3>
+                    <p className="mt-1 text-slate-700 font-medium">
+                      {resultado.unidadOrganica}
+                    </p>
+                  </div>
+                )}
+                {resultado.fueraDeHorario && (
+                  <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+                    Recibido después de las 16:30. La fecha de radicación legal pasa al siguiente día hábil.
+                  </div>
+                )}
+              </div>
+
+              {/* Línea de Tiempo del Expediente */}
+              <div className="border-t border-slate-100 pt-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4">
+                  Línea de Tiempo del Expediente
+                </h3>
+                <LineaTiempoExpediente
+                  fechaEnvioReal={resultado.fechaEnvioReal}
+                  fechaRadicacionLegal={resultado.fechaRadicacionLegal}
+                  proveidos={resultado.proveidos}
+                />
               </div>
 
               {/* Documentos */}
@@ -243,3 +311,6 @@ export default function ConsultaPublicaPage() {
     </div>
   );
 }
+
+export { InsigniaEstadoTramite, LineaTiempoExpediente };
+

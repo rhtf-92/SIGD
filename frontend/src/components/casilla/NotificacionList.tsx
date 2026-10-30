@@ -11,6 +11,7 @@ import type {
   PaginationMeta,
   TipoNotificacion,
 } from "../../types/casilla";
+import Skeleton from "../Skeleton";
 
 interface NotificationListProps {
   notificaciones: Notificacion[];
@@ -174,7 +175,7 @@ export default function NotificationList({
   onRetry,
 }: NotificationListProps) {
   return (
-    <section className="space-y-6">
+    <section className="sigd-notification-list space-y-6">
       {/* ==================================================================== */}
       {/* PANEL DE FILTROS Y BÚSQUEDA                                          */}
       {/* ==================================================================== */}
@@ -370,23 +371,9 @@ export default function NotificationList({
       {/* ESTADO DE CARGA (SKELETON)                                           */}
       {/* ==================================================================== */}
       {isLoading && (
-        <div className="space-y-4">
+        <div className="sigd-loading space-y-4">
           {[1, 2, 3].map((n) => (
-            <div
-              key={n}
-              className="animate-pulse rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <div className="h-6 w-32 rounded-md bg-slate-200" />
-                <div className="h-6 w-24 rounded-full bg-slate-200" />
-              </div>
-              <div className="mb-3 h-5 w-3/4 rounded bg-slate-200" />
-              <div className="h-4 w-1/2 rounded bg-slate-100" />
-              <div className="mt-4 flex gap-4 pt-3 border-t border-slate-100">
-                <div className="h-4 w-28 rounded bg-slate-200" />
-                <div className="h-4 w-40 rounded bg-slate-200" />
-              </div>
-            </div>
+            <Skeleton key={n} variant="card" />
           ))}
         </div>
       )}
@@ -395,7 +382,7 @@ export default function NotificationList({
       {/* ESTADO DE ERROR                                                      */}
       {/* ==================================================================== */}
       {isError && !isLoading && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center shadow-sm">
+        <div className="sigd-alert-error rounded-2xl p-6 text-center shadow-sm">
           <svg
             className="mx-auto h-12 w-12 text-red-500"
             fill="none"
@@ -430,7 +417,7 @@ export default function NotificationList({
       {/* BANDEJA VACÍA                                                        */}
       {/* ==================================================================== */}
       {!isLoading && !isError && notificaciones.length === 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+        <div className="sigd-empty rounded-2xl p-12 shadow-sm">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
             <svg
               className="h-8 w-8"
@@ -559,9 +546,11 @@ export default function NotificationList({
                           d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
                         />
                       </svg>
-                      <span className="font-medium text-slate-700">
-                        {notif.unidadEmisora}
-                      </span>
+                      {notif.unidadEmisora && (
+                        <span className="font-medium text-slate-700">
+                          {notif.unidadEmisora}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">

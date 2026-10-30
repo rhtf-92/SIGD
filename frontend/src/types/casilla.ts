@@ -27,7 +27,7 @@ export interface FirmanteDocumento {
 
 export interface ActoAdministrativo {
   tipoActo: string; // ej. "Resolución Directoral", "Oficio Múltiple"
-  numeroDocumento: string; // ej. "RD N.° 0412-2026-DG-IESTP-SUIZA"
+  numeroDocumento: string | null; // ej. "RD N.° 0412-2026-DG-IESTP-SUIZA"
   anio: number;
   asunto: string;
   resumenLegal: string;
@@ -36,35 +36,35 @@ export interface ActoAdministrativo {
   tamanoArchivo: string;
   urlDescargaPdf?: string;
   hashIntegridadSha256: string; // SHA-256 del acto administrativo
-  cvd: string; // Código de Verificación Digital (CVD-YYYY-TIP-XXXXXX-HASH)
+  cvd: string | null; // Código de Verificación Digital (CVD-YYYY-TIP-XXXXXX-HASH)
   firmantes: FirmanteDocumento[];
 }
 
 export interface DestinatarioCasilla {
   idPersona?: number;
-  nombresCompletos: string;
-  numeroDocumento: string; // DNI o RUC
-  tipoDocumento: "DNI" | "RUC" | "CE";
-  direccionCasilla: string; // ej. "74561238@casilla.iestpsuiza.edu.pe"
-  telefonoContacto?: string;
-  correoPersonal?: string;
+  nombresCompletos: string | null;
+  numeroDocumento: string | null; // DNI o RUC
+  tipoDocumento: "DNI" | "RUC" | "CE" | null;
+  direccionCasilla: string | null; // ej. "74561238@casilla.iestpsuiza.edu.pe"
+  telefonoContacto?: string | null;
+  correoPersonal?: string | null;
 }
 
 export interface AcuseNotificacion {
   idAcuse: string; // ej. "ACU-2026-000412"
   idNotificacion: string;
-  numeroExpediente: string;
-  destinatario: DestinatarioCasilla;
+  numeroExpediente: string | null;
+  destinatario: DestinatarioCasilla | null;
   timestampGeneracionIso: string; // Timestamp ISO-8601 devuelto por backend
   hashSha256Acuse: string; // Hash SHA-256 devuelto por backend
   cvdAcuse: string; // CVD del Acuse oficial
-  entidadEmisora: string; // "IESTP Suiza"
-  unidadEmisora: string; // ej. "Secretaría Académica"
-  fechaEfectoLegal: string; // Fecha en que surte efecto jurídico (Art. 20 Ley 27444)
-  plazoImpugnacionDiasHabiles: number; // ej. 15 días hábiles
-  fechaLimiteImpugnacion?: string;
-  ipRegistro?: string;
-  validezLegalMensaje: string;
+  entidadEmisora: string | null; // "IESTP Suiza"
+  unidadEmisora: string | null; // ej. "Secretaría Académica"
+  fechaEfectoLegal: string | null; // Fecha en que surte efecto jurídico (Art. 20 Ley 27444)
+  plazoImpugnacionDiasHabiles: number | null; // ej. 15 días hábiles
+  fechaLimiteImpugnacion?: string | null;
+  ipRegistro?: string | null;
+  validezLegalMensaje: string | null;
 }
 
 export interface Notificacion {
@@ -75,7 +75,7 @@ export interface Notificacion {
   tipo: TipoNotificacion;
   estado: EstadoNotificacion;
   prioridad: PrioridadNotificacion;
-  unidadEmisora: string; // ej. "Secretaría Académica", "Dirección General"
+  unidadEmisora: string | null; // ej. "Secretaría Académica", "Dirección General"
   responsableEmision?: string;
   fechaDepositoIso: string; // Timestamp ISO-8601 de depósito en buzón
   fechaLecturaIso?: string | null; // Primer acceso

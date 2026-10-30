@@ -187,6 +187,15 @@ ${notificacion.actoAdministrativo.textoCompleto || ""}
    */
   descargarAcuse(acuse: AcuseNotificacion): void {
     const filename = `ACUSE_LEGAL_${acuse.idAcuse}.txt`;
+        const dest = acuse.destinatario;
+    const lineaOpc = (
+      etiqueta: string,
+      valor: string | number | null | undefined,
+      sufijo = "",
+    ): string =>
+      valor === null || valor === undefined || valor === ""
+        ? ""
+        : `${etiqueta}: ${valor}${sufijo}\n`;
     const contenido = `================================================================================
 INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA (IESTP SUIZA)
 CONSTANCIA Y CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA INSTITUCIONAL
@@ -195,19 +204,22 @@ Conforme al Artículo 20 del TUO de la Ley N° 27444 y Ley N° 29733
 
 IDENTIFICADOR DE ACUSE : ${acuse.idAcuse}
 EXPEDIENTE              : ${acuse.numeroExpediente}
-UNIDAD EMISORA          : ${acuse.unidadEmisora}
-DESTINATARIO            : ${acuse.destinatario.nombresCompletos}
-DOCUMENTO IDENTIDAD     : ${acuse.destinatario.tipoDocumento} ${acuse.destinatario.numeroDocumento}
-CASILLA ELECTRÓNICA     : ${acuse.destinatario.direccionCasilla}
+${lineaOpc("UNIDAD EMISORA          ", acuse.unidadEmisora)}${lineaOpc("DESTINATARIO            ", dest?.nombresCompletos)}${lineaOpc("DOCUMENTO IDENTIDAD     ", dest?.tipoDocumento && dest?.numeroDocumento ? `${dest.tipoDocumento} ${dest.numeroDocumento}` : null)}${lineaOpc("CASILLA ELECTRÓNICA     ", dest?.direccionCasilla)}
+DESTINATARIO            : ${acuse.destinatario?.nombresCompletos}
+${acuse.destinatario?.tipoDocumento && acuse.destinatario?.numeroDocumento && (
+  `DOCUMENTO IDENTIDAD     : ${acuse.destinatario.tipoDocumento} ${acuse.destinatario.numeroDocumento}`
+)}
+${acuse.destinatario?.direccionCasilla && (
+  `CASILLA ELECTRÓNICA     : ${acuse.destinatario.direccionCasilla}`
+)}
 
 FECHA Y HORA UTC (ISO)  : ${acuse.timestampGeneracionIso}
 HASH CRIPTOGRÁFICO SHA256: ${acuse.hashSha256Acuse}
 CÓDIGO VERIFICACIÓN (CVD): ${acuse.cvdAcuse}
-SURTIMIENTO DE EFECTO   : ${acuse.fechaEfectoLegal}
-PLAZO LEGAL DE IMPUGN.  : ${acuse.plazoImpugnacionDiasHabiles} días hábiles
+${lineaOpc("SURTIMIENTO DE EFECTO   ", acuse.fechaEfectoLegal)}${lineaOpc("PLAZO LEGAL DE IMPUGN.  ", acuse.plazoImpugnacionDiasHabiles, " días hábiles")}
 
 VALIDEZ LEGAL:
-${acuse.validezLegalMensaje}
+${acuse.validezLegalMensaje ?? ""}
 
 Este documento digital cuenta con valor probatorio inmutable en sede administrativa.
 ================================================================================`;
