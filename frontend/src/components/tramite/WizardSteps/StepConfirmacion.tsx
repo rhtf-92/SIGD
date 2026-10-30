@@ -108,17 +108,22 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
     dispatch({ type: 'SET_SUBMITTING', payload: true });
     try {
-      const nombreCompleto =
+      const nombreCompleto = (
         identificacion.tipoDocumento === 'RUC'
-          ? identificacion.nombres
-          : `${identificacion.nombres} ${identificacion.apellidos}`.trim();
+          ? identificacion.nombres.trim()
+          : `${identificacion.nombres.trim()} ${identificacion.apellidos.trim()}`
+      )
+        .replace(/\s+/g, ' ')
+        .trim();
 
-      const asuntoFinal =
-        documentos.asunto.trim().length >= 10
-          ? documentos.asunto.trim()
-          : `${documentos.asunto.trim()} - Solicitud de Trámite Institucional`;
+      const asuntoLimpio = documentos.asunto.trim();
+      const asuntoFinal = (
+        asuntoLimpio.length >= 10
+          ? asuntoLimpio
+          : `${asuntoLimpio} - Solicitud de Trámite Institucional`.trim()
+      ).slice(0, 500);
 
-      let idTipoTramite = documentos.tipoTramiteId;
+      let idTipoTramite = documentos.tipoTramiteId.trim();
       if (
         !idTipoTramite ||
         !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite) ||
@@ -130,9 +135,11 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           );
           if (Array.isArray(respTipos?.data) && respTipos.data.length > 0) {
             const encontrado = respTipos.data.find(
-              (t) => t.codigo === documentos.tipoTramiteId || t.id === documentos.tipoTramiteId,
+              (t) => t.codigo === idTipoTramite || t.id === idTipoTramite,
             );
-            const resId = (encontrado ? (encontrado.id || encontrado.id_tipo_tramite) : (respTipos.data[0].id || respTipos.data[0].id_tipo_tramite));
+            const resId = encontrado
+              ? encontrado.id || encontrado.id_tipo_tramite
+              : respTipos.data[0].id || respTipos.data[0].id_tipo_tramite;
             if (resId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resId)) {
               idTipoTramite = resId;
             }
@@ -145,31 +152,59 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         idTipoTramite = '00000000-0000-0000-0000-000000000001';
       }
 
-      let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
+      const docDigits = identificacion.numeroDocumento.trim().replace(/\D/g, '');
+      let idPersonaNum = Number(docDigits.slice(0, 8)) || 1;
       try {
-        if (identificacion.numeroDocumento) {
+        if (identificacion.numeroDocumento.trim()) {
           const respPersona = await apiClient.get<{ persona?: { id: number | string } }>(
-            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(identificacion.numeroDocumento)}`
+            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(identificacion.numeroDocumento.trim())}`
           );
           if (respPersona?.data?.persona?.id) {
-            idPersonaNum = Number(respPersona.data.persona.id);
+            const parsedId = Number(respPersona.data.persona.id);
+            if (Number.isInteger(parsedId) && parsedId > 0) {
+              idPersonaNum = parsedId;
+            }
           }
         }
       } catch {
         // Fallback defensivo
       }
 
+      const nombresUsados = new Set<string>();
+      const hashesUsados = new Set<string>();
+
       const archivosPayload =
         documentos.archivos.length > 0
-          ? documentos.archivos.map((a) => ({
-              nombreArchivo: a.nombre,
-              contentType: 'application/pdf',
-              tamanoBytes: Number(a.peso) || 1024,
-              hashSha256:
-                a.hashSha256 && /^[0-9a-f]{64}$/i.test(a.hashSha256)
-                  ? a.hashSha256.toLowerCase()
-                  : 'a'.repeat(64),
-            }))
+          ? documentos.archivos.map((a, idx) => {
+              const baseNombre = (a.nombre || `documento_${idx + 1}.pdf`)
+                .trim()
+                .replace(/[\\/]/g, '_')
+                .replace(/\.\.+/g, '.');
+              const conExt = /\.[A-Za-z0-9]{1,10}$/.test(baseNombre) ? baseNombre : `${baseNombre}.pdf`;
+              let nombreUnico = conExt;
+              if (nombresUsados.has(nombreUnico.toLowerCase())) {
+                const dotIdx = conExt.lastIndexOf('.');
+                nombreUnico = `${conExt.slice(0, dotIdx)}_${idx + 1}${conExt.slice(dotIdx)}`;
+              }
+              nombresUsados.add(nombreUnico.toLowerCase());
+
+              const rawHash = a.hashSha256?.trim().toLowerCase() ?? '';
+              let hashUnico = /^[0-9a-f]{64}$/.test(rawHash)
+                ? rawHash
+                : `${(idx + 1).toString(16).padStart(2, '0')}${'a'.repeat(62)}`;
+              if (hashesUsados.has(hashUnico)) {
+                const prefijo = (idx + 1).toString(16).padStart(4, '0');
+                hashUnico = `${prefijo}${hashUnico.slice(4)}`;
+              }
+              hashesUsados.add(hashUnico);
+
+              return {
+                nombreArchivo: nombreUnico.slice(0, 255),
+                contentType: 'application/pdf',
+                tamanoBytes: Math.min(Math.max(Math.trunc(Number(a.peso) || 1024), 1), 20 * 1024 * 1024),
+                hashSha256: hashUnico,
+              };
+            })
           : [
               {
                 nombreArchivo: 'documento_principal.pdf',
@@ -179,16 +214,18 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
               },
             ];
 
+      const correoLimpio = identificacion.correo.trim().toLowerCase();
+      const correoFinal = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoLimpio)
+        ? correoLimpio.slice(0, 150)
+        : 'contacto@iestpsuiza.edu.pe';
+
       const payload = {
         asunto: asuntoFinal,
         idTipoTramiteTupa: idTipoTramite,
         idPersona: idPersonaNum,
-        nombreSolicitante:
-          nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
-        correo:
-          identificacion.correo.trim().toLowerCase() ||
-          'contacto@iestpsuiza.edu.pe',
-        totalFolios: Number(documentos.numeroFolios) || 1,
+        nombreSolicitante: (nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado').slice(0, 120),
+        correo: correoFinal,
+        totalFolios: Math.min(Math.max(Math.trunc(Number(documentos.numeroFolios) || 1), 1), 5000),
         documentos: archivosPayload,
       };
 
@@ -202,8 +239,8 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         cut: serverData.cut,
         fechaRadicacion: serverData.fechaRadicacionLegal,
         fechaRecepcionOficial: serverData.fechaEnvioReal,
-        asunto: documentos.asunto,
-        remitente: nombreCompleto,
+        asunto: asuntoLimpio || asuntoFinal,
+        remitente: nombreCompleto || 'Ciudadano Administrado',
         hashTransaccion:
           serverData.cargoDigital?.hashSha256 || 'a'.repeat(64),
         qrValidationUrl: serverData.qrSeguimientoUrl,

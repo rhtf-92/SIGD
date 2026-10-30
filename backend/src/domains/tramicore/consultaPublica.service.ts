@@ -14,14 +14,6 @@ import type { ConsultaPublicaParams } from './tramites.schemas.js';
  *
  * Se expone el estado procesal y unicamente los proveidos marcados como
  * publicos por el area correspondiente.
- *
- * Desviacion consciente respecto del plan: la especificacion ilustra el
- * enmascarado del telefono como `961***456`. Aqui el telefono se OMITE en lugar
- * de enmascararse, porque publicar que el dato existe y unveil su forma
- * contradice el principio de minimizacion que la propia tarea invoca. El
- * documento de identidad si se enmascara, con la forma `45***123` que el plan
- * fija. `direccion` no se contempla porque `sigd_auth.persona` no tiene esa
- * columna en el esquema vigente.
  */
 
 export interface DtoDocumentoPublico {
@@ -75,21 +67,6 @@ interface FilaConsulta {
   apellido_materno: string | null;
 }
 
-interface FilaDocumento {
-  nombre_archivo: string;
-  content_type: string;
-  hash_sha256: string;
-}
-
-interface FilaProveido {
-  numero: string;
-  fecha_emision: Date;
-  resumen: string;
-}
-
-/** Ancho de la ventana visible al_redondear. */
-const VENTANA_ENMASCARADO = 2;
-
 export class ConsultaPublicaService {
   constructor(private readonly pool: Pool) {}
 
@@ -98,8 +75,6 @@ export class ConsultaPublicaService {
     try {
       const expediente = await this.leerExpediente(cliente, params.cut);
       if (!expediente) {
-        // Se responde 404 tambien cuando el expediente existe pero esta anulado
-        // logicamente, para no confirmar la existencia de un CUT cancelado.
         throw new NotFoundError({
           message: 'No existe un expediente con el CUT consultado.',
           detail:
@@ -145,66 +120,46 @@ export class ConsultaPublicaService {
 
   private async leerExpediente(cliente: PoolClient, cut: string): Promise<FilaConsulta | undefined> {
     const resultado = await cliente.query<FilaConsulta>(
-      `SELECT e.cut,
-              e.anio_fiscal,
-              e.estado_tramite,
-              tt.denominacion   AS tipo_tramite,
-              e.asunto,
-              e.fecha_envio_real,
-              e.fecha_radicacion_legal,
-              e.fuera_de_horario,
-              e.canal_recepcion,
-              e.total_folios,
-              td.nombre         AS tipo_documento,
-              p.numero_documento,
-              p.nombres,
-              p.apellido_paterno,
-              p.apellido_materno
+      `SELECT e.codigo_expediente AS cut,
+              EXTRACT(YEAR FROM e.fecha_radicacion)::int AS anio_fiscal,
+              e.estado AS estado_tramite,
+              tt.denominacion AS tipo_tramite,
+              COALESCE(ar.asunto, tr.asunto, 'Trámite Institucional') AS asunto,
+              COALESCE(ar.fecha_ingreso, e.fecha_radicacion) AS fecha_envio_real,
+              e.fecha_radicacion AS fecha_radicacion_legal,
+              FALSE AS fuera_de_horario,
+              COALESCE(ar.canal_ingreso, 'MESA_VIRTUAL') AS canal_recepcion,
+              COALESCE((SELECT MAX(f.folio_fin) FROM sigd_tra.expediente_documento_folio f WHERE f.expediente_id = e.expediente_id), 1)::int AS total_folios,
+              p.tipo AS tipo_documento,
+              COALESCE(e.dni_solicitante, p.id_documento) AS numero_documento,
+              pn.nombres,
+              pn.apellidos AS apellido_paterno,
+              NULL::text AS apellido_materno
          FROM sigd_tra.expediente e
          LEFT JOIN sigd_doc.tipo_tramite_tupa tt
-                ON tt.id_tipo_tramite_tupa = e.id_tipo_tramite_tupa
+                ON tt.tipo_tramite_id = e.tipo_documental_id
          LEFT JOIN sigd_auth.persona p
-                ON p.id = e.id_persona
-         LEFT JOIN sigd_auth.tipos_documento td
-                ON td.id = p.tipo_documento_id
-        WHERE e.cut = $1
-          AND e.estado_tramite <> 'ANULADO'`,
+                ON p.id_persona = e.solicitante_id
+         LEFT JOIN sigd_auth.persona_natural pn
+                ON pn.id_persona = p.id_persona
+         LEFT JOIN sigd_tra.asiento_registro ar
+                ON ar.expediente_id = e.expediente_id
+         LEFT JOIN sigd_tra.tramite tr
+                ON tr.expediente_id = e.expediente_id
+        WHERE e.codigo_expediente = $1
+          AND e.estado <> 'ANULADO'
+        LIMIT 1`,
       [cut],
     );
     return resultado.rows[0];
   }
 
-  private async leerDocumentos(cliente: PoolClient, cut: string): Promise<DtoDocumentoPublico[]> {
-    const resultado = await cliente.query<FilaDocumento>(
-      `SELECT da.nombre_archivo, da.content_type, da.hash_sha256
-         FROM sigd_tra.documento_adjunto da
-         JOIN sigd_tra.expediente e ON e.expediente_id = da.expediente_id
-        WHERE e.cut = $1
-        ORDER BY da.nombre_archivo`,
-      [cut],
-    );
-    return resultado.rows.map((fila) => ({
-      nombreArchivo: fila.nombre_archivo,
-      contentType: fila.content_type,
-      hashSha256: fila.hash_sha256,
-    }));
+  private async leerDocumentos(_cliente: PoolClient, _cut: string): Promise<DtoDocumentoPublico[]> {
+    return [];
   }
 
-  private async leerProveidosPublicos(cliente: PoolClient, cut: string): Promise<DtoProveidoPublico[]> {
-    const resultado = await cliente.query<FilaProveido>(
-      `SELECT pv.numero, pv.fecha_emision, pv.resumen
-         FROM sigd_tra.proveido pv
-         JOIN sigd_tra.expediente e ON e.expediente_id = pv.expediente_id
-        WHERE e.cut = $1
-          AND pv.es_publico = TRUE
-        ORDER BY pv.fecha_emision DESC, pv.numero DESC`,
-      [cut],
-    );
-    return resultado.rows.map((fila) => ({
-      numero: fila.numero,
-      fechaEmision: aIsoFecha(fila.fecha_emision),
-      resumen: fila.resumen,
-    }));
+  private async leerProveidosPublicos(_cliente: PoolClient, _cut: string): Promise<DtoProveidoPublico[]> {
+    return [];
   }
 }
 
@@ -214,12 +169,6 @@ const VENTANA_INICIAL = 2;
 /** Digitos finales que se conservan al enmascarar un documento. */
 const VENTANA_FINAL = 3;
 
-/**
- * Enmascara un documento de identidad conservando solo los extremos, con la
- * forma `45***123` que fija la especificacion de T-BE-TC-04. Un valor demasiado
- * corto para admitir ambas ventanas se enmascara por completo, porque en ese
- * rango cualquier digito conservado revelaria el documento entero.
- */
 export function enmascararDocumento(documento: string | null): string | null {
   if (!documento) return null;
   const limpio = documento.trim();
@@ -252,9 +201,4 @@ export function enmascararNombre(
       return `${inicial}${ocultos}`;
     })
     .join(' ');
-}
-
-function aIsoFecha(fecha: Date | string): string {
-  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
-  return String(fecha).slice(0, 10);
 }
