@@ -10,17 +10,9 @@ export default function DashboardHomePage() {
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const secciones = filtrarModulosPorRol(rol, autenticado);
-  const principales = secciones.filter((m) => m.destacado);
-  const publicos = secciones.filter((m) => m.publico && !m.destacado);
-  const gestion = secciones.filter((m) => !m.publico && !m.destacado);
-  const grupos = [
-    { titulo: "Módulos principales", items: principales },
-    { titulo: "Servicios públicos", items: publicos },
-    { titulo: "Gestión y administración", items: gestion },
-  ].filter((g) => g.items.length > 0);
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-12 text-slate-900">
-      <div className="mx-auto max-w-5xl text-center space-y-2">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6 py-12 text-slate-900">
+      <div className="text-center space-y-2 max-w-2xl">
         <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800">
           IESTP &quot;Suiza&quot; — Pucallpa
         </div>
@@ -72,38 +64,29 @@ export default function DashboardHomePage() {
         )}
       </div>
 
-      <div className="mx-auto mt-10 w-full max-w-5xl space-y-10">
-        {grupos.map((grupo) => (
-          <section key={grupo.titulo} className="space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">
-              {grupo.titulo}
+      <div className="mt-10 grid w-full max-w-4xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {secciones.map((seccion) => (
+          <Link
+            key={seccion.ruta}
+            to={seccion.ruta}
+            className={`group rounded-xl border p-6 shadow-sm transition duration-200 ease-out hover:shadow-md motion-safe:hover:-translate-y-1 motion-reduce:transition-none ${
+              seccion.destacado
+                ? "border-blue-300 bg-blue-50/50 hover:border-blue-400"
+                : "border-slate-200 bg-white hover:border-slate-300"
+            }`}
+          >
+            {seccion.subtitulo && (
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600">
+                {seccion.subtitulo}
+              </span>
+            )}
+            <h2 className="mt-1 text-lg font-bold text-slate-900 group-hover:text-blue-700">
+              {seccion.titulo}
             </h2>
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {grupo.items.map((seccion) => (
-                <Link
-                  key={seccion.ruta}
-                  to={seccion.ruta}
-                  className={`group rounded-xl border p-6 shadow-sm transition duration-200 ease-out hover:shadow-md motion-safe:hover:-translate-y-1 motion-reduce:transition-none ${
-                    seccion.destacado
-                      ? "border-blue-300 bg-blue-50/50 hover:border-blue-400"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                >
-                  {seccion.subtitulo && (
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600">
-                      {seccion.subtitulo}
-                    </span>
-                  )}
-                  <h3 className="mt-1 text-lg font-bold text-slate-900 group-hover:text-blue-700">
-                    {seccion.titulo}
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {seccion.descripcion}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          </section>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {seccion.descripcion}
+            </p>
+          </Link>
         ))}
       </div>
     </main>

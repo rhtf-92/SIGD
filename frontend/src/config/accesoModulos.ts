@@ -8,7 +8,8 @@ export type RolCanonico =
   | "DIRECTOR"
   | "DOCENTE"
   | "MESA_PARTES"
-  | "ESTUDIANTE";
+  | "ESTUDIANTE"
+  | "OTROS";
 
 export const ROLES_CANONICOS: RolCanonico[] = [
   "SUPER_ADMIN",
@@ -16,6 +17,15 @@ export const ROLES_CANONICOS: RolCanonico[] = [
   "DOCENTE",
   "MESA_PARTES",
   "ESTUDIANTE",
+  "OTROS",
+];
+
+/** Roles internos/administrativos: no ven dropdown de módulos ni portada con imágenes. */
+export const ROLES_INTERNOS: RolCanonico[] = [
+  "SUPER_ADMIN",
+  "DIRECTOR",
+  "DOCENTE",
+  "MESA_PARTES",
 ];
 
 const CLAVE_TOKEN = "sigd_token";

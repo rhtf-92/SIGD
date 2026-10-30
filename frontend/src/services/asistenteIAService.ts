@@ -12,7 +12,7 @@ function construirPromptSistema(ctx: ContextoIA): string {
   ).join("\n");
   const rutas = RUTAS_MODULOS.map((m) => `${m.etiqueta} -> ${m.ruta}`).join(", ");
   return [
-    "Eres JARVIS, asistente institucional del SIGD del IESTP Suiza (Pucallpa).",
+    "Eres SIGI, asistente institucional del SIGD del IESTP Suiza (Pucallpa).",
     "Respondes en español, tono formal y cálido, máximo 120 palabras.",
     "Solo orientas sobre la plataforma SIGD: trámites, CUT, casilla, CVD, registro, titulación, resoluciones, administración, reportes, TUPA 2026.",
     "Si piden ir a un módulo, indica la ruta exacta entre estos destinos:",

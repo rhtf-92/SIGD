@@ -33,7 +33,7 @@
   }
 
   body {
-    background-color: var(--color-vault-papel);
+    background: linear-gradient(180deg, #0A1128 0%, #001F3F 35%, #003366 100%);
     color: var(--color-vault-tinta);
     font-family: var(--font-sans);
   }
@@ -126,6 +126,17 @@
     100% {
       transform: scale(2.4);
       opacity: 0;
+    }
+  }
+
+  @keyframes portada-fade {
+    from {
+      opacity: 0;
+      transform: scale(1.02);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
     }
   }
 

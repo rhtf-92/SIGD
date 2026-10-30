@@ -3,13 +3,14 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
 
-import DashboardEjecutivoPage from "../pages/DashboardEjecutivoPage";
+import DashboardEjecutivoPage from "../pages/flujos/FlujoValidezLegalPage";
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
 import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
 import VisorCvdPage from "../pages/flujos/VisorCvdPage";
 import WorkflowAcademicoPage from "../pages/flujos/WorkflowAcademicoPage";
 import ValidadorPublicoCvdPage from "../pages/validador/ValidadorPublicoCvdPage";
 import LoginPage from "../pages/LoginPage";
+import RecuperarPasswordPage from "../pages/recuperar/RecuperarPasswordPage";
 import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
 import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
@@ -21,12 +22,16 @@ import ConsultaPublicaPage from "../pages/tramite/ConsultaPublicaPage";
 import ProyectorResolucionesPage from "../pages/flujos/ProyectorResolucionesPage";
 import AdminRoutes from "./AdminRoutes";
 import ProtectedRoute from "./ProtectedRoute";
+import { PageLoader, ErrorConexion } from "../components/common/AnimacionesSistema";
 
 export default function AppRouter() {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/login" element={<LoginPage />} />
+    <>
+      <ErrorConexion />
+      <Routes>
+        <Route path="/" element={<><PageLoader /><HomePage /></>} />
+        <Route path="/login" element={<LoginPage />} />
+      <Route path="/recuperar-password" element={<RecuperarPasswordPage />} />
       <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
 
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
@@ -257,6 +262,7 @@ export default function AppRouter() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
 
-    </Routes>
+      </Routes>
+      </>
   );
 }

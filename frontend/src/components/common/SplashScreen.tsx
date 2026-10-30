@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 
-const DURACION_MS = 900;
+const DURACION_MS = 800;
 const CLAVE_VISTO = "sigd_splash_visto";
+
+const LOGOS = [
+  new URL("../../assets/LOGOS ACTUALES/EDITADO 01 .jpg", import.meta.url).href,
+  new URL("../../assets/LOGOS ACTUALES/EDITADO 02.jpg", import.meta.url).href,
+  new URL("../../assets/LOGOS ACTUALES/EDITADO 03.jpg", import.meta.url).href,
+  new URL("../../assets/LOGOS ACTUALES/EDITADO 04.jpg", import.meta.url).href,
+  new URL("../../assets/LOGOS ACTUALES/LOGO PRUEBA .jpg", import.meta.url).href,
+];
 
 function yaVisto(): boolean {
   try {
@@ -15,17 +23,19 @@ export default function SplashScreen() {
   const [visible, setVisible] = useState(() => !yaVisto());
   const [saliendo, setSaliendo] = useState(false);
   const [progreso, setProgreso] = useState(0);
+  const [logoIndex, setLogoIndex] = useState(0);
 
   useEffect(() => {
     if (!visible) return;
-    const t0 = window.setTimeout(() => setProgreso(100), 60);
-    const t1 = window.setTimeout(() => setSaliendo(true), DURACION_MS - 250);
+    setProgreso(0);
+    const t0 = window.setTimeout(() => setProgreso(100), 120);
+    const t1 = window.setTimeout(() => setSaliendo(true), DURACION_MS - 300);
     const t2 = window.setTimeout(() => {
       setVisible(false);
       try {
         window.sessionStorage.setItem(CLAVE_VISTO, "1");
       } catch {
-        // sin storage, solo se oculta
+        // sin storage
       }
     }, DURACION_MS);
     return () => {
@@ -35,13 +45,21 @@ export default function SplashScreen() {
     };
   }, [visible]);
 
+  useEffect(() => {
+    if (!visible) return;
+    const id = window.setInterval(() => {
+      setLogoIndex((i) => (i + 1) % LOGOS.length);
+    }, 600);
+    return () => window.clearInterval(id);
+  }, [visible]);
+
   if (!visible) return null;
 
   return (
     <div
       role="status"
       aria-label="Cargando SIGD"
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-blue-950 via-blue-800 to-slate-900 text-white transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-blue-950 via-blue-800 to-slate-900 text-white transition-opacity duration-500 ${
         saliendo ? "opacity-0" : "opacity-100"
       }`}
     >
@@ -52,6 +70,7 @@ export default function SplashScreen() {
         @keyframes sigd-puntos { 0% { opacity: .2; } 50% { opacity: 1; } 100% { opacity: .2; } }
         @keyframes sigd-brillo { 0% { transform: translateX(-100%); } 100% { transform: translateX(220%); } }
         @keyframes sigd-pulso { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+        @keyframes sigd-zoom-logo { 0% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(0.9); opacity: 0.7; } }
       `}</style>
 
       {/* destellos de fondo */}
@@ -60,13 +79,26 @@ export default function SplashScreen() {
         <div className="absolute -right-20 -bottom-20 h-80 w-80 rounded-full bg-cyan-400/20 blur-3xl" />
       </div>
 
-      {/* logo fijo */}
-      <span
-        className="grid h-20 w-20 place-items-center rounded-3xl bg-white text-4xl font-black text-blue-800 shadow-2xl"
+      {/* logo rotativo con animación */}
+      <div
+        className="relative grid h-28 w-28 place-items-center"
         aria-hidden="true"
       >
-        S
-      </span>
+        <div
+          className="absolute inset-0 rounded-full border-4 border-cyan-300/40"
+          style={{ animation: "sigd-anillo 2.4s linear infinite" }}
+        />
+        <div
+          className="absolute inset-1 rounded-full border-2 border-white/20"
+          style={{ animation: "sigd-anillo 3.2s linear infinite reverse" }}
+        />
+        <div
+          className="grid h-20 w-20 place-items-center overflow-hidden rounded-full bg-white shadow-2xl ring-4 ring-white/10"
+          style={{ animation: "sigd-zoom-logo 1.6s ease-in-out infinite" }}
+        >
+          <img src={LOGOS[logoIndex]} alt="" className="h-full w-full object-cover" />
+        </div>
+      </div>
 
       <h1 className="mt-5 text-4xl font-black tracking-[0.2em]">SIGD</h1>
       <p className="mt-1 max-w-xs text-center text-xs font-medium text-blue-100">
