@@ -8,10 +8,10 @@ import NavbarInstitucional from "./NavbarInstitucional";
 
 export default function HeaderLanding() {
   const navigate = useNavigate();
-  const { rol, autenticado } = useSesion();
+  const { autenticado } = useSesion();
   const usuario = useAuthStore((s) => s.usuario);
   const logout = useAuthStore((s) => s.logout);
-  const nombre = usuario?.nombreCompleto ?? (autenticado ? rol ?? "Usuario" : "Invitado");
+  const nombre = usuario?.nombreCompleto ?? (autenticado ? "Usuario" : "Invitado");
 
   const acciones = autenticado ? (
     <>

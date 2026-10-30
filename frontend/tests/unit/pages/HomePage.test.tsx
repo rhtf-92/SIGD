@@ -49,19 +49,11 @@ describe("HomePage — landing institucional", () => {
     });
   });
 
-  it("muestra el apartado de ayuda sin imágenes para invitados", () => {
+  it("el usuario externo (sin sesión) ve la imagen principal", () => {
     renderHome();
 
-    expect(screen.getByText("Ayuda con la página")).toBeDefined();
-    expect(
-      screen.getByText("Un sistema digital para gestionar tus documentos con seguridad"),
-    ).toBeDefined();
-
-    expect(screen.queryByRole("img", { name: "IESTP Suiza" })).toBeNull();
+    expect(screen.getByRole("img", { name: "IESTP Suiza" })).toBeDefined();
     expect(document.querySelector("video")).toBeNull();
-    expect(screen.queryByText("Acceso rápido")).toBeNull();
-    expect(screen.queryByText("Accesos al Sistema SIGD")).toBeNull();
-    expect(screen.queryByText("Servicios del SIGD")).toBeNull();
   });
 
   it("el rol ESTUDIANTE (usuario externo) ve la imagen principal", () => {
@@ -71,8 +63,22 @@ describe("HomePage — landing institucional", () => {
     expect(screen.getByRole("img", { name: "IESTP Suiza" })).toBeDefined();
   });
 
-  it("el rol SUPER_ADMIN no ve imágenes principales para evitar espacios vacíos", () => {
+  it("el rol SUPER_ADMIN no ve imágenes principales", () => {
     iniciarSesion("SUPER_ADMIN");
+    renderHome();
+
+    expect(screen.queryByRole("img", { name: "IESTP Suiza" })).toBeNull();
+  });
+
+  it("el rol DOCENTE (personal interno) no ve imágenes principales", () => {
+    iniciarSesion("DOCENTE");
+    renderHome();
+
+    expect(screen.queryByRole("img", { name: "IESTP Suiza" })).toBeNull();
+  });
+
+  it("el rol MESA_PARTES (personal interno) no ve imágenes principales", () => {
+    iniciarSesion("MESA_PARTES");
     renderHome();
 
     expect(screen.queryByRole("img", { name: "IESTP Suiza" })).toBeNull();

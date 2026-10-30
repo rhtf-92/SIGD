@@ -1,22 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  ArrowRight,
   ChevronDown,
   Clock,
+  ExternalLink,
   Grid2x2,
   Info,
+  Inbox,
   LifeBuoy,
   LogOut,
+  Search,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
 
-import { filtrarModulosPorRol, useSesion } from "../config/accesoModulos";
+import { filtrarModulosPorRol, ROLES_INTERNOS, useSesion } from "../config/accesoModulos";
 import { elementoIconoModulo } from "../config/iconosModulos";
 import { useAuthStore } from "../stores/authStore";
 import SelloInstitucional from "./common/SelloInstitucional";
 
-type ModalPerfil = null | "info" | "datos";
+type ModalPerfil = null | "info" | "datos" | "ayuda";
 
 function iniciales(nombre?: string | null, rol?: string | null): string {
   if (nombre) {
@@ -103,7 +107,7 @@ export default function HeaderInstitucional() {
     }
   };
 
-  const nombreMostrar = usuario?.nombreCompleto ?? (autenticado ? rol ?? "Usuario" : "Invitado");
+  const nombreMostrar = usuario?.nombreCompleto ?? (autenticado ? "Usuario" : "Invitado");
 
   return (
     <header className="header-sigd sticky top-0 z-40 print:hidden">
@@ -134,7 +138,8 @@ export default function HeaderInstitucional() {
           </span>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* Menú de módulos */}
+          {/* Menú de módulos (oculto para roles internos/administrativos) */}
+          {!rol || !ROLES_INTERNOS.includes(rol) ? (
             <div ref={menuRef} className="relative">
               <button
                 type="button"
@@ -234,6 +239,7 @@ export default function HeaderInstitucional() {
                 </nav>
               )}
             </div>
+          ) : null}
 
             {autenticado ? (
               /* Perfil del usuario */
@@ -351,15 +357,18 @@ export default function HeaderInstitucional() {
                 )}
               </div>
             ) : (
-              /* Visitante: acceso directo al sistema + ficha de información */
+              /* Visitante: acceso directo al sistema + ayuda */
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setModal("info")}
-                  aria-label="Información del sistema"
+                  onClick={() => {
+                    setPerfilAbierto(false);
+                    setModal("ayuda");
+                  }}
+                  aria-label="Ayuda con la página"
                   className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-vault-papel-3 bg-white text-tinta-600 transition hover:border-tinta-300 hover:bg-vault-papel focus:outline-none focus-visible:ring-2 focus-visible:ring-vault-azul"
                 >
-                  <Info className="h-4 w-4" aria-hidden="true" />
+                  <LifeBuoy className="h-4 w-4" aria-hidden="true" />
                 </button>
                 <button
                   type="button"
@@ -406,38 +415,137 @@ export default function HeaderInstitucional() {
           onClick={() => setModal(null)}
         >
           <div
-            className="w-full max-w-sm overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
+            className="w-full max-w-[640px] overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="border-b border-vault-papel-2 bg-vault-papel px-5 py-4">
-              <p className="text-sm font-bold text-vault-tinta">
-                Información del sistema
-              </p>
-              <p className="text-[11px] text-tinta-500">
+            <div className="border-b border-vault-papel-2 bg-vault-papel px-6 py-5">
+              <div className="flex items-center gap-2">
+                <Info className="h-5 w-5 text-vault-azul" aria-hidden="true" />
+                <p className="text-sm font-bold text-vault-tinta">Información del sistema</p>
+              </div>
+              <p className="mt-1 text-[11px] text-tinta-500">
                 Sistema Integral de Gestión Documentaria
               </p>
             </div>
-            <div className="space-y-2 px-5 py-4 text-[13px] leading-6">
-              <p>
-                <span className="font-semibold">Sistema:</span> SIGD v1.0
+            <div className="px-6 py-5">
+              <p className="text-sm font-semibold text-vault-tinta mb-4">
+                Módulos disponibles
               </p>
-              <p>
-                <span className="font-semibold">Institución:</span> IESTP Público “Suiza” · Pucallpa
-              </p>
-              <p>
-                <span className="font-semibold">Módulos:</span> Mesa de Partes, Casilla Electrónica,
-                Expedientes, Validador CVD, Firma Digital, Titulación, Administración y Reportes.
-              </p>
-              <p>
-                <span className="font-semibold">Validez legal:</span> Ley N.º 27269 de Firmas y
-                Certificados Digitales y TUO de la Ley N.º 27444.
-              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                {[
+                  { nombre: "Mesa de Partes", desc: "Radicación y seguimiento de trámites", icon: <Inbox className="h-5 w-5" />, ruta: "/tramite" },
+                  { nombre: "Casilla Electrónica", desc: "Notificaciones con validez legal", icon: <UserRound className="h-5 w-5" />, ruta: "/casilla" },
+                  { nombre: "Expedientes", desc: "Bandeja y trazabilidad de documentos", icon: <Grid2x2 className="h-5 w-5" />, ruta: "/expedientes" },
+                  { nombre: "Validador CVD", desc: "Verificación de firmas digitales", icon: <ShieldCheck className="h-5 w-5" />, ruta: "/validador-cvd" },
+                  { nombre: "Firma Digital", desc: "Flujo de validez legal", icon: <Clock className="h-5 w-5" />, ruta: "/flujo-validez-legal" },
+                  { nombre: "Administración", desc: "Usuarios, roles y reportes", icon: <ChevronDown className="h-5 w-5" />, ruta: "/administracion" },
+                ].map((m) => (
+                  <button
+                    key={m.ruta}
+                    type="button"
+                    onClick={() => { setModal(null); irA(m.ruta); }}
+                    className="flex items-center gap-3 rounded-lg border border-vault-papel-3 bg-white px-4 py-3 text-left text-[12px] font-semibold transition hover:bg-vault-papel hover:border-vault-azul focus:outline-none focus-visible:ring-2 focus-visible:ring-vault-azul"
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-vault-papel text-vault-azul shrink-0">
+                      {m.icon}
+                    </span>
+                    <div>
+                      <p className="text-vault-tinta">{m.nombre}</p>
+                      <p className="text-[10px] text-tinta-500">{m.desc}</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-tinta-400 ml-auto" aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+              <div className="rounded-lg border border-vault-papel-2 bg-vault-papel/50 px-4 py-3">
+                <p className="text-sm font-semibold text-vault-tinta mb-2">Sobre el sistema</p>
+                <p className="text-[12px] leading-relaxed text-tinta-600 mb-2">
+                  <span className="font-semibold">Institución:</span> IESTP Público “Suiza” · Pucallpa
+                </p>
+                <p className="text-[12px] leading-relaxed text-tinta-600 mb-2">
+                  <span className="font-semibold">Validez legal:</span> Ley N.º 27269 de Firmas y Certificados Digitales y TUO de la Ley N.º 27444.
+                </p>
+                <p className="text-[12px] leading-relaxed text-tinta-600">
+                  <span className="font-semibold">Versión:</span> SIGD v1.0
+                </p>
+              </div>
             </div>
-            <div className="flex justify-end border-t border-vault-papel-2 bg-vault-papel px-5 py-3">
+            <div className="flex justify-end border-t border-vault-papel-2 bg-vault-papel px-6 py-3">
               <button
                 type="button"
                 onClick={() => setModal(null)}
                 className="rounded-md bg-vault-azul px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-vault-azul-profundo"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ayuda con la página */}
+      {modal === "ayuda" && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Ayuda con la página"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-tinta-950/45 p-4 backdrop-blur-[2px]"
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-vault-papel-2 bg-vault-papel px-6 py-5">
+              <div className="flex items-center gap-2">
+                <LifeBuoy className="h-5 w-5 text-vault-azul" aria-hidden="true" />
+                <p className="text-sm font-bold text-vault-tinta">Ayuda con la página</p>
+              </div>
+              <p className="mt-1 text-[11px] text-tinta-500">
+                Sistema Integral de Gestión Documentaria
+              </p>
+            </div>
+            <div className="px-6 py-5">
+              <h2 className="text-xl font-black tracking-tight text-[#003366] mb-3">
+                Un sistema digital para gestionar tus documentos con seguridad
+              </h2>
+              <p className="text-sm leading-relaxed text-slate-600 mb-4">
+                El SIGD (Sistema de Gestión Documental) centraliza el registro, seguimiento y
+                archivado de documentos y expedientes, permitiendo a ciudadanos e instituciones
+                realizar sus trámites de forma remota y segura.
+              </p>
+              <p className="text-sm leading-relaxed text-slate-600 mb-6">
+                Con firma digital, casilla electrónica y consulta por CUT, garantizamos la validez
+                legal, la integridad y la trazabilidad de cada documento gestionado en el sistema.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                <button
+                  type="button"
+                  onClick={() => { setModal(null); navigate("/tramite"); }}
+                  className="flex items-center gap-2 rounded-lg border border-vault-papel-3 bg-white px-4 py-3 text-left text-[12px] font-semibold text-vault-tinta transition hover:bg-vault-papel hover:border-vault-azul"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  Iniciar un trámite
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setModal(null); navigate("/consulta"); }}
+                  className="flex items-center gap-2 rounded-lg border border-vault-papel-3 bg-white px-4 py-3 text-left text-[12px] font-semibold text-vault-tinta transition hover:bg-vault-papel hover:border-vault-azul"
+                >
+                  <Search className="h-4 w-4" aria-hidden="true" />
+                  Consultar con CUT
+                </button>
+              </div>
+              <p className="text-[11px] text-tinta-500">
+                ¿Necesitas más ayuda? Abre el asistente SIGI desde la burbuja inferior derecha o
+                inicia sesión para acceder a tus módulos.
+              </p>
+            </div>
+            <div className="flex justify-end border-t border-vault-papel-2 bg-vault-papel px-6 py-3">
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="rounded-md border border-vault-papel-3 bg-white px-4 py-1.5 text-xs font-semibold text-tinta-700 transition hover:bg-vault-papel"
               >
                 Cerrar
               </button>

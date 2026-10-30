@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiClient } from "../api/client";
 import SelloInstitucional from "../components/common/SelloInstitucional";
+import { BotonIngresar } from "../components/common/AnimacionesSistema";
 import { notificarCambioSesion } from "../config/accesoModulos";
 import { permisosIniciales } from "../hooks/useRbacConfig";
 import { useAuthStore } from "../stores/authStore";
@@ -20,6 +21,7 @@ export const ROLES_CANONICOS = [
   { id: "DOCENTE", label: "Docente", usuario: "docente", destino: "/flujos/titulacion", requierePassword: true },
   { id: "MESA_PARTES", label: "Mesa de Partes", usuario: "mesa_partes", destino: "/tramite/ventanilla-presencial", requierePassword: true },
   { id: "ESTUDIANTE", label: "Estudiante", usuario: "estudiante", destino: "/casilla", requierePassword: true },
+  { id: "OTROS", label: "Otros", usuario: "invitado", destino: "/casilla", requierePassword: false },
 ];
 
 export default function LoginPage() {
@@ -173,6 +175,7 @@ export default function LoginPage() {
                 className="input-sigd"
               >
                 <option value="ESTUDIANTE">Estudiante</option>
+                <option value="OTROS">Otros</option>
                 <option value="DOCENTE">Docente</option>
                 <option value="MESA_PARTES">Mesa de Partes</option>
                 <option value="DIRECTOR">Director General</option>
@@ -239,13 +242,13 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <button
-              type="submit"
+            <BotonIngresar
+              cargando={cargando}
               disabled={cargando}
-              className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => {}}
             >
               {cargando ? "Verificando en BD SIGD…" : "Ingresar al sistema"}
-            </button>
+            </BotonIngresar>
           </form>
 
           <p className="mt-4 border-t border-vault-papel-2 pt-3 text-center text-[10px] font-medium uppercase tracking-[0.1em] text-tinta-400">

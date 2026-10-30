@@ -31,6 +31,8 @@ const ROL_CANONICO: Record<string, UsuarioPerfil['rol']> = {
   MESA_PARTES: 'MESA_PARTES',
   ESTUDIANTE: 'ESTUDIANTE',
   CIUDADANO: 'ESTUDIANTE',
+  OTROS: 'ESTUDIANTE',
+  INVITADO: 'ESTUDIANTE',
 };
 
 function normalizarRol(rol: string): UsuarioPerfil['rol'] {

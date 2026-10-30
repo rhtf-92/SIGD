@@ -168,6 +168,20 @@ const REGEX_CUT = /\bcut[\s-]*(\d[\d-]*)/i;
 const REGEX_SEGUIMIENTO = /^(y )?(eso )?(donde|dónde|c[oó]mo|cu[aá]ndo|y despu[eé]s|y luego|y eso).*(\?)?$/;
 const REGEX_SOLO_SEGUIMIENTO = /^(eso|esto|ahi|ahí|ahi mismo|ese|esa|ello|eso donde|y eso)$/;
 
+// Preguntas de cortesía (respuesta corta, sin repetir saludo institucional)
+const CORTESIA_PATRONES = [
+  "como estas", "como esta", "que tal", "que tal estas", "todo bien",
+  "estas bien", "estás bien", "está bien", "como andas", "que cuentas",
+];
+
+function esSaludoCortesia(preguntaNorm: string): boolean {
+  return CORTESIA_PATRONES.some((p) => preguntaNorm === p || preguntaNorm.includes(p));
+}
+
+function respuestaCortesia(): string {
+  return "¡Hola! Estoy muy bien, gracias por preguntar. Listo para ayudarte con tus trámites del SIGD. ¿Qué necesitas hoy?";
+}
+
 // Verbos de manipulación de página (el asistente navega por usted)
 const VERBOS_NAVEGACION = [
   "llevame", "lleve", "llevar", "dirigeme", "dirija", "abreme", "abre", "abrir",
@@ -268,6 +282,11 @@ export function buscarRespuesta(pregunta: string, ultimoTemaId?: string | null):
   }
   const preguntaNorm = normalizar(original);
   const tokens = tokenizar(original);
+
+  // Respuesta corta de cortesía (no saludo institucional, no navega).
+  if (esSaludoCortesia(preguntaNorm)) {
+    return { texto: respuestaCortesia() };
+  }
 
   // 0) Manipulación de página: navegación directa por orden del usuario
   const accion = detectarAccionPagina(original, preguntaNorm);
@@ -429,39 +448,29 @@ export function sugerenciasParaRuta(pathname: string): SugerenciaTema[] {
 
 const CLAVE_HISTORIAL = "sigd_asistente_historial_v1";
 
-function cargarHistorial(): MensajeChat[] | null {
-  try {
-    const crudo = window.localStorage.getItem(CLAVE_HISTORIAL);
-    if (!crudo) return null;
-    const arr = JSON.parse(crudo) as MensajeChat[];
-    if (!Array.isArray(arr) || arr.length === 0) return null;
-    return arr.slice(-30);
-  } catch {
-    return null;
-  }
-}
-
 export function useAsistenteIA() {
   const location = useLocation();
   const navigate = useNavigate();
   const ultimoTema = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [mensajes, setMensajes] = useState<MensajeChat[]>(() =>
-    cargarHistorial() ?? [
+  const [mensajes, setMensajes] = useState<MensajeChat[]>(() => {
+    const yaSaludo = typeof sessionStorage !== "undefined" && sessionStorage.getItem("sigd_saludo_mostrado") === "1";
+    if (yaSaludo) return [];
+    return [
       {
         id: nuevoId(),
         rol: "asistente",
         hora: Date.now(),
         texto:
-          "Buenos días. Soy JARVIS, asistente institucional del SIGD. Puedo orientarle con rigor profesional y, si usted lo autoriza, dirigirle al módulo correspondiente, por ejemplo: «llévame a mi casilla» o «abre el validador». ¿En qué puedo servirle?",
+          "Buenos días. Soy SIGI, asistente institucional del SIGD. Puedo orientarle con rigor profesional y, si usted lo autoriza, dirigirle al módulo correspondiente, por ejemplo: «llévame a mi casilla» o «abre el validador». ¿En qué puedo servirle?",
         sugerencias: [
           { titulo: "Presentar trámite", ejemplo: "Llévame a Mesa de Partes Virtual" },
           { titulo: "Ver notificaciones", ejemplo: "¿Dónde consulto mis notificaciones?" },
           { titulo: "Recuperar CUT", ejemplo: "Perdí mi CUT, ¿cómo lo recupero?" },
         ],
       },
-    ],
-  );
+    ];
+  });
   const [escribiendo, setEscribiendo] = useState(false);
   const [fuenteIA, setFuenteIA] = useState<"local" | "ia" | null>(null);
 
@@ -540,6 +549,11 @@ export function useAsistenteIA() {
           hora: Date.now(),
         };
         setMensajes((prev) => [...prev, msgIA]);
+        if (esPrimera) {
+          try {
+            sessionStorage.setItem("sigd_saludo_mostrado", "1");
+          } catch { /* noop */ }
+        }
         setFuenteIA(origen);
         setEscribiendo(false);
         ejecutarAccion(r.accion);

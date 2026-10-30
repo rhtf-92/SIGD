@@ -171,7 +171,7 @@ export const BASE_CONOCIMIENTO: EntradaConocimiento[] = [
     palabrasClave: ["hola", "buenas", "buenos dias", "buenas tardes", "hey", "saludos", "buenos días"],
     ejemplos: ["hola", "buenas tardes", "buenos días, ¿me ayuda?", "hola, necesito orientación"],
     respuesta:
-      "Buenos días. Soy JARVIS, el asistente institucional del Sistema Integral de Gestión Documentaria (SIGD) del IESTP “Suiza”. Será un placer asistirle con trámites, notificaciones, validación documental o acceso al sistema. ¿En qué puedo servirle el día de hoy?",
+      "Buenos días. Soy SIGI, asistente institucional del Sistema Integral de Gestión Documentaria (SIGD) del IESTP “Suiza”. Será un placer asistirle con trámites, notificaciones, validación documental o acceso al sistema. ¿En qué puedo servirle el día de hoy?",
   },
   {
     id: "ayuda-general",

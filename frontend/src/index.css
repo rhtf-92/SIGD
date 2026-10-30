@@ -33,7 +33,7 @@
   }
 
   body {
-    background-color: var(--color-vault-papel);
+    background: linear-gradient(180deg, #0A1128 0%, #001F3F 35%, #003366 100%);
     color: var(--color-vault-tinta);
     font-family: var(--font-sans);
   }
