@@ -81,9 +81,12 @@ export interface AsistenteMotor {
   responder(mensaje: string): Promise<ResultadoAsistente>;
 }
 
-/** Registro de auditoría de una consulta (LPDP: nunca se guarda el texto plano). */
+/**
+ * Registro seudonimizado de consulta: no guarda texto plano, pero sus hashes
+ * SHA-256 sin sal son determinísticos y no deben considerarse anónimos.
+ */
 export interface RegistroConsultaAsistente {
-  /** Hash SHA-256 del mensaje del usuario (anonimizado). */
+  /** Hash SHA-256 sin sal del mensaje; potencialmente vulnerable a diccionario. */
   mensajeHashSha256: string;
   /** Intención detectada. */
   intencion: string;

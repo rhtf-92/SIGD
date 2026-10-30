@@ -6,8 +6,13 @@
  * Descripción:
  * Implementación por defecto del puerto `AsistenteAuditPort` sobre la bitácora
  * WORM `sigd_audit.bitacora_auditoria`. Conforme a la Ley N° 29733 (LPDP), jamás
- * se almacena el texto plano de la consulta: solo su hash SHA-256, de modo que
- * el registro es anónimo e inmutable (principio de disociación de datos).
+ * no se almacena el texto plano de la consulta. El hash SHA-256 sin sal es
+ * determinístico y puede ser vulnerable a ataques de diccionario; por eso el
+ * registro es seudonimizado, no anónimo. Además se vincula con metadatos de
+ * solicitud (usuario, IP y agente de usuario) de la bitácora general.
+ *
+ * La tabla WORM no tiene expiración automática ni borrado desde esta aplicación.
+ * La retención debe regirse por la política institucional de auditoría y privacidad.
  */
 
 import crypto from 'node:crypto';
@@ -28,7 +33,7 @@ export class AuditAsistenteNoOp implements AsistenteAuditPort {
   }
 }
 
-/** Persistencia en la bitácora forense WORM del SIGD. */
+/** Persistencia seudonimizada en la bitácora forense WORM del SIGD. */
 export class AuditAsistentePg implements AsistenteAuditPort {
   constructor(private readonly pool: Pool) {}
 

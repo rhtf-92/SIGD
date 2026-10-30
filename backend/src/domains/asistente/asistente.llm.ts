@@ -93,19 +93,8 @@ function numerosPositivos(valor: string | undefined, porDefecto: number): number
   return Number.isFinite(numero) && numero > 0 ? numero : porDefecto;
 }
 
-function directoriosRag(env: NodeJS.ProcessEnv = process.env): string[] {
-  const configurados = env.ASISTENTE_RAG_DIRS?.split(/[;,]/)
-    .map((directorio) => directorio.trim())
-    .filter(Boolean);
-
-  if (configurados && configurados.length > 0) {
-    return configurados.map((directorio) => path.resolve(directorio));
-  }
-
-  return [
-    path.resolve(process.cwd(), 'docs'),
-    path.resolve(process.cwd(), '..', 'frontend', 'docs'),
-  ];
+function directoriosRag(): string[] {
+  return [path.resolve(process.cwd(), 'knowledge', 'asistente')];
 }
 
 function listarMarkdown(directorio: string): string[] {

@@ -55,6 +55,19 @@ describe('AsistenteCore - RAG', () => {
     }
   });
 
+  it('solo carga la carpeta aprobada aunque ASISTENTE_RAG_DIRS apunte a otra ubicación', () => {
+    vi.stubEnv('ASISTENTE_RAG_DIRS', path.resolve('docs'));
+    try {
+      const documentos = cargarDocumentosRag();
+      expect(documentos.length).toBeGreaterThan(0);
+      expect(documentos.every((documento) =>
+        documento.ruta.startsWith('knowledge/asistente/'),
+      )).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('selecciona primero el documento relacionado con la consulta', () => {
     const seleccionados = seleccionarFragmentos('¿Dónde queda la sede?', DOCUMENTOS);
     expect(seleccionados[0]?.ruta).toBe('SEDE.md');

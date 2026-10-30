@@ -21,7 +21,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const reemplazaOrbeConLogo = RUTAS_CON_LOGO_AMBIENTAL.has(pathname);
 
   if (pathname === "/login") {
-    return <div className="min-h-screen bg-[#06132F]">{children}</div>;
+    return (
+      <div className="min-h-screen bg-[#06132F]">
+        {children}
+        <AsistenteVirtualWidget />
+      </div>
+    );
   }
 
   return (
