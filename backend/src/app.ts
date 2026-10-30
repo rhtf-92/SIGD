@@ -59,6 +59,7 @@ import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
 import { verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { createApiRoutes } from './routes/index.js';
 
 export interface AppOptions {
   busSse?: BusSse;
@@ -123,6 +124,8 @@ export function construirApp(
       res.status(503).json({ status: 'error', estado: 'NOT_READY' });
     }
   });
+
+  app.use('/api', createApiRoutes());
 
   // Configuración de Pasarela y Sesiones de Firma (DocuCore - B_VALENTIN)
   const hostsPermitidos = (process.env.REFIRMA_HOSTS_PERMITIDOS ?? 'sigd.iestp-suiza.edu.pe')

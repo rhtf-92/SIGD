@@ -152,23 +152,31 @@ export class RepositorioMgdAnalytics {
    * consolidada cuando no lo hay. El servicio decide cuándo sumar varias filas, de
    * modo que la agregación vive en un único lugar y es testeable sin base de datos.
    */
-  async obtenerContadores(periodo: string | null): Promise<ContadoresPeriodo[]> {
-    const sql = periodo === null
-      ? `SELECT to_char(MIN(periodo), 'YYYY-MM')     AS periodo,
-                MAX(actualizado_en)                 AS actualizado_en,
-                SUM(n_radicados)                    AS n_radicados,
-                SUM(n_atendidos)                    AS n_atendidos,
-                SUM(n_archivados)                   AS n_archivados,
-                SUM(n_resueltos)                    AS n_resueltos,
-                SUM(n_en_tramite)                   AS n_en_tramite,
-                SUM(n_observados)                   AS n_observados,
-                SUM(n_resueltos_dentro_plazo)       AS n_resueltos_dentro_plazo,
-                SUM(horas_habiles_suma)             AS horas_habiles_suma
-           FROM sigd_tra.mv_kpis_mgd_mensual`
-      : `${PROYECCION_CONTADORES}
-          WHERE periodo = $1::date`;
+  async obtenerContadores(
+    periodo: string | null,
+    periodoDesde: string | null = null,
+    periodoHasta: string | null = null,
+  ): Promise<ContadoresPeriodo[]> {
+    const sql = `SELECT to_char(MIN(periodo), 'YYYY-MM') AS periodo,
+                        MAX(actualizado_en) AS actualizado_en,
+                        SUM(n_radicados) AS n_radicados,
+                        SUM(n_atendidos) AS n_atendidos,
+                        SUM(n_archivados) AS n_archivados,
+                        SUM(n_resueltos) AS n_resueltos,
+                        SUM(n_en_tramite) AS n_en_tramite,
+                        SUM(n_observados) AS n_observados,
+                        SUM(n_resueltos_dentro_plazo) AS n_resueltos_dentro_plazo,
+                        SUM(horas_habiles_suma) AS horas_habiles_suma
+                   FROM sigd_tra.mv_kpis_mgd_mensual
+                  WHERE ($1::date IS NULL OR periodo = $1::date)
+                    AND ($2::date IS NULL OR periodo >= $2::date)
+                    AND ($3::date IS NULL OR periodo <= $3::date)`;
 
-    const valores = periodo === null ? [] : [periodo];
+    const valores = [
+      periodo ? `${periodo}-01` : null,
+      periodoDesde ? `${periodoDesde}-01` : null,
+      periodoHasta ? `${periodoHasta}-01` : null,
+    ];
     const { rows } = await this.pool.query<FilaContadores>(sql, valores);
     if (rows.length === 0) return [];
     return rows.map((fila) => ({
@@ -224,7 +232,11 @@ export class RepositorioMgdAnalytics {
   }
 
   /** Distribución de permanencia por (período, área, tramo). */
-  async obtenerRetencion(periodo: string | null): Promise<TramoRetencionFila[]> {
+  async obtenerRetencion(
+    periodo: string | null,
+    periodoDesde: string | null = null,
+    periodoHasta: string | null = null,
+  ): Promise<TramoRetencionFila[]> {
     const { rows } = await this.pool.query<FilaRetencion>(
       `SELECT unidad_organica_id,
               tramo_permanencia_dias_habiles,
@@ -233,9 +245,15 @@ export class RepositorioMgdAnalytics {
               promedio_horas_habiles,
               porcentaje_del_area
          FROM sigd_tra.mv_tiempos_retencion_area
-        WHERE $1::date IS NULL OR periodo = $1::date
+        WHERE ($1::date IS NULL OR periodo = $1::date)
+          AND ($2::date IS NULL OR periodo >= $2::date)
+          AND ($3::date IS NULL OR periodo <= $3::date)
         ORDER BY unidad_organica_id, tramo_permanencia_dias_habiles`,
-      [periodo],
+      [
+        periodo ? `${periodo}-01` : null,
+        periodoDesde ? `${periodoDesde}-01` : null,
+        periodoHasta ? `${periodoHasta}-01` : null,
+      ],
     );
     return rows.map((fila) => {
       const tramo = fila.tramo_permanencia_dias_habiles;

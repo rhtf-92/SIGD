@@ -136,23 +136,23 @@ base AS (
         e.expediente_id,
         e.fecha_radicacion,
         e.fecha_limite,
-        a.estado_codigo,
+        a.estado_nuevo AS estado_codigo,
         a.area_actual_id,
         ar.fecha_ingreso,
         cierre.fecha_cierre
     FROM sigd_tra.expediente e
     CROSS JOIN rango r
-    LEFT JOIN sigd_rut.estado_actual_tramite a
+    LEFT JOIN sigd_rut.estado_actual_expediente a
            ON a.expediente_id = e.expediente_id
     LEFT JOIN sigd_tra.asiento_registro ar
            ON ar.expediente_id = e.expediente_id
           AND NOT ar.anulado
     LEFT JOIN LATERAL (
-        SELECT m.fecha_movimiento
+        SELECT m.fecha_hora AS fecha_cierre
           FROM sigd_rut.movimiento_tramite m
          WHERE m.expediente_id = e.expediente_id
-           AND m.estado_destino IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
-         ORDER BY m.fecha_movimiento
+           AND m.estado_nuevo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
+         ORDER BY m.fecha_hora
          LIMIT 1
     ) cierre ON TRUE
     WHERE e.fecha_radicacion >= r.desde
@@ -255,11 +255,11 @@ WITH serie AS (
         date_trunc($3, e.fecha_radicacion)::date AS periodo,
         COUNT(*)::int AS radicados,
         COUNT(*) FILTER (
-            WHERE a.estado_codigo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
+            WHERE a.estado_nuevo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
         )::int AS atendidos,
-        COUNT(*) FILTER (WHERE a.estado_codigo = 'OBSERVADO')::int AS observados
+        COUNT(*) FILTER (WHERE a.estado_nuevo = 'OBSERVADO')::int AS observados
     FROM sigd_tra.expediente e
-    LEFT JOIN sigd_rut.estado_actual_tramite a
+    LEFT JOIN sigd_rut.estado_actual_expediente a
            ON a.expediente_id = e.expediente_id
     WHERE e.fecha_radicacion >= $1::date
       AND e.fecha_radicacion < ($2::date + 1)
@@ -317,7 +317,7 @@ SELECT
     horas_promedio,
     dias_promedio,
     dias_maximo,
-    vencido,
+    vencidos,
     semaforo_rojo,
     semaforo_amarillo,
     semaforo_verde
@@ -344,7 +344,7 @@ export async function obtenerCuellosBotella(
     horas_promedio: number | null;
     dias_promedio: number | null;
     dias_maximo: number | null;
-    vencido: number;
+    vencidos: number;
     semaforo_rojo: number;
     semaforo_amarillo: number;
     semaforo_verde: number;
@@ -364,8 +364,8 @@ export async function obtenerCuellosBotella(
         horasPromedio: fila.horas_promedio ?? 0,
         diasPromedio: dias,
         diasMaximo: fila.dias_maximo ?? 0,
-        vencido: fila.vencido,
-        nivelAlerta: nivelAlerta(dias, fila.vencido, fila.semaforo_rojo),
+        vencido: fila.vencidos,
+        nivelAlerta: nivelAlerta(dias, fila.vencidos, fila.semaforo_rojo),
         proporcion: total === 0 ? 0 : redondear((fila.expedientes / total) * 100, 2),
       };
     }),

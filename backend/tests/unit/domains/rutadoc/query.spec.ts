@@ -10,14 +10,14 @@ const actor: ActorRutaDoc = { id: 'operador-1', roles: ['MESA_PARTES'], puedeVer
 const filtros: FiltrosRutaDoc = { pestana: 'PENDIENTES', limite: 20 };
 
 const fila: ExpedienteResumen = {
-  idExpediente: '17', cut: 'EXP-2026-000017', asunto: 'Solicitud',
+  idExpediente: 'c3401043-807f-41f3-9de8-a042e4b312d4', cut: 'EXP-2026-000017', asunto: 'Solicitud',
   fechaRadicacion: '2026-09-24T14:30:00.000Z', estadoActual: 'REGISTRADO', areaActualId: null,
 };
 
 function repositorioSimulado(): RepositorioRutaDoc {
   return {
     listar: vi.fn().mockResolvedValue({ elementos: [fila], porEstado: { REGISTRADO: 1 } }),
-    obtener: vi.fn().mockResolvedValue({ ...fila, solicitanteId: '4', resumenDocumentos: null, ultimoMovimiento: null, sla: null }),
+    obtener: vi.fn().mockResolvedValue({ ...fila, solicitanteId: 'c3401043-807f-41f3-9de8-a042e4b312d4', resumenDocumentos: null, ultimoMovimiento: null, sla: null }),
   };
 }
 
@@ -43,7 +43,7 @@ describe('Consulta RutaDoc', () => {
   it('rechaza cursor malformado, alterado o usado con otros filtros', () => {
     expect(() => decodificarCursor('%', filtros)).toThrow();
     expect(() => decodificarCursor(Buffer.from('{"v":2}').toString('base64url'), filtros)).toThrow();
-    const cursor = codificarCursor({ fechaRadicacion: fila.fechaRadicacion, idExpediente: '17' }, filtros);
+    const cursor = codificarCursor({ fechaRadicacion: fila.fechaRadicacion, idExpediente: 'd3401043-807f-41f3-9de8-a042e4b312d4' }, filtros);
     expect(() => decodificarCursor(cursor, { ...filtros, terminoBusqueda: 'otro' })).toThrow();
   });
 
@@ -70,9 +70,9 @@ describe('Consulta RutaDoc', () => {
     ]) expect(() => filtrosSchema.parse({ pestana: 'PENDIENTES', ...valores })).toThrow(z.ZodError);
   });
 
-  it('valida ID BIGINT positivo sin pérdida de precisión', () => {
-    expect(idSchema.parse('9223372036854775807')).toBe('9223372036854775807');
-    for (const id of ['0', '-1', '1.2', 'abc', '9223372036854775808']) {
+  it('valida ID de expediente UUID canónico', () => {
+    expect(idSchema.parse('a3401043-807f-41f3-9de8-a042e4b312d4')).toBe('a3401043-807f-41f3-9de8-a042e4b312d4');
+    for (const id of ['0', '-1', '1.2', 'abc', '9223372036854775807', '17']) {
       expect(() => idSchema.parse(id)).toThrow(z.ZodError);
     }
   });
@@ -88,7 +88,7 @@ describe('Consulta RutaDoc', () => {
 
   it('recorta limite + 1 y emite cursor desde el último elemento visible', async () => {
     const repo = repositorioSimulado();
-    vi.mocked(repo.listar).mockResolvedValue({ elementos: [fila, { ...fila, idExpediente: '16' }], porEstado: {} });
+    vi.mocked(repo.listar).mockResolvedValue({ elementos: [fila, { ...fila, idExpediente: 'e3401043-807f-41f3-9de8-a042e4b312d4' }], porEstado: {} });
     const resultado = await new ServicioRutaDoc(repo).listar({ ...filtros, limite: 1 }, actor);
     expect(resultado.elementos).toEqual([fila]);
     expect(resultado.tieneMas).toBe(true);
@@ -100,7 +100,7 @@ describe('Consulta RutaDoc', () => {
   it('responde 404 cuando el expediente no existe', async () => {
     const repo = repositorioSimulado();
     vi.mocked(repo.obtener).mockResolvedValue(null);
-    await expect(new ServicioRutaDoc(repo).obtener('17', actor)).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
+    await expect(new ServicioRutaDoc(repo).obtener('c3401043-807f-41f3-9de8-a042e4b312d4', actor)).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
   });
 
   it('propaga el fallo de repositorio para que el middleware lo sanee', async () => {
@@ -114,7 +114,7 @@ describe('Consulta RutaDoc', () => {
     const servicio = new ServicioRutaDoc(repositorioSimulado());
     await expect(servicio.listar(filtros, { id: 'x', roles: ['ESTUDIANTE'] }))
       .rejects.toMatchObject({ status: 403 });
-    await expect(servicio.obtener('17', { id: 'x', roles: ['MESA_PARTES'] }))
+    await expect(servicio.obtener('c3401043-807f-41f3-9de8-a042e4b312d4', { id: 'x', roles: ['MESA_PARTES'] }))
       .rejects.toMatchObject({ status: 403 });
   });
 });

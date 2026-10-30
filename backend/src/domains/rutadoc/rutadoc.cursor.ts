@@ -2,9 +2,19 @@ import { createHash } from 'node:crypto';
 import { ValidationError } from '../../shared/domain/errors/validation-error.js';
 import type { FiltrosRutaDoc, PosicionCursor } from './rutadoc.types.js';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_BIGINT = 9223372036854775807n;
 
 export function esIdExpediente(valor: unknown): valor is string {
+  return typeof valor === 'string' && UUID.test(valor);
+}
+
+export function esIdMovimiento(valor: unknown): valor is string {
+  return typeof valor === 'string' && UUID.test(valor);
+}
+
+/** Identificadores numéricos del modelo legado conservados como BIGINT (secuencia, etc.). */
+export function esNumeroIdentificador(valor: unknown): valor is string {
   return typeof valor === 'string' && /^[1-9]\d{0,18}$/.test(valor) && BigInt(valor) <= MAX_BIGINT;
 }
 

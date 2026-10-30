@@ -1,7 +1,6 @@
 services:
-  # 1. Base de Datos Relacional y Extensiones Criptográficas
   postgres:
-    image: postgres:18-alpine
+    image: postgres:15-alpine
     container_name: sigd_postgres
     environment:
       POSTGRES_USER: postgres
@@ -10,33 +9,26 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d sigd_prueba"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # 2. Almacenamiento de Objetos Compatible con Amazon S3
+  # 2. Almacenamiento de Objetos S3
   minio:
-    image: minio/minio:latest
+    image: cgr.dev/chainguard/minio:latest
     container_name: sigd_minio
-    command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadminpassword
     ports:
-      - "9000:9000"   # API S3
-      - "9001:9001"   # Consola Web
+      - "9000:9000"
+      - "9001:9001"
     volumes:
       - miniodata:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
 
-  # 3. Almacén Clave-Valor en Memoria para Cache y Sesiones
   redis:
     image: redis:7-alpine
     container_name: sigd_redis
@@ -50,9 +42,8 @@ services:
       timeout: 3s
       retries: 5
 
-  # 4. API Backend y Worker Asíncrono de Auditoría Outbox
   backend:
-    image: node:20-alpine
+    image: node:24-alpine
     container_name: sigd_backend
     working_dir: /app
     volumes:
@@ -74,13 +65,12 @@ services:
       postgres:
         condition: service_healthy
       minio:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_healthy
 
-  # 5. Frontend Single Page Application (React 19 + Vite 6)
   frontend:
-    image: node:20-alpine
+    image: node:24-alpine
     container_name: sigd_frontend
     working_dir: /app
     volumes:
