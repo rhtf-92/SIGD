@@ -251,19 +251,10 @@ let idTipoTramite = documentos.tipoTramiteId.trim();
       const payload = {
         asunto: asuntoFinal,
         idTipoTramiteTupa: idTipoTramite,
-<<<<<<< HEAD
-        idPersona: idPersonaNum,
+idPersona: idPersonaNum,
         nombreSolicitante: (nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado').slice(0, 120),
         correo: correoFinal,
         totalFolios: Math.min(Math.max(Math.trunc(Number(documentos.numeroFolios) || 1), 1), 5000),
-=======
-        nombreSolicitante:
-          nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
-        correo:
-          identificacion.correo.trim().toLowerCase() ||
-          'contacto@iestpsuiza.edu.pe',
-        totalFolios: Number(documentos.numeroFolios) || 1,
->>>>>>> origin/F_MATIAS
         documentos: archivosPayload,
       };
 
