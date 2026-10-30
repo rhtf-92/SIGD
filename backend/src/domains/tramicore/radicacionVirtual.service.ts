@@ -1,7 +1,10 @@
+<<<<<<< HEAD
 import { createHash, randomUUID } from 'node:crypto';
+=======
+﻿import { createHash } from 'node:crypto';
+>>>>>>> origin/F_MATIAS
 import type { Pool, PoolClient } from 'pg';
 import { ValidationError } from '../../shared/domain/errors/index.js';
-import { CutService } from './cut.service.js';
 import { calcularHorarioCorte, type ResultadoHorarioCorte } from './horarioCorte.util.js';
 import type { RadicacionVirtualInput } from './tramites.schemas.js';
 
@@ -9,7 +12,7 @@ import type { RadicacionVirtualInput } from './tramites.schemas.js';
  * T-BE-TC-02 y T-BE-TC-03 · Logica de negocio de la radicacion virtual
  * (Mesa de Partes Virtual 24x7, endpoint #14).
  *
- * Garantias que ofrece este servicio:
+* Garantias que ofrece este servicio:
  *   * La asignacion del CUT ocurre DENTRO de la misma transaccion que la
  *     escritura del expediente. Si algo posterior falla, el ROLLBACK libera el
  *     correlativo y no se quema un numero que el ciudadano nunca vio.
@@ -18,8 +21,20 @@ import type { RadicacionVirtualInput } from './tramites.schemas.js';
  *     Art. 138 LPAG implementado en `horarioCorte.util.ts`.
  *   * La cabecera, los adjuntos y el cargo digital se escriben en una sola
  *     transaccion: es imposible que quede un expediente sin adjunto.
+ *
+ * Esquema real: sigd_tra.expediente (expediente_id, codigo_expediente, numero,
+ * dni_solicitante, tipo_documental_id NOT NULL, solicitante_id NOT NULL,
+ * area_destino_id, estado, fecha_radicacion, fecha_limite) y
+ * sigd_tra.asiento_registro (numero_registro, expediente_id, fecha_ingreso,
+ * canal_ingreso, asunto, remitente_id). El trigger tr_tra_expediente_asignar_cut
+ * genera el CUT (EXP-YYYY-XXXXXX) con sigd_tra.generar_cut_expediente, la misma
+ * funcion que CutService invoca (fn_generar_cut es su alias), por lo que la base
+ * lo asigna al insertar sin codigo_expediente.
+ *
+ * No existen sigd_tra.cargo_digital ni sigd_tra.documento_adjunto; el cargo
+ * digital es un codigo determinista recalculable y los adjuntos no se persisten
+ * en esta etapa (ver TODO).
  */
-
 export interface ResultadoRadicacion {
   expedienteId: string;
   cut: string;
@@ -39,29 +54,44 @@ export interface ResultadoRadicacion {
 interface FilaExpediente {
   expediente_id: string;
   cut: string;
-  fecha_envio_real: Date;
   fecha_radicacion_legal: Date;
-  fuera_de_horario: boolean;
 }
 
-interface FilaTramiteTupa {
-  id_tipo_tramite_tupa: string;
-  activo: boolean;
+interface FilaTipoTramite {
+  tipo_tramite_id: string;
+  vigente: boolean;
 }
 
+interface FilaTipoDocumento {
+  tipo_documental_id: string;
+}
+
+<<<<<<< HEAD
+=======
+interface FilaPersona {
+  id_persona: string;
+  id_documento: string | null;
+}
+
+>>>>>>> origin/F_MATIAS
 /** Origen del calendario de feriados. Inyectable para poder testear sin BD. */
 export type ProveedorFeriados = () => Promise<string[]>;
 
 export class RadicacionVirtualService {
-  private readonly cutService: CutService;
+  private readonly pool: Pool;
   private readonly obtenerFeriados: ProveedorFeriados;
 
-  constructor(private readonly pool: Pool, obtenerFeriados?: ProveedorFeriados) {
-    this.cutService = new CutService(pool);
+  constructor(pool: Pool, obtenerFeriados?: ProveedorFeriados) {
+    this.pool = pool;
     this.obtenerFeriados = obtenerFeriados ?? crearProveedorFeriados(pool);
   }
 
-  async radicar(datos: RadicacionVirtualInput, now: Date = new Date()): Promise<ResultadoRadicacion> {
+  async radicar(
+    datos: RadicacionVirtualInput,
+    idPersonaAutenticada: string,
+    idUsuario: string,
+    now: Date = new Date(),
+  ): Promise<ResultadoRadicacion> {
     const cliente = await this.pool.connect();
     let transaccionAbierta = false;
 
@@ -69,17 +99,21 @@ export class RadicacionVirtualService {
       await cliente.query('BEGIN');
       transaccionAbierta = true;
 
+<<<<<<< HEAD
       const tipoDocumentalId = await this.verificarTipoTramite(cliente, datos.idTipoTramiteTupa);
       const solicitanteId = await this.verificarAdministrado(cliente, datos);
+=======
+      const tipoDocumentalId = await this.resolverTipoDocumental(cliente, datos.idTipoTramiteTupa);
+      await this.verificarAdministrado(cliente, idPersonaAutenticada);
+>>>>>>> origin/F_MATIAS
 
-      const [{ cut, anio }, horario] = await Promise.all([
-        this.cutService.generar(anioDeRecepcion(now), cliente),
-        this.evaluarHorario(now),
-      ]);
+      const horario = await this.evaluarHorario(now);
+      const anio = anioDeRecepcion(now);
 
       const expediente = await this.insertarExpediente(
         cliente,
         datos,
+<<<<<<< HEAD
         cut,
         horario,
         tipoDocumentalId,
@@ -94,6 +128,20 @@ export class RadicacionVirtualService {
         datos,
         now,
       );
+=======
+        tipoDocumentalId,
+        idPersonaAutenticada,
+        horario.radicacionLegal,
+      );
+      const cut = expediente.cut;
+      const anioFiscal = Number(cut.slice(4, 8));
+
+      await this.insertarAsiento(cliente, expediente.expediente_id, datos, horario.envioReal, idPersonaAutenticada);
+      await this.insertarConstanciaCasilla(cliente, idUsuario, cut, datos, horario.envioReal);
+      // Etapa 2b: integrar con sigd_doc.expediente y MinIO.
+      // Los adjuntos se validan en el DTO pero no se persisten en esta etapa.
+      const cargo = this.emitirCargoDigital(expediente.expediente_id, cut, datos, horario.envioReal);
+>>>>>>> origin/F_MATIAS
 
       await cliente.query('COMMIT');
       transaccionAbierta = false;
@@ -101,8 +149,8 @@ export class RadicacionVirtualService {
       return {
         expedienteId: expediente.expediente_id,
         cut,
-        anio,
-        fechaEnvioReal: expediente.fecha_envio_real.toISOString(),
+        anio: anioFiscal,
+        fechaEnvioReal: horario.envioReal.toISOString(),
         fechaRadicacionLegal: expediente.fecha_radicacion_legal.toISOString(),
         fueraDeHorario: horario.requiereProyeccion,
         mensajeLegal: redactarMensajeLegal(horario),
@@ -122,11 +170,47 @@ export class RadicacionVirtualService {
     return calcularHorarioCorte(now, feriados);
   }
 
+<<<<<<< HEAD
   private async verificarTipoTramite(cliente: PoolClient, idTipoTramiteTupa: string): Promise<string> {
     let resultado = await cliente.query<FilaTramiteTupa>(
       `SELECT tipo_tramite_id::text AS id_tipo_tramite_tupa, vigente AS activo
          FROM sigd_doc.tipo_tramite_tupa
         WHERE tipo_tramite_id = $1::uuid`,
+=======
+  private async resolverTipoDocumental(
+    cliente: PoolClient,
+    idTipoTramiteTupa: string,
+  ): Promise<string> {
+    const resultado = await cliente.query<FilaTipoDocumento>(
+      `SELECT td.tipo_documental_id
+         FROM sigd_doc.tipo_documento td
+         JOIN sigd_doc.tipo_tramite_tupa t ON t.codigo = td.codigo
+        WHERE t.tipo_tramite_id = $1
+          AND td.vigente = TRUE
+          AND t.vigente = TRUE
+        LIMIT 1`,
+      [idTipoTramiteTupa],
+    );
+    const fila = resultado.rows[0];
+    if (!fila) {
+      throw new ValidationError({
+        invalidParams: [
+          {
+            name: 'idTipoTramiteTupa',
+            reason: 'TIPO_DOCUMENTAL_SIN_CONFIGURAR: no existe un tipo documental vinculado al tramite elegido.',
+          },
+        ],
+      });
+    }
+    return fila.tipo_documental_id;
+  }
+
+  private async verificarTipoTramite(cliente: PoolClient, idTipoTramiteTupa: string): Promise<void> {
+    const resultado = await cliente.query<FilaTipoTramite>(
+      `SELECT tipo_tramite_id, vigente
+         FROM sigd_doc.tipo_tramite_tupa
+        WHERE tipo_tramite_id = $1`,
+>>>>>>> origin/F_MATIAS
       [idTipoTramiteTupa],
     );
     if (!resultado.rows[0] && idTipoTramiteTupa === '00000000-0000-0000-0000-000000000001') {
@@ -146,7 +230,7 @@ export class RadicacionVirtualService {
         ],
       });
     }
-    if (!tipo.activo) {
+    if (!tipo.vigente) {
       throw new ValidationError({
         invalidParams: [
           { name: 'idTipoTramiteTupa', reason: 'TIPO_TRAMITE_INACTIVO: el tramite ya no admite nuevas radicaciones.' },
@@ -156,6 +240,7 @@ export class RadicacionVirtualService {
     return tipo.id_tipo_tramite_tupa;
   }
 
+<<<<<<< HEAD
   private async verificarAdministrado(
     cliente: PoolClient,
     datos: RadicacionVirtualInput,
@@ -167,6 +252,12 @@ export class RadicacionVirtualService {
         WHERE id_documento = $1
         LIMIT 1`,
       [docId],
+=======
+  private async verificarAdministrado(cliente: PoolClient, idPersona: string): Promise<void> {
+    const resultado = await cliente.query<FilaPersona>(
+      'SELECT id_persona, id_documento FROM sigd_auth.persona WHERE id_persona = $1',
+      [idPersona],
+>>>>>>> origin/F_MATIAS
     );
     let idPersonaUuid = existente.rows[0]?.id_persona;
 
@@ -188,6 +279,7 @@ export class RadicacionVirtualService {
         ],
       });
     }
+<<<<<<< HEAD
 
     const nombreLimpio = datos.nombreSolicitante.trim();
     const partes = nombreLimpio.split(/\s+/);
@@ -204,11 +296,14 @@ export class RadicacionVirtualService {
     );
 
     return idPersonaUuid;
+=======
+>>>>>>> origin/F_MATIAS
   }
 
   private async insertarExpediente(
     cliente: PoolClient,
     datos: RadicacionVirtualInput,
+<<<<<<< HEAD
     cut: string,
     horario: ResultadoHorarioCorte,
     tipoDocumentalId: string,
@@ -234,11 +329,31 @@ export class RadicacionVirtualService {
         solicitanteId,
         horario.radicacionLegal,
       ],
+=======
+    tipoDocumentalId: string,
+    idPersona: string,
+    fechaRadicacionLegal: Date,
+  ): Promise<FilaExpediente> {
+    const idDocumento = await this.obtenerIdDocumentoPersona(cliente, idPersona);
+    const dniSolicitante = idDocumento && /^[0-9]{8}$/.test(idDocumento) ? idDocumento : null;
+
+    // numero es NOT NULL UNIQUE; el CUT lo genera el trigger y se asigna despues.
+    const numeroTemporal = `TMP-${createHash('sha256').update(String(Date.now())).digest('hex').slice(0, 12)}`;
+
+    const resultado = await cliente.query<FilaExpediente>(
+      `INSERT INTO sigd_tra.expediente
+         (numero, dni_solicitante, tipo_documental_id, solicitante_id,
+          area_destino_id, estado, fecha_radicacion, fecha_limite)
+       VALUES ($1, $2, $3, $4, NULL, 'REGISTRADO', $5, NULL)
+       RETURNING expediente_id, codigo_expediente AS cut, fecha_radicacion AS fecha_radicacion_legal`,
+      [numeroTemporal, dniSolicitante, tipoDocumentalId, idPersona, fechaRadicacionLegal],
+>>>>>>> origin/F_MATIAS
     );
     const fila = resultado.rows[0];
     if (!fila) {
       throw new Error('La insercion del expediente no devolvio fila.');
     }
+<<<<<<< HEAD
     return {
       expediente_id: fila.expediente_id,
       cut: fila.cut,
@@ -259,25 +374,81 @@ export class RadicacionVirtualService {
        VALUES ($1::uuid, gen_random_uuid(), 1, $2::int)`,
       [expedienteId, Math.max(1, datos.totalFolios)],
     );
+=======
+
+    await cliente.query(`UPDATE sigd_tra.expediente SET numero = $1 WHERE expediente_id = $2`, [
+      expediente.cut,
+      expediente.expediente_id,
+    ]);
+
+    return expediente;
   }
 
-  private async emitirCargoDigital(
+  private async obtenerIdDocumentoPersona(cliente: PoolClient, idPersona: string): Promise<string | null> {
+    const resultado = await cliente.query<{ id_documento: string | null }>(
+      'SELECT id_documento FROM sigd_auth.persona WHERE id_persona = $1',
+      [idPersona],
+    );
+    return resultado.rows[0]?.id_documento ?? null;
+>>>>>>> origin/F_MATIAS
+  }
+
+  private async insertarAsiento(
     cliente: PoolClient,
     expedienteId: string,
     cut: string,
     solicitanteId: string,
     datos: RadicacionVirtualInput,
-    now: Date,
-  ): Promise<ResultadoRadicacion['cargoDigital']> {
-    const codigo = `CARGO-${randomUUID().slice(0, 8).toUpperCase()}`;
+    fechaEnvioReal: Date,
+    idPersona: string,
+  ): Promise<void> {
+    await cliente.query(
+      `INSERT INTO sigd_tra.asiento_registro
+         (expediente_id, fecha_ingreso, canal_ingreso, asunto, remitente_id)
+       VALUES ($1, $2, 'MESA_VIRTUAL', $3, $4)`,
+      [expedienteId, fechaEnvioReal, datos.asunto, idPersona],
+    );
+  }
+
+  private async insertarConstanciaCasilla(
+    cliente: PoolClient,
+    idUsuario: string,
+    cut: string,
+    datos: RadicacionVirtualInput,
+    fechaEnvioReal: Date,
+  ): Promise<void> {
+    const cuerpo = {
+      cut,
+      asunto: datos.asunto,
+      fechaRecepcionReal: fechaEnvioReal.toISOString(),
+    };
+    await cliente.query(
+      `INSERT INTO sigd_auth.notificacion_casilla
+         (usuario_id, cut, asunto, tipo_acto, cuerpo)
+       VALUES ($1, $2, $3, 'Constancia de presentación', $4::jsonb)`,
+      [idUsuario, cut, 'Constancia de presentación de trámite', JSON.stringify(cuerpo)],
+    );
+  }
+
+  private emitirCargoDigital(
+    expedienteId: string,
+    codigoExpediente: string,
+    datos: RadicacionVirtualInput,
+    fechaIngreso: Date,
+  ): ResultadoRadicacion['cargoDigital'] {
+    const input = `${expedienteId}|${codigoExpediente}|${fechaIngreso.toISOString()}`;
+    const hashCompleto = createHash('sha256').update(input).digest('hex');
+    const codigo = `CARGO-${hashCompleto.slice(0, 8).toUpperCase()}`;
     const contenido = JSON.stringify({
       codigo,
       expedienteId,
+      cut: codigoExpediente,
       totalFolios: datos.totalFolios,
-      emitidoEn: now.toISOString(),
+      emitidoEn: fechaIngreso.toISOString(),
     });
     const hashSha256 = createHash('sha256').update(contenido).digest('hex');
     const qrContenido = `SIGD://cargo/${codigo}?h=${hashSha256.slice(0, 16)}`;
+<<<<<<< HEAD
 
     await cliente.query(
       `INSERT INTO sigd_tra.asiento_registro
@@ -294,6 +465,8 @@ export class RadicacionVirtualService {
       [expedienteId, codigo, datos.asunto, now],
     );
 
+=======
+>>>>>>> origin/F_MATIAS
     return { codigo, hashSha256, qrContenido };
   }
 }
@@ -305,7 +478,15 @@ export class RadicacionVirtualService {
  * arranque en enero.
  */
 function anioDeRecepcion(now: Date): number {
-  return CutService.anioFiscalCorriente(now);
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+  }).formatToParts(now);
+  const anio = Number(partes.find((parte) => parte.type === 'year')?.value);
+  if (!Number.isFinite(anio)) {
+    throw new Error('No se pudo determinar el anio fiscal corriente.');
+  }
+  return anio;
 }
 
 function redactarMensajeLegal(horario: ResultadoHorarioCorte): string {

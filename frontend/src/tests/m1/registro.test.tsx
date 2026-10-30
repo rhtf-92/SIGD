@@ -55,17 +55,23 @@ const naturalDatos = {
   consentimientoLey29733: true,
   version: "1.0" as const,
   fechaAceptacion: "2026-01-12T10:00:00.000Z",
+  password: "Password123!",
+  confirmarPassword: "Password123!",
 };
 
-async function fillNaturalForm() {
+async function fillNaturalForm(skipDistrict = false) {
   fireEvent.change(screen.getByLabelText(/nombres \*/i), { target: { value: "Ana María" } });
   fireEvent.change(screen.getByLabelText(/apellidos \*/i), { target: { value: "Pérez López" } });
   fireEvent.change(screen.getByLabelText(/fecha de nacimiento/i), { target: { value: "1990-01-01" } });
   fireEvent.change(screen.getByLabelText(/correo electrónico/i), { target: { value: "ana@example.com" } });
   fireEvent.change(screen.getByLabelText(/^celular/i), { target: { value: "987654321" } });
   fireEvent.change(screen.getByLabelText(/número de documento/i), { target: { value: "12345678" } });
+  fireEvent.change(screen.getByLabelText(/^contraseña \*/i), { target: { value: "Password123!" } });
+  fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: "Password123!" } });
   fireEvent.change(screen.getByLabelText(/dirección exacta/i), { target: { value: "Jr. Prueba 123" } });
-  await userEvent.click(screen.getByRole("button", { name: /seleccionar distrito/i }));
+  if (!skipDistrict) {
+    await userEvent.click(screen.getByRole("button", { name: /seleccionar distrito/i }));
+  }
   await userEvent.click(screen.getByRole("checkbox", { name: /declaro bajo juramento/i }));
   await userEvent.click(screen.getByRole("checkbox", { name: /he leído y acepto/i }));
 }
@@ -75,10 +81,12 @@ async function fillJuridicalForm(acceptConsents = true) {
   fireEvent.change(screen.getByLabelText(/razón social/i), { target: { value: "Empresa de Prueba" } });
   fireEvent.change(screen.getByLabelText(/número de documento/i), { target: { value: "12345678" } });
   fireEvent.change(screen.getByLabelText(/^nombres/i), { target: { value: "Ana" } });
-  fireEvent.change(screen.getByLabelText(/^apellidos/i), { target: { value: "Pérez" } });
+  fireEvent.change(screen.getByLabelText(/^apellidos/i), { target: { value: "Pérez López" } });
   fireEvent.change(screen.getByLabelText(/^cargo/i), { target: { value: "Gerente" } });
   fireEvent.change(screen.getByLabelText(/correo corporativo/i), { target: { value: "contacto@example.com" } });
   fireEvent.change(screen.getByLabelText(/celular de contacto/i), { target: { value: "987654321" } });
+  fireEvent.change(screen.getByLabelText(/^contraseña \*/i), { target: { value: "Password123!" } });
+  fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: "Password123!" } });
   fireEvent.change(screen.getByLabelText(/dirección exacta/i), { target: { value: "Jr. Empresa 123" } });
   await userEvent.click(screen.getByRole("button", { name: /seleccionar distrito/i }));
   if (acceptConsents) {
@@ -87,13 +95,166 @@ async function fillJuridicalForm(acceptConsents = true) {
   }
 }
 
-describe("formularios de registro", () => {
+describe("formularios de registro persona natural", () => {
   beforeEach(() => vi.clearAllMocks());
+  it("muestra error por contraseñas distintas", async () => {
+    const onSubmit = vi.fn();
+    render(<PersonaNaturalForm onSubmit={onSubmit} />);
+    await fillNaturalForm();
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: "Password123!!" } });
+    await userEvent.click(screen.getByRole("button", { name: /registrar y crear casilla/i }));
+    expect(await screen.findByText(/las contraseñas no coinciden/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("muestra error por contraseña débil", async () => {
+    const onSubmit = vi.fn();
+    render(<PersonaNaturalForm onSubmit={onSubmit} />);
+    await fillNaturalForm();
+    fireEvent.change(screen.getByLabelText(/^contraseña \*/i), { target: { value: "pass" } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: "pass" } });
+    await userEvent.click(screen.getByRole("button", { name: /registrar y crear casilla/i }));
+    expect(await screen.findByText(/mínimo 8 caracteres/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("muestra error por un solo apellido", async () => {
+    const onSubmit = vi.fn();
+    render(<PersonaNaturalForm onSubmit={onSubmit} />);
+    await fillNaturalForm();
+    fireEvent.change(screen.getByLabelText(/apellidos \*/i), { target: { value: "PEREZ" } });
+    await userEvent.click(screen.getByRole("button", { name: /registrar y crear casilla/i }));
+    expect(await screen.findByText(/apellido paterno y apellido materno/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("muestra error por distrito vacío", async () => {
+    const onSubmit = vi.fn();
+    render(<PersonaNaturalForm onSubmit={onSubmit} />);
+    await fillNaturalForm(true);
+    await userEvent.click(screen.getByRole("button", { name: /registrar y crear casilla/i }));
+    expect(await screen.findByText(/seleccione su distrito/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("muestra Las contraseñas no coinciden al enviar con resto válido", async () => {
+    const onSubmit = vi.fn();
+    render(<PersonaNaturalForm onSubmit={onSubmit} />);
+    await fillNaturalForm();
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: "Diferente123!" } });
+    await userEvent.click(screen.getByRole("button", { name: /registrar y crear casilla/i }));
+    expect(await screen.findByText("Las contraseñas no coinciden")).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("muestra error de apellidos con un solo apellido en UI", async () => {
+    const onSubmit = vi.fn();
+    render(<PersonaNaturalForm onSubmit={onSubmit} />);
+    await fillNaturalForm();
+    fireEvent.change(screen.getByLabelText(/apellidos \*/i), { target: { value: "Solo" } });
+    await userEvent.click(screen.getByRole("button", { name: /registrar y crear casilla/i }));
+    expect(await screen.findByText(/dos apellidos/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+  it("valida partidaSunarp vacía o solo dígitos", () => {
+    expect(juridicalSchema.safeParse({
+      tipoPersona: "JURIDICA",
+      ruc: "20100070970",
+      razonSocial: "Empresa de Prueba",
+      representanteLegal: {
+        tipoDocumento: "DNI",
+        numeroDocumento: "12345678",
+        nombres: "Ana",
+        apellidos: "Pérez López",
+        cargo: "Gerente",
+      },
+      partidaSunarp: "",
+      correoCorporativo: "contacto@example.com",
+      celularContacto: "987654321",
+      domicilio: {
+        departamentoCodigo: "25",
+        provinciaCodigo: "2501",
+        distritoCodigo: "250101",
+        direccionExacta: "Jr. Empresa 123",
+        referencia: "",
+      },
+      declaracionJuradaAceptada: true,
+      consentimientoLey29733: true,
+      version: "1.0",
+      fechaAceptacion: "2026-01-12T10:00:00.000Z",
+      password: "Password123!",
+      confirmarPassword: "Password123!",
+    }).success).toBe(true);
+
+    expect(juridicalSchema.safeParse({
+      tipoPersona: "JURIDICA",
+      ruc: "20100070970",
+      razonSocial: "Empresa de Prueba",
+      representanteLegal: {
+        tipoDocumento: "DNI",
+        numeroDocumento: "12345678",
+        nombres: "Ana",
+        apellidos: "Pérez López",
+        cargo: "Gerente",
+      },
+      partidaSunarp: "123456",
+      correoCorporativo: "contacto@example.com",
+      celularContacto: "987654321",
+      domicilio: {
+        departamentoCodigo: "25",
+        provinciaCodigo: "2501",
+        distritoCodigo: "250101",
+        direccionExacta: "Jr. Empresa 123",
+        referencia: "",
+      },
+      declaracionJuradaAceptada: true,
+      consentimientoLey29733: true,
+      version: "1.0",
+      fechaAceptacion: "2026-01-12T10:00:00.000Z",
+      password: "Password123!",
+      confirmarPassword: "Password123!",
+    }).success).toBe(true);
+
+    expect(juridicalSchema.safeParse({
+      tipoPersona: "JURIDICA",
+      ruc: "20100070970",
+      razonSocial: "Empresa de Prueba",
+      representanteLegal: {
+        tipoDocumento: "DNI",
+        numeroDocumento: "12345678",
+        nombres: "Ana",
+        apellidos: "Pérez López",
+        cargo: "Gerente",
+      },
+      partidaSunarp: "ABC123",
+      correoCorporativo: "contacto@example.com",
+      celularContacto: "987654321",
+      domicilio: {
+        departamentoCodigo: "25",
+        provinciaCodigo: "2501",
+        distritoCodigo: "250101",
+        direccionExacta: "Jr. Empresa 123",
+        referencia: "",
+      },
+      declaracionJuradaAceptada: true,
+      consentimientoLey29733: true,
+      version: "1.0",
+      fechaAceptacion: "2026-01-12T10:00:00.000Z",
+      password: "Password123!",
+      confirmarPassword: "Password123!",
+    }).success).toBe(false);
+  });
 
   it("valida los datos Zod y exige declaración y consentimiento antes del envío", async () => {
     expect(naturalSchema.safeParse({ ...naturalDatos, numeroDocumento: "123" }).success).toBe(false);
     expect(naturalSchema.safeParse({ ...naturalDatos, fechaNacimiento: "2020-01-01" }).success).toBe(false);
     expect(juridicalSchema.safeParse({ tipoPersona: "JURIDICA" }).success).toBe(false);
+    expect(naturalSchema.safeParse({ ...naturalDatos, password: "pass", confirmarPassword: "pass" }).success).toBe(false);
+    expect(naturalSchema.safeParse({ ...naturalDatos, password: "Password123!", confirmarPassword: "Password123!!" }).success).toBe(false);
+    expect(naturalSchema.safeParse({ ...naturalDatos, apellidos: "PEREZ" }).success).toBe(false);
+    expect(naturalSchema.safeParse({ ...naturalDatos, domicilio: { ...naturalDatos.domicilio, distritoCodigo: "" } }).success).toBe(false);
 
     const onSubmit = vi.fn();
     render(<PersonaNaturalForm onSubmit={onSubmit} />);
@@ -120,7 +281,8 @@ describe("formularios de registro", () => {
       fechaAceptacion: expect.any(String),
     });
   });
-
+describe("formularios de registro juridica", () => {
+  beforeEach(() => vi.clearAllMocks());
   it("valida y envía los campos requeridos de una persona jurídica", async () => {
     const onSubmit = vi.fn();
     render(<PersonaJuridicaForm onSubmit={onSubmit} />);
@@ -148,17 +310,18 @@ describe("RegistroCiudadanoPage", () => {
     render(<MemoryRouter><RegistroCiudadanoPage /></MemoryRouter>);
     await fillNaturalForm();
     await userEvent.click(screen.getByRole("button", { name: /registrar y crear casilla/i }));
-    expect(await screen.findByRole("status")).toHaveTextContent(/registro completado/i);
-    expect(apiClient.post).toHaveBeenCalledWith(
+    expect(await screen.findByRole("status")).toHaveTextContent(/registro completado\. ya puedes iniciar sesión con tu dni\./i);
+    expect(vi.mocked(apiClient.post)).toHaveBeenCalledWith(
       "/api/v1/auth/registro-ciudadano",
       expect.objectContaining({
         tipoPersona: "NATURAL",
         dni: "12345678",
         consentimientoDatos: true,
         aceptaNotificaciones: true,
-        password: "Clave*12345678",
+        password: "Password123!",
       }),
     );
+    expect(vi.mocked(apiClient.post).mock.calls[0][1]).not.toHaveProperty("confirmarPassword");
     await userEvent.click(screen.getByRole("button", { name: /cerrar mensaje de éxito/i }));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
@@ -186,15 +349,17 @@ describe("RegistroCiudadanoPage", () => {
     await userEvent.click(screen.getByRole("tab", { name: /persona jurídica/i }));
     await fillJuridicalForm();
     await userEvent.click(screen.getByRole("button", { name: /registrar empresa y crear casilla/i }));
-    expect(await screen.findByRole("status")).toHaveTextContent(/20100070970@casilla/i);
+    expect(await screen.findByRole("status")).toHaveTextContent(/registro completado\. ya puedes iniciar sesión con tu ruc\./i);
+    expect(vi.mocked(apiClient.post).mock.calls[0][1]).not.toHaveProperty("confirmarPassword");
     await userEvent.click(screen.getByRole("tab", { name: /persona natural/i }));
     expect(screen.getByRole("tab", { name: /persona natural/i })).toHaveAttribute("aria-selected", "true");
-    expect(apiClient.post).toHaveBeenCalledWith(
+    expect(vi.mocked(apiClient.post)).toHaveBeenCalledWith(
       "/api/v1/auth/registro-persona-juridica",
       expect.objectContaining({
         tipoPersona: "JURIDICA",
         ruc: "20100070970",
         consentimientoDatos: true,
+        password: "Password123!",
       }),
     );
   });
@@ -276,3 +441,6 @@ describe("consentimiento y declaración", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 });
+
+
+

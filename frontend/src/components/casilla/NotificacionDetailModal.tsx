@@ -122,9 +122,11 @@ export default function NotificacionDetailModal({
             >
               {acto.numeroDocumento}
             </h2>
-            <p className="text-xs text-slate-300">
-              Emitido por: {notificacion.unidadEmisora}
-            </p>
+            {notificacion.unidadEmisora && (
+              <p className="text-xs text-slate-300">
+                Emitido por: {notificacion.unidadEmisora}
+              </p>
+            )}
           </div>
 
           <button
@@ -473,20 +475,24 @@ export default function NotificacionDetailModal({
                   <p className="font-bold text-emerald-900">
                     Efecto Jurídico y Cómputo de Plazos (Art. 20 TUO Ley N° 27444):
                   </p>
-                  <p className="text-slate-600 leading-relaxed">
-                    {acuse.fechaEfectoLegal}
-                  </p>
-                  <p className="text-slate-600">
-                    • Plazo de atención / impugnación:{" "}
-                    <strong>{acuse.plazoImpugnacionDiasHabiles} días hábiles</strong>.
-                    {acuse.fechaLimiteImpugnacion && (
-                      <span>
-                        {" "}
-                        (Vencimiento proyectado:{" "}
-                        <strong>{acuse.fechaLimiteImpugnacion}</strong>)
-                      </span>
-                    )}
-                  </p>
+                  {acuse.fechaEfectoLegal && (
+                    <p className="text-slate-600 leading-relaxed">
+                      {acuse.fechaEfectoLegal}
+                    </p>
+                  )}
+                  {acuse.plazoImpugnacionDiasHabiles != null && (
+                    <p className="text-slate-600">
+                      • Plazo de atención / impugnación:{" "}
+                      <strong>{acuse.plazoImpugnacionDiasHabiles} días hábiles</strong>.
+                      {acuse.fechaLimiteImpugnacion && (
+                        <span>
+                          {" "}
+                          (Vencimiento proyectado:{" "}
+                          <strong>{acuse.fechaLimiteImpugnacion}</strong>)
+                        </span>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 {/* Botón para descargar Cédula de Acuse Oficial */}

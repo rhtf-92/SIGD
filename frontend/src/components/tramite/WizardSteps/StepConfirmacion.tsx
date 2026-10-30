@@ -18,7 +18,7 @@
  * ==============================================================================
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type {
   TramiteWizardState,
   WizardAction,
@@ -43,6 +43,12 @@ interface RadicacionVirtualResponse {
     qrContenido: string;
   };
   mensajeLegal: string;
+}
+
+interface TipoTramiteCatalogo {
+  id: string;
+  codigo: string;
+  denominacion: string;
 }
 
 
@@ -76,6 +82,15 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
     error,
   } = state;
 
+  const [tiposTramite, setTiposTramite] = useState<TipoTramiteCatalogo[]>([]);
+  const [cargandoTipos, setCargandoTipos] = useState(true);
+
+  const textoTipoTramite = (() => {
+    if (cargandoTipos || !documentos.tipoTramiteId) return 'Procedimiento seleccionado';
+    const encontrado = tiposTramite.find((t) => t.id === documentos.tipoTramiteId);
+    return encontrado ? `${encontrado.codigo} — ${encontrado.denominacion}` : 'Procedimiento seleccionado';
+  })();
+
   const navigateToStep = useCallback(
     (step: WizardStep) => {
       if (onGoToStep) {
@@ -103,6 +118,20 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
     window.print();
   };
 
+  useEffect(() => {
+    let ignorar = false;
+    (async () => {
+      const res = await apiClient.get<TipoTramiteCatalogo[]>('/api/v1/tramites/tipos');
+      if (!ignorar) {
+        setTiposTramite(res.data);
+        setCargandoTipos(false);
+      }
+    })();
+    return () => {
+      ignorar = true;
+    };
+  }, []);
+
   const handleRadicar = async () => {
     if (isSubmitting) return;
 
@@ -123,7 +152,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           : `${asuntoLimpio} - Solicitud de Trámite Institucional`.trim()
       ).slice(0, 500);
 
-      let idTipoTramite = documentos.tipoTramiteId.trim();
+let idTipoTramite = documentos.tipoTramiteId.trim();
       if (
         !idTipoTramite ||
         !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite) ||
@@ -222,10 +251,19 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       const payload = {
         asunto: asuntoFinal,
         idTipoTramiteTupa: idTipoTramite,
+<<<<<<< HEAD
         idPersona: idPersonaNum,
         nombreSolicitante: (nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado').slice(0, 120),
         correo: correoFinal,
         totalFolios: Math.min(Math.max(Math.trunc(Number(documentos.numeroFolios) || 1), 1), 5000),
+=======
+        nombreSolicitante:
+          nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
+        correo:
+          identificacion.correo.trim().toLowerCase() ||
+          'contacto@iestpsuiza.edu.pe',
+        totalFolios: Number(documentos.numeroFolios) || 1,
+>>>>>>> origin/F_MATIAS
         documentos: archivosPayload,
       };
 
@@ -463,7 +501,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
             </button>
           </div>
           <p className="text-sm font-bold text-slate-900">
-            {documentos.tipoTramiteId || 'Procedimiento General Institucional'}
+            {textoTipoTramite}
           </p>
           <p className="text-xs text-slate-600">
             <span className="font-semibold">Folios:</span>{' '}

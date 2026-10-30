@@ -19,7 +19,9 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { useTramiteWizardReducer } from "../../hooks/useTramiteWizardReducer";
+import { useAuthStore } from "../../stores/authStore";
 import {
   StepIdentificacion,
   StepDocumentos,
@@ -48,6 +50,7 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
   className = "",
 }) => {
   const { state, dispatch } = useTramiteWizardReducer();
+  const { isAuthenticated, accessToken } = useAuthStore();
   const [modalAbierto, setModalAbierto] = useState(false);
 
   // Apertura automática del modal institucional de cargo cuando se asienta el trámite
@@ -92,8 +95,19 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
     [onSuccess],
   );
 
+  const sesionActiva = Boolean(isAuthenticated && accessToken);
+
   return (
     <div className={`space-y-6 ${className}`}>
+      {!sesionActiva && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-amber-800 text-sm">
+            Para presentar un trámite debe iniciar sesión.
+            <Link to="/login" className="underline ml-1">Iniciar sesión</Link>{" "}
+            <Link to="/registro" className="underline ml-1">Registrarse</Link>
+          </p>
+        </div>
+      )}
       {/* 1. RENDERIZADO MODULAR SEGÚN EL PASO ACTIVO */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs">
         {state.currentStep === 1 && (

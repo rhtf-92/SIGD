@@ -16,7 +16,7 @@ import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
 import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
 import ExpedienteDetallePage from "../pages/expedientes/ExpedienteDetallePage";
-import MesaPartesVirtualPage from "../pages/tramite/MesaPartesVirtualPage";
+import MesaPartesVirtualPage from "../pages/MesaPartesVirtualPage";
 import VentanillaPresencialPage from "../pages/tramite/VentanillaPresencialPage";
 import TramitePage from "../pages/tramite/TramitePage";
 import ConsultaPublicaPage from "../pages/tramite/ConsultaPublicaPage";

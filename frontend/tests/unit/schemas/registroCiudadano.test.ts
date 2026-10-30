@@ -21,12 +21,14 @@ type PersonaNatural = {
   correo: string;
   celular: string;
   domicilio: Ubigeo;
-  tipoDocumento: "DNI" | "CE";
+  tipoDocumento: "DNI";
   numeroDocumento: string;
   declaracionJuradaAceptada: boolean;
   consentimientoLey29733: boolean;
   version: "1.0";
   fechaAceptacion: string;
+    password: string;
+  confirmarPassword: string;
 };
 
 type PersonaJuridica = {
@@ -34,7 +36,7 @@ type PersonaJuridica = {
   ruc: string;
   razonSocial: string;
   representanteLegal: {
-    tipoDocumento: "DNI" | "CE";
+    tipoDocumento: "DNI";
     numeroDocumento: string;
     nombres: string;
     apellidos: string;
@@ -46,14 +48,16 @@ type PersonaJuridica = {
   domicilio: Ubigeo;
   declaracionJuradaAceptada: boolean;
   consentimientoLey29733: boolean;
-  version: "1.0";
+    version: "1.0";
   fechaAceptacion: string;
+  password: string;
+  confirmarPassword: string;
 };
 
 const crearUbigeo = (): Ubigeo => ({
-  departamentoCodigo: "1501",
-  provinciaCodigo: "150101",
-  distritoCodigo: "15010101",
+  departamentoCodigo: "25",
+  provinciaCodigo: "2501",
+  distritoCodigo: "250101",
   direccionExacta: "Av. Arequipa 123",
   referencia: "Cerca de la plaza de armas",
 });
@@ -74,7 +78,7 @@ const fechaHaceAnos = (anios: number): string => {
 const personaNaturalBase = {
   tipoPersona: "NATURAL" as const,
   nombres: "Juan",
-  apellidos: "Pérez",
+  apellidos: "Pérez López",
   fechaNacimiento: fechaHaceAnos(30),
   correo: "juan.perez@example.com",
   celular: "912345678",
@@ -85,6 +89,8 @@ const personaNaturalBase = {
   consentimientoLey29733: true,
   version: "1.0" as const,
   fechaAceptacion: new Date().toISOString(),
+  password: "Password123!",
+  confirmarPassword: "Password123!",
 } satisfies PersonaNatural;
 
 const crearPersonaNatural = (
@@ -113,6 +119,8 @@ const personaJuridicaBase = {
   consentimientoLey29733: true,
   version: "1.0" as const,
   fechaAceptacion: new Date().toISOString(),
+  password: "Password123!",
+  confirmarPassword: "Password123!",
 } satisfies PersonaJuridica;
 
 const crearPersonaJuridica = (
@@ -149,16 +157,16 @@ describe("naturalSchema", () => {
 
   it("debe RECHAZAR un CE con menos de 9 caracteres", () => {
     const resultado = naturalSchema.safeParse(
-      crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "AB12345" })
+      crearPersonaNatural({ tipoDocumento: "CE" as never, numeroDocumento: "AB12345" })
     );
     expect(resultado.success).toBe(false);
   });
 
-  it("debe ACEPTAR un CE válido de 9 a 12 caracteres alfanuméricos", () => {
+  it("debe RECHAZAR un CE ya que solo se acepta DNI", () => {
     const resultado = naturalSchema.safeParse(
-      crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "AB1234567X" })
+      crearPersonaNatural({ tipoDocumento: "CE" as never, numeroDocumento: "AB1234567X" })
     );
-    expect(resultado.success).toBe(true);
+    expect(resultado.success).toBe(false);
   });
 
   it("debe RECHAZAR una persona menor de 16 años", () => {
@@ -218,7 +226,7 @@ describe("naturalSchema", () => {
       expect(resultado.data).toMatchObject({
         tipoPersona: "NATURAL",
         nombres: "Juan",
-        apellidos: "Pérez",
+        apellidos: "Pérez López",
       });
     }
   });

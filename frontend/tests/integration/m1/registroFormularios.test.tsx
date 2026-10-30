@@ -89,7 +89,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
 
     // Verificación de mensaje de error inline emitido por el schema Zod
     const mensajeError = await screen.findByText(
-      /DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos/i,
+      /DNI debe tener exactamente 8 dígitos/i,
     );
     expect(mensajeError).toBeInTheDocument();
     expect(handleSubmit).not.toHaveBeenCalled();
@@ -284,6 +284,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     await user.type(screen.getByLabelText(/Correo Electrónico \*/i), "sergio@example.com");
     await user.type(screen.getByLabelText(/Celular \*/i), "961234567");
 
+    await user.type(screen.getByLabelText(/^contraseña \*/i), "Password123!");
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), "Password123!");
     // Seleccionar Ubigeo
     await user.selectOptions(
       screen.getByLabelText(/Seleccionar Provincia de Ucayali/i),
@@ -318,9 +320,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "74561238@casilla.iestpsuiza.edu.pe",
-    );
+    expect(mensajeExito).toHaveTextContent(/con tu DNI/i);
 
     expect(postSpy).toHaveBeenCalledWith(
       "/api/v1/auth/registro-ciudadano",
@@ -374,6 +374,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       "contacto@amazonassoft.pe",
     );
     await user.type(screen.getByLabelText(/Celular de Contacto \*/i), "961234567");
+    await user.type(screen.getByLabelText(/^contraseña \*/i), "Password123!");
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), "Password123!");
 
     // Seleccionar Ubigeo
     await user.selectOptions(
@@ -409,9 +411,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "20131312955@casilla.iestpsuiza.edu.pe",
-    );
+    expect(mensajeExito).toHaveTextContent(/con tu RUC/i);
 
     expect(postSpy).toHaveBeenCalledWith(
       "/api/v1/auth/registro-persona-juridica",
@@ -442,6 +442,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     await user.type(screen.getByLabelText(/Fecha de Nacimiento \*/i), "1998-05-15");
     await user.type(screen.getByLabelText(/Correo Electrónico \*/i), "sergio@example.com");
     await user.type(screen.getByLabelText(/Celular \*/i), "961234567");
+    await user.type(screen.getByLabelText(/^contraseña \*/i), "Password123!");
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), "Password123!");
     await user.selectOptions(
       screen.getByLabelText(/Seleccionar Provincia de Ucayali/i),
       "2501",
@@ -470,7 +472,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     );
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(
-      screen.queryByText("74561238@casilla.iestpsuiza.edu.pe"),
+      screen.queryByText(/con tu DNI/i),
     ).not.toBeInTheDocument();
   }, 30_000);
 });
