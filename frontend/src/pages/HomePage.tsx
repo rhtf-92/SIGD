@@ -29,12 +29,6 @@ const accesos = [
     descripcion: "Consulta trámites, derechos, requisitos y plazos publicados.",
     icono: "tupa",
   },
-  {
-    ruta: "/registro",
-    titulo: "Registrarme",
-    descripcion: "Crea un registro ciudadano en el sistema.",
-    icono: "registro",
-  },
 ];
 
 function AccesoIcono({ tipo }: { tipo: string }) {
