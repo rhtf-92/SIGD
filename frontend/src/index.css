@@ -2523,6 +2523,33 @@
 .sigd-asistente-sugerencia:hover { color: #fff; background: rgba(37, 99, 235, 0.3); }
 .sigd-asistente-sugerencia:focus-visible { outline: 3px solid rgba(56, 189, 248, 0.55); outline-offset: 2px; }
 
+.sigd-asistente-enlaces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.sigd-asistente-enlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 9999px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.sigd-asistente-enlace:hover { color: #1e3a8a; background: #dbeafe; text-decoration: underline; }
+.sigd-asistente-enlace:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.35); outline-offset: 2px; }
+
 .sigd-asistente-form {
   display: flex;
   align-items: center;

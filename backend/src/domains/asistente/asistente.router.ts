@@ -84,6 +84,7 @@ export function crearRouterAsistente(opciones: AsistenteRouterOptions = {}): Rou
       confianza: resultado.confianza,
       fuentes: resultado.fuentes,
       sugerencias: resultado.sugerencias,
+      enlaces: resultado.enlaces ?? [],
       motor: resultado.motor,
       correlationId: contexto?.correlation_id ?? '',
     });

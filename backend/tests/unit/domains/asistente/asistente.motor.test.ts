@@ -57,6 +57,24 @@ describe('AsistenteCore - MotorFAQ', () => {
     expect(resultado.respuesta).toContain('30 días hábiles');
   });
 
+  it('explica qué es la web y devuelve enlaces internos', async () => {
+    const resultado = await motor.responder('¿Qué es esta web y para qué sirve?');
+    expect(resultado.intencion).toBe('que_es_sigd');
+    expect(resultado.enlaces?.some((enlace) => enlace.ruta === '/tramite')).toBe(true);
+  });
+
+  it('reconoce la sugerencia "¿Cómo radico un trámite?"', async () => {
+    const resultado = await motor.responder('¿Cómo radico un trámite?');
+    expect(resultado.intencion).toBe('radicar_tramite');
+    expect(resultado.enlaces?.some((enlace) => enlace.ruta === '/tramite')).toBe(true);
+  });
+
+  it('indica cómo llegar a la sede principal', async () => {
+    const resultado = await motor.responder('¿Cómo llego al instituto?');
+    expect(resultado.intencion).toBe('como_llegar_sede');
+    expect(resultado.respuesta).toContain('Av. Centenario Km 3.5');
+  });
+
   it('responde requisitos de un procedimiento detectado', async () => {
     const resultado = await motor.responder('¿Cuáles son los requisitos de la expedición de título?');
     expect(resultado.intencion).toBe('requisitos_tramite');
@@ -67,6 +85,23 @@ describe('AsistenteCore - MotorFAQ', () => {
   it('cita la fuente del TUPA en la respuesta de requisitos', async () => {
     const resultado = await motor.responder('¿Cuánto cuesta el certificado de estudios?');
     expect(resultado.fuentes).toContain('TUPA IESTP "Suiza" 2026');
+  });
+
+  it('explica el costo de la carrera y aclara que la pensión no está en el TUPA', async () => {
+    const resultado = await motor.responder(
+      'Cuanto me costoria pagar desde que ingreso al primer ciclo hasta que me titule como tecnico en DSI',
+    );
+    expect(resultado.intencion).toBe('costo_carrera');
+    expect(resultado.respuesta).toContain('pensión');
+    expect(resultado.respuesta).toContain('S/. 200.00');
+    expect(resultado.respuesta).toContain('S/. 105.00');
+    expect(resultado.respuesta).toContain('S/. 1,382.50');
+  });
+
+  it('responde por la pensión mensual sin inventar un monto', async () => {
+    const resultado = await motor.responder('¿Cuánto cuesta la pensión mensual de DSI?');
+    expect(resultado.intencion).toBe('costo_carrera');
+    expect(resultado.respuesta).toContain('no registra una pensión');
   });
 
   it('devuelve no_encontrado cuando no hay coincidencia', async () => {
@@ -109,16 +144,18 @@ describe('AsistenteCore - MotorCompuesto', () => {
     expect(motorSecundario.responder).not.toHaveBeenCalled();
   });
 
-  it('degrada al FAQ si el secundario falla', async () => {
+  it('degrada al FAQ y registra el error si el secundario falla', async () => {
+    const alFallar = vi.fn();
     const fallido: AsistenteMotor = {
       nombre: 'llm-roto',
       responder: vi.fn(async () => {
         throw new Error('proveedor no disponible');
       }),
     };
-    const compuesto = new MotorCompuesto(new MotorFAQ(), fallido, 0.6);
+    const compuesto = new MotorCompuesto(new MotorFAQ(), fallido, 0.6, alFallar);
     const resultado = await compuesto.responder('qwerty asdf zxcv');
     expect(resultado.motor).toBe('faq');
     expect(resultado.intencion).toBe('no_encontrado');
+    expect(alFallar).toHaveBeenCalledWith(expect.any(Error));
   });
 });

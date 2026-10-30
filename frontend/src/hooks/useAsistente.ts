@@ -8,9 +8,9 @@ import { asistenteService } from "../services/asistenteService";
 import type { MensajeAsistente } from "../types/asistente";
 
 const MENSAJE_BIENVENIDA =
-  "¡Hola! Soy el asistente virtual del SIGD del IESTP “Suiza”. Puedo orientarte sobre el TUPA, " +
-  "requisitos, tarifas, horarios, plazos legales, seguimiento de trámites, casilla electrónica, " +
-  "firma digital y validación de documentos. ¿En qué necesitas ayuda?";
+  "¡Hola! Soy el asistente virtual del SIGD del IESTP “Suiza”. Puedo explicarte qué es esta web, cómo usarla y " +
+  "cómo llegar a la sede, además de orientarte sobre el TUPA, requisitos, tarifas, horarios, plazos legales, " +
+  "seguimiento de trámites, casilla electrónica, firma digital y validación de documentos. ¿En qué necesitas ayuda?";
 
 const LIMITE_MENSAJES = 100;
 
@@ -69,6 +69,7 @@ export function useAsistente(): UseAsistenteResult {
           crearMensaje("asistente", respuesta.respuesta, {
             fuentes: respuesta.fuentes,
             sugerencias: respuesta.sugerencias,
+            enlaces: respuesta.enlaces ?? [],
           }),
         ];
         return siguiente.slice(-LIMITE_MENSAJES);

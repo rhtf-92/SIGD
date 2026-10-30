@@ -24,6 +24,7 @@ import {
   SUGERENCIAS_INICIALES,
   type ProcedimientoAsistente,
 } from './asistente.conocimiento.js';
+import { crearAsistenteLLMDesdeEntorno } from './asistente.llm.js';
 
 /** Umbral mínimo de puntaje para aceptar una intención. */
 const UMBRAL_PUNTAJE = 1;
@@ -121,11 +122,15 @@ function construirRespuestaProcedimiento(procedimiento: ProcedimientoAsistente):
       `Trámite: ${procedimiento.nombre} (${procedimiento.codigo}).\n` +
       `Requisitos:\n${requisitos}\n` +
       `Derecho de pago: ${procedimiento.derechoPago}.\n` +
-      'Radícalo por la Mesa de Partes Virtual con el FUT y el comprobante de pago.',
+      'Radícalo por la Mesa de Partes Virtual adjuntando el comprobante de pago y los requisitos indicados.',
     intencion: 'requisitos_tramite',
     confianza: 0.95,
     fuentes: [FUENTE_TUPA],
     sugerencias: ['¿Cómo radico un trámite?', '¿Cuánto tarda mi trámite?', '¿Cuál es el horario de atención?'],
+    enlaces: [
+      { etiqueta: 'Radicar en Mesa de Partes Virtual', ruta: '/tramite' },
+      { etiqueta: 'Consultar el estado de mi trámite', ruta: '/consulta' },
+    ],
     motor: '',
   };
 }
@@ -140,6 +145,11 @@ const RESULTADO_NO_ENCONTRADO: Omit<ResultadoAsistente, 'motor'> = {
   confianza: 0,
   fuentes: [],
   sugerencias: [...SUGERENCIAS_INICIALES],
+  enlaces: [
+    { etiqueta: 'Ver módulos de la web', ruta: '/' },
+    { etiqueta: 'Mesa de Partes Virtual', ruta: '/tramite' },
+    { etiqueta: 'Consultar el estado de mi trámite', ruta: '/consulta' },
+  ],
 };
 
 /**
@@ -184,6 +194,7 @@ export class MotorFAQ implements AsistenteMotor {
         confianza,
         fuentes: [...mejorEntrada.fuentes],
         sugerencias: [...mejorEntrada.sugerencias],
+        enlaces: mejorEntrada.enlaces ? [...mejorEntrada.enlaces] : [],
         motor: this.nombre,
       };
     }
@@ -204,6 +215,12 @@ export class MotorCompuesto implements AsistenteMotor {
     private readonly principal: AsistenteMotor,
     private readonly secundario: AsistenteMotor | null = null,
     private readonly umbral = 0.6,
+    private readonly alFallarSecundario: (error: unknown) => void = (error) => {
+      console.warn(
+        '[asistente] Falló el motor secundario; se devuelve la respuesta FAQ.',
+        error instanceof Error ? error.name : 'Error desconocido',
+      );
+    },
   ) {}
 
   async responder(mensaje: string): Promise<ResultadoAsistente> {
@@ -215,7 +232,8 @@ export class MotorCompuesto implements AsistenteMotor {
 
     try {
       return await this.secundario.responder(mensaje);
-    } catch {
+    } catch (error) {
+      this.alFallarSecundario(error);
       return primario;
     }
   }
@@ -228,9 +246,13 @@ export class MotorCompuesto implements AsistenteMotor {
  * en el entorno del backend (nunca en el frontend).
  */
 export function crearMotorAsistente(
-  opciones: { motorSecundario?: AsistenteMotor | null } = {},
+  opciones: { motorSecundario?: AsistenteMotor | null; umbral?: number } = {},
 ): AsistenteMotor {
   const faq = new MotorFAQ();
-  const secundario = opciones.motorSecundario ?? null;
-  return secundario ? new MotorCompuesto(faq, secundario) : faq;
+  const secundario = opciones.motorSecundario === undefined
+    ? crearAsistenteLLMDesdeEntorno()
+    : opciones.motorSecundario;
+  const umbralConfigurado = opciones.umbral ?? Number(process.env.ASISTENTE_UMBRAL_CONFIANZA ?? 0.6);
+  const umbral = Number.isFinite(umbralConfigurado) ? umbralConfigurado : 0.6;
+  return secundario ? new MotorCompuesto(faq, secundario, umbral) : faq;
 }

@@ -5,12 +5,20 @@
  */
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useInRouterContext } from "react-router-dom";
 import { Bot, MessageCircle, RotateCcw, Send, User, X } from "lucide-react";
 import { useAsistente } from "../../hooks/useAsistente";
 import type { MensajeAsistente } from "../../types/asistente";
 
-function BurbujaMensaje({ mensaje }: { mensaje: MensajeAsistente }) {
+function BurbujaMensaje({
+  mensaje,
+  onNavegar,
+}: {
+  mensaje: MensajeAsistente;
+  onNavegar?: () => void;
+}) {
   const esUsuario = mensaje.rol === "usuario";
+  const enRouter = useInRouterContext();
   return (
     <div className={`flex gap-2 ${esUsuario ? "flex-row-reverse" : "flex-row"}`}>
       <span
@@ -29,10 +37,32 @@ function BurbujaMensaje({ mensaje }: { mensaje: MensajeAsistente }) {
         }`}
       >
         <p style={{ whiteSpace: "pre-line" }}>{mensaje.texto}</p>
-        {mensaje.fuentes && mensaje.fuentes.length > 0 ? (
-          <p className="mt-1 text-[10px] text-slate-400">
-            Fuente: {mensaje.fuentes.join(" · ")}
-          </p>
+        {mensaje.enlaces && mensaje.enlaces.length > 0 ? (
+          <ul className="sigd-asistente-enlaces" aria-label="Enlaces relacionados">
+            {mensaje.enlaces.map((enlace) => (
+              <li key={`${enlace.ruta}-${enlace.etiqueta}`}>
+                {enRouter ? (
+                  <Link
+                    className="sigd-asistente-enlace"
+                    to={enlace.ruta}
+                    title={enlace.descripcion}
+                    onClick={onNavegar}
+                  >
+                    {enlace.etiqueta} →
+                  </Link>
+                ) : (
+                  <a
+                    className="sigd-asistente-enlace"
+                    href={enlace.ruta}
+                    title={enlace.descripcion}
+                    onClick={onNavegar}
+                  >
+                    {enlace.etiqueta} →
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
         ) : null}
       </div>
     </div>
@@ -115,7 +145,11 @@ export default function AsistenteVirtualWidget() {
             aria-label="Historial de conversación"
           >
             {mensajes.map((mensaje) => (
-              <BurbujaMensaje key={mensaje.id} mensaje={mensaje} />
+              <BurbujaMensaje
+                key={mensaje.id}
+                mensaje={mensaje}
+                onNavegar={() => setAbierto(false)}
+              />
             ))}
             {cargando ? (
               <div className="flex gap-2">

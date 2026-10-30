@@ -38,6 +38,9 @@ describe("AsistenteCore - Widget del Asistente Virtual", () => {
         confianza: 0.9,
         fuentes: ["TUO de la Ley N° 27444 (LPAG)"],
         sugerencias: ["¿Cómo radico un trámite?"],
+        enlaces: [
+          { etiqueta: "Radicar en Mesa de Partes Virtual", ruta: "/tramite" },
+        ],
         motor: "faq",
         correlationId: "corr-1",
       },
@@ -55,6 +58,11 @@ describe("AsistenteCore - Widget del Asistente Virtual", () => {
       expect(screen.getByText("El plazo máximo es de 30 días hábiles.")).toBeInTheDocument();
     });
     expect(screen.getByText("¿Cuánto tarda mi trámite?")).toBeInTheDocument();
+    expect(screen.queryByText(/Fuente:/i)).not.toBeInTheDocument();
+    const enlace = screen.getByRole("link", {
+      name: /Radicar en Mesa de Partes Virtual/i,
+    });
+    expect(enlace).toHaveAttribute("href", "/tramite");
   });
 
   it("muestra un mensaje de error cuando el servicio no responde", async () => {

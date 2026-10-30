@@ -39,6 +39,11 @@ describe('AsistenteCore - Router', () => {
     expect(res.body).toHaveProperty('confianza');
     expect(res.body).toHaveProperty('fuentes');
     expect(res.body).toHaveProperty('sugerencias');
+    expect(res.body).toHaveProperty('enlaces');
+    expect(Array.isArray(res.body.enlaces)).toBe(true);
+    expect(res.body.enlaces).toEqual(
+      expect.arrayContaining([expect.objectContaining({ ruta: '/consulta' })]),
+    );
     expect(res.body).toHaveProperty('motor', 'faq');
     expect(res.body).toHaveProperty('correlationId');
   });

@@ -23,6 +23,16 @@ export interface ConsultaAsistente {
   contexto?: Record<string, unknown>;
 }
 
+/** Enlace de navegación interna que acompaña a una respuesta del asistente. */
+export interface EnlaceAsistente {
+  /** Texto visible del enlace. */
+  etiqueta: string;
+  /** Ruta interna de la SPA (p. ej. `/tramite/mesa-partes-virtual`). */
+  ruta: string;
+  /** Descripción breve opcional del destino. */
+  descripcion?: string;
+}
+
 /** Respuesta canónica del asistente. */
 export interface ResultadoAsistente {
   /** Texto de la respuesta listo para mostrar. */
@@ -35,6 +45,8 @@ export interface ResultadoAsistente {
   fuentes: string[];
   /** Sugerencias de continuación para el usuario. */
   sugerencias: string[];
+  /** Enlaces internos de la SPA relacionados con la respuesta. */
+  enlaces?: EnlaceAsistente[];
   /** Nombre del motor que produjo la respuesta. */
   motor: string;
 }
@@ -53,6 +65,8 @@ export interface EntradaConocimiento {
   fuentes: string[];
   /** Sugerencias de continuación. */
   sugerencias: readonly string[];
+  /** Enlaces internos de la SPA relacionados con la respuesta. */
+  enlaces?: EnlaceAsistente[];
 }
 
 /**

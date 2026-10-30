@@ -6,12 +6,19 @@
 
 export type RolMensajeAsistente = "usuario" | "asistente";
 
+export interface EnlaceAsistente {
+  etiqueta: string;
+  ruta: string;
+  descripcion?: string;
+}
+
 export interface MensajeAsistente {
   id: string;
   rol: RolMensajeAsistente;
   texto: string;
   fuentes?: string[];
   sugerencias?: string[];
+  enlaces?: EnlaceAsistente[];
   fecha: string;
 }
 
@@ -27,6 +34,7 @@ export interface ConsultaAsistenteResponse {
   confianza: number;
   fuentes: string[];
   sugerencias: string[];
+  enlaces?: EnlaceAsistente[];
   motor: string;
   correlationId: string;
 }
