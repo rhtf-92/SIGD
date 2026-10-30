@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 import { ChevronDown, Menu, X } from "lucide-react";
-=======
-﻿import { ChevronDown, Menu, X } from "lucide-react";
->>>>>>> Stashed changes
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 

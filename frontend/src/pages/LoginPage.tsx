@@ -19,19 +19,20 @@ export const ROLES_CANONICOS = [
   { id: "DIRECTOR", label: "Director General", usuario: "director", destino: "/administracion", requierePassword: true },
   { id: "DOCENTE", label: "Docente", usuario: "docente", destino: "/flujos/titulacion", requierePassword: true },
   { id: "MESA_PARTES", label: "Mesa de Partes", usuario: "mesa_partes", destino: "/tramite/ventanilla-presencial", requierePassword: true },
-  { id: "ESTUDIANTE", label: "Estudiante", usuario: "estudiante", destino: "/casilla", requierePassword: false },
+  { id: "ESTUDIANTE", label: "Estudiante", usuario: "estudiante", destino: "/casilla", requierePassword: true },
 ];
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const loginStore = useAuthStore((s) => s.login);
-  const [rol, setRol] = useState("SUPER_ADMIN");
+  const [rol, setRol] = useState("ESTUDIANTE");
+  const [identificador, setIdentificador] = useState("");
   const [password, setPassword] = useState("");
   const [mostrar, setMostrar] = useState(false);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
 
-  const rolActual = ROLES_CANONICOS.find((r) => r.id === rol) ?? ROLES_CANONICOS[0];
+  const rolActual = ROLES_CANONICOS.find((r) => r.id === rol) ?? ROLES_CANONICOS.find((r) => r.id === "ESTUDIANTE") ?? ROLES_CANONICOS[0];
   const pidePassword = rolActual.requierePassword;
 
   function guardarSesionDemo(token: string, rolId: string) {
@@ -45,19 +46,25 @@ export default function LoginPage() {
     event?.preventDefault();
     setError("");
 
+    if (!identificador.trim()) {
+      setError("Por favor, ingrese su usuario, DNI o correo.");
+      return;
+    }
+
     if (pidePassword && !password.trim()) {
       setError("Por favor, ingrese su contraseña.");
       return;
     }
 
     setCargando(true);
-    const identificador = rolActual.usuario;
-    const clave = pidePassword ? password : PASSWORD_DEMO;
+    const clave = password;
 
     // 2) Intento real contra la base de datos SIGD (PostgreSQL / pgAdmin).
     try {
       await loginStore({ identificador, password: clave });
-      const destino = rolActual.destino;
+      const rolSesion = useAuthStore.getState().usuario?.rol ?? rol;
+      const destino =
+        ROLES_CANONICOS.find((r) => r.id === rolSesion)?.destino ?? rolActual.destino;
       navigate(destino, { replace: true });
       return;
     } catch {
@@ -76,7 +83,8 @@ export default function LoginPage() {
           window.localStorage.setItem(CLAVE_PERMISOS, JSON.stringify(permisosIniciales));
         }
         notificarCambioSesion();
-        navigate(rolActual.destino, { replace: true });
+        const destinoFallback = ROLES_CANONICOS.find((r) => r.id === rol)?.destino || "/casilla";
+        navigate(destinoFallback, { replace: true });
         return;
       } catch {
         if (pidePassword && password !== PASSWORD_DEMO) {
@@ -84,7 +92,8 @@ export default function LoginPage() {
           return;
         }
         guardarSesionDemo("demo-jwt-" + Date.now(), rol);
-        navigate(rolActual.destino, { replace: true });
+        const destinoFallback = ROLES_CANONICOS.find((r) => r.id === rol)?.destino || "/casilla";
+        navigate(destinoFallback, { replace: true });
       }
     } finally {
       setCargando(false);
@@ -129,10 +138,29 @@ export default function LoginPage() {
           <form onSubmit={iniciarSesion} className="mt-6 space-y-4">
             <div>
               <label
+                htmlFor="identificador"
+                className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-tinta-500"
+              >
+                Usuario / DNI / Correo
+              </label>
+              <input
+                id="identificador"
+                type="text"
+                value={identificador}
+                onChange={(e) => setIdentificador(e.target.value)}
+                placeholder="Ingrese su usuario, DNI o correo"
+                autoComplete="username"
+                className="input-sigd"
+                required
+              />
+            </div>
+
+            <div>
+              <label
                 htmlFor="rol"
                 className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-tinta-500"
               >
-                Rol institucional
+                Rol Institucional
               </label>
               <select
                 id="rol"
@@ -144,11 +172,11 @@ export default function LoginPage() {
                 }}
                 className="input-sigd"
               >
-                {ROLES_CANONICOS.map((opcion) => (
-                  <option key={opcion.id} value={opcion.id}>
-                    {opcion.label}
-                  </option>
-                ))}
+                <option value="ESTUDIANTE">Estudiante</option>
+                <option value="DOCENTE">Docente</option>
+                <option value="MESA_PARTES">Mesa de Partes</option>
+                <option value="DIRECTOR">Director General</option>
+                <option value="SUPER_ADMIN">Super Administrador</option>
               </select>
             </div>
 
@@ -169,6 +197,7 @@ export default function LoginPage() {
                     placeholder="Ingrese su contraseña"
                     autoComplete="current-password"
                     className="input-sigd pr-24"
+                    required
                   />
                   <button
                     type="button"
@@ -194,6 +223,21 @@ export default function LoginPage() {
                 {error}
               </p>
             )}
+
+            <div className="flex items-center justify-between text-xs">
+              <Link
+                to="/recuperar-password"
+                className="font-semibold text-vault-azul-tinta hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+              <Link
+                to="/registro"
+                className="font-semibold text-vault-azul-tinta hover:underline"
+              >
+                Crear cuenta
+              </Link>
+            </div>
 
             <button
               type="submit"

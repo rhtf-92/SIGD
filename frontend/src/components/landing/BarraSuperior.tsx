@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 import { Landmark, MapPin } from "lucide-react";
-=======
-﻿import { Landmark, MapPin } from "lucide-react";
->>>>>>> Stashed changes
 
 import { CONTACTO, ENLACES_SUPERIORES } from "../../data/landingInstitucional";
 import EnlaceLanding from "./EnlaceLanding";

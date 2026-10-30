@@ -82,7 +82,7 @@ export const MENU_PRINCIPAL: GrupoMenu[] = [
     etiqueta: "Gestión",
     enlaces: agrupar(["administracion", "reportes"]),
   },
-  { etiqueta: "Contacto", to: "#contacto" },
+  { etiqueta: "Ayuda", to: "#ayuda-pagina" },
 ];
 
 /** Preguntas frecuentes construidas desde la base de conocimiento institucional. */

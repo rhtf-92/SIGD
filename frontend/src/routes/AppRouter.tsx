@@ -10,6 +10,7 @@ import VisorCvdPage from "../pages/flujos/VisorCvdPage";
 import WorkflowAcademicoPage from "../pages/flujos/WorkflowAcademicoPage";
 import ValidadorPublicoCvdPage from "../pages/validador/ValidadorPublicoCvdPage";
 import LoginPage from "../pages/LoginPage";
+import RecuperarPasswordPage from "../pages/recuperar/RecuperarPasswordPage";
 import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
 import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
@@ -27,6 +28,7 @@ export default function AppRouter() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/recuperar-password" element={<RecuperarPasswordPage />} />
       <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
 
       <Route path="/consulta" element={<ConsultaPublicaPage />} />

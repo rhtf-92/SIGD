@@ -28,7 +28,7 @@ function iniciarSesion(rol: string) {
   });
 }
 
-describe("HomePage — visibilidad de módulos por rol", () => {
+describe("HomePage — landing institucional", () => {
   beforeEach(() => {
     window.localStorage.clear();
     useAuthStore.setState({
@@ -49,39 +49,32 @@ describe("HomePage — visibilidad de módulos por rol", () => {
     });
   });
 
-  it("sin sesión muestra solo módulos públicos y la invitación a iniciar sesión", () => {
+  it("muestra el apartado de ayuda sin imágenes para invitados", () => {
     renderHome();
 
-    expect(screen.getByText("Registro Ciudadano")).toBeDefined();
-    expect(screen.getByText("Validador CVD")).toBeDefined();
-    expect(screen.getByText("Iniciar Sesión")).toBeDefined();
+    expect(screen.getByText("Ayuda con la página")).toBeDefined();
+    expect(
+      screen.getByText("Un sistema digital para gestionar tus documentos con seguridad"),
+    ).toBeDefined();
 
-    expect(screen.queryByText("Casilla Electrónica")).toBeNull();
-    expect(screen.queryByText("Panel de Administración")).toBeNull();
+    expect(screen.queryByRole("img", { name: "IESTP Suiza" })).toBeNull();
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.queryByText("Acceso rápido")).toBeNull();
+    expect(screen.queryByText("Accesos al Sistema SIGD")).toBeNull();
+    expect(screen.queryByText("Servicios del SIGD")).toBeNull();
   });
 
-  it("el rol ESTUDIANTE ve únicamente sus módulos y no Administración ni Reportes", () => {
+  it("el rol ESTUDIANTE (usuario externo) ve la imagen principal", () => {
     iniciarSesion("ESTUDIANTE");
     renderHome();
 
-    expect(screen.getByText("Casilla Electrónica")).toBeDefined();
-    expect(screen.getByText("Mesa de Partes Virtual")).toBeDefined();
-    expect(screen.getByText("Registro Ciudadano")).toBeDefined();
-    expect(screen.getByText("Validador CVD")).toBeDefined();
-
-    expect(screen.queryByText("Panel de Administración")).toBeNull();
-    expect(screen.queryByText("Reportes y Tableros de Control")).toBeNull();
-    expect(screen.queryByText("Ventanilla Presencial")).toBeNull();
-    expect(screen.queryByText("Bandeja de Expedientes")).toBeNull();
-    expect(screen.queryByText("Iniciar Sesión")).toBeNull();
+    expect(screen.getByRole("img", { name: "IESTP Suiza" })).toBeDefined();
   });
 
-  it("el rol SUPER_ADMIN ve todos los módulos incluido el Panel de Administración", () => {
+  it("el rol SUPER_ADMIN no ve imágenes principales para evitar espacios vacíos", () => {
     iniciarSesion("SUPER_ADMIN");
     renderHome();
 
-    expect(screen.getByText("Panel de Administración")).toBeDefined();
-    expect(screen.getByText("Reportes y Tableros de Control")).toBeDefined();
-    expect(screen.getByText("Ventanilla Presencial")).toBeDefined();
+    expect(screen.queryByRole("img", { name: "IESTP Suiza" })).toBeNull();
   });
 });
