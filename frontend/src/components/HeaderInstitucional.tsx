@@ -1,13 +1,26 @@
-import { ChevronDown, Menu, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  ArrowRight,
+  ChevronDown,
+  Clock,
+  ExternalLink,
+  Grid2x2,
+  Info,
+  Inbox,
+  LifeBuoy,
+  LogOut,
+  Search,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
 
-import { filtrarModulosPorRol, useSesion } from "../config/accesoModulos";
+import { filtrarModulosPorRol, ROLES_INTERNOS, useSesion } from "../config/accesoModulos";
+import { elementoIconoModulo } from "../config/iconosModulos";
 import { useAuthStore } from "../stores/authStore";
-import BarraSuperior from "./landing/BarraSuperior";
-import NavbarInstitucional from "./landing/NavbarInstitucional";
+import SelloInstitucional from "./common/SelloInstitucional";
 
-type ModalPerfil = null | "info" | "datos" | "soporte";
+type ModalPerfil = null | "info" | "datos" | "ayuda";
 
 function iniciales(nombre?: string | null, rol?: string | null): string {
   if (nombre) {
@@ -19,37 +32,44 @@ function iniciales(nombre?: string | null, rol?: string | null): string {
   return "?";
 }
 
+/** Reloj institucional en la tira de estado de la cabecera. */
+function useReloj(): string {
+  const [marca, setMarca] = useState(() => new Date());
+
+  useEffect(() => {
+    const t = window.setInterval(() => setMarca(new Date()), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  try {
+    return marca.toLocaleString("es-PE", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return marca.toISOString().slice(0, 16).replace("T", " ");
+  }
+}
+
 export default function HeaderInstitucional() {
   const navigate = useNavigate();
   const { rol, autenticado } = useSesion();
   const usuario = useAuthStore((s) => s.usuario);
   const logout = useAuthStore((s) => s.logout);
-  const setUsuario = useAuthStore((s) => s.setUsuario);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [perfilAbierto, setPerfilAbierto] = useState(false);
   const [modal, setModal] = useState<ModalPerfil>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const perfilRef = useRef<HTMLDivElement>(null);
+  const reloj = useReloj();
+  // Solo los módulos correspondientes al rol autenticado (filtrado estricto por BD/RBAC).
+  // Sin sesión: únicamente módulos públicos.
   const visibles = filtrarModulosPorRol(rol, autenticado);
 
-  const [editandoDatos, setEditandoDatos] = useState(false);
-  const [formDatos, setFormDatos] = useState({
-    nombreCompleto: usuario?.nombreCompleto ?? "",
-    correo: usuario?.correo ?? "",
-    telefono: usuario?.telefono ?? "",
-    cargo: usuario?.cargo ?? "",
-  });
-
-  const cargarFormDatos = () => {
-    setFormDatos({
-      nombreCompleto: usuario?.nombreCompleto ?? "",
-      correo: usuario?.correo ?? "",
-      telefono: usuario?.telefono ?? "",
-      cargo: usuario?.cargo ?? "",
-    });
-    setEditandoDatos(true);
-  };
-
+  // Cerrar menús con Escape y con clic fuera.
   useEffect(() => {
     if (!menuAbierto && !perfilAbierto && !modal) return;
     const onTecla = (e: KeyboardEvent) => {
@@ -80,298 +100,381 @@ export default function HeaderInstitucional() {
 
   const abrirAyuda = () => {
     setPerfilAbierto(false);
-    setModal("soporte");
     try {
-      window.dispatchEvent(new Event("sigd:abrir-soporte"));
+      window.dispatchEvent(new Event("sigd:abrir-ayuda"));
     } catch {
       // entorno sin DOM (tests)
     }
   };
 
-  const nombreMostrar = usuario?.nombreCompleto ?? (autenticado ? rol ?? "Usuario" : "Invitado");
+  const nombreMostrar = usuario?.nombreCompleto ?? (autenticado ? "Usuario" : "Invitado");
 
-  const guardarDatosUsuario = () => {
-    const actual = useAuthStore.getState().usuario;
-    if (!actual) return;
-    setUsuario({ ...actual, ...formDatos });
-    setEditandoDatos(false);
-  };
-
-  const acciones = (
-    <>
-      <div ref={menuRef} className="relative">
-        <button
-          type="button"
-          onClick={() => {
-            setMenuAbierto((v) => !v);
-            setPerfilAbierto(false);
-          }}
-          aria-haspopup="menu"
-          aria-expanded={menuAbierto}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-bold text-slate-700 transition hover:border-[#003366]/40 hover:bg-slate-50"
-        >
-          {menuAbierto ? (
-            <X aria-hidden="true" className="h-4 w-4" />
-          ) : (
-            <Menu aria-hidden="true" className="h-4 w-4" />
-          )}
-          <span className="hidden sm:inline">Menú</span>
-          <ChevronDown
-            aria-hidden="true"
-            className={`hidden h-3 w-3 text-slate-400 transition-transform sm:block ${menuAbierto ? "rotate-180" : ""}`}
-          />
-        </button>
-
-        {menuAbierto && (
-          <nav
-            aria-label="Módulos del sistema"
-            className="absolute right-0 z-50 mt-2 w-[min(92vw,340px)] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xl"
+  return (
+    <header className="header-sigd sticky top-0 z-40 print:hidden">
+      {/* Banda principal */}
+      <div className="banda-institucional">
+        <div className="mx-auto flex h-full max-w-[1680px] items-center gap-3 px-4 sm:px-6">
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="flex min-w-0 items-center gap-2.5 text-left"
           >
-            <p className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              {autenticado && rol ? `Módulos · ${rol}` : "Módulos públicos"}
-            </p>
-            <ul className="max-h-[60vh] overflow-y-auto py-1">
-              {visibles.map((m) => (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    title={m.descripcion}
-                    onClick={() => irA(m.ruta)}
-                    className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-[13px] font-semibold hover:bg-blue-50 hover:text-blue-800"
-                  >
+            <span className="shrink-0 text-vault-azul">
+              <SelloInstitucional className="h-9 w-9" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[15px] font-extrabold tracking-[0.02em] text-vault-tinta">
+                SIGD
+              </span>
+              <span className="block truncate text-[11px] font-medium text-tinta-500">
+                Sistema Integral de Gestión Documentaria
+              </span>
+            </span>
+          </button>
+
+          <span className="hidden h-7 w-px bg-vault-papel-3 lg:block" aria-hidden="true" />
+          <span className="hidden truncate text-[11px] font-semibold text-tinta-500 lg:block">
+            IESTP Público “Suiza” · Pucallpa
+          </span>
+
+          <div className="ml-auto flex items-center gap-2">
+          {/* Menú de módulos (oculto para roles internos/administrativos) */}
+          {!rol || !ROLES_INTERNOS.includes(rol) ? (
+            <div ref={menuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuAbierto((v) => !v);
+                  setPerfilAbierto(false);
+                }}
+                aria-haspopup="menu"
+                aria-expanded={menuAbierto}
+                className="flex items-center gap-2 rounded-lg border border-vault-papel-3 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-[0.06em] text-vault-tinta transition hover:border-tinta-300 hover:bg-vault-papel focus:outline-none focus-visible:ring-2 focus-visible:ring-vault-azul"
+              >
+                <Grid2x2 className="h-4 w-4 text-tinta-500" aria-hidden="true" />
+                <span className="hidden sm:inline">Módulos</span>
+                <span className="rounded bg-vault-papel-2 px-1.5 py-0.5 text-[9px] font-bold text-tinta-500">
+                  {visibles.length}
+                </span>
+                <ChevronDown
+                  className={`h-3.5 w-3.5 text-tinta-400 transition-transform ${menuAbierto ? "rotate-180" : ""}`}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {menuAbierto && (
+                <nav
+                  aria-label="Módulos del sistema"
+                  className="absolute right-0 z-50 mt-2 w-[min(94vw,25rem)] overflow-hidden rounded-xl border border-vault-papel-3 bg-white shadow-xl"
+                >
+                  <p className="flex items-center justify-between gap-2 border-b border-vault-papel-2 bg-vault-papel px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-tinta-500">
                     <span>
-                      {m.subtitulo && (
-                        <span className="mr-1.5 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
-                          {m.subtitulo}
+                      {autenticado && rol ? `Módulos · ${rol}` : "Módulos públicos"}
+                    </span>
+                    <span className="text-tinta-400">{visibles.length} accesos</span>
+                  </p>
+                  <ul className="max-h-[60vh] overflow-y-auto p-2">
+                    {visibles.map((m, i) => {
+                      return (
+                        <li key={m.id}>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            title={m.descripcion}
+                            onClick={() => irA(m.ruta)}
+                            className="item-modulo flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-vault-azul"
+                          >
+                            <span className="icono-modulo">
+                              {elementoIconoModulo(m.id, "h-4 w-4")}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[13px] font-semibold text-vault-tinta">
+                                {m.titulo}
+                              </span>
+                              <span className="block truncate text-[11px] leading-4 text-tinta-500">
+                                {m.descripcion}
+                              </span>
+                            </span>
+                            <span className="text-[10px] font-semibold text-tinta-300">
+                              {String(i + 1).padStart(2, "0")}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <div className="flex items-center justify-between gap-2 border-t border-vault-papel-2 bg-vault-papel px-4 py-2.5">
+                    {autenticado && rol ? (
+                      <>
+                        <span className="rounded-md border border-vault-papel-3 bg-white px-2.5 py-1 text-[11px] font-semibold text-tinta-700">
+                          {rol}
                         </span>
-                      )}
-                      {m.titulo}
-                    </span>
-                    <span aria-hidden="true" className="text-slate-400">
-                      →
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-4 py-2.5">
-              {autenticado && rol ? (
-                <>
-                  <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
-                    {rol}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuAbierto(false);
-                      logout();
-                      navigate("/login");
-                    }}
-                    className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-rose-700"
-                  >
-                    Salir
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="text-[11px] font-medium text-slate-500">Sin sesión</span>
-                  <button
-                    type="button"
-                    onClick={() => irA("/login")}
-                    className="rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-800"
-                  >
-                    Ingresar
-                  </button>
-                </>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMenuAbierto(false);
+                            logout();
+                            navigate("/login");
+                          }}
+                          className="rounded-md border border-estado-error/30 bg-estado-error-lavado px-3 py-1.5 text-xs font-semibold text-estado-error transition hover:bg-estado-error hover:text-white"
+                        >
+                          Salir
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[11px] font-medium text-tinta-500">
+                          Sin sesión
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => irA("/login")}
+                          className="rounded-md bg-vault-azul px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-vault-azul-profundo"
+                        >
+                          Ingresar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </nav>
               )}
             </div>
-          </nav>
-        )}
-      </div>
+          ) : null}
 
-      <div ref={perfilRef} className="relative">
-        <button
-          type="button"
-          onClick={() => {
-            setPerfilAbierto((v) => !v);
-            setMenuAbierto(false);
-          }}
-          aria-haspopup="menu"
-          aria-expanded={perfilAbierto}
-          aria-label={autenticado ? `Perfil de ${nombreMostrar}` : "Perfil de invitado"}
-          className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 py-1 pl-1 pr-2 text-slate-700 transition hover:bg-slate-100"
-        >
-          <span
-            aria-hidden="true"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#003366] text-xs font-black text-white"
-          >
-            {iniciales(usuario?.nombreCompleto, rol)}
-          </span>
-          <span className="hidden max-w-32 truncate text-left text-[11px] font-bold leading-tight md:block">
-            {nombreMostrar}
-            <span className="block text-[10px] font-medium text-slate-500">
-              {autenticado && rol ? rol : "Invitado"}
-            </span>
-          </span>
-          <ChevronDown
-            aria-hidden="true"
-            className={`h-3 w-3 text-slate-400 transition-transform ${perfilAbierto ? "rotate-180" : ""}`}
-          />
-        </button>
+            {autenticado ? (
+              /* Perfil del usuario */
+              <div ref={perfilRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPerfilAbierto((v) => !v);
+                    setMenuAbierto(false);
+                  }}
+                  aria-haspopup="menu"
+                  aria-expanded={perfilAbierto}
+                  aria-label={`Perfil de ${nombreMostrar}`}
+                  className="flex items-center gap-2 rounded-full border border-vault-papel-3 bg-white py-1 pl-1 pr-3 text-vault-tinta transition hover:border-tinta-300 hover:bg-vault-papel focus:outline-none focus-visible:ring-2 focus-visible:ring-vault-azul"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-vault-azul text-[11px] font-bold text-white"
+                  >
+                    {iniciales(usuario?.nombreCompleto, rol)}
+                  </span>
+                  <span className="hidden max-w-32 truncate text-left text-xs font-semibold leading-tight sm:block">
+                    {nombreMostrar}
+                    <span className="block text-[10px] font-medium text-tinta-500">
+                      {autenticado && rol ? rol : "Invitado"}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 text-tinta-400 transition-transform ${perfilAbierto ? "rotate-180" : ""}`}
+                    aria-hidden="true"
+                  />
+                </button>
 
-        {perfilAbierto && (
-          <nav
-            aria-label="Menú del perfil"
-            className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xl"
-          >
-            <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
-              <span
-                aria-hidden="true"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#003366] text-sm font-black text-white"
-              >
-                {iniciales(usuario?.nombreCompleto, rol)}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-[13px] font-bold">{nombreMostrar}</p>
-                <p className="truncate text-[11px] font-medium text-slate-500">
-                  {autenticado && rol ? rol : "Sin sesión iniciada"}
-                </p>
+                {perfilAbierto && (
+                  <nav
+                    aria-label="Menú del perfil"
+                    className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-xl"
+                  >
+                    <div className="flex items-center gap-3 border-b border-vault-papel-2 bg-vault-papel px-4 py-3">
+                      <span
+                        aria-hidden="true"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-vault-azul text-sm font-bold text-white"
+                      >
+                        {iniciales(usuario?.nombreCompleto, rol)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-semibold">{nombreMostrar}</p>
+                        <p className="truncate text-[11px] font-medium text-tinta-500">
+                          {autenticado && rol ? rol : "Sin sesión iniciada"}
+                        </p>
+                      </div>
+                    </div>
+                    <ul className="p-1.5">
+                      <li>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => irA("/")}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition hover:bg-vault-papel hover:text-vault-azul-tinta"
+                        >
+                          <Grid2x2 className="h-4 w-4 text-tinta-500" aria-hidden="true" /> Inicio
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={abrirAyuda}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition hover:bg-vault-papel hover:text-vault-azul-tinta"
+                        >
+                          <LifeBuoy className="h-4 w-4 text-tinta-500" aria-hidden="true" /> Ayuda
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setPerfilAbierto(false);
+                            setModal("info");
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition hover:bg-vault-papel hover:text-vault-azul-tinta"
+                        >
+                          <Info className="h-4 w-4 text-tinta-500" aria-hidden="true" /> Información
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setPerfilAbierto(false);
+                            setModal("datos");
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition hover:bg-vault-papel hover:text-vault-azul-tinta"
+                        >
+                          <UserRound className="h-4 w-4 text-tinta-500" aria-hidden="true" /> Datos del usuario
+                        </button>
+                      </li>
+                    </ul>
+                    <div className="border-t border-vault-papel-2 bg-vault-papel px-4 py-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPerfilAbierto(false);
+                          logout();
+                          navigate("/login");
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-md border border-estado-error/30 bg-estado-error-lavado px-3 py-1.5 text-xs font-semibold text-estado-error transition hover:bg-estado-error hover:text-white"
+                      >
+                        <LogOut className="h-3.5 w-3.5" aria-hidden="true" /> Cerrar sesión
+                      </button>
+                    </div>
+                  </nav>
+                )}
               </div>
-            </div>
-            <ul className="py-1">
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => irA("/")}
-                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-semibold hover:bg-blue-50 hover:text-blue-800"
-                >
-                  <span aria-hidden="true">🏠</span> Inicio
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={abrirAyuda}
-                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-semibold hover:bg-blue-50 hover:text-blue-800"
-                >
-                  <span aria-hidden="true">💬</span> Ayuda / Soporte IA
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setPerfilAbierto(false);
-                    setModal("info");
-                  }}
-                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-semibold hover:bg-blue-50 hover:text-blue-800"
-                >
-                  <span aria-hidden="true">ℹ️</span> Información
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setPerfilAbierto(false);
-                    setModal("datos");
-                    setEditandoDatos(false);
-                  }}
-                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-semibold hover:bg-blue-50 hover:text-blue-800"
-                >
-                  <span aria-hidden="true">👤</span> Datos del usuario
-                </button>
-              </li>
-            </ul>
-            <div className="border-t border-slate-100 bg-slate-50 px-4 py-2.5">
-              {autenticado ? (
+            ) : (
+              /* Visitante: acceso directo al sistema + ayuda */
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setPerfilAbierto(false);
-                    logout();
-                    navigate("/login");
+                    setModal("ayuda");
                   }}
-                  className="w-full rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-rose-700"
+                  aria-label="Ayuda con la página"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-vault-papel-3 bg-white text-tinta-600 transition hover:border-tinta-300 hover:bg-vault-papel focus:outline-none focus-visible:ring-2 focus-visible:ring-vault-azul"
                 >
-                  Cerrar sesión
+                  <LifeBuoy className="h-4 w-4" aria-hidden="true" />
                 </button>
-              ) : (
                 <button
                   type="button"
-                  onClick={() => irA("/login")}
-                  className="w-full rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-800"
+                  onClick={() => navigate("/login")}
+                  className="rounded-lg bg-vault-azul px-4 py-2 text-[12px] font-bold uppercase tracking-[0.04em] text-white transition hover:bg-vault-azul-profundo focus:outline-none focus-visible:ring-2 focus-visible:ring-vault-azul"
                 >
                   Iniciar sesión
                 </button>
-              )}
-            </div>
-          </nav>
-        )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-    </>
-  );
 
-  return (
-    <header className="print:hidden">
-      <BarraSuperior />
-      <NavbarInstitucional acciones={acciones} />
+      {/* Tira de estado institucional */}
+      <div className="tira-estado hidden md:flex">
+        <div className="mx-auto flex h-full w-full max-w-[1680px] items-center gap-4 px-4 sm:px-6">
+          <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-tinta-500">
+            <ShieldCheck className="h-3.5 w-3.5 text-vault-azul" aria-hidden="true" />
+            Ley N.º 27444 · TUO
+          </span>
+          <span className="h-3 w-px bg-vault-papel-3" aria-hidden="true" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-tinta-500">
+            Sesión · {autenticado && rol ? rol : "Invitado"}
+          </span>
+          <span className="h-3 w-px bg-vault-papel-3" aria-hidden="true" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-tinta-500">
+            {visibles.length} módulos
+          </span>
+          <span className="ml-auto flex items-center gap-1.5 text-[10px] font-medium tracking-[0.06em] text-tinta-400">
+            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+            {reloj}
+          </span>
+        </div>
+      </div>
 
+      {/* Modal Información del sistema */}
       {modal === "info" && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Información del sistema"
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/60 p-4"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-tinta-950/45 p-4 backdrop-blur-[2px]"
           onClick={() => setModal(null)}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-2xl bg-white text-slate-800 shadow-2xl max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-[640px] overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-gradient-to-r from-blue-800 to-blue-900 px-5 py-4 text-white">
-              <p className="text-sm font-black tracking-wider">INFORMACIÓN DEL SISTEMA</p>
-              <p className="text-[11px] text-blue-100">Sistema Integral de Gestión Documentaria - SIGD</p>
+            <div className="border-b border-vault-papel-2 bg-vault-papel px-6 py-5">
+              <div className="flex items-center gap-2">
+                <Info className="h-5 w-5 text-vault-azul" aria-hidden="true" />
+                <p className="text-sm font-bold text-vault-tinta">Información del sistema</p>
+              </div>
+              <p className="mt-1 text-[11px] text-tinta-500">
+                Sistema Integral de Gestión Documentaria
+              </p>
             </div>
-            <div className="space-y-4 px-5 py-5 text-[13px] leading-6">
-              <div>
-                <p className="mb-2 text-sm font-bold text-blue-900">Presentación de la Plataforma</p>
-                <p className="text-slate-700">
-                  El SIGD es la plataforma oficial del IESTP Público "Suiza" - Pucallpa para la gestión integral, digital y segura de los trámites documentarios, garantizando trazabilidad, validez legal y atención oportuna.
+            <div className="px-6 py-5">
+              <p className="text-sm font-semibold text-vault-tinta mb-4">
+                Módulos disponibles
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                {[
+                  { nombre: "Mesa de Partes", desc: "Radicación y seguimiento de trámites", icon: <Inbox className="h-5 w-5" />, ruta: "/tramite" },
+                  { nombre: "Casilla Electrónica", desc: "Notificaciones con validez legal", icon: <UserRound className="h-5 w-5" />, ruta: "/casilla" },
+                  { nombre: "Expedientes", desc: "Bandeja y trazabilidad de documentos", icon: <Grid2x2 className="h-5 w-5" />, ruta: "/expedientes" },
+                  { nombre: "Validador CVD", desc: "Verificación de firmas digitales", icon: <ShieldCheck className="h-5 w-5" />, ruta: "/validador-cvd" },
+                  { nombre: "Firma Digital", desc: "Flujo de validez legal", icon: <Clock className="h-5 w-5" />, ruta: "/flujo-validez-legal" },
+                  { nombre: "Administración", desc: "Usuarios, roles y reportes", icon: <ChevronDown className="h-5 w-5" />, ruta: "/administracion" },
+                ].map((m) => (
+                  <button
+                    key={m.ruta}
+                    type="button"
+                    onClick={() => { setModal(null); irA(m.ruta); }}
+                    className="flex items-center gap-3 rounded-lg border border-vault-papel-3 bg-white px-4 py-3 text-left text-[12px] font-semibold transition hover:bg-vault-papel hover:border-vault-azul focus:outline-none focus-visible:ring-2 focus-visible:ring-vault-azul"
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-vault-papel text-vault-azul shrink-0">
+                      {m.icon}
+                    </span>
+                    <div>
+                      <p className="text-vault-tinta">{m.nombre}</p>
+                      <p className="text-[10px] text-tinta-500">{m.desc}</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-tinta-400 ml-auto" aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+              <div className="rounded-lg border border-vault-papel-2 bg-vault-papel/50 px-4 py-3">
+                <p className="text-sm font-semibold text-vault-tinta mb-2">Sobre el sistema</p>
+                <p className="text-[12px] leading-relaxed text-tinta-600 mb-2">
+                  <span className="font-semibold">Institución:</span> IESTP Público “Suiza” · Pucallpa
+                </p>
+                <p className="text-[12px] leading-relaxed text-tinta-600 mb-2">
+                  <span className="font-semibold">Validez legal:</span> Ley N.º 27269 de Firmas y Certificados Digitales y TUO de la Ley N.º 27444.
+                </p>
+                <p className="text-[12px] leading-relaxed text-tinta-600">
+                  <span className="font-semibold">Versión:</span> SIGD v1.0
                 </p>
               </div>
-              <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-                <img src="/vite.svg" alt="Diagrama explicativo de módulos SIGD" className="w-full h-32 object-cover bg-gradient-to-r from-slate-100 to-slate-50" />
-                <div className="px-4 py-2 bg-slate-50 text-[11px] text-slate-600">Esquema general de funcionamiento por módulos</div>
-              </div>
-              <div>
-                <p className="mb-2 text-sm font-bold text-blue-900">Módulos Principales</p>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <li className="rounded-lg border border-slate-200 px-3 py-2">📝 Mesa de Partes Virtual</li>
-                  <li className="rounded-lg border border-slate-200 px-3 py-2">📬 Casilla Electrónica</li>
-                  <li className="rounded-lg border border-slate-200 px-3 py-2">📂 Expedientes y Trámite</li>
-                  <li className="rounded-lg border border-slate-200 px-3 py-2">✅ Validador CVD</li>
-                  <li className="rounded-lg border border-slate-200 px-3 py-2">✍️ Firma Digital / Validez Legal</li>
-                  <li className="rounded-lg border border-slate-200 px-3 py-2">🎓 Titulación</li>
-                  <li className="rounded-lg border border-slate-200 px-3 py-2">🧾 Resoluciones</li>
-                  <li className="rounded-lg border border-slate-200 px-3 py-2">⚙️ Administración y Reportes</li>
-                </ul>
-              </div>
-              <div className="rounded-lg bg-blue-50 p-3 ring-1 ring-blue-200">
-                <p className="mb-1 text-xs font-bold text-blue-900">Base Legal</p>
-                <p className="text-[12px] text-blue-800 leading-5">Ley N° 27269 - Firmas y Certificados Digitales • TUO de la Ley N° 27444 • Normativa Institucional</p>
-              </div>
             </div>
-            <div className="flex justify-end bg-slate-50 px-5 py-3">
+            <div className="flex justify-end border-t border-vault-papel-2 bg-vault-papel px-6 py-3">
               <button
                 type="button"
                 onClick={() => setModal(null)}
-                className="rounded-lg bg-blue-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-800"
+                className="rounded-md bg-vault-azul px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-vault-azul-profundo"
               >
                 Cerrar
               </button>
@@ -380,117 +483,126 @@ export default function HeaderInstitucional() {
         </div>
       )}
 
+      {/* Modal Ayuda con la página */}
+      {modal === "ayuda" && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Ayuda con la página"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-tinta-950/45 p-4 backdrop-blur-[2px]"
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-vault-papel-2 bg-vault-papel px-6 py-5">
+              <div className="flex items-center gap-2">
+                <LifeBuoy className="h-5 w-5 text-vault-azul" aria-hidden="true" />
+                <p className="text-sm font-bold text-vault-tinta">Ayuda con la página</p>
+              </div>
+              <p className="mt-1 text-[11px] text-tinta-500">
+                Sistema Integral de Gestión Documentaria
+              </p>
+            </div>
+            <div className="px-6 py-5">
+              <h2 className="text-xl font-black tracking-tight text-[#003366] mb-3">
+                Un sistema digital para gestionar tus documentos con seguridad
+              </h2>
+              <p className="text-sm leading-relaxed text-slate-600 mb-4">
+                El SIGD (Sistema de Gestión Documental) centraliza el registro, seguimiento y
+                archivado de documentos y expedientes, permitiendo a ciudadanos e instituciones
+                realizar sus trámites de forma remota y segura.
+              </p>
+              <p className="text-sm leading-relaxed text-slate-600 mb-6">
+                Con firma digital, casilla electrónica y consulta por CUT, garantizamos la validez
+                legal, la integridad y la trazabilidad de cada documento gestionado en el sistema.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                <button
+                  type="button"
+                  onClick={() => { setModal(null); navigate("/tramite"); }}
+                  className="flex items-center gap-2 rounded-lg border border-vault-papel-3 bg-white px-4 py-3 text-left text-[12px] font-semibold text-vault-tinta transition hover:bg-vault-papel hover:border-vault-azul"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  Iniciar un trámite
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setModal(null); navigate("/consulta"); }}
+                  className="flex items-center gap-2 rounded-lg border border-vault-papel-3 bg-white px-4 py-3 text-left text-[12px] font-semibold text-vault-tinta transition hover:bg-vault-papel hover:border-vault-azul"
+                >
+                  <Search className="h-4 w-4" aria-hidden="true" />
+                  Consultar con CUT
+                </button>
+              </div>
+              <p className="text-[11px] text-tinta-500">
+                ¿Necesitas más ayuda? Abre el asistente SIGI desde la burbuja inferior derecha o
+                inicia sesión para acceder a tus módulos.
+              </p>
+            </div>
+            <div className="flex justify-end border-t border-vault-papel-2 bg-vault-papel px-6 py-3">
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="rounded-md border border-vault-papel-3 bg-white px-4 py-1.5 text-xs font-semibold text-tinta-700 transition hover:bg-vault-papel"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Datos del usuario */}
       {modal === "datos" && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Datos del usuario"
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/60 p-4"
-          onClick={() => { setModal(null); setEditandoDatos(false); }}
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-tinta-950/45 p-4 backdrop-blur-[2px]"
+          onClick={() => setModal(null)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-2xl bg-white text-slate-800 shadow-2xl max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-sm overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 bg-gradient-to-r from-blue-800 to-blue-900 px-5 py-4 text-white">
+            <div className="flex items-center gap-3 border-b border-vault-papel-2 bg-vault-papel px-5 py-4">
               <span
                 aria-hidden="true"
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sm font-black text-blue-800"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-vault-azul text-sm font-bold text-white"
               >
                 {iniciales(usuario?.nombreCompleto, rol)}
               </span>
               <div>
-                <p className="text-sm font-black">DATOS DEL USUARIO</p>
-                <p className="text-[11px] text-blue-100">{autenticado ? "Sesión activa" : "Sin sesión"}</p>
+                <p className="text-sm font-bold text-vault-tinta">Datos del usuario</p>
+                <p className="text-[11px] text-tinta-500">
+                  {autenticado ? "Sesión activa" : "Sin sesión"}
+                </p>
               </div>
             </div>
             <div className="space-y-2 px-5 py-4 text-[13px] leading-6">
-              {editandoDatos ? (
-                <div className="space-y-3">
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Nombre completo
-                    </span>
-                    <input
-                      type="text"
-                      value={formDatos.nombreCompleto}
-                      onChange={(e) => setFormDatos((f) => ({ ...f, nombreCompleto: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[13px] outline-none focus:border-blue-600"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Correo
-                    </span>
-                    <input
-                      type="email"
-                      value={formDatos.correo}
-                      onChange={(e) => setFormDatos((f) => ({ ...f, correo: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[13px] outline-none focus:border-blue-600"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Teléfono
-                    </span>
-                    <input
-                      type="tel"
-                      value={formDatos.telefono}
-                      onChange={(e) => setFormDatos((f) => ({ ...f, telefono: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[13px] outline-none focus:border-blue-600"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Cargo
-                    </span>
-                    <input
-                      type="text"
-                      value={formDatos.cargo}
-                      onChange={(e) => setFormDatos((f) => ({ ...f, cargo: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[13px] outline-none focus:border-blue-600"
-                    />
-                  </label>
-                  <p className="text-[11px] font-medium text-slate-500">
-                    Rol: {usuario?.rol ?? rol ?? "—"}
-                    {usuario?.areaId ? ` · Área: ${usuario.areaId}` : ""}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <p>
-                    <span className="font-bold">Nombre:</span> {usuario?.nombreCompleto ?? nombreMostrar}
-                  </p>
-                  <p>
-                    <span className="font-bold">Correo:</span> {usuario?.correo ?? "—"}
-                  </p>
-                  {usuario?.telefono && (
-                    <p>
-                      <span className="font-bold">Teléfono:</span> {usuario.telefono}
-                    </p>
-                  )}
-                  {usuario?.cargo && (
-                    <p>
-                      <span className="font-bold">Cargo:</span> {usuario.cargo}
-                    </p>
-                  )}
-                  <p>
-                    <span className="font-bold">Rol:</span> {usuario?.rol ?? rol ?? "—"}
-                  </p>
-                  {usuario?.areaId && (
-                    <p>
-                      <span className="font-bold">Área:</span> {usuario.areaId}
-                    </p>
-                  )}
-                </>
+              <p>
+                <span className="font-semibold">Nombre:</span> {usuario?.nombreCompleto ?? nombreMostrar}
+              </p>
+              <p>
+                <span className="font-semibold">Correo:</span> {usuario?.correo ?? "—"}
+              </p>
+              <p>
+                <span className="font-semibold">Rol:</span> {usuario?.rol ?? rol ?? "—"}
+              </p>
+              {usuario?.areaId && (
+                <p>
+                  <span className="font-semibold">Área:</span> {usuario.areaId}
+                </p>
               )}
               {!autenticado && (
-                <p className="rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-800 ring-1 ring-amber-200">
+                <p className="rounded-md border border-estado-alerta/30 bg-estado-alerta-lavado px-3 py-2 text-[12px] text-estado-alerta">
                   No ha iniciado sesión. Inicie sesión para ver sus módulos y su casilla.
                 </p>
               )}
             </div>
-            <div className="flex justify-end gap-2 bg-slate-50 px-5 py-3">
+            <div className="flex justify-end gap-2 border-t border-vault-papel-2 bg-vault-papel px-5 py-3">
               {!autenticado && (
                 <button
                   type="button"
@@ -498,45 +610,15 @@ export default function HeaderInstitucional() {
                     setModal(null);
                     navigate("/login");
                   }}
-                  className="rounded-lg bg-blue-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-800"
+                  className="rounded-md bg-vault-azul px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-vault-azul-profundo"
                 >
                   Iniciar sesión
                 </button>
               )}
-              {autenticado && !editandoDatos && (
-                <button
-                  type="button"
-                  onClick={cargarFormDatos}
-                  className="rounded-lg bg-blue-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-800"
-                >
-                  Editar datos
-                </button>
-              )}
-              {autenticado && editandoDatos && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setEditandoDatos(false)}
-                    className="rounded-lg border border-slate-300 px-4 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={guardarDatosUsuario}
-                    className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
-                  >
-                    Guardar cambios
-                  </button>
-                </>
-              )}
               <button
                 type="button"
-                onClick={() => {
-                  setModal(null);
-                  setEditandoDatos(false);
-                }}
-                className="rounded-lg border border-slate-300 px-4 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                onClick={() => setModal(null)}
+                className="rounded-md border border-vault-papel-3 bg-white px-4 py-1.5 text-xs font-semibold text-tinta-700 transition hover:bg-vault-papel"
               >
                 Cerrar
               </button>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SUGERENCIAS_INICIALES } from "../../data/asistenteConocimiento";
 import { useAsistenteIA } from "../../hooks/useAsistenteIA";
+import { useAuthStore } from "../../stores/authStore";
 
 type ReconocimientoVoz = {
   start: () => void;
@@ -55,12 +56,46 @@ export default function AsistenteIA() {
   });
   const { mensajes, escribiendo, enviar, elegirSugerencia, irA, limpiar, fuenteIA, sugerenciasRuta, iaDisponible } =
     useAsistenteIA();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const usuario = useAuthStore((s) => s.usuario);
   const finRef = useRef<HTMLDivElement>(null);
   const recRef = useRef<ReconocimientoVoz | null>(null);
+  const saludadoRef = useRef(false);
+  const ultimaInteraccionRef = useRef(Date.now());
+  const inactividadRef = useRef<number | null>(null);
+  const autoAbrirRef = useRef<number | null>(null);
+  const autoAbridoRef = useRef(false);
+
+  const registrarInteraccion = () => {
+    ultimaInteraccionRef.current = Date.now();
+  };
 
   useEffect(() => {
     if (abierto) finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [mensajes.length, abierto, escribiendo]);
+
+  // Auto-abrir el asistente tras 10 segundos si no se ha usado aún (y se guarda solo en localStorage).
+  useEffect(() => {
+    if (autoAbridoRef.current) return;
+    autoAbrirRef.current = window.setTimeout(() => {
+      autoAbridoRef.current = true;
+      setAbierto(true);
+      try {
+        setTimeout(() => {
+          const nombre = usuario?.nombreCompleto ?? "usuario";
+          enviar(
+            `Hola ${nombre}, bienvenido al SIGD. Soy SIGI, tu asistente de soporte institucional. Estoy aquí para ayudarte cuando lo necesites.`,
+          );
+        }, 250);
+      } catch {}
+    }, 10_000);
+    return () => {
+      if (autoAbrirRef.current) {
+        window.clearTimeout(autoAbrirRef.current);
+        autoAbrirRef.current = null;
+      }
+    };
+  }, []);
 
   // El menú del perfil (Ayuda/Soporte) puede abrir el chat con el evento "sigd:abrir-ayuda".
   useEffect(() => {
@@ -83,6 +118,44 @@ export default function AsistenteIA() {
     };
   }, [enviar]);
 
+  // Saludo de bienvenida automático al iniciar sesión.
+  useEffect(() => {
+    if (isAuthenticated && !saludadoRef.current) {
+      saludadoRef.current = true;
+      const nombre = usuario?.nombreCompleto ?? "usuario";
+      window.setTimeout(() => {
+        enviar(
+          `Hola ${nombre}, bienvenido al SIGD. Soy SIGI, tu asistente de soporte institucional. Estoy aquí para ayudarte cuando lo necesites.`,
+        );
+      }, 700);
+    }
+    if (!isAuthenticated) saludadoRef.current = false;
+  }, [isAuthenticated, enviar, usuario]);
+
+  // Auto-ocultar el panel por inactividad (se mantiene el botón flotante).
+  useEffect(() => {
+    if (!abierto) {
+      if (inactividadRef.current) {
+        window.clearInterval(inactividadRef.current);
+        inactividadRef.current = null;
+      }
+      return;
+    }
+    inactividadRef.current = window.setInterval(() => {
+      if (Date.now() - ultimaInteraccionRef.current > 10_000) {
+        setAbierto(false);
+        window.clearInterval(inactividadRef.current!);
+        inactividadRef.current = null;
+      }
+    }, 1_000);
+    return () => {
+      if (inactividadRef.current) {
+        window.clearInterval(inactividadRef.current);
+        inactividadRef.current = null;
+      }
+    };
+  }, [abierto]);
+
   const votar = (id: string, voto: "up" | "down") => {
     setFeedback((prev) => {
       const next = { ...prev, [id]: voto };
@@ -95,12 +168,14 @@ export default function AsistenteIA() {
 
   const onEnviar = (e?: FormEvent) => {
     e?.preventDefault();
+    registrarInteraccion();
     if (!entrada.trim()) return;
     enviar(entrada);
     setEntrada("");
   };
 
   const alternarVoz = () => {
+    registrarInteraccion();
     if (escuchando) {
       recRef.current?.stop();
       setEscuchando(false);
@@ -125,8 +200,11 @@ export default function AsistenteIA() {
     <>
       <button
         type="button"
-        onClick={() => setAbierto((v) => !v)}
-        aria-label={abierto ? "Cerrar asistente" : "Abrir asistente de ayuda y soporte"}
+        onClick={() => {
+          registrarInteraccion();
+          setAbierto((v) => !v);
+        }}
+        aria-label={abierto ? "Cerrar asistente" : "Abrir asistente virtual SIGI"}
         className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-700 to-blue-900 text-2xl text-white shadow-xl transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 print:hidden"
       >
         {abierto ? "✕" : "🤖"}
@@ -134,7 +212,7 @@ export default function AsistenteIA() {
 
       {abierto && (
         <section
-          aria-label="Asistente virtual SIGD - Soporte y Ayuda"
+          aria-label="Asistente virtual SIGI - Soporte y Ayuda"
           className="fixed right-5 z-50 flex h-[560px] max-h-[85vh] w-[min(94vw,400px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl print:hidden"
           style={{ bottom: "5.5rem" }}
         >
@@ -145,7 +223,7 @@ export default function AsistenteIA() {
               </span>
               <div>
                 <p className="flex items-center gap-1.5 text-sm font-bold leading-tight">
-                  JARVIS • Soporte IA SIGD
+                  SIGI • Soporte IA SIGD
                   <span
                     title={iaDisponible ? "IA en la nube disponible + respaldo local" : "Modo local (sin clave de IA)"}
                     className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${iaDisponible ? "bg-emerald-400/20 text-emerald-100" : "bg-white/15 text-blue-100"}`}
@@ -159,10 +237,13 @@ export default function AsistenteIA() {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={limpiar}
-              title="Reiniciar conversación"
+              <button
+                type="button"
+                onClick={() => {
+                  registrarInteraccion();
+                  limpiar();
+                }}
+                title="Reiniciar conversación"
               className="rounded-lg bg-white/10 px-2 py-1 text-xs font-semibold hover:bg-white/20"
             >
               ↻
@@ -249,7 +330,7 @@ export default function AsistenteIA() {
             {escribiendo && (
               <div className="flex justify-start">
                 <div className="rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-500">
-                  <span className="animate-pulse">JARVIS está escribiendo…</span>
+                  <span className="animate-pulse">SIGI está escribiendo…</span>
                 </div>
               </div>
             )}
@@ -261,7 +342,10 @@ export default function AsistenteIA() {
               <button
                 key={s}
                 type="button"
-                onClick={() => elegirSugerencia(s)}
+                onClick={() => {
+                  registrarInteraccion();
+                  elegirSugerencia(s);
+                }}
                 className="whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-800"
               >
                 {s}

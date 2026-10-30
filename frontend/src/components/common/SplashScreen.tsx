@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const DURACION_MS = 3200;
+const DURACION_MS = 800;
 const CLAVE_VISTO = "sigd_splash_visto";
 
 const LOGOS = [

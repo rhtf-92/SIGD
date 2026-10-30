@@ -1,24 +1,148 @@
-@import "tailwindcss";
-@import "./styles/error404.css";
+/* `source(none)` desactiva la detección automática de fuentes: el alcance se
+   declara de forma explícita para que el escáner no lea los propios CSS del
+   proyecto (de ahí salían utilidades fantasma como
+   `bg-[linear-gradient(90deg,#006EC7,#E6007E,#F9E000)]`). */
+@import "tailwindcss" source(none);
+@import "./styles/theme.css";
 
-@keyframes portada-fade {
-  from {
-    opacity: 0;
-    transform: scale(1.02);
+@source "./**/*.{ts,tsx}";
+@source "../index.html";
+
+@layer base {
+  :root {
+    /* Altura real de la banda institucional
+       (banda 60px + tira 30px + filete inferior 1px).
+       Se usa para anclar el rail lateral y calcular el alto útil del lienzo. */
+    --sigd-altura-cabecera: 91px;
+    --sigd-ancho-rail: 16.5rem;
   }
-  to {
-    opacity: 1;
-    transform: scale(1);
+
+  @media (max-width: 767px) {
+    :root {
+      /* En móvil la tira de estado se oculta: banda 60px + filete 1px. */
+      --sigd-altura-cabecera: 61px;
+    }
+  }
+
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: linear-gradient(180deg, #0A1128 0%, #001F3F 35%, #003366 100%);
+    color: var(--color-vault-tinta);
+    font-family: var(--font-sans);
+  }
+
+  /* Foco visible y coherente con la paleta institucional. */
+  :focus-visible {
+    outline: 2px solid var(--color-vault-azul);
+    outline-offset: 2px;
+  }
+
+  /* Scrollbars discretas, en clave papel/tinta. */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #c9c4b8;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a8a294;
+  }
+
+  /* Los módulos de scroll internos (rail, paneles) usan tinta suave. */
+  .scroll-tinta {
+    scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+    scrollbar-width: thin;
   }
 }
 
-@keyframes video-centrar {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.85);
+/* Utilidades del sistema institucional */
+@layer utilities {
+  /* Malla de fondo para superficies overlays (modales, paneles). */
+  .bg-mesh-pattern {
+    background-color: var(--color-vault-papel);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--color-vault-papel-3);
+    box-shadow: var(--shadow-ficha);
+  }
+
+  .glass-card-hover {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .glass-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-ficha-alta);
+    border-color: #c3bcac;
+  }
+
+  .suiza-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .pulse-indicator {
+    position: relative;
+  }
+  .pulse-indicator::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 9999px;
+    background: inherit;
+    animation: pulseGlow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes pulseGlow {
+    0% {
+      transform: scale(1);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(2.4);
+      opacity: 0;
+    }
+  }
+
+  @keyframes portada-fade {
+    from {
+      opacity: 0;
+      transform: scale(1.02);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Sello de agua monoespaciado (códigos de módulo, folios, versiones). */
+  .codigo-mono {
+    font-family: var(--font-mono);
+    font-variant-ligatures: none;
   }
 }

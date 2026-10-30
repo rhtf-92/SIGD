@@ -1,19 +1,14 @@
-import ErrorBoundary from "./components/common/ErrorBoundary";
-import PantallaErroresSistema from "./components/common/PantallaErroresSistema";
-import PantallaSinConexion from "./components/common/PantallaSinConexion";
 import SplashScreen from "./components/common/SplashScreen";
 import MainLayout from "./layouts/MainLayout";
 import AppRouter from "./routes/AppRouter";
+import { ErrorConexion } from "./components/common/ErrorConexion";
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <MainLayout>
-        <SplashScreen />
-        <PantallaSinConexion />
-        <PantallaErroresSistema />
-        <AppRouter />
-      </MainLayout>
-    </ErrorBoundary>
+    <MainLayout>
+      <SplashScreen />
+      <ErrorConexion />
+      <AppRouter />
+    </MainLayout>
   );
 }
