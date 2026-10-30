@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import QrCodeView from "../common/QrCodeView";
+import { formatearFechaHoraLegible } from "../../utils/expedientePresentacion";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import type { CargoDigitalResponse } from "../../types/tramiteWizardState";
 
@@ -70,7 +71,7 @@ export default function CargoDigitalModal({
   const folios = isDigitalResponse ? 1 : cargo.cantidadFolios;
   const docPrincipalTipo = isDigitalResponse ? "SOLICITUD DIGITAL" : cargo.documentoPrincipalTipo;
   const horaRecepcion = isDigitalResponse
-    ? cargo.fechaRecepcionOficial
+    ? formatearFechaHoraLegible(cargo.fechaRecepcionOficial)
     : cargo.horaRecepcion;
   const operador = isDigitalResponse
     ? "Mesa de Partes Virtual"

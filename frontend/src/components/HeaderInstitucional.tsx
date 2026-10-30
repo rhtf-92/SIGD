@@ -29,7 +29,11 @@ export default function HeaderInstitucional() {
 
   const handleNavigate = (ruta: string) => {
     setIsMobileMenuOpen(false);
-    navigate(ruta);
+    if (ruta === '/tramite') {
+      navigate('/tramite', { state: { nuevoTramite: true, t: Date.now() } });
+    } else {
+      navigate(ruta);
+    }
   };
 
   return (
@@ -82,13 +86,13 @@ export default function HeaderInstitucional() {
           {isAuthenticated && usuario && (
             <div className="ml-2 flex items-center gap-2 border-l border-slate-800 pl-3">
               <div className="text-right">
-                <p className="text-[11px] font-bold text-white leading-tight max-w-[140px] lg:max-w-none truncate">
-                  {usuario.nombreCompleto}
-                </p>
+                {usuario.rol === 'CIUDADANO' ?
+                  <Link to="/mi-perfil" className="text-[11px] font-bold text-white leading-tight hover:underline">Mi cuenta</Link> :
+                  <p className="text-[11px] font-bold text-white leading-tight max-w-[140px] lg:max-w-none truncate">{usuario.nombreCompleto}</p>}
                 <div className="flex items-center gap-1 justify-end">
-                  <span className="inline-block rounded bg-amber-400/90 border border-amber-300 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-950">
+                  {usuario.rol !== 'CIUDADANO' && <span className="inline-block rounded bg-amber-400/90 border border-amber-300 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-950">
                     {usuario.rol}
-                  </span>
+                  </span>}
                   {usuario.rol !== "CIUDADANO" && (
                     <span
                       className="rounded bg-slate-800 border border-slate-700 px-1.5 py-0.5 text-[9px] font-bold text-slate-300"
@@ -116,7 +120,9 @@ export default function HeaderInstitucional() {
           {isAuthenticated && usuario && (
             <div className="flex items-center gap-1 rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-white text-[11px]" title={`Sesión: ${usuario.rol}`}>
               <User className="h-3.5 w-3.5 text-amber-300" />
-              <span className="font-bold text-[10px] truncate max-w-[90px]">{usuario.nombreCompleto.split(" ")[0]}</span>
+              {usuario.rol === 'CIUDADANO' ?
+                <Link to="/mi-perfil" className="font-bold text-[10px] hover:underline">Mi cuenta</Link> :
+                <span className="font-bold text-[10px] truncate max-w-[90px]">{usuario.nombreCompleto.split(" ")[0]}</span>}
             </div>
           )}
           <button
@@ -142,9 +148,9 @@ export default function HeaderInstitucional() {
                   <p className="text-[10px] text-cyan-200">{usuario.correo ?? "Usuario SIGD"}</p>
                 </div>
                 <div className="text-right">
-                  <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-900 block">
+                  {usuario.rol !== 'CIUDADANO' && <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-900 block">
                     {usuario.rol}
-                  </span>
+                  </span>}
                   {usuario.rol !== "CIUDADANO" && (
                     <span className="text-[9px] text-cyan-200 font-mono block mt-0.5">
                       Área: {usuario.areaId ?? "DIR"}

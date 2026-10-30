@@ -182,4 +182,24 @@ describe('SolicitudAccesoTupaPage — Acceso Restringido al TUPA y Solicitudes C
       expect(screen.getByRole('link', { name: /Consultar Catálogo TUPA Completo/i })).toHaveAttribute('href', '/tupa');
     });
   });
+
+  it('no simula una solicitud pendiente cuando el backend rechaza el envío', async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({
+      accessToken: 'token-ciudadano', refreshToken: null, isAuthenticated: true,
+      usuario: { id: 'u-ciudadano', nombreCompleto: 'Ana', correo: 'ana@example.test', rol: 'CIUDADANO' },
+    });
+    globalThis.fetch = vi.fn((url: string) => Promise.resolve(
+      String(url).includes('/acceso/estado')
+        ? { ok: true, json: async () => ({ autenticado: true, autorizado: false, estado: 'NINGUNA', solicitud: null }) }
+        : { ok: false, json: async () => ({ detail: 'No se pudo registrar' }) },
+    )) as unknown as typeof fetch;
+    render(<MemoryRouter><SolicitudAccesoTupaPage /></MemoryRouter>);
+    await screen.findByLabelText(/Motivo o Justificación/i);
+    await user.type(screen.getByLabelText(/Motivo o Justificación/i), 'Consulta de requisitos');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: /Enviar Solicitud de Acceso/i }));
+    await waitFor(() => expect(screen.getByText(/No se pudo registrar/i)).toBeInTheDocument());
+    expect(screen.queryByText(/Solicitud en Revisión por Mesa de Partes/i)).not.toBeInTheDocument();
+  });
 });

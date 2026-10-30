@@ -25,6 +25,7 @@ import type {
   WizardAction,
 } from '../../../types/tramiteWizardState';
 import { useProcedimientosTupa } from '../../../hooks/useProcedimientosTupa';
+import SelectorTupaCategorias from '../SelectorTupaCategorias';
 import {
   TupaCatalogoCargando,
   TupaCatalogoError,
@@ -259,6 +260,22 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           >
             Procedimiento Institucional o Trámite TUPA <span className="text-red-600">*</span>
           </label>
+          {/* Selector TUPA por Categorías y Búsqueda */}
+          {!catalogoNoDisponible && (
+            <div className="mb-2">
+              <SelectorTupaCategorias
+                procedimientos={procedimientos}
+                value={data.tipoTramiteId}
+                onChange={handleSeleccionProcedimiento}
+                disabled={isSubmitting || radicacionPendiente}
+                error={touched.tipoTramiteId ? errors.tipoTramiteId : undefined}
+                permitirNoTupa={true}
+                onBlur={() => markTouched('tipoTramiteId')}
+              />
+            </div>
+          )}
+
+          {/* Selector accesible para lectores de pantalla y compatibilidad de formulario */}
           <select
             id={`${formId}-tipoTramiteId`}
             name="tipoTramiteId"
@@ -274,11 +291,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             onChange={(e) => handleSeleccionProcedimiento(e.target.value)}
             onBlur={() => markTouched('tipoTramiteId')}
             disabled={isSubmitting || radicacionPendiente}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer ${
-              touched.tipoTramiteId && errors.tipoTramiteId
-                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
-            } disabled:bg-slate-100 disabled:cursor-not-allowed`}
+            className="sr-only"
+            tabIndex={-1}
           >
             <option value="">-- Seleccione un procedimiento oficial --</option>
             <option value="NO_TUPA">Trámite no TUPA / documentación general</option>

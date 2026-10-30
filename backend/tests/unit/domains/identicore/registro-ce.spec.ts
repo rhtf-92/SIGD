@@ -6,7 +6,7 @@ describe('registro ciudadano con documento CE', () => {
     const result = registroCiudadanoSchema.safeParse({
       tipoPersona: 'NATURAL', tipoDocumento: 'CE', ce: 'AB1234567X',
       nombres: 'María', apellidoPaterno: 'Pérez', apellidoMaterno: 'Ramos',
-      correo: 'maria@example.com', celular: '961234567',
+      correo: 'maria@example.com', celular: '961234567', username: 'maria.perez',
       ubigeoDistrito: '250101', direccion: 'Jr. Tarapacá 645',
       password: 'MiClaveSegura#2026', consentimientoDatos: true,
     });

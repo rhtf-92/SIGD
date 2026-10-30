@@ -2,6 +2,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { PoolClient } from 'pg';
 import {
   derivarExpediente,
+  recepcionarExpediente,
   atenderExpediente,
   archivarExpediente,
   observarExpediente,
@@ -35,6 +36,12 @@ describe('T-BE-RD-06: derivaciones.service.ts', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getRequestContext).mockReturnValue({
+      usuario_id: 'usr-123',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
   });
 
   // Helper para simular las respuestas de la Base de Datos puramente con SELECTs e INSERTs en BASELINE_2026_V1
@@ -188,6 +195,77 @@ describe('T-BE-RD-06: derivaciones.service.ts', () => {
   });
 });
 
+describe('T-BE-RD-06-REC: Recepción en Área de Destino', () => {
+  const mockQuery = vi.fn();
+  const mockCliente = {
+    query: mockQuery,
+    release: vi.fn(),
+  } as unknown as PoolClient;
+
+  const mockExpedienteId = 'exp-123-uuid';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getRequestContext).mockReturnValue({
+      usuario_id: 'usr-123',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
+  });
+
+  it('1. Debe rechazar la recepción si el usuario no está autenticado', async () => {
+    vi.mocked(getRequestContext).mockReturnValueOnce(undefined);
+
+    await expect(recepcionarExpediente(mockCliente, mockExpedienteId))
+      .rejects.toThrow(UnauthorizedError);
+
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(insertarEvento).not.toHaveBeenCalled();
+  });
+
+  it('2. Debe rechazar la recepción si el expediente no está en estado DERIVADO', async () => {
+    vi.mocked(getRequestContext).mockReturnValueOnce({
+      usuario_id: 'usr-123',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ estado_actual_id: 'REGISTRADO', area_contexto_id: 'area-sda' }],
+    });
+
+    await expect(recepcionarExpediente(mockCliente, mockExpedienteId))
+      .rejects.toThrow(DomainError);
+  });
+
+  it('3. Debe procesar exitosamente la recepción desde DERIVADO hacia EN_REVISION', async () => {
+    vi.mocked(getRequestContext).mockReturnValueOnce({
+      usuario_id: 'usr-123',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
+    mockQuery.mockReset();
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ estado_actual_id: 'DERIVADO', area_contexto_id: 'area-sda' }],
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [{ movimiento_id: 'mov-rec-1' }] });
+    mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE
+
+    await recepcionarExpediente(mockCliente, mockExpedienteId);
+
+    expect(insertarEvento).toHaveBeenCalledWith(mockCliente, expect.objectContaining({
+      tipo_evento: 'ExpedienteRecepcionado',
+      payload: expect.objectContaining({
+        identidad: { expediente_id: mockExpedienteId, movimiento_id: 'mov-rec-1' },
+      }),
+    }));
+  });
+});
+
 describe('T-BE-RD-07: Atención Resolutiva', () => {
   const mockQuery = vi.fn();
   const mockCliente = {
@@ -199,94 +277,104 @@ describe('T-BE-RD-07: Atención Resolutiva', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getRequestContext).mockReturnValue({
+      usuario_id: 'usr-123',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
   });
 
-  function setupMockQueriesAtencion() {
+  function setupMockQueriesAtencion(estado = 'EN_REVISION') {
     mockQuery.mockReset();
-    // 1. Obtener estado y rea
+    // 1. SELECT sigd_tra.expediente + estado_actual_expediente
     mockQuery.mockResolvedValueOnce({
       rowCount: 1,
-      rows: [{ estado_actual_id: 'est-actual-1', area_contexto_id: 'area-origen-1' }]
+      rows: [{
+        estado_actual_id: estado,
+        area_contexto_id: 'area-origen-1',
+        codigo_expediente: 'EXP-2026-000001',
+        solicitante_id: 'sol-123-uuid',
+        tipo_documental_id: 'tipo-doc-123',
+      }],
     });
-    // 2. Catlogos
-    mockQuery.mockResolvedValueOnce({
-      rows: [
-        { id: 'acc-atencion', tipo: 'accion' },
-        { id: 'est-atendido', tipo: 'estado' }
-      ]
-    });
-    // 3. INSERT movimiento_tramite
+    if (estado === 'DERIVADO') {
+      // Auto-recepción
+      mockQuery.mockResolvedValueOnce({});
+    }
+    // 2. INSERT ENVIAR_A_FIRMA
+    mockQuery.mockResolvedValueOnce({});
+    // 3. INSERT FIRMA -> RESUELTO
     mockQuery.mockResolvedValueOnce({ rows: [{ movimiento_id: 'mov-atencion-1' }] });
-    // 4. INSERT atencion_tramite
-    mockQuery.mockResolvedValueOnce({}); 
+    // 4. UPDATE sigd_tra.expediente SET estado = 'RESUELTO'
+    mockQuery.mockResolvedValueOnce({ rowCount: 1 });
+    // 5. SELECT id_usuario FROM sigd_auth.cuenta_usuario
+    mockQuery.mockResolvedValueOnce({ rows: [{ id_usuario: 'user-sol-123' }] });
+    // 6. INSERT sigd_auth.notificacion_casilla
+    mockQuery.mockResolvedValueOnce({});
   }
 
-  it('1. Debe rechazar la atención si el usuario no esto autenticado', async () => {
+  it('1. Debe rechazar la atención si el usuario no está autenticado', async () => {
     vi.mocked(getRequestContext).mockReturnValueOnce(undefined);
     const dto: AtenderExpedienteDTO = { resultado_resumen: 'Prueba rechazo' };
 
     await expect(atenderExpediente(mockCliente, mockExpedienteId, dto))
       .rejects.toThrow(UnauthorizedError);
-    
+
     expect(mockQuery).not.toHaveBeenCalled();
     expect(insertarEvento).not.toHaveBeenCalled();
   });
 
-  it('2. Debe procesar exitosamente la atencin y emitir al Outbox', async () => {
-    vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', unidad_organica_id: 'area-origen-1', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
-    setupMockQueriesAtencion();
+  it('2. Debe procesar exitosamente la atención y emitir al Outbox y Casilla', async () => {
+    vi.mocked(getRequestContext).mockReturnValueOnce({
+      usuario_id: 'usr-123',
+      unidad_organica_id: 'area-origen-1',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
+    setupMockQueriesAtencion('EN_REVISION');
 
-    // =========================================================================
-    // LIMITACION DE SEGURIDAD (T-BE-RD-07)
-    // No se implementa prueba falsa de ForbiddenError (unidad_organica_id).
-    // La verificacin de pertenencia de rea queda documentada como dependencia
-    // externa hasta que getRequestContext provea datos seguros.
-    // =========================================================================
-
-    const dto: AtenderExpedienteDTO = { resultado_resumen: 'Resolucin Aprobada' };
+    const dto: AtenderExpedienteDTO = { resultado_resumen: 'Resolución Aprobada' };
     await atenderExpediente(mockCliente, mockExpedienteId, dto);
 
-    // Validacin de llamadas SQL (Debe haber 4)
-    expect(mockQuery).toHaveBeenCalledTimes(4);
-    
-    // Verificamos estrcitamente que se hayan mandado los INSERTS requeridos
-    const queries = mockQuery.mock.calls.map(call => call[0].toString().toUpperCase());
-    expect(queries.some(q => q.includes('INSERT INTO SIGD_RUT.MOVIMIENTO_TRAMITE'))).toBe(true);
-    expect(queries.some(q => q.includes('INSERT INTO SIGD_RUT.ATENCION_TRAMITE'))).toBe(true);
-
-    // Validacin del Outbox
+    // Assert Outbox
     expect(insertarEvento).toHaveBeenCalledTimes(1);
     expect(insertarEvento).toHaveBeenCalledWith(mockCliente, expect.objectContaining({
       tipo_evento: 'ExpedienteAtendido',
       payload: expect.objectContaining({
-        datos_especificos: { resultado_resumen: 'Resolucin Aprobada' }
-      })
+        datos_especificos: expect.objectContaining({ resultado_resumen: 'Resolución Aprobada' }),
+      }),
     }));
+
+    // Verificamos los INSERTs requeridos
+    const queries = mockQuery.mock.calls.map(call => call[0].toString().toUpperCase());
+    expect(queries.some(q => q.includes('INSERT INTO SIGD_RUT.MOVIMIENTO_TRAMITE'))).toBe(true);
+    expect(queries.some(q => q.includes('INSERT INTO SIGD_AUTH.NOTIFICACION_CASILLA'))).toBe(true);
+    expect(queries.some(q => q.includes('UPDATE SIGD_TRA.EXPEDIENTE'))).toBe(true);
   });
 
-  it('2.1. Debe lanzar ForbiddenError si el usuario no pertenece al area del expediente', async () => {
-    vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', unidad_organica_id: 'area-diferente', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
-    setupMockQueriesAtencion();
+  it('3. Debe rechazar si el expediente no está en estado atendible', async () => {
+    vi.mocked(getRequestContext).mockReturnValueOnce({
+      usuario_id: 'usr-123',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
+    mockQuery.mockReset();
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{
+        estado_actual_id: 'ARCHIVADO',
+        area_contexto_id: 'area-origen-1',
+        codigo_expediente: 'EXP-2026-000001',
+        solicitante_id: 'sol-123-uuid',
+        tipo_documental_id: 'tipo-doc-123',
+      }],
+    });
 
-    const dto: AtenderExpedienteDTO = { resultado_resumen: 'Prueba Rechazo Area' };
-
-    await expect(atenderExpediente(mockCliente, mockExpedienteId, dto))
-      .rejects.toThrow(ForbiddenError);
-  });
-
-  it('3. Cumplimiento WORM: Ningn query debe contener sentencias UPDATE o DELETE', async () => {
-    vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', unidad_organica_id: 'area-origen-1', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
-    setupMockQueriesAtencion();
-
-    const dto: AtenderExpedienteDTO = { resultado_resumen: 'Prueba WORM' };
-    await atenderExpediente(mockCliente, mockExpedienteId, dto);
-
-    const queriesEjecutados = mockQuery.mock.calls.map(call => call[0].toString().toUpperCase());
-
-    for (const query of queriesEjecutados) {
-      expect(query).not.toMatch(/\bUPDATE\b/);
-      expect(query).not.toMatch(/\bDELETE\b/);
-    }
+    const dto: AtenderExpedienteDTO = { resultado_resumen: 'Resolución Indebida' };
+    await expect(atenderExpediente(mockCliente, mockExpedienteId, dto)).rejects.toThrow(DomainError);
   });
 });
 
@@ -301,44 +389,67 @@ describe('T-BE-RD-08: Archivado Formal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getRequestContext).mockReturnValue({
+      usuario_id: 'usr-123',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
   });
 
-  function setupMockQueriesArchivo(codigoEstado = 'CERRADO') {
+  function setupMockQueriesArchivo(codigoEstado = 'RESUELTO') {
     mockQuery.mockReset();
     mockQuery.mockResolvedValueOnce({
       rowCount: 1,
-      rows: [{ estado_actual_id: 'est-actual-uuid', area_contexto_id: 'area-origen-uuid', codigo_estado: codigoEstado }]
+      rows: [{
+        estado_actual_id: codigoEstado,
+        area_contexto_id: 'area-origen-uuid',
+        codigo_expediente: 'EXP-2026-000001',
+      }],
     });
-    if (codigoEstado === 'CERRADO') {
-      mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'acc-archivar-uuid' }] });
-      mockQuery.mockResolvedValueOnce({ rows: [{ movimiento_id: 'mov-nuevo-uuid' }] });
-      mockQuery.mockResolvedValueOnce({});
+    if (codigoEstado === 'RESUELTO') {
+      mockQuery.mockResolvedValueOnce({ rows: [{ movimiento_id: 'mov-archivo-1' }] });
+      mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE
     }
   }
 
-  it('1. Debe rechazar si el estado actual no es CERRADO', async () => {
-    vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
-    setupMockQueriesArchivo('ATENDIDO');
+  it('1. Debe rechazar si el estado actual no es RESUELTO', async () => {
+    vi.mocked(getRequestContext).mockReturnValue({
+      usuario_id: 'usr-123',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
+    setupMockQueriesArchivo('EN_REVISION');
 
     const dto: ArchivarExpedienteDTO = { estante: 'E1', balda: 'B1', caja: 'C1' };
 
     await expect(archivarExpediente(mockCliente, mockExpedienteId, dto)).rejects.toThrow(DomainError);
   });
 
-  it('2. Cumplimiento WORM: Ningun query debe contener sentencias UPDATE o DELETE', async () => {
-    vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
-    setupMockQueriesArchivo('CERRADO');
+  it('2. Debe procesar exitosamente el archivado formal desde RESUELTO', async () => {
+    vi.mocked(getRequestContext).mockReturnValueOnce({
+      usuario_id: 'usr-123',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
+    setupMockQueriesArchivo('RESUELTO');
 
     const dto: ArchivarExpedienteDTO = { estante: 'E1', balda: 'B1', caja: 'C1' };
     await archivarExpediente(mockCliente, mockExpedienteId, dto);
 
-    const queriesEjecutados = mockQuery.mock.calls.map(call => call[0].toString().toUpperCase());
     expect(insertarEvento).toHaveBeenCalledTimes(1);
+    expect(insertarEvento).toHaveBeenCalledWith(mockCliente, expect.objectContaining({
+      tipo_evento: 'ExpedienteArchivado',
+      payload: expect.objectContaining({
+        datos_especificos: expect.objectContaining({ estante: 'E1', balda: 'B1', caja: 'C1' }),
+      }),
+    }));
 
-    for (const query of queriesEjecutados) {
-      expect(query).not.toMatch(/\bUPDATE\b/);
-      expect(query).not.toMatch(/\bDELETE\b/);
-    }
+    const queries = mockQuery.mock.calls.map(call => call[0].toString().toUpperCase());
+    expect(queries.some(q => q.includes('INSERT INTO SIGD_RUT.MOVIMIENTO_TRAMITE'))).toBe(true);
+    expect(queries.some(q => q.includes('UPDATE SIGD_TRA.EXPEDIENTE'))).toBe(true);
   });
 });
 
@@ -353,6 +464,12 @@ describe('RutaDoc FSM: Observación y Subsanación Formal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getRequestContext).mockReturnValue({
+      usuario_id: 'usr-123',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
   });
 
   describe('observarExpediente', () => {

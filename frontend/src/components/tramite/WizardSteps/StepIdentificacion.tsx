@@ -17,6 +17,7 @@
  */
 
 import React, { useId, useMemo, useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import type {
   IdentificacionData,
   TipoDocumentoIdentidad,
@@ -34,6 +35,7 @@ export interface StepIdentificacionProps {
   onBack?: () => void;
   /** Indicador de procesamiento asíncrono o bloqueo de formulario */
   isSubmitting?: boolean;
+  identityLocked?: boolean;
 }
 
 export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
@@ -42,6 +44,7 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
   onNext,
   onBack,
   isSubmitting = false,
+  identityLocked = false,
 }) => {
   const formId = useId();
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -175,11 +178,19 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
           Paso 1 de 4
         </span>
         <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
-          Identificación del Solicitante
+          {identityLocked ? 'Verifica tus datos' : 'Identificación del Solicitante'}
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Consigne sus datos de identidad oficial y contacto formal. Sus datos están protegidos conforme a la Ley N° 29733 y el TUO de la Ley N° 27444.
+          {identityLocked
+            ? 'Tu identidad proviene de tu cuenta. Puedes revisar estos datos y ajustar el contacto para esta solicitud.'
+            : 'Consigne sus datos de identidad oficial y contacto formal. Sus datos están protegidos conforme a la Ley N° 29733 y el TUO de la Ley N° 27444.'}
         </p>
+        {identityLocked && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+            <span>Los cambios realizados aquí se aplican solo a esta solicitud y no modifican tu perfil.</span>
+            <Link to="/mi-perfil?returnTo=%2Ftramite" className="font-semibold text-cyan-800 underline">Actualizar mi perfil</Link>
+          </div>
+        )}
       </header>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -198,7 +209,7 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
             name="tipoDocumento"
             value={data.tipoDocumento}
             onChange={handleTipoDocChange}
-            disabled={isSubmitting}
+            disabled={isSubmitting || identityLocked}
             className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs focus:border-[#006EC7] focus:outline-none focus:ring-2 focus:ring-[#006EC7]/20 disabled:bg-slate-100 cursor-pointer"
           >
             <option value="DNI">DNI — Documento Nacional de Identidad</option>
@@ -236,6 +247,7 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
                 : '6 a 12 caracteres alfanuméricos'
             }
             value={data.numeroDocumento}
+            readOnly={identityLocked}
             onChange={(e) => handleFieldChange('numeroDocumento', e.target.value.trim())}
             onBlur={() => markTouched('numeroDocumento')}
             disabled={isSubmitting}
@@ -281,6 +293,7 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
                 : 'Ej. Juan Carlos'
             }
             value={data.nombres}
+            readOnly={identityLocked}
             onChange={(e) => handleFieldChange('nombres', e.target.value)}
             onBlur={() => markTouched('nombres')}
             disabled={isSubmitting}
@@ -326,6 +339,7 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
             }
             placeholder={data.tipoDocumento === 'RUC' ? 'No requerido para personas jurídicas' : 'Ej. Quispe Morales'}
             value={data.apellidos}
+            readOnly={identityLocked}
             onChange={(e) => handleFieldChange('apellidos', e.target.value)}
             onBlur={() => markTouched('apellidos')}
             disabled={isSubmitting || data.tipoDocumento === 'RUC'}
@@ -430,7 +444,7 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
             </p>
           ) : (
             <p className="mt-1 text-[11px] text-slate-500">
-              Para notificaciones urgentes y verificación procesal del IESTP &ldquo;Suiza&rdquo;.
+              {identityLocked && !data.telefono ? 'Completa este dato para continuar.' : 'Para notificaciones urgentes y verificación procesal del IESTP “Suiza”.'}
             </p>
           )}
         </div>

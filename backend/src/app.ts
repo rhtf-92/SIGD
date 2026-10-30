@@ -50,6 +50,8 @@ import { crearRouterRealtime } from './modules/corelink/realtime.routes.js';
 // Módulos IdentiCore Auth y Casilla
 import { crearRouterAuth } from './domains/identicore/auth.router.js';
 import { crearRouterCasilla } from './domains/identicore/casilla.router.js';
+import { crearRouterTesoreria } from './domains/tesoreria/tesoreria.router.js';
+import { crearRouterCheckoutDemo } from './domains/tesoreria/providers/demo-qr.checkout.js';
 
 // Módulo Almacenamiento S3 MinIO
 import { crearRouterStorage } from './core/storage/storage.router.js';
@@ -66,7 +68,7 @@ import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.servic
 import { UnauthorizedError, ForbiddenError } from './shared/domain/errors/index.js';
 
 export const ROLES_ADMIN_PERMITIDOS = ['ADMINISTRADOR'] as const;
-const ROLES_INSTITUCIONALES = ['ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES'] as const;
+const ROLES_INSTITUCIONALES = ['ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES', 'TESORERIA'] as const;
 
 export function requireInstitutionalRole(req: express.Request, _res: express.Response, next: express.NextFunction): void {
   const token = extraerTokenBearer(req.get('authorization'));
@@ -152,7 +154,13 @@ export function construirApp(
   app.use(securityHeadersMiddleware);
 
   app.use(corsMiddleware);
-  app.use(express.json());
+  app.use(
+    express.json({
+      verify: (req, _res, buf) => {
+        (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.use(contextMiddleware);
 
   app.get('/health', (_req, res) => {
@@ -222,6 +230,8 @@ export function construirApp(
   app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
   app.use('/api/v1', crearRouterAuth(pool));
   app.use('/api/v1', crearRouterCasilla(pool));
+  app.use('/api/v1', crearRouterTesoreria(pool));
+  app.use(crearRouterCheckoutDemo(pool));
   app.use('/api/v1', crearRouterStorage(pool, opts.s3Client));
   app.use('/api/v1', crearRouterTramites(pool, undefined, opts.s3Client));
   app.use(

@@ -20,6 +20,7 @@ type PersonaNatural = {
   fechaNacimiento: string;
   correo: string;
   celular: string;
+  username: string;
   password: string;
   confirmarPassword: string;
   domicilio: Ubigeo;
@@ -45,6 +46,7 @@ type PersonaJuridica = {
   partidaSunarp: string;
   correoCorporativo: string;
   celularContacto: string;
+  username: string;
   password: string;
   confirmarPassword: string;
   domicilio: Ubigeo;
@@ -82,6 +84,7 @@ const personaNaturalBase = {
   fechaNacimiento: fechaHaceAnos(30),
   correo: "juan.perez@example.com",
   celular: "912345678",
+  username: "juan.perez",
   password: "MiClaveSegura#2026",
   confirmarPassword: "MiClaveSegura#2026",
   domicilio: crearUbigeo(),
@@ -114,6 +117,7 @@ const personaJuridicaBase = {
   partidaSunarp: "20123456789",
   correoCorporativo: "contacto@institutosuiza.com",
   celularContacto: "987654321",
+  username: "instituto.suiza",
   password: "MiClaveSegura#2026",
   confirmarPassword: "MiClaveSegura#2026",
   domicilio: crearUbigeo(),
@@ -131,6 +135,16 @@ const crearPersonaJuridica = (
 });
 
 describe("naturalSchema", () => {
+  it('exige nombre de usuario y normaliza mayúsculas y bordes', () => {
+    expect(naturalSchema.safeParse({ ...personaNaturalBase, username: '' }).success).toBe(false);
+    const parsed = naturalSchema.safeParse({ ...personaNaturalBase, username: '  Juan.Perez  ' });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.username).toBe('juan.perez');
+  });
+
+  it.each(['juan perez', 'juan@perez', 'abc', 'x'.repeat(31)])('rechaza usuario %s', (username) => {
+    expect(naturalSchema.safeParse({ ...personaNaturalBase, username }).success).toBe(false);
+  });
   it("debe RECHAZAR un DNI con menos de 8 dígitos", () => {
     const resultado = naturalSchema.safeParse(
       crearPersonaNatural({ numeroDocumento: "1234567" })
@@ -233,6 +247,10 @@ describe("naturalSchema", () => {
 });
 
 describe("juridicalSchema", () => {
+  it('exige también nombre de usuario en la cuenta jurídica', () => {
+    expect(juridicalSchema.safeParse({ ...personaJuridicaBase, username: '' }).success).toBe(false);
+    expect(juridicalSchema.safeParse(personaJuridicaBase).success).toBe(true);
+  });
   it("debe RECHAZAR un RUC que no inicie en 10 o 20", () => {
     const resultado = juridicalSchema.safeParse(
       crearPersonaJuridica({ ruc: "30601234567" })

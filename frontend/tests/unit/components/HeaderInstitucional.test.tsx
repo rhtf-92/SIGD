@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import HeaderInstitucional from '../../../src/components/HeaderInstitucional';
 import { useAuthStore } from '../../../src/stores/authStore';
+import { NAV_ITEMS_POR_ROL } from '../../../src/config/navigation.config';
 
 afterEach(() => {
   useAuthStore.setState({
@@ -42,7 +43,7 @@ describe('HeaderInstitucional — Segmentación Modular y Menús por Rol', () =>
       isAuthenticated: true,
       usuario: {
         id: 'u-ciudadano',
-        nombreCompleto: 'Juan Pérez Ciudadano',
+        nombreCompleto: 'Ciudadano Demo Laboratorio',
         correo: 'juan.perez@example.test',
         rol: 'CIUDADANO',
       },
@@ -64,8 +65,13 @@ describe('HeaderInstitucional — Segmentación Modular y Menús por Rol', () =>
     expect(screen.queryByText('Administración')).not.toBeInTheDocument();
 
     // Perfil y badge
-    expect(screen.getByText('Juan Pérez Ciudadano')).toBeInTheDocument();
-    expect(screen.getByText('CIUDADANO')).toBeInTheDocument();
+    expect(screen.getAllByText('Mi cuenta').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'Mi cuenta' })[0]).toHaveAttribute('href', '/mi-perfil');
+    expect(screen.queryByRole('button', { name: 'Mi perfil' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nuevo Trámite' })).toBeInTheDocument();
+    expect(NAV_ITEMS_POR_ROL.CIUDADANO.find((item) => item.etiqueta === 'Nuevo Trámite')?.ruta).toBe('/tramite');
+    expect(screen.queryByText('Ciudadano Demo Laboratorio')).not.toBeInTheDocument();
+    expect(screen.queryByText('CIUDADANO')).not.toBeInTheDocument();
     expect(screen.getByText('Salir')).toBeInTheDocument();
   });
 

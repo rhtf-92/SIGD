@@ -33,6 +33,7 @@ export default function PersonaNaturalForm({
       fechaNacimiento: "",
       correo: "",
       celular: "",
+      username: "",
       password: "",
       confirmarPassword: "",
       tipoDocumento: "DNI",
@@ -247,6 +248,14 @@ export default function PersonaNaturalForm({
             {errors.celular.message}
           </p>
         )}
+      </div>
+
+      <div>
+        <label htmlFor="usernameNatural" className="block text-sm font-medium text-gray-700 mb-1">Nombre de usuario *</label>
+        <input id="usernameNatural" type="text" autoComplete="username" placeholder="Ej. geric.salas" {...register('username')}
+          className={`w-full px-3 py-2 text-sm border rounded-md ${errors.username ? 'border-red-500' : 'border-gray-300'}`} />
+        <p className="mt-1 text-xs text-gray-500">Este nombre de usuario también podrá utilizarse para iniciar sesión.</p>
+        {errors.username && <p className="mt-1 text-xs text-red-600">{errors.username.message}</p>}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

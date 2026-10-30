@@ -67,6 +67,9 @@ describe('SEC-01 BOLA: Control de Acceso Horizontal y Autorización Real', () =>
         if (userId === '44444444-4444-4444-8444-444444444444') {
           return { rows: [{ id_persona: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', area_id: AREA_DESTINO_ID }] };
         }
+        if (userId === '55555555-5555-4555-8555-555555555555') {
+          return { rows: [{ id_persona: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', area_id: AREA_DESTINO_ID }] };
+        }
         return { rows: [] };
       }
 

@@ -49,7 +49,10 @@ desktop.ini
 *.temp
 *.bak
 
-# --- Artefactos Temporales de Ofimática ---
+# --- Activos Locales Privados / Demo (QR Yape Personal) ---
+public/local-assets/*
+!public/local-assets/.gitkeep
+
 ~$*.docx
 ~$*.xlsx
 ~$*.pptx

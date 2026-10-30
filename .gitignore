@@ -64,7 +64,11 @@ coverage/
 test-results/
 .vitest/
 
-# --- IDEs, Editores y Entornos de Desarrollo ---
+# --- Backups Locales de Base de Datos ---
+backups/
+*.dump
+*.sql.bak
+
 .idea/
 *.sublime-project
 *.sublime-workspace

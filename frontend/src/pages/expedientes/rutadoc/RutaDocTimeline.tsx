@@ -1,17 +1,36 @@
 import type { Trazabilidad } from "./rutadoc.dto";
-import { FechaRutaDoc, IdentificadorRutaDoc } from "./RutaDocEstado";
+import { FechaRutaDoc } from "./RutaDocEstado";
+
+const titulosMovimiento: Record<string, string> = {
+  RECEPCION: "Solicitud recibida",
+  INICIAR_CALIFICACION: "Calificación iniciada",
+  DERIVACION: "Expediente derivado",
+  OBSERVACION: "Expediente observado",
+  CORRECCION: "Subsanación presentada",
+  INICIAR_REVISION: "Revisión iniciada",
+};
+
 export default function RutaDocTimeline({ datos }: { datos: Trazabilidad }) {
-  if (!datos.actuaciones.length) return <p>Sin actuaciones registradas.</p>;
-  return <ol className="space-y-4">{datos.actuaciones.map(a =>
-    <li key={a.movimientoId} className="rounded border p-3">
-      <p>{a.evento} · {a.tipoActuacion}</p>
-      <p>{a.estadoAnterior} → {a.estadoNuevo} · <FechaRutaDoc valor={a.fechaHora} /></p>
-      <div>Movimiento UUID: <IdentificadorRutaDoc valor={a.movimientoId} /></div><p className="break-all">Secuencia: {a.secuencia}</p>
-      <div>Operador: <IdentificadorRutaDoc valor={a.usuarioOperadorId} /></div>
-      <div>Área: <IdentificadorRutaDoc valor={a.areaAnteriorId} /> → <IdentificadorRutaDoc valor={a.areaDestinoId} /></div>
-      {a.remitente && <p>Remitente: {a.remitente}</p>}
-      {a.destinatario && <p>Destinatario: {a.destinatario}</p>}
-      {a.duracionMinutos !== null && <p>Duración: {a.duracionMinutos} minutos</p>}
-      {typeof a.proveido === "string" && <p>{a.proveido}</p>}
-    </li>)}</ol>;
+  const eventos = datos.eventos.length > 0
+    ? datos.eventos
+    : datos.actuaciones.map((actuacion) => ({
+        id: `MOVIMIENTO:${actuacion.movimientoId}`,
+        fechaHora: actuacion.fechaHora,
+        titulo: titulosMovimiento[actuacion.evento] ?? "Actuación administrativa registrada",
+        detalle: null,
+      }));
+
+  if (eventos.length === 0) return <p>Sin eventos registrados para este expediente.</p>;
+
+  return (
+    <ol className="space-y-3" aria-label="Historial cronológico del expediente">
+      {eventos.map((evento) => (
+        <li key={evento.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-800">{evento.titulo}</p>
+          <p className="text-xs text-slate-500"><FechaRutaDoc valor={evento.fechaHora} /></p>
+          {evento.detalle && <p className="mt-1 text-sm text-slate-600">{evento.detalle}</p>}
+        </li>
+      ))}
+    </ol>
+  );
 }

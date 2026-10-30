@@ -46,10 +46,37 @@ export interface UltimoMovimiento {
   usuarioOperadorId: string;
 }
 
+export interface DocumentoAdjuntoResumen {
+  idDocumento: string;
+  nombreArchivo: string;
+  tamanoBytes: number;
+  mimeType: string;
+  sha256: string | null;
+  tipoDocumental: string;
+  creadoEn: string;
+  foliado: boolean;
+  folios: string | null;
+}
+
+export interface SolicitanteResumen {
+  idPersona: string;
+  nombreCompleto: string;
+  tipoDocumento: string;
+  numeroDocumento: string;
+  documentoEnmascarado: string;
+  correo: string | null;
+  telefono: string | null;
+  direccion: string | null;
+}
+
 export interface ExpedienteDetalle extends ExpedienteResumen {
   /** UUID de sigd_tra.expediente.solicitante_id; el nombre requiere IdentiCore. */
   solicitanteId: string | null;
-  resumenDocumentos: { cantidadDocumentos: number; totalFolios: number } | null;
+  resumenDocumentos: {
+    cantidadDocumentos: number;
+    totalFolios: number;
+    cantidadFoliados?: number;
+  } | null;
   ultimoMovimiento: UltimoMovimiento | null;
   /** El cálculo SLA corresponde a otro entregable. */
   sla: null;

@@ -7,6 +7,8 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import CasillaElectronicaPage from "../../../src/pages/casilla/CasillaElectronicaPage";
 import { casillaService } from "../../../src/services/casillaService";
+import { apiClient } from "../../../src/api/client";
+import { useAuthStore } from "../../../src/stores/authStore";
 import type {
   AcuseNotificacion,
   EstadisticasCasilla,
@@ -40,6 +42,8 @@ vi.mock("../../../src/services/casillaService", () => ({
       `/api/v1/casilla/notificaciones/${id}/acuse/descargar`,
   },
 }));
+
+vi.mock("../../../src/api/client", () => ({ apiClient: { get: vi.fn() } }));
 
 // ============================================================================
 // FIXTURES TIPADAS ESTRICTAS (CERO ANY)
@@ -241,6 +245,13 @@ function renderConQueryClient(ui: ReactElement) {
 describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useAuthStore.setState({
+      accessToken: "test-token", isAuthenticated: true,
+      usuario: { id: "00000000-0000-4000-8000-000000000001", nombreCompleto: "Ciudadana Uno", correo: "uno@example.test", rol: "CIUDADANO" },
+    });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {
+      nombreCompleto: "Ciudadana Uno", tipoDocumento: "DNI", numeroDocumento: "12345678", correo: "uno@example.test",
+    } });
     vi.mocked(casillaService.getEstadisticas).mockResolvedValue(mockEstadisticasBase);
     vi.mocked(casillaService.getNotificaciones).mockImplementation(
       async (filtros?: FiltrosCasilla) => {
@@ -268,6 +279,23 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
         return crearRespuestaPaginada(resultado, page, 1, limit);
       },
     );
+  });
+
+  it("muestra la identidad de /auth/me y cambia al ciudadano de la sesión actual", async () => {
+    renderConQueryClient(<CasillaElectronicaPage />);
+    expect(await screen.findByText("Ciudadana Uno")).toBeInTheDocument();
+    expect(screen.getByText("DNI 12345678")).toBeInTheDocument();
+    expect(screen.queryByText("Sergio Serruche Panduro")).not.toBeInTheDocument();
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {
+      nombreCompleto: "Ciudadano Dos", tipoDocumento: "DNI", numeroDocumento: "87654321", correo: "dos@example.test",
+    } });
+    useAuthStore.setState({
+      usuario: { id: "00000000-0000-4000-8000-000000000002", nombreCompleto: "Ciudadano Dos", correo: "dos@example.test", rol: "CIUDADANO" },
+    });
+    expect(await screen.findByText("Ciudadano Dos")).toBeInTheDocument();
+    expect(screen.queryByText("DNI 12345678")).not.toBeInTheDocument();
+    expect(screen.getByText("DNI 87654321")).toBeInTheDocument();
   });
 
   it("a) Renderiza el listado paginado de notificaciones del administrado", async () => {
@@ -591,25 +619,11 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     expect(screen.getByText(hashValidoSha256)).toBeInTheDocument();
   });
 
-  it("j) La dirección de casilla respeta el formato {documento}@casilla.iestpsuiza.edu.pe", async () => {
+  it("j) muestra correo real del perfil y no inventa una dirección de Casilla", async () => {
     renderConQueryClient(<CasillaElectronicaPage />);
-
-    // Comprobación en la cabecera institucional del administrado
-    const regexFormatoCasilla = /^[a-zA-Z0-9._%+-]+@casilla\.iestpsuiza\.edu\.pe$/;
-    const direccionEsperada = "74561238@casilla.iestpsuiza.edu.pe";
-
-    expect(direccionEsperada).toMatch(regexFormatoCasilla);
-
-    const elementoCasilla = await screen.findByText(direccionEsperada);
-    expect(elementoCasilla).toBeInTheDocument();
-
-    // Comprobación de que coincide con el DNI del titular
-    expect(mockAcuseNotificado.destinatario.direccionCasilla).toBe(
-      `${mockAcuseNotificado.destinatario.numeroDocumento}@casilla.iestpsuiza.edu.pe`,
-    );
-    expect(mockAcuseNotificado.destinatario.direccionCasilla).toMatch(
-      regexFormatoCasilla,
-    );
+    expect(await screen.findByText("uno@example.test")).toBeInTheDocument();
+    expect(screen.getByText("Dirección de Casilla no configurada.")).toBeInTheDocument();
+    expect(screen.queryByText("74561238@casilla.iestpsuiza.edu.pe")).not.toBeInTheDocument();
   });
 
   it("k) Permite buscar por texto libre, cambiar el límite por página y limpiar los filtros", async () => {

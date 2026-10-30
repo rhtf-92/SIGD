@@ -21,6 +21,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
     await user.type(screen.getByLabelText(/Fecha de Nacimiento \*/i), "1998-05-15");
     await user.type(screen.getByLabelText(/Correo Electrónico \*/i), "sergio@example.com");
     await user.type(screen.getByLabelText(/Celular \*/i), "961234567");
+    await user.type(screen.getByLabelText(/Nombre de usuario \*/i), "sergio.panduro");
     await user.type(screen.getByLabelText(/^Contraseña \*/i), "MiClaveSegura#2026");
     await user.type(screen.getByLabelText(/^Confirmar contraseña \*/i), "MiClaveSegura#2026");
 
@@ -50,6 +51,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
     await llenarFormularioNatural(user);
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+    await user.click(await screen.findByRole("button", { name: "Confirmar y crear cuenta" }));
 
     const statusBanner = await screen.findByRole("status", {}, { timeout: 4000 });
     expect(statusBanner).toHaveTextContent("Registro completado");
@@ -73,6 +75,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
     await llenarFormularioNatural(user);
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+    await user.click(await screen.findByRole("button", { name: "Confirmar y crear cuenta" }));
 
     const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(alertBanner).toHaveTextContent("Documento inválido");
@@ -96,6 +99,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
     await llenarFormularioNatural(user);
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+    await user.click(await screen.findByRole("button", { name: "Confirmar y crear cuenta" }));
 
     const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(alertBanner).toHaveTextContent("El DNI ya se encuentra registrado");
@@ -119,6 +123,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
     await llenarFormularioNatural(user);
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+    await user.click(await screen.findByRole("button", { name: "Confirmar y crear cuenta" }));
 
     const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(alertBanner).toHaveTextContent("Ubigeo inválido");
@@ -142,6 +147,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
     await llenarFormularioNatural(user);
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+    await user.click(await screen.findByRole("button", { name: "Confirmar y crear cuenta" }));
 
     const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(alertBanner).toHaveTextContent("Demasiadas solicitudes");
@@ -165,6 +171,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
     await llenarFormularioNatural(user);
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+    await user.click(await screen.findByRole("button", { name: "Confirmar y crear cuenta" }));
 
     const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(alertBanner).toHaveTextContent("Error interno de base de datos");
@@ -184,6 +191,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
     await llenarFormularioNatural(user);
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+    await user.click(await screen.findByRole("button", { name: "Confirmar y crear cuenta" }));
 
     const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(alertBanner).toBeInTheDocument();
@@ -204,6 +212,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
     await llenarFormularioNatural(user);
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+    await user.click(await screen.findByRole("button", { name: "Confirmar y crear cuenta" }));
 
     const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(alertBanner).toHaveTextContent("timeout of 10000ms exceeded");
@@ -231,6 +240,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
 
     await llenarFormularioNatural(user);
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+    await user.click(await screen.findByRole("button", { name: "Confirmar y crear cuenta" }));
 
     const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(alertBanner).toHaveTextContent(/idPersona canónico \(UUID\)/i);

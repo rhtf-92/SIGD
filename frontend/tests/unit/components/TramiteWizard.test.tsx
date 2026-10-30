@@ -727,13 +727,13 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
       '/api/v1/tramites/radicacion-virtual',
       expect.objectContaining({
         registroVersionId: REGISTRO_VERSION_CERTIFICADO,
-        idPersona: ID_PERSONA,
       })
     );
+    expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('idPersona');
     expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('idTipoTramiteTupa');
   });
 
-  it('Radicación libre conserva idPersona y omite registroVersionId', async () => {
+  it('Radicación libre deja la identidad al backend y omite registroVersionId', async () => {
     const user = userEvent.setup();
     const mockPost = vi.spyOn(apiClient, 'post').mockResolvedValue({
       data: {
@@ -757,8 +757,9 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
 
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v1/tramites/radicacion-virtual',
-      expect.objectContaining({ idPersona: ID_PERSONA }),
+      expect.any(Object),
     );
+    expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('idPersona');
     expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('registroVersionId');
   });
 

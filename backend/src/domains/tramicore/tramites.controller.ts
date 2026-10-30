@@ -192,6 +192,9 @@ export function crearRouterTramites(
     if (req.body?.idPersona !== undefined && req.body.idPersona !== actor.id_persona) {
       throw new ForbiddenError({ detail: 'No puede radicar un expediente a nombre de otra persona.' });
     }
+    if (req.body?.personaId !== undefined || req.body?.solicitanteId !== undefined || req.body?.usuarioId !== undefined) {
+      throw new ForbiddenError({ detail: 'El solicitante se determina exclusivamente desde la sesión autenticada.' });
+    }
     const datos = radicacionVirtualSchema.parse({ ...req.body, idPersona: actor.id_persona });
     const radicacion = await radicacionService.radicar(datos);
     res.status(201).json({
@@ -497,13 +500,13 @@ export function crearRouterTramites(
 
     // Para CIUDADANO:
     const solicitud = await tupaAccesoRepo.obtenerUltimaSolicitud(identidad.idPersona);
-    const autorizado = solicitud?.estado === 'APROBADA';
+    const autorizado = await tupaAccesoRepo.tieneAccesoAprobado(identidad.idPersona);
 
     return res.status(200).json({
       autenticado: true,
       autorizado,
       roles: identidad.roles,
-      estado: solicitud?.estado ?? 'NINGUNA',
+      estado: autorizado ? 'APROBADA' : solicitud?.estado === 'APROBADA' ? 'EXPIRADA' : solicitud?.estado ?? 'NINGUNA',
       solicitud,
     });
   });
@@ -547,7 +550,9 @@ export function crearRouterTramites(
 
     // Verificar si ya tiene solicitud previa pendiente o aprobada
     const ultima = await tupaAccesoRepo.obtenerUltimaSolicitud(identidad.idPersona);
-    if (ultima && (ultima.estado === 'PENDIENTE' || ultima.estado === 'APROBADA')) {
+    const aprobacionVigente = ultima?.estado === 'APROBADA' &&
+      (ultima.vigenciaHasta === null || new Date(ultima.vigenciaHasta).getTime() > Date.now());
+    if (ultima && (ultima.estado === 'PENDIENTE' || aprobacionVigente)) {
       return res.status(409).json({
         error: 'SOLICITUD_EXISTENTE',
         mensaje: `Ya cuenta con una solicitud de acceso en estado ${ultima.estado}.`,

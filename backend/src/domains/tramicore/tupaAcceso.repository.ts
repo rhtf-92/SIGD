@@ -186,11 +186,11 @@ export class TupaAccesoRepository {
   }): Promise<SolicitudTupaRegistro | null> {
     const query = `
       UPDATE sigd_doc.tupa_solicitud_acceso
-         SET estado = $1,
+         SET estado = $1::varchar(20),
              fecha_resolucion = now(),
              resuelto_por = $2,
              observacion_resolucion = $3,
-             vigencia_hasta = CASE WHEN $1 = 'APROBADA' THEN now() + INTERVAL '30 days' ELSE NULL END
+             vigencia_hasta = CASE WHEN $1::varchar(20) = 'APROBADA' THEN now() + INTERVAL '30 days' ELSE NULL END
        WHERE id_solicitud = $4
       RETURNING id_solicitud, id_persona, correo, motivo, fecha_solicitud,
                 estado, fecha_resolucion, resuelto_por, observacion_resolucion, vigencia_hasta;

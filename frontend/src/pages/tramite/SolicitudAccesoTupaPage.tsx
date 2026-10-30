@@ -73,12 +73,17 @@ export default function SolicitudAccesoTupaPage() {
 
   const handleSubmitSolicitud = async (e: FormEvent) => {
     e.preventDefault();
+    setMensajeExito(null);
     if (!aceptaTratamientoDatos) {
       setMensajeError('Debe aceptar el aviso de tratamiento de datos personales conforme a la Ley 29733.');
       return;
     }
     if (motivo.trim().length < 5) {
       setMensajeError('El motivo debe contener al menos 5 caracteres descriptivos.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim())) {
+      setMensajeError('Complete un correo electrónico válido para esta solicitud.');
       return;
     }
 
@@ -94,7 +99,7 @@ export default function SolicitudAccesoTupaPage() {
         },
         body: JSON.stringify({
           motivo: motivo.trim(),
-          correo: correo.trim() || 'ciudadano@iestpsuiza.edu.pe',
+          correo: correo.trim(),
           aceptaTratamientoDatos: true,
         }),
       });
@@ -112,20 +117,8 @@ export default function SolicitudAccesoTupaPage() {
         solicitud: nuevaSolicitud,
       });
       setMensajeExito('Su solicitud de acceso al TUPA ha sido registrada exitosamente y se encuentra en revisión.');
-    } catch (err: any) {
-      // Mock defensivo para pruebas
-      setEstadoAutorizacion({
-        autenticado: true,
-        autorizado: false,
-        estado: 'PENDIENTE',
-        solicitud: {
-          idSolicitud: 'mock-solicitud-1',
-          estado: 'PENDIENTE',
-          motivo,
-          fechaSolicitud: new Date().toISOString(),
-        },
-      });
-      setMensajeExito('Solicitud registrada en modo de contingencia defensiva.');
+    } catch (err: unknown) {
+      setMensajeError(err instanceof Error ? err.message : 'No se pudo registrar la solicitud de acceso.');
     } finally {
       setEnviando(false);
     }

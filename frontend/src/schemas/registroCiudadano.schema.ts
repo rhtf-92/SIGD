@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const usernameSchema = z.string().trim().toLowerCase().min(4, 'Ingrese al menos 4 caracteres')
+  .max(30, 'Use como máximo 30 caracteres')
+  .regex(/^[a-z0-9._-]+$/, 'Use solo letras, números, punto, guion o guion bajo, sin espacios');
+
 /* --- Persona Natural --- */
 
 /* Schema persona natural */
@@ -35,6 +39,7 @@ export const naturalSchema = z
         { message: "La persona debe tener al menos 16 años" }
       ),
     correo: z.string().email({ message: "Formato de correo RFC 5322 inválido" }),
+    username: usernameSchema,
     celular: z
       .string()
       .regex(/^9[0-9]{8}$/, {
@@ -143,6 +148,7 @@ export const juridicalSchema = z
     representanteLegal: juridicalDocumentSchema,
     partidaSunarp: z.string(),
     correoCorporativo: z.string().email({ message: "Formato de correo RFC 5322 inválido" }),
+    username: usernameSchema,
     celularContacto: z
       .string()
       .regex(/^9[0-9]{8}$/, {

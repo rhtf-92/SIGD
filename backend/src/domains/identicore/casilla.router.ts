@@ -16,7 +16,9 @@ import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
-import { NotFoundError } from '../../shared/domain/errors/index.js';
+import { NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
+import { generarUrlPresigned } from '../../core/storage/s3-storage.service.js';
 
 const consultaPaginadaSchema = z
   .object({
@@ -56,30 +58,37 @@ interface FilaNotificacionCasilla {
   creado_en: Date | string;
 }
 
-function mapearNotificacion(fila: FilaNotificacionCasilla) {
+interface DestinatarioCasilla {
+  nombresCompletos: string;
+  numeroDocumento: string;
+  tipoDocumento: 'DNI' | 'CE' | 'RUC';
+  direccionCasilla: string;
+}
+
+function mapearNotificacion(fila: FilaNotificacionCasilla, destinatario?: DestinatarioCasilla) {
   const anio = new Date().getFullYear();
-  const cut = fila.cut ?? `EXP-${anio}-${fila.id.slice(0, 6).toUpperCase()}`;
-  const numeroDocumento = fila.numero_documento ?? `RD N.° 0${fila.id.slice(0, 3)}-${anio}-DG-IESTP-SUIZA`;
+  const cut = fila.cut ?? '';
+  const numeroDocumento = fila.numero_documento ?? '';
   const fechaDeposito = typeof fila.fecha_deposito === 'string' ? fila.fecha_deposito : fila.fecha_deposito.toISOString();
   const fechaLectura = fila.fecha_lectura
     ? typeof fila.fecha_lectura === 'string'
       ? fila.fecha_lectura
       : fila.fecha_lectura.toISOString()
     : null;
-  const hashSha256 = fila.hash_sha256 ?? crypto.createHash('sha256').update(fila.id).digest('hex');
-  const cvd = fila.cvd ?? `CVD-${anio}-RD-${fila.id.slice(0, 6).toUpperCase()}-A4F2`;
+  const hashSha256 = fila.hash_sha256 ?? '';
+  const cvd = fila.cvd ?? '';
 
   return {
     id: fila.id,
     numeroNotificacion: `NOT-${anio}-${fila.id.slice(0, 6).toUpperCase()}`,
     numeroExpediente: cut,
-    usuarioId: fila.usuario_id ?? '00000000-0000-0000-0000-000000000001',
+    usuarioId: fila.usuario_id,
     cut,
     asunto: fila.asunto,
     tipo: 'RESOLUCION' as const,
     tipoActo: fila.tipo_acto,
     prioridad: 'NORMAL' as const,
-    unidadEmisora: 'Secretaría Académica',
+    unidadEmisora: 'No registrada',
     numeroDocumento,
     estado: fila.estado === 'LEIDO' ? ('LEIDO' as const) : ('NO_LEIDO' as const),
     fechaDeposito,
@@ -109,29 +118,17 @@ function mapearNotificacion(fila: FilaNotificacionCasilla) {
       asunto: fila.asunto,
       resumenLegal: typeof fila.cuerpo === 'string' ? fila.cuerpo : fila.asunto,
       nombreArchivoPdf: 'acto_notificado.pdf',
-      tamanoArchivo: '1.2 MB',
+      tamanoArchivo: 'No registrado',
       hashIntegridadSha256: hashSha256,
       cvd,
-      firmantes: [
-        {
-          nombre: 'Lic. Julio César Mori Paredes',
-          cargo: 'Director General',
-          fechaFirma: fechaDeposito,
-          entidadCertificadora: 'RENIEC',
-        },
-      ],
+      firmantes: [],
     },
-    acuse: fila.id_acuse
+    acuse: fila.id_acuse && destinatario
       ? {
           idAcuse: fila.id_acuse,
           idNotificacion: fila.id,
           numeroExpediente: cut,
-          destinatario: {
-            nombresCompletos: 'Administrado Institucional',
-            numeroDocumento: '74561238',
-            tipoDocumento: 'DNI' as const,
-            direccionCasilla: '74561238@casilla.iestpsuiza.edu.pe',
-          },
+          destinatario,
           timestampGeneracionIso:
             typeof fila.acuse_sellado_tiempo === 'string'
               ? fila.acuse_sellado_tiempo
@@ -152,25 +149,48 @@ function mapearNotificacion(fila: FilaNotificacionCasilla) {
 export function crearRouterCasilla(pool: Pool): Router {
   const router = Router();
 
+  async function obtenerDestinatario(usuarioId: string): Promise<DestinatarioCasilla> {
+    const resultado = await pool.query<{
+      nombre_completo: string; id_documento: string; tipo: string;
+    }>(`
+      SELECT COALESCE(pn.nombre_completo, pj.razon_social) AS nombre_completo,
+             p.id_documento, p.tipo
+        FROM sigd_auth.cuenta_usuario c
+        JOIN sigd_auth.persona p ON p.id_persona = c.id_persona
+        LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+        LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = p.id_persona
+       WHERE c.id_usuario = $1::uuid`, [usuarioId]);
+    const persona = resultado.rows[0];
+    if (!persona) throw new UnauthorizedError({ detail: 'La cuenta no tiene una persona asociada.' });
+    return {
+      nombresCompletos: persona.nombre_completo,
+      numeroDocumento: persona.id_documento,
+      tipoDocumento: persona.tipo === 'JURIDICA' ? 'RUC' : /^\d{8}$/.test(persona.id_documento) ? 'DNI' : 'CE',
+      // El esquema actual no almacena una dirección de casilla propia.
+      direccionCasilla: '',
+    };
+  }
+
   function obtenerUsuarioId(req: Request): string {
     const token = extraerTokenBearer(req.get('authorization'));
-    if (!token) {
-      return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
+    if (!token) throw new UnauthorizedError({ detail: 'Se requiere una sesión válida para consultar la Casilla.' });
+    const usuarioId = verificarTokenAcceso(token).sub;
+    if (!z.uuid().safeParse(usuarioId).success) {
+      throw new UnauthorizedError({ detail: 'La sesión no identifica una cuenta válida.' });
     }
-    try {
-      const claims = verificarTokenAcceso(token);
-      return claims.sub;
-    } catch {
-      return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
-    }
+    return usuarioId;
   }
+
+  router.use('/casilla', (req, _res, next) => {
+    try { obtenerUsuarioId(req); next(); } catch (error) { next(error); }
+  });
 
   // #7 — GET /casilla/notificaciones y alias /casilla/bandeja
   const handlerBandeja = async (req: Request, res: Response) => {
     const query = consultaPaginadaSchema.parse(req.query);
     const usuarioId = obtenerUsuarioId(req);
 
-    const condiciones: string[] = ['(usuario_id = $1 OR usuario_id IS NULL OR $1 = \'00000000-0000-0000-0000-000000000001\')'];
+    const condiciones: string[] = ['usuario_id = $1::uuid'];
     const valores: unknown[] = [usuarioId];
 
     if (query.estado !== 'TODOS') {
@@ -206,7 +226,8 @@ export function crearRouterCasilla(pool: Pool): Router {
       paginacionValores,
     );
 
-    const notificaciones = itemsRes.rows.map(mapearNotificacion);
+    const destinatario = itemsRes.rows.length ? await obtenerDestinatario(usuarioId) : undefined;
+    const notificaciones = itemsRes.rows.map((fila) => mapearNotificacion(fila, destinatario));
     const totalPaginas = Math.ceil(total / query.porPagina) || 1;
 
     res.status(200).json({
@@ -237,10 +258,11 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #8 — GET /casilla/notificaciones/:id
   router.get('/casilla/notificaciones/:id', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(req);
 
     const resultado = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
-      [id],
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND usuario_id = $2::uuid`,
+      [id, usuarioId],
     );
 
     if (resultado.rows.length === 0) {
@@ -249,20 +271,21 @@ export function crearRouterCasilla(pool: Pool): Router {
       });
     }
 
-    res.status(200).json(mapearNotificacion(resultado.rows[0]));
+    res.status(200).json(mapearNotificacion(resultado.rows[0], await obtenerDestinatario(usuarioId)));
   });
 
   // #9 — PATCH /casilla/notificaciones/:id/lectura
   router.patch('/casilla/notificaciones/:id/lectura', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(req);
 
     const resultado = await pool.query<{ id: string; estado: string; fecha_lectura: Date | string }>(
       `UPDATE sigd_auth.notificacion_casilla
           SET estado = 'LEIDO',
               fecha_lectura = COALESCE(fecha_lectura, now())
-        WHERE id = $1
+        WHERE id = $1::uuid AND usuario_id = $2::uuid
         RETURNING id, estado, fecha_lectura`,
-      [id],
+      [id, usuarioId],
     );
 
     if (resultado.rows.length === 0) {
@@ -286,10 +309,11 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #10 — POST /casilla/notificaciones/:id/acuse
   router.post('/casilla/notificaciones/:id/acuse', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(req);
 
     const notifRes = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
-      [id],
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND usuario_id = $2::uuid`,
+      [id, usuarioId],
     );
 
     if (notifRes.rows.length === 0) {
@@ -300,6 +324,7 @@ export function crearRouterCasilla(pool: Pool): Router {
 
     const notif = notifRes.rows[0];
     const anio = new Date().getFullYear();
+    const destinatario = await obtenerDestinatario(usuarioId);
 
     // -------------------------------------------------------------------------
     // LPAG Art. 20 (Modalidades de Notificación) & Inmutabilidad Forense:
@@ -331,13 +356,8 @@ export function crearRouterCasilla(pool: Pool): Router {
         data: {
           idAcuse: notif.id_acuse,
           idNotificacion: id,
-          numeroExpediente: notif.cut ?? `EXP-${anio}-000142`,
-          destinatario: {
-            nombresCompletos: 'Administrado Institucional',
-            numeroDocumento: '74561238',
-            tipoDocumento: 'DNI' as const,
-            direccionCasilla: '74561238@casilla.iestpsuiza.edu.pe',
-          },
+          numeroExpediente: notif.cut ?? '',
+          destinatario,
           timestampGeneracionIso: selladoOriginalIso,
           selladoTiempo: selladoOriginalIso,
           hashSha256Acuse: hashAcuseExistente,
@@ -352,7 +372,7 @@ export function crearRouterCasilla(pool: Pool): Router {
           mensajeLegal:
             'Acuse Notificatorio Digital emitido conforme al Art. 20 del TUO de la Ley N° 27444 y Ley N° 29733.',
         },
-        notificacionActualizada: mapearNotificacion(notif),
+        notificacionActualizada: mapearNotificacion(notif, destinatario),
       });
     }
 
@@ -370,8 +390,8 @@ export function crearRouterCasilla(pool: Pool): Router {
           SET id_acuse = $1,
               acuse_hash_sha256 = $2,
               acuse_sellado_tiempo = COALESCE(acuse_sellado_tiempo, now())
-        WHERE id = $3 AND id_acuse IS NULL`,
-      [idAcuse, hashAcuse, id],
+        WHERE id = $3::uuid AND usuario_id = $4::uuid AND id_acuse IS NULL`,
+      [idAcuse, hashAcuse, id, usuarioId],
     );
 
     const notificacionActualizada = mapearNotificacion({
@@ -379,7 +399,7 @@ export function crearRouterCasilla(pool: Pool): Router {
       id_acuse: idAcuse,
       acuse_hash_sha256: hashAcuse,
       acuse_sellado_tiempo: ahoraIso,
-    });
+    }, destinatario);
 
     res.status(201).json({
       success: true,
@@ -387,13 +407,8 @@ export function crearRouterCasilla(pool: Pool): Router {
       data: {
         idAcuse,
         idNotificacion: id,
-        numeroExpediente: notif.cut ?? `EXP-${anio}-000142`,
-        destinatario: {
-          nombresCompletos: 'Administrado Institucional',
-          numeroDocumento: '74561238',
-          tipoDocumento: 'DNI' as const,
-          direccionCasilla: '74561238@casilla.iestpsuiza.edu.pe',
-        },
+        numeroExpediente: notif.cut ?? '',
+        destinatario,
         timestampGeneracionIso: ahoraIso,
         selladoTiempo: ahoraIso,
         hashSha256Acuse: hashAcuse,
@@ -420,7 +435,7 @@ export function crearRouterCasilla(pool: Pool): Router {
       `SELECT COUNT(*) FILTER (WHERE estado = 'NO_LEIDO')::text AS no_leidas,
               COUNT(*)::text AS total
          FROM sigd_auth.notificacion_casilla
-        WHERE usuario_id = $1 OR usuario_id IS NULL OR $1 = '00000000-0000-0000-0000-000000000001'`,
+        WHERE usuario_id = $1::uuid`,
       [usuarioId],
     );
 
@@ -441,8 +456,19 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #12 — GET /casilla/notificaciones/:id/documento/descargar
   router.get('/casilla/notificaciones/:id/documento/descargar', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(req);
+    const documento = await pool.query<{ documento_url: string | null }>(
+      `SELECT documento_url FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND usuario_id = $2::uuid`,
+      [id, usuarioId],
+    );
+    if (!documento.rows[0]?.documento_url) throw new NotFoundError({ detail: 'Documento no disponible para esta cuenta.' });
+    let downloadUrl = documento.rows[0].documento_url;
+    if (!downloadUrl.startsWith('http://') && !downloadUrl.startsWith('https://')) {
+      const configS3 = obtenerConfiguracionS3();
+      downloadUrl = generarUrlPresigned(downloadUrl, configS3, { metodo: 'GET', expiraSegundos: 900 });
+    }
     res.status(200).json({
-      downloadUrl: `/api/v1/storage/download/sigd-resoluciones/rd-${id}.pdf`,
+      downloadUrl,
       expiraEnSegundos: 900,
     });
   });
@@ -450,10 +476,13 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #13 — GET /casilla/notificaciones/:id/acuse/descargar
   router.get('/casilla/notificaciones/:id/acuse/descargar', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    res.status(200).json({
-      downloadUrl: `/api/v1/storage/download/sigd-acuses/acuse-${id}.pdf`,
-      expiraEnSegundos: 900,
-    });
+    const usuarioId = obtenerUsuarioId(req);
+    const acuse = await pool.query<{ id_acuse: string | null }>(
+      `SELECT id_acuse FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND usuario_id = $2::uuid`,
+      [id, usuarioId],
+    );
+    if (!acuse.rows[0]?.id_acuse) throw new NotFoundError({ detail: 'Acuse no disponible para esta cuenta.' });
+    throw new NotFoundError({ detail: 'El acuse no tiene un archivo descargable persistido.' });
   });
 
   return router;

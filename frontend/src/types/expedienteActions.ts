@@ -19,6 +19,30 @@ export interface SolicitudDerivacion {
   readonly proveido: string;
 }
 
+export interface SolicitudRecepcion {
+  readonly expediente: ExpedienteAccionReferencia;
+}
+
+export interface SolicitudAtencion {
+  readonly expediente: ExpedienteAccionReferencia;
+  readonly resultado_resumen: string;
+  readonly observacion_interna?: string;
+  readonly documento_respuesta_id?: string;
+  readonly s3_key?: string;
+  readonly sha256?: string;
+  readonly nombre_archivo?: string;
+  readonly tamano_bytes?: number;
+  readonly mime_type?: string;
+}
+
+export interface SolicitudArchivado {
+  readonly expediente: ExpedienteAccionReferencia;
+  readonly estante: string;
+  readonly balda: string;
+  readonly caja: string;
+  readonly observaciones?: string;
+}
+
 export interface SolicitudObservacion {
   readonly expediente: ExpedienteAccionReferencia;
   readonly motivo: string;
@@ -36,6 +60,9 @@ export interface SolicitudAcumulacion {
 }
 
 export interface ResultadoDerivacion { derivacionId: string; nuevoEstado: string }
+export interface ResultadoRecepcion { ok: boolean; expedienteId: string; nuevoEstado: string }
+export interface ResultadoAtencion { ok: boolean; expedienteId: string; nuevoEstado: string }
+export interface ResultadoArchivado { ok: boolean; expedienteId: string; nuevoEstado: string }
 export interface ResultadoObservacion { estado: "OBSERVADO"; slaPaused: true }
 export interface ResultadoSubsanacion { estado: "EN_REVISION" | "EN_TRAMITE"; expedienteId: string; motivo: string; estadoRutaDoc?: string; pestana?: string }
 
@@ -50,6 +77,9 @@ export class ErrorAccionExpediente extends Error {
 
 export interface ServicioExpedienteActions {
   derivar?: (entrada: SolicitudDerivacion) => Promise<ResultadoDerivacion>;
+  recepcionar?: (entrada: SolicitudRecepcion) => Promise<ResultadoRecepcion>;
+  atender?: (entrada: SolicitudAtencion) => Promise<ResultadoAtencion>;
+  archivar?: (entrada: SolicitudArchivado) => Promise<ResultadoArchivado>;
   observar?: (entrada: SolicitudObservacion) => Promise<ResultadoObservacion>;
   subsanar?: (entrada: SolicitudSubsanacion) => Promise<ResultadoSubsanacion>;
   /** Adaptador futuro: solo resuelve cuando el servidor confirma la operación. */

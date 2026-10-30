@@ -73,8 +73,8 @@ export default function HomePage() {
           <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-cyan-200/80 bg-gradient-to-b from-white/95 via-cyan-50/80 to-white px-4 py-1.5 text-xs text-slate-900 shadow-[0_2px_8px_rgba(6,182,212,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-xs ring-1 ring-cyan-400/20">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>
-              Sesión activa: <strong className="font-semibold">{usuario.nombreCompleto}</strong> (
-              <span className="font-mono font-bold text-cyan-800">{usuario.rol}</span>)
+              Sesión activa: <strong className="font-semibold">{usuario.rol === 'CIUDADANO' ? 'Mi cuenta' : usuario.nombreCompleto}</strong>
+              {usuario.rol !== 'CIUDADANO' && <> (<span className="font-mono font-bold text-cyan-800">{usuario.rol}</span>)</>}
             </span>
           </div>
         )}

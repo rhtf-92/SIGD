@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PersonaNaturalForm from "../../components/registro/PersonaNaturalForm";
 import PersonaJuridicaForm from "../../components/registro/PersonaJuridicaForm";
@@ -21,6 +21,9 @@ export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pendiente, setPendiente] = useState<{ tipo: 'NATURAL'; datos: Natural } | { tipo: 'JURIDICA'; datos: Juridical } | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
+  const confirmandoRef = useRef(false);
 
   const mergeIdPersonaToWizardDraft = (idPersona: string) => {
     if (typeof window === 'undefined' || !window.sessionStorage) return;
@@ -37,7 +40,7 @@ export default function RegistroCiudadanoPage() {
     }
   };
 
-  const handleNaturalSubmit = async (data: Natural) => {
+  const registrarNatural = async (data: Natural) => {
     const partesApellidos = data.apellidos.trim().split(/\s+/);
     const errorCampos = validarCamposObligatorios(data.celular, data.domicilio?.distritoCodigo ?? '', data.domicilio?.direccionExacta ?? '', data.password, data.confirmarPassword);
     if (errorCampos || partesApellidos.length < 2) {
@@ -56,6 +59,7 @@ export default function RegistroCiudadanoPage() {
       apellidoPaterno,
       apellidoMaterno,
       correo: data.correo.trim().toLowerCase(),
+      username: data.username.trim().toLowerCase(),
       celular: data.celular,
       ubigeoDistrito: data.domicilio.distritoCodigo,
       direccion: data.domicilio.direccionExacta.trim(),
@@ -83,7 +87,7 @@ export default function RegistroCiudadanoPage() {
 
       mergeIdPersonaToWizardDraft(idPersona.trim());
       setErrorMessage(null);
-      setSuccessMessage('Registro completado. Ya puede iniciar sesión con la contraseña que eligió.');
+      setSuccessMessage('Registro completado. Ya puede iniciar sesión con su nombre de usuario o correo y la contraseña que eligió.');
     } catch (err: any) {
       setSuccessMessage(null);
       const msg = err.response?.data?.detail || err.response?.data?.message || err.message || "Error al procesar el registro en el servidor. Verifique su conexión.";
@@ -91,7 +95,7 @@ export default function RegistroCiudadanoPage() {
     }
   };
 
-  const handleJuridicaSubmit = async (data: Juridical) => {
+  const registrarJuridica = async (data: Juridical) => {
     if (data.representanteLegal.tipoDocumento !== 'DNI') {
       setSuccessMessage(null);
       setErrorMessage('El representante legal debe identificarse con DNI según el contrato actual.');
@@ -112,6 +116,7 @@ export default function RegistroCiudadanoPage() {
       dniRepresentante: data.representanteLegal.numeroDocumento,
       nombreRepresentante: `${data.representanteLegal.nombres} ${data.representanteLegal.apellidos}`.trim(),
       correo: data.correoCorporativo.trim().toLowerCase(),
+      username: data.username.trim().toLowerCase(),
       celular: data.celularContacto,
       ubigeoDistrito: data.domicilio.distritoCodigo,
       direccion: data.domicilio.direccionExacta.trim(),
@@ -139,11 +144,49 @@ export default function RegistroCiudadanoPage() {
 
       mergeIdPersonaToWizardDraft(idPersona.trim());
       setErrorMessage(null);
-      setSuccessMessage('Registro completado. Ya puede iniciar sesión con la contraseña que eligió.');
+      setSuccessMessage('Registro completado. Ya puede iniciar sesión con su nombre de usuario o correo y la contraseña que eligió.');
     } catch (err: any) {
       setSuccessMessage(null);
       const msg = err.response?.data?.detail || err.response?.data?.message || err.message || "Error al procesar el registro en el servidor. Verifique su conexión.";
       setErrorMessage(msg);
+    }
+  };
+
+  const prepararNatural = (datos: Natural) => {
+    if (confirmandoRef.current) return;
+    const error = validarCamposObligatorios(datos.celular, datos.domicilio?.distritoCodigo ?? '', datos.domicilio?.direccionExacta ?? '', datos.password, datos.confirmarPassword);
+    if (error || datos.apellidos.trim().split(/\s+/).length < 2) {
+      setErrorMessage(error ?? 'Ingrese ambos apellidos para completar el registro.');
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setPendiente({ tipo: 'NATURAL', datos });
+  };
+
+  const prepararJuridica = (datos: Juridical) => {
+    if (confirmandoRef.current) return;
+    const error = validarCamposObligatorios(datos.celularContacto, datos.domicilio?.distritoCodigo ?? '', datos.domicilio?.direccionExacta ?? '', datos.password, datos.confirmarPassword);
+    if (error || datos.representanteLegal.tipoDocumento !== 'DNI') {
+      setErrorMessage(error ?? 'El representante legal debe identificarse con DNI.');
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setPendiente({ tipo: 'JURIDICA', datos });
+  };
+
+  const confirmarRegistro = async () => {
+    if (!pendiente || confirmandoRef.current) return;
+    confirmandoRef.current = true;
+    setConfirmando(true);
+    try {
+      if (pendiente.tipo === 'NATURAL') await registrarNatural(pendiente.datos);
+      else await registrarJuridica(pendiente.datos);
+      setPendiente(null);
+    } finally {
+      confirmandoRef.current = false;
+      setConfirmando(false);
     }
   };
 
@@ -230,7 +273,12 @@ export default function RegistroCiudadanoPage() {
           hidden={activeTab !== "NATURAL"}
         >
           {activeTab === "NATURAL" && (
-            <PersonaNaturalForm onSubmit={handleNaturalSubmit} />
+            <>
+              <p className="mb-4 rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-950">
+                Verifica cuidadosamente tu número de documento. Este dato se utilizará para identificar tu cuenta y no podrá modificarse directamente después del registro.
+              </p>
+              <PersonaNaturalForm onSubmit={prepararNatural} />
+            </>
           )}
         </div>
 
@@ -241,7 +289,12 @@ export default function RegistroCiudadanoPage() {
           hidden={activeTab !== "JURIDICA"}
         >
           {activeTab === "JURIDICA" && (
-            <PersonaJuridicaForm onSubmit={handleJuridicaSubmit} />
+            <>
+              <p className="mb-4 rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-950">
+                Verifica cuidadosamente el RUC de la entidad. No podrá modificarse directamente después del registro.
+              </p>
+              <PersonaJuridicaForm onSubmit={prepararJuridica} />
+            </>
           )}
         </div>
 
@@ -275,6 +328,22 @@ export default function RegistroCiudadanoPage() {
             >
               Cerrar
             </button>
+          </div>
+        )}
+        {pendiente && (
+          <div role="dialog" aria-modal="true" aria-labelledby="confirmar-documento" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+              <h2 id="confirmar-documento" className="text-lg font-bold text-slate-900">Verifica tu documento antes de continuar</h2>
+              <p className="mt-3 text-sm text-slate-700">
+                ¿Confirmas que el {pendiente.tipo === 'JURIDICA' ? 'RUC' : pendiente.datos.tipoDocumento} <strong>{pendiente.tipo === 'JURIDICA' ? pendiente.datos.ruc : pendiente.datos.numeroDocumento}</strong> es correcto?
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" onClick={() => setPendiente(null)} disabled={confirmando} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50">Revisar</button>
+                <button type="button" onClick={() => void confirmarRegistro()} disabled={confirmando} className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                  {confirmando ? 'Creando cuenta...' : 'Confirmar y crear cuenta'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

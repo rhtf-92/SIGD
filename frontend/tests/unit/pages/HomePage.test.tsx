@@ -161,8 +161,9 @@ describe("HomePage — Segmentación visual de módulos públicos, ciudadanos e 
     it("muestra banner con sesión activa del ciudadano", () => {
       renderHomePage();
       expect(screen.getByText(/Sesión activa:/i)).toBeInTheDocument();
-      expect(screen.getByText("Juan Pérez García")).toBeInTheDocument();
-      expect(screen.getByText("CIUDADANO")).toBeInTheDocument();
+      expect(screen.getByText("Mi cuenta")).toBeInTheDocument();
+      expect(screen.queryByText("Juan Pérez García")).not.toBeInTheDocument();
+      expect(screen.queryByText("CIUDADANO")).not.toBeInTheDocument();
     });
 
     it("habilita CTAs de acceso a los servicios de ciudadano", () => {

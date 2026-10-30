@@ -19,6 +19,7 @@
  */
 
 import React, { useState, useCallback, useRef } from 'react';
+import { Link, useInRouterContext } from 'react-router-dom';
 import type {
   TramiteWizardState,
   WizardAction,
@@ -29,8 +30,8 @@ import type {
 import QrCodeView from '../../common/QrCodeView';
 import { apiClient } from '../../../api/client';
 import { esRegistroVersionIdValido, esUuidCanonico } from '../../../types/procedimientoTupa';
-import { useAuthStore } from '../../../stores/authStore';
 import { usePresignedUpload } from '../../../hooks/usePresignedUpload';
+import { formatearFechaHoraLegible } from '../../../utils/expedientePresentacion';
 
 interface RadicacionVirtualResponse {
   expedienteId: string;
@@ -63,6 +64,8 @@ export interface StepConfirmacionProps {
   onGoToStep?: (step: WizardStep) => void;
   /** Callback opcional ejecutado al completar satisfactoriamente la radicación */
   onSuccess?: (cargo: CargoDigitalResponse, cutGenerado: string) => void;
+  /** Callback opcional ejecutado al iniciar un nuevo trámite desde la confirmación */
+  onIniciarNuevoTramite?: () => void;
 }
 
 export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
@@ -71,12 +74,13 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   onBack,
   onGoToStep,
   onSuccess,
+  onIniciarNuevoTramite,
 }) => {
   const [copiado, setCopiado] = useState(false);
   const radicacionPendiente = useRef<RadicacionPendiente | null>(state.radicacionPendiente);
   const hashesConfirmados = useRef<Set<string>>(new Set());
   const { upload, status: uploadStatus, progress: uploadProgress } = usePresignedUpload();
-  const idPersonaSesion = useAuthStore((auth) => auth.usuario?.idPersona);
+  const inRouter = useInRouterContext();
   const {
     identificacion,
     documentos,
@@ -143,16 +147,6 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         return;
       }
 
-      const idPersona = idPersonaSesion ?? identificacion.idPersona;
-      if (!esUuidCanonico(idPersona)) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'No se dispone del UUID real de la persona registrada. Vuelva a identificarse antes de radicar.',
-        });
-        dispatch({ type: 'SET_SUBMITTING', payload: false });
-        return;
-      }
-
       if (documentos.archivos.length === 0 || documentos.archivos.some((a) => !/^[0-9a-f]{64}$/i.test(a.hashSha256))) {
         dispatch({ type: 'SET_ERROR', payload: 'Los documentos deben incluir una huella SHA-256 válida.' });
         dispatch({ type: 'SET_SUBMITTING', payload: false });
@@ -177,7 +171,6 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       const payload = {
         asunto: asuntoFinal,
         ...(esTramiteLibre ? {} : { registroVersionId }),
-        idPersona,
         nombreSolicitante: nombreCompleto,
         correo: identificacion.correo.trim().toLowerCase(),
         totalFolios: Number(documentos.numeroFolios),
@@ -239,7 +232,11 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   };
 
   const handleIniciarNuevoTramite = () => {
-    dispatch({ type: 'RESET' });
+    if (onIniciarNuevoTramite) {
+      onIniciarNuevoTramite();
+    } else {
+      dispatch({ type: 'RESET' });
+    }
   };
 
   // ===========================================================================
@@ -321,12 +318,12 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
             </div>
             <div className="flex justify-between border-b border-slate-200 pb-1.5">
               <span className="font-bold text-slate-900">Fecha de Radicación:</span>
-              <span className="font-mono">{cargoEmitido.fechaRadicacion}</span>
+              <span className="font-mono">{formatearFechaHoraLegible(cargoEmitido.fechaRadicacion)}</span>
             </div>
             <div className="flex justify-between border-b border-slate-200 pb-1.5">
               <span className="font-bold text-slate-900">Recepción Oficial:</span>
               <span className="font-semibold text-emerald-700 font-mono">
-                {cargoEmitido.fechaRecepcionOficial}
+                {formatearFechaHoraLegible(cargoEmitido.fechaRecepcionOficial)}
               </span>
             </div>
             <div className="flex justify-between pt-0.5">
@@ -338,18 +335,48 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           </div>
 
           {/* Botonera Posterior */}
-          <div className="mt-7 flex flex-wrap justify-center gap-3">
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               onClick={handleImprimir}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-xs"
             >
               🖨️ Imprimir Ticket de Cargo
             </button>
+            {inRouter ? (
+              <Link
+                to={`/consulta/${cargoEmitido.cut}`}
+                className="inline-flex items-center gap-2 rounded-lg border border-cyan-300 bg-cyan-50 px-4 py-2.5 text-xs font-bold text-cyan-900 hover:bg-cyan-100 transition shadow-xs"
+              >
+                Ver mi expediente
+              </Link>
+            ) : (
+              <a
+                href={`/consulta/${cargoEmitido.cut}`}
+                className="inline-flex items-center gap-2 rounded-lg border border-cyan-300 bg-cyan-50 px-4 py-2.5 text-xs font-bold text-cyan-900 hover:bg-cyan-100 transition shadow-xs"
+              >
+                Ver mi expediente
+              </a>
+            )}
+            {inRouter ? (
+              <Link
+                to="/mis-expedientes"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+              >
+                Mis Expedientes
+              </Link>
+            ) : (
+              <a
+                href="/mis-expedientes"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+              >
+                Mis Expedientes
+              </a>
+            )}
             <button
               type="button"
               onClick={handleIniciarNuevoTramite}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#006EC7] px-6 py-2.5 text-xs font-bold text-white hover:bg-[#005ba3] transition cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#006EC7] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#005ba3] transition cursor-pointer shadow-xs"
             >
               Iniciar Nuevo Trámite
             </button>

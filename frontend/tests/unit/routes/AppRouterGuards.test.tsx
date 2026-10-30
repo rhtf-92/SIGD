@@ -28,6 +28,7 @@ function renderWithProviders(initialEntry: string) {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   useAuthStore.setState({
     accessToken: null,
     refreshToken: null,
@@ -107,8 +108,28 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
     });
 
     it('permite acceso a /tramite (Mesa de Partes Virtual)', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          idPersona: '33333333-3333-4333-8333-333333333333',
+          tipoDocumento: 'DNI', numeroDocumento: '12345678',
+          nombres: 'Ana', apellidos: 'Pérez', correo: 'ciudadano@example.test',
+          telefono: '987654321', direccion: 'Av. Central 100',
+        }),
+      } as Response);
       renderWithProviders('/tramite');
-      expect(await screen.findByText(/Identificación del Solicitante/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Verifica tus datos/i)).toBeInTheDocument();
+    });
+
+    it('permite /mi-perfil solo con sesión ciudadana', async () => {
+      vi.spyOn(apiClient, 'get').mockResolvedValue({ data: {
+        id: 'u-ciu', idPersona: '33333333-3333-4333-8333-333333333333',
+        username: '12345678', usernameConfigurado: false, tipoDocumento: 'DNI',
+        numeroDocumento: '12345678', nombres: 'Ana', apellidos: 'Pérez',
+        correo: 'ciudadano@example.test', telefono: null, direccion: null,
+      } });
+      renderWithProviders('/mi-perfil');
+      expect(await screen.findByRole('heading', { name: 'Mi perfil' })).toBeInTheDocument();
     });
 
     it('permite acceso a /mis-expedientes', async () => {
@@ -159,7 +180,7 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
       expect(await screen.findByText(/Bandeja de expedientes/i)).toBeInTheDocument();
     });
 
-    it.each(['/tramite', '/mis-expedientes', '/administracion', '/reportes/dashboard'])(
+    it.each(['/tramite', '/mis-expedientes', '/mi-perfil', '/administracion', '/reportes/dashboard'])(
       'mesa de partes accediendo a %s es bloqueado con /acceso-denegado',
       (ruta) => {
         renderWithProviders(ruta);
@@ -258,6 +279,37 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
     it('permite acceso a /expedientes', async () => {
       renderWithProviders('/expedientes');
       expect(await screen.findByText(/Bandeja de expedientes/i)).toBeInTheDocument();
+    });
+
+    it('permite acceso a /tesoreria para ADMINISTRADOR', async () => {
+      renderWithProviders('/tesoreria');
+      expect((await screen.findAllByText(/Módulo de Tesorería/i)).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('8. TESORERIA: Acceso a Módulo de Tesorería y bloqueo de otros módulos', () => {
+    beforeEach(() => {
+      useAuthStore.setState({
+        accessToken: 'jwt-tesoreria',
+        refreshToken: null,
+        isAuthenticated: true,
+        usuario: {
+          id: 'u-tes',
+          nombreCompleto: 'Tesorero Demo',
+          correo: 'tesoreria@suiza.edu.pe',
+          rol: 'TESORERIA',
+        },
+      });
+    });
+
+    it('permite acceso a /tesoreria para rol TESORERIA', async () => {
+      renderWithProviders('/tesoreria');
+      expect((await screen.findAllByText(/Módulo de Tesorería/i)).length).toBeGreaterThan(0);
+    });
+
+    it('bloquea acceso a /administracion para rol TESORERIA', () => {
+      renderWithProviders('/administracion');
+      expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
     });
   });
 });

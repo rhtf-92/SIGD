@@ -23,6 +23,7 @@ interface RepresentanteResult extends IdResult {
 
 interface ExisteResult {
   existe: boolean;
+  usuario_existente?: boolean;
 }
 
 export interface RegistroResult {
@@ -57,6 +58,7 @@ export class RegistroCiudadanoService {
       tipoDocumento: datos.tipoDocumento,
       numeroDocumento,
       correo: datos.correo,
+      username: datos.username,
       celular: datos.celular,
       direccion: datos.direccion,
       ubigeoDistrito: datos.ubigeoDistrito,
@@ -89,6 +91,7 @@ export class RegistroCiudadanoService {
       tipoDocumento: 'RUC',
       numeroDocumento: datos.ruc,
       correo: datos.correo,
+      username: datos.username,
       celular: datos.celular,
       direccion: datos.direccion,
       ubigeoDistrito: datos.ubigeoDistrito,
@@ -112,6 +115,7 @@ export class RegistroCiudadanoService {
     tipoDocumento: 'DNI' | 'CE' | 'RUC';
     numeroDocumento: string;
     correo: string;
+    username: string;
     celular: string;
     direccion: string;
     ubigeoDistrito: string;
@@ -164,11 +168,16 @@ export class RegistroCiudadanoService {
               WHERE p.tipo = $1 AND p.id_documento = $2
            ) OR EXISTS (
              SELECT 1 FROM sigd_auth.cuenta_usuario u
-              WHERE lower(u.correo) = lower($3) OR u.usuario = $4
-           ) AS existe`,
-        [datos.tipoPersona, datos.numeroDocumento, datos.correo, datos.numeroDocumento],
+              WHERE lower(u.correo) = lower($3) OR lower(u.usuario) = lower($4)
+           ) AS existe,
+           EXISTS (SELECT 1 FROM sigd_auth.cuenta_usuario u
+                    WHERE lower(u.usuario) = lower($4)) AS usuario_existente`,
+        [datos.tipoPersona, datos.numeroDocumento, datos.correo, datos.username],
       );
       if (duplicado.rows[0]?.existe) {
+        if (duplicado.rows[0]?.usuario_existente) {
+          throw new ConflictError({ code: 'USERNAME_ALREADY_EXISTS', message: 'Este nombre de usuario ya está en uso.' });
+        }
         throw new ConflictError({
           code: 'CITIZEN_ALREADY_EXISTS',
           message: 'Ya existe una persona o cuenta con ese documento o correo.',
@@ -258,7 +267,7 @@ export class RegistroCiudadanoService {
            (id_persona, usuario, correo, password_hash)
          VALUES ($1, $2, $3, $4)
          RETURNING id_usuario::text AS id`,
-        [personaId, datos.numeroDocumento, datos.correo, passwordHash],
+        [personaId, datos.username, datos.correo, passwordHash],
       );
       const usuarioId = cuenta.rows[0]?.id;
       if (!usuarioId) throw new Error('La inserción de cuenta no devolvió su identificador.');
@@ -290,6 +299,9 @@ export class RegistroCiudadanoService {
     } catch (error) {
       if (transaccionAbierta) await cliente.query('ROLLBACK');
       if (esViolacionUnicidad(error)) {
+        if (error.constraint === 'cuenta_usuario_usuario_key') {
+          throw new ConflictError({ code: 'USERNAME_ALREADY_EXISTS', message: 'Este nombre de usuario ya está en uso.' });
+        }
         throw new ConflictError({
           code: 'CITIZEN_ALREADY_EXISTS',
           message: 'Ya existe una persona o cuenta con ese documento o correo.',
@@ -302,7 +314,7 @@ export class RegistroCiudadanoService {
   }
 }
 
-function esViolacionUnicidad(error: unknown): error is { code: string } {
+function esViolacionUnicidad(error: unknown): error is { code: string; constraint?: string } {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === '23505';
 }
 

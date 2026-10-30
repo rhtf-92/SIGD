@@ -3,12 +3,26 @@ import { QueryClient, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { crearServicioExpedienteActions } from "../api/expedienteActions";
 import { ErrorAccionExpediente } from "../types/expedienteActions";
-import type { AccionExpediente, NotificacionExpediente, SolicitudAcumulacion, SolicitudDerivacion, SolicitudObservacion, SolicitudSubsanacion, UseExpedienteActionsOptions } from "../types/expedienteActions";
+import type {
+  AccionExpediente,
+  NotificacionExpediente,
+  SolicitudAcumulacion,
+  SolicitudDerivacion,
+  SolicitudRecepcion,
+  SolicitudAtencion,
+  SolicitudArchivado,
+  SolicitudObservacion,
+  SolicitudSubsanacion,
+  UseExpedienteActionsOptions
+} from "../types/expedienteActions";
 import { adaptarErrorAccion } from "../utils/expedienteActions";
 
 const servicioSinContratos = crearServicioExpedienteActions();
 const bloqueos = new WeakMap<QueryClient, Set<string>>();
 const idsDerivacion = (entrada: SolicitudDerivacion) => [entrada.expediente.id];
+const idsRecepcion = (entrada: SolicitudRecepcion) => [entrada.expediente.id];
+const idsAtencion = (entrada: SolicitudAtencion) => [entrada.expediente.id];
+const idsArchivado = (entrada: SolicitudArchivado) => [entrada.expediente.id];
 const idsObservacion = (entrada: SolicitudObservacion) => [entrada.expediente.id];
 const idsSubsanacion = (entrada: SolicitudSubsanacion) => [entrada.expediente.id];
 const idsAcumulacion = (entrada: SolicitudAcumulacion) => [entrada.principal.id, ...entrada.conexos.map((item) => item.id)];
@@ -64,8 +78,11 @@ export function useExpedienteActions(opciones: UseExpedienteActionsOptions) {
     opciones.notificar?.(aviso);
   }
   const derivacion = useAccion(servicio.derivar, idsDerivacion, "La derivación fue registrada correctamente.", opciones, notificar);
+  const recepcion = useAccion(servicio.recepcionar, idsRecepcion, "El expediente fue recepcionado correctamente.", opciones, notificar);
+  const atencion = useAccion(servicio.atender, idsAtencion, "La atención resolutiva fue emitida y notificada a la Casilla Electrónica.", opciones, notificar);
+  const archivado = useAccion(servicio.archivar, idsArchivado, "El expediente fue archivado físicamente de forma formal.", opciones, notificar);
   const observacion = useAccion(servicio.observar, idsObservacion, "La observación fue registrada. El servidor confirmó la suspensión temporal del SLA.", opciones, notificar);
   const subsanacion = useAccion(servicio.subsanar, idsSubsanacion, "La subsanación fue registrada correctamente.", opciones, notificar);
   const acumulacion = useAccion(servicio.acumular, idsAcumulacion, "La acumulación fue registrada correctamente.", opciones, notificar);
-  return { derivacion, observacion, subsanacion, acumulacion, notificacion, limpiarNotificacion: () => setNotificacion(null) };
+  return { derivacion, recepcion, atencion, archivado, observacion, subsanacion, acumulacion, notificacion, limpiarNotificacion: () => setNotificacion(null) };
 }

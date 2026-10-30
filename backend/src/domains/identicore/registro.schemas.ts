@@ -29,8 +29,12 @@ export function aceptarCasingDual(value: unknown): unknown {
   return normalizado;
 }
 
+export const usernameSchema = z.string().trim().toLowerCase().min(4).max(30).regex(/^[a-z0-9._-]+$/,
+  'Use solo letras, números, punto, guion o guion bajo, sin espacios.');
+
 const camposComunes = {
   correo: z.string().trim().email().max(150).transform((correo) => correo.toLowerCase()),
+  username: usernameSchema,
   celular: z.string().regex(/^9[0-9]{8}$/),
   ubigeoDistrito: z.string().regex(/^25[0-9]{4}$/),
   direccion: z.string().trim().min(5).max(250),

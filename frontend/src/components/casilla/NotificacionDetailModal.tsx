@@ -45,6 +45,7 @@ export default function NotificacionDetailModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
 
   // Manejo de teclado (Escape para cerrar) y foco accesible
   useEffect(() => {
@@ -77,6 +78,16 @@ export default function NotificacionDetailModal({
   const acuse = notificacion.acuse;
   const acto = notificacion.actoAdministrativo;
 
+  const descargar = async (tipo: 'documento' | 'acuse') => {
+    setErrorDescarga(null);
+    try {
+      if (tipo === 'documento') await casillaService.descargarDocumento(notificacion);
+      else if (acuse) await casillaService.descargarAcuse(acuse);
+    } catch {
+      setErrorDescarga('El archivo todavía no está disponible para descarga.');
+    }
+  };
+
   function copyToClipboard(text: string, label: string) {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedHash(label);
@@ -99,6 +110,7 @@ export default function NotificacionDetailModal({
         ref={modalRef}
         className="relative my-auto flex max-h-[92vh] w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
       >
+        {errorDescarga && <p role="alert" className="bg-rose-50 px-6 py-2 text-sm text-rose-800">{errorDescarga}</p>}
         {/* ================================================================== */}
         {/* CABECERA DEL MODAL                                                 */}
         {/* ================================================================== */}
@@ -324,7 +336,7 @@ export default function NotificacionDetailModal({
 
                 <button
                   type="button"
-                  onClick={() => casillaService.descargarDocumento(notificacion)}
+                  onClick={() => void descargar('documento')}
                   className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-2.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
                 >
                   <svg
@@ -493,7 +505,7 @@ export default function NotificacionDetailModal({
                 <div className="flex justify-end pt-1">
                   <button
                     type="button"
-                    onClick={() => casillaService.descargarAcuse(acuse)}
+                    onClick={() => void descargar('acuse')}
                     className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800"
                   >
                     <svg

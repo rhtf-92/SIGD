@@ -45,6 +45,10 @@ const MANIFIESTO_BASELINE = [
   '17_sigd_tupa_documento_oficial.sql',
   '18_sigd_indices_optimizacion.sql',
   '19_sigd_tupa_documento_inmutable.sql',
+  '20_sigd_tesoreria_orden_pago.sql',
+  '21_sigd_orden_pago_activa_unica.sql',
+  '22_sigd_tesoreria_taypi_sandbox.sql',
+  '23_sigd_orden_pago_metodo_qr_longitud.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }

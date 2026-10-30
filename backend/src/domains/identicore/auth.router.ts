@@ -25,6 +25,7 @@ import { firmarTokenAcceso, extraerTokenBearer, verificarTokenAcceso } from '../
 import { AppError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 import { Argon2Service } from './argon2.service.js';
 import { loginRateLimiter } from '../../middleware/rate-limiter.middleware.js';
+import { actualizarPerfilSchema, cambiarPasswordSchema, PerfilCiudadanoService } from './perfilCiudadano.service.js';
 
 const loginSchema = z.object({
   identificador: z.string().min(3).max(100),
@@ -55,7 +56,7 @@ export function crearRouterAuth(pool: Pool): Router {
              c.password_hash, c.activo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
              COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo,
-             p.area_id
+             COALESCE(ur.area_id, p.area_id) AS area_id
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
@@ -66,7 +67,7 @@ export function crearRouterAuth(pool: Pool): Router {
        ORDER BY CASE r.codigo
          WHEN 'ADMINISTRADOR' THEN 1 WHEN 'DIRECTOR' THEN 2
          WHEN 'SECRETARIO' THEN 3 WHEN 'ESPECIALISTA' THEN 4
-         WHEN 'MESA_PARTES' THEN 5 WHEN 'CIUDADANO' THEN 6 ELSE 7 END
+         WHEN 'TESORERIA' THEN 5 WHEN 'MESA_PARTES' THEN 5 WHEN 'CIUDADANO' THEN 6 ELSE 7 END
        LIMIT 1;
     `;
 
@@ -172,7 +173,7 @@ export function crearRouterAuth(pool: Pool): Router {
          ORDER BY CASE r.codigo
            WHEN 'ADMINISTRADOR' THEN 1 WHEN 'DIRECTOR' THEN 2
            WHEN 'SECRETARIO' THEN 3 WHEN 'ESPECIALISTA' THEN 4
-           WHEN 'MESA_PARTES' THEN 5 WHEN 'CIUDADANO' THEN 6 ELSE 7 END
+            WHEN 'TESORERIA' THEN 5 WHEN 'MESA_PARTES' THEN 5 WHEN 'CIUDADANO' THEN 6 ELSE 7 END
          FOR UPDATE OF s
          LIMIT 1;
       `;
@@ -237,9 +238,18 @@ export function crearRouterAuth(pool: Pool): Router {
     const query = `
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
+             pers.id_documento AS numero_documento,
+             CASE WHEN pers.tipo = 'JURIDICA' THEN 'RUC'
+                  WHEN pers.id_documento ~ '^[0-9]{8}$' THEN 'DNI'
+                  ELSE 'CE' END AS tipo_documento,
+             COALESCE(pn.nombres, pj.razon_social) AS nombres,
+             pn.apellidos,
+             pers.direccion,
              COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo,
-             p.area_id, p.cargo_id, p.telefono
+             COALESCE(ur.area_id, p.area_id) AS area_id,
+             p.cargo_id, COALESCE(pn.telefono, p.telefono) AS telefono
         FROM sigd_auth.cuenta_usuario c
+        JOIN sigd_auth.persona pers ON pers.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
         LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
@@ -249,7 +259,7 @@ export function crearRouterAuth(pool: Pool): Router {
        ORDER BY CASE r.codigo
          WHEN 'ADMINISTRADOR' THEN 1 WHEN 'DIRECTOR' THEN 2
          WHEN 'SECRETARIO' THEN 3 WHEN 'ESPECIALISTA' THEN 4
-         WHEN 'MESA_PARTES' THEN 5 WHEN 'CIUDADANO' THEN 6 ELSE 7 END
+         WHEN 'TESORERIA' THEN 5 WHEN 'MESA_PARTES' THEN 5 WHEN 'CIUDADANO' THEN 6 ELSE 7 END
        LIMIT 1;
     `;
 
@@ -265,17 +275,44 @@ export function crearRouterAuth(pool: Pool): Router {
       idPersona: usuario.id_persona,
       usuario: usuario.usuario,
       username: usuario.usuario,
+      usernameConfigurado: Boolean(usuario.usuario && usuario.usuario !== usuario.numero_documento),
       nombreCompleto: usuario.nombre_completo,
       correo: usuario.correo,
       rol: usuario.rol_codigo,
       areaId: usuario.area_id,
       cargoId: usuario.cargo_id,
       telefono: usuario.telefono,
+      tipoDocumento: usuario.tipo_documento,
+      numeroDocumento: usuario.numero_documento,
+      nombres: usuario.nombres,
+      apellidos: usuario.apellidos ?? '',
+      direccion: usuario.direccion,
     });
   };
 
   router.get('/auth/me', handlerPerfil);
   router.get('/auth/perfil', handlerPerfil);
+
+  const perfilCiudadano = new PerfilCiudadanoService(pool);
+  const idUsuarioAutenticado = (req: Request): string => {
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
+    const sub = verificarTokenAcceso(token).sub;
+    if (!z.uuid().safeParse(sub).success) throw new UnauthorizedError({ detail: 'La sesión no identifica una cuenta válida.' });
+    return sub;
+  };
+
+  router.patch('/auth/me', async (req: Request, res: Response) => {
+    const idUsuario = idUsuarioAutenticado(req);
+    await perfilCiudadano.actualizar(idUsuario, actualizarPerfilSchema.parse(req.body));
+    res.status(204).end();
+  });
+
+  router.patch('/auth/me/password', async (req: Request, res: Response) => {
+    const idUsuario = idUsuarioAutenticado(req);
+    await perfilCiudadano.cambiarPassword(idUsuario, cambiarPasswordSchema.parse(req.body));
+    res.status(204).end();
+  });
 
   return router;
 }

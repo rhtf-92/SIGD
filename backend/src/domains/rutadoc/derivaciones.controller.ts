@@ -5,6 +5,7 @@ import { AtenderExpedienteSchema } from './dto/atenderExpediente.dto.js';
 import { ArchivarExpedienteSchema } from './dto/archivarExpediente.dto.js';
 import {
   derivarExpediente,
+  recepcionarExpediente,
   atenderExpediente,
   archivarExpediente,
   observarExpediente,
@@ -111,6 +112,44 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
       try {
         await cliente.query('BEGIN');
 
+        // Validación de pago: si el trámite tiene costo y no está confirmado, bloquear derivación
+        const pagoRes = await cliente.query<{ estado: string; monto: number }>(`
+          SELECT estado, monto
+            FROM sigd_tra.orden_pago
+           WHERE expediente_id = $1::uuid
+           ORDER BY fecha_creacion DESC
+           LIMIT 1
+        `, [expedienteId]);
+
+        if (pagoRes.rows[0]) {
+          const orden = pagoRes.rows[0];
+          if (Number(orden.monto) > 0 && orden.estado !== 'CONFIRMADO') {
+            throw new ConflictError({
+              code: 'PAGO_PENDIENTE',
+              message: 'El expediente requiere pago confirmado antes de continuar.',
+              detail: `La orden de pago se encuentra en estado ${orden.estado}.`,
+            });
+          }
+        } else {
+          const tupaRes = await cliente.query<{ monto: number }>(`
+            SELECT COALESCE(tp.monto, NULLIF(regexp_replace(COALESCE(rv.monto_original, ''), '[^0-9.]', '', 'g'), '')::numeric, 0.00)::numeric AS monto
+              FROM sigd_doc.expediente_tupa_vinculo v
+              LEFT JOIN sigd_doc.tupa_registro_version rv ON rv.registro_version_id = v.registro_version_id
+              LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = v.registro_version_id
+             WHERE v.expediente_id = $1::uuid
+               AND v.reemplaza_vinculo_id IS NULL
+             LIMIT 1
+          `, [expedienteId]);
+
+          if (tupaRes.rows[0] && Number(tupaRes.rows[0].monto) > 0) {
+            throw new ConflictError({
+              code: 'PAGO_PENDIENTE',
+              message: 'El expediente requiere pago confirmado antes de continuar.',
+              detail: 'El procedimiento TUPA asociado tiene costo y requiere una orden de pago confirmada por Tesorería.',
+            });
+          }
+        }
+
         // Ejecución de la lógica de negocio
         await derivarExpediente(cliente, expedienteId, datos);
 
@@ -166,11 +205,114 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
   router.post('/:id/derivar', handlerDerivar);
   router.post('/:id/movimientos/derivar', handlerDerivar);
 
+  // Endpoints #24-rec — Recepción en Área de Destino
+  const handlerRecepcionar = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para recepcionar el expediente.' });
+      }
+
+      const contexto = await consultarContextoExpediente(expedienteId);
+
+      if (actor.puedeVerExpediente) {
+        const autorizado = await actor.puedeVerExpediente(expedienteId);
+        if (!autorizado) {
+          throw new ForbiddenError({ detail: 'No tiene autorización para recepcionar este expediente.' });
+        }
+      }
+
+      const esAdminOInstitucional = actor.roles.some((r) =>
+        ['ADMINISTRADOR', 'DIRECTOR'].includes(r),
+      );
+
+      if (!esAdminOInstitucional) {
+        const esAdministrado = actor.roles.some((r) => ['CIUDADANO'].includes(r));
+        if (esAdministrado) {
+          throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para recepcionar expedientes.' });
+        }
+
+        let tieneCustodia = false;
+        if (actor.unidadOrganicaId && actor.unidadOrganicaId === contexto.areaActualId) {
+          tieneCustodia = true;
+        } else if (actor.roles.some((r) => ['ESPECIALISTA', 'SECRETARIO', 'MESA_PARTES'].includes(r))) {
+          tieneCustodia = true;
+        }
+
+        if (!tieneCustodia) {
+          throw new ForbiddenError({ detail: 'No pertenece al área de destino para recepcionar el expediente.' });
+        }
+      }
+
+      const cliente = await pool.connect();
+      try {
+        await cliente.query('BEGIN');
+        await recepcionarExpediente(cliente, expedienteId);
+        await cliente.query('COMMIT');
+        res.status(200).json({
+          ok: true,
+          mensaje: 'Expediente recepcionado exitosamente.',
+          expediente_id: expedienteId,
+          expedienteId,
+          nuevoEstado: 'EN_REVISION',
+        });
+      } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => {});
+        throw error;
+      } finally {
+        cliente.release();
+      }
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  router.post('/:id/recepcionar', handlerRecepcionar);
+  router.post('/:id/movimientos/recepcionar', handlerRecepcionar);
+
   // Endpoint #25 (T-BE-RD-07) - Atención Resolutiva
-  router.post('/:id/atender', async (req: Request, res: Response, next: NextFunction) => {
+  const handlerAtender = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const expedienteId = String(req.params.id);
       const datos = AtenderExpedienteSchema.parse(req.body);
+
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para atender el expediente.' });
+      }
+
+      const contexto = await consultarContextoExpediente(expedienteId);
+
+      if (actor.puedeVerExpediente) {
+        const autorizado = await actor.puedeVerExpediente(expedienteId);
+        if (!autorizado) {
+          throw new ForbiddenError({ detail: 'No tiene autorización para atender este expediente.' });
+        }
+      }
+
+      const esAdminOInstitucional = actor.roles.some((r) =>
+        ['ADMINISTRADOR', 'DIRECTOR'].includes(r),
+      );
+
+      if (!esAdminOInstitucional) {
+        const esAdministrado = actor.roles.some((r) => ['CIUDADANO'].includes(r));
+        if (esAdministrado) {
+          throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para atender expedientes.' });
+        }
+
+        let tieneCustodia = false;
+        if (actor.unidadOrganicaId && actor.unidadOrganicaId === contexto.areaActualId) {
+          tieneCustodia = true;
+        } else if (actor.roles.some((r) => ['ESPECIALISTA', 'SECRETARIO'].includes(r))) {
+          tieneCustodia = true;
+        }
+
+        if (!tieneCustodia) {
+          throw new ForbiddenError({ detail: 'No cuenta con facultades en el área para atender el expediente.' });
+        }
+      }
+
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
@@ -180,6 +322,8 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
           ok: true,
           mensaje: 'Atención resolutiva registrada exitosamente.',
           expediente_id: expedienteId,
+          expedienteId,
+          nuevoEstado: 'RESUELTO',
         });
       } catch (error) {
         await cliente.query('ROLLBACK').catch(() => {});
@@ -190,13 +334,39 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
     } catch (error) {
       next(error);
     }
-  });
+  };
+
+  router.post('/:id/atender', handlerAtender);
+  router.post('/:id/movimientos/atender', handlerAtender);
 
   // Endpoint (T-BE-RD-08) - Archivado Formal
-  router.post('/:id/archivar', async (req: Request, res: Response, next: NextFunction) => {
+  const handlerArchivar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const expedienteId = String(req.params.id);
       const datos = ArchivarExpedienteSchema.parse(req.body);
+
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para archivar el expediente.' });
+      }
+
+      const contexto = await consultarContextoExpediente(expedienteId);
+
+      if (actor.puedeVerExpediente) {
+        const autorizado = await actor.puedeVerExpediente(expedienteId);
+        if (!autorizado) {
+          throw new ForbiddenError({ detail: 'No tiene autorización para archivar este expediente.' });
+        }
+      }
+
+      const tienePermisoArchivo = actor.roles.some((r) =>
+        ['ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'MESA_PARTES'].includes(r),
+      );
+
+      if (!tienePermisoArchivo) {
+        throw new ForbiddenError({ detail: 'No cuenta con rol habilitado para el archivado físico del expediente.' });
+      }
+
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
@@ -204,8 +374,10 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
         await cliente.query('COMMIT');
         res.status(200).json({
           ok: true,
-          mensaje: 'Archivado fisico registrado exitosamente.',
+          mensaje: 'Archivado físico registrado exitosamente.',
           expediente_id: expedienteId,
+          expedienteId,
+          nuevoEstado: 'ARCHIVADO',
         });
       } catch (error) {
         await cliente.query('ROLLBACK').catch(() => {});
@@ -216,7 +388,10 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
     } catch (error) {
       next(error);
     }
-  });
+  };
+
+  router.post('/:id/archivar', handlerArchivar);
+  router.post('/:id/movimientos/archivar', handlerArchivar);
 
   // Endpoints #29-acum (T-BE-RD-11) — Acumulación de Expedientes (Art. 160 LPAG)
   const handlerAcumular = async (req: Request, res: Response, next: NextFunction) => {

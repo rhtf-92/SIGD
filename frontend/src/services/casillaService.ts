@@ -1,11 +1,7 @@
 /**
  * Módulo: Capa de Servicio para Casilla Electrónica y Acuse Legal (ENT-M01-05)
  * Centraliza las llamadas HTTP reales, sin mocks ni datos en memoria.
- * NOTA: al momento de esta implementación, el endpoint GET /api/v1/casilla/notificaciones
- * todavía no está registrado como ruta Express en la rama de backend B_JAIR
- * (CasillaService/CasillaController existen pero no hay casilla.routes.ts).
- * Las llamadas quedan correctas contra el contrato documentado y funcionarán
- * automáticamente en cuanto el equipo de backend conecte la ruta.
+ * Consume los endpoints de Casilla protegidos por JWT.
  */
 
 import { apiClient } from "../api/client";
@@ -153,70 +149,23 @@ export const casillaService = {
     return response.data;
   },
 
-  /**
-   * Simula la descarga o apertura del acto administrativo PDF
-   */
-  descargarDocumento(notificacion: Notificacion): void {
-    const filename =
-      notificacion.actoAdministrativo.nombreArchivoPdf || "acto_notificado.pdf";
-    // Generar un blob simulado con texto representativo o abrir enlace
-    const contenido = `--- INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA ---
-CÉDULA DE NOTIFICACIÓN OFICIAL / ACTO ADMINISTRATIVO
-Expediente: ${notificacion.numeroExpediente}
-Documento: ${notificacion.actoAdministrativo.numeroDocumento}
-Asunto: ${notificacion.asunto}
-Hash SHA-256: ${notificacion.actoAdministrativo.hashIntegridadSha256}
-CVD: ${notificacion.actoAdministrativo.cvd}
-Fecha Emisión: ${notificacion.fechaDepositoIso}
-
-${notificacion.actoAdministrativo.resumenLegal}
-
-${notificacion.actoAdministrativo.textoCompleto || ""}
-`;
-    const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+  async descargarDocumento(notificacion: Notificacion): Promise<void> {
+    const { data } = await apiClient.get<{ downloadUrl: string }>(
+      CASILLA_ENDPOINTS.DESCARGAR_DOCUMENTO(notificacion.id),
+    );
     const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
+    link.href = data.downloadUrl;
+    link.rel = "noopener noreferrer";
     link.click();
-    URL.revokeObjectURL(url);
   },
 
-  /**
-   * Simula la descarga oficial de la Cédula de Acuse Digital Legal
-   */
-  descargarAcuse(acuse: AcuseNotificacion): void {
-    const filename = `ACUSE_LEGAL_${acuse.idAcuse}.txt`;
-    const contenido = `================================================================================
-INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA (IESTP SUIZA)
-CONSTANCIA Y CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA INSTITUCIONAL
-Conforme al Artículo 20 del TUO de la Ley N° 27444 y Ley N° 29733
-================================================================================
-
-IDENTIFICADOR DE ACUSE : ${acuse.idAcuse}
-EXPEDIENTE              : ${acuse.numeroExpediente}
-UNIDAD EMISORA          : ${acuse.unidadEmisora}
-DESTINATARIO            : ${acuse.destinatario.nombresCompletos}
-DOCUMENTO IDENTIDAD     : ${acuse.destinatario.tipoDocumento} ${acuse.destinatario.numeroDocumento}
-CASILLA ELECTRÓNICA     : ${acuse.destinatario.direccionCasilla}
-
-FECHA Y HORA UTC (ISO)  : ${acuse.timestampGeneracionIso}
-HASH CRIPTOGRÁFICO SHA256: ${acuse.hashSha256Acuse}
-CÓDIGO VERIFICACIÓN (CVD): ${acuse.cvdAcuse}
-SURTIMIENTO DE EFECTO   : ${acuse.fechaEfectoLegal}
-PLAZO LEGAL DE IMPUGN.  : ${acuse.plazoImpugnacionDiasHabiles} días hábiles
-
-VALIDEZ LEGAL:
-${acuse.validezLegalMensaje}
-
-Este documento digital cuenta con valor probatorio inmutable en sede administrativa.
-================================================================================`;
-    const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+  async descargarAcuse(acuse: AcuseNotificacion): Promise<void> {
+    const { data } = await apiClient.get<{ downloadUrl: string }>(
+      CASILLA_ENDPOINTS.DESCARGAR_ACUSE(acuse.idNotificacion),
+    );
     const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
+    link.href = data.downloadUrl;
+    link.rel = "noopener noreferrer";
     link.click();
-    URL.revokeObjectURL(url);
   },
 };

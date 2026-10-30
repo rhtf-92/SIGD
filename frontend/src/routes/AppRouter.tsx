@@ -15,6 +15,7 @@ import {
   ROLES_CIUDADANO,
   ROLES_INSTITUCIONALES,
   ROLES_REPORTES,
+  ROLES_TESORERIA,
   ROLES_VENTANILLA,
 } from "../config/navigation.config";
 
@@ -33,6 +34,8 @@ const ExpedienteDetallePage = lazy(() => import("../pages/expedientes/Expediente
 const VentanillaPresencialPage = lazy(() => import("../pages/tramite/VentanillaPresencialPage"));
 const TramitePage = lazy(() => import("../pages/tramite/TramitePage"));
 const MisExpedientesPage = lazy(() => import("../pages/tramite/MisExpedientesPage"));
+const MiPerfilPage = lazy(() => import("../pages/tramite/MiPerfilPage"));
+const TesoreriaPage = lazy(() => import("../pages/tesoreria/TesoreriaPage"));
 
 const withSuspense = (Component: React.ComponentType) => (
   <Suspense fallback={<RouteLoadingFallback />}>
@@ -89,6 +92,10 @@ export default function AppRouter() {
           }
         />
 
+        <Route path="/mi-perfil" element={
+          <ProtectedRoute requiredRoles={ROLES_CIUDADANO}>{withSuspense(MiPerfilPage)}</ProtectedRoute>
+        } />
+
         <Route
           path="/casilla"
           element={
@@ -130,6 +137,16 @@ export default function AppRouter() {
           element={
             <ProtectedRoute requiredRoles={ROLES_INSTITUCIONALES}>
               {withSuspense(ExpedienteDetallePage)}
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 4.1 Módulo de Tesorería */}
+        <Route
+          path="/tesoreria"
+          element={
+            <ProtectedRoute requiredRoles={ROLES_TESORERIA}>
+              {withSuspense(TesoreriaPage)}
             </ProtectedRoute>
           }
         />

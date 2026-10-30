@@ -30,7 +30,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
                 activo: true,
                 nombre_completo: 'Administrador General',
                 rol_codigo: 'ADMINISTRADOR',
-                area_id: null,
+                area_id: '33333333-3333-3333-3333-333333333333',
               },
             ],
             rowCount: 1,
@@ -67,6 +67,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
       nombreCompleto: 'Administrador General',
       correo: 'admin@iestp-suiza.edu.pe',
       rol: 'ADMINISTRADOR',
+      areaId: '33333333-3333-3333-3333-333333333333',
     });
 
     // Validar alineación exacta de columnas en el SQL capturado
@@ -77,6 +78,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
     expect(capturedQuery).not.toContain('bloqueado_hasta');
     expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
     expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
+    expect(capturedQuery).toContain('COALESCE(ur.area_id, p.area_id) AS area_id');
     expect(capturedQuery).not.toContain('r.id_rol');
     expect(capturedQuery).not.toContain('ur.estado');
     expect(capturedQuery).toContain('(c.usuario = $1 OR c.correo = $1)');
@@ -208,6 +210,11 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
                 area_id: '33333333-3333-3333-3333-333333333333',
                 cargo_id: null,
                 telefono: '987654321',
+                tipo_documento: 'DNI',
+                numero_documento: '12345678',
+                nombres: 'Administrador',
+                apellidos: 'General',
+                direccion: 'Av. Institucional 100',
               },
             ],
             rowCount: 1,
@@ -230,13 +237,23 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
       correo: 'admin@iestp-suiza.edu.pe',
       nombreCompleto: 'Administrador General',
       rol: 'ADMINISTRADOR',
+      areaId: '33333333-3333-3333-3333-333333333333',
+      tipoDocumento: 'DNI',
+      numeroDocumento: '12345678',
+      nombres: 'Administrador',
+      apellidos: 'General',
+      telefono: '987654321',
+      direccion: 'Av. Institucional 100',
     });
 
     expect(capturedQuery).toContain('c.usuario');
     expect(capturedQuery).toContain('c.correo');
+    expect(capturedQuery).toContain('JOIN sigd_auth.persona pers');
+    expect(capturedQuery).toContain('pers.id_documento AS numero_documento');
     expect(capturedQuery).not.toContain('c.username');
     expect(capturedQuery).not.toContain('c.correo_institucional');
     expect(capturedQuery).toContain('(ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())');
     expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
+    expect(capturedQuery).toContain('COALESCE(ur.area_id, p.area_id) AS area_id');
   });
 });

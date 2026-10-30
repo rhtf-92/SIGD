@@ -51,6 +51,7 @@ describe('rutas HTTP de validación IdentiCore', () => {
         dni_representante: '12345678',
         nombre_representante: 'Ana Perez Rojas',
         correo: 'ana@example.com',
+        username: 'empresa.suiza',
         celular: '912345678',
         ubigeo_distrito: '250101',
         direccion: 'Jr. Lima 123',

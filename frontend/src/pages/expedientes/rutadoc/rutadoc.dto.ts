@@ -18,7 +18,11 @@ export const resumenSchema = z.object({
 });
 export const detalleSchema = resumenSchema.extend({
   solicitanteId: uuid.nullable(),
-  resumenDocumentos: z.object({ cantidadDocumentos: entero, totalFolios: entero }).nullable(),
+  resumenDocumentos: z.object({
+    cantidadDocumentos: entero,
+    totalFolios: entero,
+    cantidadFoliados: entero.optional(),
+  }).nullable(),
   ultimoMovimiento: z.object({ idMovimiento: uuid, evento: z.string(), estadoNuevo: estado,
     fechaHora: fecha, usuarioOperadorId: decimal }).nullable(), sla: z.null(),
 });
@@ -29,6 +33,13 @@ export const bandejaSchema = z.object({
 }).refine(v => v.tieneMas === (v.siguienteCursor !== null), "Paginación inválida");
 export const trazabilidadSchema = z.object({
   expedienteId: uuid,
+  eventos: z.array(z.object({
+    id: z.string().min(1),
+    tipo: z.enum(["RADICACION", "ORDEN_PAGO", "PAGO_CONFIRMADO", "MOVIMIENTO"]),
+    fechaHora: fecha,
+    titulo: z.string().min(1),
+    detalle: z.string().nullable(),
+  })).default([]),
   actuaciones: z.array(z.object({
     movimientoId: uuid, secuencia: decimal, fechaHora: fecha,
     estadoAnterior: estado, evento: z.string(), estadoNuevo: estado, usuarioOperadorId: decimal,
@@ -56,6 +67,30 @@ export type Bandeja = z.infer<typeof bandejaSchema>;
 export type Trazabilidad = z.infer<typeof trazabilidadSchema>;
 export type Folios = z.infer<typeof foliacionSchema>;
 export type Sla = z.infer<typeof slaSchema>;
+export const documentoAdjuntoSchema = z.object({
+  idDocumento: uuid,
+  nombreArchivo: z.string(),
+  tamanoBytes: z.number().int().nonnegative(),
+  mimeType: z.string(),
+  sha256: z.string().nullable(),
+  tipoDocumental: z.string(),
+  creadoEn: z.string(),
+  foliado: z.boolean(),
+  folios: z.string().nullable(),
+});
+export type DocumentoAdjuntoDto = z.infer<typeof documentoAdjuntoSchema>;
+
+export const solicitanteResumenSchema = z.object({
+  idPersona: uuid,
+  nombreCompleto: z.string(),
+  tipoDocumento: z.string(),
+  numeroDocumento: z.string(),
+  documentoEnmascarado: z.string(),
+  correo: z.string().nullable().optional(),
+  telefono: z.string().nullable().optional(),
+  direccion: z.string().nullable().optional(),
+});
+export type SolicitanteResumenDto = z.infer<typeof solicitanteResumenSchema>;
 export interface Filtros {
   pestana: Pestana; limite: number; terminoBusqueda?: string;
   areaId?: string; fechaDesde?: string; fechaHasta?: string; cursor?: string;

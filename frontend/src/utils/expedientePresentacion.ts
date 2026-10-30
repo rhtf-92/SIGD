@@ -32,6 +32,37 @@ export function fechaExpediente(valor: string, conHora = false): string {
   return Number.isNaN(fecha.getTime()) ? "Fecha no disponible" : (conHora ? formatoFechaHora : formatoFecha).format(fecha);
 }
 
+/**
+ * Formato legible local para fechas institucionales del ciudadano:
+ * "28 oct 2026 · 08:00" en huso horario America/Lima.
+ * Preserva el timestamp original inalterado en almacenamiento.
+ */
+export function formatearFechaHoraLegible(valor: string): string {
+  if (!valor) return '';
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return valor;
+  try {
+    const formatter = new Intl.DateTimeFormat('es-PE', {
+      timeZone: 'America/Lima',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(d);
+    const day = parts.find((p) => p.type === 'day')?.value ?? '';
+    const month = (parts.find((p) => p.type === 'month')?.value ?? '').replace('.', '').toLowerCase();
+    const year = parts.find((p) => p.type === 'year')?.value ?? '';
+    const hour = parts.find((p) => p.type === 'hour')?.value ?? '';
+    const minute = parts.find((p) => p.type === 'minute')?.value ?? '';
+    return `${day} ${month} ${year} · ${hour}:${minute}`;
+  } catch {
+    return valor;
+  }
+}
+
 /** Referencia visual en días calendario; no reemplaza el cómputo oficial de SLA. */
 export function plazoExpediente(limite: string, ahora = Date.now()): string {
   const diferencia = new Date(limite).getTime() - ahora;

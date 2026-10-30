@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import type { EstadoRutaDoc } from './rutadoc.fsm.js';
-import type { ContadoresRutaDoc, ExpedienteDetalle, ExpedienteResumen, FiltrosRutaDoc, PosicionCursor, UltimoMovimiento } from './rutadoc.types.js';
+import type { ContadoresRutaDoc, DocumentoAdjuntoResumen, ExpedienteDetalle, ExpedienteResumen, FiltrosRutaDoc, PosicionCursor, UltimoMovimiento } from './rutadoc.types.js';
 
 interface FilaBandeja {
   id_expediente: string;
@@ -31,6 +31,7 @@ export interface RepositorioRutaDoc {
     porPestana?: ContadoresRutaDoc;
   }>;
   obtener(idExpediente: string): Promise<ExpedienteDetalle | null>;
+  listarDocumentosAdjuntos?(idExpediente: string): Promise<DocumentoAdjuntoResumen[]>;
 }
 
 /** Lectura del DDL ejecutable 05: UUID, CUT y fecha_radicacion. */
@@ -176,19 +177,44 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
 
     const dato = fila.rows[0];
     let resumenDocumentos: ExpedienteDetalle['resumenDocumentos'] = null;
+
+    // 1. Consultar cantidad real de documentos adjuntos persistidos en sigd_doc.documento_adjunto
+    let cantAdjuntos = 0;
+    try {
+      const existeAdjuntos = await this.pool.query<{ existe: string | null }>(
+        `SELECT to_regclass('sigd_doc.documento_adjunto')::text AS existe`);
+      if (existeAdjuntos.rows[0]?.existe) {
+        const docsAdjuntos = await this.pool.query<{ cantidad: number }>(`
+          SELECT count(*)::integer AS cantidad
+            FROM sigd_doc.documento_adjunto
+           WHERE expediente_tra_id = $1::uuid OR expediente_id = $1::uuid`, [idExpediente]);
+        cantAdjuntos = docsAdjuntos.rows[0]?.cantidad ?? 0;
+      }
+    } catch {
+      cantAdjuntos = 0;
+    }
+
+    // 2. Consultar folios asignados en sigd_tra.expediente_documento_folio si la tabla existe
+    let cantFoliados = 0;
+    let totalFolios = 0;
     const existeFoliacion = await this.pool.query<{ existe: string | null }>(
       `SELECT to_regclass('sigd_tra.expediente_documento_folio')::text AS existe`);
-    if (existeFoliacion.rows[0].existe) {
+    if (existeFoliacion.rows[0]?.existe) {
       const folios = await this.pool.query<{ cantidad: number; total: number }>(`
         SELECT count(DISTINCT id_documento)::integer AS cantidad,
                COALESCE(sum(folio_fin - folio_inicio + 1), 0)::integer AS total
           FROM sigd_tra.expediente_documento_folio
          WHERE expediente_id = $1::uuid`, [idExpediente]);
-      resumenDocumentos = {
-        cantidadDocumentos: folios.rows[0].cantidad,
-        totalFolios: folios.rows[0].total,
-      };
+      cantFoliados = folios.rows[0]?.cantidad ?? 0;
+      totalFolios = folios.rows[0]?.total ?? 0;
     }
+
+    const cantidadDocumentos = Math.max(cantAdjuntos, cantFoliados);
+    resumenDocumentos = {
+      cantidadDocumentos,
+      totalFolios,
+      cantidadFoliados: cantFoliados,
+    };
     const ultimoMovimiento: UltimoMovimiento | null = dato.id_movimiento && dato.evento && dato.fecha_hora && dato.usuario_operador_id
       ? { idMovimiento: dato.id_movimiento, evento: dato.evento,
           estadoNuevo: dato.estado_actual, fechaHora: dato.fecha_hora.toISOString(),
@@ -198,5 +224,59 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       ...mapearResumen(dato), solicitanteId: dato.solicitante_id,
       resumenDocumentos, ultimoMovimiento, sla: null,
     };
+  }
+  async listarDocumentosAdjuntos(idExpediente: string): Promise<DocumentoAdjuntoResumen[]> {
+    try {
+      const existeAdjuntos = await this.pool.query<{ existe: string | null }>(
+        `SELECT to_regclass('sigd_doc.documento_adjunto')::text AS existe`);
+      if (!existeAdjuntos.rows[0]?.existe) {
+        return [];
+      }
+
+      const res = await this.pool.query<{
+        id_documento: string;
+        nombre_archivo: string;
+        tamano_bytes: string;
+        mime_type: string;
+        sha256: string | null;
+        creado_en: Date;
+        tipo_documental: string | null;
+        folio_inicio: number | null;
+        folio_fin: number | null;
+      }>(
+        `SELECT da.documento_adjunto_id::text AS id_documento,
+                da.nombre_archivo,
+                da.tamano_bytes::text,
+                da.mime_type,
+                da.sha256,
+                da.creado_en,
+                td.nombre AS tipo_documental,
+                f.folio_inicio,
+                f.folio_fin
+           FROM sigd_doc.documento_adjunto da
+      LEFT JOIN sigd_doc.tipo_documento td ON td.tipo_documental_id = da.tipo_documental_id
+      LEFT JOIN sigd_tra.expediente_documento_folio f ON f.id_documento = da.documento_adjunto_id AND f.expediente_id = $1::uuid
+          WHERE da.expediente_tra_id = $1::uuid OR da.expediente_id = $1::uuid
+          ORDER BY da.creado_en ASC`,
+        [idExpediente],
+      );
+
+      return res.rows.map((d) => ({
+        idDocumento: d.id_documento,
+        nombreArchivo: d.nombre_archivo,
+        tamanoBytes: Number(d.tamano_bytes),
+        mimeType: d.mime_type,
+        sha256: d.sha256 ? d.sha256.trim() : null,
+        tipoDocumental: d.tipo_documental ?? 'Documento Principal',
+        creadoEn: d.creado_en instanceof Date ? d.creado_en.toISOString() : String(d.creado_en),
+        foliado: d.folio_inicio !== null && d.folio_inicio !== undefined,
+        folios:
+          d.folio_inicio !== null && d.folio_inicio !== undefined
+            ? `F. ${String(d.folio_inicio).padStart(4, '0')} - F. ${String(d.folio_fin).padStart(4, '0')}`
+            : null,
+      }));
+    } catch {
+      return [];
+    }
   }
 }

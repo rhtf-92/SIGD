@@ -23,11 +23,13 @@ vi.mock("@/components/registro/PersonaNaturalForm", () => ({
       onClick={() =>
         onSubmit({
           tipoPersona: "NATURAL",
+          tipoDocumento: "DNI",
           numeroDocumento: "71234567",
           nombres: "Juan",
           apellidos: "Perez Lopez",
           correo: "jperez@test.com",
           celular: "961234567",
+          username: "juan.perez",
           domicilio: { distritoCodigo: "250101", direccionExacta: "Av Principal 123" },
           password: "MiClaveSegura#2026",
           confirmarPassword: "MiClaveSegura#2026",
@@ -37,8 +39,8 @@ vi.mock("@/components/registro/PersonaNaturalForm", () => ({
       Enviar Natural
     </button>
     <button type="button" data-testid="submit-natural-incomplete" onClick={() => onSubmit({
-      tipoPersona: "NATURAL", numeroDocumento: "71234567", nombres: "Juan",
-      apellidos: "Perez Lopez", correo: "jperez@test.com", celular: "",
+      tipoPersona: "NATURAL", tipoDocumento: "DNI", numeroDocumento: "71234567", nombres: "Juan",
+      apellidos: "Perez Lopez", correo: "jperez@test.com", celular: "", username: "juan.perez",
       domicilio: { distritoCodigo: "", direccionExacta: "" },
       password: "MiClaveSegura#2026", confirmarPassword: "MiClaveSegura#2026",
     })}>Enviar incompleto</button>
@@ -50,6 +52,35 @@ describe("H-07: RegistroCiudadanoPage — Strict 201 + valid idPersona verificat
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
+  });
+
+  it('advierte sobre el documento y permite revisar el DNI antes de crear la cuenta', async () => {
+    post.mockResolvedValue({ status: 201, data: { idPersona: '11111111-1111-4111-8111-111111111111' } });
+    render(<MemoryRouter><RegistroCiudadanoPage /></MemoryRouter>);
+    expect(screen.getByText(/Verifica cuidadosamente tu número de documento/)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('submit-natural'));
+    expect(post).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toHaveTextContent('DNI 71234567');
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('submit-natural'));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar y crear cuenta' }));
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  });
+
+  it('bloquea un segundo envío mientras se crea la cuenta', async () => {
+    let completar: (value: unknown) => void = () => {};
+    post.mockImplementation(() => new Promise((resolve) => { completar = resolve; }));
+    render(<MemoryRouter><RegistroCiudadanoPage /></MemoryRouter>);
+    fireEvent.click(screen.getByTestId('submit-natural'));
+    const confirmar = screen.getByRole('button', { name: 'Confirmar y crear cuenta' });
+    fireEvent.click(confirmar);
+    fireEvent.click(confirmar);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Creando cuenta...' })).toBeDisabled();
+    completar({ status: 201, data: { idPersona: '11111111-1111-4111-8111-111111111111' } });
+    await waitFor(() => expect(screen.getByText(/Registro completado/)).toBeInTheDocument());
   });
 
   it("201 válido con idPersona -> éxito y fusiona idPersona en borrador", async () => {
@@ -70,6 +101,7 @@ describe("H-07: RegistroCiudadanoPage — Strict 201 + valid idPersona verificat
     );
 
     fireEvent.click(screen.getByTestId("submit-natural"));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y crear cuenta" }));
 
     await waitFor(() => {
       expect(screen.getByText(/Registro completado/i)).toBeInTheDocument();
@@ -84,9 +116,10 @@ describe("H-07: RegistroCiudadanoPage — Strict 201 + valid idPersona verificat
     post.mockResolvedValueOnce({ status: 201, data: { idPersona: '11111111-1111-4111-8111-111111111111' } });
     render(<MemoryRouter><RegistroCiudadanoPage /></MemoryRouter>);
     fireEvent.click(screen.getByTestId('submit-natural'));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y crear cuenta" }));
     await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
     expect(post.mock.calls[0][1]).toEqual(expect.objectContaining({
-      password: 'MiClaveSegura#2026', celular: '961234567',
+      password: 'MiClaveSegura#2026', celular: '961234567', username: 'juan.perez',
       ubigeoDistrito: '250101', direccion: 'Av Principal 123',
     }));
   });
@@ -113,6 +146,7 @@ describe("H-07: RegistroCiudadanoPage — Strict 201 + valid idPersona verificat
     );
 
     fireEvent.click(screen.getByTestId("submit-natural"));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y crear cuenta" }));
 
     await waitFor(() => {
       expect(screen.queryByText(/Registro completado/i)).not.toBeInTheDocument();
@@ -135,6 +169,7 @@ describe("H-07: RegistroCiudadanoPage — Strict 201 + valid idPersona verificat
     );
 
     fireEvent.click(screen.getByTestId("submit-natural"));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y crear cuenta" }));
 
     await waitFor(() => {
       expect(screen.queryByText(/Registro completado/i)).not.toBeInTheDocument();
@@ -155,6 +190,7 @@ describe("H-07: RegistroCiudadanoPage — Strict 201 + valid idPersona verificat
     );
 
     fireEvent.click(screen.getByTestId("submit-natural"));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y crear cuenta" }));
 
     await waitFor(() => {
       expect(screen.queryByText(/Registro completado/i)).not.toBeInTheDocument();
@@ -179,6 +215,7 @@ describe("H-07: RegistroCiudadanoPage — Strict 201 + valid idPersona verificat
     );
 
     fireEvent.click(screen.getByTestId("submit-natural"));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y crear cuenta" }));
 
     await waitFor(() => {
       expect(screen.queryByText(/Registro completado/i)).not.toBeInTheDocument();
@@ -196,6 +233,7 @@ describe("H-07: RegistroCiudadanoPage — Strict 201 + valid idPersona verificat
     );
 
     fireEvent.click(screen.getByTestId("submit-natural"));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y crear cuenta" }));
 
     await waitFor(() => {
       expect(screen.queryByText(/Registro completado/i)).not.toBeInTheDocument();

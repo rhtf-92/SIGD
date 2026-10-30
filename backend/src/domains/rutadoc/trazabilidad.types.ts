@@ -17,10 +17,20 @@ export interface ActuacionTrazabilidad {
   duracionMs: number | null;
   duracionMinutos: number | null;
   tipoActuacion: 'NORMAL' | 'COMPENSATORIA';
+  areaDestinoNombre?: string | null;
+}
+
+export interface EventoTrazabilidad {
+  id: string;
+  tipo: 'RADICACION' | 'ORDEN_PAGO' | 'PAGO_CONFIRMADO' | 'MOVIMIENTO';
+  fechaHora: string;
+  titulo: string;
+  detalle: string | null;
 }
 
 export interface RepositorioTrazabilidadRutaDoc {
   existeExpediente(idExpediente: string): Promise<boolean>;
+  listarEventosOrigen?(idExpediente: string): Promise<readonly EventoTrazabilidad[]>;
   listar(idExpediente: string): Promise<readonly Omit<ActuacionTrazabilidad,
     'duracionMs' | 'duracionMinutos'>[]>;
 }

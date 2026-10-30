@@ -8,6 +8,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { casillaService } from "../services/casillaService";
+import { useAuthStore } from "../stores/authStore";
 import type {
   EstadoNotificacion,
   FiltrosCasilla,
@@ -34,6 +35,7 @@ const FILTROS_INICIALES: FiltrosCasilla = {
 
 export function useCasilla() {
   const queryClient = useQueryClient();
+  const usuarioId = useAuthStore((state) => state.usuario?.id);
 
   // Estado de filtros y paginación
   const [filtros, setFiltros] = useState<FiltrosCasilla>(FILTROS_INICIALES);
@@ -45,14 +47,16 @@ export function useCasilla() {
 
   // Query: Listado paginado de notificaciones
   const notificacionesQuery = useQuery({
-    queryKey: CASILLA_QUERY_KEYS.list(filtros),
+    queryKey: [...CASILLA_QUERY_KEYS.list(filtros), usuarioId],
     queryFn: () => casillaService.getNotificaciones(filtros),
+    enabled: Boolean(usuarioId),
   });
 
   // Query: Estadísticas y contadores
   const statsQuery = useQuery({
-    queryKey: CASILLA_QUERY_KEYS.stats,
+    queryKey: [...CASILLA_QUERY_KEYS.stats, usuarioId],
     queryFn: () => casillaService.getEstadisticas(),
+    enabled: Boolean(usuarioId),
   });
 
   // Mutation: Marcar como leído

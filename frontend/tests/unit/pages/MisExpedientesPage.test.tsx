@@ -64,6 +64,7 @@ describe('MisExpedientesPage — Portal Ciudadano', () => {
     expect(screen.getByText('MESA_VIRTUAL')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('Seguimiento →')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '+ Nuevo Trámite' })).toHaveAttribute('href', '/tramite');
   });
 
   it('muestra estado vacío amigable cuando el ciudadano no registra expedientes', async () => {
@@ -82,6 +83,7 @@ describe('MisExpedientesPage — Portal Ciudadano', () => {
     });
 
     expect(screen.getByText('Presentar Primer Trámite')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Presentar Primer Trámite' })).toHaveAttribute('href', '/tramite');
   });
 
   it('muestra mensaje de error y botón de reintento si la API falla', async () => {

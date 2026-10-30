@@ -1,12 +1,13 @@
 import { useSyncExternalStore } from "react";
 import { apiClient } from "../api/client";
+import type { RolCanonica } from "../config/navigation.config";
 
 export interface UsuarioPerfil {
   id: string;
   idPersona?: string | null;
   nombreCompleto: string;
   correo: string;
-  rol: 'ADMINISTRADOR' | 'DIRECTOR' | 'SECRETARIO' | 'ESPECIALISTA' | 'MESA_PARTES' | 'CIUDADANO';
+  rol: RolCanonica;
   areaId?: string;
 }
 

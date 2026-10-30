@@ -4,7 +4,8 @@ export type RolCanonica =
   | 'DIRECTOR'
   | 'ESPECIALISTA'
   | 'MESA_PARTES'
-  | 'SECRETARIO';
+  | 'SECRETARIO'
+  | 'TESORERIA';
 
 export interface NavItem {
   etiqueta: string;
@@ -21,18 +22,21 @@ export const DESTINO_POR_ROL: Record<RolCanonica, string> = {
   SECRETARIO: '/expedientes',
   DIRECTOR: '/reportes/dashboard',
   ADMINISTRADOR: '/administracion',
+  TESORERIA: '/tesoreria',
 };
 
 export const ROLES_INSTITUCIONALES: readonly RolCanonica[] = [
-  'MESA_PARTES', 'ESPECIALISTA', 'SECRETARIO', 'DIRECTOR', 'ADMINISTRADOR',
+  'MESA_PARTES', 'ESPECIALISTA', 'SECRETARIO', 'DIRECTOR', 'ADMINISTRADOR', 'TESORERIA',
 ];
 
 export const ROLES_VENTANILLA: readonly RolCanonica[] = ROLES_INSTITUCIONALES;
 export const ROLES_REPORTES: readonly RolCanonica[] = ['DIRECTOR', 'ADMINISTRADOR'];
 export const ROLES_ADMIN: readonly RolCanonica[] = ['ADMINISTRADOR'];
 export const ROLES_CIUDADANO: readonly RolCanonica[] = ['CIUDADANO'];
+export const ROLES_TESORERIA: readonly RolCanonica[] = ['TESORERIA', 'ADMINISTRADOR'];
 
 export const RUTAS_PERSONALES_CIUDADANO = [
+  '/mi-perfil',
   '/mis-expedientes',
   '/casilla',
   '/casilla-electronica',
@@ -48,6 +52,7 @@ export function normalizarRuta(pathname: string): string {
 export function esRutaPersonalCiudadano(pathname: string): boolean {
   const ruta = normalizarRuta(pathname);
   return (
+    ruta === '/mi-perfil' ||
     ruta === '/mis-expedientes' || ruta.startsWith('/mis-expedientes/') ||
     ruta === '/casilla' || ruta.startsWith('/casilla/') ||
     ruta === '/casilla-electronica' || ruta.startsWith('/casilla-electronica/')
@@ -68,6 +73,7 @@ export function rolesPermitidosParaRuta(pathname: string): readonly RolCanonica[
     return ROLES_CIUDADANO;
   }
   if (ruta === '/expedientes' || ruta.startsWith('/expedientes/')) return ROLES_INSTITUCIONALES;
+  if (ruta === '/tesoreria' || ruta.startsWith('/tesoreria/')) return ROLES_TESORERIA;
   if (ruta === '/reportes' || ruta.startsWith('/reportes/')) return ROLES_REPORTES;
   if (
     ruta === '/administracion' ||
@@ -122,7 +128,7 @@ export const NAV_ITEMS_PUBLICOS: readonly NavItem[] = [
 export const NAV_ITEMS_POR_ROL: Record<RolCanonica, readonly NavItem[]> = {
   CIUDADANO: [
     { etiqueta: 'Inicio', ruta: '/' },
-    { etiqueta: 'Nuevo Trámite', ruta: '/solicitud-acceso-tupa' },
+    { etiqueta: 'Nuevo Trámite', ruta: '/tramite' },
     { etiqueta: 'Mis Expedientes', ruta: '/mis-expedientes' },
     { etiqueta: 'Casilla Electrónica', ruta: '/casilla' },
     { etiqueta: 'Consulta CUT', ruta: '/consulta' },
@@ -161,6 +167,12 @@ export const NAV_ITEMS_POR_ROL: Record<RolCanonica, readonly NavItem[]> = {
     { etiqueta: 'Reportes', ruta: '/reportes/dashboard' },
     { etiqueta: 'Calendario Laboral', ruta: '/calendarizacion-institucional' },
     { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
+  ],
+  TESORERIA: [
+    { etiqueta: 'Inicio', ruta: '/' },
+    { etiqueta: 'Módulo Tesorería', ruta: '/tesoreria' },
+    { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
+    { etiqueta: 'Consulta CUT', ruta: '/consulta' },
   ],
 };
 

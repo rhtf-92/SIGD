@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 import type { Pool } from 'pg';
+import { resolverOperadorBigInt } from './derivaciones.service.js';
 import type { ActorRutaDoc } from './rutadoc.types.js';
 import { verificarTokenAcceso, type ClaimsJwt } from '../../core/auth/jwt.service.js';
 
@@ -47,18 +48,29 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
 
       try {
         const resUser = await pool.query<{ id_persona: string | null; area_id: string | null }>(
-          `SELECT u.id_persona::text AS id_persona, p.area_id::text AS area_id
+          `SELECT u.id_persona::text AS id_persona,
+                  COALESCE(rol_area.area_id, p.area_id)::text AS area_id
              FROM sigd_auth.cuenta_usuario u
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = u.id_usuario
-            WHERE u.id_usuario = $1`,
-          [usuarioId],
+        LEFT JOIN LATERAL (
+          SELECT ur.area_id
+            FROM sigd_org.usuario_rol ur
+            JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+           WHERE ur.id_usuario = u.id_usuario
+             AND r.codigo = ANY($2::text[])
+             AND ur.vigente_desde <= now()
+             AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+           ORDER BY ur.vigente_desde DESC
+           LIMIT 1
+        ) rol_area ON true
+            WHERE u.id_usuario = $1 AND u.activo = true`,
+          [usuarioId, roles],
         );
-        if (resUser.rows.length > 0) {
-          idPersona = resUser.rows[0].id_persona;
-          areaId = resUser.rows[0].area_id;
-        }
+        if (resUser.rows.length === 0) return null;
+        idPersona = resUser.rows[0].id_persona;
+        areaId = resUser.rows[0].area_id;
       } catch {
-        // En caso de error de conexión, se mantiene null (falla cerrado)
+        return null;
       }
 
       const esAdminOInstitucional = roles.some((r) =>
@@ -102,7 +114,7 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
 
           // 2. Operadores de Mesa de Partes / Ventanilla
           if (roles.includes('MESA_PARTES')) {
-            if (['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION'].includes(exp.estado)) {
+            if (['REGISTRADO', 'PENDIENTE_PAGO', 'RECEPCIONADO', 'EN_CALIFICACION'].includes(exp.estado)) {
               return true;
             }
             if (areaId && exp.area_destino_id === areaId) {
@@ -124,10 +136,11 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
                     datos->>'areaId' = $2::text OR
                     datos->>'areaOrigenId' = $2::text OR
                     datos->>'area_destino_id' = $2::text OR
-                    datos->>'area_origen_id' = $2::text
+                    datos->>'area_origen_id' = $2::text OR
+                    usuario_operador_id = $3::bigint
                   )
                 LIMIT 1`,
-              [idExpediente, areaId],
+              [idExpediente, areaId, resolverOperadorBigInt(usuarioId)],
             );
             if (resMov.rows && resMov.rows.length > 0) {
               return true;

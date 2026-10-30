@@ -1,6 +1,6 @@
 import { apiClient } from "../../../api/client";
 import { adaptarTrazabilidad, RespuestaRutaDocInvalida, validarRespuesta } from "./rutadoc.adapters";
-import { bandejaSchema, detalleSchema, foliacionSchema, slaSchema, uuid, type Filtros } from "./rutadoc.dto";
+import { bandejaSchema, detalleSchema, foliacionSchema, slaSchema, uuid, type Filtros, type DocumentoAdjuntoDto, type SolicitanteResumenDto } from "./rutadoc.dto";
 
 function url(ruta: string) {
   // Evita duplicar /api al usar baseURL=/api.
@@ -34,7 +34,7 @@ export const rutaDoc = {
         porcentaje: number;
         fechaLimite: string;
       } | null;
-      foliacionResumen: { cantidadDocumentos: number; totalFolios: number };
+      foliacionResumen: { cantidadDocumentos: number; totalFolios: number; cantidadFoliados?: number };
       tupaResumen: {
         registroVersionId: string;
         codigo: string;
@@ -43,7 +43,21 @@ export const rutaDoc = {
         plazoDias: number;
         costo: number;
       } | null;
+      documentos?: DocumentoAdjuntoDto[];
+      solicitanteResumen?: SolicitanteResumenDto | null;
     };
+  },
+  obtenerUrlArchivo: async (idExpediente: string, idDocumento: string, signal?: AbortSignal) => {
+    const { data } = await apiClient.get<{
+      url: string;
+      downloadUrl: string;
+      nombreArchivo: string;
+      mimeType: string;
+      tamanoBytes: number;
+      sha256: string | null;
+      expiraEnSegundos: number;
+    }>(`/api/v1/expedientes/${encodeURIComponent(idExpediente)}/documentos/${encodeURIComponent(idDocumento)}/url-archivo`, { signal });
+    return data;
   },
   trazabilidad: async (id: string, signal?: AbortSignal) =>
     adaptarTrazabilidad(await leer(`${rutaId(id)}/trazabilidad`, signal), id),

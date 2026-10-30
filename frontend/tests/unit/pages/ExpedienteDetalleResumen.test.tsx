@@ -110,7 +110,7 @@ describe("ExpedienteDetallePage - Consumo consolidado de /resumen y foliación b
     // Verifica que se renderiza la vista inicial con los datos de /resumen
     expect(await screen.findByText("CUT-CONSOLIDADO-2026")).toBeInTheDocument();
     expect(screen.getByText("Solicitud con resumen consolidado")).toBeInTheDocument();
-    expect(screen.getByText("Resumen documental: 2 documento(s), 5 folio(s) foliados.")).toBeInTheDocument();
+    expect(screen.getByText(/2 documentos, 5 folios asignados/i)).toBeInTheDocument();
     expect(screen.getByText("Certificado Consolidado")).toBeInTheDocument();
 
     // 1 sola petición inicial (/resumen) y 0 peticiones de foliación detallada ni trazabilidad
@@ -131,13 +131,16 @@ describe("ExpedienteDetallePage - Consumo consolidado de /resumen y foliación b
     expect(await screen.findByText("Solicitud.pdf")).toBeInTheDocument();
     expect(screen.getByText("Comprobante.pdf")).toBeInTheDocument();
 
-    // D. Trazabilidad continúa siendo lazy: al pulsar "Cargar trazabilidad completa", se realiza su petición
+    // D. Trazabilidad sigue bajo demanda, pero abrir el panel ya inicia la consulta.
     expect(llamadas).not.toContain(`/api/v1/expedientes/${mockExpedienteId}/trazabilidad`);
-    const botonTrazabilidad = screen.getByRole("button", { name: "Cargar trazabilidad completa" });
-    fireEvent.click(botonTrazabilidad);
+    const panelTrazabilidad = screen.getByText("Trazabilidad").closest("details");
+    expect(panelTrazabilidad).not.toBeNull();
+    panelTrazabilidad!.open = true;
+    fireEvent(panelTrazabilidad!, new Event("toggle", { bubbles: true }));
 
     await waitFor(() => {
       expect(llamadas).toContain(`/api/v1/expedientes/${mockExpedienteId}/trazabilidad`);
     });
+    expect(await screen.findByText("Sin eventos registrados para este expediente.")).toBeInTheDocument();
   });
 });

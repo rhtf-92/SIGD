@@ -5,12 +5,32 @@
  */
 
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 import NotificationList from "../../components/casilla/NotificacionList";
 import NotificacionDetailModal from "../../components/casilla/NotificacionDetailModal";
 import { useCasilla } from "../../hooks/useCasilla";
+import { apiClient } from "../../api/client";
+import { useAuthStore } from "../../stores/authStore";
+
+interface PerfilCasilla {
+  nombreCompleto: string;
+  tipoDocumento: string;
+  numeroDocumento: string;
+  correo: string;
+}
 
 export default function CasillaElectronicaPage() {
+  const usuarioId = useAuthStore((state) => state.usuario?.id);
+  const token = useAuthStore((state) => state.accessToken);
+  const { data: perfil, isLoading: cargandoPerfil, isError: errorPerfil } = useQuery({
+    queryKey: ["casilla", "perfil", usuarioId],
+    queryFn: async () => (await apiClient.get<PerfilCasilla>("/api/v1/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })).data,
+    enabled: Boolean(usuarioId && token),
+    staleTime: 0,
+  });
   const {
     filtros,
     hasActiveFilters,
@@ -72,23 +92,23 @@ export default function CasillaElectronicaPage() {
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="relative overflow-hidden flex items-center gap-3.5 rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white/95 via-sky-50/70 to-indigo-50/40 p-3.5 shadow-[0_4px_16px_-2px_rgba(14,165,233,0.12)] ring-1 ring-white/80 backdrop-blur-xs before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-700 font-bold text-white shadow-sm">
-                  SP
+                  {perfil?.nombreCompleto?.trim().slice(0, 1).toUpperCase() ?? "—"}
                 </div>
                 <div className="text-xs">
                   <div className="flex items-center gap-1.5">
                     <p className="font-bold text-slate-900">
-                      Sergio Serruche Panduro
+                      {cargandoPerfil ? "Cargando datos..." : errorPerfil ? "No se pudo cargar el perfil" : perfil?.nombreCompleto ?? "Mi cuenta"}
                     </p>
                     <span className="rounded-full border border-sky-200/80 bg-gradient-to-b from-white to-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-800 shadow-[0_1px_3px_rgba(14,165,233,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)]">
-                      DNI 74561238
+                      {perfil?.numeroDocumento ? `${perfil.tipoDocumento} ${perfil.numeroDocumento}` : "Documento no disponible"}
                     </span>
                   </div>
                   <p className="font-mono text-[11px] text-blue-700 font-semibold mt-0.5">
-                    74561238@casilla.iestpsuiza.edu.pe
+                    {perfil?.correo ?? "Correo no disponible"}
                   </p>
                   <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span>Casilla vinculada y homologada (Ley N° 29733)</span>
+                    <span>Dirección de Casilla no configurada.</span>
                   </div>
                 </div>
               </div>

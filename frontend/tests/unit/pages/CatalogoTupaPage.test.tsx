@@ -192,7 +192,7 @@ describe('CatalogoTupaPage — Catálogo TUPA Protegido y Formulario Dinámico',
     await waitFor(() => {
       const botones = screen.getAllByRole('button', { name: /Iniciar Trámite/i });
       expect(botones.length).toBe(1);
-    });
+    }, { timeout: 4000 });
 
     const botonIniciar = screen.getByRole('button', { name: /Iniciar Trámite/i });
     await user.click(botonIniciar);

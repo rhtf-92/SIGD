@@ -67,6 +67,12 @@ describe('Consulta RutaDoc', () => {
     expect(() => filtrosSchema.parse({ pestana: 'PENDIENTES', pagina: '2' })).toThrow(z.ZodError);
   });
 
+  it('acepta identificadores de area fisicos y rechaza formatos invalidos', () => {
+    const areaId = 'a0000000-0000-0000-0000-000000000001';
+    expect(filtrosSchema.parse({ pestana: 'DERIVADOS', areaId }).areaId).toBe(areaId);
+    expect(() => filtrosSchema.parse({ pestana: 'DERIVADOS', areaId: 'SDA' })).toThrow(z.ZodError);
+  });
+
   it('valida fechas reales y un rango ordenado', () => {
     expect(filtrosSchema.parse({ pestana: 'PENDIENTES', fechaDesde: '2026-09-01', fechaHasta: '2026-09-30' }).fechaDesde)
       .toBe('2026-09-01');

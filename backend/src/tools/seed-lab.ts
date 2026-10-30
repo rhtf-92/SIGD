@@ -7,7 +7,7 @@ interface DemoAccountConfig {
   dni: string;
   nombres: string;
   apellidos: string;
-  rol: 'CIUDADANO' | 'MESA_PARTES' | 'ESPECIALISTA' | 'SECRETARIO' | 'DIRECTOR' | 'ADMINISTRADOR';
+  rol: 'CIUDADANO' | 'MESA_PARTES' | 'ESPECIALISTA' | 'SECRETARIO' | 'DIRECTOR' | 'ADMINISTRADOR' | 'TESORERIA';
   areaCodigo: 'DIR' | 'SDA' | null;
   passwordEnvVar: string;
 }
@@ -72,6 +72,16 @@ const CUENTAS_DEMO: DemoAccountConfig[] = [
     rol: 'ADMINISTRADOR',
     areaCodigo: 'DIR',
     passwordEnvVar: 'LAB_ADMINISTRADOR_PASSWORD',
+  },
+  {
+    usuario: 'tesoreria_demo',
+    correo: 'tesoreria.demo@iestp-suiza.edu.pe',
+    dni: '99000007',
+    nombres: 'Tesorero',
+    apellidos: 'Institucional Demo',
+    rol: 'TESORERIA',
+    areaCodigo: 'DIR',
+    passwordEnvVar: 'LAB_TESORERIA_PASSWORD',
   },
 ];
 

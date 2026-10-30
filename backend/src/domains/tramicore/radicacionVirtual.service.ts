@@ -5,6 +5,9 @@ import { CutService } from './cut.service.js';
 import { calcularHorarioCorte, type ResultadoHorarioCorte } from './horarioCorte.util.js';
 import type { RadicacionVirtualInput } from './tramites.schemas.js';
 import type { DtoContextoTupa } from './tupaVersionado.service.js';
+import { TesoreriaRepository } from '../tesoreria/tesoreria.repository.js';
+import { calcularVencimientoOrdenPago } from '../tesoreria/tesoreria.service.js';
+import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
 
 /**
  * T-BE-TC-02 y T-BE-TC-03 — Logica de negocio de la radicacion virtual
@@ -94,6 +97,7 @@ export type ProveedorFeriados = () => Promise<string[]>;
 
 export class RadicacionVirtualService {
   private readonly cutService: CutService;
+  private readonly tesoreriaRepository = new TesoreriaRepository();
   private readonly obtenerFeriados: ProveedorFeriados;
 
   constructor(private readonly pool: Pool, obtenerFeriados?: ProveedorFeriados) {
@@ -149,6 +153,32 @@ export class RadicacionVirtualService {
 
       if (datos.registroVersionId) {
         await this.insertarVinculoTupa(cliente, expediente.expediente_id, datos.registroVersionId);
+        const contextoPago = await this.tesoreriaRepository.obtenerContextoExpedienteParaPago(cliente, expediente.expediente_id);
+        if (!contextoPago) throw new Error('No se pudo resolver el costo TUPA del expediente radicado.');
+        if (contextoPago.costoOficial > 0) {
+          const codigoPago = await this.tesoreriaRepository.obtenerSiguienteCodigoPago(cliente, now.getFullYear());
+          const orden = await this.tesoreriaRepository.insertarOrdenPago(cliente, {
+            codigoPago,
+            expedienteId: expediente.expediente_id,
+            registroVersionId: contextoPago.registroVersionId,
+            solicitanteId: contextoPago.solicitanteId,
+            concepto: contextoPago.concepto,
+            codigoTupa: contextoPago.codigoTupa,
+            monto: contextoPago.costoOficial,
+            moneda: 'PEN',
+            fechaVencimiento: calcularVencimientoOrdenPago(now),
+          });
+          await cliente.query(
+            `UPDATE sigd_tra.expediente SET estado = 'PENDIENTE_PAGO'
+              WHERE expediente_id = $1::uuid AND estado = 'REGISTRADO'`,
+            [expediente.expediente_id],
+          );
+          await registrarMutacion(cliente, {
+            esquema: 'sigd_tra', tabla: 'orden_pago', operacion: 'INSERT',
+            datos_despues: { ordenPagoId: orden.orden_pago_id, codigoPago, expedienteId: expediente.expediente_id,
+              monto: contextoPago.costoOficial, fechaVencimiento: orden.fecha_vencimiento },
+          });
+        }
       }
       const cargo = this.emitirCargoDigital(expediente.expediente_id, datos, now);
 

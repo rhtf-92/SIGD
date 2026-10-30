@@ -9,6 +9,7 @@ const ENV_VARS_LAB = [
   'LAB_SECRETARIO_PASSWORD',
   'LAB_DIRECTOR_PASSWORD',
   'LAB_ADMINISTRADOR_PASSWORD',
+  'LAB_TESORERIA_PASSWORD',
 ];
 
 describe('seed-lab: salvaguardas y comportamiento', () => {

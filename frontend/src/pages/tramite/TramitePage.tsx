@@ -17,18 +17,60 @@
  * ==============================================================================
  */
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { FileText, ArrowRight, BookOpen, KeyRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { TRAMITE_WIZARD_STORAGE_KEY } from "../../hooks/useTramiteWizardReducer";
+import { FileText, ArrowRight, BookOpen, KeyRound, LogIn, UserPlus } from "lucide-react";
 import TramiteWizard from "../../components/tramite/TramiteWizard";
 import { useAuthStore } from "../../stores/authStore";
 
 export default function TramitePage() {
   const [ultimoCut, setUltimoCut] = useState<string | null>(null);
+  const location = useLocation();
+  const [resetKey, setResetKey] = useState<number>(0);
+
+  useEffect(() => {
+    const navState = location.state as { nuevoTramite?: boolean; t?: number } | null;
+    if (navState?.nuevoTramite) {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        try {
+          window.sessionStorage.removeItem(TRAMITE_WIZARD_STORAGE_KEY);
+        } catch {
+          // ignore
+        }
+      }
+      setUltimoCut(null);
+      setResetKey((prev) => prev + 1);
+      try {
+        window.history.replaceState({ ...window.history.state, usr: null }, '');
+      } catch {
+        // ignore
+      }
+    }
+  }, [location.state, location.key]);
   const usuario = useAuthStore((s) => s.usuario);
+  const token = useAuthStore((s) => s.accessToken);
+  const [accesoTupa, setAccesoTupa] = useState<'cargando' | 'autorizado' | 'solicitar' | 'error'>('cargando');
   const esInstitucional =
     usuario?.rol &&
     ["MESA_PARTES", "ADMINISTRADOR", "DIRECTOR", "ESPECIALISTA", "SECRETARIO"].includes(usuario.rol);
+
+  useEffect(() => {
+    if (!token || !usuario || esInstitucional) return;
+    const controller = new AbortController();
+    setAccesoTupa('cargando');
+    fetch('/api/v1/tramites/tupa/acceso/estado', {
+      headers: { Authorization: `Bearer ${token}` }, signal: controller.signal,
+    }).then(async (res) => {
+      if (!res.ok) throw new Error('No se pudo consultar el acceso TUPA.');
+      return res.json() as Promise<{ autorizado: boolean }>;
+    }).then((estado) => {
+      if (!controller.signal.aborted) setAccesoTupa(estado.autorizado ? 'autorizado' : 'solicitar');
+    }).catch(() => {
+      if (!controller.signal.aborted) setAccesoTupa('error');
+    });
+    return () => controller.abort();
+  }, [token, usuario?.id, esInstitucional]);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -79,29 +121,37 @@ export default function TramitePage() {
               </p>
               <p className="text-[11px] text-slate-500">
                 {esInstitucional
-                  ? "Como usuario con rol institucional cuenta con acceso directo al catálogo de 72 entradas."
-                  : "Los usuarios ciudadanos pueden solicitar autorización de consulta para acceder al documento oficial íntegro."}
+                  ? "Su rol institucional permite consultar las 72 entradas."
+                  : accesoTupa === 'autorizado'
+                    ? "Su acceso al catálogo completo está aprobado."
+                    : accesoTupa === 'error'
+                      ? "No se pudo consultar su autorización TUPA. Actualice la página para reintentar."
+                      : "Para consultar las 72 entradas se requiere una solicitud aprobada."}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <Link
-              to="/tupa"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-900 hover:bg-cyan-100 transition shadow-2xs"
-            >
-              <BookOpen className="h-3.5 w-3.5 text-cyan-700" />
-              Catálogo TUPA <ArrowRight className="h-3 w-3" />
-            </Link>
-            {!esInstitucional && (
+            {(esInstitucional || (token && accesoTupa === 'autorizado')) && (
+              <Link to="/tupa" className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-900 hover:bg-cyan-100 transition shadow-2xs">
+                <BookOpen className="h-3.5 w-3.5 text-cyan-700" />
+                Ver Catálogo TUPA <ArrowRight className="h-3 w-3" />
+              </Link>
+            )}
+            {token && !esInstitucional && accesoTupa === 'solicitar' && (
               <Link
                 to="/solicitud-acceso-tupa"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
               >
                 <KeyRound className="h-3.5 w-3.5 text-slate-600" />
-                Solicitar Acceso
+                Solicitar acceso TUPA
               </Link>
             )}
+            {token && !esInstitucional && accesoTupa === 'cargando' && <span role="status" className="text-xs text-slate-500">Consultando acceso TUPA...</span>}
+            {!token && <>
+              <Link to="/login" className="text-xs font-semibold text-cyan-900"><LogIn className="inline h-3.5 w-3.5" /> Iniciar sesión</Link>
+              <Link to="/registro" className="text-xs font-semibold text-cyan-900"><UserPlus className="inline h-3.5 w-3.5" /> Registrarme</Link>
+            </>}
           </div>
         </div>
       </header>
@@ -130,6 +180,7 @@ export default function TramitePage() {
       {/* ASISTENTE WIZARD OFICIAL DE 4 PASOS */}
       <main>
         <TramiteWizard
+          resetKey={resetKey}
           onSuccess={(_data, cut) => {
             setUltimoCut(cut);
           }}

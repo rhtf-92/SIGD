@@ -9,15 +9,17 @@ import AccionModal from "./AccionModal";
 
 export interface DerivacionModalProps extends ModalAccionProps<SolicitudDerivacion, ResultadoDerivacion> {
   unidades: EstadoRecurso<readonly UnidadDestino[]>;
+  destinoSugeridoId?: string;
+  destinoSugeridoNombre?: string;
 }
 
 export default function DerivacionModal(props: DerivacionModalProps) {
   return props.open ? <FormularioDerivacion key={props.expediente.id} {...props} /> : null;
 }
 
-function FormularioDerivacion({ expediente, unidades, accion, onClose }: DerivacionModalProps) {
+function FormularioDerivacion({ expediente, unidades, accion, onClose, destinoSugeridoId, destinoSugeridoNombre }: DerivacionModalProps) {
   const id = useId();
-  const [destino, setDestino] = useState("");
+  const [destino, setDestino] = useState(destinoSugeridoId || "");
   const [proveido, setProveido] = useState("");
   const [errores, setErrores] = useState({ unidadDestinoId: "", proveido: "" });
   const destinoRef = useRef<HTMLSelectElement>(null);
@@ -36,6 +38,18 @@ function FormularioDerivacion({ expediente, unidades, accion, onClose }: Derivac
   }
   return <AccionModal titulo="Derivar expediente" descripcion={`Expediente ${expediente.codigo}. El proveído motivará el pase a otra unidad orgánica.`} pending={formulario.pending} onClose={cerrar}>
     <form noValidate onSubmit={enviar}>
+      {destinoSugeridoNombre && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-3 text-xs text-blue-900 mb-3 flex items-start gap-2">
+          <span className="text-base shrink-0" aria-hidden="true">💡</span>
+          <div>
+            <span className="font-bold">Destino sugerido según TUPA: </span>
+            <span>{destinoSugeridoNombre}</span>
+            <p className="text-[11px] text-blue-700 mt-0.5">
+              Puede confirmar esta unidad orgánica sugerida o seleccionar un destino diferente según corresponda.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="m03-field"><label htmlFor={`${id}-destino`}>Unidad de destino (obligatoria)</label>
         <select id={`${id}-destino`} ref={destinoRef} data-foco-inicial className="input-sigd" value={destino} onChange={(event) => setDestino(event.target.value)} required disabled={formulario.pending || unidades.estado !== "listo"} aria-invalid={Boolean(errores.unidadDestinoId)} aria-describedby={errores.unidadDestinoId ? `${id}-destino-error` : undefined}>
           <option value="">Seleccione una unidad</option>

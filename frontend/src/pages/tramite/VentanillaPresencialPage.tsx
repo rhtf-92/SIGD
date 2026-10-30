@@ -8,6 +8,7 @@ import { obtenerCatalogoTupaCompleto, type RegistroTupaCompleto } from "../../se
 import { obtenerDefinicionTupa } from "../../data/tupaFormulariosConfig";
 import TupaDynamicFormModal from "../../components/tramite/TupaDynamicFormModal";
 import { useAuthStore } from "../../stores/authStore";
+import { tesoreriaService, type DtoPersonaBusqueda } from "../../services/tesoreria.service";
 
 export function mapearEtiquetaHumanaTipo(tipo?: string | null): string {
   if (!tipo) return 'Trámite general';
@@ -83,6 +84,38 @@ export default function VentanillaPresencialPage() {
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
   const [telefono, setTelefono] = useState("");
+
+  // Búsqueda presencial de persona registrada
+  const [buscandoPersona, setBuscandoPersona] = useState(false);
+  const [personaEncontrada, setPersonaEncontrada] = useState<DtoPersonaBusqueda | null>(null);
+  const [mensajeBusquedaPersona, setMensajeBusquedaPersona] = useState<string | null>(null);
+  const [documentoFisicoVerificado, setDocumentoFisicoVerificado] = useState(false);
+
+  const handleBuscarPersona = async () => {
+    if (!numeroDoc.trim()) {
+      setMensajeBusquedaPersona("Ingrese un número de documento para buscar.");
+      return;
+    }
+    setBuscandoPersona(true);
+    setMensajeBusquedaPersona(null);
+    try {
+      const resp = await tesoreriaService.buscarPersonaPresencial(tipoDoc, numeroDoc.trim());
+      if (resp.exito && resp.datos) {
+        setPersonaEncontrada(resp.datos);
+        setNombre(resp.datos.nombreCompleto);
+        setMensajeBusquedaPersona(`✓ Administrado registrado encontrado: ${resp.datos.nombreCompleto}`);
+        setDocumentoFisicoVerificado(true);
+      } else {
+        setPersonaEncontrada(null);
+        setMensajeBusquedaPersona("No se encontró registro previo en la base institucional. Ingrese los datos manualmente.");
+      }
+    } catch {
+      setPersonaEncontrada(null);
+      setMensajeBusquedaPersona("No se encontró registro previo en la base institucional. Ingrese los datos manualmente.");
+    } finally {
+      setBuscandoPersona(false);
+    }
+  };
   const [procedimientoTupa, setProcedimientoTupa] = useState("");
   const [busquedaTupa, setBusquedaTupa] = useState("");
   const [procedimientos, setProcedimientos] = useState<RegistroTupaCompleto[]>([]);
@@ -436,15 +469,30 @@ export default function VentanillaPresencialPage() {
               <label htmlFor="num-doc-input" className="block text-xs font-semibold text-slate-700 mb-1">
                 Número de Documento *
               </label>
-              <input
-                id="num-doc-input"
-                type="text"
-                required
-                value={numeroDoc}
-                onChange={(e) => setNumeroDoc(e.target.value)}
-                placeholder={tipoDoc === "DNI" ? "8 dígitos" : "11 dígitos"}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
-              />
+              <div className="flex gap-2">
+                <input
+                  id="num-doc-input"
+                  type="text"
+                  required
+                  value={numeroDoc}
+                  onChange={(e) => {
+                    setNumeroDoc(e.target.value);
+                    setPersonaEncontrada(null);
+                    setMensajeBusquedaPersona(null);
+                  }}
+                  placeholder={tipoDoc === "DNI" ? "8 dígitos" : "11 dígitos"}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={buscandoPersona}
+                  onClick={() => void handleBuscarPersona()}
+                  className="shrink-0 rounded-lg bg-blue-800 px-3 py-2 text-xs font-bold text-white hover:bg-blue-900 transition disabled:opacity-50"
+                  title="Buscar en base de datos ciudadana institucional"
+                >
+                  {buscandoPersona ? "..." : "Buscar"}
+                </button>
+              </div>
             </div>
 
             <div>
@@ -461,6 +509,37 @@ export default function VentanillaPresencialPage() {
               />
             </div>
           </div>
+
+          {mensajeBusquedaPersona && (
+            <div
+              className={`rounded-xl p-3 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border ${
+                personaEncontrada
+                  ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                  : "bg-slate-50 text-slate-700 border-slate-200"
+              }`}
+            >
+              <div>
+                <p className="font-semibold">{mensajeBusquedaPersona}</p>
+                {personaEncontrada && (
+                  <p className="text-[11px] text-emerald-700 mt-0.5 font-mono">
+                    Documento: {personaEncontrada.documentoEnmascarado} · Cuenta de usuario:{" "}
+                    {personaEncontrada.tieneCuentaUsuario ? "Activa" : "No registrada"}
+                  </p>
+                )}
+              </div>
+              {personaEncontrada && (
+                <label className="flex items-center gap-1.5 font-bold text-xs text-emerald-950 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-emerald-300 shadow-xs shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={documentoFisicoVerificado}
+                    onChange={(e) => setDocumentoFisicoVerificado(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span>Doc. físico verificado</span>
+                </label>
+              )}
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>

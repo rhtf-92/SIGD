@@ -64,6 +64,16 @@ describe('radicación virtual: identidad autenticada', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it('rechaza personaId alternativo manipulado antes de crear expediente', async () => {
+    const token = firmarTokenAcceso({ sub: USUARIO_A, roles: ['CIUDADANO'] });
+    const response = await request(app)
+      .post('/api/v1/tramites/radicacion-virtual')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ personaId: PERSONA_B });
+    expect(response.status).toBe(403);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it('rechaza ventanilla presencial sin JWT', async () => {
     const response = await request(app).post('/api/v1/tramites/ventanilla-presencial').send({});
     expect(response.status).toBe(401);

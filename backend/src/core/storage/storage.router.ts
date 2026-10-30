@@ -360,8 +360,8 @@ export function crearRouterStorage(pool?: Pool, s3Client?: S3Client): Router {
     });
   });
 
-  // GET /storage/download/:bucket/:key
-  router.get('/storage/download/:bucket/:key', async (req: Request, res: Response) => {
+  // GET /storage/download/:bucket/:key (soporta claves con barras con sintaxis path-to-regexp v8)
+  router.get('/storage/download/:bucket{/*key}', async (req: Request, res: Response) => {
     const claims = autenticarActorStorage(req);
     const bucket = Array.isArray(req.params.bucket) ? req.params.bucket[0] : req.params.bucket;
     const rawKey = req.params.key;

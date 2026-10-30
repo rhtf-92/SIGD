@@ -277,6 +277,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     await user.type(screen.getByLabelText(/Fecha de Nacimiento \*/i), "1998-05-15");
     await user.type(screen.getByLabelText(/Correo Electrónico \*/i), "sergio@example.com");
     await user.type(screen.getByLabelText(/Celular \*/i), "961234567");
+    await user.type(screen.getByLabelText(/Nombre de usuario \*/i), "sergio.panduro");
     await user.type(screen.getByLabelText(/^Contraseña \*/i), "MiClaveSegura#2026");
     await user.type(screen.getByLabelText(/^Confirmar contraseña \*/i), "MiClaveSegura#2026");
 
@@ -307,6 +308,9 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       name: /Registrar y Crear Casilla/i,
     });
     await user.click(botonSubmit);
+    expect(postSpy).not.toHaveBeenCalled();
+    expect(await screen.findByRole('dialog')).toHaveTextContent('DNI 74561238');
+    await user.click(screen.getByRole('button', { name: 'Confirmar y crear cuenta' }));
 
     // Mensaje de éxito tras registro
     const mensajeExito = await screen.findByRole(
@@ -321,6 +325,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       "/api/v1/auth/registro-ciudadano",
       expect.objectContaining({
         direccion: "Jr. Tarapacá N° 645",
+        username: "sergio.panduro",
         password: "MiClaveSegura#2026",
       }),
     );
@@ -367,6 +372,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       "contacto@amazonassoft.pe",
     );
     await user.type(screen.getByLabelText(/Celular de Contacto \*/i), "961234567");
+    await user.type(screen.getByLabelText(/Nombre de usuario \*/i), "amazonas.soft");
     await user.type(screen.getByLabelText(/^Contraseña \*/i), "MiClaveSegura#2026");
     await user.type(screen.getByLabelText(/^Confirmar contraseña \*/i), "MiClaveSegura#2026");
 
@@ -397,6 +403,9 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       name: /Registrar Empresa y Crear Casilla/i,
     });
     await user.click(botonSubmit);
+    expect(postSpyJuridica).not.toHaveBeenCalled();
+    expect(await screen.findByRole('dialog')).toHaveTextContent('RUC 20131312955');
+    await user.click(screen.getByRole('button', { name: 'Confirmar y crear cuenta' }));
 
     // Mensaje de éxito tras registro
     const mensajeExito = await screen.findByRole(
@@ -411,6 +420,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       "/api/v1/auth/registro-persona-juridica",
       expect.objectContaining({
         direccion: "Jr. Tarapacá N° 645",
+        username: "amazonas.soft",
         password: "MiClaveSegura#2026",
       }),
     );

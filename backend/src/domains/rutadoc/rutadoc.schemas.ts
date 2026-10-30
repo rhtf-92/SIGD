@@ -13,7 +13,7 @@ export const filtrosSchema = z.object({
   cursor: z.string().min(1).max(1024).optional(),
   limite: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(1).max(100)).default(20),
   terminoBusqueda: z.string().trim().min(1).max(100).optional(),
-  areaId: z.string().uuid().optional(),
+  areaId: z.guid().optional(),
   fechaDesde: fecha.optional(),
   fechaHasta: fecha.optional(),
 }).strict().superRefine((valor, ctx) => {

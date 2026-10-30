@@ -40,7 +40,10 @@ function recurso(id: string, sufijo: string) {
     folioInicio: 1, folioFin: id === A ? 3 : 7, cantidadFolios: id === A ? 3 : 7,
     rango: id === A ? "F. 0001 a F. 0003" : "F. 0001 a F. 0007", checksumSha256: null,
   }];
-  return { expedienteId: id, actuaciones: [{
+  return { expedienteId: id, eventos: [{
+    id: `MOVIMIENTO:${id === A ? C : B}`, tipo: "MOVIMIENTO", fechaHora: fecha,
+    titulo: id === A ? "Movimiento A" : "Movimiento B", detalle: null,
+  }], actuaciones: [{
     movimientoId: id === A ? C : B, secuencia: "9007199254740993", fechaHora: fecha,
     estadoAnterior: "REGISTRADO", estadoNuevo: "RECEPCIONADO", evento: id === A ? "EVENTO_A" : "EVENTO_B",
     usuarioOperadorId: "9223372036854775807", areaAnteriorId: null, areaDestinoId: null,
@@ -201,7 +204,7 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     expect(versiones).toHaveTextContent("La consulta del historial de versiones documentales no está disponible");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.queryByText(/sin clasificación|sin versiones|no hay versiones|suspender/i)).not.toBeInTheDocument();
-    expect(await screen.findByText(id === A ? "EVENTO_A · NORMAL" : "EVENTO_B · NORMAL")).toBeInTheDocument();
+    expect(await screen.findByText(id === A ? "Movimiento A" : "Movimiento B")).toBeInTheDocument();
     expect(await screen.findByText(id === A ? "F. 0001 a F. 0003 · 3 folios" : "F. 0001 a F. 0007 · 7 folios")).toBeInTheDocument();
     expect(await within(screen.getByRole("region", { name: "SLA" })).findByText(id === A ? "VERDE" : "ROJO")).toBeInTheDocument();
     expect(get.mock.calls.map(([url]) => new URL(url, "http://localhost").pathname).filter((ruta) => ruta !== "/api/v1/organigrama/areas-activas" && !ruta.endsWith("/resumen")).sort()).toEqual([
@@ -472,25 +475,25 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     const get = instalar(normal);
     montar();
     expect(await screen.findByText("CUT-A")).toBeInTheDocument();
-    expect(await screen.findByText("EVENTO_A · NORMAL")).toBeInTheDocument();
+    expect(await screen.findByText("Movimiento A")).toBeInTheDocument();
     expect(await screen.findByText("F. 0001 a F. 0003 · 3 folios")).toBeInTheDocument();
     const panel = screen.getByRole("region", { name: "SLA" });
     await waitFor(() => expect(within(panel).getByText("VERDE")).toBeInTheDocument());
     for (const valor of ["47", "9", "38", "19.15%", "29/11/2026"]) {
       expect(within(panel).getByText(valor)).toBeInTheDocument();
     }
-    expect(screen.getByText("Secuencia: 9007199254740993")).toBeInTheDocument();
-    expect(screen.getByText("9223372036854775807")).toBeInTheDocument();
+    expect(screen.queryByText("Secuencia: 9007199254740993")).not.toBeInTheDocument();
+    expect(screen.queryByText("9223372036854775807")).not.toBeInTheDocument();
     expect(get.mock.calls.every(([url]) => {
       const ruta = new URL(url).pathname;
       return ruta.startsWith(`/api/v1/expedientes/${A}`) || ruta === `/api/v1/tramites/expedientes/${A}/tupa`;
     })).toBe(true);
     fireEvent.click(screen.getByRole("link", { name: "Abrir B" }));
     expect(await screen.findByText("CUT-B")).toBeInTheDocument();
-    expect(await screen.findByText("EVENTO_B · NORMAL")).toBeInTheDocument();
+    expect(await screen.findByText("Movimiento B")).toBeInTheDocument();
     expect(await screen.findByText("F. 0001 a F. 0007 · 7 folios")).toBeInTheDocument();
     expect(await within(screen.getByRole("region", { name: "SLA" })).findByText("ROJO")).toBeInTheDocument();
-    expect(screen.queryByText("EVENTO_A · NORMAL")).not.toBeInTheDocument();
+    expect(screen.queryByText("Movimiento A")).not.toBeInTheDocument();
     expect(screen.queryByText("F. 0001 a F. 0003 · 3 folios")).not.toBeInTheDocument();
     expect(screen.queryByText("VERDE")).not.toBeInTheDocument();
   });
@@ -511,13 +514,13 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     await waitFor(() => expect(pendientes).toHaveLength(5));
     expect(screen.getByRole("status")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Abrir B" }));
-    expect(await screen.findByText("EVENTO_B · NORMAL")).toBeInTheDocument();
+    expect(await screen.findByText("Movimiento B")).toBeInTheDocument();
     expect(await screen.findByText("ROJO")).toBeInTheDocument();
     await act(async () => { pendientes.forEach(resolve => resolve()); });
     expect(signals.every(signal => signal.aborted)).toBe(true);
     expect(screen.getByText("CUT-B")).toBeInTheDocument();
     expect(screen.queryByText("CUT-A")).not.toBeInTheDocument();
-    expect(screen.queryByText("EVENTO_A · NORMAL")).not.toBeInTheDocument();
+    expect(screen.queryByText("Movimiento A")).not.toBeInTheDocument();
     expect(screen.queryByText("F. 0001 a F. 0003 · 3 folios")).not.toBeInTheDocument();
     expect(screen.queryByText("VERDE")).not.toBeInTheDocument();
   });
@@ -529,7 +532,7 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
         : sufijo === "/foliacion" ? [] : recurso(id, sufijo));
     });
     montar();
-    expect(await screen.findByText("Sin actuaciones registradas.")).toBeInTheDocument();
+    expect(await screen.findByText("Sin eventos registrados para este expediente.")).toBeInTheDocument();
     expect(await screen.findByText("Sin documentos foliados.")).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
