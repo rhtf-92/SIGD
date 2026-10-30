@@ -66,6 +66,8 @@ El backend del **Sistema Integral de Gestión Documentaria (SIGD)** está destin
 
 ### Estado de Validación y Certificación de Cierre — Octubre 2026 (100.0% Conforme)
 
+> **Prerequisito TUPA (Adriano):** la QA del catálogo TUPA pasa únicamente con las adaptaciones externas de las migraciones `02`, `06` y `07`; no es compatible con una instalación limpia de la rama F.
+
 - `npm run typecheck` (`tsc --noEmit`): **0 errores de compilación estricta NodeNext**.
 - **Suites Unitarias y de Integración con Vitest**: 30 suites pasadas, **534 pruebas unitarias aprobadas al 100%**.
 - **Suites de Verificación Adversarial y Criptográfica**: 2 harnesses independientes (`adversarial_harness.ts` y `argon2_challenger_m1_it2.ts`), **92 pruebas adversariales aprobadas al 100%**.

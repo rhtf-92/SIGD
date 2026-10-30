@@ -38,6 +38,7 @@ import { crearRouterReportes } from './domains/corelink/reportes.router.js';
 import { crearRouterAdminMaestras } from './domains/organicore/adminMaestras.routes.js';
 import { OrganigramaService } from './domains/organicore/organigrama.service.js';
 import { crearControladorOrganigrama } from './domains/organicore/organigrama.controller.js';
+import { crearRouterCatalogoInstitucional } from './domains/organicore/catalogoInstitucional.routes.js';
 
 // Módulos DocuCore Router y Validador CVD
 import { crearRouterDocuCore } from './domains/docucore/docucore.router.js';
@@ -183,6 +184,7 @@ export function construirApp(
   app.use('/api/v1', crearRouterCasilla(pool));
   app.use('/api/v1', crearRouterStorage(pool));
   app.use('/api/v1', crearRouterTramites(pool));
+  app.use('/api/v1', crearRouterCatalogoInstitucional(pool));
   app.use(
     '/api/v1',
     crearRouterRutaDoc(

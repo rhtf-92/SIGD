@@ -5,6 +5,7 @@ import {
   ShieldCheck,
   ClipboardList,
   Database,
+  BookOpenCheck,
   Calendar,
   Lock,
   ChevronLeft,
@@ -35,6 +36,12 @@ const ADMIN_ROUTES = [
     ruta: "/administracion/tablas-maestras",
     icono: Database,
     descripcion: "Catálogos paramétricos institucionales",
+  },
+  {
+    titulo: "Catálogo TUPA",
+    ruta: "/administracion/catalogo-tupa",
+    icono: BookOpenCheck,
+    descripcion: "Procedimientos y servicios institucionales",
   },
   {
     titulo: "Calendario Laboral",

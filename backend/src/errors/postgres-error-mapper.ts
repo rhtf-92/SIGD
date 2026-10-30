@@ -14,6 +14,8 @@ const MATRIZ_PG: Record<string, MapeoErrorPg> = {
   '23505': { status: 409, code: 'DUPLICATE_KEY', detail: 'El registro ya se encuentra registrado.' },
   '23503': { status: 400, code: 'FOREIGN_KEY_VIOLATION', detail: 'El recurso referenciado no es válido.' },
   '23502': { status: 400, code: 'NOT_NULL_VIOLATION', detail: 'Un campo obligatorio no fue proporcionado.' },
+  '23514': { status: 422, code: 'DOMAIN_RULE', detail: 'Regla de negocio incumplida.' },
+  '23001': { status: 422, code: 'DOMAIN_RULE', detail: 'La operación vulnera una regla de inmutabilidad.' },
   P0001: { status: 422, code: 'DOMAIN_RULE', detail: 'Regla de negocio incumplida.' },
 };
 

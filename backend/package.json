@@ -23,6 +23,7 @@
     "load:derivacion": "k6 run k6/escenario-2-derivacion.js",
     "worker:outbox": "tsx src/audit/worker/outbox-worker.ts",
     "migrate": "tsx src/db/migrate-cli.ts",
+    "import:catalogo-tupa": "tsx src/domains/organicore/importar-catalogo-tupa.cli.ts",
     "smoke:conmutation": "tsx tests/smoke_conmutation_test.ts"
   },
   "dependencies": {

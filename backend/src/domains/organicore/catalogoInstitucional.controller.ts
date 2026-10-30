@@ -1,0 +1,11 @@
+import type { Request, Response } from 'express';
+import type { CatalogoInstitucionalService } from './catalogoInstitucional.service.js';
+import { cambiarEstadoSchema,catalogoIdParamsSchema,consultaCatalogoPublicoSchema,crearCatalogoSchema,crearVersionSchema,editarCatalogoSchema } from './dto/catalogoInstitucional.dto.js';
+const actor=(r:Request)=>(r.res?.locals.identidad as {idUsuario?:string}|undefined)?.idUsuario??'';
+export const listarCatalogoPublico=(s:CatalogoInstitucionalService)=>async(r:Request,res:Response)=>res.json({catalogos:await s.listarPublico(consultaCatalogoPublicoSchema.parse(r.query))});
+export const listarCatalogoAdministrativo=(s:CatalogoInstitucionalService)=>async(_r:Request,res:Response)=>{const registros=await s.listarAdministrativo();res.json({total:registros.length,registros});};
+export const listarVersionesCatalogo=(s:CatalogoInstitucionalService)=>async(r:Request,res:Response)=>{const versiones=await s.listarVersiones(catalogoIdParamsSchema.parse(r.params).id);res.json({total:versiones.length,versiones});};
+export const crearCatalogo=(s:CatalogoInstitucionalService)=>async(r:Request,res:Response)=>res.status(201).json({catalogo:await s.crear(crearCatalogoSchema.parse(r.body),actor(r))});
+export const editarCatalogo=(s:CatalogoInstitucionalService)=>async(r:Request,res:Response)=>res.json({catalogo:await s.editar(catalogoIdParamsSchema.parse(r.params).id,editarCatalogoSchema.parse(r.body),actor(r))});
+export const crearVersion=(s:CatalogoInstitucionalService)=>async(r:Request,res:Response)=>res.status(201).json({version:await s.crearVersion(catalogoIdParamsSchema.parse(r.params).id,crearVersionSchema.parse(r.body),actor(r))});
+export const cambiarEstado=(s:CatalogoInstitucionalService)=>async(r:Request,res:Response)=>res.json({catalogo:await s.cambiarEstado(catalogoIdParamsSchema.parse(r.params).id,cambiarEstadoSchema.parse(r.body),actor(r))});
