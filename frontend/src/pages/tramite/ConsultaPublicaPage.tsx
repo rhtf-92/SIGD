@@ -34,6 +34,21 @@ export interface DtoConsultaPublica {
   documentos: DtoDocumentoPublico[];
   proveidos: DtoProveidoPublico[];
   mensajeLegal: string;
+  unidadOrganica: string | null;
+}
+
+const FORMATO_LIMA: Intl.DateTimeFormatOptions = {
+  timeZone: 'America/Lima',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+};
+
+function formatoLima(fechaISO: string | null | undefined): string {
+  if (!fechaISO) return 'No registrado';
+  return new Intl.DateTimeFormat('es-PE', FORMATO_LIMA).format(new Date(fechaISO));
 }
 
 export default function ConsultaPublicaPage() {
@@ -188,7 +203,7 @@ export default function ConsultaPublicaPage() {
                   </h3>
                   <p className="mt-1 text-slate-700">
                     {resultado.fechaEnvioReal
-                      ? new Date(resultado.fechaEnvioReal).toLocaleString('es-PE')
+                      ? formatoLima(resultado.fechaEnvioReal)
                       : 'No registrado'}
                   </p>
                 </div>
@@ -198,10 +213,33 @@ export default function ConsultaPublicaPage() {
                   </h3>
                   <p className="mt-1 text-slate-700">
                     {resultado.fechaRadicacionLegal
-                      ? new Date(resultado.fechaRadicacionLegal).toLocaleString('es-PE')
+                      ? formatoLima(resultado.fechaRadicacionLegal)
                       : 'En trámite'}
                   </p>
                 </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Canal de Recepción
+                  </h3>
+                  <p className="mt-1 text-slate-700 font-medium">
+                    {resultado.canalRecepcion === 'MESA_VIRTUAL' ? 'Mesa de Partes Virtual' : resultado.canalRecepcion}
+                  </p>
+                </div>
+                {resultado.unidadOrganica && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      Unidad responsable (según catálogo)
+                    </h3>
+                    <p className="mt-1 text-slate-700 font-medium">
+                      {resultado.unidadOrganica}
+                    </p>
+                  </div>
+                )}
+                {resultado.fueraDeHorario && (
+                  <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+                    Recibido después de las 16:30. La fecha de radicación legal pasa al siguiente día hábil.
+                  </div>
+                )}
               </div>
 
               {/* Línea de Tiempo del Expediente */}

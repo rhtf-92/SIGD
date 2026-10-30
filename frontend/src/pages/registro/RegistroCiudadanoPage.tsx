@@ -12,25 +12,18 @@ export default function RegistroCiudadanoPage() {
 
   const handleNaturalSubmit = async (data: Natural) => {
     setErrorMessage(null);
-    const partesApellidos = data.apellidos.trim().split(/\s+/);
-    const apellidoPaterno = partesApellidos[0] || "PATERNO";
-    const apellidoMaterno = partesApellidos.slice(1).join(" ") || "MATERNO";
-    const celularValido = /^9[0-9]{8}$/.test(data.celular) ? data.celular : "961234567";
-    const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
-      ? (data.domicilio.distritoCodigo as string)
-      : "250101";
 
     const payload = {
       tipoPersona: "NATURAL" as const,
       dni: data.numeroDocumento,
       nombres: data.nombres.trim(),
-      apellidoPaterno,
-      apellidoMaterno,
+      apellidoPaterno: data.apellidos.trim().split(/\s+/)[0],
+      apellidoMaterno: data.apellidos.trim().split(/\s+/).slice(1).join(" "),
       correo: data.correo.trim().toLowerCase(),
-      celular: celularValido,
-      ubigeoDistrito: ubigeoValido,
-      direccion: data.domicilio?.direccionExacta?.trim() || "Dirección institucional",
-      password: `Clave*${data.numeroDocumento}`,
+      celular: data.celular,
+      ubigeoDistrito: data.domicilio.distritoCodigo,
+      direccion: data.domicilio.direccionExacta.trim(),
+      password: data.password,
       consentimientoDatos: true as const,
       aceptaNotificaciones: true,
     };
@@ -47,16 +40,12 @@ export default function RegistroCiudadanoPage() {
     }
 
     setSuccessMessage(
-      `Registro completado. Tu casilla electrónica ha sido creada: ${data.numeroDocumento}@casilla.iestpsuiza.edu.pe`
+      "Registro completado. Ya puedes iniciar sesión con tu DNI."
     );
   };
 
   const handleJuridicaSubmit = async (data: Juridical) => {
     setErrorMessage(null);
-    const celularValido = /^9[0-9]{8}$/.test(data.celularContacto) ? data.celularContacto : "961234567";
-    const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
-      ? (data.domicilio.distritoCodigo as string)
-      : "250101";
 
     const payload = {
       tipoPersona: "JURIDICA" as const,
@@ -66,10 +55,10 @@ export default function RegistroCiudadanoPage() {
       dniRepresentante: data.representanteLegal.numeroDocumento,
       nombreRepresentante: `${data.representanteLegal.nombres} ${data.representanteLegal.apellidos}`.trim(),
       correo: data.correoCorporativo.trim().toLowerCase(),
-      celular: celularValido,
-      ubigeoDistrito: ubigeoValido,
-      direccion: data.domicilio?.direccionExacta?.trim() || "Dirección institucional",
-      password: `Clave*${data.ruc.slice(-8)}`,
+      celular: data.celularContacto,
+      ubigeoDistrito: data.domicilio.distritoCodigo,
+      direccion: data.domicilio.direccionExacta.trim(),
+      password: data.password,
       consentimientoDatos: true as const,
       aceptaNotificaciones: true,
     };
@@ -86,7 +75,7 @@ export default function RegistroCiudadanoPage() {
     }
 
     setSuccessMessage(
-      `Registro completado. Tu casilla electrónica ha sido creada: ${data.ruc}@casilla.iestpsuiza.edu.pe`
+      "Registro completado. Ya puedes iniciar sesión con tu RUC."
     );
   };
 

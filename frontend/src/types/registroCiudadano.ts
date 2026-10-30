@@ -18,12 +18,14 @@ export type Natural = {
   correo: string; // formato RFC 5322 válido
   celular: string; // exactamente 9 dígitos empezando en 9
   domicilio: Address;
-  tipoDocumento: "DNI" | "CE";
+  tipoDocumento: "DNI";
   numeroDocumento: string;
   declaracionJuradaAceptada: boolean; // debe ser true
   consentimientoLey29733: boolean; // debe ser true
   version: "1.0";
   fechaAceptacion: string; // ISO-8601, se completa al marcar el consentimiento
+  password: string;
+  confirmarPassword: string;
 };
 
 /* Persona Jurídica - RegistroCiudadanoJuridica */
@@ -32,7 +34,7 @@ export type Juridical = {
   ruc: string; // exactamente 11 dígitos, inicia en "10" o "20", validar dígito verifier Módulo 11 SUNAT
   razonSocial: string; // 3-150 caracteres
   representanteLegal: {
-    tipoDocumento: "DNI" | "CE";
+    tipoDocumento: "DNI";
     numeroDocumento: string; // DNI exactamente 8 dígitos
     nombres: string;
     apellidos: string;
@@ -46,6 +48,8 @@ export type Juridical = {
   consentimientoLey29733: boolean; // debe ser true
   version: "1.0";
   fechaAceptacion: string; // ISO-8601, se completa al marcar el consentimiento
+  password: string;
+  confirmarPassword: string;
 };
 
 /* Unión discriminada para RegistroCiudadanoRequest */

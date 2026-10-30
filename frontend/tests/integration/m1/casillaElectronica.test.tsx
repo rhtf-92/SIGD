@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import CasillaElectronicaPage from "../../../src/pages/casilla/CasillaElectronicaPage";
 import { casillaService } from "../../../src/services/casillaService";
+import { useAuthStore } from "../../../src/stores/authStore";
 import type {
   AcuseNotificacion,
   EstadisticasCasilla,
@@ -473,7 +474,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     // 1. Número de documento del acto administrativo dentro del modal
     expect(
       within(modal).getByRole("heading", {
-        name: mockNotificacionNoLeida.actoAdministrativo.numeroDocumento,
+        name: mockNotificacionNoLeida.actoAdministrativo.numeroDocumento!,
       }),
     ).toBeInTheDocument();
 
@@ -496,7 +497,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
 
     // 4. Código de Verificación Digital (CVD) dentro del modal
     expect(
-      within(modal).getByText(mockNotificacionNoLeida.actoAdministrativo.cvd),
+      within(modal).getByText(mockNotificacionNoLeida.actoAdministrativo.cvd!),
     ).toBeInTheDocument();
   });
 
@@ -592,6 +593,18 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
   });
 
   it("j) La dirección de casilla respeta el formato {documento}@casilla.iestpsuiza.edu.pe", async () => {
+        useAuthStore.setState({
+      accessToken: "token-de-prueba",
+      isAuthenticated: true,
+      usuario: {
+        id: "usuario-prueba",
+        nombreCompleto: "AUDITORIA Prueba",
+        correo: "74561238@casilla.iestpsuiza.edu.pe",
+        rol: "ESTUDIANTE",
+
+      },
+      
+    });
     renderConQueryClient(<CasillaElectronicaPage />);
 
     // Comprobación en la cabecera institucional del administrado
@@ -604,12 +617,13 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     expect(elementoCasilla).toBeInTheDocument();
 
     // Comprobación de que coincide con el DNI del titular
-    expect(mockAcuseNotificado.destinatario.direccionCasilla).toBe(
-      `${mockAcuseNotificado.destinatario.numeroDocumento}@casilla.iestpsuiza.edu.pe`,
+    expect(mockAcuseNotificado.destinatario!.direccionCasilla).toBe(
+      `${mockAcuseNotificado.destinatario!.numeroDocumento}@casilla.iestpsuiza.edu.pe`,
     );
-    expect(mockAcuseNotificado.destinatario.direccionCasilla).toMatch(
+    expect(mockAcuseNotificado.destinatario!.direccionCasilla).toMatch(
       regexFormatoCasilla,
     );
+useAuthStore.setState({ accessToken: null, isAuthenticated: false, usuario: null });
   });
 
   it("k) Permite buscar por texto libre, cambiar el límite por página y limpiar los filtros", async () => {

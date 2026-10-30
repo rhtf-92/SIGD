@@ -1,12 +1,17 @@
 import { normalizarTexto, textoCoincideBusqueda } from "./normalizarTexto";
 import { tupaApi, type TupaTramite } from "./tupaApi";
+import { buscarConocimiento, type ConocimientoEntrada } from "./conocimiento";
+import baseJson from "../data/conocimiento/base.json";
+
+const basePorDefecto: ConocimientoEntrada[] = baseJson;
 
 export type AssistantIntent = "casilla" | "expediente" | "registro" | "buscar" | "desconocida";
 
 export type AssistantOutcome =
   | { tipo: "ruta"; ruta: string; mensaje: string }
   | { tipo: "resultados"; tramites: TupaTramite[] }
-  | { tipo: "desconocida"; mensaje: string };
+  | { tipo: "desconocida"; mensaje: string }
+  | { tipo: "conocimiento"; respuestas: { texto: string; fuente: string; validado: boolean }[] };
 
 const palabrasIgnoradas = new Set([
   "busca", "buscar", "tramite", "tramites", "tupa", "por", "favor", "quiero",
@@ -41,10 +46,30 @@ export function extraerPalabrasClave(texto: string): string {
     .trim();
 }
 
+function formatoFuente(fuente: { documento: string; seccion?: string; fecha?: string }): string {
+  const partes = [fuente.documento];
+  if (fuente.seccion) partes.push(fuente.seccion);
+  if (fuente.fecha) partes.push(fuente.fecha);
+  return partes.join(", ");
+}
+
 export async function resolverConsultaAsistente(
   texto: string,
   listar: typeof tupaApi.listarVigente = tupaApi.listarVigente,
+  base: ConocimientoEntrada[] = basePorDefecto,
 ): Promise<AssistantOutcome> {
+  const coincidencias = buscarConocimiento(texto, base);
+  if (coincidencias.length > 0) {
+    return {
+      tipo: "conocimiento",
+      respuestas: coincidencias.slice(0, 2).map((c) => ({
+        texto: c.entrada.respuesta,
+        fuente: formatoFuente(c.entrada.fuente),
+        validado: c.entrada.validado,
+      })),
+    };
+  }
+
   const intencion = detectarIntencion(texto);
   if (intencion === "casilla") {
     return { tipo: "ruta", ruta: "/casilla", mensaje: "Tu Casilla Electrónica está protegida. Si no tienes sesión, el sistema te llevará al inicio de sesión." };
