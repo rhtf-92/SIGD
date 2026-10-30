@@ -3,37 +3,38 @@ import { Link, useNavigate } from "react-router-dom";
 import Skeleton from "../components/Skeleton";
 import { tupaApi, type TupaVersion } from "../services/tupaApi";
 
-const accesos = [
+interface AccesoDirecto {
+  ruta: string;
+  titulo: string;
+  descripcion: string;
+  icono: string;
+  protegida?: boolean;
+}
+
+const accesos: AccesoDirecto[] = [
   {
     ruta: "/tramite/mesa-partes-virtual",
-    titulo: "Mesa de Partes Virtual",
-    descripcion: "Presenta documentación mediante la mesa de partes digital.",
+    titulo: "Mesa de partes",
+    descripcion: "Presenta documentación mediante la Mesa de Partes Virtual.",
     icono: "documento",
   },
   {
     ruta: "/consulta",
-    titulo: "Consultar expediente",
-    descripcion: "Revisa el estado de un expediente con su CUT.",
+    titulo: "Consulta y seguimiento",
+    descripcion: "Consultar expediente y revisar su estado con su CUT.",
     icono: "busqueda",
   },
   {
-    ruta: "/casilla",
-    titulo: "Casilla Electrónica",
-    descripcion: "Revisa las notificaciones disponibles en tu casilla.",
-    icono: "casilla",
-    protegida: true,
-  },
-  {
-    ruta: "/tupa",
-    titulo: "TUPA vigente",
-    descripcion: "Consulta trámites, derechos, requisitos y plazos publicados.",
-    icono: "tupa",
-  },
-  {
     ruta: "/registro",
-    titulo: "Registrarme",
+    titulo: "Registro de usuarios externos",
     descripcion: "Crea un registro ciudadano en el sistema.",
     icono: "registro",
+  },
+  {
+    ruta: "/login",
+    titulo: "Iniciar sesión / Administración",
+    descripcion: "Ingresa al sistema o accede al panel de administración.",
+    icono: "admin",
   },
 ];
 
@@ -49,6 +50,8 @@ function AccesoIcono({ tipo }: { tipo: string }) {
           <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>
         ) : tipo === "registro" ? (
           <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0M19 8v6m-3-3h6" /></>
+        ) : tipo === "admin" ? (
+          <><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>
         ) : (
           <><path d="M4 4h16v16H4z" /><path d="M8 8h8M8 12h8M8 16h5" /></>
         )}

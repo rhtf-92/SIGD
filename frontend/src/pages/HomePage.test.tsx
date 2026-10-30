@@ -56,6 +56,10 @@ describe("HomePage", () => {
     render(<MemoryRouter><HomePage /></MemoryRouter>);
     expect(await screen.findByText("12")).toBeInTheDocument();
     expect(screen.getByText("TUPA-BASE")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Mesa de partes" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Consulta y seguimiento" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Registro de usuarios externos" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Iniciar sesión / Administración" })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /Mesa de Partes Virtual/ })[0]).toHaveAttribute("href", "/tramite/mesa-partes-virtual");
     expect(screen.getAllByRole("link", { name: /Consultar expediente/ })[0]).toHaveAttribute("href", "/consulta");
   });
