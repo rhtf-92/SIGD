@@ -51,7 +51,7 @@ export default function VentanillaPresencialPage() {
     e.preventDefault();
 
     const asuntoFinal = procedimientoSeleccionado
-      ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
+      ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre}\n${asunto}`
       : asunto;
 
     const dniValido = /^[0-9]{8}$/.test(numeroDoc) ? numeroDoc : "74561238";
@@ -120,71 +120,42 @@ export default function VentanillaPresencialPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
+    <main className="min-h-screen bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-200 via-sky-300 to-sky-400 text-slate-900 pb-12">
+      <header className="border-b border-sky-300 bg-sky-100/50 backdrop-blur-md shadow-sm">
         <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
-          <nav className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <nav className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-600">
             <Link to="/" className="hover:text-blue-700">Inicio</Link>
             <span>/</span>
             <Link to="/tramite" className="hover:text-blue-700">Trámite Documentario</Link>
             <span>/</span>
-            <span className="text-slate-800">Ventanilla Presencial</span>
+            <span className="text-slate-900 font-bold">Ventanilla Presencial</span>
           </nav>
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-800">
                 Módulo 02 · Mesa de Partes y Registro Documentario
               </p>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
                 Ventanilla Presencial de Atención al Ciudadano
               </h1>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-700">
                 Digitación de mesa de partes física, asignación de CUT y emisión de ticket con QR (ENT-M02-05).
               </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
-                  enJornada && !esCorteSuperado
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-300"
-                    : "bg-amber-50 text-amber-900 border border-amber-300"
-                }`}
-              >
-                <span className="h-2 w-2 rounded-full bg-current" />
-                {enJornada && !esCorteSuperado
-                  ? "Atención Ordinaria LPAG (< 16:30 hrs)"
-                  : "Horario Posterior al Corte (Art. 138 LPAG)"}
-              </span>
             </div>
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        {esCorteSuperado && (
-          <div
-            role="note"
-            className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs font-medium text-amber-900 shadow-sm"
-          >
-            <p className="font-bold">Aviso Legal — Horario de Corte LPAG:</p>
-            <p className="mt-0.5">
-              Son más de las 16:30 hrs. Los documentos recepcionados se registrarán con la fecha física actual,
-              pero surtirán efectos legales a partir de las 08:00 hrs del día hábil siguiente ({proximoDiaHabil}).
-            </p>
-          </div>
-        )}
-
         <form
           onSubmit={handleSubmit}
-          className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
+          className="space-y-6 rounded-2xl border border-sky-300 bg-sky-100/70 p-6 shadow-xl backdrop-blur-md sm:p-8"
         >
-          <h2 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-3">
-            Datos de Recepción en Ventanilla
+          <h2 className="text-lg font-bold text-slate-900 border-b border-sky-300 pb-3">
+            DATOS DE RECEPCIÓN EN VENTANILLA
           </h2>
 
-          {/* Tipo de Persona */}
           <div className="flex gap-4">
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
               <input
@@ -216,14 +187,13 @@ export default function VentanillaPresencialPage() {
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <label htmlFor="tipo-doc-select" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Tipo Documento Identidad *
               </label>
               <select
-                id="tipo-doc-select"
                 value={tipoDoc}
                 onChange={(e) => setTipoDoc(e.target.value as "DNI" | "RUC" | "CE")}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border-2 border-amber-300 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               >
                 {tipoPersona === "NATURAL" ? (
                   <>
@@ -237,81 +207,74 @@ export default function VentanillaPresencialPage() {
             </div>
 
             <div>
-              <label htmlFor="num-doc-input" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Número de Documento *
               </label>
               <input
-                id="num-doc-input"
                 type="text"
                 required
                 value={numeroDoc}
                 onChange={(e) => setNumeroDoc(e.target.value)}
-                placeholder={tipoDoc === "DNI" ? "8 dígitos" : "11 dígitos"}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
+                placeholder="45678910"
+                className="w-full rounded-lg border-2 border-blue-400 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
               />
             </div>
 
             <div>
-              <label htmlFor="nombre-input" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 {tipoPersona === "NATURAL" ? "Apellidos y Nombres *" : "Razón Social *"}
               </label>
               <input
-                id="nombre-input"
                 type="text"
                 required
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                placeholder="JUAN RAMIRO PÉREZ GARCÍA"
+                className="w-full rounded-lg border-2 border-amber-300 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="correo-input" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Correo Electrónico para Notificación *
               </label>
               <input
-                id="correo-input"
                 type="email"
                 required
                 value={correo}
                 onChange={(e) => setCorreo(e.target.value)}
                 placeholder="ejemplo@correo.com"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border-2 border-amber-300 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               />
             </div>
 
             <div>
-              <label htmlFor="tel-input" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Teléfono / Celular de Contacto *
               </label>
               <input
-                id="tel-input"
                 type="tel"
                 required
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
-                placeholder="9XXXXXXXX"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                placeholder="9100000XX"
+                className="w-full rounded-lg border-2 border-amber-300 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="procedimiento-tupa-select" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Procedimiento TUPA 2026 *
               </label>
               <select
-                id="procedimiento-tupa-select"
                 required
                 value={procedimientoTupa}
-                onChange={(e) => {
-                  setProcedimientoTupa(e.target.value);
-                  setRequisitosRecibidos(new Set());
-                }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                onChange={(e) => setProcedimientoTupa(e.target.value)}
+                className="w-full rounded-lg border-2 border-amber-300 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               >
                 <option value="">Seleccione un procedimiento o servicio</option>
                 <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
@@ -324,162 +287,66 @@ export default function VentanillaPresencialPage() {
             </div>
 
             <div>
-              <label htmlFor="tipo-documento-select" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Tipo de Documento Presentado *
               </label>
               <select
-                id="tipo-documento-select"
                 value={tipoDocumento}
                 onChange={(e) => setTipoDocumento(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border-2 border-amber-300 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               >
                 <option value="SOLICITUD">Solicitud Simple / Formato Único</option>
                 <option value="OFICIO">Oficio Institucional</option>
                 <option value="CARTA">Carta / Carta Notarial</option>
-                <option value="EXPEDIENTE_EXTERNO">Expediente Externo</option>
-                <option value="INFORME">Informe Técnico</option>
               </select>
             </div>
 
             <div>
-              <label htmlFor="folios-input" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Cantidad de Folios Físicos *
               </label>
               <input
-                id="folios-input"
                 type="number"
                 min={1}
-                max={500}
                 required
                 value={cantidadFolios}
                 onChange={(e) => setCantidadFolios(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border-2 border-amber-300 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
               />
             </div>
           </div>
 
-          {procedimientoSeleccionado && (
-            <section
-              aria-labelledby="detalle-tupa-heading"
-              className="rounded-lg border border-blue-200 bg-blue-50/60 p-4"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-200 pb-3">
-                <div>
-                  <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
-                    TUPA {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Pasco</p>
-                </div>
-                {procedimientoSeleccionado.derechoPago && (
-                  <p className="max-w-xl text-sm font-semibold text-slate-800">
-                    Derecho de pago: {procedimientoSeleccionado.derechoPago}
-                  </p>
-                )}
-              </div>
-
-              {procedimientoSeleccionado.requisitos && (
-                <div className="mt-3">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold uppercase text-slate-700">Requisitos documentarios</h4>
-                    <span className="text-xs text-slate-600">
-                      {requisitosRecibidos.size} de {procedimientoSeleccionado.requisitos.length} verificados
-                    </span>
-                  </div>
-                  <ul className="grid gap-2 sm:grid-cols-2">
-                    {procedimientoSeleccionado.requisitos.map((requisito, index) => (
-                      <li key={`${procedimientoSeleccionado.codigo}-${index}`}>
-                        <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={requisitosRecibidos.has(index)}
-                            onChange={(event) => {
-                              setRequisitosRecibidos((actuales) => {
-                                const siguientes = new Set(actuales);
-                                if (event.target.checked) siguientes.add(index);
-                                else siguientes.delete(index);
-                                return siguientes;
-                              });
-                            }}
-                            className="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-                          />
-                          <span>{requisito}</span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {procedimientoSeleccionado.detalleTarifas && (
-                <div className="mt-3">
-                  <h4 className="mb-2 text-xs font-bold uppercase text-slate-700">Servicios y tarifas</h4>
-                  <ul className="grid gap-1 text-sm text-slate-700 sm:grid-cols-2">
-                    {procedimientoSeleccionado.detalleTarifas.map((tarifa) => (
-                      <li key={tarifa}>{tarifa}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {(procedimientoSeleccionado.dependencia || procedimientoSeleccionado.autoridad || procedimientoSeleccionado.tiempoMaximo) && (
-                <dl className="mt-3 grid gap-2 border-t border-blue-200 pt-3 text-xs sm:grid-cols-3">
-                  {procedimientoSeleccionado.dependencia && (
-                    <div><dt className="font-bold text-slate-700">Dependencia</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.dependencia}</dd></div>
-                  )}
-                  {procedimientoSeleccionado.autoridad && (
-                    <div><dt className="font-bold text-slate-700">Autoridad</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.autoridad}</dd></div>
-                  )}
-                  {procedimientoSeleccionado.tiempoMaximo && (
-                    <div><dt className="font-bold text-slate-700">Tiempo máximo</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.tiempoMaximo}</dd></div>
-                  )}
-                </dl>
-              )}
-              {procedimientoSeleccionado.nota && (
-                <p className="mt-3 text-xs text-slate-600">{procedimientoSeleccionado.nota}</p>
-              )}
-            </section>
-          )}
-
           <div>
-            <label htmlFor="asunto-input" className="block text-xs font-semibold text-slate-700 mb-1">
-              Asunto / Petitorio Concreto *
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              ASUNTO / PETITORIO CONCRETO *
             </label>
             <textarea
-              id="asunto-input"
               rows={3}
               required
               value={asunto}
               onChange={(e) => setAsunto(e.target.value)}
               placeholder="Describa brevemente el petitorio del administrado..."
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-lg border-2 border-amber-300 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-sky-300">
             <button
               type="button"
               onClick={handleNuevoRegistro}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm"
             >
               Limpiar Campos
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-800 transition"
+              className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-red-800 transition"
             >
               ✓ Registrar y Emitir Cargo CUT
             </button>
           </div>
         </form>
       </div>
-
-      {cargoGenerado && (
-        <CargoDigitalModal
-          isOpen={modalAbierto}
-          onClose={() => setModalAbierto(false)}
-          cargo={cargoGenerado}
-        />
-      )}
     </main>
   );
 }
