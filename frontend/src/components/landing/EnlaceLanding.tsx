@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 import type { ReactNode } from "react";
-=======
-﻿import type { ReactNode } from "react";
->>>>>>> Stashed changes
 import { Link } from "react-router-dom";
 
 import type { EnlaceInstitucional } from "../../data/landingInstitucional";

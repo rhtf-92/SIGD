@@ -14,6 +14,7 @@ const modulos = [
         <path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2" />
       </>
     ),
+    acento: "from-blue-500 to-blue-700",
   },
   {
     titulo: "Roles y Permisos",
@@ -26,6 +27,7 @@ const modulos = [
         <path d="m8 12 3 3 5-5" />
       </>
     ),
+    acento: "from-indigo-500 to-blue-700",
   },
   {
     titulo: "Auditoría",
@@ -39,6 +41,7 @@ const modulos = [
         <path d="m19 19 3 3" />
       </>
     ),
+    acento: "from-cyan-500 to-blue-700",
   },
   {
     titulo: "Tablas Maestras",
@@ -51,6 +54,7 @@ const modulos = [
         <path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
       </>
     ),
+    acento: "from-sky-500 to-blue-700",
   },
   {
     titulo: "Calendario Laboral",
@@ -63,6 +67,7 @@ const modulos = [
         <path d="M8 3v4m8-4v4M3 11h18M7 15h2m3 0h2m3 0h1M7 18h2m3 0h2" />
       </>
     ),
+    acento: "from-blue-600 to-indigo-700",
   },
   {
     titulo: "Seguridad",
@@ -75,6 +80,7 @@ const modulos = [
         <path d="M8 10V7a4 4 0 0 1 8 0v3M12 15v2" />
       </>
     ),
+    acento: "from-slate-600 to-blue-700",
   },
 ];
 
@@ -82,25 +88,43 @@ export default function AdministracionPage() {
   const navigate = useNavigate();
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 text-slate-900">
       <AdminPageHeader
         title="Panel de Administración"
         description="Administración, Seguridad y Auditoría: configuración y control administrativo del sistema."
       />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
-        <p className="mb-7 text-sm text-slate-600">
-          Selecciona una opción para administrar el SIGD.
-        </p>
+      <section className="mx-auto max-w-7xl px-6 py-10">
+        <div className="mb-8 rounded-2xl border border-blue-100 bg-white/80 p-6 shadow-sm backdrop-blur">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Centro de control administrativo
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Selecciona una opción para administrar el SIGD. Cada módulo
+                concentra la configuración institucional y operativa del
+                sistema.
+              </p>
+            </div>
+            <span className="inline-flex w-fit items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              6 módulos disponibles
+            </span>
+          </div>
+        </div>
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {modulos.map((modulo) => (
             <article
               key={modulo.titulo}
-              className="group rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition duration-200 ease-out hover:shadow-md motion-safe:hover:-translate-y-1 motion-reduce:transition-none"
+              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl motion-reduce:transition-none"
             >
-              <div className="flex items-center gap-3">
-                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#006ec7]">
+              <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-blue-50 opacity-60 transition-transform duration-300 group-hover:scale-110" />
+
+              <div className="relative flex items-center gap-4">
+                <span
+                  className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${modulo.acento} text-white shadow-md transition-transform duration-300 ease-out motion-safe:group-hover:scale-105 motion-reduce:transition-none`}
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
@@ -111,24 +135,40 @@ export default function AdministracionPage() {
                     strokeLinejoin="round"
                     aria-hidden="true"
                     focusable="false"
-                    className="h-6 w-6 transition-transform duration-200 ease-out motion-safe:group-hover:scale-105 motion-reduce:transition-none"
+                    className="h-6 w-6"
                   >
                     {modulo.icono}
                   </svg>
                 </span>
-                <h3 className="text-lg font-bold">{modulo.titulo}</h3>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {modulo.titulo}
+                </h3>
               </div>
-              <p className="mt-2 min-h-12 text-sm leading-6 text-slate-600">
+
+              <p className="relative mt-3 min-h-12 text-sm leading-6 text-slate-600">
                 {modulo.descripcion}
               </p>
 
               <button
                 type="button"
                 onClick={() => navigate(modulo.ruta)}
-                className="mt-5 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
                 aria-label={`Administrar ${modulo.titulo}`}
+                className="relative mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 motion-reduce:transition-none"
               >
                 Administrar
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
+                >
+                  <path d="M5 12h14M13 5l7 7-7 7" />
+                </svg>
               </button>
             </article>
           ))}

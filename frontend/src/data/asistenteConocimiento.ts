@@ -196,24 +196,6 @@ export const BASE_CONOCIMIENTO: EntradaConocimiento[] = [
     ],
   },
   {
-    id: "que-es-sigd",
-    titulo: "Presentación del SIGD",
-    palabrasClave: ["sigd", "sistema", "instituto", "suiza", "para que sirve", "que es esta pagina", "plataforma", "informacion", "información", "presentacion", "presentación"],
-    ejemplos: [
-      "��qué es el SIGD?",
-      "��de qué trata esta plataforma?",
-      "para qué sirve este sistema",
-      "información sobre el instituto",
-      "explícame la plataforma",
-    ],
-    respuesta:
-      "El SIGD es el Sistema Integral de Gestión Documentaria del Instituto de Educación Superior Tecnológico Público “Suiza” (Pucallpa, Ucayali). Constituye la plataforma oficial para la presentación de trámites, el seguimiento de expedientes con código CUT, la notificación electrónica con plena validez legal y la verificación pública de documentos mediante código CVD, en concordancia con el TUO de la Ley N.º 27444 y la Ley N.º 27269 de Firmas y Certificados Digitales.",
-    enlaces: [
-      { etiqueta: "Ir al inicio", ruta: "/" },
-      { etiqueta: "Mesa de Partes Virtual", ruta: "/tramite" },
-    ],
-  },
-  {
     id: "mesa-partes-virtual",
     titulo: "Presentación de trámites",
     palabrasClave: [

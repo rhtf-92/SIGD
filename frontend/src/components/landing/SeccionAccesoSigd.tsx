@@ -9,7 +9,6 @@ import {
   GraduationCap,
   Inbox,
   Landmark,
-  LockKeyhole,
   LogIn,
   Search,
   Settings,
@@ -17,7 +16,6 @@ import {
   Sparkles,
   Star,
   User,
-  UserPlus,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -385,50 +383,8 @@ export default function SeccionAccesoSigd() {
 
         {!autenticado ? (
           <>
-            <div className="mt-6 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
-              <span>Modo invitado: los módulos del SIGD están bloqueados hasta que inicies sesión.</span>
-              <Link
-                to="/login"
-                className="font-bold underline underline-offset-2 hover:text-amber-900"
-              >
-                Iniciar sesión
-              </Link>
-            </div>
-
-            <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[auto_1fr_auto] lg:items-center">
-                <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[#003366] text-white">
-                  <LockKeyhole aria-hidden="true" className="h-7 w-7" />
-                </span>
-                <div>
-                  <h3 className="text-lg font-black text-[#003366]">
-                    Acceso exclusivo para usuarios
-                  </h3>
-                  <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
-                    Para abrir la mesa de partes, la casilla electrónica, el registro documentario o
-                    cualquier otro módulo del SIGD, inicia sesión con tu cuenta institucional.
-                  </p>
-                  <p className="mt-2 text-xs text-slate-400">
-                    ¿Aún no tienes cuenta? Regístrate para solicitar acceso como ciudadano.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-                  <Link
-                    to="/login"
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#003366] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#00264d]"
-                  >
-                    <LogIn aria-hidden="true" className="h-4 w-4" />
-                    Iniciar sesión
-                  </Link>
-                  <Link
-                    to="/registro"
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <UserPlus aria-hidden="true" className="h-4 w-4" />
-                    Crear cuenta
-                  </Link>
-                </div>
-              </div>
+            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Modo invitado: los módulos del SIGD están bloqueados hasta que inicies sesión.
             </div>
           </>
         ) : (

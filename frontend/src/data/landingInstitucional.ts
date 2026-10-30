@@ -87,7 +87,6 @@ export const MENU_PRINCIPAL: GrupoMenu[] = [
 
 /** Preguntas frecuentes construidas desde la base de conocimiento institucional. */
 const IDS_FAQ = [
-  "que-es-sigd",
   "mesa-partes-virtual",
   "consulta-cut",
   "casilla-electronica",
@@ -138,16 +137,7 @@ export interface TemaAyuda {
 }
 
 /** Centro de ayuda: temas reales extraídos de la base de conocimiento institucional. */
-const IDS_AYUDA = [
-  "que-es-sigd",
-  "mesa-partes-virtual",
-  "consulta-cut",
-  "casilla-electronica",
-  "validador-cvd",
-  "firma-validez-legal",
-  "titulacion",
-  "registro-login",
-] as const;
+const IDS_AYUDA: string[] = [];
 
 export const CENTRO_AYUDA: TemaAyuda[] = IDS_AYUDA.flatMap((id) => {
   const entrada = BASE_CONOCIMIENTO.find((e) => e.id === id);

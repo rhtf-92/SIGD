@@ -247,7 +247,6 @@ const TEMA_POR_RUTA: Record<string, string> = {
   "/reportes/dashboard": "reportes",
   "/registro": "registro-login",
   "/login": "registro-login",
-  "/": "que-es-sigd",
 };
 
 function topSugerencias(excluirId?: string, n = 3): SugerenciaTema[] {

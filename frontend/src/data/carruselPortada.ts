@@ -47,20 +47,5 @@ export const DIAPOSITIVAS_PORTADA: DiapositivaPortada[] = [
   },
 ];
 
-/** Videos institucionales, mostrados aparte del carrusel de imágenes. */
-export const VIDEOS_INSTITUCIONALES: VideoInstitucional[] = [
-  {
-    id: "instituto-video",
-    src: "/images/carrusel/Instituto/instituto.mp4",
-    categoria: "Instituto",
-    titulo: "Conoce el Instituto",
-    descripcion: "Recorre nuestros ambientes y descubre la propuesta educativa del IESTP Suiza.",
-  },
-  {
-    id: "matriculas-video",
-    src: "/images/carrusel/matriculas%20abiertas/ADMISION-SUIZA-2025-6-ABRIL-Ok.mp4",
-    categoria: "Matrículas abiertas",
-    titulo: "Admisión 2025",
-    descripcion: "Conoce el proceso de matrícula y asegura tu vacante para el próximo periodo.",
-  },
-];
+/** Videos institucionales eliminados del sistema. */
+export const VIDEOS_INSTITUCIONALES: VideoInstitucional[] = [];

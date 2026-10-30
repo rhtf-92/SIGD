@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 import { LayoutDashboard, LogIn, LogOut } from "lucide-react";
-=======
-﻿import { LayoutDashboard, LogIn, LogOut } from "lucide-react";
->>>>>>> Stashed changes
 import { Link, useNavigate } from "react-router-dom";
 
 import { useSesion } from "../../config/accesoModulos";
