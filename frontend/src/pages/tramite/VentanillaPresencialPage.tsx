@@ -367,6 +367,7 @@ export default function VentanillaPresencialPage() {
           </div>
         </form>
       </div>
+<<<<<<< HEAD
 
       <CargoDigitalModal
         isOpen={modalAbierto}
@@ -374,6 +375,8 @@ export default function VentanillaPresencialPage() {
         cargo={cargoGenerado}
         onNuevoRegistro={handleNuevoRegistro}
       />
+=======
+>>>>>>> F_URQUIA
     </main>
   );
 }
