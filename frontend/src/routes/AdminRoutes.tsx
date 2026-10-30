@@ -9,6 +9,7 @@ import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosPage from "../pages/administracion/UsuariosPage";
+import CatalogoTupaPage from "../pages/administracion/CatalogoTupaPage";
 import ProtectedRoute from "./ProtectedRoute";
 
 export default function AdminRoutes() {
@@ -32,6 +33,7 @@ export default function AdminRoutes() {
       <Route path="roles-permisos" element={<RolesPermisosPage />} />
       <Route path="auditoria" element={<AuditoriaPage />} />
       <Route path="tablas-maestras" element={<TablasMaestrasPage />} />
+      <Route path="catalogo-tupa" element={<CatalogoTupaPage />} />
       <Route path="calendario-laboral" element={<CalendarioLaboralPage />} />
       <Route path="seguridad" element={<SeguridadPage />} />
     </>

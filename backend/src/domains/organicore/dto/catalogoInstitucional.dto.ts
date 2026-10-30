@@ -1,0 +1,10 @@
+import { z } from 'zod';
+const tipo = z.enum(['PROCEDIMIENTO_ADMINISTRATIVO', 'BIEN_SERVICIO_PRODUCTIVO']);
+const texto = z.string().trim().max(5000).optional().nullable();
+export const consultaCatalogoPublicoSchema = z.object({ tipo_catalogo: tipo.optional(), q: z.string().trim().min(1).max(300).optional() });
+export const crearCatalogoSchema = z.object({ codigo: z.string().trim().min(1).max(40), nombre: z.string().trim().min(1).max(300), tipo_catalogo: tipo, rubro: texto, sub_rubro: texto, dependencia: texto, autoridad: texto, motivo: z.string().trim().min(1).max(5000) });
+export const editarCatalogoSchema = z.object({ nombre: z.string().trim().min(1).max(300).optional(), rubro: texto, sub_rubro: texto, dependencia: texto, autoridad: texto, motivo: z.string().trim().min(1).max(5000) }).refine(v => Object.keys(v).some(k => k !== 'motivo'));
+export const crearVersionSchema = z.object({ requisitos: z.array(z.unknown()).default([]), tarifas: z.array(z.unknown()).default([]), monto_texto: texto, base_legal: texto, fuente: texto, motivo: z.string().trim().min(1).max(5000), vigente_desde: z.string().date(), vigente_hasta: z.string().date().optional().nullable() }).refine(v => !v.vigente_hasta || v.vigente_hasta >= v.vigente_desde);
+export const cambiarEstadoSchema = z.object({ vigente: z.boolean().optional(), version_publicada_id: z.string().uuid().nullable().optional(), motivo: z.string().trim().min(1).max(5000) }).refine(v => v.vigente !== undefined || v.version_publicada_id !== undefined);
+export const catalogoIdParamsSchema = z.object({ id: z.string().uuid() });
+export type CrearCatalogoInput=z.infer<typeof crearCatalogoSchema>; export type EditarCatalogoInput=z.infer<typeof editarCatalogoSchema>; export type CrearVersionInput=z.infer<typeof crearVersionSchema>; export type CambiarEstadoInput=z.infer<typeof cambiarEstadoSchema>;

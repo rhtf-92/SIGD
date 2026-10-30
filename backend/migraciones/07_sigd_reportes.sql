@@ -32,10 +32,10 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS sigd_tra.mv_kpis_mgd_mensual AS
 WITH cierre AS (
     SELECT
         m.expediente_id,
-        m.fecha_movimiento,
-        ROW_NUMBER() OVER (PARTITION BY m.expediente_id ORDER BY m.fecha_movimiento) AS orden
+        m.fecha_hora,
+        ROW_NUMBER() OVER (PARTITION BY m.expediente_id ORDER BY m.fecha_hora) AS orden
     FROM sigd_rut.movimiento_tramite m
-    WHERE m.estado_destino IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
+    WHERE m.estado_nuevo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
 ),
 base AS (
     SELECT
@@ -43,12 +43,12 @@ base AS (
         e.expediente_id,
         e.fecha_radicacion,
         e.fecha_limite,
-        a.estado_codigo,
+        COALESCE(a.estado_nuevo, e.estado) AS estado_codigo,
         a.area_actual_id,
         ar.fecha_ingreso,
-        c.fecha_movimiento AS fecha_cierre
+        c.fecha_hora AS fecha_cierre
     FROM sigd_tra.expediente e
-    LEFT JOIN sigd_rut.estado_actual_tramite a
+    LEFT JOIN sigd_rut.estado_actual_expediente a
            ON a.expediente_id = e.expediente_id
     LEFT JOIN sigd_tra.asiento_registro ar
            ON ar.expediente_id = e.expediente_id
@@ -126,25 +126,33 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS sigd_tra.mv_tiempos_retencion_area AS
 SELECT
     COALESCE(ar.area_id, e.area_destino_id)                                   AS area_id,
     COALESCE(ar.nombre, 'Sin área asignada')                                  AS area,
-    e.estado                                                                     AS estado,
+    COALESCE(a.estado_nuevo, e.estado)                                           AS estado,
     COUNT(*)::int                                                                AS expedientes,
-    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_estado)) / 3600)::numeric, 2)::float8
-                                                                                 AS horas_promedio,
-    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_estado)) / 86400)::numeric, 2)::float8
-                                                                                 AS dias_promedio,
-    ROUND(MAX(EXTRACT(EPOCH FROM (now() - a.fecha_estado)) / 86400)::numeric, 2)::float8
-                                                                                 AS dias_maximo,
+    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 3600)::numeric, 2)::float8
+                                                                                  AS horas_promedio,
+    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 86400)::numeric, 2)::float8
+                                                                                  AS dias_promedio,
+    ROUND(MAX(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 86400)::numeric, 2)::float8
+                                                                                  AS dias_maximo,
     COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite < now())::int
-                                                                                 AS vencidos,
-    COUNT(*) FILTER (WHERE a.semaforo_sla = 'ROJO')::int                         AS semaforo_rojo,
-    COUNT(*) FILTER (WHERE a.semaforo_sla = 'AMARILLO')::int                     AS semaforo_amarillo,
-    COUNT(*) FILTER (WHERE a.semaforo_sla = 'VERDE')::int                        AS semaforo_verde
-FROM sigd_rut.estado_actual_tramite a
+                                                                                  AS vencidos,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite < now())::int
+                                                                                  AS semaforo_rojo,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL
+                      AND e.fecha_limite >= now()
+                      AND e.fecha_limite < now() + INTERVAL '24 hours')::int       AS semaforo_amarillo,
+    COUNT(*) FILTER (WHERE e.fecha_limite IS NULL
+                      OR e.fecha_limite >= now() + INTERVAL '24 hours')::int       AS semaforo_verde
+FROM sigd_rut.estado_actual_expediente a
 JOIN sigd_tra.expediente e
   ON e.expediente_id = a.expediente_id
 LEFT JOIN sigd_org.area ar
-  ON ar.area_id = a.area_actual_id
-WHERE a.estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
+  ON ar.area_id = CASE
+      WHEN a.area_actual_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      THEN a.area_actual_id::uuid
+      ELSE NULL
+  END
+WHERE a.estado_nuevo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
 GROUP BY 1, 2, 3
 WITH DATA;
 
@@ -170,14 +178,14 @@ DECLARE
     v_inicio TIMESTAMPTZ := clock_timestamp();
     v_fin    TIMESTAMPTZ;
 BEGIN
-    REFRESH MATERIALIZED VIEW CONCURRENTLY sigd_tra.mv_kpis_mgd_mensual;
+    REFRESH MATERIALIZED VIEW sigd_tra.mv_kpis_mgd_mensual;
     v_fin := clock_timestamp();
     vista := 'sigd_tra.mv_kpis_mgd_mensual';
     duracion_ms := EXTRACT(EPOCH FROM (v_fin - v_inicio)) * 1000;
     RETURN NEXT;
 
     v_inicio := clock_timestamp();
-    REFRESH MATERIALIZED VIEW CONCURRENTLY sigd_tra.mv_tiempos_retencion_area;
+    REFRESH MATERIALIZED VIEW sigd_tra.mv_tiempos_retencion_area;
     v_fin := clock_timestamp();
     vista := 'sigd_tra.mv_tiempos_retencion_area';
     duracion_ms := EXTRACT(EPOCH FROM (v_fin - v_inicio)) * 1000;
