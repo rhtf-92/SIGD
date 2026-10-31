@@ -86,7 +86,7 @@ export default function NotificacionDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-950/60 backdrop-blur-xs transition-opacity overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-blue-950/45 p-3 backdrop-blur-md transition-opacity sm:p-4 md:p-6"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -97,32 +97,29 @@ export default function NotificacionDetailModal({
     >
       <div
         ref={modalRef}
-        className="relative my-auto flex max-h-[92vh] w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="relative my-auto flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-sky-200 bg-white/95 shadow-[0_24px_70px_rgba(15,23,42,0.3)] backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150"
       >
         {/* ================================================================== */}
         {/* CABECERA DEL MODAL                                                 */}
         {/* ================================================================== */}
-        <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 px-6 py-5 text-white">
+        <header className="flex items-start justify-between gap-4 border-b border-sky-100 bg-gradient-to-r from-white via-sky-50 to-cyan-50 px-6 py-5 text-blue-950">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-blue-500/30 border border-blue-400/40 px-2.5 py-0.5 text-xs font-bold text-blue-200">
+              <span className="rounded-full border border-sky-200 bg-sky-100 px-2.5 py-0.5 text-xs font-bold text-sky-800">
                 {acto.tipoActo}
               </span>
-              <span className="font-mono text-xs text-slate-300">
+              <span className="font-mono text-xs text-slate-600">
                 {notificacion.numeroNotificacion}
               </span>
               <span className="text-slate-400">•</span>
-              <span className="text-xs font-bold text-amber-300">
+              <span className="text-xs font-bold text-blue-700">
                 {notificacion.numeroExpediente}
               </span>
             </div>
-            <h2
-              id="modal-act-title"
-              className="text-lg font-bold text-white sm:text-xl tracking-tight"
-            >
+            <h2 id="modal-act-title" className="text-lg font-bold tracking-tight text-blue-950 sm:text-xl">
               {acto.numeroDocumento}
             </h2>
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-slate-600">
               Emitido por: {notificacion.unidadEmisora}
             </p>
           </div>
@@ -132,7 +129,7 @@ export default function NotificacionDetailModal({
             type="button"
             onClick={onClose}
             aria-label="Cerrar modal de notificación"
-            className="rounded-xl border border-white/20 bg-white/10 p-2 text-slate-300 hover:bg-white/20 hover:text-white transition focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="rounded-xl border border-sky-200 bg-white p-2 text-slate-600 transition hover:border-sky-400 hover:bg-sky-50 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-sky-300"
           >
             <svg
               className="h-5 w-5"
@@ -153,12 +150,12 @@ export default function NotificacionDetailModal({
         {/* ================================================================== */}
         {/* CUERPO DEL MODAL (SCROLLABLE)                                      */}
         {/* ================================================================== */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 text-slate-800">
+        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6 text-slate-700">
           {/* Metadatos institucionales de la notificación */}
-          <section className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-3 text-xs">
+          <section className="grid gap-3 rounded-2xl border border-sky-200 bg-sky-50/80 p-4 text-xs sm:grid-cols-3">
             <div>
               <p className="font-semibold text-slate-500">Fecha de Depósito</p>
-              <p className="mt-0.5 font-medium text-slate-900">
+              <p className="mt-0.5 font-medium text-blue-900">
                 {formatIsoFecha(notificacion.fechaDepositoIso)}
               </p>
             </div>
@@ -166,7 +163,7 @@ export default function NotificacionDetailModal({
               <p className="font-semibold text-slate-500">
                 Primer Acceso (Lectura)
               </p>
-              <p className="mt-0.5 font-medium text-slate-900">
+              <p className="mt-0.5 font-medium text-blue-900">
                 {notificacion.fechaLecturaIso
                   ? formatIsoFecha(notificacion.fechaLecturaIso)
                   : "Lectura en este momento"}
@@ -178,7 +175,7 @@ export default function NotificacionDetailModal({
               </p>
               <p className="mt-0.5 font-bold">
                 {notificacion.estado === "NOTIFICADO" ? (
-                  <span className="text-emerald-700 flex items-center gap-1">
+                  <span className="flex items-center gap-1 text-emerald-700">
                     <svg
                       className="h-3.5 w-3.5"
                       fill="none"
@@ -205,9 +202,9 @@ export default function NotificacionDetailModal({
 
           {/* Asunto y Contenido del Acto Administrativo */}
           <section className="space-y-3">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 flex items-center gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-blue-900">
               <svg
-                className="h-4 w-4 text-blue-700"
+                className="h-4 w-4 text-sky-600"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -222,32 +219,32 @@ export default function NotificacionDetailModal({
               Contenido Oficial del Acto Administrativo
             </h3>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
+            <div className="space-y-3 rounded-2xl border border-sky-100 bg-white/80 p-5 shadow-[0_8px_24px_rgba(14,165,233,0.08)]">
               <div>
                 <p className="text-xs font-semibold text-slate-500">Asunto:</p>
                 <p
                   id="modal-act-desc"
-                  className="mt-0.5 text-sm font-bold text-slate-900"
+                  className="mt-0.5 text-sm font-bold text-blue-950"
                 >
                   {acto.asunto}
                 </p>
               </div>
 
-              <div className="border-t border-slate-100 pt-3">
+              <div className="border-t border-sky-100 pt-3">
                 <p className="text-xs font-semibold text-slate-500">
                   Fundamentación y Resumen Legal:
                 </p>
-                <p className="mt-1 text-xs sm:text-sm text-slate-700 leading-relaxed text-justify bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                <p className="mt-1 rounded-xl border border-sky-100 bg-sky-50/80 p-3.5 text-justify text-xs leading-relaxed text-slate-700 sm:text-sm">
                   {acto.resumenLegal}
                 </p>
               </div>
 
               {acto.textoCompleto && (
-                <div className="border-t border-slate-100 pt-3">
+                <div className="border-t border-sky-100 pt-3">
                   <p className="text-xs font-semibold text-slate-500">
                     Parte Resolutiva / Dispositiva:
                   </p>
-                  <pre className="mt-1 font-sans text-xs text-slate-800 whitespace-pre-line bg-blue-50/40 p-3.5 rounded-xl border border-blue-100 leading-relaxed">
+                  <pre className="mt-1 whitespace-pre-line rounded-xl border border-sky-100 bg-sky-50 p-3.5 font-sans text-xs leading-relaxed text-slate-700">
                     {acto.textoCompleto}
                   </pre>
                 </div>
@@ -257,9 +254,9 @@ export default function NotificacionDetailModal({
 
           {/* Adjunto Oficial y Firmas Digitales */}
           <section className="space-y-3">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 flex items-center gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-blue-900">
               <svg
-                className="h-4 w-4 text-blue-700"
+                className="h-4 w-4 text-sky-600"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -276,14 +273,14 @@ export default function NotificacionDetailModal({
 
             <div className="grid gap-3 sm:grid-cols-2">
               {/* Tarjeta de descarga de documento */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex flex-col justify-between">
+              <div className="flex flex-col justify-between rounded-2xl border border-sky-100 bg-white/80 p-4 shadow-[0_8px_24px_rgba(14,165,233,0.08)]">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-lg bg-red-100 p-2 text-red-700 font-bold text-xs">
+                    <span className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs font-bold text-rose-700">
                       PDF
                     </span>
                     <div>
-                      <p className="text-xs font-bold text-slate-900 truncate">
+                      <p className="truncate text-xs font-bold text-blue-950">
                         {acto.nombreArchivoPdf}
                       </p>
                       <p className="text-[11px] text-slate-500">
@@ -296,7 +293,7 @@ export default function NotificacionDetailModal({
                     <p className="text-[11px] font-semibold text-slate-500">
                       Hash SHA-256 (Integridad):
                     </p>
-                    <div className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-700 truncate">
+                    <div className="flex items-center gap-1 truncate rounded bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-700">
                       <span className="truncate">{acto.hashIntegridadSha256}</span>
                       <button
                         type="button"
@@ -306,7 +303,7 @@ export default function NotificacionDetailModal({
                             "hash-doc",
                           )
                         }
-                        className="ml-auto text-blue-700 hover:text-blue-900 shrink-0 font-sans text-xs font-semibold"
+                        className="ml-auto shrink-0 font-sans text-xs font-semibold text-sky-700 hover:text-blue-900"
                         title="Copiar Hash"
                       >
                         {copiedHash === "hash-doc" ? "✓" : "Copiar"}
@@ -325,7 +322,7 @@ export default function NotificacionDetailModal({
                 <button
                   type="button"
                   onClick={() => casillaService.descargarDocumento(notificacion)}
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-2.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400 bg-sky-50 px-4 py-2.5 text-xs font-bold text-blue-800 transition hover:border-sky-500 hover:bg-sky-100"
                 >
                   <svg
                     className="h-4 w-4"
@@ -345,15 +342,15 @@ export default function NotificacionDetailModal({
               </div>
 
               {/* Tarjeta de Firmantes Digitales */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
+              <div className="rounded-2xl border border-sky-100 bg-white/80 p-4 shadow-[0_8px_24px_rgba(14,165,233,0.08)]">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-blue-950">
                   Firmantes Digitales Validados
                 </p>
                 <div className="space-y-2.5">
                   {acto.firmantes.map((firmante) => (
                     <div
                       key={firmante.nombre}
-                      className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-xs"
+                      className="rounded-xl border border-sky-100 bg-sky-50/80 p-2.5 text-xs"
                     >
                       <div className="flex items-center gap-1.5 font-semibold text-slate-800">
                         <svg
@@ -371,7 +368,7 @@ export default function NotificacionDetailModal({
                         </svg>
                         <span>{firmante.nombre}</span>
                       </div>
-                      <p className="text-[11px] text-slate-600 pl-5">
+                      <p className="pl-5 text-[11px] text-slate-400">
                         {firmante.cargo}
                       </p>
                       <p className="text-[10px] text-slate-400 pl-5 mt-0.5">
@@ -390,7 +387,7 @@ export default function NotificacionDetailModal({
           {/* SECCIÓN CRÍTICA: ACUSE DIGITAL LEGAL (LPAG LEY N° 27444)          */}
           {/* ================================================================ */}
           <section className="space-y-3">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 flex items-center gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-blue-900">
               <svg
                 className="h-4 w-4 text-emerald-600"
                 fill="none"
@@ -409,14 +406,14 @@ export default function NotificacionDetailModal({
 
             {/* CASO A: YA SE HA GENERADO EL ACUSE LEGAL */}
             {acuse ? (
-              <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50/50 via-white to-teal-50/30 p-5 shadow-sm space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-3">
+              <div className="space-y-4 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/80 p-5 shadow-[0_10px_28px_rgba(16,185,129,0.1)]">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-3">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-xs">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-xs font-bold text-emerald-800">
                       ✓
                     </span>
                     <div>
-                      <h4 className="text-sm font-bold text-emerald-950">
+                      <h4 className="text-sm font-bold text-emerald-900">
                         CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA
                       </h4>
                       <p className="text-xs text-emerald-800">
@@ -425,7 +422,7 @@ export default function NotificacionDetailModal({
                     </div>
                   </div>
 
-                  <span className="rounded-full bg-emerald-100 border border-emerald-300 px-3 py-1 text-xs font-black uppercase tracking-wider text-emerald-800">
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-wider text-emerald-800">
                     Validez Jurídica Plena
                   </span>
                 </div>
@@ -436,7 +433,7 @@ export default function NotificacionDetailModal({
                     <p className="font-semibold text-slate-500">
                       Timestamp Oficial Servidor (ISO-8601):
                     </p>
-                    <div className="mt-1 flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2 font-mono text-emerald-400">
+                    <div className="mt-1 flex items-center justify-between rounded-lg border border-emerald-100 bg-white/90 px-3 py-2 font-mono text-emerald-700">
                       <span>{acuse.timestampGeneracionIso}</span>
                     </div>
                     <p className="mt-1 text-[11px] text-slate-500">
@@ -449,14 +446,14 @@ export default function NotificacionDetailModal({
                     <p className="font-semibold text-slate-500">
                       Hash SHA-256 del Acuse (Inmutable):
                     </p>
-                    <div className="mt-1 flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2 font-mono text-xs text-emerald-400">
+                    <div className="mt-1 flex items-center justify-between rounded-lg border border-emerald-100 bg-white/90 px-3 py-2 font-mono text-xs text-emerald-700">
                       <span className="truncate">{acuse.hashSha256Acuse}</span>
                       <button
                         type="button"
                         onClick={() =>
                           copyToClipboard(acuse.hashSha256Acuse, "hash-acuse")
                         }
-                        className="ml-2 text-xs font-sans font-bold text-emerald-300 hover:text-white shrink-0 underline"
+                        className="ml-2 shrink-0 font-sans text-xs font-bold text-emerald-700 underline hover:text-emerald-900"
                       >
                         {copiedHash === "hash-acuse" ? "Copiado!" : "Copiar"}
                       </button>
@@ -469,14 +466,14 @@ export default function NotificacionDetailModal({
                 </div>
 
                 {/* Surtimiento de Efecto y Cómputo de Plazos */}
-                <div className="rounded-xl border border-emerald-200 bg-white p-3.5 text-xs text-slate-700 space-y-1.5">
+                <div className="space-y-1.5 rounded-xl border border-emerald-200 bg-white/80 p-3.5 text-xs text-slate-700">
                   <p className="font-bold text-emerald-900">
                     Efecto Jurídico y Cómputo de Plazos (Art. 20 TUO Ley N° 27444):
                   </p>
-                  <p className="text-slate-600 leading-relaxed">
+                  <p className="leading-relaxed text-slate-700">
                     {acuse.fechaEfectoLegal}
                   </p>
-                  <p className="text-slate-600">
+                  <p className="text-slate-700">
                     • Plazo de atención / impugnación:{" "}
                     <strong>{acuse.plazoImpugnacionDiasHabiles} días hábiles</strong>.
                     {acuse.fechaLimiteImpugnacion && (
@@ -494,7 +491,7 @@ export default function NotificacionDetailModal({
                   <button
                     type="button"
                     onClick={() => casillaService.descargarAcuse(acuse)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800"
+                    className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-800 transition hover:border-sky-300 hover:bg-sky-50"
                   >
                     <svg
                       className="h-4 w-4"
@@ -515,16 +512,16 @@ export default function NotificacionDetailModal({
               </div>
             ) : (
               /* CASO B: AÚN NO SE HA GENERADO EL ACUSE DIGITAL */
-              <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-5 space-y-4">
+              <div className="space-y-4 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/80 p-5 shadow-[0_10px_28px_rgba(245,158,11,0.1)]">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white font-bold text-sm">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-100 text-sm font-bold text-amber-800">
                     !
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-amber-950">
+                    <h4 className="text-sm font-bold text-amber-900">
                       Requisito de Acuse Digital Legal (TUO Ley N° 27444)
                     </h4>
-                    <p className="mt-1 text-xs text-amber-900 leading-relaxed">
+                    <p className="mt-1 text-xs leading-relaxed text-amber-900">
                       Conforme al Artículo 20 del TUO de la Ley N° 27444, para
                       que la notificación surta plenos efectos jurídicos y se
                       inicie el cómputo legal de plazos, debe generar el acuse de
@@ -533,11 +530,11 @@ export default function NotificacionDetailModal({
                   </div>
                 </div>
 
-                <div className="rounded-xl bg-white p-3.5 text-xs text-slate-600 border border-amber-200">
-                  <p className="font-semibold text-slate-800">
+                <div className="rounded-xl border border-amber-100 bg-white/85 p-3.5 text-xs text-slate-700">
+                  <p className="font-semibold text-slate-900">
                     Al confirmar el acuse:
                   </p>
-                  <ul className="mt-1 list-disc list-inside space-y-0.5 text-slate-600">
+                  <ul className="mt-1 list-inside list-disc space-y-0.5 text-slate-700">
                     <li>
                       El servidor del SIGD registrará la marca de tiempo cierta
                       (formato ISO-8601).
@@ -561,7 +558,7 @@ export default function NotificacionDetailModal({
                     type="button"
                     disabled={isGenerandoAcuse}
                     onClick={() => onGenerarAcuse(notificacion.id)}
-                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-xs font-bold text-white shadow-md transition hover:bg-blue-800 disabled:cursor-wait disabled:opacity-60"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-500 bg-gradient-to-r from-blue-600 to-sky-500 px-5 py-3 text-xs font-bold text-white shadow-[0_6px_18px_rgba(14,165,233,0.24)] transition hover:border-cyan-300 hover:from-blue-700 hover:to-sky-600 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
                   >
                     {isGenerandoAcuse ? (
                       <>
@@ -614,7 +611,7 @@ export default function NotificacionDetailModal({
         {/* ================================================================== */}
         {/* PIE DEL MODAL                                                      */}
         {/* ================================================================== */}
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-sky-100 bg-sky-50/80 px-6 py-4">
           <p className="text-xs text-slate-500">
             IESTP Suiza • Sistema Integral de Gestión Documentaria
           </p>
@@ -623,7 +620,7 @@ export default function NotificacionDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-100"
+              className="rounded-xl border border-sky-200 bg-white px-5 py-2.5 text-xs font-bold text-blue-800 transition hover:border-sky-400 hover:bg-sky-50"
             >
               Cerrar
             </button>

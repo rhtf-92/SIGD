@@ -1,14 +1,3 @@
-/**
- * T-BE-TC-06 / Endpoint #15 — Ventanilla Presencial y Cargo de Recepción Física
- * Responsable: Leysglin Riquelmer Rojas Fachin (B_RIQUELMER) / Grupo 2 TramiCore
- * Esquema: sigd_tra (DDL 05_sigd_tra.sql)
- *
- * Refactorización: Reemplaza la generación provisional Math.random() por la llamada
- * atómica PL/pgSQL a sigd_tra.generar_cut_expediente (consecutivo EXP-YYYY-XXXXXX con
- * bloqueo pesimista FOR UPDATE), registra el asiento institucional inmutable en
- * sigd_tra.asiento_registro y formatea el ticket térmico de 80mm/58mm.
- */
-
 import crypto from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { TicketTermicoUtil } from './ticketTermico.util.js';
@@ -75,7 +64,6 @@ export class VentanillaPresencialService {
 
       const anioActual = new Date().getFullYear();
 
-      // 1. Asignación atómica de CUT universal mediante función PL/pgSQL
       const cutRes = await cliente.query<{ cut: string }>(
         'SELECT sigd_tra.generar_cut_expediente($1::INT) AS cut;',
         [anioActual],
@@ -90,10 +78,9 @@ export class VentanillaPresencialService {
         });
       }
 
-      // 2. Resolver o registrar persona solicitante
       let solicitanteId: string;
       const personaExistente = await cliente.query<{ id_persona: string }>(
-        'SELECT id_persona FROM sigd_auth.persona_natural WHERE dni = $1 LIMIT 1',
+        'SELECT id_persona FROM sigd_auth.persona_natural WHERE numero_documento = $1 LIMIT 1',
         [datos.dniSolicitante],
       );
 
@@ -108,14 +95,13 @@ export class VentanillaPresencialService {
         solicitanteId = nuevaPersona.rows[0].id_persona;
 
         await cliente.query(
-          `INSERT INTO sigd_auth.persona_natural (id_persona, dni, nombres, apellido_paterno, ubigeo_distrito)
+          `INSERT INTO sigd_auth.persona_natural (id_persona, numero_documento, nombres, apellido_paterno, ubigeo_distrito)
            VALUES ($1, $2, $3, 'REGISTRADO', '250101')
            ON CONFLICT DO NOTHING;`,
           [solicitanteId, datos.dniSolicitante, datos.datosRemitente],
         );
       }
 
-      // 3. Insertar expediente formal en sigd_tra.expediente
       const ahora = new Date();
       const expRes = await cliente.query<{ expediente_id: string }>(
         `INSERT INTO sigd_tra.expediente (
@@ -148,7 +134,6 @@ export class VentanillaPresencialService {
       );
       const expedienteId = expRes.rows[0].expediente_id;
 
-      // 4. Asentar en libro de registro institucional inmutable
       await cliente.query(
         `INSERT INTO sigd_tra.asiento_registro (
            numero_asiento,
@@ -178,7 +163,6 @@ export class VentanillaPresencialService {
 
       if (debeManejarTx) await cliente.query('COMMIT');
 
-      // 5. Generar cargo y ticket térmico
       const hashSeguridad = crypto
         .createHash('sha256')
         .update(`${cut}:${ahora.toISOString()}:${datos.dniSolicitante}`)
@@ -217,39 +201,6 @@ export class VentanillaPresencialService {
     } finally {
       if (debeManejarTx) cliente.release();
     }
-  }
-
-  public static async registrarExpediente(datos: any, dbClient: any): Promise<string> {
-    const canalEntrada = 'VENTANILLA_PRESENCIAL';
-    const anioActual = new Date().getFullYear();
-    const cutGenerado = `CUT-${anioActual}-${Math.floor(Math.random() * 9000) + 1000}`;
-
-    const queryExpediente = `
-      INSERT INTO sigd_tra.expediente (
-        cut, 
-        canal_recepcion, 
-        id_operador_ventanilla,
-        datos_remitente,
-        asunto,
-        folios,
-        estado_tramite, 
-        fecha_radicacion
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, 'RECEPCIONADO', NOW()
-      ) RETURNING id_expediente;
-    `;
-    
-    const valores = [
-      cutGenerado, 
-      canalEntrada, 
-      datos.idOperadorVentanilla,
-      datos.datosRemitente,
-      datos.asunto,
-      datos.foliosTotales
-    ];
-
-    await dbClient.query(queryExpediente, valores);
-    return cutGenerado;
   }
 }
 

@@ -23,13 +23,13 @@ export function crearControladorLecturasRutaDoc(
   };
   const idValido = (id: string): string => {
     if (!esIdExpediente(id)) throw new ValidationError({ invalidParams: [{
-      name: 'id', reason: 'Debe ser un identificador BIGINT positivo válido.',
+      name: 'id', reason: 'Debe ser un UUID válido.',
     }] });
     return id;
   };
   const idDeRuta = (valor: string | string[] | undefined): string => {
     if (typeof valor !== 'string') throw new ValidationError({ invalidParams: [{
-      name: 'id', reason: 'Debe indicar un único identificador BIGINT positivo.',
+      name: 'id', reason: 'Debe indicar un único UUID.',
     }] });
     return idValido(valor);
   };

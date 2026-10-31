@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "@/api/client";
+import { ApiHttpError } from "@/types/api";
 import type {
   DashboardCuelloBotellaItem,
   DashboardEjecutivoData,
@@ -13,6 +14,8 @@ export interface DashboardMetricsQuery {
   fechaInicio: string;
   fechaFin: string;
   periodo?: string;
+  periodoDesde?: string;
+  periodoHasta?: string;
   diasLimite?: number;
   anio?: number;
   mes?: string;
@@ -26,7 +29,7 @@ export interface DashboardUnitOption {
 
 export interface ExecutiveSummaryMetrics {
   conformity: number;
-  growth: number;
+  growth: number | null;
   desksHealth: string;
 }
 
@@ -39,97 +42,156 @@ function asNumber(value: unknown): number {
   return Number.isFinite(number) ? number : 0;
 }
 
-function unwrapPayload(value: unknown): Record<string, unknown> {
+function unwrapPayload(value: unknown): unknown {
   const record = asRecord(value);
-  return record.data ? asRecord(record.data) : record;
+  return record.data ?? value;
 }
 
-function normalizeDashboard(value: unknown): DashboardEjecutivoData & {
+interface DashboardResponses {
+  resumen: unknown;
+  tendencias: unknown;
+  cuellosBotella: unknown;
+}
+
+function normalizeDashboard(value: DashboardResponses, params: DashboardMetricsQuery): DashboardEjecutivoData & {
   executive: ExecutiveSummaryMetrics;
   units: DashboardUnitOption[];
 } {
-  const dto = unwrapPayload(value);
-  const rawMetrics = Array.isArray(dto.metrics) ? dto.metrics : [];
-  const metrics: DashboardKpiMetric[] = rawMetrics.map((value, index) => {
-    const metric = asRecord(value);
-    const number = asNumber(metric.value);
-    const delta = asNumber(metric.delta);
+  const resumen = asRecord(unwrapPayload(value.resumen));
+  const indicadores = asRecord(resumen);
+  const contadores = asRecord(resumen.contadores);
+  const vtep = asRecord(indicadores.vtep);
+  const tpr = asRecord(indicadores.tprHorasHabiles);
+  const tro = asRecord(indicadores.tro);
+  const teo = asRecord(indicadores.teo);
+  const total = asNumber(contadores.nRadicados);
+  const atendidos = asNumber(contadores.nAtendidos);
+  const archivados = asNumber(contadores.nArchivados);
+  const enTramite = asNumber(contadores.nEnTramite);
+  const observados = asNumber(contadores.nObservados);
+  const procesados = atendidos + archivados;
+  const otros = Math.max(total - procesados - enTramite - observados, 0);
+
+  const trendData = unwrapPayload(value.tendencias);
+  const trend: DashboardTrendPoint[] = Array.isArray(trendData)
+    ? trendData.flatMap((entry) => {
+      const point = asRecord(entry);
+      const month = asNumber(point.mes);
+      if (month < 1 || month > 12) return [];
+      return [{
+        label: new Intl.DateTimeFormat("es-PE", { month: "short", timeZone: "UTC" })
+          .format(new Date(Date.UTC(params.anio ?? new Date().getFullYear(), month - 1, 1))),
+        radicados: asNumber(point.radicados),
+        resueltos: asNumber(point.atendidos),
+      }];
+    })
+    : [];
+  const filteredTrend = params.periodo
+    ? trend.filter((_, index) => String(index + 1).padStart(2, "0") === params.mes)
+    : params.periodoDesde && params.periodoHasta
+      ? trend.filter((_, index) => {
+        const month = `${params.anio ?? new Date().getFullYear()}-${String(index + 1).padStart(2, "0")}`;
+        return month >= params.periodoDesde! && month <= params.periodoHasta!;
+      })
+      : trend;
+  const sparkline = trend
+    .filter((point) => point.radicados > 0)
+    .map((point) => (point.resueltos / point.radicados) * 100);
+
+  const metricDefinitions = [
+    {
+      id: "vtep",
+      title: "Expedientes procesados",
+      indicator: vtep,
+      unit: "%",
+      target: "Meta ≥ 95%",
+      description: "Porcentaje de expedientes atendidos o archivados respecto a los radicados.",
+      sparkline,
+    },
+    {
+      id: "tpr",
+      title: "Tiempo de respuesta",
+      indicator: tpr,
+      unit: "h",
+      target: "Meta ≤ 24 h",
+      description: "Tiempo promedio de respuesta en horas hábiles.",
+      sparkline: [],
+    },
+    {
+      id: "tro",
+      title: "Resolución oportuna",
+      indicator: tro,
+      unit: "%",
+      target: "Meta ≥ 90%",
+      description: "Porcentaje de expedientes resueltos dentro del plazo establecido.",
+      sparkline: [],
+    },
+    {
+      id: "teo",
+      title: "Expedientes observados",
+      indicator: teo,
+      unit: "%",
+      target: "Meta ≤ 5%",
+      description: "Porcentaje de expedientes observados respecto a los que están en trámite.",
+      sparkline: [],
+    },
+  ];
+
+  const metrics: DashboardKpiMetric[] = metricDefinitions.map((definition) => {
+    const indicator = definition.indicator;
     return {
-      id: String(metric.id ?? `kpi-${index + 1}`),
-      title: String(metric.title ?? metric.nombre ?? `Indicador ${index + 1}`),
-      value: number,
-      unit: String(metric.unit ?? metric.unidad ?? ""),
-      delta,
-      deltaLabel: String(metric.deltaLabel ?? `${delta > 0 ? "+" : ""}${delta}${metric.unit === "%" ? "%" : ""}`),
-      status: metric.status === "positive" || metric.status === "warning" || metric.status === "critical" ? metric.status : "neutral",
-      sparkline: Array.isArray(metric.sparkline) ? metric.sparkline.map(asNumber) : [],
-      description: String(metric.description ?? ""),
+      id: definition.id,
+      title: definition.title,
+      value: asNumber(indicator.valor),
+      unit: definition.unit,
+      delta: 0,
+      deltaLabel: definition.target,
+      status: indicator.cumple === true ? "positive" : indicator.cumple === false ? "warning" : "neutral",
+      sparkline: definition.sparkline,
+      description: definition.description,
     };
   });
 
-  const processed = asNumber(dto.totalProcesados ?? dto.totalExpedientes ?? dto.totalRadicados ?? dto.volumenProcesado);
-  const resolution = asNumber(dto.tasaResolucionOportuna ?? dto.tasaResolucion);
-  const critical = asNumber(dto.atrasadosCriticos ?? dto.expedientesCriticos);
-  const completeness = asNumber(dto.tasaCompletitud ?? dto.cumplimientoDocumental);
-  if (metrics.length === 0) {
-    metrics.push(
-      { id: "procesados", title: "Expedientes procesados", value: processed, unit: "casos", delta: 0, deltaLabel: "0", status: "neutral", sparkline: [], description: "Volumen procesado en el periodo seleccionado." },
-      { id: "resolucion", title: "Tasa de resolución", value: resolution, unit: "%", delta: 0, deltaLabel: "0%", status: resolution >= 80 ? "positive" : "warning", sparkline: [], description: "Resoluciones dentro del periodo seleccionado." },
-      { id: "criticos", title: "Expedientes críticos", value: critical, unit: "casos", delta: 0, deltaLabel: "0", status: critical > 0 ? "warning" : "positive", sparkline: [], description: "Expedientes atrasados críticos." },
-      { id: "completitud", title: "Cumplimiento documental", value: completeness, unit: "%", delta: 0, deltaLabel: "0%", status: completeness >= 90 ? "positive" : "warning", sparkline: [], description: "Completitud documental reportada." },
-    );
-  }
+  const estados: DashboardEstadoItem[] = total > 0
+    ? [
+      { label: "Procesados", value: (procesados / total) * 100, color: "#059669" },
+      { label: "En trámite", value: (enTramite / total) * 100, color: "#2563eb" },
+      { label: "Observados", value: (observados / total) * 100, color: "#d97706" },
+      ...(otros > 0 ? [{ label: "Otros", value: (otros / total) * 100, color: "#64748b" }] : []),
+    ].filter((state) => state.value > 0)
+    : [];
 
-  const trendData = Array.isArray(dto.tendencia) ? dto.tendencia : [];
-  const trend: DashboardTrendPoint[] = trendData.map((value) => {
-    const point = asRecord(value);
+  const bottlenecksData = unwrapPayload(value.cuellosBotella);
+  const bottlenecks = Array.isArray(bottlenecksData) ? bottlenecksData : [];
+  const cuellosBotella: DashboardCuelloBotellaItem[] = bottlenecks.map((entry) => {
+    const item = asRecord(entry);
+    const risk = String(item.riesgo ?? "").toLowerCase();
     return {
-      label: String(point.fechaLabel ?? point.label ?? point.fecha ?? ""),
-      radicados: asNumber(point.radicados ?? point.totalRadicados),
-      resueltos: asNumber(point.resueltos ?? point.atendidos ?? point.totalResueltos),
+      area: String(item.areaNombre ?? item.areaId ?? "Área"),
+      expedienteCount: asNumber(item.expedientesEstancados),
+      diasPromedio: asNumber(item.diasRetencion),
+      severity: risk === "alto" ? "high" : risk === "medio" ? "medium" : "low",
     };
   });
 
-  const statesData = Array.isArray(dto.estados) ? dto.estados : [];
-  const colors = ["#1d4ed8", "#059669", "#d97706", "#64748b"];
-  const estados: DashboardEstadoItem[] = statesData.map((value, index) => {
-    const state = asRecord(value);
-    return {
-      label: String(state.estado ?? state.label ?? "Sin estado"),
-      value: asNumber(state.porcentaje ?? state.value),
-      color: String(state.color ?? colors[index % colors.length]),
-    };
-  });
-
-  const bottlenecks = Array.isArray(dto.cuellosBotella) ? dto.cuellosBotella : [];
-  const cuellosBotella: DashboardCuelloBotellaItem[] = bottlenecks.map((value) => {
-    const item = asRecord(value);
-    const risk = String(item.severity ?? item.nivelAlerta ?? "low").toLowerCase();
-    return {
-      area: String(item.area ?? item.nombreArea ?? item.unidadOrganica ?? "Área"),
-      expedienteCount: asNumber(item.expedienteCount ?? item.expedientesEstancados),
-      diasPromedio: asNumber(item.diasPromedio ?? item.tprPromedio),
-      severity: risk === "high" || risk === "alto" || risk === "critico" ? "high" : risk === "medium" || risk === "medio" || risk === "advertencia" ? "medium" : "low",
-    };
-  });
-
-  const unitsData = Array.isArray(dto.unidades) ? dto.unidades : [];
-  const units = unitsData.flatMap((value) => {
-    const unit = asRecord(value);
-    const id = unit.id ?? unit.unidadOrganicaId ?? unit.areaId;
-    const name = unit.nombre ?? unit.nombreArea ?? unit.descripcion;
-    return id !== undefined && name !== undefined ? [{ id: String(id), name: String(name) }] : [];
+  const units = bottlenecks.flatMap((entry) => {
+    const item = asRecord(entry);
+    return item.areaId !== undefined && item.areaNombre !== undefined
+      ? [{ id: String(item.areaId), name: String(item.areaNombre) }]
+      : [];
   });
 
   return {
     summary: { metrics },
-    trend,
+    trend: filteredTrend,
     estados,
     cuellosBotella,
     executive: {
-      conformity: asNumber(dto.conformidadGlobal ?? dto.tasaCompletitud ?? dto.tasaResolucionOportuna),
-      growth: asNumber(dto.deltaMensual ?? dto.deltaPorcentaje),
-      desksHealth: String(dto.saludMesasPartes ?? dto.estadoOperativo ?? "Sin datos"),
+      conformity: asNumber(vtep.valor),
+      growth: null,
+      desksHealth: typeof resumen.actualizadoEn === "string"
+        ? new Date(resumen.actualizadoEn).toLocaleString("es-PE")
+        : "Sin registro de actualización",
     },
     units,
   };
@@ -139,18 +201,25 @@ export function useDashboardMetrics(params: DashboardMetricsQuery) {
   const query = useQuery({
     queryKey: ["dashboard-ejecutivo", params],
     queryFn: async () => {
-      const response = await apiClient.get<unknown>("/api/v1/reportes/dashboard/resumen", {
-        params: {
-          fechaInicio: params.fechaInicio,
-          fechaFin: params.fechaFin,
-          periodo: params.periodo,
-          diasLimite: params.diasLimite,
-          anio: params.anio,
-          mes: params.mes,
-          unidadOrganicaId: params.unidadOrganicaId || undefined,
-        },
-      });
-      return normalizeDashboard(response.data);
+      const filtrosPeriodo = params.periodo
+        ? { periodo: params.periodo }
+        : params.periodoDesde && params.periodoHasta
+          ? { periodoDesde: params.periodoDesde, periodoHasta: params.periodoHasta }
+          : {};
+      const [resumen, tendencias, cuellosBotella] = await Promise.all([
+        apiClient.get<unknown>("/api/v1/reportes/dashboard/resumen", { params: filtrosPeriodo }),
+        apiClient.get<unknown>("/api/v1/reportes/dashboard/tendencias", {
+          params: { anio: params.anio },
+        }),
+        apiClient.get<unknown>("/api/v1/reportes/dashboard/cuellos-botella", {
+          params: { ...filtrosPeriodo, diasLimite: params.diasLimite ?? 5 },
+        }),
+      ]);
+      return normalizeDashboard({
+        resumen: resumen.data,
+        tendencias: tendencias.data,
+        cuellosBotella: cuellosBotella.data,
+      }, params);
     },
     staleTime: 60_000,
     placeholderData: (previousData) => previousData,
@@ -163,11 +232,13 @@ export function useDashboardMetrics(params: DashboardMetricsQuery) {
     trend: query.data?.trend ?? [],
     estados: query.data?.estados ?? [],
     cuellosBotella: query.data?.cuellosBotella ?? [],
-    executive: query.data?.executive ?? { conformity: 0, growth: 0, desksHealth: "Sin datos" },
+    executive: query.data?.executive ?? { conformity: 0, growth: null, desksHealth: "Sin datos" },
     units: query.data?.units ?? [],
     isLoading: query.isPending,
     isFetching: query.isFetching,
     isError: query.isError,
     errorMessage: query.error instanceof Error ? query.error.message : undefined,
+    errorStatus: query.error instanceof ApiHttpError ? query.error.status : undefined,
+    refetch: () => query.refetch(),
   };
 }

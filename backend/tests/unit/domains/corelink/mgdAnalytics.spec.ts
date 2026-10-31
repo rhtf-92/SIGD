@@ -46,6 +46,7 @@ import {
 import {
   anioEnLima,
   filtrosCuellosBotellaSchema,
+  filtrosResumenSchema,
 } from '../../../../src/domains/corelink/reportes.schemas.js';
 import { obtenerPartesLima } from '../../../../src/domains/tramicore/horarioCorte.util.js';
 import { calcularSla } from '../../../../src/domains/rutadoc/sla.service.js';
@@ -447,6 +448,23 @@ describe('Validación de la query de reportes', () => {
 
   it('28 rechaza un parámetro desconocido en vez de ignorarlo', () => {
     expect(() => filtrosCuellosBotellaSchema.parse({ diaslimite: 5 })).toThrow();
+  });
+
+  it('28a acepta rangos mensuales y rechaza rangos incompletos o invertidos', () => {
+    expect(filtrosResumenSchema.parse({
+      periodoDesde: '2026-03',
+      periodoHasta: '2026-06',
+    })).toEqual({ periodoDesde: '2026-03', periodoHasta: '2026-06' });
+    expect(() => filtrosResumenSchema.parse({ periodoDesde: '2026-03' })).toThrow();
+    expect(() => filtrosResumenSchema.parse({
+      periodoDesde: '2026-06',
+      periodoHasta: '2026-03',
+    })).toThrow();
+    expect(() => filtrosResumenSchema.parse({
+      periodo: '2026-04',
+      periodoDesde: '2026-03',
+      periodoHasta: '2026-06',
+    })).toThrow();
   });
 
   it('29 toma el año en Lima y no en la zona del host', () => {

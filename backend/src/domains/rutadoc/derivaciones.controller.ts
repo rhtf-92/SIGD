@@ -3,8 +3,12 @@ import type { Pool } from 'pg';
 import { DerivarExpedienteSchema } from './dto/derivarExpediente.dto.js';
 import { AtenderExpedienteSchema } from './dto/atenderExpediente.dto.js';
 import { ArchivarExpedienteSchema } from './dto/archivarExpediente.dto.js';
-import { derivarExpediente, atenderExpediente, archivarExpediente } from './derivaciones.service.js';
+import {
+  derivarExpediente, atenderExpediente, archivarExpediente,
+  observarExpediente, subsanarExpediente,
+} from './derivaciones.service.js';
 import { NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
+import { idSchema } from './rutadoc.schemas.js';
 
 export function crearRouterDerivaciones(pool: Pool): Router {
   const router = Router();
@@ -13,7 +17,7 @@ export function crearRouterDerivaciones(pool: Pool): Router {
   // Prefijo esperado en app.ts: /api/v1/expedientes
   const handlerDerivar = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const expedienteId = String(req.params.id);
+      const expedienteId = idSchema.parse(req.params.id);
       // 1. Validación del contrato de entrada mediante Zod
       const datos = DerivarExpedienteSchema.parse(req.body);
 
@@ -53,7 +57,7 @@ export function crearRouterDerivaciones(pool: Pool): Router {
   // Endpoint #25 (T-BE-RD-07) - Atención Resolutiva
   router.post('/:id/atender', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const expedienteId = String(req.params.id);
+      const expedienteId = idSchema.parse(req.params.id);
       const datos = AtenderExpedienteSchema.parse(req.body);
       const cliente = await pool.connect();
       try {
@@ -79,7 +83,7 @@ export function crearRouterDerivaciones(pool: Pool): Router {
   // Endpoint (T-BE-RD-08) - Archivado Formal
   router.post('/:id/archivar', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const expedienteId = String(req.params.id);
+      const expedienteId = idSchema.parse(req.params.id);
       const datos = ArchivarExpedienteSchema.parse(req.body);
       const cliente = await pool.connect();
       try {
@@ -105,7 +109,7 @@ export function crearRouterDerivaciones(pool: Pool): Router {
   // Endpoints #29-acum (T-BE-RD-11) — Acumulación de Expedientes (Art. 160 LPAG)
   const handlerAcumular = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const expedientePrincipalId = String(req.params.id);
+      const expedientePrincipalId = idSchema.parse(req.params.id);
       const accesorioId = req.body.expedienteAccesorioId || (Array.isArray(req.body.conexos) && req.body.conexos[0]?.id) || req.body.accesorioId;
       const actoResolutivo = req.body.actoResolutivo || req.body.motivo || 'Acumulación de expedientes conexos conforme al Art. 160 LPAG';
 
@@ -154,20 +158,13 @@ export function crearRouterDerivaciones(pool: Pool): Router {
   // Endpoints #25-obs — Observación de Expediente
   const handlerObservar = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const expedienteId = String(req.params.id);
+      const expedienteId = idSchema.parse(req.params.id);
       const motivo = req.body.motivo || req.body.observacion || 'Expediente observado por requisitos pendientes';
 
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        const resultado = await cliente.query(
-          `UPDATE sigd_tra.expediente SET estado = 'OBSERVADO' WHERE expediente_id = $1::uuid`,
-          [expedienteId],
-        );
-
-        if (resultado.rowCount === 0) {
-          throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
-        }
+        await observarExpediente(cliente, expedienteId, motivo);
 
         await cliente.query('COMMIT');
 
@@ -196,20 +193,13 @@ export function crearRouterDerivaciones(pool: Pool): Router {
   // Endpoints #26-sub — Subsanación de Expediente
   const handlerSubsanar = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const expedienteId = String(req.params.id);
+      const expedienteId = idSchema.parse(req.params.id);
       const motivo = req.body.motivo || req.body.detalle || 'Subsanación de observaciones presentada por el administrado';
 
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        const resultado = await cliente.query(
-          `UPDATE sigd_tra.expediente SET estado = 'EN_TRAMITE' WHERE expediente_id = $1::uuid`,
-          [expedienteId],
-        );
-
-        if (resultado.rowCount === 0) {
-          throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
-        }
+        await subsanarExpediente(cliente, expedienteId, motivo);
 
         await cliente.query('COMMIT');
 
@@ -236,4 +226,3 @@ export function crearRouterDerivaciones(pool: Pool): Router {
 
   return router;
 }
-

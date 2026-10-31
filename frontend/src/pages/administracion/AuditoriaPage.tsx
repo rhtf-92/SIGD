@@ -1,12 +1,23 @@
+import {
+  ClipboardList,
+  Shield,
+  Download,
+  Search,
+  CheckCircle2,
+  AlertCircle,
+  FileWarning,
+} from "lucide-react";
+
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
 import AuditDetailDrawer from "../../components/administracion/AuditDetailDrawer";
+import GlassCard from "../../components/administracion/common/GlassCard";
+import KpiCard from "../../components/administracion/common/KpiCard";
+import StatusBadge from "../../components/administracion/common/StatusBadge";
+import SearchInput from "../../components/administracion/common/SearchInput";
+import FilterSelect from "../../components/administracion/common/FilterSelect";
+import { PrimaryButton, SecondaryButton } from "../../components/administracion/common/Buttons";
+import { EmptyState } from "../../components/administracion/common/StateViews";
 import { useAuditLogs } from "../../hooks/useAuditLogs";
-
-function estiloResultado(resultado: string) {
-  if (resultado === "Exitoso") return "bg-emerald-100 text-emerald-700";
-  if (resultado === "Denegado") return "bg-amber-100 text-amber-700";
-  return "bg-red-100 text-red-700";
-}
 
 export default function AuditoriaPage() {
   const {
@@ -24,181 +35,257 @@ export default function AuditoriaPage() {
   } = useAuditLogs();
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-full">
       <AdminPageHeader
         title="Logs de Auditoría"
-        description="Trazabilidad inmutable (WORM), acciones, accesos y correlación X-Correlation-ID."
+        description="Trazabilidad inmutable (WORM), acciones de usuarios, eventos del sistema y correlación técnica X-Correlation-ID."
+        icon={ClipboardList}
+        badge="Bitácora Forense"
+        action={
+          <SecondaryButton
+            onClick={exportarCsv}
+            icon={Download}
+            size="sm"
+          >
+            Exportar CSV
+          </SecondaryButton>
+        }
       />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-          Los registros de auditoría son de solo lectura. La inmutabilidad real
-          debe garantizarse en backend y base de datos (append-only + hash
-          encadenado).
-        </div>
-
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
-          <article className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-            <p className="text-sm font-semibold text-emerald-800">
-              Eventos exitosos
-            </p>
-            <p className="mt-2 text-3xl font-bold text-emerald-700">
-              {resumen.exitosos}
-            </p>
-          </article>
-          <article className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-            <p className="text-sm font-semibold text-amber-800">
-              Acciones denegadas (403)
-            </p>
-            <p className="mt-2 text-3xl font-bold text-amber-700">
-              {resumen.denegados}
-            </p>
-          </article>
-          <article className="rounded-xl border border-red-200 bg-red-50 p-5">
-            <p className="text-sm font-semibold text-red-800">
-              Errores de sistema (RFC 7807)
-            </p>
-            <p className="mt-2 text-3xl font-bold text-red-700">
-              {resumen.errores}
-            </p>
-          </article>
-        </div>
-
-        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 lg:grid-cols-[1fr_220px_220px_auto]">
-            <div>
-              <label className="mb-2 block text-sm font-semibold">Buscar</label>
-              <input
-                value={busqueda}
-                onChange={(event) => setBusqueda(event.target.value)}
-                placeholder="Usuario, acción, expediente, ID o X-Correlation-ID"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600"
-              />
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* WORM Inmutability Info Banner */}
+        <div className="relative overflow-hidden rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-blue-950/70 via-slate-900/80 to-slate-950/80 p-5 backdrop-blur-xl shadow-lg">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-400">
+              <Shield className="h-5 w-5" />
             </div>
-
             <div>
-              <label className="mb-2 block text-sm font-semibold">Módulo</label>
-              <select
-                value={modulo}
-                onChange={(event) => setModulo(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-              >
-                <option>Todos</option>
-                <option>Expedientes</option>
-                <option>Documentos</option>
-                <option>Autenticación</option>
-                <option>Seguridad</option>
-                <option>Administración</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold">
-                Resultado
-              </label>
-              <select
-                value={resultado}
-                onChange={(event) =>
-                  setResultado(
-                    event.target.value as "Exitoso" | "Denegado" | "Error" | "Todos",
-                  )
-                }
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-              >
-                <option value="Todos">Todos</option>
-                <option value="Exitoso">Exitoso</option>
-                <option value="Denegado">Denegado</option>
-                <option value="Error">Error</option>
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={exportarCsv}
-                className="w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
-              >
-                Exportar CSV
-              </button>
+              <h3 className="text-sm font-bold text-white tracking-wide">
+                Principio de Inmutabilidad WORM (Write Once, Read Many)
+              </h3>
+              <p className="mt-1 text-xs text-slate-300 leading-relaxed">
+                Los registros de auditoría institucional son estrictamente de solo lectura y no pueden ser alterados ni eliminados.
+                El almacenamiento garantiza trazabilidad legal encadenada conforme al marco del TUO de la Ley N° 27444.
+              </p>
             </div>
           </div>
-        </section>
+        </div>
 
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
-            <h2 className="font-bold">Registro de eventos</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              {filtrados.length} evento
-              {filtrados.length === 1 ? "" : "s"} encontrado
-              {filtrados.length === 1 ? "" : "s"}
-            </p>
+        {/* 3 Metric Cards */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <KpiCard
+            title="Eventos Exitosos"
+            value={resumen.exitosos}
+            subtitle="Operaciones completadas"
+            icon={CheckCircle2}
+            badge={{ text: "Normal", variant: "positive" }}
+            color="emerald"
+          />
+          <KpiCard
+            title="Acciones Denegadas"
+            value={resumen.denegados}
+            subtitle="Respuestas HTTP 403 (RBAC)"
+            icon={AlertCircle}
+            badge={{ text: "Restricción", variant: "warning" }}
+            color="gold"
+          />
+          <KpiCard
+            title="Errores de Sistema"
+            value={resumen.errores}
+            subtitle="Notificaciones RFC 7807"
+            icon={FileWarning}
+            badge={{ text: "Atención", variant: "danger" }}
+            color="rose"
+          />
+        </div>
+
+        {/* Filters Bar */}
+        <GlassCard>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center gap-2">
+                <Search className="h-4 w-4 text-cyan-400" />
+                <h3 className="text-sm font-bold text-white tracking-wide">
+                  Filtros de Búsqueda Forense
+                </h3>
+              </div>
+              <span className="text-xs text-slate-400 font-mono">
+                {filtrados.length} evento{filtrados.length === 1 ? "" : "s"} encontrado{filtrados.length === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-[1fr_220px_220px_auto] items-end">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold tracking-wider uppercase text-slate-400">
+                  Buscar evento
+                </label>
+                <SearchInput
+                  value={busqueda}
+                  onChange={setBusqueda}
+                  placeholder="Usuario, acción, expediente, ID o X-Correlation-ID"
+                />
+              </div>
+
+              <div>
+                <FilterSelect
+                  label="Módulo"
+                  value={modulo}
+                  onChange={(event) => setModulo(event.target.value)}
+                >
+                  <option value="Todos" className="bg-slate-900 text-slate-300">Todos los módulos</option>
+                  <option value="Expedientes" className="bg-slate-900 text-white">Expedientes</option>
+                  <option value="Documentos" className="bg-slate-900 text-white">Documentos</option>
+                  <option value="Autenticación" className="bg-slate-900 text-white">Autenticación</option>
+                  <option value="Seguridad" className="bg-slate-900 text-white">Seguridad</option>
+                  <option value="Administración" className="bg-slate-900 text-white">Administración</option>
+                </FilterSelect>
+              </div>
+
+              <div>
+                <FilterSelect
+                  label="Resultado"
+                  value={resultado}
+                  onChange={(event) =>
+                    setResultado(
+                      event.target.value as "Exitoso" | "Denegado" | "Error" | "Todos",
+                    )
+                  }
+                >
+                  <option value="Todos" className="bg-slate-900 text-slate-300">Todos los resultados</option>
+                  <option value="Exitoso" className="bg-slate-900 text-emerald-300">Exitoso</option>
+                  <option value="Denegado" className="bg-slate-900 text-amber-300">Denegado</option>
+                  <option value="Error" className="bg-slate-900 text-rose-300">Error</option>
+                </FilterSelect>
+              </div>
+
+              <div className="sm:col-span-2 lg:col-span-1">
+                <PrimaryButton
+                  onClick={exportarCsv}
+                  icon={Download}
+                  className="w-full text-xs"
+                >
+                  Exportar
+                </PrimaryButton>
+              </div>
+            </div>
+          </div>
+        </GlassCard>
+
+        {/* Audit Logs Table */}
+        <div className="overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/60 backdrop-blur-xl shadow-xl">
+          <div className="border-b border-slate-800/80 px-6 py-4 flex items-center justify-between">
+            <h3 className="font-bold text-white text-base tracking-tight">
+              Registro Histórico de Auditoría
+            </h3>
+            <span className="font-mono text-xs text-cyan-400">
+              {filtrados.length} registro{filtrados.length === 1 ? "" : "s"}
+            </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1350px] text-left">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <table className="w-full min-w-[1250px] text-left">
+              <thead className="border-b border-slate-800/80 bg-slate-950/60 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 <tr>
-                  <th className="px-5 py-3">ID / Fecha</th>
-                  <th className="px-5 py-3">Usuario</th>
-                  <th className="px-5 py-3">Área</th>
-                  <th className="px-5 py-3">Acción</th>
-                  <th className="px-5 py-3">Módulo</th>
-                  <th className="px-5 py-3">Registro</th>
-                  <th className="px-5 py-3">Resultado</th>
-                  <th className="px-5 py-3">IP</th>
-                  <th className="px-5 py-3">Detalle</th>
+                  <th className="px-5 py-3.5">ID / Fecha y Hora</th>
+                  <th className="px-5 py-3.5">Usuario / Rol</th>
+                  <th className="px-5 py-3.5">Área</th>
+                  <th className="px-5 py-3.5">Acción</th>
+                  <th className="px-5 py-3.5">Módulo</th>
+                  <th className="px-5 py-3.5">Recurso / CUT</th>
+                  <th className="px-5 py-3.5">Resultado</th>
+                  <th className="px-5 py-3.5">IP de Origen</th>
+                  <th className="px-5 py-3.5 text-right">Detalle</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtrados.map((registro) => (
-                  <tr key={registro.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-4">
-                      <p className="text-sm font-semibold">{registro.id}</p>
-                      <p className="text-xs text-slate-500">{registro.fecha}</p>
-                    </td>
-                    <td className="px-5 py-4">
-                      <p className="text-sm font-semibold">{registro.usuario}</p>
-                      <p className="text-xs text-slate-500">{registro.rol}</p>
-                    </td>
-                    <td className="px-5 py-4 text-sm">{registro.area}</td>
-                    <td className="px-5 py-4 text-sm">{registro.accion}</td>
-                    <td className="px-5 py-4 text-sm">{registro.modulo}</td>
-                    <td className="px-5 py-4 text-sm font-medium">
-                      {registro.registro}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${estiloResultado(
-                          registro.resultado,
-                        )}`}
-                      >
-                        {registro.resultado}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 font-mono text-xs text-slate-600">
-                      {registro.ip}
-                    </td>
-                    <td className="px-5 py-4">
-                      <button
-                        type="button"
-                        onClick={() => setSeleccionado(registro)}
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                      >
-                        Ver
-                      </button>
+
+              <tbody className="divide-y divide-slate-800/60">
+                {filtrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-6 py-12 text-center">
+                      <EmptyState
+                        title="No se encontraron eventos de auditoría"
+                        description="Pruebe cambiando los filtros de búsqueda o consulte nuevamente."
+                      />
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filtrados.map((registro) => (
+                    <tr
+                      key={registro.id}
+                      className="hover:bg-slate-800/40 transition-colors group"
+                    >
+                      {/* ID / Fecha */}
+                      <td className="px-5 py-3.5">
+                        <p className="font-mono text-xs font-bold text-cyan-300">
+                          #{registro.id}
+                        </p>
+                        <p className="text-[11px] text-slate-400">{registro.fecha}</p>
+                      </td>
+
+                      {/* Usuario / Rol */}
+                      <td className="px-5 py-3.5">
+                        <p className="text-sm font-semibold text-white group-hover:text-cyan-200 transition-colors">
+                          {registro.usuario}
+                        </p>
+                        <p className="text-[11px] text-slate-400">{registro.rol}</p>
+                      </td>
+
+                      {/* Área */}
+                      <td className="px-5 py-3.5 text-xs text-slate-300">
+                        {registro.area}
+                      </td>
+
+                      {/* Acción */}
+                      <td className="px-5 py-3.5 text-xs font-medium text-slate-200">
+                        {registro.accion}
+                      </td>
+
+                      {/* Módulo */}
+                      <td className="px-5 py-3.5 text-xs text-slate-400">
+                        <span className="rounded-md bg-slate-800 px-2 py-0.5 border border-slate-700/60">
+                          {registro.modulo}
+                        </span>
+                      </td>
+
+                      {/* Recurso / CUT */}
+                      <td className="px-5 py-3.5 font-mono text-xs font-semibold text-cyan-300">
+                        {registro.registro}
+                      </td>
+
+                      {/* Resultado */}
+                      <td className="px-5 py-3.5">
+                        <StatusBadge status={registro.resultado} size="sm" />
+                      </td>
+
+                      {/* IP */}
+                      <td className="px-5 py-3.5 font-mono text-xs text-slate-400">
+                        {registro.ip}
+                      </td>
+
+                      {/* Detalle */}
+                      <td className="px-5 py-3.5 text-right">
+                        <SecondaryButton
+                          size="sm"
+                          onClick={() => setSeleccionado(registro)}
+                          className="text-xs"
+                        >
+                          Ver
+                        </SecondaryButton>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
-        </section>
+        </div>
       </section>
 
+      {/* Slide-over Drawer de Detalle Forense */}
       <AuditDetailDrawer
         registro={seleccionado}
         onClose={() => setSeleccionado(null)}
       />
-    </main>
+    </div>
   );
 }

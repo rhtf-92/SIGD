@@ -6,17 +6,20 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ESTADOS_RUTADOC, EVENTOS_RUTADOC, TRANSICIONES_RUTADOC } from '../../../../src/domains/rutadoc/rutadoc.fsm.js';
 
+const USUARIO = 'a3401043-807f-41f3-9de8-a042e4b312d4';
+const uuidExpediente = (id: number): string => `00000000-0000-4000-8000-${String(id).padStart(12, '0')}`;
+
 let contenedor: StartedPostgreSqlContainer;
 let cliente: Client;
 
-async function insertar(expediente: number, fecha: string, clave?: string): Promise<{ particion: string; secuencia: string; fecha_hora: Date }> {
+async function insertar(expedienteId: number, fecha: string, clave?: string): Promise<{ particion: string; secuencia: string; fecha_hora: Date }> {
   const resultado = await cliente.query<{ particion: string; secuencia: string; fecha_hora: Date }>(
     `INSERT INTO sigd_rut.movimiento_tramite
        (id_movimiento, expediente_id, estado_anterior, evento, estado_nuevo,
         usuario_operador_id, fecha_hora, clave_idempotencia)
-     VALUES ($1, $2, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7, $3, $4)
+     VALUES ($1, $2, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', $3, $4, $5)
      RETURNING tableoid::regclass::text AS particion, secuencia, fecha_hora`,
-    [randomUUID(), expediente, fecha, clave ?? null],
+    [randomUUID(), uuidExpediente(expedienteId), USUARIO, fecha, clave ?? null],
   );
   return resultado.rows[0];
 }
@@ -93,8 +96,8 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
       await expect(cliente.query(
         `INSERT INTO sigd_rut.movimiento_tramite
           (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora)
-         VALUES (200, $1, $2, $3, 7, '2026-07-01T00:00:00Z')`,
-        [anterior, evento, nuevo],
+         VALUES ($1, $2, $3, $4, $5, '2026-07-01T00:00:00Z')`,
+        [uuidExpediente(200), anterior, evento, nuevo, USUARIO],
       )).rejects.toMatchObject({ code: '23503' });
     }
   });
@@ -104,13 +107,13 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
     await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (id_movimiento, expediente_id, estado_anterior, evento, estado_nuevo,
        usuario_operador_id, fecha_hora, clave_idempotencia)
-      VALUES ($1, 300, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7,
-              '2026-09-01T00:00:00Z', 'orden-300')`, [id]);
+      VALUES ($1, $2, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', $3,
+              '2026-09-01T00:00:00Z', 'orden-300')`, [id, uuidExpediente(300), USUARIO]);
     await expect(cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (id_movimiento, expediente_id, estado_anterior, evento, estado_nuevo,
        usuario_operador_id, fecha_hora)
-      VALUES ($1, 300, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7,
-              '2027-09-01T00:00:00Z')`, [id])).rejects.toMatchObject({ code: '23505' });
+      VALUES ($1, $2, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', $3,
+              '2027-09-01T00:00:00Z')`, [id, uuidExpediente(300), USUARIO])).rejects.toMatchObject({ code: '23505' });
     await expect(insertar(300, '2027-09-01T00:00:00Z', 'orden-300'))
       .rejects.toMatchObject({ code: '23505' });
   });
@@ -136,16 +139,17 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
   it('mantiene proyección del último estado y la reconstruye sin duplicar al repetir DDL', async () => {
     const antes = await cliente.query<{ secuencia: string; estado_nuevo: string }>(`
       SELECT secuencia::text, estado_nuevo FROM sigd_rut.estado_actual_expediente
-      WHERE expediente_id = 105`);
+      WHERE expediente_id = $1`, [uuidExpediente(105)]);
     expect(antes.rows).toEqual([{ secuencia: '2', estado_nuevo: 'RECEPCIONADO' }]);
     await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-      VALUES (105, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7)`);
+      VALUES ($1, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', $2)`,
+    [uuidExpediente(105), USUARIO]);
     const sql = readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8');
     await cliente.query(sql);
     const despues = await cliente.query<{ secuencia: string; estado_nuevo: string }>(`
       SELECT secuencia::text, estado_nuevo FROM sigd_rut.estado_actual_expediente
-      WHERE expediente_id = 105`);
+      WHERE expediente_id = $1`, [uuidExpediente(105)]);
     expect(despues.rows).toEqual([{ secuencia: '3', estado_nuevo: 'EN_CALIFICACION' }]);
     const indices = await cliente.query<{ indexname: string }>(`
       SELECT indexname FROM pg_indexes WHERE schemaname = 'sigd_rut'
@@ -164,8 +168,9 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
     await insertar(777, '2026-09-25T09:00:00.123Z');
     await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-      VALUES (777, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7),
-             (777, 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', 7)`);
+      VALUES ($1, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', $2),
+             ($1, 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', $2)`,
+    [uuidExpediente(777), USUARIO]);
     const despues = await leer();
     const porPestana = Object.fromEntries(despues.map((fila) => [fila.pestana, Number(fila.cantidad)]));
     const conteoReal = await cliente.query<{ pestana: string; cantidad: number }>(`
@@ -198,7 +203,8 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
       await Promise.all([a, b].map((conexion, indice) => conexion.query(`
         INSERT INTO sigd_rut.movimiento_tramite
           (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-        VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7)`, [779 + indice])));
+        VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', $2)`,
+        [uuidExpediente(779 + indice), USUARIO])));
       expect(await contar()).toBe(inicial + 2);
     } finally {
       await Promise.all([a.end(), b.end()]);
