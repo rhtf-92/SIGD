@@ -133,7 +133,7 @@ describe("schemaFormParser — regresión LPAG y parseo JSON Schema", () => {
       // @ts-expect-error - forzamos estructura inválida intencionalmente
       expect(parseJsonSchema(null)).toEqual([]);
       // @ts-expect-error - sin properties
-      expect(parseJsonSchema({ title: "X", type: "object" } as any)).toEqual([]);
+      expect(parseJsonSchema({ title: "X", type: "object" })).toEqual([]);
     });
 
     it("parseSchemaToFields es alias de parseJsonSchema", () => {
