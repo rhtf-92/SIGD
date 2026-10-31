@@ -6,24 +6,6 @@ import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
 
-interface VentanillaPresencialResultado {
-  expedienteId: string;
-  cut: string;
-  anioFiscal: number;
-  fechaRadicacion: string;
-  ticketImpresion: string;
-  cargo: {
-    cut: string;
-    remitente: string;
-    dni: string;
-    asunto: string;
-    folios: number;
-    fechaRecepcion: string;
-    hashSha256: string;
-    qrSeguimientoUrl: string;
-  };
-}
-
 export default function VentanillaPresencialPage() {
   const { isAfterCutoff, requiresProjection, legalDate } = useHorarioCorte();
   const esCorteSuperado = isAfterCutoff || requiresProjection;
@@ -39,7 +21,7 @@ export default function VentanillaPresencialPage() {
   const [tipoDocumento, setTipoDocumento] = useState("SOLICITUD");
   const [asunto, setAsunto] = useState("");
   const [cantidadFolios, setCantidadFolios] = useState(1);
-  const [cargoGenerado, setCargoGenerado] = useState<CargoOficialTramite | null>(null);
+  const [cargoGenerado, setCargoGenerado] = useState<any>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
 
   const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_2026.find(
@@ -57,10 +39,10 @@ export default function VentanillaPresencialPage() {
     const fechaActual = new Date().toISOString();
     const cutSimulado = `CUT-2026-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    let serverData: VentanillaPresencialResultado;
+    let serverData: any;
 
     try {
-      const res = await apiClient.post<VentanillaPresencialResultado>(
+      const res = await apiClient.post(
         "/api/v1/tramites/ventanilla-presencial",
         {
           dniSolicitante: dniValido,
@@ -72,13 +54,9 @@ export default function VentanillaPresencialPage() {
       serverData = res.data;
     } catch (error) {
       console.warn("[VentanillaPresencial] Activando simulación local de respaldo para demostración:", error);
-      // Simulación local infalible en caso de fallo de red
       serverData = {
-        expedienteId: "exp-simulado-01",
         cut: cutSimulado,
-        anioFiscal: 2026,
         fechaRadicacion: fechaActual,
-        ticketImpresion: "TICKET-QR-OK",
         cargo: {
           cut: cutSimulado,
           remitente: nombre.trim() || "JUAN RAMIRO PÉREZ GARCÍA",
@@ -367,16 +345,12 @@ export default function VentanillaPresencialPage() {
           </div>
         </form>
       </div>
-<<<<<<< HEAD
 
       <CargoDigitalModal
         isOpen={modalAbierto}
         onClose={() => setModalAbierto(false)}
         cargo={cargoGenerado}
-        onNuevoRegistro={handleNuevoRegistro}
       />
-=======
->>>>>>> F_URQUIA
     </main>
   );
 }
