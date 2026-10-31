@@ -1,3 +1,4 @@
+import { contratoLecturaUuid, uuidPrueba } from '../support/rutadoc-uuid.js';
 import { readFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 import type { Server } from 'node:http';
@@ -51,22 +52,14 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
     const pool = new Pool({ connectionString: contenedor.getConnectionUri(), max: 8 });
     let servidor: Server | undefined;
     try {
-      await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
-      await pool.query(`CREATE SCHEMA sigd_tra;
-        CREATE TABLE sigd_tra.tramite (id_tramite BIGINT PRIMARY KEY, asunto TEXT NOT NULL,
-          fk_remitente BIGINT NOT NULL);
-        CREATE TABLE sigd_tra.expediente (id_expediente BIGINT PRIMARY KEY,
-          codigo_expediente TEXT NOT NULL, fk_tramite BIGINT NOT NULL,
-          creado_en TIMESTAMPTZ NOT NULL)`);
+      await pool.query('BEGIN;\n' + readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8') + '\nCOMMIT;');
+      await pool.query(contratoLecturaUuid);
       // Reejecutar la migración propia tras el fixture externo instala su índice de bandeja.
-      await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
-      await pool.query(`INSERT INTO sigd_tra.tramite (id_tramite, asunto, fk_remitente)
-        SELECT 100000+n, 'Solicitud de laboratorio ' || (n % 100), 80
-        FROM generate_series(1,50000) n`);
+      await pool.query('BEGIN;\n' + readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8') + '\nCOMMIT;');
       await pool.query('ALTER TABLE sigd_tra.expediente DISABLE TRIGGER tr_rutadoc_contador_expediente');
       await pool.query(`INSERT INTO sigd_tra.expediente
-        (id_expediente, codigo_expediente, fk_tramite, creado_en)
-        SELECT 100000+n, 'EXP-2026-' || lpad(n::text, 6, '0'), 100000+n,
+        (expediente_id, codigo_expediente, asunto, fecha_radicacion)
+        SELECT ('00000000-0000-4000-8000-' || lpad((100000+n)::text, 12, '0'))::uuid, 'EXP-2026-' || lpad(n::text, 6, '0'), 'Solicitud de laboratorio ' || (n % 100),
           '2026-09-24T09:00:00Z'::timestamptz + ((n % 2000) * interval '1 millisecond')
         FROM generate_series(1,50000) n`);
       await pool.query('ALTER TABLE sigd_tra.expediente ENABLE TRIGGER tr_rutadoc_contador_expediente');
@@ -76,20 +69,19 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
       await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
         (expediente_id, estado_anterior, evento, estado_nuevo,
          usuario_operador_id, fecha_hora, datos)
-        SELECT 100000+n,
+        SELECT ('00000000-0000-4000-8000-' || lpad((100000+n)::text, 12, '0'))::uuid,
           (ARRAY['REGISTRADO','RECEPCIONADO','EN_CALIFICACION','EN_CALIFICACION',
                  'EN_REVISION','OBSERVADO','EN_REVISION','EN_FIRMA','RESUELTO'])[n%10],
           (ARRAY['RECEPCION','INICIAR_CALIFICACION','DERIVACION','INICIAR_REVISION',
                  'OBSERVACION','CORRECCION','ENVIAR_A_FIRMA','FIRMA','CIERRE'])[n%10],
           (ARRAY['RECEPCIONADO','EN_CALIFICACION','DERIVADO','EN_REVISION',
                  'OBSERVADO','SUBSANADO','EN_FIRMA','RESUELTO','ARCHIVADO'])[n%10],
-          7, '2026-09-24T10:00:00Z'::timestamptz + ((n % 2000) * interval '1 millisecond'),
+          '00000000-0000-4000-8000-000000000007', '2026-09-24T10:00:00Z'::timestamptz + ((n % 2000) * interval '1 millisecond'),
           jsonb_build_object('areaId', CASE WHEN n % 3 = 0 THEN $1::text ELSE 'otra-area' END)
         FROM generate_series(1,50000) n WHERE n % 10 <> 0`, [AREA]);
       await pool.query('ALTER TABLE sigd_rut.estado_actual_expediente ENABLE TRIGGER tr_contador_pestana_local');
-      await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
+      await pool.query('BEGIN;\n' + readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8') + '\nCOMMIT;');
       await pool.query('VACUUM ANALYZE sigd_tra.expediente');
-      await pool.query('VACUUM ANALYZE sigd_tra.tramite');
       await pool.query('VACUUM ANALYZE sigd_rut.estado_actual_expediente');
       await pool.query('VACUUM ANALYZE sigd_rut.movimiento_tramite');
       const volumen = await pool.query<{ expedientes: string; movimientos: string;
@@ -98,13 +90,13 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
         (SELECT count(*) FROM sigd_rut.movimiento_tramite)::text movimientos,
         (SELECT count(DISTINCT COALESCE(u.estado_nuevo, 'REGISTRADO'))
            FROM sigd_tra.expediente e LEFT JOIN sigd_rut.estado_actual_expediente u
-             ON u.expediente_id = e.id_expediente)::text estados`);
+             ON u.expediente_id = e.expediente_id)::text estados`);
       expect(volumen.rows[0]).toEqual({ expedientes: '50000', movimientos: '45000', estados: '10' });
-      const sqlProyeccion10k = `SELECT e.id_expediente, COALESCE(u.estado_nuevo, 'REGISTRADO') AS estado_actual
+      const sqlProyeccion10k = `SELECT e.expediente_id, COALESCE(u.estado_nuevo, 'REGISTRADO') AS estado_actual
         FROM sigd_tra.expediente e LEFT JOIN sigd_rut.estado_actual_expediente u
-          ON u.expediente_id = e.id_expediente
-        WHERE e.id_expediente BETWEEN 100001 AND 110000
-        ORDER BY e.id_expediente`;
+          ON u.expediente_id = e.expediente_id
+        WHERE e.expediente_id BETWEEN '00000000-0000-4000-8000-000000100001'::uuid AND '00000000-0000-4000-8000-000000110000'::uuid
+        ORDER BY e.expediente_id`;
       const explicacionProyeccion = await pool.query(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${sqlProyeccion10k}`);
       const tiemposProyeccion: number[] = [];
       let filasProyeccion = 0;
@@ -127,7 +119,7 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
       const sqlSinMovimiento = `SELECT count(*)::integer total
         FROM sigd_tra.expediente e
         WHERE NOT EXISTS (SELECT 1 FROM sigd_rut.estado_actual_expediente u
-                          WHERE u.expediente_id = e.id_expediente)`;
+                          WHERE u.expediente_id = e.expediente_id)`;
       const actual = await pool.query(SQL_CONTADORES_SIN_TERMINO_RUTADOC,
         [null, null, null, null]);
       const agrupado = await pool.query<{ estado_nuevo: string; total: number }>(sqlDirecto);
@@ -180,7 +172,7 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
       servidor = servidorActivo;
       const escenarios = [
         { nombre: 'base', filtro: [null, null, null, null] },
-        { nombre: 'cursor', filtro: [null, null, null, null], cursor: ['2026-09-24T09:00:01.900Z', '101900'] },
+        { nombre: 'cursor', filtro: [null, null, null, null], cursor: ['2026-09-24T09:00:01.900Z', uuidPrueba(101900)] },
         { nombre: 'termino', filtro: ['laboratorio 42', null, null, null] },
         { nombre: 'area', filtro: [null, AREA, null, null] },
         { nombre: 'fechas', filtro: [null, null, '2026-09-24', '2026-09-24'] },
@@ -189,7 +181,7 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
         const comunes = [...escenario.filtro];
         const cursor = 'cursor' in escenario ? escenario.cursor : undefined;
         const params = [...comunes, ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION'],
-          cursor?.[0] ?? null, cursor?.[1] ?? null, 21];
+          cursor?.[0] ?? null, cursor ? cursor[1] : null, 21];
         const local = comunes.every((valor) => valor === null);
         const sqlContadores = local ? SQL_CONTADORES_LOCALES_RUTADOC :
           comunes[0] ? SQL_CONTADORES_RUTADOC : SQL_CONTADORES_SIN_TERMINO_RUTADOC;

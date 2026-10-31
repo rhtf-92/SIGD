@@ -26,6 +26,15 @@ function filas(tabla: string): string[][] {
 }
 
 describe('DDL RutaDoc y FSM publicada', () => {
+  it('deja la transacción al runner y conserva secuencias numéricas con entidades UUID', () => {
+    expect(sql).not.toMatch(/^(?:BEGIN|COMMIT);$/m);
+    expect(sql).toContain('expediente_id UUID');
+    expect(sql).toContain('usuario_operador_id UUID');
+    expect(sql).toContain('secuencia BIGINT');
+    expect(sql).toContain('ultima_secuencia BIGINT');
+    expect(sql).toContain('fecha_radicacion DESC, expediente_id DESC');
+    expect(sql).not.toContain('e.id_expediente');
+  });
   it('mantiene idénticos el SQL ejecutable y el entregable documental', () => {
     const hash = (contenido: string): string =>
       createHash('sha256').update(normalizar(contenido)).digest('hex');

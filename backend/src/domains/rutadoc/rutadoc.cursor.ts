@@ -1,11 +1,17 @@
 import { createHash } from 'node:crypto';
+import { z } from 'zod';
 import { ValidationError } from '../../shared/domain/errors/validation-error.js';
 import type { FiltrosRutaDoc, PosicionCursor } from './rutadoc.types.js';
 
 const MAX_BIGINT = 9223372036854775807n;
 
-export function esIdExpediente(valor: unknown): valor is string {
+export function esSecuenciaMovimiento(valor: unknown): valor is string {
   return typeof valor === 'string' && /^[1-9]\d{0,18}$/.test(valor) && BigInt(valor) <= MAX_BIGINT;
+}
+
+/** Expedientes y cuentas siguen las claves UUID de las migraciones 02 y 05. */
+export function esIdExpediente(valor: unknown): valor is string {
+  return z.string().uuid().safeParse(valor).success;
 }
 
 export function huellaFiltros(filtros: FiltrosRutaDoc): string {

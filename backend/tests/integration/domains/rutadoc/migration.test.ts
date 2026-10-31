@@ -1,3 +1,4 @@
+import { uuidPrueba } from '../../../support/rutadoc-uuid.js';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -14,9 +15,9 @@ async function insertar(expediente: number, fecha: string, clave?: string): Prom
     `INSERT INTO sigd_rut.movimiento_tramite
        (id_movimiento, expediente_id, estado_anterior, evento, estado_nuevo,
         usuario_operador_id, fecha_hora, clave_idempotencia)
-     VALUES ($1, $2, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7, $3, $4)
+     VALUES ($1, $2, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', '00000000-0000-4000-8000-000000000007', $3, $4)
      RETURNING tableoid::regclass::text AS particion, secuencia, fecha_hora`,
-    [randomUUID(), expediente, fecha, clave ?? null],
+    [randomUUID(), uuidPrueba(expediente), fecha, clave ?? null],
   );
   return resultado.rows[0];
 }
@@ -37,8 +38,12 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
 
   it('instala la migración y permite repetirla sin duplicar catálogos', async () => {
     const sql = readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8');
+    await cliente.query('BEGIN');
     await cliente.query(sql);
+    await cliente.query('COMMIT');
+    await cliente.query('BEGIN');
     await cliente.query(sql);
+    await cliente.query('COMMIT');
     const { rows } = await cliente.query<{ estados: string; eventos: string; transiciones: string }>(`
       SELECT (SELECT count(*) FROM sigd_rut.estado_tramite)::text AS estados,
              (SELECT count(*) FROM sigd_rut.accion_tramite)::text AS eventos,
@@ -93,7 +98,7 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
       await expect(cliente.query(
         `INSERT INTO sigd_rut.movimiento_tramite
           (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora)
-         VALUES (200, $1, $2, $3, 7, '2026-07-01T00:00:00Z')`,
+         VALUES ('00000000-0000-4000-8000-000000000200', $1, $2, $3, '00000000-0000-4000-8000-000000000007', '2026-07-01T00:00:00Z')`,
         [anterior, evento, nuevo],
       )).rejects.toMatchObject({ code: '23503' });
     }
@@ -104,12 +109,12 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
     await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (id_movimiento, expediente_id, estado_anterior, evento, estado_nuevo,
        usuario_operador_id, fecha_hora, clave_idempotencia)
-      VALUES ($1, 300, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7,
+      VALUES ($1, '00000000-0000-4000-8000-000000000300', 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', '00000000-0000-4000-8000-000000000007',
               '2026-09-01T00:00:00Z', 'orden-300')`, [id]);
     await expect(cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (id_movimiento, expediente_id, estado_anterior, evento, estado_nuevo,
        usuario_operador_id, fecha_hora)
-      VALUES ($1, 300, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7,
+      VALUES ($1, '00000000-0000-4000-8000-000000000300', 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', '00000000-0000-4000-8000-000000000007',
               '2027-09-01T00:00:00Z')`, [id])).rejects.toMatchObject({ code: '23505' });
     await expect(insertar(300, '2027-09-01T00:00:00Z', 'orden-300'))
       .rejects.toMatchObject({ code: '23505' });
@@ -136,16 +141,18 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
   it('mantiene proyección del último estado y la reconstruye sin duplicar al repetir DDL', async () => {
     const antes = await cliente.query<{ secuencia: string; estado_nuevo: string }>(`
       SELECT secuencia::text, estado_nuevo FROM sigd_rut.estado_actual_expediente
-      WHERE expediente_id = 105`);
+      WHERE expediente_id = '00000000-0000-4000-8000-000000000105'`);
     expect(antes.rows).toEqual([{ secuencia: '2', estado_nuevo: 'RECEPCIONADO' }]);
     await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-      VALUES (105, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7)`);
+      VALUES ('00000000-0000-4000-8000-000000000105', 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', '00000000-0000-4000-8000-000000000007')`);
     const sql = readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8');
+    await cliente.query('BEGIN');
     await cliente.query(sql);
+    await cliente.query('COMMIT');
     const despues = await cliente.query<{ secuencia: string; estado_nuevo: string }>(`
       SELECT secuencia::text, estado_nuevo FROM sigd_rut.estado_actual_expediente
-      WHERE expediente_id = 105`);
+      WHERE expediente_id = '00000000-0000-4000-8000-000000000105'`);
     expect(despues.rows).toEqual([{ secuencia: '3', estado_nuevo: 'EN_CALIFICACION' }]);
     const indices = await cliente.query<{ indexname: string }>(`
       SELECT indexname FROM pg_indexes WHERE schemaname = 'sigd_rut'
@@ -164,8 +171,8 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
     await insertar(777, '2026-09-25T09:00:00.123Z');
     await cliente.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-      VALUES (777, 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', 7),
-             (777, 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', 7)`);
+      VALUES ('00000000-0000-4000-8000-000000000777', 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', '00000000-0000-4000-8000-000000000007'),
+             ('00000000-0000-4000-8000-000000000777', 'EN_CALIFICACION', 'DERIVACION', 'DERIVADO', '00000000-0000-4000-8000-000000000007')`);
     const despues = await leer();
     const porPestana = Object.fromEntries(despues.map((fila) => [fila.pestana, Number(fila.cantidad)]));
     const conteoReal = await cliente.query<{ pestana: string; cantidad: number }>(`
@@ -175,7 +182,9 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
     expect(porPestana.DERIVADOS).toBe(
       Number(antes.find((fila) => fila.pestana === 'DERIVADOS')?.cantidad) + 1);
     const sql = readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8');
+    await cliente.query('BEGIN');
     await cliente.query(sql);
+    await cliente.query('COMMIT');
     expect(await leer()).toEqual(despues);
     await expect(cliente.query(`UPDATE sigd_rut.contador_pestana_local
       SET cantidad = -1 WHERE pestana = 'DERIVADOS'`)).rejects.toMatchObject({ code: '23514' });
@@ -198,7 +207,7 @@ describe('Migración RutaDoc en PostgreSQL 18 aislado', () => {
       await Promise.all([a, b].map((conexion, indice) => conexion.query(`
         INSERT INTO sigd_rut.movimiento_tramite
           (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id)
-        VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', 7)`, [779 + indice])));
+        VALUES ($1, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', '00000000-0000-4000-8000-000000000007')`, [uuidPrueba(779 + indice)])));
       expect(await contar()).toBe(inicial + 2);
     } finally {
       await Promise.all([a.end(), b.end()]);
