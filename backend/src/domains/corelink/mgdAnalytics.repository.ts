@@ -256,7 +256,7 @@ export class RepositorioMgdAnalytics {
   /**
    * Nombres y siglas de las unidades orgánicas, para enriquecer el ranking.
    *
-   * `sigd_org.unidad_organica` NO es un requisito del motor analítico: el preflight
+   * `sigd_org.area` NO es un requisito del motor analítico: el preflight
    * del script DDL no lo exige y las vistas no lo necesitan. Por eso la consulta se
    * degrada a un mapa vacío si OrganiCore no está instalado, y el servicio usa
    * entonces el identificador como nombre. Un tablero sin siglas es un defecto
@@ -266,8 +266,8 @@ export class RepositorioMgdAnalytics {
     const nombres = new Map<string, { nombre: string; sigla: string | null }>();
     try {
       const { rows } = await this.pool.query<{ id: string; sigla: string | null; nombre: string }>(
-        `SELECT id::text AS id, sigla, nombre
-           FROM sigd_org.unidad_organica`,
+        `SELECT area_id::text AS id, NULL::text AS sigla, nombre
+           FROM sigd_org.area`,
       );
       for (const fila of rows) {
         nombres.set(fila.id, { nombre: fila.nombre, sigla: fila.sigla });
