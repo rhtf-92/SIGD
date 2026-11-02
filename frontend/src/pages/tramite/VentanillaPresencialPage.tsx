@@ -4,7 +4,18 @@ import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
-import { obtenerCatalogoTupaCompleto, type RegistroTupaCompleto } from "../../services/procedimientosTupa.service";
+import {
+  obtenerCatalogoTupaCompleto,
+  obtenerRequisitosProcedimiento,
+  type RegistroTupaCompleto,
+  type DtoRequisitosProcedimiento,
+  type DtoRequisitoTupa,
+} from "../../services/procedimientosTupa.service";
+import {
+  contarPaginasPdfArchivo,
+  recalcularRangosFolios,
+  type DocumentoCargadoConFolios,
+} from "../../utils/foliacionPdf";
 import { obtenerDefinicionTupa } from "../../data/tupaFormulariosConfig";
 import TupaDynamicFormModal from "../../components/tramite/TupaDynamicFormModal";
 import { useAuthStore } from "../../stores/authStore";
@@ -57,6 +68,14 @@ interface VentanillaPresencialResultado {
   cut: string;
   anioFiscal: number;
   fechaRadicacion: string;
+  registroVersionId?: string | null;
+  ordenPago?: {
+    ordenPagoId: string;
+    codigoPago: string;
+    monto: number;
+    concepto: string;
+    fechaVencimiento: string;
+  } | null;
   ticketImpresion: string;
   cargo: {
     cut: string;
@@ -84,12 +103,50 @@ export default function VentanillaPresencialPage() {
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [direccion, setDireccion] = useState("");
 
   // Búsqueda presencial de persona registrada
   const [buscandoPersona, setBuscandoPersona] = useState(false);
   const [personaEncontrada, setPersonaEncontrada] = useState<DtoPersonaBusqueda | null>(null);
   const [mensajeBusquedaPersona, setMensajeBusquedaPersona] = useState<string | null>(null);
   const [documentoFisicoVerificado, setDocumentoFisicoVerificado] = useState(false);
+
+  // Registro de administrado nuevo sin cuenta
+  const [mostrarFormularioRegistro, setMostrarFormularioRegistro] = useState(false);
+  const [registrandoPersona, setRegistrandoPersona] = useState(false);
+  const [nuevoNombres, setNuevoNombres] = useState("");
+  const [nuevoApellidos, setNuevoApellidos] = useState("");
+  const [nuevoRazonSocial, setNuevoRazonSocial] = useState("");
+  const [nuevoCorreo, setNuevoCorreo] = useState("");
+  const [nuevoTelefono, setNuevoTelefono] = useState("");
+  const [nuevoDireccion, setNuevoDireccion] = useState("");
+  const [ordenPagoGenerada, setOrdenPagoGenerada] = useState<VentanillaPresencialResultado['ordenPago'] | null>(null);
+
+  // Documento presentado físico escaneado / digital
+  const [archivoPresentado, setArchivoPresentado] = useState<File | null>(null);
+  const [archivoBase64, setArchivoBase64] = useState<string | null>(null);
+
+  const handleArchivoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setArchivoPresentado(null);
+      setArchivoBase64(null);
+      return;
+    }
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      alert("Solo se admiten documentos en formato PDF (%PDF- requerido).");
+      e.target.value = "";
+      return;
+    }
+    setArchivoPresentado(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = reader.result as string;
+      const base64 = res.includes(",") ? res.split(",")[1] : res;
+      setArchivoBase64(base64);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleBuscarPersona = async () => {
     if (!numeroDoc.trim()) {
@@ -98,33 +155,91 @@ export default function VentanillaPresencialPage() {
     }
     setBuscandoPersona(true);
     setMensajeBusquedaPersona(null);
+    setMostrarFormularioRegistro(false);
     try {
       const resp = await tesoreriaService.buscarPersonaPresencial(tipoDoc, numeroDoc.trim());
-      if (resp.exito && resp.datos) {
-        setPersonaEncontrada(resp.datos);
-        setNombre(resp.datos.nombreCompleto);
-        setMensajeBusquedaPersona(`✓ Administrado registrado encontrado: ${resp.datos.nombreCompleto}`);
+      const p = resp.persona ?? resp.datos;
+      const encontrada = Boolean(resp.encontrada || (resp.exito && resp.datos));
+
+      if (encontrada && p) {
+        setPersonaEncontrada(p);
+        setNombre(p.nombreCompleto);
+        if (p.correo) setCorreo(p.correo);
+        if (p.telefono) setTelefono(p.telefono);
+        if (p.direccion) setDireccion(p.direccion);
+        setMensajeBusquedaPersona(`✓ Administrado registrado encontrado: ${p.nombreCompleto}`);
         setDocumentoFisicoVerificado(true);
+        setMostrarFormularioRegistro(false);
       } else {
         setPersonaEncontrada(null);
-        setMensajeBusquedaPersona("No se encontró registro previo en la base institucional. Ingrese los datos manualmente.");
+        setMensajeBusquedaPersona("No existe un administrado registrado. Puede registrarlo para continuar la atención presencial.");
+        setMostrarFormularioRegistro(true);
+        setNuevoNombres("");
+        setNuevoApellidos("");
+        setNuevoRazonSocial("");
+        setNuevoCorreo(correo);
+        setNuevoTelefono(telefono);
+        setNuevoDireccion(direccion);
       }
     } catch {
       setPersonaEncontrada(null);
-      setMensajeBusquedaPersona("No se encontró registro previo en la base institucional. Ingrese los datos manualmente.");
+      setMensajeBusquedaPersona("No existe un administrado registrado. Puede registrarlo para continuar la atención presencial.");
+      setMostrarFormularioRegistro(true);
     } finally {
       setBuscandoPersona(false);
+    }
+  };
+
+  const handleRegistrarPersona = async (e: FormEvent) => {
+    e.preventDefault();
+    if (tipoPersona === 'NATURAL' && (!nuevoNombres.trim() || !nuevoApellidos.trim())) {
+      alert("Ingrese nombres y apellidos para registrar al administrado.");
+      return;
+    }
+    if (tipoPersona === 'JURIDICA' && !nuevoRazonSocial.trim()) {
+      alert("Ingrese la razón social de la entidad jurídica.");
+      return;
+    }
+    setRegistrandoPersona(true);
+    try {
+      const resp = await tesoreriaService.registrarPersonaPresencial({
+        tipoPersona,
+        tipoDocumento: tipoDoc,
+        numeroDocumento: numeroDoc.trim(),
+        nombres: nuevoNombres.trim() || undefined,
+        apellidos: nuevoApellidos.trim() || undefined,
+        razonSocial: nuevoRazonSocial.trim() || undefined,
+        correo: nuevoCorreo.trim() || null,
+        telefono: nuevoTelefono.trim() || null,
+        direccion: nuevoDireccion.trim() || null,
+      });
+
+      const p = resp.persona;
+      setPersonaEncontrada(p);
+      setNombre(p.nombreCompleto);
+      if (p.correo) setCorreo(p.correo);
+      if (p.telefono) setTelefono(p.telefono);
+      if (p.direccion) setDireccion(p.direccion);
+      setMensajeBusquedaPersona(`✓ Administrado registrado exitosamente: ${p.nombreCompleto}`);
+      setDocumentoFisicoVerificado(true);
+      setMostrarFormularioRegistro(false);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Error al registrar administrado presencial.");
+    } finally {
+      setRegistrandoPersona(false);
     }
   };
   const [procedimientoTupa, setProcedimientoTupa] = useState("");
   const [busquedaTupa, setBusquedaTupa] = useState("");
   const [procedimientos, setProcedimientos] = useState<RegistroTupaCompleto[]>([]);
+  const [requisitosEstructurados, setRequisitosEstructurados] = useState<DtoRequisitosProcedimiento | null>(null);
+  const [cargandoRequisitos, setCargandoRequisitos] = useState(false);
+  const [documentosConFolios, setDocumentosConFolios] = useState<DocumentoCargadoConFolios[]>([]);
   const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
   const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null);
   const [intentoCatalogo, setIntentoCatalogo] = useState(0);
   const [enviando, setEnviando] = useState(false);
   const [modalDinamicoAbierto, setModalDinamicoAbierto] = useState(false);
-  const [requisitosRecibidos, setRequisitosRecibidos] = useState<Set<number>>(new Set());
   const [tipoDocumento, setTipoDocumento] = useState("SOLICITUD");
   const [asunto, setAsunto] = useState("");
   const [cantidadFolios, setCantidadFolios] = useState(1);
@@ -133,6 +248,96 @@ export default function VentanillaPresencialPage() {
   const [comboboxAbierto, setComboboxAbierto] = useState(false);
   const [indiceActivo, setIndiceActivo] = useState(0);
   const comboboxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!procedimientoTupa || procedimientoTupa === "NO_TUPA") {
+      setRequisitosEstructurados(null);
+      return;
+    }
+    const controller = new AbortController();
+    setCargandoRequisitos(true);
+    obtenerRequisitosProcedimiento(procedimientoTupa, controller.signal)
+      .then((res) => {
+        if (!controller.signal.aborted && res && Array.isArray(res.requisitos)) {
+          setRequisitosEstructurados(res);
+        } else if (!controller.signal.aborted) {
+          setRequisitosEstructurados(null);
+        }
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          console.warn("No se pudieron cargar requisitos estructurados:", err);
+          setRequisitosEstructurados(null);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCargandoRequisitos(false);
+      });
+    return () => controller.abort();
+  }, [procedimientoTupa]);
+
+  const requisitosObligatoriosFaltantes = useMemo(() => {
+    if (!requisitosEstructurados || !Array.isArray(requisitosEstructurados.anexosDigitales)) return [];
+    const obligatorios = requisitosEstructurados.anexosDigitales.filter((r) => r && r.obligatorio);
+    return obligatorios.filter(
+      (req) => !(documentosConFolios ?? []).some((doc) => doc.idRequisito === req.idRequisito),
+    );
+  }, [requisitosEstructurados, documentosConFolios]);
+
+  const handleCargarDocumentoConFolios = async (file: File, requisito?: DtoRequisitoTupa) => {
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      alert("Solo se admiten documentos en formato PDF (%PDF- requerido).");
+      return;
+    }
+    try {
+      const paginas = await contarPaginasPdfArchivo(file);
+      const buffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+      const hashHex = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const res = reader.result as string;
+        const base64 = res.includes(",") ? res.split(",")[1] : res;
+
+        setDocumentosConFolios((anteriores) => {
+          const filtrados = requisito
+            ? anteriores.filter((d) => d.idRequisito !== requisito.idRequisito)
+            : anteriores;
+
+          const nuevoDoc: DocumentoCargadoConFolios = {
+            id: crypto.randomUUID(),
+            idRequisito: requisito?.idRequisito ?? null,
+            nombreRequisito: requisito?.nombre ?? "Documento Adicional",
+            archivo: file,
+            nombreArchivo: file.name,
+            tamanoBytes: file.size,
+            paginas,
+            folioInicio: 1,
+            folioFin: paginas,
+            hashSha256: hashHex,
+            base64,
+          };
+
+          const { documentosConFolios: recalculados, totalFolios } = recalcularRangosFolios([...filtrados, nuevoDoc]);
+          setCantidadFolios(totalFolios);
+          return recalculados;
+        });
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      alert("Error al procesar el archivo PDF: " + (err.message || String(err)));
+    }
+  };
+
+  const handleEliminarDocumentoConFolios = (idDoc: string) => {
+    setDocumentosConFolios((anteriores) => {
+      const filtrados = anteriores.filter((d) => d.id !== idDoc);
+      const { documentosConFolios: recalculados, totalFolios } = recalcularRangosFolios(filtrados);
+      setCantidadFolios(totalFolios > 0 ? totalFolios : 1);
+      return recalculados;
+    });
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -222,7 +427,7 @@ export default function VentanillaPresencialPage() {
 
   function handleSeleccionarProcedimiento(id: string) {
     setProcedimientoTupa(id);
-    setRequisitosRecibidos(new Set());
+    setDocumentosConFolios([]);
     setComboboxAbierto(false);
   }
 
@@ -270,29 +475,70 @@ export default function VentanillaPresencialPage() {
       : null;
     const asuntoFinal = etiquetaProcedimiento ? `${etiquetaProcedimiento} - ${asunto}` : asunto;
 
-    if (!/^[0-9]{8}$/.test(numeroDoc) || nombre.trim().length < 2 || asuntoFinal.trim().length < 5) {
-      alert("Complete DNI, remitente y asunto con valores válidos antes de radicar.");
+    const docLimpio = numeroDoc.trim();
+    const esDniValido = tipoDoc === "DNI" && /^[0-9]{8}$/.test(docLimpio);
+    const esRucValido = tipoDoc === "RUC" && /^[0-9]{11}$/.test(docLimpio);
+    const esCeValido = tipoDoc === "CE" && /^[0-9a-zA-Z]{9,12}$/.test(docLimpio);
+
+    if (!esDniValido && !esRucValido && !esCeValido) {
+      alert(`El número de ${tipoDoc} no cumple con el formato requerido.`);
+      return;
+    }
+    if (nombre.trim().length < 2 || asuntoFinal.trim().length < 5) {
+      alert("Complete remitente y asunto con valores válidos antes de radicar.");
+      return;
+    }
+
+    if (requisitosObligatoriosFaltantes.length > 0) {
+      const faltantesTxt = requisitosObligatoriosFaltantes.map((r) => `"${r.nombre}"`).join(", ");
+      alert(`Faltan requisitos documentales obligatorios: ${faltantesTxt}. Debe adjuntar todos los documentos requeridos antes de radicar.`);
       return;
     }
 
     try {
       setEnviando(true);
+      const documentosAdjuntos = documentosConFolios.length > 0
+        ? documentosConFolios.map((d) => ({
+            nombreArchivo: d.nombreArchivo,
+            contenidoBase64: d.base64,
+            idRequisito: d.idRequisito || undefined,
+          }))
+        : (archivoPresentado && archivoBase64 ? [
+            {
+              nombreArchivo: archivoPresentado.name,
+              contenidoBase64: archivoBase64,
+            }
+          ] : undefined);
+
       const res = await apiClient.post<VentanillaPresencialResultado>(
         "/api/v1/tramites/ventanilla-presencial",
         {
-          dniSolicitante: numeroDoc,
+          tipoDocumento: tipoDoc,
+          numeroDocumento: docLimpio,
+          dniSolicitante: tipoDoc === "DNI" ? docLimpio : undefined,
+          solicitanteId: personaEncontrada?.idPersona,
           datosRemitente: nombre.trim(),
+          correo: correo.trim() || undefined,
+          telefono: telefono.trim() || undefined,
+          direccion: direccion.trim() || undefined,
           asunto: asuntoFinal.trim(),
-          foliosTotales: Number(cantidadFolios),
+          foliosTotales: Math.max(1, Number(cantidadFolios)),
           ...(procedimientoSeleccionado
             ? { registroVersionId: procedimientoSeleccionado.registroVersionId }
             : {}),
+          documentosAdjuntos,
         },
       );
 
       const serverData = res.data;
       const cargoServer = serverData.cargo;
       const fechaRecepcion = cargoServer.fechaRecepcion;
+
+      if (serverData.ordenPago) {
+        setOrdenPagoGenerada(serverData.ordenPago);
+      } else {
+        setOrdenPagoGenerada(null);
+      }
 
       const nuevoCargo: CargoOficialTramite = {
         codigoExpediente: cargoServer.cut,
@@ -308,7 +554,7 @@ export default function VentanillaPresencialPage() {
         solicitante: {
           tipoPersona,
           tipoDocumento: tipoDoc,
-          numeroDocumento: numeroDoc,
+          numeroDocumento: docLimpio,
           nombreOrazonSocial: nombre,
           correoElectronico: correo,
           telefono,
@@ -324,9 +570,10 @@ export default function VentanillaPresencialPage() {
 
       setCargoGenerado(nuevoCargo);
       setModalAbierto(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[VentanillaPresencial] Error al radicar en ventanilla:", error);
-      alert("Error al conectar con el servidor de radicación de ventanilla. Intente nuevamente.");
+      const msg = error?.response?.data?.detail || error?.response?.data?.message || error?.message || "Error al conectar con el servidor de radicación de ventanilla. Intente nuevamente.";
+      alert(msg);
     } finally {
       setEnviando(false);
     }
@@ -337,11 +584,20 @@ export default function VentanillaPresencialPage() {
     setNombre("");
     setCorreo("");
     setTelefono("");
+    setDireccion("");
+    setPersonaEncontrada(null);
+    setMensajeBusquedaPersona(null);
+    setMostrarFormularioRegistro(false);
+    setDocumentoFisicoVerificado(false);
+    setOrdenPagoGenerada(null);
     setProcedimientoTupa("");
     setBusquedaTupa("");
-    setRequisitosRecibidos(new Set());
+    setRequisitosEstructurados(null);
+    setDocumentosConFolios([]);
     setAsunto("");
     setCantidadFolios(1);
+    setArchivoPresentado(null);
+    setArchivoBase64(null);
     setModalAbierto(false);
   }
 
@@ -512,23 +768,26 @@ export default function VentanillaPresencialPage() {
 
           {mensajeBusquedaPersona && (
             <div
-              className={`rounded-xl p-3 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border ${
+              className={`rounded-xl p-3.5 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border ${
                 personaEncontrada
-                  ? "bg-emerald-50 text-emerald-900 border-emerald-200"
-                  : "bg-slate-50 text-slate-700 border-slate-200"
+                  ? "bg-emerald-50/90 text-emerald-900 border-emerald-300 shadow-xs"
+                  : "bg-amber-50/90 text-amber-900 border-amber-300 shadow-xs"
               }`}
             >
-              <div>
-                <p className="font-semibold">{mensajeBusquedaPersona}</p>
+              <div className="space-y-0.5">
+                <p className="font-bold flex items-center gap-1.5 text-sm">
+                  <span>{personaEncontrada ? "✓" : "ℹ️"}</span>
+                  <span>{mensajeBusquedaPersona}</span>
+                </p>
                 {personaEncontrada && (
-                  <p className="text-[11px] text-emerald-700 mt-0.5 font-mono">
-                    Documento: {personaEncontrada.documentoEnmascarado} · Cuenta de usuario:{" "}
-                    {personaEncontrada.tieneCuentaUsuario ? "Activa" : "No registrada"}
+                  <p className="text-xs text-emerald-800 font-mono">
+                    Doc: <strong>{personaEncontrada.documentoEnmascarado}</strong> · Cuenta web:{" "}
+                    <span className="font-semibold">{personaEncontrada.tieneCuentaUsuario ? "Activa" : "Sin cuenta (atención presencial)"}</span>
                   </p>
                 )}
               </div>
               {personaEncontrada && (
-                <label className="flex items-center gap-1.5 font-bold text-xs text-emerald-950 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-emerald-300 shadow-xs shrink-0">
+                <label className="flex items-center gap-2 font-bold text-xs text-emerald-950 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-emerald-300 shadow-xs shrink-0">
                   <input
                     type="checkbox"
                     checked={documentoFisicoVerificado}
@@ -538,6 +797,119 @@ export default function VentanillaPresencialPage() {
                   <span>Doc. físico verificado</span>
                 </label>
               )}
+            </div>
+          )}
+
+          {/* Formulario de Alta de Administrado Presencial sin Cuenta */}
+          {mostrarFormularioRegistro && !personaEncontrada && (
+            <div className="rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/50 p-4 sm:p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-blue-950 flex items-center gap-1.5">
+                    <span>📋</span>
+                    <span>Registrar Administrado para Atención Presencial</span>
+                  </h3>
+                  <p className="text-xs text-blue-800 mt-0.5">
+                    Registro administrativo sin creación de cuenta de usuario web (persona natural/jurídica independiente).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMostrarFormularioRegistro(false)}
+                  className="text-xs text-slate-500 hover:text-slate-800 underline"
+                >
+                  Ocultar
+                </button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {tipoPersona === 'NATURAL' ? (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Nombres *</label>
+                      <input
+                        type="text"
+                        required
+                        value={nuevoNombres}
+                        onChange={(e) => setNuevoNombres(e.target.value)}
+                        placeholder="Nombres del administrado"
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Apellidos *</label>
+                      <input
+                        type="text"
+                        required
+                        value={nuevoApellidos}
+                        onChange={(e) => setNuevoApellidos(e.target.value)}
+                        placeholder="Apellidos completos"
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Razón Social *</label>
+                    <input
+                      type="text"
+                      required
+                      value={nuevoRazonSocial}
+                      onChange={(e) => setNuevoRazonSocial(e.target.value)}
+                      placeholder="Nombre o razón social institucional"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Teléfono / Celular</label>
+                  <input
+                    type="tel"
+                    value={nuevoTelefono}
+                    onChange={(e) => setNuevoTelefono(e.target.value)}
+                    placeholder="9XXXXXXXX"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Correo Electrónico</label>
+                  <input
+                    type="email"
+                    value={nuevoCorreo}
+                    onChange={(e) => setNuevoCorreo(e.target.value)}
+                    placeholder="correo@ejemplo.com"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Dirección / Domicilio</label>
+                  <input
+                    type="text"
+                    value={nuevoDireccion}
+                    onChange={(e) => setNuevoDireccion(e.target.value)}
+                    placeholder="Av. / Jr. / Calle y número"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-blue-200">
+                <button
+                  type="button"
+                  onClick={() => setMostrarFormularioRegistro(false)}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={registrandoPersona}
+                  onClick={(e) => void handleRegistrarPersona(e)}
+                  className="rounded-lg bg-blue-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-800 disabled:opacity-50"
+                >
+                  {registrandoPersona ? "Registrando..." : "Registrar y Continuar"}
+                </button>
+              </div>
             </div>
           )}
 
@@ -588,7 +960,7 @@ export default function VentanillaPresencialPage() {
               value={procedimientoTupa}
               onChange={(e) => {
                 setProcedimientoTupa(e.target.value);
-                setRequisitosRecibidos(new Set());
+                setDocumentosConFolios([]);
               }}
               disabled={cargandoCatalogo || Boolean(errorCatalogo)}
               className="sr-only"
@@ -745,6 +1117,11 @@ export default function VentanillaPresencialPage() {
                       <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
                         {procedimientoSeleccionado ? mapearEtiquetaHumanaTipo(definicionSeleccionada?.categoria) : 'Trámite general'}
                       </span>
+                      {procedimientoSeleccionado && (
+                        <span className="inline-flex items-center rounded-md bg-cyan-100 px-2 py-0.5 text-xs font-mono font-semibold text-cyan-800">
+                          {`${procedimientoSeleccionado.fuente.referenciaFila} · ${definicionSeleccionada?.tipoFormulario ?? 'DOCUMENTARIO'} · ${definicionSeleccionada?.generaExpediente ? 'CUT' : 'DIRECTO'}`}
+                        </span>
+                      )}
                       <span className="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
                         {procedimientoSeleccionado ? (procedimientoSeleccionado.monto ?? 'Gratuito') : 'Sin costo'}
                       </span>
@@ -818,53 +1195,300 @@ export default function VentanillaPresencialPage() {
                 onChange={(e) => setCantidadFolios(Number(e.target.value))}
                 className="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
               />
+              <p className="mt-1 text-[11px] text-slate-500">
+                Calculado automáticamente según páginas físicas de los PDFs adjuntos.
+              </p>
             </div>
           </div>
 
+          {/* SECCIÓN GUIADA DE REQUISITOS Y FOLIACIÓN CONTINUA */}
+          {cargandoRequisitos && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 text-center text-xs text-blue-700 font-medium animate-pulse">
+              Cargando requisitos documentales oficiales del procedimiento...
+            </div>
+          )}
+
           {procedimientoSeleccionado && (
-            <section aria-label="Detalle del procedimiento TUPA seleccionado">
-              <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm">
-                <h3 className="font-semibold">{procedimientoSeleccionado.denominacion}</h3>
-                <p>{procedimientoSeleccionado.fuente.referenciaFila} · {definicionSeleccionada?.tipoFormulario} · {definicionSeleccionada?.generaExpediente ? 'CUT' : definicionSeleccionada?.bloqueadoParaCiudadano ? 'INTERNO' : 'SOL'}</p>
-                <p>Monto TUPA: {procedimientoSeleccionado.monto ?? 'No indicado'}</p>
-                <p>Fuente: {procedimientoSeleccionado.fuente.nombre}, página {procedimientoSeleccionado.fuente.pagina}, revisión {procedimientoSeleccionado.revision}</p>
-                {(procedimientoSeleccionado.vigenciaDesde || procedimientoSeleccionado.vigenciaHasta) &&
-                  <p>Vigencia: {procedimientoSeleccionado.vigenciaDesde ?? 'sin inicio'} a {procedimientoSeleccionado.vigenciaHasta ?? 'sin fin'}</p>}
-                <p>Estado de validación: {procedimientoSeleccionado.estadoValidacion}</p>
-                {procedimientoSeleccionado.requisitos.length > 0 && (
-                  <div className="mt-3">
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                      <h4 className="text-xs font-bold uppercase text-slate-700">Requisitos documentarios</h4>
-                      <span className="text-xs text-slate-600">
-                        {requisitosRecibidos.size} de {procedimientoSeleccionado.requisitos.length} verificados
-                      </span>
+            <section aria-label="Detalle del procedimiento TUPA seleccionado" className="space-y-4">
+              <div className="rounded-xl border border-cyan-200 bg-cyan-50/80 p-4 text-sm space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-bold text-slate-900">{procedimientoSeleccionado.denominacion}</h3>
+                  <span className="rounded-full bg-cyan-100 px-2.5 py-0.5 text-xs font-bold text-cyan-800 font-mono">
+                    {procedimientoSeleccionado.fuente.referenciaFila}
+                  </span>
+                </div>
+                <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-4">
+                  <p>{`Monto TUPA: ${procedimientoSeleccionado.monto ?? 'Gratuito'}`}</p>
+                  <p>{`Fuente: ${procedimientoSeleccionado.fuente.nombre} (Pág. ${procedimientoSeleccionado.fuente.pagina})`}</p>
+                  <p><strong>Clasificación:</strong> {definicionSeleccionada?.tipoFormulario ?? 'DOCUMENTARIO'}</p>
+                  <p><strong>Régimen:</strong> {definicionSeleccionada?.generaExpediente ? 'Emisión CUT' : 'Servicio Directo'}</p>
+                </div>
+              </div>
+
+              {/* LISTA ESTRUCTURADA DE REQUISITOS OFICIALES */}
+              {requisitosEstructurados && Array.isArray(requisitosEstructurados.requisitos) && requisitosEstructurados.requisitos.length > 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                        Requisitos Oficiales del Procedimiento TUPA
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        {requisitosEstructurados.totalAnexosObligatorios > 0
+                          ? `${requisitosEstructurados.totalAnexosObligatorios} anexo(s) obligatorio(s) requerido(s)`
+                          : 'Este procedimiento no exige anexos documentales obligatorios'}
+                      </p>
                     </div>
-                    <ul className="grid gap-2 sm:grid-cols-2">
-                      {procedimientoSeleccionado.requisitos.map((requisito, index) => (
-                        <li key={`${procedimientoSeleccionado.registroVersionId}-${index}`}>
-                          <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={requisitosRecibidos.has(index)}
-                              onChange={(event) => {
-                                setRequisitosRecibidos((actuales) => {
-                                  const siguientes = new Set(actuales);
-                                  if (event.target.checked) siguientes.add(index);
-                                  else siguientes.delete(index);
-                                  return siguientes;
-                                });
-                              }}
-                              className="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-                            />
-                            <span>{requisito}</span>
-                          </label>
-                        </li>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {documentosConFolios.filter((d) => d.idRequisito).length} de {requisitosEstructurados.requisitos.length} atendidos
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {requisitosEstructurados.requisitos.map((req, idx) => {
+                      const docAdjunto = documentosConFolios.find((d) => d.idRequisito === req.idRequisito);
+                      const esObligatorio = req.obligatorio;
+
+                      return (
+                        <div
+                          key={req.idRequisito || `req-${idx}`}
+                          className={`rounded-lg border p-3.5 transition text-xs ${
+                            docAdjunto
+                              ? 'border-emerald-200 bg-emerald-50/30'
+                              : esObligatorio && req.esAnexoDigital
+                              ? 'border-amber-300 bg-amber-50/40'
+                              : 'border-slate-200 bg-slate-50/40'
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2 mb-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-slate-500 text-[11px]">{idx + 1}.</span>
+                              <span className="font-bold text-slate-900">{req.nombre}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                                  req.tipoRequisito === 'DOCUMENTAL'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : req.tipoRequisito === 'FINANCIERO'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : req.tipoRequisito === 'INTERNO'
+                                    ? 'bg-purple-100 text-purple-800'
+                                    : 'bg-slate-200 text-slate-700'
+                                }`}
+                              >
+                                {req.tipoRequisito}
+                              </span>
+                              {esObligatorio ? (
+                                <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                                  [Obligatorio]
+                                </span>
+                              ) : (
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                                  [Opcional]
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {req.descripcion && (
+                            <p className="text-slate-500 text-[11px] mb-2">{req.descripcion}</p>
+                          )}
+
+                          {req.esAnexoDigital ? (
+                            <div>
+                              {docAdjunto ? (
+                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md bg-white border border-emerald-200 px-3 py-2">
+                                  <div className="flex items-center gap-2 overflow-hidden">
+                                    <span className="font-bold text-emerald-700">✓ [Cargado]</span>
+                                    <span className="font-medium text-slate-800 truncate">{docAdjunto.nombreArchivo}</span>
+                                    <span className="text-slate-400 font-mono text-[10px]">
+                                      ({(docAdjunto.tamanoBytes / 1024).toFixed(1)} KB)
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="rounded-sm bg-blue-100 px-2 py-0.5 text-[11px] font-bold font-mono text-blue-800">
+                                      {docAdjunto.paginas} {docAdjunto.paginas === 1 ? 'pág' : 'págs'} · Folios {docAdjunto.folioInicio}–{docAdjunto.folioFin}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEliminarDocumentoConFolios(docAdjunto.id)}
+                                      className="text-red-600 hover:text-red-800 font-bold hover:underline cursor-pointer"
+                                    >
+                                      Quitar
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5">
+                                    {esObligatorio ? (
+                                      <span className="font-semibold text-amber-700">⚠️ [!] Requerido sin archivo</span>
+                                    ) : (
+                                      <span className="text-slate-400 font-medium">○ [Opcional] Sin archivo cargado</span>
+                                    )}
+                                  </div>
+                                  <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-blue-500 shadow-2xs">
+                                    <span>Adjuntar PDF para este requisito</span>
+                                    <input
+                                      type="file"
+                                      accept="application/pdf"
+                                      className="sr-only"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleCargarDocumentoConFolios(file, req);
+                                        e.target.value = '';
+                                      }}
+                                    />
+                                  </label>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-[11px] text-slate-500 italic bg-white/70 rounded p-1.5 border border-slate-200">
+                              ℹ️ Requisito {req.tipoRequisito.toLowerCase()}: Gestionado como trámite institucional (no requiere adjunto PDF).
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* CARGA DE DOCUMENTOS ADICIONALES */}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Documentos Adicionales Presentados
+                  </h4>
+                  <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50/50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100/70 shadow-2xs">
+                    <span>+ Adjuntar documento adicional (PDF)</span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleCargarDocumentoConFolios(file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {documentosConFolios.filter((d) => !d.idRequisito).length > 0 && (
+                  <div className="space-y-2">
+                    {documentosConFolios
+                      .filter((d) => !d.idRequisito)
+                      .map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 p-2.5 text-xs"
+                        >
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <span className="font-semibold text-slate-800 truncate">{doc.nombreArchivo}</span>
+                            <span className="text-slate-400 font-mono text-[10px]">
+                              ({(doc.tamanoBytes / 1024).toFixed(1)} KB)
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="rounded-sm bg-blue-100 px-2 py-0.5 text-[11px] font-bold font-mono text-blue-800">
+                              {doc.paginas} {doc.paginas === 1 ? 'pág' : 'págs'} · Folios {doc.folioInicio}–{doc.folioFin}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleEliminarDocumentoConFolios(doc.id)}
+                              className="text-red-600 hover:text-red-800 font-bold hover:underline cursor-pointer"
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        </div>
                       ))}
-                    </ul>
                   </div>
                 )}
               </div>
+
+              {/* RESUMEN DE FOLIACIÓN FÍSICA AUTORITATIVA */}
+              {documentosConFolios.length > 0 && (
+                <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 text-xs space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-200 pb-2">
+                    <span className="font-bold uppercase tracking-wider text-blue-900">
+                      Resumen de Foliación Física Continua
+                    </span>
+                    <span className="font-bold text-blue-900">
+                      TOTAL: {documentosConFolios.length} documento(s) · {cantidadFolios} folio(s) útiles
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1 font-mono text-[11px]">
+                    {documentosConFolios.map((doc, idx) => (
+                      <span
+                        key={`folio-item-${idx}`}
+                        className="rounded bg-white border border-blue-200 px-2 py-1 text-slate-700 shadow-2xs"
+                      >
+                        Doc {idx + 1}: Folios <strong>{doc.folioInicio}–{doc.folioFin}</strong> ({doc.paginas} pág.)
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ALERTA DE BLOQUEO SI FALTAN REQUISITOS OBLIGATORIOS */}
+              {requisitosObligatoriosFaltantes.length > 0 && (
+                <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-xs text-red-900 space-y-1">
+                  <div className="flex items-center gap-2 font-bold text-sm text-red-800">
+                    <span>⚠️</span>
+                    <span>Requisitos documentales obligatorios pendientes</span>
+                  </div>
+                  <p>
+                    Faltan los siguientes documentos obligatorios según el TUPA oficial:
+                  </p>
+                  <ul className="list-disc list-inside font-semibold space-y-0.5 pt-1">
+                    {requisitosObligatoriosFaltantes.map((f, i) => (
+                      <li key={`faltante-${i}`}>{f.nombre}</li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] text-red-700 pt-1">
+                    Debe adjuntar cada documento requerido antes de poder radicar el expediente y emitir el CUT.
+                  </p>
+                </div>
+              )}
             </section>
+          )}
+
+          {/* MODO GENERAL O NO-TUPA: CARGA SIMPLE CON DETECCIÓN DE PÁGINAS */}
+          {(!procedimientoSeleccionado || procedimientoTupa === "NO_TUPA") && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+              <label htmlFor="archivo-presentado-input" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                Documentación Sustentatoria Principal en PDF (%PDF-)
+              </label>
+              <input
+                id="archivo-presentado-input"
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleCargarDocumentoConFolios(file);
+                  handleArchivoChange(e);
+                }}
+                className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 focus:border-blue-600 focus:outline-none"
+              />
+              {documentosConFolios.length > 0 && (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 text-xs space-y-1">
+                  <p className="font-bold text-emerald-800">✓ Documentos cargados con foliación automática:</p>
+                  {documentosConFolios.map((doc, i) => (
+                    <div key={`no-tupa-doc-${i}`} className="flex justify-between items-center text-slate-700 font-mono text-[11px]">
+                      <span>{doc.nombreArchivo} ({(doc.tamanoBytes / 1024).toFixed(1)} KB)</span>
+                      <span className="font-bold text-blue-700">Folios {doc.folioInicio}–{doc.folioFin} ({doc.paginas} págs)</span>
+                    </div>
+                  ))}
+                  <p className="font-bold text-slate-900 pt-1 border-t border-emerald-200">
+                    TOTAL FOLIOS: {cantidadFolios}
+                  </p>
+                </div>
+              )}
+            </div>
           )}
 
           <div>
@@ -881,6 +1505,19 @@ export default function VentanillaPresencialPage() {
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
             />
           </div>
+
+          {ordenPagoGenerada && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-sm">
+                <span>💳</span>
+                <span>Orden de Pago Generada: {ordenPagoGenerada.codigoPago}</span>
+              </p>
+              <p>
+                Monto oficial a recaudar: <strong>S/ {Number(ordenPagoGenerada.monto).toFixed(2)}</strong> ({ordenPagoGenerada.concepto}).
+                El expediente ha quedado registrado y bloqueado para derivación hasta la confirmación del pago en Tesorería.
+              </p>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
             {!puedeRadicarCut && (!definicionSeleccionada || definicionSeleccionada.generaExpediente) &&

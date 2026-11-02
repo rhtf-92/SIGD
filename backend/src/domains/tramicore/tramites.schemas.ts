@@ -67,6 +67,7 @@ export const adjuntoRadicacionSchema = z
     }),
     hashSha256,
     storagePath: z.string().trim().max(512).optional(),
+    idRequisito: z.string().uuid('El idRequisito debe ser un UUID valido.').optional().nullable(),
   })
   .strict();
 
@@ -132,6 +133,8 @@ export const radicacionVirtualSchema = z
       .email('El correo electronico no tiene un formato valido.')
       .max(150, 'El correo electronico no puede superar los 150 caracteres.'),
     totalFolios: z.number().int().min(1).max(5000),
+    idUsuarioCreador: z.string().uuid().optional().nullable(),
+    canalIngreso: z.string().optional(),
     documentos: z
       .array(adjuntoRadicacionSchema)
       .min(1, 'La radicacion exige al menos un archivo cargado.')
@@ -184,3 +187,83 @@ export const expedienteTupaParamsSchema = z
   .strict();
 
 export type ExpedienteTupaParams = z.infer<typeof expedienteTupaParamsSchema>;
+
+export const mesaPartesDigitalSchema = z
+  .object({
+    tipoPersona: z.enum(['NATURAL', 'JURIDICA']),
+    tipoDocumento: z.enum(['DNI', 'CE', 'RUC']),
+    numeroDocumento: z.string().trim().min(8).max(20),
+    nombres: z.string().trim().optional(),
+    apellidoPaterno: z.string().trim().optional(),
+    apellidoMaterno: z.string().trim().optional(),
+    razonSocial: z.string().trim().optional(),
+    representanteLegal: z.string().trim().optional(),
+    dniRepresentante: z.string().trim().optional(),
+    correo: z.string().trim().toLowerCase().email('El correo electrónico no tiene un formato válido.').max(150),
+    celular: z.string().trim().optional(),
+    direccion: z.string().trim().optional(),
+    ubigeoDistrito: z.string().trim().optional(),
+    asunto: z.string().trim().min(5, 'El asunto debe tener al menos 5 caracteres.').max(500),
+    registroVersionId: z.string().uuid('registroVersionId debe ser un UUID válido de tupa_registro_version.'),
+    documentos: z
+      .array(
+        z.object({
+          idRequisito: z.string().uuid().optional(),
+          nombreArchivo: z.string().trim().min(1, 'El nombre de archivo es obligatorio.'),
+          mimeType: z.string().default('application/pdf'),
+          hashSha256: z.string().optional(),
+          tamanioBytes: z.number().int().optional(),
+          base64Content: z.string().optional(),
+          totalPaginas: z.number().int().min(1).optional(),
+        })
+      )
+      .min(1, 'Debe adjuntar al menos un documento o anexo.'),
+  })
+  .strict();
+
+export type MesaPartesDigitalInput = z.infer<typeof mesaPartesDigitalSchema>;
+
+export const consultaPublicaQuerySchema = z
+  .object({
+    documento: z.string().trim().min(4).max(20).optional(),
+    numeroDocumento: z.string().trim().min(4).max(20).optional(),
+  })
+  .strip();
+
+export type ConsultaPublicaQuery = z.infer<typeof consultaPublicaQuerySchema>;
+
+export const solicitudVinculacionSchema = z
+  .object({
+    cut: z
+      .string()
+      .trim()
+      .transform((val) => val.toUpperCase())
+      .refine((val) => REGEX_CUT.test(val), {
+        message: 'El CUT debe cumplir la máscara EXP-YYYY-XXXXXX.',
+      }),
+    motivo: z.string().trim().max(500).optional(),
+  })
+  .strict();
+
+export type SolicitudVinculacionInput = z.infer<typeof solicitudVinculacionSchema>;
+
+export const resolverVinculacionSchema = z
+  .object({
+    decision: z.enum(['APROBADA', 'RECHAZADA']),
+    motivoRechazo: z.string().trim().max(500).optional(),
+  })
+  .strict()
+  .refine(
+    (data) => {
+      if (data.decision === 'RECHAZADA' && (!data.motivoRechazo || data.motivoRechazo.trim().length === 0)) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Debe especificar el motivo del rechazo.',
+      path: ['motivoRechazo'],
+    }
+  );
+
+export type ResolverVinculacionInput = z.infer<typeof resolverVinculacionSchema>;

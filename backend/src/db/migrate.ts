@@ -49,6 +49,10 @@ const MANIFIESTO_BASELINE = [
   '21_sigd_orden_pago_activa_unica.sql',
   '22_sigd_tesoreria_taypi_sandbox.sql',
   '23_sigd_orden_pago_metodo_qr_longitud.sql',
+  '24_sigd_tupa_requisitos_documentales.sql',
+  '25_sigd_vinculacion_historica.sql',
+  '26_sigd_devoluciones_y_pagos_adicionales.sql',
+  '27_sigd_causal_pago_duplicado.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }

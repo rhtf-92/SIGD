@@ -15,6 +15,8 @@ const estado = z.enum(["REGISTRADO", "RECEPCIONADO", "EN_CALIFICACION", "EN_REVI
 export const resumenSchema = z.object({
   idExpediente: uuid, cut: z.string(), asunto: z.string(), fechaRadicacion: fecha,
   estadoActual: estado, areaActualId: z.string().nullable(),
+  areaActualNombre: z.string().nullable().optional(),
+  areaActualCodigo: z.string().nullable().optional(),
 });
 export const detalleSchema = resumenSchema.extend({
   solicitanteId: uuid.nullable(),
@@ -35,7 +37,7 @@ export const trazabilidadSchema = z.object({
   expedienteId: uuid,
   eventos: z.array(z.object({
     id: z.string().min(1),
-    tipo: z.enum(["RADICACION", "ORDEN_PAGO", "PAGO_CONFIRMADO", "MOVIMIENTO"]),
+    tipo: z.enum(["RADICACION", "ORDEN_PAGO", "PAGO_CONFIRMADO", "MOVIMIENTO", "NOTIFICACION"]),
     fechaHora: fecha,
     titulo: z.string().min(1),
     detalle: z.string().nullable(),

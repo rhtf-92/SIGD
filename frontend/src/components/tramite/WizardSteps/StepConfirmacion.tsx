@@ -166,6 +166,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         contentType: 'application/pdf',
         tamanoBytes: Number(a.peso),
         hashSha256: a.hashSha256.toLowerCase(),
+        idRequisito: a.idRequisito || undefined,
       }));
 
       const payload = {

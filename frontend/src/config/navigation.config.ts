@@ -66,9 +66,7 @@ export function rolesPermitidosParaRuta(pathname: string): readonly RolCanonica[
   if (
     esRutaPersonalCiudadano(ruta) ||
     ruta === '/tramite' ||
-    ruta === '/tramite/mesa-partes-virtual' ||
-    ruta === '/tramite/mesa-partes' ||
-    ruta === '/mesa-partes'
+    ruta === '/tramite/mesa-partes-virtual'
   ) {
     return ROLES_CIUDADANO;
   }
@@ -98,7 +96,7 @@ export function canAccessRoute(rol: RolCanonica, pathname: string): boolean {
   // 2. ADMINISTRADOR: rol institucional superior. Acceso irrestricto a todos los módulos institucionales y públicos.
   // Queda excluido de la creación ciudadana en /tramite (el administrador utiliza Ventanilla Presencial).
   if (rol === 'ADMINISTRADOR') {
-    if (ruta === '/tramite' || ruta === '/tramite/mesa-partes-virtual' || ruta === '/tramite/mesa-partes' || ruta === '/mesa-partes') {
+    if (ruta === '/tramite' || ruta === '/tramite/mesa-partes-virtual') {
       return false;
     }
     return true;
@@ -115,6 +113,7 @@ export function canAccessRoute(rol: RolCanonica, pathname: string): boolean {
  */
 export const NAV_ITEMS_PUBLICOS: readonly NavItem[] = [
   { etiqueta: 'Inicio', ruta: '/' },
+  { etiqueta: 'Mesa de Partes Digital', ruta: '/mesa-partes' },
   { etiqueta: 'Consulta CUT', ruta: '/consulta' },
   { etiqueta: 'Validador CVD', ruta: '/validador-cvd' },
   { etiqueta: 'Flujo Validez Legal', ruta: '/flujo-validez-legal' },

@@ -10,10 +10,27 @@ export class ServicioRutaDoc {
 
   async listar(filtros: FiltrosRutaDoc, actor: ActorRutaDoc): Promise<ResultadoBandeja> {
     if (!actor.roles.some((rol) => ROLES_BANDEJA.has(rol))) throw new ForbiddenError();
-    const posicion = filtros.cursor ? decodificarCursor(filtros.cursor, filtros) : null;
-    const resultado = await this.repositorio.listar(filtros, ESTADOS_POR_PESTANA[filtros.pestana], posicion);
-    const tieneMas = resultado.elementos.length > filtros.limite;
-    const elementos = resultado.elementos.slice(0, filtros.limite);
+
+    const esSupervisionGlobal = actor.roles.some((r) => ['ADMINISTRADOR', 'DIRECTOR'].includes(r));
+    const filtrosEfectivos: FiltrosRutaDoc = { ...filtros };
+
+    // Si el actor es operador de área (Especialista o Secretario) y no tiene rol de supervisión global,
+    // acotar forzosamente a su unidad orgánica. Si no tiene unidad asignada o intenta consultar otra,
+    // aplicar Fail-Closed con ForbiddenError para mitigar bypass de confinamiento (BOLA).
+    if (!esSupervisionGlobal && actor.roles.some((r) => ['ESPECIALISTA', 'SECRETARIO'].includes(r))) {
+      if (!actor.unidadOrganicaId) {
+        throw new ForbiddenError({ detail: 'Operador sin unidad orgánica asignada.' });
+      }
+      if (filtrosEfectivos.areaId && filtrosEfectivos.areaId !== actor.unidadOrganicaId) {
+        throw new ForbiddenError({ detail: 'No autorizado para consultar bandejas de otras unidades orgánicas.' });
+      }
+      filtrosEfectivos.areaId = actor.unidadOrganicaId;
+    }
+
+    const posicion = filtrosEfectivos.cursor ? decodificarCursor(filtrosEfectivos.cursor, filtrosEfectivos) : null;
+    const resultado = await this.repositorio.listar(filtrosEfectivos, ESTADOS_POR_PESTANA[filtrosEfectivos.pestana], posicion);
+    const tieneMas = resultado.elementos.length > filtrosEfectivos.limite;
+    const elementos = resultado.elementos.slice(0, filtrosEfectivos.limite);
     const ultimo = elementos.at(-1);
     const contadores = resultado.porPestana ?? Object.fromEntries(Object.entries(ESTADOS_POR_PESTANA).map(
       ([pestana, estados]) => [pestana, estados.reduce(
@@ -24,7 +41,7 @@ export class ServicioRutaDoc {
       siguienteCursor: tieneMas && ultimo ? codificarCursor({
         fechaRadicacion: ultimo.fechaRadicacion,
         idExpediente: ultimo.idExpediente,
-      }, filtros) : null,
+      }, filtrosEfectivos) : null,
       tieneMas,
       contadores,
     };

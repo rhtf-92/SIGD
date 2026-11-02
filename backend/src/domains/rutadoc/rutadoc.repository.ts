@@ -9,6 +9,8 @@ interface FilaBandeja {
   fecha_radicacion: Date;
   estado_actual: EstadoRutaDoc;
   area_actual_id: string | null;
+  area_actual_nombre?: string | null;
+  area_actual_codigo?: string | null;
 }
 
 interface FilaBandejaConContadores {
@@ -34,16 +36,18 @@ export interface RepositorioRutaDoc {
   listarDocumentosAdjuntos?(idExpediente: string): Promise<DocumentoAdjuntoResumen[]>;
 }
 
-/** Lectura del DDL ejecutable 05: UUID, CUT y fecha_radicacion. */
+/** Lectura del DDL ejecutable 05: UUID, CUT y fecha_radicacion con enriquecimiento de área. */
 const BASE = `
   FROM sigd_tra.expediente e
   LEFT JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
   LEFT JOIN sigd_rut.estado_actual_expediente ultimo
-    ON ultimo.expediente_id = e.expediente_id`;
+    ON ultimo.expediente_id = e.expediente_id
+  LEFT JOIN sigd_org.area a
+    ON a.area_id::text = COALESCE(ultimo.area_actual_id, e.area_destino_id::text)`;
 
 const FILTROS = `
   WHERE ($1::text IS NULL OR position(lower($1::text) in lower(e.codigo_expediente || ' ' || COALESCE(t.asunto, ''))) > 0)
-    AND ($2::text IS NULL OR ultimo.area_actual_id = $2::text)
+    AND ($2::text IS NULL OR COALESCE(ultimo.area_actual_id, e.area_destino_id::text) = $2::text)
     AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
     AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
 
@@ -51,7 +55,9 @@ export const SQL_LISTAR_RUTADOC = `
   SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut,
          COALESCE(t.asunto, '') AS asunto, e.fecha_radicacion,
          COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
-         ultimo.area_actual_id
+         COALESCE(ultimo.area_actual_id, e.area_destino_id::text) AS area_actual_id,
+         a.nombre AS area_actual_nombre,
+         a.codigo AS area_actual_codigo
   ${BASE} ${FILTROS}
     AND COALESCE(ultimo.estado_nuevo, 'REGISTRADO') = ANY($5::text[])
     AND ($6::timestamptz IS NULL OR
@@ -79,7 +85,7 @@ export const SQL_CONTADORES_SIN_TERMINO_RUTADOC = `
   FROM sigd_tra.expediente e
   LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
   WHERE $1::text IS NULL
-    AND ($2::text IS NULL OR ultimo.area_actual_id = $2::text)
+    AND ($2::text IS NULL OR COALESCE(ultimo.area_actual_id, e.area_destino_id::text) = $2::text)
     AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
     AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
 
@@ -123,6 +129,8 @@ function mapearResumen(fila: FilaBandeja): ExpedienteResumen {
     fechaRadicacion: new Date(fila.fecha_radicacion).toISOString(),
     estadoActual: fila.estado_actual,
     areaActualId: fila.area_actual_id,
+    areaActualNombre: fila.area_actual_nombre ?? null,
+    areaActualCodigo: fila.area_actual_codigo ?? null,
   };
 }
 
@@ -167,7 +175,9 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut,
              COALESCE(t.asunto, '') AS asunto, e.fecha_radicacion,
              COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
-             ultimo.area_actual_id,
+             COALESCE(ultimo.area_actual_id, e.area_destino_id::text) AS area_actual_id,
+             a.nombre AS area_actual_nombre,
+             a.codigo AS area_actual_codigo,
              e.solicitante_id::text,
              ultimo.id_movimiento::text, ultimo.evento, ultimo.fecha_hora,
              ultimo.usuario_operador_id::text
@@ -194,7 +204,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       cantAdjuntos = 0;
     }
 
-    // 2. Consultar folios asignados en sigd_tra.expediente_documento_folio si la tabla existe
+    // 2. Consultar si existen folios reales registrados en sigd_tra.expediente_documento_folio
     let cantFoliados = 0;
     let totalFolios = 0;
     const existeFoliacion = await this.pool.query<{ existe: string | null }>(

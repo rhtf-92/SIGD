@@ -36,6 +36,7 @@ const TramitePage = lazy(() => import("../pages/tramite/TramitePage"));
 const MisExpedientesPage = lazy(() => import("../pages/tramite/MisExpedientesPage"));
 const MiPerfilPage = lazy(() => import("../pages/tramite/MiPerfilPage"));
 const TesoreriaPage = lazy(() => import("../pages/tesoreria/TesoreriaPage"));
+const MesaPartesDigitalPage = lazy(() => import("../pages/tramite/MesaPartesDigitalPage"));
 
 const withSuspense = (Component: React.ComponentType) => (
   <Suspense fallback={<RouteLoadingFallback />}>
@@ -60,6 +61,8 @@ export default function AppRouter() {
         <Route path="/transparencia/:seccion" element={withSuspense(TransparenciaLegalPage)} />
         <Route path="/solicitud-acceso-tupa" element={withSuspense(SolicitudAccesoTupaPage)} />
         <Route path="/tupa" element={<CatalogoTupaPage />} />
+        <Route path="/mesa-partes" element={withSuspense(MesaPartesDigitalPage)} />
+        <Route path="/mesa-partes-digital" element={<Navigate to="/mesa-partes" replace />} />
 
         {/* 2. Módulos del Ciudadano Autenticado */}
         <Route
@@ -76,11 +79,7 @@ export default function AppRouter() {
         />
         <Route
           path="/tramite/mesa-partes"
-          element={<Navigate to="/tramite" replace />}
-        />
-        <Route
-          path="/mesa-partes"
-          element={<Navigate to="/tramite" replace />}
+          element={<Navigate to="/mesa-partes" replace />}
         />
 
         <Route

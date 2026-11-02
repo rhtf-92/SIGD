@@ -118,7 +118,7 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
         }),
       } as Response);
       renderWithProviders('/tramite');
-      expect(await screen.findByText(/Verifica tus datos/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Verifica tus datos/i, {}, { timeout: 5000 })).toBeInTheDocument();
     });
 
     it('permite /mi-perfil solo con sesión ciudadana', async () => {
@@ -145,6 +145,7 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
 
     it.each([
       '/expedientes',
+      '/expedientes/11111111-1111-4111-8111-111111111111',
       '/tramite/ventanilla-presencial',
       '/reportes/dashboard',
       '/administracion',

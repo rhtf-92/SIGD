@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, LogOut, User } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
+import { obtenerInfoArea } from "../utils/areaPresentacion";
 import {
   NAV_ITEMS_PUBLICOS,
   NAV_ITEMS_POR_ROL,
@@ -93,14 +94,17 @@ export default function HeaderInstitucional() {
                   {usuario.rol !== 'CIUDADANO' && <span className="inline-block rounded bg-amber-400/90 border border-amber-300 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-950">
                     {usuario.rol}
                   </span>}
-                  {usuario.rol !== "CIUDADANO" && (
-                    <span
-                      className="rounded bg-slate-800 border border-slate-700 px-1.5 py-0.5 text-[9px] font-bold text-slate-300"
-                      title="Uso estrictamente institucional. Prohibido compartir credenciales."
-                    >
-                      {usuario.areaId ?? "DIR"}
-                    </span>
-                  )}
+                  {usuario.rol !== "CIUDADANO" && (() => {
+                    const infoArea = obtenerInfoArea(usuario.areaId, null, usuario.rol);
+                    return (
+                      <span
+                        className="rounded bg-slate-800 border border-slate-700 px-1.5 py-0.5 text-[9px] font-bold text-slate-300"
+                        title={`Área: ${infoArea.nombre}. ${infoArea.descripcion}`}
+                      >
+                        {infoArea.codigo}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               <button
@@ -151,11 +155,14 @@ export default function HeaderInstitucional() {
                   {usuario.rol !== 'CIUDADANO' && <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-900 block">
                     {usuario.rol}
                   </span>}
-                  {usuario.rol !== "CIUDADANO" && (
-                    <span className="text-[9px] text-cyan-200 font-mono block mt-0.5">
-                      Área: {usuario.areaId ?? "DIR"}
-                    </span>
-                  )}
+                  {usuario.rol !== "CIUDADANO" && (() => {
+                    const infoArea = obtenerInfoArea(usuario.areaId, null, usuario.rol);
+                    return (
+                      <span className="text-[9px] text-cyan-200 block mt-0.5" title={infoArea.descripcion}>
+                        Área: {infoArea.nombre} ({infoArea.codigo})
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               <button

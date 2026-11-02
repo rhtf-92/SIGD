@@ -2,7 +2,18 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { formatearFechaHoraLegible } from "../../utils/expedientePresentacion";
-import { tesoreriaService, type DtoOrdenPago } from "../../services/tesoreria.service";
+import { tesoreriaService, type DtoOrdenPago, type DtoSaldosExpediente, type CausalDevolucion } from "../../services/tesoreria.service";
+
+export interface SolicitudVinculacionDto {
+  solicitudId: string;
+  expedienteId: string;
+  cut: string;
+  motivo: string | null;
+  estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+  motivoRechazo: string | null;
+  fechaSolicitud: string;
+  fechaResolucion: string | null;
+}
 
 export interface DtoExpedienteCiudadano {
   expedienteId: string;
@@ -130,7 +141,63 @@ export default function MisExpedientesPage() {
   } | null>(null);
 
   const [copiado, setCopiado] = useState(false);
+  const [saldosDevolucion, setSaldosDevolucion] = useState<DtoSaldosExpediente | null>(null);
+  const [errorDevolucion, setErrorDevolucion] = useState<string | null>(null);
+  const [enviandoDevolucion, setEnviandoDevolucion] = useState(false);
+  const [ordenDevolucionId, setOrdenDevolucionId] = useState("");
+  const [causalDevolucion, setCausalDevolucion] = useState<CausalDevolucion>("SOBREPAGO");
+  const [montoDevolucion, setMontoDevolucion] = useState("");
+  const [motivoDevolucion, setMotivoDevolucion] = useState("");
   const [expandido, setExpandido] = useState<Record<string, boolean>>({});
+
+  const [solicitudesVinculacion, setSolicitudesVinculacion] = useState<SolicitudVinculacionDto[]>([]);
+  const [mostrarSolicitudes, setMostrarSolicitudes] = useState<boolean>(false);
+  const [modalVinculacion, setModalVinculacion] = useState<boolean>(false);
+  const [cutVinculacion, setCutVinculacion] = useState<string>('');
+  const [motivoVinculacion, setMotivoVinculacion] = useState<string>('');
+  const [enviandoVinculacion, setEnviandoVinculacion] = useState<boolean>(false);
+  const [errorVinculacion, setErrorVinculacion] = useState<string | null>(null);
+  const [exitoVinculacion, setExitoVinculacion] = useState<string | null>(null);
+
+  const cargarSolicitudesVinculacion = async () => {
+    try {
+      const resp = await apiClient.get<SolicitudVinculacionDto[]>(
+        '/api/v1/tramites/vinculaciones/mis-solicitudes'
+      );
+      if (resp && Array.isArray(resp.data)) {
+        setSolicitudesVinculacion(resp.data);
+      }
+    } catch {
+      // Ignorar si no está disponible
+    }
+  };
+
+  const handleSolicitarVinculacion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cutVinculacion.trim()) {
+      setErrorVinculacion('Ingrese el código CUT del expediente.');
+      return;
+    }
+    setEnviandoVinculacion(true);
+    setErrorVinculacion(null);
+    setExitoVinculacion(null);
+    try {
+      await apiClient.post('/api/v1/tramites/vinculaciones', {
+        cut: cutVinculacion.trim().toUpperCase(),
+        motivo: motivoVinculacion.trim() || undefined,
+      });
+      setExitoVinculacion('Solicitud de vinculación enviada exitosamente. Mesa de Partes revisará su solicitud.');
+      setCutVinculacion('');
+      setMotivoVinculacion('');
+      void cargarSolicitudesVinculacion();
+      void cargarExpedientes();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'No se pudo enviar la solicitud de vinculación.';
+      setErrorVinculacion(msg);
+    } finally {
+      setEnviandoVinculacion(false);
+    }
+  };
 
   const toggleProgreso = (expId: string) => {
     setExpandido((prev) => ({ ...prev, [expId]: !prev[expId] }));
@@ -138,8 +205,14 @@ export default function MisExpedientesPage() {
 
   const abrirModalPago = async (expedienteId: string, cut: string) => {
     setModalPago({ cargando: true, error: null, cut, orden: null, tieneOrden: false });
+    setSaldosDevolucion(null);
+    setErrorDevolucion(null);
     try {
-      const resp = await tesoreriaService.obtenerPagoExpediente(expedienteId);
+      const [resp, saldos] = await Promise.all([
+        tesoreriaService.obtenerPagoExpediente(expedienteId),
+        tesoreriaService.obtenerSaldosExpediente(expedienteId),
+      ]);
+      setSaldosDevolucion(saldos);
       setModalPago({
         cargando: false,
         error: null,
@@ -155,6 +228,36 @@ export default function MisExpedientesPage() {
         orden: null,
         tieneOrden: false,
       });
+    }
+  };
+
+  const enviarDevolucion = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!saldosDevolucion || enviandoDevolucion) return;
+    const orden = saldosDevolucion.ordenes.find((item) => item.ordenPagoId === ordenDevolucionId);
+    const monto = Number(montoDevolucion);
+    if (!orden || !Number.isFinite(monto) || monto <= 0 || monto > orden.saldoDevolvible || motivoDevolucion.trim().length < 10) {
+      setErrorDevolucion("Revise el monto, el saldo disponible y el motivo (mínimo 10 caracteres).");
+      return;
+    }
+    setEnviandoDevolucion(true);
+    setErrorDevolucion(null);
+    try {
+      await tesoreriaService.solicitarDevolucion({
+        expedienteId: saldosDevolucion.expedienteId,
+        ordenPagoId: ordenDevolucionId,
+        causal: causalDevolucion,
+        montoSolicitado: monto,
+        motivo: motivoDevolucion.trim(),
+      });
+      setSaldosDevolucion(await tesoreriaService.obtenerSaldosExpediente(saldosDevolucion.expedienteId));
+      setOrdenDevolucionId("");
+      setMontoDevolucion("");
+      setMotivoDevolucion("");
+    } catch (error) {
+      setErrorDevolucion(error instanceof Error ? error.message : "No se pudo registrar la devolución.");
+    } finally {
+      setEnviandoDevolucion(false);
     }
   };
 
@@ -177,6 +280,7 @@ export default function MisExpedientesPage() {
 
   useEffect(() => {
     void cargarExpedientes();
+    void cargarSolicitudesVinculacion();
   }, []);
 
   const formatFecha = (isoString: string) => formatearFechaHoraLegible(isoString);
@@ -215,6 +319,18 @@ export default function MisExpedientesPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setModalVinculacion(true);
+                setErrorVinculacion(null);
+                setExitoVinculacion(null);
+                void cargarSolicitudesVinculacion();
+              }}
+              className="inline-flex items-center rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs sm:text-sm font-semibold text-cyan-800 shadow-2xs hover:bg-cyan-100 transition"
+            >
+              🔗 Vincular Trámite Previo
+            </button>
             <Link
               to="/casilla"
               className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
@@ -254,6 +370,71 @@ export default function MisExpedientesPage() {
                 Reintentar
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Banner de Solicitudes de Vinculación */}
+        {solicitudesVinculacion.length > 0 && (
+          <div className="rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50/70 via-white to-teal-50/40 p-4 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-base" aria-hidden="true">🔗</span>
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-950">
+                    Solicitudes de Vinculación de Trámites Previos ({solicitudesVinculacion.length})
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Trámites presentados presencialmente o por Mesa Digital pública que solicitó asociar formalmente a su cuenta.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarSolicitudes((prev) => !prev)}
+                className="text-xs font-semibold text-cyan-800 underline hover:text-cyan-950 cursor-pointer"
+              >
+                {mostrarSolicitudes ? 'Ocultar detalles ▲' : 'Ver solicitudes ▼'}
+              </button>
+            </div>
+
+            {mostrarSolicitudes && (
+              <div className="mt-3 divide-y divide-cyan-100 border-t border-cyan-100 pt-3 space-y-2">
+                {solicitudesVinculacion.map((sol) => (
+                  <div key={sol.solicitudId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 text-xs">
+                    <div>
+                      <span className="font-mono font-bold text-cyan-900">{sol.cut}</span>
+                      <span className="text-slate-400 mx-2">•</span>
+                      <span className="text-slate-500">
+                        Fecha: {new Date(sol.fechaSolicitud).toLocaleDateString('es-PE')}
+                      </span>
+                      {sol.motivo && (
+                        <p className="text-slate-600 italic mt-0.5">&quot;{sol.motivo}&quot;</p>
+                      )}
+                      {sol.estado === 'RECHAZADA' && sol.motivoRechazo && (
+                        <p className="text-rose-700 font-medium mt-0.5">Motivo rechazo: {sol.motivoRechazo}</p>
+                      )}
+                    </div>
+                    <div>
+                      {sol.estado === 'PENDIENTE' && (
+                        <span className="inline-block rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 font-bold text-amber-800 text-[11px]">
+                          En revisión Mesa de Partes
+                        </span>
+                      )}
+                      {sol.estado === 'APROBADA' && (
+                        <span className="inline-block rounded-full bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 font-bold text-emerald-800 text-[11px]">
+                          ✓ Aprobada y Vinculado
+                        </span>
+                      )}
+                      {sol.estado === 'RECHAZADA' && (
+                        <span className="inline-block rounded-full bg-rose-100 border border-rose-300 px-2.5 py-0.5 font-bold text-rose-800 text-[11px]">
+                          Rechazada
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -413,10 +594,97 @@ export default function MisExpedientesPage() {
           </>
         )}
 
+        {/* MODAL VINCULACIÓN DE TRÁMITE PREVIO */}
+        {modalVinculacion && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+            <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-800">Vinculación Histórica Controlada</span>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Vincular Trámite Previo
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalVinculacion(false)}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Si radicó un trámite mediante <strong>Mesa de Partes Digital</strong> o <strong>Ventanilla Presencial</strong> antes de registrar su cuenta, puede solicitar vincularlo. Por seguridad (Ley N° 29733), el sistema validará que su documento de identidad coincida con el solicitante del expediente, y Mesa de Partes revisará formalmente la solicitud.
+              </p>
+
+              <form onSubmit={handleSolicitarVinculacion} className="space-y-4 pt-1">
+                <div>
+                  <label htmlFor="cut-vincular" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Código Único de Trámite (CUT) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    id="cut-vincular"
+                    type="text"
+                    placeholder="Ejemplo: EXP-2026-000001"
+                    value={cutVinculacion}
+                    onChange={(e) => setCutVinculacion(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-800 font-mono text-sm uppercase focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="motivo-vincular" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Motivo o Aclaración (Opcional)
+                  </label>
+                  <textarea
+                    id="motivo-vincular"
+                    rows={3}
+                    placeholder="Ejemplo: Trámite presentado por Mesa de Partes Digital sin haber iniciado sesión."
+                    value={motivoVinculacion}
+                    onChange={(e) => setMotivoVinculacion(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-800 text-xs focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 focus:outline-none"
+                  />
+                </div>
+
+                {errorVinculacion && (
+                  <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800">
+                    {errorVinculacion}
+                  </div>
+                )}
+
+                {exitoVinculacion && (
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 font-semibold">
+                    {exitoVinculacion}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setModalVinculacion(false)}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={enviandoVinculacion}
+                    className="rounded-xl bg-cyan-800 hover:bg-cyan-900 px-5 py-2 text-xs font-bold text-white shadow-sm transition disabled:opacity-50"
+                  >
+                    {enviandoVinculacion ? 'Enviando...' : 'Enviar Solicitud'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* MODAL ORDEN DE PAGO CIUDADANO */}
         {modalPago && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4">
+            <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800">Estado de Recaudación</span>
@@ -519,6 +787,41 @@ export default function MisExpedientesPage() {
                     </div>
                   ) : null}
                 </div>
+              )}
+
+              {saldosDevolucion && (
+                <section className="space-y-3 border-t border-slate-200 pt-4 text-xs" aria-label="Devoluciones de pago">
+                  <h4 className="font-bold text-slate-900">Devoluciones de pago</h4>
+                  {saldosDevolucion.posibleSobrepago && (
+                    <p className="rounded-lg bg-amber-50 p-2 text-amber-900">Posible sobrepago: S/ {saldosDevolucion.diferencia.toFixed(2)}</p>
+                  )}
+                  {saldosDevolucion.devoluciones.map((dev) => (
+                    <p key={dev.solicitudDevolucionId} className="rounded-lg bg-slate-50 p-2">
+                      <strong>{dev.codigoDev}</strong> · {dev.estado} · S/ {dev.montoSolicitado.toFixed(2)}
+                    </p>
+                  ))}
+                  {saldosDevolucion.ordenes.some((orden) => orden.estado === "CONFIRMADO" && orden.saldoDevolvible > 0) && (
+                    <form onSubmit={enviarDevolucion} className="space-y-2">
+                      <label className="block">Pago confirmado
+                        <select className="mt-1 w-full rounded border p-2" value={ordenDevolucionId} onChange={(e) => setOrdenDevolucionId(e.target.value)} required>
+                          <option value="">Seleccione un pago</option>
+                          {saldosDevolucion.ordenes.filter((orden) => orden.estado === "CONFIRMADO" && orden.saldoDevolvible > 0).map((orden) => (
+                            <option key={orden.ordenPagoId} value={orden.ordenPagoId}>{orden.codigoPago} · {orden.codigoRecibo} · S/ {orden.monto.toFixed(2)} · saldo S/ {orden.saldoDevolvible.toFixed(2)}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block">Causal
+                        <select className="mt-1 w-full rounded border p-2" value={causalDevolucion} onChange={(e) => setCausalDevolucion(e.target.value as CausalDevolucion)}>
+                          <option value="SOBREPAGO">Sobrepago</option><option value="PAGO_DUPLICADO">Pago duplicado</option><option value="PAGO_INDEBIDO">Pago indebido</option><option value="DESISTIMIENTO">Desistimiento</option><option value="TRAMITE_DENEGADO">Trámite denegado</option><option value="OTRO">Otro</option>
+                        </select>
+                      </label>
+                      <label className="block">Monto solicitado (S/)<input className="mt-1 w-full rounded border p-2" type="number" min="0.01" step="0.01" value={montoDevolucion} onChange={(e) => setMontoDevolucion(e.target.value)} required /></label>
+                      <label className="block">Motivo<textarea className="mt-1 w-full rounded border p-2" minLength={10} value={motivoDevolucion} onChange={(e) => setMotivoDevolucion(e.target.value)} required /></label>
+                      {errorDevolucion && <p role="alert" className="text-rose-700">{errorDevolucion}</p>}
+                      <button type="submit" disabled={enviandoDevolucion} className="rounded bg-blue-800 px-3 py-2 font-semibold text-white disabled:opacity-50">{enviandoDevolucion ? "Enviando..." : "Solicitar devolución"}</button>
+                    </form>
+                  )}
+                </section>
               )}
 
               <div className="pt-2 flex justify-end">

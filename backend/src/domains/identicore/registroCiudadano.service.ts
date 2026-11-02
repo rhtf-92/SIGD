@@ -166,6 +166,7 @@ export class RegistroCiudadanoService {
            EXISTS (
              SELECT 1 FROM sigd_auth.persona p
               WHERE p.tipo = $1 AND p.id_documento = $2
+                AND EXISTS (SELECT 1 FROM sigd_auth.cuenta_usuario cu WHERE cu.id_persona = p.id_persona)
            ) OR EXISTS (
              SELECT 1 FROM sigd_auth.cuenta_usuario u
               WHERE lower(u.correo) = lower($3) OR lower(u.usuario) = lower($4)
@@ -184,82 +185,196 @@ export class RegistroCiudadanoService {
         });
       }
 
-      const persona = await cliente.query<IdResult>(
-        `INSERT INTO sigd_auth.persona
-           (tipo, id_documento, direccion, ubigeo_distrito)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id_persona::text AS id`,
-        [datos.tipoPersona, datos.numeroDocumento, datos.direccion, datos.ubigeoDistrito],
+      // Verificar si la persona ya existe en el padrón (ej. de radicación presencial o digital sin cuenta)
+      const personaExistente = await cliente.query<{ id_persona: string }>(
+        `SELECT id_persona::text AS id_persona FROM sigd_auth.persona WHERE tipo = $1 AND id_documento = $2 LIMIT 1`,
+        [datos.tipoPersona, datos.numeroDocumento],
       );
-      const personaId = persona.rows[0]?.id;
-      if (!personaId) throw new Error('La inserción de persona no devolvió su identificador.');
 
-      if (datos.tipoPersona === 'NATURAL') {
-        const apellidos = [datos.apellidoPaterno, datos.apellidoMaterno]
-          .filter(Boolean)
-          .join(' ');
-        const nombreCompleto = [datos.nombres, apellidos].filter(Boolean).join(' ');
+      let personaId: string;
+
+      if (personaExistente.rows[0]?.id_persona) {
+        // Reutilizar persona existente
+        personaId = personaExistente.rows[0].id_persona;
         await cliente.query(
-          `INSERT INTO sigd_auth.persona_natural
-             (id_persona, nombres, apellidos, nombre_completo, correo, telefono)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [
-            personaId,
-            datos.nombres,
-            apellidos,
-            nombreCompleto,
-            datos.correo,
-            datos.celular,
-          ],
+          `UPDATE sigd_auth.persona
+              SET direccion = COALESCE($2, direccion),
+                  ubigeo_distrito = COALESCE($3, ubigeo_distrito),
+                  actualizado_en = now()
+            WHERE id_persona = $1::uuid`,
+          [personaId, datos.direccion || null, datos.ubigeoDistrito || null],
         );
+
+        if (datos.tipoPersona === 'NATURAL') {
+          const apellidos = [datos.apellidoPaterno, datos.apellidoMaterno].filter(Boolean).join(' ');
+          const nombreCompleto = [datos.nombres, apellidos].filter(Boolean).join(' ');
+
+          const existeNatural = await cliente.query<{ id_persona: string }>(
+            `SELECT id_persona::text FROM sigd_auth.persona_natural WHERE id_persona = $1::uuid LIMIT 1`,
+            [personaId],
+          );
+          if (existeNatural.rows[0]) {
+            await cliente.query(
+              `UPDATE sigd_auth.persona_natural
+                  SET nombres = COALESCE(NULLIF($2, ''), nombres),
+                      apellidos = COALESCE(NULLIF($3, ''), apellidos),
+                      nombre_completo = COALESCE(NULLIF($4, ''), nombre_completo),
+                      correo = COALESCE(NULLIF($5, ''), correo),
+                      telefono = COALESCE(NULLIF($6, ''), telefono)
+                WHERE id_persona = $1::uuid`,
+              [personaId, datos.nombres, apellidos, nombreCompleto, datos.correo, datos.celular],
+            );
+          } else {
+            await cliente.query(
+              `INSERT INTO sigd_auth.persona_natural
+                 (id_persona, nombres, apellidos, nombre_completo, correo, telefono)
+               VALUES ($1::uuid, $2, $3, $4, $5, $6)`,
+              [personaId, datos.nombres, apellidos, nombreCompleto, datos.correo, datos.celular],
+            );
+          }
+        } else {
+          const documentoRepresentante = datos.documentoRepresentante;
+          const nombreRepresentante = datos.nombreRepresentante;
+          if (!documentoRepresentante || !nombreRepresentante) {
+            throw new Error('Faltan los datos de identificación del representante legal.');
+          }
+          const representante = await cliente.query<RepresentanteResult>(
+            `SELECT pn.id_persona::text AS id, pn.nombres, pn.apellidos
+               FROM sigd_auth.persona_natural pn
+               JOIN sigd_auth.persona p ON p.id_persona = pn.id_persona
+              WHERE p.id_documento = $1
+                AND p.tipo = 'NATURAL'
+              FOR SHARE OF pn, p`,
+            [documentoRepresentante],
+          );
+          const personaRepresentante = representante.rows[0];
+          if (!personaRepresentante) {
+            throw new ConflictError({
+              code: 'REPRESENTANTE_NO_REGISTRADO',
+              message: 'El representante legal debe estar previamente registrado como persona natural.',
+            });
+          }
+          const nombreRegistrado = normalizarNombre([
+            personaRepresentante.nombres,
+            personaRepresentante.apellidos,
+          ].filter(Boolean).join(' '));
+          if (nombreRegistrado !== normalizarNombre(nombreRepresentante)) {
+            throw new ValidationError({
+              invalidParams: [{ name: 'nombreRepresentante', reason: 'El nombre no coincide con el DNI del representante.' }],
+            });
+          }
+
+          const existeJuridica = await cliente.query<{ id_persona: string }>(
+            `SELECT id_persona::text FROM sigd_auth.persona_juridica WHERE id_persona = $1::uuid LIMIT 1`,
+            [personaId],
+          );
+          if (existeJuridica.rows[0]) {
+            await cliente.query(
+              `UPDATE sigd_auth.persona_juridica
+                  SET razon_social = COALESCE(NULLIF($2, ''), razon_social),
+                      nombre_comercial = COALESCE(NULLIF($3, ''), nombre_comercial),
+                      representante_legal = COALESCE(NULLIF($4, ''), representante_legal),
+                      direccion = COALESCE(NULLIF($5, ''), direccion),
+                      partida_registral_sunarp = COALESCE(NULLIF($6, ''), partida_registral_sunarp)
+                WHERE id_persona = $1::uuid`,
+              [personaId, datos.razonSocial, datos.nombreComercial, nombreRepresentante, datos.direccion, datos.partidaRegistral],
+            );
+          } else {
+            await cliente.query(
+              `INSERT INTO sigd_auth.persona_juridica
+                 (id_persona, razon_social, nombre_comercial, representante_legal, direccion, partida_registral_sunarp)
+               VALUES ($1::uuid, $2, $3, $4, $5, $6)`,
+              [personaId, datos.razonSocial, datos.nombreComercial, nombreRepresentante, datos.direccion, datos.partidaRegistral],
+            );
+          }
+
+          await cliente.query(
+            `INSERT INTO sigd_auth.representacion_legal
+               (id_persona_juridica, id_persona_natural, cargo, vigente_desde)
+             VALUES ($1, $2, 'REPRESENTANTE LEGAL', CURRENT_DATE)
+             ON CONFLICT DO NOTHING`,
+            [personaId, personaRepresentante.id],
+          );
+        }
       } else {
-        const documentoRepresentante = datos.documentoRepresentante;
-        const nombreRepresentante = datos.nombreRepresentante;
-        if (!documentoRepresentante || !nombreRepresentante) {
-          throw new Error('Faltan los datos de identificación del representante legal.');
-        }
-        const representante = await cliente.query<RepresentanteResult>(
-          `SELECT pn.id_persona::text AS id, pn.nombres, pn.apellidos
-             FROM sigd_auth.persona_natural pn
-             JOIN sigd_auth.persona p ON p.id_persona = pn.id_persona
-            WHERE p.id_documento = $1
-              AND p.tipo = 'NATURAL'
-            FOR SHARE OF pn, p`,
-          [documentoRepresentante],
-        );
-        const personaRepresentante = representante.rows[0];
-        if (!personaRepresentante) {
-          throw new ConflictError({
-            code: 'REPRESENTANTE_NO_REGISTRADO',
-            message: 'El representante legal debe estar previamente registrado como persona natural.',
-          });
-        }
-        const nombreRegistrado = normalizarNombre([
-          personaRepresentante.nombres,
-          personaRepresentante.apellidos,
-        ].filter(Boolean).join(' '));
-        if (nombreRegistrado !== normalizarNombre(nombreRepresentante)) {
-          throw new ValidationError({
-            invalidParams: [{ name: 'nombreRepresentante', reason: 'El nombre no coincide con el DNI del representante.' }],
-          });
-        }
-
-        const juridica = await cliente.query<IdResult>(
-          `INSERT INTO sigd_auth.persona_juridica
-             (id_persona, razon_social, nombre_comercial, representante_legal, direccion, partida_registral_sunarp)
-           VALUES ($1, $2, $3, $4, $5, $6)
+        const persona = await cliente.query<IdResult>(
+          `INSERT INTO sigd_auth.persona
+             (tipo, id_documento, direccion, ubigeo_distrito)
+           VALUES ($1, $2, $3, $4)
            RETURNING id_persona::text AS id`,
-          [personaId, datos.razonSocial, datos.nombreComercial, nombreRepresentante, datos.direccion, datos.partidaRegistral],
+          [datos.tipoPersona, datos.numeroDocumento, datos.direccion, datos.ubigeoDistrito],
         );
-        const personaJuridicaId = juridica.rows[0]?.id;
-        if (!personaJuridicaId) throw new Error('La inserción de persona jurídica no devolvió su identificador.');
+        const nuevoId = persona.rows[0]?.id;
+        if (!nuevoId) throw new Error('La inserción de persona no devolvió su identificador.');
+        personaId = nuevoId;
 
-        await cliente.query(
-          `INSERT INTO sigd_auth.representacion_legal
-             (id_persona_juridica, id_persona_natural, cargo, vigente_desde)
-           VALUES ($1, $2, 'REPRESENTANTE LEGAL', CURRENT_DATE)`,
-          [personaJuridicaId, personaRepresentante.id],
-        );
+        if (datos.tipoPersona === 'NATURAL') {
+          const apellidos = [datos.apellidoPaterno, datos.apellidoMaterno]
+            .filter(Boolean)
+            .join(' ');
+          const nombreCompleto = [datos.nombres, apellidos].filter(Boolean).join(' ');
+          await cliente.query(
+            `INSERT INTO sigd_auth.persona_natural
+               (id_persona, nombres, apellidos, nombre_completo, correo, telefono)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              personaId,
+              datos.nombres,
+              apellidos,
+              nombreCompleto,
+              datos.correo,
+              datos.celular,
+            ],
+          );
+        } else {
+          const documentoRepresentante = datos.documentoRepresentante;
+          const nombreRepresentante = datos.nombreRepresentante;
+          if (!documentoRepresentante || !nombreRepresentante) {
+            throw new Error('Faltan los datos de identificación del representante legal.');
+          }
+          const representante = await cliente.query<RepresentanteResult>(
+            `SELECT pn.id_persona::text AS id, pn.nombres, pn.apellidos
+               FROM sigd_auth.persona_natural pn
+               JOIN sigd_auth.persona p ON p.id_persona = pn.id_persona
+              WHERE p.id_documento = $1
+                AND p.tipo = 'NATURAL'
+              FOR SHARE OF pn, p`,
+            [documentoRepresentante],
+          );
+          const personaRepresentante = representante.rows[0];
+          if (!personaRepresentante) {
+            throw new ConflictError({
+              code: 'REPRESENTANTE_NO_REGISTRADO',
+              message: 'El representante legal debe estar previamente registrado como persona natural.',
+            });
+          }
+          const nombreRegistrado = normalizarNombre([
+            personaRepresentante.nombres,
+            personaRepresentante.apellidos,
+          ].filter(Boolean).join(' '));
+          if (nombreRegistrado !== normalizarNombre(nombreRepresentante)) {
+            throw new ValidationError({
+              invalidParams: [{ name: 'nombreRepresentante', reason: 'El nombre no coincide con el DNI del representante.' }],
+            });
+          }
+
+          const juridica = await cliente.query<IdResult>(
+            `INSERT INTO sigd_auth.persona_juridica
+               (id_persona, razon_social, nombre_comercial, representante_legal, direccion, partida_registral_sunarp)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id_persona::text AS id`,
+            [personaId, datos.razonSocial, datos.nombreComercial, nombreRepresentante, datos.direccion, datos.partidaRegistral],
+          );
+          const personaJuridicaId = juridica.rows[0]?.id;
+          if (!personaJuridicaId) throw new Error('La inserción de persona jurídica no devolvió su identificador.');
+
+          await cliente.query(
+            `INSERT INTO sigd_auth.representacion_legal
+               (id_persona_juridica, id_persona_natural, cargo, vigente_desde)
+             VALUES ($1, $2, 'REPRESENTANTE LEGAL', CURRENT_DATE)`,
+            [personaJuridicaId, personaRepresentante.id],
+          );
+        }
       }
 
       const cuenta = await cliente.query<IdResult>(

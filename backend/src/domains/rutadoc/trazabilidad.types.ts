@@ -22,7 +22,15 @@ export interface ActuacionTrazabilidad {
 
 export interface EventoTrazabilidad {
   id: string;
-  tipo: 'RADICACION' | 'ORDEN_PAGO' | 'PAGO_CONFIRMADO' | 'MOVIMIENTO';
+  tipo:
+    | 'RADICACION'
+    | 'ORDEN_PAGO'
+    | 'PAGO_CONFIRMADO'
+    | 'MOVIMIENTO'
+    | 'NOTIFICACION'
+    | 'DEVOLUCION_SOLICITADA'
+    | 'DEVOLUCION_APROBADA'
+    | 'DEVOLUCION_PROCESADA';
   fechaHora: string;
   titulo: string;
   detalle: string | null;

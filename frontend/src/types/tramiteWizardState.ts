@@ -111,6 +111,11 @@ export interface ArchivoTramite {
   storageUrl?: string;
   /** Referencia binaria solo en memoria; nunca se guarda en sessionStorage. */
   file?: File;
+  paginas?: number;
+  folioInicio?: number;
+  folioFin?: number;
+  idRequisito?: string | null;
+  nombreRequisito?: string;
 }
 
 /**

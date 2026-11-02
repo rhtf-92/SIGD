@@ -7,12 +7,19 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3
 import { ConsultaPublicaService } from './consultaPublica.service.js';
 import { RadicacionVirtualService, type ProveedorFeriados } from './radicacionVirtual.service.js';
 import { VentanillaPresencialService } from './ventanillaPresencial.service.js';
+import { MesaPartesDigitalService } from './mesaPartesDigital.service.js';
+import { VinculacionHistoricaService } from './vinculacionHistorica.service.js';
 import { TupaVersionadoService } from './tupaVersionado.service.js';
+import { TupaRequisitosService } from './tupaRequisitos.service.js';
 import { TicketTermicoUtil } from './ticketTermico.util.js';
 import {
   consultaPublicaParamsSchema,
+  consultaPublicaQuerySchema,
   expedienteTupaParamsSchema,
   radicacionVirtualSchema,
+  mesaPartesDigitalSchema,
+  solicitudVinculacionSchema,
+  resolverVinculacionSchema,
 } from './tramites.schemas.js';
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from '../../shared/domain/errors/index.js';
 import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
@@ -88,13 +95,44 @@ function tipoFormularioOficial(categoria: string, denominacion: string): TipoFor
 }
 
 const ventanillaPresencialSchema = z.object({
-  dniSolicitante: z.string().regex(/^[0-9]{8}$/, 'DNI debe contener exactamente 8 dígitos'),
-  datosRemitente: z.string().min(3),
+  tipoDocumento: z.enum(['DNI', 'CE', 'RUC']).optional(),
+  numeroDocumento: z.string().min(6).max(20).optional(),
+  dniSolicitante: z.string().optional(),
+  solicitanteId: z.string().uuid().optional(),
+  datosRemitente: z.string().min(2),
+  nombres: z.string().optional(),
+  apellidos: z.string().optional(),
+  correo: z.string().email().optional().nullable().or(z.literal('')),
+  telefono: z.string().optional().nullable().or(z.literal('')),
+  direccion: z.string().optional().nullable().or(z.literal('')),
   asunto: z.string().min(5).max(500),
   foliosTotales: z.coerce.number().int().positive(),
   areaDestinoId: z.string().uuid().optional(),
   tipoDocumentalId: z.string().uuid().optional(),
   registroVersionId: z.string().uuid('registroVersionId debe ser un UUID valido.').optional().nullable(),
+  documentosAdjuntos: z.array(z.object({
+    nombreArchivo: z.string().min(1),
+    contenidoBase64: z.string().optional(),
+    documentoId: z.string().uuid().optional(),
+    documentId: z.string().uuid().optional(),
+    s3Bucket: z.string().optional(),
+    s3Key: z.string().optional(),
+    sha256: z.string().optional(),
+    tamanoBytes: z.number().optional(),
+    mimeType: z.string().optional(),
+    tipoDocumentalId: z.string().uuid().optional(),
+    idRequisito: z.string().uuid().optional().nullable(),
+  })).optional(),
+}).refine((data) => {
+  const tipo = (data.tipoDocumento || 'DNI').toUpperCase();
+  const num = (data.numeroDocumento || data.dniSolicitante || '').trim();
+  if (tipo === 'DNI') return /^[0-9]{8}$/.test(num);
+  if (tipo === 'RUC') return /^[0-9]{11}$/.test(num);
+  if (tipo === 'CE') return /^[A-Za-z0-9]{9,12}$/.test(num);
+  return num.length >= 6;
+}, {
+  message: 'Formato de número de documento inválido: DNI requiere 8 dígitos, RUC 11 dígitos, CE 9-12 caracteres alfanuméricos.',
+  path: ['numeroDocumento'],
 });
 
 /**
@@ -122,6 +160,9 @@ export function crearRouterTramites(
   const tupaAccesoRepo = new TupaAccesoRepository(pool);
   const solicitudDinamicaRepo = new SolicitudDinamicaRepository(pool);
   const tupaVersionRepo = new TupaVersionRepository(pool);
+  const tupaRequisitosService = new TupaRequisitosService(pool);
+  const mesaPartesDigitalService = new MesaPartesDigitalService(pool, obtenerFeriados);
+  const vinculacionService = new VinculacionHistoricaService(pool);
 
   async function resolverIdentidadPersona(req: Request): Promise<{
     idUsuario: string;
@@ -196,7 +237,7 @@ export function crearRouterTramites(
       throw new ForbiddenError({ detail: 'El solicitante se determina exclusivamente desde la sesión autenticada.' });
     }
     const datos = radicacionVirtualSchema.parse({ ...req.body, idPersona: actor.id_persona });
-    const radicacion = await radicacionService.radicar(datos);
+    const radicacion = await radicacionService.radicar({ ...datos, idUsuarioCreador: claims.sub });
     res.status(201).json({
       expedienteId: radicacion.expedienteId,
       tipoDocumentalId: radicacion.tipoDocumentalId,
@@ -298,9 +339,18 @@ export function crearRouterTramites(
          ) tv ON TRUE
         WHERE e.solicitante_id = $1::uuid
           AND e.estado <> 'ANULADO'
+          AND (
+            e.id_usuario_creador = $4::uuid
+            OR EXISTS (
+              SELECT 1 FROM sigd_tra.solicitud_vinculacion_expediente sv
+               WHERE sv.expediente_id = e.expediente_id
+                 AND sv.id_usuario = $4::uuid
+                 AND sv.estado = 'APROBADA'
+            )
+          )
         ORDER BY e.fecha_radicacion DESC
         LIMIT $2 OFFSET $3`,
-      [actor.id_persona, limit, offset],
+      [actor.id_persona, limit, offset, claims.sub],
     );
 
     const totalCount = resultado.rows.length > 0 ? Number(resultado.rows[0].total_count || 0) : 0;
@@ -351,6 +401,7 @@ export function crearRouterTramites(
     const datos = ventanillaPresencialSchema.parse(req.body);
     const resultado = await ventanillaService.registrarExpedienteVentanilla({
       ...datos,
+      idOperadorVentanilla: claims.sub,
       registroVersionId: datos.registroVersionId ?? undefined,
     });
     res.status(201).json(resultado);
@@ -659,6 +710,15 @@ export function crearRouterTramites(
     }
   });
 
+  // Requisitos estructurados por procedimiento TUPA
+  router.get('/tramites/tupa/procedimientos/:id/requisitos', async (req: Request, res: Response) => {
+    const idOIdentificador = String(req.params.id);
+    const info = await tupaRequisitosService.obtenerRequisitosPorProcedimiento(idOIdentificador);
+    return res.status(200).json(info);
+  });
+
+
+
   // Crear nueva versión en borrador (solo ADMINISTRADOR)
   router.post('/admin/tupa/versiones', async (req: Request, res: Response) => {
     const identidad = await resolverIdentidadPersona(req);
@@ -700,6 +760,8 @@ export function crearRouterTramites(
     void invalidateCache('tupa:catalogo:*');
     return res.status(200).json(mapearProcedimientoADto(proc));
   });
+
+
 
   // Publicar y activar versión (solo ADMINISTRADOR)
   router.post('/admin/tupa/versiones/:idVersion/publicar', async (req: Request, res: Response) => {
@@ -1492,11 +1554,107 @@ export function crearRouterTramites(
 
   router.get('/tramites/tipos', handlerTiposTupa);
 
-  // #16 — Consulta pública por CUT
+  // #16 — Consulta pública por CUT + documento de identidad
   router.get('/tramites/consulta-publica/:cut', async (req: Request, res: Response) => {
     const params = consultaPublicaParamsSchema.parse({ cut: req.params.cut });
-    const consulta = await consultaService.consultarPorCut(params);
+    const query = consultaPublicaQuerySchema.parse(req.query);
+    const documento = query.documento || query.numeroDocumento || (req.headers['x-documento-identidad'] as string | undefined);
+
+    if (!documento) {
+      throw new ValidationError({
+        message: 'DOCUMENTO_REQUERIDO: Para consultar el estado del expediente debe ingresar el documento de identidad del solicitante.',
+        invalidParams: [{ name: 'documento', reason: 'Documento de identidad no provisto' }],
+      });
+    }
+
+    const consulta = await consultaService.consultarPorCut({ cut: params.cut, documento: String(documento) });
     res.status(200).json(consulta);
+  });
+
+  // Mesa de Partes Digital Pública (radicación sin requerir cuenta previa)
+  router.post('/tramites/mesa-partes-digital', async (req: Request, res: Response) => {
+    const datos = mesaPartesDigitalSchema.parse(req.body);
+    const resultado = await mesaPartesDigitalService.radicarDigital(datos);
+    res.status(201).json(resultado);
+  });
+
+  // Solicitud de vinculación de trámite histórico por ciudadano autenticado
+  router.post('/tramites/vinculaciones', async (req: Request, res: Response) => {
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) throw new UnauthorizedError({ detail: 'Debe iniciar sesión para solicitar vinculación de expedientes.' });
+    const claims = verificarTokenAcceso(token);
+    const cuenta = await pool.query<{ id_persona: string | null; activo: boolean }>(
+      `SELECT id_persona::text AS id_persona, activo FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1::uuid`,
+      [claims.sub],
+    );
+    const actor = cuenta.rows[0];
+    if (!actor?.activo || !actor?.id_persona) {
+      throw new ForbiddenError({ detail: 'Cuenta no habilitada para realizar vinculaciones.' });
+    }
+    const body = solicitudVinculacionSchema.parse(req.body);
+    const resultado = await vinculacionService.solicitarVinculacion({
+      idUsuario: claims.sub,
+      idPersona: actor.id_persona,
+      cut: body.cut,
+      motivo: body.motivo,
+    });
+    res.status(201).json(resultado);
+  });
+
+  // Listar solicitudes de vinculación del ciudadano autenticado
+  router.get('/tramites/vinculaciones/mis-solicitudes', async (req: Request, res: Response) => {
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) throw new UnauthorizedError({ detail: 'Debe iniciar sesión para consultar sus solicitudes.' });
+    const claims = verificarTokenAcceso(token);
+    const solicitudes = await vinculacionService.listarMisSolicitudes(claims.sub);
+    res.status(200).json(solicitudes);
+  });
+
+  // Listar solicitudes pendientes de vinculación (Mesa de Partes / Administrador)
+  router.get('/tramites/vinculaciones/pendientes', async (req: Request, res: Response) => {
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) throw new UnauthorizedError({ detail: 'Debe iniciar sesión.' });
+    const claims = verificarTokenAcceso(token);
+    const autorizado = await pool.query<{ permitido: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM sigd_auth.cuenta_usuario c
+         JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario
+           AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+         JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+        WHERE c.id_usuario = $1::uuid AND c.activo = true
+          AND r.codigo IN ('MESA_PARTES', 'ADMINISTRADOR')
+       ) AS permitido`,
+      [claims.sub],
+    );
+    if (!autorizado.rows[0]?.permitido) {
+      throw new ForbiddenError({ detail: 'Se requiere rol vigente de Mesa de Partes o Administrador.' });
+    }
+    const pendientes = await vinculacionService.listarPendientesMesa();
+    res.status(200).json(pendientes);
+  });
+
+  // Resolver solicitud de vinculación (Aprobar o Rechazar)
+  router.post('/tramites/vinculaciones/:id/resolver', async (req: Request, res: Response) => {
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) throw new UnauthorizedError({ detail: 'Debe iniciar sesión.' });
+    const claims = verificarTokenAcceso(token);
+    const autorizado = await pool.query<{ permitido: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM sigd_auth.cuenta_usuario c
+         JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario
+           AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+         JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+        WHERE c.id_usuario = $1::uuid AND c.activo = true
+          AND r.codigo IN ('MESA_PARTES', 'ADMINISTRADOR')
+       ) AS permitido`,
+      [claims.sub],
+    );
+    if (!autorizado.rows[0]?.permitido) {
+      throw new ForbiddenError({ detail: 'Se requiere rol vigente de Mesa de Partes o Administrador.' });
+    }
+    const body = resolverVinculacionSchema.parse(req.body);
+    const resultado = await vinculacionService.resolverSolicitud(String(req.params.id), claims.sub, body);
+    res.status(200).json(resultado);
   });
 
   // #20 — Cargo de recepción física para impresión térmica

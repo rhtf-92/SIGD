@@ -449,6 +449,7 @@ describe('SIGD 2026 — MVP Tesorería: Pruebas Unitarias de Dominio y Seguridad
     it('4.1 Consulta por DNI devuelve información minimizada y enmascarada', async () => {
       vi.spyOn(repository, 'buscarPersonaPorDocumento').mockResolvedValueOnce({
         idPersona: mockSolicitanteId,
+        tipoPersona: 'NATURAL',
         nombres: 'Geric',
         apellidos: 'Salas Ormeño',
         nombreCompleto: 'Geric Salas Ormeño',
@@ -480,6 +481,80 @@ describe('SIGD 2026 — MVP Tesorería: Pruebas Unitarias de Dominio y Seguridad
 
       expect(resultado.encontrada).toBe(false);
       expect(resultado.persona).toBeUndefined();
+    });
+
+    it('4.3 Búsqueda por RUC devuelve persona jurídica sin cuenta', async () => {
+      vi.spyOn(repository, 'buscarPersonaPorDocumento').mockResolvedValueOnce({
+        idPersona: 'pj-0000-0000-0000-000000000001',
+        tipoPersona: 'JURIDICA',
+        nombres: 'EMPRESA SERVICIOS SAC',
+        apellidos: '',
+        nombreCompleto: 'EMPRESA SERVICIOS SAC',
+        documentoEnmascarado: '••••••••001',
+        tipoDocumento: 'RUC',
+        numeroDocumento: '20123456789',
+        tieneCuentaUsuario: false,
+      });
+
+      const resultado = await service.buscarPersonaParaAtencionPresencial(
+        'RUC',
+        '20123456789',
+        'operador-1',
+      );
+
+      expect(resultado.encontrada).toBe(true);
+      expect(resultado.persona?.tipoPersona).toBe('JURIDICA');
+      expect(resultado.persona?.tieneCuentaUsuario).toBe(false);
+    });
+
+    it('4.4 Alta de administrado nuevo sin cuenta valida formato y delega al repositorio', async () => {
+      vi.spyOn(repository, 'registrarPersonaSinCuenta').mockResolvedValueOnce({
+        idPersona: 'pn-0000-0000-0000-000000000002',
+        tipoPersona: 'NATURAL',
+        nombres: 'Rosa',
+        apellidos: 'Pinedo',
+        nombreCompleto: 'Rosa Pinedo',
+        documentoEnmascarado: '•••••456',
+        tipoDocumento: 'DNI',
+        numeroDocumento: '71234456',
+        correo: 'rosa@example.test',
+        telefono: '999888111',
+        direccion: 'Calle Real 100',
+        tieneCuentaUsuario: false,
+      });
+
+      const res = await service.registrarPersonaPresencial(
+        {
+          tipoPersona: 'NATURAL',
+          tipoDocumento: 'DNI',
+          numeroDocumento: '71234456',
+          nombres: 'Rosa',
+          apellidos: 'Pinedo',
+          correo: 'rosa@example.test',
+          telefono: '999888111',
+          direccion: 'Calle Real 100',
+        },
+        'operador-1',
+      );
+
+      expect(res.idPersona).toBe('pn-0000-0000-0000-000000000002');
+      expect(res.tieneCuentaUsuario).toBe(false);
+      expect(repository.registrarPersonaSinCuenta).toHaveBeenCalled();
+    });
+
+    it('4.5 Alta de administrado con formato de documento inválido lanza ValidationError', async () => {
+      await expect(
+        service.registrarPersonaPresencial(
+          {
+            tipoPersona: 'NATURAL',
+            tipoDocumento: 'DNI',
+            numeroDocumento: '123', // Invalido: DNI exige 8 digitos
+            nombres: 'Invalido',
+            apellidos: 'Doc',
+          },
+          'operador-1',
+        ),
+      ).rejects.toThrow(ValidationError);
     });
   });
 });

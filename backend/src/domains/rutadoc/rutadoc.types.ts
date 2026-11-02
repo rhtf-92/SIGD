@@ -36,6 +36,8 @@ export interface ExpedienteResumen {
   estadoActual: EstadoRutaDoc;
   /** Procede de datos.areaId del último movimiento, si el escritor lo aporta. */
   areaActualId: string | null;
+  areaActualNombre?: string | null;
+  areaActualCodigo?: string | null;
 }
 
 export interface UltimoMovimiento {

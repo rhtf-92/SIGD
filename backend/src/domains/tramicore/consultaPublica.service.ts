@@ -1,3 +1,27 @@
+
+function resolverPasoSiguiente(estado: string): string {
+  switch (estado) {
+    case 'PENDIENTE_PAGO':
+      return 'Realizar el pago de la tasa en Tesorería o mediante canal digital para continuar.';
+    case 'REGISTRADO':
+      return 'Expediente registrado en Mesa de Partes, pendiente de revisión y derivación al área competente.';
+    case 'EN_REVISION':
+      return 'Expediente en revisión técnica por el área asignada.';
+    case 'EN_TRAMITE':
+    case 'DERIVADO':
+      return 'Expediente en curso de atención formal por el área competente.';
+    case 'OBSERVADO':
+      return 'Presenta observaciones pendientes de subsanación por el administrado.';
+    case 'RESUELTO':
+    case 'ATENDIDO':
+      return 'El trámite ha sido concluido favorablemente.';
+    case 'ARCHIVADO':
+      return 'Expediente formalmente archivado y finalizado.';
+    default:
+      return 'En proceso de gestión documentaria institucional.';
+  }
+}
+
 import type { Pool, PoolClient } from 'pg';
 import { NotFoundError } from '../../shared/domain/errors/index.js';
 import type { ConsultaPublicaParams } from './tramites.schemas.js';
@@ -47,6 +71,9 @@ export interface DtoConsultaPublica {
   fueraDeHorario: boolean;
   canalRecepcion: string;
   totalFolios: number;
+  areaActual: string;
+  pasoSiguiente: string;
+  estadoPago: string;
   /** Datos del administrado enmascarados; nunca el valor integro. */
   administrado: {
     documentoEnmascarado: string | null;
@@ -72,6 +99,8 @@ interface FilaConsulta {
   nombres: string | null;
   apellido_paterno: string | null;
   apellido_materno: string | null;
+  area_actual?: string | null;
+  estado_pago?: string | null;
 }
 
 /** Ancho de la ventana visible al_redondear. */
@@ -80,7 +109,7 @@ const VENTANA_ENMASCARADO = 2;
 export class ConsultaPublicaService {
   constructor(private readonly pool: Pool) {}
 
-  async consultarPorCut(params: ConsultaPublicaParams): Promise<DtoConsultaPublica> {
+  async consultarPorCut(params: { cut: string; documento?: string }): Promise<DtoConsultaPublica> {
     const cliente = await this.pool.connect();
     try {
       const expediente = await this.leerExpediente(cliente, params.cut);
@@ -95,10 +124,24 @@ export class ConsultaPublicaService {
         });
       }
 
+      // Seguridad: Si se envía documento, verificar que coincida con el registrado en el expediente
+      if (params.documento) {
+        const docIngresado = params.documento.trim().replace(/[-\s]/g, '').toLowerCase();
+        const docExpediente = (expediente.numero_documento || '').trim().replace(/[-\s]/g, '').toLowerCase();
+        if (docIngresado !== docExpediente) {
+          throw new NotFoundError({
+            message: 'No se encontró ningún expediente con los datos provistos o los datos no coinciden.',
+            detail: 'El documento de identidad no coincide con el registrado para este CUT.',
+          });
+        }
+      }
+
       const [documentos, proveidos] = await Promise.all([
         this.leerDocumentos(cliente, params.cut),
         this.leerProveidosPublicos(cliente, params.cut),
       ]);
+
+      const pasoSiguiente = resolverPasoSiguiente(expediente.estado_tramite);
 
       return {
         cut: expediente.cut,
@@ -111,6 +154,9 @@ export class ConsultaPublicaService {
         fueraDeHorario: expediente.fuera_de_horario,
         canalRecepcion: expediente.canal_recepcion,
         totalFolios: expediente.total_folios,
+        areaActual: expediente.area_actual || 'Mesa de Partes',
+        pasoSiguiente,
+        estadoPago: expediente.estado_pago || 'NO_APLICA',
         administrado: {
           documentoEnmascarado: enmascararDocumento(expediente.numero_documento),
           nombreEnmascarado: enmascararNombre(

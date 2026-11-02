@@ -6,6 +6,7 @@ import { UnauthorizedError, NotFoundError, DomainError, ForbiddenError, Conflict
 import type { DerivarExpedienteDTO } from './dto/derivarExpediente.dto.js';
 import type { ArchivarExpedienteDTO } from './dto/archivarExpediente.dto.js';
 import type { AtenderExpedienteDTO } from './dto/atenderExpediente.dto.js';
+import { documentoStorageService } from '../../core/storage/documento-storage.service.js';
 
 export function resolverOperadorBigInt(id: string | number | undefined | null): string {
   if (!id) return '1';
@@ -425,69 +426,112 @@ export async function atenderExpediente(
     });
   }
 
-  // Persistir documento PDF de respuesta en sigd_doc.documento_adjunto si viene adjunto
-  let documentoUrl = datos.s3_key || null;
-  let hashDocRespuesta = datos.sha256 || null;
+  // Persistir documento PDF de respuesta en sigd_doc.documento_adjunto
+  let documentoUrl: string | null = null;
+  let hashDocRespuesta: string | null = null;
 
-  if (datos.s3_key) {
-    const docId = datos.documento_respuesta_id || randomUUID();
-    const nombreArchivo = datos.nombre_archivo || 'Resolucion_Respuesta.pdf';
-    const tamanoBytes = datos.tamano_bytes || 102400;
-    const sha256 = (datos.sha256 || '0'.repeat(64)).toLowerCase();
-
-    const existeDoc = await cliente.query(
-      `SELECT documento_adjunto_id FROM sigd_doc.documento_adjunto
-      WHERE (expediente_tra_id = $1::uuid OR expediente_id = $1::uuid) AND sha256 = $2`,
-      [expedienteId, sha256]
+  // CASO 1: Si el cliente envía documento_respuesta_id, verificar ownership estricto
+  if (datos.documento_respuesta_id) {
+    const docExistenteRes = await cliente.query<{
+      documento_adjunto_id: string;
+      expediente_tra_id: string | null;
+      expediente_id: string | null;
+      s3_bucket: string;
+      s3_key: string;
+      sha256: string;
+      tamano_bytes: number;
+    }>(
+      `SELECT documento_adjunto_id, expediente_tra_id, expediente_id, s3_bucket, s3_key, sha256, tamano_bytes
+         FROM sigd_doc.documento_adjunto
+        WHERE documento_adjunto_id = $1::uuid`,
+      [datos.documento_respuesta_id],
     );
-
-    if (existeDoc.rowCount === 0) {
-      await cliente.query(
-        `INSERT INTO sigd_doc.documento_adjunto (
-          documento_adjunto_id,
-          expediente_tra_id,
-          tipo_documental_id,
-          nombre_archivo,
-          s3_bucket,
-          s3_key,
-          sha256,
-          tamano_bytes,
-          mime_type,
-          magic_bytes,
-          subido_por,
-          creado_en
-        ) VALUES (
-          $1::uuid,
-          $2::uuid,
-          $3::uuid,
-          $4,
-          'sigd-documentos',
-          $5,
-          $6,
-          $7,
-          $8,
-          '25504446',
-          $9::uuid,
-          now()
-        )`,
-        [
-          docId,
-          expedienteId,
-          tipoDocumentalId,
-          nombreArchivo,
-          datos.s3_key,
-          sha256,
-          tamanoBytes,
-          datos.mime_type || 'application/pdf',
-          usuarioActorId,
-        ]
-      );
+    const docRow = docExistenteRes.rows[0];
+    if (!docRow) {
+      throw new NotFoundError({ detail: 'DOCUMENTO_NO_ENCONTRADO: El documento de respuesta especificado no existe.' });
     }
+    // REGLA: Ownership estricto server-side. El documento DEBE pertenecer al expediente actual.
+    if (docRow.expediente_tra_id !== expedienteId && docRow.expediente_id !== expedienteId) {
+      throw new ForbiddenError({
+        code: 'DOCUMENTO_NO_PERTENECE_EXPEDIENTE',
+        detail: 'DOCUMENTO_NO_PERTENECE_EXPEDIENTE: El documento especificado no pertenece al expediente actual.',
+      });
+    }
+
+    hashDocRespuesta = docRow.sha256;
+    documentoUrl = `/api/v1/storage/download/${docRow.s3_bucket}/${docRow.s3_key}`;
+  } else {
+    // CASO 2: Generación oficial server-side. El backend SIEMPRE genera la resolución y su clave canónica.
+    // NUNCA se confía en s3_key enviado por el cliente (se ignora cualquier s3_key del cliente).
+    const s3KeyResolucion = documentoStorageService.generarKeyResolucion(expedienteId);
+    const resolucionBuffer = await documentoStorageService.generarResolucionPdf({
+      cut: codigoExpediente,
+      fechaHora: new Date(),
+      administrado: solicitanteId,
+      resultadoResumen: datos.resultado_resumen,
+      observacionInterna: datos.observacion_interna || null,
+      operador: usuarioActorId,
+      area: areaActualExpediente || 'Subdirección Académica',
+    });
+
+    const verificado = await documentoStorageService.subirDocumentoPdf({
+      s3Key: s3KeyResolucion,
+      buffer: resolucionBuffer,
+      bucket: documentoStorageService.canonicalBucket,
+    });
+
+    const docId = randomUUID();
+    const nombreArchivo = datos.nombre_archivo || 'Resolucion_Respuesta.pdf';
+    hashDocRespuesta = verificado.sha256;
+    documentoUrl = `/api/v1/storage/download/${verificado.s3Bucket}/${verificado.s3Key}`;
+
+    await cliente.query(
+      `INSERT INTO sigd_doc.documento_adjunto (
+        documento_adjunto_id,
+        expediente_tra_id,
+        tipo_documental_id,
+        nombre_archivo,
+        s3_bucket,
+        s3_key,
+        sha256,
+        tamano_bytes,
+        mime_type,
+        magic_bytes,
+        subido_por,
+        creado_en
+      ) VALUES (
+        $1::uuid,
+        $2::uuid,
+        $3::uuid,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        '25504446',
+        $10::uuid,
+        now()
+      )`,
+      [
+        docId,
+        expedienteId,
+        tipoDocumentalId,
+        nombreArchivo,
+        verificado.s3Bucket,
+        verificado.s3Key,
+        verificado.sha256,
+        verificado.tamanoBytes,
+        datos.mime_type || 'application/pdf',
+        usuarioActorId,
+      ],
+    );
   }
 
   // Notificación a la Casilla Electrónica del Ciudadano (sigd_auth.notificacion_casilla)
   if (solicitanteId) {
-    let usuarioDestinatarioId: string | null = solicitanteId;
+    let usuarioDestinatarioId: string | null = null;
+    let correoDestinatario: string | null = null;
     try {
       const resUsuario = await cliente.query<{ id_usuario: string }>(
         `SELECT id_usuario::text AS id_usuario
@@ -500,59 +544,77 @@ export async function atenderExpediente(
         usuarioDestinatarioId = resUsuario.rows[0].id_usuario;
       }
     } catch {
-      usuarioDestinatarioId = solicitanteId;
+      usuarioDestinatarioId = null;
     }
 
-    if (usuarioDestinatarioId) {
-      const cuerpoJson = JSON.stringify({
-        resumen: datos.resultado_resumen,
-        expediente: codigoExpediente,
-        fecha: new Date().toISOString(),
-        observacion: datos.observacion_interna || undefined,
-      });
-
-      await cliente.query(
-        `INSERT INTO sigd_auth.notificacion_casilla (
-          id,
-          usuario_id,
-          cut,
-          asunto,
-          tipo_acto,
-          numero_documento,
-          cuerpo,
-          referencia,
-          estado,
-          fecha_deposito,
-          hash_sha256,
-          documento_url,
-          creado_en
-        ) VALUES (
-          gen_random_uuid(),
-          $1::uuid,
-          $2,
-          $3,
-          'RESOLUCION',
-          $4,
-          $5::jsonb,
-          $6,
-          'NO_LEIDO',
-          now(),
-          $7,
-          $8,
-          now()
-        )`,
-        [
-          usuarioDestinatarioId,
-          codigoExpediente,
-          `Resolución de Trámite: ${codigoExpediente}`,
-          `RES-${codigoExpediente}`,
-          cuerpoJson,
-          `Atención realizada por ${areaActualExpediente || 'Subdirección Académica'}`,
-          hashDocRespuesta || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          documentoUrl || `/expedientes/${expedienteId}`,
-        ]
+    try {
+      const resPersona = await cliente.query<{ correo: string | null }>(
+        `SELECT COALESCE(pn.correo, u.correo) AS correo
+           FROM sigd_auth.persona p
+           LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+           LEFT JOIN sigd_auth.cuenta_usuario u ON u.id_persona = p.id_persona
+          WHERE p.id_persona = $1::uuid
+          LIMIT 1`,
+        [solicitanteId]
       );
+      if (resPersona?.rows?.[0]?.correo) {
+        correoDestinatario = resPersona.rows[0].correo;
+      }
+    } catch {
+      correoDestinatario = null;
     }
+
+    const cuerpoJson = JSON.stringify({
+      resumen: datos.resultado_resumen,
+      expediente: codigoExpediente,
+      fecha: new Date().toISOString(),
+      observacion: datos.observacion_interna || undefined,
+    });
+
+    await cliente.query(
+      `INSERT INTO sigd_auth.notificacion_casilla (
+        id,
+        usuario_id,
+        correo_destinatario,
+        cut,
+        asunto,
+        tipo_acto,
+        numero_documento,
+        cuerpo,
+        referencia,
+        estado,
+        fecha_deposito,
+        hash_sha256,
+        documento_url,
+        creado_en
+      ) VALUES (
+        gen_random_uuid(),
+        $1::uuid,
+        $2,
+        $3,
+        $4,
+        'RESOLUCION',
+        $5,
+        $6::jsonb,
+        $7,
+        'NO_LEIDO',
+        now(),
+        $8,
+        $9,
+        now()
+      )`,
+      [
+        usuarioDestinatarioId,
+        correoDestinatario,
+        codigoExpediente,
+        `Resolución de Trámite: ${codigoExpediente}`,
+        `RES-${codigoExpediente}`,
+        cuerpoJson,
+        `Atención realizada por ${areaActualExpediente || 'Subdirección Académica'}`,
+        hashDocRespuesta || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        documentoUrl || `/expedientes/${expedienteId}`,
+      ]
+    );
   }
 
   // Evento Outbox

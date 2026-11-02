@@ -6,6 +6,25 @@ export type PaymentProvider = 'MANUAL' | 'TAYPI' | 'DEMO_QR';
 
 export type ConfirmedSource = 'TESORERIA' | 'WEBHOOK';
 
+export type TipoOrdenPago = 'PRINCIPAL' | 'ADICIONAL';
+
+export type CausalDevolucion = 'SOBREPAGO' | 'PAGO_DUPLICADO' | 'PAGO_INDEBIDO' | 'DESISTIMIENTO' | 'TRAMITE_DENEGADO' | 'OTRO';
+
+export type EstadoDevolucion =
+  | 'SOLICITADA'
+  | 'EN_REVISION'
+  | 'OBSERVADA'
+  | 'SUBSANADA'
+  | 'APROBADA'
+  | 'PENDIENTE_TESORERIA'
+  | 'DEVUELTA'
+  | 'RECHAZADA'
+  | 'ANULADA';
+
+export type CanalRegistroDevolucion = 'VIRTUAL' | 'PRESENCIAL' | 'MESA_PARTES';
+
+export type MetodoDevolucion = 'EFECTIVO' | 'TRANSFERENCIA' | 'YAPE' | 'CHEQUE';
+
 export interface FilaOrdenPago {
   orden_pago_id: string;
   codigo_pago: string;
@@ -17,6 +36,8 @@ export interface FilaOrdenPago {
   monto: string | number;
   moneda: string;
   estado: EstadoOrdenPago;
+  tipo_orden?: TipoOrdenPago;
+  motivo_adicional?: string | null;
   metodo_pago: MetodoPago | null;
   referencia_operacion: string | null;
   monto_recibido: string | number | null;
@@ -61,6 +82,8 @@ export interface DtoOrdenPago {
   monto: number;
   moneda: string;
   estado: EstadoOrdenPago;
+  tipoOrden: TipoOrdenPago;
+  motivoAdicional: string | null;
   metodoPago: MetodoPago | null;
   referenciaOperacion: string | null;
   montoRecibido: number | null;
@@ -83,6 +106,99 @@ export interface DtoOrdenPago {
   providerReference?: string | null;
 }
 
+export interface FilaSolicitudDevolucion {
+  solicitud_devolucion_id: string;
+  codigo_dev: string;
+  expediente_id: string;
+  orden_pago_id: string;
+  solicitante_id: string;
+  cuenta_usuario_id: string | null;
+  canal_registro: CanalRegistroDevolucion;
+  causal: CausalDevolucion;
+  motivo: string;
+  monto_original: string | number;
+  monto_solicitado: string | number;
+  monto_autorizado: string | number | null;
+  monto_devuelto: string | number | null;
+  estado: EstadoDevolucion;
+  fecha_solicitud: Date;
+  fecha_aprobacion: Date | null;
+  aprobado_por_id: string | null;
+  fecha_devolucion: Date | null;
+  procesado_por_id: string | null;
+  metodo_devolucion: MetodoDevolucion | null;
+  constancia_devolucion_codigo: string | null;
+  motivo_observacion: string | null;
+  motivo_rechazo: string | null;
+  observacion_resolucion: string | null;
+  created_at: Date;
+  updated_at: Date;
+  // Campos de JOIN opcionales
+  codigo_expediente?: string;
+  codigo_pago?: string;
+  codigo_recibo?: string | null;
+  solicitante_nombre?: string | null;
+  solicitante_documento?: string | null;
+  aprobado_por_nombre?: string | null;
+  procesado_por_nombre?: string | null;
+}
+
+export interface DtoSolicitudDevolucion {
+  solicitudDevolucionId: string;
+  codigoDev: string;
+  expedienteId: string;
+  codigoExpediente: string;
+  ordenPagoId: string;
+  codigoPago: string;
+  codigoRecibo: string | null;
+  solicitanteId: string;
+  solicitanteNombre: string;
+  solicitanteDocumento: string;
+  cuentaUsuarioId: string | null;
+  canalRegistro: CanalRegistroDevolucion;
+  causal: CausalDevolucion;
+  motivo: string;
+  montoOriginal: number;
+  montoSolicitado: number;
+  montoAutorizado: number | null;
+  montoDevuelto: number | null;
+  estado: EstadoDevolucion;
+  fechaSolicitud: string;
+  fechaAprobacion: string | null;
+  aprobadoPorId: string | null;
+  aprobadoPorNombre: string | null;
+  fechaDevolucion: string | null;
+  procesadoPorId: string | null;
+  procesadoPorNombre: string | null;
+  metodoDevolucion: MetodoDevolucion | null;
+  constanciaDevolucionCodigo: string | null;
+  motivoObservacion: string | null;
+  motivoRechazo: string | null;
+  observacionResolucion: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DtoSaldosExpediente {
+  expedienteId: string;
+  codigoExpediente: string;
+  costoOficial: number;
+  totalPagado: number;
+  diferencia: number;
+  posibleSobrepago: boolean;
+  ordenes: Array<{
+    ordenPagoId: string;
+    codigoPago: string;
+    codigoRecibo: string | null;
+    tipoOrden: TipoOrdenPago;
+    monto: number;
+    estado: EstadoOrdenPago;
+    fechaPago: string | null;
+    saldoDevolvible: number;
+  }>;
+  devoluciones: DtoSolicitudDevolucion[];
+}
+
 export interface DtoResumenDashboardTesoreria {
   pendientes: number;
   confirmadosHoy: number;
@@ -92,6 +208,14 @@ export interface DtoResumenDashboardTesoreria {
 export interface DtoBuscarOrdenesParams {
   estado?: EstadoOrdenPago | 'TODOS';
   buscar?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface DtoBuscarDevolucionesParams {
+  estado?: EstadoDevolucion | 'TODAS';
+  buscar?: string;
+  expedienteId?: string;
   page?: number;
   limit?: number;
 }

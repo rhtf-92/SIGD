@@ -54,7 +54,14 @@ export class ServicioTrazabilidadRutaDoc {
       eventosUnicos.set(evento.id, evento);
     }
     const prioridad: Record<EventoTrazabilidad['tipo'], number> = {
-      RADICACION: 0, ORDEN_PAGO: 1, PAGO_CONFIRMADO: 2, MOVIMIENTO: 3,
+      RADICACION: 0,
+      ORDEN_PAGO: 1,
+      PAGO_CONFIRMADO: 2,
+      DEVOLUCION_SOLICITADA: 3,
+      DEVOLUCION_APROBADA: 4,
+      DEVOLUCION_PROCESADA: 5,
+      MOVIMIENTO: 6,
+      NOTIFICACION: 7,
     };
     const secuenciaMovimiento = new Map(historial.map((item) =>
       [`MOVIMIENTO:${item.movimientoId}`, BigInt(item.secuencia)]));

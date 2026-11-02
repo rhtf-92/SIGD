@@ -22,7 +22,13 @@ import { useExpedienteActions } from "../../hooks/useExpedienteActions";
 import { servicioExpedienteActionsReal } from "../../api/expedienteActions";
 import { useAuthStore } from "../../stores/authStore";
 import { apiClient } from "../../api/client";
-import { tesoreriaService, type DtoOrdenPago } from "../../services/tesoreria.service";
+import {
+  tesoreriaService,
+  type DtoOrdenPago,
+  type DtoSolicitudDevolucion,
+  type CausalDevolucion,
+  type EstadoDevolucion,
+} from "../../services/tesoreria.service";
 import type { BusquedaExpedientes, ExpedienteAccionReferencia, UnidadDestino } from "../../types/expedienteActions";
 
 const busquedaConexos: BusquedaExpedientes = {
@@ -298,9 +304,65 @@ export default function ExpedienteDetallePage() {
     staleTime: 5_000,
   });
 
+  // Saldos consolidados del expediente (Fase 3: Devoluciones y Sobrepagos bajo demanda)
+  const saldosQuery = useQuery({
+    queryKey: ["tesoreria", id, "saldos"],
+    queryFn: ({ signal }) => tesoreriaService.obtenerSaldosExpediente(id!, signal),
+    enabled: Boolean(id) && consultarPagoBajoDemanda,
+    staleTime: 5_000,
+  });
+
+  // Solicitudes de devolución registradas para este expediente (bajo demanda)
+  const devolucionesQuery = useQuery({
+    queryKey: ["tesoreria", id, "devoluciones"],
+    queryFn: ({ signal }) => tesoreriaService.listarDevoluciones({ expedienteId: id! }, signal),
+    enabled: Boolean(id) && consultarPagoBajoDemanda,
+    staleTime: 5_000,
+  });
+
   const [generandoOrden, setGenerandoOrden] = useState(false);
   const [errorOrden, setErrorOrden] = useState<string | null>(null);
   const [modalReciboDetalle, setModalReciboDetalle] = useState<DtoOrdenPago | null>(null);
+
+  // Modal de Doble Advertencia para Pago Duplicado / Adicional
+  interface InfoPagoDuplicado {
+    codigoRecibo?: string;
+    monto?: number;
+    totalPagado?: number;
+    mensaje?: string;
+  }
+  const [modalDobleAdvertenciaPago, setModalDobleAdvertenciaPago] = useState<InfoPagoDuplicado | null>(null);
+  const [pasoAdvertencia, setPasoAdvertencia] = useState<1 | 2>(1);
+  const [motivoPagoAdicional, setMotivoPagoAdicional] = useState("");
+  const [confirmandoPagoAdicional, setConfirmandoPagoAdicional] = useState(false);
+  const [errorPagoAdicional, setErrorPagoAdicional] = useState<string | null>(null);
+
+  // Modal de Solicitud de Devolución
+  const [modalSolicitarDevAbierto, setModalSolicitarDevAbierto] = useState(false);
+  const [ordenParaDevolucion, setOrdenParaDevolucion] = useState<string>("");
+  const [causalDev, setCausalDev] = useState<CausalDevolucion>("SOBREPAGO");
+  const [montoSolicitadoDev, setMontoSolicitadoDev] = useState<string>("");
+  const [motivoDev, setMotivoDev] = useState<string>("");
+  const [procesandoSolicitudDev, setProcesandoSolicitudDev] = useState(false);
+  const [errorSolicitudDev, setErrorSolicitudDev] = useState<string | null>(null);
+
+  // Modales de Gestión de Devoluciones (Mesa de Partes / Administrador / Subsanación)
+  const [devParaGestion, setDevParaGestion] = useState<DtoSolicitudDevolucion | null>(null);
+  const [modalAprobarDevAbierto, setModalAprobarDevAbierto] = useState(false);
+  const [montoAutorizadoDev, setMontoAutorizadoDev] = useState<string>("");
+  const [observacionResolucionDev, setObservacionResolucionDev] = useState("");
+
+  const [modalObservarDevAbierto, setModalObservarDevAbierto] = useState(false);
+  const [motivoObservacionDev, setMotivoObservacionDev] = useState("");
+
+  const [modalRechazarDevAbierto, setModalRechazarDevAbierto] = useState(false);
+  const [motivoRechazoDev, setMotivoRechazoDev] = useState("");
+
+  const [modalSubsanarDevAbierto, setModalSubsanarDevAbierto] = useState(false);
+  const [sustentoSubsanacionDev, setSustentoSubsanacionDev] = useState("");
+
+  const [procesandoAccionDev, setProcesandoAccionDev] = useState(false);
+  const [errorAccionDev, setErrorAccionDev] = useState<string | null>(null);
 
   const handleGenerarOrdenPago = async () => {
     if (!id) return;
@@ -310,7 +372,25 @@ export default function ExpedienteDetallePage() {
       await tesoreriaService.generarOrdenPagoExpediente(id);
       setConsultarPagoBajoDemanda(true);
       void pagoQuery.refetch();
+      void saldosQuery.refetch();
     } catch (e: unknown) {
+      const axiosErr = e as { response?: { status?: number; data?: { error?: string; codigo?: string; mensaje?: string; detalles?: { codigoRecibo?: string; monto?: number; totalPagado?: number } } } };
+      const respData = axiosErr.response?.data;
+      if (
+        axiosErr.response?.status === 409 &&
+        (respData?.codigo === "PAGO_YA_CONFIRMADO" || respData?.error === "PAGO_YA_CONFIRMADO")
+      ) {
+        setModalDobleAdvertenciaPago({
+          codigoRecibo: respData.detalles?.codigoRecibo,
+          monto: respData.detalles?.monto,
+          totalPagado: respData.detalles?.totalPagado,
+          mensaje: respData.mensaje || "Este expediente ya cuenta con un pago verificado y confirmado.",
+        });
+        setPasoAdvertencia(1);
+        setMotivoPagoAdicional("");
+        setErrorPagoAdicional(null);
+        return;
+      }
       const msg = e instanceof Error ? e.message : "Error al generar orden de pago.";
       setErrorOrden(msg);
     } finally {
@@ -318,9 +398,272 @@ export default function ExpedienteDetallePage() {
     }
   };
 
+  const handleAbrirPagoAdicionalDirecto = () => {
+    setConsultarPagoBajoDemanda(true);
+    setModalDobleAdvertenciaPago({
+      codigoRecibo: saldosQuery.data?.ordenes?.find((o) => o.codigoRecibo)?.codigoRecibo ?? ordenPago?.codigoRecibo ?? undefined,
+      totalPagado: saldosQuery.data?.totalPagado ?? (ordenPago?.estado === "CONFIRMADO" ? ordenPago.monto : undefined),
+      mensaje: "Registrar una nueva orden de pago adicional para este expediente.",
+    });
+    setPasoAdvertencia(1);
+    setMotivoPagoAdicional("");
+    setErrorPagoAdicional(null);
+  };
+
+  const handleConfirmarPagoAdicionalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    if (motivoPagoAdicional.trim().length < 10) {
+      setErrorPagoAdicional("Debe ingresar un motivo o justificación de al menos 10 caracteres.");
+      return;
+    }
+    setConfirmandoPagoAdicional(true);
+    setErrorPagoAdicional(null);
+    try {
+      await tesoreriaService.generarOrdenPagoExpediente(id, {
+        confirmarPagoAdicional: true,
+        motivoAdicional: motivoPagoAdicional.trim(),
+      });
+      setModalDobleAdvertenciaPago(null);
+      setConsultarPagoBajoDemanda(true);
+      void pagoQuery.refetch();
+      void saldosQuery.refetch();
+    } catch (e: unknown) {
+      const axiosErr = e as { response?: { data?: { mensaje?: string } } };
+      const msg = axiosErr.response?.data?.mensaje || (e instanceof Error ? e.message : "Error al generar orden de pago adicional.");
+      setErrorPagoAdicional(msg);
+    } finally {
+      setConfirmandoPagoAdicional(false);
+    }
+  };
+
+  const handleAbrirSolicitarDevolucion = (ordenId?: string) => {
+    setConsultarPagoBajoDemanda(true);
+    const ordenesDisponibles = saldosQuery.data?.ordenes?.filter((o) => (o.saldoDevolvible ?? 0) > 0) ?? [];
+    const targetOrden = ordenId
+      ? (ordenesDisponibles.find((o) => o.ordenPagoId === ordenId) ?? (ordenPago?.ordenPagoId === ordenId ? { ordenPagoId: ordenPago.ordenPagoId, saldoDevolvible: ordenPago.monto } : null))
+      : (ordenesDisponibles[0] ?? (ordenPago?.estado === "CONFIRMADO" ? { ordenPagoId: ordenPago.ordenPagoId, saldoDevolvible: ordenPago.monto } : null));
+
+    if (!targetOrden) {
+      alert("No se encontró ningún pago con saldo disponible para devolución.");
+      return;
+    }
+    setOrdenParaDevolucion(targetOrden.ordenPagoId);
+    setCausalDev(saldosQuery.data?.posibleSobrepago ? "SOBREPAGO" : "PAGO_INDEBIDO");
+    setMontoSolicitadoDev(String((targetOrden.saldoDevolvible ?? 0).toFixed(2)));
+    setMotivoDev("");
+    setErrorSolicitudDev(null);
+    setModalSolicitarDevAbierto(true);
+  };
+
+  const handleSolicitarDevolucionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !ordenParaDevolucion) return;
+    const montoNum = Number(montoSolicitadoDev);
+    if (isNaN(montoNum) || montoNum <= 0) {
+      setErrorSolicitudDev("El monto a devolver debe ser mayor a 0.");
+      return;
+    }
+    const ordenSeleccionadaActual = saldosQuery.data?.ordenes.find((o) => o.ordenPagoId === ordenParaDevolucion);
+    if (ordenSeleccionadaActual && montoNum > ordenSeleccionadaActual.saldoDevolvible) {
+      setErrorSolicitudDev(`El monto no puede exceder el saldo devolvible disponible de esta orden (S/ ${ordenSeleccionadaActual.saldoDevolvible.toFixed(2)}).`);
+      return;
+    }
+    if (motivoDev.trim().length < 10) {
+      setErrorSolicitudDev("El motivo de la solicitud debe tener al menos 10 caracteres.");
+      return;
+    }
+    setProcesandoSolicitudDev(true);
+    setErrorSolicitudDev(null);
+    try {
+      await tesoreriaService.solicitarDevolucion({
+        expedienteId: id,
+        ordenPagoId: ordenParaDevolucion,
+        causal: causalDev,
+        montoSolicitado: montoNum,
+        motivo: motivoDev.trim(),
+      });
+      setModalSolicitarDevAbierto(false);
+      void saldosQuery.refetch();
+      void devolucionesQuery.refetch();
+    } catch (e: unknown) {
+      const axiosErr = e as { response?: { data?: { mensaje?: string } } };
+      const msg = axiosErr.response?.data?.mensaje || (e instanceof Error ? e.message : "Error al registrar solicitud de devolución.");
+      setErrorSolicitudDev(msg);
+    } finally {
+      setProcesandoSolicitudDev(false);
+    }
+  };
+
+  const handleIniciarRevisionDev = async (devId: string) => {
+    try {
+      await tesoreriaService.revisarDevolucion(devId);
+      void devolucionesQuery.refetch();
+    } catch (e: unknown) {
+      const axiosErr = e as { response?: { data?: { mensaje?: string } } };
+      alert(axiosErr.response?.data?.mensaje || "Error al iniciar revisión de devolución.");
+    }
+  };
+
+  const handleAbrirAprobarDev = (dev: DtoSolicitudDevolucion) => {
+    setDevParaGestion(dev);
+    setMontoAutorizadoDev(String(dev.montoSolicitado.toFixed(2)));
+    setObservacionResolucionDev("");
+    setErrorAccionDev(null);
+    setModalAprobarDevAbierto(true);
+  };
+
+  const handleAprobarDevSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!devParaGestion) return;
+    const monto = Number(montoAutorizadoDev);
+    if (isNaN(monto) || monto <= 0 || monto > devParaGestion.montoSolicitado) {
+      setErrorAccionDev(`El monto autorizado debe estar entre S/ 0.01 y S/ ${devParaGestion.montoSolicitado.toFixed(2)}.`);
+      return;
+    }
+    setProcesandoAccionDev(true);
+    setErrorAccionDev(null);
+    try {
+      await tesoreriaService.aprobarDevolucion(
+        devParaGestion.solicitudDevolucionId,
+        monto,
+        observacionResolucionDev.trim() || undefined
+      );
+      setModalAprobarDevAbierto(false);
+      void saldosQuery.refetch();
+      void devolucionesQuery.refetch();
+    } catch (e: unknown) {
+      const axiosErr = e as { response?: { data?: { mensaje?: string } } };
+      setErrorAccionDev(axiosErr.response?.data?.mensaje || "Error al aprobar devolución.");
+    } finally {
+      setProcesandoAccionDev(false);
+    }
+  };
+
+  const handleAbrirObservarDev = (dev: DtoSolicitudDevolucion) => {
+    setDevParaGestion(dev);
+    setMotivoObservacionDev("");
+    setErrorAccionDev(null);
+    setModalObservarDevAbierto(true);
+  };
+
+  const handleObservarDevSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!devParaGestion) return;
+    if (motivoObservacionDev.trim().length < 5) {
+      setErrorAccionDev("Debe indicar el motivo u observación formal (mínimo 5 caracteres).");
+      return;
+    }
+    setProcesandoAccionDev(true);
+    setErrorAccionDev(null);
+    try {
+      await tesoreriaService.observarDevolucion(
+        devParaGestion.solicitudDevolucionId,
+        motivoObservacionDev.trim()
+      );
+      setModalObservarDevAbierto(false);
+      void devolucionesQuery.refetch();
+    } catch (e: unknown) {
+      const axiosErr = e as { response?: { data?: { mensaje?: string } } };
+      setErrorAccionDev(axiosErr.response?.data?.mensaje || "Error al observar devolución.");
+    } finally {
+      setProcesandoAccionDev(false);
+    }
+  };
+
+  const handleAbrirRechazarDev = (dev: DtoSolicitudDevolucion) => {
+    setDevParaGestion(dev);
+    setMotivoRechazoDev("");
+    setErrorAccionDev(null);
+    setModalRechazarDevAbierto(true);
+  };
+
+  const handleRechazarDevSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!devParaGestion) return;
+    if (motivoRechazoDev.trim().length < 5) {
+      setErrorAccionDev("Debe indicar el motivo del rechazo formal (mínimo 5 caracteres).");
+      return;
+    }
+    setProcesandoAccionDev(true);
+    setErrorAccionDev(null);
+    try {
+      await tesoreriaService.rechazarDevolucion(
+        devParaGestion.solicitudDevolucionId,
+        motivoRechazoDev.trim()
+      );
+      setModalRechazarDevAbierto(false);
+      void saldosQuery.refetch();
+      void devolucionesQuery.refetch();
+    } catch (e: unknown) {
+      const axiosErr = e as { response?: { data?: { mensaje?: string } } };
+      setErrorAccionDev(axiosErr.response?.data?.mensaje || "Error al rechazar devolución.");
+    } finally {
+      setProcesandoAccionDev(false);
+    }
+  };
+
+  const handleAbrirSubsanarDev = (dev: DtoSolicitudDevolucion) => {
+    setDevParaGestion(dev);
+    setSustentoSubsanacionDev("");
+    setErrorAccionDev(null);
+    setModalSubsanarDevAbierto(true);
+  };
+
+  const handleSubsanarDevSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!devParaGestion) return;
+    if (sustentoSubsanacionDev.trim().length < 5) {
+      setErrorAccionDev("Debe ingresar el sustento de la subsanación (mínimo 5 caracteres).");
+      return;
+    }
+    setProcesandoAccionDev(true);
+    setErrorAccionDev(null);
+    try {
+      await tesoreriaService.subsanarDevolucion(
+        devParaGestion.solicitudDevolucionId,
+        sustentoSubsanacionDev.trim()
+      );
+      setModalSubsanarDevAbierto(false);
+      void devolucionesQuery.refetch();
+    } catch (e: unknown) {
+      const axiosErr = e as { response?: { data?: { mensaje?: string } } };
+      setErrorAccionDev(axiosErr.response?.data?.mensaje || "Error al subsanar observación de devolución.");
+    } finally {
+      setProcesandoAccionDev(false);
+    }
+  };
+
+  const badgeEstadoDevolucion = (estado: EstadoDevolucion) => {
+    switch (estado) {
+      case "SOLICITADA":
+        return "bg-amber-50 text-amber-900 border-amber-300";
+      case "EN_REVISION":
+        return "bg-blue-50 text-blue-900 border-blue-300";
+      case "OBSERVADA":
+        return "bg-orange-50 text-orange-900 border-orange-300";
+      case "SUBSANADA":
+        return "bg-indigo-50 text-indigo-900 border-indigo-300";
+      case "APROBADA":
+        return "bg-purple-50 text-purple-900 border-purple-300";
+      case "PENDIENTE_TESORERIA":
+        return "bg-emerald-50 text-emerald-900 border-emerald-300";
+      case "DEVUELTA":
+        return "bg-teal-50 text-teal-900 border-teal-300";
+      case "RECHAZADA":
+        return "bg-rose-50 text-rose-900 border-rose-300";
+      case "ANULADA":
+        return "bg-slate-100 text-slate-700 border-slate-300";
+      default:
+        return "bg-slate-100 text-slate-700 border-slate-200";
+    }
+  };
+
   const pagoEnResumen = (resumen.data as { pago?: DtoOrdenPago | null } | undefined)?.pago;
   const ordenPago = pagoQuery.data?.tieneOrden ? pagoQuery.data.pago : (pagoEnResumen ?? null);
-  const pagoConfirmado = Boolean(ordenPago && ordenPago.estado === "CONFIRMADO");
+  const pagoConfirmado =
+    Boolean(ordenPago && ordenPago.estado === "CONFIRMADO") ||
+    Boolean(saldosQuery.data && saldosQuery.data.totalPagado > 0);
   const bloqueadoPorPago = tieneCostoTupa && !pagoConfirmado;
 
   const accionesDisponibles = [
@@ -1245,8 +1588,34 @@ export default function ExpedienteDetallePage() {
                     <span className="font-mono font-bold text-slate-700 text-sm">S/ 0.00</span>
                   </div>
                 ) : (
-                  <div className="space-y-3 text-xs">
-                    {/* Tarjeta de estado de la orden */}
+                  <div className="space-y-4 text-xs">
+                    {/* Alerta de Posible Sobrepago (Fase 3) */}
+                    {saldosQuery.data?.posibleSobrepago && (
+                      <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">⚠️</span>
+                            <strong className="text-sm font-bold text-amber-900">
+                              Alerta de Posible Sobrepago Detectada
+                            </strong>
+                          </div>
+                          <p className="text-xs text-amber-800">
+                            El monto total pagado (<strong>S/ {saldosQuery.data.totalPagado.toFixed(2)}</strong>) supera el arancel oficial del TUPA (<strong>S/ {saldosQuery.data.costoOficial.toFixed(2)}</strong>) por una diferencia de <strong>S/ {saldosQuery.data.diferencia.toFixed(2)}</strong>. El administrado puede solicitar una devolución formal por el excedente.
+                          </p>
+                        </div>
+                        {saldosQuery.data?.ordenes?.some((o) => (o.saldoDevolvible ?? 0) > 0) && (
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirSolicitarDevolucion()}
+                            className="shrink-0 rounded-xl bg-amber-800 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-900 transition shadow-xs"
+                          >
+                            ↩️ Solicitar Devolución
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Resumen Financiero Consolidado */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
                       <div>
                         <span className="text-slate-500 block">Arancel TUPA:</span>
@@ -1255,27 +1624,135 @@ export default function ExpedienteDetallePage() {
                         </span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block">Código Orden Pago:</span>
-                        <span className="font-mono font-bold text-slate-800">
-                          {ordenPago ? ordenPago.codigoPago : "Sin generar"}
+                        <span className="text-slate-500 block">Total Pagado:</span>
+                        <span className="font-mono font-bold text-slate-800 text-base">
+                          S/ {(saldosQuery.data?.totalPagado ?? (ordenPago?.estado === "CONFIRMADO" ? ordenPago.monto : 0)).toFixed(2)}
                         </span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block">Estado del Pago:</span>
-                        <span className="font-bold text-slate-800">
-                          {ordenPago ? ordenPago.estado : "No generado"}
+                        <span className="text-slate-500 block">Estado General Pago:</span>
+                        <span className={`inline-block font-bold mt-0.5 ${pagoConfirmado ? "text-emerald-700" : "text-amber-700"}`}>
+                          {pagoConfirmado ? "✓ Pago Confirmado" : ordenPago ? ordenPago.estado : "Sin Orden"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block">Vencimiento Orden:</span>
-                        <span className="text-slate-700 font-medium">
-                          {ordenPago ? formatearFechaCorta(ordenPago.fechaVencimiento) : "-"}
+                        <span className="text-slate-500 block">Saldo Devolvible Disponible:</span>
+                        <span className="font-mono font-bold text-teal-800 text-base">
+                          S/ {(saldosQuery.data?.ordenes?.reduce((acc, o) => acc + (o.saldoDevolvible ?? 0), 0) ?? (ordenPago?.estado === "CONFIRMADO" ? ordenPago.monto : 0)).toFixed(2)}
                         </span>
                       </div>
                     </div>
 
-                    {/* Botones de acción / Recibo */}
-                    {!ordenPago ? (
+                    {/* Listado de Órdenes de Cobro (Principal y Adicionales) */}
+                    {saldosQuery.data?.ordenes && saldosQuery.data.ordenes.length > 0 ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                            Órdenes de Pago del Expediente
+                          </h3>
+                          {pagoConfirmado && (
+                            <button
+                              type="button"
+                              onClick={handleAbrirPagoAdicionalDirecto}
+                              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+                            >
+                              + Registrar Pago Adicional
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {saldosQuery.data.ordenes.map((ord) => (
+                            <div
+                              key={ord.ordenPagoId}
+                              className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl border ${
+                                ord.estado === "CONFIRMADO"
+                                  ? "bg-emerald-50/70 border-emerald-200"
+                                  : "bg-amber-50/70 border-amber-200"
+                              }`}
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-bold text-slate-900">
+                                    {ord.codigoPago}
+                                  </span>
+                                  <span
+                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                      ord.tipoOrden === "ADICIONAL"
+                                        ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                        : "bg-slate-100 text-slate-700"
+                                    }`}
+                                  >
+                                    {ord.tipoOrden}
+                                  </span>
+                                  <span
+                                    className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                      ord.estado === "CONFIRMADO"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : "bg-amber-100 text-amber-800"
+                                    }`}
+                                  >
+                                    {ord.estado}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-600 font-mono">
+                                  Monto: <strong>S/ {ord.monto.toFixed(2)}</strong>
+                                  {ord.codigoRecibo ? ` · Recibo: ${ord.codigoRecibo}` : ""}
+                                  {ord.fechaPago ? ` · Fecha: ${formatearFechaLarga(ord.fechaPago)}` : ""}
+                                </p>
+                                {ord.estado === "CONFIRMADO" && (
+                                  <p className="text-[11px] text-teal-800">
+                                    Saldo devolvible de esta orden: <strong>S/ {ord.saldoDevolvible.toFixed(2)}</strong>
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                {ord.estado === "CONFIRMADO" && ordenPago && ordenPago.ordenPagoId === ord.ordenPagoId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setModalReciboDetalle(ordenPago)}
+                                    className="rounded-xl border border-emerald-700 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-50 transition shadow-xs"
+                                  >
+                                    Ver Recibo
+                                  </button>
+                                )}
+                                {ord.estado === "CONFIRMADO" && ord.saldoDevolvible > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAbrirSolicitarDevolucion(ord.ordenPagoId)}
+                                    className="rounded-xl border border-teal-700 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800 hover:bg-teal-100 transition shadow-xs"
+                                  >
+                                    ↩️ Devolución
+                                  </button>
+                                )}
+                                {ord.estado === "PENDIENTE" && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        void navigator.clipboard.writeText(ord.codigoPago);
+                                        setCopiadoId(`pago-${ord.ordenPagoId}`);
+                                        setTimeout(() => setCopiadoId(null), 2000);
+                                      }}
+                                      className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-50 transition"
+                                    >
+                                      {copiadoId === `pago-${ord.ordenPagoId}` ? "✓ Copiado" : "Copiar código"}
+                                    </button>
+                                    {(usuario?.rol === "TESORERIA" || usuario?.rol === "ADMINISTRADOR") && (
+                                      <Link
+                                        to="/tesoreria"
+                                        className="rounded-xl bg-blue-800 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-900 transition"
+                                      >
+                                        Ir a Cobrar →
+                                      </Link>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : !ordenPago ? (
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-amber-50/60 border border-amber-200">
                         <div>
                           <p className="font-semibold text-amber-900">
@@ -1294,7 +1771,7 @@ export default function ExpedienteDetallePage() {
                           {generandoOrden ? "Generando..." : "Generar orden de pago"}
                         </button>
                       </div>
-                    ) : ordenPago.estado === "CONFIRMADO" ? (
+                    ) : (
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200">
                         <div className="space-y-0.5">
                           <p className="font-bold text-emerald-950 flex items-center gap-1.5">
@@ -1310,47 +1787,173 @@ export default function ExpedienteDetallePage() {
                             {ordenPago.fechaPago ? ` · Fecha: ${formatearFechaLarga(ordenPago.fechaPago)}` : ""}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setModalReciboDetalle(ordenPago)}
-                          className="shrink-0 rounded-xl border border-emerald-700 bg-white px-3.5 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-50 transition shadow-xs"
-                        >
-                          Ver Recibo Oficial
-                        </button>
-                      </div>
-                    ) : ordenPago.estado === "PENDIENTE" ? (
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-amber-50/80 border border-amber-200">
-                        <div>
-                          <p className="font-bold text-amber-900">
-                            Orden emitida ({ordenPago.codigoPago}) — Pendiente de cobro en Tesorería
-                          </p>
-                          <p className="text-amber-700 mt-0.5">
-                            El ciudadano puede pagar en efectivo en Ventanilla o vía Yape institucional.
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => {
-                              void navigator.clipboard.writeText(ordenPago.codigoPago);
-                              setCopiadoId("codigo-pago");
-                              setTimeout(() => setCopiadoId(null), 2000);
-                            }}
-                            className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-50 transition"
+                            onClick={() => setModalReciboDetalle(ordenPago)}
+                            className="shrink-0 rounded-xl border border-emerald-700 bg-white px-3.5 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-50 transition shadow-xs"
                           >
-                            {copiadoId === "codigo-pago" ? "✓ Copiado" : "Copiar código"}
+                            Ver Recibo Oficial
                           </button>
-                          {usuario?.rol === "TESORERIA" || usuario?.rol === "ADMINISTRADOR" ? (
-                            <Link
-                              to="/tesoreria"
-                              className="rounded-xl bg-blue-800 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-900 transition"
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirSolicitarDevolucion(ordenPago.ordenPagoId)}
+                            className="shrink-0 rounded-xl border border-teal-700 bg-teal-50 px-3.5 py-1.5 text-xs font-bold text-teal-900 hover:bg-teal-100 transition shadow-xs"
+                          >
+                            ↩️ Solicitar Devolución
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAbrirPagoAdicionalDirecto}
+                            className="shrink-0 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition shadow-xs"
+                          >
+                            + Registrar Pago Adicional
+                          </button>
+                          {!consultarPagoBajoDemanda && (
+                            <button
+                              type="button"
+                              onClick={() => setConsultarPagoBajoDemanda(true)}
+                              className="shrink-0 rounded-xl border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs"
                             >
-                              Ir a Cobrar →
-                            </Link>
-                          ) : null}
+                              Ver Detalle de Saldos y DEV
+                            </button>
+                          )}
                         </div>
                       </div>
-                    ) : null}
+                    )}
+
+                    {/* Sección de Solicitudes de Devolución (DEV) */}
+                    {devolucionesQuery.data?.items && devolucionesQuery.data.items.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-slate-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                            <span>↩️</span> Solicitudes de Devolución de Pago (DEV)
+                          </h3>
+                          <span className="text-[11px] text-slate-500 font-mono">
+                            {devolucionesQuery.data.items.length} solicitud(es)
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          {devolucionesQuery.data.items.map((dev) => (
+                            <div
+                              key={dev.solicitudDevolucionId}
+                              className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/80 space-y-2"
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-bold text-purple-900 text-sm">
+                                    {dev.codigoDev}
+                                  </span>
+                                  <span className="inline-block rounded bg-amber-100 text-amber-900 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                                    {dev.causal}
+                                  </span>
+                                  <span className={`inline-block rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${badgeEstadoDevolucion(dev.estado)}`}>
+                                    {dev.estado}
+                                  </span>
+                                </div>
+                                <div className="text-right text-xs">
+                                  <span className="text-slate-500">Monto: </span>
+                                  <strong className="font-mono text-slate-900">
+                                    S/ {dev.montoSolicitado.toFixed(2)}
+                                  </strong>
+                                  {dev.montoAutorizado !== null && (
+                                    <span className="text-emerald-700 font-bold ml-2">
+                                      (Aut: S/ {dev.montoAutorizado.toFixed(2)})
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <p className="text-slate-700 text-xs">
+                                <strong>Motivo: </strong> {dev.motivo}
+                              </p>
+
+                              {dev.motivoObservacion && (
+                                <div className="p-2 rounded-lg bg-orange-50 border border-orange-200 text-orange-900 text-xs">
+                                  <strong>Observación de Mesa de Partes: </strong> {dev.motivoObservacion}
+                                </div>
+                              )}
+
+                              {dev.motivoRechazo && (
+                                <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs">
+                                  <strong>Motivo de Rechazo: </strong> {dev.motivoRechazo}
+                                </div>
+                              )}
+
+                              {dev.constanciaDevolucionCodigo && (
+                                <div className="p-2 rounded-lg bg-teal-50 border border-teal-200 text-teal-950 font-mono text-xs flex items-center justify-between">
+                                  <span>✓ Constancia de Devolución Oficial: <strong>{dev.constanciaDevolucionCodigo}</strong></span>
+                                  <span className="text-[11px] font-sans font-semibold text-teal-800">
+                                    Medio: {dev.metodoDevolucion}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Acciones por rol en la Devolución */}
+                              <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-slate-200">
+                                {dev.estado === "OBSERVADA" && (esTitular || rolSubsanacionInstitucional) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAbrirSubsanarDev(dev)}
+                                    className="rounded-lg bg-emerald-700 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-800 shadow-xs"
+                                  >
+                                    Subsanar Observación
+                                  </button>
+                                )}
+
+                                {(usuario?.rol === "MESA_PARTES" || usuario?.rol === "ADMINISTRADOR") && (
+                                  <>
+                                    {dev.estado === "SOLICITADA" && (
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleIniciarRevisionDev(dev.solicitudDevolucionId)}
+                                        className="rounded-lg border border-blue-600 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800 hover:bg-blue-100"
+                                      >
+                                        Iniciar Revisión
+                                      </button>
+                                    )}
+                                    {["SOLICITADA", "EN_REVISION", "OBSERVADA", "SUBSANADA"].includes(dev.estado) && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAbrirAprobarDev(dev)}
+                                          className="rounded-lg bg-purple-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-purple-800 shadow-xs"
+                                        >
+                                          Aprobar Devolución
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAbrirObservarDev(dev)}
+                                          className="rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-900 hover:bg-orange-100"
+                                        >
+                                          Observar
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAbrirRechazarDev(dev)}
+                                          className="rounded-lg border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                                        >
+                                          Rechazar
+                                        </button>
+                                      </>
+                                    )}
+                                  </>
+                                )}
+
+                                {dev.estado === "PENDIENTE_TESORERIA" && (usuario?.rol === "TESORERIA" || usuario?.rol === "ADMINISTRADOR") && (
+                                  <Link
+                                    to="/tesoreria"
+                                    className="rounded-lg bg-teal-800 px-3 py-1 text-xs font-bold text-white hover:bg-teal-900 shadow-xs"
+                                  >
+                                    Ir a Tesorería para Desembolsar →
+                                  </Link>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {errorOrden && (
                       <p className="text-xs text-rose-700 bg-rose-50 p-2 rounded-lg border border-rose-200">
@@ -1918,6 +2521,579 @@ export default function ExpedienteDetallePage() {
                 🖨️ Imprimir Recibo
               </button>
             </div>
+          </div>
+        </dialog>
+      )}
+
+      {/* MODAL DOBLE ADVERTENCIA: PAGO DUPLICADO / ADICIONAL */}
+      {modalDobleAdvertenciaPago && (
+        <dialog
+          open
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 w-full h-full backdrop-blur-xs"
+          aria-labelledby="advertencia-pago-titulo"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-amber-200 bg-white shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                    Control Anti-Duplicados (Fase 3)
+                  </span>
+                  <h2 id="advertencia-pago-titulo" className="text-base font-bold text-slate-900">
+                    {pasoAdvertencia === 1 ? "Nivel 1: Pago Ya Confirmado" : "Nivel 2: Confirmación de Pago Adicional"}
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalDobleAdvertenciaPago(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            {pasoAdvertencia === 1 ? (
+              <div className="space-y-4 text-xs">
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 space-y-2">
+                  <p className="font-bold text-amber-900">
+                    {modalDobleAdvertenciaPago.mensaje}
+                  </p>
+                  <p className="text-amber-800">
+                    Este trámite ya cuenta con pago verificado en Tesorería:
+                  </p>
+                  <ul className="list-disc list-inside font-mono text-[11px] space-y-0.5 text-amber-950">
+                    {modalDobleAdvertenciaPago.codigoRecibo && (
+                      <li>Recibo emitido: <strong>{modalDobleAdvertenciaPago.codigoRecibo}</strong></li>
+                    )}
+                    {modalDobleAdvertenciaPago.monto !== undefined && (
+                      <li>Monto pagado: <strong>S/ {modalDobleAdvertenciaPago.monto.toFixed(2)}</strong></li>
+                    )}
+                    {modalDobleAdvertenciaPago.totalPagado !== undefined && (
+                      <li>Total acumulado: <strong>S/ {modalDobleAdvertenciaPago.totalPagado.toFixed(2)}</strong></li>
+                    )}
+                  </ul>
+                  <p className="text-[11px] text-amber-800 pt-1">
+                    Para evitar cobros accidentales o duplicados, el sistema no permite generar un pago idéntico de forma automática.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setModalDobleAdvertenciaPago(null)}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Entendido, Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPasoAdvertencia(2)}
+                    className="rounded-xl bg-amber-800 px-4 py-2 font-bold text-white hover:bg-amber-900 shadow-xs"
+                  >
+                    Deseo solicitar un Pago Adicional →
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleConfirmarPagoAdicionalSubmit} className="space-y-4 text-xs">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                  <p className="font-bold text-slate-900">
+                    Está a punto de emitir una orden de PAGO ADICIONAL
+                  </p>
+                  <p className="text-slate-600">
+                    Debe ingresar una justificación explícita de por qué este expediente requiere un cobro complementario (por ejemplo: derechos de inspección adicional, arancel suplementario aprobado, rectificación formal).
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="motivo-pago-adicional" className="block font-bold text-slate-800 mb-1">
+                    Motivo o Justificación del Pago Adicional *
+                  </label>
+                  <textarea
+                    id="motivo-pago-adicional"
+                    rows={3}
+                    required
+                    value={motivoPagoAdicional}
+                    onChange={(e) => setMotivoPagoAdicional(e.target.value)}
+                    placeholder="Ingrese la causal formal de la orden de pago adicional (mínimo 10 caracteres)..."
+                    className="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                  />
+                  <span className="text-[10px] text-slate-400">
+                    Caracteres ingresados: {motivoPagoAdicional.trim().length} / 10 requeridos
+                  </span>
+                </div>
+
+                {errorPagoAdicional && (
+                  <p className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-semibold">
+                    {errorPagoAdicional}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setPasoAdvertencia(1)}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    ← Volver
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={confirmandoPagoAdicional || motivoPagoAdicional.trim().length < 10}
+                    className="rounded-xl bg-blue-800 px-4 py-2 font-bold text-white hover:bg-blue-900 shadow-xs disabled:opacity-50"
+                  >
+                    {confirmandoPagoAdicional ? "Generando..." : "Confirmar y Generar Pago Adicional"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </dialog>
+      )}
+
+      {/* MODAL: SOLICITAR DEVOLUCIÓN DE PAGO (DEV) */}
+      {modalSolicitarDevAbierto && (
+        <dialog
+          open
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 w-full h-full backdrop-blur-xs"
+          aria-labelledby="solicitar-dev-titulo"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-purple-700">
+                  Mesa de Partes / Trámite Documental
+                </span>
+                <h2 id="solicitar-dev-titulo" className="text-base font-bold text-slate-900">
+                  Solicitar Devolución de Pago (Ticket DEV)
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalSolicitarDevAbierto(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSolicitarDevolucionSubmit} className="space-y-4 text-xs">
+              {/* Selección de orden / pago a devolver */}
+              {saldosQuery.data?.ordenes && saldosQuery.data.ordenes.length > 1 && (
+                <div>
+                  <label htmlFor="orden-devolucion-select" className="block font-bold text-slate-700 mb-1">
+                    Seleccione la Orden de Pago Origen *
+                  </label>
+                  <select
+                    id="orden-devolucion-select"
+                    value={ordenParaDevolucion}
+                    onChange={(e) => {
+                      const selId = e.target.value;
+                      setOrdenParaDevolucion(selId);
+                      const target = saldosQuery.data?.ordenes.find((o) => o.ordenPagoId === selId);
+                      if (target) setMontoSolicitadoDev(String(target.saldoDevolvible.toFixed(2)));
+                    }}
+                    className="w-full rounded-xl border border-slate-300 p-2 text-slate-800"
+                  >
+                    {saldosQuery.data.ordenes
+                      .filter((o) => o.saldoDevolvible > 0)
+                      .map((o) => (
+                        <option key={o.ordenPagoId} value={o.ordenPagoId}>
+                          {o.codigoPago} ({o.tipoOrden}) — Pagado: S/ {o.monto.toFixed(2)} (Saldo Disp: S/ {o.saldoDevolvible.toFixed(2)})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="causal-devolucion" className="block font-bold text-slate-700 mb-1">
+                  Causal de la Devolución *
+                </label>
+                <select
+                  id="causal-devolucion"
+                  value={causalDev}
+                  onChange={(e) => setCausalDev(e.target.value as CausalDevolucion)}
+                  className="w-full rounded-xl border border-slate-300 p-2 text-slate-800"
+                >
+                  <option value="SOBREPAGO">SOBREPAGO (Pago por encima del arancel TUPA)</option>
+                  <option value="PAGO_DUPLICADO">PAGO_DUPLICADO (Más de un pago confirmado en el trámite)</option>
+                  <option value="PAGO_INDEBIDO">PAGO_INDEBIDO (Cobro erróneo o sin causa legal)</option>
+                  <option value="DESISTIMIENTO">DESISTIMIENTO (Ciudadano desiste formalmente)</option>
+                  <option value="TRAMITE_DENEGADO">TRAMITE_DENEGADO (Procedimiento no procedente con devolución)</option>
+                  <option value="OTRO">OTRO (Causal extraordinaria debidamente sustentada)</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="monto-solicitado-dev" className="block font-bold text-slate-700 mb-1">
+                  Monto a Solicitar (S/) *
+                </label>
+                <input
+                  id="monto-solicitado-dev"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={montoSolicitadoDev}
+                  onChange={(e) => setMontoSolicitadoDev(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 p-2 font-mono font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="motivo-devolucion" className="block font-bold text-slate-700 mb-1">
+                  Sustento o Motivo de la Solicitud *
+                </label>
+                <textarea
+                  id="motivo-devolucion"
+                  rows={3}
+                  required
+                  value={motivoDev}
+                  onChange={(e) => setMotivoDev(e.target.value)}
+                  placeholder="Explique detalladamente el motivo de la devolución (mínimo 10 caracteres)..."
+                  className="w-full rounded-xl border border-slate-300 p-2 text-slate-800"
+                />
+                <span className="text-[10px] text-slate-400">
+                  Caracteres ingresados: {motivoDev.trim().length} / 10 requeridos
+                </span>
+              </div>
+
+              {errorSolicitudDev && (
+                <p className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-semibold">
+                  {errorSolicitudDev}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setModalSolicitarDevAbierto(false)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={procesandoSolicitudDev}
+                  className="rounded-xl bg-purple-800 px-4 py-2 font-bold text-white hover:bg-purple-900 shadow-xs disabled:opacity-50"
+                >
+                  {procesandoSolicitudDev ? "Registrando..." : "Registrar Solicitud DEV"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </dialog>
+      )}
+
+      {/* MODAL: APROBAR DEVOLUCIÓN (MESA DE PARTES) */}
+      {modalAprobarDevAbierto && devParaGestion && (
+        <dialog
+          open
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 w-full h-full backdrop-blur-xs"
+          aria-labelledby="aprobar-dev-titulo"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-purple-700">
+                  Mesa de Partes / Calificación Documental
+                </span>
+                <h2 id="aprobar-dev-titulo" className="text-base font-bold text-slate-900">
+                  Aprobar Devolución — {devParaGestion.codigoDev}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalAprobarDevAbierto(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAprobarDevSubmit} className="space-y-4 text-xs">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                <p><strong>Administrado:</strong> {devParaGestion.solicitanteNombre}</p>
+                <p><strong>Causal:</strong> {devParaGestion.causal}</p>
+                <p><strong>Monto Solicitado:</strong> S/ {devParaGestion.montoSolicitado.toFixed(2)}</p>
+                <p><strong>Motivo:</strong> {devParaGestion.motivo}</p>
+              </div>
+
+              <div>
+                <label htmlFor="monto-autorizado-dev" className="block font-bold text-slate-700 mb-1">
+                  Monto Autorizado a Devolver (S/) *
+                </label>
+                <input
+                  id="monto-autorizado-dev"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={devParaGestion.montoSolicitado}
+                  required
+                  value={montoAutorizadoDev}
+                  onChange={(e) => setMontoAutorizadoDev(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 p-2 font-mono font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="observacion-resolucion-dev" className="block font-bold text-slate-700 mb-1">
+                  Observación o Sustento de la Resolución (Opcional)
+                </label>
+                <textarea
+                  id="observacion-resolucion-dev"
+                  rows={2}
+                  value={observacionResolucionDev}
+                  onChange={(e) => setObservacionResolucionDev(e.target.value)}
+                  placeholder="Detalles de la aprobación documental..."
+                  className="w-full rounded-xl border border-slate-300 p-2 text-slate-800"
+                />
+              </div>
+
+              {errorAccionDev && (
+                <p className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-semibold">
+                  {errorAccionDev}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setModalAprobarDevAbierto(false)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={procesandoAccionDev}
+                  className="rounded-xl bg-purple-800 px-4 py-2 font-bold text-white hover:bg-purple-900 shadow-xs disabled:opacity-50"
+                >
+                  {procesandoAccionDev ? "Aprobando..." : "Autorizar y Derivar a Tesorería"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </dialog>
+      )}
+
+      {/* MODAL: OBSERVAR DEVOLUCIÓN (MESA DE PARTES) */}
+      {modalObservarDevAbierto && devParaGestion && (
+        <dialog
+          open
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 w-full h-full backdrop-blur-xs"
+          aria-labelledby="observar-dev-titulo"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-orange-700">
+                  Mesa de Partes / Observación Formal
+                </span>
+                <h2 id="observar-dev-titulo" className="text-base font-bold text-slate-900">
+                  Observar Devolución — {devParaGestion.codigoDev}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalObservarDevAbierto(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleObservarDevSubmit} className="space-y-4 text-xs">
+              <div>
+                <label htmlFor="motivo-observacion-dev" className="block font-bold text-slate-700 mb-1">
+                  Pliego de Observaciones para el Administrado *
+                </label>
+                <textarea
+                  id="motivo-observacion-dev"
+                  rows={3}
+                  required
+                  value={motivoObservacionDev}
+                  onChange={(e) => setMotivoObservacionDev(e.target.value)}
+                  placeholder="Detalle los requisitos faltantes o inconsistencias (mínimo 5 caracteres)..."
+                  className="w-full rounded-xl border border-slate-300 p-2 text-slate-800"
+                />
+              </div>
+
+              {errorAccionDev && (
+                <p className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-semibold">
+                  {errorAccionDev}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setModalObservarDevAbierto(false)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={procesandoAccionDev}
+                  className="rounded-xl bg-orange-700 px-4 py-2 font-bold text-white hover:bg-orange-800 shadow-xs disabled:opacity-50"
+                >
+                  {procesandoAccionDev ? "Registrando..." : "Confirmar Observación"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </dialog>
+      )}
+
+      {/* MODAL: RECHAZAR DEVOLUCIÓN (MESA DE PARTES) */}
+      {modalRechazarDevAbierto && devParaGestion && (
+        <dialog
+          open
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 w-full h-full backdrop-blur-xs"
+          aria-labelledby="rechazar-dev-titulo"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
+                  Mesa de Partes / Denegación Formal
+                </span>
+                <h2 id="rechazar-dev-titulo" className="text-base font-bold text-slate-900">
+                  Rechazar Devolución — {devParaGestion.codigoDev}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalRechazarDevAbierto(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleRechazarDevSubmit} className="space-y-4 text-xs">
+              <div>
+                <label htmlFor="motivo-rechazo-dev" className="block font-bold text-slate-700 mb-1">
+                  Motivo de Rechazo *
+                </label>
+                <textarea
+                  id="motivo-rechazo-dev"
+                  rows={3}
+                  required
+                  value={motivoRechazoDev}
+                  onChange={(e) => setMotivoRechazoDev(e.target.value)}
+                  placeholder="Detalle la fundamentación jurídica/administrativa del rechazo (mínimo 5 caracteres)..."
+                  className="w-full rounded-xl border border-slate-300 p-2 text-slate-800"
+                />
+              </div>
+
+              {errorAccionDev && (
+                <p className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-semibold">
+                  {errorAccionDev}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setModalRechazarDevAbierto(false)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={procesandoAccionDev}
+                  className="rounded-xl bg-rose-700 px-4 py-2 font-bold text-white hover:bg-rose-800 shadow-xs disabled:opacity-50"
+                >
+                  {procesandoAccionDev ? "Rechazando..." : "Confirmar Rechazo Formal"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </dialog>
+      )}
+
+      {/* MODAL: SUBSANAR OBSERVACIÓN DE DEVOLUCIÓN */}
+      {modalSubsanarDevAbierto && devParaGestion && (
+        <dialog
+          open
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 w-full h-full backdrop-blur-xs"
+          aria-labelledby="subsanar-dev-titulo"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                  Subsanación de Devolución
+                </span>
+                <h2 id="subsanar-dev-titulo" className="text-base font-bold text-slate-900">
+                  Subsanar Observación — {devParaGestion.codigoDev}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalSubsanarDevAbierto(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubsanarDevSubmit} className="space-y-4 text-xs">
+              <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-950 space-y-1">
+                <p className="font-bold">Observación formulada:</p>
+                <p>{devParaGestion.motivoObservacion}</p>
+              </div>
+
+              <div>
+                <label htmlFor="sustento-subsanacion-dev" className="block font-bold text-slate-700 mb-1">
+                  Sustento o Corrección de Subsanación *
+                </label>
+                <textarea
+                  id="sustento-subsanacion-dev"
+                  rows={3}
+                  required
+                  value={sustentoSubsanacionDev}
+                  onChange={(e) => setSustentoSubsanacionDev(e.target.value)}
+                  placeholder="Detalle la subsanación realizada (mínimo 5 caracteres)..."
+                  className="w-full rounded-xl border border-slate-300 p-2 text-slate-800"
+                />
+              </div>
+
+              {errorAccionDev && (
+                <p className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-semibold">
+                  {errorAccionDev}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setModalSubsanarDevAbierto(false)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={procesandoAccionDev}
+                  className="rounded-xl bg-emerald-700 px-4 py-2 font-bold text-white hover:bg-emerald-800 shadow-xs disabled:opacity-50"
+                >
+                  {procesandoAccionDev ? "Subsanando..." : "Enviar Subsanación"}
+                </button>
+              </div>
+            </form>
           </div>
         </dialog>
       )}

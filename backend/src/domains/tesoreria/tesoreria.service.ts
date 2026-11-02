@@ -18,6 +18,15 @@ import type {
   DtoResumenDashboardTesoreria,
   FilaOrdenPago,
   MetodoPago,
+  TipoOrdenPago,
+  CausalDevolucion,
+  EstadoDevolucion,
+  CanalRegistroDevolucion,
+  MetodoDevolucion,
+  FilaSolicitudDevolucion,
+  DtoSolicitudDevolucion,
+  DtoSaldosExpediente,
+  DtoBuscarDevolucionesParams,
 } from './tesoreria.types.js';
 import { TaypiProvider } from './providers/taypi.provider.js';
 import { DemoQrProvider } from './providers/demo-qr.provider.js';
@@ -57,6 +66,8 @@ export class TesoreriaService {
       monto: Number(fila.monto) || 0,
       moneda: fila.moneda,
       estado: fila.estado,
+      tipoOrden: fila.tipo_orden ?? 'PRINCIPAL',
+      motivoAdicional: fila.motivo_adicional ?? null,
       metodoPago: fila.metodo_pago ?? null,
       referenciaOperacion: fila.referencia_operacion ?? null,
       montoRecibido: fila.monto_recibido !== null ? Number(fila.monto_recibido) : null,
@@ -83,11 +94,59 @@ export class TesoreriaService {
     };
   }
 
+  private mapearFilaDevolucionADto(fila: FilaSolicitudDevolucion): DtoSolicitudDevolucion {
+    const docStr = fila.solicitante_documento ?? '';
+    const visibleLength = Math.min(3, Math.floor(docStr.length / 2));
+    const masked = docStr.length > 0
+      ? '•'.repeat(Math.max(docStr.length - visibleLength, 3)) + docStr.slice(-visibleLength)
+      : '••••••';
+
+    return {
+      solicitudDevolucionId: fila.solicitud_devolucion_id,
+      codigoDev: fila.codigo_dev,
+      expedienteId: fila.expediente_id,
+      codigoExpediente: fila.codigo_expediente ?? '',
+      ordenPagoId: fila.orden_pago_id,
+      codigoPago: fila.codigo_pago ?? '',
+      codigoRecibo: fila.codigo_recibo ?? null,
+      solicitanteId: fila.solicitante_id,
+      solicitanteNombre: fila.solicitante_nombre ?? 'Administrado',
+      solicitanteDocumento: masked,
+      cuentaUsuarioId: fila.cuenta_usuario_id ?? null,
+      canalRegistro: fila.canal_registro,
+      causal: fila.causal,
+      motivo: fila.motivo,
+      montoOriginal: Number(fila.monto_original) || 0,
+      montoSolicitado: Number(fila.monto_solicitado) || 0,
+      montoAutorizado: fila.monto_autorizado !== null ? Number(fila.monto_autorizado) : null,
+      montoDevuelto: fila.monto_devuelto !== null ? Number(fila.monto_devuelto) : null,
+      estado: fila.estado,
+      fechaSolicitud: fila.fecha_solicitud instanceof Date ? fila.fecha_solicitud.toISOString() : String(fila.fecha_solicitud),
+      fechaAprobacion: fila.fecha_aprobacion ? (fila.fecha_aprobacion instanceof Date ? fila.fecha_aprobacion.toISOString() : String(fila.fecha_aprobacion)) : null,
+      aprobadoPorId: fila.aprobado_por_id ?? null,
+      aprobadoPorNombre: fila.aprobado_por_nombre ?? null,
+      fechaDevolucion: fila.fecha_devolucion ? (fila.fecha_devolucion instanceof Date ? fila.fecha_devolucion.toISOString() : String(fila.fecha_devolucion)) : null,
+      procesadoPorId: fila.procesado_por_id ?? null,
+      procesadoPorNombre: fila.procesado_por_nombre ?? null,
+      metodoDevolucion: fila.metodo_devolucion ?? null,
+      constanciaDevolucionCodigo: fila.constancia_devolucion_codigo ?? null,
+      motivoObservacion: fila.motivo_observacion ?? null,
+      motivoRechazo: fila.motivo_rechazo ?? null,
+      observacionResolucion: fila.observacion_resolucion ?? null,
+      createdAt: fila.created_at instanceof Date ? fila.created_at.toISOString() : String(fila.created_at),
+      updatedAt: fila.updated_at instanceof Date ? fila.updated_at.toISOString() : String(fila.updated_at),
+    };
+  }
+
   async generarOrdenPago(
     expedienteId: string,
     usuarioActorId: string,
     rolesActor: string[],
     personaActorId?: string,
+    opciones?: {
+      confirmarPagoAdicional?: boolean;
+      motivoAdicional?: string;
+    },
   ): Promise<DtoOrdenPago> {
     const contexto = await this.repository.obtenerContextoExpedienteParaPago(
       this.pool,
@@ -120,32 +179,71 @@ export class TesoreriaService {
       });
     }
 
-    // Verificar si ya existe una orden activa (Idempotencia y regla de una orden)
     const ordenExistente = await this.repository.obtenerOrdenActivaPorExpediente(
       this.pool,
       expedienteId,
     );
 
-    const ahora = new Date();
+    const todasLasOrdenes = await this.repository.obtenerOrdenesPorExpediente(this.pool, expedienteId);
 
-    if (ordenExistente) {
-      if (ordenExistente.estado === 'CONFIRMADO') {
+    const ordenesConfirmadas = todasLasOrdenes.filter((o) => o.estado === 'CONFIRMADO');
+    const ordenConfirmada = ordenesConfirmadas[ordenesConfirmadas.length - 1] ?? (ordenExistente?.estado === 'CONFIRMADO' ? ordenExistente : null);
+
+    const ahora = new Date();
+    let esAdicional = false;
+
+    if (ordenConfirmada) {
+      // Prevención de duplicados accidentales: si ya existe pago confirmado, se exige confirmación explícita
+      if (!opciones?.confirmarPagoAdicional) {
+        const totalPagado = ordenesConfirmadas.length > 0
+          ? ordenesConfirmadas.reduce((acc, curr) => acc + (Number(curr.monto) || 0), 0)
+          : Number(ordenConfirmada.monto);
         throw new ConflictError({
-          code: 'EXPEDIENTE_YA_PAGADO',
+          code: 'PAGO_YA_CONFIRMADO',
           message: 'El expediente ya cuenta con un pago confirmado y registrado en Tesorería.',
+          detail: JSON.stringify({
+            codigoPago: ordenConfirmada.codigo_pago,
+            codigoRecibo: ordenConfirmada.codigo_recibo,
+            monto: Number(ordenConfirmada.monto),
+            fechaPago: ordenConfirmada.fecha_pago ? new Date(ordenConfirmada.fecha_pago).toISOString() : null,
+            totalPagado,
+            requiereConfirmacionAdicional: true,
+          }),
         });
       }
 
-      if (ordenExistente.estado === 'PENDIENTE') {
-        const vence = new Date(ordenExistente.fecha_vencimiento);
-        if (ahora <= vence) {
-          // Idempotente: retornar la orden pendiente activa sin duplicar
-          return this.mapearFilaADto(ordenExistente);
-        }
-        // Si ya venció en tiempo, marcar como vencida para permitir reemisión
-        await this.repository.marcarOrdenVencida(this.pool, ordenExistente.orden_pago_id);
+      // Si confirmó explícitamente la intención de pago adicional
+      if (!opciones.motivoAdicional || opciones.motivoAdicional.trim().length < 5) {
+        throw new ValidationError({
+          message: 'Debe ingresar un motivo descriptivo (mínimo 5 caracteres) para registrar un pago adicional.',
+          invalidParams: [{ name: 'motivoAdicional', reason: 'MOTIVO_REQUERIDO: Ingrese la justificación del pago adicional.' }],
+        });
       }
-      // Si está RECHAZADA o VENCIDA, se permite la reemisión de una nueva orden
+
+      // Idempotencia: si ya existe una orden adicional en PENDIENTE
+      const adicionalPendiente = todasLasOrdenes.find(
+        (o) => o.tipo_orden === 'ADICIONAL' && o.estado === 'PENDIENTE',
+      );
+      if (adicionalPendiente) {
+        const vence = new Date(adicionalPendiente.fecha_vencimiento);
+        if (ahora <= vence) {
+          return this.mapearFilaADto(adicionalPendiente);
+        }
+        await this.repository.marcarOrdenVencida(this.pool, adicionalPendiente.orden_pago_id);
+      }
+
+      esAdicional = true;
+    } else {
+      // Orden principal: verificar si ya existe una orden activa
+      if (ordenExistente) {
+        if (ordenExistente.estado === 'PENDIENTE') {
+          const vence = new Date(ordenExistente.fecha_vencimiento);
+          if (ahora <= vence) {
+            return this.mapearFilaADto(ordenExistente);
+          }
+          await this.repository.marcarOrdenVencida(this.pool, ordenExistente.orden_pago_id);
+        }
+      }
     }
 
     const cliente = await this.pool.connect();
@@ -161,14 +259,16 @@ export class TesoreriaService {
         expedienteId,
         registroVersionId: contexto.registroVersionId,
         solicitanteId: contexto.solicitanteId,
-        concepto: contexto.concepto,
+        concepto: esAdicional ? `Pago Adicional: ${contexto.concepto}` : contexto.concepto,
         codigoTupa: contexto.codigoTupa,
         monto: contexto.costoOficial,
         moneda: 'PEN',
         fechaVencimiento,
+        tipoOrden: esAdicional ? 'ADICIONAL' : 'PRINCIPAL',
+        motivoAdicional: esAdicional ? opciones?.motivoAdicional?.trim() : null,
       });
 
-      // Actualizar estado del expediente a PENDIENTE_PAGO
+      // Actualizar estado del expediente a PENDIENTE_PAGO si estaba en REGISTRADO
       await cliente.query(
         `UPDATE sigd_tra.expediente
             SET estado = 'PENDIENTE_PAGO'
@@ -187,20 +287,46 @@ export class TesoreriaService {
           codigoPago: nuevaOrden.codigo_pago,
           expedienteId,
           monto: nuevaOrden.monto,
+          tipoOrden: nuevaOrden.tipo_orden,
+          motivoAdicional: nuevaOrden.motivo_adicional,
           fechaVencimiento,
         },
       });
 
+      if (esAdicional) {
+        await insertarEvento(cliente, {
+          agregado: 'TESORERIA',
+          tipo_evento: 'ORDEN_PAGO_ADICIONAL_GENERADA',
+          payload: {
+            ordenPagoId: nuevaOrden.orden_pago_id,
+            expedienteId,
+            codigoPago: nuevaOrden.codigo_pago,
+            monto: nuevaOrden.monto,
+            motivoAdicional: nuevaOrden.motivo_adicional,
+          },
+        });
+      }
+
       await cliente.query('COMMIT');
 
-      // Re-consultar con datos de solicitante y expediente
       const ordenCompleta = await this.repository.obtenerOrdenPorId(this.pool, nuevaOrden.orden_pago_id);
       return this.mapearFilaADto(ordenCompleta ?? nuevaOrden);
     } catch (error) {
       try { await cliente.query('ROLLBACK'); } catch { /* ignore */ }
-      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505' &&
-          'constraint' in error && error.constraint === 'uq_tra_orden_pago_activa_expediente') {
-        const existente = await this.repository.obtenerOrdenActivaPorExpediente(this.pool, expedienteId);
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === '23505' &&
+        'constraint' in error &&
+        (error.constraint === 'uq_tra_orden_pago_principal_activa' ||
+          error.constraint === 'uq_tra_orden_pago_adicional_pendiente' ||
+          error.constraint === 'uq_tra_orden_pago_activa_expediente')
+      ) {
+        const existente = error.constraint === 'uq_tra_orden_pago_adicional_pendiente'
+          ? (await this.repository.obtenerOrdenesPorExpediente(this.pool, expedienteId))
+              .find((orden) => orden.tipo_orden === 'ADICIONAL' && orden.estado === 'PENDIENTE')
+          : await this.repository.obtenerOrdenActivaPorExpediente(this.pool, expedienteId);
         if (existente?.estado === 'PENDIENTE') return this.mapearFilaADto(existente);
         if (existente?.estado === 'CONFIRMADO') {
           throw new ConflictError({ code: 'EXPEDIENTE_YA_PAGADO', message: 'El expediente ya cuenta con un pago confirmado.' });
@@ -478,6 +604,771 @@ export class TesoreriaService {
     return this.repository.obtenerMetricasDashboard(this.pool);
   }
 
+  // ---------------------------------------------------------------------------
+  // Módulo Devoluciones y Saldos de Expediente (Fase 3)
+  // ---------------------------------------------------------------------------
+
+  async calcularSaldosExpediente(
+    expedienteId: string,
+    rolesActor: string[],
+    personaActorId?: string,
+    usuarioActorId?: string,
+  ): Promise<DtoSaldosExpediente> {
+    const contexto = await this.repository.obtenerContextoExpedienteParaPago(
+      this.pool,
+      expedienteId,
+    );
+    if (!contexto) {
+      throw new NotFoundError({
+        message: 'Expediente no encontrado.',
+        detail: `No existe expediente con id ${expedienteId}.`,
+      });
+    }
+
+    const esInstitucional = rolesActor.some((r) =>
+      ['MESA_PARTES', 'ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'TESORERIA'].includes(
+        r.toUpperCase(),
+      ),
+    );
+
+    if (!esInstitucional && (!personaActorId || contexto.solicitanteId !== personaActorId)) {
+      throw new ForbiddenError({
+        detail: 'BOLA_VIOLATION: No tiene autorización para consultar la información financiera de este expediente.',
+      });
+    }
+    if (!esInstitucional && (!usuarioActorId ||
+      !await this.repository.cuentaCiudadanaVinculadaAlExpediente(this.pool, expedienteId, usuarioActorId, personaActorId!))) {
+      throw new ForbiddenError({ detail: 'BOLA_VIOLATION: Expediente no vinculado formalmente a esta cuenta.' });
+    }
+
+    const todasOrdenes = await this.repository.obtenerOrdenesPorExpediente(this.pool, expedienteId);
+    const todasDevoluciones = await this.repository.listarDevolucionesPorExpediente(this.pool, expedienteId);
+
+    const ordenesConfirmadas = todasOrdenes.filter((o) => o.estado === 'CONFIRMADO');
+    const totalPagado = ordenesConfirmadas.reduce((acc, curr) => acc + (Number(curr.monto) || 0), 0);
+    const costoOficial = contexto.costoOficial;
+    const diferencia = Number((totalPagado - costoOficial).toFixed(2));
+    const posibleSobrepago = (costoOficial > 0 && totalPagado > costoOficial) || (costoOficial === 0 && totalPagado > 0);
+
+    const ordenesCalculadas = await Promise.all(
+      todasOrdenes.map(async (ord) => {
+        const saldoDevolvible = ord.estado === 'CONFIRMADO'
+          ? await this.repository.calcularSaldoDevolviblePago(this.pool, ord.orden_pago_id)
+          : 0;
+
+        return {
+          ordenPagoId: ord.orden_pago_id,
+          codigoPago: ord.codigo_pago,
+          codigoRecibo: ord.codigo_recibo ?? null,
+          tipoOrden: ord.tipo_orden ?? 'PRINCIPAL',
+          monto: Number(ord.monto) || 0,
+          estado: ord.estado,
+          fechaPago: ord.fecha_pago ? (ord.fecha_pago instanceof Date ? ord.fecha_pago.toISOString() : String(ord.fecha_pago)) : null,
+          saldoDevolvible,
+        };
+      }),
+    );
+
+    return {
+      expedienteId,
+      codigoExpediente: contexto.codigoExpediente,
+      costoOficial,
+      totalPagado,
+      diferencia,
+      posibleSobrepago,
+      ordenes: ordenesCalculadas,
+      devoluciones: todasDevoluciones.map((d) => this.mapearFilaDevolucionADto(d)),
+    };
+  }
+
+  async solicitarDevolucion(
+    datos: {
+      expedienteId: string;
+      ordenPagoId: string;
+      causal: CausalDevolucion;
+      motivo: string;
+      montoSolicitado: number;
+      canalRegistro: CanalRegistroDevolucion;
+    },
+    usuarioActorId: string,
+    rolesActor: string[],
+    personaActorId?: string,
+  ): Promise<DtoSolicitudDevolucion> {
+    const orden = await this.repository.obtenerOrdenPorId(this.pool, datos.ordenPagoId);
+    if (!orden || orden.expediente_id !== datos.expedienteId) {
+      throw new NotFoundError({
+        message: 'Orden de pago no encontrada.',
+        detail: `No existe la orden ${datos.ordenPagoId} en el expediente ${datos.expedienteId}.`,
+      });
+    }
+
+    if (orden.estado !== 'CONFIRMADO') {
+      throw new ConflictError({
+        code: 'ORDEN_NO_CONFIRMADA',
+        message: 'Solo se puede solicitar devolución sobre pagos efectivamente confirmados en Tesorería.',
+      });
+    }
+
+    const esInstitucional = rolesActor.some((r) =>
+      ['MESA_PARTES', 'ADMINISTRADOR'].includes(r.toUpperCase()),
+    );
+
+    if (!esInstitucional && (!personaActorId || orden.solicitante_id !== personaActorId)) {
+      throw new ForbiddenError({
+        detail: 'BOLA_VIOLATION: No tiene autorización para solicitar devoluciones sobre este pago.',
+      });
+    }
+    if (!esInstitucional && !await this.repository.cuentaCiudadanaVinculadaAlExpediente(
+      this.pool, datos.expedienteId, usuarioActorId, personaActorId!,
+    )) {
+      throw new ForbiddenError({ detail: 'BOLA_VIOLATION: Expediente no vinculado formalmente a esta cuenta.' });
+    }
+
+    const saldoDevolvible = await this.repository.calcularSaldoDevolviblePago(this.pool, datos.ordenPagoId);
+    if (datos.montoSolicitado > saldoDevolvible) {
+      throw new ValidationError({
+        message: `El monto solicitado (S/ ${datos.montoSolicitado.toFixed(2)}) supera el saldo disponible devolvible de este pago (S/ ${saldoDevolvible.toFixed(2)}).`,
+        invalidParams: [{ name: 'montoSolicitado', reason: 'MONTO_EXCEDE_SALDO_DISPONIBLE' }],
+      });
+    }
+
+    // Validación semántica para PAGO_DUPLICADO: debe existir evidencia real de más de un pago
+    // confirmado asociado al expediente. No permite convertir un pago único en "duplicado".
+    if (datos.causal === 'PAGO_DUPLICADO') {
+      const todasLasOrdenes = await this.repository.obtenerOrdenesPorExpediente(this.pool, datos.expedienteId);
+      const ordenesConfirmadas = todasLasOrdenes.filter((o) => o.estado === 'CONFIRMADO');
+      if (ordenesConfirmadas.length < 2) {
+        throw new ValidationError({
+          message: 'La causal PAGO_DUPLICADO requiere evidencia de más de un pago confirmado asociado al expediente.',
+          invalidParams: [{ name: 'causal', reason: 'PAGO_DUPLICADO_REQUIERE_EVIDENCIA: No existe más de un pago confirmado para este expediente.' }],
+        });
+      }
+    }
+
+    const devolucionActiva = await this.repository.obtenerSolicitudDevolucionActivaPorOrden(
+      this.pool,
+      datos.ordenPagoId,
+    );
+    if (devolucionActiva) {
+      throw new ConflictError({
+        code: 'DEVOLUCION_EN_TRAMITE',
+        message: `Ya existe una solicitud de devolución (${devolucionActiva.codigo_dev}) en estado ${devolucionActiva.estado} para este pago.`,
+      });
+    }
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+
+      const ahora = new Date();
+      const anio = ahora.getFullYear();
+      const codigoDev = await this.repository.obtenerSiguienteCodigoDev(cliente, anio);
+
+      const nuevaSolicitud = await this.repository.insertarSolicitudDevolucion(cliente, {
+        codigoDev,
+        expedienteId: datos.expedienteId,
+        ordenPagoId: datos.ordenPagoId,
+        solicitanteId: orden.solicitante_id,
+        cuentaUsuarioId: esInstitucional ? null : usuarioActorId,
+        canalRegistro: datos.canalRegistro,
+        causal: datos.causal,
+        motivo: datos.motivo.trim(),
+        montoOriginal: Number(orden.monto),
+        montoSolicitado: datos.montoSolicitado,
+      });
+
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_tra',
+        tabla: 'solicitud_devolucion',
+        operacion: 'INSERT',
+        datos_despues: {
+          solicitudDevolucionId: nuevaSolicitud.solicitud_devolucion_id,
+          codigoDev,
+          expedienteId: datos.expedienteId,
+          ordenPagoId: datos.ordenPagoId,
+          montoSolicitado: datos.montoSolicitado,
+          causal: datos.causal,
+        },
+      });
+
+      await insertarEvento(cliente, {
+        agregado: 'TESORERIA',
+        tipo_evento: 'DEVOLUCION_SOLICITADA',
+        payload: {
+          solicitudDevolucionId: nuevaSolicitud.solicitud_devolucion_id,
+          codigoDev,
+          expedienteId: datos.expedienteId,
+          ordenPagoId: datos.ordenPagoId,
+          montoSolicitado: datos.montoSolicitado,
+          causal: datos.causal,
+        },
+      });
+
+      await cliente.query('COMMIT');
+
+      const completa = await this.repository.obtenerSolicitudDevolucionPorId(
+        this.pool,
+        nuevaSolicitud.solicitud_devolucion_id,
+      );
+      return this.mapearFilaDevolucionADto(completa ?? nuevaSolicitud);
+    } catch (error) {
+      try { await cliente.query('ROLLBACK'); } catch { /* ignore */ }
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  async revisarDevolucion(
+    solicitudDevolucionId: string,
+    usuarioActorId: string,
+    rolesActor: string[],
+  ): Promise<DtoSolicitudDevolucion> {
+    const esAutorizado = rolesActor.some((r) => ['MESA_PARTES', 'ADMINISTRADOR'].includes(r.toUpperCase()));
+    if (!esAutorizado) {
+      throw new ForbiddenError({
+        detail: 'Acceso denegado: Solo Mesa de Partes o Administrador pueden revisar solicitudes de devolución.',
+      });
+    }
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+
+      const solicitud = await this.repository.obtenerSolicitudDevolucionPorIdConLock(
+        cliente,
+        solicitudDevolucionId,
+      );
+      if (!solicitud) {
+        throw new NotFoundError({
+          message: 'Solicitud de devolución no encontrada.',
+          detail: `No existe la solicitud con id ${solicitudDevolucionId}.`,
+        });
+      }
+
+      if (!['SOLICITADA', 'SUBSANADA'].includes(solicitud.estado)) {
+        throw new ConflictError({
+          code: 'ESTADO_INVALIDO_PARA_REVISION',
+          message: `La solicitud se encuentra en estado ${solicitud.estado} y no puede pasar a revisión.`,
+        });
+      }
+
+      await this.repository.actualizarSolicitudDevolucion(cliente, solicitudDevolucionId, {
+        estado: 'EN_REVISION',
+      });
+
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_tra',
+        tabla: 'solicitud_devolucion',
+        operacion: 'UPDATE',
+        datos_antes: { estado: solicitud.estado },
+        datos_despues: { estado: 'EN_REVISION', revisadoPor: usuarioActorId },
+      });
+
+      await cliente.query('COMMIT');
+
+      const actualizada = await this.repository.obtenerSolicitudDevolucionPorId(
+        this.pool,
+        solicitudDevolucionId,
+      );
+      return this.mapearFilaDevolucionADto(actualizada!);
+    } catch (error) {
+      try { await cliente.query('ROLLBACK'); } catch { /* ignore */ }
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  async observarDevolucion(
+    solicitudDevolucionId: string,
+    motivoObservacion: string,
+    usuarioActorId: string,
+    rolesActor: string[],
+  ): Promise<DtoSolicitudDevolucion> {
+    const esAutorizado = rolesActor.some((r) => ['MESA_PARTES', 'ADMINISTRADOR'].includes(r.toUpperCase()));
+    if (!esAutorizado) {
+      throw new ForbiddenError({
+        detail: 'Acceso denegado: Solo Mesa de Partes o Administrador pueden observar solicitudes de devolución.',
+      });
+    }
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+
+      const solicitud = await this.repository.obtenerSolicitudDevolucionPorIdConLock(
+        cliente,
+        solicitudDevolucionId,
+      );
+      if (!solicitud) {
+        throw new NotFoundError({
+          message: 'Solicitud de devolución no encontrada.',
+          detail: `No existe la solicitud con id ${solicitudDevolucionId}.`,
+        });
+      }
+
+      if (!['SOLICITADA', 'EN_REVISION'].includes(solicitud.estado)) {
+        throw new ConflictError({
+          code: 'ESTADO_INVALIDO_PARA_OBSERVACION',
+          message: `La solicitud se encuentra en estado ${solicitud.estado} y no puede ser observada.`,
+        });
+      }
+
+      await this.repository.actualizarSolicitudDevolucion(cliente, solicitudDevolucionId, {
+        estado: 'OBSERVADA',
+        motivoObservacion: motivoObservacion.trim(),
+      });
+
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_tra',
+        tabla: 'solicitud_devolucion',
+        operacion: 'UPDATE',
+        datos_antes: { estado: solicitud.estado },
+        datos_despues: {
+          estado: 'OBSERVADA',
+          motivoObservacion: motivoObservacion.trim(),
+          observadoPor: usuarioActorId,
+        },
+      });
+
+      await cliente.query('COMMIT');
+
+      const actualizada = await this.repository.obtenerSolicitudDevolucionPorId(
+        this.pool,
+        solicitudDevolucionId,
+      );
+      return this.mapearFilaDevolucionADto(actualizada!);
+    } catch (error) {
+      try { await cliente.query('ROLLBACK'); } catch { /* ignore */ }
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  async subsanarDevolucion(
+    solicitudDevolucionId: string,
+    sustentoSubsanacion: string,
+    usuarioActorId: string,
+    rolesActor: string[],
+    personaActorId?: string,
+  ): Promise<DtoSolicitudDevolucion> {
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+
+      const solicitud = await this.repository.obtenerSolicitudDevolucionPorIdConLock(
+        cliente,
+        solicitudDevolucionId,
+      );
+      if (!solicitud) {
+        throw new NotFoundError({
+          message: 'Solicitud de devolución no encontrada.',
+          detail: `No existe la solicitud con id ${solicitudDevolucionId}.`,
+        });
+      }
+
+      const esMesa = rolesActor.some((r) => ['MESA_PARTES', 'ADMINISTRADOR'].includes(r.toUpperCase()));
+      if (!esMesa && (!personaActorId || solicitud.solicitante_id !== personaActorId)) {
+        throw new ForbiddenError({
+          detail: 'BOLA_VIOLATION: No tiene autorización para subsanar esta solicitud de devolución.',
+        });
+      }
+
+      if (solicitud.estado !== 'OBSERVADA') {
+        throw new ConflictError({
+          code: 'SOLICITUD_NO_OBSERVADA',
+          message: `La solicitud se encuentra en estado ${solicitud.estado} y no requiere subsanación.`,
+        });
+      }
+
+      const observacionActual = solicitud.motivo_observacion ?? '';
+      const observacionConSubsanacion = `${observacionActual}\n[Subsanación ${new Date().toISOString()}]: ${sustentoSubsanacion.trim()}`.trim();
+
+      await this.repository.actualizarSolicitudDevolucion(cliente, solicitudDevolucionId, {
+        estado: 'SUBSANADA',
+        motivoObservacion: observacionConSubsanacion,
+      });
+
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_tra',
+        tabla: 'solicitud_devolucion',
+        operacion: 'UPDATE',
+        datos_antes: { estado: solicitud.estado },
+        datos_despues: {
+          estado: 'SUBSANADA',
+          sustentoSubsanacion: sustentoSubsanacion.trim(),
+          subsanadoPor: usuarioActorId,
+        },
+      });
+
+      await cliente.query('COMMIT');
+
+      const actualizada = await this.repository.obtenerSolicitudDevolucionPorId(
+        this.pool,
+        solicitudDevolucionId,
+      );
+      return this.mapearFilaDevolucionADto(actualizada!);
+    } catch (error) {
+      try { await cliente.query('ROLLBACK'); } catch { /* ignore */ }
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  async aprobarDevolucion(
+    solicitudDevolucionId: string,
+    montoAutorizado: number,
+    observacionResolucion: string | undefined,
+    usuarioActorId: string,
+    rolesActor: string[],
+  ): Promise<DtoSolicitudDevolucion> {
+    // Principio de Separación de Poderes: Mesa de Partes autoriza documentalmente. Tesorería NO autoriza devoluciones.
+    const esAutorizado = rolesActor.some((r) => ['MESA_PARTES', 'ADMINISTRADOR'].includes(r.toUpperCase()));
+    if (!esAutorizado) {
+      throw new ForbiddenError({
+        detail: 'Acceso denegado: Solo Mesa de Partes o Administrador tienen competencia para autorizar documentalmente devoluciones.',
+      });
+    }
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+
+      const solicitud = await this.repository.obtenerSolicitudDevolucionPorIdConLock(
+        cliente,
+        solicitudDevolucionId,
+      );
+      if (!solicitud) {
+        throw new NotFoundError({
+          message: 'Solicitud de devolución no encontrada.',
+          detail: `No existe la solicitud con id ${solicitudDevolucionId}.`,
+        });
+      }
+
+      if (!['SOLICITADA', 'EN_REVISION', 'SUBSANADA'].includes(solicitud.estado)) {
+        throw new ConflictError({
+          code: 'ESTADO_INVALIDO_PARA_APROBACION',
+          message: `La solicitud se encuentra en estado ${solicitud.estado} y no puede ser aprobada.`,
+        });
+      }
+
+      // Bloqueo pesimista en la orden de pago para evitar carreras concurrentes de sobre-devolución
+      const orden = await this.repository.obtenerOrdenPorIdConLock(cliente, solicitud.orden_pago_id);
+      if (!orden || orden.estado !== 'CONFIRMADO') {
+        throw new ConflictError({
+          code: 'ORDEN_NO_CONFIRMADA',
+          message: 'La orden de pago asociada no se encuentra en estado CONFIRMADO.',
+        });
+      }
+
+      // Cálculo atómico del saldo devolvible disponible
+      const saldoDevolvible = await this.repository.calcularSaldoDevolviblePago(cliente, solicitud.orden_pago_id);
+      if (!Number.isFinite(montoAutorizado) || montoAutorizado <= 0) {
+        throw new ValidationError({
+          message: 'El monto autorizado debe ser mayor a cero.',
+          invalidParams: [{ name: 'montoAutorizado', reason: 'MONTO_INVALIDO' }],
+        });
+      }
+      if (montoAutorizado > Number(solicitud.monto_solicitado)) {
+        throw new ConflictError({
+          code: 'MONTO_EXCEDE_SOLICITADO',
+          message: 'El monto autorizado no puede superar el monto solicitado.',
+        });
+      }
+      if (montoAutorizado > saldoDevolvible) {
+        throw new ConflictError({
+          code: 'SALDO_INSUFICIENTE',
+          message: `El monto autorizado (S/ ${montoAutorizado.toFixed(2)}) excede el saldo devolvible disponible del pago (S/ ${saldoDevolvible.toFixed(2)}).`,
+        });
+      }
+
+      const ahora = new Date();
+
+      // Transición a PENDIENTE_TESORERIA (formal reserva de saldo financiero)
+      await this.repository.actualizarSolicitudDevolucion(cliente, solicitudDevolucionId, {
+        estado: 'PENDIENTE_TESORERIA',
+        montoAutorizado,
+        fechaAprobacion: ahora,
+        aprobadoPorId: usuarioActorId,
+        observacionResolucion: observacionResolucion?.trim() || null,
+      });
+
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_tra',
+        tabla: 'solicitud_devolucion',
+        operacion: 'UPDATE',
+        datos_antes: { estado: solicitud.estado },
+        datos_despues: {
+          estado: 'PENDIENTE_TESORERIA',
+          montoAutorizado,
+          fechaAprobacion: ahora.toISOString(),
+          aprobadoPorId: usuarioActorId,
+        },
+      });
+
+      await insertarEvento(cliente, {
+        agregado: 'TESORERIA',
+        tipo_evento: 'DEVOLUCION_APROBADA',
+        payload: {
+          solicitudDevolucionId,
+          codigoDev: solicitud.codigo_dev,
+          expedienteId: solicitud.expediente_id,
+          ordenPagoId: solicitud.orden_pago_id,
+          montoAutorizado,
+          aprobadoPorId: usuarioActorId,
+          fechaAprobacion: ahora.toISOString(),
+        },
+      });
+
+      await cliente.query('COMMIT');
+
+      const actualizada = await this.repository.obtenerSolicitudDevolucionPorId(
+        this.pool,
+        solicitudDevolucionId,
+      );
+      return this.mapearFilaDevolucionADto(actualizada!);
+    } catch (error) {
+      try { await cliente.query('ROLLBACK'); } catch { /* ignore */ }
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  async rechazarDevolucion(
+    solicitudDevolucionId: string,
+    motivoRechazo: string,
+    usuarioActorId: string,
+    rolesActor: string[],
+  ): Promise<DtoSolicitudDevolucion> {
+    const esAutorizado = rolesActor.some((r) => ['MESA_PARTES', 'ADMINISTRADOR'].includes(r.toUpperCase()));
+    if (!esAutorizado) {
+      throw new ForbiddenError({
+        detail: 'Acceso denegado: Solo Mesa de Partes o Administrador pueden rechazar solicitudes de devolución.',
+      });
+    }
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+
+      const solicitud = await this.repository.obtenerSolicitudDevolucionPorIdConLock(
+        cliente,
+        solicitudDevolucionId,
+      );
+      if (!solicitud) {
+        throw new NotFoundError({
+          message: 'Solicitud de devolución no encontrada.',
+          detail: `No existe la solicitud con id ${solicitudDevolucionId}.`,
+        });
+      }
+
+      if (!['SOLICITADA', 'EN_REVISION', 'OBSERVADA', 'SUBSANADA'].includes(solicitud.estado)) {
+        throw new ConflictError({
+          code: 'ESTADO_INVALIDO_PARA_RECHAZO',
+          message: `La solicitud se encuentra en estado ${solicitud.estado} y no puede ser rechazada.`,
+        });
+      }
+
+      await this.repository.actualizarSolicitudDevolucion(cliente, solicitudDevolucionId, {
+        estado: 'RECHAZADA',
+        motivoRechazo: motivoRechazo.trim(),
+      });
+
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_tra',
+        tabla: 'solicitud_devolucion',
+        operacion: 'UPDATE',
+        datos_antes: { estado: solicitud.estado },
+        datos_despues: {
+          estado: 'RECHAZADA',
+          motivoRechazo: motivoRechazo.trim(),
+          rechazadoPor: usuarioActorId,
+        },
+      });
+
+      await cliente.query('COMMIT');
+
+      const actualizada = await this.repository.obtenerSolicitudDevolucionPorId(
+        this.pool,
+        solicitudDevolucionId,
+      );
+      return this.mapearFilaDevolucionADto(actualizada!);
+    } catch (error) {
+      try { await cliente.query('ROLLBACK'); } catch { /* ignore */ }
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  async ejecutarDevolucion(
+    solicitudDevolucionId: string,
+    metodoDevolucion: MetodoDevolucion,
+    observacion: string | undefined,
+    usuarioActorId: string,
+    rolesActor: string[],
+  ): Promise<DtoSolicitudDevolucion> {
+    // Principio de Separación de Poderes: Tesorería ejecuta financieramente. Mesa de Partes NO ejecuta desembolsos.
+    const esAutorizado = rolesActor.some((r) => ['TESORERIA', 'ADMINISTRADOR'].includes(r.toUpperCase()));
+    if (!esAutorizado) {
+      throw new ForbiddenError({
+        detail: 'Acceso denegado: Solo el personal de Tesorería o Administrador pueden ejecutar materialmente el desembolso de devolución.',
+      });
+    }
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+
+      const solicitud = await this.repository.obtenerSolicitudDevolucionPorIdConLock(
+        cliente,
+        solicitudDevolucionId,
+      );
+      if (!solicitud) {
+        throw new NotFoundError({
+          message: 'Solicitud de devolución no encontrada.',
+          detail: `No existe la solicitud con id ${solicitudDevolucionId}.`,
+        });
+      }
+
+      if (solicitud.estado !== 'PENDIENTE_TESORERIA') {
+        throw new ConflictError({
+          code: 'NO_PENDIENTE_TESORERIA',
+          message: `La solicitud se encuentra en estado ${solicitud.estado}. Solo se pueden procesar desembolsos sobre solicitudes en PENDIENTE_TESORERIA.`,
+        });
+      }
+
+      const ahora = new Date();
+      const anio = ahora.getFullYear();
+      const codigoCdev = await this.repository.obtenerSiguienteCodigoCdev(cliente, anio);
+      const montoDevuelto = Number(solicitud.monto_autorizado);
+
+      await this.repository.actualizarSolicitudDevolucion(cliente, solicitudDevolucionId, {
+        estado: 'DEVUELTA',
+        montoDevuelto,
+        fechaDevolucion: ahora,
+        procesadoPorId: usuarioActorId,
+        metodoDevolucion,
+        constanciaDevolucionCodigo: codigoCdev,
+        observacionResolucion: observacion?.trim()
+          ? `${solicitud.observacion_resolucion ?? ''}\n[Tesorería ${ahora.toISOString()}]: ${observacion.trim()}`.trim()
+          : solicitud.observacion_resolucion,
+      });
+
+      // La orden de pago y recibo original quedan intactos (principio de inmutabilidad contable)
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_tra',
+        tabla: 'solicitud_devolucion',
+        operacion: 'UPDATE',
+        datos_antes: { estado: solicitud.estado },
+        datos_despues: {
+          estado: 'DEVUELTA',
+          constanciaDevolucionCodigo: codigoCdev,
+          montoDevuelto,
+          metodoDevolucion,
+          procesadoPorId: usuarioActorId,
+          fechaDevolucion: ahora.toISOString(),
+        },
+      });
+
+      await insertarEvento(cliente, {
+        agregado: 'TESORERIA',
+        tipo_evento: 'DEVOLUCION_PROCESADA',
+        payload: {
+          solicitudDevolucionId,
+          codigoDev: solicitud.codigo_dev,
+          constanciaDevolucionCodigo: codigoCdev,
+          expedienteId: solicitud.expediente_id,
+          ordenPagoId: solicitud.orden_pago_id,
+          montoDevuelto,
+          metodoDevolucion,
+          procesadoPorId: usuarioActorId,
+          fechaDevolucion: ahora.toISOString(),
+        },
+      });
+
+      await cliente.query('COMMIT');
+
+      const actualizada = await this.repository.obtenerSolicitudDevolucionPorId(
+        this.pool,
+        solicitudDevolucionId,
+      );
+      return this.mapearFilaDevolucionADto(actualizada!);
+    } catch (error) {
+      try { await cliente.query('ROLLBACK'); } catch { /* ignore */ }
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  async listarDevoluciones(
+    params: DtoBuscarDevolucionesParams,
+    rolesActor: string[],
+    personaActorId?: string,
+  ): Promise<{ total: number; items: DtoSolicitudDevolucion[] }> {
+    const esInstitucional = rolesActor.some((r) =>
+      ['MESA_PARTES', 'ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'TESORERIA'].includes(
+        r.toUpperCase(),
+      ),
+    );
+
+    // Si es ciudadano, solo puede listar las suyas
+    if (!esInstitucional && !personaActorId) {
+      throw new ForbiddenError({
+        detail: 'BOLA_VIOLATION: No tiene autorización para listar devoluciones.',
+      });
+    }
+
+    const { total, items } = await this.repository.listarSolicitudesDevolucion(
+      this.pool, params, esInstitucional ? undefined : personaActorId,
+    );
+
+    return {
+      total,
+      items: items.map((d) => this.mapearFilaDevolucionADto(d)),
+    };
+  }
+
+  async obtenerDevolucionPorId(
+    solicitudDevolucionId: string,
+    rolesActor: string[],
+    personaActorId?: string,
+  ): Promise<DtoSolicitudDevolucion> {
+    const solicitud = await this.repository.obtenerSolicitudDevolucionPorId(
+      this.pool,
+      solicitudDevolucionId,
+    );
+    if (!solicitud) {
+      throw new NotFoundError({
+        message: 'Solicitud de devolución no encontrada.',
+        detail: `No existe la solicitud con id ${solicitudDevolucionId}.`,
+      });
+    }
+
+    const esInstitucional = rolesActor.some((r) =>
+      ['MESA_PARTES', 'ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'TESORERIA'].includes(
+        r.toUpperCase(),
+      ),
+    );
+
+    if (!esInstitucional && (!personaActorId || solicitud.solicitante_id !== personaActorId)) {
+      throw new ForbiddenError({
+        detail: 'BOLA_VIOLATION: No tiene autorización para consultar esta solicitud de devolución.',
+      });
+    }
+
+    return this.mapearFilaDevolucionADto(solicitud);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Atención presencial y registro sin cuenta
+  // ---------------------------------------------------------------------------
+
   async buscarPersonaParaAtencionPresencial(
     tipoDocumento: string,
     numeroDocumento: string,
@@ -486,12 +1377,16 @@ export class TesoreriaService {
     encontrada: boolean;
     persona?: {
       idPersona: string;
+      tipoPersona: 'NATURAL' | 'JURIDICA';
       nombres: string;
       apellidos: string;
       nombreCompleto: string;
       documentoEnmascarado: string;
       tipoDocumento: string;
       numeroDocumento: string;
+      correo?: string | null;
+      telefono?: string | null;
+      direccion?: string | null;
       tieneCuentaUsuario: boolean;
     };
   }> {
@@ -533,6 +1428,39 @@ export class TesoreriaService {
     };
   }
 
+  async registrarPersonaPresencial(
+    datos: {
+      tipoPersona: 'NATURAL' | 'JURIDICA';
+      tipoDocumento: 'DNI' | 'CE' | 'RUC';
+      numeroDocumento: string;
+      nombres?: string;
+      apellidos?: string;
+      razonSocial?: string;
+      correo?: string | null;
+      telefono?: string | null;
+      direccion?: string | null;
+    },
+    operadorId: string,
+  ) {
+    if (datos.tipoDocumento === 'DNI' && !/^[0-9]{8}$/.test(datos.numeroDocumento.trim())) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'numeroDocumento', reason: 'El DNI debe tener exactamente 8 dígitos.' }],
+      });
+    }
+    if (datos.tipoDocumento === 'RUC' && !/^[0-9]{11}$/.test(datos.numeroDocumento.trim())) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'numeroDocumento', reason: 'El RUC debe tener exactamente 11 dígitos.' }],
+      });
+    }
+    if (datos.tipoDocumento === 'CE' && !/^[0-9a-zA-Z]{9,12}$/.test(datos.numeroDocumento.trim())) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'numeroDocumento', reason: 'El Carné de Extranjería debe tener entre 9 y 12 caracteres alfanuméricos.' }],
+      });
+    }
+
+    return await this.repository.registrarPersonaSinCuenta(this.pool, datos, operadorId);
+  }
+
   // ---------------------------------------------------------------------------
   // 4. Módulo TAYPI: Pago QR Automático Sandbox & Webhook
   // ---------------------------------------------------------------------------
@@ -553,7 +1481,6 @@ export class TesoreriaService {
       throw new ConflictError({ code: 'DEMO_QR_EXPIRED', message: 'Este QR expiró o ya no está disponible.' });
     }
     const { rawBody, signature } = this.demoQrProvider.createSignedWebhook(pago);
-    // El simulador actúa como proveedor: entrega un evento firmado al endpoint real de SIGD.
     const response = await fetch(`http://127.0.0.1:${process.env.PORT ?? 3000}/api/v1/webhooks/demo-qr`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Demo-Qr-Signature': signature },
@@ -569,7 +1496,9 @@ export class TesoreriaService {
   }
 
   async crearPagoAutomaticoDemo(
-    ordenPagoId: string, rolesActor: string[], personaActorId?: string,
+    ordenPagoId: string,
+    rolesActor: string[],
+    personaActorId?: string,
   ): Promise<DtoOrdenPago> {
     if (!this.demoQrProvider.isConfigured()) {
       throw new ConflictError({ code: 'DEMO_QR_NOT_CONFIGURED', message: 'El simulador QR no está configurado.' });
@@ -639,7 +1568,6 @@ export class TesoreriaService {
       });
     }
 
-    // Salvaguarda BOLA: Solo el solicitante o personal institucional puede iniciar el pago
     const esInstitucional = rolesActor.some((r) =>
       ['MESA_PARTES', 'ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'TESORERIA'].includes(
         r.toUpperCase(),
@@ -672,7 +1600,6 @@ export class TesoreriaService {
       });
     }
 
-    // Idempotencia: Si ya tiene un pago TAYPI vigente y no expirado con QR generado, reutilizarlo
     if (
       orden.payment_provider === 'TAYPI' &&
       orden.provider_payment_id &&
@@ -683,7 +1610,6 @@ export class TesoreriaService {
       return this.mapearFilaADto(orden);
     }
 
-    // Invocar proveedor TAYPI (monto se toma exclusivamente server-side de la orden)
     const resultado = await this.taypiProvider.createPayment({
       ordenPagoId: orden.orden_pago_id,
       codigoPago: orden.codigo_pago,
@@ -691,7 +1617,6 @@ export class TesoreriaService {
       concepto: orden.concepto,
     });
 
-    // Persistir datos del proveedor en BD
     await this.repository.actualizarDatosProviderPago(this.pool, {
       ordenPagoId: orden.orden_pago_id,
       paymentProvider: 'TAYPI',
@@ -730,7 +1655,6 @@ export class TesoreriaService {
     codigoPago?: string;
     codigoRecibo?: string | null;
   }> {
-    // 1. Verificación estricta de firma HMAC contra el cuerpo crudo
     const firmaValida = proveedor === 'TAYPI'
       ? this.taypiProvider.verifyWebhookSignature(rawBody, signatureHeader)
       : this.demoQrProvider.verifyWebhook(
@@ -743,7 +1667,6 @@ export class TesoreriaService {
       });
     }
 
-    // 2. Parseo del payload
     let jsonBody: Record<string, any>;
     try {
       jsonBody = typeof rawBody === 'string'
@@ -765,7 +1688,6 @@ export class TesoreriaService {
       };
     }
 
-    // Solo procesamos payment.completed
     if (event.event !== 'payment.completed') {
       return {
         received: true,
@@ -774,7 +1696,6 @@ export class TesoreriaService {
       };
     }
 
-    // Moneda debe ser estrictamente PEN
     if (event.currency !== 'PEN') {
       return {
         received: true,
@@ -783,7 +1704,6 @@ export class TesoreriaService {
       };
     }
 
-    // Estado del proveedor debe ser completed
     if (event.status !== 'completed') {
       return {
         received: true,
@@ -792,12 +1712,10 @@ export class TesoreriaService {
       };
     }
 
-    // 3. Conexión y transacción con bloqueo pesimista contra carreras concurrentes
     const cliente = await this.pool.connect();
     try {
       await cliente.query('BEGIN');
 
-      // Buscar por provider_payment_id con lock
       let orden = await this.repository.obtenerOrdenPorProviderPaymentIdConLock(
         cliente,
         event.paymentId,
@@ -825,7 +1743,6 @@ export class TesoreriaService {
         };
       }
 
-      // Idempotencia: Si ya está confirmada
       if (orden.estado === 'CONFIRMADO') {
         await cliente.query('COMMIT');
         return {
@@ -836,7 +1753,6 @@ export class TesoreriaService {
         };
       }
 
-      // Solo se puede confirmar si está PENDIENTE
       if (orden.estado !== 'PENDIENTE') {
         await cliente.query('ROLLBACK');
         return {
@@ -853,13 +1769,11 @@ export class TesoreriaService {
         return { received: true, status: 'rejected', motivo: 'El QR simulado ha expirado.' };
       }
 
-      // 4. Verificación estricta del monto recibido vs monto oficial
       const montoOficial = Number(orden.monto);
       const montoDiscrepante = proveedor === 'DEMO_QR'
         ? !Number.isFinite(event.amount) || Math.round(event.amount * 100) !== Math.round(montoOficial * 100)
         : Math.abs(event.amount - montoOficial) > 0.01;
       if (montoDiscrepante) {
-        // Registrar anomalía en auditoría
         await registrarMutacion(cliente, {
           esquema: 'sigd_tra',
           tabla: 'orden_pago',
@@ -880,7 +1794,6 @@ export class TesoreriaService {
         };
       }
 
-      // 5. Confirmación Atómica, Generación de Recibo y Desbloqueo FSM
       const ahora = new Date();
       const anio = ahora.getFullYear();
       const codigoRecibo = await this.repository.obtenerSiguienteCodigoRecibo(cliente, anio);
@@ -893,14 +1806,13 @@ export class TesoreriaService {
         montoRecibido: montoOficial,
         vuelto: 0,
         codigoRecibo,
-        tesoreroId: null, // Confirmado por pasarela automatizada
+        tesoreroId: null,
         fechaPago,
         confirmedSource: 'WEBHOOK',
         providerPaymentId: event.paymentId,
         providerStatus: 'completed',
       });
 
-      // Desbloqueo atómico del expediente: transiciona a REGISTRADO para habilitar derivación
       await cliente.query(
         `UPDATE sigd_tra.expediente
             SET estado = 'REGISTRADO'
@@ -909,7 +1821,6 @@ export class TesoreriaService {
         [orden.expediente_id],
       );
 
-      // Auditoría inmutable de la confirmación
       await registrarMutacion(cliente, {
         esquema: 'sigd_tra',
         tabla: 'orden_pago',
@@ -926,7 +1837,6 @@ export class TesoreriaService {
         },
       });
 
-      // Outbox transaccional para eventos del sistema
       await insertarEvento(cliente, {
         agregado: 'TESORERIA',
         tipo_evento: 'PAGO_CONFIRMADO',

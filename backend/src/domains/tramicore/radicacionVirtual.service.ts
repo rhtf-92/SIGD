@@ -8,6 +8,7 @@ import type { DtoContextoTupa } from './tupaVersionado.service.js';
 import { TesoreriaRepository } from '../tesoreria/tesoreria.repository.js';
 import { calcularVencimientoOrdenPago } from '../tesoreria/tesoreria.service.js';
 import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
+import { TupaRequisitosService } from './tupaRequisitos.service.js';
 
 /**
  * T-BE-TC-02 y T-BE-TC-03 — Logica de negocio de la radicacion virtual
@@ -98,11 +99,13 @@ export type ProveedorFeriados = () => Promise<string[]>;
 export class RadicacionVirtualService {
   private readonly cutService: CutService;
   private readonly tesoreriaRepository = new TesoreriaRepository();
+  private readonly tupaRequisitosService: TupaRequisitosService;
   private readonly obtenerFeriados: ProveedorFeriados;
 
   constructor(private readonly pool: Pool, obtenerFeriados?: ProveedorFeriados) {
     this.cutService = new CutService(pool);
     this.obtenerFeriados = obtenerFeriados ?? crearProveedorFeriados(pool);
+    this.tupaRequisitosService = new TupaRequisitosService(pool);
   }
 
   async radicar(datos: RadicacionVirtualInput, now: Date = new Date()): Promise<ResultadoRadicacion> {
@@ -138,6 +141,14 @@ export class RadicacionVirtualService {
 
       if (datos.registroVersionId) {
         await this.verificarVersionTupa(cliente, datos.registroVersionId, now);
+        await this.tupaRequisitosService.validarRequisitosObligatorios(
+          datos.registroVersionId,
+          (datos.documentos ?? []).map((d) => ({
+            idRequisito: d.idRequisito ?? undefined,
+            nombreArchivo: d.nombreArchivo,
+          })),
+          cliente,
+        );
       }
 
       const [{ cut, anio }, horario] = await Promise.all([
@@ -149,7 +160,7 @@ export class RadicacionVirtualService {
         cliente, datos, persona, tipoDocId, cut, horario,
       );
       await this.insertarTramite(cliente, expediente.expediente_id, datos.asunto);
-      await this.insertarAsiento(cliente, expediente.expediente_id, persona, datos.asunto, horario);
+      await this.insertarAsiento(cliente, expediente.expediente_id, persona, datos.asunto, horario, datos.canalIngreso ?? 'MESA_VIRTUAL');
 
       if (datos.registroVersionId) {
         await this.insertarVinculoTupa(cliente, expediente.expediente_id, datos.registroVersionId);
@@ -440,8 +451,8 @@ export class RadicacionVirtualService {
     const resultado = await cliente.query<FilaExpediente>(
       `INSERT INTO sigd_tra.expediente
          (codigo_expediente, numero, dni_solicitante, tipo_documental_id,
-          solicitante_id, area_destino_id, estado, fecha_radicacion)
-       VALUES ($1, $1, $2, $3::uuid, $4::uuid, NULL, 'REGISTRADO', $5)
+          solicitante_id, area_destino_id, estado, fecha_radicacion, id_usuario_creador)
+       VALUES ($1, $1, $2, $3::uuid, $4::uuid, NULL, 'REGISTRADO', $5, $6::uuid)
        RETURNING expediente_id`,
       [
         cut,
@@ -449,6 +460,7 @@ export class RadicacionVirtualService {
         tipoDocumentalId,
         persona.id_persona,
         horario.radicacionLegal,
+        datos.idUsuarioCreador ?? null,
       ],
     );
     const expediente = resultado.rows[0];
@@ -472,12 +484,13 @@ export class RadicacionVirtualService {
     persona: FilaPersona,
     asunto: string,
     horario: ResultadoHorarioCorte,
+    canalIngreso: string = 'MESA_VIRTUAL',
   ): Promise<void> {
     await cliente.query(
       `INSERT INTO sigd_tra.asiento_registro
          (expediente_id, fecha_ingreso, canal_ingreso, asunto, remitente_id)
-       VALUES ($1::uuid, $2, 'MESA_VIRTUAL', $3, $4::uuid)`,
-      [expedienteId, horario.envioReal, asunto, persona.id_persona],
+       VALUES ($1::uuid, $2, $3, $4, $5::uuid)`,
+      [expedienteId, horario.envioReal, canalIngreso, asunto, persona.id_persona],
     );
   }
 

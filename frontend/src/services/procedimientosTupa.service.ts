@@ -240,3 +240,43 @@ function normalizarTextoParaBusqueda(txt: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+export type TipoRequisitoTupa = 'DOCUMENTAL' | 'FINANCIERO' | 'DECLARATIVO' | 'INTERNO' | 'AMBIGUO';
+
+export interface DtoRequisitoTupa {
+  idRequisito: string;
+  idProcedimiento: string;
+  registroVersionId: string | null;
+  nombre: string;
+  descripcion: string | null;
+  tipoRequisito: TipoRequisitoTupa;
+  esAnexoDigital: boolean;
+  obligatorio: boolean;
+  orden: number;
+  formatosPermitidos: string;
+  activo: boolean;
+  fuenteOriginal: string;
+}
+
+export interface DtoRequisitosProcedimiento {
+  procedimientoId: string;
+  codigoRef: string;
+  denominacion: string;
+  generaExpediente: boolean;
+  totalRequisitos: number;
+  totalAnexosDigitales: number;
+  totalAnexosObligatorios: number;
+  requisitos: DtoRequisitoTupa[];
+  anexosDigitales: DtoRequisitoTupa[];
+}
+
+export async function obtenerRequisitosProcedimiento(
+  identificador: string,
+  signal?: AbortSignal,
+): Promise<DtoRequisitosProcedimiento> {
+  const respuesta = await apiClient.get<DtoRequisitosProcedimiento>(
+    `/api/v1/tramites/tupa/procedimientos/${encodeURIComponent(identificador)}/requisitos`,
+    { signal },
+  );
+  return respuesta.data;
+}

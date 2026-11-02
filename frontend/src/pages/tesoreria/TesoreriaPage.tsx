@@ -5,7 +5,10 @@ import {
   type DtoConfiguracionDemoQr,
   type DtoOrdenPago,
   type DtoResumenDashboardTesoreria,
+  type DtoSolicitudDevolucion,
+  type EstadoDevolucion,
   type EstadoOrdenPago,
+  type MetodoDevolucion,
   type MetodoPago,
 } from "../../services/tesoreria.service";
 
@@ -33,6 +36,28 @@ export default function TesoreriaPage() {
   const [modalConfirmarAbierto, setModalConfirmarAbierto] = useState<boolean>(false);
   const [modalRechazarAbierto, setModalRechazarAbierto] = useState<boolean>(false);
   const [modalReciboAbierto, setModalReciboAbierto] = useState<boolean>(false);
+
+  // Módulo / Pestaña Activa
+  const [vistaActiva, setVistaActiva] = useState<"ORDENES" | "DEVOLUCIONES">("ORDENES");
+
+  // Estados de Devoluciones (DEV)
+  const [devoluciones, setDevoluciones] = useState<DtoSolicitudDevolucion[]>([]);
+  const [cargandoDevoluciones, setCargandoDevoluciones] = useState<boolean>(false);
+  const [errorDevoluciones, setErrorDevoluciones] = useState<string | null>(null);
+  const [filtroEstadoDev, setFiltroEstadoDev] = useState<string>("TODAS");
+  const [busquedaDev, setBusquedaDev] = useState<string>("");
+  const [paginaDev, setPaginaDev] = useState<number>(1);
+  const [totalPaginasDev, setTotalPaginasDev] = useState<number>(1);
+  const [totalRegistrosDev, setTotalRegistrosDev] = useState<number>(0);
+
+  // Modal de Desembolso de Devolución
+  const [devSeleccionada, setDevSeleccionada] = useState<DtoSolicitudDevolucion | null>(null);
+  const [modalEjecutarDevAbierto, setModalEjecutarDevAbierto] = useState<boolean>(false);
+  const [metodoDevolucion, setMetodoDevolucion] = useState<MetodoDevolucion>("EFECTIVO");
+  const [observacionDevolucion, setObservacionDevolucion] = useState<string>("");
+  const [procesandoEjecucionDev, setProcesandoEjecucionDev] = useState<boolean>(false);
+  const [errorEjecucionDev, setErrorEjecucionDev] = useState<string | null>(null);
+  const [constanciaEmitida, setConstanciaEmitida] = useState<string | null>(null);
 
   // Estados del modal de confirmación
   const [metodoPago, setMetodoPago] = useState<Exclude<MetodoPago, "QR_AUTOMATICO_SANDBOX"> | "DEMO_QR">("EFECTIVO");
@@ -102,6 +127,27 @@ export default function TesoreriaPage() {
     }
   }, [filtroEstado, busqueda, pagina]);
 
+  const cargarDevoluciones = useCallback(async () => {
+    setCargandoDevoluciones(true);
+    setErrorDevoluciones(null);
+    try {
+      const data = await tesoreriaService.listarDevoluciones({
+        estado: filtroEstadoDev === "TODAS" ? undefined : (filtroEstadoDev as EstadoDevolucion),
+        buscar: busquedaDev.trim() || undefined,
+        page: paginaDev,
+        limit: 10,
+      });
+      setDevoluciones(Array.isArray(data?.items) ? data.items : []);
+      setTotalPaginasDev(data?.totalPages || 1);
+      setTotalRegistrosDev(data?.total || 0);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al consultar las solicitudes de devolución.";
+      setErrorDevoluciones(msg);
+    } finally {
+      setCargandoDevoluciones(false);
+    }
+  }, [filtroEstadoDev, busquedaDev, paginaDev]);
+
   useEffect(() => {
     void cargarDashboard();
   }, [cargarDashboard]);
@@ -109,6 +155,12 @@ export default function TesoreriaPage() {
   useEffect(() => {
     void cargarOrdenes();
   }, [cargarOrdenes]);
+
+  useEffect(() => {
+    if (vistaActiva === "DEVOLUCIONES") {
+      void cargarDevoluciones();
+    }
+  }, [vistaActiva, cargarDevoluciones]);
 
   // Polling mientras el modal del simulador esté abierto y pendiente
   useEffect(() => {
@@ -289,6 +341,68 @@ export default function TesoreriaPage() {
     }
   };
 
+  const badgeEstadoDevolucion = (estado: EstadoDevolucion) => {
+    switch (estado) {
+      case "SOLICITADA":
+        return "bg-amber-50 text-amber-900 border-amber-300";
+      case "EN_REVISION":
+        return "bg-blue-50 text-blue-900 border-blue-300";
+      case "OBSERVADA":
+        return "bg-orange-50 text-orange-900 border-orange-300";
+      case "SUBSANADA":
+        return "bg-indigo-50 text-indigo-900 border-indigo-300";
+      case "APROBADA":
+        return "bg-purple-50 text-purple-900 border-purple-300";
+      case "PENDIENTE_TESORERIA":
+        return "bg-emerald-50 text-emerald-900 border-emerald-300";
+      case "DEVUELTA":
+        return "bg-teal-50 text-teal-900 border-teal-300";
+      case "RECHAZADA":
+        return "bg-rose-50 text-rose-900 border-rose-300";
+      case "ANULADA":
+        return "bg-slate-100 text-slate-700 border-slate-300";
+      default:
+        return "bg-slate-100 text-slate-700 border-slate-200";
+    }
+  };
+
+  const handleAbrirEjecutarDev = (dev: DtoSolicitudDevolucion) => {
+    setDevSeleccionada(dev);
+    setMetodoDevolucion("EFECTIVO");
+    setObservacionDevolucion("");
+    setErrorEjecucionDev(null);
+    setConstanciaEmitida(null);
+    setModalEjecutarDevAbierto(true);
+  };
+
+  const handleEjecutarDevolucionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!devSeleccionada) return;
+    setProcesandoEjecucionDev(true);
+    setErrorEjecucionDev(null);
+    try {
+      const res = await tesoreriaService.ejecutarDevolucion(
+        devSeleccionada.solicitudDevolucionId,
+        metodoDevolucion,
+        observacionDevolucion.trim() || undefined
+      );
+      setConstanciaEmitida(res.constanciaDevolucionCodigo);
+      void cargarDevoluciones();
+      void cargarDashboard();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al procesar el desembolso.";
+      setErrorEjecucionDev(msg);
+    } finally {
+      setProcesandoEjecucionDev(false);
+    }
+  };
+
+  const handleBuscarDev = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPaginaDev(1);
+    void cargarDevoluciones();
+  };
+
   const formatearFecha = (str: string) => {
     if (!str) return "-";
     const d = new Date(str);
@@ -359,196 +473,453 @@ export default function TesoreriaPage() {
           </div>
         </section>
 
-        {/* Barra de Filtros y Búsqueda */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            {/* Pestañas de Estado */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {(["TODOS", "PENDIENTE", "CONFIRMADO", "RECHAZADO", "VENCIDO"] as const).map((estado) => (
-                <button
-                  key={estado}
-                  type="button"
-                  onClick={() => {
-                    setFiltroEstado(estado);
-                    setPagina(1);
-                  }}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                    filtroEstado === estado
-                      ? "bg-blue-800 text-white shadow-xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {estado}
-                </button>
-              ))}
-            </div>
-
-            {/* Buscador */}
-            <form onSubmit={handleBuscar} className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Buscar por PAG-..., DNI, CUT..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full sm:w-64 rounded-xl border border-slate-300 px-3 py-1.5 text-xs text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-              />
-              <button
-                type="submit"
-                className="rounded-xl bg-blue-800 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-900 transition shadow-xs"
-              >
-                Buscar
-              </button>
-            </form>
-          </div>
-        </div>
-
-        {/* Tabla de Órdenes de Pago */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-          {cargando ? (
-            <div className="p-12 text-center text-slate-500">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-700 border-r-transparent align-[-0.125em]" />
-              <p className="mt-3 text-sm font-medium">Cargando órdenes de pago...</p>
-            </div>
-          ) : error ? (
-            <div className="p-6 text-center text-rose-700 bg-rose-50 border-b border-rose-200">
-              <p className="text-sm font-semibold">{error}</p>
-              <button
-                type="button"
-                onClick={() => void cargarOrdenes()}
-                className="mt-2 rounded-lg bg-rose-700 px-3 py-1 text-xs text-white hover:bg-rose-800"
-              >
-                Reintentar
-              </button>
-            </div>
-          ) : (!ordenes || ordenes.length === 0) ? (
-            <div className="p-12 text-center text-slate-500">
-              <p className="text-base font-semibold text-slate-700">No se encontraron órdenes de pago</p>
-              <p className="text-xs text-slate-400 mt-1">
-                {filtroEstado !== "TODOS"
-                  ? `No existen órdenes en estado ${filtroEstado}.`
-                  : "No hay registros disponibles con el criterio de búsqueda."}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600">
-                <thead className="border-b border-slate-200 bg-slate-50 uppercase text-[11px] font-bold text-slate-700">
-                  <tr>
-                    <th scope="col" className="px-4 py-3">Código Pago</th>
-                    <th scope="col" className="px-4 py-3">Expediente</th>
-                    <th scope="col" className="px-4 py-3">Administrado</th>
-                    <th scope="col" className="px-4 py-3">Concepto TUPA</th>
-                    <th scope="col" className="px-4 py-3">Monto</th>
-                    <th scope="col" className="px-4 py-3">Vencimiento</th>
-                    <th scope="col" className="px-4 py-3">Estado</th>
-                    <th scope="col" className="px-4 py-3 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {ordenes.map((ord) => (
-                    <tr key={ord.ordenPagoId} className="hover:bg-slate-50/80 transition">
-                      <td className="px-4 py-3 font-mono font-bold text-blue-900 whitespace-nowrap">
-                        {ord.codigoPago}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-slate-700 whitespace-nowrap">
-                        <Link
-                          to={`/expedientes/${ord.expedienteId}`}
-                          className="hover:underline text-blue-700 font-semibold"
-                        >
-                          {ord.codigoExpediente}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-800">{ord.solicitanteNombre}</p>
-                        <p className="text-[11px] text-slate-500 font-mono">{ord.documentoEnmascarado}</p>
-                      </td>
-                      <td className="px-4 py-3 max-w-xs">
-                        <p className="font-medium text-slate-800 truncate" title={ord.concepto}>
-                          {ord.concepto}
-                        </p>
-                        {ord.codigoTupa && (
-                          <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
-                            {ord.codigoTupa}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-mono font-bold text-slate-900 whitespace-nowrap">
-                        {ord.moneda} {ord.monto.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">
-                        {formatearFecha(ord.fechaVencimiento)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${badgeEstado(ord.estado)}`}>
-                          {ord.estado}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap space-x-1.5">
-                        {ord.estado === "PENDIENTE" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleAbrirConfirmar(ord)}
-                              className="rounded-xl border border-emerald-700 bg-emerald-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-800 transition shadow-xs"
-                            >
-                              Cobrar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleAbrirRechazar(ord)}
-                              className="rounded-xl border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
-                            >
-                              Rechazar
-                            </button>
-                          </>
-                        )}
-                        {ord.estado === "CONFIRMADO" && (
-                          <button
-                            type="button"
-                            onClick={() => handleAbrirRecibo(ord)}
-                            className="rounded-xl border border-blue-700 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800 hover:bg-blue-100 transition"
-                          >
-                            Ver Recibo
-                          </button>
-                        )}
-                        {ord.estado === "RECHAZADO" && ord.motivoRechazo && (
-                          <span className="text-[11px] text-rose-600 italic truncate max-w-xs inline-block" title={ord.motivoRechazo}>
-                            {ord.motivoRechazo}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Paginación */}
-          <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-3 flex items-center justify-between text-xs text-slate-600">
-            <span>
-              Total: <strong>{totalRegistros}</strong> registros (Página {pagina} de {totalPaginas})
+        {/* Pestañas Principales: Órdenes de Cobro vs Devoluciones */}
+        <div className="flex border-b border-slate-200 gap-2">
+          <button
+            type="button"
+            onClick={() => setVistaActiva("ORDENES")}
+            className={`flex items-center gap-2 py-3 px-5 text-sm font-bold border-b-2 transition ${
+              vistaActiva === "ORDENES"
+                ? "border-blue-700 text-blue-900 bg-white rounded-t-xl"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <span>💰</span> Órdenes de Cobro
+            <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 font-mono">
+              {totalRegistros}
             </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={pagina <= 1}
-                onClick={() => setPagina((p) => Math.max(p - 1, 1))}
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-              >
-                Anterior
-              </button>
-              <button
-                type="button"
-                disabled={pagina >= totalPaginas}
-                onClick={() => setPagina((p) => p + 1)}
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setVistaActiva("DEVOLUCIONES");
+              setPaginaDev(1);
+            }}
+            className={`flex items-center gap-2 py-3 px-5 text-sm font-bold border-b-2 transition ${
+              vistaActiva === "DEVOLUCIONES"
+                ? "border-blue-700 text-blue-900 bg-white rounded-t-xl"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <span>↩️</span> Devoluciones de Pago (DEV)
+            <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 font-mono">
+              {totalRegistrosDev}
+            </span>
+          </button>
         </div>
+
+        {vistaActiva === "ORDENES" ? (
+          <>
+            {/* Barra de Filtros y Búsqueda de Órdenes */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                {/* Pestañas de Estado */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(["TODOS", "PENDIENTE", "CONFIRMADO", "RECHAZADO", "VENCIDO"] as const).map((estado) => (
+                    <button
+                      key={estado}
+                      type="button"
+                      onClick={() => {
+                        setFiltroEstado(estado);
+                        setPagina(1);
+                      }}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                        filtroEstado === estado
+                          ? "bg-blue-800 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {estado}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Buscador */}
+                <form onSubmit={handleBuscar} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Buscar por PAG-..., DNI, CUT..."
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    className="w-full sm:w-64 rounded-xl border border-slate-300 px-3 py-1.5 text-xs text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-blue-800 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-900 transition shadow-xs"
+                  >
+                    Buscar
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {/* Tabla de Órdenes de Pago */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+              {cargando ? (
+                <div className="p-12 text-center text-slate-500">
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-700 border-r-transparent align-[-0.125em]" />
+                  <p className="mt-3 text-sm font-medium">Cargando órdenes de pago...</p>
+                </div>
+              ) : error ? (
+                <div className="p-6 text-center text-rose-700 bg-rose-50 border-b border-rose-200">
+                  <p className="text-sm font-semibold">{error}</p>
+                  <button
+                    type="button"
+                    onClick={() => void cargarOrdenes()}
+                    className="mt-2 rounded-lg bg-rose-700 px-3 py-1 text-xs text-white hover:bg-rose-800"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              ) : (!ordenes || ordenes.length === 0) ? (
+                <div className="p-12 text-center text-slate-500">
+                  <p className="text-base font-semibold text-slate-700">No se encontraron órdenes de pago</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {filtroEstado !== "TODOS"
+                      ? `No existen órdenes en estado ${filtroEstado}.`
+                      : "No hay registros disponibles con el criterio de búsqueda."}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600">
+                    <thead className="border-b border-slate-200 bg-slate-50 uppercase text-[11px] font-bold text-slate-700">
+                      <tr>
+                        <th scope="col" className="px-4 py-3">Código Pago</th>
+                        <th scope="col" className="px-4 py-3">Expediente</th>
+                        <th scope="col" className="px-4 py-3">Administrado</th>
+                        <th scope="col" className="px-4 py-3">Concepto TUPA</th>
+                        <th scope="col" className="px-4 py-3">Monto</th>
+                        <th scope="col" className="px-4 py-3">Vencimiento</th>
+                        <th scope="col" className="px-4 py-3">Estado</th>
+                        <th scope="col" className="px-4 py-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {ordenes.map((ord) => (
+                        <tr key={ord.ordenPagoId} className="hover:bg-slate-50/80 transition">
+                          <td className="px-4 py-3 font-mono font-bold text-blue-900 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span>{ord.codigoPago}</span>
+                              {ord.tipoOrden === "ADICIONAL" ? (
+                                <span
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300"
+                                  title={ord.motivoAdicional ? `Pago Adicional: ${ord.motivoAdicional}` : "Pago Adicional"}
+                                >
+                                  ADICIONAL
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
+                                  PRINCIPAL
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-slate-700 whitespace-nowrap">
+                            <Link
+                              to={`/expedientes/${ord.expedienteId}`}
+                              className="hover:underline text-blue-700 font-semibold"
+                            >
+                              {ord.codigoExpediente}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-slate-800">{ord.solicitanteNombre}</p>
+                            <p className="text-[11px] text-slate-500 font-mono">{ord.documentoEnmascarado}</p>
+                          </td>
+                          <td className="px-4 py-3 max-w-xs">
+                            <p className="font-medium text-slate-800 truncate" title={ord.concepto}>
+                              {ord.concepto}
+                            </p>
+                            {ord.codigoTupa && (
+                              <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
+                                {ord.codigoTupa}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 font-mono font-bold text-slate-900 whitespace-nowrap">
+                            {ord.moneda} {ord.monto.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-slate-500">
+                            {formatearFecha(ord.fechaVencimiento)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${badgeEstado(ord.estado)}`}>
+                              {ord.estado}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap space-x-1.5">
+                            {ord.estado === "PENDIENTE" && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAbrirConfirmar(ord)}
+                                  className="rounded-xl border border-emerald-700 bg-emerald-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-800 transition shadow-xs"
+                                >
+                                  Cobrar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAbrirRechazar(ord)}
+                                  className="rounded-xl border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                >
+                                  Rechazar
+                                </button>
+                              </>
+                            )}
+                            {ord.estado === "CONFIRMADO" && (
+                              <button
+                                type="button"
+                                onClick={() => handleAbrirRecibo(ord)}
+                                className="rounded-xl border border-blue-700 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800 hover:bg-blue-100 transition"
+                              >
+                                Ver Recibo
+                              </button>
+                            )}
+                            {ord.estado === "RECHAZADO" && ord.motivoRechazo && (
+                              <span className="text-[11px] text-rose-600 italic truncate max-w-xs inline-block" title={ord.motivoRechazo}>
+                                {ord.motivoRechazo}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Paginación Órdenes */}
+              <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-3 flex items-center justify-between text-xs text-slate-600">
+                <span>
+                  Total: <strong>{totalRegistros}</strong> registros (Página {pagina} de {totalPaginas})
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={pagina <= 1}
+                    onClick={() => setPagina((p) => Math.max(p - 1, 1))}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pagina >= totalPaginas}
+                    onClick={() => setPagina((p) => p + 1)}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Barra de Filtros y Búsqueda de Devoluciones */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                {/* Pestañas de Estado Devolución */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[
+                    { label: "TODAS", val: "TODAS" },
+                    { label: "Por Desembolsar", val: "PENDIENTE_TESORERIA" },
+                    { label: "Completadas (DEVUELTA)", val: "DEVUELTA" },
+                    { label: "SOLICITADA", val: "SOLICITADA" },
+                    { label: "EN_REVISION", val: "EN_REVISION" },
+                    { label: "OBSERVADA", val: "OBSERVADA" },
+                    { label: "RECHAZADA", val: "RECHAZADA" },
+                  ].map((filtro) => (
+                    <button
+                      key={filtro.val}
+                      type="button"
+                      onClick={() => {
+                        setFiltroEstadoDev(filtro.val);
+                        setPaginaDev(1);
+                      }}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                        filtroEstadoDev === filtro.val
+                          ? "bg-blue-800 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {filtro.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Buscador Devoluciones */}
+                <form onSubmit={handleBuscarDev} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Buscar por DEV-..., CUT, DNI..."
+                    value={busquedaDev}
+                    onChange={(e) => setBusquedaDev(e.target.value)}
+                    className="w-full sm:w-64 rounded-xl border border-slate-300 px-3 py-1.5 text-xs text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-blue-800 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-900 transition shadow-xs"
+                  >
+                    Buscar
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {/* Tabla de Devoluciones */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+              {cargandoDevoluciones ? (
+                <div className="p-12 text-center text-slate-500">
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-700 border-r-transparent align-[-0.125em]" />
+                  <p className="mt-3 text-sm font-medium">Cargando solicitudes de devolución...</p>
+                </div>
+              ) : errorDevoluciones ? (
+                <div className="p-6 text-center text-rose-700 bg-rose-50 border-b border-rose-200">
+                  <p className="text-sm font-semibold">{errorDevoluciones}</p>
+                  <button
+                    type="button"
+                    onClick={() => void cargarDevoluciones()}
+                    className="mt-2 rounded-lg bg-rose-700 px-3 py-1 text-xs text-white hover:bg-rose-800"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              ) : (!devoluciones || devoluciones.length === 0) ? (
+                <div className="p-12 text-center text-slate-500">
+                  <p className="text-base font-semibold text-slate-700">No se encontraron solicitudes de devolución</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {filtroEstadoDev !== "TODAS"
+                      ? `No existen solicitudes en estado ${filtroEstadoDev}.`
+                      : "No hay devoluciones registradas hasta el momento."}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600">
+                    <thead className="border-b border-slate-200 bg-slate-50 uppercase text-[11px] font-bold text-slate-700">
+                      <tr>
+                        <th scope="col" className="px-4 py-3">Código DEV</th>
+                        <th scope="col" className="px-4 py-3">Expediente</th>
+                        <th scope="col" className="px-4 py-3">Pago Original</th>
+                        <th scope="col" className="px-4 py-3">Administrado</th>
+                        <th scope="col" className="px-4 py-3">Causal / Motivo</th>
+                        <th scope="col" className="px-4 py-3">Monto Solicitado / Autorizado</th>
+                        <th scope="col" className="px-4 py-3">Estado</th>
+                        <th scope="col" className="px-4 py-3">Constancia CDEV</th>
+                        <th scope="col" className="px-4 py-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {devoluciones.map((dev) => (
+                        <tr key={dev.solicitudDevolucionId} className="hover:bg-slate-50/80 transition">
+                          <td className="px-4 py-3 font-mono font-bold text-purple-900 whitespace-nowrap">
+                            {dev.codigoDev}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-slate-700 whitespace-nowrap">
+                            <Link
+                              to={`/expedientes/${dev.expedienteId}`}
+                              className="hover:underline text-blue-700 font-semibold"
+                            >
+                              {dev.codigoExpediente}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="font-mono text-slate-800 block">{dev.codigoPago}</span>
+                            <span className="text-[11px] text-slate-500 font-mono">
+                              Recibo: {dev.codigoRecibo || "-"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-slate-800">{dev.solicitanteNombre}</p>
+                            <p className="text-[11px] text-slate-500 font-mono">{dev.solicitanteDocumento}</p>
+                          </td>
+                          <td className="px-4 py-3 max-w-xs">
+                            <span className="inline-block rounded bg-amber-100 text-amber-900 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold uppercase mb-0.5">
+                              {dev.causal}
+                            </span>
+                            <p className="font-medium text-slate-700 truncate" title={dev.motivo}>
+                              {dev.motivo}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 font-mono whitespace-nowrap">
+                            <p className="text-slate-800">
+                              Sol: <strong>S/ {dev.montoSolicitado.toFixed(2)}</strong>
+                            </p>
+                            {dev.montoAutorizado !== null && (
+                              <p className="text-emerald-700 font-bold text-[11px]">
+                                Aut: S/ {dev.montoAutorizado.toFixed(2)}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${badgeEstadoDevolucion(dev.estado)}`}>
+                              {dev.estado}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-teal-800 font-bold whitespace-nowrap">
+                            {dev.constanciaDevolucionCodigo ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-teal-50 border border-teal-200 px-2 py-0.5 text-xs text-teal-900">
+                                ✓ {dev.constanciaDevolucionCodigo}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-normal">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap space-x-1.5">
+                            {dev.estado === "PENDIENTE_TESORERIA" ? (
+                              <button
+                                type="button"
+                                onClick={() => handleAbrirEjecutarDev(dev)}
+                                className="rounded-xl border border-emerald-700 bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 transition shadow-xs"
+                              >
+                                Ejecutar Desembolso
+                              </button>
+                            ) : dev.estado === "DEVUELTA" ? (
+                              <span className="text-[11px] text-teal-700 font-semibold inline-flex items-center gap-1">
+                                ✓ Desembolsado ({dev.metodoDevolucion})
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">
+                                Trámite documental
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Paginación Devoluciones */}
+              <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-3 flex items-center justify-between text-xs text-slate-600">
+                <span>
+                  Total: <strong>{totalRegistrosDev}</strong> solicitudes (Página {paginaDev} de {totalPaginasDev})
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={paginaDev <= 1}
+                    onClick={() => setPaginaDev((p) => Math.max(p - 1, 1))}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    disabled={paginaDev >= totalPaginasDev}
+                    onClick={() => setPaginaDev((p) => p + 1)}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* MODAL 1: CONFIRMAR PAGO (EFECTIVO O YAPE ASISTIDO) */}
@@ -1095,6 +1466,144 @@ export default function TesoreriaPage() {
                 🖨️ Imprimir Recibo
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: EJECUTAR DESEMBOLSO DE DEVOLUCIÓN (TESORERÍA) */}
+      {modalEjecutarDevAbierto && devSeleccionada && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
+                  Tesorería / Desembolso Financiero
+                </span>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Ejecutar Devolución — {devSeleccionada.codigoDev}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEjecutarDevAbierto(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Resumen de la Solicitud y Autorización */}
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 space-y-1.5 text-xs text-slate-700">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Expediente:</span>
+                <span className="font-mono font-bold text-blue-900">{devSeleccionada.codigoExpediente}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Administrado:</span>
+                <span className="font-bold text-slate-900">{devSeleccionada.solicitanteNombre}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Doc. Identidad:</span>
+                <span className="font-mono text-slate-700">{devSeleccionada.solicitanteDocumento}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Orden / Recibo Original:</span>
+                <span className="font-mono text-slate-800">
+                  {devSeleccionada.codigoPago} {devSeleccionada.codigoRecibo ? `(${devSeleccionada.codigoRecibo})` : ""}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Causal:</span>
+                <span className="font-bold text-amber-800">{devSeleccionada.causal}</span>
+              </div>
+              <div className="flex justify-between border-t border-slate-200 pt-1.5 mt-1.5">
+                <span className="text-slate-700 font-bold">Monto a Devolver:</span>
+                <span className="font-mono font-extrabold text-base text-teal-800">
+                  S/ {(devSeleccionada.montoAutorizado ?? devSeleccionada.montoSolicitado).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {constanciaEmitida ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5 text-sm">
+                    ✓ Desembolso procesado exitosamente
+                  </p>
+                  <p className="text-xs">
+                    Se emitió la constancia oficial de devolución de Tesorería:
+                  </p>
+                  <p className="text-base font-mono font-extrabold text-teal-950 mt-1">
+                    {constanciaEmitida}
+                  </p>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setModalEjecutarDevAbierto(false)}
+                    className="rounded-xl bg-teal-800 px-4 py-2 text-xs font-bold text-white hover:bg-teal-900 shadow-xs"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleEjecutarDevolucionSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="metodo-devolucion" className="block text-xs font-bold text-slate-700 mb-1">
+                    Método de Desembolso
+                  </label>
+                  <select
+                    id="metodo-devolucion"
+                    value={metodoDevolucion}
+                    onChange={(e) => setMetodoDevolucion(e.target.value as MetodoDevolucion)}
+                    className="w-full rounded-xl border border-slate-300 p-2 text-xs text-slate-800 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                  >
+                    <option value="EFECTIVO">Efectivo en Ventanilla / Caja</option>
+                    <option value="TRANSFERENCIA">Transferencia Bancaria (CCI)</option>
+                    <option value="YAPE">Billetera Digital (Yape / Plin)</option>
+                    <option value="CHEQUE">Cheque de Gerencia Institucional</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="observacion-devolucion" className="block text-xs font-bold text-slate-700 mb-1">
+                    Observaciones o N° de Operación (Opcional)
+                  </label>
+                  <textarea
+                    id="observacion-devolucion"
+                    rows={2}
+                    value={observacionDevolucion}
+                    onChange={(e) => setObservacionDevolucion(e.target.value)}
+                    placeholder="Ej. N° Operación bancaria, observaciones de ventanilla..."
+                    className="w-full rounded-xl border border-slate-300 p-2 text-xs text-slate-800 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                  />
+                </div>
+
+                {errorEjecucionDev && (
+                  <p className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700">
+                    {errorEjecucionDev}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setModalEjecutarDevAbierto(false)}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={procesandoEjecucionDev}
+                    className="rounded-xl bg-teal-800 px-4 py-2 text-xs font-bold text-white hover:bg-teal-900 transition shadow-xs disabled:opacity-50"
+                  >
+                    {procesandoEjecucionDev ? "Emitiendo CDEV..." : "Confirmar Desembolso y Emitir CDEV"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

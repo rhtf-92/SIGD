@@ -28,10 +28,7 @@ export interface SolicitudAtencion {
   readonly resultado_resumen: string;
   readonly observacion_interna?: string;
   readonly documento_respuesta_id?: string;
-  readonly s3_key?: string;
-  readonly sha256?: string;
   readonly nombre_archivo?: string;
-  readonly tamano_bytes?: number;
   readonly mime_type?: string;
 }
 
