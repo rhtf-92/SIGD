@@ -26,6 +26,7 @@ import { TesoreriaRepository } from '../tesoreria/tesoreria.repository.js';
 import { calcularVencimientoOrdenPago } from '../tesoreria/tesoreria.service.js';
 import { ValidationError, NotFoundError, ConflictError } from '../../shared/domain/errors/index.js';
 import type { MesaPartesDigitalInput } from './tramites.schemas.js';
+import { TupaVersionRepository } from './tupaVersion.repository.js';
 
 export interface ResultadoMesaPartesDigital {
   expedienteId: string;
@@ -55,12 +56,14 @@ export interface ResultadoMesaPartesDigital {
 export class MesaPartesDigitalService {
   private readonly cutService: CutService;
   private readonly tesoreriaRepository = new TesoreriaRepository();
+  private readonly tupaVersionRepository: TupaVersionRepository;
   private readonly tupaRequisitosService: TupaRequisitosService;
   private readonly documentoStorageService: DocumentoStorageService;
   private readonly obtenerFeriados: () => Promise<string[]>;
 
   constructor(private readonly pool: Pool, obtenerFeriados?: () => Promise<string[]>) {
     this.cutService = new CutService(pool);
+    this.tupaVersionRepository = new TupaVersionRepository(pool);
     this.tupaRequisitosService = new TupaRequisitosService(pool);
     this.documentoStorageService = new DocumentoStorageService();
     this.obtenerFeriados = obtenerFeriados ?? crearProveedorFeriados(pool);
@@ -264,10 +267,11 @@ export class MesaPartesDigitalService {
         [expedienteId, horario.envioReal, datos.asunto, personaId],
       );
 
-      await cliente.query(
-        `INSERT INTO sigd_doc.expediente_tupa_vinculo (expediente_id, registro_version_id)
-         VALUES ($1::uuid, $2::uuid)`,
-        [expedienteId, datos.registroVersionId],
+      await this.tupaVersionRepository.crearVinculoConSnapshot(
+        expedienteId,
+        datos.registroVersionId,
+        {},
+        cliente,
       );
 
       // 7. Procesar y foliar documentos PDF presentados

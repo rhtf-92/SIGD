@@ -4,6 +4,8 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { construirApp } from '../../../../src/app.js';
 import { calcularHorarioCorte } from '../../../../src/domains/tramicore/horarioCorte.util.js';
+import { firmarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
+import { restaurarBaseE2E } from '../../../helpers/database.helper.js';
 
 /**
  * Verificacion de extremo a extremo de los endpoints #14 y #16 sobre la base de
@@ -11,40 +13,63 @@ import { calcularHorarioCorte } from '../../../../src/domains/tramicore/horarioC
  * instalado `05_esquema_sigd_tra_v6.3.sql` y los stubs de los dominios externos.
  */
 
+const SECRETO_JWT_E2E = 'sigd-e2e-only-signing-secret-not-for-production';
 const url = process.env.TEST_DATABASE_URL;
 const describeE2e = url ? describe : describe.skip;
 
 describeE2e('TramiCore · Radicacion virtual (#14) y consulta publica (#16)', () => {
   let pool: Pool;
   let app: Express;
-  let idPersona: number;
+  let idPersona: string;
   let idTipoTramite: string;
+  let tipoDocumentalId: string;
+  let token: string;
   /** CUT de la radicacion exitosa, reutilizado por la consulta publica. */
   let cutRadicable: string;
 
   beforeAll(async () => {
+    await restaurarBaseE2E();
+    process.env.AUTH_JWT_SECRET = SECRETO_JWT_E2E;
     pool = new Pool({ connectionString: url, max: 10 });
     app = construirApp(pool);
 
-    const documento = await pool.query(
-      `INSERT INTO sigd_auth.tipos_documento (codigo, nombre) VALUES ('DNI', 'DNI')
-       ON CONFLICT (codigo) DO UPDATE SET nombre = EXCLUDED.nombre
-       RETURNING id`,
+    await pool.query(
+      `INSERT INTO sigd_auth.tipos_documento (codigo, descripcion) VALUES ('DNI', 'Documento Nacional de Identidad')
+       ON CONFLICT (codigo) DO UPDATE SET descripcion = EXCLUDED.descripcion
+       RETURNING id_tipo_documento`,
     );
     const persona = await pool.query(
       `INSERT INTO sigd_auth.persona
-         (tipo_documento_id, numero_documento, nombres, apellido_paterno, apellido_materno)
-       VALUES ($1, '45872315', 'Ana', 'Quispe', 'Ramos') RETURNING id`,
-      [documento.rows[0].id],
+         (tipo, id_documento)
+       VALUES ('NATURAL', '45872315') RETURNING id_persona`,
     );
-    idPersona = persona.rows[0].id;
+    idPersona = persona.rows[0].id_persona;
+    await pool.query(
+      `INSERT INTO sigd_auth.persona_natural
+         (id_persona, nombres, apellidos, nombre_completo, correo)
+       VALUES ($1::uuid, 'Ana', 'Quispe Ramos', 'Ana Quispe Ramos', 'ana.quispe@estudiante.iestpsuiza.edu.pe')`,
+      [idPersona],
+    );
+    const cuenta = await pool.query(
+      `INSERT INTO sigd_auth.cuenta_usuario (id_persona, usuario, correo, password_hash)
+       VALUES ($1::uuid, 'tramites-e2e', 'tramites-e2e@example.test', '$argon2id$test')
+       RETURNING id_usuario`,
+      [idPersona],
+    );
+    token = firmarTokenAcceso({ sub: cuenta.rows[0].id_usuario, secreto: SECRETO_JWT_E2E });
 
     const tupa = await pool.query(
-      `INSERT INTO sigd_doc.tipo_tramite_tupa (id_tipo_tramite_tupa, codigo_tupa, denominacion, es_tupa)
-       VALUES (gen_random_uuid(), 'TD-001', 'Solicitud de certificado estudiantil', TRUE)
-       RETURNING id_tipo_tramite_tupa`,
+      `INSERT INTO sigd_doc.tipo_tramite_tupa (codigo, denominacion, unidad_organica)
+       VALUES ('TD-001', 'Solicitud de certificado estudiantil', 'Secretaría Académica')
+       RETURNING tipo_tramite_id`,
     );
-    idTipoTramite = tupa.rows[0].id_tipo_tramite_tupa;
+    idTipoTramite = tupa.rows[0].tipo_tramite_id;
+    const tipoDocumental = await pool.query(
+      `INSERT INTO sigd_doc.tipo_documento (codigo, nombre)
+       VALUES ('E2E-DOC', 'Documento E2E')
+       RETURNING tipo_documental_id`,
+    );
+    tipoDocumentalId = tipoDocumental.rows[0].tipo_documental_id;
   });
 
   afterAll(async () => {
@@ -55,6 +80,7 @@ describeE2e('TramiCore · Radicacion virtual (#14) y consulta publica (#16)', ()
     asunto: 'Solicitud de certificado de estudios SUPERIOR',
     idTipoTramiteTupa: idTipoTramite,
     idPersona,
+    tipoDocumentalId,
     nombreSolicitante: 'Ana Quispe Ramos',
     correo: 'ana.quispe@estudiante.iestpsuiza.edu.pe',
     totalFolios: 3,
@@ -68,9 +94,14 @@ describeE2e('TramiCore · Radicacion virtual (#14) y consulta publica (#16)', ()
     ],
   });
 
+  const postAutenticado = (ruta: string) =>
+    request(app).post(ruta).set('Authorization', `Bearer ${token}`);
+
+  const getAutenticado = (ruta: string) =>
+    request(app).get(ruta).set('Authorization', `Bearer ${token}`);
+
   it('Rechaza la radicacion sin ningun archivo cargado', async () => {
-    const respuesta = await request(app)
-      .post('/api/v1/tramites/radicacion-virtual')
+    const respuesta = await postAutenticado('/api/v1/tramites/radicacion-virtual')
       .send({ ...cuerpoValido('a'.repeat(64)), documentos: [] });
 
     expect(respuesta.status).toBe(400);
@@ -78,13 +109,11 @@ describeE2e('TramiCore · Radicacion virtual (#14) y consulta publica (#16)', ()
   });
 
   it('Rechaza un asunto en blanco y un hash de longitud incorrecta', async () => {
-    const sinAsunto = await request(app)
-      .post('/api/v1/tramites/radicacion-virtual')
+    const sinAsunto = await postAutenticado('/api/v1/tramites/radicacion-virtual')
       .send({ ...cuerpoValido('a'.repeat(64)), asunto: '   ' });
     expect(sinAsunto.status).toBe(400);
 
-    const hashCorto = await request(app)
-      .post('/api/v1/tramites/radicacion-virtual')
+    const hashCorto = await postAutenticado('/api/v1/tramites/radicacion-virtual')
       .send(cuerpoValido('abc'));
     expect(hashCorto.status).toBe(400);
   });
@@ -98,35 +127,30 @@ describeE2e('TramiCore · Radicacion virtual (#14) y consulta publica (#16)', ()
       'ana@',
     ];
     for (const correo of correos) {
-      const respuesta = await request(app)
-        .post('/api/v1/tramites/radicacion-virtual')
+      const respuesta = await postAutenticado('/api/v1/tramites/radicacion-virtual')
         .send({ ...cuerpoValido('e'.repeat(64)), correo });
       expect(respuesta.status, `correo "${correo}" debio ser rechazado`).toBe(400);
     }
 
     for (const nombre of ['', '   ', 'A']) {
-      const respuesta = await request(app)
-        .post('/api/v1/tramites/radicacion-virtual')
+      const respuesta = await postAutenticado('/api/v1/tramites/radicacion-virtual')
         .send({ ...cuerpoValido('e'.repeat(64)), nombreSolicitante: nombre });
       expect(respuesta.status, `nombre "${nombre}" debio ser rechazado`).toBe(400);
     }
   });
 
   it('Exige nombre y correo: sin ellos la radicacion no prospera', async () => {
-    const sinCorreo = await request(app)
-      .post('/api/v1/tramites/radicacion-virtual')
+    const sinCorreo = await postAutenticado('/api/v1/tramites/radicacion-virtual')
       .send((({ correo: _omitido, ...resto }) => resto)(cuerpoValido('f'.repeat(64))));
     expect(sinCorreo.status).toBe(400);
 
-    const sinNombre = await request(app)
-      .post('/api/v1/tramites/radicacion-virtual')
+    const sinNombre = await postAutenticado('/api/v1/tramites/radicacion-virtual')
       .send((({ nombreSolicitante: _omitido, ...resto }) => resto)(cuerpoValido('f'.repeat(64))));
     expect(sinNombre.status).toBe(400);
   });
 
   it('Rechaza un tipo de tramite que no existe en el catalogo TUPA', async () => {
-    const respuesta = await request(app)
-      .post('/api/v1/tramites/radicacion-virtual')
+    const respuesta = await postAutenticado('/api/v1/tramites/radicacion-virtual')
       .send({
         ...cuerpoValido('b'.repeat(64)),
         idTipoTramiteTupa: '00000000-0000-0000-0000-000000000000',
@@ -135,8 +159,7 @@ describeE2e('TramiCore · Radicacion virtual (#14) y consulta publica (#16)', ()
   });
 
   it('Radica un expediente y emite el cargo digital', async () => {
-    const respuesta = await request(app)
-      .post('/api/v1/tramites/radicacion-virtual')
+    const respuesta = await postAutenticado('/api/v1/tramites/radicacion-virtual')
       .send(cuerpoValido('c'.repeat(64)));
 
     expect(respuesta.status).toBe(201);
@@ -153,37 +176,31 @@ describeE2e('TramiCore · Radicacion virtual (#14) y consulta publica (#16)', ()
     const envio = new Date(respuesta.body.fechaEnvioReal).getTime();
     expect(legal).toBeGreaterThanOrEqual(envio - 60_000);
 
-    // La cabecera, el adjunto y el cargo deben existir juntos.
+    // La cabecera, el trámite y el asiento deben persistir; el cargo se devuelve en la respuesta.
     const persistido = await pool.query(
-      `SELECT e.cut,
-              e.nombre_solicitante,
-              e.correo_notificacion,
-              e.fecha_envio_real,
-              e.fecha_radicacion_legal,
-              (SELECT count(*) FROM sigd_tra.documento_adjunto da
-                WHERE da.expediente_id = e.expediente_id) AS adjuntos,
-              (SELECT count(*) FROM sigd_tra.cargo_digital cd
-                WHERE cd.expediente_id = e.expediente_id) AS cargos
+      `SELECT e.codigo_expediente AS cut,
+              e.dni_solicitante,
+              tr.asunto,
+              (SELECT count(*) FROM sigd_tra.asiento_registro ar
+                WHERE ar.expediente_id = e.expediente_id) AS asientos
          FROM sigd_tra.expediente e
-        WHERE e.cut = $1`,
+         JOIN sigd_tra.tramite tr ON tr.expediente_id = e.expediente_id
+        WHERE e.codigo_expediente = $1`,
       [respuesta.body.cut],
     );
-    expect(Number(persistido.rows[0].adjuntos)).toBe(1);
-    expect(Number(persistido.rows[0].cargos)).toBe(1);
-
-    // Los datos del solicitante quedan registrados para las notificaciones.
-    expect(persistido.rows[0].nombre_solicitante).toBe('Ana Quispe Ramos');
-    expect(persistido.rows[0].correo_notificacion).toBe(
-      'ana.quispe@estudiante.iestpsuiza.edu.pe',
-    );
+    expect(persistido.rowCount).toBe(1);
+    expect(persistido.rows[0].cut).toBe(respuesta.body.cut);
+    expect(persistido.rows[0].dni_solicitante).toBe('45872315');
+    expect(persistido.rows[0].asunto).toBe('Solicitud de certificado de estudios SUPERIOR');
+    expect(Number(persistido.rows[0].asientos)).toBe(1);
 
     cutRadicable = respuesta.body.cut as string;
   });
 
   it('Consulta el expediente por CUT enmascarando los datos del administrado', async () => {
     expect(cutRadicable).toMatch(/^EXP-\d{4}-\d{6}$/);
-    const respuesta = await request(app).get(
-      `/api/v1/tramites/consulta-publica/${cutRadicable}`,
+    const respuesta = await getAutenticado(
+      `/api/v1/tramites/consulta-publica/${cutRadicable}?documento=45872315`,
     );
 
     expect(respuesta.status).toBe(200);
@@ -214,12 +231,12 @@ describeE2e('TramiCore · Radicacion virtual (#14) y consulta publica (#16)', ()
   });
 
   it('Responde 404 con un CUT bien formado pero inexistente', async () => {
-    const respuesta = await request(app).get('/api/v1/tramites/consulta-publica/EXP-2026-999999');
+    const respuesta = await getAutenticado('/api/v1/tramites/consulta-publica/EXP-2026-999999?documento=45872315');
     expect(respuesta.status).toBe(404);
   });
 
   it('Responde 400 con un CUT que incumple la mascara EXP-YYYY-XXXXXX', async () => {
-    const respuesta = await request(app).get('/api/v1/tramites/consulta-publica/CUT-2026-1');
+    const respuesta = await getAutenticado('/api/v1/tramites/consulta-publica/CUT-2026-1');
     expect(respuesta.status).toBe(400);
     expect(respuesta.body.code).toBe('VALIDATION_ERROR');
   });
@@ -228,8 +245,7 @@ describeE2e('TramiCore · Radicacion virtual (#14) y consulta publica (#16)', ()
     const antes = await pool.query('SELECT count(*)::int AS n FROM sigd_tra.expediente');
 
     // Tipo MIME no admitido: falla la validacion, luego no debe quedar nada.
-    const respuesta = await request(app)
-      .post('/api/v1/tramites/radicacion-virtual')
+    const respuesta = await postAutenticado('/api/v1/tramites/radicacion-virtual')
       .send({
         ...cuerpoValido('d'.repeat(64)),
         documentos: [

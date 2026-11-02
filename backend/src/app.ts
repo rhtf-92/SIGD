@@ -226,7 +226,7 @@ export function construirApp(
   const actorProviderReportesEfectivo =
     opts.actorProviderReportes ?? opts.actorProviderRutaDoc ?? jwtActorProvider;
 
-  app.use('/api', crearRouterReferencia(pool));
+  app.use('/api', crearRouterReferencia(pool, actorProviderRutaDocEfectivo));
   app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
   app.use('/api/v1', crearRouterAuth(pool));
   app.use('/api/v1', crearRouterCasilla(pool));

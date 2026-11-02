@@ -29,6 +29,7 @@ import { calcularVencimientoOrdenPago } from '../tesoreria/tesoreria.service.js'
 import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
 import { documentoStorageService } from '../../core/storage/documento-storage.service.js';
 import { TupaRequisitosService } from './tupaRequisitos.service.js';
+import { TupaVersionRepository } from './tupaVersion.repository.js';
 
 export interface DocumentoAdjuntoPresencialInput {
   nombreArchivo: string;
@@ -119,6 +120,7 @@ export function enmascararNumeroDocumento(tipoDoc: string, numDoc: string): stri
 
 export class VentanillaPresencialService {
   private readonly tupaRequisitosService: TupaRequisitosService;
+  private readonly tupaVersionRepository: TupaVersionRepository;
 
   constructor(
     private readonly pool: Pool,
@@ -126,6 +128,7 @@ export class VentanillaPresencialService {
     tupaRequisitosService?: TupaRequisitosService,
   ) {
     this.tupaRequisitosService = tupaRequisitosService ?? new TupaRequisitosService(pool);
+    this.tupaVersionRepository = new TupaVersionRepository(pool);
   }
 
   public async registrarExpedienteVentanilla(
@@ -429,10 +432,11 @@ export class VentanillaPresencialService {
       let ordenPagoGenerada: ResultadoVentanilla['ordenPago'] = null;
       let contextoPagoInfo: { codigoTupa?: string | null; concepto?: string; costoOficial?: number } | null = null;
       if (datos.registroVersionId) {
-        await cliente.query(
-          `INSERT INTO sigd_doc.expediente_tupa_vinculo (expediente_id, registro_version_id)
-           VALUES ($1::uuid, $2::uuid);`,
-          [expedienteId, datos.registroVersionId],
+        await this.tupaVersionRepository.crearVinculoConSnapshot(
+          expedienteId,
+          datos.registroVersionId,
+          {},
+          cliente,
         );
 
         const contextoPago = await this.tesoreriaRepository.obtenerContextoExpedienteParaPago(

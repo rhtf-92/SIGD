@@ -717,7 +717,13 @@ export function crearRouterTramites(
     return res.status(200).json(info);
   });
 
-
+  router.get('/tramites/tupa/procedimientos/:id/tarifas', async (req: Request, res: Response) => {
+    const parametros = z.object({
+      id: z.string().uuid(),
+    }).parse(req.params);
+    const tarifas = await tupaVersionRepo.listarTarifasVariante(parametros.id);
+    return res.status(200).json(tarifas);
+  });
 
   // Crear nueva versión en borrador (solo ADMINISTRADOR)
   router.post('/admin/tupa/versiones', async (req: Request, res: Response) => {
@@ -761,7 +767,88 @@ export function crearRouterTramites(
     return res.status(200).json(mapearProcedimientoADto(proc));
   });
 
+  router.get('/admin/tupa/procedimientos/:idProcedimiento/procedencia', async (req: Request, res: Response) => {
+    const identidad = await resolverIdentidadPersona(req);
+    if (!identidad || !identidad.roles.includes('ADMINISTRADOR')) {
+      throw new ForbiddenError({ detail: 'Se requiere rol ADMINISTRADOR para consultar la procedencia del TUPA.' });
+    }
 
+    const parametros = z.object({
+      idProcedimiento: z.string().uuid(),
+    }).parse(req.params);
+    const query = z.object({
+      idRegistroVersion: z.string().uuid().optional(),
+    }).parse(req.query);
+    const procedencia = await tupaVersionRepo.listarCamposProcedencia(
+      parametros.idProcedimiento,
+      query.idRegistroVersion,
+    );
+    return res.status(200).json(procedencia);
+  });
+
+  router.post('/admin/tupa/procedimientos/:idProcedimiento/tarifas', async (req: Request, res: Response) => {
+    const identidad = await resolverIdentidadPersona(req);
+    if (!identidad || !identidad.roles.includes('ADMINISTRADOR')) {
+      throw new ForbiddenError({ detail: 'Se requiere rol ADMINISTRADOR para registrar tarifas TUPA.' });
+    }
+
+    const parametros = z.object({
+      idProcedimiento: z.string().uuid(),
+    }).parse(req.params);
+    const esquema = z.object({
+      idRegistroVersion: z.string().uuid(),
+      codigoVariante: z.string().trim().min(1).max(30),
+      nombreVariante: z.string().trim().min(1).max(160),
+      descripcion: z.string().nullable().optional(),
+      monto: z.coerce.number().positive(),
+      moneda: z.string().trim().min(1).max(10).optional(),
+      orden: z.coerce.number().int().min(0).max(32767).optional(),
+      fuente: z.enum(['OFICIAL', 'DEFAULT', 'PROPUESTA', 'REFERENCIA']),
+    });
+    const datos = esquema.parse(req.body);
+    const tarifa = await tupaVersionRepo.insertarTarifaVariante({
+      id_procedimiento: parametros.idProcedimiento,
+      id_registro_version: datos.idRegistroVersion,
+      codigo_variante: datos.codigoVariante,
+      nombre_variante: datos.nombreVariante,
+      descripcion: datos.descripcion,
+      monto: datos.monto,
+      moneda: datos.moneda,
+      orden: datos.orden,
+      fuente: datos.fuente,
+    });
+    void invalidateCache('tupa:catalogo:*');
+    return res.status(201).json(tarifa);
+  });
+
+  router.post('/admin/tupa/procedimientos/:idProcedimiento/procedencia', async (req: Request, res: Response) => {
+    const identidad = await resolverIdentidadPersona(req);
+    if (!identidad || !identidad.roles.includes('ADMINISTRADOR')) {
+      throw new ForbiddenError({ detail: 'Se requiere rol ADMINISTRADOR para registrar procedencia TUPA.' });
+    }
+
+    const parametros = z.object({
+      idProcedimiento: z.string().uuid(),
+    }).parse(req.params);
+    const esquema = z.object({
+      idRegistroVersion: z.string().uuid(),
+      campoNombre: z.string().trim().min(1).max(50),
+      valor: z.string().nullable().optional(),
+      fuente: z.enum(['OFICIAL', 'DEFAULT', 'PROPUESTA', 'REFERENCIA']),
+      evidencia: z.string().nullable().optional(),
+    });
+    const datos = esquema.parse(req.body);
+    const procedencia = await tupaVersionRepo.insertarCampoProcedencia({
+      id_procedimiento: parametros.idProcedimiento,
+      id_registro_version: datos.idRegistroVersion,
+      campo_nombre: datos.campoNombre,
+      valor: datos.valor,
+      fuente: datos.fuente,
+      evidencia: datos.evidencia,
+    });
+    void invalidateCache('tupa:catalogo:*');
+    return res.status(201).json(procedencia);
+  });
 
   // Publicar y activar versión (solo ADMINISTRADOR)
   router.post('/admin/tupa/versiones/:idVersion/publicar', async (req: Request, res: Response) => {

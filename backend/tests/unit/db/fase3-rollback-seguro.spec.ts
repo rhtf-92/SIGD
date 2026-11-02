@@ -5,6 +5,8 @@ import path from 'node:path';
 const sql = fs.readFileSync(path.resolve(process.cwd(), 'migraciones/26_sigd_devoluciones_y_pagos_adicionales_rollback.sql'), 'utf8');
 const rollback24 = fs.readFileSync(path.resolve(process.cwd(), 'migraciones/24_sigd_tupa_requisitos_documentales_rollback.sql'), 'utf8');
 const rollback25 = fs.readFileSync(path.resolve(process.cwd(), 'migraciones/25_sigd_vinculacion_historica_rollback.sql'), 'utf8');
+const rollback29 = fs.readFileSync(path.resolve(process.cwd(), 'migraciones/29_sigd_tupa_datos_oficiales_rollback.sql'), 'utf8');
+const migracion29 = fs.readFileSync(path.resolve(process.cwd(), 'migraciones/29_sigd_tupa_datos_oficiales.sql'), 'utf8');
 
 describe('Rollback 26: historia financiera preservada', () => {
   it('comprueba DEV y órdenes adicionales antes de cualquier DROP', () => {
@@ -38,4 +40,16 @@ describe('Rollbacks TUPA anteriores: preservan datos y dependencias', () => {
     expect(rollback25).not.toMatch(/DROP\s+TABLE[^;]*CASCADE/i);
   });
 
+  it('rollback 29 elimina solo las tarifas propias y valida metadatos antes de restaurar', () => {
+    expect(migracion29).toMatch(/IF EXISTS[\s\S]*tupa_tarifa_variante/i);
+    expect(migracion29).toMatch(/periodo_documento\s+IS NOT NULL/i);
+    expect(rollback29).toMatch(/JOIN\s+.*tupa_procedimiento/i);
+    expect(rollback29).toMatch(/p\.codigo_ref/i);
+    expect(rollback29).toMatch(/p\.registro_version_id/i);
+    expect(rollback29).toMatch(/tv\.monto\s*=\s*esperado\.monto/i);
+    expect(rollback29).toMatch(/'HEMBRAS', 30\.00[\s\S]*'MACHOS', 40\.00[\s\S]*'REPRODUCTOR', 25\.00[\s\S]*'CARNE', 15\.00[\s\S]*'CARCASA', 20\.00[\s\S]*'EN_PIE', 15\.00/i);
+    expect(rollback29).not.toMatch(/DELETE FROM sigd_doc\.tupa_tarifa_variante\s+WHERE fuente\s*=\s*'OFICIAL'\s+AND codigo_variante/i);
+    expect(rollback29).toMatch(/periodo_documento\s+IS DISTINCT FROM '2026-01'/i);
+    expect(rollback29).toMatch(/SET\s+periodo_documento\s*=\s*NULL/i);
+  });
 });

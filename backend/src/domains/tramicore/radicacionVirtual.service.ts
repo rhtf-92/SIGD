@@ -9,6 +9,7 @@ import { TesoreriaRepository } from '../tesoreria/tesoreria.repository.js';
 import { calcularVencimientoOrdenPago } from '../tesoreria/tesoreria.service.js';
 import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
 import { TupaRequisitosService } from './tupaRequisitos.service.js';
+import { TupaVersionRepository } from './tupaVersion.repository.js';
 
 /**
  * T-BE-TC-02 y T-BE-TC-03 — Logica de negocio de la radicacion virtual
@@ -100,12 +101,14 @@ export class RadicacionVirtualService {
   private readonly cutService: CutService;
   private readonly tesoreriaRepository = new TesoreriaRepository();
   private readonly tupaRequisitosService: TupaRequisitosService;
+  private readonly tupaVersionRepository: TupaVersionRepository;
   private readonly obtenerFeriados: ProveedorFeriados;
 
   constructor(private readonly pool: Pool, obtenerFeriados?: ProveedorFeriados) {
     this.cutService = new CutService(pool);
     this.obtenerFeriados = obtenerFeriados ?? crearProveedorFeriados(pool);
     this.tupaRequisitosService = new TupaRequisitosService(pool);
+    this.tupaVersionRepository = new TupaVersionRepository(pool);
   }
 
   async radicar(datos: RadicacionVirtualInput, now: Date = new Date()): Promise<ResultadoRadicacion> {
@@ -499,10 +502,11 @@ export class RadicacionVirtualService {
     expedienteId: string,
     registroVersionId: string,
   ): Promise<void> {
-    await cliente.query(
-      `INSERT INTO sigd_doc.expediente_tupa_vinculo (expediente_id, registro_version_id)
-       VALUES ($1::uuid, $2::uuid)`,
-      [expedienteId, registroVersionId],
+    await this.tupaVersionRepository.crearVinculoConSnapshot(
+      expedienteId,
+      registroVersionId,
+      {},
+      cliente,
     );
   }
 

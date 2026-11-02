@@ -31,7 +31,7 @@ export interface RegistroMigracion {
 export const SIGD_MIGRATION_ADVISORY_LOCK_ID = 987654321;
 
 const PERFIL_BASELINE = 'BASELINE_2026_V1';
-const MANIFIESTO_BASELINE = [
+export const MANIFIESTO_BASELINE = [
   '01_sigd_audit.sql', '02_sigd_auth.sql', '03_sigd_org.sql',
   '04_sigd_doc.sql', '05_sigd_tra.sql', 'BASELINE_2026_V1.sql',
   '08_sigd_tupa_acoplamiento.sql', '09_sigd_seguridad_remediacion.sql',
@@ -53,6 +53,8 @@ const MANIFIESTO_BASELINE = [
   '25_sigd_vinculacion_historica.sql',
   '26_sigd_devoluciones_y_pagos_adicionales.sql',
   '27_sigd_causal_pago_duplicado.sql',
+  '28_sigd_tupa_versionado_organizacional.sql',
+  '29_sigd_tupa_datos_oficiales.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }

@@ -115,6 +115,7 @@ export const NAV_ITEMS_PUBLICOS: readonly NavItem[] = [
   { etiqueta: 'Inicio', ruta: '/' },
   { etiqueta: 'Mesa de Partes Digital', ruta: '/mesa-partes' },
   { etiqueta: 'Consulta CUT', ruta: '/consulta' },
+  { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
   { etiqueta: 'Validador CVD', ruta: '/validador-cvd' },
   { etiqueta: 'Flujo Validez Legal', ruta: '/flujo-validez-legal' },
   { etiqueta: 'Registro', ruta: '/registro' },
