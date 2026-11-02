@@ -40,9 +40,9 @@ describe('Rollbacks TUPA anteriores: preservan datos y dependencias', () => {
     expect(rollback25).not.toMatch(/DROP\s+TABLE[^;]*CASCADE/i);
   });
 
-  it('rollback 29 elimina solo las tarifas propias y valida metadatos antes de restaurar', () => {
-    expect(migracion29).toMatch(/IF EXISTS[\s\S]*tupa_tarifa_variante/i);
-    expect(migracion29).toMatch(/periodo_documento\s+IS NOT NULL/i);
+  it('rollback 29 elimina solo las tarifas propias y preserva la migración histórica idempotente', () => {
+    expect(migracion29.match(/ON CONFLICT \(id_procedimiento, id_registro_version, codigo_variante\) DO NOTHING;/gi)).toHaveLength(6);
+    expect(migracion29).toMatch(/periodo_documento\s*=\s*'2026-01'/i);
     expect(rollback29).toMatch(/JOIN\s+.*tupa_procedimiento/i);
     expect(rollback29).toMatch(/p\.codigo_ref/i);
     expect(rollback29).toMatch(/p\.registro_version_id/i);

@@ -8,55 +8,6 @@
 
 BEGIN;
 
-LOCK TABLE sigd_doc.tupa_tarifa_variante IN SHARE ROW EXCLUSIVE MODE;
-
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM sigd_doc.tupa_version
-        WHERE codigo = 'TUPA-2026'
-          AND (periodo_documento IS NOT NULL
-               OR uit_vigente IS NOT NULL
-               OR fuente_documental IS NOT NULL)
-    ) THEN
-        RAISE EXCEPTION 'Migración 29 abortada: los metadatos TUPA-2026 no están en su estado inicial NULL.';
-    END IF;
-
-    IF EXISTS (
-        SELECT 1
-        FROM sigd_doc.tupa_procedimiento p
-        JOIN sigd_doc.tupa_version v ON v.id_version = p.id_version
-        JOIN sigd_doc.tupa_tarifa_variante tv
-          ON tv.id_procedimiento = p.id_procedimiento
-         AND tv.id_registro_version = p.registro_version_id
-        JOIN (VALUES
-            ('p3-fila-01', 'HEMBRAS'),
-            ('p3-fila-01', 'MACHOS'),
-            ('p3-fila-06', 'REPRODUCTOR'),
-            ('p3-fila-06', 'CARNE'),
-            ('p3-fila-07', 'CARCASA'),
-            ('p3-fila-07', 'EN_PIE')
-        ) AS esperado(codigo_ref, codigo_variante)
-          ON esperado.codigo_ref = p.codigo_ref
-         AND esperado.codigo_variante = tv.codigo_variante
-        WHERE v.codigo = 'TUPA-2026'
-    ) THEN
-        RAISE EXCEPTION 'Migración 29 abortada: ya existen tarifas variantes objetivo; no es posible atribuirlas a esta migración.';
-    END IF;
-
-    IF EXISTS (
-        SELECT 1
-        FROM sigd_doc.tupa_procedimiento p
-        JOIN sigd_doc.tupa_version v ON v.id_version = p.id_version
-        WHERE v.codigo = 'TUPA-2026'
-          AND p.codigo_ref = 'p2-fila-05'
-          AND p.monto IS DISTINCT FROM 1.00
-    ) THEN
-        RAISE EXCEPTION 'Migración 29 abortada: p2-fila-05 no tiene el monto inicial esperado S/1.00.';
-    END IF;
-END $$;
-
 -- -----------------------------------------------------------------------------
 -- 29.1 Metadatos de versión TUPA-2026 (solo si existe)
 -- -----------------------------------------------------------------------------
@@ -86,7 +37,8 @@ SELECT
     30.00, 'PEN', 1, 'OFICIAL'
 FROM sigd_doc.tupa_procedimiento p
 WHERE p.codigo_ref = 'p3-fila-01'
-  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026');
+  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026')
+ON CONFLICT (id_procedimiento, id_registro_version, codigo_variante) DO NOTHING;
 
 INSERT INTO sigd_doc.tupa_tarifa_variante (
     id_procedimiento, id_registro_version, codigo_variante, nombre_variante,
@@ -99,7 +51,8 @@ SELECT
     40.00, 'PEN', 2, 'OFICIAL'
 FROM sigd_doc.tupa_procedimiento p
 WHERE p.codigo_ref = 'p3-fila-01'
-  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026');
+  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026')
+ON CONFLICT (id_procedimiento, id_registro_version, codigo_variante) DO NOTHING;
 
 -- p3-fila-06: Venta de Porcino en Pie Kg
 -- REPRODUCTOR = 25.00, CARNE = 15.00 (fuente: TUPA oficial)
@@ -114,7 +67,8 @@ SELECT
     25.00, 'PEN', 1, 'OFICIAL'
 FROM sigd_doc.tupa_procedimiento p
 WHERE p.codigo_ref = 'p3-fila-06'
-  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026');
+  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026')
+ON CONFLICT (id_procedimiento, id_registro_version, codigo_variante) DO NOTHING;
 
 INSERT INTO sigd_doc.tupa_tarifa_variante (
     id_procedimiento, id_registro_version, codigo_variante, nombre_variante,
@@ -127,7 +81,8 @@ SELECT
     15.00, 'PEN', 2, 'OFICIAL'
 FROM sigd_doc.tupa_procedimiento p
 WHERE p.codigo_ref = 'p3-fila-06'
-  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026');
+  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026')
+ON CONFLICT (id_procedimiento, id_registro_version, codigo_variante) DO NOTHING;
 
 -- p3-fila-07: Venta de Ganado Vacuno en pie Kg
 -- CARCASA = 20.00, EN_PIE = 15.00 (fuente: TUPA oficial)
@@ -142,7 +97,8 @@ SELECT
     20.00, 'PEN', 1, 'OFICIAL'
 FROM sigd_doc.tupa_procedimiento p
 WHERE p.codigo_ref = 'p3-fila-07'
-  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026');
+  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026')
+ON CONFLICT (id_procedimiento, id_registro_version, codigo_variante) DO NOTHING;
 
 INSERT INTO sigd_doc.tupa_tarifa_variante (
     id_procedimiento, id_registro_version, codigo_variante, nombre_variante,
@@ -155,7 +111,8 @@ SELECT
     15.00, 'PEN', 2, 'OFICIAL'
 FROM sigd_doc.tupa_procedimiento p
 WHERE p.codigo_ref = 'p3-fila-07'
-  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026');
+  AND p.id_version = (SELECT id_version FROM sigd_doc.tupa_version WHERE codigo = 'TUPA-2026')
+ON CONFLICT (id_procedimiento, id_registro_version, codigo_variante) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
 -- 29.3 Corrección p2-fila-05: Alquiler de Ambientes para servicio de alimentación
