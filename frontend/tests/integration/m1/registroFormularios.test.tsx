@@ -1,25 +1,33 @@
 import { useState } from "react";
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
 
 import RegistroCiudadanoPage from "../../../src/pages/registro/RegistroCiudadanoPage";
+import { apiClient } from "../../../src/api/client";
 import PersonaNaturalForm from "../../../src/components/registro/PersonaNaturalForm";
 import PersonaJuridicaForm from "../../../src/components/registro/PersonaJuridicaForm";
 import { DeclaracionJuradaCheckbox } from "../../../src/components/registro/DeclaracionJuradaCheckbox";
 import { ConsentimientoLey29733Modal } from "../../../src/components/registro/ConsentimientoLey29733Modal";
 import { consentimientoLey29733Schema } from "../../../src/schemas/consentimiento.schema";
 
+function renderRegistroCiudadanoPage() {
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <RegistroCiudadanoPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / ENT-M01-04 / ENT-M01-05)", () => {
   it("a) RegistroCiudadanoPage: el conmutador role=\"tablist\" alterna entre Persona Natural y Persona Jurídica sin recargar, y cambia los campos visibles", async () => {
     const user = userEvent.setup();
-    render(
-      <MemoryRouter>
-        <RegistroCiudadanoPage />
-      </MemoryRouter>,
-    );
+    renderRegistroCiudadanoPage();
 
     // Verificar existencia del conmutador con role="tablist"
     const tablist = screen.getByRole("tablist", { name: /Tipo de persona/i });
@@ -123,6 +131,38 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     );
     expect(mensajeError).toBeInTheDocument();
     expect(handleSubmit).not.toHaveBeenCalled();
+  });
+
+  it("PersonaNaturalForm: quita el error de dirección al corregirla", async () => {
+    const user = userEvent.setup();
+    render(<PersonaNaturalForm onSubmit={vi.fn()} />);
+
+    await user.click(screen.getByRole("checkbox", { name: /Declaro bajo juramento/i }));
+    await user.click(screen.getByRole("checkbox", { name: /conforme a la Ley N° 29733/i }));
+
+    const direccion = screen.getByLabelText(/Dirección Exacta \*/i);
+    await user.type(direccion, "Jr.");
+    await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
+    expect(await screen.findByText(/La dirección exacta debe tener al menos 5 caracteres/i)).toBeInTheDocument();
+
+    await user.type(direccion, " Masisea 460 San Fernando");
+    expect(screen.queryByText(/La dirección exacta debe tener al menos 5 caracteres/i)).not.toBeInTheDocument();
+  });
+
+  it("PersonaJuridicaForm: quita el error de dirección al corregirla", async () => {
+    const user = userEvent.setup();
+    render(<PersonaJuridicaForm onSubmit={vi.fn()} />);
+
+    await user.click(screen.getByRole("checkbox", { name: /Declaro bajo juramento/i }));
+    await user.click(screen.getByRole("checkbox", { name: /conforme a la Ley N° 29733/i }));
+
+    const direccion = screen.getByLabelText(/Dirección Exacta \*/i);
+    await user.type(direccion, "Jr.");
+    await user.click(screen.getByRole("button", { name: /Registrar Empresa y Crear Casilla/i }));
+    expect(await screen.findByText(/La dirección exacta debe tener al menos 5 caracteres/i)).toBeInTheDocument();
+
+    await user.type(direccion, " Masisea 460 San Fernando");
+    expect(screen.queryByText(/La dirección exacta debe tener al menos 5 caracteres/i)).not.toBeInTheDocument();
   });
 
   it("d) PersonaJuridicaForm: un RUC con dígito verificador incorrecto muestra error inline; uno válido no lo muestra", async () => {
@@ -259,14 +299,10 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     expect(invalido.success).toBe(false);
   });
 
-  it("h) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Natural y muestra la casilla creada", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  it("h) RegistroCiudadanoPage: crea el registro natural y ofrece acceso a la bandeja de expedientes", async () => {
+    const apiSpy = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {} } as never);
     const user = userEvent.setup();
-    render(
-      <MemoryRouter>
-        <RegistroCiudadanoPage />
-      </MemoryRouter>,
-    );
+    renderRegistroCiudadanoPage();
 
     // Llenar campos de Persona Natural
     await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
@@ -310,49 +346,28 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "74561238@casilla.iestpsuiza.edu.pe",
-    );
-
-    // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
+    expect(mensajeExito).toHaveTextContent("Sergio Serruche Panduro");
+    expect(mensajeExito).toHaveTextContent("expediente quedó registrado");
+    expect(
+      screen.getByRole("link", { name: /Ver bandeja de expedientes/i }),
+    ).toHaveAttribute("href", "/expedientes");
+    expect(apiSpy).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-ciudadano",
       expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
+        dni: "74561238",
+        direccion: "Jr. Tarapacá N° 645",
+        ubigeoDistrito: "250101",
       }),
     );
-
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
-    );
-    expect(postCall).toBeDefined();
-    if (!postCall) {
-      throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
-    }
-    const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
-
-    consoleSpy.mockRestore();
-
-    // Cerrar mensaje de éxito
-    const botonCerrarExito = screen.getByLabelText(/Cerrar mensaje de éxito/i);
-    await user.click(botonCerrarExito);
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    apiSpy.mockRestore();
     // FIX estabilidad (F_ADRIANO): flujo con ~100 keystrokes de user-event;
     // bajo carga de suite completa supera el timeout de 5 s de Vitest.
   }, 30_000);
 
-  it("i) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Jurídica y muestra la casilla creada", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  it("i) RegistroCiudadanoPage: crea el registro jurídico y ofrece acceso a la bandeja de expedientes", async () => {
+    const apiSpy = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {} } as never);
     const user = userEvent.setup();
-    render(
-      <MemoryRouter>
-        <RegistroCiudadanoPage />
-      </MemoryRouter>,
-    );
+    renderRegistroCiudadanoPage();
 
     // Cambiar a Persona Jurídica
     await user.click(screen.getByRole("tab", { name: /Persona Jurídica/i }));
@@ -408,32 +423,18 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "20131312955@casilla.iestpsuiza.edu.pe",
-    );
-
-    // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
+    expect(mensajeExito).toHaveTextContent("Amazonas Soft SAC");
+    expect(mensajeExito).toHaveTextContent("expediente quedó registrado");
+    expect(apiSpy).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-persona-juridica",
       expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
+        ruc: "20131312955",
+        razonSocial: "Amazonas Soft SAC",
+        direccion: "Jr. Tarapacá N° 645",
+        ubigeoDistrito: "250101",
       }),
     );
-
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
-    );
-    expect(postCall).toBeDefined();
-    if (!postCall) {
-      throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
-    }
-    const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
-
-    consoleSpy.mockRestore();
+    apiSpy.mockRestore();
     // FIX estabilidad (F_ADRIANO): idem test h) — flujo largo de user-event.
   }, 30_000);
 });

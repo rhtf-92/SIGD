@@ -6,8 +6,9 @@ export interface UsuarioPerfil {
   id: string;
   nombreCompleto: string;
   correo: string;
-  rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE';
+  rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE' | 'CIUDADANO';
   areaId?: string;
+  debeCambiarPassword?: boolean;
 }
 
 interface LoginCredentials {

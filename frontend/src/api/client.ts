@@ -75,6 +75,32 @@ function procesarCola(error: unknown, token: string | null) {
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: unknown) => {
+    if (axios.isAxiosError(error) && !error.response) {
+      const timedOut = error.code === "ECONNABORTED" || error.code === "ETIMEDOUT";
+      const code = timedOut ? "ERR_TIMEOUT" : "ERR_NETWORK";
+
+      return Promise.reject(
+        new ApiHttpError({
+          type: "https://sigd.iestpsuiza.edu.pe/errors/system",
+          title: timedOut
+            ? "Tiempo de espera agotado"
+            : "No se pudo conectar con el servidor",
+          status: 0,
+          detail: timedOut
+            ? "El servidor de registro tardó demasiado en responder. Verifique que el backend esté iniciado y vuelva a intentarlo."
+            : `No se pudo conectar con el servidor de registro (${env.apiBaseUrl}). Verifique que el backend esté iniciado y permita el acceso desde esta página.`,
+          instance: error.config?.url ?? "",
+          code,
+          category: "System",
+          correlationId:
+            (typeof error.config?.headers?.["X-Correlation-ID"] === "string" &&
+              error.config.headers["X-Correlation-ID"]) ||
+            generateCorrelationId(),
+          retryable: true,
+        }),
+      );
+    }
+
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 

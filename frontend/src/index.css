@@ -104,41 +104,41 @@
 }
 
 .registration-form label:not(.flex) {
-  color: #1e3a8a;
+  color: #334155;
   font-weight: 600;
 }
 
 .registration-form input:not([type="checkbox"]),
 .registration-form select {
   min-height: 44px;
-  border-color: #c4b5fd;
+  border-color: #cbd5e1;
   border-radius: 0.65rem;
-  background-color: #f5f3ff;
-  color: #1e40af;
+  background-color: #fff;
+  color: #0f172a;
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
 .registration-form input:not([type="checkbox"])::placeholder {
-  color: #6481b8;
+  color: #94a3b8;
   opacity: 1;
 }
 
 .registration-form label.flex,
 .registration-form label.flex span {
-  color: #1e3a8a;
+  color: #334155;
 }
 
 .registration-form input:not([type="checkbox"]):hover,
 .registration-form select:not(:disabled):hover {
-  border-color: #a78bfa;
-  background-color: #ede9fe;
+  border-color: #93c5fd;
+  background-color: #fff;
 }
 
 .registration-form input:not([type="checkbox"]):focus,
 .registration-form select:focus {
-  border-color: #7c3aed;
-  background-color: #faf5ff;
-  box-shadow: 0 0 0 3px rgb(124 58 237 / 18%);
+  border-color: #2563eb;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 14%);
 }
 
 .registration-form input[type="checkbox"] {
@@ -161,9 +161,9 @@
 }
 
 .registration-location {
-  border-color: #c4b5fd;
-  background: linear-gradient(135deg, #f5f3ff 0%, #faf5ff 58%, #f3e8ff 100%);
-  box-shadow: 0 8px 24px rgb(109 40 217 / 8%);
+  border-color: #bfdbfe;
+  background: linear-gradient(135deg, #fff 0%, #f8fbff 58%, #eff6ff 100%);
+  box-shadow: 0 8px 24px rgb(37 99 235 / 7%);
 }
 
 .registration-location h3 {
@@ -175,8 +175,8 @@
 }
 
 .registration-location > div:first-child > span {
-  border: 1px solid #c4b5fd;
-  background-color: #ede9fe;
+  border: 1px solid #bfdbfe;
+  background-color: #eff6ff;
   color: #1d4ed8;
 }
 

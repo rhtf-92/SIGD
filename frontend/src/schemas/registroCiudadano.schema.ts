@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+const direccionExactaSchema = z
+  .string()
+  .trim()
+  .min(5, {
+    message: "La dirección exacta debe tener al menos 5 caracteres",
+  })
+  .max(200, {
+    message: "La dirección exacta debe tener máximo 200 caracteres",
+  });
+
 /* --- Persona Natural --- */
 
 /* Schema persona natural */
@@ -44,14 +54,7 @@ export const naturalSchema = z
       departamentoCodigo: z.string(),
       provinciaCodigo: z.string(),
       distritoCodigo: z.string(),
-      direccionExacta: z
-        .string()
-        .min(5, {
-          message: "La dirección exacta debe tener al menos 5 caracteres",
-        })
-        .max(200, {
-          message: "La dirección exacta debe tener máximo 200 caracteres",
-        }),
+      direccionExacta: direccionExactaSchema,
       referencia: z.string().max(200).optional(),
     }),
     tipoDocumento: z.enum(["DNI", "CE"]),
@@ -156,14 +159,7 @@ export const juridicalSchema = z
       departamentoCodigo: z.string(),
       provinciaCodigo: z.string(),
       distritoCodigo: z.string(),
-      direccionExacta: z
-        .string()
-        .min(5, {
-          message: "La dirección exacta debe tener al menos 5 caracteres",
-        })
-        .max(200, {
-          message: "La dirección exacta debe tener máximo 200 caracteres",
-        }),
+      direccionExacta: direccionExactaSchema,
       referencia: z.string().max(200).optional(),
     }),
     declaracionJuradaAceptada: z.boolean().refine((val) => val === true, {
