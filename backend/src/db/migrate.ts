@@ -55,6 +55,7 @@ export const MANIFIESTO_BASELINE = [
   '27_sigd_causal_pago_duplicado.sql',
   '28_sigd_tupa_versionado_organizacional.sql',
   '29_sigd_tupa_datos_oficiales.sql',
+  '30_sigd_devolucion_monto_autorizado_check.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }
