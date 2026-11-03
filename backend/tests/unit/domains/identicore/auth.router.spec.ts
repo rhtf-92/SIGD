@@ -40,7 +40,9 @@ function crearPool(rolesIniciales: Array<{ rol_codigo: string; permiso_codigo: s
     }
     return { rows: [], rowCount: 0 };
   });
-  return { pool: { query } as unknown as Pool, query, setRoles: (next: typeof roles) => { roles = [...next]; } };
+  const clientQuery = vi.fn((sql: string, params?: unknown[]) => query(sql, params ?? []));
+  const pool = { query, connect: vi.fn(async () => ({ query: clientQuery, release: vi.fn() })) } as unknown as Pool;
+  return { pool, query, setRoles: (next: typeof roles) => { roles = [...next]; } };
 }
 
 describe('Auth Router — perfiles institucionales activos', () => {
@@ -100,6 +102,16 @@ describe('Auth Router — perfiles institucionales activos', () => {
     expect((await request(sinRoles).post('/api/v1/auth/login').send({ identificador: 'persona', password: PASSWORD })).status).toBe(403);
     expect((await request(deshabilitada).post('/api/v1/auth/login').send({ identificador: 'persona', password: PASSWORD })).status).toBe(403);
     expect((await request(sinRoles).post('/api/v1/auth/login').send({ identificador: 'persona', password: 'incorrecta' })).status).toBe(401);
+  });
+
+  it('registra intento fallido en WORM e incrementa el bloqueo de la cuenta', async () => {
+    const { pool, query } = crearPool([{ rol_codigo: 'DOCENTE', permiso_codigo: null }]);
+    const response = await request(construirApp(pool)).post('/api/v1/auth/login')
+      .send({ identificador: 'persona', password: 'password-incorrecto' });
+    expect(response.status).toBe(401);
+    const update = query.mock.calls.find(([sql]) => String(sql).includes('UPDATE sigd_auth.cuenta_usuario') && String(sql).includes('intentos_fallidos'));
+    expect(update?.[1]).toEqual([ID, 5, 30]);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO sigd_audit.bitacora_auditoria') && String(sql).includes('intento_acceso'))).toBe(true);
   });
 
   it('permite cambiar solo a otro perfil actualmente asignado', async () => {

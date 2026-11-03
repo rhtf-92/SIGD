@@ -1,5 +1,5 @@
 // Hook de configuración RBAC de la Matriz de Control de Acceso (ENT-M05-03)
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { apiClient } from "../api/client";
 
@@ -25,7 +25,9 @@ export const CODIGO_PERMISO_BACKEND: Partial<Record<string, string>> = {
   "Expedientes.derivar": "EXPEDIENTE_DERIVAR",
   "Expedientes.editar": "EXPEDIENTE_RESOLVER",
   "Documentos.editar": "FIRMA_FIRMAR",
+  "Administración.ver": "ADMIN_USUARIOS",
   "Administración.editar": "ADMIN_USUARIOS",
+  "Auditoría.ver": "REPORTE_LEER",
   "Auditoría.exportar": "REPORTE_LEER",
 };
 
@@ -40,43 +42,44 @@ const ROLES_BACKEND: Record<string, string[]> = {
 interface RolBackend {
   codigo: string;
   permisos: string[];
+  usuarios?: number;
 }
 
-const roles: Rol[] = [
+const rolesIniciales: Rol[] = [
   {
     id: "SUPER_ADMIN",
     nombre: "Super Administrador",
     descripcion: "Gobernanza global, auditoría forense WORM y configuración institucional.",
     alcance: "Institución y Servidores",
-    usuarios: 2,
+    usuarios: null,
   },
   {
     id: "DIRECTOR",
     nombre: "Director General",
     descripcion: "Firma digital de Resoluciones Directorales, visado y reportes estratégicos.",
     alcance: "Despacho de Dirección",
-    usuarios: 1,
+    usuarios: null,
   },
   {
     id: "DOCENTE",
     nombre: "Docente / Coordinador",
     descripcion: "Evaluación académica de proyectos de titulación y derivación de actuados.",
     alcance: "Programas de Estudio",
-    usuarios: 12,
+    usuarios: null,
   },
   {
     id: "MESA_PARTES",
     nombre: "Mesa de Partes / Ventanilla",
     descripcion: "Recepción ciudadana virtual y presencial, foliado y asignación de CUT.",
     alcance: "Mesa de Partes",
-    usuarios: 4,
+    usuarios: null,
   },
   {
     id: "ESTUDIANTE",
     nombre: "Estudiante / Administrado",
     descripcion: "Presentación de solicitudes académicas y consulta de Casilla Electrónica.",
     alcance: "Trámites propios",
-    usuarios: 450,
+    usuarios: null,
   },
 ];
 
@@ -148,37 +151,50 @@ export const ACCIONES_INMUTABLES_AUDITORIA: ClavePermiso[] = [
 
 export function useRbacConfig() {
   const [rolSeleccionado, setRolSeleccionado] = useState("SUPER_ADMIN");
+  const [roles, setRoles] = useState<Rol[]>(rolesIniciales);
   const [permisos, setPermisos] = useState<MatrizPermisos>(permisosIniciales);
+  const [permisosPersistidos, setPermisosPersistidos] = useState<MatrizPermisos>(permisosIniciales);
   const [mensaje, setMensaje] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isError, setIsError] = useState(false);
 
-  useEffect(() => {
+  const recargar = useCallback(async () => {
     if (!window.localStorage.getItem("sigd_token") && !window.localStorage.getItem("token")) return;
-    let vigente = true;
-    apiClient.get<{ roles: RolBackend[] }>("/api/v1/admin/roles-permisos")
-      .then(({ data }) => {
-        if (!vigente) return;
-        setPermisos((actuales) => {
-          const sincronizados = { ...actuales };
-          for (const [rolCanonico, codigos] of Object.entries(ROLES_BACKEND)) {
-            const permisosRol = new Set(
-              data.roles.filter((rol) => codigos.includes(rol.codigo)).flatMap((rol) => rol.permisos),
-            );
-            sincronizados[rolCanonico] = MODULOS_SISTEMA.map((modulo) => {
-              const fila = { modulo, ver: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false };
-              for (const clave of Object.keys(fila) as Array<keyof typeof fila>) {
-                if (clave === "modulo") continue;
-                const codigo = CODIGO_PERMISO_BACKEND[`${modulo}.${clave}`];
-                if (codigo) fila[clave] = permisosRol.has(codigo);
-              }
-              return fila;
-            });
-          }
-          return sincronizados;
-        });
-      })
-      .catch(() => vigente && setMensaje("No fue posible cargar la matriz RBAC desde PostgreSQL."));
-    return () => { vigente = false; };
+    setIsLoading(true);
+    setIsError(false);
+    try {
+        const { data } = await apiClient.get<{ roles: RolBackend[] }>("/api/v1/admin/roles-permisos");
+        setRoles((actuales) => actuales.map((rol) => {
+          const codigos = ROLES_BACKEND[rol.id] ?? [rol.id];
+          const asociados = data.roles.filter((item) => codigos.includes(item.codigo));
+          return { ...rol, usuarios: asociados.reduce((total, item) => total + Number(item.usuarios ?? 0), 0) };
+        }));
+        const sincronizados: MatrizPermisos = Object.fromEntries(
+          Object.entries(permisosIniciales).map(([rol, filas]) => [rol, filas.map((fila) => ({ ...fila }))]),
+        );
+        for (const [rolCanonico, codigos] of Object.entries(ROLES_BACKEND)) {
+          const permisosRol = new Set(
+            data.roles.filter((rol) => codigos.includes(rol.codigo)).flatMap((rol) => rol.permisos),
+          );
+          sincronizados[rolCanonico] = MODULOS_SISTEMA.map((modulo) => {
+            const fila = { modulo, ver: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false };
+            for (const clave of Object.keys(fila) as Array<keyof typeof fila>) {
+              if (clave === "modulo") continue;
+              const codigo = CODIGO_PERMISO_BACKEND[`${modulo}.${clave}`];
+              if (codigo) fila[clave] = permisosRol.has(codigo);
+            }
+            return fila;
+          });
+        }
+        setPermisos(sincronizados);
+        setPermisosPersistidos(sincronizados);
+    } catch {
+      setIsError(true);
+      setMensaje("No fue posible cargar la matriz RBAC desde PostgreSQL.");
+    } finally { setIsLoading(false); }
   }, []);
+
+  useEffect(() => { void recargar(); }, [recargar]);
 
   const rolActual: Rol = useMemo(
     () => roles.find((rol) => rol.id === rolSeleccionado) ?? roles[0],
@@ -216,8 +232,14 @@ export function useRbacConfig() {
       await apiClient.put(`/api/v1/admin/roles/${payload.roleId}/permisos`, {
         permisos: [...new Set(codigos)],
       });
+      setPermisosPersistidos((actual) => ({
+        ...actual,
+        [payload.roleId]: (permisos[payload.roleId] ?? []).map((fila) => ({ ...fila })),
+      }));
       setMensaje(`Matriz guardada en PostgreSQL para ${rolActual.nombre}.`);
     } catch {
+      const restaurar = permisosPersistidos[payload.roleId];
+      if (restaurar) setPermisos((actual) => ({ ...actual, [payload.roleId]: restaurar.map((fila) => ({ ...fila })) }));
       setMensaje(`No fue posible guardar la matriz de ${rolActual.nombre}.`);
     }
   }
@@ -232,6 +254,9 @@ export function useRbacConfig() {
     guardarPermisos,
     mensaje,
     setMensaje,
+    isLoading,
+    isError,
+    recargar,
   };
 }
 

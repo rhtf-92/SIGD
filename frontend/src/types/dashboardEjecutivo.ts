@@ -37,6 +37,7 @@ export interface DashboardEstadoItem {
 }
 
 export interface DashboardCuelloBotellaItem {
+  areaId: string;
   area: string;
   expedienteCount: number;
   diasPromedio: number;
@@ -98,17 +99,13 @@ export interface DashboardKpiResumenDTO {
 }
 
 export interface AreaCuelloBotellaDTO {
-  areaId: number;
+  areaId: string;
   nombreArea: string;
-  area?: string;
   estancados: number;
   expedientesEstancados?: number;
-  tprPromedio: number;
-  tiempoPromedioRespuesta?: number;
-  nivelAlerta: DashboardAlertLevel;
+  diasRetencion: number;
+  nivelAlerta?: DashboardAlertLevel;
   nivel?: DashboardAlertLevel;
-  diasRetencion?: number;
-  dias?: number;
-  riesgo?: number;
+  riesgo?: DashboardAlertLevel;
 }
 

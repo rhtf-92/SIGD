@@ -54,11 +54,11 @@ function normalizeAlertState(value: string | number | undefined): HeatmapState {
     return "ok";
   }
 
-  if (["warning", "advertencia", "medio", "moderado", "atencion"].includes(normalized)) {
+  if (["warning", "medium", "advertencia", "medio", "moderado", "atencion"].includes(normalized)) {
     return "warning";
   }
 
-  if (["critical", "critico", "alto", "alarm", "riesgo"].includes(normalized)) {
+  if (["critical", "high", "critico", "alto", "alarm", "riesgo"].includes(normalized)) {
     return "critical";
   }
 
@@ -93,7 +93,7 @@ export default function BottleNeckHeatmap({
   const rows = useMemo(() => {
     return data.map((item) => {
       const estancados = Number(item.estancados ?? item.expedientesEstancados ?? 0);
-      const diasRetencion = Number(item.diasRetencion ?? item.dias ?? 0);
+      const diasRetencion = Number(item.diasRetencion ?? 0);
       const alertState = normalizeAlertState(
         item.nivelAlerta ?? item.nivel ?? item.riesgo ?? "normal",
       );
@@ -175,7 +175,7 @@ export default function BottleNeckHeatmap({
       ) : (
         <div
           className="overflow-x-auto"
-          role="grid"
+          role="table"
           aria-label="Mapa de calor de cuellos de botella por dependencia"
         >
           <div className="min-w-[640px]">
@@ -193,16 +193,18 @@ export default function BottleNeckHeatmap({
               {rows.map((row) => (
                 <div
                   key={row.areaId}
-                  className="grid grid-cols-[minmax(170px,1.6fr)_minmax(120px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)] gap-2"
+                  className="grid grid-cols-[minmax(170px,1.6fr)_minmax(120px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)] gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700"
                   role="row"
+                  tabIndex={0}
+                  aria-label={`${row.nombreArea || `Área ${row.areaId}`}. ${row.estancados} expedientes estancados. ${row.diasRetencion} días de retención. Riesgo ${statePalette[row.alertState].label}.`}
                 >
                   <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800" role="cell">
-                    {row.nombreArea || row.area || `Área ${row.areaId}`}
+                    {row.nombreArea || `Área ${row.areaId}`}
                   </div>
 
                   {row.cells.map((cell) => {
                     const palette = statePalette[cell.state];
-                    const ariaLabel = `${row.nombreArea || row.area || `Área ${row.areaId}`} ${cell.label}: ${String(cell.value)} ${palette.label}`;
+                    const ariaLabel = `${row.nombreArea || `Área ${row.areaId}`} ${cell.label}: ${String(cell.value)} ${palette.label}`;
 
                     return (
                       <div

@@ -13,6 +13,9 @@ export default function RolesPermisosPage() {
     guardarPermisos,
     mensaje,
     setMensaje,
+    isLoading,
+    isError,
+    recargar,
   } = useRbacConfig();
 
   return (
@@ -23,6 +26,7 @@ export default function RolesPermisosPage() {
       />
 
       <section className="mx-auto max-w-7xl px-6 py-8">
+        {isLoading && <p role="status" className="mb-4 rounded-lg bg-white p-4">Cargando roles y permisos desde el servidor…</p>}
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
           <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="mb-4 text-lg font-bold">Roles del sistema</h2>
@@ -45,7 +49,7 @@ export default function RolesPermisosPage() {
                   <div className="flex items-start justify-between gap-3">
                     <p className="font-bold">{rol.nombre}</p>
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
-                      {rol.usuarios}
+                      {rol.usuarios ?? "—"}
                     </span>
                   </div>
                   <p className="mt-2 text-xs leading-5 text-slate-500">
@@ -77,8 +81,9 @@ export default function RolesPermisosPage() {
             </section>
 
             {mensaje && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              <div role={isError ? "alert" : "status"} className={`rounded-lg px-4 py-3 text-sm ${isError ? "border border-red-200 bg-red-50 text-red-700" : "border border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
                 {mensaje}
+                {isError && <button type="button" onClick={() => void recargar()} className="ml-3 font-semibold underline">Reintentar</button>}
               </div>
             )}
 
@@ -99,7 +104,8 @@ export default function RolesPermisosPage() {
               <div className="flex justify-end p-5">
                 <button
                   type="button"
-                  onClick={guardarPermisos}
+                  onClick={() => void guardarPermisos()}
+                  disabled={isLoading}
                   className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
                 >
                   Guardar permisos

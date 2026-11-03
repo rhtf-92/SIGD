@@ -6,9 +6,6 @@ import ProtectedRoute from "./ProtectedRoute";
 
 const AccesoDenegadoPage = lazy(() => import("../pages/AccesoDenegadoPage"));
 const HomePage = lazy(() => import("../pages/HomePage"));
-const SeguridadPage = lazy(
-  () => import("../pages/administracion/SeguridadPage"),
-);
 const DashboardEjecutivoPage = lazy(
   () => import("../pages/DashboardEjecutivoPage"),
 );
@@ -103,7 +100,6 @@ export default function AppRouter() {
         path="/ventanilla"
         element={<VentanillaPresencialPage />}
       />
-      <Route path="/administracion/seguridad" element={<SeguridadPage />} />
       <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
       <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
       <Route

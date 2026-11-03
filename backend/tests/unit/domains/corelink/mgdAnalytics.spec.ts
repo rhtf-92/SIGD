@@ -133,8 +133,8 @@ describe('calcularTro: N_resueltos_≤_30_días_hábiles / N_resueltos × 100', 
     expect(calcularTro(95, 100)).toBe(95);
   });
 
-  it('02 devuelve 0 sin resueltos en vez de dividir entre cero', () => {
-    expect(calcularTro(0, 0)).toBe(0);
+  it('02 devuelve la meta neutra de 100 sin resueltos en vez de dividir entre cero', () => {
+    expect(calcularTro(0, 0)).toBe(100);
   });
 
   it('03 llega a 100 cuando todos los resueltos fueron oportunos', () => {
@@ -157,9 +157,19 @@ describe('calcularTro: N_resueltos_≤_30_días_hábiles / N_resueltos × 100', 
   });
 });
 
-describe('calcularTeo: N_observados / N_en_trámite × 100', () => {
-  it('01 mide la calidad de la tabla sobre lo que sigue en trámite', () => {
-    expect(calcularTeo(2, 100)).toBe(2);
+describe('calcularTeo: N_observados / N_radicados × 100 (M06)', () => {
+  it('01 mide los observados sobre el total radicado del período', () => {
+    expect(calcularTeo(2, 50)).toBe(4);
+  });
+
+  it('usa el total radicado y no el subtotal que sigue en trámite', () => {
+    const resumen = calcularIndicadoresMgd({
+      ...CONTADORES_VACIOS,
+      nRadicados: 50,
+      nEnTramite: 100,
+      nObservados: 2,
+    });
+    expect(resumen.teo.valor).toBe(4);
   });
 
   it('02 devuelve 0 cuando no hay expedientes en trámite', () => {
@@ -167,9 +177,7 @@ describe('calcularTeo: N_observados / N_en_trámite × 100', () => {
     expect(calcularTeo(5, 0)).toBe(0);
   });
 
-  it('03 un observado cuenta también dentro del denominador', () => {
-    // OBSERVADO pertenece a la pestaña EN_TRAMITE, así que sube numerador y
-    // denominador a la vez: 1 de 4 observados, no 1 de 3.
+  it('03 un observado cuenta dentro de los radicados del período', () => {
     expect(calcularTeo(1, 4)).toBe(25);
   });
 
@@ -179,27 +187,26 @@ describe('calcularTeo: N_observados / N_en_trámite × 100', () => {
 });
 
 describe('División por cero: los cuatro KPIs con un área vacía', () => {
-  it('05 los cuatro indicadores quedan en 0 y ninguno es NaN', () => {
+  it('05 las tasas vacías usan los neutros M06 y ningún indicador es NaN', () => {
     const resumen = calcularIndicadoresMgd(CONTADORES_VACIOS);
     for (const valor of [
       resumen.vtep.valor,
       resumen.tprHorasHabiles.valor,
-      resumen.tro.valor,
       resumen.teo.valor,
     ]) {
       expect(Number.isNaN(valor)).toBe(false);
       expect(valor).toBe(0);
     }
+    expect(resumen.tro.valor).toBe(100);
     expect(resumen.totalExpedientesEnTramite).toBe(0);
     expect(resumen.totalExpedientesAtendidos).toBe(0);
   });
 
-  it('06 un área sin radicados no cumple ninguna meta', () => {
+  it('06 aplica los valores neutros definidos por M06 en un período vacío', () => {
     const resumen = calcularIndicadoresMgd(CONTADORES_VACIOS);
-    // Es lo correcto: 0 % no alcanza la meta del 95 %. Un tablero que mostrara
-    // "cumple" sobre una unidad sin expedientes sería un falso positivo de gestión.
     expect(resumen.vtep.cumple).toBe(false);
-    expect(resumen.tro.cumple).toBe(false);
+    expect(resumen.tro.cumple).toBe(true);
+    expect(resumen.teo.cumple).toBe(true);
     expect(resumen.vtep.meta).toBe(META_VTEP);
   });
 
@@ -222,8 +229,8 @@ describe('Cumplimiento de metas y semáforo', () => {
     expect(calcularIndicadoresMgd({ ...CONTADORES_VACIOS, nRadicados: 100, nAtendidos: 95 }).vtep.cumple).toBe(true);
     expect(calcularIndicadoresMgd({ ...CONTADORES_VACIOS, nRadicados: 100, nAtendidos: 94 }).vtep.cumple).toBe(false);
     // TEO y TPR son topes: menos es mejor.
-    expect(calcularIndicadoresMgd({ ...CONTADORES_VACIOS, nEnTramite: 100, nObservados: 5 }).teo.cumple).toBe(true);
-    expect(calcularIndicadoresMgd({ ...CONTADORES_VACIOS, nEnTramite: 100, nObservados: 6 }).teo.cumple).toBe(false);
+    expect(calcularIndicadoresMgd({ ...CONTADORES_VACIOS, nRadicados: 100, nEnTramite: 100, nObservados: 5 }).teo.cumple).toBe(true);
+    expect(calcularIndicadoresMgd({ ...CONTADORES_VACIOS, nRadicados: 100, nEnTramite: 100, nObservados: 6 }).teo.cumple).toBe(false);
   });
 
   it('09 las metas coinciden con el plan maestro §4.7', () => {
@@ -507,7 +514,7 @@ describe('Servicio: agregación y degradación sin caché', () => {
     expect(resumen.tprHorasHabiles.valor).toBe(20);
     // 90 / 95 = 94,7368… → 94,74 con dos decimales.
     expect(resumen.tro.valor).toBe(94.74);
-    expect(resumen.teo.valor).toBe(10);
+    expect(resumen.teo.valor).toBe(1);
     expect(resumen.totalExpedientesAtendidos).toBe(95);
   });
 
