@@ -37,11 +37,9 @@ export interface CrearUsuarioDTO {
   apellidos: string;
   telefono?: string | null;
   correo: string;
-  username: string;
   passwordInicial: string;
   areaId: string;
   cargoId: string;
-  rolIds: string[];
 }
 
 export interface UpdateEstadoDTO { estado: EstadoUsuario }
