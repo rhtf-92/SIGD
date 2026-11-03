@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import sigdLogo from "../assets/LOGO 3.png";
+import { useAuthStore } from "../stores/authStore";
 
 const NAVEGACION = [
   { etiqueta: "Inicio", ruta: "/", icono: Home, exacta: true },
@@ -24,6 +25,7 @@ const NAVEGACION = [
 
 export default function HeaderInstitucional() {
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return (
     <header className="sigd-app-header print:hidden">
@@ -51,10 +53,12 @@ export default function HeaderInstitucional() {
         </nav>
 
         <div className="sigd-header-actions">
-          <Link to="/login" className="sigd-access-link">
-            <LogIn aria-hidden="true" size={17} />
-            <span>Acceder</span>
-          </Link>
+          {!isAuthenticated && (
+            <Link to="/login" className="sigd-access-link">
+              <LogIn aria-hidden="true" size={17} />
+              <span>Acceder</span>
+            </Link>
+          )}
           <button
             type="button"
             className="sigd-menu-toggle"
