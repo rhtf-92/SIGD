@@ -1,0 +1,2 @@
+backend/migraciones/*.sql text eol=lf
+academic-snapshot/* text eol=lf

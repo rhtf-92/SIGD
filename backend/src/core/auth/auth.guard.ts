@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { AppError, ForbiddenError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 import { extraerTokenBearer, verificarTokenAcceso, type ClaimsJwt } from './jwt.service.js';
 import { rolCanonico } from './roles-activos.js';
+import { setUsuarioId } from '../../shared/request-context/request-context.js';
 
 export interface CuentaActual {
   idUsuario: string;
@@ -52,6 +53,7 @@ export function autenticarJwt(req: Request, _res: Response, next: NextFunction):
   if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
 
   const claims = verificarTokenAcceso(token);
+  setUsuarioId(claims.sub);
   req.cuentaActual = { idUsuario: claims.sub, roles: claims.roles };
   next();
 }

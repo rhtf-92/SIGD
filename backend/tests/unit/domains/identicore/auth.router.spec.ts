@@ -28,6 +28,9 @@ function crearPool(rolesIniciales: Array<{ rol_codigo: string; permiso_codigo: s
     }
     if (sql.includes('FROM sigd_auth.sesion_usuario s')) {
       const sesion = sesiones.get(String(params[0]));
+      if (sql.includes('s.revocado_en IS NULL') && sesion?.revocado_en) {
+        return { rows: [], rowCount: 0 };
+      }
       return { rows: sesion ? [{ ...sesion, activo }] : [], rowCount: sesion ? 1 : 0 };
     }
     if (sql.includes('UPDATE sigd_auth.sesion_usuario')) {
@@ -37,7 +40,9 @@ function crearPool(rolesIniciales: Array<{ rol_codigo: string; permiso_codigo: s
     }
     return { rows: [], rowCount: 0 };
   });
-  return { pool: { query } as unknown as Pool, query, setRoles: (next: typeof roles) => { roles = [...next]; } };
+  const clientQuery = vi.fn((sql: string, params?: unknown[]) => query(sql, params ?? []));
+  const pool = { query, connect: vi.fn(async () => ({ query: clientQuery, release: vi.fn() })) } as unknown as Pool;
+  return { pool, query, setRoles: (next: typeof roles) => { roles = [...next]; } };
 }
 
 describe('Auth Router — perfiles institucionales activos', () => {
@@ -99,6 +104,16 @@ describe('Auth Router — perfiles institucionales activos', () => {
     expect((await request(sinRoles).post('/api/v1/auth/login').send({ identificador: 'persona', password: 'incorrecta' })).status).toBe(401);
   });
 
+  it('registra intento fallido en WORM e incrementa el bloqueo de la cuenta', async () => {
+    const { pool, query } = crearPool([{ rol_codigo: 'DOCENTE', permiso_codigo: null }]);
+    const response = await request(construirApp(pool)).post('/api/v1/auth/login')
+      .send({ identificador: 'persona', password: 'password-incorrecto' });
+    expect(response.status).toBe(401);
+    const update = query.mock.calls.find(([sql]) => String(sql).includes('UPDATE sigd_auth.cuenta_usuario') && String(sql).includes('intentos_fallidos'));
+    expect(update?.[1]).toEqual([ID, 5, 30]);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO sigd_audit.bitacora_auditoria') && String(sql).includes('intento_acceso'))).toBe(true);
+  });
+
   it('permite cambiar solo a otro perfil actualmente asignado', async () => {
     const fixture = crearPool([{ rol_codigo: 'DOCENTE', permiso_codigo: null },
       { rol_codigo: 'DIRECTOR', permiso_codigo: 'reportes:leer' }]);
@@ -113,5 +128,20 @@ describe('Auth Router — perfiles institucionales activos', () => {
     expect(verificarTokenAcceso(cambio.body.accessToken).roles).toEqual(['DIRECTOR']);
     expect((await request(app).post('/api/v1/auth/switch-role')
       .set('Authorization', `Bearer ${cambio.body.accessToken}`).send({ rol: 'SUPER_ADMIN' })).status).toBe(403);
+  });
+
+  it('rechaza el token de acceso cuando se cierra su sesión persistida', async () => {
+    const { pool } = crearPool([{ rol_codigo: 'DIRECTOR', permiso_codigo: 'reportes:leer' }]);
+    const app = construirApp(pool);
+    const login = await request(app).post('/api/v1/auth/login')
+      .send({ identificador: 'persona', password: PASSWORD });
+    expect(login.status).toBe(200);
+    const token = login.body.accessToken as string;
+    expect((await request(app).get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${token}`)).status).toBe(200);
+    expect((await request(app).post('/api/v1/auth/logout')
+      .send({ refreshToken: login.body.refreshToken })).status).toBe(200);
+    expect((await request(app).get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${token}`)).status).toBe(401);
   });
 });

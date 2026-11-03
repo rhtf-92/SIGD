@@ -69,7 +69,7 @@ export default function ReportExportModal({ reportName, filters, records }: Repo
               }}
               className="rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              Excel XML (.xml)
+              Excel (.xlsx)
             </button>
             <button
               type="button"

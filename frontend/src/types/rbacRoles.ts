@@ -17,7 +17,7 @@ export interface Rol {
   nombre: string;
   descripcion: string;
   alcance: string;
-  usuarios: number;
+  usuarios: number | null;
 }
 
 export interface PermisoModulo {

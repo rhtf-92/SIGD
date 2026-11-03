@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import AnimatedUniverseBackground from "../components/common/AnimatedUniverseBackground";
 import LogoSIGD3D from "../components/common/LogoSIGD3D";
 import HeaderInstitucional from "../components/HeaderInstitucional";
+import AsistenteVirtualWidget from "../components/asistente/AsistenteVirtualWidget";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -20,7 +21,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const reemplazaOrbeConLogo = RUTAS_CON_LOGO_AMBIENTAL.has(pathname);
 
   if (pathname === "/login") {
-    return <div className="min-h-screen bg-[#06132F]">{children}</div>;
+    return (
+      <div className="min-h-screen bg-[#06132F]">
+        {children}
+        <AsistenteVirtualWidget />
+      </div>
+    );
   }
 
   return (
@@ -38,6 +44,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         </footer>
       </div>
+      <AsistenteVirtualWidget />
     </AnimatedUniverseBackground>
   );
 }

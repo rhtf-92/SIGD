@@ -1,0 +1,11 @@
+services:
+  postgres:
+    container_name: sigd_bartra_postgres
+  s3:
+    container_name: sigd_bartra_s3
+  redis:
+    container_name: sigd_bartra_redis
+  backend:
+    container_name: sigd_bartra_backend
+  frontend:
+    container_name: sigd_bartra_frontend

@@ -3,6 +3,8 @@ import { UnauthorizedError } from '../../shared/domain/errors/index.js';
 
 export interface ClaimsJwt {
   sub: string;
+  /** Huella persistida del refresh token que identifica y permite revocar la sesión. */
+  sid?: string;
   roles: string[];
   rolesAutorizados: string[];
   rolActivo: string;
@@ -31,6 +33,7 @@ export interface ClaimsRefresh {
 
 export interface OpcionesFirma {
   sub: string;
+  sid?: string;
   roles?: string[];
   rolesAutorizados?: string[];
   rolActivo?: string;
@@ -40,6 +43,7 @@ export interface OpcionesFirma {
 }
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
+const MARCADOR_SECRETO = /^(?:REPLACE_WITH_|EXAMPLE_|CHANGE_ME|CHANGEME|PLACEHOLDER)/i;
 
 function base64url(datos: Buffer | string): string {
   return Buffer.from(datos).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -53,13 +57,18 @@ function fromBase64url(texto: string): Buffer {
 
 export function secretoJwt(env: NodeJS.ProcessEnv = process.env): string {
   const secreto = env.AUTH_JWT_SECRET ?? env.JWT_SECRET;
-  if (!secreto || secreto.trim().length < 32) {
+  const secretoNormalizado = secreto?.trim() ?? '';
+  const esProduccion = env.NODE_ENV?.toLowerCase() === 'production';
+  if (
+    secretoNormalizado.length < 32 ||
+    (esProduccion && MARCADOR_SECRETO.test(secretoNormalizado))
+  ) {
     throw new Error(
-      'AUTH_JWT_SECRET no configurado o demasiado corto (mínimo 32 caracteres). ' +
-        'Defina la variable de entorno antes de emitir o verificar tokens.',
+      'AUTH_JWT_SECRET no configurado, inseguro para producción o demasiado corto ' +
+        '(mínimo 32 caracteres). Defina una variable de entorno segura antes de emitir o verificar tokens.',
     );
   }
-  return secreto;
+  return secreto as string;
 }
 
 function firmarClaims(claims: object, secreto?: string): string {
@@ -114,6 +123,7 @@ export function firmarTokenAcceso(opciones: OpcionesFirma): string {
   const rolesAutorizados = opciones.rolesAutorizados ?? opciones.roles ?? (rolActivo ? [rolActivo] : []);
   const claims: ClaimsJwt = {
     sub: opciones.sub,
+    ...(opciones.sid ? { sid: opciones.sid } : {}),
     roles: rolActivo ? [rolActivo] : [],
     rolesAutorizados,
     rolActivo,
@@ -155,6 +165,9 @@ export function verificarTokenAcceso(token: string, opciones: { ahora?: number; 
 
   if (claims.typ !== 'access' || typeof claims.sub !== 'string' || claims.sub === '') {
     throw new UnauthorizedError({ detail: 'El token no corresponde a un token de acceso.' });
+  }
+  if (claims.sid !== undefined && (typeof claims.sid !== 'string' || claims.sid.length < 16)) {
+    throw new UnauthorizedError({ detail: 'La sesión asociada al token no es válida.' });
   }
 
   verificarExpiracion(claims as unknown as Record<string, unknown>, opciones.ahora);

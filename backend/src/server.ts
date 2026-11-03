@@ -24,7 +24,9 @@ if (process.env.MIGRATE_ON_BOOT !== 'false') {
 }
 
 const app = construirApp(pool, busSse);
-const detenerRefrescoMgd = iniciarRefrescoMgd(pool, Number(process.env.MGD_REFRESH_MS ?? 60_000));
+const detenerRefrescoMgd = process.env.MGD_REFRESH_ENABLED === 'false'
+  ? () => undefined
+  : iniciarRefrescoMgd(pool, Number(process.env.MGD_REFRESH_MS ?? 60_000));
 const servidor = app.listen(port, () => {
   console.log(`SIGD Backend escuchando en http://localhost:${port}`);
   console.log(`API canónica: http://localhost:${port}${API_PREFIX}`);

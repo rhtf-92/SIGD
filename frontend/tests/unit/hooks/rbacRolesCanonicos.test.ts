@@ -1,6 +1,7 @@
-import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useRbacConfig } from "../../../src/hooks/useRbacConfig";
+import { apiClient } from "../../../src/api/client";
 
 describe("Suite de Pruebas de Gobernanza RBAC y 5 Roles Canónicos Institucionales (BR-08 / ENT-M05-03)", () => {
   beforeEach(() => {
@@ -70,5 +71,47 @@ describe("Suite de Pruebas de Gobernanza RBAC y 5 Roles Canónicos Institucional
 
     const permisoActualizado = result.current.permisosRolActual[0];
     expect(permisoActualizado?.exportar).toBe(false);
+  });
+
+  it("muestra la cantidad real de cuentas por rol y no cifras de ejemplo", async () => {
+    localStorage.setItem("sigd_token", "token-test");
+    vi.spyOn(apiClient, "get").mockResolvedValue({ data: { roles: [
+      { codigo: "ADMINISTRADOR", permisos: [], usuarios: 7 },
+      { codigo: "DIRECTOR", permisos: [], usuarios: 2 },
+    ] } } as never);
+    const { result } = renderHook(() => useRbacConfig());
+    await waitFor(() => expect(result.current.roles.find((role) => role.id === "SUPER_ADMIN")?.usuarios).toBe(7));
+    expect(result.current.roles.find((role) => role.id === "DIRECTOR")?.usuarios).toBe(2);
+    vi.restoreAllMocks();
+  });
+
+  it("restaura la matriz previa si el servidor rechaza el guardado", async () => {
+    localStorage.setItem("sigd_token", "token-test");
+    vi.spyOn(apiClient, "get").mockResolvedValue({ data: { roles: [
+      { codigo: "ADMINISTRADOR", permisos: ["ADMIN_USUARIOS"], usuarios: 1 },
+    ] } } as never);
+    vi.spyOn(apiClient, "put").mockRejectedValue(new Error("El servidor rechazó la matriz"));
+    const { result } = renderHook(() => useRbacConfig());
+    await waitFor(() => expect(result.current.permisosRolActual.find((item) => item.modulo === "Administración")?.editar).toBe(true));
+    act(() => result.current.alternarPermiso(2, "editar"));
+    expect(result.current.permisosRolActual[2].editar).toBe(false);
+    await act(async () => { await result.current.guardarPermisos(); });
+    expect(result.current.permisosRolActual[2].editar).toBe(true);
+    expect(result.current.mensaje).toMatch(/no fue posible guardar/i);
+    vi.restoreAllMocks();
+  });
+
+  it("expone error de carga y permite reintentar la sincronización desde PostgreSQL", async () => {
+    localStorage.setItem("sigd_token", "token-test");
+    const get = vi.spyOn(apiClient, "get")
+      .mockRejectedValueOnce(new Error("API no disponible"))
+      .mockResolvedValueOnce({ data: { roles: [{ codigo: "ADMINISTRADOR", permisos: ["ADMIN_USUARIOS"], usuarios: 3 }] } } as never);
+    const { result } = renderHook(() => useRbacConfig());
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    await act(async () => { await result.current.recargar(); });
+    expect(result.current.isError).toBe(false);
+    expect(result.current.roles.find((role) => role.id === "SUPER_ADMIN")?.usuarios).toBe(3);
+    expect(get).toHaveBeenCalledTimes(2);
+    vi.restoreAllMocks();
   });
 });

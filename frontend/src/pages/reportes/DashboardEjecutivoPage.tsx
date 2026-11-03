@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import ExecutiveKpiSummary from "@/components/dashboard/ExecutiveKpiSummary";
 import TimeFilterControls, { type DashboardPeriodMode } from "@/components/dashboard/TimeFilterControls";
 import KpiMetricGrid from "@/components/reportes/KpiMetricGrid";
+import BottleNeckHeatmap from "@/components/reportes/BottleNeckHeatmap";
 import ReportExportModal from "@/components/reportes/ReportExportModal";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 
@@ -46,7 +47,7 @@ export default function DashboardEjecutivoPage() {
     ...(periodMode === "month" ? { mes: month } : {}),
     ...(unitId ? { unidadOrganicaId: unitId } : {}),
   };
-  const { summary, trend, estados, cuellosBotella, executive, units, isLoading, isError, errorMessage } = useDashboardMetrics(filters);
+  const { summary, trend, estados, cuellosBotella, executive, units, isLoading, isError, errorMessage, refetch } = useDashboardMetrics(filters);
 
   const state: DashboardPageState = isLoading ? "loading" : isError ? "error" : "ready";
   const summaryMetrics = summary?.metrics ?? [];
@@ -113,7 +114,10 @@ export default function DashboardEjecutivoPage() {
         >
           <h1 className="text-2xl font-bold text-slate-900">No se pudo cargar el tablero ejecutivo</h1>
           <p className="mt-3 text-slate-600">{errorMessage ?? "La consulta a la API de reportes no respondió correctamente."}</p>
-            {filterControls}
+          <button type="button" onClick={() => void refetch()} className="mt-5 rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-300">
+            Reintentar
+          </button>
+          {filterControls}
         </section>
       </main>
     );
@@ -211,41 +215,15 @@ export default function DashboardEjecutivoPage() {
           </section>
         </div>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="bottleneck-title">
-          <h2 id="bottleneck-title" className="mb-4 text-lg font-semibold text-slate-900">Cuellos de botella</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
-                  <th className="px-3 py-2 font-medium">Área</th>
-                  <th className="px-3 py-2 font-medium">Expedientes</th>
-                  <th className="px-3 py-2 font-medium">Días promedio</th>
-                  <th className="px-3 py-2 font-medium">Riesgo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cuellosBotella.map((item) => (
-                  <tr key={item.area} className="border-b border-slate-100 last:border-none">
-                    <td className="px-3 py-3 font-medium text-slate-800">{item.area}</td>
-                    <td className="px-3 py-3 text-slate-600">{item.expedienteCount}</td>
-                    <td className="px-3 py-3 text-slate-600">{item.diasPromedio.toFixed(1)} días</td>
-                    <td className="px-3 py-3">
-                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                        item.severity === "high"
-                          ? "bg-red-100 text-red-700"
-                          : item.severity === "medium"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-emerald-100 text-emerald-700"
-                      }`}>
-                        {item.severity === "high" ? "Alto" : item.severity === "medium" ? "Medio" : "Bajo"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <BottleNeckHeatmap
+          data={cuellosBotella.map((item) => ({
+            areaId: item.areaId,
+            nombreArea: item.area,
+            estancados: item.expedienteCount,
+            diasRetencion: item.diasPromedio,
+            nivelAlerta: item.severity,
+          }))}
+        />
       </div>
     </main>
   );

@@ -17,8 +17,15 @@ const PERMISO_BACKEND: Record<string, string | undefined> = {
   'Documentos.editar': 'FIRMA_FIRMAR',
   'Administración.ver': 'ADMIN_USUARIOS',
   'Administración.editar': 'ADMIN_USUARIOS',
-  'Auditoría.ver': 'REPORTE_LEER',
-  'Auditoría.exportar': 'REPORTE_LEER',
+  'Auditoría.ver': 'ADMIN_USUARIOS',
+  'Auditoría.exportar': 'ADMIN_USUARIOS',
+  'Roles y Permisos.ver': 'ADMIN_USUARIOS',
+  'Tablas Maestras.ver': 'ADMIN_USUARIOS',
+  'Tablas Maestras.editar': 'ADMIN_USUARIOS',
+  'Calendario Laboral.ver': 'ADMIN_USUARIOS',
+  'Calendario Laboral.editar': 'ADMIN_USUARIOS',
+  'Seguridad.ver': 'ADMIN_USUARIOS',
+  'Seguridad.editar': 'ADMIN_USUARIOS',
 };
 
 export default function ProtectedRoute({
