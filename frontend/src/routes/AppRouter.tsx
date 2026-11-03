@@ -100,19 +100,25 @@ export default function AppRouter() {
         path="/ventanilla"
         element={<VentanillaPresencialPage />}
       />
-      <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
-      <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
+      <Route path="/flujo-validez-legal" element={
+        <ProtectedRoute requiredAnyPermissions={["EXPEDIENTE_LEER", "FIRMA_FIRMAR"]}>
+          <FlujoValidezLegalPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/flujos/titulacion" element={
+        <ProtectedRoute requiredModule="Expedientes"><WorkflowAcademicoPage /></ProtectedRoute>
+      } />
       <Route
         path="/flujos/proyector-resoluciones"
-        element={<ProyectorResolucionesPage />}
+        element={<ProtectedRoute requiredModule="Expedientes"><ProyectorResolucionesPage /></ProtectedRoute>}
       />
       <Route
         path="/flujo-validez-legal/firma"
-        element={<PasarelaFirmaPage />}
+        element={<ProtectedRoute requiredModule="Documentos" requiredAction="editar"><PasarelaFirmaPage /></ProtectedRoute>}
       />
       <Route
         path="/flujo-validez-legal/visor-cvd"
-        element={<VisorCvdPage />}
+        element={<ProtectedRoute requiredAnyPermissions={["EXPEDIENTE_LEER", "FIRMA_FIRMAR"]}><VisorCvdPage /></ProtectedRoute>}
       />
       <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
 
@@ -133,12 +139,12 @@ export default function AppRouter() {
         element={<Navigate to="/administracion" replace />}
       />
 
-      <Route path="/expedientes" element={<BandejaExpedientesPage />} />
-      <Route path="/expedientes/:id/seguimiento" element={<SeguimientoLocalPage />} />
-      <Route path="/expedientes/:id" element={<SeguimientoLocalPage />} />
+      <Route path="/expedientes" element={<ProtectedRoute requiredModule="Expedientes"><BandejaExpedientesPage /></ProtectedRoute>} />
+      <Route path="/expedientes/:id/seguimiento" element={<ProtectedRoute><SeguimientoLocalPage /></ProtectedRoute>} />
+      <Route path="/expedientes/:id" element={<ProtectedRoute><SeguimientoLocalPage /></ProtectedRoute>} />
 
-      <Route path="/reportes" element={<DashboardEjecutivoPage />} />
-      <Route path="/reportes/dashboard" element={<DashboardEjecutivoPage />} />
+      <Route path="/reportes" element={<ProtectedRoute requiredModule="Reportes"><DashboardEjecutivoPage /></ProtectedRoute>} />
+      <Route path="/reportes/dashboard" element={<ProtectedRoute requiredModule="Reportes"><DashboardEjecutivoPage /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

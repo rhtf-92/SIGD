@@ -17,15 +17,19 @@ import { useAuthStore } from "../stores/authStore";
 const NAVEGACION = [
   { etiqueta: "Inicio", ruta: "/", icono: Home, exacta: true },
   { etiqueta: "Trámites", ruta: "/tramite", icono: FileInput, exacta: false },
-  { etiqueta: "Expedientes", ruta: "/expedientes", icono: Archive, exacta: false },
+  { etiqueta: "Expedientes", ruta: "/expedientes", icono: Archive, exacta: false, permiso: "EXPEDIENTE_LEER" },
   { etiqueta: "Casilla", ruta: "/casilla", icono: Inbox, exacta: false },
-  { etiqueta: "Reportes", ruta: "/reportes/dashboard", icono: BarChart3, exacta: false },
-  { etiqueta: "Administración", ruta: "/administracion", icono: Settings, exacta: false },
+  { etiqueta: "Reportes", ruta: "/reportes/dashboard", icono: BarChart3, exacta: false, permiso: "REPORTE_LEER" },
+  { etiqueta: "Administración", ruta: "/administracion", icono: Settings, exacta: false, permiso: "ADMIN_USUARIOS" },
 ] as const;
 
 export default function HeaderInstitucional() {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const permisosUsuario = useAuthStore((state) => state.usuario?.permisos ?? []);
+  const navegacionVisible = NAVEGACION.filter((elemento) =>
+    !("permiso" in elemento) || permisosUsuario.includes(elemento.permiso),
+  );
 
   return (
     <header className="sigd-app-header print:hidden">
@@ -39,7 +43,7 @@ export default function HeaderInstitucional() {
         </Link>
 
         <nav className="sigd-desktop-nav" aria-label="Navegación principal">
-          {NAVEGACION.map(({ etiqueta, ruta, icono: Icono, exacta }) => (
+          {navegacionVisible.map(({ etiqueta, ruta, icono: Icono, exacta }) => (
             <NavLink
               key={ruta}
               to={ruta}
@@ -77,7 +81,7 @@ export default function HeaderInstitucional() {
         className={`sigd-mobile-nav${menuAbierto ? " is-open" : ""}`}
         aria-label="Navegación móvil"
       >
-        {NAVEGACION.map(({ etiqueta, ruta, icono: Icono, exacta }) => (
+        {navegacionVisible.map(({ etiqueta, ruta, icono: Icono, exacta }) => (
           <NavLink
             key={ruta}
             to={ruta}
