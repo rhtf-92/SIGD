@@ -26,7 +26,7 @@ const NAVEGACION = [
 export default function HeaderInstitucional() {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const permisosUsuario = useAuthStore((state) => state.usuario?.permisos ?? []);
+  const permisosUsuario = useAuthStore((state) => state.usuario?.permisos) ?? [];
   const navegacionVisible = NAVEGACION.filter((elemento) =>
     !("permiso" in elemento) || permisosUsuario.includes(elemento.permiso),
   );

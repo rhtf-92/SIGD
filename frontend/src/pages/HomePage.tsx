@@ -85,7 +85,7 @@ const secciones = [
 
 export default function HomePage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const permisosUsuario = useAuthStore((state) => state.usuario?.permisos ?? []);
+  const permisosUsuario = useAuthStore((state) => state.usuario?.permisos) ?? [];
 
   return (
     <main className="sigd-home-page">
