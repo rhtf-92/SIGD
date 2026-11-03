@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
@@ -27,6 +28,12 @@ const cambioPerfilSchema = z.object({
   rol: z.string().min(2).max(50),
   refreshToken: z.string().min(20).optional(),
 });
+
+// Persistir solo una huella del token evita guardar credenciales reutilizables
+// y mantiene la columna VARCHAR(255) compatible con JWT de longitud variable.
+function huellaRefreshToken(token: string): string {
+  return `sha256:${createHash('sha256').update(token, 'utf8').digest('hex')}`;
+}
 
 interface CuentaAuth {
   id_usuario: string;
@@ -106,14 +113,15 @@ async function emitirSesion(
     throw new ForbiddenError({ detail: 'El perfil solicitado no está asignado o ya no se encuentra vigente.' });
   }
   const rolesAutorizados = perfiles.map((item) => item.rol);
-  const accessToken = firmarTokenAcceso({ sub: cuenta.id_usuario, rolActivo, rolesAutorizados, expiraSegundos: 900 });
   const refreshToken = firmarTokenRefresco({ sub: cuenta.id_usuario, rolActivo, rolesAutorizados });
+  const huellaSesion = huellaRefreshToken(refreshToken);
+  const accessToken = firmarTokenAcceso({ sub: cuenta.id_usuario, sid: huellaSesion, rolActivo, rolesAutorizados, expiraSegundos: 900 });
   const expiraEn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await pool.query(
     `INSERT INTO sigd_auth.sesion_usuario (id_usuario, refresh_token, ip_origen, user_agent, expira_en)
      VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (refresh_token) DO NOTHING`,
-    [cuenta.id_usuario, refreshToken, req.ip ?? null, req.get('user-agent') ?? null, expiraEn],
+    [cuenta.id_usuario, huellaSesion, req.ip ?? null, req.get('user-agent') ?? null, expiraEn],
   );
   return {
     requiresRoleSelection: false,
@@ -147,7 +155,8 @@ export function crearRouterAuth(pool: Pool): Router {
          LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
          LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
          LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
-        WHERE c.usuario = $1 OR c.correo = $1
+        WHERE c.usuario = $1 OR lower(c.correo) = lower($1)
+        ORDER BY (lower(c.correo) = lower($1)) DESC
         LIMIT 1`,
       [datos.identificador],
     );
@@ -210,8 +219,8 @@ export function crearRouterAuth(pool: Pool): Router {
     if (datos.refreshToken) {
       await pool.query(
         `UPDATE sigd_auth.sesion_usuario SET revocado_en = now()
-          WHERE refresh_token = $1 AND id_usuario = $2 AND revocado_en IS NULL`,
-        [datos.refreshToken, cuenta.id_usuario],
+          WHERE refresh_token IN ($1, $2) AND id_usuario = $3 AND revocado_en IS NULL`,
+        [huellaRefreshToken(datos.refreshToken), datos.refreshToken, cuenta.id_usuario],
       );
     }
     res.status(200).json(await emitirSesion(pool, req, cuenta, perfiles, datos.rol));
@@ -221,8 +230,8 @@ export function crearRouterAuth(pool: Pool): Router {
     const { refreshToken } = refreshSchema.parse(req.body);
     await pool.query(
       `UPDATE sigd_auth.sesion_usuario SET revocado_en = now()
-        WHERE refresh_token = $1 AND revocado_en IS NULL`,
-      [refreshToken],
+        WHERE refresh_token IN ($1, $2) AND revocado_en IS NULL`,
+      [huellaRefreshToken(refreshToken), refreshToken],
     );
     res.status(200).json({ ok: true, mensaje: 'Sesión cerrada correctamente' });
   });
@@ -234,9 +243,9 @@ export function crearRouterAuth(pool: Pool): Router {
       `SELECT s.id_usuario, s.expira_en, s.revocado_en, c.activo
          FROM sigd_auth.sesion_usuario s
          JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
-        WHERE s.refresh_token = $1
+        WHERE s.refresh_token IN ($1, $2)
         LIMIT 1`,
-      [refreshToken],
+      [huellaRefreshToken(refreshToken), refreshToken],
     );
     const sesion = rows[0];
     if (!sesion || sesion.id_usuario !== claims.sub || !sesion.activo || sesion.revocado_en !== null || new Date(sesion.expira_en) < new Date()) {
@@ -249,7 +258,16 @@ export function crearRouterAuth(pool: Pool): Router {
     if (!perfiles.some((perfil) => perfil.rol === claims.rolActivo)) {
       throw new UnauthorizedError({ detail: 'El perfil activo ya no está vigente.' });
     }
-    await pool.query('UPDATE sigd_auth.sesion_usuario SET revocado_en = now() WHERE refresh_token = $1', [refreshToken]);
+    const consumo = await pool.query(
+      `UPDATE sigd_auth.sesion_usuario SET revocado_en = now()
+        WHERE refresh_token IN ($1, $2) AND revocado_en IS NULL AND expira_en > now()
+        RETURNING id_usuario`, [
+      huellaRefreshToken(refreshToken), refreshToken,
+      ],
+    );
+    if (consumo.rowCount !== 1) {
+      throw new UnauthorizedError({ detail: 'El token de refresco ya fue utilizado o revocado.' });
+    }
     res.status(200).json(await emitirSesion(pool, req, cuenta, perfiles, claims.rolActivo));
   });
 

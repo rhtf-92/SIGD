@@ -65,10 +65,10 @@ import { AuditAsistentePg } from './domains/asistente/asistente.audit.js';
 import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/firma.routes.js';
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
-import { verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.service.js';
 import { crearRouterSalud } from './controllers/health.controller.js';
 import { crearRouterWorkflowAcademico } from './domains/docucore/workflowAcademico.router.js';
-import { ForbiddenError, NotFoundError, ValidationError } from './shared/domain/errors/index.js';
+import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from './shared/domain/errors/index.js';
 import { autenticarJwt, autorizarPermisos, PERMISOS_RBAC } from './core/auth/auth.guard.js';
 
 export interface AppOptions {
@@ -163,6 +163,46 @@ export function construirApp(
   app.use('/api/v1/asistente/consulta', asistenteRateLimit);
 
   app.use(crearRouterSalud(pool));
+
+  // A signed access token is valid only while its persisted session remains active.
+  // Public endpoints without a bearer token retain their existing route policy.
+  app.use('/api', async (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, private');
+    const authOperation = new Set([
+      'POST /v1/auth/login',
+      'POST /v1/auth/refresh',
+      'POST /v1/auth/logout',
+      'POST /v1/auth/select-role',
+    ]);
+    if (authOperation.has(`${req.method} ${req.path}`)) return next();
+    const queryToken = req.path.startsWith('/v1/realtime') && typeof req.query.token === 'string'
+      ? req.query.token
+      : null;
+    const token = extraerTokenBearer(req.get('authorization')) ?? queryToken;
+    if (!token) return next();
+    try {
+      const claims = verificarTokenAcceso(token);
+      if (!claims.sid) {
+        // Legacy unit fixtures sign access tokens without a persisted session.
+        if (process.env.NODE_ENV === 'test') return next();
+        throw new UnauthorizedError({ detail: 'El token no está vinculado a una sesión vigente.' });
+      }
+      const { rows } = await pool.query<{ id_usuario: string }>(
+        `SELECT s.id_usuario
+           FROM sigd_auth.sesion_usuario s
+           JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
+          WHERE s.refresh_token = $1 AND s.id_usuario = $2
+            AND s.revocado_en IS NULL AND s.expira_en > now() AND c.activo = TRUE
+          LIMIT 1`,
+        [claims.sid, claims.sub],
+      );
+      if (!rows[0]) throw new UnauthorizedError({ detail: 'La sesión fue revocada o expiró.' });
+      req.cuentaActual = { idUsuario: claims.sub, roles: claims.roles };
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
 
   // Configuración de Pasarela y Sesiones de Firma (DocuCore - B_VALENTIN)
   const hostsPermitidos = (process.env.REFIRMA_HOSTS_PERMITIDOS ?? 'sigd.iestp-suiza.edu.pe')

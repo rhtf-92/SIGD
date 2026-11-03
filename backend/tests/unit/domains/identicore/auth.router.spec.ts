@@ -28,6 +28,9 @@ function crearPool(rolesIniciales: Array<{ rol_codigo: string; permiso_codigo: s
     }
     if (sql.includes('FROM sigd_auth.sesion_usuario s')) {
       const sesion = sesiones.get(String(params[0]));
+      if (sql.includes('s.revocado_en IS NULL') && sesion?.revocado_en) {
+        return { rows: [], rowCount: 0 };
+      }
       return { rows: sesion ? [{ ...sesion, activo }] : [], rowCount: sesion ? 1 : 0 };
     }
     if (sql.includes('UPDATE sigd_auth.sesion_usuario')) {
@@ -113,5 +116,20 @@ describe('Auth Router — perfiles institucionales activos', () => {
     expect(verificarTokenAcceso(cambio.body.accessToken).roles).toEqual(['DIRECTOR']);
     expect((await request(app).post('/api/v1/auth/switch-role')
       .set('Authorization', `Bearer ${cambio.body.accessToken}`).send({ rol: 'SUPER_ADMIN' })).status).toBe(403);
+  });
+
+  it('rechaza el token de acceso cuando se cierra su sesión persistida', async () => {
+    const { pool } = crearPool([{ rol_codigo: 'DIRECTOR', permiso_codigo: 'reportes:leer' }]);
+    const app = construirApp(pool);
+    const login = await request(app).post('/api/v1/auth/login')
+      .send({ identificador: 'persona', password: PASSWORD });
+    expect(login.status).toBe(200);
+    const token = login.body.accessToken as string;
+    expect((await request(app).get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${token}`)).status).toBe(200);
+    expect((await request(app).post('/api/v1/auth/logout')
+      .send({ refreshToken: login.body.refreshToken })).status).toBe(200);
+    expect((await request(app).get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${token}`)).status).toBe(401);
   });
 });
