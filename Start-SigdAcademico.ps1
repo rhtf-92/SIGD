@@ -23,7 +23,15 @@ if ($VerifyOnly) {
 
 if (-not (Test-Path -LiteralPath $envPath)) {
   function New-RandomHex([int]$bytes) {
-    return [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes($bytes)).ToLowerInvariant()
+    # Compatible con Windows PowerShell 5.1 (.NET Framework) y PowerShell 7+.
+    $buffer = New-Object byte[] $bytes
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+      $generator.GetBytes($buffer)
+      return [BitConverter]::ToString($buffer).Replace('-', '').ToLowerInvariant()
+    } finally {
+      $generator.Dispose()
+    }
   }
   $settings = @(
     "ACADEMIC_POSTGRES_PASSWORD=$(New-RandomHex 24)"
