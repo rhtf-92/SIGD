@@ -6,6 +6,7 @@ import {
   Home,
   Inbox,
   LogIn,
+  LogOut,
   Menu,
   Settings,
   X,
@@ -26,6 +27,7 @@ const NAVEGACION = [
 export default function HeaderInstitucional() {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const logout = useAuthStore((state) => state.logout);
   const permisosUsuario = useAuthStore((state) => state.usuario?.permisos) ?? [];
   const navegacionVisible = NAVEGACION.filter((elemento) =>
     !("permiso" in elemento) || permisosUsuario.includes(elemento.permiso),
@@ -57,7 +59,12 @@ export default function HeaderInstitucional() {
         </nav>
 
         <div className="sigd-header-actions">
-          {!isAuthenticated && (
+          {isAuthenticated ? (
+            <button type="button" className="sigd-access-link" onClick={logout}>
+              <LogOut aria-hidden="true" size={17} />
+              <span>Cerrar sesión</span>
+            </button>
+          ) : (
             <Link to="/login" className="sigd-access-link">
               <LogIn aria-hidden="true" size={17} />
               <span>Acceder</span>
