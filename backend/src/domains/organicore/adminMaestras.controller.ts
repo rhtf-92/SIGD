@@ -40,6 +40,11 @@ import {
   TablasMaestrasService,
   TTL_TABLAS_MAESTRAS_SEGUNDOS,
 } from './tablasMaestras.service.js';
+import {
+  TablasMaestrasWriteService,
+  crearTablasMaestrasWriteService,
+  type RegistroMaestraEntrada,
+} from './tablasMaestras.write.service.js';
 import { getRequestContext } from '../../shared/request-context/request-context.js';
 
 /** Umbral a partir del cual se comprime la respuesta. */
@@ -65,6 +70,56 @@ export type ConsultaTablasMaestras = z.infer<typeof esquemaConsultaTablasMaestra
 export interface DependenciasController {
   calendario: CalendarioService;
   tablasMaestras: TablasMaestrasService;
+  tablasMaestrasWrite: TablasMaestrasWriteService;
+}
+
+/* ------------------------------------------------------------------ */
+/* Esquemas de escritura de tablas maestras                           */
+/* ------------------------------------------------------------------ */
+
+const esquemaCrearTablaMaestra = z
+  .object({
+    tipo: z.enum(['Sedes', 'Áreas', 'Tipos documentales']),
+    codigo: z.string().trim().min(1, 'El código es obligatorio'),
+    nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
+    detalle: z.string().trim().optional().nullable(),
+  })
+  .strict();
+
+const esquemaIdTablaMaestra = z
+  .object({
+    id: z.string().uuid('El ID debe ser un UUID válido'),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ */
+/* Handler: crear registro de tabla maestra                           */
+/* ------------------------------------------------------------------ */
+
+export function crearRegistroTablaMaestra(deps: DependenciasController) {
+  return async function crearRegistroTablaMaestraHandler(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const entrada = esquemaCrearTablaMaestra.parse(req.body) as RegistroMaestraEntrada;
+    const registrado = await deps.tablasMaestrasWrite.crearRegistro(entrada);
+    res.status(201).json(registrado);
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Handler: alternar estado de registro                               */
+/* ------------------------------------------------------------------ */
+
+export function alternarEstadoTablaMaestra(deps: DependenciasController) {
+  return async function alternarEstadoTablaMaestraHandler(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const { id } = esquemaIdTablaMaestra.parse(req.params);
+    const actualizado = await deps.tablasMaestrasWrite.alternarEstado(id);
+    res.json(actualizado);
+  };
 }
 
 function anioPorDefecto(): number {
@@ -130,6 +185,31 @@ export function listarTablasMaestras(deps: DependenciasController) {
     res.setHeader('Vary', 'Accept-Encoding');
     res.setHeader('X-Cache-TTL', String(TTL_TABLAS_MAESTRAS_SEGUNDOS));
     escribirRespuestaComprimida(req, res, payload);
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Esquema de parámetro de ruta: tipo de tabla maestra                */
+/* ------------------------------------------------------------------ */
+
+const esquemaTipoTablaMaestra = z
+  .object({
+    tipo: z.enum(['Sedes', 'Áreas', 'Tipos documentales']),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ */
+/* Handler: listar registros de un tipo de tabla maestra              */
+/* ------------------------------------------------------------------ */
+
+export function listarRegistrosTablaMaestra(deps: DependenciasController) {
+  return async function listarRegistrosTablaMaestraHandler(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const { tipo } = esquemaTipoTablaMaestra.parse(req.params);
+    const registros = await deps.tablasMaestrasWrite.listarPorTipo(tipo);
+    res.json(registros);
   };
 }
 

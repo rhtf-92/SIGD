@@ -28,20 +28,28 @@ import type { Pool } from 'pg';
 import { CalendarioService } from './calendario.service.js';
 import { TablasMaestrasService } from './tablasMaestras.service.js';
 import {
+  alternarEstadoTablaMaestra,
+  crearRegistroTablaMaestra,
   listarCalendario,
+  listarRegistrosTablaMaestra,
   listarTablasMaestras,
   registrarFeriadoExcepcional,
   type DependenciasController,
 } from './adminMaestras.controller.js';
+import { crearTablasMaestrasWriteService } from './tablasMaestras.write.service.js';
 
 export function crearRouterAdminMaestras(pool: Pool): Router {
   const router = Router();
   const deps: DependenciasController = {
     calendario: new CalendarioService(pool),
     tablasMaestras: new TablasMaestrasService(pool),
+    tablasMaestrasWrite: crearTablasMaestrasWriteService(pool),
   };
 
   router.get('/tablas-maestras', listarTablasMaestras(deps));
+  router.get('/tablas-maestras/:tipo/registros', listarRegistrosTablaMaestra(deps));
+  router.post('/tablas-maestras', crearRegistroTablaMaestra(deps));
+  router.patch('/tablas-maestras/:id/estado', alternarEstadoTablaMaestra(deps));
   router.get('/calendario-laboral', listarCalendario(deps));
   router.post('/calendario-laboral/feriado-excepcional', registrarFeriadoExcepcional(deps));
 
