@@ -372,6 +372,26 @@ export function crearAdminDirectorioRouter(pool: Pool): Router {
     res.json(await obtenerUsuario(pool, id));
   }));
 
+    router.get('/auditoria', manejar(async (req, res) => {
+    const pagina = Math.max(1, Number.parseInt(String(req.query['pagina'] ?? '1'), 10) || 1);
+    const limite = Math.min(100, Math.max(1, Number.parseInt(String(req.query['limite'] ?? '20'), 10) || 20));
+    const total = await pool.query<{ n: string }>(
+      'SELECT count(*)::text AS n FROM sigd_audit.bitacora_auditoria',
+    );
+    const r = await pool.query(
+      `SELECT b.id_auditoria AS "idAuditoria", b.fecha_hora AS "fechaHora",
+              b.usuario_id AS "usuarioId", cu.usuario AS "usuario",
+              b.esquema, b.tabla, b.operacion,
+              b.datos_antes AS "datosAntes", b.datos_despues AS "datosDespues"
+         FROM sigd_audit.bitacora_auditoria b
+         LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = b.usuario_id
+        ORDER BY b.fecha_hora DESC
+        LIMIT $1 OFFSET $2`,
+      [limite, (pagina - 1) * limite],
+    );
+    res.json({ items: r.rows, total: Number(total.rows[0]?.n ?? 0), pagina, limite });
+  }));
+
   // ------------------------------------------------------------------- ROLES
   router.get('/roles', manejar(async (_req, res) => {
     const r = await pool.query<Fila>(
