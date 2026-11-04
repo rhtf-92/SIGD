@@ -25,8 +25,9 @@ Todos los servicios deben quedar `healthy`:
 - S3: http://localhost:9000
 - Consola SeaweedFS: http://localhost:8888
 
-El backend aplica automáticamente las **14 migraciones** bajo advisory lock. No
-se debe usar `docker compose down -v`, porque esa opción elimina los volúmenes
+El backend arranca sin aplicar migraciones. El CLI requiere `--apply` y una
+`MIGRATOR_DATABASE_URL` separada, según la sección «Migraciones manuales». No se
+debe usar `docker compose down -v`, porque esa opción elimina los volúmenes
 persistentes de PostgreSQL, Redis y S3.
 
 ## Arquitectura de endpoints S3
@@ -43,11 +44,11 @@ endpoint público para PUT/GET prefirmados.
 ## Variables y credenciales locales
 
 Los secretos y cuentas de demostración permanecen en archivos `.env` excluidos
-de Git. La cuenta principal se prepara con:
+de Git. Para el flujo de demostración, use únicamente una base aislada y descartable; el script siguiente escribe en la URL configurada:
 
 ```powershell
 Set-Location backend
-$env:DATABASE_URL='postgres://postgres:postgres_password@localhost:5432/sigd_prueba'
+$env:DATABASE_URL='postgres://sigd_app:<URL_ENCODED_APP_PASSWORD>@localhost:5433/<DB_AISLADA>'
 npm exec -- tsx tests/local/demo-account.ts
 ```
 
@@ -60,10 +61,10 @@ Backend:
 
 ```powershell
 Set-Location backend
-$env:DATABASE_URL='postgres://postgres:postgres_password@localhost:5432/sigd_prueba'
+$env:DATABASE_URL='postgres://sigd_app:<URL_ENCODED_APP_PASSWORD>@localhost:5433/<DB_AISLADA>'
 $env:PORT='3000'
 $env:START_FRONTEND='false'
-npm run migrate
+# Las migraciones no se ejecutan durante el arranque normal.
 npm run dev
 ```
 
@@ -130,3 +131,9 @@ La firma con certificado oficial ReFirma/RENIEC, consultas RENIEC/SUNAT/SUNARP,
 SMTP y otros servicios institucionales requieren credenciales, certificados y
 endpoints del organismo correspondiente; no deben presentarse como certificados
 externamente hasta disponer de esos insumos.
+
+## Migraciones manuales
+
+El servidor arranca sin aplicar migraciones. Una migración requiere revisar antes cada SQL y su huella, aprobación específica, una base aislada y una cuenta migradora separada. Nunca apuntar este procedimiento a la base compartida.
+
+PowerShell: configure MIGRATOR_DATABASE_URL con la cuenta migradora local y ejecute npm run migrate -- --apply solo después de esa aprobación.

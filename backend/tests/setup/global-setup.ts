@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
@@ -6,19 +7,46 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 
 const ON_ERROR_STOP = 'ON_ERROR_STOP=1';
 
-export default async function globalSetup(): Promise<void> {
+export default async function globalSetup(): Promise<() => Promise<void>> {
   const imagen = process.env.TESTCONTAINERS_IMAGE ?? 'postgres:18-alpine';
+  const passwordTemporal = randomBytes(32).toString('base64url');
+  const databaseUrlAnterior = process.env.TEST_DATABASE_URL;
   const container = await new PostgreSqlContainer(imagen)
     .withDatabase('sigd_prueba')
     .withUsername('postgres')
-    .withPassword('postgres')
+    .withPassword(passwordTemporal)
     .start();
 
-  const databaseUrl = `postgres://postgres:postgres@${container.getHost()}:${container.getPort()}/sigd_prueba`;
+  const databaseUrl =
+    'postgres://postgres:' +
+    passwordTemporal +
+    '@' +
+    container.getHost() +
+    ':' +
+    container.getPort() +
+    '/sigd_prueba';
   process.env.TEST_DATABASE_URL = databaseUrl;
-  (globalThis as Record<string, unknown>).__SIGD_CONTAINER__ = container;
 
-  await ejecutarMigraciones(databaseUrl);
+  try {
+    await ejecutarMigraciones(databaseUrl);
+  } catch (error) {
+    restaurarDatabaseUrlDePrueba(databaseUrlAnterior);
+    await container.stop();
+    throw error;
+  }
+
+  return async () => {
+    restaurarDatabaseUrlDePrueba(databaseUrlAnterior);
+    await container.stop();
+  };
+}
+
+function restaurarDatabaseUrlDePrueba(valorAnterior: string | undefined): void {
+  if (valorAnterior === undefined) {
+    delete process.env.TEST_DATABASE_URL;
+    return;
+  }
+  process.env.TEST_DATABASE_URL = valorAnterior;
 }
 
 function directorioSetup(): string {
