@@ -103,6 +103,41 @@ export function crearAtencionRouter(pool: Pool): Router {
     })();
   });
 
+    router.get('/expedientes', (req: Request, res: Response): void => {
+    const cut = typeof req.query['cut'] === 'string' ? req.query['cut'].trim() : '';
+    if (!/^EXP-\d{4}-\d{6}$/.test(cut)) {
+      enviarError(res, 400, 'CUT_NO_VALIDO', 'El CUT debe tener la forma EXP-AAAA-NNNNNN.');
+      return;
+    }
+    void (async () => {
+      try {
+        const e = await pool.query<{ expediente_id: string; estado: string }>(
+          `SELECT e.expediente_id, COALESCE(ea.estado_nuevo, e.estado) AS estado
+             FROM sigd_tra.expediente e
+             LEFT JOIN sigd_rut.estado_actual_expediente ea ON ea.expediente_id = e.expediente_id
+            WHERE e.codigo_expediente = $1`,
+          [cut],
+        );
+        const fila = e.rows[0];
+        if (!fila) {
+          enviarError(res, 404, 'NO_ENCONTRADO', 'No existe un expediente con ese CUT.');
+          return;
+        }
+        const t = await pool.query(
+          `SELECT evento, estado_nuevo AS "estadoNuevo"
+             FROM sigd_rut.transicion_estado_tramite
+            WHERE estado_anterior = $1
+            ORDER BY evento`,
+          [fila.estado],
+        );
+        res.json({ expedienteId: fila.expediente_id, cut, estado: fila.estado, transiciones: t.rows });
+      } catch (error) {
+        console.error('[atencion]', error instanceof Error ? error.message : error);
+        enviarError(res, 500, 'ERROR_INTERNO', 'No se pudo buscar el expediente.');
+      }
+    })();
+  });
+
   router.get('/expedientes/:id/trazabilidad', (req: Request, res: Response): void => {
     const id = String(req.params['id'] ?? '');
     if (!UUID_RE.test(id)) {

@@ -10,6 +10,7 @@ import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosDirectorioPage from "../pages/administracion/UsuariosDirectorioPage";
 import ProtectedRoute from "./ProtectedRoute";
+import AtencionPage from "../pages/administracion/AtencionPage";
 
 export default function AdminRoutes() {
   return (
@@ -36,6 +37,14 @@ export default function AdminRoutes() {
       <Route path="tablas-maestras" element={<TablasMaestrasPage />} />
       <Route path="calendario-laboral" element={<CalendarioLaboralPage />} />
       <Route path="seguridad" element={<SeguridadPage />} />
+            <Route
+        path="atencion"
+        element={
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "ESPECIALISTA", "MESA_PARTES"]}>
+            <AtencionPage />
+          </ProtectedRoute>
+        }
+      />
     </>
   );
 }
