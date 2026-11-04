@@ -36,6 +36,11 @@ export default function CalendarioLaboralPage() {
       />
 
       <section className="mx-auto max-w-7xl px-6 py-8">
+                <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="status">
+          Módulo en proceso: la lista de feriados mostrada incluye valores de ejemplo
+          que no están en la base de datos (hoy la base registra solo 2 feriados
+          regionales de Ucayali). Guardar y quitar todavía no están verificados.
+        </div>
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
           <p>
             <strong>Hora de corte normativa: {HORA_CORTE_LPAG} hrs</strong>.
