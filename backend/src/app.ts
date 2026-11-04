@@ -6,6 +6,7 @@ import { crearRouterReferencia } from './referencia/expediente.router.js';
 import { crearRouterResoluciones } from './domains/docucore/resoluciones.controller.js';
 import { crearUsuariosAdminRouter } from './domains/organicore/usuariosAdmin.routes.js';
 import { crearAdminDirectorioRouter } from './domains/organicore/adminDirectorio.routes.js';
+import { crearAtencionRouter } from './domains/rutadoc/atencion.routes.js';
 
 // Módulos de DocuCore / Firma Digital (B_VALENTIN)
 import { crearFirmaRouter } from './domains/docucore/firma.controller.js';
@@ -259,6 +260,7 @@ export function construirApp(
   app.use('/api/v1/firma', routerFirmaPendientes);
   app.use('/api/v1/firmas', routerFirmaPendientes);
     app.use('/api/v1/administracion', crearAdminDirectorioRouter(pool));
+    app.use('/api/v1/atencion', crearAtencionRouter(pool));
   app.get('/api/v1/firmas/cola-firmantes', (req, res, next) => {
     req.url = '/pendientes';
     routerFirmaPendientes(req, res, next);
