@@ -4,6 +4,7 @@ import { OutboxWorker } from '../outbox-worker.js';
 import { crearDespachadorPorDefecto } from '../despachador-notificaciones.js';
 import { BusSse } from '../../modules/corelink/sseStream.service.js';
 import { BridgeNotificacion } from '../../core/realtime/bridge-notificacion.js';
+import { requireDatabaseUrl } from '../../config/runtime-safety.js';
 
 /**
  * Entrypoint del worker Outbox como proceso independiente (`npm run
@@ -22,8 +23,7 @@ import { BridgeNotificacion } from '../../core/realtime/bridge-notificacion.js';
  * el worker opera de forma aislada, útil para una ejecución de un solo proceso.
  */
 
-const databaseUrl =
-  process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
+const databaseUrl = requireDatabaseUrl(process.env);
 
 const pool = crearPool(databaseUrl);
 const busSse = new BusSse();

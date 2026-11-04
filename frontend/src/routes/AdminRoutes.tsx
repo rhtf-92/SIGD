@@ -45,11 +45,11 @@ export default function AdminRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="roles-permisos" element={<RolesPermisosPage />} />
-      <Route path="auditoria" element={<AuditoriaPage />} />
-      <Route path="tablas-maestras" element={<TablasMaestrasPage />} />
-      <Route path="calendario-laboral" element={<CalendarioLaboralPage />} />
-      <Route path="seguridad" element={<SeguridadPage />} />
+      <Route path="roles-permisos" element={<ProtectedRoute requiredModule="Roles y Permisos"><RolesPermisosPage /></ProtectedRoute>} />
+      <Route path="auditoria" element={<ProtectedRoute requiredModule="Auditoría"><AuditoriaPage /></ProtectedRoute>} />
+      <Route path="tablas-maestras" element={<ProtectedRoute requiredModule="Tablas Maestras"><TablasMaestrasPage /></ProtectedRoute>} />
+      <Route path="calendario-laboral" element={<ProtectedRoute requiredModule="Calendario Laboral"><CalendarioLaboralPage /></ProtectedRoute>} />
+      <Route path="seguridad" element={<ProtectedRoute requiredModule="Seguridad"><SeguridadPage /></ProtectedRoute>} />
     </>
   );
 }

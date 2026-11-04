@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuthStore } from "../stores/authStore";
 
 const secciones = [
   {
@@ -19,6 +20,7 @@ const secciones = [
     ruta: "/flujo-validez-legal",
     icono: FileCheck2,
     destacado: true,
+    permisos: ["EXPEDIENTE_LEER", "FIRMA_FIRMAR"],
   },
   {
     titulo: "Casilla Electrónica",
@@ -51,6 +53,7 @@ const secciones = [
     ruta: "/expedientes",
     icono: Boxes,
     destacado: false,
+    permisos: ["EXPEDIENTE_LEER"],
   },
   {
     titulo: "Validador CVD",
@@ -67,14 +70,7 @@ const secciones = [
     ruta: "/administracion",
     icono: Boxes,
     destacado: false,
-  },
-  {
-    titulo: "Iniciar Sesión",
-    subtitulo: "Acceso Institucional",
-    descripcion: "Ingreso seguro al SIGD con credenciales y perfil institucional asignado.",
-    ruta: "/login",
-    icono: LogIn,
-    destacado: false,
+    permisos: ["ADMIN_USUARIOS"],
   },
   {
     titulo: "Reportes y Tableros",
@@ -83,10 +79,14 @@ const secciones = [
     ruta: "/reportes/dashboard",
     icono: BarChart3,
     destacado: false,
+    permisos: ["REPORTE_LEER"],
   },
 ] as const;
 
 export default function HomePage() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const permisosUsuario = useAuthStore((state) => state.usuario?.permisos) ?? [];
+
   return (
     <main className="sigd-home-page">
       <section className="sigd-home-hero" aria-labelledby="home-title">
@@ -98,6 +98,12 @@ export default function HomePage() {
           Una plataforma institucional para administrar el ciclo completo de cada documento,
           desde su registro hasta su archivo y verificación legal.
         </p>
+        {!isAuthenticated && (
+          <Link to="/login" className="sigd-access-link mt-6 w-fit">
+            <LogIn aria-hidden="true" size={17} />
+            <span>Iniciar sesión</span>
+          </Link>
+        )}
         <div className="sigd-home-metrics" aria-label="Capacidades principales">
           <span><strong>360°</strong> Trazabilidad</span>
           <span><strong>24/7</strong> Servicios digitales</span>
@@ -115,19 +121,21 @@ export default function HomePage() {
         </div>
 
         <div className="sigd-module-grid">
-          {secciones.map(({ titulo, subtitulo, descripcion, ruta, icono: Icono, destacado }) => (
-            <Link
-              key={ruta}
-              to={ruta}
-              className={`sigd-module-card${destacado ? " is-featured" : ""}`}
-            >
-              <span className="sigd-module-icon"><Icono aria-hidden="true" size={23} /></span>
-              <span className="sigd-module-code">{subtitulo}</span>
-              <h3>{titulo}</h3>
-              <p>{descripcion}</p>
-              <span className="sigd-module-action">Abrir módulo <ArrowUpRight aria-hidden="true" size={16} /></span>
-            </Link>
-          ))}
+          {secciones
+            .filter((seccion) => !("permisos" in seccion) || seccion.permisos.some((permiso) => permisosUsuario.includes(permiso)))
+            .map(({ titulo, subtitulo, descripcion, ruta, icono: Icono, destacado }) => (
+              <Link
+                key={ruta}
+                to={ruta}
+                className={`sigd-module-card${destacado ? " is-featured" : ""}`}
+              >
+                <span className="sigd-module-icon"><Icono aria-hidden="true" size={23} /></span>
+                <span className="sigd-module-code">{subtitulo}</span>
+                <h3>{titulo}</h3>
+                <p>{descripcion}</p>
+                <span className="sigd-module-action">Abrir módulo <ArrowUpRight aria-hidden="true" size={16} /></span>
+              </Link>
+            ))}
         </div>
       </section>
     </main>

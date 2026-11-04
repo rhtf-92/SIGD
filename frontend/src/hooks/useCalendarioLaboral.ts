@@ -27,6 +27,15 @@ async function obtenerFeriados(): Promise<Feriado[]> {
   }));
 }
 
+interface JornadaApi {
+  hora_inicio: string; hora_fin: string; hora_corte: string; zona_horaria: string; dias_laborales: number[];
+}
+
+async function obtenerJornada(): Promise<JornadaApi> {
+  const { data } = await apiClient.get<{ jornada: JornadaApi }>("/api/v1/admin/calendario-laboral/configuracion");
+  return data.jornada;
+}
+
 export function useCalendarioLaboral() {
   const [dias, setDias] = useState(diasIniciales);
   const [horaInicio, setHoraInicio] = useState(HORA_INICIO_REFERENCIA);
@@ -44,7 +53,13 @@ export function useCalendarioLaboral() {
   const cargar = useCallback(async () => {
     setIsLoading(true); setError(null);
     try {
-      setFeriados(await obtenerFeriados());
+      const [diasFeriado, jornada] = await Promise.all([obtenerFeriados(), obtenerJornada()]);
+      setFeriados(diasFeriado);
+      setHoraInicio(jornada.hora_inicio);
+      setHoraFin(jornada.hora_fin);
+      setHoraCorteRecepcion(jornada.hora_corte);
+      setZonaHoraria(jornada.zona_horaria);
+      setDias((actuales) => actuales.map((dia, indice) => ({ ...dia, activo: jornada.dias_laborales.includes(indice + 1) })));
     } catch (causa) {
       setError(causa instanceof Error ? causa : new Error("No se pudo cargar el calendario."));
     } finally { setIsLoading(false); }
@@ -52,8 +67,16 @@ export function useCalendarioLaboral() {
 
   useEffect(() => {
     let activo = true;
-    void obtenerFeriados()
-      .then((resultado) => { if (activo) setFeriados(resultado); })
+    void Promise.all([obtenerFeriados(), obtenerJornada()])
+      .then(([resultado, jornada]) => {
+        if (!activo) return;
+        setFeriados(resultado);
+        setHoraInicio(jornada.hora_inicio);
+        setHoraFin(jornada.hora_fin);
+        setHoraCorteRecepcion(jornada.hora_corte);
+        setZonaHoraria(jornada.zona_horaria);
+        setDias((actuales) => actuales.map((dia, indice) => ({ ...dia, activo: jornada.dias_laborales.includes(indice + 1) })));
+      })
       .catch((causa) => {
         if (activo) setError(causa instanceof Error ? causa : new Error("No se pudo cargar el calendario."));
       })
@@ -90,10 +113,25 @@ export function useCalendarioLaboral() {
     } finally { setIsSaving(false); }
   }
 
-  function guardarConfiguracion(): ConfiguracionJornada {
-    const configuracion = { horaInicio, horaFin, horaCorteRecepcion, zonaHoraria, diasLaborales: dias, feriados };
-    setMensaje("Los feriados están persistidos. La jornada mostrada es una referencia normativa local.");
-    return configuracion;
+  async function guardarConfiguracion(): Promise<boolean> {
+    setError(null); setMensaje("");
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(horaInicio) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(horaFin) || horaInicio >= horaFin || horaCorteRecepcion !== HORA_CORTE_LPAG || dias.every((dia) => !dia.activo)) {
+      setError(new Error("Revisa el horario, conserva el corte normativo 16:30 y selecciona al menos un día laborable."));
+      return false;
+    }
+    setIsSaving(true);
+    try {
+      await apiClient.put("/api/v1/admin/calendario-laboral/configuracion", {
+        horaInicio, horaFin, horaCorte: HORA_CORTE_LPAG, zonaHoraria,
+        diasLaborales: dias.flatMap((dia, indice) => dia.activo ? [indice + 1] : []),
+      });
+      await cargar();
+      setMensaje("La jornada laboral quedó guardada en el servidor.");
+      return true;
+    } catch (causa) {
+      setError(causa instanceof Error ? causa : new Error("No se pudo guardar la jornada laboral."));
+      return false;
+    } finally { setIsSaving(false); }
   }
 
   return {

@@ -1,7 +1,7 @@
 // Modelos forenses de la bitácora de auditoría inmutable WORM (ENT-M05-04)
 // Alineado al documento SIGD-DOC-ADMIN-SEGURIDAD-AUDITORIA-04
 
-export type ResultadoAuditoria = "Exitoso" | "Denegado" | "Error";
+export type ResultadoAuditoria = "Exitoso" | "Denegado" | "Error" | "Registrado";
 
 export interface RegistroAuditoria {
   id: string;

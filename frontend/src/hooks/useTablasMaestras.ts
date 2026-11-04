@@ -50,6 +50,7 @@ export function useTablasMaestras() {
   const [codigo, setCodigo] = useState("");
   const [nombre, setNombre] = useState("");
   const [detalle, setDetalle] = useState("");
+  const [registroEditando, setRegistroEditando] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,19 +90,41 @@ export function useTablasMaestras() {
   }, [busqueda, registros, tipoActivo]);
 
   function cambiarTipo(tipo: TipoTabla) {
-    setTipoActivo(tipo); setBusqueda(""); setMostrarFormulario(false); setMensaje("");
+    setTipoActivo(tipo); setBusqueda(""); setMostrarFormulario(false); setRegistroEditando(null); setMensaje("");
+  }
+
+  function editarRegistro(id: string) {
+    const registro = registros.find((item) => item.id === id);
+    if (!registro) return;
+    setRegistroEditando(id);
+    setCodigo(registro.codigo);
+    setNombre(registro.nombre);
+    setDetalle(registro.detalle === "Sin detalle" ? "" : registro.detalle);
+    setMostrarFormulario(true);
+    setMensaje("");
+  }
+
+  function cancelarFormulario() {
+    setMostrarFormulario(false); setRegistroEditando(null);
+    setCodigo(""); setNombre(""); setDetalle("");
   }
 
   async function crearRegistro() {
     if (!codigo.trim() || !nombre.trim()) return;
     setIsSaving(true); setError(null); setMensaje("");
     try {
-      await apiClient.post(`/api/v1/admin/tablas-maestras/${CLAVES[tipoActivo]}`, {
+      const payload = {
         codigo: codigo.trim(), nombre: nombre.trim(), descripcion: detalle.trim() || null,
-      });
+      };
+      if (registroEditando) {
+        await apiClient.put(`/api/v1/admin/tablas-maestras/${CLAVES[tipoActivo]}/${registroEditando}`, payload);
+      } else {
+        await apiClient.post(`/api/v1/admin/tablas-maestras/${CLAVES[tipoActivo]}`, payload);
+      }
+      const codigoGuardado = codigo.trim().toUpperCase();
       await cargar();
-      setCodigo(""); setNombre(""); setDetalle(""); setMostrarFormulario(false);
-      setMensaje(`Registro ${codigo.trim().toUpperCase()} guardado correctamente.`);
+      cancelarFormulario();
+      setMensaje(`Registro ${codigoGuardado} ${registroEditando ? "actualizado" : "guardado"} correctamente.`);
     } catch (causa) {
       setError(causa instanceof Error ? causa : new Error("No se pudo guardar el registro."));
     } finally { setIsSaving(false); }
@@ -125,7 +148,7 @@ export function useTablasMaestras() {
     tipos: TIPOS_TABLA, registros: filtrados, areasOrganicas, tipoActivo, cambiarTipo,
     busqueda, setBusqueda, mostrarFormulario, setMostrarFormulario,
     codigo, setCodigo, nombre, setNombre, detalle, setDetalle,
-    mensaje, setMensaje, crearRegistro, alternarEstado,
+    mensaje, setMensaje, crearRegistro, alternarEstado, editarRegistro, cancelarFormulario, registroEditando,
     isLoading, isSaving, error, recargar: cargar,
   };
 }

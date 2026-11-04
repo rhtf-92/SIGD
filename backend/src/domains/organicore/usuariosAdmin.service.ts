@@ -106,10 +106,8 @@ export function crearUsuariosAdminService(pool: Pool) {
   async function crearUsuario(datos: CrearUsuarioAdminDTO): Promise<UsuarioDirectorio> {
     const cliente = await pool.connect();
     try {
-      const rolIds = [...new Set(datos.rolIds?.length ? datos.rolIds : [datos.rolId!])];
       const passwordHash = await Argon2Service.hash(datos.passwordInicial);
       await cliente.query('BEGIN');
-      await validarRoles(cliente, rolIds);
       const persona = await cliente.query<{ id_persona: string }>(
         'INSERT INTO sigd_auth.persona (tipo, id_documento) VALUES ($1, $2) RETURNING id_persona',
         [datos.tipo, datos.numeroDocumento],
@@ -127,14 +125,10 @@ export function crearUsuariosAdminService(pool: Pool) {
       const cuenta = await cliente.query<{ id_usuario: string }>(
         `INSERT INTO sigd_auth.cuenta_usuario (id_persona, usuario, correo, password_hash)
          VALUES ($1, $2, $3, $4) RETURNING id_usuario`,
-        [idPersona, datos.username, datos.correo, passwordHash],
+        [idPersona, datos.numeroDocumento, datos.correo, passwordHash],
       );
       const usuarioId = cuenta.rows[0].id_usuario;
       await cliente.query('INSERT INTO sigd_org.asignacion_personal (id_usuario, area_id, cargo_id) VALUES ($1, $2, $3)', [usuarioId, datos.areaId, datos.cargoId]);
-      await cliente.query(
-        'INSERT INTO sigd_org.usuario_rol (id_usuario, rol_id, area_id) SELECT $1, rol_id, $3 FROM unnest($2::uuid[]) AS rol_id',
-        [usuarioId, rolIds, datos.areaId],
-      );
       await cliente.query('COMMIT');
       return await obtenerUsuario(pool, usuarioId);
     } catch (error) {

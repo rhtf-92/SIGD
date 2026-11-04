@@ -13,7 +13,6 @@ export default function CalendarioLaboralPage() {
     horaFin,
     setHoraFin,
     horaCorteRecepcion,
-    setHoraCorteRecepcion,
     zonaHoraria,
     setZonaHoraria,
     feriados,
@@ -25,7 +24,6 @@ export default function CalendarioLaboralPage() {
     setNombreNuevo,
     guardarConfiguracion,
     mensaje,
-    setMensaje,
     error,
     isLoading,
     isSaving,
@@ -67,7 +65,7 @@ export default function CalendarioLaboralPage() {
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold">Jornada laboral</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Los valores son configurables y no están fijados por código.
+              La jornada y los días hábiles se guardan en el servidor. El corte LPAG permanece fijo a las 16:30.
             </p>
 
             <div className="mt-5 space-y-3">
@@ -117,25 +115,14 @@ export default function CalendarioLaboralPage() {
                 <input
                   type="time"
                   value={horaCorteRecepcion}
-                  onChange={(event) => {
-                    setHoraCorteRecepcion(event.target.value);
-                    setMensaje("");
-                  }}
+                  readOnly
+                  aria-readonly="true"
                   className={`w-full rounded-lg border px-3 py-2.5 text-sm ${
                     horaCorteRecepcion === HORA_CORTE_LPAG
                       ? "border-emerald-300 bg-emerald-50 text-emerald-800"
                       : "border-red-300 bg-red-50 text-red-800"
                   }`}
                 />
-                {horaCorteRecepcion !== HORA_CORTE_LPAG && (
-                  <button
-                    type="button"
-                    onClick={() => setHoraCorteRecepcion(HORA_CORTE_LPAG)}
-                    className="mt-1 text-xs font-semibold text-blue-700 hover:underline"
-                  >
-                    Restaurar corte normativo {HORA_CORTE_LPAG} hrs
-                  </button>
-                )}
               </div>
             </div>
 
@@ -212,6 +199,7 @@ export default function CalendarioLaboralPage() {
           <button
             type="button"
             onClick={guardarConfiguracion}
+            disabled={isSaving || isLoading}
             className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
           >
             Guardar calendario

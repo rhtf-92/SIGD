@@ -40,6 +40,31 @@ function asNumber(value: unknown): number {
   return Number.isFinite(number) ? number : 0;
 }
 
+const MGD_COUNTER_FIELDS = [
+  "nRadicados",
+  "nAtendidos",
+  "nArchivados",
+  "nResueltos",
+  "nEnTramite",
+  "nObservados",
+  "nResueltosDentroPlazo",
+  "horasHabilesSuma",
+] as const;
+
+function getMgdCounters(value: unknown): Record<string, number> {
+  const counters = asRecord(value);
+  const missingField = MGD_COUNTER_FIELDS.find((field) => {
+    const count = counters[field];
+    return typeof count !== "number" || !Number.isFinite(count);
+  });
+
+  if (missingField) {
+    throw new Error(`La respuesta analítica no contiene el contador MGD válido «${missingField}».`);
+  }
+
+  return counters as Record<string, number>;
+}
+
 function unwrapPayload(value: unknown): Record<string, unknown> {
   const record = asRecord(value);
   return record.data ? asRecord(record.data) : record;
@@ -110,10 +135,11 @@ function normalizeDashboard(value: unknown): DashboardEjecutivoData & {
   });
 
   const bottlenecks = Array.isArray(dto.cuellosBotella) ? dto.cuellosBotella : [];
-  const cuellosBotella: DashboardCuelloBotellaItem[] = bottlenecks.map((value) => {
+  const cuellosBotella: DashboardCuelloBotellaItem[] = bottlenecks.map((value, index) => {
     const item = asRecord(value);
     const risk = String(item.severity ?? item.nivelAlerta ?? item.riesgo ?? "low").toLowerCase();
     return {
+      areaId: String(item.areaId ?? item.id ?? `area-${index + 1}`),
       area: String(item.area ?? item.nombreArea ?? item.unidadOrganica ?? item.areaNombre ?? "Área"),
       expedienteCount: asNumber(item.expedienteCount ?? item.expedientesEstancados),
       diasPromedio: asNumber(item.diasPromedio ?? item.tprPromedio ?? item.diasRetencion),
@@ -160,7 +186,7 @@ export function useDashboardMetrics(params: DashboardMetricsQuery) {
         Promise.all(periods.map(periodo=>apiClient.get('/api/v1/reportes/dashboard/cuellos-botella',{params:{periodo,diasLimite:params.diasLimite??5}}))),
       ]);
       const counts:Record<string,number>={};
-      for(const result of summaries)for(const [key,value] of Object.entries(asRecord(result.data.contadores)))counts[key]=(counts[key]??0)+asNumber(value);
+      for(const result of summaries)for(const [key,value] of Object.entries(getMgdCounters(asRecord(result.data).contadores)))counts[key]=(counts[key]??0)+value;
       const ratio=(n:number,d:number)=>d?Math.round(n/d*10000)/100:0;
       const areas=new Map<string,Record<string,unknown>>();
       for(const response of bottlenecks)for(const raw of response.data as Record<string,unknown>[]){
@@ -172,11 +198,14 @@ export function useDashboardMetrics(params: DashboardMetricsQuery) {
       }
       const stateCounts=[['Pendientes',Math.max(0,(counts.nRadicados??0)-(counts.nEnTramite??0)-(counts.nAtendidos??0)-(counts.nArchivados??0))],
         ['En tramite',counts.nEnTramite??0],['Atendidos',counts.nAtendidos??0],['Archivados',counts.nArchivados??0]] as const;
+      const tro = counts.nResueltos > 0
+        ? ratio(counts.nResueltosDentroPlazo ?? 0, counts.nResueltos)
+        : 100;
       return normalizeDashboard({contadores:counts,
         vtep:{valor:ratio((counts.nAtendidos??0)+(counts.nArchivados??0),counts.nRadicados??0)},
         tprHorasHabiles:{valor:counts.nResueltos?counts.horasHabilesSuma/counts.nResueltos:0},
-        tro:{valor:ratio(counts.nResueltosDentroPlazo??0,counts.nResueltos??0)},
-        teo:{valor:ratio(counts.nObservados??0,counts.nEnTramite??0)},
+        tro:{valor:tro},
+        teo:{valor:ratio(counts.nObservados??0,counts.nRadicados??0)},
         tendencia:(trend.data as Record<string,unknown>[]).filter(p=>{
           const month=String(params.anio??Number(first.slice(0,4)))+'-'+String(p.mes).padStart(2,'0');return month>=first&&month<=last;
         }).map(p=>({...p,fechaLabel:String(p.mes).padStart(2,'0'),resueltos:p.atendidos})),
@@ -203,5 +232,6 @@ export function useDashboardMetrics(params: DashboardMetricsQuery) {
     isFetching: query.isFetching,
     isError: query.isError,
     errorMessage: query.error instanceof Error ? query.error.message : undefined,
+    refetch: query.refetch,
   };
 }

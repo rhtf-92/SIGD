@@ -20,7 +20,9 @@
 
 import { Router } from 'express';
 import type { Pool } from 'pg';
+import { z } from 'zod';
 import { autorizarPermisos, PERMISOS_RBAC } from '../../core/auth/auth.guard.js';
+import { crearAdminConfiguracionService } from './adminConfiguracion.service.js';
 import { CalendarioService } from './calendario.service.js';
 import { TablasMaestrasService } from './tablasMaestras.service.js';
 import {
@@ -40,6 +42,19 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
     calendario: new CalendarioService(pool),
     tablasMaestras: new TablasMaestrasService(pool),
   };
+  const configuracion = crearAdminConfiguracionService(pool);
+  const jornadaSchema = z.object({
+    horaInicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    horaFin: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    horaCorte: z.literal('16:30'),
+    zonaHoraria: z.string().min(3).max(64),
+    diasLaborales: z.array(z.number().int().min(1).max(7)).min(1).max(7),
+  }).strict().superRefine((input, ctx) => {
+    if (input.horaInicio >= input.horaFin) ctx.addIssue({ code: 'custom', path: ['horaFin'], message: 'La hora de fin debe ser posterior al inicio.' });
+    if (new Set(input.diasLaborales).size !== input.diasLaborales.length) ctx.addIssue({ code: 'custom', path: ['diasLaborales'], message: 'No se permiten días duplicados.' });
+    try { new Intl.DateTimeFormat('es-PE', { timeZone: input.zonaHoraria }); }
+    catch { ctx.addIssue({ code: 'custom', path: ['zonaHoraria'], message: 'La zona horaria no es válida.' }); }
+  });
 
   router.get(
     '/tablas-maestras',
@@ -66,6 +81,15 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
     autorizarPermisos(PERMISOS_RBAC.CALENDARIO_LEER),
     listarCalendario(deps),
   );
+  router.get('/calendario-laboral/configuracion', autorizarPermisos(PERMISOS_RBAC.CALENDARIO_LEER), async (_req, res) => {
+    res.json({ jornada: await configuracion.obtenerJornada() });
+  });
+  router.put('/calendario-laboral/configuracion', autorizarPermisos(PERMISOS_RBAC.CALENDARIO_GESTIONAR), async (req, res) => {
+    const entrada = jornadaSchema.parse(req.body);
+    const usuarioId = req.cuentaActual?.idUsuario;
+    if (!usuarioId) throw new Error('La identidad autenticada es requerida.');
+    res.json(await configuracion.guardarJornada(entrada, usuarioId));
+  });
   router.post(
     '/calendario-laboral/feriado-excepcional',
     autorizarPermisos(PERMISOS_RBAC.CALENDARIO_GESTIONAR),

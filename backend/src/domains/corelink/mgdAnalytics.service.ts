@@ -146,21 +146,17 @@ export function calcularTpr(horasHabilesSuma: number, nResueltos: number): numbe
  * Meta ≥ 90 %.
  */
 export function calcularTro(nResueltosDentroPlazo: number, nResueltos: number): number {
-  if (!Number.isFinite(nResueltos) || nResueltos <= 0) return 0;
+  if (!Number.isFinite(nResueltos) || nResueltos <= 0) return 100;
   return redondear((nResueltosDentroPlazo / nResueltos) * 100, DECIMALES_PORCENTAJE);
 }
 
 /**
- * TEO — Tasa de Expedientes Observados.
- * `TEO = N_observados / N_en_trámite × 100`. Meta ≤ 5 %.
- *
- * El denominador es `N_en_trámite` (EN_REVISION + OBSERVADO + SUBSANADO) y no el
- * total de expedientes: un RESUELTO no observado no puede degradar la tasa, y un
- * REGISTRADO aún no evaluable tampoco debe contarse como fallo de calidad.
+ * TEO — Tasa de Expedientes Observados (fórmula M06).
+ * `TEO = N_observados / N_radicados × 100`. Meta ≤ 5 %.
  */
-export function calcularTeo(nObservados: number, nEnTramite: number): number {
-  if (!Number.isFinite(nEnTramite) || nEnTramite <= 0) return 0;
-  return redondear((nObservados / nEnTramite) * 100, DECIMALES_PORCENTAJE);
+export function calcularTeo(nObservados: number, nRadicados: number): number {
+  if (!Number.isFinite(nRadicados) || nRadicados <= 0) return 0;
+  return redondear((nObservados / nRadicados) * 100, DECIMALES_PORCENTAJE);
 }
 
 /**
@@ -177,7 +173,7 @@ export function calcularIndicadoresMgd(
   const vtep = calcularVtep(contadores.nRadicados, contadores.nAtendidos, contadores.nArchivados);
   const tpr = calcularTpr(contadores.horasHabilesSuma, contadores.nResueltos);
   const tro = calcularTro(contadores.nResueltosDentroPlazo, contadores.nResueltos);
-  const teo = calcularTeo(contadores.nObservados, contadores.nEnTramite);
+  const teo = calcularTeo(contadores.nObservados, contadores.nRadicados);
 
   return {
     periodo: null,
