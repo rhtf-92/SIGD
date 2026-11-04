@@ -98,10 +98,7 @@ export default function AppRouter() {
       <Route
         path="/administracion"
         element={
-          <ProtectedRoute
-            requiredModule="Administración"
-            requiredAction="ver"
-          />
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR", "DIRECTOR"]} />
         }
       >
         {AdminRoutes()}

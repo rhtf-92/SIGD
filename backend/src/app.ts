@@ -5,6 +5,7 @@ import { errorMiddleware } from './middleware/error-middleware.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
 import { crearRouterResoluciones } from './domains/docucore/resoluciones.controller.js';
 import { crearUsuariosAdminRouter } from './domains/organicore/usuariosAdmin.routes.js';
+import { crearAdminDirectorioRouter } from './domains/organicore/adminDirectorio.routes.js';
 
 // Módulos de DocuCore / Firma Digital (B_VALENTIN)
 import { crearFirmaRouter } from './domains/docucore/firma.controller.js';
@@ -257,6 +258,7 @@ export function construirApp(
   const routerFirmaPendientes = crearRouterFirmaPendientes(pool);
   app.use('/api/v1/firma', routerFirmaPendientes);
   app.use('/api/v1/firmas', routerFirmaPendientes);
+    app.use('/api/v1/administracion', crearAdminDirectorioRouter(pool));
   app.get('/api/v1/firmas/cola-firmantes', (req, res, next) => {
     req.url = '/pendientes';
     routerFirmaPendientes(req, res, next);
@@ -285,34 +287,23 @@ export function construirApp(
   app.get('/api/v1/admin/roles-permisos', async (_req, res, next) => {
     try {
       const { rows: roles } = await pool.query(
-        `SELECT r.id, r.codigo, r.nombre, r.descripcion,
-                COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
-         FROM sigd_org.rol_sistema r
-         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.id
-         LEFT JOIN sigd_org.permiso_sistema p ON p.id = rp.permiso_id
-         GROUP BY r.id, r.codigo, r.nombre, r.descripcion`,
+        `SELECT r.rol_id AS id, r.codigo, r.nombre, r.descripcion,
+                COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') AS permisos
+           FROM sigd_org.rol_sistema r
+           LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
+           LEFT JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+          GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion
+          ORDER BY r.codigo`,
       );
       res.json({ roles });
-    } catch {
-      res.json({
-        roles: [
-          { codigo: 'SUPER_ADMIN', nombre: 'Super Administrador' },
-          { codigo: 'DIRECTOR', nombre: 'Director General' },
-          { codigo: 'DOCENTE', nombre: 'Docente Titular' },
-          { codigo: 'MESA_PARTES', nombre: 'Operador de Mesa de Partes' },
-          { codigo: 'ESTUDIANTE', nombre: 'Estudiante / Administrado' },
-        ],
-      });
+    } catch (error) {
+      next(error);
     }
   });
 
+  /* Sedes: el esquema no tiene tabla de sedes. Se devuelve lista vacia (sin datos inventados). */
   app.get('/api/v1/admin/maestras/sede', (_req, res) => {
-    res.json({
-      sedes: [
-        { id: '1', codigo: 'SEDE_CENTRAL', nombre: 'Sede Central Pucallpa - Av. Túpac Amaru Km. 4.5' },
-        { id: '2', codigo: 'SEDE_FILIAL', nombre: 'Filial Yarinacocha' },
-      ],
-    });
+    res.json({ sedes: [] });
   });
 
   app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {

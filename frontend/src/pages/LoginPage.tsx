@@ -48,7 +48,7 @@ export default function LoginPage() {
     setCargando(true);
     try {
       await login({ identificador: identificador.trim(), password });
-      navigate(rutaDestino(), { replace: true });
+      const rolSesion = String(useAuthStore.getState().usuario?.rol ?? ""); navigate(!location.state?.from && (rolSesion === "ADMINISTRADOR" || rolSesion === "DIRECTOR") ? "/administracion" : rutaDestino(), { replace: true });
     } catch (cause) {
       const status =
         cause instanceof ApiHttpError
