@@ -306,23 +306,18 @@ export function construirApp(
     res.json({ sedes: [] });
   });
 
-  app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
+    app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
     try {
       const { rows } = await pool.query(
-        `SELECT id, codigo, nombre, descripcion, dias_atencion_legal, vigente
-         FROM sigd_doc.tipo_documento
-         WHERE vigente = TRUE
-         ORDER BY nombre ASC`,
+        `SELECT tipo_documental_id AS id, codigo, nombre, extension, mime_type,
+                tamano_maximo_mb, exige_firma, vigente
+           FROM sigd_doc.tipo_documento
+          WHERE vigente = TRUE
+          ORDER BY nombre ASC`,
       );
       res.json(rows);
-    } catch {
-      res.json([
-        { codigo: 'SOLICITUD', nombre: 'Solicitud' },
-        { codigo: 'OFICIO', nombre: 'Oficio' },
-        { codigo: 'MEMORANDO', nombre: 'Memorando' },
-        { codigo: 'INFORME', nombre: 'Informe Técnico' },
-        { codigo: 'RESOLUCION', nombre: 'Resolución Directoral' },
-      ]);
+    } catch (error) {
+      next(error);
     }
   });
 
