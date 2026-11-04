@@ -7,17 +7,19 @@
  *   #9  PATCH /api/v1/casilla/notificaciones/:id/lectura    — Asiento fehaciente de primera lectura procesal
  *   #10 POST  /api/v1/casilla/notificaciones/:id/acuse      — Generación inmutable de Acuse Notificatorio Digital (SHA-256)
  *   #11 GET   /api/v1/casilla/estadisticas                  — Contadores de notificaciones no leídas y plazos
- *   #12 GET   /api/v1/casilla/notificaciones/:id/documento/descargar — Presigned GET URL para PDF del acto notificado
- *   #13 GET   /api/v1/casilla/notificaciones/:id/acuse/descargar     — Presigned GET URL para certificado de acuse legal
+ *   #12 GET   /api/v1/casilla/notificaciones/:id/documento/descargar — Enlace interno sujeto a autorización de almacenamiento
+ *   #13 GET   /api/v1/casilla/notificaciones/:id/acuse/descargar     — PDF generado desde el acuse del propietario autenticado
  */
 
 import crypto from 'node:crypto';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { extraerTokenBearer } from '../../core/auth/jwt.service.js';
 import { verificarSesionActiva } from '../../core/auth/sesion-activa.js';
 import { NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import { esClaveS3, extraerClaveDeReferencia } from '../../core/storage/s3-storage.service.js';
 
 const consultaPaginadaSchema = z
   .object({
@@ -74,7 +76,9 @@ function mapearNotificacion(fila: FilaNotificacionCasilla) {
     id: fila.id,
     numeroNotificacion: `NOT-${anio}-${fila.id.slice(0, 6).toUpperCase()}`,
     numeroExpediente: cut,
-    usuarioId: fila.usuario_id ?? '00000000-0000-0000-0000-000000000001',
+    // Las filas históricas sin propietario no se reasignan a una cuenta ficticia.
+    // Las rutas de lectura filtran por usuario_id = JWT.sub y por eso no las exponen.
+    usuarioId: fila.usuario_id,
     cut,
     asunto: fila.asunto,
     tipo: 'RESOLUCION' as const,
@@ -457,8 +461,15 @@ export function crearRouterCasilla(pool: Pool): Router {
       [id, usuarioId],
     );
     if (notificacion.rows.length === 0) throw new NotFoundError();
+    const referencia = notificacion.rows[0].documento_url;
+    if (!esClaveS3(referencia)) throw new NotFoundError();
+    const resto = referencia.slice('s3://'.length);
+    const separador = resto.indexOf('/');
+    const clave = extraerClaveDeReferencia(referencia);
+    if (separador <= 0 || !clave) throw new NotFoundError();
+    const bucket = resto.slice(0, separador);
     res.status(200).json({
-      downloadUrl: notificacion.rows[0].documento_url ?? `/api/v1/storage/download/sigd-resoluciones/rd-${id}.pdf`,
+      downloadUrl: `/api/v1/storage/download/${encodeURIComponent(bucket)}/${clave.split('/').map(encodeURIComponent).join('/')}`,
       expiraEnSegundos: 900,
     });
   });
@@ -467,15 +478,38 @@ export function crearRouterCasilla(pool: Pool): Router {
   router.get('/casilla/notificaciones/:id/acuse/descargar', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const usuarioId = obtenerUsuarioId(res);
-    const notificacion = await pool.query<{ id_acuse: string | null }>(
-      `SELECT id_acuse FROM sigd_auth.notificacion_casilla WHERE id = $1 AND usuario_id = $2`,
+    const notificacion = await pool.query<{
+      id_acuse: string | null;
+      cut: string | null;
+      asunto: string;
+      fecha_deposito: Date | string;
+      acuse_hash_sha256: string | null;
+      acuse_sellado_tiempo: Date | string | null;
+    }>(
+      `SELECT id_acuse, cut, asunto, fecha_deposito, acuse_hash_sha256, acuse_sellado_tiempo
+         FROM sigd_auth.notificacion_casilla WHERE id = $1 AND usuario_id = $2`,
       [id, usuarioId],
     );
     if (notificacion.rows.length === 0 || !notificacion.rows[0].id_acuse) throw new NotFoundError();
-    res.status(200).json({
-      downloadUrl: `/api/v1/storage/download/sigd-acuses/${notificacion.rows[0].id_acuse}.pdf`,
-      expiraEnSegundos: 900,
-    });
+    const acuse = notificacion.rows[0];
+    const pdf = await PDFDocument.create();
+    const pagina = pdf.addPage([595.28, 841.89]);
+    const fuente = await pdf.embedFont(StandardFonts.Helvetica);
+    const linea = (texto: string, y: number, size = 12) =>
+      pagina.drawText(texto.normalize('NFD').replace(/[^\x20-\x7E]/g, '?').slice(0, 110), { x: 48, y, size, font: fuente });
+    linea('CONSTANCIA DE ACUSE DE NOTIFICACION ELECTRONICA', 780, 16);
+    linea(`Codigo de acuse: ${acuse.id_acuse}`, 735);
+    linea(`Expediente: ${acuse.cut ?? 'No indicado'}`, 710);
+    linea(`Asunto: ${acuse.asunto}`, 685);
+    linea(`Fecha de deposito: ${new Date(acuse.fecha_deposito).toISOString()}`, 660);
+    linea(`Fecha de acuse: ${acuse.acuse_sellado_tiempo ? new Date(acuse.acuse_sellado_tiempo).toISOString() : 'No indicado'}`, 635);
+    linea(`Hash SHA-256: ${acuse.acuse_hash_sha256 ?? 'No disponible'}`, 610);
+    linea('Documento generado desde el registro de Casilla autenticado.', 565, 10);
+    const bytes = await pdf.save();
+    res.status(200)
+      .type('application/pdf')
+      .set('Content-Disposition', `attachment; filename="acuse-${acuse.id_acuse}.pdf"`)
+      .send(Buffer.from(bytes));
   });
 
   return router;

@@ -9,33 +9,34 @@ const USUARIO_A = '11111111-1111-4111-8111-111111111111';
 const USUARIO_B = '22222222-2222-4222-8222-222222222222';
 const ID_PROPIO = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const ID_AJENO = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const FILA_BASE = {
+  id: ID_PROPIO,
+  usuario_id: USUARIO_B,
+  correo_destinatario: 'b@example.test',
+  cut: 'EXP-2026-000001',
+  asunto: 'Notificación privada',
+  tipo_acto: 'RESOLUCION',
+  numero_documento: 'RD-1',
+  cuerpo: 'Contenido privado',
+  referencia: null,
+  estado: 'NO_LEIDO',
+  fecha_deposito: new Date('2026-01-01T00:00:00Z'),
+  fecha_lectura: null,
+  hash_sha256: null,
+  cvd: null,
+  id_acuse: null as string | null,
+  acuse_hash_sha256: null as string | null,
+  acuse_sellado_tiempo: null as Date | null,
+  documento_url: 's3://private/documento.pdf' as string | null,
+  creado_en: new Date('2026-01-01T00:00:00Z'),
+};
 
 function token(sub: string) {
   return firmarTokenAcceso({ sub, sid: `${sub}-session-token`, roles: ['ESTUDIANTE'] });
 }
 
-function crearApp() {
-  const fila = {
-    id: ID_PROPIO,
-    usuario_id: USUARIO_B,
-    correo_destinatario: 'b@example.test',
-    cut: 'EXP-2026-000001',
-    asunto: 'Notificación privada',
-    tipo_acto: 'RESOLUCION',
-    numero_documento: 'RD-1',
-    cuerpo: 'Contenido privado',
-    referencia: null,
-    estado: 'NO_LEIDO',
-    fecha_deposito: new Date('2026-01-01T00:00:00Z'),
-    fecha_lectura: null,
-    hash_sha256: null,
-    cvd: null,
-    id_acuse: null,
-    acuse_hash_sha256: null,
-    acuse_sellado_tiempo: null,
-    documento_url: 's3://private/documento.pdf',
-    creado_en: new Date('2026-01-01T00:00:00Z'),
-  };
+function crearApp(overrides: Partial<typeof FILA_BASE> = {}) {
+  const fila = { ...FILA_BASE, ...overrides };
   let sesionRevocada = false;
   let perfilActivo = true;
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
@@ -124,7 +125,35 @@ describe('seguridad de Casilla Electrónica', () => {
     expect(respuesta.status).toBe(200);
     const consultaNotificacion = query.mock.calls.find(([sql]) => String(sql).includes('notificacion_casilla'));
     expect(String(consultaNotificacion?.[0])).toContain('usuario_id =');
-    expect(respuesta.body.downloadUrl).toBe('s3://private/documento.pdf');
+    expect(respuesta.body.downloadUrl).toBe('/api/v1/storage/download/private/documento.pdf');
+  });
+
+  it('no entrega enlaces externos o no verificables como descarga del documento', async () => {
+    const { app } = crearApp({ documento_url: 'https://files.example.test/other-user.pdf' });
+    const respuesta = await request(app)
+      .get(`/api/v1/casilla/notificaciones/${ID_PROPIO}/documento/descargar`)
+      .set('Authorization', `Bearer ${token(USUARIO_B)}`);
+
+    expect(respuesta.status).toBe(404);
+  });
+
+  it('genera la descarga PDF del acuse solo para el propietario autenticado', async () => {
+    const { app } = crearApp({
+      id_acuse: 'ACU-2026-A1B2C3D4',
+      acuse_hash_sha256: 'a'.repeat(64),
+      acuse_sellado_tiempo: new Date('2026-01-02T00:00:00Z'),
+    });
+    const propio = await request(app)
+      .get(`/api/v1/casilla/notificaciones/${ID_PROPIO}/acuse/descargar`)
+      .set('Authorization', `Bearer ${token(USUARIO_B)}`);
+    const ajeno = await request(app)
+      .get(`/api/v1/casilla/notificaciones/${ID_PROPIO}/acuse/descargar`)
+      .set('Authorization', `Bearer ${token(USUARIO_A)}`);
+
+    expect(propio.status).toBe(200);
+    expect(propio.headers['content-type']).toContain('application/pdf');
+    expect(propio.body.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(ajeno.status).toBe(404);
   });
 
   it('rechaza JWT asociados a una sesión revocada', async () => {

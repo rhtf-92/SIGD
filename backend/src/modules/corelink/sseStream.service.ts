@@ -60,18 +60,20 @@ export class BusSse extends EventEmitter {
 
   emitirEvento(evento: string, datos: unknown): void {
     const canal = EVENTO_A_CANAL[evento];
-    const usuarioId = canal === 'casilla' ? extraerUsuarioId(datos) : undefined;
-    // Sin propietario no se conserva ni se distribuye un evento de Casilla.
-    if (canal === 'casilla' && !usuarioId) return;
+    // Los eventos sin canal conocido o sin destinatario explícito no se guardan
+    // ni se publican. `usuario_id` puede identificar al actor, no al receptor.
+    if (!canal) return;
+    const usuarioId = canal === 'casilla' ? extraerUsuarioId(datos) : extraerDestinatarioId(datos);
+    if (!usuarioId) return;
     this.contadorEvento += 1;
     const idEvento = this.contadorEvento;
     const carga = JSON.stringify(datos);
 
-    this.registrarEnBuffer({ id: idEvento, evento, carga, ...(usuarioId ? { usuarioId } : {}) });
+    this.registrarEnBuffer({ id: idEvento, evento, carga, usuarioId });
 
     for (const suscriptor of this.suscriptores.values()) {
       if (canal && !suscriptor.canales.has(canal)) continue;
-      if (canal === 'casilla' && suscriptor.usuarioId !== usuarioId) continue;
+      if (suscriptor.usuarioId !== usuarioId) continue;
       this.escribir(suscriptor.res, `id: ${idEvento}\nevent: ${evento}\ndata: ${carga}\n\n`);
     }
   }
@@ -87,7 +89,7 @@ export class BusSse extends EventEmitter {
     for (const entrada of pendientes) {
       const canal = EVENTO_A_CANAL[entrada.evento];
       if (canal && !canales.has(canal)) continue;
-      if (canal === 'casilla' && entrada.usuarioId !== usuarioId) continue;
+      if (entrada.usuarioId !== usuarioId) continue;
       this.escribir(res, `id: ${entrada.id}\nevent: ${entrada.evento}\ndata: ${entrada.carga}\n\n`);
       reproducidos.push(entrada.id);
     }
@@ -136,6 +138,13 @@ function extraerUsuarioId(datos: unknown): string | undefined {
   if (typeof datos !== 'object' || datos === null) return undefined;
   const registro = datos as Record<string, unknown>;
   const valor = registro.usuario_id ?? registro.usuarioId;
+  return typeof valor === 'string' && valor.trim() !== '' ? valor : undefined;
+}
+
+function extraerDestinatarioId(datos: unknown): string | undefined {
+  if (typeof datos !== 'object' || datos === null) return undefined;
+  const registro = datos as Record<string, unknown>;
+  const valor = registro.destinatario_usuario_id ?? registro.destinatarioUsuarioId;
   return typeof valor === 'string' && valor.trim() !== '' ? valor : undefined;
 }
 

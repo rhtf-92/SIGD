@@ -12,7 +12,13 @@ const esquemaConsulta = z.object({
   token: z.string().min(20).optional(),
 });
 
-export function crearRouterRealtime(bus: BusSse, pool: Pool): Router {
+export interface OpcionesRealtime {
+  intervaloRevalidacionSesionMs?: number;
+}
+
+const INTERVALO_REVALIDACION_SESION_MS = 15_000;
+
+export function crearRouterRealtime(bus: BusSse, pool: Pool, opciones: OpcionesRealtime = {}): Router {
   const router = Router();
 
   /**
@@ -31,7 +37,11 @@ export function crearRouterRealtime(bus: BusSse, pool: Pool): Router {
     if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
     try {
       const claims = await verificarSesionActiva(pool, token);
-      iniciarStream(req, res, bus, claims.sub, bearer ? 'bearer' : 'query', canalesQuery, lastEventIdQuery);
+      iniciarStream(
+        req, res, bus, pool, token, claims.sub, bearer ? 'bearer' : 'query',
+        canalesQuery, lastEventIdQuery,
+        opciones.intervaloRevalidacionSesionMs ?? INTERVALO_REVALIDACION_SESION_MS,
+      );
     } catch (error) {
       next(error);
     }
@@ -44,14 +54,18 @@ function iniciarStream(
   req: Request,
   res: Response,
   bus: BusSse,
+  pool: Pool,
+  token: string,
   usuarioId: string,
   via: 'bearer' | 'query',
   canalesQuery: string | undefined,
   lastEventIdQuery: string | undefined,
+  intervaloRevalidacionSesionMs: number,
 ): void {
   res.status(200).set({
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
+    'Cache-Control': 'no-store, no-cache, private, no-transform',
+    'Referrer-Policy': 'no-referrer',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
   });
@@ -59,6 +73,26 @@ function iniciarStream(
 
   const canales = parsearCanales(canalesQuery);
   const idSuscripcion = bus.suscribir(res, canales, usuarioId);
+  let cerrada = false;
+  let validacionEnCurso = false;
+  const cerrar = () => {
+    if (cerrada) return;
+    cerrada = true;
+    clearInterval(intervaloSesion);
+    bus.cancelar(idSuscripcion);
+    if (!res.writableEnded) res.end();
+  };
+  const intervaloSesion = setInterval(() => {
+    if (validacionEnCurso || cerrada) return;
+    validacionEnCurso = true;
+    void verificarSesionActiva(pool, token)
+      .then((claims) => {
+        if (claims.sub !== usuarioId) cerrar();
+      })
+      .catch(cerrar)
+      .finally(() => { validacionEnCurso = false; });
+  }, intervaloRevalidacionSesionMs);
+  intervaloSesion.unref?.();
   const ultimoEventoId = req.get('last-event-id') ?? lastEventIdQuery;
 
   if (ultimoEventoId) {
@@ -69,8 +103,8 @@ function iniciarStream(
   }
 
   // El heartbeat lo emite un único ticker global del proceso (ver server.ts).
-  req.on('close', () => bus.cancelar(idSuscripcion));
-  res.on('close', () => bus.cancelar(idSuscripcion));
+  req.on('aborted', cerrar);
+  res.on('close', cerrar);
 }
 
 export { CANALES_SSE, HEARTBEAT_SEGUNDOS };

@@ -2,7 +2,7 @@ import type { Response } from 'express';
 import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { DestinoCasilla, DestinoSse } from '../../../../src/audit/despachador-notificaciones.js';
-import { BusSse, EVENTO_CASILLA } from '../../../../src/modules/corelink/sseStream.service.js';
+import { BusSse, EVENTO_CASILLA, EVENTO_SLA, EVENTO_TRANSICION } from '../../../../src/modules/corelink/sseStream.service.js';
 
 const USUARIO_A = '11111111-1111-4111-8111-111111111111';
 const USUARIO_B = '22222222-2222-4222-8222-222222222222';
@@ -40,6 +40,31 @@ describe('aislamiento de eventos SSE de Casilla', () => {
 
     expect(respuestaA.write).not.toHaveBeenCalled();
     expect(bus.replayDesde(0, respuestaSse(), new Set(['casilla']), USUARIO_A)).toHaveLength(0);
+  });
+
+  it.each([EVENTO_TRANSICION, EVENTO_SLA])('entrega %s solo al destinatario y aplica el mismo filtro al replay', (evento) => {
+    const bus = new BusSse();
+    const respuestaA = respuestaSse();
+    const respuestaB = respuestaSse();
+    bus.suscribir(respuestaA, ['expedientes', 'sla'], USUARIO_A);
+    bus.suscribir(respuestaB, ['expedientes', 'sla'], USUARIO_B);
+
+    bus.emitirEvento(evento, { destinatario_usuario_id: USUARIO_A, expediente_id: 'private-case' });
+
+    expect(respuestaA.write).toHaveBeenCalledOnce();
+    expect(respuestaB.write).not.toHaveBeenCalled();
+    expect(bus.replayDesde(0, respuestaSse(), new Set(['expedientes', 'sla']), USUARIO_B)).toHaveLength(0);
+  });
+
+  it.each([EVENTO_TRANSICION, EVENTO_SLA, 'evento_desconocido'])('descarta %s sin destinatario explícito', (evento) => {
+    const bus = new BusSse();
+    const respuesta = respuestaSse();
+    bus.suscribir(respuesta, ['expedientes', 'sla'], USUARIO_A);
+
+    bus.emitirEvento(evento, { usuario_id: USUARIO_A, expediente_id: 'private-case' });
+
+    expect(respuesta.write).not.toHaveBeenCalled();
+    expect(bus.replayDesde(0, respuestaSse(), new Set(['expedientes', 'sla']), USUARIO_A)).toHaveLength(0);
   });
 
   it('resuelve el destinatario desde la cuenta activa antes de publicar el evento', async () => {
