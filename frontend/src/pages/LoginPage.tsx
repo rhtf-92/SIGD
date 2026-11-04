@@ -1,18 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { apiClient } from "../api/client";
 import SelloInstitucional from "../components/common/SelloInstitucional";
 import { BotonIngresar } from "../components/common/AnimacionesSistema";
-import { notificarCambioSesion } from "../config/accesoModulos";
-import { permisosIniciales } from "../hooks/useRbacConfig";
 import { useAuthStore } from "../stores/authStore";
-
-const CLAVE_TOKEN = "sigd_token";
-const CLAVE_ROL = "sigd_rol";
-const CLAVE_PERMISOS = "sigd_permisos";
-
-/** Contraseña institucional demo para personal interno (base SIGD). */
-const PASSWORD_DEMO = "123";
 
 /** Usuario semilla por rol (coincide con migración 08_usuarios_demo.sql en BD SIGD). */
 export const ROLES_CANONICOS = [
@@ -43,13 +33,6 @@ export default function LoginPage() {
   const rolActual = ROLES_CANONICOS.find((r) => r.id === rol) ?? ROLES_CANONICOS.find((r) => r.id === "ESTUDIANTE") ?? ROLES_CANONICOS[0];
   const pidePassword = rolActual.requierePassword;
 
-  function guardarSesionDemo(token: string, rolId: string) {
-    window.localStorage.setItem(CLAVE_TOKEN, token);
-    window.localStorage.setItem(CLAVE_ROL, rolId);
-    window.localStorage.setItem(CLAVE_PERMISOS, JSON.stringify(permisosIniciales));
-    notificarCambioSesion();
-  }
-
   async function iniciarSesion(event?: React.FormEvent) {
     event?.preventDefault();
     setError("");
@@ -65,44 +48,17 @@ export default function LoginPage() {
     }
 
     setCargando(true);
-    const clave = password;
 
-    // 2) Intento real contra la base de datos SIGD (PostgreSQL / pgAdmin).
     try {
-      await loginStore({ identificador, password: clave });
+      await loginStore({ identificador, password });
       const rolSesion = useAuthStore.getState().usuario?.rol ?? rol;
       const destino =
         ROLES_CANONICOS.find((r) => r.id === rolSesion)?.destino ?? rolActual.destino;
       navigate(destino, { replace: true });
-      return;
     } catch {
-      // 3) Fallback demo (si el backend no está levantado): sesión local por rol.
-      //    Mantiene el filtrado estricto de módulos por usuario.
-      try {
-        // Intento directo HTTP por si el store falló por interceptor
-        const { data } = await apiClient.post("/api/v1/auth/login", {
-          identificador,
-          password: clave,
-        });
-        window.localStorage.setItem(CLAVE_TOKEN, data.accessToken);
-        window.localStorage.setItem("token", data.accessToken);
-        window.localStorage.setItem(CLAVE_ROL, data.usuario?.rol ?? rol);
-        if (!window.localStorage.getItem(CLAVE_PERMISOS)) {
-          window.localStorage.setItem(CLAVE_PERMISOS, JSON.stringify(permisosIniciales));
-        }
-        notificarCambioSesion();
-        const destinoFallback = ROLES_CANONICOS.find((r) => r.id === rol)?.destino || "/casilla";
-        navigate(destinoFallback, { replace: true });
-        return;
-      } catch {
-        if (pidePassword && password !== PASSWORD_DEMO) {
-          setError("Contraseña incorrecta. Inténtelo nuevamente.");
-          return;
-        }
-        guardarSesionDemo("demo-jwt-" + Date.now(), rol);
-        const destinoFallback = ROLES_CANONICOS.find((r) => r.id === rol)?.destino || "/casilla";
-        navigate(destinoFallback, { replace: true });
-      }
+      setError(
+        "No se pudo iniciar sesión. Verifique sus credenciales y que el servidor SIGD esté disponible.",
+      );
     } finally {
       setCargando(false);
     }

@@ -76,9 +76,8 @@ export default function AdminSidebarNav() {
 
   return (
     <nav
-      className={`flex h-full flex-col border-r border-slate-200 bg-white shadow-sm transition-all duration-200 ease-out ${
-        colapsado ? "w-16" : "w-72"
-      }`}
+      className={`flex h-full flex-col border-r border-slate-200 bg-white shadow-sm transition-all duration-200 ease-out ${colapsado ? "w-16" : "w-72"
+        }`}
       aria-label="Navegación lateral de administración"
     >
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
@@ -115,18 +114,16 @@ export default function AdminSidebarNav() {
               <button
                 type="button"
                 onClick={() => navigate(rutaItem.ruta)}
-                className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 ${
-                  esActiva
+                className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 ${esActiva
                     ? "bg-blue-50 text-blue-700 shadow-sm"
                     : "text-slate-700 hover:bg-slate-50"
-                }`}
+                  }`}
                 aria-current={esActiva ? "page" : undefined}
                 title={colapsado ? rutaItem.titulo : undefined}
               >
                 <Icono
-                  className={`h-5 w-5 shrink-0 ${
-                    esActiva ? "text-blue-700" : "text-slate-500"
-                  }`}
+                  className={`h-5 w-5 shrink-0 ${esActiva ? "text-blue-700" : "text-slate-500"
+                    }`}
                   aria-hidden="true"
                 />
                 {!colapsado && (

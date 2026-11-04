@@ -74,28 +74,7 @@ export default function AsistenteIA() {
     if (abierto) finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [mensajes.length, abierto, escribiendo]);
 
-  // Auto-abrir el asistente tras 10 segundos si no se ha usado aún (y se guarda solo en localStorage).
-  useEffect(() => {
-    if (autoAbridoRef.current) return;
-    autoAbrirRef.current = window.setTimeout(() => {
-      autoAbridoRef.current = true;
-      setAbierto(true);
-      try {
-        setTimeout(() => {
-          const nombre = usuario?.nombreCompleto ?? "usuario";
-          enviar(
-            `Hola ${nombre}, bienvenido al SIGD. Soy SIGI, tu asistente de soporte institucional. Estoy aquí para ayudarte cuando lo necesites.`,
-          );
-        }, 250);
-      } catch {}
-    }, 10_000);
-    return () => {
-      if (autoAbrirRef.current) {
-        window.clearTimeout(autoAbrirRef.current);
-        autoAbrirRef.current = null;
-      }
-    };
-  }, []);
+  // Auto-abrir deshabilitado por solicitud.
 
   // El menú del perfil (Ayuda/Soporte) puede abrir el chat con el evento "sigd:abrir-ayuda".
   useEffect(() => {
