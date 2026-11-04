@@ -27,20 +27,36 @@ export interface DestinoSseOptions {
 export class DestinoSse implements DestinoNotificacion {
   readonly nombre = 'sse';
   private readonly bus: BusSse;
+  private readonly pool: Pool;
   private readonly publicar?: (evento: string, datos: unknown) => Promise<void>;
 
-  constructor(bus: BusSse, bridge?: BridgeNotificacion | null) {
+  constructor(bus: BusSse, pool: Pool, bridge?: BridgeNotificacion | null) {
     this.bus = bus;
+    this.pool = pool;
     this.publicar = bridge?.publicar.bind(bridge) ?? undefined;
   }
 
   async despachar(evento: EventoPendiente): Promise<void> {
-    const datos = {
+    const datos: Record<string, unknown> = {
       ...(evento.payload as Record<string, unknown>),
       idEvento: evento.id_evento,
       correlationId: evento.correlation_id,
       tipoEvento: evento.tipo_evento,
     };
+    if (evento.tipo_evento === 'casilla_notificacion') {
+      const correo = typeof datos.correo_destinatario === 'string' ? datos.correo_destinatario : null;
+      if (!correo) return;
+      const destinatario = await this.pool.query<{ id_usuario: string }>(
+        `SELECT id_usuario FROM sigd_auth.cuenta_usuario
+          WHERE lower(correo) = lower($1) AND activo
+          ORDER BY id_usuario
+          LIMIT 1`,
+        [correo],
+      );
+      const usuarioId = destinatario.rows[0]?.id_usuario;
+      if (!usuarioId) return;
+      datos.usuario_id = usuarioId;
+    }
     this.bus.emitirEvento(evento.tipo_evento, datos);
     await this.publicar?.(evento.tipo_evento, datos);
   }
@@ -88,10 +104,21 @@ export class DestinoCasilla implements DestinoNotificacion {
     const correo = typeof payload.correo_destinatario === 'string' ? payload.correo_destinatario : null;
     if (!correo) return;
 
+    const destinatario = await this.pool.query<{ id_usuario: string }>(
+      `SELECT id_usuario FROM sigd_auth.cuenta_usuario
+        WHERE lower(correo) = lower($1) AND activo
+        ORDER BY id_usuario
+        LIMIT 1`,
+      [correo],
+    );
+    const usuarioId = destinatario.rows[0]?.id_usuario;
+    if (!usuarioId) return;
+
     await this.pool.query(
-      `INSERT INTO ${this.tabla} (correo_destinatario, asunto, cuerpo, referencia, estado)
-       VALUES ($1, $2, $3::jsonb, $4, 'PENDIENTE')`,
+      `INSERT INTO ${this.tabla} (usuario_id, correo_destinatario, asunto, cuerpo, referencia, estado)
+       VALUES ($1, $2, $3, $4::jsonb, $5, 'PENDIENTE')`,
       [
+        usuarioId,
         correo,
         typeof payload.asunto === 'string' ? payload.asunto : evento.tipo_evento,
         JSON.stringify(payload),
@@ -154,7 +181,7 @@ export function crearDespachadorPorDefecto(
   bridge?: BridgeNotificacion | null,
 ): DespachadorNotificaciones {
   return new DespachadorNotificaciones([
-    new DestinoSse(bus, bridge),
+    new DestinoSse(bus, pool, bridge),
     new DestinoCasilla(pool),
   ]);
 }

@@ -344,7 +344,7 @@ export function construirApp(
   /*
    * CoreLink - Streaming reactivo Server-Sent Events (SSE) (#55)
    */
-  app.use('/api/v1/realtime', crearRouterRealtime(busSse));
+  app.use('/api/v1/realtime', crearRouterRealtime(busSse, pool));
 
   /*
    * Asistente Virtual Institucional (AsistenteCore)
