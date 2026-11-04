@@ -27,8 +27,12 @@ export function crearRouterRealtime(bus: BusSse, pool: Pool, opciones: OpcionesR
    * Autenticación obligatoria: un stream sin identidad verificada permitiría a
    * cualquier cliente anónimo recibir los movimientos de expedientes ajenos. Se
    * acepta `Authorization: Bearer <jwt>` y, por la limitación de la API nativa
-   * `EventSource` (no admite cabeceras personalizadas), `?token=<jwt>`; ambas
-   * rutas verifican firma, vencimiento, sesión persistida y perfil activo.
+   * `EventSource` (no admite cabeceras personalizadas), `?token=<jwt>`. La query
+   * puede quedar expuesta en historial y logs de infraestructura: usar TLS,
+   * `no-store`, `no-referrer`, nunca registrar la query y redactar `token` en
+   * proxies. La mitigación local y el cambio futuro a tickets SSE se documentan
+   * en `docs/00_corelink/seguridad-sse.md`. Ambas rutas verifican firma,
+   * vencimiento, sesión persistida y perfil activo.
    */
   router.get('/stream', async (req: Request, res: Response, next: NextFunction) => {
     const { canales: canalesQuery, lastEventId: lastEventIdQuery } = esquemaConsulta.parse(req.query);

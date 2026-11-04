@@ -14,7 +14,7 @@ export function errorMiddleware(error: unknown, req: Request, res: Response, _ne
 
   if (serializado.status >= 500) {
     console.error(
-      `[ERROR 5xx] correlation_id=${correlation_id} method=${req.method} path=${req.originalUrl}`,
+      `[ERROR 5xx] correlation_id=${correlation_id} method=${req.method} path=${req.path}`,
       error,
     );
   }
@@ -28,7 +28,9 @@ export function errorMiddleware(error: unknown, req: Request, res: Response, _ne
     title: titleForStatus(serializado.status, serializado.code),
     status: serializado.status,
     detail: serializado.detail,
-    instance: req.originalUrl,
+    // req.originalUrl conserva la query string, que puede incluir credenciales
+    // de SSE cuando EventSource no permite enviar Authorization headers.
+    instance: req.path,
     code: serializado.code,
     codigo: serializado.code,
     correlation_id,

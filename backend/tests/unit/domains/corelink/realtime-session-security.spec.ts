@@ -5,10 +5,23 @@ import { describe, expect, it, vi } from 'vitest';
 import { firmarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
 import { crearRouterRealtime } from '../../../../src/modules/corelink/realtime.routes.js';
 import { BusSse } from '../../../../src/modules/corelink/sseStream.service.js';
+import { errorMiddleware } from '../../../../src/middleware/error-middleware.js';
 
 const USUARIO = '11111111-1111-4111-8111-111111111111';
 
 describe('sesión SSE', () => {
+  it('rechaza la apertura de un stream si no se presenta credencial', async () => {
+    const query = vi.fn();
+    const app = express();
+    app.use('/realtime', crearRouterRealtime(new BusSse(), { query } as unknown as Pool));
+    app.use(errorMiddleware);
+
+    const respuesta = await request(app).get('/realtime/stream?canales=casilla');
+
+    expect(respuesta.status).toBe(401);
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it('cierra una conexión ya abierta al revocarse su sesión', async () => {
     let revocada = false;
     const query = vi.fn(async (sql: string) => {
