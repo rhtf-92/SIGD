@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Skeleton from "../components/Skeleton";
 import { tupaApi, type TupaVersion } from "../services/tupaApi";
 
-const accesos = [
+const accesos: Array<{ ruta: string; titulo: string; descripcion: string; icono: string; protegida?: boolean }> = [
   {
     ruta: "/tramite/mesa-partes-virtual",
     titulo: "Mesa de Partes Virtual",
@@ -12,22 +12,21 @@ const accesos = [
   },
   {
     ruta: "/consulta",
-    titulo: "Consultar expediente",
-    descripcion: "Revisa el estado de un expediente con su CUT.",
+    titulo: "Consulta y seguimiento",
+    descripcion: "Revisa el estado y seguimiento de tus trámites.",
     icono: "busqueda",
   },
   {
-    ruta: "/casilla",
-    titulo: "Casilla Electrónica",
-    descripcion: "Revisa las notificaciones disponibles en tu casilla.",
-    icono: "casilla",
-    protegida: true,
+    ruta: "/registro",
+    titulo: "Registro de usuarios externos",
+    descripcion: "Completa tu registro para acceder a los servicios.",
+    icono: "registro",
   },
   {
-    ruta: "/tupa",
-    titulo: "TUPA vigente",
-    descripcion: "Consulta trámites, derechos, requisitos y plazos publicados.",
-    icono: "tupa",
+    ruta: "/login",
+    titulo: "Iniciar sesión",
+    descripcion: "Accede con tus credenciales institucionales.",
+    icono: "casilla",
   },
 ];
 
