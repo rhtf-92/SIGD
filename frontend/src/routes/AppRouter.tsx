@@ -33,7 +33,14 @@ export default function AppRouter() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
       <Route path="/tupa" element={<TupaVigentePage />} />
-      <Route path="/tupa/gestion" element={<TupaGestionPage />} />
+            <Route
+        path="/tupa/gestion"
+        element={
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR"]}>
+            <TupaGestionPage />
+          </ProtectedRoute>
+        }
+      />
 
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
