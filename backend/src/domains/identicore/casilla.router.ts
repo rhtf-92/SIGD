@@ -16,7 +16,8 @@ import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
-import { NotFoundError } from '../../shared/domain/errors/index.js';
+import { obtenerPerfilesActivos } from '../../core/auth/roles-activos.js';
+import { NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 
 const consultaPaginadaSchema = z
   .object({
@@ -152,25 +153,58 @@ function mapearNotificacion(fila: FilaNotificacionCasilla) {
 export function crearRouterCasilla(pool: Pool): Router {
   const router = Router();
 
-  function obtenerUsuarioId(req: Request): string {
+  async function autenticarUsuario(req: Request): Promise<string> {
     const token = extraerTokenBearer(req.get('authorization'));
-    if (!token) {
-      return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
+    if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
+
+    const claims = verificarTokenAcceso(token);
+    if (!claims.sid) throw new UnauthorizedError({ detail: 'La sesión del token no es válida.' });
+
+    const sesionRes = await pool.query<{
+      id_usuario: string;
+      expira_en: Date | string;
+      revocado_en: Date | string | null;
+      activo: boolean;
+    }>(
+      `SELECT s.id_usuario, s.expira_en, s.revocado_en, c.activo
+         FROM sigd_auth.sesion_usuario s
+         JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
+        WHERE s.refresh_token = $1
+        LIMIT 1`,
+      [claims.sid],
+    );
+    const sesion = sesionRes.rows[0];
+    if (!sesion || sesion.id_usuario !== claims.sub || !sesion.activo || sesion.revocado_en !== null ||
+        new Date(sesion.expira_en).getTime() <= Date.now()) {
+      throw new UnauthorizedError({ detail: 'La sesión no está vigente.' });
     }
+
+    const perfiles = await obtenerPerfilesActivos(pool, claims.sub);
+    if (!claims.rolActivo || !perfiles.some((perfil) => perfil.rol === claims.rolActivo)) {
+      throw new UnauthorizedError({ detail: 'El perfil activo ya no está vigente.' });
+    }
+    return claims.sub;
+  }
+
+  router.use('/casilla', async (req: Request, res: Response, next) => {
     try {
-      const claims = verificarTokenAcceso(token);
-      return claims.sub;
-    } catch {
-      return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
+      res.locals.usuarioCasillaId = await autenticarUsuario(req);
+      next();
+    } catch (error) {
+      next(error);
     }
+  });
+
+  function obtenerUsuarioId(res: Response): string {
+    return res.locals.usuarioCasillaId as string;
   }
 
   // #7 — GET /casilla/notificaciones y alias /casilla/bandeja
   const handlerBandeja = async (req: Request, res: Response) => {
     const query = consultaPaginadaSchema.parse(req.query);
-    const usuarioId = obtenerUsuarioId(req);
+    const usuarioId = obtenerUsuarioId(res);
 
-    const condiciones: string[] = ['(usuario_id = $1 OR usuario_id IS NULL OR $1 = \'00000000-0000-0000-0000-000000000001\')'];
+    const condiciones: string[] = ['usuario_id = $1'];
     const valores: unknown[] = [usuarioId];
 
     if (query.estado !== 'TODOS') {
@@ -237,10 +271,11 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #8 — GET /casilla/notificaciones/:id
   router.get('/casilla/notificaciones/:id', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(res);
 
     const resultado = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
-      [id],
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId],
     );
 
     if (resultado.rows.length === 0) {
@@ -255,14 +290,15 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #9 — PATCH /casilla/notificaciones/:id/lectura
   router.patch('/casilla/notificaciones/:id/lectura', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(res);
 
     const resultado = await pool.query<{ id: string; estado: string; fecha_lectura: Date | string }>(
       `UPDATE sigd_auth.notificacion_casilla
           SET estado = 'LEIDO',
               fecha_lectura = COALESCE(fecha_lectura, now())
-        WHERE id = $1
+        WHERE id = $1 AND usuario_id = $2
         RETURNING id, estado, fecha_lectura`,
-      [id],
+      [id, usuarioId],
     );
 
     if (resultado.rows.length === 0) {
@@ -286,10 +322,11 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #10 — POST /casilla/notificaciones/:id/acuse
   router.post('/casilla/notificaciones/:id/acuse', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(res);
 
     const notifRes = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
-      [id],
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId],
     );
 
     if (notifRes.rows.length === 0) {
@@ -370,8 +407,8 @@ export function crearRouterCasilla(pool: Pool): Router {
           SET id_acuse = $1,
               acuse_hash_sha256 = $2,
               acuse_sellado_tiempo = COALESCE(acuse_sellado_tiempo, now())
-        WHERE id = $3 AND id_acuse IS NULL`,
-      [idAcuse, hashAcuse, id],
+        WHERE id = $3 AND usuario_id = $4 AND id_acuse IS NULL`,
+      [idAcuse, hashAcuse, id, usuarioId],
     );
 
     const notificacionActualizada = mapearNotificacion({
@@ -414,13 +451,13 @@ export function crearRouterCasilla(pool: Pool): Router {
 
   // #11 — GET /casilla/estadisticas
   router.get('/casilla/estadisticas', async (req: Request, res: Response) => {
-    const usuarioId = obtenerUsuarioId(req);
+    const usuarioId = obtenerUsuarioId(res);
 
     const resultado = await pool.query<{ no_leidas: string; total: string }>(
       `SELECT COUNT(*) FILTER (WHERE estado = 'NO_LEIDO')::text AS no_leidas,
               COUNT(*)::text AS total
          FROM sigd_auth.notificacion_casilla
-        WHERE usuario_id = $1 OR usuario_id IS NULL OR $1 = '00000000-0000-0000-0000-000000000001'`,
+        WHERE usuario_id = $1`,
       [usuarioId],
     );
 
@@ -441,8 +478,14 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #12 — GET /casilla/notificaciones/:id/documento/descargar
   router.get('/casilla/notificaciones/:id/documento/descargar', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(res);
+    const notificacion = await pool.query<{ documento_url: string | null }>(
+      `SELECT documento_url FROM sigd_auth.notificacion_casilla WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId],
+    );
+    if (notificacion.rows.length === 0) throw new NotFoundError();
     res.status(200).json({
-      downloadUrl: `/api/v1/storage/download/sigd-resoluciones/rd-${id}.pdf`,
+      downloadUrl: notificacion.rows[0].documento_url ?? `/api/v1/storage/download/sigd-resoluciones/rd-${id}.pdf`,
       expiraEnSegundos: 900,
     });
   });
@@ -450,8 +493,14 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #13 — GET /casilla/notificaciones/:id/acuse/descargar
   router.get('/casilla/notificaciones/:id/acuse/descargar', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(res);
+    const notificacion = await pool.query<{ id_acuse: string | null }>(
+      `SELECT id_acuse FROM sigd_auth.notificacion_casilla WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId],
+    );
+    if (notificacion.rows.length === 0 || !notificacion.rows[0].id_acuse) throw new NotFoundError();
     res.status(200).json({
-      downloadUrl: `/api/v1/storage/download/sigd-acuses/acuse-${id}.pdf`,
+      downloadUrl: `/api/v1/storage/download/sigd-acuses/${notificacion.rows[0].id_acuse}.pdf`,
       expiraEnSegundos: 900,
     });
   });
