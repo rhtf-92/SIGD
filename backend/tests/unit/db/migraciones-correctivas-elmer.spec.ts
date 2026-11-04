@@ -15,11 +15,12 @@ describe('integridad migraciones correctivas PostgreSQL (Elmer)', () => {
     expect(m).toContain('information_schema.columns');
     expect(m).toContain('refresh_token');
     expect(m).toContain('TYPE TEXT');
+    expect(m).not.toContain('\\$\\$');
     expect(m).not.toMatch(/\bBEGIN\s*;/);
     expect(m).not.toMatch(/\bCOMMIT\s*;/);
   });
 
-  it('23: sin BEGIN/COMMIT, sin CROSS JOIN masivo, con NOTICE y detección', () => {
+  it('23: deshabilita la cuenta conocida y retira permisos masivos de forma segura', () => {
     const m = leerMigracion('23_sigd_superadmin_hardening.sql');
     expect(m).toContain('DO ');
     expect(m).toContain('LANGUAGE plpgsql');
@@ -28,7 +29,10 @@ describe('integridad migraciones correctivas PostgreSQL (Elmer)', () => {
     expect(m).not.toContain('CROSS JOIN sigd_org.rol_permiso');
     expect(m).not.toContain('CROSS JOIN sigd_org.permiso_sistema');
     expect(m).toContain('ADMINISTRADOR');
-    expect(m).toContain('RAISE NOTICE');
+    expect(m).toContain('activo = FALSE');
+    expect(m).toContain('revocado_en');
+    expect(m).toContain('DELETE FROM sigd_org.rol_permiso');
+    expect(m).toContain('RAISE EXCEPTION');
   });
 
   it('24: valida conteo y lanza EXCEPTION con mapeo', () => {
@@ -40,6 +44,8 @@ describe('integridad migraciones correctivas PostgreSQL (Elmer)', () => {
     expect(m).toContain('COUNT(*)');
     expect(m).toContain('RAISE EXCEPTION');
     expect(m).toMatch(/mapeo|IdentiCore/i);
+    expect(m).toContain('actor_id_uuid_mapeo');
+    expect(m).toContain('actor_uuid');
     expect(m).not.toMatch(/\bBEGIN\s*;/);
     expect(m).not.toMatch(/\bCOMMIT\s*;/);
   });
