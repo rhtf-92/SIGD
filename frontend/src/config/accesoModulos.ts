@@ -60,7 +60,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "mesa-virtual",
     familia: "ingreso",
     titulo: "Mesa de Partes Virtual",
-    subtitulo: "ENT-M02 / TUPA",
     descripcion:
       "Presentación y radicación de trámites digitales, requisitos TUPA y anexos documentales.",
     ruta: "/tramite",
@@ -74,7 +73,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "ventanilla",
     familia: "ingreso",
     titulo: "Ventanilla Presencial",
-    subtitulo: "ENT-M02 / Presencial",
     descripcion:
       "Recepción ciudadana presencial, foliado y asignación de CUT.",
     ruta: "/tramite/ventanilla-presencial",
@@ -87,7 +85,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "registro",
     familia: "ingreso",
     titulo: "Registro Ciudadano",
-    subtitulo: "ENT-M01-01 / ENT-M01-02",
     descripcion:
       "Registro de personas naturales y jurídicas con validación RENIEC / SUNAT y Ubigeo Ucayali.",
     ruta: "/registro",
@@ -99,7 +96,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "expedientes",
     familia: "gestion",
     titulo: "Bandeja de Expedientes",
-    subtitulo: "ENT-M05",
     descripcion:
       "Gestiona y consulta el estado, trazabilidad, providencias y foliado de expedientes.",
     ruta: "/expedientes",
@@ -112,7 +108,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "casilla",
     familia: "gestion",
     titulo: "Casilla Electrónica",
-    subtitulo: "ENT-M01-03",
     descripcion:
       "Consulta y recepción de notificaciones electrónicas institucionales con plena validez legal.",
     ruta: "/casilla",
@@ -126,7 +121,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "consulta",
     familia: "ingreso",
     titulo: "Consulta Pública",
-    subtitulo: "Seguimiento CUT",
     descripcion: "Consulta pública del estado de tu trámite con tu CUT.",
     ruta: "/consulta",
     orden: 60,
@@ -137,7 +131,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "validador",
     familia: "validez",
     titulo: "Validador CVD",
-    subtitulo: "MOD-04 / Verificación",
     descripcion:
       "Valida la autenticidad e integridad de documentos firmados digitalmente mediante el Código de Verificación de Documentos.",
     ruta: "/validador-cvd",
@@ -149,7 +142,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "flujo-validez",
     familia: "validez",
     titulo: "Flujo y Validez Legal",
-    subtitulo: "MOD-04 / Firma Digital",
     descripcion:
       "Tramitación con plena validez legal: firma digital, re-firma, workflow académico y verificación pública de documentos (CVD).",
     ruta: "/flujo-validez-legal",
@@ -163,7 +155,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "titulacion",
     familia: "validez",
     titulo: "Workflow Titulación",
-    subtitulo: "ENT-M04-01",
     descripcion:
       "Evaluación académica de proyectos de titulación y derivación de actuados.",
     ruta: "/flujos/titulacion",
@@ -176,7 +167,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "proyector",
     familia: "validez",
     titulo: "Proyector de Resoluciones",
-    subtitulo: "ENT-M04-02 · Isaí",
     descripcion:
       "Bandeja de proyectos de resolución directoral con correlativo, estados y pase a firma.",
     ruta: "/flujos/proyector-resoluciones",
@@ -189,7 +179,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "administracion",
     familia: "gobierno",
     titulo: "Panel de Administración",
-    subtitulo: "ENT-M05-01 / RBAC",
     descripcion:
       "Gestión de usuarios, roles, permisos, auditoría, tablas maestras y calendario laboral.",
     ruta: "/administracion",
@@ -202,7 +191,6 @@ export const MODULOS_VISIBLES: DefinicionModulo[] = [
     id: "reportes",
     familia: "gobierno",
     titulo: "Reportes y Tableros de Control",
-    subtitulo: "06_reportes-tablero-control",
     descripcion:
       "Consulta indicadores ejecutivos, tendencias, distribución de expedientes y áreas con cuellos de botella.",
     ruta: "/reportes/dashboard",

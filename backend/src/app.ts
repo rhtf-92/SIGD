@@ -58,8 +58,13 @@ import { crearRouterStorage } from './core/storage/storage.router.js';
 import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/firma.routes.js';
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
+import { crearAuditoriaAccesoMiddleware } from './middleware/auditoria-acceso.middleware.js';
 import { verificarTokenAcceso } from './core/auth/jwt.service.js';
-import { ETIQUETAS_ROL, ROLES_CANONICOS } from './shared/domain/roles.js';
+import { ETIQUETAS_ROL, ROLES_CANONICOS, normalizarRol } from './shared/domain/roles.js';
+
+// Módulo de Auditoría Forense (Logs de Auditoría WORM)
+import { AuditoriaService } from './audit/auditoria.service.js';
+import type { FiltrosAuditoria } from './audit/auditoria.service.js';
 
 export interface AppOptions {
   busSse?: BusSse;
@@ -106,6 +111,10 @@ export function construirApp(
   app.use(corsMiddleware);
   app.use(express.json());
   app.use(contextMiddleware);
+  app.use(crearAuditoriaAccesoMiddleware(pool));
+
+  // Servicio de Auditoría Forense (Logs de Auditoría WORM)
+  const auditoriaService = new AuditoriaService(pool);
 
   app.get('/health', (_req, res) => {
     res.json({
@@ -302,6 +311,95 @@ export function construirApp(
     }
   });
 
+  /*
+   * Escritura de la matriz RBAC - OrganiCore (#45)
+   * Reemplaza los permisos de cada rol enviado en sigd_org.rol_permiso.
+   * Cuerpo esperado: { roles: [{ codigo: string, permisos: string[] }] }
+   * Los códigos de rol se normalizan al vocabulario canónico de la BD
+   * (SUPER_ADMIN -> ADMINISTRADOR, DOCENTE -> SECRETARIO, ESTUDIANTE -> CIUDADANO, etc.).
+   * Los permisos que no existan en sigd_org.permiso_sistema se ignoran.
+   */
+  app.put('/api/v1/admin/roles-permisos', async (req, res, next) => {
+    try {
+      const { roles } = req.body ?? {};
+      if (!Array.isArray(roles)) {
+        res.status(400).json({
+          type: 'https://sigd.iestpsuiza.edu.pe/errors/validation',
+          title: 'Solicitud inválida',
+          status: 400,
+          detail: 'El cuerpo debe contener un arreglo "roles" con elementos { codigo, permisos: string[] }.',
+          instance: '/api/v1/admin/roles-permisos',
+        });
+        return;
+      }
+
+      const resultados = [];
+
+      for (const rol of roles) {
+        const { codigo, permisos } = rol ?? {};
+        if (typeof codigo !== 'string' || !Array.isArray(permisos)) {
+          continue;
+        }
+
+        const rolNormalizado = normalizarRol(codigo);
+        if (!rolNormalizado) {
+          resultados.push({ codigo, normalizado: null, aplicados: [], ignorados: [] });
+          continue;
+        }
+
+        const { rows: filasRol } = await pool.query(
+          `SELECT rol_id FROM sigd_org.rol_sistema WHERE codigo = $1 AND vigente = TRUE`,
+          [rolNormalizado],
+        );
+        if (filasRol.length === 0) {
+          resultados.push({
+            codigo,
+            normalizado: rolNormalizado,
+            aplicados: [],
+            ignorados: [],
+          });
+          continue;
+        }
+        const rolId = filasRol[0].rol_id;
+
+        const permisoIds: string[] = [];
+        const ignorados: string[] = [];
+        for (const p of permisos) {
+          if (typeof p !== 'string') continue;
+          const { rows: filasPermiso } = await pool.query(
+            `SELECT permiso_id FROM sigd_org.permiso_sistema WHERE codigo = $1`,
+            [p],
+          );
+          if (filasPermiso.length > 0) {
+            permisoIds.push(filasPermiso[0].permiso_id);
+          } else {
+            ignorados.push(p);
+          }
+        }
+
+        await pool.query(`DELETE FROM sigd_org.rol_permiso WHERE rol_id = $1`, [rolId]);
+        if (permisoIds.length > 0) {
+          const values = permisoIds.map((_, i) => `($1, $${i + 2})`).join(', ');
+          await pool.query(
+            `INSERT INTO sigd_org.rol_permiso (rol_id, permiso_id) VALUES ${values}`,
+            [rolId, ...permisoIds],
+          );
+        }
+
+        resultados.push({
+          codigo,
+          normalizado: rolNormalizado,
+          aplicados: permisos.filter((p) => !ignorados.includes(p)),
+          ignorados,
+        });
+      }
+
+      res.json({ ok: true, resultados });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get('/api/v1/admin/maestras/sede', (_req, res) => {
     res.json({
       sedes: [
@@ -339,6 +437,253 @@ export function construirApp(
   app.post('/api/v1/tramite/radicacion', (req, res, next) => {
     req.url = '/tramites/radicacion-virtual';
     routerTramites(req, res, next);
+  });
+
+  /* =========================================================================
+   * Módulo Logs de Auditoría — Trazabilidad inmutable (WORM), acciones,
+   * accesos y correlación X-Correlation-ID.
+   * ========================================================================= */
+
+  // GET /api/v1/auditoria/logs — listado paginado con filtros
+  app.get('/api/v1/auditoria/logs', async (req, res, next) => {
+    try {
+      const filtros: FiltrosAuditoria = {
+        busqueda: typeof req.query.busqueda === 'string' ? req.query.busqueda : undefined,
+        modulo: typeof req.query.modulo === 'string' ? req.query.modulo : undefined,
+        accion: typeof req.query.accion === 'string' ? req.query.accion : undefined,
+        resultado:
+          req.query.resultado === 'Exitoso' || req.query.resultado === 'Denegado' || req.query.resultado === 'Error'
+            ? (req.query.resultado as 'Exitoso' | 'Denegado' | 'Error')
+            : undefined,
+        usuario_id: typeof req.query.usuario_id === 'string' ? req.query.usuario_id : undefined,
+        correlation_id:
+          typeof req.query.correlation_id === 'string' ? req.query.correlation_id : undefined,
+        fecha_desde: typeof req.query.fecha_desde === 'string' ? req.query.fecha_desde : undefined,
+        fecha_hasta: typeof req.query.fecha_hasta === 'string' ? req.query.fecha_hasta : undefined,
+        pagina: req.query.pagina ? Number(req.query.pagina) : 1,
+        por_pagina: req.query.por_pagina ? Number(req.query.por_pagina) : 50,
+      };
+
+      const { filas, total } = await auditoriaService.listar(filtros);
+
+      // Mapear filas de BD al contrato del visor forense del frontend.
+      const registros = filas.map((fila) => {
+        const datosDespues = fila.datos_despues as Record<string, unknown> | null;
+        const datosAntes = fila.datos_antes as Record<string, unknown> | null;
+
+        return {
+          id: fila.id_auditoria,
+          fecha: fila.fecha_hora
+            ? new Date(fila.fecha_hora).toLocaleString('es-PE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })
+            : '',
+          usuario: fila.usuario_id
+            ? `Usuario ${fila.usuario_id}`
+            : 'Sistema',
+          rol: 'Sistema',
+          area: 'Sistema',
+          accion: (datosDespues?.accion as string) ?? fila.operacion,
+          modulo: (datosDespues?.modulo as string) ?? fila.tabla,
+          registro: (datosDespues?.registro as string) ?? `${fila.esquema}.${fila.tabla}`,
+          resultado: ((datosDespues?.resultado as string) ??
+            (fila.operacion === 'INSERT' ? 'Exitoso' : 'Exitoso')) as
+            | 'Exitoso' | 'Denegado' | 'Error',
+          ip: fila.ip_origen ?? '',
+          correlationId: fila.correlation_id ?? undefined,
+          hash: fila.hash_registro ?? undefined,
+          hashAnterior: fila.hash_anterior ?? undefined,
+          detallesTecnicos: {
+            tipo: datosDespues?.tipo,
+            estado_anterior: datosDespues?.estado_anterior ?? datosAntes,
+            estado_nuevo: datosDespues?.estado_nuevo,
+            detalles_tecnicos: datosDespues?.detalles_tecnicos,
+            esquema: fila.esquema,
+            tabla: fila.tabla,
+            operacion: fila.operacion,
+            user_agent: fila.user_agent ?? undefined,
+            hash_registro: fila.hash_registro ?? undefined,
+            hash_anterior: fila.hash_anterior ?? undefined,
+          },
+        };
+      });
+
+      res.json({
+        total,
+        pagina: filtros.pagina,
+        por_pagina: filtros.por_pagina,
+        registros,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // GET /api/v1/auditoria/logs/:id — detalle forense de un registro
+  app.get('/api/v1/auditoria/logs/:id', async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const fila = await auditoriaService.obtenerPorId(id);
+
+      if (!fila) {
+        res.status(404).json({
+          type: 'https://sigd.iestpsuiza.edu.pe/errors/not-found',
+          title: 'Registro de auditoría no encontrado',
+          status: 404,
+          detail: `No existe un registro de auditoría con el id ${id}.`,
+          instance: `/api/v1/auditoria/logs/${id}`,
+        });
+        return;
+      }
+
+      const datosDespues = fila.datos_despues as Record<string, unknown> | null;
+      const datosAntes = fila.datos_antes as Record<string, unknown> | null;
+
+      res.json({
+        id: fila.id_auditoria,
+        fecha: fila.fecha_hora
+          ? new Date(fila.fecha_hora).toISOString()
+          : '',
+        usuario: fila.usuario_id ? `Usuario ${fila.usuario_id}` : 'Sistema',
+        rol: 'Sistema',
+        area: 'Sistema',
+        accion: (datosDespues?.accion as string) ?? fila.operacion,
+        modulo: (datosDespues?.modulo as string) ?? fila.tabla,
+        registro: (datosDespues?.registro as string) ?? `${fila.esquema}.${fila.tabla}`,
+        resultado: ((datosDespues?.resultado as string) ?? 'Exitoso') as
+          | 'Exitoso' | 'Denegado' | 'Error',
+        ip: fila.ip_origen ?? '',
+        correlationId: fila.correlation_id ?? undefined,
+        hash: fila.hash_registro ?? undefined,
+        hashAnterior: fila.hash_anterior ?? undefined,
+        detallesTecnicos: {
+          tipo: datosDespues?.tipo,
+          estado_anterior: datosDespues?.estado_anterior ?? datosAntes,
+          estado_nuevo: datosDespues?.estado_nuevo,
+          detalles_tecnicos: datosDespues?.detalles_tecnicos,
+          esquema: fila.esquema,
+          tabla: fila.tabla,
+          operacion: fila.operacion,
+          user_agent: fila.user_agent ?? undefined,
+          hash_registro: fila.hash_registro ?? undefined,
+          hash_anterior: fila.hash_anterior ?? undefined,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // GET /api/v1/auditoria/resumen — estadísticas para tarjetas resumen
+  app.get('/api/v1/auditoria/resumen', async (req, res, next) => {
+    try {
+      const filtros: Pick<FiltrosAuditoria, 'fecha_desde' | 'fecha_hasta' | 'usuario_id'> = {};
+      if (typeof req.query.fecha_desde === 'string') filtros.fecha_desde = req.query.fecha_desde;
+      if (typeof req.query.fecha_hasta === 'string') filtros.fecha_hasta = req.query.fecha_hasta;
+      if (typeof req.query.usuario_id === 'string') filtros.usuario_id = req.query.usuario_id;
+
+      const resumen = await auditoriaService.resumen(filtros);
+      res.json(resumen);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // GET /api/v1/auditoria/validar-worm — integridad criptográfica de la cadena
+  app.get('/api/v1/auditoria/validar-worm', async (req, res, next) => {
+    try {
+      const validacion = await auditoriaService.validarIntegridadWorm();
+      res.json(validacion);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // POST /api/v1/auditoria/acceso — registrar un acceso (login, lectura, denegado)
+  app.post('/api/v1/auditoria/acceso', async (req, res, next) => {
+    try {
+      const {
+        accion,
+        modulo,
+        registro,
+        resultado,
+        detalles_tecnicos,
+        ip_origen,
+        user_agent,
+      } = req.body ?? {};
+
+      if (!accion || !modulo || !registro || !resultado) {
+        res.status(400).json({
+          type: 'https://sigd.iestpsuiza.edu.pe/errors/validation',
+          title: 'Solicitud inválida',
+          status: 400,
+          detail: 'Se requieren los campos: accion, modulo, registro, resultado.',
+          instance: '/api/v1/auditoria/acceso',
+        });
+        return;
+      }
+
+      const id = await auditoriaService.registrarAcceso({
+        accion,
+        modulo,
+        registro,
+        resultado: resultado as 'Exitoso' | 'Denegado' | 'Error',
+        detalles_tecnicos: detalles_tecnicos ?? null,
+        ip_origen: ip_origen ?? null,
+        user_agent: user_agent ?? null,
+      });
+
+      res.status(201).json({ id_auditoria: id, correlation_id: auditoriaService.obtenerCorrelationId() });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // POST /api/v1/auditoria/accion — registrar una acción de negocio
+  app.post('/api/v1/auditoria/accion', async (req, res, next) => {
+    try {
+      const {
+        accion,
+        modulo,
+        registro,
+        resultado,
+        datos_antes,
+        datos_despues,
+        ip_origen,
+        user_agent,
+      } = req.body ?? {};
+
+      if (!accion || !modulo || !registro || !resultado) {
+        res.status(400).json({
+          type: 'https://sigd.iestpsuiza.edu.pe/errors/validation',
+          title: 'Solicitud inválida',
+          status: 400,
+          detail: 'Se requieren los campos: accion, modulo, registro, resultado.',
+          instance: '/api/v1/auditoria/accion',
+        });
+        return;
+      }
+
+      const id = await auditoriaService.registrarAccion({
+        accion,
+        modulo,
+        registro,
+        resultado: resultado as 'Exitoso' | 'Denegado' | 'Error',
+        datos_antes: datos_antes ?? null,
+        datos_despues: datos_despues ?? null,
+        ip_origen: ip_origen ?? null,
+        user_agent: user_agent ?? null,
+      });
+
+      res.status(201).json({ id_auditoria: id, correlation_id: auditoriaService.obtenerCorrelationId() });
+    } catch (error) {
+      next(error);
+    }
   });
 
   app.use(errorMiddleware);

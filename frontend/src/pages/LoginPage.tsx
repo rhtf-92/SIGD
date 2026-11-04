@@ -21,14 +21,20 @@ export const ROLES_CANONICOS = [
   { id: "DOCENTE", label: "Docente", usuario: "docente", destino: "/flujos/titulacion", requierePassword: true },
   { id: "MESA_PARTES", label: "Mesa de Partes", usuario: "mesa_partes", destino: "/tramite/ventanilla-presencial", requierePassword: true },
   { id: "ESTUDIANTE", label: "Estudiante", usuario: "estudiante", destino: "/casilla", requierePassword: true },
-  { id: "OTROS", label: "Otros", usuario: "invitado", destino: "/casilla", requierePassword: false },
 ];
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const loginStore = useAuthStore((s) => s.login);
-  const [rol, setRol] = useState("ESTUDIANTE");
   const [identificador, setIdentificador] = useState("");
+  const rol = (() => {
+    const id = identificador.trim().toLowerCase();
+    if (id.includes("superadmin") || id.includes("admin")) return "SUPER_ADMIN";
+    if (id.includes("director")) return "DIRECTOR";
+    if (id.includes("docente")) return "DOCENTE";
+    if (id.includes("mesa")) return "MESA_PARTES";
+    return "ESTUDIANTE";
+  })();
   const [password, setPassword] = useState("");
   const [mostrar, setMostrar] = useState(false);
   const [error, setError] = useState("");
@@ -155,32 +161,6 @@ export default function LoginPage() {
                 className="input-sigd"
                 required
               />
-            </div>
-
-            <div>
-              <label
-                htmlFor="rol"
-                className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-tinta-500"
-              >
-                Rol Institucional
-              </label>
-              <select
-                id="rol"
-                value={rol}
-                onChange={(event) => {
-                  setRol(event.target.value);
-                  setError("");
-                  setPassword("");
-                }}
-                className="input-sigd"
-              >
-                <option value="ESTUDIANTE">Estudiante</option>
-                <option value="OTROS">Otros</option>
-                <option value="DOCENTE">Docente</option>
-                <option value="MESA_PARTES">Mesa de Partes</option>
-                <option value="DIRECTOR">Director General</option>
-                <option value="SUPER_ADMIN">Super Administrador</option>
-              </select>
             </div>
 
             {pidePassword ? (

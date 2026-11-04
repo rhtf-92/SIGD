@@ -5,6 +5,37 @@ import { AtenderExpedienteSchema } from './dto/atenderExpediente.dto.js';
 import { ArchivarExpedienteSchema } from './dto/archivarExpediente.dto.js';
 import { derivarExpediente, atenderExpediente, archivarExpediente } from './derivaciones.service.js';
 import { NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
+import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
+import type { OperacionBitacora } from '../../shared/types/index.js';
+
+/**
+ * Registra una mutación de negocio en la bitácora forense WORM dentro de la
+ * transacción ya abierta (`cliente`). Se ejecuta justo antes del COMMIT para
+ * garantizar atomicidad: si la transacción falla, el registro de auditoría
+ * también se deshace.
+ */
+async function registrarAuditoriaMutacion(
+  cliente: Parameters<typeof registrarMutacion>[0],
+  operacion: OperacionBitacora,
+  expedienteId: string,
+  accion: string,
+  detalle: string,
+  datosExtra?: Record<string, unknown>,
+): Promise<void> {
+  await registrarMutacion(cliente, {
+    esquema: 'sigd_tra',
+    tabla: 'expediente',
+    operacion,
+    datos_antes: null,
+    datos_despues: {
+      expediente_id: expedienteId,
+      accion,
+      resultado: 'Exitoso',
+      detalle,
+      ...datosExtra,
+    },
+  });
+}
 
 export function crearRouterDerivaciones(pool: Pool): Router {
   const router = Router();
@@ -26,7 +57,20 @@ export function crearRouterDerivaciones(pool: Pool): Router {
         // 3. Ejecución de la lógica de negocio
         await derivarExpediente(cliente, expedienteId, datos);
 
-        // 4. Confirmar transacción
+        // 4. Auditoría WORM: registrar mutación antes del COMMIT
+        await registrarAuditoriaMutacion(
+          cliente,
+          'UPDATE',
+          expedienteId,
+          'DERIVAR_EXPEDIENTE',
+          'Derivación procesada exitosamente.',
+          {
+            destino: datos.destinos[0]?.area_destino_id ?? null,
+            motivo: datos.proveido,
+          },
+        );
+
+        // 5. Confirmar transacción
         await cliente.query('COMMIT');
 
         res.status(200).json({
@@ -59,6 +103,15 @@ export function crearRouterDerivaciones(pool: Pool): Router {
       try {
         await cliente.query('BEGIN');
         await atenderExpediente(cliente, expedienteId, datos);
+        // Auditoría WORM
+        await registrarAuditoriaMutacion(
+          cliente,
+          'UPDATE',
+          expedienteId,
+          'ATENDER_EXPEDIENTE',
+          'Atención resolutiva registrada exitosamente.',
+          { resumen: datos.resultado_resumen },
+        );
         await cliente.query('COMMIT');
         res.status(200).json({
           ok: true,
@@ -85,6 +138,15 @@ export function crearRouterDerivaciones(pool: Pool): Router {
       try {
         await cliente.query('BEGIN');
         await archivarExpediente(cliente, expedienteId, datos);
+        // Auditoría WORM
+        await registrarAuditoriaMutacion(
+          cliente,
+          'UPDATE',
+          expedienteId,
+          'ARCHIVAR_EXPEDIENTE',
+          'Archivado físico registrado exitosamente.',
+          { observaciones: datos.observaciones ?? null },
+        );
         await cliente.query('COMMIT');
         res.status(200).json({
           ok: true,
@@ -125,6 +187,16 @@ export function crearRouterDerivaciones(pool: Pool): Router {
           'SELECT sigd_tra.acumular_expediente($1::uuid, $2::uuid, $3::text) AS id_acumulacion',
           [expedientePrincipalId, accesorioId, actoResolutivo],
         );
+        // Auditoría WORM
+        await registrarAuditoriaMutacion(
+          cliente,
+          'UPDATE',
+          expedientePrincipalId,
+          'ACUMULAR_EXPEDIENTE',
+          'Expediente acumulado formalmente según Art. 160 LPAG.',
+          { expediente_accesorio: accesorioId, acto_resolutivo: actoResolutivo },
+        );
+
         await cliente.query('COMMIT');
 
         res.status(200).json({
@@ -169,6 +241,16 @@ export function crearRouterDerivaciones(pool: Pool): Router {
           throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
         }
 
+        // Auditoría WORM
+        await registrarAuditoriaMutacion(
+          cliente,
+          'UPDATE',
+          expedienteId,
+          'OBSERVAR_EXPEDIENTE',
+          'Observación registrada exitosamente.',
+          { motivo },
+        );
+
         await cliente.query('COMMIT');
 
         res.status(200).json({
@@ -210,6 +292,16 @@ export function crearRouterDerivaciones(pool: Pool): Router {
         if (resultado.rowCount === 0) {
           throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
         }
+
+        // Auditoría WORM
+        await registrarAuditoriaMutacion(
+          cliente,
+          'UPDATE',
+          expedienteId,
+          'SUBSANAR_EXPEDIENTE',
+          'Subsanación registrada exitosamente.',
+          { motivo },
+        );
 
         await cliente.query('COMMIT');
 

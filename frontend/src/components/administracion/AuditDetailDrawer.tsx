@@ -116,6 +116,26 @@ export default function AuditDetailDrawer({
                 {registro.correlationId ?? "—"}
               </dd>
             </div>
+            {registro.hash && (
+              <div>
+                <dt className="text-xs font-semibold uppercase text-slate-500">
+                  Hash WORM (SHA-256)
+                </dt>
+                <dd className="mt-1 break-all font-mono text-xs text-slate-600">
+                  {registro.hash}
+                </dd>
+              </div>
+            )}
+            {registro.hashAnterior && (
+              <div>
+                <dt className="text-xs font-semibold uppercase text-slate-500">
+                  Hash Anterior (encadenamiento)
+                </dt>
+                <dd className="mt-1 break-all font-mono text-xs text-slate-600">
+                  {registro.hashAnterior}
+                </dd>
+              </div>
+            )}
           </dl>
 
           {(anterior !== undefined || nuevo !== undefined) && (

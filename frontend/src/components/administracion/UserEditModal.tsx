@@ -32,7 +32,7 @@ interface UsuarioAdminForm {
 }
 
 // El correo corporativo del IESTP "Suiza" es el único dominio admitido.
-const CORREO_INSTITUCIONAL_DOMINIO = "iestpsuiza.edu.pe";
+const CORREO_INSTITUCIONAL_DOMINIO = "iestp-suiza.edu.pe";
 const MENSAJE_DOMINIO = `El correo debe pertenecer al dominio @${CORREO_INSTITUCIONAL_DOMINIO}.`;
 
 const ESTADOS: EstadoUsuario[] = ["Activo", "Inactivo", "Bloqueado"];

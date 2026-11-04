@@ -1,31 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-const roles = ['SUPER_ADMIN', 'DIRECTOR', 'DOCENTE', 'MESA_PARTES', 'ESTUDIANTE'];
-const permisos = [
+export interface RbacPermissionMatrixProps {
+  /** Matriz inicial de permisos por rol. Si se omite, se usan los valores por defecto. */
+  matriz?: Record<string, Record<string, boolean>>;
+  /** Callback disparado cuando el usuario cambia algún checkbox. */
+  onMatrizChange?: (matriz: Record<string, Record<string, boolean>>) => void;
+}
+
+const PERMISOS_POR_DEFECTO = [
   'EXPEDIENTE_CREAR',
   'EXPEDIENTE_DERIVAR',
   'EXPEDIENTE_FIRMAR',
   'CONFIG_CALENDARIO',
-  'GESTION_ROLES'
-];
+  'GESTION_ROLES',
+] as const;
 
-export default function RbacPermissionMatrix() {
-  const [matriz, setMatriz] = useState<Record<string, Record<string, boolean>>>({
-    SUPER_ADMIN: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: true, EXPEDIENTE_FIRMAR: true, CONFIG_CALENDARIO: true, GESTION_ROLES: true },
-    DIRECTOR: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: true, EXPEDIENTE_FIRMAR: true, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
-    DOCENTE: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: false, EXPEDIENTE_FIRMAR: false, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
-    MESA_PARTES: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: true, EXPEDIENTE_FIRMAR: false, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
-    ESTUDIANTE: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: false, EXPEDIENTE_FIRMAR: false, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
-  });
+const MATRIZ_INICIAL: Record<string, Record<string, boolean>> = {
+  SUPER_ADMIN: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: true, EXPEDIENTE_FIRMAR: true, CONFIG_CALENDARIO: true, GESTION_ROLES: true },
+  DIRECTOR: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: true, EXPEDIENTE_FIRMAR: true, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
+  DOCENTE: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: false, EXPEDIENTE_FIRMAR: false, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
+  MESA_PARTES: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: true, EXPEDIENTE_FIRMAR: false, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
+  ESTUDIANTE: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: false, EXPEDIENTE_FIRMAR: false, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
+};
+
+export default function RbacPermissionMatrix({
+  matriz: matrizProp,
+  onMatrizChange,
+}: RbacPermissionMatrixProps) {
+  const [matriz, setMatriz] = useState<Record<string, Record<string, boolean>>>(
+    matrizProp ?? MATRIZ_INICIAL,
+  );
+
+  // Si la prop inicial cambia, sincronizar el estado interno.
+  useEffect(() => {
+    if (matrizProp) setMatriz(matrizProp);
+  }, [matrizProp]);
+
+  const roles = Object.keys(matriz);
+  const permisos = PERMISOS_POR_DEFECTO;
 
   const handleCheckboxChange = (rol: string, permiso: string) => {
-    setMatriz((prev) => ({
-      ...prev,
+    const siguiente = {
+      ...matriz,
       [rol]: {
-        ...prev[rol],
-        [permiso]: !prev[rol][permiso],
+        ...matriz[rol],
+        [permiso]: !matriz[rol]?.[permiso],
       },
-    }));
+    };
+    setMatriz(siguiente);
+    onMatrizChange?.(siguiente);
   };
 
   return (

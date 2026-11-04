@@ -9,7 +9,7 @@ import {
   CATALOGO_SEDES,
   useUsuariosAdmin,
 } from "../../hooks/useUsuariosAdmin";
-import { eliminarUsuario } from "../../services/adminUsuariosService";
+
 import type { ApiHttpError } from "../../types/api";
 import {
   INTERVALO_ACTUALIZACION_USUARIOS_MS,
@@ -100,41 +100,6 @@ export default function UsuariosPage() {
           >
             + Nuevo usuario
           </button>
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800"
-          >
-            <span className="inline-flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className={`h-2 w-2 rounded-full ${
-                  isFetching ? "animate-pulse bg-blue-600" : "bg-emerald-500"
-                }`}
-              />
-              {isFetching
-                ? "Actualizando usuarios..."
-                : `En vivo · cada ${INTERVALO_ACTUALIZACION_USUARIOS_MS / 1000} s`}
-            </span>
-            {ultimaActualizacion > 0 && (
-              <span className="font-normal text-emerald-700">
-                Última actualización:{" "}
-                {new Date(ultimaActualizacion).toLocaleTimeString("es-PE", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={refrescarDirectorio}
-              disabled={isFetching}
-              className="rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Actualizar ahora
-            </button>
-          </div>
         </div>
 
         {mensaje && (
@@ -167,10 +132,10 @@ export default function UsuariosPage() {
           </div>
         )}
 
-        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="mb-6 rounded-xl border border-blue-700 bg-blue-600 p-5 text-white shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <div>
-              <label htmlFor="busqueda" className="mb-2 block text-sm font-semibold">
+              <label htmlFor="busqueda" className="mb-2 block text-sm font-semibold text-blue-100">
                 Buscar usuario
               </label>
               <input
@@ -178,19 +143,19 @@ export default function UsuariosPage() {
                 value={busqueda}
                 onChange={(event) => setBusqueda(event.target.value)}
                 placeholder="Nombre, DNI, correo o área"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-blue-300 outline-none focus:border-blue-600"
               />
             </div>
 
             <div>
-              <label htmlFor="area" className="mb-2 block text-sm font-semibold">
+              <label htmlFor="area" className="mb-2 block text-sm font-semibold text-blue-100">
                 Unidad orgánica
               </label>
               <select
                 id="area"
                 value={area}
                 onChange={(event) => setArea(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900"
               >
                 <option value="">Todas</option>
                 {CATALOGO_AREAS.map((item) => (
@@ -202,14 +167,14 @@ export default function UsuariosPage() {
             </div>
 
             <div>
-              <label htmlFor="sede" className="mb-2 block text-sm font-semibold">
+              <label htmlFor="sede" className="mb-2 block text-sm font-semibold text-blue-100">
                 Sede
               </label>
               <select
                 id="sede"
                 value={sede}
                 onChange={(event) => setSede(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900"
               >
                 <option value="">Todas</option>
                 {CATALOGO_SEDES.map((item) => (
@@ -221,14 +186,14 @@ export default function UsuariosPage() {
             </div>
 
             <div>
-              <label htmlFor="rol" className="mb-2 block text-sm font-semibold">
+              <label htmlFor="rol" className="mb-2 block text-sm font-semibold text-blue-100">
                 Rol asignado
               </label>
               <select
                 id="rol"
                 value={rol}
                 onChange={(event) => setRol(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900"
               >
                 <option value="">Todos</option>
                 {CATALOGO_ROLES_USUARIOS.map((item) => (
@@ -240,7 +205,7 @@ export default function UsuariosPage() {
             </div>
 
             <div>
-              <label htmlFor="estado" className="mb-2 block text-sm font-semibold">
+              <label htmlFor="estado" className="mb-2 block text-sm font-semibold text-blue-100">
                 Estado
               </label>
               <select
@@ -249,7 +214,7 @@ export default function UsuariosPage() {
                 onChange={(event) =>
                   setEstado(event.target.value as EstadoUsuario | "Todos")
                 }
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900"
               >
                 <option value="Todos">Todos</option>
                 <option value="Activo">Activo</option>
@@ -262,11 +227,50 @@ export default function UsuariosPage() {
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-6 py-4">
-            <h3 className="font-bold">Usuarios registrados</h3>
-            <p className="mt-1 text-xs text-slate-500">
-              {usuarios.length} resultado
-              {usuarios.length === 1 ? "" : "s"}
-            </p>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="font-bold">Usuarios registrados</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  {usuarios.length} resultado
+                  {usuarios.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className={`h-2 w-2 rounded-full ${
+                      isFetching ? "animate-pulse bg-blue-600" : "bg-emerald-500"
+                    }`}
+                  />
+                  {isFetching
+                    ? "Actualizando usuarios..."
+                    : `En vivo · cada ${INTERVALO_ACTUALIZACION_USUARIOS_MS / 1000} s`}
+                </span>
+                {ultimaActualizacion > 0 && (
+                  <span className="font-normal text-emerald-700">
+                    Última actualización:{" "}
+                    {new Date(ultimaActualizacion).toLocaleTimeString("es-PE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={refrescarDirectorio}
+                  disabled={isFetching}
+                  className="rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Actualizar ahora
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -369,15 +373,7 @@ export default function UsuariosPage() {
                           >
                             Conmutar estado
                           </button>
-                          <button type="button" onClick={async () => {
-                            alert("CLICK ELIMINAR " + usuario.id);
-                            try {
-                              await eliminarUsuario(usuario.id);
-                              window.location.reload();
-                            } catch (e: any) {
-                              alert("Error: " + (e?.response?.status ?? e?.message ?? "desconocido"));
-                            }
-                          }} className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50">Eliminar</button>
+                          <button type="button" onClick={() => void alternarEstado(usuario.id)} className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50">Suspender</button>
                         </div>
                       </td>
                     </tr>

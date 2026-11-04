@@ -15,5 +15,7 @@ export interface RegistroAuditoria {
   resultado: ResultadoAuditoria;
   ip: string;
   correlationId?: string;
+  hash?: string;
+  hashAnterior?: string;
   detallesTecnicos?: Record<string, unknown>;
 }

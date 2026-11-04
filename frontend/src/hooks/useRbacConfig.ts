@@ -124,7 +124,12 @@ export const ACCIONES_INMUTABLES_AUDITORIA: ClavePermiso[] = [
 
 export function useRbacConfig() {
   const [rolSeleccionado, setRolSeleccionado] = useState("SUPER_ADMIN");
-  const [permisos, setPermisos] = useState<MatrizPermisos>(permisosIniciales);
+
+  // Lee permisos guardados en localStorage si existen; si no, usa los iniciales
+  const almacenados = obtenerPermisosAlmacenados();
+  const [permisos, setPermisos] = useState<MatrizPermisos>(
+    almacenados ?? permisosIniciales,
+  );
   const [mensaje, setMensaje] = useState("");
 
   const rolActual: Rol = useMemo(
@@ -135,11 +140,22 @@ export function useRbacConfig() {
   const permisosRolActual = permisos[rolSeleccionado] ?? [];
 
   function alternarPermiso(indice: number, clave: ClavePermiso) {
+    const filas = permisos[rolSeleccionado] ?? [];
+    const fila = filas[indice];
+
+    // Evita quitar 'Ver' al módulo Expedientes para no bloquear el acceso
+    if (clave === "ver" && fila.modulo === "Expedientes" && fila.ver) {
+      setMensaje(
+        "No se puede quitar 'Ver' al módulo Expedientes: dejaría el rol sin acceso a esa sección.",
+      );
+      return;
+    }
+
     setMensaje("");
     setPermisos((actuales) => ({
       ...actuales,
-      [rolSeleccionado]: actuales[rolSeleccionado].map((fila, posicion) =>
-        posicion === indice ? { ...fila, [clave]: !fila[clave] } : fila,
+      [rolSeleccionado]: actuales[rolSeleccionado].map((f, posicion) =>
+        posicion === indice ? { ...f, [clave]: !f[clave] } : f,
       ),
     }));
   }
@@ -152,10 +168,12 @@ export function useRbacConfig() {
   }
 
   function guardarPermisos() {
-    const payload = construirPayload();
-    window.localStorage.setItem(CLAVE_STORAGE_PERMISOS, JSON.stringify(permisos));
+    window.localStorage.setItem(
+      CLAVE_STORAGE_PERMISOS,
+      JSON.stringify(permisos),
+    );
     setMensaje(
-      `Matriz guardada para ${rolActual.nombre}. Persistencia preparada para PUT /api/v1/roles/${payload.roleId}/permisos.`,
+      `Matriz guardada localmente para ${rolActual.nombre}. Nota: el backend expone solo lectura GET /api/v1/admin/roles-permisos; la escritura de permisos se sincronizará cuando se implemente el endpoint PUT correspondiente.`,
     );
   }
 
@@ -164,6 +182,7 @@ export function useRbacConfig() {
     rolSeleccionado,
     setRolSeleccionado,
     rolActual,
+    permisos,
     permisosRolActual,
     alternarPermiso,
     guardarPermisos,

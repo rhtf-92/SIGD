@@ -36,7 +36,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "registro",
     familia: "ingreso",
     titulo: "Registro Ciudadano",
-    subtitulo: "ENT-M01-01 / ENT-M01-02",
     descripcion:
       "Registro de personas naturales y jurídicas con validación RENIEC / SUNAT y Ubigeo Ucayali.",
     ruta: "/registro",
@@ -47,7 +46,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "casilla",
     familia: "gestion",
     titulo: "Casilla Electrónica",
-    subtitulo: "ENT-M01-03",
     descripcion:
       "Consulta y recepción de notificaciones electrónicas institucionales con plena validez legal.",
     ruta: "/casilla",
@@ -59,7 +57,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "mesa-partes",
     familia: "ingreso",
     titulo: "Mesa de Partes Virtual",
-    subtitulo: "ENT-M02 / TUPA",
     descripcion:
       "Presentación y radicación de trámites digitales, requisitos TUPA y anexos documentales.",
     ruta: "/tramite",
@@ -71,7 +68,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "ventanilla",
     familia: "ingreso",
     titulo: "Ventanilla Presencial",
-    subtitulo: "ENT-M02 / Atención en sede",
     descripcion:
       "Atención presencial en ventanilla única con emisión de cargo y ticket térmico.",
     ruta: "/tramite/ventanilla-presencial",
@@ -81,7 +77,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "expedientes",
     familia: "gestion",
     titulo: "Bandeja de Expedientes",
-    subtitulo: "ENT-M05",
     descripcion:
       "Gestiona y consulta el estado, trazabilidad, providencias y foliado de expedientes.",
     ruta: "/expedientes",
@@ -91,7 +86,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "validez-legal",
     familia: "validez",
     titulo: "Flujo y Validez Legal",
-    subtitulo: "MOD-04 / Firma Digital",
     descripcion:
       "Tramitación con plena validez legal: firma digital, re-firma, workflow académico y verificación pública (CVD).",
     ruta: "/flujo-validez-legal",
@@ -103,7 +97,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "titulacion",
     familia: "validez",
     titulo: "Workflow Académico",
-    subtitulo: "MOD-05 / Titulación",
     descripcion:
       "Flujo académico de titulación: evaluación, aprobación y emisión de actos resolutivos.",
     ruta: "/flujos/titulacion",
@@ -113,7 +106,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "resoluciones",
     familia: "validez",
     titulo: "Proyector de Resoluciones",
-    subtitulo: "MOD-04 / Actos resolutivos",
     descripcion:
       "Editor de Resoluciones Directorales en formato A4 con firma digital y estampado CVD.",
     ruta: "/flujos/proyector-resoluciones",
@@ -123,7 +115,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "reportes",
     familia: "gobierno",
     titulo: "Reportes y Tableros de Control",
-    subtitulo: "06_reportes-tablero-control",
     descripcion:
       "Indicadores ejecutivos, tendencias, distribución de expedientes y áreas con cuellos de botella.",
     ruta: "/reportes/dashboard",
@@ -133,7 +124,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "validador-cvd",
     familia: "validez",
     titulo: "Validador CVD",
-    subtitulo: "MOD-04 / Verificación",
     descripcion:
       "Valida la autenticidad e integridad de documentos firmados digitalmente mediante el Código de Verificación de Documentos.",
     ruta: "/validador-cvd",
@@ -145,7 +135,6 @@ export const MODULOS: ModuloSistema[] = [
     id: "administracion",
     familia: "gobierno",
     titulo: "Panel de Administración",
-    subtitulo: "ENT-M05-01 / RBAC",
     descripcion:
       "Gestión de usuarios, roles, permisos, auditoría, tablas maestras y calendario laboral.",
     ruta: "/administracion",

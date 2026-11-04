@@ -95,24 +95,6 @@ export default function AdministracionPage() {
       />
 
       <section className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-8 rounded-2xl border border-blue-100 bg-white/80 p-6 shadow-sm backdrop-blur">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">
-                Centro de control administrativo
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Selecciona una opción para administrar el SIGD. Cada módulo
-                concentra la configuración institucional y operativa del
-                sistema.
-              </p>
-            </div>
-            <span className="inline-flex w-fit items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-              6 módulos disponibles
-            </span>
-          </div>
-        </div>
-
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {modulos.map((modulo) => (
             <article
