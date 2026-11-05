@@ -117,6 +117,29 @@ describe('App Routing & Health Verification', () => {
     expect(res.headers['x-content-type-options']).toBe('nosniff');
   });
 
+  it('rechaza un JWT administrativo cuando el rol fue revocado en la base de datos', async () => {
+    const idUsuario = '00000000-0000-4000-8000-000000000003';
+    const query = async (sql: string) => {
+      if (sql.includes('FROM sigd_auth.sesion_usuario')) {
+        return { rows: [{ id_usuario: idUsuario, expira_en: new Date(Date.now() + 60_000), revocado_en: null, activo: true }], rowCount: 1 };
+      }
+      if (sql.includes('FROM sigd_org.usuario_rol')) return { rows: [], rowCount: 0 };
+      return { rows: [], rowCount: 0 };
+    };
+    const appConSesionRevocada = construirApp({ query } as unknown as Pool);
+    const tokenConRolAntiguo = firmarTokenAcceso({
+      sub: idUsuario,
+      sid: 'sesion-activa-rol-revocado',
+      roles: ['ADMINISTRADOR'],
+    });
+
+    const res = await request(appConSesionRevocada)
+      .get('/api/v1/admin/maestras/sede')
+      .set('Authorization', `Bearer ${tokenConRolAntiguo}`);
+
+    expect(res.status).toBe(401);
+  });
+
   it('no monta el router de referencia ni acepta cabeceras simuladas fuera de test', async () => {
     const nodeEnvOriginal = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';

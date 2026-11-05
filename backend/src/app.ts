@@ -68,6 +68,7 @@ import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
 import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { verificarSesionActiva } from './core/auth/sesion-activa.js';
 import { crearRouterSalud } from './controllers/health.controller.js';
 import { crearRouterWorkflowAcademico } from './domains/docucore/workflowAcademico.router.js';
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from './shared/domain/errors/index.js';
@@ -189,17 +190,8 @@ export function construirApp(
         if (process.env.NODE_ENV === 'test') return next();
         throw new UnauthorizedError({ detail: 'El token no está vinculado a una sesión vigente.' });
       }
-      const { rows } = await pool.query<{ id_usuario: string }>(
-        `SELECT s.id_usuario
-           FROM sigd_auth.sesion_usuario s
-           JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
-          WHERE s.refresh_token = $1 AND s.id_usuario = $2
-            AND s.revocado_en IS NULL AND s.expira_en > now() AND c.activo = TRUE
-          LIMIT 1`,
-        [claims.sid, claims.sub],
-      );
-      if (!rows[0]) throw new UnauthorizedError({ detail: 'La sesión fue revocada o expiró.' });
-      req.cuentaActual = { idUsuario: claims.sub, roles: claims.roles };
+      const sesion = await verificarSesionActiva(pool, token);
+      req.cuentaActual = { idUsuario: sesion.sub, roles: sesion.roles };
       next();
     } catch (error) {
       next(error);
