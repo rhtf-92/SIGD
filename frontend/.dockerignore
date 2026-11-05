@@ -1,0 +1,31 @@
+# Dependencias y artefactos locales
+node_modules
+dist
+dist-ccd
+dist-ssr
+build
+coverage
+.vite
+
+# Variables de entorno (se inyectan desde docker compose)
+.env
+.env.*
+!.env.example
+
+# Pruebas, documentacion y archivos ajenos al runtime
+tests
+docs
+*.md
+diff_registro.txt
+entregables-m03.html
+
+# Control de versiones, logs y temporales
+.git
+.gitignore
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+*.local
