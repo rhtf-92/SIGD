@@ -71,7 +71,7 @@ export function useAuditLogs() {
     },
   });
 
-  const filtrados = query.data?.registros ?? [];
+  const filtrados = useMemo(() => query.data?.registros ?? [], [query.data?.registros]);
 
   const resumen = useMemo(() => ({
     exitosos: filtrados.filter((row) => row.resultado === "Exitoso").length,

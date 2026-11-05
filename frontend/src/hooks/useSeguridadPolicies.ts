@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../api/client";
 
@@ -26,9 +26,7 @@ function formatoFecha(valor: string): string {
 
 export function useSeguridadPolicies() {
   const queryClient = useQueryClient();
-  const [maxIntentos, setMaxIntentos] = useState(MAX_INTENTOS_DEFECTO);
-  const [minutosBloqueo, setMinutosBloqueo] = useState(MINUTOS_BLOQUEO_DEFECTO);
-  const [minutosSesion, setMinutosSesion] = useState(MINUTOS_SESION_DEFECTO);
+  const [borrador, setBorrador] = useState<Partial<PoliticasDto>>({});
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState<Error | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -46,14 +44,12 @@ export function useSeguridadPolicies() {
     queryFn: async () => (await apiClient.get<{ intentos: IntentoDto[] }>("/api/v1/admin/seguridad/intentos", { params: { limite: 50, offset: 0 } })).data.intentos,
   });
 
-  useEffect(() => {
-    const dto = politicasQuery.data;
-    if (dto) {
-      setMaxIntentos(dto.max_intentos_fallidos);
-      setMinutosBloqueo(dto.minutos_bloqueo);
-      setMinutosSesion(dto.minutos_sesion);
-    }
-  }, [politicasQuery.data]);
+  const maxIntentos = borrador.max_intentos_fallidos ?? politicasQuery.data?.max_intentos_fallidos ?? MAX_INTENTOS_DEFECTO;
+  const minutosBloqueo = borrador.minutos_bloqueo ?? politicasQuery.data?.minutos_bloqueo ?? MINUTOS_BLOQUEO_DEFECTO;
+  const minutosSesion = borrador.minutos_sesion ?? politicasQuery.data?.minutos_sesion ?? MINUTOS_SESION_DEFECTO;
+  const setMaxIntentos = (value: number) => setBorrador((actual) => ({ ...actual, max_intentos_fallidos: value }));
+  const setMinutosBloqueo = (value: number) => setBorrador((actual) => ({ ...actual, minutos_bloqueo: value }));
+  const setMinutosSesion = (value: number) => setBorrador((actual) => ({ ...actual, minutos_sesion: value }));
 
   const cuentasBloqueadas: CuentaBloqueada[] = (blockedQuery.data ?? []).map((row) => ({
     id: row.id_usuario, usuario: row.nombre_completo, correo: row.correo,

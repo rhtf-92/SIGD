@@ -26,10 +26,10 @@ Se revisaron los flujos de autenticación, perfiles y permisos administrativos, 
 | Backend `npm run test:unit` | 607 aprobadas, 9 omitidas; 54 archivos aprobados, 1 omitido |
 | Backend `npm run typecheck` | Aprobado |
 | Backend `npm run build` | Aprobado |
-| Frontend `npm test` | 454 aprobadas |
-| Frontend `npm run typecheck` | Aprobado |
+| Frontend `npm test` | 455 aprobadas |
+| Frontend `npm run typecheck` y `npm run typecheck:m03` | Aprobados |
 | Frontend `npm run build` | Aprobado; Rollup descartó comentarios `PURE` mal ubicados de Zod |
-| Frontend `npm run lint` | No aprobado: 3 errores y 2 warnings preexistentes en `useAuditLogs.ts`, `useRbacConfig.ts`, `useSeguridadPolicies.ts` y `excelReportExporter.ts`; ninguno de esos archivos forma parte de esta corrección |
+| Frontend `npm run lint` | Aprobado sin errores ni warnings; se corrigieron dependencias/hooks y el escape de nombre de hoja XLSX |
 | `git diff --check` | Aprobado |
 | Backend `npm run test:db` | Aprobado: 3 archivos, 9 pruebas; PostgreSQL efímero Testcontainers, migraciones incluidas y rotación concurrente real de refresh token |
 
