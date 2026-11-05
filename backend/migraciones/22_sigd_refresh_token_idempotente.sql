@@ -1,9 +1,13 @@
 -- Migración correctiva idempotente: asegurar refresh_token como TEXT.
--- El runner aplica este archivo dentro de su transacción DDL.
+-- No modifica migraciones históricas (02, 15, 16). El runner aplica este archivo en su transacción DDL.
 DO $$
 DECLARE
   v_type text;
 BEGIN
+  IF to_regclass('sigd_auth.sesion_usuario') IS NULL THEN
+    RETURN;
+  END IF;
+
   SELECT data_type INTO v_type
     FROM information_schema.columns
    WHERE table_schema = 'sigd_auth'
