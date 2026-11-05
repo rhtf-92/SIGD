@@ -353,7 +353,7 @@ export default function UsuariosPage() {
         />
       )}
       {creando && (
-        <UserCreateModal areas={catalogos.areas} cargos={catalogos.cargos} roles={catalogos.roles}
+        <UserCreateModal areas={catalogos.areas} cargos={catalogos.cargos}
           onClose={() => setCreando(false)} onSave={async (datos) => {
             setErrorServidor("");
             try {

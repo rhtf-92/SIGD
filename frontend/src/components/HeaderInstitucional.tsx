@@ -6,24 +6,32 @@ import {
   Home,
   Inbox,
   LogIn,
+  LogOut,
   Menu,
   Settings,
   X,
 } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import sigdLogo from "../assets/LOGO 3.png";
+import { useAuthStore } from "../stores/authStore";
 
 const NAVEGACION = [
   { etiqueta: "Inicio", ruta: "/", icono: Home, exacta: true },
   { etiqueta: "Trámites", ruta: "/tramite", icono: FileInput, exacta: false },
-  { etiqueta: "Expedientes", ruta: "/expedientes", icono: Archive, exacta: false },
+  { etiqueta: "Expedientes", ruta: "/expedientes", icono: Archive, exacta: false, permiso: "EXPEDIENTE_LEER" },
   { etiqueta: "Casilla", ruta: "/casilla", icono: Inbox, exacta: false },
-  { etiqueta: "Reportes", ruta: "/reportes/dashboard", icono: BarChart3, exacta: false },
-  { etiqueta: "Administración", ruta: "/administracion", icono: Settings, exacta: false },
+  { etiqueta: "Reportes", ruta: "/reportes/dashboard", icono: BarChart3, exacta: false, permiso: "REPORTE_LEER" },
+  { etiqueta: "Administración", ruta: "/administracion", icono: Settings, exacta: false, permiso: "ADMIN_USUARIOS" },
 ] as const;
 
 export default function HeaderInstitucional() {
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const logout = useAuthStore((state) => state.logout);
+  const permisosUsuario = useAuthStore((state) => state.usuario?.permisos) ?? [];
+  const navegacionVisible = NAVEGACION.filter((elemento) =>
+    !("permiso" in elemento) || permisosUsuario.includes(elemento.permiso),
+  );
 
   return (
     <header className="sigd-app-header print:hidden">
@@ -37,7 +45,7 @@ export default function HeaderInstitucional() {
         </Link>
 
         <nav className="sigd-desktop-nav" aria-label="Navegación principal">
-          {NAVEGACION.map(({ etiqueta, ruta, icono: Icono, exacta }) => (
+          {navegacionVisible.map(({ etiqueta, ruta, icono: Icono, exacta }) => (
             <NavLink
               key={ruta}
               to={ruta}
@@ -51,10 +59,17 @@ export default function HeaderInstitucional() {
         </nav>
 
         <div className="sigd-header-actions">
-          <Link to="/login" className="sigd-access-link">
-            <LogIn aria-hidden="true" size={17} />
-            <span>Acceder</span>
-          </Link>
+          {isAuthenticated ? (
+            <button type="button" className="sigd-access-link" onClick={logout}>
+              <LogOut aria-hidden="true" size={17} />
+              <span>Cerrar sesión</span>
+            </button>
+          ) : (
+            <Link to="/login" className="sigd-access-link">
+              <LogIn aria-hidden="true" size={17} />
+              <span>Acceder</span>
+            </Link>
+          )}
           <button
             type="button"
             className="sigd-menu-toggle"
@@ -73,7 +88,7 @@ export default function HeaderInstitucional() {
         className={`sigd-mobile-nav${menuAbierto ? " is-open" : ""}`}
         aria-label="Navegación móvil"
       >
-        {NAVEGACION.map(({ etiqueta, ruta, icono: Icono, exacta }) => (
+        {navegacionVisible.map(({ etiqueta, ruta, icono: Icono, exacta }) => (
           <NavLink
             key={ruta}
             to={ruta}
