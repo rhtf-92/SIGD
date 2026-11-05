@@ -17,7 +17,7 @@ describe('rotación concurrente de refresh token con PostgreSQL', () => {
 
     const persona = await pool.query<{ id_persona: string }>(
       `INSERT INTO sigd_auth.persona (tipo, id_documento) VALUES ('NATURAL', $1) RETURNING id_persona`,
-      [`QA-REFRESH-${randomUUID()}`],
+      [`QA-${randomUUID().replaceAll('-', '').slice(0, 16)}`],
     );
     await pool.query(
       `INSERT INTO sigd_auth.persona_natural (id_persona, nombres, apellidos, nombre_completo)

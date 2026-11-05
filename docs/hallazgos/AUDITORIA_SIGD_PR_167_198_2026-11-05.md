@@ -31,9 +31,9 @@ Se revisaron los flujos de autenticación, perfiles y permisos administrativos, 
 | Frontend `npm run build` | Aprobado; Rollup descartó comentarios `PURE` mal ubicados de Zod |
 | Frontend `npm run lint` | No aprobado: 3 errores y 2 warnings preexistentes en `useAuditLogs.ts`, `useRbacConfig.ts`, `useSeguridadPolicies.ts` y `excelReportExporter.ts`; ninguno de esos archivos forma parte de esta corrección |
 | `git diff --check` | Aprobado |
-| Backend `npm run test:db` | No ejecutable: Testcontainers no encontró runtime Docker; `docker info` confirmó que Docker Desktop no está disponible y `127.0.0.1:5432` no tiene PostgreSQL escuchando |
+| Backend `npm run test:db` | Aprobado: 3 archivos, 9 pruebas; PostgreSQL efímero Testcontainers, migraciones incluidas y rotación concurrente real de refresh token |
 
-Las pruebas de base de datos, migración aplicada y concurrencia real de refresh deben repetirse cuando haya un PostgreSQL de pruebas aislado disponible. Por ello, no se certifica aún compatibilidad operacional completa ni “100% funcional” en una instancia desplegada.
+La suite PostgreSQL excluye explícitamente `06_sigd_rut.sql`, `07_sigd_reportes.sql` y `11_sigd_mgd_contract.sql`: son contratos de RutaDoc/Reportes y la 11 depende de tablas de la 06. Por tanto, este resultado valida los módulos de OrganiCore/IdentiCore y la migración RBAC 19 en PostgreSQL real de prueba; no certifica todas las migraciones ni una instancia desplegada.
 
 ## Integración SSE pendiente
 
