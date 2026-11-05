@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 import {
   extraerTokenBearer,
@@ -52,7 +52,7 @@ interface CuentaAuth {
 interface PoliticaSeguridad { max_intentos_fallidos: number; minutos_bloqueo: number; minutos_sesion: number }
 const POLITICA_SEGURIDAD_PREDETERMINADA: PoliticaSeguridad = { max_intentos_fallidos: 5, minutos_bloqueo: 30, minutos_sesion: 30 };
 
-async function obtenerPoliticaSeguridad(pool: Pool): Promise<PoliticaSeguridad> {
+async function obtenerPoliticaSeguridad(pool: Pool | PoolClient): Promise<PoliticaSeguridad> {
   const { rows } = await pool.query<PoliticaSeguridad>(`SELECT max_intentos_fallidos, minutos_bloqueo, minutos_sesion
     FROM sigd_org.politicas_seguridad WHERE singleton=TRUE`);
   return rows[0] ?? POLITICA_SEGURIDAD_PREDETERMINADA;
@@ -120,7 +120,7 @@ function asegurarCuentaHabilitada(cuenta: CuentaAuth): void {
   }
 }
 
-async function obtenerCuentaActiva(pool: Pool, idUsuario: string): Promise<CuentaAuth | undefined> {
+async function obtenerCuentaActiva(pool: Pool | PoolClient, idUsuario: string): Promise<CuentaAuth | undefined> {
   const { rows } = await pool.query<CuentaAuth>(
     `SELECT c.id_usuario, c.id_persona, c.usuario, c.correo, c.activo, c.bloqueado_hasta,
             COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
@@ -149,7 +149,7 @@ function perfilPublico(cuenta: CuentaAuth, perfil: PerfilRolActivo, rolesAutoriz
 }
 
 async function emitirSesion(
-  pool: Pool,
+  pool: Pool | PoolClient,
   req: Request,
   cuenta: CuentaAuth,
   perfiles: PerfilRolActivo[],
@@ -297,35 +297,52 @@ export function crearRouterAuth(pool: Pool): Router {
   router.post('/auth/refresh', async (req: Request, res: Response) => {
     const { refreshToken } = refreshSchema.parse(req.body);
     const claims = verificarTokenRefresco(refreshToken);
-    const { rows } = await pool.query<{ id_usuario: string; expira_en: string; revocado_en: string | null; activo: boolean }>(
-      `SELECT s.id_usuario, s.expira_en, s.revocado_en, c.activo
-         FROM sigd_auth.sesion_usuario s
-         JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
-        WHERE s.refresh_token IN ($1, $2)
-        LIMIT 1`,
-      [huellaRefreshToken(refreshToken), refreshToken],
-    );
-    const sesion = rows[0];
-    if (!sesion || sesion.id_usuario !== claims.sub || !sesion.activo || sesion.revocado_en !== null || new Date(sesion.expira_en) < new Date()) {
-      throw new UnauthorizedError({ detail: 'El token de refresco es inválido o ha expirado.' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query<{
+        id_usuario: string;
+        expira_en: string;
+        revocado_en: string | null;
+        activo: boolean;
+      }>(
+        `SELECT s.id_usuario, s.expira_en, s.revocado_en, c.activo
+           FROM sigd_auth.sesion_usuario s
+           JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
+          WHERE s.refresh_token IN ($1, $2)
+          LIMIT 1
+          FOR UPDATE OF s`,
+        [huellaRefreshToken(refreshToken), refreshToken],
+      );
+      const sesion = rows[0];
+      if (!sesion || sesion.id_usuario !== claims.sub || !sesion.activo || sesion.revocado_en !== null || new Date(sesion.expira_en) <= new Date()) {
+        throw new UnauthorizedError({ detail: 'El token de refresco es inválido o ha expirado.' });
+      }
+      const cuenta = await obtenerCuentaActiva(client, claims.sub);
+      if (!cuenta) throw new UnauthorizedError({ detail: 'La cuenta ya no está habilitada.' });
+      asegurarCuentaHabilitada(cuenta);
+      const perfiles = await obtenerPerfilesActivos(client, claims.sub);
+      if (!perfiles.some((perfil) => perfil.rol === claims.rolActivo)) {
+        throw new UnauthorizedError({ detail: 'El perfil activo ya no está vigente.' });
+      }
+      const consumo = await client.query(
+        `UPDATE sigd_auth.sesion_usuario SET revocado_en = now()
+          WHERE refresh_token IN ($1, $2) AND revocado_en IS NULL AND expira_en > now()
+          RETURNING id_usuario`, [huellaRefreshToken(refreshToken), refreshToken],
+      );
+      if (consumo.rowCount !== 1) {
+        throw new UnauthorizedError({ detail: 'El token de refresco ya fue utilizado o revocado.' });
+      }
+      const politica = await obtenerPoliticaSeguridad(client);
+      const respuesta = await emitirSesion(client, req, cuenta, perfiles, claims.rolActivo, politica.minutos_sesion);
+      await client.query('COMMIT');
+      res.status(200).json(respuesta);
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
-    const cuenta = await obtenerCuentaActiva(pool, claims.sub);
-    if (!cuenta) throw new UnauthorizedError({ detail: 'La cuenta ya no está habilitada.' });
-    asegurarCuentaHabilitada(cuenta);
-    const perfiles = await obtenerPerfilesActivos(pool, claims.sub);
-    if (!perfiles.some((perfil) => perfil.rol === claims.rolActivo)) {
-      throw new UnauthorizedError({ detail: 'El perfil activo ya no está vigente.' });
-    }
-    const consumo = await pool.query(
-      `UPDATE sigd_auth.sesion_usuario SET revocado_en = now()
-        WHERE refresh_token IN ($1, $2) AND revocado_en IS NULL AND expira_en > now()
-        RETURNING id_usuario`, [huellaRefreshToken(refreshToken), refreshToken],
-    );
-    if (consumo.rowCount !== 1) {
-      throw new UnauthorizedError({ detail: 'El token de refresco ya fue utilizado o revocado.' });
-    }
-    const politica = await obtenerPoliticaSeguridad(pool);
-    res.status(200).json(await emitirSesion(pool, req, cuenta, perfiles, claims.rolActivo, politica.minutos_sesion));
   });
 
   const handlerPerfil = async (req: Request, res: Response) => {

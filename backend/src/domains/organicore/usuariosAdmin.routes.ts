@@ -24,8 +24,8 @@ export function crearUsuariosAdminRouter(pool: Pool): Router {
 
   const controller = crearUsuariosAdminController(service);
   const autenticar = autenticarJwt;
-  const permisoLectura = autorizarPermisos(PERMISOS_RBAC.USUARIOS_LEER);
-  const permisoGestion = autorizarPermisos(PERMISOS_RBAC.USUARIOS_GESTIONAR);
+  const permisoLectura = autorizarPermisos(pool, PERMISOS_RBAC.USUARIOS_LEER);
+  const permisoGestion = autorizarPermisos(pool, PERMISOS_RBAC.USUARIOS_GESTIONAR);
 
   /**
    * Directorio institucional paginado.

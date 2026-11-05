@@ -5,6 +5,7 @@ export default defineConfig({
     include: [
       'tests/unit/domains/corelink/outbox.spec.ts',
       'tests/integration/domains/organicore/admin-postgres.test.ts',
+      'tests/integration/domains/identicore/refresh-concurrency.test.ts',
     ],
     globalSetup: ['./tests/setup/global-setup.ts'],
     fileParallelism: false,
