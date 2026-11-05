@@ -64,4 +64,13 @@ describe('aislamiento de destinatarios en SSE', () => {
     expect(streamB.write).toHaveBeenCalledOnce();
     expect(String(vi.mocked(streamB.write).mock.calls[0]?.[0])).toContain('ExpedienteDerivado');
   });
+
+  it('reconoce eventos de radicación y subsanación con destinatario explícito', () => {
+    const bus = new BusSse();
+    const stream = response();
+    bus.suscribir(stream, ['expedientes'], USER_A);
+    bus.emitirEvento('ExpedienteRadicado', { destinatario_usuario_id: USER_A, id_expediente: 'exp-1' });
+    bus.emitirEvento('ExpedienteSubsanado', { destinatario_usuario_id: USER_A, id_expediente: 'exp-2' });
+    expect(stream.write).toHaveBeenCalledTimes(2);
+  });
 });

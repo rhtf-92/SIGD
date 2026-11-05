@@ -723,7 +723,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     });
     await user.click(botonDescargarPdf);
     expect(casillaService.descargarDocumento).toHaveBeenCalledWith(
-      mockNotificacionNotificada,
+      mockNotificacionNotificada.id,
     );
 
     // Descargar Acuse oficial
@@ -732,7 +732,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     });
     await user.click(botonDescargarAcuse);
     expect(casillaService.descargarAcuse).toHaveBeenCalledWith(
-      mockAcuseNotificado,
+      mockNotificacionNotificada.id,
     );
 
     // Cerrar modal con botón Cerrar

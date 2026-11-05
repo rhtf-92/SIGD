@@ -45,6 +45,8 @@ export default function NotificacionDetailModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
+  const [descargando, setDescargando] = useState(false);
 
   // Manejo de teclado (Escape para cerrar) y foco accesible
   useEffect(() => {
@@ -82,6 +84,32 @@ export default function NotificacionDetailModal({
       setCopiedHash(label);
       setTimeout(() => setCopiedHash(null), 2500);
     });
+  }
+
+  async function descargarDocumento() {
+    if (!notificacion) return;
+    setErrorDescarga(null);
+    setDescargando(true);
+    try {
+      await casillaService.descargarDocumento(notificacion.id);
+    } catch {
+      setErrorDescarga("No se pudo descargar el acto. Inténtalo nuevamente.");
+    } finally {
+      setDescargando(false);
+    }
+  }
+
+  async function descargarAcuse() {
+    if (!notificacion) return;
+    setErrorDescarga(null);
+    setDescargando(true);
+    try {
+      await casillaService.descargarAcuse(notificacion.id);
+    } catch {
+      setErrorDescarga("No se pudo descargar el acuse. Inténtalo nuevamente.");
+    } finally {
+      setDescargando(false);
+    }
   }
 
   return (
@@ -324,7 +352,8 @@ export default function NotificacionDetailModal({
 
                 <button
                   type="button"
-                  onClick={() => casillaService.descargarDocumento(notificacion)}
+                  onClick={descargarDocumento}
+                  disabled={descargando}
                   className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-2.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
                 >
                   <svg
@@ -340,7 +369,7 @@ export default function NotificacionDetailModal({
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                     />
                   </svg>
-                  Descargar Acto Administrativo (.PDF)
+                  {descargando ? "Preparando descarga…" : "Descargar Acto Administrativo (.PDF)"}
                 </button>
               </div>
 
@@ -493,7 +522,8 @@ export default function NotificacionDetailModal({
                 <div className="flex justify-end pt-1">
                   <button
                     type="button"
-                    onClick={() => casillaService.descargarAcuse(acuse)}
+                    onClick={descargarAcuse}
+                    disabled={descargando}
                     className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800"
                   >
                     <svg
@@ -509,9 +539,10 @@ export default function NotificacionDetailModal({
                         d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                       />
                     </svg>
-                    Descargar Cédula de Acuse (.TXT / .PDF)
+                    {descargando ? "Preparando descarga…" : "Descargar Cédula de Acuse (.PDF)"}
                   </button>
                 </div>
+                {errorDescarga && <p role="alert" className="text-sm text-red-700">{errorDescarga}</p>}
               </div>
             ) : (
               /* CASO B: AÚN NO SE HA GENERADO EL ACUSE DIGITAL */

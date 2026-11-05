@@ -13,6 +13,8 @@ const EVENTO_A_CANAL: Record<string, CanalSse> = {
   [EVENTO_CASILLA]: 'casilla',
   [EVENTO_TRANSICION]: 'expedientes',
   TramiteRegistrado: 'expedientes',
+  ExpedienteRadicado: 'expedientes',
+  ExpedienteSubsanado: 'expedientes',
   ExpedienteDerivado: 'expedientes',
   ExpedienteAtendido: 'expedientes',
   ExpedienteObservado: 'expedientes',

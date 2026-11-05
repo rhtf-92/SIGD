@@ -1,16 +1,12 @@
 /**
  * Módulo: Capa de Servicio para Casilla Electrónica y Acuse Legal (ENT-M01-05)
  * Centraliza las llamadas HTTP reales, sin mocks ni datos en memoria.
- * NOTA: al momento de esta implementación, el endpoint GET /api/v1/casilla/notificaciones
- * todavía no está registrado como ruta Express en la rama de backend B_JAIR
- * (CasillaService/CasillaController existen pero no hay casilla.routes.ts).
- * Las llamadas quedan correctas contra el contrato documentado y funcionarán
- * automáticamente en cuanto el equipo de backend conecte la ruta.
+ * Consume los endpoints autenticados de Casilla y sus descargas reales.
  */
 
 import { apiClient } from "../api/client";
+import { env } from "../config/env";
 import type {
-  AcuseNotificacion,
   EstadisticasCasilla,
   FiltrosCasilla,
   GenerarAcuseRequest,
@@ -153,70 +149,28 @@ export const casillaService = {
     return response.data;
   },
 
-  /**
-   * Simula la descarga o apertura del acto administrativo PDF
-   */
-  descargarDocumento(notificacion: Notificacion): void {
-    const filename =
-      notificacion.actoAdministrativo.nombreArchivoPdf || "acto_notificado.pdf";
-    // Generar un blob simulado con texto representativo o abrir enlace
-    const contenido = `--- INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA ---
-CÉDULA DE NOTIFICACIÓN OFICIAL / ACTO ADMINISTRATIVO
-Expediente: ${notificacion.numeroExpediente}
-Documento: ${notificacion.actoAdministrativo.numeroDocumento}
-Asunto: ${notificacion.asunto}
-Hash SHA-256: ${notificacion.actoAdministrativo.hashIntegridadSha256}
-CVD: ${notificacion.actoAdministrativo.cvd}
-Fecha Emisión: ${notificacion.fechaDepositoIso}
-
-${notificacion.actoAdministrativo.resumenLegal}
-
-${notificacion.actoAdministrativo.textoCompleto || ""}
-`;
-    const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+  /** Solicita al backend una URL temporal tras validar la propiedad del documento. */
+  async descargarDocumento(notificacionId: string): Promise<void> {
+    const { data } = await apiClient.get<{ downloadUrl: string }>(
+      CASILLA_ENDPOINTS.DESCARGAR_DOCUMENTO(notificacionId),
+    );
+    if (!data.downloadUrl) throw new Error("El servidor no devolvió el enlace del documento.");
+    const { data: firmado } = await apiClient.get<{ downloadUrl: string }>(data.downloadUrl);
+    if (!firmado.downloadUrl) throw new Error("El servidor no devolvió el enlace temporal de descarga.");
+    window.location.assign(new URL(firmado.downloadUrl, env.apiBaseUrl).toString());
   },
 
-  /**
-   * Simula la descarga oficial de la Cédula de Acuse Digital Legal
-   */
-  descargarAcuse(acuse: AcuseNotificacion): void {
-    const filename = `ACUSE_LEGAL_${acuse.idAcuse}.txt`;
-    const contenido = `================================================================================
-INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA (IESTP SUIZA)
-CONSTANCIA Y CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA INSTITUCIONAL
-Conforme al Artículo 20 del TUO de la Ley N° 27444 y Ley N° 29733
-================================================================================
-
-IDENTIFICADOR DE ACUSE : ${acuse.idAcuse}
-EXPEDIENTE              : ${acuse.numeroExpediente}
-UNIDAD EMISORA          : ${acuse.unidadEmisora}
-DESTINATARIO            : ${acuse.destinatario.nombresCompletos}
-DOCUMENTO IDENTIDAD     : ${acuse.destinatario.tipoDocumento} ${acuse.destinatario.numeroDocumento}
-CASILLA ELECTRÓNICA     : ${acuse.destinatario.direccionCasilla}
-
-FECHA Y HORA UTC (ISO)  : ${acuse.timestampGeneracionIso}
-HASH CRIPTOGRÁFICO SHA256: ${acuse.hashSha256Acuse}
-CÓDIGO VERIFICACIÓN (CVD): ${acuse.cvdAcuse}
-SURTIMIENTO DE EFECTO   : ${acuse.fechaEfectoLegal}
-PLAZO LEGAL DE IMPUGN.  : ${acuse.plazoImpugnacionDiasHabiles} días hábiles
-
-VALIDEZ LEGAL:
-${acuse.validezLegalMensaje}
-
-Este documento digital cuenta con valor probatorio inmutable en sede administrativa.
-================================================================================`;
-    const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
+  /** Descarga el PDF de acuse generado y servido por el backend. */
+  async descargarAcuse(notificacionId: string): Promise<void> {
+    const response = await apiClient.get<Blob>(CASILLA_ENDPOINTS.DESCARGAR_ACUSE(notificacionId), {
+      responseType: "blob",
+    });
+    const blob = response.data;
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = filename;
+    link.download = `ACUSE_${notificacionId}.pdf`;
     link.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   },
 };
