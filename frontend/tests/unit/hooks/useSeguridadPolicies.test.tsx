@@ -7,9 +7,11 @@ import { useSeguridadPolicies } from '../../../src/hooks/useSeguridadPolicies';
 import { vi } from 'vitest';
 
 vi.mock('@/api/client', () => ({ apiClient: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }));
-function wrapper({ children }: { children: React.ReactNode }) {
+function crearWrapper() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
 }
 
 describe('useSeguridadPolicies', () => {
@@ -17,7 +19,7 @@ describe('useSeguridadPolicies', () => {
     vi.mocked(apiClient.get).mockImplementation(async (url) => String(url).includes('politicas')
       ? { data: { politicas: { max_intentos_fallidos: 5, minutos_bloqueo: 30, minutos_sesion: 30 } } } as never
       : { data: { cuentas: [], intentos: [] } } as never);
-    const { result } = renderHook(() => useSeguridadPolicies(), { wrapper });
+    const { result } = renderHook(() => useSeguridadPolicies(), { wrapper: crearWrapper() });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.cuentasBloqueadas).toEqual([]);
     expect(result.current.intentosIniciales).toEqual([]);
@@ -32,12 +34,35 @@ describe('useSeguridadPolicies', () => {
     });
     vi.mocked(apiClient.put).mockResolvedValue({ data: { guardado: true } } as never);
     vi.mocked(apiClient.post).mockResolvedValue({ data: { guardado: true } } as never);
-    const { result } = renderHook(() => useSeguridadPolicies(), { wrapper });
+    const { result } = renderHook(() => useSeguridadPolicies(), { wrapper: crearWrapper() });
     await waitFor(() => expect(result.current.cuentasBloqueadas).toHaveLength(1));
     expect(result.current.intentosFallidos).toBe(1);
     await act(async () => { await result.current.guardarPoliticas(); });
     expect(apiClient.put).toHaveBeenCalledWith('/api/v1/admin/seguridad/politicas', { maxIntentosFallidos: 5, minutosBloqueo: 30, minutosSesion: 30 });
     await act(async () => { await result.current.desbloquearCuenta('u-1', 'Revisión forense confirmada'); });
     expect(apiClient.post).toHaveBeenCalledWith('/api/v1/admin/seguridad/cuentas/u-1/desbloquear', { justificacion: 'Revisión forense confirmada' });
+  });
+
+  it('conserva los cambios locales del formulario cuando se vuelven a cargar las políticas', async () => {
+    let lecturasPoliticas = 0;
+    vi.mocked(apiClient.get).mockImplementation(async (url) => {
+      if (String(url).includes('politicas')) {
+        lecturasPoliticas += 1;
+        return { data: { politicas: {
+          max_intentos_fallidos: 8,
+          minutos_bloqueo: 45,
+          minutos_sesion: lecturasPoliticas === 1 ? 60 : 75,
+        } } } as never;
+      }
+      return { data: { cuentas: [], intentos: [] } } as never;
+    });
+    const { result } = renderHook(() => useSeguridadPolicies(), { wrapper: crearWrapper() });
+    await waitFor(() => expect(result.current.minutosSesion).toBe(60));
+
+    act(() => { result.current.setMinutosSesion(90); });
+    await act(async () => { await result.current.recargar(); });
+
+    expect(lecturasPoliticas).toBeGreaterThanOrEqual(2);
+    expect(result.current.minutosSesion).toBe(90);
   });
 });

@@ -68,6 +68,7 @@ import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/
 
 import { corsMiddleware } from './middleware/cors.middleware.js';
 import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { verificarSesionActiva } from './core/auth/sesion-activa.js';
 import { crearRouterSalud } from './controllers/health.controller.js';
 import { crearRouterWorkflowAcademico } from './domains/docucore/workflowAcademico.router.js';
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from './shared/domain/errors/index.js';
@@ -130,7 +131,7 @@ export function construirApp(
   app.use(
     '/api/v1/admin',
     autenticarJwt,
-    autorizarPermisos(PERMISOS_RBAC.ADMIN_ACCESO),
+    autorizarPermisos(pool, PERMISOS_RBAC.ADMIN_ACCESO),
   );
 
   const loginRateLimit = rateLimit({
@@ -189,17 +190,8 @@ export function construirApp(
         if (process.env.NODE_ENV === 'test') return next();
         throw new UnauthorizedError({ detail: 'El token no está vinculado a una sesión vigente.' });
       }
-      const { rows } = await pool.query<{ id_usuario: string }>(
-        `SELECT s.id_usuario
-           FROM sigd_auth.sesion_usuario s
-           JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
-          WHERE s.refresh_token = $1 AND s.id_usuario = $2
-            AND s.revocado_en IS NULL AND s.expira_en > now() AND c.activo = TRUE
-          LIMIT 1`,
-        [claims.sid, claims.sub],
-      );
-      if (!rows[0]) throw new UnauthorizedError({ detail: 'La sesión fue revocada o expiró.' });
-      req.cuentaActual = { idUsuario: claims.sub, roles: claims.roles };
+      const sesion = await verificarSesionActiva(pool, token);
+      req.cuentaActual = { idUsuario: sesion.sub, roles: sesion.roles };
       next();
     } catch (error) {
       next(error);
@@ -291,7 +283,7 @@ export function construirApp(
   app.use(
     '/api/v1/usuarios',
     autenticarJwt,
-    autorizarPermisos(PERMISOS_RBAC.USUARIOS_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.USUARIOS_LEER),
     usuariosAdminRouter,
   );
 
@@ -312,22 +304,22 @@ export function construirApp(
   const organigramaCtrl = crearControladorOrganigrama(new OrganigramaService(pool));
   app.get(
     '/api/v1/admin/organigrama',
-    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.ORGANIGRAMA_LEER),
     organigramaCtrl.getOrganigrama,
   );
   app.get(
     '/api/v1/admin/organigrama/arbol',
-    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.ORGANIGRAMA_LEER),
     organigramaCtrl.getOrganigrama,
   );
   app.post(
     '/api/v1/admin/organigrama/areas',
-    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR),
+    autorizarPermisos(pool, PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR),
     organigramaCtrl.crearUnidad,
   );
   app.put(
     '/api/v1/admin/organigrama/areas/:id',
-    autorizarPermisos(PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR),
+    autorizarPermisos(pool, PERMISOS_RBAC.ORGANIGRAMA_GESTIONAR),
     organigramaCtrl.actualizarUnidad,
   );
 
@@ -344,7 +336,7 @@ export function construirApp(
   /*
    * CoreLink - Streaming reactivo Server-Sent Events (SSE) (#55)
    */
-  app.use('/api/v1/realtime', crearRouterRealtime(busSse));
+  app.use('/api/v1/realtime', crearRouterRealtime(busSse, pool));
 
   /*
    * Asistente Virtual Institucional (AsistenteCore)
@@ -369,7 +361,7 @@ export function construirApp(
    */
   app.get(
     '/api/v1/admin/auditoria/bitacora',
-    autorizarPermisos(PERMISOS_RBAC.AUDITORIA_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.AUDITORIA_LEER),
     async (req, res, next) => {
       try {
         const filtro = z.object({
@@ -430,7 +422,7 @@ export function construirApp(
 
   app.get(
     '/api/v1/admin/roles-permisos',
-    autorizarPermisos(PERMISOS_RBAC.ROLES_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.ROLES_LEER),
     async (_req, res, next) => {
       try {
         const { rows: roles } = await pool.query(
@@ -509,7 +501,7 @@ export function construirApp(
   });
   app.get(
     '/api/v1/admin/maestras/sede',
-    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_LEER),
     (_req, res) => {
       res.json({
         sedes: [
@@ -522,7 +514,7 @@ export function construirApp(
 
   app.get(
     '/api/v1/admin/maestras/tipo-documento',
-    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_LEER),
     async (_req, res, next) => {
       try {
         const { rows } = await pool.query(

@@ -54,13 +54,23 @@ export function crearRouterStorage(pool: Pool): Router {
   if(!updated.rowCount) throw new ValidationError({invalidParams:[]});
   res.status(201).json({idDocumentoAdjunto:carga.carga_id,s3Key:key,confirmado:true});
  });
- router.get('/storage/download/:bucket/:key',async(req,res)=>{
+ router.get('/storage/download/:bucket/*key',async(req,res)=>{
   const cuenta=await cuentaActual(pool,req);
-  const {rows}=await pool.query(`SELECT e.solicitante_id FROM sigd_doc.documento_adjunto d
-   JOIN sigd_tra.expediente e USING(expediente_id) WHERE d.s3_bucket=$1 AND d.s3_key=$2`,[req.params.bucket,req.params.key]);
+  const bucket=String(req.params.bucket);
+  const key=Array.isArray(req.params.key) ? req.params.key.join('/') : String(req.params.key);
+  const {rows}=await pool.query<{ autorizado: boolean }>(`SELECT true AS autorizado
+    FROM sigd_doc.documento_adjunto d
+    JOIN sigd_tra.expediente e USING(expediente_id)
+   WHERE d.s3_bucket=$1 AND d.s3_key=$2
+     AND (e.solicitante_id=$4 OR $5::boolean)
+   UNION ALL
+   SELECT true AS autorizado
+     FROM sigd_auth.notificacion_casilla n
+    WHERE n.usuario_id=$3
+      AND n.documento_url='s3://' || $1 || '/' || $2
+   LIMIT 1`,[bucket,key,cuenta.id_usuario,cuenta.id_persona,cuenta.permisos.includes('EXPEDIENTE_LEER')]);
   if(!rows[0]) throw new NotFoundError();
-  if(rows[0].solicitante_id!==cuenta.id_persona && !cuenta.permisos.includes('EXPEDIENTE_LEER')) throw new ForbiddenError();
-  res.json({downloadUrl:generarUrlPresigned(String(req.params.key),{...configPublica,bucket:String(req.params.bucket)},{metodo:'GET'}),expiraEnSegundos:900});
+  res.json({downloadUrl:generarUrlPresigned(key,{...configPublica,bucket},{metodo:'GET'}),expiraEnSegundos:config.presignExpirationSegundos});
  });
  return router;
 }

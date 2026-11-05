@@ -34,6 +34,21 @@ describe('Actuaciones RutaDoc sobre el contrato 06', () => {
     expect(query.mock.calls.some(([sql]) => /UPDATE|DELETE/.test(sql))).toBe(false);
     expect(query.mock.calls[3][0]).toContain('evento_outbox');
   });
+  it('dirige el evento al dueño del expediente y nunca al actor por inferencia', async () => {
+    query.mockResolvedValueOnce({}).mockResolvedValueOnce({rows:[{estado:'RESUELTO',area_id:area,destinatario_usuario_id:'00000000-0000-4000-8000-000000000099'}]})
+      .mockResolvedValueOnce({rows:[{id_movimiento:id}]}).mockResolvedValueOnce({rows:[{id_evento:id}]});
+    await runWithContext(contexto, () => registrarActuacion(cliente,id,'CIERRE',{},'ExpedienteArchivado'));
+    const payload = JSON.parse(String(query.mock.calls[3][1][3]));
+    expect(payload.destinatario_usuario_id).toBe('00000000-0000-4000-8000-000000000099');
+    expect(payload.destinatario_usuario_id).not.toBe(contexto.usuario_id);
+  });
+  it('no agrega destinatario si el expediente no tiene cuenta única activa', async () => {
+    query.mockResolvedValueOnce({}).mockResolvedValueOnce({rows:[{estado:'RESUELTO',area_id:area,destinatario_usuario_id:null}]})
+      .mockResolvedValueOnce({rows:[{id_movimiento:id}]}).mockResolvedValueOnce({rows:[{id_evento:id}]});
+    await runWithContext(contexto, () => registrarActuacion(cliente,id,'CIERRE',{},'ExpedienteArchivado'));
+    const payload = JSON.parse(String(query.mock.calls[3][1][3]));
+    expect(payload.destinatario_usuario_id).toBeUndefined();
+  });
   it('rechaza derivaciones ambiguas sin un principal unico', async () => {
     await expect(derivarExpediente(cliente,id,{destinos:[{area_destino_id:area,es_copia:true}],proveido:'Pase'})).rejects.toMatchObject({status:400});
   });

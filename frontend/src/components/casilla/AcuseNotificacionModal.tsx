@@ -157,11 +157,11 @@ function AcuseNotificacionDialog({
                   <dd className="mt-1">{formatFechaHora(acuse.selladoTiempo)}</dd>
                 </div>
                 <div>
-                  <dt className="font-bold text-slate-900">Sello de tiempo ISO-8601</dt>
+                  <dt className="font-bold text-slate-900">Fecha y hora registradas (ISO-8601)</dt>
                   <dd className="mt-1 break-all font-mono text-xs">{acuse.selladoTiempo}</dd>
                 </div>
                 <div>
-                  <dt className="font-bold text-slate-900">Hash criptográfico SHA-256</dt>
+                  <dt className="font-bold text-slate-900">Hash SHA-256 del registro</dt>
                   <dd className="mt-1 break-all rounded-md bg-slate-950 p-3 font-mono text-xs text-emerald-300">
                     {acuse.hashSha256}
                   </dd>

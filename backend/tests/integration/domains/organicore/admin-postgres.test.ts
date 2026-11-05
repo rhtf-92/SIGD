@@ -48,21 +48,21 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
       identificador: '99166123', password: 'ClaveSegura166!',
     });
     expect(login.status).toBe(200);
-    expect(login.body.requiereSeleccionPerfil).toBe(true);
+    expect(login.body.requiresRoleSelection).toBe(true);
     expect(login.body).not.toHaveProperty('accessToken');
 
     const administrador = roles.rows.find((rol) => rol.codigo === 'ADMINISTRADOR')!;
-    const seleccion = await request(app).post('/api/v1/auth/seleccionar-perfil').send({
-      tokenSeleccionPerfil: login.body.tokenSeleccionPerfil,
-      rolId: administrador.rol_id,
+    const seleccion = await request(app).post('/api/v1/auth/select-role').send({
+      selectionToken: login.body.selectionToken,
+      rol: 'SUPER_ADMIN',
     });
     expect(seleccion.status).toBe(200);
-    expect(verificarTokenAcceso(seleccion.body.accessToken).roles).toEqual(['ADMINISTRADOR']);
+    expect(verificarTokenAcceso(seleccion.body.accessToken).roles).toEqual(['SUPER_ADMIN']);
 
     const director = roles.rows.find((rol) => rol.codigo === 'DIRECTOR')!;
-    const cambio = await request(app).post('/api/v1/auth/cambiar-perfil')
+    const cambio = await request(app).post('/api/v1/auth/switch-role')
       .set('Authorization', `Bearer ${seleccion.body.accessToken}`)
-      .send({ refreshToken: seleccion.body.refreshToken, rolId: director.rol_id });
+      .send({ refreshToken: seleccion.body.refreshToken, rol: director.codigo });
     expect(cambio.status).toBe(200);
     expect(verificarTokenAcceso(cambio.body.accessToken).roles).toEqual(['DIRECTOR']);
 

@@ -88,9 +88,12 @@ export class DestinoCasilla implements DestinoNotificacion {
     const correo = typeof payload.correo_destinatario === 'string' ? payload.correo_destinatario : null;
     if (!correo) return;
 
-    await this.pool.query(
-      `INSERT INTO ${this.tabla} (correo_destinatario, asunto, cuerpo, referencia, estado)
-       VALUES ($1, $2, $3::jsonb, $4, 'PENDIENTE')`,
+    const insertado = await this.pool.query(
+      `INSERT INTO ${this.tabla} (usuario_id, correo_destinatario, asunto, cuerpo, referencia, estado)
+       SELECT c.id_usuario, $1, $2, $3::jsonb, $4, 'PENDIENTE'
+         FROM sigd_auth.cuenta_usuario c
+        WHERE lower(c.correo) = lower($1)
+       RETURNING usuario_id`,
       [
         correo,
         typeof payload.asunto === 'string' ? payload.asunto : evento.tipo_evento,
@@ -98,6 +101,9 @@ export class DestinoCasilla implements DestinoNotificacion {
         evento.correlation_id ?? evento.id_evento,
       ],
     );
+    if (insertado.rowCount !== 1) {
+      throw new Error('No se encontró una cuenta para el destinatario de Casilla.');
+    }
   }
 }
 

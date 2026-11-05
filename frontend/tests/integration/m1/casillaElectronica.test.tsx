@@ -16,6 +16,11 @@ import type {
   NotificacionesResponse,
 } from "../../../src/types/casilla";
 
+vi.mock("../../../src/stores/authStore", () => ({
+  useAuthStore: (selector: (state: { usuario: { nombreCompleto: string; correo: string } }) => unknown) =>
+    selector({ usuario: { nombreCompleto: "Titular autenticado", correo: "titular@example.test" } }),
+}));
+
 // Mock completo y determinista del servicio de casilla sin llamadas a red ni localStorage
 vi.mock("../../../src/services/casillaService", () => ({
   casillaService: {
@@ -536,7 +541,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
 
     // Botón para generar acuse digital
     const botonGenerarAcuse = await screen.findByRole("button", {
-      name: /Generar y Confirmar Acuse Digital Legal/i,
+      name: /Confirmar y registrar acuse/i,
     });
     await user.click(botonGenerarAcuse);
 
@@ -591,25 +596,13 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     expect(screen.getByText(hashValidoSha256)).toBeInTheDocument();
   });
 
-  it("j) La dirección de casilla respeta el formato {documento}@casilla.iestpsuiza.edu.pe", async () => {
+  it("j) Muestra la identidad autenticada y no inventa un DNI ni dirección de casilla", async () => {
     renderConQueryClient(<CasillaElectronicaPage />);
 
-    // Comprobación en la cabecera institucional del administrado
-    const regexFormatoCasilla = /^[a-zA-Z0-9._%+-]+@casilla\.iestpsuiza\.edu\.pe$/;
-    const direccionEsperada = "74561238@casilla.iestpsuiza.edu.pe";
-
-    expect(direccionEsperada).toMatch(regexFormatoCasilla);
-
-    const elementoCasilla = await screen.findByText(direccionEsperada);
-    expect(elementoCasilla).toBeInTheDocument();
-
-    // Comprobación de que coincide con el DNI del titular
-    expect(mockAcuseNotificado.destinatario.direccionCasilla).toBe(
-      `${mockAcuseNotificado.destinatario.numeroDocumento}@casilla.iestpsuiza.edu.pe`,
-    );
-    expect(mockAcuseNotificado.destinatario.direccionCasilla).toMatch(
-      regexFormatoCasilla,
-    );
+    expect(await screen.findByText("Titular autenticado")).toBeInTheDocument();
+    expect(screen.getByText("titular@example.test")).toBeInTheDocument();
+    expect(screen.queryByText("DNI 74561238")).not.toBeInTheDocument();
+    expect(screen.queryByText("74561238@casilla.iestpsuiza.edu.pe")).not.toBeInTheDocument();
   });
 
   it("k) Permite buscar por texto libre, cambiar el límite por página y limpiar los filtros", async () => {
@@ -689,7 +682,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
 
     // Clic en la tarjeta de Notificados con Acuse
     const tarjetaMetricaNotificados = screen.getByRole("button", {
-      name: /^Con Acuse Legal/i,
+      name: /^Con acuse registrado/i,
     });
     await user.click(tarjetaMetricaNotificados);
 
@@ -723,7 +716,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     });
     await user.click(botonDescargarPdf);
     expect(casillaService.descargarDocumento).toHaveBeenCalledWith(
-      mockNotificacionNotificada,
+      mockNotificacionNotificada.id,
     );
 
     // Descargar Acuse oficial
@@ -732,7 +725,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     });
     await user.click(botonDescargarAcuse);
     expect(casillaService.descargarAcuse).toHaveBeenCalledWith(
-      mockAcuseNotificado,
+      mockNotificacionNotificada.id,
     );
 
     // Cerrar modal con botón Cerrar
