@@ -38,6 +38,17 @@ function token(sub: string) {
 function crearApp(overrides: Partial<typeof FILA> = {}) {
   const fila = { ...FILA, ...overrides };
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
+    if (sql.includes('UPDATE sigd_auth.notificacion_casilla') && sql.includes('SET estado')) {
+      const autorizada = params[0] === fila.id && params[1] === fila.usuario_id;
+      return { rows: autorizada ? [{ ...fila, estado: 'LEIDO', fecha_lectura: new Date('2026-01-02T00:00:00Z') }] : [], rowCount: autorizada ? 1 : 0 };
+    }
+    if (sql.includes('UPDATE sigd_auth.notificacion_casilla') && sql.includes('SET id_acuse')) {
+      if (fila.id_acuse) return { rows: [], rowCount: 0 };
+      fila.id_acuse = String(params[0]);
+      fila.acuse_hash_sha256 = String(params[1]);
+      fila.acuse_sellado_tiempo = new Date(String(params[2]));
+      return { rows: [fila], rowCount: 1 };
+    }
     if (sql.includes('notificacion_casilla') && sql.includes('COUNT(*)')) {
       return { rows: [{ total: '0', no_leidas: '0' }], rowCount: 1 };
     }
@@ -87,6 +98,20 @@ describe('seguridad de Casilla Electrónica', () => {
     }
   });
 
+  it('aplica filtros de estado, tipo y fechas en la consulta del propietario', async () => {
+    const { app, query } = crearApp();
+    const response = await request(app).get('/api/v1/casilla/notificaciones')
+      .query({ estado: 'NOTIFICADO', tipo: 'RESOLUCION', fechaInicio: '2026-01-01', fechaFin: '2026-01-31' })
+      .set('Authorization', `Bearer ${token(USUARIO_B)}`);
+    expect(response.status).toBe(200);
+    const consulta = query.mock.calls.find(([sql]) => String(sql).includes('FROM sigd_auth.notificacion_casilla') && String(sql).includes('COUNT(*)'));
+    expect(String(consulta?.[0])).toContain('id_acuse IS NOT NULL');
+    expect(String(consulta?.[0])).toContain('tipo_acto ILIKE ANY');
+    expect(String(consulta?.[0])).toContain('fecha_deposito >=');
+    expect(String(consulta?.[0])).toContain('fecha_deposito <');
+    expect(consulta?.[1]).toEqual([USUARIO_B, ['RESOLUCION%', 'RESOLUCIÓN%'], '2026-01-01', '2026-01-31']);
+  });
+
   it.each([
     ['detalle', 'get', `/api/v1/casilla/notificaciones/${ID_AJENO}`],
     ['lectura', 'patch', `/api/v1/casilla/notificaciones/${ID_AJENO}/lectura`],
@@ -119,10 +144,24 @@ describe('seguridad de Casilla Electrónica', () => {
       .set('Authorization', `Bearer ${token(USUARIO_B)}`);
 
     expect(detalle.status).toBe(200);
+    expect(detalle.body.actoAdministrativo.hashIntegridadSha256).toBe('');
+    expect(detalle.body.actoAdministrativo.cvd).toBe('');
+    expect(detalle.body.actoAdministrativo.firmantes).toEqual([]);
     expect(descarga.status).toBe(200);
     expect(descarga.body.downloadUrl).toBe('/api/v1/storage/download/private/documento.pdf');
     expect(query.mock.calls.filter(([sql]) => String(sql).includes('notificacion_casilla'))
       .every(([sql]) => String(sql).includes('usuario_id ='))).toBe(true);
+  });
+
+  it('devuelve la notificación completa tras marcar lectura para mantener el modal sincronizado', async () => {
+    const { app } = crearApp();
+    const response = await request(app).patch(`/api/v1/casilla/notificaciones/${ID_PROPIO}/lectura`)
+      .set('Authorization', `Bearer ${token(USUARIO_B)}`);
+    expect(response.status).toBe(200);
+    expect(response.body.id).toBe(ID_PROPIO);
+    expect(response.body.estado).toBe('LEIDO');
+    expect(response.body.actoAdministrativo.numeroDocumento).toBe(FILA.numero_documento);
+    expect(response.body.acuse).toBeNull();
   });
 
   it('genera el PDF del acuse existente solo para el propietario', async () => {
@@ -140,5 +179,36 @@ describe('seguridad de Casilla Electrónica', () => {
     expect(propio.headers['content-type']).toContain('application/pdf');
     expect(propio.body.subarray(0, 5).toString()).toBe('%PDF-');
     expect(ajeno.status).toBe(404);
+  });
+
+  it('no inventa identidad ni CVD para un acuse persistido sin esos metadatos', async () => {
+    const { app } = crearApp({ id_acuse: 'ACU-REAL', acuse_hash_sha256: 'a'.repeat(64) });
+    const response = await request(app).get(`/api/v1/casilla/notificaciones/${ID_PROPIO}`)
+      .set('Authorization', `Bearer ${token(USUARIO_B)}`);
+    expect(response.status).toBe(200);
+    expect(response.body.acuse.destinatario.numeroDocumento).toBe('No registrado');
+    expect(response.body.acuse.destinatario.direccionCasilla).toBe(FILA.correo_destinatario);
+    expect(response.body.acuse.cvdAcuse).toBe('');
+  });
+
+  it('clasifica una resolución con su nombre documental completo', async () => {
+    const { app } = crearApp({ tipo_acto: 'Resolución Directoral' });
+    const response = await request(app).get(`/api/v1/casilla/notificaciones/${ID_PROPIO}`)
+      .set('Authorization', `Bearer ${token(USUARIO_B)}`);
+    expect(response.status).toBe(200);
+    expect(response.body.tipo).toBe('RESOLUCION');
+  });
+
+  it('devuelve el mismo acuse persistido al repetir la solicitud', async () => {
+    const { app } = crearApp();
+    const endpoint = `/api/v1/casilla/notificaciones/${ID_PROPIO}/acuse`;
+    const primero = await request(app).post(endpoint).set('Authorization', `Bearer ${token(USUARIO_B)}`);
+    const segundo = await request(app).post(endpoint).set('Authorization', `Bearer ${token(USUARIO_B)}`);
+    expect(primero.status).toBe(201);
+    expect(segundo.status).toBe(200);
+    expect(segundo.body.data.idAcuse).toBe(primero.body.data.idAcuse);
+    expect(segundo.body.data.hashSha256Acuse).toBe(primero.body.data.hashSha256Acuse);
+    expect(segundo.body.data.timestampGeneracionIso).toBe(primero.body.data.timestampGeneracionIso);
+    expect(segundo.body.data.cvdAcuse).toBe('');
   });
 });

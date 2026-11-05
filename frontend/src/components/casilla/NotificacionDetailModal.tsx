@@ -263,7 +263,7 @@ export default function NotificacionDetailModal({
 
               <div className="border-t border-slate-100 pt-3">
                 <p className="text-xs font-semibold text-slate-500">
-                  Fundamentación y Resumen Legal:
+                  Resumen del acto:
                 </p>
                 <p className="mt-1 text-xs sm:text-sm text-slate-700 leading-relaxed text-justify bg-slate-50 p-3.5 rounded-xl border border-slate-100">
                   {acto.resumenLegal}
@@ -299,7 +299,7 @@ export default function NotificacionDetailModal({
                   d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
                 />
               </svg>
-              Documento Digital Adjunto y Firma Electrónica
+              Documento digital adjunto
             </h3>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -325,9 +325,10 @@ export default function NotificacionDetailModal({
                       Hash SHA-256 (Integridad):
                     </p>
                     <div className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-700 truncate">
-                      <span className="truncate">{acto.hashIntegridadSha256}</span>
+                      <span className="truncate">{acto.hashIntegridadSha256 || 'No registrado'}</span>
                       <button
                         type="button"
+                        disabled={!acto.hashIntegridadSha256}
                         onClick={() =>
                           copyToClipboard(
                             acto.hashIntegridadSha256,
@@ -345,7 +346,7 @@ export default function NotificacionDetailModal({
                       Código de Verificación Digital (CVD):
                     </p>
                     <p className="font-mono text-xs font-bold text-blue-800">
-                      {acto.cvd}
+                      {acto.cvd || 'No registrado'}
                     </p>
                   </div>
                 </div>
@@ -371,14 +372,16 @@ export default function NotificacionDetailModal({
                   </svg>
                   {descargando ? "Preparando descarga…" : "Descargar Acto Administrativo (.PDF)"}
                 </button>
+                {errorDescarga && <p role="alert" className="mt-2 text-sm text-red-700">{errorDescarga}</p>}
               </div>
 
               {/* Tarjeta de Firmantes Digitales */}
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
                 <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
-                  Firmantes Digitales Validados
+                  Firmantes del documento
                 </p>
                 <div className="space-y-2.5">
+                  {acto.firmantes.length === 0 && <p className="text-xs text-slate-500">No hay firmantes registrados.</p>}
                   {acto.firmantes.map((firmante) => (
                     <div
                       key={firmante.nombre}
@@ -433,7 +436,7 @@ export default function NotificacionDetailModal({
                   d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                 />
               </svg>
-              Acuse de Notificación Electrónica y Cómputo Legal
+              Acuse de notificación electrónica
             </h3>
 
             {/* CASO A: YA SE HA GENERADO EL ACUSE LEGAL */}
@@ -449,13 +452,13 @@ export default function NotificacionDetailModal({
                         CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA
                       </h4>
                       <p className="text-xs text-emerald-800">
-                        Identificador Oficial: <strong>{acuse.idAcuse}</strong>
+                        Identificador: <strong>{acuse.idAcuse}</strong>
                       </p>
                     </div>
                   </div>
 
                   <span className="rounded-full bg-emerald-100 border border-emerald-300 px-3 py-1 text-xs font-black uppercase tracking-wider text-emerald-800">
-                    Validez Jurídica Plena
+                    Acuse registrado
                   </span>
                 </div>
 
@@ -469,19 +472,20 @@ export default function NotificacionDetailModal({
                       <span>{acuse.timestampGeneracionIso}</span>
                     </div>
                     <p className="mt-1 text-[11px] text-slate-500">
-                      Hora local certificada:{" "}
+                      Hora local:{" "}
                       {formatIsoFecha(acuse.timestampGeneracionIso)}
                     </p>
                   </div>
 
                   <div>
                     <p className="font-semibold text-slate-500">
-                      Hash SHA-256 del Acuse (Inmutable):
+                      Hash SHA-256 registrado del acuse:
                     </p>
                     <div className="mt-1 flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2 font-mono text-xs text-emerald-400">
-                      <span className="truncate">{acuse.hashSha256Acuse}</span>
+                      <span className="truncate">{acuse.hashSha256Acuse || 'No registrado'}</span>
                       <button
                         type="button"
+                        disabled={!acuse.hashSha256Acuse}
                         onClick={() =>
                           copyToClipboard(acuse.hashSha256Acuse, "hash-acuse")
                         }
@@ -492,7 +496,7 @@ export default function NotificacionDetailModal({
                     </div>
                     <p className="mt-1 text-[11px] text-slate-500">
                       CVD de Verificación:{" "}
-                      <strong className="text-slate-800">{acuse.cvdAcuse}</strong>
+                      <strong className="text-slate-800">{acuse.cvdAcuse || 'No registrado'}</strong>
                     </p>
                   </div>
                 </div>
@@ -500,14 +504,14 @@ export default function NotificacionDetailModal({
                 {/* Surtimiento de Efecto y Cómputo de Plazos */}
                 <div className="rounded-xl border border-emerald-200 bg-white p-3.5 text-xs text-slate-700 space-y-1.5">
                   <p className="font-bold text-emerald-900">
-                    Efecto Jurídico y Cómputo de Plazos (Art. 20 TUO Ley N° 27444):
+                    Datos de efectos y plazos registrados:
                   </p>
                   <p className="text-slate-600 leading-relaxed">
                     {acuse.fechaEfectoLegal}
                   </p>
                   <p className="text-slate-600">
                     • Plazo de atención / impugnación:{" "}
-                    <strong>{acuse.plazoImpugnacionDiasHabiles} días hábiles</strong>.
+                    <strong>{acuse.plazoImpugnacionDiasHabiles === null ? 'No registrado' : `${acuse.plazoImpugnacionDiasHabiles} días hábiles`}</strong>.
                     {acuse.fechaLimiteImpugnacion && (
                       <span>
                         {" "}
@@ -518,7 +522,7 @@ export default function NotificacionDetailModal({
                   </p>
                 </div>
 
-                {/* Botón para descargar Cédula de Acuse Oficial */}
+                {/* Descarga del PDF generado a partir del registro del acuse. */}
                 <div className="flex justify-end pt-1">
                   <button
                     type="button"
@@ -553,13 +557,11 @@ export default function NotificacionDetailModal({
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-amber-950">
-                      Requisito de Acuse Digital Legal (TUO Ley N° 27444)
+                      Confirmación de recepción
                     </h4>
                     <p className="mt-1 text-xs text-amber-900 leading-relaxed">
-                      Conforme al Artículo 20 del TUO de la Ley N° 27444, para
-                      que la notificación surta plenos efectos jurídicos y se
-                      inicie el cómputo legal de plazos, debe generar el acuse de
-                      recibo formal.
+                      Puede registrar la recepción de esta notificación. Los efectos
+                      y plazos aplicables deben consultarse en el acto administrativo.
                     </p>
                   </div>
                 </div>
@@ -570,22 +572,20 @@ export default function NotificacionDetailModal({
                   </p>
                   <ul className="mt-1 list-disc list-inside space-y-0.5 text-slate-600">
                     <li>
-                      El servidor del SIGD registrará la marca de tiempo cierta
-                      (formato ISO-8601).
+                      El servidor registrará la fecha y hora en formato ISO-8601.
                     </li>
                     <li>
-                      Se generará y sellará el código criptográfico SHA-256
-                      inmutable.
+                      Se almacenará un hash SHA-256 asociado al registro del acuse.
                     </li>
                     <li>
-                      Podrá descargar la cédula de acuse como constancia oficial.
+                      Podrá descargar un PDF con los datos registrados del acuse.
                     </li>
                   </ul>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                   <span className="text-[11px] text-amber-800">
-                    * Acción certificada y registrada en los logs de auditoría.
+                    * El registro queda asociado a su sesión y notificación.
                   </span>
 
                   <button
@@ -615,7 +615,7 @@ export default function NotificacionDetailModal({
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                           />
                         </svg>
-                        Generando acuse legal con timestamp en servidor...
+                        Registrando acuse en el servidor...
                       </>
                     ) : (
                       <>
@@ -632,7 +632,7 @@ export default function NotificacionDetailModal({
                             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                           />
                         </svg>
-                        Generar y Confirmar Acuse Digital Legal
+                        Confirmar y registrar acuse
                       </>
                     )}
                   </button>

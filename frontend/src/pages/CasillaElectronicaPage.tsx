@@ -14,82 +14,6 @@ const PESTAÑAS: { id: PestañaLegal; estado: EstadoNotificacion | "TODOS" }[] =
   { id: "CON_ACUSE", estado: "NOTIFICADO" },
 ];
 
-function fechaPascua(anio: number): Date {
-  const a = anio % 19;
-  const b = Math.floor(anio / 100);
-  const c = anio % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const mes = Math.floor((h + l - 7 * m + 114) / 31);
-  const dia = ((h + l - 7 * m + 114) % 31) + 1;
-  return new Date(Date.UTC(anio, mes - 1, dia));
-}
-
-function feriadosNacionales(anio: number): Set<string> {
-  const fechas = [
-    `${anio}-01-01`,
-    `${anio}-05-01`,
-    `${anio}-06-07`,
-    `${anio}-06-29`,
-    `${anio}-07-23`,
-    `${anio}-07-28`,
-    `${anio}-07-29`,
-    `${anio}-08-06`,
-    `${anio}-08-30`,
-    `${anio}-10-08`,
-    `${anio}-11-01`,
-    `${anio}-12-08`,
-    `${anio}-12-09`,
-    `${anio}-12-25`,
-  ];
-  const pascua = fechaPascua(anio);
-  const juevesSanto = new Date(pascua);
-  juevesSanto.setUTCDate(pascua.getUTCDate() - 3);
-  const viernesSanto = new Date(pascua);
-  viernesSanto.setUTCDate(pascua.getUTCDate() - 2);
-
-  for (const fecha of [juevesSanto, viernesSanto]) {
-    fechas.push(fecha.toISOString().slice(0, 10));
-  }
-
-  return new Set(fechas);
-}
-
-function contarDiasHabiles(fechaDeposito: string, fechaReferencia = new Date()): number {
-  const inicio = new Date(fechaDeposito);
-  if (Number.isNaN(inicio.getTime())) return 0;
-
-  const dia = new Date(Date.UTC(
-    inicio.getUTCFullYear(),
-    inicio.getUTCMonth(),
-    inicio.getUTCDate() + 1,
-  ));
-  const fin = Date.UTC(
-    fechaReferencia.getUTCFullYear(),
-    fechaReferencia.getUTCMonth(),
-    fechaReferencia.getUTCDate(),
-  );
-  let diasHabiles = 0;
-
-  while (dia.getTime() <= fin) {
-    const diaSemana = dia.getUTCDay();
-    const feriado = feriadosNacionales(dia.getUTCFullYear()).has(
-      dia.toISOString().slice(0, 10),
-    );
-    if (diaSemana !== 0 && diaSemana !== 6 && !feriado) diasHabiles += 1;
-    dia.setUTCDate(dia.getUTCDate() + 1);
-  }
-
-  return diasHabiles;
-}
-
 function etiquetaEstado(estado: EstadoNotificacion): string {
   if (estado === "NO_LEIDO") return "NO LEÍDO";
   if (estado === "LEIDO") return "LEÍDO";
@@ -145,11 +69,6 @@ export default function CasillaElectronicaPage() {
     void casilla.refetch();
   }
 
-  const diasHabiles = seleccionada
-    ? contarDiasHabiles(seleccionada.fechaDepositoIso)
-    : 0;
-  const plazoVencido = diasHabiles > 5;
-
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
       <header className="border-b border-slate-300 bg-white">
@@ -165,9 +84,7 @@ export default function CasillaElectronicaPage() {
               Notificaciones oficiales, actos administrativos y constancias de recepción.
             </p>
           </div>
-          <p className="text-sm font-semibold text-slate-700">
-            Plazo de lectura: <span className="text-blue-900">5 días hábiles</span>
-          </p>
+          <p className="text-sm font-semibold text-slate-700">Consulte los plazos en el acto administrativo.</p>
         </div>
       </header>
 
@@ -247,19 +164,11 @@ export default function CasillaElectronicaPage() {
                 </div>
               </dl>
 
-              <div className={`border p-4 ${plazoVencido ? "border-red-800 bg-red-50 text-red-950" : "border-blue-800 bg-blue-50 text-blue-950"}`}>
+              <div className="border border-blue-800 bg-blue-50 p-4 text-blue-950">
                 <p className="text-xs font-black uppercase tracking-wide">
-                  Cómputo del plazo legal de lectura
+                  Plazos del acto administrativo
                 </p>
-                <p className="mt-2 text-2xl font-black">
-                  {diasHabiles} <span className="text-sm font-bold">días hábiles transcurridos</span>
-                </p>
-                <p className="mt-1 text-xs">
-                  {plazoVencido
-                    ? "Plazo de 5 días hábiles vencido."
-                    : `${Math.max(0, 5 - diasHabiles)} días hábiles restantes del plazo.`}
-                  {" "}Cómputo de lunes a viernes, excluidos los feriados nacionales del Perú.
-                </p>
+                <p className="mt-2 text-sm">El plazo aplicable no está registrado en la Casilla. Consulte el acto y su fecha de notificación.</p>
               </div>
 
               <section className="space-y-3">
@@ -275,7 +184,7 @@ export default function CasillaElectronicaPage() {
                   </pre>
                 )}
                 <p className="break-all border-l-4 border-slate-500 bg-white p-3 font-mono text-xs text-slate-700">
-                  SHA-256 del acto: {seleccionada.actoAdministrativo.hashIntegridadSha256}
+                  SHA-256 del acto: {seleccionada.actoAdministrativo.hashIntegridadSha256 || "No registrado"}
                 </p>
               </section>
 
@@ -303,7 +212,7 @@ export default function CasillaElectronicaPage() {
             </article>
           ) : (
             <div className="flex min-h-72 items-center justify-center border border-dashed border-slate-400 bg-white p-8 text-center text-sm text-slate-600">
-              Seleccione una cédula para consultar el acto administrativo y su plazo legal.
+              Seleccione una notificación para consultar el acto administrativo.
             </div>
           )}
         </section>

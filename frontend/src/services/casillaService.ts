@@ -39,7 +39,7 @@ export const CASILLA_ENDPOINTS = {
 
   /**
    * POST /api/v1/casilla/notificaciones/:id/acuse
-   * Solicita al backend la generación inmutable del acuse digital legal
+   * Solicita al backend el registro idempotente del acuse
    * Body: { confirmacionAdministrado: boolean }
    * Response: { success: boolean, data: AcuseNotificacion (con timestamp ISO-8601 y hash SHA-256) }
    */
@@ -60,7 +60,7 @@ export const CASILLA_ENDPOINTS = {
 
   /**
    * GET /api/v1/casilla/notificaciones/:id/acuse/descargar
-   * Descarga la cédula oficial de acuse de recibo en PDF
+   * Descarga el PDF generado a partir del registro del acuse
    */
   DESCARGAR_ACUSE: (id: string) =>
     `/api/v1/casilla/notificaciones/${id}/acuse/descargar`,
@@ -116,9 +116,8 @@ export const casillaService = {
   },
 
   /**
-   * Genera el Acuse Digital Legal (Fecha cierta ISO-8601 + Hash SHA-256 + CVD)
-   * ¡IMPORTANTE!: Los valores criptográficos y de tiempo son provistos por el servidor.
-   * El cliente solo los solicita formalmente y los visualiza.
+   * Registra el acuse y muestra fecha/hora y hash provistos por el servidor.
+   * El hash del registro no acredita por sí solo la firma de un PDF.
    */
   async generarAcuseLegal(
     notificacionId: string,
