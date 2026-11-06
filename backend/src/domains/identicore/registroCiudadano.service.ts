@@ -18,8 +18,10 @@ interface TipoDocumentoResult {
 
 interface RepresentanteResult extends IdResult {
   nombres: string;
-  apellido_paterno: string;
-  apellido_materno: string | null;
+  apellidos?: string;
+  nombre_completo?: string;
+  apellido_paterno?: string;
+  apellido_materno?: string | null;
 }
 
 interface ExisteResult {
@@ -139,9 +141,9 @@ export class RegistroCiudadanoService {
       transaccionAbierta = true;
 
       const tipoDocumento = await cliente.query<TipoDocumentoResult>(
-        `SELECT id::text AS id
+        `SELECT id_tipo_documento::text AS id
            FROM sigd_auth.tipos_documento
-          WHERE codigo = $1 AND estado = TRUE`,
+          WHERE codigo = $1 AND vigente = TRUE`,
         [datos.tipoDocumento],
       );
       const tipoDocumentoId = tipoDocumento.rows[0]?.id;
@@ -157,12 +159,12 @@ export class RegistroCiudadanoService {
         `SELECT
            EXISTS (
              SELECT 1 FROM sigd_auth.persona p
-              WHERE p.tipo_documento_id = $1 AND p.numero_documento = $2
+              WHERE p.tipo = $1 AND p.id_documento = $2
            ) OR EXISTS (
              SELECT 1 FROM sigd_auth.cuenta_usuario u
-              WHERE lower(u.email_login) = lower($3) OR u.username = $4
+              WHERE lower(u.correo) = lower($3) OR u.usuario = $4
            ) AS existe`,
-        [tipoDocumentoId, datos.numeroDocumento, datos.correo, datos.numeroDocumento],
+        [datos.tipoPersona, datos.numeroDocumento, datos.correo, datos.numeroDocumento],
       );
       if (duplicado.rows[0]?.existe) {
         throw new ConflictError({
@@ -172,42 +174,28 @@ export class RegistroCiudadanoService {
       }
 
       const persona = await cliente.query<IdResult>(
-        `INSERT INTO sigd_auth.persona
-           (tipo_documento_id, numero_documento, nombres, apellido_paterno,
-            apellido_materno, telefono, email_contacto, tipo_persona,
-            direccion, ubigeo_distrito)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         RETURNING id::text AS id`,
-        [
-          tipoDocumentoId,
-          datos.numeroDocumento,
-          datos.nombres,
-          datos.apellidoPaterno,
-          datos.apellidoMaterno,
-          datos.celular,
-          datos.correo,
-          datos.tipoPersona,
-          datos.direccion,
-          datos.ubigeoDistrito,
-        ],
+        `INSERT INTO sigd_auth.persona (tipo, id_documento)
+         VALUES ($1, $2)
+         RETURNING id_persona::text AS id`,
+        [datos.tipoPersona, datos.numeroDocumento],
       );
       const personaId = persona.rows[0]?.id;
       if (!personaId) throw new Error('La inserción de persona no devolvió su identificador.');
 
       if (datos.tipoPersona === 'NATURAL') {
+        const apellidos = [datos.apellidoPaterno, datos.apellidoMaterno].filter(Boolean).join(' ') || datos.apellidoPaterno || '';
+        const nombreCompleto = [datos.nombres, apellidos].filter(Boolean).join(' ');
         await cliente.query(
           `INSERT INTO sigd_auth.persona_natural
-             (persona_id, numero_documento, nombres, apellido_paterno,
-              apellido_materno, telefono, email_contacto)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+             (id_persona, nombres, apellidos, nombre_completo, correo, telefono)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
           [
             personaId,
-            datos.numeroDocumento,
             datos.nombres,
-            datos.apellidoPaterno,
-            datos.apellidoMaterno,
-            datos.celular,
+            apellidos,
+            nombreCompleto,
             datos.correo,
+            datos.celular,
           ],
         );
       } else {
@@ -217,15 +205,11 @@ export class RegistroCiudadanoService {
           throw new Error('Faltan los datos de identificación del representante legal.');
         }
         const representante = await cliente.query<RepresentanteResult>(
-          `SELECT pn.id::text AS id, p.nombres, p.apellido_paterno, p.apellido_materno
+          `SELECT p.id_persona::text AS id, pn.nombres, pn.apellidos, pn.nombre_completo
              FROM sigd_auth.persona_natural pn
-             JOIN sigd_auth.persona p ON p.id = pn.persona_id
-             JOIN sigd_auth.tipos_documento td ON td.id = p.tipo_documento_id
-            WHERE pn.numero_documento = $1
-              AND td.codigo = 'DNI'
-              AND p.tipo_persona = 'NATURAL'
-              AND p.estado = TRUE
-              AND pn.estado = TRUE
+             JOIN sigd_auth.persona p ON p.id_persona = pn.id_persona
+            WHERE p.id_documento = $1
+              AND p.tipo = 'NATURAL'
             FOR SHARE OF pn, p`,
           [documentoRepresentante],
         );
@@ -236,11 +220,10 @@ export class RegistroCiudadanoService {
             message: 'El representante legal debe estar previamente registrado como persona natural.',
           });
         }
-        const nombreRegistrado = normalizarNombre([
-          personaRepresentante.nombres,
-          personaRepresentante.apellido_paterno,
-          personaRepresentante.apellido_materno,
-        ].filter(Boolean).join(' '));
+        const nombreRegistrado = normalizarNombre(
+          personaRepresentante.nombre_completo ||
+          [personaRepresentante.nombres, personaRepresentante.apellidos].filter(Boolean).join(' ')
+        );
         if (nombreRegistrado !== normalizarNombre(nombreRepresentante)) {
           throw new ValidationError({
             invalidParams: [{ name: 'nombreRepresentante', reason: 'El nombre no coincide con el DNI del representante.' }],
@@ -249,27 +232,27 @@ export class RegistroCiudadanoService {
 
         const juridica = await cliente.query<IdResult>(
           `INSERT INTO sigd_auth.persona_juridica
-             (persona_id, razon_social, nombre_comercial, partida_registral_sunarp)
-           VALUES ($1, $2, $3, $4)
-           RETURNING id::text AS id`,
-          [personaId, datos.razonSocial, datos.nombreComercial, datos.partidaRegistral],
+             (id_persona, razon_social, nombre_comercial, representante_legal, direccion)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id_persona::text AS id`,
+          [personaId, datos.razonSocial, datos.nombreComercial, datos.nombreRepresentante, datos.direccion],
         );
         const personaJuridicaId = juridica.rows[0]?.id;
         if (!personaJuridicaId) throw new Error('La inserción de persona jurídica no devolvió su identificador.');
 
         await cliente.query(
           `INSERT INTO sigd_auth.representacion_legal
-             (persona_natural_id, persona_juridica_id, vigencia_inicio, activo)
-           VALUES ($1, $2, CURRENT_DATE, TRUE)`,
-          [personaRepresentante.id, personaJuridicaId],
+             (id_persona_juridica, id_persona_natural, cargo, vigente_desde)
+           VALUES ($1, $2, 'Representante Legal', CURRENT_DATE)`,
+          [personaJuridicaId, personaRepresentante.id],
         );
       }
 
       const cuenta = await cliente.query<IdResult>(
         `INSERT INTO sigd_auth.cuenta_usuario
-           (persona_id, username, email_login, password_hash)
+           (id_persona, usuario, correo, password_hash)
          VALUES ($1, $2, $3, $4)
-         RETURNING id::text AS id`,
+         RETURNING id_usuario::text AS id`,
         [personaId, datos.numeroDocumento, datos.correo, passwordHash],
       );
       const usuarioId = cuenta.rows[0]?.id;
@@ -277,10 +260,9 @@ export class RegistroCiudadanoService {
 
       await cliente.query(
         `INSERT INTO sigd_auth.consentimiento_datos
-           (usuario_id, ip_address, version_termsoservicio,
-            aceptacion_notificaciones, consentimiento_obfuscacion)
-         VALUES ($1, $2, 'v1.0', $3, TRUE)`,
-        [usuarioId, datos.ipAddress, datos.aceptaNotificaciones],
+           (id_persona, finalidade, version_politica, aceptado, fecha_aceptacion, ip_origen)
+         VALUES ($1, 'Trámites y Notificaciones SIGD', 'v1.0', $2, CASE WHEN $2 THEN now() ELSE null END, $3)`,
+        [personaId, datos.aceptaNotificaciones, datos.ipAddress],
       );
 
       await cliente.query('COMMIT');

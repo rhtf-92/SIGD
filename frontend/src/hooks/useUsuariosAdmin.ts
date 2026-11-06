@@ -7,11 +7,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   useActualizarUsuarioMutation,
   useConmutarEstadoMutation,
+  useCrearUsuarioMutation,
   useUsuariosQuery,
 } from "../services/adminUsuariosService";
 import {
   DEBOUNCE_BUSQUEDA_MS,
   FILTROS_USUARIOS_INICIALES,
+  type CreateUsuarioDTO,
   type EstadoUsuario,
   type FiltrosUsuarios,
   type Usuario,
@@ -19,6 +21,12 @@ import {
 
 export const CATALOGO_ROLES_USUARIOS = [
   "Administrador",
+  "Administrador del Sistema",
+  "Director General",
+  "Secretario Académico",
+  "Mesa de Partes",
+  "Docente / Coordinador",
+  "Especialista",
   "Responsable de Área",
   "Operador",
   "Consulta",
@@ -29,6 +37,7 @@ export const CATALOGO_AREAS = [
   "Secretaría Académica",
   "Mesa de Partes",
   "Administración",
+  "Unidad Académica",
   "Archivo Central",
   "Coordinación DSI",
 ];
@@ -53,6 +62,7 @@ export function useUsuariosAdmin() {
     FILTROS_USUARIOS_INICIALES.estado,
   );
   const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
+  const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
 
   // Debounce de 300 ms: el texto tecleado no dispara peticiones hasta 300 ms
   // después de la última pulsación, reduciendo el tráfico hacia el backend.
@@ -71,25 +81,34 @@ export function useUsuariosAdmin() {
   );
 
   const consulta = useUsuariosQuery(filtros);
+  const mutacionCreacion = useCrearUsuarioMutation();
   const mutacionActualizacion = useActualizarUsuarioMutation();
   const mutacionEstado = useConmutarEstadoMutation();
 
   const usuarios = useMemo(() => consulta.data ?? [], [consulta.data]);
 
+  function crearUsuario(nuevo: CreateUsuarioDTO) {
+    return mutacionCreacion.mutateAsync(nuevo);
+  }
+
   function actualizarUsuario(usuarioActualizado: Usuario) {
     return mutacionActualizacion.mutateAsync({
       id: usuarioActualizado.id,
       cambios: {
+        nombre: usuarioActualizado.nombre,
+        dni: usuarioActualizado.dni,
+        correo: usuarioActualizado.correo,
         area: usuarioActualizado.area,
         sede: usuarioActualizado.sede,
         cargo: usuarioActualizado.cargo,
         rol: usuarioActualizado.rol,
+        estado: usuarioActualizado.estado,
       },
     });
   }
 
-  function conmutarEstado(id: number) {
-    const usuario = usuarios.find((item) => item.id === id);
+  function conmutarEstado(id: string | number) {
+    const usuario = usuarios.find((item) => String(item.id) === String(id));
     if (!usuario) return undefined;
 
     return mutacionEstado.mutateAsync({
@@ -113,12 +132,16 @@ export function useUsuariosAdmin() {
     setEstado,
     usuarioEditando,
     setUsuarioEditando,
+    modalCrearAbierto,
+    setModalCrearAbierto,
+    crearUsuario,
     actualizarUsuario,
     conmutarEstado,
     isLoading: consulta.isLoading,
     isFetching: consulta.isFetching,
     error: consulta.error,
     guardarPendiente: mutacionActualizacion.isPending,
+    creacionPendiente: mutacionCreacion.isPending,
     estadoPendiente: mutacionEstado.isPending,
   };
 }

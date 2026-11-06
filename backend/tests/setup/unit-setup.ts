@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import { vi } from 'vitest';
 
-process.env.AUTH_JWT_SECRET ??= 'test-jwt-secret-minimo-32-caracteres-para-sigd-auth';
-process.env.JWT_SECRET ??= 'test-jwt-secret-minimo-32-caracteres-para-sigd-auth';
+process.env.AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET ?? 'clave_secreta_institucional_jwt_segura_32_caracteres_minimo_sigd';
+process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'clave_secreta_institucional_jwt_segura_32_caracteres_minimo_sigd';
 
 /**
  * Mock criptográfico limpio de la librería 'argon2' para entorno de pruebas unitarias.

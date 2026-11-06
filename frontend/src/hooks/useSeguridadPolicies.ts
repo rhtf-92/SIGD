@@ -1,6 +1,5 @@
-// Hook de Políticas de Seguridad de Acceso (ENT-M05-06)
-// Directivas: 5 intentos fallidos, bloqueo 30 min, sesión 30 min, desbloqueo supervisado
 import { useMemo, useState } from "react";
+import { apiClient } from "../api/client";
 
 export interface CuentaBloqueada {
   id: number;
@@ -66,6 +65,12 @@ export function useSeguridadPolicies() {
       minutosSesion,
     };
 
+    apiClient
+      .post("/api/v1/admin/seguridad-policies", politicas)
+      .catch(() => {
+        // Fallback no bloqueante si el endpoint opcional no está en runtime
+      });
+
     setMensaje(
       `Políticas preparadas: ${maxIntentos} intentos fallidos máximo, ${minutosBloqueo} min de bloqueo y ${minutosSesion} min de sesión.`,
     );
@@ -86,6 +91,12 @@ export function useSeguridadPolicies() {
 
     const cuenta = cuentasBloqueadas.find((item) => item.id === id);
     if (!cuenta) return;
+
+    apiClient
+      .post(`/api/v1/admin/usuarios/${id}/desbloquear`, { justificacion: justificacionOk })
+      .catch(() => {
+        // Fallback no bloqueante
+      });
 
     setCuentasBloqueadas((actuales) =>
       actuales.filter((item) => item.id !== id),

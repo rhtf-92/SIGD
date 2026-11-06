@@ -43,16 +43,22 @@ export function useCasilla() {
     useState<Notificacion | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Query: Listado paginado de notificaciones
+  // Query: Listado paginado de notificaciones con Smart Polling (Plan §4.2)
   const notificacionesQuery = useQuery({
     queryKey: CASILLA_QUERY_KEYS.list(filtros),
     queryFn: () => casillaService.getNotificaciones(filtros),
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+    staleTime: 10_000,
   });
 
-  // Query: Estadísticas y contadores
+  // Query: Estadísticas y contadores con Smart Polling (Plan §4.2)
   const statsQuery = useQuery({
     queryKey: CASILLA_QUERY_KEYS.stats,
     queryFn: () => casillaService.getEstadisticas(),
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+    staleTime: 10_000,
   });
 
   // Mutation: Marcar como leído

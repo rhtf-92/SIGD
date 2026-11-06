@@ -18,6 +18,7 @@ import {
 import { apiClient } from "../api/client";
 import { ApiHttpError, type InvalidParamDetail } from "../types/api";
 import type {
+  CreateUsuarioDTO,
   EstadoUsuario,
   FiltrosUsuarios,
   UpdateEstadoDTO,
@@ -30,7 +31,7 @@ const RUTA_CANONICA_USUARIOS = "/api/v1/admin/usuarios";
 export const usuariosAdminKeys = {
   todos: ["admin", "usuarios"] as const,
   lista: (filtros: FiltrosUsuarios) => ["admin", "usuarios", filtros] as const,
-  detalle: (id: number) => ["admin", "usuarios", "detalle", id] as const,
+  detalle: (id: string | number) => ["admin", "usuarios", "detalle", id] as const,
 };
 
 function toStringValue(value: unknown, porDefecto = ""): string {
@@ -56,31 +57,44 @@ function normalizarUsuario(valor: unknown): Usuario | null {
   const registro = valor as Record<string, unknown>;
 
   const idCrudo = registro.id ?? registro.idUsuario ?? registro.id_usuario;
-  const id = typeof idCrudo === "number" ? idCrudo : Number(idCrudo);
-  if (!Number.isFinite(id)) return null;
+  let id: string | number | null = null;
+  if (typeof idCrudo === "number") {
+    id = idCrudo;
+  } else if (typeof idCrudo === "string" && idCrudo.trim().length > 0) {
+    id = idCrudo.trim();
+  }
+  if (id === null) return null;
 
-  const nombre = toStringValue(registro.nombre ?? registro.nombreCompleto ?? registro.nombre_completo);
+  const nombre = toStringValue(
+    registro.nombre ?? registro.nombreCompleto ?? registro.nombre_completo,
+  );
   if (nombre === "") return null;
 
   return {
     id,
     nombre,
     dni: toStringValue(registro.dni),
-    correo: toStringValue(registro.correo ?? registro.correoInstitucional ?? registro.correo_institucional),
-    sede: toStringValue(registro.sede),
-    area: toStringValue(registro.area ?? registro.areaOrganica ?? registro.area_organica),
-    cargo: toStringValue(registro.cargo),
-    rol: toStringValue(registro.rol),
+    correo: toStringValue(
+      registro.correo ?? registro.correoInstitucional ?? registro.correo_institucional,
+    ),
+    sede: toStringValue(registro.sede, "Sede Principal"),
+    area: toStringValue(
+      registro.area ?? registro.areaOrganica ?? registro.area_organica,
+      "Administración",
+    ),
+    cargo: toStringValue(registro.cargo, "Personal Institucional"),
+    rol: toStringValue(registro.rol, "Operador"),
     estado: toEstadoUsuario(registro.estado),
     ultimoAcceso: toStringValue(registro.ultimoAcceso ?? registro.ultimo_acceso, "—"),
   };
 }
 
-/** Extrae el arreglo de usuarios tanto de una respuesta plana como envuelta en `data`. */
+/** Extrae el arreglo de usuarios tanto de una respuesta plana como envuelta en `datos`, `data`, `usuarios` o `items`. */
 function extraerUsuarios(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
   if (typeof payload === "object" && payload !== null) {
     const envuelto = payload as Record<string, unknown>;
+    if (Array.isArray(envuelto.datos)) return envuelto.datos;
     if (Array.isArray(envuelto.data)) return envuelto.data;
     if (Array.isArray(envuelto.usuarios)) return envuelto.usuarios;
     if (Array.isArray(envuelto.items)) return envuelto.items;
@@ -108,8 +122,29 @@ export async function listarUsuarios(
     .filter((usuario): usuario is Usuario => usuario !== null);
 }
 
+export async function crearUsuario(datos: CreateUsuarioDTO): Promise<Usuario> {
+  const response = await apiClient.post(RUTA_CANONICA_USUARIOS, datos);
+  const normalizado = normalizarUsuario(response.data);
+
+  if (!normalizado) {
+    throw new ApiHttpError({
+      type: "about:blank",
+      title: "Respuesta incompleta del servidor",
+      status: 502,
+      detail: "El servidor no devolvió el detalle del usuario registrado.",
+      instance: RUTA_CANONICA_USUARIOS,
+      code: "ERR_USUARIO_CREACION",
+      category: "System",
+      correlationId: "",
+      retryable: true,
+    });
+  }
+
+  return normalizado;
+}
+
 export async function actualizarUsuario(
-  id: number,
+  id: string | number,
   cambios: UpdateUsuarioDTO,
 ): Promise<Usuario> {
   const response = await apiClient.put(`${RUTA_CANONICA_USUARIOS}/${id}`, cambios);
@@ -133,7 +168,7 @@ export async function actualizarUsuario(
 }
 
 export async function conmutarEstadoUsuario(
-  id: number,
+  id: string | number,
   cambios: UpdateEstadoDTO,
 ): Promise<Usuario> {
   const estadoBackend = cambios.estado.toUpperCase();
@@ -172,13 +207,34 @@ export function useUsuariosQuery(
   });
 }
 
-type VariablesActualizacion = { id: number; cambios: UpdateUsuarioDTO };
+type VariablesActualizacion = { id: string | number; cambios: UpdateUsuarioDTO };
 
 // El snapshot guarda cada lista por su propia clave: la tabla vive en varias
 // claves (una por combinación de filtros) y revertir exige restaurarlas todas.
 type ContextoActualizacion = {
   instantanea: Array<[readonly unknown[], Usuario[] | undefined]>;
 };
+
+export function useCrearUsuarioMutation(): UseMutationResult<
+  Usuario,
+  ApiHttpError,
+  CreateUsuarioDTO
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (datos: CreateUsuarioDTO) => crearUsuario(datos),
+    onSuccess: (nuevoUsuario) => {
+      queryClient.setQueryData(
+        usuariosAdminKeys.detalle(nuevoUsuario.id),
+        nuevoUsuario,
+      );
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: usuariosAdminKeys.todos });
+    },
+  });
+}
 
 export function useActualizarUsuarioMutation(): UseMutationResult<
   Usuario,
@@ -205,7 +261,7 @@ export function useActualizarUsuarioMutation(): UseMutationResult<
         { queryKey: usuariosAdminKeys.todos },
         (actuales) =>
           actuales?.map((usuario) =>
-            usuario.id === id ? { ...usuario, ...cambios } : usuario,
+            String(usuario.id) === String(id) ? { ...usuario, ...cambios } : usuario,
           ),
       );
 
@@ -231,7 +287,7 @@ export function useActualizarUsuarioMutation(): UseMutationResult<
 export function useConmutarEstadoMutation(): UseMutationResult<
   Usuario,
   ApiHttpError,
-  { id: number; estado: EstadoUsuario }
+  { id: string | number; estado: EstadoUsuario }
 > {
   const queryClient = useQueryClient();
 

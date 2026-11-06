@@ -101,10 +101,22 @@ CREATE TABLE IF NOT EXISTS sigd_tra.expediente (
     estado             VARCHAR(30)  NOT NULL DEFAULT 'REGISTRADO',
     fecha_radicacion   TIMESTAMPTZ  NOT NULL DEFAULT now(),
     fecha_limite       TIMESTAMPTZ  NULL,
+    id_expediente      UUID         GENERATED ALWAYS AS (expediente_id) STORED,
+    creado_en          TIMESTAMPTZ  GENERATED ALWAYS AS (fecha_radicacion) STORED,
     CONSTRAINT uq_tra_expediente_numero UNIQUE (numero),
     CONSTRAINT chk_tra_expediente_dni CHECK (dni_solicitante IS NULL OR dni_solicitante ~ '^[0-9]{8}$'),
     CONSTRAINT chk_tra_expediente_cut CHECK (codigo_expediente ~ '^EXP-[0-9]{4}-[0-9]{6}$')
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'sigd_tra' AND table_name = 'expediente' AND column_name = 'id_expediente') THEN
+        ALTER TABLE sigd_tra.expediente ADD COLUMN id_expediente UUID GENERATED ALWAYS AS (expediente_id) STORED;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'sigd_tra' AND table_name = 'expediente' AND column_name = 'creado_en') THEN
+        ALTER TABLE sigd_tra.expediente ADD COLUMN creado_en TIMESTAMPTZ GENERATED ALWAYS AS (fecha_radicacion) STORED;
+    END IF;
+END $$;
 
 -- Asignación automática del CUT a partir del año de radicación.
 CREATE OR REPLACE FUNCTION sigd_tra.fn_tra_expediente_asignar_cut()

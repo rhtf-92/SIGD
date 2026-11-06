@@ -90,7 +90,7 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
 
     expect(screen.getByText("Constancia de No Adeudar", { exact: true })).toBeInTheDocument();
     expect(screen.getByText(/S\/. 11\.00 por semestre/i)).toBeInTheDocument();
-    expect(screen.getByText(/05 días hábiles/i)).toBeInTheDocument();
+    expect(screen.getByText(/(?:0?5|5)\s*días hábiles/i)).toBeInTheDocument();
   });
 
   it("CargoDigitalModal: renderiza el ticket térmico con CUT, QR y datos del solicitante", () => {

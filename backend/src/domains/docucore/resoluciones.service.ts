@@ -42,7 +42,7 @@ export interface ProyectoResolucion {
   numero: string;
   tipoResolucion: TipoResolucion;
   expedienteId: string;
-  estado: 'BORRADOR';
+  estado: string;
   visto: string;
   considerandos: string[];
   articulos: ArticuloResolutivo[];
@@ -55,21 +55,20 @@ export type ProyectoResolucionAGuardar = Omit<ProyectoResolucion, 'creadoEn'> & 
   usuarioId?: string | null;
 };
 
-interface FilaProyecto {
-  id_proyecto: string;
-  numero_resolucion: string;
+interface FilaResolucion {
+  resolucion_id: string;
+  expediente_id: string;
+  numero_borrador: string;
+  numero_resolucion: string | null;
   tipo_resolucion: TipoResolucion;
-  id_expediente: string;
+  asunto: string;
   estado: string;
-  visto: string;
-  considerandos: unknown;
-  articulos: unknown;
-  distribucion: unknown;
-  html_renderizado: string;
-  fecha_creacion: string;
+  fecha_proyeccion: string | Date;
+  proyectado_por: string | null;
+  creado_en: string | Date;
 }
 
-// --- Persistencia (patrón repositorio, mismo estilo que crearCargadorDesdePool)
+// --- Persistencia (patrón repositorio, alineado con sigd_doc.resolucion)
 
 export interface RepositorioProyectoResolucion {
   asignarNumeroAnual(anio: number): Promise<string>;
@@ -87,34 +86,28 @@ function formatearNumeroResolucion(anio: number, secuencia: number): string {
 export function crearRepositorioResoluciones(pool: Pool): RepositorioProyectoResolucion {
   return {
     /**
-     * Asigna el siguiente número correlativo del año fiscal de forma atómica.
-     * El UPDATE sobre la fila del año adquiere su lock de fila, de modo que dos
-     * proyecciones concurrentes jamás reciben el mismo número. (Configuración
-     * READ COMMITTED; patrón equivalente a sigd_tra.generar_cut_expediente.)
+     * Asigna el siguiente número correlativo anual de resolución de forma atómica
+     * usando lock consultivo transaccional en PostgreSQL sobre el año fiscal.
      */
     async asignarNumeroAnual(anio: number): Promise<string> {
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        await cliente.query(
-          `INSERT INTO sigd_doc.secuencia_anual_resolucion (anio_fiscal, secuencia)
-           VALUES ($1, 0)
-           ON CONFLICT (anio_fiscal) DO NOTHING`,
+        await cliente.query(`SELECT pg_advisory_xact_lock(hashtext('resolucion_' || $1::text))`, [anio]);
+        const res = await cliente.query<{ siguiente: number }>(
+          `SELECT COALESCE(
+             MAX(
+               CAST(SUBSTRING(numero_borrador FROM '[0-9]+$') AS INTEGER)
+             ),
+             0
+           ) + 1 AS siguiente
+           FROM sigd_doc.resolucion
+           WHERE EXTRACT(YEAR FROM fecha_proyeccion) = $1`,
           [anio],
         );
-        const actualizado = await cliente.query<{ numero: string }>(
-          `UPDATE sigd_doc.secuencia_anual_resolucion
-              SET secuencia = secuencia + 1,
-                  ultimo_numero_generado = 'RD-' || anio_fiscal || '-' || lpad((secuencia + 1)::text, 6, '0')
-            WHERE anio_fiscal = $1
-          RETURNING ultimo_numero_generado AS numero`,
-          [anio],
-        );
-        if (!actualizado.rows[0]) {
-          throw new Error(`No se pudo inicializar la secuencia de resolución del año ${anio}.`);
-        }
+        const siguiente = res.rows[0]?.siguiente ?? 1;
         await cliente.query('COMMIT');
-        return actualizado.rows[0].numero;
+        return formatearNumeroResolucion(anio, siguiente);
       } catch (error) {
         await cliente.query('ROLLBACK');
         throw error;
@@ -126,65 +119,81 @@ export function crearRepositorioResoluciones(pool: Pool): RepositorioProyectoRes
     async guardar(proyecto: ProyectoResolucionAGuardar): Promise<ProyectoResolucion> {
       const cliente = await pool.connect();
       try {
-        const insertado = await cliente.query<FilaProyecto>(
-          `INSERT INTO sigd_doc.proyecto_resolucion
-             (numero_resolucion, tipo_resolucion, id_expediente, estado,
-              visto, considerandos, articulos, distribucion, html_renderizado,
-              id_usuario_creador)
-           VALUES ($1, $2, $3, 'BORRADOR', $4, $5, $6, $7, $8, $9)
-           RETURNING id_proyecto, numero_resolucion, tipo_resolucion, id_expediente,
-                     estado, visto, considerandos, articulos, distribucion,
-                     html_renderizado, fecha_creacion`,
+        const usuarioValido =
+          proyecto.usuarioId && /^[0-9a-fA-F-]{36}$/.test(proyecto.usuarioId)
+            ? proyecto.usuarioId
+            : null;
+        const asunto = (proyecto.visto || 'Proyecto de resolución directoral').slice(0, 500);
+
+        const insertado = await cliente.query<FilaResolucion>(
+          `INSERT INTO sigd_doc.resolucion
+             (expediente_id, numero_borrador, numero_resolucion, tipo_resolucion,
+              asunto, estado, fecha_proyeccion, proyectado_por)
+           VALUES ($1, $2, $3, $4, $5, 'BORRADOR_PENDIENTE_FIRMA', CURRENT_DATE, $6)
+           RETURNING resolucion_id, expediente_id, numero_borrador, numero_resolucion,
+                     tipo_resolucion, asunto, estado, fecha_proyeccion, proyectado_por,
+                     creado_en`,
           [
+            proyecto.expedienteId,
+            proyecto.numero,
             proyecto.numero,
             proyecto.tipoResolucion,
-            proyecto.expedienteId,
-            proyecto.visto,
-            JSON.stringify(proyecto.considerandos),
-            JSON.stringify(proyecto.articulos),
-            JSON.stringify(proyecto.distribucion),
-            proyecto.html,
-            proyecto.usuarioId ?? null,
+            asunto,
+            usuarioValido,
           ],
         );
-        return mapearFilaProyecto(insertado.rows[0]);
+        const fila = insertado.rows[0];
+        return {
+          id: fila.resolucion_id,
+          numero: fila.numero_borrador,
+          tipoResolucion: fila.tipo_resolucion,
+          expedienteId: fila.expediente_id,
+          estado: fila.estado,
+          visto: proyecto.visto,
+          considerandos: proyecto.considerandos,
+          articulos: proyecto.articulos,
+          distribucion: proyecto.distribucion,
+          html: proyecto.html,
+          creadoEn: fila.creado_en instanceof Date ? fila.creado_en.toISOString() : String(fila.creado_en),
+        };
       } finally {
         cliente.release();
       }
     },
 
     async obtenerPorId(id: string): Promise<ProyectoResolucion | null> {
-      const resultado = await pool.query<FilaProyecto>(
-        `SELECT id_proyecto, numero_resolucion, tipo_resolucion, id_expediente,
-                estado, visto, considerandos, articulos, distribucion,
-                html_renderizado, fecha_creacion
-           FROM sigd_doc.proyecto_resolucion
-          WHERE id_proyecto = $1`,
+      const resultado = await pool.query<FilaResolucion>(
+        `SELECT resolucion_id, expediente_id, numero_borrador, numero_resolucion,
+                tipo_resolucion, asunto, estado, fecha_proyeccion, proyectado_por,
+                creado_en
+           FROM sigd_doc.resolucion
+          WHERE resolucion_id = $1`,
         [id],
       );
       const fila = resultado.rows[0];
-      return fila ? mapearFilaProyecto(fila) : null;
+      if (!fila) return null;
+      const html = renderizarResolucionHTML({
+        numero: fila.numero_borrador,
+        tipoResolucion: fila.tipo_resolucion,
+        visto: fila.asunto,
+        considerandos: [fila.asunto],
+        articulos: [{ numero: 1, texto: fila.asunto }],
+        distribucion: ['Dirección General'],
+      });
+      return {
+        id: fila.resolucion_id,
+        numero: fila.numero_borrador,
+        tipoResolucion: fila.tipo_resolucion,
+        expedienteId: fila.expediente_id,
+        estado: fila.estado,
+        visto: fila.asunto,
+        considerandos: [fila.asunto],
+        articulos: [{ numero: 1, texto: fila.asunto }],
+        distribucion: ['Dirección General'],
+        html,
+        creadoEn: fila.creado_en instanceof Date ? fila.creado_en.toISOString() : String(fila.creado_en),
+      };
     },
-  };
-}
-
-function mapearFilaProyecto(fila: FilaProyecto): ProyectoResolucion {
-  return {
-    id: fila.id_proyecto,
-    numero: fila.numero_resolucion,
-    tipoResolucion: fila.tipo_resolucion,
-    expedienteId: fila.id_expediente,
-    estado: 'BORRADOR',
-    visto: fila.visto,
-    considerandos: Array.isArray(fila.considerandos)
-      ? fila.considerandos.map(String)
-      : [],
-    articulos: Array.isArray(fila.articulos)
-      ? (fila.articulos as ArticuloResolutivo[])
-      : [],
-    distribucion: Array.isArray(fila.distribucion) ? fila.distribucion.map(String) : [],
-    html: fila.html_renderizado,
-    creadoEn: fila.fecha_creacion,
   };
 }
 

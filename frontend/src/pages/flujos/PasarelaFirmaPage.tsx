@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 
 import FirmaBatchDrawer from "../../components/firma/FirmaBatchDrawer";
+import FlujoPageHeader from "../../components/flujos/FlujoPageHeader";
 import RefirmaConnectorModal from "../../components/firma/RefirmaConnectorModal";
 import type {
   DocumentoOficial,
@@ -139,40 +139,18 @@ export default function PasarelaFirmaPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-5">
-          <Link
-            to="/"
-            className="mb-4 mr-3 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-          >
-            ← Volver al inicio
-          </Link>
-          <Link
-            to="/flujo-validez-legal"
-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-          >
-            ← Volver al módulo
-          </Link>
-          <p className="text-sm font-bold text-blue-700">
-            ENT-M04-03 · Adriano David Espinoza Ramírez (R/A) · Mayra (R)
-          </p>
-          <h1 className="text-2xl font-bold">
-            Pasarela Frontend de Despacho de Firma Digital (Refirma RENIEC)
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Invocación del agente local mediante el protocolo{" "}
-            <code>refirma://sign?token=&hash=&callback=</code> · Firma PAdES-BES
-            con sellado de tiempo TSA (RFC 3161).
-          </p>
-        </div>
-      </header>
+    <div className="flex-1 w-full bg-slate-100 text-slate-900">
+      <FlujoPageHeader
+        faseTag="IESTP &quot;Suiza&quot; · Servicio Oficial de Firma Digital (Ley N° 27269)"
+        title="Pasarela Frontend de Despacho de Firma Digital (Refirma RENIEC)"
+        description="Invocación del agente local mediante el protocolo refirma://sign?token=&hash=&callback= · Firma PAdES-BES con sellado de tiempo TSA (RFC 3161)."
+      />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 flex flex-wrap items-center gap-3">
-          <div className="mr-auto">
-            <h2 className="text-lg font-bold">Documentos pendientes de suscripción</h2>
-            <p className="text-sm text-slate-500">
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base sm:text-lg font-bold">Documentos pendientes de suscripción</h2>
+            <p className="text-xs sm:text-sm text-slate-500">
               Bandeja criptográfica de la Dirección General y Secretaría Académica.
             </p>
           </div>
@@ -180,7 +158,7 @@ export default function PasarelaFirmaPage() {
           <button
             type="button"
             onClick={() => setDrawerAbierto(true)}
-            className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
           >
             Firmar en lote (Secretaría)
           </button>
@@ -216,7 +194,7 @@ export default function PasarelaFirmaPage() {
                         HASH: {documento.hashSha256.slice(0, 12)}…
                       </p>
                     </td>
-                    <td className="max-w-xs px-4 py-4 text-sm text-slate-600">
+                    <td className="max-w-md xl:max-w-xl 2xl:max-w-2xl px-4 py-4 text-sm text-slate-600">
                       {documento.asunto}
                       {documento.cvd && (
                         <p className="mt-1 text-xs font-semibold text-emerald-700">
@@ -278,6 +256,6 @@ export default function PasarelaFirmaPage() {
         )}
         onCerrar={() => setDrawerAbierto(false)}
       />
-    </main>
+    </div>
   );
 }

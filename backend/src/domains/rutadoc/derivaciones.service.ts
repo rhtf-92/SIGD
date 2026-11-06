@@ -25,15 +25,17 @@ export async function derivarExpediente(
     throw new UnauthorizedError({ detail: 'No se encontr usuario en el contexto para registrar el movimiento.' });
   }
 
-  // 2. Obtener estado y ǭrea actual del expediente (ltimo movimiento)
-  const resEstadoActual = await cliente.query<{ estado_actual_id: string, area_contexto_id: string }>(`
+  // 2. Obtener estado y área actual del expediente (último movimiento)
+  const resEstadoActual = await cliente.query<{ estado_actual_id: string; area_contexto_id: string }>(
+    `
     SELECT
-      e.estado_actual_id,
-      m.area_contexto_id
-    FROM sigd_rut.estado_actual_tramite e
-    JOIN sigd_rut.movimiento_tramite m ON e.movimiento_actual_id = m.movimiento_id
-    WHERE e.expediente_id = $1
-  `, [expedienteId]);
+      e.estado_nuevo AS estado_actual_id,
+      e.area_actual_id AS area_contexto_id
+    FROM sigd_rut.estado_actual_expediente e
+    WHERE e.expediente_id::text = $1::text
+  `,
+    [expedienteId],
+  );
 
   if (resEstadoActual.rowCount === 0) {
     throw new NotFoundError({ detail: 'El expediente no existe o no tiene estado actual.' });
@@ -42,11 +44,11 @@ export async function derivarExpediente(
   const estadoAnteriorId = resEstadoActual.rows[0].estado_actual_id;
   const areaOrigenId = resEstadoActual.rows[0].area_contexto_id;
 
-  // 3. Obtener IDs fsicos de los catǭlogos (No podemos hardcodear IDs numricos)
-  const resCatalogos = await cliente.query<{ id: string, tipo: string }>(`
-    SELECT accion_tramite_id::text as id, 'accion' as tipo FROM sigd_rut.accion_tramite WHERE codigo = 'DERIVACION'
+  // 3. Obtener IDs físicos de los catálogos (No podemos hardcodear IDs numéricos)
+  const resCatalogos = await cliente.query<{ id: string; tipo: string }>(`
+    SELECT codigo AS id, 'accion' as tipo FROM sigd_rut.accion_tramite WHERE codigo = 'DERIVACION'
     UNION ALL
-    SELECT estado_tramite_id::text as id, 'estado' as tipo FROM sigd_rut.estado_tramite WHERE codigo = 'PENDIENTE_RECEPCION'
+    SELECT codigo AS id, 'estado' as tipo FROM sigd_rut.estado_tramite WHERE codigo IN ('DERIVADO', 'PENDIENTE_RECEPCION')
   `);
 
   const accionId = resCatalogos.rows.find(r => r.tipo === 'accion')?.id;
@@ -63,7 +65,6 @@ export async function derivarExpediente(
     const resMovimiento = await cliente.query<{ movimiento_id: string }>(`
       INSERT INTO sigd_rut.movimiento_tramite (
         expediente_id,
-        secuencia,
         accion_tramite_id,
         estado_anterior_id,
         estado_resultante_id,
@@ -73,7 +74,6 @@ export async function derivarExpediente(
         clave_idempotencia
       ) VALUES (
         $1,
-        (SELECT COALESCE(MAX(secuencia), 0) + 1 FROM sigd_rut.movimiento_tramite WHERE expediente_id = $1),
         $2,
         $3,
         $4,
@@ -154,13 +154,17 @@ export async function atenderExpediente(
     throw new UnauthorizedError({ detail: 'No se encontr usuario en el contexto.' });
   }
 
-  // 1. Obtener estado y orea actual
-  const resEstadoActual = await cliente.query<{ estado_actual_id: string, area_contexto_id: string }>(`
-    SELECT e.estado_actual_id, m.area_contexto_id
-    FROM sigd_rut.estado_actual_tramite e
-    JOIN sigd_rut.movimiento_tramite m ON e.movimiento_actual_id = m.movimiento_id
-    WHERE e.expediente_id = $1
-  `, [expedienteId]);
+  // 1. Obtener estado y área actual
+  const resEstadoActual = await cliente.query<{ estado_actual_id: string; area_contexto_id: string }>(
+    `
+    SELECT
+      e.estado_nuevo AS estado_actual_id,
+      e.area_actual_id AS area_contexto_id
+    FROM sigd_rut.estado_actual_expediente e
+    WHERE e.expediente_id::text = $1::text
+  `,
+    [expedienteId],
+  );
 
   if (resEstadoActual.rowCount === 0) {
     throw new NotFoundError({ detail: 'El expediente no existe o no tiene estado actual.' });
@@ -179,11 +183,11 @@ export async function atenderExpediente(
     throw new ForbiddenError({ detail: 'El usuario no pertenece al área donde se encuentra el expediente.' });
   }
 
-  // 2. Obtener IDs fsicos de los catologos
-  const resCatalogos = await cliente.query<{ id: string, tipo: string }>(`
-    SELECT accion_tramite_id::text as id, 'accion' as tipo FROM sigd_rut.accion_tramite WHERE codigo = 'ATENCION'
+  // 2. Obtener IDs físicos de los catálogos
+  const resCatalogos = await cliente.query<{ id: string; tipo: string }>(`
+    SELECT codigo AS id, 'accion' as tipo FROM sigd_rut.accion_tramite WHERE codigo = 'ATENCION'
     UNION ALL
-    SELECT estado_tramite_id::text as id, 'estado' as tipo FROM sigd_rut.estado_tramite WHERE codigo = 'ATENDIDO'
+    SELECT codigo AS id, 'estado' as tipo FROM sigd_rut.estado_tramite WHERE codigo = 'ATENDIDO'
   `);
 
   const accionId = resCatalogos.rows.find(r => r.tipo === 'accion')?.id;
@@ -196,12 +200,10 @@ export async function atenderExpediente(
   // 3. INSERT en movimiento_tramite
   const resMovimiento = await cliente.query<{ movimiento_id: string }>(`
     INSERT INTO sigd_rut.movimiento_tramite (
-      expediente_id, secuencia, accion_tramite_id, estado_anterior_id, estado_resultante_id,
+      expediente_id, accion_tramite_id, estado_anterior_id, estado_resultante_id,
       usuario_actor_id, area_contexto_id, observacion, clave_idempotencia
     ) VALUES (
-      $1,
-      (SELECT COALESCE(MAX(secuencia), 0) + 1 FROM sigd_rut.movimiento_tramite WHERE expediente_id = $1),
-      $2, $3, $4, $5, $6, null, $7
+      $1, $2, $3, $4, $5, $6, null, $7
     ) RETURNING movimiento_id
   `, [
     expedienteId, accionId, estadoAnteriorId, estadoResultanteId,
@@ -246,43 +248,61 @@ export async function archivarExpediente(
   }
 
   // 1. Obtener estado y area actual
-  const resEstadoActual = await cliente.query<{ estado_actual_id: string, area_contexto_id: string, codigo_estado: string }>(`
-    SELECT e.estado_actual_id, m.area_contexto_id, et.codigo as codigo_estado
-    FROM sigd_rut.estado_actual_tramite e
-    JOIN sigd_rut.movimiento_tramite m ON e.movimiento_actual_id = m.movimiento_id
-    JOIN sigd_rut.estado_tramite et ON et.estado_tramite_id = e.estado_actual_id
-    WHERE e.expediente_id = $1
-  `, [expedienteId]);
+  const resEstadoActual = await cliente.query<{
+    estado_actual_id: string;
+    area_contexto_id: string;
+    codigo_estado: string;
+  }>(
+    `
+    SELECT
+      e.estado_nuevo AS estado_actual_id,
+      e.area_actual_id AS area_contexto_id,
+      e.estado_nuevo AS codigo_estado
+    FROM sigd_rut.estado_actual_expediente e
+    WHERE e.expediente_id::text = $1::text
+  `,
+    [expedienteId],
+  );
 
   if (resEstadoActual.rowCount === 0) {
     throw new NotFoundError({ detail: 'El expediente no existe o no tiene estado actual.' });
   }
 
-  const { estado_actual_id: estadoAnteriorId, area_contexto_id: areaActualExpediente, codigo_estado: codigoEstadoActual } = resEstadoActual.rows[0];
+  const {
+    estado_actual_id: estadoAnteriorId,
+    area_contexto_id: areaActualExpediente,
+    codigo_estado: codigoEstadoActual,
+  } = resEstadoActual.rows[0];
 
-  if (codigoEstadoActual !== 'CERRADO') {
-    throw new DomainError({ code: 'ESTADO_INVALIDO', message: 'El estado actual del expediente no permite realizar esta acción.', detail: 'Solo se pueden archivar expedientes en estado CERRADO.' });
+  if (codigoEstadoActual !== 'CERRADO' && codigoEstadoActual !== 'RESUELTO') {
+    throw new DomainError({
+      code: 'ESTADO_INVALIDO',
+      message: 'El estado actual del expediente no permite realizar esta acción.',
+      detail: 'Solo se pueden archivar expedientes en estado CERRADO o RESUELTO.',
+    });
   }
 
   // 2. Obtener IDs fisicos (Accion ARCHIVAR)
   const resCatalogos = await cliente.query<{ id: string }>(`
-    SELECT accion_tramite_id::text as id FROM sigd_rut.accion_tramite WHERE codigo = 'ARCHIVAR'
+    SELECT codigo AS id FROM sigd_rut.accion_tramite WHERE codigo IN ('ARCHIVAR', 'CIERRE')
   `);
 
   if (resCatalogos.rowCount === 0) {
-    throw new DomainError({ code: 'CATALOGO_NO_ENCONTRADO', message: 'Faltan datos en el catálogo de base de datos.', detail: 'Error fisico: No se encontro la accion ARCHIVAR en BD.' });
+    throw new DomainError({
+      code: 'CATALOGO_NO_ENCONTRADO',
+      message: 'Faltan datos en el catálogo de base de datos.',
+      detail: 'Error fisico: No se encontro la accion ARCHIVAR en BD.',
+    });
   }
   const accionId = resCatalogos.rows[0].id;
 
   // 3. INSERT en movimiento_tramite (Manteniendo estado_resultante = CERRADO)
   const resMovimiento = await cliente.query<{ movimiento_id: string }>(`
     INSERT INTO sigd_rut.movimiento_tramite (
-      expediente_id, secuencia, accion_tramite_id, estado_anterior_id, estado_resultante_id,
+      expediente_id, accion_tramite_id, estado_anterior_id, estado_resultante_id,
       usuario_actor_id, area_contexto_id, observacion, clave_idempotencia
     ) VALUES (
-      $1,
-      (SELECT COALESCE(MAX(secuencia), 0) + 1 FROM sigd_rut.movimiento_tramite WHERE expediente_id = $1),
-      $2, $3, $3, $4, $5, $6, $7
+      $1, $2, $3, $3, $4, $5, $6, $7
     ) RETURNING movimiento_id
   `, [
     expedienteId, accionId, estadoAnteriorId,

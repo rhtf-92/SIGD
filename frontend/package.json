@@ -9,7 +9,6 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "typecheck:m03": "tsc --noEmit -p tsconfig.m03.json",
     "lint": "eslint src --max-warnings 0",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

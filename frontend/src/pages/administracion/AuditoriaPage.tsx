@@ -24,48 +24,46 @@ export default function AuditoriaPage() {
   } = useAuditLogs();
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="flex-1 bg-slate-100 text-slate-900">
       <AdminPageHeader
         title="Logs de Auditoría"
         description="Trazabilidad inmutable (WORM), acciones, accesos y correlación X-Correlation-ID."
       />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-          Los registros de auditoría son de solo lectura. La inmutabilidad real
-          debe garantizarse en backend y base de datos (append-only + hash
-          encadenado).
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8">
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs sm:text-sm text-blue-800">
+          Registro inmutable de trazabilidad (WORM) y pistas de auditoría institucional.
         </div>
 
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
-          <article className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-            <p className="text-sm font-semibold text-emerald-800">
+        <div className="mb-6 grid gap-3 sm:gap-4 xl:gap-6 grid-cols-1 sm:grid-cols-3">
+          <article className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5">
+            <p className="text-xs sm:text-sm font-semibold text-emerald-800">
               Eventos exitosos
             </p>
-            <p className="mt-2 text-3xl font-bold text-emerald-700">
+            <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-emerald-700">
               {resumen.exitosos}
             </p>
           </article>
-          <article className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-            <p className="text-sm font-semibold text-amber-800">
+          <article className="rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+            <p className="text-xs sm:text-sm font-semibold text-amber-800">
               Acciones denegadas (403)
             </p>
-            <p className="mt-2 text-3xl font-bold text-amber-700">
+            <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-amber-700">
               {resumen.denegados}
             </p>
           </article>
-          <article className="rounded-xl border border-red-200 bg-red-50 p-5">
-            <p className="text-sm font-semibold text-red-800">
+          <article className="rounded-xl border border-red-200 bg-red-50 p-4 sm:p-5">
+            <p className="text-xs sm:text-sm font-semibold text-red-800">
               Errores de sistema (RFC 7807)
             </p>
-            <p className="mt-2 text-3xl font-bold text-red-700">
+            <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-red-700">
               {resumen.errores}
             </p>
           </article>
         </div>
 
-        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 lg:grid-cols-[1fr_220px_220px_auto]">
+        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+          <div className="grid gap-3 sm:gap-4 xl:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_200px_200px_auto] xl:grid-cols-[1fr_240px_240px_auto]">
             <div>
               <label className="mb-2 block text-sm font-semibold">Buscar</label>
               <input
@@ -116,7 +114,7 @@ export default function AuditoriaPage() {
               <button
                 type="button"
                 onClick={exportarCsv}
-                className="w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+                className="w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
               >
                 Exportar CSV
               </button>
@@ -125,7 +123,7 @@ export default function AuditoriaPage() {
         </section>
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
+          <div className="border-b border-slate-200 px-4 py-4 sm:px-6">
             <h2 className="font-bold">Registro de eventos</h2>
             <p className="mt-1 text-xs text-slate-500">
               {filtrados.length} evento
@@ -135,7 +133,7 @@ export default function AuditoriaPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1350px] text-left">
+            <table className="w-full min-w-[1000px] text-left">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
                   <th className="px-5 py-3">ID / Fecha</th>
@@ -182,7 +180,7 @@ export default function AuditoriaPage() {
                       <button
                         type="button"
                         onClick={() => setSeleccionado(registro)}
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
                       >
                         Ver
                       </button>
@@ -199,6 +197,6 @@ export default function AuditoriaPage() {
         registro={seleccionado}
         onClose={() => setSeleccionado(null)}
       />
-    </main>
+    </div>
   );
 }

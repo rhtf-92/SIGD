@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiClient } from "../api/client";
 
 import type {
   EstadoEtapaWorkflow,
@@ -310,7 +311,48 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
   const [tramite, setTramite] = useState<WorkflowAcademico>(() =>
     crearTramiteDemo(),
   );
+  const [expedientesDisponibles, setExpedientesDisponibles] = useState<WorkflowAcademico[]>([
+    ...EXPEDIENTES_DEMO,
+  ]);
   const [errorFsm, setErrorFsm] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    async function sincronizarExpedientesReales() {
+      try {
+        const respuesta = await apiClient.get<any>("/api/v1/expedientes", {
+          params: { porPagina: 10 },
+        });
+        const items = respuesta.data?.elementos || (Array.isArray(respuesta.data) ? respuesta.data : []);
+        if (!cancelado && items && items.length > 0) {
+          const adaptados: WorkflowAcademico[] = items.map((e: any, idx: number) =>
+            crearTramiteDemo({
+              idTramite: 500 + idx,
+              cut: e.cut || `EXP-2026-${String(idx + 500).padStart(6, "0")}`,
+              nombreTramite: e.asunto || "Trámite Académico Oficial",
+              programa: "Desarrollo de Sistemas de Información (DSI)",
+              solicitante: {
+                idPersona: 3000 + idx,
+                numeroDocumento: e.solicitanteDni || "45000000",
+                nombres: e.solicitanteNombre || "Administrado Institucional",
+                apellidos: "",
+                correoElectronico: "estudiante@alumno.institutosuiza.edu.pe",
+              },
+              estado: (e.estadoFsm === "EN_PROCESO" ? "EN_TRAMITE" : e.estadoFsm) || "EN_TRAMITE",
+              etapaActualId: 1,
+            }),
+          );
+          setExpedientesDisponibles([...adaptados, ...EXPEDIENTES_DEMO]);
+        }
+      } catch {
+        // Fallback defensivo a EXPEDIENTES_DEMO si el backend está desconectado
+      }
+    }
+    void sincronizarExpedientesReales();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   const estado = tramite.estado;
 
@@ -344,15 +386,15 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
 
   /** Buscador ENT-M04-01: carga un expediente de la bandeja para pasarlo a revisión. */
   const cargarExpediente = useCallback((idTramite: number) => {
-    const encontrado = EXPEDIENTES_DEMO.find((e) => e.idTramite === idTramite);
+    const encontrado = expedientesDisponibles.find((e) => e.idTramite === idTramite);
     if (!encontrado) {
-      setErrorFsm(`Expediente N.° ${idTramite} no encontrado en la bandeja demo.`);
+      setErrorFsm(`Expediente N.° ${idTramite} no encontrado en la bandeja.`);
       return;
     }
     setErrorFsm(null);
     // Clon profundo para no mutar el catálogo al avanzar la FSM.
     setTramite(JSON.parse(JSON.stringify(encontrado)) as WorkflowAcademico);
-  }, []);
+  }, [expedientesDisponibles]);
 
   const aprobarEtapaActual = useCallback(() => {
     if (!validarTransicion("EN_REVISION", "APROBADO", "Solo se puede aprobar en estado EN_REVISION.")) {
@@ -511,7 +553,7 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
     estado,
     errorFsm,
     requisitosPendientesEtapaActual,
-    expedientesDisponibles: [...EXPEDIENTES_DEMO],
+    expedientesDisponibles,
     puedeTomar: estado === "EN_TRAMITE",
     puedeAprobar:
       estado === "EN_REVISION" && requisitosPendientesEtapaActual.length === 0,

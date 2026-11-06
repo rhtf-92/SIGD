@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
+import UserCreateModal from "../../components/administracion/UserCreateModal";
 import UserEditModal from "../../components/administracion/UserEditModal";
 import {
   CATALOGO_AREAS,
@@ -9,7 +10,7 @@ import {
   useUsuariosAdmin,
 } from "../../hooks/useUsuariosAdmin";
 import type { ApiHttpError } from "../../types/api";
-import type { EstadoUsuario } from "../../types/usuarioAdmin";
+import type { CreateUsuarioDTO, EstadoUsuario } from "../../types/usuarioAdmin";
 
 function estiloEstado(estado: EstadoUsuario) {
   if (estado === "Activo") return "bg-emerald-100 text-emerald-700";
@@ -36,6 +37,9 @@ export default function UsuariosPage() {
     setEstado,
     usuarioEditando,
     setUsuarioEditando,
+    modalCrearAbierto,
+    setModalCrearAbierto,
+    crearUsuario,
     actualizarUsuario,
     conmutarEstado,
     isLoading,
@@ -61,7 +65,22 @@ export default function UsuariosPage() {
     }
   }
 
-  async function alternarEstado(id: number) {
+  async function guardarNuevo(datos: CreateUsuarioDTO) {
+    setErrorServidor("");
+    try {
+      await crearUsuario(datos);
+      setModalCrearAbierto(false);
+      setMensaje("El usuario institucional fue registrado exitosamente.");
+    } catch (error) {
+      setMensaje("");
+      setErrorServidor(
+        "No se pudo registrar el usuario. Revise los campos requeridos e intente nuevamente.",
+      );
+      throw error;
+    }
+  }
+
+  async function alternarEstado(id: string | number) {
     setErrorServidor("");
     try {
       await conmutarEstado(id);
@@ -73,27 +92,44 @@ export default function UsuariosPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="flex-1 bg-slate-100 text-slate-900">
       <AdminPageHeader
         title="Gestión de Usuarios"
         description="Administración de cuentas, áreas, cargos, roles y estados."
       />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <p className="text-sm text-slate-600">
-            Directorio institucional de {totalUsuarios} cuentas registradas.
-            Búsqueda en tiempo real y filtro por estado operativo.
-          </p>
-          {isFetching && !isLoading && (
-            <span
-              role="status"
-              aria-live="polite"
-              className="rounded-lg bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700"
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-slate-600">
+              Directorio institucional · <span className="font-semibold text-slate-900">{totalUsuarios}</span> cuentas registradas
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {isFetching && !isLoading && (
+              <span
+                role="status"
+                aria-live="polite"
+                className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700"
+              >
+                Consultando directorio institucional...
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setMensaje("");
+                setErrorServidor("");
+                setModalCrearAbierto(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 transition-colors"
             >
-              Consultando directorio institucional...
-            </span>
-          )}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Registrar Usuario
+            </button>
+          </div>
         </div>
 
         {mensaje && (
@@ -126,8 +162,8 @@ export default function UsuariosPage() {
           </div>
         )}
 
-        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+          <div className="grid gap-3 sm:gap-4 xl:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <label htmlFor="busqueda" className="mb-2 block text-sm font-semibold">
                 Buscar usuario
@@ -220,7 +256,7 @@ export default function UsuariosPage() {
         </section>
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
+          <div className="border-b border-slate-200 px-4 py-4 sm:px-6">
             <h3 className="font-bold">Usuarios registrados</h3>
             <p className="mt-1 text-xs text-slate-500">
               {usuarios.length} resultado
@@ -229,7 +265,7 @@ export default function UsuariosPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-left">
+            <table className="w-full min-w-[900px] text-left">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
                   <th className="px-6 py-3">Usuario</th>
@@ -338,6 +374,25 @@ export default function UsuariosPage() {
         </section>
       </section>
 
+      {modalCrearAbierto && (
+        <UserCreateModal
+          areas={CATALOGO_AREAS}
+          sedes={CATALOGO_SEDES}
+          roles={CATALOGO_ROLES_USUARIOS}
+          onClose={() => {
+            setModalCrearAbierto(false);
+          }}
+          onSave={guardarNuevo}
+          onServerError={(err: ApiHttpError) => {
+            if (err?.correlationId) {
+              setErrorServidor(
+                `Operación rechazada por el servidor. Código de correlación: ${err.correlationId}.`,
+              );
+            }
+          }}
+        />
+      )}
+
       {usuarioEditando && (
         <UserEditModal
           usuario={usuarioEditando}
@@ -358,6 +413,6 @@ export default function UsuariosPage() {
           }}
         />
       )}
-    </main>
+    </div>
   );
 }

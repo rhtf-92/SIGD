@@ -29,11 +29,62 @@ export default function AdminRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="roles-permisos" element={<RolesPermisosPage />} />
-      <Route path="auditoria" element={<AuditoriaPage />} />
-      <Route path="tablas-maestras" element={<TablasMaestrasPage />} />
-      <Route path="calendario-laboral" element={<CalendarioLaboralPage />} />
-      <Route path="seguridad" element={<SeguridadPage />} />
+      <Route
+        path="roles-permisos"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN"]}
+            requiredModule="Administración"
+            requiredAction="editar"
+          >
+            <RolesPermisosPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="auditoria"
+        element={
+          <ProtectedRoute requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}>
+            <AuditoriaPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="tablas-maestras"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN"]}
+            requiredModule="Administración"
+            requiredAction="editar"
+          >
+            <TablasMaestrasPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="calendario-laboral"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN"]}
+            requiredModule="Administración"
+            requiredAction="editar"
+          >
+            <CalendarioLaboralPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="seguridad"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN"]}
+            requiredModule="Administración"
+            requiredAction="editar"
+          >
+            <SeguridadPage />
+          </ProtectedRoute>
+        }
+      />
     </>
   );
 }

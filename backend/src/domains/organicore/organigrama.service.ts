@@ -8,6 +8,10 @@ export interface UnidadOrganica {
   padre_id: string | null;
   path: string;
   estado: boolean;
+  area_id?: string;
+  codigo?: string;
+  area_padre_id?: string | null;
+  vigente?: boolean;
 }
 
 export interface UnidadOrganicaAnidada extends UnidadOrganica {
@@ -30,7 +34,19 @@ export class OrganigramaService {
 
   async obtenerOrganigrama(): Promise<UnidadOrganicaAnidada[]> {
     const { rows } = await this.pool.query(
-      'SELECT id, sigla, nombre, padre_id, path, estado FROM sigd_org.unidad_organica WHERE estado = TRUE ORDER BY path ASC'
+      `SELECT area_id AS id,
+              codigo AS sigla,
+              nombre,
+              area_padre_id AS padre_id,
+              path::text AS path,
+              vigente AS estado,
+              area_id,
+              codigo,
+              area_padre_id,
+              vigente
+         FROM sigd_org.area
+        WHERE vigente = TRUE
+        ORDER BY path ASC`
     );
 
     const planas = rows as UnidadOrganica[];
@@ -58,11 +74,12 @@ export class OrganigramaService {
   async crearUnidad(dto: CrearUnidadDTO): Promise<UnidadOrganica> {
     const { sigla, nombre, padre_id } = dto;
     const query = `
-      INSERT INTO sigd_org.unidad_organica (sigla, nombre, padre_id)
+      INSERT INTO sigd_org.area (codigo, nombre, area_padre_id)
       VALUES ($1, $2, $3)
-      RETURNING id, sigla, nombre, padre_id, path, estado
+      RETURNING area_id AS id, codigo AS sigla, nombre, area_padre_id AS padre_id, path::text AS path, vigente AS estado,
+                area_id, codigo, area_padre_id, vigente
     `;
-    const { rows } = await this.pool.query(query, [sigla, nombre, padre_id]);
+    const { rows } = await this.pool.query(query, [sigla, nombre, padre_id || null]);
     return rows[0];
   }
 
@@ -77,18 +94,19 @@ export class OrganigramaService {
       setClauses.push(`nombre = $${values.length}`);
     }
     if (padre_id !== undefined) {
-      values.push(padre_id);
-      setClauses.push(`padre_id = $${values.length}`);
+      values.push(padre_id || null);
+      setClauses.push(`area_padre_id = $${values.length}`);
     }
 
     if (setClauses.length === 0) throw new Error('No se proporcionaron datos para actualizar');
 
     values.push(id);
     const query = `
-      UPDATE sigd_org.unidad_organica 
-      SET ${setClauses.join(', ')}, actualizado_en = now()
-      WHERE id = $${values.length}
-      RETURNING id, sigla, nombre, padre_id, path, estado
+      UPDATE sigd_org.area 
+      SET ${setClauses.join(', ')}
+      WHERE area_id = $${values.length}
+      RETURNING area_id AS id, codigo AS sigla, nombre, area_padre_id AS padre_id, path::text AS path, vigente AS estado,
+                area_id, codigo, area_padre_id, vigente
     `;
 
     try {
@@ -96,11 +114,11 @@ export class OrganigramaService {
       if (rows.length === 0) throw new Error('Unidad orgánica no encontrada');
       return rows[0];
     } catch (error: any) {
-      if (error.message?.includes('JERARQUIA_CICLO_INVALIDO')) {
+      if (error.message?.includes('JERARQUIA_CICLO_INVALIDO') || error.code === '23503') {
         throw new DomainError({
           code: 'JERARQUIA_CICLO_INVALIDO',
           message: 'Operación rechazada: se ha detectado un ciclo jerárquico en la reubicación de la unidad orgánica.',
-          detail: 'Una unidad no puede ser asignada como hija de uno de sus propios descendientes.'
+          detail: 'Una unidad no puede ser asignada como hija de uno de sus propios descendientes o de un área inexistente.'
         });
       }
       throw error;

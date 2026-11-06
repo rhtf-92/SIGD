@@ -82,22 +82,64 @@ export default function ConsultaPublicaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="flex-1 w-full bg-slate-50 py-6 px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16">
+      <div className="w-full max-w-6xl 2xl:max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        {/* Migajas de pan canónicas */}
+        <nav
+          aria-label="Migajas de pan de consulta pública"
+          className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-500"
+        >
+          <Link to="/" className="hover:text-emerald-700 hover:underline transition-colors">
+            Inicio
+          </Link>
+          <span className="text-slate-300">/</span>
+          <span className="text-slate-600">Transparencia</span>
+          <span className="text-slate-300">/</span>
+          <span aria-current="page" className="font-semibold text-emerald-700">
+            Consulta Pública CUT
+          </span>
+        </nav>
+
+        {/* Píldoras de navegación de servicios ciudadanos */}
+        <nav
+          aria-label="Accesos directos ciudadanos"
+          className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none"
+        >
+          <Link
+            to="/consulta"
+            aria-current="page"
+            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-emerald-700 text-white shadow-xs"
+          >
+            <span>🔍 Consulta Pública CUT</span>
+          </Link>
+          <Link
+            to="/tramite"
+            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 transition"
+          >
+            <span>📝 Mesa de Partes Virtual</span>
+          </Link>
+          <Link
+            to="/validador-cvd"
+            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 transition"
+          >
+            <span>🛡️ Validador CVD / QR</span>
+          </Link>
+        </nav>
+
         {/* Cabecera Institucional */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 pb-6 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5 sm:pb-6 mb-5 sm:mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                 Consulta Pública de Trámites y Expedientes
               </h1>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
                 IESTP "Suiza" — Sede Digital y Transparencia Documentaria (Ley N° 27444 / Ley N° 29733)
               </p>
             </div>
             <Link
               to="/"
-              className="text-sm font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-4 py-2 rounded-lg transition"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-100 hover:text-emerald-700 self-start sm:self-center"
             >
               ← Volver al Portal
             </Link>
@@ -115,13 +157,13 @@ export default function ConsultaPublicaPage() {
                 placeholder="Ejemplo: EXP-2026-000104"
                 value={cutInput}
                 onChange={(e) => setCutInput(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-800 placeholder-slate-400 font-mono text-base uppercase"
+                className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-800 placeholder-slate-400 font-mono text-sm sm:text-base uppercase"
               />
             </div>
             <button
               type="submit"
               disabled={cargando}
-              className="px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               {cargando ? 'Buscando...' : 'Consultar Estado'}
             </button>

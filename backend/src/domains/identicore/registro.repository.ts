@@ -26,7 +26,7 @@ export class RegistroRepository {
       const personaId = await insertarPersona(cliente, tipoDocumentoId, datos);
       await insertarExtensionPersona(cliente, personaId, datos);
       const usuarioId = await this.insertarCuenta(cliente, personaId, datos, passwordHash);
-      await this.insertarConsentimiento(cliente, usuarioId, datos);
+      await this.insertarConsentimiento(cliente, personaId, datos);
 
       await cliente.query('COMMIT');
       transaccionAbierta = false;
@@ -47,8 +47,8 @@ export class RegistroRepository {
 
   private async buscarTipoDocumento(cliente: PoolClient, codigo: 'DNI' | 'RUC'): Promise<string> {
     const resultado = await cliente.query<IdResult>(
-      `SELECT id::text AS id FROM sigd_auth.tipos_documento
-        WHERE codigo = $1 AND estado = TRUE`,
+      `SELECT id_tipo_documento::text AS id FROM sigd_auth.tipos_documento
+        WHERE codigo = $1 AND vigente = TRUE`,
       [codigo],
     );
     const id = resultado.rows[0]?.id;
@@ -64,18 +64,18 @@ export class RegistroRepository {
 
   private async verificarDuplicados(
     cliente: PoolClient,
-    tipoDocumentoId: string,
+    _tipoDocumentoId: string,
     datos: DatosRegistro,
   ): Promise<void> {
     const resultado = await cliente.query<ExisteResult>(
       `SELECT EXISTS (
            SELECT 1 FROM sigd_auth.persona
-            WHERE tipo_documento_id = $1 AND numero_documento = $2
+            WHERE tipo = $1 AND id_documento = $2
        ) OR EXISTS (
            SELECT 1 FROM sigd_auth.cuenta_usuario
-            WHERE lower(email_login) = lower($3) OR username = $4
+            WHERE lower(correo) = lower($3) OR usuario = $4
        ) AS existe`,
-      [tipoDocumentoId, datos.numeroDocumento, datos.correo, datos.numeroDocumento],
+      [datos.tipoPersona, datos.numeroDocumento, datos.correo, datos.numeroDocumento],
     );
     if (resultado.rows[0]?.existe) {
       throw new ConflictError({
@@ -92,8 +92,8 @@ export class RegistroRepository {
     passwordHash: string,
   ): Promise<string> {
     const resultado = await cliente.query<IdResult>(
-      `INSERT INTO sigd_auth.cuenta_usuario (persona_id, username, email_login, password_hash)
-       VALUES ($1, $2, $3, $4) RETURNING id::text AS id`,
+      `INSERT INTO sigd_auth.cuenta_usuario (id_persona, usuario, correo, password_hash)
+       VALUES ($1, $2, $3, $4) RETURNING id_usuario::text AS id`,
       [personaId, datos.numeroDocumento, datos.correo, passwordHash],
     );
     const id = resultado.rows[0]?.id;
@@ -103,19 +103,18 @@ export class RegistroRepository {
 
   private async insertarConsentimiento(
     cliente: PoolClient,
-    usuarioId: string,
+    personaId: string,
     datos: DatosRegistro,
   ): Promise<void> {
     await cliente.query(
       `INSERT INTO sigd_auth.consentimiento_datos
-         (usuario_id, ip_address, version_termsoservicio,
-          aceptacion_notificaciones, consentimiento_obfuscacion)
-       VALUES ($1, $2, 'v1.0', $3, TRUE)`,
-      [usuarioId, datos.ipAddress, datos.aceptaNotificaciones],
+         (id_persona, finalidade, version_politica, aceptado, fecha_aceptacion, ip_origen)
+       VALUES ($1, 'Trámites y Notificaciones SIGD', 'v1.0', $2, CASE WHEN $2 THEN now() ELSE null END, $3)`,
+      [personaId, datos.aceptaNotificaciones, datos.ipAddress],
     );
   }
 }
 
-function esViolacionUnicidad(error: unknown): error is { code: string } {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === '23505';
+function esViolacionUnicidad(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === '23505';
 }

@@ -129,12 +129,17 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     soloActivos: true,
     sql: `
       SELECT t.codigo,
-             t.nombre,
-             NULL::text AS descripcion,
-             '{}'::jsonb AS extra
+             t.descripcion AS nombre,
+             t.descripcion AS descripcion,
+             jsonb_build_object(
+                 'id_tipo_documento', t.id_tipo_documento,
+                 'requiere_ruc', t.requiere_ruc,
+                 'largo', t.largo,
+                 'vigente', t.vigente
+             ) AS extra
         FROM sigd_auth.tipos_documento AS t
-       WHERE ($1 = FALSE OR t.estado = TRUE)
-       ORDER BY t.nombre`,
+       WHERE ($1 = FALSE OR t.vigente = TRUE)
+       ORDER BY t.codigo`,
   },
   {
     clave: 'tipos_documento_tramite',
@@ -143,12 +148,19 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     descripcion: 'Tipos documentales configurables exigidos por los trámites del TUPA.',
     soloActivos: true,
     sql: `
-      SELECT t.codigo_tipo AS codigo,
+      SELECT t.codigo,
              t.nombre      AS nombre,
-             t.descripcion AS descripcion,
-             jsonb_build_object('id_tipo_tramite_tupa', t.id_tipo_tramite_tupa) AS extra
+             t.nombre      AS descripcion,
+             jsonb_build_object(
+                 'tipo_documental_id', t.tipo_documental_id,
+                 'extension', t.extension,
+                 'mime_type', t.mime_type,
+                 'tamano_maximo_mb', t.tamano_maximo_mb,
+                 'exige_firma', t.exige_firma,
+                 'vigente', t.vigente
+             ) AS extra
         FROM sigd_doc.tipo_documento AS t
-       WHERE ($1 = FALSE OR t.activo = TRUE)
+       WHERE ($1 = FALSE OR t.vigente = TRUE)
        ORDER BY t.nombre`,
   },
   {
@@ -158,18 +170,19 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     descripcion: 'Tipos de trámite del TUPA con su calificación y plazo legal en días hábiles.',
     soloActivos: true,
     sql: `
-      SELECT t.codigo_tupa     AS codigo,
+      SELECT t.codigo          AS codigo,
              t.denominacion    AS nombre,
-             t.base_legal      AS descripcion,
+             t.descripcion     AS descripcion,
              jsonb_build_object(
-                 'es_tupa', t.es_tupa,
-                 'calificacion_administrativa', t.calificacion_administrativa,
-                 'plazo_max_dias_habiles', t.plazo_max_dias_habiles,
-                 'costo', t.costo,
-                 'unidad_organica_responsable', t.unidad_organica_responsable
+                 'tipo_tramite_id', t.tipo_tramite_id,
+                 'unidad_organica', t.unidad_organica,
+                 'plazo_dias', t.plazo_dias,
+                 'silencio_administrativo', t.silencio_administrativo,
+                 'base_legal', t.base_legal,
+                 'vigente', t.vigente
              ) AS extra
         FROM sigd_doc.tipo_tramite_tupa AS t
-       WHERE ($1 = FALSE OR t.activo = TRUE)
+       WHERE ($1 = FALSE OR t.vigente = TRUE)
        ORDER BY t.denominacion`,
   },
   {
@@ -180,12 +193,11 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     soloActivos: true,
     sql: `
       SELECT e.codigo            AS codigo,
-             e.nombre            AS nombre,
-             e.descripcion       AS descripcion,
+             e.codigo            AS nombre,
+             NULL::text          AS descripcion,
              jsonb_build_object('es_terminal', e.es_terminal) AS extra
         FROM sigd_rut.estado_tramite AS e
-       WHERE ($1 = FALSE OR e.activo = TRUE)
-       ORDER BY e.nombre`,
+       ORDER BY e.codigo`,
   },
   {
     clave: 'acciones_tramite',
@@ -195,27 +207,29 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     soloActivos: true,
     sql: `
       SELECT a.codigo      AS codigo,
-             a.nombre      AS nombre,
-             a.descripcion AS descripcion,
+             a.codigo      AS nombre,
+             NULL::text    AS descripcion,
              '{}'::jsonb   AS extra
         FROM sigd_rut.accion_tramite AS a
-       WHERE ($1 = FALSE OR a.activo = TRUE)
-       ORDER BY a.nombre`,
+       ORDER BY a.codigo`,
   },
   {
     clave: 'tipos_relacion_movimiento',
     esquema: 'sigd_rut',
-    tabla: 'tipo_relacion_movimiento',
+    tabla: 'transicion_estado_tramite',
     descripcion: 'Relaciones semánticas entre movimientos de trámite.',
     soloActivos: true,
     sql: `
-      SELECT r.codigo      AS codigo,
-             r.nombre      AS nombre,
-             r.descripcion AS descripcion,
-             '{}'::jsonb   AS extra
-        FROM sigd_rut.tipo_relacion_movimiento AS r
-       WHERE ($1 = FALSE OR r.activo = TRUE)
-       ORDER BY r.nombre`,
+      SELECT t.evento      AS codigo,
+             (t.estado_anterior || ' -> ' || t.estado_nuevo) AS nombre,
+             t.evento      AS descripcion,
+             jsonb_build_object(
+                 'estado_anterior', t.estado_anterior,
+                 'estado_nuevo', t.estado_nuevo,
+                 'evento', t.evento
+             ) AS extra
+        FROM sigd_rut.transicion_estado_tramite AS t
+       ORDER BY t.evento`,
   },
   {
     clave: 'unidades_organicas',
@@ -224,34 +238,40 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     descripcion: 'Unidades orgánicas del IESTP "Suiza" con su nivel jerárquico.',
     soloActivos: true,
     sql: `
-      SELECT a.sigla        AS codigo,
+      SELECT a.codigo       AS codigo,
              a.nombre       AS nombre,
              NULL::text     AS descripcion,
              jsonb_build_object(
-                 'id_area', a.id_area,
-                 'nivel_organizacional', a.nivel_organizacional
+                 'area_id', a.area_id,
+                 'path', a.path::text,
+                 'nivel', a.nivel,
+                 'vigente', a.vigente
              ) AS extra
         FROM sigd_org.area AS a
-       WHERE ($1 = FALSE OR a.activo = TRUE)
-       ORDER BY a.nivel_organizacional, a.nombre`,
+       WHERE ($1 = FALSE OR a.vigente = TRUE)
+       ORDER BY a.nivel, a.nombre`,
   },
   {
     clave: 'unidades_organicas_ltree',
     esquema: 'sigd_org',
-    tabla: 'unidad_organica',
-    descripcion: 'Unidades orgánicas del esquema v6.3 con ruta jerárquica ltree.',
+    tabla: 'area',
+    descripcion: 'Unidades orgánicas del esquema con ruta jerárquica ltree.',
     soloActivos: true,
     sql: `
-      SELECT u.sigla  AS codigo,
-             u.nombre AS nombre,
+      SELECT a.codigo   AS codigo,
+             a.nombre   AS nombre,
              NULL::text AS descripcion,
              jsonb_build_object(
-                 'id', u.id,
-                 'path', u.path::text
+                 'id', a.area_id,
+                 'area_id', a.area_id,
+                 'path', a.path::text,
+                 'nivel', a.nivel,
+                 'area_padre_id', a.area_padre_id,
+                 'vigente', a.vigente
              ) AS extra
-        FROM sigd_org.unidad_organica AS u
-       WHERE ($1 = FALSE OR u.estado = TRUE)
-       ORDER BY u.path`,
+        FROM sigd_org.area AS a
+       WHERE ($1 = FALSE OR a.vigente = TRUE)
+       ORDER BY a.path`,
   },
   {
     clave: 'cargos',
@@ -260,12 +280,12 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     descripcion: 'Cargos de la estructura orgánica institucional.',
     soloActivos: true,
     sql: `
-      SELECT NULL::text AS codigo,
-             c.nombre    AS nombre,
+      SELECT c.codigo   AS codigo,
+             c.nombre   AS nombre,
              c.descripcion AS descripcion,
-             '{}'::jsonb AS extra
+             jsonb_build_object('cargo_id', c.cargo_id, 'vigente', c.vigente) AS extra
         FROM sigd_org.cargo AS c
-       WHERE ($1 = FALSE OR c.activo = TRUE)
+       WHERE ($1 = FALSE OR c.vigente = TRUE)
        ORDER BY c.nombre`,
   },
   {
@@ -278,9 +298,9 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
       SELECT r.codigo      AS codigo,
              r.nombre      AS nombre,
              r.descripcion AS descripcion,
-             '{}'::jsonb   AS extra
+             jsonb_build_object('rol_id', r.rol_id, 'vigente', r.vigente) AS extra
         FROM sigd_org.rol_sistema AS r
-       WHERE ($1 = FALSE OR r.activo = TRUE)
+       WHERE ($1 = FALSE OR r.vigente = TRUE)
        ORDER BY r.codigo`,
   },
   {
@@ -291,11 +311,10 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     soloActivos: true,
     sql: `
       SELECT p.codigo      AS codigo,
-             p.codigo      AS nombre,
-             p.descripcion AS descripcion,
-             jsonb_build_object('alcance_predeterminado', p.alcance_predeterminado) AS extra
+             p.nombre      AS nombre,
+             NULL::text    AS descripcion,
+             jsonb_build_object('permiso_id', p.permiso_id, 'ambito', p.ambito) AS extra
         FROM sigd_org.permiso_sistema AS p
-       WHERE ($1 = FALSE OR p.activo = TRUE)
        ORDER BY p.codigo`,
   },
   {
@@ -352,9 +371,10 @@ async function consultarCatalogo(
   };
 
   try {
-    const resultado = await pool.query<ItemCatalogo>(definicion.sql, [
-      soloActivos && definicion.soloActivos,
-    ]);
+    const params = definicion.sql.includes('$1')
+      ? [soloActivos && definicion.soloActivos]
+      : [];
+    const resultado = await pool.query<ItemCatalogo>(definicion.sql, params);
     return {
       ...base,
       disponible: true,

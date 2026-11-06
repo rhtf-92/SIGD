@@ -202,6 +202,29 @@ CREATE INDEX IF NOT EXISTS idx_notif_casilla_fecha
     ON sigd_auth.notificacion_casilla (fecha_deposito DESC);
 
 -- Semilla inicial determinista para pruebas y desarrollo
+INSERT INTO sigd_auth.tipos_documento (id_tipo_documento, codigo, descripcion, requiere_ruc, largo, vigente)
+OVERRIDING SYSTEM VALUE
+VALUES (1, 'DNI', 'Documento Nacional de Identidad', FALSE, 8, TRUE)
+ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO sigd_auth.persona (id_persona, tipo, id_documento)
+VALUES ('00000000-0000-0000-0000-000000000001', 'NATURAL', '00000001')
+ON CONFLICT (id_persona) DO NOTHING;
+
+INSERT INTO sigd_auth.persona_natural (id_persona, nombres, apellidos, nombre_completo, correo)
+VALUES ('00000000-0000-0000-0000-000000000001', 'Administrador', 'SIGD Institucional', 'Administrador General SIGD', 'admin@iestpsuiza.edu.pe')
+ON CONFLICT (id_persona) DO NOTHING;
+
+INSERT INTO sigd_auth.cuenta_usuario (id_usuario, id_persona, usuario, correo, password_hash, activo)
+VALUES (
+    '00000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000001',
+    'admin',
+    'admin@iestpsuiza.edu.pe',
+    '$argon2id$v=19$m=65536,p=4,t=3$BfmveRUBmFPr1WUSeiR86Q$HcG44Uih6qIU3kB2YtTvJ8gJLwuXFmwiRhYL4O/pStY',
+    TRUE
+) ON CONFLICT (id_usuario) DO NOTHING;
+
 INSERT INTO sigd_auth.notificacion_casilla (
     id, usuario_id, cut, asunto, tipo_acto, numero_documento,
     estado, fecha_deposito, hash_sha256, cvd

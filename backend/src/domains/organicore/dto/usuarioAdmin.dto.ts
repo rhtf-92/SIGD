@@ -2,8 +2,7 @@ import { z } from "zod";
 
 /**
  * OrganiCore - Administración de usuarios institucionales
- * Responsable: Leonardo
- * Rama: B_LEONARDO
+ * Responsable: Leonardo / Ricardo
  *
  * Tareas relacionadas:
  * - T-BE-OC-06: Directorio institucional
@@ -61,17 +60,26 @@ export const listarUsuariosQuerySchema = z.object({
     .uuid("El ID del área no es válido")
     .optional(),
 
+  area: z.string().optional(),
+
   sedeId: z
     .string()
     .uuid("El ID de la sede no es válido")
     .optional(),
+
+  sede: z.string().optional(),
 
   rolId: z
     .string()
     .uuid("El ID del rol no es válido")
     .optional(),
 
-  estado: estadoUsuarioSchema.optional(),
+  rol: z.string().optional(),
+
+  estado: z.preprocess((val) => {
+    if (typeof val === "string") return val.toUpperCase();
+    return val;
+  }, estadoUsuarioSchema).optional(),
 
   pagina: z.coerce
     .number()
@@ -96,25 +104,44 @@ export const crearUsuarioAdminSchema = z.object({
   tipoDocumentoId: z.coerce
     .number()
     .int()
-    .positive("El tipo de documento es obligatorio"),
+    .positive("El tipo de documento es obligatorio")
+    .optional()
+    .default(1),
 
   numeroDocumento: z
     .string()
     .trim()
     .min(8, "El documento debe tener al menos 8 caracteres")
-    .max(20, "El documento no puede superar los 20 caracteres"),
+    .max(20, "El documento no puede superar los 20 caracteres")
+    .optional(),
+
+  dni: z
+    .string()
+    .trim()
+    .min(8, "El DNI debe tener al menos 8 caracteres")
+    .max(20, "El DNI no puede superar los 20 caracteres")
+    .optional(),
 
   nombres: z
     .string()
     .trim()
     .min(2, "Los nombres son obligatorios")
-    .max(120, "Los nombres no pueden superar los 120 caracteres"),
+    .max(120, "Los nombres no pueden superar los 120 caracteres")
+    .optional(),
+
+  nombre: z
+    .string()
+    .trim()
+    .min(2, "El nombre completo es obligatorio")
+    .max(150, "El nombre no puede superar los 150 caracteres")
+    .optional(),
 
   apellidoPaterno: z
     .string()
     .trim()
     .min(2, "El apellido paterno es obligatorio")
-    .max(120, "El apellido paterno no puede superar los 120 caracteres"),
+    .max(120, "El apellido paterno no puede superar los 120 caracteres")
+    .optional(),
 
   apellidoMaterno: z
     .string()
@@ -140,26 +167,71 @@ export const crearUsuarioAdminSchema = z.object({
     .regex(
       /^[a-zA-Z0-9._-]+$/,
       "El usuario solo puede contener letras, números, punto, guion y guion bajo",
-    ),
+    )
+    .optional(),
+
+  usuario: z
+    .string()
+    .trim()
+    .min(4, "El usuario debe tener al menos 4 caracteres")
+    .max(50, "El usuario no puede superar los 50 caracteres")
+    .optional(),
 
   passwordInicial: z
     .string()
     .min(8, "La contraseña inicial debe tener al menos 8 caracteres")
-    .max(128, "La contraseña no puede superar los 128 caracteres"),
+    .max(128, "La contraseña no puede superar los 128 caracteres")
+    .optional(),
+
+  password: z
+    .string()
+    .min(8, "La contraseña debe tener al menos 8 caracteres")
+    .max(128, "La contraseña no puede superar los 128 caracteres")
+    .optional(),
 
   puestoLaboralId: z
     .string()
-    .uuid("El ID del puesto laboral no es válido"),
+    .uuid("El ID del puesto laboral no es válido")
+    .optional(),
+
+  cargoId: z.string().optional().nullable(),
+  cargo: z.string().optional().nullable(),
+
+  areaId: z.string().optional().nullable(),
+  area: z.string().optional().nullable(),
 
   rolId: z
     .string()
-    .uuid("El ID del rol no es válido"),
-});
+    .uuid("El ID del rol no es válido")
+    .optional(),
+
+  rol: z.string().optional().nullable(),
+
+  sede: z.string().optional().nullable(),
+
+  estado: z.preprocess((val) => {
+    if (typeof val === "string") return val.toUpperCase();
+    return val;
+  }, estadoUsuarioSchema).optional().default("ACTIVO"),
+}).refine(
+  (data) => !!(data.numeroDocumento || data.dni),
+  {
+    message: "El número de documento es obligatorio",
+    path: ["numeroDocumento"],
+  },
+).refine(
+  (data) => !!(data.nombres || data.nombre),
+  {
+    message: "El nombre o nombres son obligatorios",
+    path: ["nombres"],
+  },
+);
 
 /**
  * Schema base para actualización.
  */
 const actualizarUsuarioAdminBaseSchema = z.object({
+  nombre: z.string().trim().min(2).max(150).optional(),
   nombres: z
     .string()
     .trim()
@@ -181,6 +253,8 @@ const actualizarUsuarioAdminBaseSchema = z.object({
     .optional()
     .nullable(),
 
+  dni: z.string().trim().min(8).max(20).optional(),
+
   telefono: z
     .string()
     .trim()
@@ -195,12 +269,29 @@ const actualizarUsuarioAdminBaseSchema = z.object({
     .uuid("El ID del puesto laboral no es válido")
     .optional(),
 
+  cargoId: z.string().optional().nullable(),
+  cargo: z.string().trim().optional().nullable(),
+
+  areaId: z
+    .string()
+    .uuid("El ID del área no es válido")
+    .optional(),
+
+  area: z.string().trim().optional().nullable(),
+
   rolId: z
     .string()
     .uuid("El ID del rol no es válido")
     .optional(),
 
-  estado: estadoUsuarioSchema.optional(),
+  rol: z.string().trim().optional().nullable(),
+
+  sede: z.string().trim().optional().nullable(),
+
+  estado: z.preprocess((val) => {
+    if (typeof val === "string") return val.toUpperCase();
+    return val;
+  }, estadoUsuarioSchema).optional(),
 });
 
 /**
@@ -220,17 +311,23 @@ export const actualizarUsuarioAdminSchema =
 
 /**
  * Parámetro :id del usuario.
- *
- * Actualmente:
- * sigd_auth.cuenta_usuario.id = BIGSERIAL
- *
- * Por eso el identificador se valida como entero positivo.
+ * Acepta tanto identificadores enteros positivos como identificadores UUID estándar.
  */
 export const usuarioIdParamSchema = z.object({
-  id: z.coerce
-    .number()
-    .int("El ID del usuario debe ser un número entero")
-    .positive("El ID del usuario debe ser mayor que cero"),
+  id: z.preprocess((val) => {
+    if (typeof val === "string") {
+      const limpia = val.trim();
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(limpia)) {
+        return limpia;
+      }
+      const num = Number(limpia);
+      if (Number.isInteger(num)) return num;
+    }
+    return val;
+  }, z.union([
+    z.string().uuid("El ID del usuario no es un UUID válido"),
+    z.number().int("El ID del usuario debe ser un número entero").positive("El ID del usuario debe ser mayor que cero"),
+  ])),
 });
 
 /* =========================================================
@@ -245,7 +342,7 @@ export type ListarUsuariosQuery = z.infer<
   typeof listarUsuariosQuerySchema
 >;
 
-export type CrearUsuarioAdminDTO = z.infer<
+export type CrearUsuarioAdminDTO = z.input<
   typeof crearUsuarioAdminSchema
 >;
 

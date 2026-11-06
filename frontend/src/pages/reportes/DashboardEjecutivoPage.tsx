@@ -81,11 +81,11 @@ export default function DashboardEjecutivoPage() {
 
   if (state === "loading") {
     return (
-      <main className="min-h-screen bg-slate-100 p-4 md:p-8" aria-busy="true">
+      <div role="main" className="flex-1 w-full bg-slate-100 px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8" aria-busy="true">
         <div role="status" aria-live="polite" className="sr-only">
           Cargando tablero ejecutivo.
         </div>
-        <div className="mx-auto max-w-7xl space-y-6">
+        <div className="w-full space-y-6">
           <header className="rounded-lg border border-slate-200 bg-white p-4">
             <h1 className="text-2xl font-bold text-slate-900">Tablero Directivo Ejecutivo</h1>
           </header>
@@ -96,13 +96,13 @@ export default function DashboardEjecutivoPage() {
             ))}
           </section>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (state === "error") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6" aria-live="assertive">
+      <div className="flex-1 flex min-h-[60vh] items-center justify-center bg-slate-100 p-6" aria-live="assertive">
         <div role="status" aria-live="polite" className="sr-only">
           Error al cargar el tablero ejecutivo.
         </div>
@@ -115,26 +115,73 @@ export default function DashboardEjecutivoPage() {
           <p className="mt-3 text-slate-600">{errorMessage ?? "La consulta a la API de reportes no respondió correctamente."}</p>
             {filterControls}
         </section>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-4 text-slate-900 md:p-8">
+    <div className="flex-1 w-full bg-slate-100 px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8 text-slate-900">
       <div role="status" aria-live="polite" className="sr-only">
         Tablero ejecutivo cargado correctamente.
       </div>
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-end md:justify-between">
+      <div className="w-full space-y-5 sm:space-y-6">
+        {/* Migajas de pan canónicas */}
+        <nav
+          aria-label="Migajas de pan del tablero ejecutivo"
+          className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-500"
+        >
+          <Link to="/" className="hover:text-blue-700 hover:underline transition-colors">
+            Inicio
+          </Link>
+          <span className="text-slate-300">/</span>
+          <span className="text-slate-600">Reportes MGD</span>
+          <span className="text-slate-300">/</span>
+          <span aria-current="page" className="font-semibold text-blue-700">
+            Tablero Directivo Ejecutivo
+          </span>
+        </nav>
+
+        {/* Botones de navegación intermodular */}
+        <nav
+          aria-label="Navegación gerencial institucional"
+          className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none"
+        >
+          <Link
+            to="/reportes"
+            aria-current="page"
+            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-blue-700 text-white shadow-xs"
+          >
+            <span>📊 Tablero Ejecutivo</span>
+          </Link>
+          <Link
+            to="/expedientes"
+            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700 transition"
+          >
+            <span>📂 Bandeja de Expedientes</span>
+          </Link>
+          <Link
+            to="/flujo-validez-legal"
+            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700 transition"
+          >
+            <span>📜 Validez Legal</span>
+          </Link>
+          <Link
+            to="/administracion"
+            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700 transition"
+          >
+            <span>⚙️ Panel de Administración</span>
+          </Link>
+        </nav>
+
+        <header className="flex flex-col sm:flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-xs sm:items-end justify-between">
           <div>
             <Link
               to="/"
-              className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              className="mb-3 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-blue-700"
             >
               ← Volver al inicio
             </Link>
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-blue-700">SIGD / Dashboard</p>
-            <h1 className="mt-2 text-2xl font-bold md:text-3xl">Tablero Directivo Ejecutivo</h1>
+            <h1 className="mt-1 text-xl sm:text-2xl md:text-3xl font-bold">Tablero Directivo Ejecutivo</h1>
           </div>
           <ReportExportModal
             reportName="dashboard-ejecutivo"
@@ -152,7 +199,7 @@ export default function DashboardEjecutivoPage() {
         <ExecutiveKpiSummary metrics={executive} />
         <KpiMetricGrid metrics={summaryMetrics} />
 
-        <div className="grid min-w-0 grid-cols-1 gap-6 min-[1025px]:grid-cols-[1.7fr_1fr]">
+        <div className="grid min-w-0 grid-cols-1 gap-6 xl:gap-8 min-[1025px]:grid-cols-[1.7fr_1fr] 2xl:grid-cols-[2fr_1fr]">
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="trend-title">
             <div className="mb-4 flex items-center justify-between">
               <h2 id="trend-title" className="text-lg font-semibold text-slate-900">
@@ -163,7 +210,7 @@ export default function DashboardEjecutivoPage() {
               </span>
             </div>
 
-            <svg viewBox="0 0 100 100" className="h-56 w-full" role="img" aria-label="Gráfico de tendencia de radicados y resueltos">
+            <svg viewBox="0 0 100 100" className="h-56 sm:h-64 lg:h-72 xl:h-80 w-full" role="img" aria-label="Gráfico de tendencia de radicados y resueltos">
               <path d={trendChart.map((point) => `${point.x === 0 ? "M" : "L"}${point.x},${point.yRadicados}`).join(" ")} fill="none" stroke="#1E40AF" strokeWidth="2.3" strokeLinecap="round" />
               <path d={trendChart.map((point) => `${point.x === 0 ? "M" : "L"}${point.x},${point.yResueltos}`).join(" ")} fill="none" stroke="#10B981" strokeWidth="2.3" strokeLinecap="round" />
               {trendChart.map((point, index) => (
@@ -247,6 +294,6 @@ export default function DashboardEjecutivoPage() {
           </div>
         </section>
       </div>
-    </main>
+    </div>
   );
 }

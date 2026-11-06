@@ -20,7 +20,7 @@ export default function BandejaTabFilter({
     <div
       role="tablist"
       aria-label="Pestañas de la Bandeja Operativa de Expedientes"
-      className="flex flex-wrap gap-2 border-b border-slate-200 pb-3"
+      className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-3 sm:flex-wrap border-b border-slate-200 scrollbar-none"
     >
       {ORDEN_PESTANAS_BANDEJA.map((estado) => {
         const activo = estado === estadoActivo;
@@ -32,7 +32,7 @@ export default function BandejaTabFilter({
             role="tab"
             aria-selected={activo}
             onClick={() => onCambiarEstado(estado)}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition ${
               activo
                 ? "bg-blue-700 text-white shadow-sm"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"

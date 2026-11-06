@@ -416,8 +416,9 @@ export function crearRouterCasilla(pool: Pool): Router {
   router.get('/casilla/estadisticas', async (req: Request, res: Response) => {
     const usuarioId = obtenerUsuarioId(req);
 
-    const resultado = await pool.query<{ no_leidas: string; total: string }>(
+    const resultado = await pool.query<{ no_leidas: string; notificados: string; total: string }>(
       `SELECT COUNT(*) FILTER (WHERE estado = 'NO_LEIDO')::text AS no_leidas,
+              COUNT(*) FILTER (WHERE id_acuse IS NOT NULL OR estado = 'NOTIFICADO')::text AS notificados,
               COUNT(*)::text AS total
          FROM sigd_auth.notificacion_casilla
         WHERE usuario_id = $1 OR usuario_id IS NULL OR $1 = '00000000-0000-0000-0000-000000000001'`,
@@ -425,6 +426,7 @@ export function crearRouterCasilla(pool: Pool): Router {
     );
 
     const noLeidas = Number(resultado.rows[0]?.no_leidas ?? 0);
+    const notificados = Number(resultado.rows[0]?.notificados ?? 0);
     const total = Number(resultado.rows[0]?.total ?? 0);
 
     res.status(200).json({
@@ -432,7 +434,7 @@ export function crearRouterCasilla(pool: Pool): Router {
       noLeidos: noLeidas,
       total,
       leidos: Math.max(0, total - noLeidas),
-      notificados: total,
+      notificados,
       urgentes: 0,
       ultimosMovimientos: total > 0 ? 1 : 0,
     });

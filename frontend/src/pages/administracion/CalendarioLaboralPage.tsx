@@ -29,14 +29,14 @@ export default function CalendarioLaboralPage() {
   } = useCalendarioLaboral();
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="flex-1 bg-slate-100 text-slate-900">
       <AdminPageHeader
         title="Calendario Laboral"
         description="Configuración de jornada, corte de recepción LPAG y feriados de Ucayali."
       />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8">
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs sm:text-sm text-blue-800">
           <p>
             <strong>Hora de corte normativa: {HORA_CORTE_LPAG} hrs</strong>.
             Los documentos ingresados después de las 16:30 hrs (o en día
@@ -51,11 +51,11 @@ export default function CalendarioLaboralPage() {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 xl:gap-8 lg:grid-cols-2">
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold">Jornada laboral</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Los valores son configurables y no están fijados por código.
+              Horario de atención institucional y días hábiles laborables.
             </p>
 
             <div className="mt-5 space-y-3">
@@ -148,7 +148,7 @@ export default function CalendarioLaboralPage() {
               Feriados nacionales (D. Leg. N° 713) y regionales de Ucayali.
             </p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-[170px_1fr_auto]">
+            <div className="mt-5 grid gap-3 grid-cols-1 sm:grid-cols-[170px_1fr_auto]">
               <input
                 type="date"
                 value={fechaNueva}
@@ -164,7 +164,7 @@ export default function CalendarioLaboralPage() {
               <button
                 type="button"
                 onClick={agregarFeriado}
-                className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+                className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
               >
                 Agregar
               </button>
@@ -193,16 +193,16 @@ export default function CalendarioLaboralPage() {
           </section>
         </div>
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex flex-col sm:flex-row justify-end">
           <button
             type="button"
             onClick={guardarConfiguracion}
-            className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+            className="w-full sm:w-auto rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
           >
             Guardar calendario
           </button>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

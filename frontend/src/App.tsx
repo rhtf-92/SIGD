@@ -1,12 +1,13 @@
-import SplashScreen from "./components/common/SplashScreen";
 import MainLayout from "./layouts/MainLayout";
 import AppRouter from "./routes/AppRouter";
+import ErrorBoundary from "./components/common/ErrorBoundary";
 
 export default function App() {
   return (
-    <MainLayout>
-      <SplashScreen />
-      <AppRouter />
-    </MainLayout>
+    <ErrorBoundary fallbackTitle="Error en el contenedor principal del SIGD">
+      <MainLayout>
+        <AppRouter />
+      </MainLayout>
+    </ErrorBoundary>
   );
 }

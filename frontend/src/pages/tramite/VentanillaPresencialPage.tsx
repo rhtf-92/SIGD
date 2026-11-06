@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useState, useMemo, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
-import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
+import { useCatalogoTupa } from "../../hooks/useCatalogoTupa";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
@@ -30,6 +30,8 @@ export default function VentanillaPresencialPage() {
   const enJornada = !requiresProjection;
   const proximoDiaHabil = legalDate;
 
+  const { catalogo, obtenerPorCodigo } = useCatalogoTupa();
+
   const [tipoPersona, setTipoPersona] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [tipoDoc, setTipoDoc] = useState<"DNI" | "RUC" | "CE">("DNI");
   const [numeroDoc, setNumeroDoc] = useState("");
@@ -43,18 +45,48 @@ export default function VentanillaPresencialPage() {
   const [cantidadFolios, setCantidadFolios] = useState(1);
   const [cargoGenerado, setCargoGenerado] = useState<CargoOficialTramite | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
-  const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_2026.find(
-    (procedimiento) => procedimiento.codigo === procedimientoTupa,
-  );
+
+  const procedimientoSeleccionado = useMemo(() => {
+    if (!procedimientoTupa) return undefined;
+    if (procedimientoTupa === "NO_TUPA") {
+      return (
+        obtenerPorCodigo("LIBRE-01") ?? {
+          id: "00000000-0000-0000-0001-000000000099",
+          codigo: "LIBRE-01",
+          codigoCorto: "NO_TUPA",
+          nombre: "Trámite no TUPA / documentación general",
+          requisitos: [
+            "Solicitud formal dirigida a la Dirección o FUT debidamente fundamentado",
+            "Copia simple de documento de identidad del solicitante",
+          ],
+          derechoPago: "Gratuito",
+          dependencia: "Mesa de Partes General",
+          tiempoMaximo: "30 días hábiles",
+          esTupa: false,
+        }
+      );
+    }
+    return obtenerPorCodigo(procedimientoTupa);
+  }, [procedimientoTupa, obtenerPorCodigo]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
     const asuntoFinal = procedimientoSeleccionado
-      ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
+      ? `TUPA ${procedimientoSeleccionado.codigoCorto}: ${procedimientoSeleccionado.nombre} - ${asunto}`
       : asunto;
 
     const dniValido = /^[0-9]{8}$/.test(numeroDoc) ? numeroDoc : "74561238";
+
+    const idTipoTramiteTupa =
+      procedimientoSeleccionado?.id &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(procedimientoSeleccionado.id)
+        ? procedimientoSeleccionado.id
+        : undefined;
+
+    const codigoTupa =
+      procedimientoSeleccionado?.codigo ??
+      (procedimientoTupa === "NO_TUPA" ? "LIBRE-01" : undefined);
 
     try {
       const res = await apiClient.post<VentanillaPresencialResultado>(
@@ -64,6 +96,8 @@ export default function VentanillaPresencialPage() {
           datosRemitente: nombre.trim() || "Ciudadano Administrado",
           asunto: asuntoFinal.trim() || "Solicitud de trámite presencial",
           foliosTotales: Number(cantidadFolios) || 1,
+          idTipoTramiteTupa,
+          codigoTupa,
         },
       );
 
@@ -120,31 +154,37 @@ export default function VentanillaPresencialPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="flex-1 w-full bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
-          <nav className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <Link to="/" className="hover:text-blue-700">Inicio</Link>
-            <span>/</span>
-            <Link to="/tramite" className="hover:text-blue-700">Trámite Documentario</Link>
-            <span>/</span>
-            <span className="text-slate-800">Ventanilla Presencial</span>
+        <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-4 sm:py-5">
+          <nav
+            aria-label="Migajas de pan de ventanilla"
+            className="mb-3 flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-500"
+          >
+            <Link to="/" className="hover:text-blue-700 hover:underline transition-colors">Inicio</Link>
+            <span className="text-slate-300">/</span>
+            <Link to="/tramite" className="hover:text-blue-700 hover:underline transition-colors">Trámite Documentario</Link>
+            <span className="text-slate-300">/</span>
+            <span aria-current="page" className="font-semibold text-blue-700">Ventanilla Presencial</span>
           </nav>
 
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
-                Módulo 02 · Mesa de Partes y Registro Documentario
-              </p>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Ventanilla Presencial de Atención al Ciudadano
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Digitación de mesa de partes física, asignación de CUT y emisión de ticket con QR (ENT-M02-05).
-              </p>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                to="/tramite"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-100 hover:text-blue-700"
+              >
+                ← Volver a Trámites
+              </Link>
+              <Link
+                to="/"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+              >
+                Volver al inicio
+              </Link>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-start sm:self-center">
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
                   enJornada && !esCorteSuperado
@@ -159,10 +199,53 @@ export default function VentanillaPresencialPage() {
               </span>
             </div>
           </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                Ventanilla Presencial de Atención al Ciudadano
+              </h1>
+              <p className="mt-1 text-xs sm:text-sm text-slate-500">
+                Digitación de mesa de partes física, asignación de CUT y emisión de ticket con QR institucional.
+              </p>
+            </div>
+          </div>
+
+          {/* Botones de navegación intermodular */}
+          <nav
+            aria-label="Navegación entre componentes de trámite y despacho"
+            className="flex items-center gap-2 overflow-x-auto pt-3 pb-1 mt-4 border-t border-slate-100 scrollbar-none"
+          >
+            <Link
+              to="/ventanilla"
+              aria-current="page"
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-blue-700 text-white shadow-xs"
+            >
+              <span>🏛️ Ventanilla Presencial</span>
+            </Link>
+            <Link
+              to="/tramite"
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700"
+            >
+              <span>📝 Mesa de Partes Virtual</span>
+            </Link>
+            <Link
+              to="/consulta"
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700"
+            >
+              <span>🔍 Consulta CUT</span>
+            </Link>
+            <Link
+              to="/expedientes"
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700"
+            >
+              <span>📂 Bandeja de Expedientes</span>
+            </Link>
+          </nav>
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-5 sm:py-8">
         {esCorteSuperado && (
           <div
             role="note"
@@ -315,11 +398,13 @@ export default function VentanillaPresencialPage() {
               >
                 <option value="">Seleccione un procedimiento o servicio</option>
                 <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
-                {PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => (
-                  <option key={procedimiento.codigo} value={procedimiento.codigo}>
-                    {procedimiento.codigo} - {procedimiento.nombre}
-                  </option>
-                ))}
+                {catalogo
+                  .filter((procedimiento) => procedimiento.esTupa)
+                  .map((procedimiento) => (
+                    <option key={procedimiento.id} value={procedimiento.codigoCorto}>
+                      {procedimiento.codigoCorto} - {procedimiento.nombre}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -366,7 +451,7 @@ export default function VentanillaPresencialPage() {
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-200 pb-3">
                 <div>
                   <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
-                    TUPA {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
+                    TUPA {procedimientoSeleccionado.codigoCorto || procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
                   </h3>
                   <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Pasco</p>
                 </div>
@@ -385,9 +470,9 @@ export default function VentanillaPresencialPage() {
                       {requisitosRecibidos.size} de {procedimientoSeleccionado.requisitos.length} verificados
                     </span>
                   </div>
-                  <ul className="grid gap-2 sm:grid-cols-2">
+                  <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {procedimientoSeleccionado.requisitos.map((requisito, index) => (
-                      <li key={`${procedimientoSeleccionado.codigo}-${index}`}>
+                      <li key={`${procedimientoSeleccionado.id}-${index}`}>
                         <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
                           <input
                             type="checkbox"
@@ -455,17 +540,17 @@ export default function VentanillaPresencialPage() {
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
               onClick={handleNuevoRegistro}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              className="w-full sm:w-auto rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-center"
             >
               Limpiar Campos
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-800 transition"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-800 transition text-center"
             >
               ✓ Registrar y Emitir Cargo CUT
             </button>
@@ -480,6 +565,6 @@ export default function VentanillaPresencialPage() {
           cargo={cargoGenerado}
         />
       )}
-    </main>
+    </div>
   );
 }

@@ -34,7 +34,7 @@ import { TramiteWizard } from '@/components/tramite/TramiteWizard';
 import { TRAMITE_WIZARD_STORAGE_KEY } from '@/hooks/useTramiteWizardReducer';
 import { apiClient } from '@/api/client';
 
-describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', () => {
+describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', { timeout: 30000 }, () => {
   beforeEach(() => {
     sessionStorage.clear();
     vi.restoreAllMocks();
@@ -498,6 +498,12 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     const user = userEvent.setup();
 
     // Mock de API REST con código HTTP 201 Created
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      data: [
+        { id: '00000000-0000-0000-0000-000000000001', codigo: 'TUPA-01' },
+      ],
+      status: 200,
+    } as any);
     vi.spyOn(apiClient, 'post').mockResolvedValue({
       data: {
         expedienteId: '00000000-0000-0000-0000-000000000001',

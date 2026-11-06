@@ -19,9 +19,11 @@ export interface DatosRecepcionFisica {
   datosRemitente: string;
   asunto: string;
   foliosTotales: number;
-  idOperadorVentanilla?: string;
+  idOperadorVentanilla?: string | number;
   areaDestinoId?: string;
   tipoDocumentalId?: string;
+  idTipoTramiteTupa?: string;
+  codigoTupa?: string;
 }
 
 export interface ResultadoVentanilla {
@@ -93,7 +95,10 @@ export class VentanillaPresencialService {
       // 2. Resolver o registrar persona solicitante
       let solicitanteId: string;
       const personaExistente = await cliente.query<{ id_persona: string }>(
-        'SELECT id_persona FROM sigd_auth.persona_natural WHERE dni = $1 LIMIT 1',
+        `SELECT p.id_persona
+           FROM sigd_auth.persona p
+          WHERE p.id_documento = $1
+          LIMIT 1`,
         [datos.dniSolicitante],
       );
 
@@ -101,17 +106,19 @@ export class VentanillaPresencialService {
         solicitanteId = personaExistente.rows[0].id_persona;
       } else {
         const nuevaPersona = await cliente.query<{ id_persona: string }>(
-          `INSERT INTO sigd_auth.persona (tipo_persona, estado)
-           VALUES ('NATURAL', TRUE)
+          `INSERT INTO sigd_auth.persona (tipo, id_documento)
+           VALUES ('NATURAL', $1)
+           ON CONFLICT (tipo, id_documento) DO UPDATE SET id_documento = EXCLUDED.id_documento
            RETURNING id_persona;`,
+          [datos.dniSolicitante],
         );
         solicitanteId = nuevaPersona.rows[0].id_persona;
 
         await cliente.query(
-          `INSERT INTO sigd_auth.persona_natural (id_persona, dni, nombres, apellido_paterno, ubigeo_distrito)
-           VALUES ($1, $2, $3, 'REGISTRADO', '250101')
-           ON CONFLICT DO NOTHING;`,
-          [solicitanteId, datos.dniSolicitante, datos.datosRemitente],
+          `INSERT INTO sigd_auth.persona_natural (id_persona, nombres, apellidos, nombre_completo)
+           VALUES ($1, $2, 'REGISTRADO', $2)
+           ON CONFLICT (id_persona) DO NOTHING;`,
+          [solicitanteId, datos.datosRemitente],
         );
       }
 
@@ -134,7 +141,7 @@ export class VentanillaPresencialService {
            COALESCE($3::uuid, '00000000-0000-0000-0000-000000000001'::uuid),
            $4,
            $5::uuid,
-           'RECEPCIONADO',
+           'REGISTRADO',
            $6
          ) RETURNING expediente_id;`,
         [
@@ -148,32 +155,46 @@ export class VentanillaPresencialService {
       );
       const expedienteId = expRes.rows[0].expediente_id;
 
-      // 4. Asentar en libro de registro institucional inmutable
+      // Si se especificó trámite TUPA, vincular en sigd_doc.expediente
+      if (datos.idTipoTramiteTupa || datos.codigoTupa) {
+        let tipoTramiteId = datos.idTipoTramiteTupa;
+        if (!tipoTramiteId && datos.codigoTupa) {
+          const tupaRes = await cliente.query<{ tipo_tramite_id: string }>(
+            `SELECT tipo_tramite_id FROM sigd_doc.tipo_tramite_tupa
+              WHERE codigo = $1 OR codigo = 'TUPA-' || $1 LIMIT 1`,
+            [datos.codigoTupa],
+          );
+          if (tupaRes.rows[0]) {
+            tipoTramiteId = tupaRes.rows[0].tipo_tramite_id;
+          }
+        }
+        if (tipoTramiteId) {
+          await cliente.query(
+            `INSERT INTO sigd_doc.expediente (
+               expediente_id, tipo_tramite_id, codigo_expediente, asunto, solicitante_id, estado, fecha_registro
+             ) VALUES ($1, $2, $3, $4, $5, 'REGISTRADO', $6)
+             ON CONFLICT (codigo_expediente) DO NOTHING;`,
+            [expedienteId, tipoTramiteId, cut, datos.asunto, solicitanteId, ahora],
+          ).catch(() => null);
+        }
+      }
+
+      // 4. Asentar en libro de registro institucional inmutable (sigd_tra.asiento_registro)
       await cliente.query(
         `INSERT INTO sigd_tra.asiento_registro (
-           numero_asiento,
-           tipo_libro,
-           anio_fiscal,
-           cut,
-           remitente,
-           remitente_documento,
+           expediente_id,
+           fecha_ingreso,
+           canal_ingreso,
            asunto,
-           folios,
-           canal_recepcion,
-           fecha_asiento
+           remitente_id
          ) VALUES (
            $1,
-           'ENTRADA',
            $2,
-           $1,
+           'MESA_PRESENCIAL',
            $3,
-           $4,
-           $5,
-           $6,
-           'VENTANILLA_PRESENCIAL',
-           $7
-         ) ON CONFLICT (numero_asiento, anio_fiscal) DO NOTHING;`,
-        [cut, anioActual, datos.datosRemitente, datos.dniSolicitante, datos.asunto, datos.foliosTotales, ahora],
+           $4
+         );`,
+        [expedienteId, ahora, datos.asunto, solicitanteId],
       );
 
       if (debeManejarTx) await cliente.query('COMMIT');

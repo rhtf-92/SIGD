@@ -1,3 +1,5 @@
+process.env.AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET ?? 'clave_secreta_institucional_jwt_segura_32_caracteres_minimo_sigd';
+
 import request from 'supertest';
 import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';

@@ -19,7 +19,7 @@ export default function RolesPermisosPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Gestión de Matriz RBAC (5 Roles)</h1>

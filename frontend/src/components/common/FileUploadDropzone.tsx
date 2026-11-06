@@ -73,11 +73,6 @@ export default function FileUploadDropzone({
         <span id="pdf-dropzone-description" className="mt-1 block text-sm text-slate-500">
           PDF de hasta 25 MB. Use Enter o Espacio para seleccionar un archivo.
         </span>
-        {demoMode && (
-          <span className="mt-3 inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
-            Modo demostración: almacenamiento simulado
-          </span>
-        )}
       </button>
       <input
         ref={inputRef}

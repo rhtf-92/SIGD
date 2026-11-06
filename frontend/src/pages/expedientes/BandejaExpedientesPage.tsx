@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import BandejaTabFilter from "../../components/expedientes/BandejaTabFilter";
 import ExpedienteTable from "../../components/expedientes/ExpedienteTable";
@@ -125,61 +125,112 @@ export default function BandejaExpedientesPage() {
     }).length ?? 0;
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="flex-1 w-full bg-slate-100 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-5">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+        <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-4 sm:py-5">
+          {/* Migajas de pan canónicas */}
+          <nav
+            aria-label="Migajas de pan de expedientes"
+            className="mb-3 flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-500"
           >
-            ← Volver al inicio
-          </button>
+            <Link to="/" className="hover:text-blue-700 hover:underline transition-colors">
+              Inicio
+            </Link>
+            <span className="text-slate-300">/</span>
+            <span className="text-slate-600">Expedientes</span>
+            <span className="text-slate-300">/</span>
+            <span aria-current="page" className="font-semibold text-blue-700">
+              Bandeja de Trabajo
+            </span>
+          </nav>
 
-          <p className="text-sm font-bold text-blue-700">SIGD · IESTP "Suiza"</p>
-          <h1 className="text-2xl font-bold">Bandeja de Trabajo Diario</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                ← Volver al inicio
+              </button>
+            </div>
+          </div>
+
+          <h1 className="text-xl sm:text-2xl font-bold">Bandeja de Trabajo Diario</h1>
+          <p className="mt-1 text-xs sm:text-sm text-slate-500">
             Gestión operativa de expedientes, semáforo SLA de 30 días LPAG y taxonomía archivística CCD.
           </p>
+
+          {/* Botones de navegación intermodular */}
+          <nav
+            aria-label="Navegación operativa institucional"
+            className="flex items-center gap-2 overflow-x-auto pt-3 pb-1 mt-4 border-t border-slate-100 scrollbar-none"
+          >
+            <Link
+              to="/expedientes"
+              aria-current="page"
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-blue-700 text-white shadow-xs"
+            >
+              <span>📂 Bandeja de Expedientes</span>
+            </Link>
+            <Link
+              to="/ventanilla"
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700"
+            >
+              <span>🏛️ Ventanilla Presencial</span>
+            </Link>
+            <Link
+              to="/flujo-validez-legal"
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700"
+            >
+              <span>📜 Validez Legal</span>
+            </Link>
+            <Link
+              to="/reportes"
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700"
+            >
+              <span>📊 Reportes MGD</span>
+            </Link>
+          </nav>
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-5 sm:py-8">
         {/* Panel de KPIs */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-            <p className="text-3xl font-bold text-blue-700">{volumenActivo}</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 xl:gap-6 2xl:gap-8">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 text-center shadow-xs">
+            <p className="text-2xl sm:text-3xl font-bold text-blue-700">{volumenActivo}</p>
+            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Volumen Activo
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-            <p className="text-3xl font-bold text-amber-600">{urgentes}</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 text-center shadow-xs">
+            <p className="text-2xl sm:text-3xl font-bold text-amber-600">{urgentes}</p>
+            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Trámites Urgentes
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-            <p className="text-3xl font-bold text-red-600">{proximosAVencer}</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 text-center shadow-xs">
+            <p className="text-2xl sm:text-3xl font-bold text-red-600">{proximosAVencer}</p>
+            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Próximos a Vencer (LPAG)
             </p>
           </div>
         </div>
 
         {/* Barra de Búsqueda y Filtro CCD */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex-1 max-w-md">
+        <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex-1 w-full sm:max-w-lg lg:max-w-xl">
             <input
               type="search"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar por CUT, solicitante o asunto…"
-              className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-xs sm:text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setMostrarFiltroCcd(!mostrarFiltroCcd)}
@@ -256,6 +307,6 @@ export default function BandejaExpedientesPage() {
           />
         )}
       </section>
-    </main>
+    </div>
   );
 }

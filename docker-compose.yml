@@ -1,14 +1,14 @@
 services:
   # 1. Base de Datos Relacional y Extensiones Criptográficas
   postgres:
-    image: postgres:18-alpine
+    image: postgres:17-alpine
     container_name: sigd_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_password
       POSTGRES_DB: sigd_prueba
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
@@ -19,7 +19,7 @@ services:
 
   # 2. Almacenamiento de Objetos Compatible con Amazon S3
   minio:
-    image: minio/minio:latest
+    image: elestio/minio:latest
     container_name: sigd_minio
     command: server /data --console-address ":9001"
     environment:

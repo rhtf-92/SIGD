@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import CasillaElectronicaPage from "../../../src/pages/casilla/CasillaElectronicaPage";
 import { casillaService } from "../../../src/services/casillaService";
+import { useAuthStore } from "../../../src/stores/authStore";
 import type {
   AcuseNotificacion,
   EstadisticasCasilla,
@@ -241,6 +242,18 @@ function renderConQueryClient(ui: ReactElement) {
 describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useAuthStore.setState({
+      accessToken: "mock-valid-token",
+      isAuthenticated: true,
+      usuario: {
+        id: "104",
+        nombreCompleto: "Sergio Serruche Panduro",
+        correo: "sergio.serruche@estudiante.iestpsuiza.edu.pe",
+        numeroDocumento: "74561238",
+        rol: "ESTUDIANTE",
+        usuario: "sergio.serruche",
+      },
+    });
     vi.mocked(casillaService.getEstadisticas).mockResolvedValue(mockEstadisticasBase);
     vi.mocked(casillaService.getNotificaciones).mockImplementation(
       async (filtros?: FiltrosCasilla) => {
@@ -772,5 +785,26 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     expect(
       await screen.findByText(/No se encontraron notificaciones oficiales/i),
     ).toBeInTheDocument();
+  });
+
+  it("o) Muestra mensaje de autenticación requerida si no hay sesión activa", async () => {
+    useAuthStore.setState({
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+      usuario: null,
+    });
+
+    renderConQueryClient(<CasillaElectronicaPage />);
+
+    expect(
+      screen.getByRole("heading", { name: /Autenticación Requerida/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Iniciar Sesión Institucional/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Sergio Serruche Panduro"),
+    ).not.toBeInTheDocument();
   });
 });

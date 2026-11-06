@@ -1,14 +1,18 @@
 /**
  * Suite ENT-M04-05 · F_ADRIANO (Adriano David Espinoza Ramírez) / T-FE-DOC-05.
- * 8 casos: códigos CVD válidos vs. apócrifos, máscara guiada, cronómetro de
- * días hábiles, bloqueo FSM sin actas y dictamen CvdIntegrityReport
- * (titular RENIEC + sellado TSA + alerta roja de adulteración).
+ * Casos: códigos CVD válidos vs. apócrifos, máscara guiada, cronómetro de
+ * días hábiles, bloqueo FSM sin actas, dictamen CvdIntegrityReport
+ * (titular RENIEC + sellado TSA + alerta roja de adulteración) y renderizado
+ * RWD Full-Width de ValidadorPublicoCvdPage.
  */
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import CvdIntegrityReport from "../../../src/components/cvd/CvdIntegrityReport";
+import ValidadorPublicoCvdPage from "../../../src/pages/validador/ValidadorPublicoCvdPage";
 import { requisitosPendientesDe } from "../../../src/hooks/useWorkflowAcademico";
 import type { ValidacionCVDResult } from "../../../src/types/validadorCvd";
 import type { WorkflowAcademico } from "../../../src/types/workflowAcademico";
@@ -49,6 +53,20 @@ const RESULTADO_ADULTERADO: ValidacionCVDResult = {
   selloTiempoTsa: null,
   mensajeSeguridad: "Contenido alterado tras la emisión.",
 };
+
+function renderConProviders(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 describe("Validador público CVD — ENT-M04-05 (F_ADRIANO)", () => {
   it("1. acepta un CVD válido con formato CVD-YYYY-RD-XXXXXX-XXXX", () => {
@@ -113,5 +131,30 @@ describe("Validador público CVD — ENT-M04-05 (F_ADRIANO)", () => {
     expect(alerta).toBeInTheDocument();
     expect(alerta.textContent).toMatch(/adulterado/i);
     expect(screen.getByText(/Documento no reconocido o adulterado/i)).toBeInTheDocument();
+  });
+
+  it("9. la página ValidadorPublicoCvdPage se renderiza con maquetación fluida y controles", () => {
+    renderConProviders(<ValidadorPublicoCvdPage />);
+
+    expect(screen.getByText(/Verificador público de Códigos de Verificación Digital/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Código CVD del documento/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Verificar$/i })).toBeInTheDocument();
+    expect(screen.getByText(/¿Posee el PDF oficial\? Arrástrelo aquí/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Escanear QR con cámara/i })).toBeInTheDocument();
+    expect(screen.getByText(/¿Qué es el CVD\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/Marco normativo aplicable/i)).toBeInTheDocument();
+  });
+
+  it("10. permite interactuar con el campo de búsqueda y botones de ejemplo", () => {
+    renderConProviders(<ValidadorPublicoCvdPage />);
+
+    const input = screen.getByLabelText(/Código CVD del documento/i) as HTMLInputElement;
+    const btnEjemplo = screen.getByRole("button", { name: "CVD-2026-RD-000412-892F" });
+    fireEvent.click(btnEjemplo);
+
+    expect(input.value).toBe("CVD-2026-RD-000412-892F");
+
+    const btnVerificar = screen.getByRole("button", { name: /Verificar|Verificando/i });
+    expect(btnVerificar).toBeInTheDocument();
   });
 });

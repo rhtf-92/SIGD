@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import AcademicWorkflowStepper from "../../components/flujos/AcademicWorkflowStepper";
 import BuscadorExpedientes from "../../components/flujos/BuscadorExpedientes";
+import FlujoPageHeader from "../../components/flujos/FlujoPageHeader";
 import StageDetailCard from "../../components/flujos/StageDetailCard";
 import { useTitulacionBackend } from "../../hooks/useTitulacionBackend";
 import { useWorkflowAcademico } from "../../hooks/useWorkflowAcademico";
@@ -139,58 +140,40 @@ export default function WorkflowAcademicoPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-5">
-          <Link
-            to="/"
-            className="mb-4 mr-3 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+    <div className="flex-1 w-full bg-slate-100 text-slate-900">
+      <FlujoPageHeader
+        faseTag="Secretaría Académica · Trámite Oficial de Titulación Profesional"
+        title="Visualizador de Flujos Académicos de Titulación"
+        breadcrumbLabel="Workflow Académico"
+        description="Procedimiento oficial PROC-ACA-01 de Expedientes Académicos (titulación, grados, certificaciones, convalidaciones y trabajos de investigación)."
+      >
+        <p className="inline-flex flex-wrap items-center gap-2 text-xs">
+          <span
+            data-testid="numero-expediente"
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 font-bold text-slate-700"
           >
-            ← Volver al inicio
-          </Link>
-          <Link
-            to="/flujo-validez-legal"
-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            N.° expediente: {workflow.idTramite}
+          </span>
+          <span
+            data-testid="cut-expediente"
+            className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-mono font-bold text-blue-700"
           >
-            ← Volver al módulo
-          </Link>
-          <p className="text-sm font-bold text-blue-700">
-            ENT-M04-01 · Adriano David Espinoza Ramírez
-          </p>
-          <h1 className="text-2xl font-bold">
-            Visualizador de Workflows Académicos de 5 Etapas
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Máquina de Estados Finitos (FSM) de 10 estados · Procedimiento
-            PROC-ACA-01 de Expedientes Académicos (titulación, grados,
-            certificaciones, convalidaciones y trabajos de investigación).
-          </p>
-          <p className="mt-2 inline-flex flex-wrap items-center gap-2 text-xs">
-            <span
-              data-testid="numero-expediente"
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 font-bold text-slate-700"
-            >
-              N.° expediente: {workflow.idTramite}
-            </span>
-            <span
-              data-testid="cut-expediente"
-              className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-mono font-bold text-blue-700"
-            >
-              CUT: {workflow.cut}
-            </span>
-          </p>
+            CUT: {workflow.cut}
+          </span>
+        </p>
+        <div className="mt-2">
           <InsigniaConexionBackend tramiteId={workflow.idTramite} />
         </div>
-      </header>
+      </FlujoPageHeader>
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8">
         <BuscadorExpedientes
           expedientes={expedientesDisponibles}
           expedienteActualId={workflow.idTramite}
           onSeleccionar={cargarExpediente}
         />
 
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-6 grid gap-4 sm:gap-5 xl:gap-6 2xl:gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
               Expediente
@@ -265,29 +248,31 @@ export default function WorkflowAcademicoPage() {
           <AcademicWorkflowStepper etapas={etapas} estadoTramite={estado} />
         </div>
 
-        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mr-auto text-lg font-bold">Acciones de la FSM</h2>
+        <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+          <h2 className="w-full sm:w-auto sm:mr-auto text-base sm:text-lg font-bold">Acciones del Trámite</h2>
 
-          {acciones.map((accion) => (
+          <div className="w-full sm:w-auto flex flex-wrap items-center gap-2">
+            {acciones.map((accion) => (
+              <button
+                key={accion.etiqueta}
+                type="button"
+                onClick={accion.onClick}
+                disabled={!accion.habilitada}
+                className={`w-full sm:w-auto inline-flex items-center justify-center rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${accion.clases} ${accion.habilitada ? "" : "cursor-not-allowed opacity-40"}`}
+              >
+                {accion.etiqueta}
+              </button>
+            ))}
+
             <button
-              key={accion.etiqueta}
               type="button"
-              onClick={accion.onClick}
-              disabled={!accion.habilitada}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${accion.clases} ${accion.habilitada ? "" : "cursor-not-allowed opacity-40"}`}
+              onClick={anularTramite}
+              disabled={!puedeAnular}
+              className={`w-full sm:w-auto inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs sm:text-sm font-semibold text-red-700 transition hover:bg-red-100 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none ${puedeAnular ? "" : "cursor-not-allowed opacity-40"}`}
             >
-              {accion.etiqueta}
+              Anular trámite
             </button>
-          ))}
-
-          <button
-            type="button"
-            onClick={anularTramite}
-            disabled={!puedeAnular}
-            className={`rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none ${puedeAnular ? "" : "cursor-not-allowed opacity-40"}`}
-          >
-            Anular trámite
-          </button>
+          </div>
         </div>
 
         {errorFsm && (
@@ -305,7 +290,7 @@ export default function WorkflowAcademicoPage() {
             className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
           >
             <p className="font-bold">
-              Bloqueo FSM activo: faltan {requisitosPendientesEtapaActual.length} requisito(s) en la
+              Requisitos pendientes obligatorios: faltan {requisitosPendientesEtapaActual.length} requisito(s) en la
               etapa actual
             </p>
             <ul className="mt-1 list-inside list-disc">
@@ -322,7 +307,7 @@ export default function WorkflowAcademicoPage() {
         )}
 
         <h2 className="mb-3 text-lg font-bold">Detalle por etapa</h2>
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
           {etapas.map((etapa, indice) => (
             <StageDetailCard
               key={etapa.idEtapa}
@@ -341,7 +326,7 @@ export default function WorkflowAcademicoPage() {
             Resolución → Registro MinEdu
           </strong>
           .<br />
-          Transiciones permitidas por la FSM:{" "}
+          Etapas procesales autorizadas:{" "}
           <code className="text-slate-700">
             REGISTRADO → EN_TRAMITE → EN_REVISION → (OBSERVADO ⇄ SUBSANADO) →
             APROBADO → PARA_FIRMA → RESUELTO
@@ -351,7 +336,7 @@ export default function WorkflowAcademicoPage() {
           del TUO de la Ley N° 27444).
         </p>
       </section>
-    </main>
+    </div>
   );
 }
 
@@ -360,7 +345,7 @@ function InsigniaConexionBackend({ tramiteId }: { tramiteId: number }) {
   if (cargandoRemoto) {
     return (
       <p className="mt-2 text-xs text-slate-400" role="status">
-        Sincronizando FSM con el backend…
+        Sincronizando estado con el servidor institucional…
       </p>
     );
   }
@@ -374,15 +359,15 @@ function InsigniaConexionBackend({ tramiteId }: { tramiteId: number }) {
         }`}
         title={
           conectado
-            ? "La FSM se consume desde GET /api/v1/flujos/titulacion/:id"
-            : "Sin backend disponible: opera la FSM local del cliente (mocks solo en desarrollo)"
+            ? "Servicio sincronizado con el servidor institucional"
+            : "Operando en modo local"
         }
       >
         <span
           className={`h-2 w-2 rounded-full ${conectado ? "bg-emerald-500" : "bg-slate-400"}`}
           aria-hidden="true"
         />
-        {conectado ? "FSM backend conectada" : "FSM local (modo desarrollo)"}
+        {conectado ? "Servidor Institucional Conectado" : "Servicio Institucional Local"}
       </span>
     </p>
   );

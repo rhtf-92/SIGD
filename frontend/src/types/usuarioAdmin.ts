@@ -4,7 +4,7 @@
 export type EstadoUsuario = "Activo" | "Inactivo" | "Bloqueado";
 
 export interface Usuario {
-  id: number;
+  id: string | number;
   nombre: string;
   dni: string;
   correo: string;
@@ -17,11 +17,28 @@ export interface Usuario {
 }
 
 // Contratos de integración REST /api/v1/usuarios (canónicos del módulo)
+export interface CreateUsuarioDTO {
+  nombre: string;
+  dni: string;
+  correo: string;
+  sede: string;
+  area: string;
+  cargo: string;
+  rol: string;
+  estado?: EstadoUsuario;
+  usuario?: string;
+  clave?: string;
+}
+
 export interface UpdateUsuarioDTO {
+  nombre?: string;
+  dni?: string;
+  correo?: string;
   area: string;
   sede: string;
   cargo: string;
   rol: string;
+  estado?: EstadoUsuario;
 }
 
 export interface UpdateEstadoDTO {

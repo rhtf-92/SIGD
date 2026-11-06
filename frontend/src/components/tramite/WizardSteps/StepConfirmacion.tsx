@@ -27,6 +27,7 @@ import type {
 } from '../../../types/tramiteWizardState';
 import QrCodeView from '../../common/QrCodeView';
 import { apiClient } from '../../../api/client';
+import { getCanonicalUuidForCodigo } from '../../../hooks/useCatalogoTupa';
 
 interface RadicacionVirtualResponse {
   expedienteId: string;
@@ -118,21 +119,30 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           ? documentos.asunto.trim()
           : `${documentos.asunto.trim()} - Solicitud de Trámite Institucional`;
 
-      let idTipoTramite = documentos.tipoTramiteId;
-      if (
-        !idTipoTramite ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite) ||
-        idTipoTramite === '00000000-0000-0000-0000-000000000001'
-      ) {
+      let idTipoTramite = (documentos.tipoTramiteId || '').trim();
+      if (!idTipoTramite) {
+        idTipoTramite = 'TUPA-01';
+      }
+
+      // Si es un código TUPA o identificador no-UUID, intentamos resolver el UUID canónico oficial desde el backend
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite)) {
         try {
-          const respTipos = await apiClient.get<Array<{ id: string; codigo?: string; id_tipo_tramite?: string }>>(
+          const respTipos = await apiClient.get<Array<{ id?: string; codigo?: string; id_tipo_tramite?: string }>>(
             '/api/v1/tramites/tipos',
           );
           if (Array.isArray(respTipos?.data) && respTipos.data.length > 0) {
-            const encontrado = respTipos.data.find(
-              (t) => t.codigo === documentos.tipoTramiteId || t.id === documentos.tipoTramiteId,
-            );
-            const resId = (encontrado ? (encontrado.id || encontrado.id_tipo_tramite) : (respTipos.data[0].id || respTipos.data[0].id_tipo_tramite));
+            const codLimpio = idTipoTramite.toLowerCase();
+            const encontrado = respTipos.data.find((t) => {
+              const tc = String(t.codigo ?? '').toLowerCase();
+              const ti = String(t.id ?? t.id_tipo_tramite ?? '').toLowerCase();
+              return (
+                tc === codLimpio ||
+                ti === codLimpio ||
+                `tupa-${tc.replace(/^tupa-?/i, '')}` === codLimpio ||
+                tc.replace(/^tupa-?/i, '') === codLimpio.replace(/^tupa-?/i, '')
+              );
+            });
+            const resId = encontrado?.id || encontrado?.id_tipo_tramite;
             if (resId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resId)) {
               idTipoTramite = resId;
             }
@@ -141,8 +151,10 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           // Fallback defensivo si el endpoint no está disponible en entorno aislado
         }
       }
-      if (!idTipoTramite || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite)) {
-        idTipoTramite = '00000000-0000-0000-0000-000000000001';
+
+      // Si aún no es UUID válido, resolver el UUID determinista canónico según el procedimiento seleccionado
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite)) {
+        idTipoTramite = getCanonicalUuidForCodigo(idTipoTramite);
       }
 
       let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
@@ -161,14 +173,21 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
       const archivosPayload =
         documentos.archivos.length > 0
-          ? documentos.archivos.map((a) => ({
+          ? documentos.archivos.map((a: any) => ({
               nombreArchivo: a.nombre,
               contentType: 'application/pdf',
               tamanoBytes: Number(a.peso) || 1024,
               hashSha256:
                 a.hashSha256 && /^[0-9a-f]{64}$/i.test(a.hashSha256)
                   ? a.hashSha256.toLowerCase()
+                  : a.sha256 && /^[0-9a-f]{64}$/i.test(a.sha256)
+                  ? a.sha256.toLowerCase()
                   : 'a'.repeat(64),
+              storagePath:
+                a.s3Key ||
+                (typeof a.storageUrl === 'string' && a.storageUrl.startsWith('s3://')
+                  ? a.storageUrl.replace(/^s3:\/\/[^/]+\//, '')
+                  : undefined),
             }))
           : [
               {
@@ -176,6 +195,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
                 contentType: 'application/pdf',
                 tamanoBytes: 2048,
                 hashSha256: 'a'.repeat(64),
+                storagePath: 'expedientes/documento_principal.pdf',
               },
             ];
 

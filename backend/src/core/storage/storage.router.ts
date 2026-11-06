@@ -8,7 +8,7 @@
  */
 
 import crypto from 'node:crypto';
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
@@ -33,11 +33,29 @@ const presignedInputSchema = z.preprocess(
   }),
 );
 
-const confirmarInputSchema = z.object({
-  s3Key: z.string().min(3),
-  sha256Hash: z.string().length(64).regex(/^[a-fA-F0-9]{64}$/),
-  idExpediente: z.string().uuid().optional(),
-});
+const confirmarInputSchema = z.preprocess(
+  (val) => {
+    if (val && typeof val === 'object') {
+      return {
+        ...val,
+        sha256Hash: (val as any).sha256Hash ?? (val as any).checksumSha256 ?? (val as any).sha256,
+        expedienteId: (val as any).expedienteId ?? (val as any).idExpediente,
+        tipoDocumentalId: (val as any).tipoDocumentalId ?? (val as any).idTipoDocumento,
+      };
+    }
+    return val;
+  },
+  z.object({
+    s3Key: z.string().min(3),
+    sha256Hash: z.string().length(64).regex(/^[a-fA-F0-9]{64}$/),
+    expedienteId: z.string().uuid({ message: 'expedienteId es obligatorio y debe ser un UUID válido.' }),
+    tipoDocumentalId: z.string().uuid().optional(),
+    nombreArchivo: z.string().optional(),
+    tamanoBytes: z.number().int().positive().optional(),
+    mimeType: z.string().optional(),
+    subidoPor: z.string().uuid().optional(),
+  }),
+);
 
 export function crearRouterStorage(pool?: Pool): Router {
   const router = Router();
@@ -65,29 +83,64 @@ export function crearRouterStorage(pool?: Pool): Router {
   });
 
   // #19 — POST /storage/confirmar-carga
-  router.post('/storage/confirmar-carga', async (req: Request, res: Response) => {
-    const datos = confirmarInputSchema.parse(req.body);
-    const idAdjunto = crypto.randomUUID();
+  router.post('/storage/confirmar-carga', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const datos = confirmarInputSchema.parse(req.body);
+      const idAdjunto = crypto.randomUUID();
+      let finalId: string = idAdjunto;
 
-    if (pool) {
-      // Registrar en sigd_doc.documento_adjunto si se proporciona pool
-      await pool
-        .query(
+      if (pool) {
+        const expId = datos.expedienteId;
+
+        let tipoDocId = datos.tipoDocumentalId;
+        if (!tipoDocId) {
+          const tipoRow = await pool.query<{ tipo_documental_id: string }>(
+            `SELECT tipo_documental_id FROM sigd_doc.tipo_documento WHERE vigente = TRUE ORDER BY codigo ASC LIMIT 1`,
+          );
+          tipoDocId = tipoRow.rows[0]?.tipo_documental_id;
+        }
+
+        const nombreArchivo = (datos.nombreArchivo ?? datos.s3Key.split('/').pop() ?? 'documento.pdf').slice(0, 255);
+        const tamanoBytes = datos.tamanoBytes ?? 1024;
+        const mimeType = (datos.mimeType ?? 'application/pdf').slice(0, 120);
+
+        const insertResult = await pool.query<{ documento_adjunto_id: string }>(
           `INSERT INTO sigd_doc.documento_adjunto
-             (id_documento_adjunto, s3_bucket, s3_key, sha256_hash, creado_en)
-           VALUES ($1, $2, $3, $4, now())
-           ON CONFLICT DO NOTHING;`,
-          [idAdjunto, config.bucket, datos.s3Key, datos.sha256Hash.toLowerCase()],
-        )
-        .catch(() => null);
-    }
+             (documento_adjunto_id, expediente_id, tipo_documental_id, nombre_archivo,
+              s3_bucket, s3_key, sha256, tamano_bytes, mime_type, magic_bytes, subido_por)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '25504446', $10)
+           ON CONFLICT (s3_bucket, s3_key) DO UPDATE
+             SET sha256 = EXCLUDED.sha256,
+                 tamano_bytes = EXCLUDED.tamano_bytes
+           RETURNING documento_adjunto_id;`,
+          [
+            idAdjunto,
+            expId,
+            tipoDocId,
+            nombreArchivo,
+            config.bucket,
+            datos.s3Key,
+            datos.sha256Hash.toLowerCase(),
+            tamanoBytes,
+            mimeType,
+            datos.subidoPor ?? null,
+          ],
+        );
 
-    res.status(201).json({
-      idDocumentoAdjunto: idAdjunto,
-      s3Key: datos.s3Key,
-      confirmado: true,
-      mensaje: 'Documento PDF verificado y registrado en el almacenamiento institucional.',
-    });
+        if (insertResult.rows[0]?.documento_adjunto_id) {
+          finalId = insertResult.rows[0].documento_adjunto_id;
+        }
+      }
+
+      res.status(201).json({
+        idDocumentoAdjunto: finalId,
+        s3Key: datos.s3Key,
+        confirmado: true,
+        mensaje: 'Documento PDF verificado y registrado en el almacenamiento institucional.',
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
   // GET /storage/download/:bucket/:key

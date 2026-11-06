@@ -22,37 +22,38 @@ export default function AdminBreadcrumbs() {
 
   const segmentos = location.pathname.split("/").filter(Boolean);
 
-  const migas: Miga[] =
-    segmentos.length === 0
-      ? [{ etiqueta: "Panel de Administración", ruta: "/administracion", actual: true }]
-      : segmentos.map((segmento, indice) => {
-          const camino = segmentos.slice(0, indice + 1).join("/");
-          const etiqueta =
-            ETIQUETAS_ADMIN[segmento] ??
-            segmento.charAt(0).toUpperCase() + segmento.slice(1);
-          return {
-            etiqueta,
-            ruta: `/${camino}`,
-            actual: indice === segmentos.length - 1,
-          };
-        });
-
-  if (migas.length === 0) return null;
+  const migas: Miga[] = [
+    { etiqueta: "Inicio", ruta: "/", actual: false },
+    ...segmentos.map((segmento, indice) => {
+      const camino = segmentos.slice(0, indice + 1).join("/");
+      const etiqueta =
+        ETIQUETAS_ADMIN[segmento] ??
+        segmento.charAt(0).toUpperCase() + segmento.slice(1);
+      return {
+        etiqueta,
+        ruta: `/${camino}`,
+        actual: indice === segmentos.length - 1,
+      };
+    }),
+  ];
 
   return (
     <nav
       aria-label="Migajas de pan de administración"
-      className="mb-4 flex flex-wrap items-center gap-1 text-xs font-medium text-slate-500"
+      className="mb-3 flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-500"
     >
       {migas.map((miga, indice) => (
-        <span key={miga.ruta} className="flex items-center gap-1">
+        <span key={miga.ruta} className="flex items-center gap-1.5">
           {indice > 0 && <span className="text-slate-300">/</span>}
           {miga.actual ? (
-            <span aria-current="page" className="text-blue-700">
+            <span aria-current="page" className="font-semibold text-blue-700">
               {miga.etiqueta}
             </span>
           ) : (
-            <Link to={miga.ruta} className="hover:text-blue-700 hover:underline">
+            <Link
+              to={miga.ruta}
+              className="hover:text-blue-700 hover:underline transition-colors"
+            >
               {miga.etiqueta}
             </Link>
           )}

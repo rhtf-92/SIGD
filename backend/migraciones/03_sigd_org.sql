@@ -276,3 +276,20 @@ INSERT INTO sigd_org.calendario_laboral (
 ('2026-10-13', 'REGIONAL_UCAYALI', 'Aniversario de Creación de Ucayali', 'REGIONAL_UCAYALI', FALSE, 'Ley N° 29001')
 ON CONFLICT (fecha, unidad_territorial) DO NOTHING;
 
+-- Áreas institucionales oficiales del IESTP "Suiza"
+INSERT INTO sigd_org.area (codigo, nombre) VALUES
+    ('DIR_GEN', 'Dirección General'),
+    ('SEC_ACAD', 'Secretaría Académica'),
+    ('UNID_ACAD', 'Unidad Académica'),
+    ('MESA_PAR', 'Mesa de Partes'),
+    ('ADMIN', 'Administración')
+ON CONFLICT (codigo) DO NOTHING;
+
+-- Asignación de rol inicial al Administrador General
+INSERT INTO sigd_org.usuario_rol (id_usuario, rol_id, area_id)
+SELECT '00000000-0000-0000-0000-000000000001', r.rol_id, a.area_id
+FROM sigd_org.rol_sistema r, sigd_org.area a
+WHERE r.codigo = 'ADMINISTRADOR' AND a.codigo = 'DIR_GEN'
+ON CONFLICT DO NOTHING;
+
+

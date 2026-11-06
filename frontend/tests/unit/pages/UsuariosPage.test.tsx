@@ -11,12 +11,14 @@ import { DEBOUNCE_BUSQUEDA_MS, type Usuario } from "@/types/usuarioAdmin";
 const get = vi.fn();
 const put = vi.fn();
 const patch = vi.fn();
+const post = vi.fn();
 
 vi.mock("@/api/client", () => ({
   apiClient: {
     get: (...args: unknown[]) => get(...args),
     put: (...args: unknown[]) => put(...args),
     patch: (...args: unknown[]) => patch(...args),
+    post: (...args: unknown[]) => post(...args),
   },
 }));
 
@@ -81,6 +83,7 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     get.mockResolvedValue({ data: { data: USUARIOS } });
     put.mockResolvedValue({ data: USUARIOS[0] });
     patch.mockResolvedValue({ data: { ...USUARIOS[0], estado: "Inactivo" } });
+    post.mockResolvedValue({ data: USUARIOS[0] });
   });
 
   afterEach(() => {
@@ -250,5 +253,56 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
       ),
     ).toBeInTheDocument();
     expect(put).not.toHaveBeenCalled();
+  });
+
+  it("abre el modal de registro al presionar 'Registrar Usuario' y persiste con POST /api/v1/admin/usuarios", async () => {
+    const nuevoUsuario: Usuario = {
+      id: "99",
+      nombre: "Carlos Huamán",
+      dni: "88889999",
+      correo: "chuaman@iestpsuiza.edu.pe",
+      sede: "Sede Principal",
+      area: "Secretaría Académica",
+      cargo: "Especialista",
+      rol: "Operador",
+      estado: "Activo",
+      ultimoAcceso: "—",
+    };
+    post.mockResolvedValueOnce({ data: nuevoUsuario });
+
+    const usuario = userEvent.setup();
+    montarConProvider();
+    await screen.findByText("Juan Carlos Pérez");
+
+    await usuario.click(screen.getByRole("button", { name: /Registrar Usuario/i }));
+
+    const dialogo = await screen.findByRole("dialog", {
+      name: /Registrar nuevo usuario institucional/i,
+    });
+    expect(dialogo).toBeInTheDocument();
+
+    await usuario.type(within(dialogo).getByLabelText(/Nombre completo/i), "Carlos Huamán");
+    await usuario.type(within(dialogo).getByLabelText(/DNI/i), "88889999");
+    await usuario.type(
+      within(dialogo).getByLabelText(/Correo institucional/i),
+      "chuaman@iestpsuiza.edu.pe",
+    );
+
+    await usuario.click(within(dialogo).getByRole("button", { name: "Registrar Usuario" }));
+
+    await waitFor(() => {
+      expect(post).toHaveBeenCalledWith(
+        "/api/v1/admin/usuarios",
+        expect.objectContaining({
+          nombre: "Carlos Huamán",
+          dni: "88889999",
+          correo: "chuaman@iestpsuiza.edu.pe",
+        }),
+      );
+    });
+
+    expect(
+      await screen.findByText("El usuario institucional fue registrado exitosamente."),
+    ).toBeInTheDocument();
   });
 });

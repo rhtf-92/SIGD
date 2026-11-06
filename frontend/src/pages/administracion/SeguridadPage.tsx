@@ -26,25 +26,25 @@ export default function SeguridadPage() {
   const [justificacion, setJustificacion] = useState("");
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="flex-1 bg-slate-100 text-slate-900">
       <AdminPageHeader
         title="Seguridad"
         description="Control de accesos, bloqueos e intentos fallidos de autenticación."
       />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="grid gap-4 md:grid-cols-3">
-          <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Cuentas bloqueadas</p>
-            <p className="mt-2 text-3xl font-bold">{cuentasBloqueadas.length}</p>
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8">
+        <div className="grid gap-3 sm:gap-4 xl:gap-6 grid-cols-1 sm:grid-cols-3">
+          <article className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+            <p className="text-xs sm:text-sm text-slate-500">Cuentas bloqueadas</p>
+            <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">{cuentasBloqueadas.length}</p>
           </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Intentos fallidos visibles</p>
-            <p className="mt-2 text-3xl font-bold">{intentosFallidos}</p>
+          <article className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+            <p className="text-xs sm:text-sm text-slate-500">Intentos fallidos visibles</p>
+            <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">{intentosFallidos}</p>
           </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Sesión configurada</p>
-            <p className="mt-2 text-3xl font-bold">{minutosSesion} min</p>
+          <article className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+            <p className="text-xs sm:text-sm text-slate-500">Sesión configurada</p>
+            <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">{minutosSesion} min</p>
           </article>
         </div>
 
@@ -54,12 +54,11 @@ export default function SeguridadPage() {
           </div>
         )}
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="mt-6 grid gap-6 xl:gap-8 lg:grid-cols-2">
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold">Políticas de acceso</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Parámetros de demostración para su futura integración con
-              autenticación JWT.
+              Parámetros institucionales de control de sesiones y bloqueo preventivo.
             </p>
 
             <div className="mt-5 space-y-4">
@@ -244,6 +243,6 @@ export default function SeguridadPage() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }

@@ -1,22 +1,68 @@
 import crypto from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
-import { z } from 'zod';
 import { ConsultaPublicaService } from './consultaPublica.service.js';
 import { RadicacionVirtualService, type ProveedorFeriados } from './radicacionVirtual.service.js';
 import { VentanillaPresencialService } from './ventanillaPresencial.service.js';
 import { TicketTermicoUtil } from './ticketTermico.util.js';
-import { consultaPublicaParamsSchema, radicacionVirtualSchema } from './tramites.schemas.js';
+import {
+  consultaPublicaParamsSchema,
+  radicacionVirtualSchema,
+  ventanillaPresencialSchema,
+} from './tramites.schemas.js';
 import { NotFoundError } from '../../shared/domain/errors/index.js';
 
-const ventanillaPresencialSchema = z.object({
-  dniSolicitante: z.string().regex(/^[0-9]{8}$/, 'DNI debe contener exactamente 8 dígitos'),
-  datosRemitente: z.string().min(3),
-  asunto: z.string().min(5).max(500),
-  foliosTotales: z.coerce.number().int().positive(),
-  areaDestinoId: z.string().uuid().optional(),
-  tipoDocumentalId: z.string().uuid().optional(),
-});
+const ARANCELES_TUPA: Record<string, string> = {
+  'TUPA-01': 'S/. 11.00 por semestre; S/. 2.00',
+  'TUPA-02': 'S/. 25.00 por asignatura interna; S/. 30.00 externa',
+  'TUPA-03': 'S/. 3.00',
+  'TUPA-04': 'S/. 3.00',
+  'TUPA-05': 'S/. 20.00',
+  'TUPA-06': 'Gratuito',
+  'TUPA-07': 'S/. 150.00 por nivel',
+  'TUPA-08': 'Módulo semestral: S/. 75.00; anual: S/. 150.00',
+  'TUPA-09': 'S/. 250.00 a S/. 900.00 según tasas vigentes',
+  'TUPA-10': 'S/. 2.00',
+  'TUPA-11': 'S/. 5.00',
+  'TUPA-12': 'S/. 10.00',
+  'TUPA-13': 'S/. 35.00',
+  'TUPA-14': 'S/. 20.00 a S/. 35.00',
+  'TUPA-15': 'S/. 35.00 por asignatura / unidad didáctica',
+  'TUPA-16': 'S/. 100.00',
+  'TUPA-17': 'S/. 150.00',
+  'TUPA-18': 'S/. 3.00 c/s',
+  'TUPA-19': 'S/. 20.00',
+  'TUPA-20': 'S/. 30.00',
+  'TUPA-21': 'Tasas vigentes según R.D. N.º 048',
+  'TUPA-22': 'S/. 250.00',
+  'TUPA-23': 'S/. 5.00',
+  'TUPA-24': 'S/. 20.00',
+  'TUPA-25': 'S/. 15.00',
+  'TUPA-26': 'S/. 50.00',
+  'TUPA-27': 'S/. 15.00',
+  'TUPA-28': 'S/. 10.00',
+  'TUPA-29': 'S/. 10.00',
+  'TUPA-30': 'S/. 50.00',
+  'TUPA-31': 'S/. 30.00',
+  'TUPA-32': 'S/. 150.00',
+  'TUPA-33': 'S/. 150.00',
+  'TUPA-34': 'S/. 100.00',
+  'TUPA-35': 'S/. 80.00',
+  'TUPA-36': 'S/. 130.00',
+  'TUPA-37': 'S/. 100.00',
+  'TUPA-38': 'S/. 20.00',
+  'TUPA-39': 'S/. 40.00',
+  'TUPA-40': 'S/. 100.00',
+  'TUPA-41': 'S/. 200.00',
+  'TUPA-42': 'S/. 220.00',
+  'TUPA-43': 'S/. 230.00',
+  'TUPA-44': 'S/. 200.00',
+  'TUPA-45': 'S/. 150.00',
+  'TUPA-46': 'S/. 200.00',
+  'TUPA-47': 'Curación S/. 10.00 - S/. 30.00; Extracción S/. 15.00 - S/. 50.00',
+  'TUPA-48': 'Tarifas según servicio y alquiler',
+  'LIBRE-01': 'Gratuito',
+};
 
 /**
  * Endpoints del dominio TramiCore (Grupo 2 - OE2)
@@ -64,28 +110,45 @@ export function crearRouterTramites(
   // #15 en catálogo — Catálogo de tipos de trámite TUPA y trámites internos
   const handlerTiposTupa = async (_req: Request, res: Response) => {
     const query = `
-      SELECT tipo_tramite_id AS id,
-             tipo_tramite_id AS id_tipo_tramite,
-             codigo,
-             denominacion,
-             descripcion,
-             unidad_organica,
-             plazo_dias,
-             plazo_dias AS plazo_dias_habiles,
-             silencio_administrativo,
-             silencio_administrativo AS calificacion,
-             base_legal,
-             vigente
-        FROM sigd_doc.tipo_tramite_tupa
-       WHERE vigente = TRUE
-       ORDER BY codigo ASC;
+      SELECT t.tipo_tramite_id AS id,
+             t.tipo_tramite_id AS id_tipo_tramite,
+             t.tipo_tramite_id AS id_tipo_tramite_tupa,
+             t.codigo,
+             t.denominacion,
+             t.denominacion AS nombre,
+             t.descripcion,
+             t.unidad_organica,
+             t.unidad_organica AS dependencia,
+             t.plazo_dias,
+             t.plazo_dias AS plazo_dias_habiles,
+             t.silencio_administrativo,
+             t.silencio_administrativo AS calificacion,
+             t.base_legal,
+             t.vigente,
+             TRUE AS es_tupa,
+             COALESCE(
+               json_agg(r.denominacion ORDER BY r.orden) FILTER (WHERE r.denominacion IS NOT NULL),
+               '[]'::json
+             ) AS requisitos
+        FROM sigd_doc.tipo_tramite_tupa t
+        LEFT JOIN sigd_doc.requisito r ON r.tipo_tramite_id = t.tipo_tramite_id
+       WHERE t.vigente = TRUE
+       GROUP BY t.tipo_tramite_id, t.codigo, t.denominacion, t.descripcion, t.unidad_organica, t.plazo_dias, t.silencio_administrativo, t.base_legal, t.vigente
+       ORDER BY t.codigo ASC;
     `;
     const resultado = await pool.query(query);
-    res.status(200).json(resultado.rows);
+    const filasConArancel = resultado.rows.map((fila: any) => ({
+      ...fila,
+      derecho_pago: ARANCELES_TUPA[fila.codigo] ?? 'Gratuito',
+      derechoPago: ARANCELES_TUPA[fila.codigo] ?? 'Gratuito',
+      arancel: ARANCELES_TUPA[fila.codigo] ?? 'Gratuito',
+    }));
+    res.status(200).json(filasConArancel);
   };
 
   router.get('/tramites/tipos', handlerTiposTupa);
   router.get('/tramites/tupa', handlerTiposTupa);
+  router.get('/tramites/catalogo-tupa', handlerTiposTupa);
 
   // #16 — Consulta pública por CUT
   router.get('/tramites/consulta-publica/:cut', async (req: Request, res: Response) => {
@@ -99,37 +162,53 @@ export function crearRouterTramites(
     const cut = String(req.params.cut).trim().toUpperCase();
 
     const query = `
-      SELECT a.numero_asiento, a.anio_fiscal, a.cut, a.remitente,
-             a.remitente_documento, a.asunto, a.folios, a.fecha_asiento
-        FROM sigd_tra.asiento_registro a
-       WHERE a.cut = $1
+      SELECT e.expediente_id,
+             e.codigo_expediente AS cut,
+             e.fecha_radicacion,
+             COALESCE(e.dni_solicitante, p.id_documento, '') AS remitente_documento,
+             COALESCE(pn.nombre_completo, p.id_documento, 'Ciudadano') AS remitente,
+             COALESCE(a.asunto, de.asunto, 'Trámite Presencial') AS asunto,
+             a.fecha_ingreso,
+             a.numero_registro,
+             COALESCE(
+               (SELECT MAX(folio_fin) FROM sigd_tra.expediente_documento_folio edf WHERE edf.expediente_id = e.expediente_id),
+               1
+             ) AS folios
+        FROM sigd_tra.expediente e
+        LEFT JOIN sigd_tra.asiento_registro a ON a.expediente_id = e.expediente_id
+        LEFT JOIN sigd_doc.expediente de ON de.codigo_expediente = e.codigo_expediente
+        LEFT JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
+        LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+       WHERE e.codigo_expediente = $1
        LIMIT 1;
     `;
 
     const resultado = await pool.query(query, [cut]);
-    const asiento = resultado.rows[0];
+    const fila = resultado.rows[0];
 
-    if (!asiento) {
+    if (!fila) {
       throw new NotFoundError({
         detail: `No se encontró cargo físico registrado para el CUT ${cut}.`,
       });
     }
 
+    const fechaAsiento = fila.fecha_ingreso ?? fila.fecha_radicacion ?? new Date();
+
     const ticketImpresion = TicketTermicoUtil.generarTicketVentanilla({
-      cut: asiento.cut,
-      timestamp: new Date(asiento.fecha_asiento),
-      folios: Number(asiento.folios),
-      hashSha256: crypto.createHash('sha256').update(asiento.cut).digest('hex'),
-      qrUrlSeguimiento: `https://sigd.iestp-suiza.edu.pe/consulta/${encodeURIComponent(asiento.cut)}`,
+      cut: fila.cut,
+      timestamp: new Date(fechaAsiento),
+      folios: Number(fila.folios),
+      hashSha256: crypto.createHash('sha256').update(fila.cut).digest('hex'),
+      qrUrlSeguimiento: `https://sigd.iestp-suiza.edu.pe/consulta/${encodeURIComponent(fila.cut)}`,
     });
 
     res.status(200).json({
-      cut: asiento.cut,
-      remitente: asiento.remitente,
-      dni: asiento.remitente_documento,
-      asunto: asiento.asunto,
-      folios: Number(asiento.folios),
-      fechaRecepcion: asiento.fecha_asiento,
+      cut: fila.cut,
+      remitente: fila.remitente,
+      dni: fila.remitente_documento,
+      asunto: fila.asunto,
+      folios: Number(fila.folios),
+      fechaRecepcion: new Date(fechaAsiento).toISOString(),
       ticketTermicoTexto: ticketImpresion,
     });
   });
@@ -138,3 +217,4 @@ export function crearRouterTramites(
 }
 
 export default crearRouterTramites;
+

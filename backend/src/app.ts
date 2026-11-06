@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import express, { Express } from 'express';
 import type { Pool } from 'pg';
 import { contextMiddleware } from './middleware/context-middleware.js';
@@ -33,6 +34,7 @@ import type { ClasificadorCcdPort } from './domains/rutadoc/ccd.types.js';
 import type { DocumentoMetadataPort } from './domains/rutadoc/foliacion.types.js';
 import { crearRouterTramites } from './domains/tramicore/tramites.controller.js';
 import { crearRouterReportes } from './domains/corelink/reportes.router.js';
+import { crearRouterReportes as crearRouterReportesModulares } from './modules/reportes/reportes.routes.js';
 
 // Módulos OrganiCore Maestras, Calendario y Organigrama
 import { crearRouterAdminMaestras } from './domains/organicore/adminMaestras.routes.js';
@@ -201,6 +203,26 @@ export function construirApp(
     ),
   );
   app.use('/api/v1', crearRouterReportes(pool, actorProviderReportesEfectivo, opts.mgdCache));
+  const routerReportesModulares = crearRouterReportesModulares(pool);
+  app.use('/api/v1/reportes', routerReportesModulares);
+  app.get('/api/v1/reportes/exportar/pdf', (req, res, next) => {
+    req.url = '/exportar-pdf';
+    routerReportesModulares(req, res, next);
+  });
+  app.get('/api/v1/reportes/exportar/excel', (req, res, next) => {
+    req.url = '/exportar-excel';
+    routerReportesModulares(req, res, next);
+  });
+  app.post('/api/v1/reportes/exportar/pdf', (req, res, next) => {
+    req.method = 'GET';
+    req.url = '/exportar-pdf';
+    routerReportesModulares(req, res, next);
+  });
+  app.post('/api/v1/reportes/exportar/excel', (req, res, next) => {
+    req.method = 'GET';
+    req.url = '/exportar-excel';
+    routerReportesModulares(req, res, next);
+  });
   app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
   app.use('/api/v1/firma', crearFirmaRouter(servicio));
 
@@ -268,9 +290,9 @@ export function construirApp(
       const limite = Math.min(Number(req.query.limite ?? 50), 100);
       const offset = Number(req.query.offset ?? 0);
       const { rows } = await pool.query(
-        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, creado_en
+        `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion, fecha_hora, fecha_hora AS creado_en
          FROM sigd_audit.bitacora_auditoria
-         ORDER BY creado_en DESC
+         ORDER BY fecha_hora DESC
          LIMIT $1 OFFSET $2`,
         [limite, offset],
       );
@@ -283,24 +305,209 @@ export function construirApp(
   app.get('/api/v1/admin/roles-permisos', async (_req, res, next) => {
     try {
       const { rows: roles } = await pool.query(
-        `SELECT r.id, r.codigo, r.nombre, r.descripcion,
+        `SELECT r.rol_id AS id, r.rol_id, r.codigo, r.nombre, r.descripcion,
                 COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
          FROM sigd_org.rol_sistema r
-         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.id
-         LEFT JOIN sigd_org.permiso_sistema p ON p.id = rp.permiso_id
-         GROUP BY r.id, r.codigo, r.nombre, r.descripcion`,
+         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
+         LEFT JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+         GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion`,
       );
       res.json({ roles });
-    } catch {
-      res.json({
-        roles: [
-          { codigo: 'SUPER_ADMIN', nombre: 'Super Administrador' },
-          { codigo: 'DIRECTOR', nombre: 'Director General' },
-          { codigo: 'DOCENTE', nombre: 'Docente Titular' },
-          { codigo: 'MESA_PARTES', nombre: 'Operador de Mesa de Partes' },
-          { codigo: 'ESTUDIANTE', nombre: 'Estudiante / Administrado' },
-        ],
-      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put('/api/v1/admin/roles-permisos', async (req, res, next) => {
+    try {
+      const { rolId, permisosIds, permisos } = req.body ?? {};
+      const targetRolId = rolId;
+      const listaPermisos = permisosIds ?? permisos ?? [];
+      const tienePermisoAuditoriaMutacion = Array.isArray(listaPermisos) && listaPermisos.some((p: string) =>
+        typeof p === 'string' && (p.includes('audit:delete') || p.includes('audit:update') || p.includes('bitacora:mutar'))
+      );
+      if (tienePermisoAuditoriaMutacion) {
+        return res.status(422).json({
+          type: 'https://sigd.iestpsuiza.edu.pe/errors/worm-violation',
+          title: 'Violación de Invariante WORM',
+          status: 422,
+          code: 'WORM_IMMUTABLE_VIOLATION',
+          detail: 'No se permite otorgar permisos de edición o borrado sobre la bitácora de auditoría (Directiva WORM LPAG/AGN).',
+        });
+      }
+
+      // Validar rol existente
+      const isUuid = typeof targetRolId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetRolId);
+      const rolRes = await pool.query<{ rol_id: string }>(
+        isUuid
+          ? `SELECT rol_id FROM sigd_org.rol_sistema WHERE rol_id = $1`
+          : `SELECT rol_id FROM sigd_org.rol_sistema WHERE codigo = $1`,
+        [targetRolId],
+      );
+      if (rolRes.rowCount === 0) {
+        return res.status(404).json({
+          type: 'https://sigd.iestpsuiza.edu.pe/errors/not-found',
+          title: 'Rol no encontrado',
+          status: 404,
+          detail: `No se encontró el rol con identificador: ${targetRolId}`,
+        });
+      }
+      const realRolId = rolRes.rows[0].rol_id;
+
+      // Resolver permisos válidos
+      const permisosArray: string[] = Array.isArray(listaPermisos) ? listaPermisos : [];
+      let permIds: string[] = [];
+      if (permisosArray.length > 0) {
+        for (const p of permisosArray) {
+          const pIsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p);
+          if (!pIsUuid) {
+            await pool.query(
+              `INSERT INTO sigd_org.permiso_sistema (codigo, nombre, ambito)
+               VALUES ($1, $1, 'GLOBAL')
+               ON CONFLICT (codigo) DO NOTHING`,
+              [p.slice(0, 60)],
+            );
+          }
+        }
+        const permRes = await pool.query<{ permiso_id: string }>(
+          `SELECT permiso_id FROM sigd_org.permiso_sistema
+           WHERE permiso_id::text = ANY($1::text[]) OR codigo = ANY($1::text[])`,
+          [permisosArray.map(String)],
+        );
+        permIds = permRes.rows.map((r) => r.permiso_id);
+      }
+
+      // Persistencia transaccional real
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(`DELETE FROM sigd_org.rol_permiso WHERE rol_id = $1`, [realRolId]);
+        for (const pId of permIds) {
+          await client.query(
+            `INSERT INTO sigd_org.rol_permiso (rol_id, permiso_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [realRolId, pId],
+          );
+        }
+        const correlationId = (req.headers['x-correlation-id'] as string) || crypto.randomUUID();
+        await client.query(
+          `INSERT INTO sigd_audit.bitacora_auditoria
+             (id_auditoria, correlation_id, usuario_id, ip_origen, user_agent, esquema, tabla, operacion, datos_despues)
+           VALUES ($1, $2, $3, $4, $5, 'sigd_org', 'rol_permiso', 'UPDATE', $6)`,
+          [
+            crypto.randomUUID(),
+            correlationId,
+            (req as any).user?.id || '00000000-0000-0000-0000-000000000001',
+            req.ip || '127.0.0.1',
+            req.headers['user-agent'] || 'backend-service',
+            JSON.stringify({ rol_id: realRolId, total_permisos: permIds.length }),
+          ],
+        );
+        await client.query('COMMIT');
+      } catch (dbErr) {
+        await client.query('ROLLBACK');
+        throw dbErr;
+      } finally {
+        client.release();
+      }
+
+      res.json({ actualizado: true, rolId: realRolId, totalPermisos: permIds.length, mensaje: 'Matriz de roles y permisos actualizada correctamente' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put('/api/v1/admin/roles/:id/permisos', async (req, res, next) => {
+    try {
+      const { permisosIds, permisos } = req.body ?? {};
+      const targetRolId = req.params.id;
+      const listaPermisos = permisosIds ?? permisos ?? [];
+      const tienePermisoAuditoriaMutacion = Array.isArray(listaPermisos) && listaPermisos.some((p: string) =>
+        typeof p === 'string' && (p.includes('audit:delete') || p.includes('audit:update') || p.includes('bitacora:mutar'))
+      );
+      if (tienePermisoAuditoriaMutacion) {
+        return res.status(422).json({
+          type: 'https://sigd.iestpsuiza.edu.pe/errors/worm-violation',
+          title: 'Violación de Invariante WORM',
+          status: 422,
+          code: 'WORM_IMMUTABLE_VIOLATION',
+          detail: 'No se permite otorgar permisos de edición o borrado sobre la bitácora de auditoría (Directiva WORM LPAG/AGN).',
+        });
+      }
+
+      const isUuid = typeof targetRolId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetRolId);
+      const rolRes = await pool.query<{ rol_id: string }>(
+        isUuid
+          ? `SELECT rol_id FROM sigd_org.rol_sistema WHERE rol_id = $1`
+          : `SELECT rol_id FROM sigd_org.rol_sistema WHERE codigo = $1`,
+        [targetRolId],
+      );
+      if (rolRes.rowCount === 0) {
+        return res.status(404).json({
+          type: 'https://sigd.iestpsuiza.edu.pe/errors/not-found',
+          title: 'Rol no encontrado',
+          status: 404,
+          detail: `No se encontró el rol con identificador: ${targetRolId}`,
+        });
+      }
+      const realRolId = rolRes.rows[0].rol_id;
+
+      const permisosArray: string[] = Array.isArray(listaPermisos) ? listaPermisos : [];
+      let permIds: string[] = [];
+      if (permisosArray.length > 0) {
+        for (const p of permisosArray) {
+          const pIsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p);
+          if (!pIsUuid) {
+            await pool.query(
+              `INSERT INTO sigd_org.permiso_sistema (codigo, nombre, ambito)
+               VALUES ($1, $1, 'GLOBAL')
+               ON CONFLICT (codigo) DO NOTHING`,
+              [p.slice(0, 60)],
+            );
+          }
+        }
+        const permRes = await pool.query<{ permiso_id: string }>(
+          `SELECT permiso_id FROM sigd_org.permiso_sistema
+           WHERE permiso_id::text = ANY($1::text[]) OR codigo = ANY($1::text[])`,
+          [permisosArray.map(String)],
+        );
+        permIds = permRes.rows.map((r) => r.permiso_id);
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(`DELETE FROM sigd_org.rol_permiso WHERE rol_id = $1`, [realRolId]);
+        for (const pId of permIds) {
+          await client.query(
+            `INSERT INTO sigd_org.rol_permiso (rol_id, permiso_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [realRolId, pId],
+          );
+        }
+        const correlationId = (req.headers['x-correlation-id'] as string) || crypto.randomUUID();
+        await client.query(
+          `INSERT INTO sigd_audit.bitacora_auditoria
+             (id_auditoria, correlation_id, usuario_id, ip_origen, user_agent, esquema, tabla, operacion, datos_despues)
+           VALUES ($1, $2, $3, $4, $5, 'sigd_org', 'rol_permiso', 'UPDATE', $6)`,
+          [
+            crypto.randomUUID(),
+            correlationId,
+            (req as any).user?.id || '00000000-0000-0000-0000-000000000001',
+            req.ip || '127.0.0.1',
+            req.headers['user-agent'] || 'backend-service',
+            JSON.stringify({ rol_id: realRolId, total_permisos: permIds.length }),
+          ],
+        );
+        await client.query('COMMIT');
+      } catch (dbErr) {
+        await client.query('ROLLBACK');
+        throw dbErr;
+      } finally {
+        client.release();
+      }
+
+      res.json({ actualizado: true, rolId: req.params.id, totalPermisos: permIds.length, mensaje: 'Permisos del rol actualizados correctamente' });
+    } catch (error) {
+      next(error);
     }
   });
 
@@ -316,20 +523,29 @@ export function construirApp(
   app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
     try {
       const { rows } = await pool.query(
-        `SELECT id, codigo, nombre, descripcion, dias_atencion_legal, vigente
+        `SELECT tipo_documental_id, codigo, nombre, extension, mime_type, tamano_maximo_mb, exige_firma, vigente
          FROM sigd_doc.tipo_documento
          WHERE vigente = TRUE
          ORDER BY nombre ASC`,
       );
-      res.json(rows);
-    } catch {
-      res.json([
-        { codigo: 'SOLICITUD', nombre: 'Solicitud' },
-        { codigo: 'OFICIO', nombre: 'Oficio' },
-        { codigo: 'MEMORANDO', nombre: 'Memorando' },
-        { codigo: 'INFORME', nombre: 'Informe Técnico' },
-        { codigo: 'RESOLUCION', nombre: 'Resolución Directoral' },
-      ]);
+      const items = rows.map((r: any) => ({
+        id: r.tipo_documental_id,
+        tipoDocumentalId: r.tipo_documental_id,
+        tipo_documental_id: r.tipo_documental_id,
+        codigo: r.codigo,
+        nombre: r.nombre,
+        extension: r.extension,
+        mimeType: r.mime_type,
+        mime_type: r.mime_type,
+        tamanoMaximoMb: Number(r.tamano_maximo_mb),
+        tamano_maximo_mb: Number(r.tamano_maximo_mb),
+        exigeFirma: Boolean(r.exige_firma),
+        exige_firma: Boolean(r.exige_firma),
+        vigente: Boolean(r.vigente),
+      }));
+      res.json(items);
+    } catch (error) {
+      next(error);
     }
   });
 

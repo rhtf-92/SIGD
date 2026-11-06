@@ -22,8 +22,28 @@ async function obtenerExpedientesMock(): Promise<ExpedienteSGD[]> {
 }
 
 async function obtenerExpedientesApi(): Promise<ExpedienteSGD[]> {
-  const { data } = await apiClient.get<ExpedienteSGD[]>("/api/v1/expedientes");
-  return data;
+  const { data } = await apiClient.get<any>("/api/v1/expedientes");
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.elementos)) {
+    return data.elementos.map((item: any, idx: number) => ({
+      id: item.id || `exp-${idx}`,
+      codigoExpediente: item.cut || `EXP-2026-${String(idx).padStart(6, "0")}`,
+      asunto: item.asunto || "Expediente Institucional",
+      fechaRegistro: item.fechaIngreso || new Date().toISOString(),
+      estadoFlujo: (item.estadoFsm || "PENDIENTE") as EstadoFlujoExpediente,
+      solicitante: {
+        tipo: "PERSONA_NATURAL",
+        numeroDocumento: "45000000",
+        nombreOrazonSocial: item.solicitante || "Ciudadano",
+      },
+      documentos: [],
+      historial: [],
+      prioridad: "NORMAL",
+      diasHabilesTranscurridos: 1,
+      slaDiasLimite: 30,
+    }));
+  }
+  return EXPEDIENTES_FIXTURE;
 }
 
 function aplicarFiltros(

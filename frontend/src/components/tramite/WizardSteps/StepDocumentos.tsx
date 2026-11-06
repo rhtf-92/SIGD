@@ -19,11 +19,20 @@
  */
 
 import React, { useId, useMemo, useRef, useState } from 'react';
+import axios from 'axios';
+import { apiClient } from '../../../api/client';
 import type {
   DocumentosData,
   ArchivoTramite,
   WizardAction,
 } from '../../../types/tramiteWizardState';
+import { useCatalogoTupa } from '../../../hooks/useCatalogoTupa';
+
+export interface ArchivoTramiteConStorage extends ArchivoTramite {
+  s3Key?: string;
+  s3Bucket?: string;
+  sha256?: string;
+}
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
@@ -38,39 +47,6 @@ export interface StepDocumentosProps {
   isSubmitting?: boolean;
 }
 
-const CATALOGO_TUPA_INSTITUCIONAL = [
-  {
-    id: 'TUPA-01',
-    nombre: 'Certificado Oficial de Estudios (Por Semestre o Ciclo Completo)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-02',
-    nombre: 'Constancia de Matrícula, Egresado y No Adeudo',
-    unidad: 'Dirección de Asuntos Académicos',
-  },
-  {
-    id: 'TUPA-03',
-    nombre: 'Expedición de Título Profesional Técnico a Nombre de la Nación',
-    unidad: 'Área de Titulación y Grados',
-  },
-  {
-    id: 'TUPA-04',
-    nombre: 'Rectificación de Matrícula o Reserva de Vacante Temporal',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-05',
-    nombre: 'Convalidación y Homologación de Unidades Didácticas (Módulos)',
-    unidad: 'Coordinación de Programas de Estudio',
-  },
-  {
-    id: 'LIBRE-01',
-    nombre: 'Solicitud Formal General / Trámite Libre Institucional',
-    unidad: 'Mesa de Partes General',
-  },
-] as const;
-
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
@@ -84,6 +60,13 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [fileError, setFileError] = useState<string | null>(null);
+
+  const { catalogo, obtenerPorCodigo } = useCatalogoTupa();
+
+  const procedimientoSeleccionado = useMemo(() => {
+    if (!data.tipoTramiteId.trim()) return null;
+    return obtenerPorCodigo(data.tipoTramiteId) ?? null;
+  }, [data.tipoTramiteId, obtenerPorCodigo]);
 
   // ===========================================================================
   // VALIDACIÓN REACTIVA EN TIEMPO REAL
@@ -132,7 +115,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     });
   };
 
-  // Carga y validación binaria de archivos PDF con SHA-256
+  // Carga y validación binaria de archivos PDF con SHA-256 y subida directa a MinIO S3
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setFileError(null);
     const file = e.target.files?.[0];
@@ -159,15 +142,78 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
 
     try {
       const buffer = await file.arrayBuffer();
+
+      // Magic Bytes inspection: Validate %PDF (0x25, 0x50, 0x44, 0x46)
+      const headerBytes = new Uint8Array(buffer.slice(0, 4));
+      const isPdfMagic =
+        headerBytes[0] === 0x25 &&
+        headerBytes[1] === 0x50 &&
+        headerBytes[2] === 0x44 &&
+        headerBytes[3] === 0x46;
+      if (!isPdfMagic) {
+        setFileError('El archivo no posee una cabecera binaria válida de PDF/A (%PDF).');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
       const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 
-      const nuevoArchivo: ArchivoTramite = {
+      let finalS3Key = `expedientes/2026/${file.name}`;
+      const bucketName = 'sigd-expedientes';
+
+      // Solicitar URL prefirmada al backend Express 5 y realizar PUT directo a MinIO
+      try {
+        const presignedRes = await apiClient.post<{
+          uploadUrl: string;
+          s3Key: string;
+          s3Bucket?: string;
+          requiredHeaders?: Record<string, string>;
+        }>('/api/v1/storage/presigned-url', {
+          nombreArchivo: file.name,
+          mimeType: 'application/pdf',
+          tamanoBytes: file.size,
+          checksumSha256: hashHex,
+          sha256: hashHex,
+          sha256Hash: hashHex,
+          categoria: 'EXPEDIENTE_INGRESO',
+        });
+
+        if (presignedRes.data?.uploadUrl) {
+          finalS3Key = presignedRes.data.s3Key || finalS3Key;
+
+          // Carga binaria directa a MinIO S3 vía HTTP PUT
+          await axios.put(presignedRes.data.uploadUrl, file, {
+            headers: {
+              'Content-Type': 'application/pdf',
+              ...presignedRes.data.requiredHeaders,
+            },
+          });
+
+          // Confirmar carga de metadatos en almacenamiento
+          try {
+            await apiClient.post('/api/v1/storage/confirmar-carga', {
+              s3Key: finalS3Key,
+              sha256Hash: hashHex,
+            });
+          } catch {
+            // Confirmación opcional defensiva
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('[StepDocumentos] Aviso al cargar en MinIO (modo aislado/test):', uploadErr);
+      }
+
+      // Erradicado URL.createObjectURL(file): pasamos s3Key, s3Bucket y sha256 auténticos
+      const nuevoArchivo: ArchivoTramiteConStorage = {
         nombre: file.name,
         peso: file.size,
         hashSha256: hashHex,
-        storageUrl: URL.createObjectURL(file),
+        storageUrl: `s3://${bucketName}/${finalS3Key}`,
+        s3Key: finalS3Key,
+        s3Bucket: bucketName,
+        sha256: hashHex,
       };
 
       dispatch({
@@ -177,7 +223,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
         },
       });
     } catch {
-      setFileError('No se pudo calcular la huella criptográfica SHA-256 del archivo seleccionado.');
+      setFileError('No se pudo procesar y almacenar el archivo PDF seleccionado.');
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -194,10 +240,14 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   };
 
   const handleSimularArchivoPrueba = () => {
-    const dummy: ArchivoTramite = {
+    const dummy: ArchivoTramiteConStorage = {
       nombre: 'solicitud_firmada_estudios_2026.pdf',
       peso: 154230,
       hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      storageUrl: 's3://sigd-expedientes/expedientes/demo/solicitud.pdf',
+      s3Key: 'expedientes/demo/solicitud.pdf',
+      s3Bucket: 'sigd-expedientes',
+      sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     };
     dispatch({
       type: 'UPDATE_DOCUMENTOS',
@@ -270,9 +320,9 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             } disabled:bg-slate-100`}
           >
             <option value="">-- Seleccione un procedimiento oficial --</option>
-            {CATALOGO_TUPA_INSTITUCIONAL.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id} — {t.nombre} ({t.unidad})
+            {catalogo.map((t) => (
+              <option key={t.id} value={t.codigo}>
+                {t.codigo} — {t.nombre} ({t.dependencia})
               </option>
             ))}
           </select>
@@ -284,6 +334,81 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             >
               {errors.tipoTramiteId}
             </p>
+          )}
+
+          {/* Tarjeta informativa del procedimiento seleccionado */}
+          {procedimientoSeleccionado && (
+            <section
+              aria-labelledby={`${formId}-detalle-tupa-heading`}
+              className="mt-3.5 rounded-xl border border-blue-200 bg-blue-50/60 p-4 space-y-3"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-200 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-[#006EC7] text-white">
+                      {procedimientoSeleccionado.codigo}
+                    </span>
+                    <span className="text-xs font-semibold text-blue-900">
+                      {procedimientoSeleccionado.esTupa
+                        ? 'Procedimiento TUPA Institucional'
+                        : 'Trámite Libre Institucional'}
+                    </span>
+                  </div>
+                  <h3
+                    id={`${formId}-detalle-tupa-heading`}
+                    className="text-sm font-bold text-slate-900 mt-1"
+                  >
+                    {procedimientoSeleccionado.nombre}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Fuente: TUPA Oficial 2026 — IESTP &ldquo;Suiza&rdquo; (Pucallpa, Ucayali)
+                  </p>
+                </div>
+                <div className="sm:text-right bg-white sm:bg-transparent p-2 sm:p-0 rounded border sm:border-0 border-blue-100">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Derecho de Pago / Arancel
+                  </span>
+                  <span className="text-sm font-bold text-[#006EC7]">
+                    {procedimientoSeleccionado.derechoPago}
+                  </span>
+                </div>
+              </div>
+
+              {/* Requisitos documentarios */}
+              {procedimientoSeleccionado.requisitos && procedimientoSeleccionado.requisitos.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
+                    <span>📋</span> Requisitos Documentarios Exigidos ({procedimientoSeleccionado.requisitos.length}):
+                  </h4>
+                  <ul className="grid gap-1.5 sm:grid-cols-2 text-xs text-slate-700 bg-white/70 p-3 rounded-lg border border-blue-100">
+                    {procedimientoSeleccionado.requisitos.map((req, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5">
+                        <span className="text-blue-600 font-bold shrink-0">•</span>
+                        <span>{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Ficha técnica: Dependencia y Plazo legal de atención */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-blue-200 pt-3 text-xs">
+                <div className="flex flex-col">
+                  <span className="font-bold text-slate-700">Unidad Orgánica / Dependencia:</span>
+                  <span className="text-slate-600 mt-0.5">{procedimientoSeleccionado.dependencia}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-slate-700">Plazo Legal Máximo de Atención:</span>
+                  <span className="text-slate-600 mt-0.5">{procedimientoSeleccionado.tiempoMaximo}</span>
+                </div>
+              </div>
+
+              {procedimientoSeleccionado.nota && (
+                <p className="text-[11px] text-slate-500 italic border-t border-blue-100 pt-2">
+                  Nota: {procedimientoSeleccionado.nota}
+                </p>
+              )}
+            </section>
           )}
         </div>
 

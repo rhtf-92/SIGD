@@ -1,6 +1,5 @@
-import { Link } from "react-router-dom";
-
 import DocumentoCvdViewer from "../../components/firma/DocumentoCvdViewer";
+import FlujoPageHeader from "../../components/flujos/FlujoPageHeader";
 
 /**
  * ENT-M04-04 · Mayra (R).
@@ -9,35 +8,17 @@ import DocumentoCvdViewer from "../../components/firma/DocumentoCvdViewer";
  */
 export default function VisorCvdPage() {
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900 print:min-h-0 print:bg-white">
-      <header className="border-b border-slate-200 bg-white print:hidden">
-        <div className="mx-auto max-w-7xl px-6 py-5">
-          <div className="mb-4 flex flex-wrap gap-2">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
-              ← Volver al inicio
-            </Link>
-            <Link
-              to="/flujo-validez-legal"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
-              ← Volver al módulo
-            </Link>
-          </div>
-          <p className="text-sm font-bold text-blue-700">ENT-M04-04 · Mayra (R)</p>
-          <h1 className="text-2xl font-bold">Visor Documental y Códigos QR</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Copia auténtica imprimible con estampa lateral CVD y QR de cotejo
-            (D.S. N.° 070-2013-PCM · Ley N.° 27269).
-          </p>
-        </div>
-      </header>
+    <div className="flex-1 w-full bg-slate-100 text-slate-900 print:min-h-0 print:bg-white">
+      <FlujoPageHeader
+        faseTag="IESTP &quot;Suiza&quot; · Visualización Documental Institucional"
+        title="Visor Documental y Códigos QR"
+        breadcrumbLabel="Visor CVD"
+        description="Copia auténtica imprimible con estampa lateral CVD y QR de cotejo (D.S. N.° 070-2013-PCM · Ley N.° 27269)."
+      />
 
-      <section className="mx-auto max-w-7xl px-6 py-8 print:mx-0 print:max-w-none print:p-0">
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8 print:mx-0 print:max-w-none print:p-0">
         <DocumentoCvdViewer />
       </section>
-    </main>
+    </div>
   );
 }

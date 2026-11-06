@@ -12,8 +12,17 @@ interface PlantillaResolucionEditorProps {
   modoEdicion?: boolean;
 }
 
+const DEFAULT_TITULACION_UUID = "e2e00000-0000-4000-8000-000000000001";
+
+export function generarUuidResolucion(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return DEFAULT_TITULACION_UUID;
+}
+
 const PLANTILLA_TITULACION_DEFAULT: ResolucionDirectoral = {
-  id: "RD-TMP-2026-001",
+  id: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : DEFAULT_TITULACION_UUID,
   numeroResolucion: "RD N.° 0412-2026-DG-IESTP-SUIZA",
   anio: 2026,
   tipo: "TITULACION",
@@ -62,7 +71,11 @@ export default function PlantillaResolucionEditor({
   onGuardarBorrador,
   onProcederFirma,
 }: PlantillaResolucionEditorProps) {
-  const [resolucion, setResolucion] = useState<ResolucionDirectoral>(resolucionInicial);
+  const [resolucion, setResolucion] = useState<ResolucionDirectoral>(() => {
+    const base = resolucionInicial || PLANTILLA_TITULACION_DEFAULT;
+    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(base.id);
+    return isValidUuid ? base : { ...base, id: generarUuidResolucion() };
+  });
   const [vistaPrevia, setVistaPrevia] = useState(true);
 
   function handleCampoChange(

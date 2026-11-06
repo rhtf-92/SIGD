@@ -1,24 +1,54 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import FlujoPageHeader from "../../components/flujos/FlujoPageHeader";
 import PlantillaResolucionEditor from "../../components/flujos/PlantillaResolucionEditor";
 import type { ResolucionDirectoral } from "../../types/resolucionAcademica";
+import { apiClient } from "../../api/client";
 
 export default function ProyectorResolucionesPage() {
   const navigate = useNavigate();
-  const [alerta, setAlerta] = useState<string | null>(null);
+  const [alerta, setAlerta] = useState<{ tipo: "exito" | "error"; mensaje: string } | null>(null);
 
-  function handleGuardarBorrador(resolucion: ResolucionDirectoral) {
+  async function handleGuardarBorrador(resolucion: ResolucionDirectoral) {
     try {
       localStorage.setItem(`sigd_rd_borrador_${resolucion.id}`, JSON.stringify(resolucion));
-      setAlerta(`Borrador de resolución ${resolucion.numeroResolucion} guardado exitosamente en almacenamiento seguro.`);
-      setTimeout(() => setAlerta(null), 4000);
-    } catch {
-      setAlerta("Borrador actualizado localmente.");
+      const res = await apiClient.post<{ resolucionId?: string; numeroBorrador?: string }>("/api/v1/resoluciones/proyectar", {
+        expedienteId: resolucion.id,
+        tipoResolucion: "DIRECTORAL_TITULACION",
+        visto: resolucion.visto,
+        considerandos: resolucion.considerandos,
+        articulos: resolucion.articulos.map((art) => ({
+          numero: art.numero,
+          texto: art.texto,
+        })),
+      });
+      const numBorrador = res.data?.numeroBorrador || resolucion.numeroResolucion;
+      setAlerta({
+        tipo: "exito",
+        mensaje: `Borrador de resolución ${numBorrador} proyectado y registrado exitosamente en el servidor.`,
+      });
+      setTimeout(() => setAlerta(null), 5000);
+    } catch (err: any) {
+      console.error("[ProyectorResolucionesPage] Error al proyectar borrador:", err);
+      const detail = err?.response?.data?.detail || err?.response?.data?.title || err?.message || "No se pudo conectar con el servidor.";
+      setAlerta({
+        tipo: "error",
+        mensaje: `Error al proyectar borrador en el servidor: ${detail}`,
+      });
     }
   }
 
-  function handleProcederFirma(resolucion: ResolucionDirectoral) {
-    // Redirigir a la pasarela de firma digital con el documento proyectado
+  async function handleProcederFirma(resolucion: ResolucionDirectoral) {
+    const rawContent = `${resolucion.numeroResolucion}-${resolucion.asunto}-${resolucion.visto}`;
+    let realHash = "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0";
+    if (typeof crypto !== "undefined" && crypto.subtle) {
+      try {
+        const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawContent));
+        realHash = Array.from(new Uint8Array(buffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+      } catch {
+        // fallback
+      }
+    }
     navigate("/flujo-validez-legal/firma", {
       state: {
         documentoParaFirma: {
@@ -28,56 +58,40 @@ export default function ProyectorResolucionesPage() {
           numeroDocumento: resolucion.numeroResolucion,
           asunto: resolucion.asunto,
           tamanoBytes: 245760,
-          hashSha256: "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+          hashSha256: realHash,
         },
       },
     });
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
-          <nav className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <Link to="/" className="hover:text-blue-700">Inicio</Link>
-            <span>/</span>
-            <Link to="/flujo-validez-legal" className="hover:text-blue-700">Flujo de Validez Legal</Link>
-            <span>/</span>
-            <span className="text-slate-800">Proyector de Resoluciones</span>
-          </nav>
+    <div className="flex-1 w-full bg-slate-50 text-slate-900">
+      <FlujoPageHeader
+        faseTag="Módulo 04 · Validez Legal y Firma Digital"
+        title="Proyector de Resoluciones Directorales y Actas"
+        breadcrumbLabel="Proyector de Resoluciones"
+        description="Redacción estructurada, generación de correlativo institucional y previsualización oficial según formato institucional."
+        action={
+          <Link
+            to="/flujo-validez-legal/firma"
+            className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:text-blue-700"
+          >
+            Ir a Pasarela de Firma Refirma →
+          </Link>
+        }
+      />
 
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
-                Módulo 04 · Validez Legal y Firma Digital
-              </p>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Proyector de Resoluciones Directorales y Actas
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Redacción estructurada, generación de correlativo institucional y previsualización WYSIWYG oficial (ENT-M04-02).
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Link
-                to="/flujo-validez-legal/firma"
-                className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Ir a Pasarela de Firma Refirma →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6">
         {alerta && (
           <div
             role="status"
-            className="mb-6 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 shadow-sm"
+            className={`mb-6 rounded-xl border p-4 text-sm font-semibold shadow-sm ${
+              alerta.tipo === "exito"
+                ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                : "border-red-300 bg-red-50 text-red-800"
+            }`}
           >
-            ✓ {alerta}
+            {alerta.tipo === "exito" ? "✓" : "✗"} {alerta.mensaje}
           </div>
         )}
 
@@ -86,6 +100,6 @@ export default function ProyectorResolucionesPage() {
           onProcederFirma={handleProcederFirma}
         />
       </div>
-    </main>
+    </div>
   );
 }

@@ -40,8 +40,16 @@ const registrosIniciales: RegistroMaestro[] = [
   { id: 13, tipo: "Tipos documentales", codigo: "ACT", nombre: "Acta de Notas / Evaluación", detalle: "Registro oficial e inalterable de calificaciones.", estado: "Inactivo" },
 ];
 
+export interface RegistroMaestroExtendido extends RegistroMaestro {
+  uuid?: string;
+  extension?: string;
+  mimeType?: string;
+  tamanoMaximoMb?: number;
+  exigeFirma?: boolean;
+}
+
 export function useTablasMaestras() {
-  const [registros, setRegistros] = useState(registrosIniciales);
+  const [registros, setRegistros] = useState<RegistroMaestroExtendido[]>(registrosIniciales);
   const [tipoActivo, setTipoActivo] = useState<TipoTabla>("Sedes");
   const [busqueda, setBusqueda] = useState("");
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -52,8 +60,11 @@ export function useTablasMaestras() {
 
   const [areasOrganicas, setAreasOrganicas] = useState<AreaOrganica[]>(ORGANIGRAMA_MATERIALIZED_PATH);
 
+  // Carga inicial y conmutación de tipos documentales y organigrama desde la API REST
   useEffect(() => {
     let montado = true;
+
+    // 1. Cargar organigrama institucional
     apiClient
       .get<
         Array<{
@@ -79,7 +90,59 @@ export function useTablasMaestras() {
         setAreasOrganicas(mapped);
       })
       .catch(() => {
-        // Fallback al catálogo predeterminado
+        // Fallback defensivo a organigrama predeterminado
+      });
+
+    // 2. Cargar catálogo de tipos documentales desde el backend real
+    apiClient
+      .get<
+        Array<{
+          tipoDocumentalId?: string;
+          tipo_documental_id?: string;
+          id?: string | number;
+          codigo: string;
+          nombre: string;
+          descripcion?: string;
+          extension?: string;
+          mimeType?: string;
+          mime_type?: string;
+          tamanoMaximoMb?: number;
+          tamano_maximo_mb?: number;
+          exigeFirma?: boolean;
+          exige_firma?: boolean;
+          vigente?: boolean;
+        }>
+      >("/api/v1/admin/maestras/tipo-documento")
+      .then((res) => {
+        if (!montado || !Array.isArray(res.data) || res.data.length === 0) return;
+        const tiposDesdeApi: RegistroMaestroExtendido[] = res.data.map((item, index) => {
+          const uuid = item.tipoDocumentalId || item.tipo_documental_id || (typeof item.id === "string" ? item.id : undefined);
+          const mime = item.mimeType || item.mime_type || "application/pdf";
+          const maxMb = item.tamanoMaximoMb || item.tamano_maximo_mb || 25;
+          const firma = item.exigeFirma ?? item.exige_firma ?? false;
+          return {
+            id: 100 + index,
+            uuid,
+            tipo: "Tipos documentales",
+            codigo: item.codigo,
+            nombre: item.nombre,
+            detalle: item.descripcion || `${mime} (${maxMb} MB)${firma ? " · Exige firma" : ""}`,
+            estado: (item.vigente !== false ? "Activo" : "Inactivo") as EstadoRegistro,
+            extension: item.extension || "pdf",
+            mimeType: mime,
+            tamanoMaximoMb: maxMb,
+            exigeFirma: firma,
+          };
+        });
+
+        setRegistros((actuales) => {
+          // Mantener Sedes y Áreas, y reemplazar los Tipos documentales con los reales de la BD
+          const noTipos = actuales.filter((r) => r.tipo !== "Tipos documentales");
+          return [...noTipos, ...tiposDesdeApi];
+        });
+      })
+      .catch(() => {
+        // Fallback defensivo a catálogo inicial si el backend está desconectado
       });
 
     return () => {
@@ -109,47 +172,87 @@ export function useTablasMaestras() {
 
   // Invariante SIGD-DOC-ADMIN-SEGURIDAD-AUDITORIA-02:
   // prohibido el borrado físico; solo inactivación (borrado lógico).
-  function alternarEstado(id: number) {
+  async function alternarEstado(id: number) {
     setMensaje("");
+    const registro = registros.find((item) => item.id === id);
+    if (!registro) return;
+
+    const nuevoEstado: EstadoRegistro = registro.estado === "Activo" ? "Inactivo" : "Activo";
+    const nuevoVigente = nuevoEstado === "Activo";
+
+    // Si es un tipo documental con UUID persistido o código, conmutar en el backend
+    if (registro.tipo === "Tipos documentales") {
+      const targetId = registro.uuid || registro.codigo;
+      try {
+        await apiClient.patch(`/api/v1/admin/tipos-documento/${encodeURIComponent(targetId)}/estado`, {
+          vigente: nuevoVigente,
+        });
+      } catch (err) {
+        console.warn(`[useTablasMaestras] Aviso al conmutar estado de ${registro.codigo} en backend:`, err);
+      }
+    }
+
     setRegistros((actuales) =>
-      actuales.map((registro) =>
-        registro.id === id
+      actuales.map((item) =>
+        item.id === id
           ? {
-              ...registro,
-              estado: (registro.estado === "Activo"
-                ? "Inactivo"
-                : "Activo") as EstadoRegistro,
+              ...item,
+              estado: nuevoEstado,
             }
-          : registro,
+          : item,
       ),
     );
-    const registro = registros.find((item) => item.id === id);
-    if (registro) {
-      setMensaje(
-        `Registro ${registro.codigo} ${
-          registro.estado === "Activo" ? "desactivado (borrado lógico)" : "reactivado"
-        }. Los históricos preservan su trazabilidad.`,
-      );
-    }
-  }
-
-  function crearRegistro() {
-    if (!codigo.trim() || !nombre.trim()) return;
-
-    setRegistros((actuales) => [
-      ...actuales,
-      {
-        id: Math.max(0, ...actuales.map((registro) => registro.id)) + 1,
-        tipo: tipoActivo,
-        codigo: codigo.trim().toUpperCase(),
-        nombre: nombre.trim(),
-        detalle: detalle.trim() || "Sin detalle",
-        estado: "Activo",
-      },
-    ]);
 
     setMensaje(
-      `Registro ${codigo.trim().toUpperCase()} creado correctamente en ${tipoActivo}.`,
+      `Registro ${registro.codigo} ${
+        nuevoEstado === "Inactivo" ? "desactivado (borrado lógico)" : "reactivado"
+      }. Los históricos preservan su trazabilidad.`,
+    );
+  }
+
+  async function crearRegistro() {
+    if (!codigo.trim() || !nombre.trim()) return;
+
+    const codNormalizado = codigo.trim().toUpperCase();
+    const nomNormalizado = nombre.trim();
+    const detNormalizado = detalle.trim() || "Sin detalle";
+
+    let nuevoUuid: string | undefined = undefined;
+
+    // Si el tipo activo es Tipo Documental, persistir formalmente en backend
+    if (tipoActivo === "Tipos documentales") {
+      try {
+        const payload = {
+          codigo: codNormalizado,
+          nombre: nomNormalizado,
+          extension: "pdf",
+          mimeType: "application/pdf",
+          tamanoMaximoMb: 25,
+          exigeFirma: false,
+          vigente: true,
+        };
+        const res = await apiClient.post<{ tipoDocumentalId?: string; id?: string }>("/api/v1/admin/tipos-documento", payload);
+        nuevoUuid = res.data?.tipoDocumentalId || res.data?.id;
+      } catch (err) {
+        console.warn(`[useTablasMaestras] Aviso al registrar tipo documental ${codNormalizado} en backend:`, err);
+      }
+    }
+
+    const nuevoId = Math.max(0, ...registros.map((registro) => registro.id)) + 1;
+    const nuevoRegistro: RegistroMaestroExtendido = {
+      id: nuevoId,
+      uuid: nuevoUuid,
+      tipo: tipoActivo,
+      codigo: codNormalizado,
+      nombre: nomNormalizado,
+      detalle: detNormalizado,
+      estado: "Activo",
+    };
+
+    setRegistros((actuales) => [...actuales, nuevoRegistro]);
+
+    setMensaje(
+      `Registro ${codNormalizado} creado correctamente en ${tipoActivo}.`,
     );
     setCodigo("");
     setNombre("");

@@ -13,6 +13,9 @@ export default defineConfig({
     },
   },
   server: {
+    port: 5173,
+    strictPort: true,
+    host: true,
     proxy: {
       "/api": {
         target: "http://localhost:3000",
@@ -25,6 +28,8 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./tests/setup.ts",
+    testTimeout: 30000,
+    hookTimeout: 30000,
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

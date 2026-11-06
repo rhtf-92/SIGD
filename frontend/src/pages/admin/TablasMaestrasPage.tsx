@@ -36,11 +36,11 @@ export default function TablasMaestrasPage() {
           description="Configuración institucional de sedes, organigrama y tipos documentales."
         />
 
-        <section className="mx-auto max-w-7xl px-6 py-6">
+        <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-4">
           <AdminBreadcrumbs />
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 py-2 pb-8">
+        <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-2 pb-8">
           {mensaje && (
             <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
               {mensaje}
@@ -83,7 +83,7 @@ export default function TablasMaestrasPage() {
 
           <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div className="w-full md:max-w-xl">
+              <div className="w-full md:max-w-xl xl:max-w-2xl">
                 <label
                   htmlFor="busqueda-tablas"
                   className="mb-2 block text-sm font-semibold"

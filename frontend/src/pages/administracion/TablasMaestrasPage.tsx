@@ -26,13 +26,13 @@ export default function TablasMaestrasPage() {
   } = useTablasMaestras();
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="flex-1 bg-slate-100 text-slate-900">
       <AdminPageHeader
         title="Tablas Maestras"
         description="Configuración institucional de sedes, organigrama y tipos documentales."
       />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8">
         {mensaje && (
           <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             {mensaje}
@@ -74,7 +74,7 @@ export default function TablasMaestrasPage() {
 
         <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="w-full md:max-w-xl">
+            <div className="w-full md:max-w-xl xl:max-w-2xl">
               <label className="mb-2 block text-sm font-semibold">
                 Buscar en {tipoActivo.toLowerCase()}
               </label>
@@ -89,14 +89,14 @@ export default function TablasMaestrasPage() {
             <button
               type="button"
               onClick={() => setMostrarFormulario((actual) => !actual)}
-              className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+              className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
             >
               + Nuevo registro
             </button>
           </div>
 
           {mostrarFormulario && (
-            <div className="mt-5 grid gap-4 border-t border-slate-200 pt-5 md:grid-cols-3">
+            <div className="mt-5 grid gap-3 sm:gap-4 border-t border-slate-200 pt-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
               <div>
                 <label className="mb-1.5 block text-sm font-semibold">Código</label>
                 <input
@@ -125,18 +125,18 @@ export default function TablasMaestrasPage() {
                 />
               </div>
 
-              <div className="flex gap-3 md:col-span-3 md:justify-end">
+              <div className="flex flex-col sm:flex-row gap-3 sm:col-span-2 md:col-span-3 md:justify-end">
                 <button
                   type="button"
                   onClick={() => setMostrarFormulario(false)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
+                  className="w-full sm:w-auto rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
                   onClick={crearRegistro}
-                  className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                  className="w-full sm:w-auto rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
                 >
                   Guardar registro
                 </button>
@@ -205,6 +205,6 @@ export default function TablasMaestrasPage() {
           </div>
         </section>
       </section>
-    </main>
+    </div>
   );
 }

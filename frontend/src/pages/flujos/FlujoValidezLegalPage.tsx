@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import FlujoPageHeader from "../../components/flujos/FlujoPageHeader";
 
 interface TarjetaModulo {
   codigo: string;
@@ -10,78 +11,60 @@ interface TarjetaModulo {
 
 const MODULOS: TarjetaModulo[] = [
   {
-    codigo: "ENT-M04-01",
-    titulo: "Flujo de expedientes",
+    codigo: "Fase 1",
+    titulo: "Workflow Académico de Titulación",
     descripcion:
       "Workflow de 5 etapas de la Secretaría Académica para titulación, grados, certificaciones, convalidaciones y trabajos de investigación (verificación, revisión de requisitos, observaciones, subsanación y emisión de resolución).",
-    responsables: "Adriano D. Espinoza (R/A)",
+    responsables: "Secretaría Académica",
     ruta: "/flujos/titulacion",
   },
   {
-    codigo: "ENT-M04-02",
-    titulo: "Proyectos y Resoluciones Académicas",
+    codigo: "Fase 2",
+    titulo: "Proyectos y Resoluciones Directorales",
     descripcion:
-      "Gestión de expedientes de proyectos y resoluciones del Director General (pendiente de implementación).",
-    responsables: "Isaí (R)",
-    ruta: null,
+      "Gestión y redacción estructurada de resoluciones directorales, generación de correlativo institucional y previsualización oficial WYSIWYG.",
+    responsables: "Dirección General",
+    ruta: "/flujos/proyector-resoluciones",
   },
   {
-    codigo: "ENT-M04-03",
-    titulo: "Pasarela de Despacho de Firma Digital (Refirma RENIEC)",
+    codigo: "Fase 3",
+    titulo: "Pasarela de Firma Digital (Refirma RENIEC)",
     descripcion:
-      "Invocación del agente local refirma://, secuencia PAdES-BES + TSA y firma de documentos en lote desde la Secretaría Académica.",
-    responsables: "Adriano D. Espinoza (R/A) · Mayra (R)",
+      "Invocación del agente local refirma://, secuencia PAdES-BES + TSA y suscripción de documentos en lote con plena validez jurídica.",
+    responsables: "Dirección y Secretaría General",
     ruta: "/flujo-validez-legal/firma",
   },
   {
-    codigo: "ENT-M04-04",
+    codigo: "Fase 4",
     titulo: "Visor Documental y Códigos QR",
     descripcion:
-      "Renderizado de copias auténticas A4 con estampa lateral CVD de 20mm y QR de cotejo (D.S. 070-2013-PCM).",
-    responsables: "Mayra (R)",
+      "Renderizado de copias auténticas A4 con estampa lateral CVD de 20mm y QR de cotejo fehaciente (D.S. N° 070-2013-PCM).",
+    responsables: "Archivo y Mesa de Partes",
     ruta: "/flujo-validez-legal/visor-cvd",
   },
   {
-    codigo: "ENT-M04-05",
+    codigo: "Fase 5",
     titulo: "Portal Validador Público de CVD",
     descripcion:
-      "Servicio sin autenticación para verificar Códigos de Verificación Digital, firmantes y sello de tiempo de documentos emitidos.",
-    responsables: "Adriano D. Espinoza (R/A) · Mayra (R)",
+      "Portal oficial para la verificación de Códigos de Verificación Digital (CVD), firmantes y sello de tiempo de documentos emitidos.",
+    responsables: "Portal de Transparencia y Ciudadanía",
     ruta: "/validador-cvd",
   },
 ];
 
 export default function FlujoValidezLegalPage() {
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-start justify-between gap-4 px-6 py-8">
-          <div>
-            <p className="text-sm font-bold tracking-[0.16em] text-slate-900 uppercase">
-              Módulo 04 · Flujo y Validez Legal de Documentos Digitales
-            </p>
-            <h1 className="mt-1 text-3xl font-black text-slate-900">
-              Centro de Coordinación
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-700">
-              Hub de navegación de la entrega 04 liderada por Adriano David
-              Espinoza Ramírez (ADERRTX). Cada tarjeta corresponde a un artefacto
-              evaluable del plan de trabajo.
-            </p>
-          </div>
-          <Link
-            to="/"
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-          >
-            ← Volver al inicio
-          </Link>
-        </div>
-      </header>
+    <div className="flex-1 w-full bg-slate-100 text-slate-900">
+      <FlujoPageHeader
+        faseTag="Módulo 04 · Flujo y Validez Legal de Documentos Digitales"
+        title="Centro de Coordinación Documental"
+        description="Plataforma integral de firma digital, emisión y certificación de resoluciones y documentos institucionales con plena validez legal (Ley N° 27269 y D.S. N° 070-2013-PCM)."
+      />
 
       <div className="header-bar" aria-hidden="true" />
 
-      <section className="mx-auto max-w-7xl px-6 py-10">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-10">
+        <div className="grid gap-4 sm:gap-6 xl:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
           {MODULOS.map((modulo) => {
             const disponible = modulo.ruta !== null;
             return (
@@ -123,11 +106,11 @@ export default function FlujoValidezLegalPage() {
                       to={modulo.ruta}
                       className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
                     >
-                      Ir al artefacto →
+                      Acceder al servicio →
                     </Link>
                   ) : (
                     <span className="text-xs text-slate-500">
-                      🔒 Pendiente del integrante responsable
+                      🔒 En proceso de habilitación
                     </span>
                   )}
                 </div>
@@ -136,6 +119,6 @@ export default function FlujoValidezLegalPage() {
           })}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

@@ -88,12 +88,12 @@ export default function AdministracionPage() {
         description="Administración, Seguridad y Auditoría: configuración y control administrativo del sistema."
       />
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
+      <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8">
         <p className="mb-7 text-sm text-slate-600">
           Selecciona una opción para administrar el SIGD.
         </p>
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:gap-5 xl:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {modulos.map((modulo) => (
             <article
               key={modulo.titulo}

@@ -6,8 +6,12 @@ export interface UsuarioPerfil {
   id: string;
   nombreCompleto: string;
   correo: string;
-  rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE';
+  rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE' | 'ADMINISTRADOR' | 'CIUDADANO' | string;
   areaId?: string;
+  usuario?: string;
+  numeroDocumento?: string;
+  roles?: string[];
+  permisos?: string[];
 }
 
 interface LoginCredentials {

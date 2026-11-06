@@ -55,8 +55,8 @@ export default function MesaPartesVirtualPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 sm:px-6">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <main className="min-h-screen bg-slate-100 w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 text-slate-900">
+      <div className="w-full space-y-6">
         <header className="rounded-2xl bg-slate-900 p-6 text-white shadow-lg">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

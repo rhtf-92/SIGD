@@ -26,9 +26,20 @@ import { AppError, UnauthorizedError } from '../../shared/domain/errors/index.js
 import { Argon2Service } from './argon2.service.js';
 
 const loginSchema = z.object({
-  identificador: z.string().min(3).max(100),
-  password: z.string().min(6).max(128),
-});
+  identificador: z.string().min(3).max(100).optional(),
+  username: z.string().min(3).max(100).optional(),
+  password: z.string().min(4).max(128).optional(),
+  clave: z.string().min(4).max(128).optional(),
+}).refine(data => !!(data.identificador || data.username), {
+  message: 'Debe proporcionar identificador o username',
+  path: ['identificador'],
+}).refine(data => !!(data.password || data.clave), {
+  message: 'Debe proporcionar password o clave',
+  path: ['password'],
+}).transform(data => ({
+  identificador: (data.identificador || data.username)!,
+  password: (data.password || data.clave)!,
+}));
 
 const refreshSchema = z.object({
   refreshToken: z.string().min(20),
@@ -48,16 +59,23 @@ export function crearRouterAuth(pool: Pool): Router {
     const query = `
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
              c.password_hash, c.activo,
+             per.id_documento AS numero_documento,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
              COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
              p.area_id
         FROM sigd_auth.cuenta_usuario c
+        LEFT JOIN sigd_auth.persona per ON per.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
         LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
        WHERE (c.usuario = $1 OR c.correo = $1)
+       ORDER BY CASE r.codigo
+         WHEN 'SUPER_ADMIN' THEN 1
+         WHEN 'ADMINISTRADOR' THEN 2
+         WHEN 'DIRECTOR' THEN 3
+         ELSE 4 END
        LIMIT 1;
     `;
 
@@ -87,9 +105,31 @@ export function crearRouterAuth(pool: Pool): Router {
     }
 
     const rol = usuario.rol_codigo ?? 'ESTUDIANTE';
+
+    // Enriquecimiento de todos los roles y permisos del usuario
+    const rolesResult = await pool.query(`
+      SELECT DISTINCT r.codigo
+        FROM sigd_org.usuario_rol ur
+        JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+       WHERE ur.id_usuario = $1
+         AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now());
+    `, [usuario.id_usuario]).catch(() => ({ rows: [] }));
+    const rolesUsuario = (rolesResult.rows as { codigo: string }[]).map(r => r.codigo);
+    if (!rolesUsuario.includes(rol)) rolesUsuario.unshift(rol);
+
+    const permisosResult = await pool.query(`
+      SELECT DISTINCT p.codigo
+        FROM sigd_org.usuario_rol ur
+        JOIN sigd_org.rol_permiso rp ON rp.rol_id = ur.rol_id
+        JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+       WHERE ur.id_usuario = $1
+         AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now());
+    `, [usuario.id_usuario]).catch(() => ({ rows: [] }));
+    const permisosUsuario = (permisosResult.rows as { codigo: string }[]).map(p => p.codigo);
+
     const accessToken = firmarTokenAcceso({
       sub: usuario.id_usuario,
-      roles: [rol],
+      roles: rolesUsuario,
       expiraSegundos: 900, // 15 minutos
     });
 
@@ -114,9 +154,13 @@ export function crearRouterAuth(pool: Pool): Router {
       refreshToken,
       usuario: {
         id: usuario.id_usuario,
+        usuario: usuario.usuario,
+        numeroDocumento: usuario.numero_documento ?? undefined,
         nombreCompleto: usuario.nombre_completo,
-        correo: usuario.correo ?? `${usuario.usuario}@iestp-suiza.edu.pe`,
+        correo: usuario.correo ?? `${usuario.usuario}@iestpsuiza.edu.pe`,
         rol: rol,
+        roles: rolesUsuario,
+        permisos: permisosUsuario,
         areaId: usuario.area_id ?? undefined,
       },
     });
@@ -152,6 +196,11 @@ export function crearRouterAuth(pool: Pool): Router {
         LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
        WHERE s.refresh_token = $1
+       ORDER BY CASE r.codigo
+         WHEN 'SUPER_ADMIN' THEN 1
+         WHEN 'ADMINISTRADOR' THEN 2
+         WHEN 'DIRECTOR' THEN 3
+         ELSE 4 END
        LIMIT 1;
     `;
 
@@ -164,9 +213,20 @@ export function crearRouterAuth(pool: Pool): Router {
       });
     }
 
+    const rol = sesion.rol_codigo ?? 'ESTUDIANTE';
+    const rolesResult = await pool.query(`
+      SELECT DISTINCT r.codigo
+        FROM sigd_org.usuario_rol ur
+        JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+       WHERE ur.id_usuario = $1
+         AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now());
+    `, [sesion.id_usuario]).catch(() => ({ rows: [] }));
+    const rolesUsuario = (rolesResult.rows as { codigo: string }[]).map(r => r.codigo);
+    if (!rolesUsuario.includes(rol)) rolesUsuario.unshift(rol);
+
     const nuevoAccessToken = firmarTokenAcceso({
       sub: sesion.id_usuario,
-      roles: [sesion.rol_codigo],
+      roles: rolesUsuario,
       expiraSegundos: 900,
     });
 
@@ -204,16 +264,23 @@ export function crearRouterAuth(pool: Pool): Router {
 
     const query = `
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
+             per.id_documento AS numero_documento,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
              COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
              p.area_id, p.cargo_id, p.telefono
         FROM sigd_auth.cuenta_usuario c
+        LEFT JOIN sigd_auth.persona per ON per.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
         LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
        WHERE c.id_usuario = $1
+       ORDER BY CASE r.codigo
+         WHEN 'SUPER_ADMIN' THEN 1
+         WHEN 'ADMINISTRADOR' THEN 2
+         WHEN 'DIRECTOR' THEN 3
+         ELSE 4 END
        LIMIT 1;
     `;
 
@@ -224,13 +291,37 @@ export function crearRouterAuth(pool: Pool): Router {
       throw new UnauthorizedError({ detail: 'Usuario no encontrado o sesión caducada.' });
     }
 
+    const rol = usuario.rol_codigo ?? 'ESTUDIANTE';
+    const rolesResult = await pool.query(`
+      SELECT DISTINCT r.codigo
+        FROM sigd_org.usuario_rol ur
+        JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+       WHERE ur.id_usuario = $1
+         AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now());
+    `, [usuario.id_usuario]).catch(() => ({ rows: [] }));
+    const rolesUsuario = (rolesResult.rows as { codigo: string }[]).map(r => r.codigo);
+    if (!rolesUsuario.includes(rol)) rolesUsuario.unshift(rol);
+
+    const permisosResult = await pool.query(`
+      SELECT DISTINCT p.codigo
+        FROM sigd_org.usuario_rol ur
+        JOIN sigd_org.rol_permiso rp ON rp.rol_id = ur.rol_id
+        JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+       WHERE ur.id_usuario = $1
+         AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now());
+    `, [usuario.id_usuario]).catch(() => ({ rows: [] }));
+    const permisosUsuario = (permisosResult.rows as { codigo: string }[]).map(p => p.codigo);
+
     res.status(200).json({
       id: usuario.id_usuario,
       usuario: usuario.usuario,
       username: usuario.usuario,
+      numeroDocumento: usuario.numero_documento ?? undefined,
       nombreCompleto: usuario.nombre_completo,
       correo: usuario.correo,
-      rol: usuario.rol_codigo,
+      rol: rol,
+      roles: rolesUsuario,
+      permisos: permisosUsuario,
       areaId: usuario.area_id,
       cargoId: usuario.cargo_id,
       telefono: usuario.telefono,

@@ -154,69 +154,43 @@ export const casillaService = {
   },
 
   /**
-   * Simula la descarga o apertura del acto administrativo PDF
+   * Conecta con el endpoint oficial para descargar el acto administrativo en PDF
    */
-  descargarDocumento(notificacion: Notificacion): void {
-    const filename =
-      notificacion.actoAdministrativo.nombreArchivoPdf || "acto_notificado.pdf";
-    // Generar un blob simulado con texto representativo o abrir enlace
-    const contenido = `--- INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA ---
-CÉDULA DE NOTIFICACIÓN OFICIAL / ACTO ADMINISTRATIVO
-Expediente: ${notificacion.numeroExpediente}
-Documento: ${notificacion.actoAdministrativo.numeroDocumento}
-Asunto: ${notificacion.asunto}
-Hash SHA-256: ${notificacion.actoAdministrativo.hashIntegridadSha256}
-CVD: ${notificacion.actoAdministrativo.cvd}
-Fecha Emisión: ${notificacion.fechaDepositoIso}
-
-${notificacion.actoAdministrativo.resumenLegal}
-
-${notificacion.actoAdministrativo.textoCompleto || ""}
-`;
-    const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+  async descargarDocumento(notificacion: Notificacion): Promise<void> {
+    try {
+      const response = await apiClient.get<{ downloadUrl: string; expiraEnSegundos?: number }>(
+        CASILLA_ENDPOINTS.DESCARGAR_DOCUMENTO(notificacion.id),
+      );
+      const url = response.data?.downloadUrl;
+      if (url && typeof window !== "undefined") {
+        window.open(url, "_blank");
+      }
+    } catch (err) {
+      console.warn("[casillaService] Error al obtener URL de descarga de documento:", err);
+      if (typeof window !== "undefined") {
+        window.open(CASILLA_ENDPOINTS.DESCARGAR_DOCUMENTO(notificacion.id), "_blank");
+      }
+    }
   },
 
   /**
-   * Simula la descarga oficial de la Cédula de Acuse Digital Legal
+   * Conecta con el endpoint oficial para descargar la cédula oficial de acuse en PDF
    */
-  descargarAcuse(acuse: AcuseNotificacion): void {
-    const filename = `ACUSE_LEGAL_${acuse.idAcuse}.txt`;
-    const contenido = `================================================================================
-INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA (IESTP SUIZA)
-CONSTANCIA Y CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA INSTITUCIONAL
-Conforme al Artículo 20 del TUO de la Ley N° 27444 y Ley N° 29733
-================================================================================
-
-IDENTIFICADOR DE ACUSE : ${acuse.idAcuse}
-EXPEDIENTE              : ${acuse.numeroExpediente}
-UNIDAD EMISORA          : ${acuse.unidadEmisora}
-DESTINATARIO            : ${acuse.destinatario.nombresCompletos}
-DOCUMENTO IDENTIDAD     : ${acuse.destinatario.tipoDocumento} ${acuse.destinatario.numeroDocumento}
-CASILLA ELECTRÓNICA     : ${acuse.destinatario.direccionCasilla}
-
-FECHA Y HORA UTC (ISO)  : ${acuse.timestampGeneracionIso}
-HASH CRIPTOGRÁFICO SHA256: ${acuse.hashSha256Acuse}
-CÓDIGO VERIFICACIÓN (CVD): ${acuse.cvdAcuse}
-SURTIMIENTO DE EFECTO   : ${acuse.fechaEfectoLegal}
-PLAZO LEGAL DE IMPUGN.  : ${acuse.plazoImpugnacionDiasHabiles} días hábiles
-
-VALIDEZ LEGAL:
-${acuse.validezLegalMensaje}
-
-Este documento digital cuenta con valor probatorio inmutable en sede administrativa.
-================================================================================`;
-    const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+  async descargarAcuse(acuse: AcuseNotificacion): Promise<void> {
+    const notificacionId = (acuse as any).notificacionId || acuse.idAcuse;
+    try {
+      const response = await apiClient.get<{ downloadUrl: string; expiraEnSegundos?: number }>(
+        CASILLA_ENDPOINTS.DESCARGAR_ACUSE(notificacionId),
+      );
+      const url = response.data?.downloadUrl;
+      if (url && typeof window !== "undefined") {
+        window.open(url, "_blank");
+      }
+    } catch (err) {
+      console.warn("[casillaService] Error al obtener URL de descarga de acuse:", err);
+      if (typeof window !== "undefined") {
+        window.open(CASILLA_ENDPOINTS.DESCARGAR_ACUSE(notificacionId), "_blank");
+      }
+    }
   },
 };
