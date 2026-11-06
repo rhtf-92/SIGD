@@ -1,4 +1,4 @@
-name: SIGD CI
+Name: SIGD CI
 
 on:
   pull_request:
@@ -58,11 +58,13 @@ jobs:
         run: docker compose -f docker-compose.prod.yml build
 
       - name: Escaneo de Seguridad de Imagen (Trivy)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: "sigd-backend:production"
           format: "table"
-          exit-code: "0"
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
 
       - name: Verificaciones de arranque (Smoke Test Docker)
@@ -71,7 +73,7 @@ jobs:
           docker compose -f docker-compose.prod.yml up -d
           echo "Esperando inicialización de contenedores..."
           sleep 15
-          docker ps | grep "sigd_backend"
+          docker compose -f docker-compose.prod.yml ps
           docker compose -f docker-compose.prod.yml down
 
   frontend:

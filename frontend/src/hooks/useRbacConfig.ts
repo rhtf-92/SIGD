@@ -194,12 +194,16 @@ export function useRbacConfig() {
     } finally { setIsLoading(false); }
   }, []);
 
-  useEffect(() => { void recargar(); }, [recargar]);
+ useEffect(() => {
+  let montado = true;
+  void recargar().then(() => { if (!montado) return; /* fin carga */ });
+  return () => { montado = false; };
+}, [recargar]);
 
-  const rolActual: Rol = useMemo(
-    () => roles.find((rol) => rol.id === rolSeleccionado) ?? roles[0],
-    [rolSeleccionado],
-  );
+const rolActual: Rol = useMemo(
+  () => roles.find((rol) => rol.id === rolSeleccionado) ?? roles[0],
+  [roles, rolSeleccionado]
+);
 
   const permisosRolActual = permisos[rolSeleccionado] ?? [];
 

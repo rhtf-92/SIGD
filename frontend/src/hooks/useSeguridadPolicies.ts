@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../api/client";
 
@@ -39,16 +39,19 @@ export function useSeguridadPolicies() {
   });
   const blockedQuery = useQuery({
     queryKey: ["admin-blocked-accounts"],
-    queryFn: async () => (await apiClient.get<{ cuentas: BloqueoDto[] }>("/api/v1/admin/seguridad/cuentas-bloqueadas")).data.cuentas,
+    queryFn: async () => (await apiClient.get<{ cuentas: BloqueoDto }>("/api/v1/admin/seguridad/cuentas-bloqueadas")).data.cuentas,
   });
   const attemptsQuery = useQuery({
     queryKey: ["admin-access-attempts"],
     queryFn: async () => (await apiClient.get<{ intentos: IntentoDto[] }>("/api/v1/admin/seguridad/intentos", { params: { limite: 50, offset: 0 } })).data.intentos,
   });
 
+  const dataLoadedRef = useRef(false);
+
   useEffect(() => {
     const dto = politicasQuery.data;
-    if (dto) {
+    if (dto && !dataLoadedRef.current) {
+      dataLoadedRef.current = true;
       setMaxIntentos(dto.max_intentos_fallidos);
       setMinutosBloqueo(dto.minutos_bloqueo);
       setMinutosSesion(dto.minutos_sesion);
