@@ -68,7 +68,7 @@ describe("Adversarial Empirical Testing: UI Navigation & Landing Filtering (Mile
       );
 
       // Verify allowed public links only
-      expect(links).toEqual(["/", "/tramite", "/validador-cvd"]);
+      expect(links).toEqual(["/", "/tramite", "/consulta", "/validador-cvd", "/registro"]);
 
       // Verify no private routes anywhere in the rendered header
       PRIVATE_ROUTES.forEach((privRoute) => {

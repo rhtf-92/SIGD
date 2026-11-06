@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Menu,
@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   Clock,
   ChevronRight,
-  ChevronDown,
   Search,
   UserCheck,
 } from "lucide-react";
@@ -26,8 +25,6 @@ export default function HeaderInstitucional() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuAbierto, setMenuAbierto] = useState(false);
-  const [tramitesDropdownOpen, setTramitesDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const { usuario, isAuthenticated, logout } = useAuthStore();
 
   const userRole = usuario?.rol;
@@ -61,25 +58,21 @@ export default function HeaderInstitucional() {
         ["SUPER_ADMIN", "DIRECTOR", "DOCENTE", "MESA_PARTES"].includes(userRole)
     );
 
-  // Cerrar menús al cambiar de ruta
+  // Cerrar menú al cambiar de ruta
   useEffect(() => {
     setMenuAbierto(false);
-    setTramitesDropdownOpen(false);
   }, [location.pathname]);
 
-  // Cerrar menús con tecla Escape
+  // Cerrar menú con tecla Escape
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setMenuAbierto(false);
-        setTramitesDropdownOpen(false);
       }
     }
-    if (menuAbierto || tramitesDropdownOpen) {
+    if (menuAbierto) {
       window.addEventListener("keydown", handleKeyDown);
-      if (menuAbierto) {
-        document.body.style.overflow = "hidden";
-      }
+      document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
     }
@@ -87,22 +80,7 @@ export default function HeaderInstitucional() {
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
     };
-  }, [menuAbierto, tramitesDropdownOpen]);
-
-  // Cerrar dropdown al hacer click fuera
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setTramitesDropdownOpen(false);
-      }
-    }
-    if (tramitesDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [tramitesDropdownOpen]);
+  }, [menuAbierto]);
 
   function isActive(path: string): boolean {
     if (path === "/" && location.pathname === "/") return true;
@@ -159,199 +137,53 @@ export default function HeaderInstitucional() {
             <span>Inicio</span>
           </Link>
 
-          {/* MENÚ DESPLEGABLE DE TRÁMITES Y SERVICIOS CIUDADANOS */}
-          <div
-            ref={dropdownRef}
-            className="relative"
-            onMouseEnter={() => setTramitesDropdownOpen(true)}
-            onMouseLeave={() => setTramitesDropdownOpen(false)}
+          <Link
+            to="/tramite"
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition ${
+              isActive("/tramite")
+                ? "bg-white/20 text-white shadow-xs font-bold"
+                : "text-blue-100 hover:bg-white/10 hover:text-white"
+            }`}
           >
-            <div className="flex items-center">
-              <Link
-                to="/tramite"
-                className={`flex items-center gap-1.5 rounded-l-lg pl-2.5 pr-1.5 py-1.5 transition ${
-                  isActive("/tramite") || isActive("/consulta") || isActive("/registro")
-                    ? "bg-white/20 text-white shadow-xs font-bold"
-                    : "text-blue-100 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                <span>Trámites</span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => setTramitesDropdownOpen((prev) => !prev)}
-                aria-expanded={tramitesDropdownOpen}
-                aria-haspopup="menu"
-                aria-label="Desplegar menú de trámites y servicios ciudadanos"
-                className={`flex items-center rounded-r-lg pr-2 py-1.5 transition ${
-                  isActive("/tramite") || isActive("/consulta") || isActive("/registro")
-                    ? "bg-white/20 text-white"
-                    : "text-blue-100 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <ChevronDown
-                  className={`h-3.5 w-3.5 transition-transform duration-200 ${
-                    tramitesDropdownOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-            </div>
+            <FileText className="h-3.5 w-3.5" />
+            <span>Trámites</span>
+          </Link>
 
-            {tramitesDropdownOpen && (
-              <div
-                role="menu"
-                aria-label="Menú de Trámites y Servicios Ciudadanos"
-                className="absolute left-0 top-full pt-2 w-[720px] lg:w-[760px] xl:w-[800px] max-w-[calc(100vw-3rem)] z-50 animate-in fade-in slide-in-from-top-2 duration-150"
-              >
-                <div className="rounded-2xl bg-white text-slate-800 shadow-2xl border border-slate-200/90 p-3.5 sm:p-4 overflow-hidden ring-1 ring-black/5">
-                  {/* Cabecera del panel de opciones horizontales */}
-                  <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                        Servicios Públicos a la Ciudadanía
-                      </p>
-                    </div>
-                    <span className="text-[11px] text-slate-400 font-medium">
-                      Opciones y trámites institucionales digitales
-                    </span>
-                  </div>
+          <Link
+            to="/consulta"
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition ${
+              isActive("/consulta")
+                ? "bg-white/20 text-white shadow-xs font-bold"
+                : "text-blue-100 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <Search className="h-3.5 w-3.5" />
+            <span>Consulta CUT</span>
+          </Link>
 
-                  {/* Opciones organizadas de manera horizontal */}
-                  <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
-                    {/* Opción 1: Mesa de Partes Virtual */}
-                    <Link
-                      to="/tramite"
-                      role="menuitem"
-                      onClick={() => setTramitesDropdownOpen(false)}
-                      className={`flex flex-col justify-between rounded-xl p-3 border transition-all duration-150 group ${
-                        isActive("/tramite")
-                          ? "bg-blue-50/80 border-blue-300 shadow-xs"
-                          : "bg-slate-50/60 border-slate-200/80 hover:bg-blue-50/40 hover:border-blue-200 hover:shadow-xs"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition">
-                            <FileText className="h-4 w-4" />
-                          </div>
-                          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-800">
-                            24x7
-                          </span>
-                        </div>
-                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-blue-700 transition leading-snug">
-                          Mesa de Partes Virtual
-                        </h3>
-                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                          Radicación de solicitudes y expedientes
-                        </p>
-                      </div>
-                      <span className="mt-3 inline-flex items-center text-[10px] font-semibold text-blue-700 group-hover:translate-x-0.5 transition">
-                        Ingresar al trámite →
-                      </span>
-                    </Link>
+          <Link
+            to="/validador-cvd"
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition ${
+              isActive("/validador-cvd")
+                ? "bg-white/20 text-white shadow-xs font-bold"
+                : "text-blue-100 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            <span>Validador</span>
+          </Link>
 
-                    {/* Opción 2: Consulta Pública CUT */}
-                    <Link
-                      to="/consulta"
-                      role="menuitem"
-                      onClick={() => setTramitesDropdownOpen(false)}
-                      className={`flex flex-col justify-between rounded-xl p-3 border transition-all duration-150 group ${
-                        isActive("/consulta")
-                          ? "bg-emerald-50/80 border-emerald-300 shadow-xs"
-                          : "bg-slate-50/60 border-slate-200/80 hover:bg-emerald-50/40 hover:border-emerald-200 hover:shadow-xs"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition">
-                            <Search className="h-4 w-4" />
-                          </div>
-                          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
-                            CUT
-                          </span>
-                        </div>
-                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition leading-snug">
-                          Consulta Pública CUT
-                        </h3>
-                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                          Seguimiento del estado de expediente
-                        </p>
-                      </div>
-                      <span className="mt-3 inline-flex items-center text-[10px] font-semibold text-emerald-700 group-hover:translate-x-0.5 transition">
-                        Consultar estado →
-                      </span>
-                    </Link>
-
-                    {/* Opción 3: Validador CVD / QR */}
-                    <Link
-                      to="/validador-cvd"
-                      role="menuitem"
-                      onClick={() => setTramitesDropdownOpen(false)}
-                      className={`flex flex-col justify-between rounded-xl p-3 border transition-all duration-150 group ${
-                        isActive("/validador-cvd")
-                          ? "bg-teal-50/80 border-teal-300 shadow-xs"
-                          : "bg-slate-50/60 border-slate-200/80 hover:bg-teal-50/40 hover:border-teal-200 hover:shadow-xs"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition">
-                            <ShieldCheck className="h-4 w-4" />
-                          </div>
-                          <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[9px] font-bold text-teal-800">
-                            QR
-                          </span>
-                        </div>
-                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition leading-snug">
-                          Validador CVD / QR
-                        </h3>
-                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                          Cotejo de integridad y firma digital
-                        </p>
-                      </div>
-                      <span className="mt-3 inline-flex items-center text-[10px] font-semibold text-teal-700 group-hover:translate-x-0.5 transition">
-                        Verificar código →
-                      </span>
-                    </Link>
-
-                    {/* Opción 4: Registro de Administrados */}
-                    <Link
-                      to="/registro"
-                      role="menuitem"
-                      onClick={() => setTramitesDropdownOpen(false)}
-                      className={`flex flex-col justify-between rounded-xl p-3 border transition-all duration-150 group ${
-                        isActive("/registro")
-                          ? "bg-indigo-50/80 border-indigo-300 shadow-xs"
-                          : "bg-slate-50/60 border-slate-200/80 hover:bg-indigo-50/40 hover:border-indigo-200 hover:shadow-xs"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white transition">
-                            <UserCheck className="h-4 w-4" />
-                          </div>
-                          <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] font-bold text-indigo-800">
-                            Oficial
-                          </span>
-                        </div>
-                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition leading-snug">
-                          Registro de Administrados
-                        </h3>
-                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                          Inscripción para casilla y notificaciones
-                        </p>
-                      </div>
-                      <span className="mt-3 inline-flex items-center text-[10px] font-semibold text-indigo-700 group-hover:translate-x-0.5 transition">
-                        Registrarse ahora →
-                      </span>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <Link
+            to="/registro"
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition ${
+              isActive("/registro")
+                ? "bg-white/20 text-white shadow-xs font-bold"
+                : "text-blue-100 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <UserCheck className="h-3.5 w-3.5" />
+            <span>Registro</span>
+          </Link>
 
           {canAccessExpedientes && (
             <Link
@@ -380,18 +212,6 @@ export default function HeaderInstitucional() {
               <span>Casilla</span>
             </Link>
           )}
-
-          <Link
-            to="/validador-cvd"
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition ${
-              isActive("/validador-cvd")
-                ? "bg-white/20 text-white shadow-xs font-bold"
-                : "text-blue-100 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Validador</span>
-          </Link>
 
           {canAccessReportes && (
             <Link
