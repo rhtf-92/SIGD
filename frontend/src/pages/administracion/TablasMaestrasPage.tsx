@@ -26,7 +26,7 @@ export default function TablasMaestrasPage() {
   } = useTablasMaestras();
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
       <AdminPageHeader
         title="Tablas Maestras"
         description="Configuración institucional de sedes, organigrama y tipos documentales."
@@ -57,7 +57,7 @@ export default function TablasMaestrasPage() {
         </div>
 
         {tipoActivo === "Áreas" && (
-          <section className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="mb-6 rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-6 shadow-sm">
             <h2 className="text-lg font-bold">Organigrama institucional</h2>
             <p className="mt-1 text-sm text-slate-500">
               Jerarquía bajo el modelo Materialized Path (formato{" "}
@@ -72,7 +72,7 @@ export default function TablasMaestrasPage() {
           </section>
         )}
 
-        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="mb-6 rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-5 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="w-full md:max-w-xl">
               <label className="mb-2 block text-sm font-semibold">
@@ -82,14 +82,14 @@ export default function TablasMaestrasPage() {
                 value={busqueda}
                 onChange={(event) => setBusqueda(event.target.value)}
                 placeholder="Código, nombre o detalle"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-400/60"
               />
             </div>
 
             <button
               type="button"
               onClick={() => setMostrarFormulario((actual) => !actual)}
-              className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+              className="rounded-lg bg-cyan-600/90 px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
             >
               + Nuevo registro
             </button>
@@ -136,7 +136,7 @@ export default function TablasMaestrasPage() {
                 <button
                   type="button"
                   onClick={crearRegistro}
-                  className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                  className="rounded-lg bg-cyan-600/90 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
                 >
                   Guardar registro
                 </button>
@@ -145,7 +145,7 @@ export default function TablasMaestrasPage() {
           )}
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] shadow-sm">
           <div className="border-b border-slate-200 px-6 py-4">
             <h2 className="font-bold">{tipoActivo}</h2>
             <p className="mt-1 text-xs text-slate-500">

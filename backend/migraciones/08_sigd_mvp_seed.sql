@@ -44,7 +44,7 @@ VALUES (
     'admin@iestp-suiza.edu.pe',
     '$argon2id$v=19$m=65536,t=3,p=4$eb61bfc077deb7628711e2968838a351$d36240363331fc658d6da9d7bb2c64fd19dbaa43926f1fba51d2780e7b69453c410a6166ae31e4f9bfd0760ed7d32160135d4e54febf95c4039345be1cadd0dc'
 )
-ON CONFLICT (usuario) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- -----------------------------------------------------------------------------
 -- 8.3 Áreas raíz y perfil del administrador

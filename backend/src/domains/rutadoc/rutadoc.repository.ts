@@ -51,7 +51,7 @@ const BASE = `
   FROM sigd_tra.expediente e
   LEFT JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
   LEFT JOIN sigd_rut.estado_actual_expediente ultimo
-    ON ultimo.expediente_id = e.expediente_id`;
+    ON ultimo.expediente_id::text = e.expediente_id::text`;
 
 const FILTROS = `
   WHERE ($1::text IS NULL OR position(lower($1::text) in lower(e.codigo_expediente || ' ' || COALESCE(e.asunto, t.asunto, ''))) > 0)
@@ -64,26 +64,28 @@ export const SQL_LISTAR_RUTADOC = `
          e.codigo_expediente AS cut,
          COALESCE(e.asunto, t.asunto, '(sin asunto)') AS asunto,
          e.fecha_radicacion AS fecha_radicacion,
-         COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
+         COALESCE(ultimo.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual,
          ultimo.area_actual_id
   ${BASE} ${FILTROS}
-    AND COALESCE(ultimo.estado_nuevo, 'REGISTRADO') = ANY($5::text[])
+    AND COALESCE(ultimo.estado_nuevo, e.estado, 'REGISTRADO') = ANY($5::text[])
     AND ($6::timestamptz IS NULL OR
          (e.fecha_radicacion, e.expediente_id) < ($6::timestamptz, $7::uuid))
   ORDER BY e.fecha_radicacion DESC, e.expediente_id DESC
   LIMIT $8`;
 
+const ESTADO_ACTUAL = `COALESCE(ultimo.estado_nuevo, e.estado, 'REGISTRADO')`;
+
 const COLUMNAS_CONTEO = `
-  count(*) FILTER (WHERE ultimo.estado_nuevo IS NULL OR ultimo.estado_nuevo = 'REGISTRADO')::integer AS "REGISTRADO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'RECEPCIONADO')::integer AS "RECEPCIONADO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'EN_CALIFICACION')::integer AS "EN_CALIFICACION",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'DERIVADO')::integer AS "DERIVADO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'EN_REVISION')::integer AS "EN_REVISION",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'OBSERVADO')::integer AS "OBSERVADO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'SUBSANADO')::integer AS "SUBSANADO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'EN_FIRMA')::integer AS "EN_FIRMA",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'RESUELTO')::integer AS "RESUELTO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'ARCHIVADO')::integer AS "ARCHIVADO"`;
+  count(*) FILTER (WHERE ${ESTADO_ACTUAL} = 'REGISTRADO')::integer AS "REGISTRADO",
+  count(*) FILTER (WHERE ${ESTADO_ACTUAL} = 'RECEPCIONADO')::integer AS "RECEPCIONADO",
+  count(*) FILTER (WHERE ${ESTADO_ACTUAL} = 'EN_CALIFICACION')::integer AS "EN_CALIFICACION",
+  count(*) FILTER (WHERE ${ESTADO_ACTUAL} = 'DERIVADO')::integer AS "DERIVADO",
+  count(*) FILTER (WHERE ${ESTADO_ACTUAL} = 'EN_REVISION')::integer AS "EN_REVISION",
+  count(*) FILTER (WHERE ${ESTADO_ACTUAL} = 'OBSERVADO')::integer AS "OBSERVADO",
+  count(*) FILTER (WHERE ${ESTADO_ACTUAL} = 'SUBSANADO')::integer AS "SUBSANADO",
+  count(*) FILTER (WHERE ${ESTADO_ACTUAL} = 'EN_FIRMA')::integer AS "EN_FIRMA",
+  count(*) FILTER (WHERE ${ESTADO_ACTUAL} = 'RESUELTO')::integer AS "RESUELTO",
+  count(*) FILTER (WHERE ${ESTADO_ACTUAL} = 'ARCHIVADO')::integer AS "ARCHIVADO"`;
 
 export const SQL_CONTADORES_RUTADOC = `SELECT ${COLUMNAS_CONTEO} ${BASE} ${FILTROS}`;
 
@@ -91,7 +93,7 @@ export const SQL_CONTADORES_RUTADOC = `SELECT ${COLUMNAS_CONTEO} ${BASE} ${FILTR
 export const SQL_CONTADORES_SIN_TERMINO_RUTADOC = `
   SELECT ${COLUMNAS_CONTEO}
   FROM sigd_tra.expediente e
-  LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
+  LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id::text = e.expediente_id::text
   WHERE $1::text IS NULL
     AND ($2::text IS NULL OR ultimo.area_actual_id = $2::text)
     AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
@@ -178,15 +180,16 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
 
   async obtener(idExpediente: string): Promise<ExpedienteDetalle | null> {
     const fila = await this.pool.query<FilaDetalle>(`
-      SELECT e.id_expediente::text, e.codigo_expediente AS cut, t.asunto,
-             e.creado_en AS fecha_radicacion,
-             COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
+      SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut,
+             COALESCE(e.asunto, t.asunto, '(sin asunto)') AS asunto,
+             e.fecha_radicacion,
+             ${ESTADO_ACTUAL} AS estado_actual,
              ultimo.area_actual_id,
-             t.fk_remitente::text AS solicitante_id,
+             e.solicitante_id::text AS solicitante_id,
              ultimo.id_movimiento::text, ultimo.evento, ultimo.fecha_hora,
              ultimo.usuario_operador_id::text
       ${BASE}
-      WHERE e.id_expediente = $1::bigint`, [idExpediente]);
+      WHERE e.expediente_id = $1::uuid`, [idExpediente]);
     if (fila.rowCount === 0) return null;
 
     const dato = fila.rows[0];
@@ -196,9 +199,9 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
     if (existeFoliacion.rows[0].existe) {
       const folios = await this.pool.query<{ cantidad: number; total: number }>(`
         SELECT count(DISTINCT id_documento)::integer AS cantidad,
-               COALESCE(sum(total_folios), 0)::integer AS total
+               COALESCE(sum(folio_fin - folio_inicio + 1), 0)::integer AS total
           FROM sigd_tra.expediente_documento_folio
-         WHERE id_expediente = $1::bigint`, [idExpediente]);
+         WHERE expediente_id = $1::uuid`, [idExpediente]);
       resumenDocumentos = {
         cantidadDocumentos: folios.rows[0].cantidad,
         totalFolios: folios.rows[0].total,

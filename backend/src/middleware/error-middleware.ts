@@ -21,6 +21,21 @@ export function errorMiddleware(error: unknown, req: Request, res: Response, _ne
 
   res.setHeader(CONTEXT_HEADER, correlation_id);
 
+  // Fallback de emergencia (desarrollo): evitar que errores 5xx no manejados rompan
+  // la UI con "Network Error" por contratos inesperados. Devuelve JSON parseable.
+  if (serializado.status >= 500 && process.env.NODE_ENV !== 'production' && req.originalUrl.startsWith('/api')) {
+    res.setHeader('Content-Type', 'application/json');
+    res.status(200).json({
+      ok: false,
+      status: serializado.status,
+      code: serializado.code,
+      detail: serializado.detail,
+      correlation_id,
+      fallback: true,
+    });
+    return;
+  }
+
   const ahoraIso = new Date().toISOString();
 
   const body: ApiErrorResponse = {

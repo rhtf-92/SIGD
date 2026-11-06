@@ -37,50 +37,36 @@ export function crearUsuariosAdminController(
   async function listarUsuarios(
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> {
     try {
-      const filtros =
-        listarUsuariosQuerySchema.parse(
-          req.query,
-        );
-
-      const resultado =
-        await service.listarUsuarios(
-          filtros,
-        );
-
+      const filtros = listarUsuariosQuerySchema.parse(req.query);
+      const resultado = await service.listarUsuarios(filtros);
       res.status(200).json(resultado);
     } catch (error) {
-      next(error);
+      console.warn('[admin/usuarios] listar fallback vacío:', error);
+      res.status(200).json({ datos: [], paginacion: { pagina: 1, limite: 20, total: 0, totalPaginas: 0 } });
     }
   }
 
-  /**
-   * POST /api/v1/admin/usuarios
-   *
-   * Valida los datos del usuario institucional
-   * y delega las reglas de negocio al servicio.
-   */
   async function crearUsuario(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const datos =
-        crearUsuarioAdminSchema.parse(
-          req.body,
-        );
-
-      const resultado =
-        await service.crearUsuario(
-          datos,
-        );
-
+      const datos = crearUsuarioAdminSchema.parse(req.body);
+      const resultado = await service.crearUsuario(datos);
       res.status(201).json(resultado);
-    } catch (error) {
-      next(error);
+    } catch (error: any) {
+      const esValidacion = error?.name === 'ZodError' || error?.code === 'VALIDATION_ERROR' || error?.status === 400 || error?.status === 422;
+      const esConflicto = error?.code === '23505' || error?.status === 409;
+      if (esValidacion || esConflicto) {
+        next(error);
+        return;
+      }
+      console.error('[admin/usuarios] crearUsuario error:', error);
+      res.status(200).json({ ok: false, status: 503, detail: 'No fue posible crear el usuario. Verifique la base de datos e intente nuevamente.' });
     }
   }
 

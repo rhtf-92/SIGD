@@ -45,7 +45,7 @@ const ciudadanoSchema = z.object({
   dni: z.string().regex(/^[0-9]{8}$/),
   nombres: z.string().trim().min(2).max(120),
   apellidoPaterno: z.string().trim().min(2).max(120),
-  apellidoMaterno: z.string().trim().min(2).max(120),
+  apellidoMaterno: z.string().trim().max(120).optional().default(''),
 }).strict();
 
 const personaJuridicaSchema = z.object({

@@ -15,12 +15,16 @@
 -- 2.1 Columnas de encadenamiento WORM
 -- -----------------------------------------------------------------------------
 ALTER TABLE sigd_audit.bitacora_auditoria
-    ADD COLUMN IF NOT EXISTS hash_registro CHAR(64) NULL
-        COMMENT 'SHA-256 hex del contenido de esta fila (hash autocontenido).';
+    ADD COLUMN IF NOT EXISTS hash_registro CHAR(64) NULL;
 
 ALTER TABLE sigd_audit.bitacora_auditoria
-    ADD COLUMN IF NOT EXISTS hash_anterior CHAR(64) NULL
-        COMMENT 'SHA-256 hex del hash_registro de la fila inmediatamente anterior (encadenamiento WORM).';
+    ADD COLUMN IF NOT EXISTS hash_anterior CHAR(64) NULL;
+
+COMMENT ON COLUMN sigd_audit.bitacora_auditoria.hash_registro IS
+    'SHA-256 hex del contenido de esta fila (hash autocontenido).';
+
+COMMENT ON COLUMN sigd_audit.bitacora_auditoria.hash_anterior IS
+    'SHA-256 hex del hash_registro de la fila inmediatamente anterior (encadenamiento WORM).';
 
 CREATE INDEX IF NOT EXISTS idx_bitacora_hash_anterior
     ON sigd_audit.bitacora_auditoria (hash_anterior);
@@ -137,6 +141,7 @@ AS $$
 DECLARE
     v_fila RECORD;
     v_hash_anterior CHAR(64) := '';
+    v_hash_esperado CHAR(64);
     v_orden INTEGER := 0;
 BEGIN
     FOR v_fila IN
@@ -149,24 +154,20 @@ BEGIN
         v_orden := v_orden + 1;
 
         -- Recalcular el hash esperado para esta fila.
-        DECLARE
-            v_hash_esperado CHAR(64);
-        BEGIN
-            v_hash_esperado := sigd_audit.fn_calcular_hash_bitacora(
-                v_fila.id_auditoria,
-                v_fila.correlation_id,
-                v_fila.usuario_id,
-                v_fila.ip_origen,
-                v_fila.user_agent,
-                v_fila.esquema,
-                v_fila.tabla,
-                v_fila.operacion,
-                v_fila.datos_antes,
-                v_fila.datos_despues,
-                v_fila.fecha_hora,
-                v_hash_anterior
-            );
-        END;
+        v_hash_esperado := sigd_audit.fn_calcular_hash_bitacora(
+            v_fila.id_auditoria,
+            v_fila.correlation_id,
+            v_fila.usuario_id,
+            v_fila.ip_origen,
+            v_fila.user_agent,
+            v_fila.esquema,
+            v_fila.tabla,
+            v_fila.operacion,
+            v_fila.datos_antes,
+            v_fila.datos_despues,
+            v_fila.fecha_hora,
+            v_hash_anterior
+        );
 
         -- Validar: hash almacenado debe coincidir con el recalculado
         -- Y hash_anterior debe coincidir con el hash del registro previo.
@@ -223,6 +224,8 @@ COMMENT ON VIEW sigd_audit.vw_validacion_worm IS
 -- -----------------------------------------------------------------------------
 -- 2.6 Concesión de privilegios sobre los nuevos objetos
 -- -----------------------------------------------------------------------------
-GRANT SELECT ON sigd_audit.fn_validar_cadena_worm() TO sigd_app;
+GRANT EXECUTE ON FUNCTION sigd_audit.fn_validar_cadena_worm() TO sigd_app;
 GRANT SELECT ON sigd_audit.vw_validacion_worm TO sigd_app;
-GRANT SELECT ON sigd_audit.fn_calcular_hash_bitacora(...) TO sigd_app;
+GRANT EXECUTE ON FUNCTION sigd_audit.fn_calcular_hash_bitacora(
+    uuid, uuid, uuid, inet, varchar, varchar, varchar, varchar, jsonb, jsonb, timestamptz, char
+) TO sigd_app;

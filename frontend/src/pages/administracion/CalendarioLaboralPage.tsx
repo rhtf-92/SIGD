@@ -29,14 +29,14 @@ export default function CalendarioLaboralPage() {
   } = useCalendarioLaboral();
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
       <AdminPageHeader
         title="Calendario Laboral"
         description="Configuración de jornada, corte de recepción LPAG y feriados de Ucayali."
       />
 
       <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+        <div className="mb-6 rounded-xl border border-cyan-400/40 bg-cyan-500/10 p-4 text-sm text-cyan-200">
           <p>
             <strong>Hora de corte normativa: {HORA_CORTE_LPAG} hrs</strong>.
             Los documentos ingresados después de las 16:30 hrs (o en día
@@ -52,7 +52,7 @@ export default function CalendarioLaboralPage() {
         )}
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-6 shadow-sm">
             <h2 className="text-xl font-bold">Jornada laboral</h2>
             <p className="mt-1 text-sm text-slate-500">
               Los valores son configurables y no están fijados por código.
@@ -119,7 +119,7 @@ export default function CalendarioLaboralPage() {
                   <button
                     type="button"
                     onClick={() => setHoraCorteRecepcion(HORA_CORTE_LPAG)}
-                    className="mt-1 text-xs font-semibold text-blue-700 hover:underline"
+                    className="mt-1 text-xs font-semibold text-cyan-400 hover:underline"
                   >
                     Restaurar corte normativo {HORA_CORTE_LPAG} hrs
                   </button>
@@ -142,7 +142,7 @@ export default function CalendarioLaboralPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-6 shadow-sm">
             <h2 className="text-xl font-bold">Feriados y días no laborables</h2>
             <p className="mt-1 text-sm text-slate-500">
               Feriados nacionales (D. Leg. N° 713) y regionales de Ucayali.
@@ -164,7 +164,7 @@ export default function CalendarioLaboralPage() {
               <button
                 type="button"
                 onClick={agregarFeriado}
-                className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+                className="rounded-lg bg-cyan-600/90 px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
               >
                 Agregar
               </button>
@@ -197,7 +197,7 @@ export default function CalendarioLaboralPage() {
           <button
             type="button"
             onClick={guardarConfiguracion}
-            className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+            className="rounded-lg bg-cyan-600/90 px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
           >
             Guardar calendario
           </button>

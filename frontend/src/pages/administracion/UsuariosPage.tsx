@@ -81,7 +81,7 @@ export default function UsuariosPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
       <AdminPageHeader
         title="Gestión de Usuarios"
         description="Administración de cuentas, áreas, cargos, roles y estados."
@@ -96,7 +96,7 @@ export default function UsuariosPage() {
           <button
             type="button"
             onClick={() => setMostrarCrear(true)}
-            className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+            className="rounded-lg bg-cyan-600/90 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
           >
             + Nuevo usuario
           </button>
@@ -132,10 +132,10 @@ export default function UsuariosPage() {
           </div>
         )}
 
-        <section className="mb-6 rounded-xl border border-blue-700 bg-blue-600 p-5 text-white shadow-sm">
+        <section className="mb-6 rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-5 text-white shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <div>
-              <label htmlFor="busqueda" className="mb-2 block text-sm font-semibold text-blue-100">
+              <label htmlFor="busqueda" className="mb-2 block text-sm font-semibold text-slate-200">
                 Buscar usuario
               </label>
               <input
@@ -143,12 +143,12 @@ export default function UsuariosPage() {
                 value={busqueda}
                 onChange={(event) => setBusqueda(event.target.value)}
                 placeholder="Nombre, DNI, correo o área"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-blue-300 outline-none focus:border-blue-600"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-blue-300 outline-none focus:border-cyan-400/60"
               />
             </div>
 
             <div>
-              <label htmlFor="area" className="mb-2 block text-sm font-semibold text-blue-100">
+              <label htmlFor="area" className="mb-2 block text-sm font-semibold text-slate-200">
                 Unidad orgánica
               </label>
               <select
@@ -167,7 +167,7 @@ export default function UsuariosPage() {
             </div>
 
             <div>
-              <label htmlFor="sede" className="mb-2 block text-sm font-semibold text-blue-100">
+              <label htmlFor="sede" className="mb-2 block text-sm font-semibold text-slate-200">
                 Sede
               </label>
               <select
@@ -186,7 +186,7 @@ export default function UsuariosPage() {
             </div>
 
             <div>
-              <label htmlFor="rol" className="mb-2 block text-sm font-semibold text-blue-100">
+              <label htmlFor="rol" className="mb-2 block text-sm font-semibold text-slate-200">
                 Rol asignado
               </label>
               <select
@@ -205,7 +205,7 @@ export default function UsuariosPage() {
             </div>
 
             <div>
-              <label htmlFor="estado" className="mb-2 block text-sm font-semibold text-blue-100">
+              <label htmlFor="estado" className="mb-2 block text-sm font-semibold text-slate-200">
                 Estado
               </label>
               <select
@@ -225,7 +225,7 @@ export default function UsuariosPage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] shadow-sm">
           <div className="border-b border-slate-200 px-6 py-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
@@ -244,7 +244,7 @@ export default function UsuariosPage() {
                   <span
                     aria-hidden="true"
                     className={`h-2 w-2 rounded-full ${
-                      isFetching ? "animate-pulse bg-blue-600" : "bg-emerald-500"
+                      isFetching ? "animate-pulse bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] border border-cyan-400/40" : "bg-emerald-500"
                     }`}
                   />
                   {isFetching
@@ -310,7 +310,7 @@ export default function UsuariosPage() {
                 {!isLoading && usuarios.length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-6 py-10 text-center">
-                      <div className="rounded-lg bg-blue-50 px-6 py-8 text-blue-600">
+                      <div className="rounded-lg bg-cyan-500/10 px-6 py-8 text-blue-600">
                         <p className="font-semibold">
                           No se registran usuarios institucionales
                         </p>
@@ -360,7 +360,7 @@ export default function UsuariosPage() {
                               setErrorServidor("");
                               setUsuarioEditando({ ...usuario });
                             }}
-                            className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                            className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-cyan-400 hover:bg-cyan-500/10"
                           >
                             Administrar
                           </button>

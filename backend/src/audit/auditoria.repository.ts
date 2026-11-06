@@ -210,6 +210,11 @@ export async function listarAuditoria(
     orden_direccion = 'DESC',
   } = filtros;
 
+  const paginaSegura = Number.isFinite(pagina) && pagina >= 1 ? Math.floor(pagina) : 1;
+  const porPaginaSegura = Number.isFinite(por_pagina) && por_pagina >= 1
+    ? Math.min(Math.floor(por_pagina), 200)
+    : 50;
+
   const condiciones: string[] = [];
   const valores: unknown[] = [];
   let parametro = 1;
@@ -269,7 +274,7 @@ export async function listarAuditoria(
   const where =
     condiciones.length > 0 ? `WHERE ${condiciones.join(' AND ')}` : '';
 
-  const offset = (pagina - 1) * por_pagina;
+  const offset = (paginaSegura - 1) * porPaginaSegura;
 
   const ordenValido = ordenar_por === 'usuario_id' ? 'usuario_id' : ordenar_por === 'fecha_hora' ? 'fecha_hora' : 'operacion';
   const direccionValida = orden_direccion === 'ASC' ? 'ASC' : 'DESC';
@@ -283,7 +288,7 @@ export async function listarAuditoria(
     ORDER BY ${ordenValido} ${direccionValida}, id_auditoria
     LIMIT $${parametro} OFFSET $${parametro + 1}
   `;
-  valores.push(por_pagina, offset);
+  valores.push(porPaginaSegura, offset);
 
   const queryTotal = `
     SELECT COUNT(*) AS total
@@ -428,7 +433,7 @@ export async function validarCadenaWorm(
     registros_validos: string;
     cadena_integral: boolean;
   }>(
-    `SELECT * FROM sigd_audit.vw_validacion_worm()`,
+    `SELECT * FROM sigd_audit.vw_validacion_worm`,
   );
   const r = resultado.rows[0];
   return {

@@ -22,6 +22,8 @@ import type {
   TipoDocumentoIdentidad,
   WizardAction,
 } from '../../../types/tramiteWizardState';
+import type { PersonaDniDemo } from '../../../data/padronDniDemo';
+import LectorDniDigital from '../../dni/LectorDniDigital';
 
 export interface StepIdentificacionProps {
   /** Datos reactivos del paso de identificación */
@@ -147,6 +149,29 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
     });
   };
 
+  const autocompletarConDni = (persona: PersonaDniDemo) => {
+    dispatch({
+      type: 'UPDATE_IDENTIFICACION',
+      payload: {
+        tipoDocumento: 'DNI',
+        numeroDocumento: persona.dni,
+        nombres: persona.nombres,
+        apellidos: persona.apellidos,
+        correo: persona.correo,
+        telefono: persona.telefono,
+        direccion: persona.direccion,
+      },
+    });
+    setTouched((prev) => ({
+      ...prev,
+      numeroDocumento: true,
+      nombres: true,
+      apellidos: true,
+      correo: true,
+      telefono: true,
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Marcar todos como tocados para revelar errores si los hubiera
@@ -181,6 +206,23 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
           Consigne sus datos de identidad oficial y contacto formal. Sus datos están protegidos conforme a la Ley N° 29733 y el TUO de la Ley N° 27444.
         </p>
       </header>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-semibold text-white">
+            <span className="h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse-soft" />
+            Lector de DNI digital
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+            Detecta el código PDF417 y completa automáticamente tus datos de identidad y contacto.
+          </p>
+        </div>
+        <LectorDniDigital
+          variant="inline"
+          label="Escanear DNI"
+          onDetected={autocompletarConDni}
+        />
+      </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {/* 1. Tipo de Documento */}

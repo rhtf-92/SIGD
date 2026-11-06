@@ -72,12 +72,13 @@ export function useAuditLogs() {
       if (modulo !== "Todos") params.modulo = modulo;
       if (resultado !== "Todos") params.resultado = resultado;
 
-      const { data } = await apiClient.get<LogsApiResponse>("/api/v1/auditoria/logs", {
+      const { data } = await apiClient.get<Partial<LogsApiResponse>>("/api/v1/auditoria/logs", {
         params,
       });
 
-      setRegistros(data.registros);
-      setTotal(data.total);
+      const registros = Array.isArray(data?.registros) ? data.registros : Array.isArray((data as any)?.logs) ? (data as any).logs : [];
+      setRegistros(registros as RegistroAuditoria[]);
+      setTotal(typeof data?.total === "number" ? data.total : registros.length);
     } catch (err: unknown) {
       console.error("[useAuditLogs] Error cargando logs:", err);
       setError(

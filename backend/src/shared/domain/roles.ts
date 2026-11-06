@@ -67,6 +67,7 @@ export function normalizarRol(rol: string | null | undefined): RolCanonico | nul
   if (!rol) return null;
   const codigo = rol.trim().toUpperCase();
   switch (codigo) {
+    case 'ADMIN':
     case 'SUPER_ADMIN':
     case 'ADMINISTRADOR':
       return 'ADMINISTRADOR';

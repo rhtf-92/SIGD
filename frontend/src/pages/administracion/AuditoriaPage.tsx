@@ -47,7 +47,7 @@ export default function AuditoriaPage() {
   } = useAuditLogs();
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
       <AdminPageHeader
         title="Logs de Auditoría"
         description="Trazabilidad inmutable (WORM), acciones, accesos y correlación X-Correlation-ID."
@@ -69,7 +69,7 @@ export default function AuditoriaPage() {
       )}
 
       <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+        <div className="mb-6 rounded-xl border border-cyan-400/40 bg-cyan-500/10 p-4 text-sm text-cyan-200">
           Los registros de auditoría son de solo lectura. La inmutabilidad real
           se garantiza en backend y base de datos (append-only + hash
           encadenado SHA-256). Cada registro incluye su X-Correlation-ID para
@@ -103,7 +103,7 @@ export default function AuditoriaPage() {
           </article>
         </div>
 
-        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="mb-6 rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-5 shadow-sm">
           <div className="grid gap-4 lg:grid-cols-[1fr_220px_220px_auto]">
             <div>
               <label className="mb-2 block text-sm font-semibold">Buscar</label>
@@ -111,7 +111,7 @@ export default function AuditoriaPage() {
                 value={busqueda}
                 onChange={(event) => setBusqueda(event.target.value)}
                 placeholder="Usuario, acción, expediente, ID o X-Correlation-ID"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-400/60"
               />
             </div>
 
@@ -156,7 +156,7 @@ export default function AuditoriaPage() {
                 type="button"
                 onClick={exportarCsv}
                 disabled={cargando}
-                className="w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-lg bg-cyan-600/90 px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Exportar CSV
               </button>
@@ -164,7 +164,7 @@ export default function AuditoriaPage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] shadow-sm">
           <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
             <div>
               <h2 className="font-bold">Registro de eventos</h2>

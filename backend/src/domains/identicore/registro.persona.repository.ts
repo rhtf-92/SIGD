@@ -8,28 +8,14 @@ interface IdResult {
 
 export async function insertarPersona(
   cliente: PoolClient,
-  tipoDocumentoId: string,
   datos: DatosRegistro,
 ): Promise<string> {
   const resultado = await cliente.query<IdResult>(
     `INSERT INTO sigd_auth.persona
-       (tipo_documento_id, numero_documento, nombres, apellido_paterno,
-        apellido_materno, telefono, email_contacto, tipo_persona,
-        direccion, ubigeo_distrito)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-     RETURNING id::text AS id`,
-    [
-      tipoDocumentoId,
-      datos.numeroDocumento,
-      datos.nombres,
-      datos.apellidoPaterno,
-      datos.apellidoMaterno,
-      datos.celular,
-      datos.correo,
-      datos.tipoPersona,
-      datos.direccion,
-      datos.ubigeoDistrito,
-    ],
+       (tipo, id_documento)
+     VALUES ($1, $2)
+     RETURNING id_persona::text AS id`,
+    [datos.tipoPersona, datos.numeroDocumento],
   );
   const personaId = resultado.rows[0]?.id;
   if (!personaId) throw new Error('La inserción de persona no devolvió su identificador.');
@@ -53,13 +39,14 @@ async function insertarPersonaNatural(
   personaId: string,
   datos: DatosRegistro,
 ): Promise<void> {
+  const apellidos = [datos.apellidoPaterno, datos.apellidoMaterno]
+    .filter((apellido): apellido is string => Boolean(apellido))
+    .join(' ');
   await cliente.query(
     `INSERT INTO sigd_auth.persona_natural
-       (persona_id, numero_documento, nombres, apellido_paterno,
-        apellido_materno, telefono, email_contacto)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [personaId, datos.numeroDocumento, datos.nombres, datos.apellidoPaterno,
-      datos.apellidoMaterno, datos.celular, datos.correo],
+       (id_persona, nombres, apellidos, nombre_completo, telefono, correo)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [personaId, datos.nombres, apellidos, `${datos.nombres} ${apellidos}`.trim(), datos.celular, datos.correo],
   );
 }
 
@@ -68,31 +55,39 @@ async function insertarPersonaJuridica(
   personaId: string,
   datos: DatosRegistro,
 ): Promise<void> {
-  const documentoRepresentante = datos.documentoRepresentante;
-  const nombreRepresentante = datos.nombreRepresentante;
-  if (!datos.razonSocial || !datos.nombreComercial || !documentoRepresentante || !nombreRepresentante) {
+  if (!datos.razonSocial || !datos.nombreComercial) {
     throw new Error('Faltan los datos de identificación de la persona jurídica.');
   }
-
-  const representante = await buscarRepresentante(cliente, documentoRepresentante);
-  validarNombreRepresentante(representante, nombreRepresentante);
-  const personaJuridicaId = await guardarPersonaJuridica(cliente, personaId, datos);
-  await cliente.query(
-    `INSERT INTO sigd_auth.representacion_legal
-       (persona_natural_id, persona_juridica_id, vigencia_inicio, activo)
-     VALUES ($1, $2, CURRENT_DATE, TRUE)`,
-    [representante.id, personaJuridicaId],
+  const resultado = await cliente.query<IdResult>(
+    `INSERT INTO sigd_auth.persona_juridica
+       (id_persona, razon_social, nombre_comercial, direccion)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id_persona::text AS id`,
+    [personaId, datos.razonSocial, datos.nombreComercial, datos.direccion],
   );
+  const personaJuridicaId = resultado.rows[0]?.id;
+  if (!personaJuridicaId) throw new Error('La inserción de persona jurídica no devolvió su identificador.');
+
+  const documentoRepresentante = datos.documentoRepresentante;
+  const nombreRepresentante = datos.nombreRepresentante;
+  if (documentoRepresentante && nombreRepresentante) {
+    const representante = await buscarRepresentante(cliente, documentoRepresentante);
+    validarNombreRepresentante(representante, nombreRepresentante);
+    await cliente.query(
+      `INSERT INTO sigd_auth.representacion_legal
+         (id_persona_juridica, id_persona_natural, cargo, vigente_desde)
+       VALUES ($1, $2, 'REPRESENTANTE LEGAL', CURRENT_DATE)`,
+      [personaJuridicaId, representante.id],
+    );
+  }
 }
 
 async function buscarRepresentante(cliente: PoolClient, dni: string): Promise<RepresentanteLegal> {
-  const resultado = await cliente.query<RepresentanteLegal>(
-    `SELECT pn.id::text AS id, p.nombres, p.apellido_paterno, p.apellido_materno
+  const resultado = await cliente.query<{ id: string; nombres: string; apellidos: string }>(
+    `SELECT pn.id_persona::text AS id, pn.nombres, pn.apellidos
        FROM sigd_auth.persona_natural pn
-       JOIN sigd_auth.persona p ON p.id = pn.persona_id
-       JOIN sigd_auth.tipos_documento td ON td.id = p.tipo_documento_id
-      WHERE pn.numero_documento = $1 AND td.codigo = 'DNI'
-        AND p.tipo_persona = 'NATURAL' AND p.estado = TRUE AND pn.estado = TRUE
+       JOIN sigd_auth.persona p ON p.id_persona = pn.id_persona
+      WHERE p.id_documento = $1 AND p.tipo = 'NATURAL'
       FOR SHARE OF pn, p`,
     [dni],
   );
@@ -103,7 +98,13 @@ async function buscarRepresentante(cliente: PoolClient, dni: string): Promise<Re
       message: 'El representante legal debe estar previamente registrado como persona natural.',
     });
   }
-  return representante;
+  const partesApellido = (representante.apellidos ?? '').split(' ');
+  return {
+    id: representante.id,
+    nombres: representante.nombres,
+    apellido_paterno: partesApellido[0] ?? null,
+    apellido_materno: partesApellido.slice(1).join(' ') || null,
+  };
 }
 
 function validarNombreRepresentante(representante: RepresentanteLegal, nombre: string): void {
@@ -114,22 +115,6 @@ function validarNombreRepresentante(representante: RepresentanteLegal, nombre: s
       invalidParams: [{ name: 'nombreRepresentante', reason: 'El nombre no coincide con el DNI del representante.' }],
     });
   }
-}
-
-async function guardarPersonaJuridica(
-  cliente: PoolClient,
-  personaId: string,
-  datos: DatosRegistro,
-): Promise<string> {
-  const resultado = await cliente.query<IdResult>(
-    `INSERT INTO sigd_auth.persona_juridica
-       (persona_id, razon_social, nombre_comercial, partida_registral_sunarp)
-     VALUES ($1, $2, $3, $4) RETURNING id::text AS id`,
-    [personaId, datos.razonSocial, datos.nombreComercial, datos.partidaRegistral],
-  );
-  const id = resultado.rows[0]?.id;
-  if (!id) throw new Error('La inserción de persona jurídica no devolvió su identificador.');
-  return id;
 }
 
 function normalizarNombre(nombre: string): string {

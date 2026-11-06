@@ -1,7 +1,10 @@
+import { Bot, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SUGERENCIAS_INICIALES } from "../../data/asistenteConocimiento";
 import { useAsistenteIA } from "../../hooks/useAsistenteIA";
 import { useAuthStore } from "../../stores/authStore";
+
+const CLAVE_BURBUJA = "sigd_asistente_burbuja_v1";
 
 type ReconocimientoVoz = {
   start: () => void;
@@ -60,15 +63,45 @@ export default function AsistenteIA() {
   const usuario = useAuthStore((s) => s.usuario);
   const finRef = useRef<HTMLDivElement>(null);
   const recRef = useRef<ReconocimientoVoz | null>(null);
+  const [burbujaVisible, setBurbujaVisible] = useState(false);
   const saludadoRef = useRef(false);
   const ultimaInteraccionRef = useRef(Date.now());
   const inactividadRef = useRef<number | null>(null);
-  const autoAbrirRef = useRef<number | null>(null);
-  const autoAbridoRef = useRef(false);
 
   const registrarInteraccion = () => {
     ultimaInteraccionRef.current = Date.now();
   };
+
+  const descartarBurbuja = () => {
+    setBurbujaVisible(false);
+    try {
+      window.sessionStorage.setItem(CLAVE_BURBUJA, "1");
+    } catch {
+      // sin storage
+    }
+  };
+
+  const abrirChat = () => {
+    registrarInteraccion();
+    descartarBurbuja();
+    setAbierto(true);
+  };
+
+  useEffect(() => {
+    let yaVista = false;
+    try {
+      yaVista = window.sessionStorage.getItem(CLAVE_BURBUJA) === "1";
+    } catch {
+      yaVista = false;
+    }
+    if (yaVista) return;
+    const temporizador = window.setTimeout(() => setBurbujaVisible(true), 1600);
+    return () => window.clearTimeout(temporizador);
+  }, []);
+
+  useEffect(() => {
+    if (abierto) setBurbujaVisible(false);
+  }, [abierto]);
 
   useEffect(() => {
     if (abierto) finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -177,16 +210,62 @@ export default function AsistenteIA() {
 
   return (
     <>
+      {burbujaVisible && !abierto && (
+        <div className="fixed bottom-24 right-5 z-40 w-[min(92vw,330px)] animate-fade-in print:hidden">
+          <div className="glass-card relative overflow-hidden p-4 pr-10">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+            <button
+              type="button"
+              onClick={descartarBurbuja}
+              aria-label="Cerrar mensaje de bienvenida"
+              className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-lg text-zinc-500 transition hover:bg-white/10 hover:text-white"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <div className="flex items-start gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/[0.06] text-white">
+                <Bot className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                  SIGI · asistente institucional
+                </p>
+                <p className="mt-1.5 text-sm leading-relaxed text-zinc-200">
+                  Hola, soy SIGI. Puedo guiarte con tu DNI, un trámite, tu casilla electrónica o
+                  soporte técnico.
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <button type="button" onClick={abrirChat} className="btn-cyber px-3.5 py-2 text-xs">
+                Hablar con SIGI
+              </button>
+              <button
+                type="button"
+                onClick={descartarBurbuja}
+                className="rounded-lg px-2.5 py-2 text-xs font-semibold text-zinc-400 transition hover:text-white"
+              >
+                Ahora no
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={() => {
           registrarInteraccion();
-          setAbierto((v) => !v);
+          if (abierto) {
+            setAbierto(false);
+          } else {
+            abrirChat();
+          }
         }}
         aria-label={abierto ? "Cerrar asistente" : "Abrir asistente virtual SIGI"}
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-700 to-blue-900 text-2xl text-white shadow-xl transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 print:hidden"
+        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-zinc-100 text-black shadow-[0_0_38px_rgba(255,255,255,0.35)] transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-white/30 print:hidden"
       >
-        {abierto ? "✕" : "🤖"}
+        {abierto ? <X className="h-5 w-5" /> : <Bot className="h-6 w-6" />}
       </button>
 
       {abierto && (
@@ -197,8 +276,8 @@ export default function AsistenteIA() {
         >
           <header className="flex items-center justify-between gap-2 bg-gradient-to-r from-blue-800 to-blue-900 px-4 py-3 text-white">
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-lg">
-                🤖
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-black">
+                <Bot className="h-4 w-4" />
               </span>
               <div>
                 <p className="flex items-center gap-1.5 text-sm font-bold leading-tight">

@@ -1,12 +1,31 @@
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Activity,
+  ArrowRight,
+  Cpu,
+  FileCheck2,
+  Fingerprint,
+  ScanLine,
+  ShieldCheck,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useSesion } from "../../config/accesoModulos";
-import { ROLES_INTERNOS } from "../../config/accesoModulos";
 import { DIAPOSITIVAS_PORTADA } from "../../data/carruselPortada";
 
-const INTERVALO_MS = 5000;
+const INTERVALO_MS = 6000;
+
+const INDICADORES = [
+  { valor: "12", rotulo: "Módulos integrados" },
+  { valor: "24/7", rotulo: "Mesa de partes" },
+  { valor: "100%", rotulo: "Trazabilidad" },
+];
+
+const CAPACIDADES = [
+  { icono: ScanLine, texto: "Lectura de DNI digital" },
+  { icono: ShieldCheck, texto: "Firma y validez legal" },
+  { icono: Cpu, texto: "Asistente IA institucional" },
+];
 
 export default function HeroInstitucional() {
   const { rol } = useSesion();
@@ -14,17 +33,7 @@ export default function HeroInstitucional() {
   const [pausado, setPausado] = useState(false);
   const total = DIAPOSITIVAS_PORTADA.length;
   const diapositiva = DIAPOSITIVAS_PORTADA[indice];
-
-  // Las imágenes de portada SOLO se renderizan para: invitado (sin sesión),
-  // estudiante / usuario externo. Cualquier otro rol interno o administrativo
-  // (SUPER_ADMIN, DIRECTOR, director_general, DOCENTE, MESA_PARTES,
-  // mesa_de_partes, etc.) recibe una portada limpia sin imágenes.
-  const rolStr = (rol ?? "") as import("../../config/accesoModulos").RolCanonico;
-  const mostrarImagen =
-    !rolStr ||
-    rolStr === "ESTUDIANTE" ||
-    rolStr === "OTROS" ||
-    !ROLES_INTERNOS.includes(rolStr);
+  const esInterno = Boolean(rol);
 
   useEffect(() => {
     if (pausado) return;
@@ -35,215 +44,188 @@ export default function HeroInstitucional() {
     ) {
       return;
     }
-
     const temporizador = window.setTimeout(() => {
       setIndice((actual) => (actual + 1) % total);
     }, INTERVALO_MS);
-
     return () => window.clearTimeout(temporizador);
   }, [indice, pausado, total]);
 
-  const mover = (paso: number) => {
-    setIndice((actual) => (actual + paso + total) % total);
+  const abrirLectorDni = () => {
+    window.dispatchEvent(new Event("sigd:abrir-lector-dni"));
   };
 
   return (
-    <section className="relative bg-[#04213f] text-white">
+    <section
+      className="relative overflow-hidden"
+      onMouseEnter={() => setPausado(true)}
+      onMouseLeave={() => setPausado(false)}
+    >
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-20 top-[-10%] h-[600px] w-[600px] rounded-full bg-[#006EC7]/35 blur-[120px]" />
-        <div className="absolute -right-20 bottom-[-10%] h-[600px] w-[600px] rounded-full bg-[#E6007E]/20 blur-[120px]" />
-        <div className="absolute inset-0 bg-[#04213f]/40" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_0%,rgba(255,255,255,0.11),transparent_55%)]" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+        <div className="absolute -right-24 top-10 h-72 w-72 rounded-full border border-white/10 animate-spin-slow" />
+        <div className="absolute -right-10 top-24 h-40 w-40 rounded-full border border-dashed border-white/10 animate-spin-slow" />
       </div>
 
-      {/* ---------- BANNER CORPORATIVO (solo roles externos) ---------- */}
-      {mostrarImagen && (
-        <div
-          role="region"
-          aria-roledescription="carrusel"
-          aria-label="Portada institucional IESTP Suiza"
-          className="relative w-full overflow-hidden border-b border-white/10"
-          onMouseEnter={() => setPausado(true)}
-          onMouseLeave={() => setPausado(false)}
-          onFocusCapture={() => setPausado(true)}
-          onBlurCapture={() => setPausado(false)}
-          onKeyDown={(evento) => {
-            if (evento.key === "ArrowLeft") {
-              evento.preventDefault();
-              mover(-1);
-            }
-            if (evento.key === "ArrowRight") {
-              evento.preventDefault();
-              mover(1);
-            }
-          }}
-        >
-          <div className="relative h-[520px] sm:h-[620px] lg:h-[720px] w-full">
-            {/* Imagen de fondo (contiene toda la diapositiva sin recortes laterales) */}
-            <img
-              key={`fondo-${diapositiva.id}`}
-              src={diapositiva.src}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 h-full w-full object-cover opacity-30"
-            />
-
-            {/* Gradiente oscuro sobre la imagen para que el texto contraste */}
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 bg-gradient-to-r from-[#04213f]/90 via-[#04213f]/60 to-transparent"
-            />
-
-            {/* Layout tipo banner: 2 columnas en desktop, 1 columna apilada en mobile */}
-            <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-full w-full">
-              <div
-                className={`grid h-full items-center gap-6 lg:gap-10 ${
-                  mostrarImagen ? "lg:grid-cols-[45%_55%]" : "grid-cols-1"
-                }`}
-              >
-                {/* Columna Izquierda: Imagen tipo máscara con borde celeste marino */}
-                <div
-                  className="relative flex items-center justify-center lg:pr-4"
-                >
-                  <div className="relative z-10 flex h-full w-full flex-col items-center justify-center">
-                    <div
-                      className={`relative h-[340px] sm:h-[420px] lg:h-[560px] w-full max-w-md sm:max-w-lg lg:max-w-xl rounded-[3rem] overflow-hidden border-4 border-[#00AEEF]/60 bg-[#04213f] shadow-[0_0_40px_rgba(0,174,239,0.35)]`}
-                    >
-                      <img
-                        key={diapositiva.id}
-                        src={diapositiva.src}
-                        alt={diapositiva.titulo}
-                        className="h-full w-full object-cover object-center"
-                        loading={indice === 0 ? "eager" : "lazy"}
-                      />
-                    </div>
-                    <div className="mt-4 flex items-center gap-2 text-cyan-300/90 text-xs font-semibold uppercase tracking-wider">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#00AEEF]" aria-hidden="true" />
-                      IESTP Pública “Suiza” · Pucallpa
-                    </div>
-                  </div>
-                </div>
-
-                {/* Columna Derecha: Fondo oscuro con títulos y botones de acción */}
-                <div className="flex flex-col justify-center lg:pl-8 text-white">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/40 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100 mb-2">
-                    <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#F9E000]" />
-                    IESTP Suiza · Gestión Documental
-                  </span>
-                  <h1 className="text-3xl font-black leading-tight tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl">
-                    {diapositiva.titulo}
-                  </h1>
-                  <p className="mt-3 max-w-lg text-base leading-relaxed text-blue-100/90 sm:text-lg lg:text-xl">
-                    {diapositiva.descripcion}
-                  </p>
-
-                  <div className="mt-5 flex flex-wrap items-center gap-3">
-                    <Link
-                      to="/tramite"
-                      className="inline-flex items-center gap-2.5 rounded-lg bg-[#00AEEF] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#00AEEF]/30 transition hover:bg-[#0072CE] sm:px-6 sm:py-3.5 sm:text-base"
-                    >
-                      Iniciar un trámite
-                      <ArrowRight aria-hidden="true" className="h-5 w-5" />
-                    </Link>
-                    <Link
-                      to="/consulta"
-                      className="inline-flex items-center gap-2.5 rounded-lg border border-white/30 bg-white/5 px-5 py-3 text-sm font-bold text-white transition hover:border-white/60 hover:bg-white/10 sm:px-6 sm:py-3.5 sm:text-base"
-                    >
-                      Consultar con CUT
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Indicadores de diapositiva */}
-            <div
-              className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-30 pointer-events-auto"
-            >
-              {DIAPOSITIVAS_PORTADA.map((item, posicion) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setIndice(posicion)}
-                  aria-label={`Ir a la diapositiva ${posicion + 1}: ${item.titulo}`}
-                  aria-current={posicion === indice}
-                  className={`h-1.5 rounded-full transition-all ${
-                    posicion === indice ? "w-10 bg-[#F9E000]" : "w-2.5 bg-white/30 hover:bg-white/60"
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* Controles de navegación manual */}
-            <div className="absolute inset-y-0 left-4 right-4 flex justify-between items-center z-30 pointer-events-none">
-              <button
-                type="button"
-                onClick={() => mover(-1)}
-                aria-label="Diapositiva anterior"
-                className="pointer-events-auto grid h-12 w-12 place-items-center rounded-full border border-white/25 bg-black/30 text-white/80 backdrop-blur-md transition hover:border-white/60 hover:text-white"
-              >
-                <ChevronLeft aria-hidden="true" className="h-6 w-6" />
-              </button>
-              <button
-                type="button"
-                onClick={() => mover(1)}
-                aria-label="Diapositiva siguiente"
-                className="pointer-events-auto grid h-12 w-12 place-items-center rounded-full border border-white/25 bg-black/30 text-white/80 backdrop-blur-md transition hover:border-white/60 hover:text-white"
-              >
-                <ChevronRight aria-hidden="true" className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ---------- PORTADA LIMPIA para roles internos (sin imágenes) ---------- */}
-      {!mostrarImagen && (
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-12 pb-8 text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/40 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#F9E000]" />
-            IESTP Suiza · Gestión Documental
+      <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-16 pt-14 sm:px-6 sm:pt-20 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:pb-24">
+        <div className="animate-fade-up">
+          <span className="cyber-chip">
+            <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse-soft" />
+            {esInterno ? "Sesión institucional activa" : "Plataforma documental inteligente"}
           </span>
-          <h1 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl">
-            {diapositiva.titulo}
+
+          <h1 className="mt-6 max-w-2xl text-4xl font-black leading-[1.04] tracking-[-0.045em] text-white sm:text-5xl lg:text-6xl xl:text-7xl">
+            Gestión documentaria
+            <span className="block text-transparent [-webkit-text-stroke:1px_rgba(255,255,255,0.55)]">
+              del futuro.
+            </span>
           </h1>
-          <p className="mt-3 max-w-lg mx-auto text-base leading-relaxed text-blue-100/90 sm:text-lg lg:text-xl">
-            {diapositiva.descripcion}
+
+          <p className="mt-6 max-w-xl text-base leading-relaxed text-zinc-400 sm:text-lg">
+            El SIGD del IESTP Público “Suiza” conecta trámites, expedientes, casillas
+            electrónicas y verificación pública en una sola experiencia. Simple, trazable y
+            diseñada para las personas.
           </p>
-          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              to="/tramite"
-              className="inline-flex items-center gap-2.5 rounded-lg bg-[#E6007E] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#E6007E]/30 transition hover:bg-[#c90070] sm:px-6 sm:py-3.5 sm:text-base"
-            >
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Link to="/tramite" className="btn-cyber group px-6 py-3 text-sm">
               Iniciar un trámite
-              <ArrowRight aria-hidden="true" className="h-5 w-5" />
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
+            <button type="button" onClick={abrirLectorDni} className="btn-ghost-cyber px-6 py-3 text-sm">
+              <Fingerprint className="h-4 w-4" />
+              Escanear DNI digital
+            </button>
             <Link
               to="/consulta"
-              className="inline-flex items-center gap-2.5 rounded-lg border border-white/30 bg-white/5 px-5 py-3 text-sm font-bold text-white transition hover:border-white/60 hover:bg-white/10 sm:px-6 sm:py-3.5 sm:text-base"
+              className="inline-flex items-center gap-2 px-2 py-3 text-sm font-semibold text-zinc-400 transition hover:text-white"
             >
               Consultar con CUT
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div
-            role="group"
-            aria-label="Seleccionar diapositiva"
-            className="mt-8 flex items-center gap-2"
-          >
-            {DIAPOSITIVAS_PORTADA.map((item, posicion) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setIndice(posicion)}
-                aria-label={`Ir a la diapositiva ${posicion + 1}: ${item.titulo}`}
-                aria-current={posicion === indice}
-                className={`h-1.5 rounded-full transition-all ${
-                  posicion === indice ? "w-10 bg-[#F9E000]" : "w-2.5 bg-white/20 hover:bg-white/50"
-                }`}
-              />
+
+          <div className="mt-10 grid max-w-lg grid-cols-3 gap-3">
+            {INDICADORES.map((item) => (
+              <div
+                key={item.rotulo}
+                className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 backdrop-blur-sm"
+              >
+                <p className="font-mono text-xl font-bold text-white sm:text-2xl">{item.valor}</p>
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                  {item.rotulo}
+                </p>
+              </div>
             ))}
           </div>
         </div>
-      )}
+
+        <div className="relative animate-fade-up [animation-delay:150ms]">
+          <div className="pointer-events-none absolute -inset-6 rounded-[2rem] bg-white/[0.04] blur-2xl" />
+          <div className="cyber-panel relative overflow-hidden p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-white/80 animate-pulse-soft" />
+                <span className="h-2 w-2 rounded-full bg-white/25" />
+                <span className="h-2 w-2 rounded-full bg-white/25" />
+                <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+                  sigd · terminal
+                </span>
+              </div>
+              <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-400">
+                <Activity className="h-3 w-3" />
+                en línea
+              </span>
+            </div>
+
+            <div className="relative mt-5 overflow-hidden rounded-2xl border border-white/12 bg-black/50 p-5">
+              <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent animate-scan" />
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-500">
+                    Documento nacional de identidad
+                  </p>
+                  <p className="mt-2 font-mono text-2xl font-bold tracking-[0.18em] text-white">
+                    7 4 5 6 • • • •
+                  </p>
+                </div>
+                <span className="grid h-14 w-14 place-items-center rounded-xl border border-white/15 bg-white/[0.04]">
+                  <Fingerprint className="h-7 w-7 text-white/80" />
+                </span>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+                    Verificación
+                  </p>
+                  <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-white">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    RENIEC · demo
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+                    Estado
+                  </p>
+                  <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-white">
+                    <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse-soft" />
+                    Datos listos
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2 font-mono text-[11px] text-zinc-500">
+                <p className="flex items-center gap-2">
+                  <FileCheck2 className="h-3.5 w-3.5 text-white/60" />
+                  &gt; vinculando identidad al expediente…
+                </p>
+                <p className="flex items-center gap-2">
+                  <Cpu className="h-3.5 w-3.5 text-white/60" />
+                  &gt; caché local cifrada · ok
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-2.5">
+              {CAPACIDADES.map(({ icono: Icono, texto }) => (
+                <div key={texto} className="flex items-center gap-3 text-sm text-zinc-300">
+                  <span className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/[0.04]">
+                    <Icono className="h-4 w-4" />
+                  </span>
+                  {texto}
+                  <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-600">
+                    activo
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-600">
+                Portada institucional
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {DIAPOSITIVAS_PORTADA.map((item, posicion) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setIndice(posicion)}
+                    aria-label={`Ver portada ${posicion + 1}: ${item.titulo}`}
+                    aria-current={posicion === indice}
+                    className={`h-1.5 rounded-full transition-all ${
+                      posicion === indice ? "w-8 bg-white" : "w-3 bg-white/25 hover:bg-white/50"
+                    }`}
+                  />
+                ))}
+              </div>
+              <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                {diapositiva.descripcion}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

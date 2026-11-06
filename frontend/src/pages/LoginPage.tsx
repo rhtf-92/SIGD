@@ -1,197 +1,193 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import SelloInstitucional from "../components/common/SelloInstitucional";
-import { BotonIngresar } from "../components/common/AnimacionesSistema";
+import { type FormEvent, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 
-/** Usuario semilla por rol (coincide con migración 08_usuarios_demo.sql en BD SIGD). */
-export const ROLES_CANONICOS = [
-  { id: "SUPER_ADMIN", label: "SA", usuario: "superadmin", destino: "/administracion", requierePassword: true },
-  { id: "DIRECTOR", label: "Director General", usuario: "director", destino: "/administracion", requierePassword: true },
-  { id: "DOCENTE", label: "Docente", usuario: "docente", destino: "/flujos/titulacion", requierePassword: true },
-  { id: "MESA_PARTES", label: "Mesa de Partes", usuario: "mesa_partes", destino: "/tramite/ventanilla-presencial", requierePassword: true },
-  { id: "ESTUDIANTE", label: "Estudiante", usuario: "estudiante", destino: "/casilla", requierePassword: true },
+interface RolOpcion {
+  id: string;
+  label: string;
+  usuario: string;
+  destino: string;
+  icono: string;
+  description: string;
+}
+
+const ROLES: RolOpcion[] = [
+  {
+    id: "SUPER_ADMIN",
+    label: "Administrador",
+    usuario: "admin",
+    destino: "/administracion",
+    icono: "⚙️",
+    description: "Gestión total del sistema",
+  },
+  {
+    id: "DIRECTOR",
+    label: "Director General",
+    usuario: "director",
+    destino: "/administracion",
+    icono: "👔",
+    description: "Resoluciones y firma",
+  },
+  {
+    id: "DOCENTE",
+    label: "Docente",
+    usuario: "docente",
+    destino: "/flujos/titulacion",
+    icono: "📘",
+    description: "Evaluación académica",
+  },
+  {
+    id: "MESA_PARTES",
+    label: "Mesa de Partes",
+    usuario: "mesa_partes",
+    destino: "/tramite/ventanilla-presencial",
+    icono: "🗂️",
+    description: "Radicación y seguimiento",
+  },
+  {
+    id: "ESTUDIANTE",
+    label: "Estudiante",
+    usuario: "estudiante",
+    destino: "/casilla",
+    icono: "🎓",
+    description: "Casilla y trámites",
+  },
 ];
+
+const DESTINOS_POR_ROL: Record<string, string> = {
+  SUPER_ADMIN: "/administracion",
+  DIRECTOR: "/administracion",
+  DOCENTE: "/flujos/titulacion",
+  MESA_PARTES: "/tramite/ventanilla-presencial",
+  ESTUDIANTE: "/casilla",
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const loginStore = useAuthStore((s) => s.login);
-  const [identificador, setIdentificador] = useState("");
-  const rol = (() => {
-    const id = identificador.trim().toLowerCase();
-    if (id.includes("superadmin") || id.includes("admin")) return "SUPER_ADMIN";
-    if (id.includes("director")) return "DIRECTOR";
-    if (id.includes("docente")) return "DOCENTE";
-    if (id.includes("mesa")) return "MESA_PARTES";
-    return "ESTUDIANTE";
-  })();
-  const [password, setPassword] = useState("");
-  const [mostrar, setMostrar] = useState(false);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [rolSeleccionado, setRolSeleccionado] = useState<string | null>(null);
+  const [identificador, setIdentificador] = useState("");
+  const [password, setPassword] = useState("");
 
-  const rolActual = ROLES_CANONICOS.find((r) => r.id === rol) ?? ROLES_CANONICOS.find((r) => r.id === "ESTUDIANTE") ?? ROLES_CANONICOS[0];
-  const pidePassword = rolActual.requierePassword;
-
-  async function iniciarSesion(event?: React.FormEvent) {
-    event?.preventDefault();
+  async function iniciarSesion(usuario: string, clave: string, destino?: string) {
     setError("");
-
-    if (!identificador.trim()) {
-      setError("Por favor, ingrese su usuario, DNI o correo.");
-      return;
-    }
-
-    if (pidePassword && !password.trim()) {
-      setError("Por favor, ingrese su contraseña.");
-      return;
-    }
-
     setCargando(true);
-
     try {
-      await loginStore({ identificador, password });
-      const rolSesion = useAuthStore.getState().usuario?.rol ?? rol;
-      const destino =
-        ROLES_CANONICOS.find((r) => r.id === rolSesion)?.destino ?? rolActual.destino;
-      navigate(destino, { replace: true });
+      await loginStore({ identificador: usuario.trim(), password: clave });
+      const rol = useAuthStore.getState().usuario?.rol;
+      navigate(destino ?? (rol ? DESTINOS_POR_ROL[rol] : "/administracion") ?? "/administracion", {
+        replace: true,
+      });
     } catch {
-      setError(
-        "No se pudo iniciar sesión. Verifique sus credenciales y que el servidor SIGD esté disponible.",
-      );
+      setError("No se pudo iniciar sesión. Verifica tus credenciales e intenta nuevamente.");
     } finally {
       setCargando(false);
+      setRolSeleccionado(null);
     }
   }
 
+  async function seleccionarRol(rol: RolOpcion) {
+    setRolSeleccionado(rol.id);
+    await iniciarSesion(rol.usuario, "123", rol.destino);
+  }
+
+  async function enviarManual(e: FormEvent) {
+    e.preventDefault();
+    if (!identificador.trim() || !password) return;
+    await iniciarSesion(identificador, password);
+  }
+
   return (
-    <main className="lienzo-oficio flex min-h-screen items-center justify-center px-4 py-10 text-vault-tinta">
-      <section className="w-full max-w-md overflow-hidden rounded-xl border border-vault-papel-3 bg-white shadow-[var(--shadow-ficha)]">
-        {/* Identidad institucional */}
-        <header className="flex items-center gap-3 border-b border-vault-papel-2 bg-vault-papel px-7 py-6">
-          <span className="shrink-0 text-vault-azul">
-            <SelloInstitucional className="h-11 w-11" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-vault-azul-tinta">
-              IESTP Público “Suiza” · Pucallpa
-            </p>
-            <p className="mt-1 text-[13px] font-semibold leading-snug text-vault-tinta">
-              Sistema Integral de Gestión Documentaria
-            </p>
+    <main className="sigd-fade-in min-h-screen flex items-center justify-center p-4 bg-transparent">
+      <div className="w-full max-w-4xl">
+        <div className="text-center mb-8 sigd-fade-in" style={{ animationDelay: "40ms" }}>
+          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center border border-cyan-400/40 bg-[rgba(15,23,42,0.55)] shadow-[0_0_15px_rgba(6,182,212,0.15)] backdrop-blur-[12px]">
+            <span className="text-4xl" aria-hidden="true">🏛️</span>
           </div>
-        </header>
+          <h1 className="text-4xl font-semibold text-slate-100 tracking-tight">SIGD</h1>
+          <p className="text-cyan-300 mt-1.5 text-lg">Sistema Integral de Gestión Documentaria</p>
+          <p className="text-slate-400 text-sm mt-1">IESTP Público &quot;Suiza&quot; · Pucallpa · Ucayali</p>
+        </div>
 
-        <div className="px-7 py-6">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 rounded-md border border-vault-papel-3 bg-white px-3 py-1.5 text-xs font-semibold text-tinta-600 transition hover:bg-vault-papel hover:text-vault-tinta"
-          >
-            ← Volver al inicio
-          </Link>
+        <div
+          className="sigd-fade-in rounded-2xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] shadow-[0_0_15px_rgba(6,182,212,0.15)] backdrop-blur-[12px] p-6 md:p-8 transition-all duration-300 ease-out"
+          style={{ animationDelay: "80ms" }}
+        >
+          <h2 className="text-xl font-semibold text-slate-100 text-center mb-1">Acceso al sistema</h2>
+          <p className="text-slate-300 text-center text-sm mb-6">Selecciona tu rol o ingresa tus credenciales.</p>
 
-          <h1 className="mt-5 text-xl font-extrabold tracking-tight text-vault-tinta">
-            Iniciar sesión
-          </h1>
-          <p className="mt-1.5 text-[13px] leading-5 text-tinta-500">
-            Sesiones validadas contra{" "}
-            <span className="font-mono text-[12px]">sigd_auth.cuenta_usuario</span>.
-            Cada usuario sólo verá sus módulos correspondientes.
-          </p>
+          {error && (
+            <div className="mb-5 p-3 rounded-xl border border-red-500/30 bg-red-950/30 text-red-200 text-sm text-center sigd-fade-in">{error}</div>
+          )}
 
-          <form onSubmit={iniciarSesion} className="mt-6 space-y-4">
-            <div>
-              <label
-                htmlFor="identificador"
-                className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-tinta-500"
-              >
-                Usuario / DNI / Correo
-              </label>
+          <form onSubmit={enviarManual} className="mb-7 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+            <label className="block">
+              <span className="block text-xs font-medium text-slate-300 mb-1">Usuario</span>
               <input
-                id="identificador"
-                type="text"
                 value={identificador}
                 onChange={(e) => setIdentificador(e.target.value)}
-                placeholder="Ingrese su usuario, DNI o correo"
                 autoComplete="username"
-                className="input-sigd"
-                required
+                className="w-full rounded-xl border border-cyan-400/40 bg-slate-950/35 px-3 py-2.5 text-slate-100 placeholder:text-slate-500 transition-all duration-300 ease-out hover:brightness-110 hover:border-cyan-300/60 focus:outline-none focus:border-cyan-300/70 focus:shadow-[0_0_12px_rgba(6,182,212,0.18)]"
+                placeholder="admin, director, docente..."
               />
-            </div>
-
-            {pidePassword ? (
-              <div>
-                <label
-                  htmlFor="password"
-                  className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-tinta-500"
-                >
-                  Contraseña institucional
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={mostrar ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Ingrese su contraseña"
-                    autoComplete="current-password"
-                    className="input-sigd pr-24"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setMostrar((v) => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[11px] font-bold text-tinta-500 transition hover:text-vault-azul-tinta"
-                  >
-                    {mostrar ? "Ocultar" : "Ver"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-estado-ok/25 bg-estado-ok-lavado px-3 py-2.5 text-xs font-medium text-estado-ok">
-                Acceso de estudiante: ingreso inmediato a Mesa Virtual, Casilla,
-                Consulta y Validador.
-              </div>
-            )}
-
-            {error && (
-              <p
-                role="alert"
-                className="rounded-lg border border-estado-error/25 bg-estado-error-lavado px-3 py-2 text-xs font-semibold text-estado-error"
-              >
-                {error}
-              </p>
-            )}
-
-            <div className="flex items-center justify-between text-xs">
-              <Link
-                to="/recuperar-password"
-                className="font-semibold text-vault-azul-tinta hover:underline"
-              >
-                ¿Olvidaste tu contraseña?
-              </Link>
-              <Link
-                to="/registro"
-                className="font-semibold text-vault-azul-tinta hover:underline"
-              >
-                Crear cuenta
-              </Link>
-            </div>
-
-            <BotonIngresar
-              cargando={cargando}
-              disabled={cargando}
-              onClick={() => {}}
+            </label>
+            <label className="block">
+              <span className="block text-xs font-medium text-slate-300 mb-1">Contraseña</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                className="w-full rounded-xl border border-cyan-400/40 bg-slate-950/35 px-3 py-2.5 text-slate-100 placeholder:text-slate-500 transition-all duration-300 ease-out hover:brightness-110 hover:border-cyan-300/60 focus:outline-none focus:border-cyan-300/70 focus:shadow-[0_0_12px_rgba(6,182,212,0.18)]"
+                placeholder="••••••••"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={cargando || !identificador.trim() || !password}
+              className="rounded-xl border border-cyan-400/40 bg-cyan-500/15 px-5 py-2.5 text-sm font-medium text-cyan-50 shadow-[0_0_15px_rgba(6,182,212,0.12)] transition-all duration-300 ease-out hover:-translate-y-[1px] hover:brightness-125 hover:border-cyan-300/60 hover:shadow-[0_0_20px_rgba(6,182,212,0.22)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
-              {cargando ? "Verificando en BD SIGD…" : "Ingresar al sistema"}
-            </BotonIngresar>
+              Ingresar
+            </button>
           </form>
 
-          <p className="mt-4 border-t border-vault-papel-2 pt-3 text-center text-[10px] font-medium uppercase tracking-[0.1em] text-tinta-400">
-            Ley N.º 27444 · TUO · Ley N.º 27269
-          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {ROLES.map((rol) => (
+              <button
+                key={rol.id}
+                type="button"
+                onClick={() => seleccionarRol(rol)}
+                disabled={cargando}
+                className="group text-left rounded-xl p-4 border border-cyan-400/40 bg-[rgba(15,23,42,0.55)] shadow-[0_0_15px_rgba(6,182,212,0.10)] backdrop-blur-[12px] transition-all duration-300 ease-out hover:-translate-y-[2px] hover:brightness-110 hover:border-cyan-300/60 hover:shadow-[0_0_20px_rgba(6,182,212,0.20)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-xl leading-none" aria-hidden="true">{rol.icono}</span>
+                  <div className="min-w-0">
+                    <h3 className="font-medium text-slate-100 text-sm leading-snug">{rol.label}</h3>
+                    <p className="text-[11px] text-cyan-300/80 mt-0.5">@{rol.usuario}</p>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-snug">{rol.description}</p>
+                  </div>
+                </div>
+                {rolSeleccionado === rol.id && (
+                  <div className="mt-3 h-0.5 w-full overflow-hidden rounded-full bg-slate-800/80">
+                    <div className="h-full w-1/2 rounded-full bg-cyan-400/80 sigd-fade-in" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-7 flex items-center justify-center gap-5 text-sm">
+            <button type="button" onClick={() => navigate("/")} className="text-slate-400 hover:text-cyan-300 transition-all duration-300 ease-out">Volver al inicio</button>
+            <span className="text-slate-700">|</span>
+            <button type="button" onClick={() => navigate("/registro")} className="text-slate-400 hover:text-cyan-300 transition-all duration-300 ease-out">Crear cuenta</button>
+          </div>
+
+          <p className="mt-6 text-center text-[11px] text-slate-500 border-t border-cyan-400/15 pt-4">Ley N.º 27444 · TUO · Ley N.º 27269 · SIGD v2.0</p>
         </div>
-      </section>
+      </div>
     </main>
   );
 }

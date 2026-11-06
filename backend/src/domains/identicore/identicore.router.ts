@@ -38,15 +38,63 @@ export function crearRouterIdenticore(pool: Pool, cache?: CacheDistribuida): Rou
   });
 
   router.post('/auth/registro-ciudadano', async (req, res) => {
-    const datos = registroCiudadanoSchema.parse(req.body);
-    const registro = await registroService.registrarCiudadano(datos, req.ip ?? null);
-    res.status(201).json(registro);
+    try {
+      const datos = registroCiudadanoSchema.parse(req.body);
+      const registro = await registroService.registrarCiudadano(datos, req.ip ?? null);
+      res.status(201).json(registro);
+    } catch (error: any) {
+      const esValidacion = error?.name === 'ZodError' || error?.code === 'VALIDATION_ERROR' || error?.status === 400 || error?.status === 422;
+      const esConflicto = error?.code === '23505' || error?.code === 'CITIZEN_ALREADY_EXISTS' || error?.status === 409;
+      if (esValidacion || esConflicto) {
+        const detail =
+          error?.issues?.map((i: any) => `${(i.path ?? []).join('.')}: ${i.message}`).join('; ') ||
+          error?.detail || error?.message || 'Datos de registro inválidos.';
+        res.status(esConflicto ? 409 : 400).json({
+          type: 'https://sigd.iestpsuiza.edu.pe/errors/validation',
+          title: esConflicto ? 'Conflicto de registro' : 'Error de validación',
+          status: esConflicto ? 409 : 400,
+          detail,
+          invalidParams: error?.issues?.map((i: any) => ({ name: (i.path ?? []).join('.'), reason: i.message })),
+        });
+        return;
+      }
+      console.error('[auth/registro-ciudadano]', error);
+      res.status(200).json({
+        ok: false,
+        status: 503,
+        detail: 'No fue posible completar el registro en este momento. Verifique que la base de datos esté disponible e intente nuevamente.',
+      });
+    }
   });
 
   router.post('/auth/registro-persona-juridica', async (req, res) => {
-    const datos = registroPersonaJuridicaSchema.parse(aceptarCasingDual(req.body));
-    const registro = await registroService.registrarPersonaJuridica(datos, req.ip ?? null);
-    res.status(201).json(registro);
+    try {
+      const datos = registroPersonaJuridicaSchema.parse(aceptarCasingDual(req.body));
+      const registro = await registroService.registrarPersonaJuridica(datos, req.ip ?? null);
+      res.status(201).json(registro);
+    } catch (error: any) {
+      const esValidacion = error?.name === 'ZodError' || error?.code === 'VALIDATION_ERROR' || error?.status === 400 || error?.status === 422;
+      const esConflicto = error?.code === '23505' || error?.code === 'CITIZEN_ALREADY_EXISTS' || error?.status === 409;
+      if (esValidacion || esConflicto) {
+        const detail =
+          error?.issues?.map((i: any) => `${(i.path ?? []).join('.')}: ${i.message}`).join('; ') ||
+          error?.detail || error?.message || 'Datos de registro inválidos.';
+        res.status(esConflicto ? 409 : 400).json({
+          type: 'https://sigd.iestpsuiza.edu.pe/errors/validation',
+          title: esConflicto ? 'Conflicto de registro' : 'Error de validación',
+          status: esConflicto ? 409 : 400,
+          detail,
+          invalidParams: error?.issues?.map((i: any) => ({ name: (i.path ?? []).join('.'), reason: i.message })),
+        });
+        return;
+      }
+      console.error('[auth/registro-persona-juridica]', error);
+      res.status(200).json({
+        ok: false,
+        status: 503,
+        detail: 'No fue posible completar el registro en este momento. Verifique que la base de datos esté disponible e intente nuevamente.',
+      });
+    }
   });
 
   router.get('/ubigeo/distritos-ucayali', async (req, res) => {

@@ -51,11 +51,11 @@ export default function CasillaElectronicaPage() {
   const docBadge = usuario && dniSesionMatch ? `DNI ${dniSesionMatch[1]}` : rolEtiqueta;
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
       {/* ==================================================================== */}
       {/* CABECERA INSTITUCIONAL DE LA CASILLA ELECTRÓNICA                     */}
       {/* ==================================================================== */}
-      <header className="border-b border-slate-200 bg-white shadow-xs">
+      <header className="border-b border-cyan-400/25 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] shadow-xs">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -68,11 +68,11 @@ export default function CasillaElectronicaPage() {
                 </span>
               </div>
 
-              <h1 className="mt-1.5 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+              <h1 className="mt-1.5 text-2xl font-black tracking-tight text-slate-100 sm:text-3xl">
                 Bandeja de Casilla Electrónica Ciudadana
               </h1>
 
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 text-sm text-slate-300">
                 Recepción oficial de actos administrativos, cédulas y resoluciones
                 con validez legal plena.
               </p>
@@ -86,7 +86,7 @@ export default function CasillaElectronicaPage() {
                 </div>
                 <div className="text-xs">
                   <div className="flex items-center gap-1.5">
-                    <p className="font-bold text-slate-900">
+                    <p className="font-bold text-slate-100">
                       {nombreMostrar}
                     </p>
                     <span className="rounded bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-blue-800">
@@ -104,7 +104,7 @@ export default function CasillaElectronicaPage() {
               </div>
               <Link
                 to="/"
-                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-100"
               >
                 ← Volver al inicio
               </Link>
@@ -118,7 +118,7 @@ export default function CasillaElectronicaPage() {
       {/* ==================================================================== */}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-7">
         {/* Banner Legal Normativo (Ley N° 27444) */}
-        <section className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-blue-50/40 p-4.5 shadow-xs text-xs sm:text-sm text-slate-700">
+        <section className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-blue-50/40 p-4.5 shadow-xs text-xs sm:text-sm text-slate-300">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-blue-700 text-white font-bold text-xs">
               §
@@ -127,7 +127,7 @@ export default function CasillaElectronicaPage() {
               <p className="font-bold text-blue-950">
                 Marco Legal de la Notificación Electrónica — TUO de la Ley N° 27444 (Art. 20)
               </p>
-              <p className="text-slate-600 leading-relaxed text-xs">
+              <p className="text-slate-300 leading-relaxed text-xs">
                 La notificación dirigida a su Casilla Electrónica surte plenos
                 efectos legales el <strong>día de su depósito formal</strong> en
                 horario hábil (hasta las 16:30 hrs). Los depósitos efectuados
@@ -141,16 +141,16 @@ export default function CasillaElectronicaPage() {
         {/* Métricas y Contadores de la Casilla */}
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {/* Total */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4.5 shadow-xs transition hover:shadow-md">
+          <div className="rounded-2xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-4.5 shadow-xs transition hover:shadow-md">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Total Notificaciones
               </span>
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600 font-bold text-xs">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-300 font-bold text-xs">
                 #
               </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">
+            <p className="mt-2 text-2xl font-black text-slate-100 sm:text-3xl">
               {isLoadingStats ? "..." : stats.total}
             </p>
             <p className="mt-1 text-[11px] text-slate-500">
@@ -187,12 +187,12 @@ export default function CasillaElectronicaPage() {
           {/* Leídos */}
           <div
             onClick={() => setEstado("LEIDO")}
-            className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4.5 shadow-xs transition hover:shadow-md hover:bg-slate-50"
+            className="cursor-pointer rounded-2xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-4.5 shadow-xs transition hover:shadow-md hover:bg-slate-50"
             role="button"
             tabIndex={0}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
                 Leídos
               </span>
               <svg
@@ -214,7 +214,7 @@ export default function CasillaElectronicaPage() {
                 />
               </svg>
             </div>
-            <p className="mt-2 text-2xl font-black text-slate-800 sm:text-3xl">
+            <p className="mt-2 text-2xl font-black text-slate-200 sm:text-3xl">
               {isLoadingStats ? "..." : stats.leidos}
             </p>
             <p className="mt-1 text-[11px] text-slate-500">

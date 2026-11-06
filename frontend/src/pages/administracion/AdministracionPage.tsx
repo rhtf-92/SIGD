@@ -88,7 +88,7 @@ export default function AdministracionPage() {
   const navigate = useNavigate();
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 text-slate-900">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
       <AdminPageHeader
         title="Panel de Administración"
         description="Administración, Seguridad y Auditoría: configuración y control administrativo del sistema."
@@ -99,9 +99,9 @@ export default function AdministracionPage() {
           {modulos.map((modulo) => (
             <article
               key={modulo.titulo}
-              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl motion-reduce:transition-none"
+              className="group relative overflow-hidden rounded-2xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-6 shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:border-cyan-400/40 hover:shadow-xl motion-reduce:transition-none"
             >
-              <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-blue-50 opacity-60 transition-transform duration-300 group-hover:scale-110" />
+              <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-cyan-500/10 opacity-40" />
 
               <div className="relative flex items-center gap-4">
                 <span
@@ -122,12 +122,12 @@ export default function AdministracionPage() {
                     {modulo.icono}
                   </svg>
                 </span>
-                <h3 className="text-lg font-bold text-slate-900">
+                <h3 className="text-lg font-bold text-slate-100">
                   {modulo.titulo}
                 </h3>
               </div>
 
-              <p className="relative mt-3 min-h-12 text-sm leading-6 text-slate-600">
+              <p className="relative mt-3 min-h-12 text-sm leading-6 text-slate-300">
                 {modulo.descripcion}
               </p>
 
@@ -135,7 +135,7 @@ export default function AdministracionPage() {
                 type="button"
                 onClick={() => navigate(modulo.ruta)}
                 aria-label={`Administrar ${modulo.titulo}`}
-                className="relative mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 motion-reduce:transition-none"
+                className="relative mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600/90 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-125 transition-all duration-300 ease-out"
               >
                 Administrar
                 <svg

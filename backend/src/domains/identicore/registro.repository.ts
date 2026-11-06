@@ -20,13 +20,12 @@ export class RegistroRepository {
     try {
       await cliente.query('BEGIN');
       transaccionAbierta = true;
-      const tipoDocumentoId = await this.buscarTipoDocumento(cliente, datos.tipoDocumento);
-      await this.verificarDuplicados(cliente, tipoDocumentoId, datos);
+      await this.verificarDuplicados(cliente, datos);
 
-      const personaId = await insertarPersona(cliente, tipoDocumentoId, datos);
+      const personaId = await insertarPersona(cliente, datos);
       await insertarExtensionPersona(cliente, personaId, datos);
       const usuarioId = await this.insertarCuenta(cliente, personaId, datos, passwordHash);
-      await this.insertarConsentimiento(cliente, usuarioId, datos);
+      await this.insertarConsentimiento(cliente, personaId, datos, datos.ipAddress);
 
       await cliente.query('COMMIT');
       transaccionAbierta = false;
@@ -45,37 +44,19 @@ export class RegistroRepository {
     }
   }
 
-  private async buscarTipoDocumento(cliente: PoolClient, codigo: 'DNI' | 'RUC'): Promise<string> {
-    const resultado = await cliente.query<IdResult>(
-      `SELECT id::text AS id FROM sigd_auth.tipos_documento
-        WHERE codigo = $1 AND estado = TRUE`,
-      [codigo],
-    );
-    const id = resultado.rows[0]?.id;
-    if (!id) {
-      throw new AppError({
-        status: 500,
-        code: 'DOCUMENT_TYPE_NOT_CONFIGURED',
-        message: `No está configurado el tipo de documento ${codigo}.`,
-      });
-    }
-    return id;
-  }
-
   private async verificarDuplicados(
     cliente: PoolClient,
-    tipoDocumentoId: string,
     datos: DatosRegistro,
   ): Promise<void> {
     const resultado = await cliente.query<ExisteResult>(
       `SELECT EXISTS (
            SELECT 1 FROM sigd_auth.persona
-            WHERE tipo_documento_id = $1 AND numero_documento = $2
+            WHERE id_documento = $1
        ) OR EXISTS (
            SELECT 1 FROM sigd_auth.cuenta_usuario
-            WHERE lower(email_login) = lower($3) OR username = $4
+            WHERE lower(correo) = lower($2) OR usuario = $3
        ) AS existe`,
-      [tipoDocumentoId, datos.numeroDocumento, datos.correo, datos.numeroDocumento],
+      [datos.numeroDocumento, datos.correo, datos.numeroDocumento],
     );
     if (resultado.rows[0]?.existe) {
       throw new ConflictError({
@@ -92,8 +73,8 @@ export class RegistroRepository {
     passwordHash: string,
   ): Promise<string> {
     const resultado = await cliente.query<IdResult>(
-      `INSERT INTO sigd_auth.cuenta_usuario (persona_id, username, email_login, password_hash)
-       VALUES ($1, $2, $3, $4) RETURNING id::text AS id`,
+      `INSERT INTO sigd_auth.cuenta_usuario (id_persona, usuario, correo, password_hash)
+       VALUES ($1, $2, $3, $4) RETURNING id_usuario::text AS id`,
       [personaId, datos.numeroDocumento, datos.correo, passwordHash],
     );
     const id = resultado.rows[0]?.id;
@@ -103,15 +84,22 @@ export class RegistroRepository {
 
   private async insertarConsentimiento(
     cliente: PoolClient,
-    usuarioId: string,
+    personaId: string,
     datos: DatosRegistro,
+    ipAddress: string | null,
   ): Promise<void> {
     await cliente.query(
       `INSERT INTO sigd_auth.consentimiento_datos
-         (usuario_id, ip_address, version_termsoservicio,
-          aceptacion_notificaciones, consentimiento_obfuscacion)
-       VALUES ($1, $2, 'v1.0', $3, TRUE)`,
-      [usuarioId, datos.ipAddress, datos.aceptaNotificaciones],
+         (id_persona, finalidade, version_politica, aceptado, fecha_aceptacion, ip_origen)
+       VALUES ($1, $2, 'v1.0', $3, now(), $4::inet)`,
+      [
+        personaId,
+        datos.aceptaNotificaciones
+          ? 'GESTION_DE_TRAMITES_Y_NOTIFICACIONES'
+          : 'GESTION_DE_TRAMITES',
+        datos.aceptaNotificaciones,
+        ipAddress,
+      ],
     );
   }
 }

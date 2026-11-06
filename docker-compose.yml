@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: postgres_password
       POSTGRES_DB: sigd_prueba
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
@@ -69,6 +69,8 @@ services:
       S3_BUCKET: sigd-expedientes
       REDIS_URL: redis://redis:6379
       OUTBOX_POLL_INTERVAL_MS: 5000
+      # El binario nativo de argon2 no es compatible con musl/Alpine.
+      ARGON2_DISABLE_NATIVE: "true"
     ports:
       - "3000:3000"
     depends_on:

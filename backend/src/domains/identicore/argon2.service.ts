@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 
 export interface Argon2Options {
   type?: number;
@@ -26,9 +27,31 @@ const HEX_REGEX = /^[0-9a-fA-F]+$/;
 
 let argon2ModuleCache: Argon2NativeModule | null | undefined = undefined;
 
+/**
+ * El binario nativo de Argon2 no es compatible con la libc musl de Alpine
+ * (node:20-alpine): cargarlo aborta el proceso con SIGSEGV (exit 139).
+ * En Alpine se usa siempre el fallback scrypt salvo que se fuerce lo contrario
+ * con ARGON2_DISABLE_NATIVE=false. ARGON2_DISABLE_NATIVE=true lo desactiva en
+ * cualquier plataforma.
+ */
+function nativoDeshabilitado(): boolean {
+  const configuracion = process.env.ARGON2_DISABLE_NATIVE?.trim().toLowerCase();
+  if (configuracion === 'true') return true;
+  if (configuracion === 'false') return false;
+  try {
+    return process.platform === 'linux' && fs.existsSync('/etc/alpine-release');
+  } catch {
+    return false;
+  }
+}
+
 async function getArgon2Module(): Promise<Argon2NativeModule | null> {
   if (argon2ModuleCache !== undefined) {
     return argon2ModuleCache;
+  }
+  if (nativoDeshabilitado()) {
+    argon2ModuleCache = null;
+    return null;
   }
   try {
     const mod = await import('argon2');

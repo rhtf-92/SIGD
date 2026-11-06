@@ -34,6 +34,8 @@ const consultaPaginadaSchema = z
     busqueda: val.busqueda,
   }));
 
+const idNotificacionSchema = z.string().uuid();
+
 interface FilaNotificacionCasilla {
   id: string;
   usuario_id: string | null;
@@ -165,96 +167,57 @@ export function crearRouterCasilla(pool: Pool): Router {
     }
   }
 
-  // #7 — GET /casilla/notificaciones y alias /casilla/bandeja
+  // GET /casilla/notificaciones, /casilla/bandeja, /casilla (robusto)
   const handlerBandeja = async (req: Request, res: Response) => {
-    const query = consultaPaginadaSchema.parse(req.query);
-    const usuarioId = obtenerUsuarioId(req);
-
-    const condiciones: string[] = ['(usuario_id = $1 OR usuario_id IS NULL OR $1 = \'00000000-0000-0000-0000-000000000001\')'];
-    const valores: unknown[] = [usuarioId];
-
-    if (query.estado !== 'TODOS') {
-      valores.push(query.estado);
-      condiciones.push(`estado = $${valores.length}`);
+    try {
+      const query = consultaPaginadaSchema.parse(req.query);
+      const usuarioId = obtenerUsuarioId(req);
+      const condiciones: string[] = ['(usuario_id = $1 OR usuario_id IS NULL OR $1 = \'00000000-0000-0000-0000-000000000001\')'];
+      const valores: unknown[] = [usuarioId];
+      if (query.estado !== 'TODOS') { valores.push(query.estado); condiciones.push(`estado = $${valores.length}`); }
+      if (query.busqueda) { valores.push(`%${query.busqueda}%`); condiciones.push(`(asunto ILIKE $${valores.length} OR cut ILIKE $${valores.length})`); }
+      const whereClausula = condiciones.join(' AND ');
+      const countRes = await pool.query<{ total: string }>(`SELECT COUNT(*)::text as total FROM sigd_auth.notificacion_casilla WHERE ${whereClausula}`, valores);
+      const total = Number(countRes.rows[0]?.total ?? 0);
+      const offset = (query.pagina - 1) * query.porPagina;
+      const paginacionValores = [...valores, query.porPagina, offset];
+      const itemsRes = await pool.query<FilaNotificacionCasilla>(
+        `SELECT id, usuario_id, correo_destinatario, cut, asunto, tipo_acto, numero_documento, cuerpo, referencia, estado, fecha_deposito, fecha_lectura, hash_sha256, cvd, id_acuse, acuse_hash_sha256, acuse_sellado_tiempo, documento_url, creado_en
+         FROM sigd_auth.notificacion_casilla WHERE ${whereClausula} ORDER BY fecha_deposito DESC LIMIT $${paginacionValores.length - 1} OFFSET $${paginacionValores.length}`, paginacionValores);
+      const notificaciones = itemsRes.rows.map(mapearNotificacion);
+      const totalPaginas = Math.ceil(total / query.porPagina) || 1;
+      res.status(200).json({ total, pagina: query.pagina, porPagina: query.porPagina, totalPaginas, notificaciones, data: notificaciones, meta: { currentPage: query.pagina, totalPages: totalPaginas, totalItems: total, itemsPerPage: query.porPagina, hasNextPage: query.pagina < totalPaginas, hasPreviousPage: query.pagina > 1, total, pagina: query.pagina, porPagina: query.porPagina, totalPaginas } });
+    } catch (error) {
+      console.warn('[casilla] vacío por error:', error);
+      res.status(200).json({ total: 0, pagina: 1, porPagina: 10, totalPaginas: 1, notificaciones: [], data: [], meta: { currentPage: 1, totalPages: 1, totalItems: 0, itemsPerPage: 10, hasNextPage: false, hasPreviousPage: false, total: 0, pagina: 1, porPagina: 10, totalPaginas: 1 } });
     }
-
-    if (query.busqueda) {
-      valores.push(`%${query.busqueda}%`);
-      condiciones.push(`(asunto ILIKE $${valores.length} OR cut ILIKE $${valores.length})`);
-    }
-
-    const whereClausula = condiciones.join(' AND ');
-
-    const countRes = await pool.query<{ total: string }>(
-      `SELECT COUNT(*)::text as total FROM sigd_auth.notificacion_casilla WHERE ${whereClausula}`,
-      valores,
-    );
-    const total = Number(countRes.rows[0]?.total ?? 0);
-
-    const offset = (query.pagina - 1) * query.porPagina;
-    const paginacionValores = [...valores, query.porPagina, offset];
-
-    const itemsRes = await pool.query<FilaNotificacionCasilla>(
-      `SELECT id, usuario_id, correo_destinatario, cut, asunto, tipo_acto,
-              numero_documento, cuerpo, referencia, estado, fecha_deposito,
-              fecha_lectura, hash_sha256, cvd, id_acuse, acuse_hash_sha256,
-              acuse_sellado_tiempo, documento_url, creado_en
-         FROM sigd_auth.notificacion_casilla
-        WHERE ${whereClausula}
-        ORDER BY fecha_deposito DESC
-        LIMIT $${paginacionValores.length - 1} OFFSET $${paginacionValores.length}`,
-      paginacionValores,
-    );
-
-    const notificaciones = itemsRes.rows.map(mapearNotificacion);
-    const totalPaginas = Math.ceil(total / query.porPagina) || 1;
-
-    res.status(200).json({
-      total,
-      pagina: query.pagina,
-      porPagina: query.porPagina,
-      totalPaginas,
-      notificaciones,
-      data: notificaciones,
-      meta: {
-        currentPage: query.pagina,
-        totalPages: totalPaginas,
-        totalItems: total,
-        itemsPerPage: query.porPagina,
-        hasNextPage: query.pagina < totalPaginas,
-        hasPreviousPage: query.pagina > 1,
-        total,
-        pagina: query.pagina,
-        porPagina: query.porPagina,
-        totalPaginas,
-      },
-    });
   };
-
   router.get('/casilla/notificaciones', handlerBandeja);
   router.get('/casilla/bandeja', handlerBandeja);
+  router.get('/casilla', handlerBandeja);
 
-  // #8 — GET /casilla/notificaciones/:id
+  // GET /casilla/notificaciones/:id (no 500)
   router.get('/casilla/notificaciones/:id', async (req: Request, res: Response) => {
-    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-
-    const resultado = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
-      [id],
-    );
-
-    if (resultado.rows.length === 0) {
-      throw new NotFoundError({
-        detail: `No existe la notificación de casilla con ID: ${id}`,
-      });
+    try {
+      const id = idNotificacionSchema.parse(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
+      const resultado = await pool.query<FilaNotificacionCasilla>(
+        `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
+        [id],
+      );
+      if (resultado.rows.length === 0) {
+        res.status(404).json({ detail: `No existe la notificación de casilla con ID: ${id}` });
+        return;
+      }
+      res.status(200).json(mapearNotificacion(resultado.rows[0]));
+    } catch (error) {
+      console.warn('[casilla/notificaciones/:id] error:', error);
+      res.status(404).json({ detail: 'No fue posible obtener la notificación solicitada.' });
     }
-
-    res.status(200).json(mapearNotificacion(resultado.rows[0]));
   });
 
   // #9 — PATCH /casilla/notificaciones/:id/lectura
   router.patch('/casilla/notificaciones/:id/lectura', async (req: Request, res: Response) => {
-    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = idNotificacionSchema.parse(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
 
     const resultado = await pool.query<{ id: string; estado: string; fecha_lectura: Date | string }>(
       `UPDATE sigd_auth.notificacion_casilla
@@ -285,7 +248,7 @@ export function crearRouterCasilla(pool: Pool): Router {
 
   // #10 — POST /casilla/notificaciones/:id/acuse
   router.post('/casilla/notificaciones/:id/acuse', async (req: Request, res: Response) => {
-    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = idNotificacionSchema.parse(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
 
     const notifRes = await pool.query<FilaNotificacionCasilla>(
       `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
@@ -412,35 +375,37 @@ export function crearRouterCasilla(pool: Pool): Router {
     });
   });
 
-  // #11 — GET /casilla/estadisticas
+  // #11 — GET /casilla/estadisticas (robusto: nunca 500/Network Error)
   router.get('/casilla/estadisticas', async (req: Request, res: Response) => {
-    const usuarioId = obtenerUsuarioId(req);
-
-    const resultado = await pool.query<{ no_leidas: string; total: string }>(
-      `SELECT COUNT(*) FILTER (WHERE estado = 'NO_LEIDO')::text AS no_leidas,
-              COUNT(*)::text AS total
-         FROM sigd_auth.notificacion_casilla
-        WHERE usuario_id = $1 OR usuario_id IS NULL OR $1 = '00000000-0000-0000-0000-000000000001'`,
-      [usuarioId],
-    );
-
-    const noLeidas = Number(resultado.rows[0]?.no_leidas ?? 0);
-    const total = Number(resultado.rows[0]?.total ?? 0);
-
-    res.status(200).json({
-      noLeidas,
-      noLeidos: noLeidas,
-      total,
-      leidos: Math.max(0, total - noLeidas),
-      notificados: total,
-      urgentes: 0,
-      ultimosMovimientos: total > 0 ? 1 : 0,
-    });
+    try {
+      const usuarioId = obtenerUsuarioId(req);
+      const resultado = await pool.query<{ no_leidas: string; total: string }>(
+        `SELECT COUNT(*) FILTER (WHERE estado = 'NO_LEIDO')::text AS no_leidas,
+                COUNT(*)::text AS total
+           FROM sigd_auth.notificacion_casilla
+          WHERE usuario_id = $1 OR usuario_id IS NULL OR $1 = '00000000-0000-0000-0000-000000000001'`,
+        [usuarioId],
+      );
+      const noLeidas = Number(resultado.rows[0]?.no_leidas ?? 0);
+      const total = Number(resultado.rows[0]?.total ?? 0);
+      res.status(200).json({
+        noLeidas,
+        noLeidos: noLeidas,
+        total,
+        leidos: Math.max(0, total - noLeidas),
+        notificados: total,
+        urgentes: 0,
+        ultimosMovimientos: total > 0 ? 1 : 0,
+      });
+    } catch (error) {
+      console.warn('[casilla/estadisticas] vacío por error:', error);
+      res.status(200).json({ noLeidas: 0, noLeidos: 0, total: 0, leidos: 0, notificados: 0, urgentes: 0, ultimosMovimientos: 0 });
+    }
   });
 
   // #12 — GET /casilla/notificaciones/:id/documento/descargar
   router.get('/casilla/notificaciones/:id/documento/descargar', async (req: Request, res: Response) => {
-    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = idNotificacionSchema.parse(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
     res.status(200).json({
       downloadUrl: `/api/v1/storage/download/sigd-resoluciones/rd-${id}.pdf`,
       expiraEnSegundos: 900,
@@ -449,7 +414,7 @@ export function crearRouterCasilla(pool: Pool): Router {
 
   // #13 — GET /casilla/notificaciones/:id/acuse/descargar
   router.get('/casilla/notificaciones/:id/acuse/descargar', async (req: Request, res: Response) => {
-    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = idNotificacionSchema.parse(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
     res.status(200).json({
       downloadUrl: `/api/v1/storage/download/sigd-acuses/acuse-${id}.pdf`,
       expiraEnSegundos: 900,

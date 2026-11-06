@@ -1,10 +1,20 @@
+import { ArrowRight, FileSearch, Fingerprint, LogIn, ShieldCheck, Sparkles } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+
 import { filtrarModulosPorRol, useSesion } from "../config/accesoModulos";
 import { elementoIconoModulo } from "../config/iconosModulos";
-import { useNavigate } from "react-router-dom";
 import HeroInstitucional from "../components/landing/HeroInstitucional";
 import SeccionBienvenida from "../components/landing/SeccionBienvenida";
+import LectorDniDigital from "../components/dni/LectorDniDigital";
 
-const ROLES_ADMIN: string[] = ["SUPER_ADMIN", "DIRECTOR", "director_general", "DOCENTE", "MESA_PARTES", "mesa_de_partes"];
+const ROLES_ADMIN: string[] = [
+  "SUPER_ADMIN",
+  "DIRECTOR",
+  "director_general",
+  "DOCENTE",
+  "MESA_PARTES",
+  "mesa_de_partes",
+];
 
 function AccesosModulosInternos() {
   const { rol, autenticado } = useSesion();
@@ -14,49 +24,129 @@ function AccesosModulosInternos() {
 
   if (!esInterno || visibles.length === 0) return null;
 
-  const irA = (ruta: string) => navigate(ruta);
-
   return (
-    <section className="bg-[#0D1B2A]/30 py-10 sm:py-12 border-t border-vault-papel-2/50">
+    <section className="relative border-t border-white/10 py-14 sm:py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8">
-          <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/40 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100">
-            Módulos de acceso directo
-          </span>
-          <h2 className="mt-3 text-2xl font-black leading-tight tracking-tight text-vault-tinta sm:text-3xl">
-            Acceso rápido a módulos
-          </h2>
-          <p className="mt-2 text-sm text-tinta-500">
-            Selecciona el módulo que necesitas. El acceso está filtrado por tu rol institucional.
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <span className="cyber-chip">
+              <Sparkles className="h-3.5 w-3.5" />
+              Módulos de acceso directo
+            </span>
+            <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] text-white sm:text-4xl">
+              Tu panel institucional
+            </h2>
+          </div>
+          <p className="max-w-md text-sm leading-relaxed text-zinc-400">
+            Accesos filtrados según tu rol. Cada módulo conserva trazabilidad y permisos
+            granulares.
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {visibles.map((m, i) => (
+
+        <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {visibles.map((modulo, indice) => (
             <button
-              key={m.id}
+              key={modulo.id}
               type="button"
-              onClick={() => irA(m.ruta)}
-              className="group relative flex flex-col items-center justify-between rounded-2xl border border-vault-papel-3 bg-white p-5 text-left transition hover:border-vault-azul hover:bg-white hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-vault-azul"
+              onClick={() => navigate(modulo.ruta)}
+              className="glass-card group flex flex-col items-start p-5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             >
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-vault-papel-2 bg-white/50 mb-3 group-hover:bg-vault-azul/10 group-hover:border-vault-azul transition-colors">
-                {elementoIconoModulo(m.id, "h-6 w-6")}
-              </div>
-              <div className="min-w-0 text-center">
-                <span className="block truncate font-semibold text-vault-tinta text-sm">
-                  {m.titulo}
+              <div className="flex w-full items-center justify-between">
+                <span className="grid h-12 w-12 place-items-center rounded-xl border border-white/12 bg-white/[0.04] text-white transition group-hover:bg-white group-hover:text-black">
+                  {elementoIconoModulo(modulo.id, "h-5 w-5")}
                 </span>
-                <span className="block mt-1 text-[11px] text-tinta-400 leading-tight">
-                  {m.descripcion}
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-600">
+                  {String(indice + 1).padStart(2, "0")}
                 </span>
               </div>
-              <span
-                className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-vault-azul text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                {String(i + 1).padStart(2, "0")}
+              <span className="mt-4 block text-sm font-bold text-white">{modulo.titulo}</span>
+              <span className="mt-1.5 block text-xs leading-relaxed text-zinc-400">
+                {modulo.descripcion}
+              </span>
+              <span className="mt-4 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition group-hover:text-white">
+                Abrir módulo
+                <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
               </span>
             </button>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function AccesosCiudadano() {
+  return (
+    <section id="accesos" className="relative border-t border-white/10 py-14 sm:py-16">
+      <div className="mx-auto grid max-w-7xl gap-4 px-4 sm:px-6 lg:grid-cols-3 lg:px-8">
+        <div className="glass-card flex flex-col justify-between p-6 lg:col-span-2">
+          <div>
+            <span className="cyber-chip">
+              <Fingerprint className="h-3.5 w-3.5" />
+              Identidad digital
+            </span>
+            <h2 className="mt-5 max-w-xl text-2xl font-black tracking-[-0.03em] text-white sm:text-3xl">
+              Tus datos, listos en segundos.
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
+              El lector reconoce el código PDF417 del DNI electrónico, muestra la identidad
+              completa y guarda los datos en tu dispositivo para agilizar el registro y los
+              trámites.
+            </p>
+          </div>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <LectorDniDigital variant="solid" label="Escanear DNI ahora" />
+            <Link to="/registro" className="btn-ghost-cyber">
+              Ir al registro
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          <Link
+            to="/tramite"
+            className="glass-card group flex flex-col justify-between p-5 transition hover:border-white/30"
+          >
+            <span className="grid h-11 w-11 place-items-center rounded-xl border border-white/12 bg-white/[0.04] text-white transition group-hover:bg-white group-hover:text-black">
+              <FileSearch className="h-5 w-5" />
+            </span>
+            <div className="mt-5">
+              <p className="text-sm font-bold text-white">Mesa de partes virtual</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                Inicia un trámite y obtén tu CUT al instante.
+              </p>
+            </div>
+            <span className="mt-4 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition group-hover:text-white">
+              Iniciar
+              <ArrowRight className="h-3 w-3" />
+            </span>
+          </Link>
+
+          <Link
+            to="/login"
+            className="glass-card group flex flex-col justify-between p-5 transition hover:border-white/30"
+          >
+            <span className="grid h-11 w-11 place-items-center rounded-xl border border-white/12 bg-white/[0.04] text-white transition group-hover:bg-white group-hover:text-black">
+              <LogIn className="h-5 w-5" />
+            </span>
+            <div className="mt-5">
+              <p className="text-sm font-bold text-white">Acceso institucional</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                Personal administrativo y docentes con roles habilitados.
+              </p>
+            </div>
+            <span className="mt-4 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition group-hover:text-white">
+              Ingresar
+              <ArrowRight className="h-3 w-3" />
+            </span>
+          </Link>
+        </div>
+      </div>
+
+      <div className="mx-auto mt-4 flex max-w-7xl items-center gap-2 px-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600 sm:px-6 lg:px-8">
+        <ShieldCheck className="h-3.5 w-3.5" />
+        Lector en modo demostración · los datos se almacenan solo en este dispositivo
       </div>
     </section>
   );
@@ -67,11 +157,12 @@ export default function HomePage() {
   const esInterno = Boolean(rol) && ROLES_ADMIN.includes(rol as string);
 
   return (
-    <main className="bg-white text-slate-900">
+    <main className="relative bg-transparent text-zinc-100">
       <HeroInstitucional />
-      {!esInterno && <SeccionBienvenida />}
+      {!esInterno && <AccesosCiudadano />}
       <AccesosModulosInternos />
-      {esInterno && <SeccionBienvenida />}
+      <SeccionBienvenida />
+      <LectorDniDigital hideTrigger />
     </main>
   );
 }

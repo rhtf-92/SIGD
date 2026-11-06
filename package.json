@@ -9,6 +9,11 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
+    "prender": "powershell -NoProfile -ExecutionPolicy Bypass -File ./INICIAR.ps1",
+    "apagar": "powershell -NoProfile -ExecutionPolicy Bypass -File ./DETENER.ps1",
+    "verificar": "powershell -NoProfile -ExecutionPolicy Bypass -File ./VERIFICAR.ps1",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose stop",
     "dev": "concurrently --names \"backend,frontend\" --prefix-colors \"magenta,cyan\" \"npm:dev:backend\" \"npm:dev:frontend\"",
     "dev:backend": "cross-env SKIP_FRONTEND_AUTOSTART=true npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",

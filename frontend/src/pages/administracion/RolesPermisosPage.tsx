@@ -57,7 +57,7 @@ export default function RolesPermisosPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
       <AdminPageHeader
         title="Roles y Permisos"
         description="Control de acceso por rol, acción y alcance institucional (RBAC)."
@@ -65,7 +65,7 @@ export default function RolesPermisosPage() {
 
       <section className="mx-auto max-w-7xl px-6 py-8">
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <aside className="rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-4 shadow-sm">
             <h2 className="mb-4 text-lg font-bold">Roles del sistema</h2>
 
             <div className="space-y-3">
@@ -79,7 +79,7 @@ export default function RolesPermisosPage() {
                   }}
                   className={`w-full rounded-xl border p-4 text-left transition ${
                     rolSeleccionado === rol.id
-                      ? "border-blue-600 bg-blue-50"
+                      ? "border-blue-600 bg-cyan-500/10"
                       : "border-slate-200 hover:bg-slate-50"
                   }`}
                 >
@@ -98,10 +98,10 @@ export default function RolesPermisosPage() {
           </aside>
 
           <div className="space-y-6">
-            <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-6 shadow-sm">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <p className="text-xs font-bold uppercase text-blue-700">
+                  <p className="text-xs font-bold uppercase text-cyan-400">
                     Rol seleccionado
                   </p>
                   <h2 className="mt-1 text-2xl font-bold">{rolActual.nombre}</h2>
@@ -135,7 +135,7 @@ export default function RolesPermisosPage() {
               </div>
             )}
 
-            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <section className="overflow-hidden rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] shadow-sm">
               <div className="border-b border-slate-200 px-6 py-4">
                 <h3 className="font-bold">Matriz de permisos</h3>
                 <p className="mt-1 text-xs text-slate-500">
@@ -154,7 +154,7 @@ export default function RolesPermisosPage() {
                 <button
                   type="button"
                   onClick={guardarEnServidor}
-                  className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+                  className="rounded-lg bg-cyan-600/90 px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
                 >
                   Guardar permisos
                 </button>

@@ -3,9 +3,12 @@ import { ValidationError } from '../../shared/domain/errors/validation-error.js'
 import type { FiltrosRutaDoc, PosicionCursor } from './rutadoc.types.js';
 
 const MAX_BIGINT = 9223372036854775807n;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function esIdExpediente(valor: unknown): valor is string {
-  return typeof valor === 'string' && /^[1-9]\d{0,18}$/.test(valor) && BigInt(valor) <= MAX_BIGINT;
+  if (typeof valor !== 'string') return false;
+  if (UUID.test(valor)) return true;
+  return /^[1-9]\d{0,18}$/.test(valor) && BigInt(valor) <= MAX_BIGINT;
 }
 
 export function huellaFiltros(filtros: FiltrosRutaDoc): string {

@@ -38,11 +38,18 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction):
   const origin = req.headers.origin;
   const origenesValidos = parsearOrigenesPermitidos();
 
-  if (origin && esOrigenPermitido(origin, origenesValidos)) {
+  if (process.env.NODE_ENV !== 'production') {
+    // Desarrollo: aceptar peticiones desde cualquier origen (incl. http://localhost:5173)
+    // sin bloquear por CORS. Se refleja el Origin para compatibilidad con credenciales.
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+  } else if (origin && esOrigenPermitido(origin, origenesValidos)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-  } else if (!origin && process.env.NODE_ENV !== 'production') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
   }
 
   res.setHeader('Access-Control-Allow-Methods', METODOS_PERMITIDOS);

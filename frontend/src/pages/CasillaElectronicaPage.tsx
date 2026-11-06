@@ -151,8 +151,8 @@ export default function CasillaElectronicaPage() {
   const plazoVencido = diasHabiles > 5;
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-950">
-      <header className="border-b border-slate-300 bg-white">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
+      <header className="border-b border-cyan-400/25 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px]">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-blue-800">
@@ -161,11 +161,11 @@ export default function CasillaElectronicaPage() {
             <h1 className="mt-2 text-2xl font-black sm:text-3xl">
               Casilla Electrónica
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-slate-600">
+            <p className="mt-1 max-w-2xl text-sm text-slate-300">
               Notificaciones oficiales, actos administrativos y constancias de recepción.
             </p>
           </div>
-          <p className="text-sm font-semibold text-slate-700">
+          <p className="text-sm font-semibold text-slate-300">
             Plazo de lectura: <span className="text-blue-900">5 días hábiles</span>
           </p>
         </div>
@@ -173,7 +173,7 @@ export default function CasillaElectronicaPage() {
 
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:px-8">
         <section aria-label="Bandeja de notificaciones" className="min-w-0">
-          <div role="tablist" aria-label="Estado legal de notificaciones" className="flex flex-wrap border-b border-slate-300">
+          <div role="tablist" aria-label="Estado legal de notificaciones" className="flex flex-wrap border-b border-cyan-400/40">
             {PESTAÑAS.map((item) => (
               <button
                 key={item.id}
@@ -184,7 +184,7 @@ export default function CasillaElectronicaPage() {
                 className={`border-b-2 px-3 py-3 text-xs font-bold sm:px-4 ${
                   pestaña === item.id
                     ? "border-blue-800 text-blue-900"
-                    : "border-transparent text-slate-600 hover:text-slate-950"
+                    : "border-transparent text-slate-300 hover:text-slate-100"
                 }`}
               >
                 {item.id}
@@ -218,31 +218,31 @@ export default function CasillaElectronicaPage() {
           </div>
         </section>
 
-        <section aria-label="Visor del acto administrativo" className="min-w-0 border-t border-slate-300 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+        <section aria-label="Visor del acto administrativo" className="min-w-0 border-t border-cyan-400/40 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
           {seleccionada ? (
             <article className="space-y-5">
-              <header className="border-b border-slate-300 pb-4">
+              <header className="border-b border-cyan-400/40 pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className={`inline-flex items-center border px-3 py-1 text-xs font-black ${clasesEstado(seleccionada.estado)}`}>
                     {etiquetaEstado(seleccionada.estado)}
                   </span>
-                  <span className="font-mono text-xs font-semibold text-slate-600">
+                  <span className="font-mono text-xs font-semibold text-slate-300">
                     {seleccionada.numeroNotificacion}
                   </span>
                 </div>
                 <h2 className="mt-4 text-xl font-bold">{seleccionada.asunto}</h2>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-slate-300">
                   {seleccionada.actoAdministrativo.numeroDocumento} · {seleccionada.unidadEmisora}
                 </p>
               </header>
 
               <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <dt className="font-bold text-slate-600">Depositada</dt>
+                  <dt className="font-bold text-slate-300">Depositada</dt>
                   <dd className="mt-1">{formatFecha(seleccionada.fechaDepositoIso)}</dd>
                 </div>
                 <div>
-                  <dt className="font-bold text-slate-600">Expediente</dt>
+                  <dt className="font-bold text-slate-300">Expediente</dt>
                   <dd className="mt-1 font-mono">{seleccionada.numeroExpediente}</dd>
                 </div>
               </dl>
@@ -263,18 +263,18 @@ export default function CasillaElectronicaPage() {
               </div>
 
               <section className="space-y-3">
-                <h3 className="text-sm font-black uppercase tracking-wide text-slate-800">
+                <h3 className="text-sm font-black uppercase tracking-wide text-slate-200">
                   Acto administrativo
                 </h3>
-                <p className="text-sm leading-6 text-slate-700">
+                <p className="text-sm leading-6 text-slate-300">
                   {seleccionada.actoAdministrativo.resumenLegal}
                 </p>
                 {seleccionada.actoAdministrativo.textoCompleto && (
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap border border-slate-300 bg-white p-4 font-sans text-sm leading-6 text-slate-800">
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-4 font-sans text-sm leading-6 text-slate-200">
                     {seleccionada.actoAdministrativo.textoCompleto}
                   </pre>
                 )}
-                <p className="break-all border-l-4 border-slate-500 bg-white p-3 font-mono text-xs text-slate-700">
+                <p className="break-all border-l-4 border-slate-500 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-3 font-mono text-xs text-slate-300">
                   SHA-256 del acto: {seleccionada.actoAdministrativo.hashIntegridadSha256}
                 </p>
               </section>
@@ -295,14 +295,14 @@ export default function CasillaElectronicaPage() {
                 <button
                   type="button"
                   onClick={() => setAcuseAbierto(true)}
-                  className="w-full bg-blue-800 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900"
+                  className="w-full bg-cyan-600/30 border border-cyan-400/40 px-4 py-3 text-sm font-bold text-white hover:brightness-125 transition-all duration-300 ease-out"
                 >
                   Confirmar lectura y emitir acuse
                 </button>
               ) : null}
             </article>
           ) : (
-            <div className="flex min-h-72 items-center justify-center border border-dashed border-slate-400 bg-white p-8 text-center text-sm text-slate-600">
+            <div className="flex min-h-72 items-center justify-center border border-dashed border-slate-400 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-8 text-center text-sm text-slate-300">
               Seleccione una cédula para consultar el acto administrativo y su plazo legal.
             </div>
           )}

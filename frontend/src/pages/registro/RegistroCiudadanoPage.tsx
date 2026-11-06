@@ -40,17 +40,16 @@ export default function RegistroCiudadanoPage() {
 
     try {
       const response = await apiClient.post("/api/v1/auth/registro-ciudadano", payload);
-      const casillaId = response.data?.casillaId;
-      setSuccessMessage(
-        `Registro completado. Tu casilla electrónica ha sido creada: ${casillaId}`
-      );
-      setTimeout(() => {
-        navigate("/login", { replace: true });
-      }, 2000);
+      if (response.data?.ok === false) {
+        setErrorMessage(response.data?.detail ?? "No fue posible completar el registro en este momento.");
+        return;
+      }
+      const casillaId = response.data?.casillaId ?? response.data?.idPersona ?? "";
+      setSuccessMessage(`Registro completado. Tu casilla electrónica ha sido creada${casillaId ? `: ${casillaId}` : ""}.`);
+      setTimeout(() => { navigate("/login", { replace: true }); }, 2000);
     } catch (err: unknown) {
-      const respuesta = (err as { response?: { data?: { detail?: string } } })?.response;
-      const detalle = respuesta?.data?.detail ?? "Error al registrar la persona natural.";
-      setErrorMessage(detalle);
+      const r = (err as { response?: { data?: any } })?.response?.data;
+      setErrorMessage(r?.detail ?? r?.message ?? "No se pudo registrar la persona natural. Verifique los datos e intente nuevamente.");
     }
   };
 
@@ -81,17 +80,16 @@ export default function RegistroCiudadanoPage() {
 
     try {
       const response = await apiClient.post("/api/v1/auth/registro-persona-juridica", payload);
-      const casillaId = response.data?.casillaId;
-      setSuccessMessage(
-        `Registro completado. Tu casilla electrónica ha sido creada: ${casillaId}`
-      );
-      setTimeout(() => {
-        navigate("/login", { replace: true });
-      }, 2000);
+      if (response.data?.ok === false) {
+        setErrorMessage(response.data?.detail ?? "No fue posible completar el registro en este momento.");
+        return;
+      }
+      const casillaId = response.data?.casillaId ?? response.data?.idPersona ?? "";
+      setSuccessMessage(`Registro completado. Tu casilla electrónica ha sido creada${casillaId ? `: ${casillaId}` : ""}.`);
+      setTimeout(() => { navigate("/login", { replace: true }); }, 2000);
     } catch (err: unknown) {
-      const respuesta = (err as { response?: { data?: { detail?: string } } })?.response;
-      const detalle = respuesta?.data?.detail ?? "Error al registrar la persona jurídica.";
-      setErrorMessage(detalle);
+      const r = (err as { response?: { data?: any } })?.response?.data;
+      setErrorMessage(r?.detail ?? r?.message ?? "No se pudo registrar la persona jurídica. Verifique los datos e intente nuevamente.");
     }
   };
 
@@ -101,118 +99,47 @@ export default function RegistroCiudadanoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F3F4F6] flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-sm max-w-2xl w-full p-8">
+    <div className="sigd-fade-in admin-dark min-h-screen bg-transparent flex items-center justify-center p-4">
+      <div className="rounded-2xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] shadow-[0_0_15px_rgba(6,182,212,0.15)] backdrop-blur-[12px] max-w-2xl w-full p-8 transition-all duration-300 ease-out">
         <Link
           to="/"
-          className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+          className="mb-4 inline-flex items-center gap-2 rounded-xl border border-cyan-400/40 bg-slate-950/30 px-4 py-2.5 text-sm font-semibold text-slate-200 transition-all duration-300 ease-out hover:brightness-110 hover:border-cyan-300/60"
         >
           ← Volver al inicio
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Registro de Usuario Externo
-        </h1>
-        <p className="text-sm text-gray-600 mb-8">
-          Complete sus datos para crear su cuenta y Casilla Electrónica
-          Institucional
-        </p>
+        <h1 className="text-2xl font-bold text-slate-100 mb-2">Registro de Usuario Externo</h1>
+        <p className="text-sm text-slate-300 mb-8">Complete sus datos para crear su cuenta y Casilla Electrónica Institucional</p>
 
-        <div
-          role="tablist"
-          aria-label="Tipo de persona"
-          className="flex gap-1 mb-8 border-b border-gray-200"
-        >
-          <button
-            role="tab"
-            aria-selected={activeTab === "NATURAL"}
-            aria-controls="panel-natural"
-            id="tab-natural"
-            onClick={() => {
-              setActiveTab("NATURAL");
-              setSuccessMessage(null);
-              setErrorMessage(null);
-            }}
-            className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-[#006EC7] focus:ring-offset-2 ${
-              activeTab === "NATURAL"
-                ? "text-[#006EC7] border-b-2 border-[#006EC7]"
-                : "text-gray-500 hover:text-gray-700 border-b-2 border-transparent"
-            }`}
-          >
+        <div role="tablist" aria-label="Tipo de persona" className="flex gap-1 mb-8 border-b border-cyan-400/25">
+          <button role="tab" aria-selected={activeTab === "NATURAL"} aria-controls="panel-natural" id="tab-natural"
+            onClick={() => { setActiveTab("NATURAL"); setSuccessMessage(null); setErrorMessage(null); }}
+            className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-all duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-cyan-400/50 ${activeTab === "NATURAL" ? "text-cyan-300 border-b-2 border-cyan-400" : "text-slate-400 hover:text-slate-200 border-b-2 border-transparent"}`}>
             Persona Natural
           </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === "JURIDICA"}
-            aria-controls="panel-juridica"
-            id="tab-juridica"
-            onClick={() => {
-              setActiveTab("JURIDICA");
-              setSuccessMessage(null);
-              setErrorMessage(null);
-            }}
-            className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-[#006EC7] focus:ring-offset-2 ${
-              activeTab === "JURIDICA"
-                ? "text-[#006EC7] border-b-2 border-[#006EC7]"
-                : "text-gray-500 hover:text-gray-700 border-b-2 border-transparent"
-            }`}
-          >
+          <button role="tab" aria-selected={activeTab === "JURIDICA"} aria-controls="panel-juridica" id="tab-juridica"
+            onClick={() => { setActiveTab("JURIDICA"); setSuccessMessage(null); setErrorMessage(null); }}
+            className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-all duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-cyan-400/50 ${activeTab === "JURIDICA" ? "text-cyan-300 border-b-2 border-cyan-400" : "text-slate-400 hover:text-slate-200 border-b-2 border-transparent"}`}>
             Persona Jurídica
           </button>
         </div>
 
-        <div
-          role="tabpanel"
-          id="panel-natural"
-          aria-labelledby="tab-natural"
-          hidden={activeTab !== "NATURAL"}
-        >
-          {activeTab === "NATURAL" && (
-            <PersonaNaturalForm onSubmit={handleNaturalSubmit} />
-          )}
+        <div role="tabpanel" id="panel-natural" aria-labelledby="tab-natural" hidden={activeTab !== "NATURAL"}>
+          {activeTab === "NATURAL" && <PersonaNaturalForm onSubmit={handleNaturalSubmit} />}
         </div>
-
-        <div
-          role="tabpanel"
-          id="panel-juridica"
-          aria-labelledby="tab-juridica"
-          hidden={activeTab !== "JURIDICA"}
-        >
-          {activeTab === "JURIDICA" && (
-            <PersonaJuridicaForm onSubmit={handleJuridicaSubmit} />
-          )}
+        <div role="tabpanel" id="panel-juridica" aria-labelledby="tab-juridica" hidden={activeTab !== "JURIDICA"}>
+          {activeTab === "JURIDICA" && <PersonaJuridicaForm onSubmit={handleJuridicaSubmit} />}
         </div>
 
         {errorMessage && (
-          <div
-            className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm flex items-center justify-between"
-            role="alert"
-            aria-live="assertive"
-          >
+          <div className="mt-6 p-4 bg-red-950/30 border border-red-500/30 rounded-xl text-red-200 text-sm flex items-center justify-between" role="alert" aria-live="assertive">
             <span>{errorMessage}</span>
-            <button
-              onClick={handleClearMessages}
-              className="text-red-600 hover:text-red-800 underline text-xs focus:outline-none focus:ring-2 focus:ring-red-500 rounded"
-              aria-label="Cerrar mensaje de error"
-            >
-              Cerrar
-            </button>
+            <button onClick={handleClearMessages} className="text-red-300 hover:text-red-100 underline text-xs" aria-label="Cerrar mensaje de error">Cerrar</button>
           </div>
         )}
-
         {successMessage && (
-          <div
-            className="mt-6 p-4 bg-green-50 border border-green-200 rounded-md text-green-800 text-sm flex items-center justify-between"
-            role="status"
-            aria-live="polite"
-          >
+          <div className="mt-6 p-4 bg-emerald-950/30 border border-emerald-500/30 rounded-xl text-emerald-200 text-sm flex items-center justify-between" role="status" aria-live="polite">
             <span>{successMessage}</span>
-            <button
-              onClick={handleClearMessages}
-              className="text-green-600 hover:text-green-800 underline text-xs focus:outline-none focus:ring-2 focus:ring-green-500 rounded"
-              aria-label="Cerrar mensaje de éxito"
-            >
-              Cerrar
-            </button>
+            <button onClick={handleClearMessages} className="text-emerald-300 hover:text-emerald-100 underline text-xs" aria-label="Cerrar mensaje de éxito">Cerrar</button>
           </div>
         )}
       </div>

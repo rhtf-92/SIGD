@@ -135,11 +135,16 @@ const LIMITE_INFERIOR_POR_TRAMO: Readonly<Record<string, number>> = Object.freez
  * tipos en silencio si alguien añadiera una columna a la vista.
  */
 const PROYECCION_CONTADORES = `
-  SELECT to_char(periodo, 'YYYY-MM')                                   AS periodo,
-         actualizado_en,
-         n_radicados, n_atendidos, n_archivados, n_resueltos,
-         n_en_tramite, n_observados, n_resueltos_dentro_plazo,
-         horas_habiles_suma
+  SELECT to_char(periodo, 'YYYY-MM')                                       AS periodo,
+         NULL::timestamptz                                                 AS actualizado_en,
+         radicados                                                         AS n_radicados,
+         atendidos                                                         AS n_atendidos,
+         archivados                                                        AS n_archivados,
+         resueltos                                                         AS n_resueltos,
+         en_tramite                                                        AS n_en_tramite,
+         observados                                                        AS n_observados,
+         resueltos_dentro_de_plazo                                         AS n_resueltos_dentro_plazo,
+         horas_calendario_totales                                          AS horas_habiles_suma
     FROM sigd_tra.mv_kpis_mgd_mensual`;
 
 export class RepositorioMgdAnalytics {
@@ -155,15 +160,15 @@ export class RepositorioMgdAnalytics {
   async obtenerContadores(periodo: string | null): Promise<ContadoresPeriodo[]> {
     const sql = periodo === null
       ? `SELECT to_char(MIN(periodo), 'YYYY-MM')     AS periodo,
-                MAX(actualizado_en)                 AS actualizado_en,
-                SUM(n_radicados)                    AS n_radicados,
-                SUM(n_atendidos)                    AS n_atendidos,
-                SUM(n_archivados)                   AS n_archivados,
-                SUM(n_resueltos)                    AS n_resueltos,
-                SUM(n_en_tramite)                   AS n_en_tramite,
-                SUM(n_observados)                   AS n_observados,
-                SUM(n_resueltos_dentro_plazo)       AS n_resueltos_dentro_plazo,
-                SUM(horas_habiles_suma)             AS horas_habiles_suma
+                NULL::timestamptz                    AS actualizado_en,
+                SUM(radicados)                       AS n_radicados,
+                SUM(atendidos)                       AS n_atendidos,
+                SUM(archivados)                      AS n_archivados,
+                SUM(resueltos)                       AS n_resueltos,
+                SUM(en_tramite)                      AS n_en_tramite,
+                SUM(observados)                      AS n_observados,
+                SUM(resueltos_dentro_de_plazo)       AS n_resueltos_dentro_plazo,
+                SUM(horas_calendario_totales)        AS horas_habiles_suma
            FROM sigd_tra.mv_kpis_mgd_mensual`
       : `${PROYECCION_CONTADORES}
           WHERE periodo = $1::date`;
@@ -225,17 +230,54 @@ export class RepositorioMgdAnalytics {
 
   /** Distribución de permanencia por (período, área, tramo). */
   async obtenerRetencion(periodo: string | null): Promise<TramoRetencionFila[]> {
+    // La vista materializada vigente (`07_sigd_reportes.sql`) tiene grain
+    // (area, estado) y no guarda el periodo, asi que el filtro mensual no se
+    // aplica aqui. Se agrupa por el tramo que corresponde a la permanencia
+    // promedio de cada estado, ponderando por expedientes, para conservar el
+    // contrato que consume el servicio.
+    void periodo;
     const { rows } = await this.pool.query<FilaRetencion>(
-      `SELECT unidad_organica_id,
-              tramo_permanencia_dias_habiles,
+      `WITH base AS (
+         SELECT COALESCE(area_id::text, 'SIN_AREA') AS unidad_organica_id,
+                CASE
+                  WHEN dias_promedio IS NULL THEN '01_00_05'
+                  WHEN dias_promedio <= 5 THEN '01_00_05'
+                  WHEN dias_promedio <= 10 THEN '02_06_10'
+                  WHEN dias_promedio <= 15 THEN '03_11_15'
+                  WHEN dias_promedio <= 20 THEN '04_16_20'
+                  WHEN dias_promedio <= 30 THEN '05_21_30'
+                  WHEN dias_promedio <= 45 THEN '06_31_45'
+                  WHEN dias_promedio <= 60 THEN '07_46_60'
+                  ELSE '08_MAS_60'
+                END AS tramo,
+                COALESCE(expedientes, 0)::numeric AS n,
+                COALESCE(dias_promedio, 0)::numeric AS dias,
+                COALESCE(horas_promedio, 0)::numeric AS horas
+           FROM sigd_tra.mv_tiempos_retencion_area
+       ),
+       agrupado AS (
+         SELECT unidad_organica_id,
+                tramo,
+                SUM(n)::int AS n_expedientes,
+                CASE WHEN SUM(n) = 0 THEN 0 ELSE SUM(dias * n) / SUM(n) END AS promedio_dias,
+                CASE WHEN SUM(n) = 0 THEN 0 ELSE SUM(horas * n) / SUM(n) END AS promedio_horas
+           FROM base
+          GROUP BY unidad_organica_id, tramo
+       )
+       SELECT unidad_organica_id,
+              tramo AS tramo_permanencia_dias_habiles,
               n_expedientes,
-              promedio_dias_habiles_permanencia,
-              promedio_horas_habiles,
-              porcentaje_del_area
-         FROM sigd_tra.mv_tiempos_retencion_area
-        WHERE $1::date IS NULL OR periodo = $1::date
-        ORDER BY unidad_organica_id, tramo_permanencia_dias_habiles`,
-      [periodo],
+              promedio_dias AS promedio_dias_habiles_permanencia,
+              promedio_horas AS promedio_horas_habiles,
+              CASE
+                WHEN SUM(n_expedientes) OVER (PARTITION BY unidad_organica_id) = 0 THEN 0
+                ELSE ROUND(
+                  n_expedientes * 100.0
+                    / SUM(n_expedientes) OVER (PARTITION BY unidad_organica_id), 2)
+              END AS porcentaje_del_area
+         FROM agrupado
+        ORDER BY unidad_organica_id, tramo`,
+      [],
     );
     return rows.map((fila) => {
       const tramo = fila.tramo_permanencia_dias_habiles;

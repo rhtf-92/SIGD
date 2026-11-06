@@ -5,6 +5,8 @@ import { naturalSchema } from "../../schemas/registroCiudadano.schema";
 import type { Natural } from "../../types/registroCiudadano";
 import { UbigeoSelector } from "../common/UbigeoSelector";
 import type { UbigeoDTO } from "../../data/ucayali";
+import type { PersonaDniDemo } from "../../data/padronDniDemo";
+import LectorDniDigital from "../dni/LectorDniDigital";
 import { DeclaracionJuradaCheckbox } from "./DeclaracionJuradaCheckbox";
 import { ConsentimientoLey29733Modal } from "./ConsentimientoLey29733Modal";
 
@@ -75,12 +77,48 @@ export default function PersonaNaturalForm({
     });
   };
 
+  const autocompletarConDni = (persona: PersonaDniDemo) => {
+    const opciones = { shouldValidate: true, shouldDirty: true };
+    setValue("tipoDocumento", "DNI", opciones);
+    setValue("numeroDocumento", persona.dni, opciones);
+    setValue("nombres", persona.nombres, opciones);
+    setValue("apellidos", persona.apellidos, opciones);
+    setValue("fechaNacimiento", persona.fechaNacimiento, opciones);
+    setValue("correo", persona.correo, opciones);
+    setValue("celular", persona.telefono, opciones);
+    setValue(
+      "domicilio",
+      {
+        ...domicilioValue,
+        direccionExacta: persona.direccion,
+      },
+      opciones,
+    );
+  };
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-6"
       noValidate
     >
+      <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-semibold text-white">
+            <span className="h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse-soft" />
+            Autocompletar con DNI digital
+          </p>
+          <p className="mt-1 text-xs text-zinc-400">
+            Escanea el PDF417 del DNI electrónico o ingresa el número para recuperar tus datos.
+          </p>
+        </div>
+        <LectorDniDigital
+          variant="inline"
+          label="Escanear DNI"
+          onDetected={autocompletarConDni}
+        />
+      </div>
+
       {/* Tipo de Documento y Número de Documento */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -96,7 +134,6 @@ export default function PersonaNaturalForm({
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] focus:border-[#006EC7] outline-none"
           >
             <option value="DNI">DNI</option>
-            <option value="CE">CE</option>
           </select>
           {errors.tipoDocumento && (
             <p className="mt-1 text-xs text-red-600 font-medium">
