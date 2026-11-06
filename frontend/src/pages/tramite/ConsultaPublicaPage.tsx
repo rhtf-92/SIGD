@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
-import PublicCitizenNav from '../../components/common/PublicCitizenNav';
 
 export interface DtoDocumentoPublico {
   nombreArchivo: string;
@@ -100,9 +99,6 @@ export default function ConsultaPublicaPage() {
             Consulta Pública CUT
           </span>
         </nav>
-
-        {/* Navegación unificada de servicios ciudadanos */}
-        <PublicCitizenNav currentPath="/consulta" />
 
         {/* Cabecera Institucional */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8">

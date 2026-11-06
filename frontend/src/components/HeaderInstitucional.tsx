@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Menu,
@@ -16,6 +16,9 @@ import {
   CheckCircle2,
   Clock,
   ChevronRight,
+  ChevronDown,
+  Search,
+  UserCheck,
 } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 
@@ -23,6 +26,8 @@ export default function HeaderInstitucional() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [tramitesDropdownOpen, setTramitesDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const { usuario, isAuthenticated, logout } = useAuthStore();
 
   const userRole = usuario?.rol;
@@ -56,21 +61,25 @@ export default function HeaderInstitucional() {
         ["SUPER_ADMIN", "DIRECTOR", "DOCENTE", "MESA_PARTES"].includes(userRole)
     );
 
-  // Cerrar menú al cambiar de ruta
+  // Cerrar menús al cambiar de ruta
   useEffect(() => {
     setMenuAbierto(false);
+    setTramitesDropdownOpen(false);
   }, [location.pathname]);
 
-  // Cerrar menú con tecla Escape
+  // Cerrar menús con tecla Escape
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setMenuAbierto(false);
+        setTramitesDropdownOpen(false);
       }
     }
-    if (menuAbierto) {
+    if (menuAbierto || tramitesDropdownOpen) {
       window.addEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "hidden";
+      if (menuAbierto) {
+        document.body.style.overflow = "hidden";
+      }
     } else {
       document.body.style.overflow = "";
     }
@@ -78,7 +87,22 @@ export default function HeaderInstitucional() {
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
     };
-  }, [menuAbierto]);
+  }, [menuAbierto, tramitesDropdownOpen]);
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setTramitesDropdownOpen(false);
+      }
+    }
+    if (tramitesDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [tramitesDropdownOpen]);
 
   function isActive(path: string): boolean {
     if (path === "/" && location.pathname === "/") return true;
@@ -135,17 +159,169 @@ export default function HeaderInstitucional() {
             <span>Inicio</span>
           </Link>
 
-          <Link
-            to="/tramite"
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition ${
-              isActive("/tramite")
-                ? "bg-white/20 text-white shadow-xs font-bold"
-                : "text-blue-100 hover:bg-white/10 hover:text-white"
-            }`}
+          {/* MENÚ DESPLEGABLE DE TRÁMITES Y SERVICIOS CIUDADANOS */}
+          <div
+            ref={dropdownRef}
+            className="relative"
+            onMouseEnter={() => setTramitesDropdownOpen(true)}
+            onMouseLeave={() => setTramitesDropdownOpen(false)}
           >
-            <FileText className="h-3.5 w-3.5" />
-            <span>Trámites</span>
-          </Link>
+            <div className="flex items-center">
+              <Link
+                to="/tramite"
+                className={`flex items-center gap-1.5 rounded-l-lg pl-2.5 pr-1.5 py-1.5 transition ${
+                  isActive("/tramite") || isActive("/consulta") || isActive("/registro")
+                    ? "bg-white/20 text-white shadow-xs font-bold"
+                    : "text-blue-100 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span>Trámites</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setTramitesDropdownOpen((prev) => !prev)}
+                aria-expanded={tramitesDropdownOpen}
+                aria-haspopup="menu"
+                aria-label="Desplegar menú de trámites y servicios ciudadanos"
+                className={`flex items-center rounded-r-lg pr-2 py-1.5 transition ${
+                  isActive("/tramite") || isActive("/consulta") || isActive("/registro")
+                    ? "bg-white/20 text-white"
+                    : "text-blue-100 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                    tramitesDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            </div>
+
+            {tramitesDropdownOpen && (
+              <div
+                role="menu"
+                aria-label="Menú de Trámites y Servicios Ciudadanos"
+                className="absolute left-0 top-full pt-1.5 w-72 sm:w-80 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+              >
+                <div className="rounded-2xl bg-white text-slate-800 shadow-2xl border border-slate-200/90 p-2 overflow-hidden ring-1 ring-black/5">
+                  <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/70 -mx-2 -mt-2 mb-1.5 rounded-t-2xl">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Servicios Públicos a la Ciudadanía
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-normal">
+                      Trámites y consultas digitales oficiales
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Link
+                      to="/tramite"
+                      role="menuitem"
+                      onClick={() => setTramitesDropdownOpen(false)}
+                      className={`flex items-start gap-3 rounded-xl p-2.5 transition group ${
+                        isActive("/tramite")
+                          ? "bg-blue-50 text-blue-900 font-semibold"
+                          : "hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 group-hover:bg-blue-700 group-hover:text-white transition">
+                        <FileText className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-900 group-hover:text-blue-700 transition">
+                            Mesa de Partes Virtual
+                          </span>
+                          <span className="rounded bg-blue-100 px-1.5 py-0.2 text-[9px] font-bold text-blue-800">
+                            24x7
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                          Radicación de solicitudes y documentos en línea
+                        </p>
+                      </div>
+                    </Link>
+
+                    <Link
+                      to="/consulta"
+                      role="menuitem"
+                      onClick={() => setTramitesDropdownOpen(false)}
+                      className={`flex items-start gap-3 rounded-xl p-2.5 transition group ${
+                        isActive("/consulta")
+                          ? "bg-blue-50 text-blue-900 font-semibold"
+                          : "hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition">
+                        <Search className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition">
+                            Consulta Pública CUT
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                          Seguimiento del estado de expediente por CUT
+                        </p>
+                      </div>
+                    </Link>
+
+                    <Link
+                      to="/validador-cvd"
+                      role="menuitem"
+                      onClick={() => setTramitesDropdownOpen(false)}
+                      className={`flex items-start gap-3 rounded-xl p-2.5 transition group ${
+                        isActive("/validador-cvd")
+                          ? "bg-blue-50 text-blue-900 font-semibold"
+                          : "hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition">
+                        <ShieldCheck className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition">
+                            Validador CVD / QR
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                          Cotejo de integridad y autenticidad digital
+                        </p>
+                      </div>
+                    </Link>
+
+                    <Link
+                      to="/registro"
+                      role="menuitem"
+                      onClick={() => setTramitesDropdownOpen(false)}
+                      className={`flex items-start gap-3 rounded-xl p-2.5 transition group ${
+                        isActive("/registro")
+                          ? "bg-blue-50 text-blue-900 font-semibold"
+                          : "hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white transition">
+                        <UserCheck className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition">
+                            Registro de Administrados
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                          Inscripción para casilla y notificaciones
+                        </p>
+                      </div>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {canAccessExpedientes && (
             <Link

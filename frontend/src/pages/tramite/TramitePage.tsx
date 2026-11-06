@@ -19,7 +19,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import TramiteWizard from "../../components/tramite/TramiteWizard";
-import PublicCitizenNav from "../../components/common/PublicCitizenNav";
 
 export default function TramitePage() {
   const [ultimoCut, setUltimoCut] = useState<string | null>(null);
@@ -42,8 +41,6 @@ export default function TramitePage() {
         </span>
       </nav>
 
-      {/* Píldoras de navegación unificada de servicios ciudadanos */}
-      <PublicCitizenNav currentPath="/tramite" />
 
       {/* CABECERA INSTITUCIONAL OFICIAL */}
       <header className="rounded-xl sm:rounded-2xl border border-blue-200/80 bg-linear-to-r from-blue-50 via-sky-50/50 to-indigo-50/40 p-4 sm:p-7 shadow-xs">

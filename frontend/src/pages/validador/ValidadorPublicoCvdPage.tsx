@@ -13,7 +13,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import CvdIntegrityReport from "../../components/cvd/CvdIntegrityReport";
-import PublicCitizenNav from "../../components/common/PublicCitizenNav";
 import {
   CVD_ALTERADO,
   CVD_VALIDO,
@@ -205,9 +204,6 @@ export default function ValidadorPublicoCvdPage() {
               ← Volver al inicio
             </Link>
           </div>
-
-          {/* Navegación unificada de servicios ciudadanos */}
-          <PublicCitizenNav currentPath="/validador-cvd" className="mt-4 pt-3 border-t border-slate-100" />
         </div>
       </header>
 
