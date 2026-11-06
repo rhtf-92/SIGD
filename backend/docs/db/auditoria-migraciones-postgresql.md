@@ -61,12 +61,27 @@ Las 21 migraciones históricas existentes en `backend/migraciones/` se mantienen
 ## 3. Migraciones Correctivas Entregadas (`22`, `23` y `24`)
 
 - **`22_sigd_refresh_token_idempotente.sql`:** asegura `sigd_auth.sesion_usuario.refresh_token` como `TEXT` de forma idempotente y sin transacciones internas, preservando datos, `NOT NULL` y `UNIQUE`.
-- **`23_sigd_superadmin_hardening.sql`:** deshabilita y bloquea exclusivamente la cuenta semilla `superadmin` (`superadmin@sigd.local`), revoca sus sesiones activas y cierra su vigencia en `sigd_org.usuario_rol` respetando `chk_usuario_rol_vigencia` y `ex_usuario_rol_vigencia` (incluso en la misma transacción), sin eliminar permisos de `sigd_org.rol_permiso` ni afectar otros usuarios `ADMINISTRADOR`.
-- **`24_sigd_rut_actor_uuid_mapeo_seguro.sql`:** convierte `actor_id` a `UUID` in-place mediante `sigd_rut.actor_id_uuid_mapeo`, sin `DROP COLUMN` ni `RENAME COLUMN`, preservando datos, identidad de columna, índices, relaciones y vistas dependientes.
+- **`23_sigd_superadmin_hardening.sql` (con garantía anti-bloqueo de acceso al sistema):**
+  - Verifica mediante `sigd_org.fn_endurecer_superadmin_si_hay_relevo()` que exista **al menos otra cuenta administrativa funcional activa** (`c.activo = TRUE`, no bloqueada, con credencial válida, asignación vigente al rol `ADMINISTRADOR` activo y permisos efectivos en `sigd_org.rol_permiso`, incluidos los de `19_sigd_admin_rbac_permissions.sql`) antes de deshabilitar `superadmin`.
+  - Si ya existe otro `ADMINISTRADOR` funcional, deshabilita y bloquea exclusivamente `superadmin` (`superadmin@sigd.local`), revoca sus sesiones activas y cierra su vigencia en `sigd_org.usuario_rol` sin eliminar permisos de `sigd_org.rol_permiso` ni afectar a los demás administradores.
+  - Si `superadmin` es aún la única cuenta `ADMINISTRADOR` funcional (p. ej. primer arranque limpio), la conserva operativa temporalmente para evitar pérdida de acceso administrativo y deja activo el disparador automático `tr_auto_hardening_superadmin` que deshabilita `superadmin` en cuanto se habilite y asigne un relevo nominal `ADMINISTRADOR`.
+- **`24_sigd_rut_actor_uuid_mapeo_seguro.sql` (compatibilidad con módulos existentes):**
+  - Convierte `actor_id` a `UUID` in-place mediante `sigd_rut.actor_id_uuid_mapeo`, sin `DROP COLUMN` ni `RENAME COLUMN`, preservando `attnum`, datos, índices, relaciones y vistas dependientes.
+  - Mantiene compatibilidad directa con `FolioCompensationPostgres` (`backend/src/domains/rutadoc/rutadoc.folio-compensation.ts`, que inserta `$7::uuid` proveniente de `sigd_auth.cuenta_usuario.id_usuario`), `sigd_tra.expediente` y `sigd_audit.evento_outbox` (`CompensacionFoliosSolicitada`).
 
 ---
 
-## 4. Aislamiento Estricto de Pruebas Destructivas
+## 4. Compatibilidad con Migraciones MGD (`11_sigd_mgd_contract.sql` y PR #200)
+
+- Las migraciones `22`, `23` y `24` operan sobre `sigd_auth.sesion_usuario`, `sigd_auth.cuenta_usuario` / `sigd_org.usuario_rol` y `sigd_rut.solicitud_compensacion_folios.actor_id`, sin colisionar con `sigd_tra.vw_mgd_expediente_base`, `sigd_tra.mv_kpis_mgd_mensual`, `sigd_tra.mv_kpis_mgd_mensual_v2` ni `sigd_tra.mv_tiempos_retencion_area_v2`.
+- En PostgreSQL 18 aislado, el lote completo de **25 migraciones** (`01`–`19` + `22`–`24`) ejecuta de extremo a extremo sin exclusiones y admite `REFRESH MATERIALIZED VIEW CONCURRENTLY` sobre las vistas MGD.
+- **Coordinación técnica con PR #200 (`F_JASTIN`):**
+  1. `F_BARTRA` ya incluye `19_sigd_admin_rbac_permissions.sql` y conserva `11_sigd_mgd_contract.sql` (inmutable en el ledger `public.sigd_migraciones`). En PR #200 no debe renombrarse `11_sigd_mgd_contract.sql` a `19_sigd_mgd_contract.sql` para evitar colisión de prefijo `19_` y ruptura del ledger histórico.
+  2. La tabla real `sigd_rut.estado_actual_expediente` (8 columnas) y `sigd_rut.pestana_de_estado(TEXT)` ya existen canónicamente en `06_sigd_rut.sql` (líneas 313 y 407); el fallo observado en Testcontainers ocurría únicamente porque `backend/tests/setup/global-setup.ts` excluía `06_sigd_rut.sql` y `11_sigd_mgd_contract.sql` por nombre exacto, por lo que mantener `11_sigd_mgd_contract.sql` elimina la necesidad del mock `18_5_sigd_rut_estado_mock.sql`.
+
+---
+
+## 5. Aislamiento Estricto de Pruebas Destructivas
 
 - Las pruebas de integración (`backend/tests/integration/db/migraciones-correctivas.test.ts` + `backend/tests/helpers/ephemeral-postgres.helper.ts`) **jamás leen URLs externas** (`MIGRATION_TEST_DATABASE_URL`, `DATABASE_URL`, `MIGRATOR_DATABASE_URL`, `PG*`) ni ejecutan `DROP SCHEMA ... CASCADE`.
 - Levantan exclusivamente una instancia PostgreSQL 18 efímera (Testcontainers o clúster temporal `initdb` en directorio temporal del sistema en `127.0.0.1` con puerto aleatorio) y crean una base aislada nueva `sigd_tmp_<hex>` por cada prueba, verificada con marcador criptográfico UUID antes de cualquier operación.

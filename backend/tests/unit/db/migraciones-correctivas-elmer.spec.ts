@@ -123,7 +123,7 @@ describe('integridad migraciones correctivas PostgreSQL (22, 23 y 24)', () => {
     expect(m).not.toMatch(/\bCOMMIT\s*;/i);
   });
 
-  it('23: deshabilita la cuenta inicial superadmin sin eliminar permisos globales del rol ADMINISTRADOR ni fallar con otros administradores', () => {
+  it('23: verifica relevo ADMINISTRADOR funcional antes de deshabilitar superadmin, preserva permisos globales y arma transición automática', () => {
     const m = leerMigracion('23_sigd_superadmin_hardening.sql');
     expect(m).not.toContain('\r');
     expect(m).toContain('DO $$');
@@ -134,6 +134,10 @@ describe('integridad migraciones correctivas PostgreSQL (22, 23 y 24)', () => {
     expect(m).not.toContain('CROSS JOIN sigd_org.permiso_sistema');
     expect(m).not.toContain('DELETE FROM sigd_org.rol_permiso');
     expect(m).not.toMatch(/\bRAISE\s+EXCEPTION\b/i);
+    expect(m).toContain('fn_endurecer_superadmin_si_hay_relevo');
+    expect(m).toContain('v_admins_alternativos < 1');
+    expect(m).toContain('tr_auto_hardening_superadmin');
+    expect(m).toContain('REVOKE ALL ON FUNCTION sigd_org.fn_endurecer_superadmin_si_hay_relevo() FROM PUBLIC');
     expect(m).toContain('superadmin');
     expect(m).toContain('activo = FALSE');
     expect(m).toContain('revocado_en = now()');

@@ -1,15 +1,25 @@
+import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Client } from 'pg';
+import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { construirApp } from '../../../src/app.js';
 import { ejecutarMigraciones, listarMigracionesAplicadas } from '../../../src/db/migrate.js';
+import { OrganigramaService } from '../../../src/domains/organicore/organigrama.service.js';
+import { TablasMaestrasService } from '../../../src/domains/organicore/tablasMaestras.service.js';
+import { crearUsuariosAdminService } from '../../../src/domains/organicore/usuariosAdmin.service.js';
+import { FolioCompensationPostgres } from '../../../src/domains/rutadoc/rutadoc.folio-compensation.js';
+import { crearContexto, runWithContext } from '../../../src/shared/request-context/request-context.js';
 import {
   asegurarBaseTemporalAislada,
   iniciarClusterPostgresEfimero,
   type ClusterPostgresEfimero,
 } from '../../helpers/ephemeral-postgres.helper.js';
+
+process.env.AUTH_JWT_SECRET ??= 'test-only-jwt-secret-migraciones-correctivas-elmer-2026';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../');
 const sqlDe = (nombre: string) => readFileSync(path.join(raiz, 'migraciones', nombre), 'utf8');
@@ -700,6 +710,389 @@ describe('migraciones correctivas (22, 23, 24): PostgreSQL 18 efímero, aislado,
         }
         rmSync(dirTemporal, { recursive: true, force: true });
       }
+    });
+  });
+
+  it('23 garantiza acceso administrativo continuo: no bloquea el sistema si superadmin es el único admin y lo deshabilita automáticamente al habilitar un relevo ADMINISTRADOR funcional (login HTTP real)', async () => {
+    await cluster.conBaseTemporalAislada(async ({ cliente, crearPool }) => {
+      const pool = crearPool();
+
+      // 1) Aplicar las 25 migraciones reales del repositorio (01..19 + 22, 23, 24) sin exclusiones.
+      const aplicadas = await ejecutarMigraciones(pool);
+      expect(aplicadas).toHaveLength(25);
+      expect(aplicadas).toContain('19_sigd_admin_rbac_permissions.sql');
+      expect(aplicadas).toContain('23_sigd_superadmin_hardening.sql');
+
+      // Como aún no existe otra cuenta ADMINISTRADOR funcional, la migración 23 preserva el acceso administrativo.
+      const seedInicial = await cliente.query<{ activo: boolean; bloqueado_hasta: Date | null }>(`
+        SELECT activo, bloqueado_hasta
+          FROM sigd_auth.cuenta_usuario
+         WHERE usuario = 'superadmin'
+      `);
+      expect(seedInicial.rows[0]).toEqual({ activo: true, bloqueado_hasta: null });
+
+      // Candidatos NO funcionales (p. ej. rol MESA_PARTES o cuenta inactiva) NO deben deshabilitar superadmin.
+      const organigrama = new OrganigramaService(pool);
+      const maestras = new TablasMaestrasService(pool);
+      const usuarios = crearUsuariosAdminService(pool);
+
+      const area = await organigrama.crearUnidad({
+        codigo: 'DIR_GEN_QA',
+        nombre: 'Dirección General QA',
+        padreId: null,
+      });
+      await maestras.crear('cargos', { codigo: 'JEFE_TI_QA', nombre: 'Jefe de TI QA' });
+      const cargoRes = await pool.query<{ cargo_id: string }>(
+        "SELECT cargo_id FROM sigd_org.cargo WHERE codigo = 'JEFE_TI_QA'",
+      );
+      const rolesRes = await pool.query<{ rol_id: string; codigo: string }>(
+        "SELECT rol_id, codigo FROM sigd_org.rol_sistema WHERE codigo IN ('ADMINISTRADOR', 'MESA_PARTES')",
+      );
+      const rolAdmin = rolesRes.rows.find((r) => r.codigo === 'ADMINISTRADOR')!;
+      const rolMesa = rolesRes.rows.find((r) => r.codigo === 'MESA_PARTES')!;
+
+      const operadorMesa = await usuarios.crearUsuario({
+        tipo: 'NATURAL',
+        numeroDocumento: '70112233',
+        nombres: 'Operador',
+        apellidos: 'Mesa Partes',
+        correo: 'mesa.qa@iestpsuiza.edu.pe',
+        passwordInicial: 'ClaveSeguraMesa2026!',
+        areaId: area.id,
+        cargoId: cargoRes.rows[0]!.cargo_id,
+      });
+      await usuarios.actualizarUsuario(operadorMesa.id, { rolesAgregar: [rolMesa.rol_id] });
+
+      const seedTrasNoAdmin = await cliente.query<{ activo: boolean }>(
+        "SELECT activo FROM sigd_auth.cuenta_usuario WHERE usuario = 'superadmin'",
+      );
+      expect(seedTrasNoAdmin.rows[0]?.activo).toBe(true);
+
+      // 2) Crear y asignar una cuenta ADMINISTRADOR nominal funcional -> dispara transición automática y deshabilita superadmin.
+      const adminNominal = await usuarios.crearUsuario({
+        tipo: 'NATURAL',
+        numeroDocumento: '70889911',
+        nombres: 'Elmer',
+        apellidos: 'Administrador Relevo',
+        correo: 'admin.relevo@iestpsuiza.edu.pe',
+        passwordInicial: 'ClaveAdminRelevo2026!',
+        areaId: area.id,
+        cargoId: cargoRes.rows[0]!.cargo_id,
+      });
+      await usuarios.actualizarUsuario(adminNominal.id, { rolesAgregar: [rolAdmin.rol_id] });
+
+      const seedEndurecido = await cliente.query<{
+        activo: boolean;
+        bloqueado_infinito: boolean;
+        roles_activos: number;
+      }>(`
+        SELECT c.activo,
+               (c.bloqueado_hasta = 'infinity'::timestamptz) AS bloqueado_infinito,
+               (
+                 SELECT COUNT(*)::int
+                   FROM sigd_org.usuario_rol ur
+                  WHERE ur.id_usuario = c.id_usuario
+                    AND ur.vigente_desde <= now()
+                    AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+               ) AS roles_activos
+          FROM sigd_auth.cuenta_usuario c
+         WHERE c.usuario = 'superadmin'
+      `);
+      expect(seedEndurecido.rows[0]).toEqual({
+        activo: false,
+        bloqueado_infinito: true,
+        roles_activos: 0,
+      });
+
+      // 3) Comprobar acceso real vía API HTTP: el nuevo administrador inicia sesión y opera rutas protegidas de administración.
+      const app = construirApp(pool);
+      const loginAdmin = await request(app).post('/api/v1/auth/login').send({
+        identificador: '70889911',
+        password: 'ClaveAdminRelevo2026!',
+      });
+      expect(loginAdmin.status).toBe(200);
+      expect(loginAdmin.body.accessToken).toBeTruthy();
+      expect(loginAdmin.body.usuario?.rol).toBe('SUPER_ADMIN');
+      expect(loginAdmin.body.usuario?.permisos).toEqual(
+        expect.arrayContaining(['admin:acceso', 'usuarios:leer', 'usuarios:gestionar']),
+      );
+
+      const listadoUsuarios = await request(app)
+        .get('/api/v1/admin/usuarios')
+        .set('Authorization', `Bearer ${loginAdmin.body.accessToken}`);
+      expect(listadoUsuarios.status).toBe(200);
+    });
+  });
+
+  it('24 mantiene compatibilidad integral de actor_id con los módulos existentes (RutaDoc FolioCompensationPostgres, IdentiCore cuenta_usuario, TramiCore expediente y CoreLink evento_outbox)', async () => {
+    await cluster.conBaseTemporalAislada(async ({ cliente }) => {
+      // Instalar esquemas base con 06_sigd_rut antes de migrar actor_id (actor_id inicia como BIGINT).
+      for (const script of [
+        '01_sigd_audit.sql',
+        '02_sigd_auth.sql',
+        '03_sigd_org.sql',
+        '04_sigd_doc.sql',
+        '05_sigd_tra.sql',
+        '06_sigd_rut.sql',
+        '08_sigd_auth_bloqueo_cuentas.sql',
+        '09_sigd_auth_perfil_activo.sql',
+        '15_sigd_superadmin.sql',
+        '19_sigd_admin_rbac_permissions.sql',
+        '22_sigd_refresh_token_idempotente.sql',
+      ]) {
+        await cliente.query(sqlDe(script));
+      }
+
+      // Crear actor real en IdentiCore (UUID) y expediente real en TramiCore + movimientos en RutaDoc.
+      const idPersona = '81000000-0000-4000-8000-000000000001';
+      const idActorUuid = '82000000-0000-4000-8000-000000000077';
+      const idExpediente = '83000000-0000-4000-8000-000000000001';
+      const idTipoDoc = '84000000-0000-4000-8000-000000000001';
+      const idMovOrig1 = '85000000-0000-4000-8000-000000000001';
+      const idMovOrig2 = '85000000-0000-4000-8000-000000000002';
+      const idMovCompHist = '86000000-0000-4000-8000-000000000001';
+      const idMovCompNuevo = '86000000-0000-4000-8000-000000000002';
+      const idSolicitudHist = '87000000-0000-4000-8000-000000000001';
+
+      await cliente.query(`
+        INSERT INTO sigd_auth.persona (id_persona, tipo, id_documento)
+        VALUES ('${idPersona}', 'NATURAL', '44556677');
+
+        INSERT INTO sigd_auth.cuenta_usuario (id_usuario, id_persona, usuario, correo, password_hash, activo)
+        VALUES (
+          '${idActorUuid}',
+          '${idPersona}',
+          'operador_rutadoc',
+          'operador.rutadoc@iestpsuiza.edu.pe',
+          '$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA',
+          TRUE
+        );
+
+        INSERT INTO sigd_tra.expediente (expediente_id, codigo_expediente, numero, tipo_documental_id, solicitante_id, fecha_radicacion)
+        VALUES ('${idExpediente}', 'EXP-2026-000001', 'NUM-2026-0001', '${idTipoDoc}', '${idPersona}', '2026-06-15T14:00:00.000Z');
+
+        INSERT INTO sigd_rut.movimiento_tramite (
+          id_movimiento, expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora, datos
+        ) VALUES
+          ('${idMovOrig1}', '${idExpediente}', 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', '${idActorUuid}', '2026-06-15T14:05:00.000Z', '{}'::jsonb),
+          ('${idMovOrig2}', '${idExpediente}', 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', '${idActorUuid}', '2026-06-15T14:10:00.000Z', '{}'::jsonb);
+
+        INSERT INTO sigd_rut.movimiento_compensatorio (
+          id_movimiento, expediente_id, estado_anterior, estado_nuevo, usuario_operador_id,
+          fecha_hora, correlation_id, clave_idempotencia, movimiento_objetivo_fecha_hora,
+          movimiento_objetivo_id, movimiento_objetivo_secuencia, huella_comando, motivo,
+          compensacion_folios, datos
+        ) VALUES
+          (
+            '${idMovCompHist}', '${idExpediente}',
+            'EN_CALIFICACION', 'RECEPCIONADO', '${idActorUuid}',
+            '2026-06-15T14:15:00.000Z', 'corr-hist-77', '88000000-0000-4000-8000-000000000001',
+            '2026-06-15T14:10:00.000Z', '${idMovOrig2}', 2, 'huella-hist-77',
+            'Reversión histórica previa a migración 24', '{}'::jsonb, '{}'::jsonb
+          ),
+          (
+            '${idMovCompNuevo}', '${idExpediente}',
+            'RECEPCIONADO', 'REGISTRADO', '${idActorUuid}',
+            '2026-06-15T14:20:00.000Z', 'corr-nuevo-77', '88000000-0000-4000-8000-000000000002',
+            '2026-06-15T14:05:00.000Z', '${idMovOrig1}', 1, 'huella-nuevo-77',
+            'Reversión posterior con módulo FolioCompensationPostgres', '{}'::jsonb, '{}'::jsonb
+          );
+
+        INSERT INTO sigd_rut.solicitud_compensacion_folios (
+          id_solicitud, expediente_id, movimiento_original_id, movimiento_compensatorio_id,
+          rango_afectado, motivo, actor_id, correlation_id, clave_idempotencia, estado
+        ) VALUES (
+          '${idSolicitudHist}', '${idExpediente}', '${idMovOrig2}', '${idMovCompHist}',
+          '{"inicio": 1, "fin": 2}'::jsonb, 'Solicitud histórica BIGINT 77', 77, 'corr-hist-77',
+          '88000000-0000-4000-8000-000000000001', 'PENDIENTE'
+        );
+
+        CREATE TABLE sigd_rut.actor_id_uuid_mapeo (
+          actor_id_numerico BIGINT PRIMARY KEY,
+          actor_uuid UUID NOT NULL
+        );
+        INSERT INTO sigd_rut.actor_id_uuid_mapeo (actor_id_numerico, actor_uuid)
+        VALUES (77, '${idActorUuid}');
+      `);
+
+      // Aplicar migración 24 sobre datos existentes.
+      await aplicarAtomico(cliente, sqlDe('24_sigd_rut_actor_uuid_mapeo_seguro.sql'));
+
+      // Ejecutar el servicio real FolioCompensationPostgres (módulo RutaDoc + CoreLink Outbox).
+      const servicioCompensacion = new FolioCompensationPostgres();
+      const idSolicitudNueva = randomUUID();
+      const idCorrelationNuevo = randomUUID();
+
+      await runWithContext(
+        crearContexto({ correlation_id: idCorrelationNuevo, usuario_id: idActorUuid }),
+        async () => {
+          await servicioCompensacion.solicitar(cliente as unknown as Parameters<typeof servicioCompensacion.solicitar>[0], {
+            referencia: idSolicitudNueva,
+            expedienteId: idExpediente,
+            movimientoOriginal: {
+              idMovimiento: idMovOrig1,
+              expedienteId: idExpediente,
+              secuencia: '1',
+              estadoAnterior: 'REGISTRADO',
+              evento: 'RECEPCION',
+              estadoNuevo: 'RECEPCIONADO',
+              fechaHora: new Date('2026-06-15T14:05:00.000Z'),
+              areaAnteriorId: null,
+            },
+            movimientoCompensatorioId: idMovCompNuevo,
+            rangoAfectado: { inicio: 1, fin: 3 },
+            motivo: 'Compensación emitida por servicio RutaDoc real tras migración 24',
+            actor: { id: idActorUuid, roles: ['SUPER_ADMIN'], puedeVerExpediente: () => true },
+            correlationId: idCorrelationNuevo,
+            claveIdempotencia: randomUUID(),
+          });
+        },
+      );
+
+      await servicioCompensacion.registrarEstado(
+        cliente as unknown as Parameters<typeof servicioCompensacion.registrarEstado>[0],
+        idSolicitudNueva,
+        'PROCESANDO',
+      );
+      await servicioCompensacion.registrarEstado(
+        cliente as unknown as Parameters<typeof servicioCompensacion.registrarEstado>[0],
+        idSolicitudNueva,
+        'COMPLETADO',
+      );
+
+      // Comprobar que tanto la fila histórica migrada como la nueva fila del módulo unen limpiamente con IdentiCore, TramiCore y CoreLink.
+      const integracion = await cliente.query<{
+        id_solicitud: string;
+        actor_id: string;
+        usuario: string;
+        codigo_expediente: string;
+        estado: string;
+        outbox_evento: string | null;
+        outbox_actor: string | null;
+      }>(`
+        SELECT s.id_solicitud::text,
+               s.actor_id::text,
+               u.usuario,
+               e.codigo_expediente,
+               s.estado,
+               o.tipo_evento AS outbox_evento,
+               o.payload->>'actorId' AS outbox_actor
+          FROM sigd_rut.solicitud_compensacion_folios s
+          JOIN sigd_auth.cuenta_usuario u
+            ON u.id_usuario = s.actor_id
+          JOIN sigd_tra.expediente e
+            ON e.expediente_id = s.expediente_id
+          JOIN sigd_rut.movimiento_compensatorio mc
+            ON mc.id_movimiento = s.movimiento_compensatorio_id
+          LEFT JOIN sigd_audit.evento_outbox o
+            ON o.id_evento = s.id_evento_outbox
+         ORDER BY s.creado_en ASC
+      `);
+
+      expect(integracion.rows).toEqual([
+        {
+          id_solicitud: idSolicitudHist,
+          actor_id: idActorUuid,
+          usuario: 'operador_rutadoc',
+          codigo_expediente: 'EXP-2026-000001',
+          estado: 'PENDIENTE',
+          outbox_evento: null,
+          outbox_actor: null,
+        },
+        {
+          id_solicitud: idSolicitudNueva,
+          actor_id: idActorUuid,
+          usuario: 'operador_rutadoc',
+          codigo_expediente: 'EXP-2026-000001',
+          estado: 'COMPLETADO',
+          outbox_evento: 'CompensacionFoliosSolicitada',
+          outbox_actor: idActorUuid,
+        },
+      ]);
+    });
+  });
+
+  it('22, 23 y 24 son totalmente compatibles con las migraciones MGD (11_sigd_mgd_contract y escenario MGD de PR #200) y permiten REFRESH MATERIALIZED VIEW CONCURRENTLY sin conflictos', async () => {
+    await cluster.conBaseTemporalAislada(async ({ cliente, crearPool }) => {
+      const pool = crearPool();
+
+      // Ejecutar pipeline completo (01..19 + 22..24), que incluye 06_sigd_rut, 07_sigd_reportes y 11_sigd_mgd_contract.
+      const aplicadas = await ejecutarMigraciones(pool);
+      expect(aplicadas).toHaveLength(25);
+
+      // Reproducir además el escenario MGD del PR #200 (18_5 IF NOT EXISTS + re-aplicación idempotente del contrato MGD) junto con 22, 23 y 24.
+      await cliente.query(`
+        CREATE TABLE IF NOT EXISTS sigd_rut.estado_actual_expediente (
+          expediente_id UUID PRIMARY KEY,
+          estado_nuevo VARCHAR(50),
+          area_actual_id VARCHAR(50)
+        );
+      `);
+      await cliente.query(sqlDe('11_sigd_mgd_contract.sql'));
+      await cliente.query(sqlDe('22_sigd_refresh_token_idempotente.sql'));
+      await cliente.query(sqlDe('23_sigd_superadmin_hardening.sql'));
+      await cliente.query(sqlDe('24_sigd_rut_actor_uuid_mapeo_seguro.sql'));
+
+      // Verificar que estado_actual_expediente conserva las 8 columnas canónicas de 06_sigd_rut.sql.
+      const colsEstadoActual = await cliente.query<{ total: number }>(`
+        SELECT COUNT(*)::int AS total
+          FROM information_schema.columns
+         WHERE table_schema = 'sigd_rut'
+           AND table_name = 'estado_actual_expediente'
+      `);
+      expect(colsEstadoActual.rows[0]?.total).toBe(8);
+
+      // Sembrar un expediente radicado y su flujo hasta RESUELTO para verificar vistas MGD y refresco concurrente.
+      const idPersona = '91000000-0000-4000-8000-000000000001';
+      const idExpediente = '92000000-0000-4000-8000-000000000001';
+      const idOperador = '93000000-0000-4000-8000-000000000001';
+
+      await cliente.query(`
+        INSERT INTO sigd_auth.persona (id_persona, tipo, id_documento)
+        VALUES ('${idPersona}', 'NATURAL', '77665544');
+
+        INSERT INTO sigd_tra.expediente (
+          expediente_id, codigo_expediente, numero, tipo_documental_id, solicitante_id, fecha_radicacion
+        ) VALUES (
+          '${idExpediente}', 'EXP-2026-000099', 'NUM-2026-0099',
+          '10000000-0000-4000-8000-000000000001', '${idPersona}', '2026-06-15T13:00:00.000Z'
+        );
+
+        INSERT INTO sigd_rut.movimiento_tramite (
+          expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora, datos
+        ) VALUES
+          ('${idExpediente}', 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', '${idOperador}', '2026-06-15T14:00:00.000Z', '{}'::jsonb),
+          ('${idExpediente}', 'RECEPCIONADO', 'INICIAR_CALIFICACION', 'EN_CALIFICACION', '${idOperador}', '2026-06-15T15:00:00.000Z', '{}'::jsonb),
+          ('${idExpediente}', 'EN_CALIFICACION', 'INICIAR_REVISION', 'EN_REVISION', '${idOperador}', '2026-06-15T16:00:00.000Z', '{}'::jsonb),
+          ('${idExpediente}', 'EN_REVISION', 'ENVIAR_A_FIRMA', 'EN_FIRMA', '${idOperador}', '2026-06-15T17:00:00.000Z', '{}'::jsonb),
+          ('${idExpediente}', 'EN_FIRMA', 'FIRMA', 'RESUELTO', '${idOperador}', '2026-06-15T18:00:00.000Z', '{}'::jsonb);
+      `);
+
+      // Refrescar vistas materializadas MGD (v1 de 07 y v2 de 11/PR #200) usando CONCURRENTLY fuera de bloque transaccional.
+      await cliente.query('REFRESH MATERIALIZED VIEW CONCURRENTLY sigd_tra.mv_kpis_mgd_mensual');
+      await cliente.query('REFRESH MATERIALIZED VIEW CONCURRENTLY sigd_tra.mv_kpis_mgd_mensual_v2');
+      await cliente.query('REFRESH MATERIALIZED VIEW CONCURRENTLY sigd_tra.mv_tiempos_retencion_area_v2');
+
+      const kpiV2 = await cliente.query<{
+        n_radicados: string;
+        n_resueltos: string;
+        vtep_porcentaje: string;
+        tro_porcentaje: string;
+      }>(`
+        SELECT n_radicados::text,
+               n_resueltos::text,
+               vtep_porcentaje::text,
+               tro_porcentaje::text
+          FROM sigd_tra.mv_kpis_mgd_mensual_v2
+      `);
+      expect(kpiV2.rows).toEqual([
+        {
+          n_radicados: '1',
+          n_resueltos: '1',
+          vtep_porcentaje: '100.00',
+          tro_porcentaje: '100.00',
+        },
+      ]);
     });
   });
 });
