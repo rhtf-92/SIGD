@@ -18,9 +18,14 @@ export default function SeguridadPage() {
     guardarPoliticas,
     mensaje,
     setMensaje,
+    error,
+    isLoading,
+    isSaving,
+    isError,
+    recargar,
   } = useSeguridadPolicies();
 
-  const [cuentaEnDesbloqueo, setCuentaEnDesbloqueo] = useState<number | null>(
+  const [cuentaEnDesbloqueo, setCuentaEnDesbloqueo] = useState<string | null>(
     null,
   );
   const [justificacion, setJustificacion] = useState("");
@@ -53,13 +58,14 @@ export default function SeguridadPage() {
             {mensaje}
           </div>
         )}
+        {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error.message}{isError && <button type="button" onClick={() => void recargar()} className="ml-3 font-semibold underline">Reintentar</button>}</div>}
+        {isLoading && <p role="status" className="mt-4 rounded-lg bg-white p-4">Cargando políticas, cuentas bloqueadas e intentos desde el servidor…</p>}
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold">Políticas de acceso</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Parámetros de demostración para su futura integración con
-              autenticación JWT.
+              La política guardada controla intentos fallidos, bloqueos y duración de sesión de autenticación.
             </p>
 
             <div className="mt-5 space-y-4">
@@ -70,6 +76,7 @@ export default function SeguridadPage() {
                 <input
                   type="number"
                   min={1}
+                  max={20}
                   value={maxIntentos}
                   onChange={(event) => setMaxIntentos(Number(event.target.value))}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
@@ -83,6 +90,7 @@ export default function SeguridadPage() {
                 <input
                   type="number"
                   min={1}
+                  max={1440}
                   value={minutosBloqueo}
                   onChange={(event) =>
                     setMinutosBloqueo(Number(event.target.value))
@@ -98,6 +106,7 @@ export default function SeguridadPage() {
                 <input
                   type="number"
                   min={5}
+                  max={1440}
                   value={minutosSesion}
                   onChange={(event) =>
                     setMinutosSesion(Number(event.target.value))
@@ -108,10 +117,11 @@ export default function SeguridadPage() {
 
               <button
                 type="button"
-                onClick={guardarPoliticas}
+                onClick={() => void guardarPoliticas()}
+                disabled={isSaving}
                 className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
               >
-                Guardar políticas
+                {isSaving ? "Guardando…" : "Guardar políticas"}
               </button>
             </div>
           </section>
@@ -179,6 +189,7 @@ export default function SeguridadPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
+                {intentosIniciales.length === 0 && <tr><td colSpan={4} className="px-6 py-6 text-center text-sm text-slate-500">No hay intentos registrados para la vista actual.</td></tr>}
                 {intentosIniciales.map((intento) => (
                   <tr key={intento.id}>
                     <td className="px-6 py-4 text-sm">{intento.fecha}</td>
@@ -231,10 +242,9 @@ export default function SeguridadPage() {
               </button>
               <button
                 type="button"
-                disabled={!justificacion.trim()}
+                disabled={isSaving || justificacion.trim().length < 10}
                 onClick={() => {
-                  desbloquearCuenta(cuentaEnDesbloqueo, justificacion);
-                  setCuentaEnDesbloqueo(null);
+                  void desbloquearCuenta(cuentaEnDesbloqueo, justificacion).then((ok) => { if (ok) setCuentaEnDesbloqueo(null); });
                 }}
                 className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
               >

@@ -52,13 +52,12 @@ describe('calculateBusinessHours', () => {
   });
 
   it('debe excluir sábados y domingos del cálculo', () => {
-    // Viernes 11 de septiembre hasta lunes 14 de septiembre
-    // Excluye sábado 12 y domingo 13
+    // Desde el viernes 11 hasta el lunes 14 a las 00:00 (fin exclusivo).
+    // El intervalo incluye el viernes; el lunes aún no ha comenzado.
     const friday = new Date('2026-09-11T00:00:00Z');
     const nextMonday = new Date('2026-09-14T00:00:00Z');
     const result = calculateBusinessHours(friday, nextMonday);
-    // Viernes + Lunes = 2 días = 48 horas
-    expect(result).toBe(48);
+    expect(result).toBe(24);
   });
 
   it('debe calcular correctamente para una semana laboral completa', () => {
@@ -218,7 +217,8 @@ describe('calculateKpi02TempoPromedio', () => {
   });
 
   it('debe excluir fines de semana en el cálculo', () => {
-    // Viernes a lunes (excluye sábado y domingo)
+    // Desde viernes hasta lunes a las 00:00 (fecha final exclusiva).
+    // Solo se cuenta el viernes; el lunes todavía no está dentro del intervalo.
     aggregateData.expedientes = [
       {
         id: 'EXP001',
@@ -230,8 +230,7 @@ describe('calculateKpi02TempoPromedio', () => {
       },
     ];
     const result = calculateKpi02TempoPromedio(aggregateData);
-    // Viernes = 24 horas, Lunes = 24 horas = 48 horas
-    expect(result).toBe(48);
+    expect(result).toBe(24);
   });
 
   it('debe redondear a 2 decimales', () => {

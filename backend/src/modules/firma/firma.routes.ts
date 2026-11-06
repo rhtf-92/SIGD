@@ -212,7 +212,9 @@ export async function listarPendientesFirma(
         solicitanteNombre: fila.solicitante_nombre,
         fechaProyeccion: new Date(fila.fecha_proyeccion).toISOString(),
         foliosTotal: fila.folios_total,
-        s3PreviewUrl: clave ? generarUrlPresigned(clave, configS3) : '',
+        s3PreviewUrl: clave
+          ? generarUrlPresigned(clave, { ...configS3, endpoint: configS3.publicEndpoint })
+          : '',
         puedeFirmar,
         ...(puedeFirmar
           ? {}

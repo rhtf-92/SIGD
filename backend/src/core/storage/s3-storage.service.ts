@@ -68,8 +68,6 @@ export function generarUrlPresigned(
 
   const cabecerasFirmadas: Record<string, string> = {
     host,
-    'x-amz-content-sha256': PAYLOAD_SIN_FIRMA,
-    'x-amz-date': amzFecha,
   };
   if (opciones.contentType) {
     cabecerasFirmadas['content-type'] = opciones.contentType;

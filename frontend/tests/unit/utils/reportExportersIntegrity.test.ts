@@ -61,7 +61,7 @@ describe("Suite de Integridad de Exportadores de Reportes PDF y Excel (BR-07 / E
 
     const excelRes = await exportExcelReport({ ...mockExportRequest, format: "xlsx" });
     expect(excelRes.sha256Checksum).toMatch(/^[a-f0-9]{64}$/i);
-    expect(excelRes.fileName).toContain(".xls");
+    expect(excelRes.fileName).toMatch(/\.xlsx$/);
 
     clickSpy.mockRestore();
   });

@@ -35,8 +35,8 @@ export interface ActoAdministrativo {
   nombreArchivoPdf: string;
   tamanoArchivo: string;
   urlDescargaPdf?: string;
-  hashIntegridadSha256: string; // SHA-256 del acto administrativo
-  cvd: string; // Código de Verificación Digital (CVD-YYYY-TIP-XXXXXX-HASH)
+  hashIntegridadSha256: string; // Vacío cuando el hash del acto no está registrado
+  cvd: string; // Vacío cuando no hay CVD persistido
   firmantes: FirmanteDocumento[];
 }
 
@@ -44,8 +44,8 @@ export interface DestinatarioCasilla {
   idPersona?: number;
   nombresCompletos: string;
   numeroDocumento: string; // DNI o RUC
-  tipoDocumento: "DNI" | "RUC" | "CE";
-  direccionCasilla: string; // ej. "74561238@casilla.iestpsuiza.edu.pe"
+  tipoDocumento: "DNI" | "RUC" | "CE" | "NO_REGISTRADO";
+  direccionCasilla: string; // Dirección registrada o indicador de ausencia
   telefonoContacto?: string;
   correoPersonal?: string;
 }
@@ -57,11 +57,11 @@ export interface AcuseNotificacion {
   destinatario: DestinatarioCasilla;
   timestampGeneracionIso: string; // Timestamp ISO-8601 devuelto por backend
   hashSha256Acuse: string; // Hash SHA-256 devuelto por backend
-  cvdAcuse: string; // CVD del Acuse oficial
+  cvdAcuse: string; // Vacío cuando no hay CVD persistido
   entidadEmisora: string; // "IESTP Suiza"
   unidadEmisora: string; // ej. "Secretaría Académica"
-  fechaEfectoLegal: string; // Fecha en que surte efecto jurídico (Art. 20 Ley 27444)
-  plazoImpugnacionDiasHabiles: number; // ej. 15 días hábiles
+  fechaEfectoLegal: string; // Valor registrado o indicador de ausencia
+  plazoImpugnacionDiasHabiles: number | null;
   fechaLimiteImpugnacion?: string;
   ipRegistro?: string;
   validezLegalMensaje: string;
@@ -69,7 +69,7 @@ export interface AcuseNotificacion {
 
 export interface Notificacion {
   id: string;
-  numeroNotificacion: string; // ej. "NOT-2026-000184"
+  numeroNotificacion: string; // Identificador real del registro
   numeroExpediente: string; // ej. "EXP-2026-000104"
   asunto: string;
   tipo: TipoNotificacion;
@@ -79,7 +79,7 @@ export interface Notificacion {
   responsableEmision?: string;
   fechaDepositoIso: string; // Timestamp ISO-8601 de depósito en buzón
   fechaLecturaIso?: string | null; // Primer acceso
-  fechaNotificadoIso?: string | null; // Perfeccionamiento con acuse
+  fechaNotificadoIso?: string | null; // Fecha registrada del acuse
   requiereAcuse: boolean;
   actoAdministrativo: ActoAdministrativo;
   acuse?: AcuseNotificacion | null;

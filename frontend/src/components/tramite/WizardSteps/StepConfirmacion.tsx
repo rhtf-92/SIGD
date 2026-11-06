@@ -1,3 +1,4 @@
+import { useAuthStore } from '../../../stores/authStore';
 /**
  * ==============================================================================
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
@@ -118,71 +119,15 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           ? documentos.asunto.trim()
           : `${documentos.asunto.trim()} - Solicitud de Trámite Institucional`;
 
-      let idTipoTramite = documentos.tipoTramiteId;
-      if (
-        !idTipoTramite ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite) ||
-        idTipoTramite === '00000000-0000-0000-0000-000000000001'
-      ) {
-        try {
-          const respTipos = await apiClient.get<Array<{ id: string; codigo?: string; id_tipo_tramite?: string }>>(
-            '/api/v1/tramites/tipos',
-          );
-          if (Array.isArray(respTipos?.data) && respTipos.data.length > 0) {
-            const encontrado = respTipos.data.find(
-              (t) => t.codigo === documentos.tipoTramiteId || t.id === documentos.tipoTramiteId,
-            );
-            const resId = (encontrado ? (encontrado.id || encontrado.id_tipo_tramite) : (respTipos.data[0].id || respTipos.data[0].id_tipo_tramite));
-            if (resId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resId)) {
-              idTipoTramite = resId;
-            }
-          }
-        } catch {
-          // Fallback defensivo si el endpoint no está disponible en entorno aislado
-        }
-      }
-      if (!idTipoTramite || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite)) {
-        idTipoTramite = '00000000-0000-0000-0000-000000000001';
-      }
-
-      let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
-      try {
-        if (identificacion.numeroDocumento) {
-          const respPersona = await apiClient.get<{ persona?: { id: number | string } }>(
-            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(identificacion.numeroDocumento)}`
-          );
-          if (respPersona?.data?.persona?.id) {
-            idPersonaNum = Number(respPersona.data.persona.id);
-          }
-        }
-      } catch {
-        // Fallback defensivo
-      }
-
-      const archivosPayload =
-        documentos.archivos.length > 0
-          ? documentos.archivos.map((a) => ({
-              nombreArchivo: a.nombre,
-              contentType: 'application/pdf',
-              tamanoBytes: Number(a.peso) || 1024,
-              hashSha256:
-                a.hashSha256 && /^[0-9a-f]{64}$/i.test(a.hashSha256)
-                  ? a.hashSha256.toLowerCase()
-                  : 'a'.repeat(64),
-            }))
-          : [
-              {
-                nombreArchivo: 'documento_principal.pdf',
-                contentType: 'application/pdf',
-                tamanoBytes: 2048,
-                hashSha256: 'a'.repeat(64),
-              },
-            ];
-
+      const usuario=useAuthStore.getState().usuario;
+      if(!usuario?.idPersona)throw new Error('Debe iniciar sesion.');
+      const idTipoTramite=documentos.tipoTramiteId;
+      if(!documentos.archivos.length || documentos.archivos.some(a=>!a.storageUrl || !/^[a-f0-9]{64}$/i.test(a.hashSha256)))throw new Error('Debe confirmar sus adjuntos.');
+      const archivosPayload=documentos.archivos.map(a=>({nombreArchivo:a.nombre,contentType:'application/pdf',tamanoBytes:a.peso,hashSha256:a.hashSha256,storagePath:a.storageUrl}));
       const payload = {
         asunto: asuntoFinal,
         idTipoTramiteTupa: idTipoTramite,
-        idPersona: idPersonaNum,
+        idPersona: usuario.idPersona,
         nombreSolicitante:
           nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
         correo:
@@ -205,7 +150,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         asunto: documentos.asunto,
         remitente: nombreCompleto,
         hashTransaccion:
-          serverData.cargoDigital?.hashSha256 || 'a'.repeat(64),
+          serverData.cargoDigital.hashSha256,
         qrValidationUrl: serverData.qrSeguimientoUrl,
       };
 

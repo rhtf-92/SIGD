@@ -91,7 +91,7 @@ const KPI_CONFIGURATIONS: Record<string, KpiConfiguration> = {
  * @returns true si es día hábil (lunes a viernes)
  */
 function isBusinessDay(date: Date): boolean {
-  const day = date.getDay();
+  const day = date.getUTCDay();
   return day !== 0 && day !== 6; // 0 = domingo, 6 = sábado
 }
 
@@ -114,14 +114,14 @@ export function calculateBusinessHours(
 
   let totalHours = 0;
   const currentDate = new Date(startDate);
-  currentDate.setHours(0, 0, 0, 0);
+  currentDate.setUTCHours(0, 0, 0, 0);
 
   // Iterar por cada día desde startDate hasta endDate (endDate exclusiva)
   while (currentDate < endDate) {
     if (isBusinessDay(currentDate)) {
       totalHours += 24;
     }
-    currentDate.setDate(currentDate.getDate() + 1);
+    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
   }
 
   return totalHours;

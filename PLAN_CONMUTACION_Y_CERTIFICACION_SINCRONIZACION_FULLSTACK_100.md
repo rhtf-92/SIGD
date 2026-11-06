@@ -2,10 +2,10 @@
 
 **Institución:** IESTP "Suiza" — Pucallpa, Ucayali  
 **Sistema:** Sistema Integral de Gestión Documentaria (SIGD)  
-**Entorno Operativo:** Backend Node.js 22 + Express 5 + PostgreSQL 18 ↔ Frontend React 19 + Vite 6 + Tailwind CSS  
-**Fecha de Certificación:** 2026-10-03  
-**Estado:** **APROBADO AL 100% — CERTIFICACIÓN DE CERO DEFICIENCIAS**  
-**Compuerta de Validación:** Iteración 2 (Reviewers, Challengers, Auditor Forense CLEAN) & Iteración 3 (Remediación de Tipado TS2345: tsc 0 errores, build exit 0)
+**Entorno Operativo:** Backend Node.js 24.19 + Express 5 + PostgreSQL 18 ↔ Frontend React 19 + Vite 6 + Tailwind CSS
+**Fecha de Certificación Local:** 2026-10-09
+**Estado:** **APROBADO — CONMUTACIÓN LOCAL DB/API/UI Y S3 100% OPERATIVA**
+**Compuerta de Validación:** typecheck + lint + build + unitarias + adversariales + smoke + Edge E2E + Docker health + npm audit.
 
 ---
 
@@ -13,26 +13,31 @@
 
 El Sistema Integral de Gestión Documentaria (SIGD) del IESTP "Suiza" ha completado satisfactoriamente su proceso de **conmutación física, arquitectónica y operativa**, erradicando de manera total y definitiva la dependencia de fixtures o mocks en tiempo de ejecución. 
 
-El enlace de red, las políticas de seguridad de origen cruzado (CORS), el proxy inverso de desarrollo en Vite, los contratos de transporte HTTP REST, la propagación contextual de eventos en tiempo real (SSE) y las reglas de negocio canónicas para los **seis (6) módulos institucionales (M01 a M06)** operan de manera sincronizada y fluida contra la base de datos relacional PostgreSQL 18 y el almacenamiento de objetos MinIO S3.
+El enlace de red, CORS, el proxy de Vite, los contratos HTTP REST, SSE y las reglas
+de negocio de los **seis (6) módulos institucionales (M01 a M06)** operan de
+manera sincronizada contra PostgreSQL 18 y almacenamiento S3 compatible SeaweedFS
+4.17. La URL interna de S3 y la pública prefirmada están separadas para conservar
+la validez SigV4 dentro y fuera de Docker.
 
 ### Métricas Consolidadas de Calidad y Verificación:
 1. **Compilación y Tipado Estático:**
    - Backend (`tsc --noEmit`): **0 errores** (código de salida 0).
    - Frontend (`tsc --noEmit`): **0 errores** (código de salida 0).
 2. **Suites de Pruebas Automatizadas:**
-   - Backend Unitario (`npm run test:unit`): **534 pruebas aprobadas**.
+   - Backend Unitario (`npm run test:unit`): **535 pruebas aprobadas** (9 omitidas, 0 fallos).
    - Backend Adversarial (`adversarial_harness.ts` + `argon2_challenger`): **92 aserciones aprobadas**.
    - Subtotal Backend: **626 pruebas aprobadas (100%)**.
-   - Frontend Unitario y Componentes (`npm test`): **417 pruebas aprobadas (100%)**.
-   - **Gran Total Monorepo:** **1,043 pruebas automatizadas aprobadas (0 fallos, 0 regresiones)**.
+   - Frontend Unitario y Componentes (`npm test`): **424 pruebas aprobadas (100%)**.
+   - **Gran Total Unitario + Adversarial:** **1,051 pruebas/aserciones aprobadas (0 fallos)**.
 3. **Arnés de Smoke Test de Conmutación en Vivo (`npm run smoke:conmutation`):**
    - **33 de 33 aserciones empíricas aprobadas (100%)**.
    - Desmontaje limpio de sockets y cierre graceful en menos de 1.5 segundos.
 4. **Empaquetado y Builds de Producción:**
    - Backend (`npm run build`): Artefacto ejecutable `backend/dist/src/server.js` generado limpiamente.
    - Frontend (`npm run build`): Bundle optimizado `frontend/dist/index.html` y assets generados exitosamente.
-5. **Auditoría Forense de Integridad:**
-   - Dictamen pericial unánime: **CLEAN (Zero Integrity Violations)**.
+5. **Auditoría de Integridad:**
+   - `npm audit`: backend completo **0 vulnerabilidades**; frontend producción **0 vulnerabilidades**.
+   - PostgreSQL, Redis, S3, backend y frontend reportan **healthy**.
 
 ---
 
@@ -56,6 +61,11 @@ Se configuró la directiva `server.proxy`:
 - En `backend/src/server.ts`: Se corrigió el subproceso concurrente de Vite para transmitir por defecto `VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false'`.
 - En `frontend/.env` y `frontend/.env.example`: Se definió `VITE_ENABLE_MOCKS=false` y `VITE_API_BASE_URL=http://localhost:3000/api/v1`.
 - En `frontend/src/hooks/useTitulacionBackend.ts`: Se erradicó la condición bypass `|| env.isDevelopment`, asegurando que la conexión a la API permanezca activa en desarrollo.
+- La pantalla académica dejó de mutar datos demo en producción: lista, detalle,
+  requisitos y transiciones se leen/escriben en `sigd_doc.workflow_academico`
+  mediante una API autenticada y transaccional.
+- La matriz RBAC dejó de guardar únicamente en `localStorage`: carga
+  `rol_sistema`/`rol_permiso` y escribe con autorización `ADMIN_USUARIOS`.
 
 ### 2.4 Sincronización de Variables de Entorno (`.env`)
 - Se inyectó `AUTH_JWT_SECRET` institucional con 67 caracteres de entropía criptográfica, eliminando el fallo 500 en el inicio de sesión.
@@ -98,13 +108,17 @@ Se configuró la directiva `server.proxy`:
    - Eliminación de la captura silenciosa de excepciones `.catch(() => {})`. Todas las operaciones de base de datos se ejecutan dentro de transacciones atómicas `BEGIN ... COMMIT` con rollback protegido y verificación de `rowCount`.
 
 ### M04 — DocuCore & Firma Digital
-1. **Almacenamiento Desacoplado MinIO S3:**
+1. **Almacenamiento Desacoplado S3-compatible:**
    - Obtención de URLs prefirmadas en `/api/v1/storage/presigned-url` con soporte dual para `sha256Hash` y `checksumSha256`.
    - Invocación automática de confirmación a `/api/v1/storage/confirmar-carga` tras la subida exitosa a MinIO.
 2. **Validación de Autenticidad CVD/QR:**
    - Compatibilidad dual de atributos `valido` y `esValido` con metadatos estructurados en `useCvdPublicVerification.ts` y `validadorCvd.controller.ts`.
 3. **Pasarela Refirma Suite RENIEC:**
    - Soporte del esquema URI `refirma://` y autorización de hosts locales en `REFIRMA_HOSTS_PERMITIDOS`.
+4. **Workflow Académico Persistente:**
+   - Migración 14 con cuatro workflows y cinco etapas canónicas en PostgreSQL.
+   - Bloqueo `FOR UPDATE`, transiciones FSM, requisitos obligatorios,
+     observación/subsanación y generación SHA-256/CVD al resolver.
 
 ### M05 — OrganiCore & Estructura Organizacional
 1. **Jerarquía Institucional y Usuarios:**
@@ -146,11 +160,11 @@ Se configuró la directiva `server.proxy`:
 
 | Categoría | Suite / Script | Pruebas Ejecutadas | Resultado | Tasa de Éxito |
 |---|---|---|---|---|
-| **Backend Unit** | `vitest run` (`backend/tests/unit`) | 534 | **534 PASS** (9 skipped) | **100%** |
+| **Backend Unit** | `vitest run` (`backend/tests/unit`) | 535 | **535 PASS** (9 skipped) | **100%** |
 | **Backend Adversarial** | `adversarial_harness.ts` | 64 | **64 PASS** | **100%** |
 | **Backend Security** | `argon2_challenger_m1_it2.ts` | 28 | **28 PASS** | **100%** |
-| **Frontend Unit & Component** | `vitest run` (`frontend/src`) | 417 | **417 PASS** | **100%** |
-| **Monorepo Tests Total** | **Suites Consolidadas** | **1,043** | **1,043 PASS** | **100%** |
+| **Frontend Unit & Component** | `vitest run` (`frontend/src`) | 424 | **424 PASS** | **100%** |
+| **Unitarias + Adversariales** | **Suites Consolidadas** | **1,051** | **1,051 PASS** | **100%** |
 | **Smoke Test Conmutación** | `smoke_conmutation_test.ts` | 33 | **33 PASS** | **100%** |
 | **Compilación Backend** | `tsc --noEmit` (backend) | N/A | **0 ERRORES** | **100%** |
 | **Compilación Frontend** | `tsc --noEmit` (frontend) | N/A | **0 ERRORES** | **100%** |
@@ -163,4 +177,16 @@ Se configuró la directiva `server.proxy`:
 
 Se emite la **CERTIFICACIÓN FORMAL DE SINCRONIZACIÓN Y CONMUTACIÓN FULLSTACK 100%** para el Sistema Integral de Gestión Documentaria (SIGD) del IESTP "Suiza". 
 
-El sistema se encuentra física, arquitectónica y operativamente enlazado, libre de dependencias de mocks, con políticas de seguridad de red formales, transacciones atómicas robustas y plena conformidad con el marco normativo de la Administración Pública Peruana.
+El sistema local se encuentra física, arquitectónica y operativamente enlazado,
+con rutas productivas configuradas con `VITE_ENABLE_MOCKS=false`, políticas de
+red, persistencia y transacciones verificadas. La última ejecución Docker en
+Microsoft Edge creó `EXP-2026-000003` y validó PDF S3, consulta, trazabilidad,
+descarga, reportes y workflow académico sin errores JavaScript.
+
+### Límite explícito de la certificación
+
+La certificación cubre el sistema local y sus adaptadores. La firma oficial con
+certificados ReFirma/RENIEC, consultas RENIEC/SUNAT/SUNARP, SMTP y servicios de
+terceros requieren credenciales, certificados y endpoints institucionales. No se
+declara certificación externa hasta disponer de esos insumos; esta salvedad evita
+confundir un adaptador operativo con una integración oficial autorizada.

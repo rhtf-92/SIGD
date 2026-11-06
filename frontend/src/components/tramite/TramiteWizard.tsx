@@ -18,7 +18,7 @@
  * ==============================================================================
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useTramiteWizardReducer } from "../../hooks/useTramiteWizardReducer";
 import {
   StepIdentificacion,
@@ -49,13 +49,6 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
 }) => {
   const { state, dispatch } = useTramiteWizardReducer();
   const [modalAbierto, setModalAbierto] = useState(false);
-
-  // Apertura automática del modal institucional de cargo cuando se asienta el trámite
-  useEffect(() => {
-    if (state.cargoEmitido) {
-      setModalAbierto(true);
-    }
-  }, [state.cargoEmitido]);
 
   const handleNext = useCallback(() => {
     if (state.currentStep < 4) {

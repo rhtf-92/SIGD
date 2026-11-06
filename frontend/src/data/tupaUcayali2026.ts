@@ -323,7 +323,7 @@ export const PROCEDIMIENTOS_TUPA_2026: readonly ProcedimientoTupa2026[] = [
     ],
     derechoPago:
       "El cuadro indica S/. 10.50 (0.19 % de la UIT); la descripción señala S/. 10.00 por hoja.",
-    nota: "El documento consigna dos montos distintos: conservar ambas referencias para su validación institucional.",
+    nota: "Pendiente de confirmación administrativa: el documento consigna dos montos distintos. No utilizar para cobros automáticos ni liquidaciones definitivas.",
   },
   {
     codigo: "ACA-40",
@@ -665,7 +665,7 @@ export const PROCEDIMIENTOS_TUPA_2026: readonly ProcedimientoTupa2026[] = [
       "Emisión de boleta de venta",
     ],
     detalleTarifas: ["S/. 50.00", "S/. 55.00"],
-    nota: "El documento muestra dos importes sin indicar a qué corresponden.",
+    nota: "Pendiente de confirmación administrativa: el documento muestra dos importes sin indicar a qué corresponden. No utilizar para cobros automáticos ni liquidaciones definitivas.",
   },
   {
     codigo: "BIE-15",

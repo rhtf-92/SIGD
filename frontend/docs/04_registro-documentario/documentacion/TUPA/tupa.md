@@ -133,4 +133,5 @@ Para las ventas de bienes, el documento indica pago en Tesorería, entrega del b
 - Se conservaron las denominaciones, montos y condiciones indicados en el documento escaneado. No se añadieron plazos ni autoridades que la fuente no especifica.
 - Los importes de acceso a la información pública aparecen como S/. 10.50 en el cuadro y S/. 10.00 por hoja en la descripción; ambos se mantienen para validación institucional.
 - Para patos adultos machos aparecen S/. 50.00 y S/. 55.00 sin asociar cada monto a una condición; no se presume una distinción.
+- Ambos conceptos quedan pendientes de confirmación administrativa y sus importes no deben utilizarse para cobros automáticos, órdenes de pago ni liquidaciones definitivas.
 - La fuente identifica como base legal la Ley 28693, Ley General del Sistema Nacional de Tesorería, el principio de unidad de caja y la Directiva de Tesorería.

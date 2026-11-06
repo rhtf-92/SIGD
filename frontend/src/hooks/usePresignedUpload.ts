@@ -239,17 +239,10 @@ export function usePresignedUpload(
         }
 
         if (!options.demoMode) {
-          try {
-            await apiClient.post("/api/v1/storage/confirmar-carga", {
-              s3Key: presigned.s3Key,
-              sha256Hash: sha256,
-            });
-          } catch (confirmError) {
-            console.warn(
-              "[usePresignedUpload] Aviso al confirmar carga en almacenamiento:",
-              confirmError,
-            );
-          }
+          const confirmed = await apiClient.post('/api/v1/storage/confirmar-carga', {
+            s3Key: presigned.s3Key, sha256Hash: sha256,
+          });
+          presigned.s3Key = confirmed.data.s3Key;
         }
 
         const uploaded: UploadResult = { file, sha256, s3Key: presigned.s3Key };

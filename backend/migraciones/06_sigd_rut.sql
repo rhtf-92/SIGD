@@ -2,7 +2,7 @@
 -- Fuente de los catálogos: rutadoc.fsm.ts, commit eba677c.
 -- Este archivo se instala después de 01..05 cuando exista el runner general.
 -- Los límites anuales son instantes UTC con extremo superior exclusivo.
-BEGIN;
+-- La transacci?n pertenece al ejecutor general.
 
 CREATE SCHEMA IF NOT EXISTS sigd_rut;
 
@@ -72,13 +72,13 @@ ON CONFLICT (estado_anterior, evento) DO UPDATE
 -- globalmente, incluso si el expediente cruza años. La clave idempotente es
 -- única por expediente cuando se suministra; NULL significa sin deduplicación.
 CREATE TABLE IF NOT EXISTS sigd_rut.movimiento_secuencia (
-    expediente_id BIGINT PRIMARY KEY,
+    expediente_id UUID PRIMARY KEY,
     ultima_secuencia BIGINT NOT NULL CHECK (ultima_secuencia > 0)
 );
 
 CREATE TABLE IF NOT EXISTS sigd_rut.movimiento_identidad (
     id_movimiento UUID PRIMARY KEY,
-    expediente_id BIGINT NOT NULL,
+    expediente_id UUID NOT NULL,
     secuencia BIGINT NOT NULL CHECK (secuencia > 0),
     fecha_hora TIMESTAMPTZ(3) NOT NULL,
     clave_idempotencia TEXT,
@@ -88,12 +88,12 @@ CREATE TABLE IF NOT EXISTS sigd_rut.movimiento_identidad (
 
 CREATE TABLE IF NOT EXISTS sigd_rut.movimiento_tramite (
     id_movimiento UUID NOT NULL DEFAULT gen_random_uuid(),
-    expediente_id BIGINT NOT NULL,
+    expediente_id UUID NOT NULL,
     secuencia BIGINT NOT NULL,
     estado_anterior TEXT NOT NULL,
     evento TEXT NOT NULL,
     estado_nuevo TEXT NOT NULL,
-    usuario_operador_id BIGINT NOT NULL,
+    usuario_operador_id UUID NOT NULL,
     fecha_hora TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     correlation_id UUID,
     clave_idempotencia TEXT,
@@ -178,9 +178,9 @@ COMMENT ON TABLE sigd_rut.movimiento_tramite IS
 COMMENT ON TABLE sigd_rut.movimiento_identidad IS
     'Reserva transaccional no particionada: identidad, secuencia e idempotencia globales.';
 COMMENT ON COLUMN sigd_rut.movimiento_tramite.expediente_id IS
-    'Identificador externo BIGINT de TramiCore; sin FK física intermodular.';
+    'Identificador externo UUID de TramiCore; sin FK física intermodular.';
 COMMENT ON COLUMN sigd_rut.movimiento_tramite.usuario_operador_id IS
-    'Identificador externo BIGINT del operador; sin FK física intermodular.';
+    'Identificador externo UUID del operador; sin FK física intermodular.';
 COMMENT ON COLUMN sigd_rut.movimiento_tramite.clave_idempotencia IS
     'Única por expediente si no es NULL; el reintento devuelve 23505 hasta que un servicio resuelva la clave.';
 COMMENT ON COLUMN sigd_rut.movimiento_tramite.fecha_hora IS
@@ -201,13 +201,13 @@ ON CONFLICT (codigo) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS sigd_rut.movimiento_compensatorio (
     id_movimiento UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    expediente_id BIGINT NOT NULL,
+    expediente_id UUID NOT NULL,
     secuencia BIGINT NOT NULL CHECK (secuencia > 0),
     evento TEXT NOT NULL DEFAULT 'REVERSION_ADMINISTRATIVA'
         REFERENCES sigd_rut.accion_compensatoria (codigo),
     estado_anterior TEXT NOT NULL REFERENCES sigd_rut.estado_tramite (codigo),
     estado_nuevo TEXT NOT NULL REFERENCES sigd_rut.estado_tramite (codigo),
-    usuario_operador_id BIGINT NOT NULL,
+    usuario_operador_id UUID NOT NULL,
     fecha_hora TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     correlation_id TEXT NOT NULL,
     clave_idempotencia TEXT NOT NULL,
@@ -287,7 +287,7 @@ COMMENT ON COLUMN sigd_rut.movimiento_compensatorio.secuencia IS
 -- copia transaccional en su outbox si el esquema ya está instalado.
 CREATE TABLE IF NOT EXISTS sigd_rut.solicitud_compensacion_folios (
     id_solicitud UUID PRIMARY KEY,
-    expediente_id BIGINT NOT NULL,
+    expediente_id UUID NOT NULL,
     movimiento_original_id UUID NOT NULL,
     movimiento_compensatorio_id UUID NOT NULL UNIQUE
         REFERENCES sigd_rut.movimiento_compensatorio (id_movimiento),
@@ -311,14 +311,14 @@ CREATE INDEX IF NOT EXISTS ix_solicitud_folios_estado_fecha
 -- en movimiento_tramite más sus asientos compensatorios; esta tabla guarda sólo
 -- el último estado por expediente y se actualiza en la misma transacción.
 CREATE TABLE IF NOT EXISTS sigd_rut.estado_actual_expediente (
-    expediente_id BIGINT PRIMARY KEY,
+    expediente_id UUID PRIMARY KEY,
     secuencia BIGINT NOT NULL CHECK (secuencia > 0),
     estado_nuevo TEXT NOT NULL REFERENCES sigd_rut.estado_tramite (codigo),
     evento TEXT NOT NULL,
     area_actual_id TEXT,
     id_movimiento UUID NOT NULL,
     fecha_hora TIMESTAMPTZ(3) NOT NULL,
-    usuario_operador_id BIGINT NOT NULL
+    usuario_operador_id UUID NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_estado_actual_estado_expediente
     ON sigd_rut.estado_actual_expediente (estado_nuevo, expediente_id);
@@ -432,7 +432,7 @@ BEGIN
                 count(*) AS cantidad
               FROM sigd_tra.expediente e
               LEFT JOIN sigd_rut.estado_actual_expediente p
-                ON p.expediente_id = e.id_expediente
+                ON p.expediente_id = e.expediente_id
              GROUP BY 1
         )
         UPDATE sigd_rut.contador_pestana_local c
@@ -462,7 +462,7 @@ RETURNS TRIGGER LANGUAGE plpgsql SET search_path = pg_catalog, sigd_rut AS $func
 DECLARE
     v_anterior TEXT;
     v_nueva TEXT;
-    v_expediente BIGINT;
+    v_expediente UUID;
     v_visible BOOLEAN;
 BEGIN
     v_expediente := CASE WHEN TG_OP = 'DELETE' THEN OLD.expediente_id
@@ -470,7 +470,7 @@ BEGIN
     PERFORM pg_advisory_xact_lock(hashtext('exp_' || v_expediente::text));
     IF to_regclass('sigd_tra.expediente') IS NOT NULL THEN
         SELECT EXISTS(SELECT 1 FROM sigd_tra.expediente
-            WHERE id_expediente = v_expediente) INTO v_visible;
+            WHERE expediente_id = v_expediente) INTO v_visible;
         IF NOT v_visible THEN
             RETURN NULL;
         END IF;
@@ -523,22 +523,22 @@ DECLARE
     v_vieja TEXT;
     v_nueva TEXT;
 BEGIN
-    IF TG_OP = 'UPDATE' AND OLD.id_expediente = NEW.id_expediente THEN
+    IF TG_OP = 'UPDATE' AND OLD.expediente_id = NEW.expediente_id THEN
         RETURN NULL;
     END IF;
     IF TG_OP <> 'INSERT' THEN
-        PERFORM pg_advisory_xact_lock(hashtext('exp_' || OLD.id_expediente::text));
+        PERFORM pg_advisory_xact_lock(hashtext('exp_' || OLD.expediente_id::text));
         SELECT sigd_rut.pestana_de_estado(COALESCE(p.estado_nuevo, 'REGISTRADO'))
           INTO v_vieja FROM (SELECT 1) base
           LEFT JOIN sigd_rut.estado_actual_expediente p
-            ON p.expediente_id = OLD.id_expediente;
+            ON p.expediente_id = OLD.expediente_id;
     END IF;
     IF TG_OP <> 'DELETE' THEN
-        PERFORM pg_advisory_xact_lock(hashtext('exp_' || NEW.id_expediente::text));
+        PERFORM pg_advisory_xact_lock(hashtext('exp_' || NEW.expediente_id::text));
         SELECT sigd_rut.pestana_de_estado(COALESCE(p.estado_nuevo, 'REGISTRADO'))
           INTO v_nueva FROM (SELECT 1) base
           LEFT JOIN sigd_rut.estado_actual_expediente p
-            ON p.expediente_id = NEW.id_expediente;
+            ON p.expediente_id = NEW.expediente_id;
     END IF;
     PERFORM 1 FROM sigd_rut.contador_pestana_local
      WHERE pestana IN (v_vieja, v_nueva) ORDER BY pestana FOR UPDATE;
@@ -573,9 +573,9 @@ DO $indice_expediente$
 BEGIN
     IF to_regclass('sigd_tra.expediente') IS NOT NULL THEN
         CREATE INDEX IF NOT EXISTS ix_rutadoc_expediente_fecha_id
-            ON sigd_tra.expediente (creado_en DESC, id_expediente DESC);
+            ON sigd_tra.expediente (fecha_radicacion DESC, expediente_id DESC);
     END IF;
 END;
 $indice_expediente$;
 
-COMMIT;
+

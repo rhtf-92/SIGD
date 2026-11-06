@@ -6,7 +6,12 @@ import { firmarTokenAcceso } from '../../src/core/auth/jwt.service.js';
 
 describe('App Routing & Health Verification', () => {
   const fakePool = {
-    query: async () => ({ rows: [], rowCount: 0 }),
+    query: async (sql: string, params?: unknown[]) => ({
+      rows: sql.includes('SELECT DISTINCT ps.codigo AS permiso_codigo') && params?.[1] instanceof Array && (params[1] as string[]).includes('SUPER_ADMIN')
+        ? ['admin:acceso', 'usuarios:leer', 'usuarios:gestionar', 'roles:leer', 'auditoria:leer', 'organigrama:leer', 'organigrama:gestionar', 'maestras:leer', 'maestras:gestionar', 'calendario:leer', 'calendario:gestionar'].map((permiso_codigo) => ({ permiso_codigo }))
+        : [],
+      rowCount: 0,
+    }),
     connect: async () => ({
       query: async () => ({ rows: [], rowCount: 0 }),
       release: () => {},
@@ -157,6 +162,7 @@ describe('App Routing & Health Verification', () => {
     }
   });
 
+<<<<<<< HEAD
   it('POST /api/v1/storage/presigned-url requiere JWT antes de procesar la solicitud', async () => {
     const res = await request(app).post('/api/v1/storage/presigned-url').send({});
     expect(res.status).toBe(401);
@@ -165,6 +171,11 @@ describe('App Routing & Health Verification', () => {
   it('POST /api/v1/firma/callback-refirma exige la firma HMAC del webhook', async () => {
     const res = await request(app).post('/api/v1/firma/callback-refirma').send({});
     expect(res.status).toBe(403);
+=======
+  it('POST /api/v1/storage/presigned-url exige autenticacion antes de validar el cuerpo', async () => {
+    const res = await request(app).post('/api/v1/storage/presigned-url').send({});
+    expect(res.status).toBe(401);
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
   });
 
   it('GET /api/v1/firmas/cola-firmantes responde protegiendo acceso sin autenticacion', async () => {

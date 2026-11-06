@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
 
+import { apiClient } from "../../../src/api/client";
 import RegistroCiudadanoPage from "../../../src/pages/registro/RegistroCiudadanoPage";
 import PersonaNaturalForm from "../../../src/components/registro/PersonaNaturalForm";
 import PersonaJuridicaForm from "../../../src/components/registro/PersonaJuridicaForm";
@@ -260,13 +261,15 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
   });
 
   it("h) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Natural y muestra la casilla creada", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({data:{idPersona:"registrada",mensaje:"Registro exitoso"}});
     const user = userEvent.setup();
     render(
       <MemoryRouter>
         <RegistroCiudadanoPage />
       </MemoryRouter>,
     );
+    await user.type(screen.getByLabelText("Clave para iniciar sesi\u00f3n"),"ClaveLocal123!");
+    await user.type(screen.getByLabelText("Confirmar clave"),"ClaveLocal123!");
 
     // Llenar campos de Persona Natural
     await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
@@ -311,31 +314,11 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       { timeout: 3000 },
     );
     expect(mensajeExito).toHaveTextContent(
-      "74561238@casilla.iestpsuiza.edu.pe",
+      "Cuenta creada. Inicie sesi\u00f3n con el usuario 74561238",
     );
 
-    // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
-      expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
-      }),
-    );
-
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
-    );
-    expect(postCall).toBeDefined();
-    if (!postCall) {
-      throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
-    }
-    const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
-
-    consoleSpy.mockRestore();
+    expect(postSpy).toHaveBeenCalledWith("/api/v1/auth/registro-ciudadano", expect.objectContaining({direccion:"Jr. Tarapac\u00e1 N\u00b0 645",password:"ClaveLocal123!"}));
+    postSpy.mockRestore();
 
     // Cerrar mensaje de éxito
     const botonCerrarExito = screen.getByLabelText(/Cerrar mensaje de éxito/i);
@@ -346,13 +329,15 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
   }, 30_000);
 
   it("i) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Jurídica y muestra la casilla creada", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({data:{idPersona:"registrada",mensaje:"Registro exitoso"}});
     const user = userEvent.setup();
     render(
       <MemoryRouter>
         <RegistroCiudadanoPage />
       </MemoryRouter>,
     );
+    await user.type(screen.getByLabelText("Clave para iniciar sesi\u00f3n"),"ClaveLocal123!");
+    await user.type(screen.getByLabelText("Confirmar clave"),"ClaveLocal123!");
 
     // Cambiar a Persona Jurídica
     await user.click(screen.getByRole("tab", { name: /Persona Jurídica/i }));
@@ -409,31 +394,17 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       { timeout: 3000 },
     );
     expect(mensajeExito).toHaveTextContent(
-      "20131312955@casilla.iestpsuiza.edu.pe",
+      "Cuenta creada. Inicie sesi\u00f3n con el usuario 20131312955",
     );
 
-    // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
-      expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
-      }),
-    );
-
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
-    );
-    expect(postCall).toBeDefined();
-    if (!postCall) {
-      throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
-    }
-    const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
-
-    consoleSpy.mockRestore();
+    expect(postSpy).toHaveBeenCalledWith("/api/v1/auth/registro-persona-juridica", expect.objectContaining({direccion:"Jr. Tarapac\u00e1 N\u00b0 645",password:"ClaveLocal123!"}));
+    postSpy.mockRejectedValueOnce(new Error('Ya existe una cuenta con ese documento.'));
+    await user.type(screen.getByLabelText("Clave para iniciar sesión"),"ClaveLocal123!");
+    await user.type(screen.getByLabelText("Confirmar clave"),"ClaveLocal123!");
+    await user.click(botonSubmit);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ya existe una cuenta');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    postSpy.mockRestore();
     // FIX estabilidad (F_ADRIANO): idem test h) — flujo largo de user-event.
   }, 30_000);
 });

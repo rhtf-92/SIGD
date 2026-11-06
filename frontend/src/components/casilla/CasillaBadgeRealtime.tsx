@@ -3,21 +3,13 @@
    al backend) y aplica una animación de pulso cada vez que useCasillaNotifications
    detecta un evento SSE nuevo. */
 
-import { useEffect, useState } from "react";
 import { useCasilla } from "../../hooks/useCasilla";
 import { useCasillaNotifications } from "../../hooks/useCasillaNotifications";
 
 export function CasillaBadgeRealtime() {
   const { stats, isLoadingStats } = useCasilla();
   const { sseConectado, notificacionesRecibidas } = useCasillaNotifications();
-  const [pulsando, setPulsando] = useState(false);
-
-  useEffect(() => {
-    if (notificacionesRecibidas === 0) return;
-    setPulsando(true);
-    const temporizador = window.setTimeout(() => setPulsando(false), 1000);
-    return () => window.clearTimeout(temporizador);
-  }, [notificacionesRecibidas]);
+  const animar = notificacionesRecibidas > 0;
 
   const noLeidas = stats.noLeidos;
 
@@ -29,14 +21,20 @@ export function CasillaBadgeRealtime() {
 
   return (
     <div className="relative inline-flex items-center" role="status" aria-live="polite">
-      <span aria-hidden="true" className={`text-2xl ${pulsando ? "animate-pulse" : ""}`}>
+      <span
+        key={`campana-${notificacionesRecibidas}`}
+        aria-hidden="true"
+        className={`text-2xl ${animar ? "animate-pulse" : ""}`}
+        style={animar ? { animationIterationCount: 1 } : undefined}
+      >
         🔔
       </span>
       {noLeidas > 0 && (
         <span
           className={`absolute -top-1 -right-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#006EC7] px-1 text-xs font-bold text-white ${
-            pulsando ? "animate-ping" : ""
+            animar ? "animate-ping" : ""
           }`}
+          style={animar ? { animationIterationCount: 1 } : undefined}
         >
           {noLeidas > 99 ? "99+" : noLeidas}
         </span>

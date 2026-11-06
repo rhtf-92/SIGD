@@ -17,8 +17,8 @@ it("consulta el endpoint real con el token y señal", async () => {
  localStorage.setItem("sigd_token","prueba");
  const consulta=vi.fn().mockResolvedValue({ok:true,json:async()=>[]}); vi.stubGlobal("fetch",consulta);
  const signal=new AbortController().signal;
- expect(await obtenerFoliacion("https://sigd.test/api", "10", signal)).toEqual([]);
- expect(consulta).toHaveBeenCalledWith("https://sigd.test/api/v1/expedientes/10/foliacion",expect.objectContaining({signal,headers:{Authorization:"Bearer prueba"}}));
+ expect(await obtenerFoliacion("https://sigd.test/api", "00000000-0000-4000-8000-000000000010", signal)).toEqual([]);
+ expect(consulta).toHaveBeenCalledWith("https://sigd.test/api/v1/expedientes/00000000-0000-4000-8000-000000000010/foliacion",expect.objectContaining({signal,headers:{Authorization:"Bearer prueba"}}));
 });
 it("no simula éxito ante una ruta no publicada", async () => {
  vi.stubGlobal("fetch",vi.fn().mockResolvedValue({ok:false,status:404}));

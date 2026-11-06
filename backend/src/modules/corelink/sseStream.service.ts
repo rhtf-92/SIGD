@@ -12,6 +12,13 @@ export const EVENTO_SLA = 'sla_alerta';
 const EVENTO_A_CANAL: Record<string, CanalSse> = {
   [EVENTO_CASILLA]: 'casilla',
   [EVENTO_TRANSICION]: 'expedientes',
+  TramiteRegistrado: 'expedientes',
+  ExpedienteRadicado: 'expedientes',
+  ExpedienteSubsanado: 'expedientes',
+  ExpedienteDerivado: 'expedientes',
+  ExpedienteAtendido: 'expedientes',
+  ExpedienteObservado: 'expedientes',
+  ExpedienteArchivado: 'expedientes',
   [EVENTO_SLA]: 'sla',
 };
 
@@ -21,12 +28,14 @@ interface Suscriptor {
   id: number;
   res: Response;
   canales: Set<CanalSse>;
+  usuarioId: string;
 }
 
 interface EventoBufferizado {
   id: number;
   evento: string;
   carga: string;
+  usuarioId: string;
 }
 
 export class BusSse extends EventEmitter {
@@ -42,9 +51,9 @@ export class BusSse extends EventEmitter {
     this.maxEventosPorSuscriptor = maxEventosPorSuscriptor;
   }
 
-  suscribir(res: Response, canales: CanalSse[]): number {
+  suscribir(res: Response, canales: CanalSse[], usuarioId: string): number {
     const id = this.siguienteId++;
-    this.suscriptores.set(id, { id, res, canales: new Set(canales) });
+    this.suscriptores.set(id, { id, res, canales: new Set(canales), usuarioId });
     return id;
   }
 
@@ -58,14 +67,17 @@ export class BusSse extends EventEmitter {
 
   emitirEvento(evento: string, datos: unknown): void {
     const canal = EVENTO_A_CANAL[evento];
+    if (!canal) return;
+    const usuarioId = canal === 'casilla' ? extraerUsuarioId(datos) : extraerDestinatarioId(datos);
+    if (!usuarioId) return;
     this.contadorEvento += 1;
     const idEvento = this.contadorEvento;
     const carga = JSON.stringify(datos);
 
-    this.registrarEnBuffer({ id: idEvento, evento, carga });
+    this.registrarEnBuffer({ id: idEvento, evento, carga, usuarioId });
 
     for (const suscriptor of this.suscriptores.values()) {
-      if (canal && !suscriptor.canales.has(canal)) continue;
+      if (!suscriptor.canales.has(canal) || suscriptor.usuarioId !== usuarioId) continue;
       this.escribir(suscriptor.res, `id: ${idEvento}\nevent: ${evento}\ndata: ${carga}\n\n`);
     }
   }
@@ -74,13 +86,13 @@ export class BusSse extends EventEmitter {
    * Reproduce los eventos posteriores a `ultimoEventoId` para una reconexión
    * transparente del `EventSource`. Devuelve los ids realmente reproducidos.
    */
-  replayDesde(ultimoEventoId: number, res: Response, canales: Set<CanalSse>): number[] {
+  replayDesde(ultimoEventoId: number, res: Response, canales: Set<CanalSse>, usuarioId: string): number[] {
     const pendientes = this.buffer.filter((e) => e.id > ultimoEventoId);
     const reproducidos: number[] = [];
 
     for (const entrada of pendientes) {
       const canal = EVENTO_A_CANAL[entrada.evento];
-      if (canal && !canales.has(canal)) continue;
+      if (!canal || !canales.has(canal) || entrada.usuarioId !== usuarioId) continue;
       this.escribir(res, `id: ${entrada.id}\nevent: ${entrada.evento}\ndata: ${entrada.carga}\n\n`);
       reproducidos.push(entrada.id);
     }
@@ -123,6 +135,20 @@ export class BusSse extends EventEmitter {
       // conexión caída a mitad de escritura: se limpia en el evento 'close'
     }
   }
+}
+
+function extraerUsuarioId(datos: unknown): string | undefined {
+  if (typeof datos !== 'object' || datos === null) return undefined;
+  const registro = datos as Record<string, unknown>;
+  const valor = registro.usuario_id ?? registro.usuarioId;
+  return typeof valor === 'string' && valor.trim() !== '' ? valor : undefined;
+}
+
+function extraerDestinatarioId(datos: unknown): string | undefined {
+  if (typeof datos !== 'object' || datos === null) return undefined;
+  const registro = datos as Record<string, unknown>;
+  const valor = registro.destinatario_usuario_id ?? registro.destinatarioUsuarioId;
+  return typeof valor === 'string' && valor.trim() !== '' ? valor : undefined;
 }
 
 export function parsearCanales(entrada: string | undefined): CanalSse[] {

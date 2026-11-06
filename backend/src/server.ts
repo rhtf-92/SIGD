@@ -7,23 +7,23 @@ import { crearPool } from './database.js';
 import { construirApp } from './app.js';
 import { API_PREFIX } from './config/rutas.js';
 import { BusSse, HEARTBEAT_SEGUNDOS } from './modules/corelink/sseStream.service.js';
-import { ejecutarMigraciones } from './db/migrate.js';
+import { assertMigrationsDisabledOnBoot, requireDatabaseUrl } from './config/runtime-safety.js';
 import { OutboxWorker } from './audit/outbox-worker.js';
 import { crearDespachadorPorDefecto } from './audit/despachador-notificaciones.js';
 import { BridgeNotificacion } from './core/realtime/bridge-notificacion.js';
+import { iniciarRefrescoMgd } from './domains/corelink/mgdRefresh.worker.js';
 
-const databaseUrl =
-  process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
+assertMigrationsDisabledOnBoot(process.env);
+const databaseUrl = requireDatabaseUrl(process.env);
 const port = Number(process.env.PORT ?? 3000);
 
 const pool = crearPool(databaseUrl);
 const busSse = new BusSse();
 
-if (process.env.MIGRATE_ON_BOOT !== 'false') {
-  await ejecutarMigraciones(pool);
-}
-
 const app = construirApp(pool, busSse);
+const detenerRefrescoMgd = process.env.MGD_REFRESH_ENABLED === 'false'
+  ? () => undefined
+  : iniciarRefrescoMgd(pool, Number(process.env.MGD_REFRESH_MS ?? 60_000));
 const servidor = app.listen(port, () => {
   console.log(`SIGD Backend escuchando en http://localhost:${port}`);
   console.log(`API canónica: http://localhost:${port}${API_PREFIX}`);
@@ -47,7 +47,9 @@ const outboxWorker = new OutboxWorker(
   {
     backoffBaseMs: Number(process.env.OUTBOX_BACKOFF_BASE_MS ?? 1000),
     backoffTechoMs: Number(process.env.OUTBOX_BACKOFF_TECHO_MS ?? 300_000),
-    intervaloPollMs: Number(process.env.OUTBOX_POLL_MS ?? 5000),
+    intervaloPollMs: Number(
+      process.env.OUTBOX_POLL_INTERVAL_MS ?? process.env.OUTBOX_POLL_MS ?? 5000,
+    ),
   },
 );
 const cicloOutbox = outboxWorker.iniciar();
@@ -56,6 +58,7 @@ cicloOutbox.catch((error: unknown) => console.error('[OUTBOX] El poller terminó
 const apagar = (senal: string): void => {
   console.log(`[SERVER] Señal ${senal} recibida; cerrando conexiones SSE.`);
   clearInterval(intervaloHeartbeat);
+  detenerRefrescoMgd();
   outboxWorker.detener();
   void bridge.detener();
   busSse.cerrarTodos();
@@ -70,6 +73,7 @@ const frontendDir = path.resolve(__dirname, '../../frontend');
 const viteBin = path.resolve(frontendDir, 'node_modules/vite/bin/vite.js');
 
 let viteProc: ReturnType<typeof spawn> | null = null;
+<<<<<<< HEAD
 
 // En Docker el backend no incluye el frontend: se omite el arranque de Vite.
 if (!fs.existsSync(viteBin)) {
@@ -98,6 +102,32 @@ if (!fs.existsSync(viteBin)) {
       console.error('[Frontend Vite] Error al iniciar:', err);
     });
 
+=======
+if (process.env.START_VITE_WITH_BACKEND === 'true') {
+  try {
+    viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
+      cwd: frontendDir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
+        VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
+      },
+    });
+
+    viteProc.stdout?.on('data', (data) => {
+      console.log(`[Vite stdout] ${data}`);
+    });
+
+    viteProc.stderr?.on('data', (data) => {
+      console.error(`[Vite stderr] ${data}`);
+    });
+
+    viteProc.on('error', (err) => {
+      console.error('[Frontend Vite] Error al iniciar:', err);
+    });
+
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
     viteProc.on('close', (code) => {
       console.log(`[Frontend Vite] Proceso cerrado con código ${code}`);
     });

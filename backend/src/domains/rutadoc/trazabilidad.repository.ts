@@ -24,7 +24,7 @@ export class RepositorioPostgresTrazabilidadRutaDoc implements RepositorioTrazab
 
   async existeExpediente(idExpediente: string): Promise<boolean> {
     const r = await this.pool.query<{ existe: boolean }>(
-      'SELECT EXISTS(SELECT 1 FROM sigd_tra.expediente WHERE id_expediente = $1::bigint) AS existe', [idExpediente]);
+      'SELECT EXISTS(SELECT 1 FROM sigd_tra.expediente WHERE expediente_id = $1::uuid) AS existe', [idExpediente]);
     return r.rows[0].existe;
   }
 
@@ -33,11 +33,11 @@ export class RepositorioPostgresTrazabilidadRutaDoc implements RepositorioTrazab
       WITH historial AS (
         SELECT id_movimiento, secuencia, fecha_hora, estado_anterior, evento, estado_nuevo,
                usuario_operador_id, datos, 'NORMAL'::text AS tipo_actuacion
-          FROM sigd_rut.movimiento_tramite WHERE expediente_id = $1::bigint
+          FROM sigd_rut.movimiento_tramite WHERE expediente_id = $1::uuid
         UNION ALL
         SELECT id_movimiento, secuencia, fecha_hora, estado_anterior, evento, estado_nuevo,
                usuario_operador_id, datos, 'COMPENSATORIA'::text AS tipo_actuacion
-          FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = $1::bigint
+          FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = $1::uuid
       ), enriquecido AS (
         SELECT *,
           lag(datos->>'areaId') OVER (ORDER BY secuencia, fecha_hora, id_movimiento) AS area_anterior_id

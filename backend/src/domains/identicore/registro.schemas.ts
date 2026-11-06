@@ -46,6 +46,11 @@ const ciudadanoSchema = z.object({
   nombres: z.string().trim().min(2).max(120),
   apellidoPaterno: z.string().trim().min(2).max(120),
   apellidoMaterno: z.string().trim().min(2).max(120),
+  fechaNacimiento: z.string().date().refine((fecha) => {
+    const nacimiento = new Date(fecha + 'T00:00:00Z');
+    const limite = new Date(); limite.setUTCFullYear(limite.getUTCFullYear() - 16);
+    return nacimiento <= limite;
+  }, 'Debe tener al menos 16 años.').optional(),
 }).strict();
 
 const personaJuridicaSchema = z.object({

@@ -9,76 +9,42 @@ export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const [password,setPassword] = useState('');
+  const [confirmacion,setConfirmacion] = useState('');
+  const [error,setError] = useState<string|null>(null);
+  const [aceptaNotificaciones,setAceptaNotificaciones] = useState(false);
+  async function registrar(path:string,payload:Record<string,unknown>,documento:string) {
+    setSuccessMessage(null);setError(null);
+    if(password.length<8 || password.length>128 || password!==confirmacion){setError('Ingrese una clave de 8 a 128 caracteres y confirme la misma clave.');return;}
+    try {
+      await apiClient.post(path,{...payload,password});
+      setSuccessMessage('Cuenta creada. Inicie sesi\u00f3n con el usuario '+documento+' y la clave que acaba de elegir.');
+      setPassword('');setConfirmacion('');
+    } catch(err) {setError(err instanceof Error ? err.message : 'No se pudo registrar la cuenta.');}
+  }
   const handleNaturalSubmit = async (data: Natural) => {
-    console.log("POST /api/v1/auth/registro-ciudadano", data);
-
-    const partesApellidos = data.apellidos.trim().split(/\s+/);
-    const apellidoPaterno = partesApellidos[0] || "PATERNO";
-    const apellidoMaterno = partesApellidos.slice(1).join(" ") || "MATERNO";
-    const celularValido = /^9[0-9]{8}$/.test(data.celular) ? data.celular : "961234567";
-    const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
-      ? (data.domicilio.distritoCodigo as string)
-      : "250101";
-
-    const payload = {
-      tipoPersona: "NATURAL" as const,
-      dni: data.numeroDocumento,
-      nombres: data.nombres.trim(),
-      apellidoPaterno,
-      apellidoMaterno,
-      correo: data.correo.trim().toLowerCase(),
-      celular: celularValido,
-      ubigeoDistrito: ubigeoValido,
-      direccion: data.domicilio?.direccionExacta?.trim() || "Dirección institucional",
-      password: `Clave*${data.numeroDocumento}`,
-      consentimientoDatos: true as const,
-      aceptaNotificaciones: true,
-    };
-
-    try {
-      await apiClient.post("/api/v1/auth/registro-ciudadano", payload);
-    } catch (err) {
-      console.warn("[RegistroCiudadano] Fallo de llamada a API en registro natural:", err);
-    }
-
-    setSuccessMessage(
-      `Registro completado. Tu casilla electrónica ha sido creada: ${data.numeroDocumento}@casilla.iestpsuiza.edu.pe`
-    );
+    if(data.tipoDocumento!=='DNI'){setError('El registro local admite DNI. CE requiere una integraci\u00f3n pendiente.');return;}
+    const partes=data.apellidos.trim().split(/\s+/);
+    if(partes.length<2){setError('Ingrese apellido paterno y materno.');return;}
+    await registrar('/api/v1/auth/registro-ciudadano',{
+      tipoPersona:'NATURAL',dni:data.numeroDocumento,nombres:data.nombres.trim(),
+      apellidoPaterno:partes[0],apellidoMaterno:partes.slice(1).join(' '),
+      fechaNacimiento:data.fechaNacimiento,
+      correo:data.correo.trim().toLowerCase(),celular:data.celular,ubigeoDistrito:data.domicilio.distritoCodigo,
+      direccion:data.domicilio.direccionExacta.trim(),consentimientoDatos:data.consentimientoLey29733,
+      aceptaNotificaciones,
+    },data.numeroDocumento);
   };
-
   const handleJuridicaSubmit = async (data: Juridical) => {
-    console.log("POST /api/v1/auth/registro-ciudadano", data);
-
-    const celularValido = /^9[0-9]{8}$/.test(data.celularContacto) ? data.celularContacto : "961234567";
-    const ubigeoValido = /^25[0-9]{4}$/.test(data.domicilio?.distritoCodigo || "")
-      ? (data.domicilio.distritoCodigo as string)
-      : "250101";
-
-    const payload = {
-      tipoPersona: "JURIDICA" as const,
-      ruc: data.ruc,
-      razonSocial: data.razonSocial.trim(),
-      partidaRegistral: data.partidaSunarp || undefined,
-      dniRepresentante: data.representanteLegal.numeroDocumento,
-      nombreRepresentante: `${data.representanteLegal.nombres} ${data.representanteLegal.apellidos}`.trim(),
-      correo: data.correoCorporativo.trim().toLowerCase(),
-      celular: celularValido,
-      ubigeoDistrito: ubigeoValido,
-      direccion: data.domicilio?.direccionExacta?.trim() || "Dirección institucional",
-      password: `Clave*${data.ruc.slice(-8)}`,
-      consentimientoDatos: true as const,
-      aceptaNotificaciones: true,
-    };
-
-    try {
-      await apiClient.post("/api/v1/auth/registro-persona-juridica", payload);
-    } catch (err) {
-      console.warn("[RegistroCiudadano] Fallo de llamada a API en registro jurídica:", err);
-    }
-
-    setSuccessMessage(
-      `Registro completado. Tu casilla electrónica ha sido creada: ${data.ruc}@casilla.iestpsuiza.edu.pe`
-    );
+    if(data.representanteLegal.tipoDocumento!=='DNI'){setError('El representante debe estar registrado con DNI.');return;}
+    await registrar('/api/v1/auth/registro-persona-juridica',{
+      tipoPersona:'JURIDICA',ruc:data.ruc,razonSocial:data.razonSocial.trim(),partidaRegistral:data.partidaSunarp||undefined,
+      dniRepresentante:data.representanteLegal.numeroDocumento,
+      nombreRepresentante:(data.representanteLegal.nombres+' '+data.representanteLegal.apellidos).trim(),
+      correo:data.correoCorporativo.trim().toLowerCase(),celular:data.celularContacto,
+      ubigeoDistrito:data.domicilio.distritoCodigo,direccion:data.domicilio.direccionExacta.trim(),
+      consentimientoDatos:data.consentimientoLey29733,aceptaNotificaciones,
+    },data.ruc);
   };
 
   const handleClearSuccess = () => setSuccessMessage(null);
@@ -96,8 +62,7 @@ export default function RegistroCiudadanoPage() {
           Registro de Usuario Externo
         </h1>
         <p className="text-sm text-gray-600 mb-8">
-          Complete sus datos para crear su cuenta y Casilla Electrónica
-          Institucional
+          Complete sus datos para crear su cuenta local.
         </p>
 
         <div
@@ -140,6 +105,14 @@ export default function RegistroCiudadanoPage() {
             Persona Jurídica
           </button>
         </div>
+
+        <div className="mb-6 grid gap-4 sm:grid-cols-2">
+          <label>Clave para iniciar sesión<input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={password} onChange={e=>setPassword(e.target.value)} className="block w-full rounded border p-2"/></label>
+          <label>Confirmar clave<input type="password" autoComplete="new-password" value={confirmacion} onChange={e=>setConfirmacion(e.target.value)} className="block w-full rounded border p-2"/></label>
+        </div>
+        {error && <p role="alert" className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-red-800">{error}</p>}
+        <label className="mb-4 flex gap-2 text-sm"><input type="checkbox" checked={aceptaNotificaciones} onChange={e=>setAceptaNotificaciones(e.target.checked)}/>Acepto recibir notificaciones (opcional)</label>
+        {successMessage && <Link className="mb-4 block text-blue-700 underline" to="/login">Iniciar sesión</Link>}
 
         <div
           role="tabpanel"

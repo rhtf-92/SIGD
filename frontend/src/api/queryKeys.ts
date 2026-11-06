@@ -9,6 +9,7 @@ export const queryKeys = {
   },
   flujos: {
     titulacion: {
+      lista: ["flujos", "titulacion", "lista"] as const,
       detalle: (tramiteId: number | string) =>
         ["flujos", "titulacion", "detalle", String(tramiteId)] as const,
       transiciones: (tramiteId: number | string) =>

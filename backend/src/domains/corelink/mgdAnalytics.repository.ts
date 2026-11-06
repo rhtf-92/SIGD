@@ -5,7 +5,7 @@
  * Tarea: T-BE-CL-12 (lectura analítica de alta velocidad) y T-BE-CL-10.
  *
  * Todas las consultas leen EXCLUSIVAMENTE de las vistas materializadas
- * `sigd_tra.mv_kpis_mgd_mensual` y `sigd_tra.mv_tiempos_retencion_area`, nunca de
+ * `sigd_tra.mv_kpis_mgd_mensual_v2` y `sigd_tra.mv_tiempos_retencion_area_v2`, nunca de
  * `sigd_tra.expediente` ni de `sigd_rut.movimiento_tramite`. Esa es la razón de ser
  * del diseño: la analítica del tablero no debe competir por I/O con la mesa de
  * partes, y una consulta de métricas sobre cientos de miles de movimientos
@@ -29,8 +29,8 @@ const LOCK_REFRESCO_MGD = 827_140_051;
  * la retención más nueva que los contadores que la originan.
  */
 const VISTAS_REFRESCO = Object.freeze([
-  'sigd_tra.mv_kpis_mgd_mensual',
-  'sigd_tra.mv_tiempos_retencion_area',
+  'sigd_tra.mv_kpis_mgd_mensual_v2',
+  'sigd_tra.mv_tiempos_retencion_area_v2',
 ] as const);
 
 /**
@@ -140,7 +140,7 @@ const PROYECCION_CONTADORES = `
          n_radicados, n_atendidos, n_archivados, n_resueltos,
          n_en_tramite, n_observados, n_resueltos_dentro_plazo,
          horas_habiles_suma
-    FROM sigd_tra.mv_kpis_mgd_mensual`;
+    FROM sigd_tra.mv_kpis_mgd_mensual_v2`;
 
 export class RepositorioMgdAnalytics {
   constructor(private readonly pool: Pool) {}
@@ -164,11 +164,11 @@ export class RepositorioMgdAnalytics {
                 SUM(n_observados)                   AS n_observados,
                 SUM(n_resueltos_dentro_plazo)       AS n_resueltos_dentro_plazo,
                 SUM(horas_habiles_suma)             AS horas_habiles_suma
-           FROM sigd_tra.mv_kpis_mgd_mensual`
+           FROM sigd_tra.mv_kpis_mgd_mensual_v2`
       : `${PROYECCION_CONTADORES}
           WHERE periodo = $1::date`;
 
-    const valores = periodo === null ? [] : [periodo];
+    const valores = periodo === null ? [] : [periodo + '-01'];
     const { rows } = await this.pool.query<FilaContadores>(sql, valores);
     if (rows.length === 0) return [];
     return rows.map((fila) => ({
@@ -232,10 +232,10 @@ export class RepositorioMgdAnalytics {
               promedio_dias_habiles_permanencia,
               promedio_horas_habiles,
               porcentaje_del_area
-         FROM sigd_tra.mv_tiempos_retencion_area
+         FROM sigd_tra.mv_tiempos_retencion_area_v2
         WHERE $1::date IS NULL OR periodo = $1::date
         ORDER BY unidad_organica_id, tramo_permanencia_dias_habiles`,
-      [periodo],
+      [periodo === null ? null : periodo + '-01'],
     );
     return rows.map((fila) => {
       const tramo = fila.tramo_permanencia_dias_habiles;
@@ -266,8 +266,8 @@ export class RepositorioMgdAnalytics {
     const nombres = new Map<string, { nombre: string; sigla: string | null }>();
     try {
       const { rows } = await this.pool.query<{ id: string; sigla: string | null; nombre: string }>(
-        `SELECT id::text AS id, sigla, nombre
-           FROM sigd_org.unidad_organica`,
+        `SELECT area_id::text AS id, codigo AS sigla, nombre
+           FROM sigd_org.area`,
       );
       for (const fila of rows) {
         nombres.set(fila.id, { nombre: fila.nombre, sigla: fila.sigla });

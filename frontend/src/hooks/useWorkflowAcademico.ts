@@ -394,7 +394,7 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
         estado: "EN_TRAMITE",
       };
     });
-  }, [validarTransicion]);
+  }, [tramite, validarTransicion]);
 
   const observarEtapaActual = useCallback(
     (observacion: string) => {
@@ -466,7 +466,7 @@ export function useWorkflowAcademico(): UseWorkflowAcademicoResultado {
         ),
       };
     });
-  }, [validarTransicion]);
+  }, [tramite.etapas, validarTransicion]);
 
   const anularTramite = useCallback(() => {
     const permitido = estado === "EN_REVISION" || estado === "OBSERVADO";

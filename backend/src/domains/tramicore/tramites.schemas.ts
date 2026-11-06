@@ -12,15 +12,7 @@ import { REGEX_CUT } from './cut.service.js';
  */
 
 /** Tipos MIME aceptados para la radicacion virtual. */
-export const TIPOS_ARCHIVO_ACEPTADOS = [
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/tiff',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.oasis.opendocument.text',
-] as const;
+export const TIPOS_ARCHIVO_ACEPTADOS = ['application/pdf'] as const;
 
 /** Tope por archivo: 20 MiB. El limite lo aplica el gateway S3 (B_RIQUELMER). */
 export const TAMANO_MAXIMO_BYTES = 20 * 1024 * 1024;
@@ -66,7 +58,7 @@ export const adjuntoRadicacionSchema = z
       message: 'El archivo supera el maximo permitido de 20 MiB.',
     }),
     hashSha256,
-    storagePath: z.string().trim().max(512).optional(),
+    storagePath: z.string().trim().min(3).max(512),
   })
   .strict();
 
@@ -86,14 +78,8 @@ export const radicacionVirtualSchema = z
         (valor) => valor !== '00000000-0000-0000-0000-000000000000',
         'El tipo de tramite no puede ser el UUID nulo.',
       ),
-    // `sigd_auth.persona.id` es BIGSERIAL en el DDL canonico de IdentiCore, de
-    // modo que el identificador del solicitante llega como entero. Se acepta
-    // tambien string porque las variables de ruta y los formularios del
-    // frontend serializan todo como texto.
-    idPersona: z.coerce
-      .number()
-      .int('El administrado debe ser un identificador entero.')
-      .positive('El administrado debe ser un identificador entero positivo.'),
+    // Identidad UUID del padron autentificado.
+    idPersona: z.string().uuid(),
     // T-BE-TC-02 exige certificar los datos completos del solicitante y
     // rechazar los correos invalidos. Se capturan en el acto de la radicacion
     // porque el cargo digital y las notificaciones de seguimiento se dirigen a

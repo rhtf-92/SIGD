@@ -10,38 +10,54 @@ import { DEBOUNCE_BUSQUEDA_MS, type Usuario } from "@/types/usuarioAdmin";
 
 const get = vi.fn();
 const put = vi.fn();
+const post = vi.fn();
 const patch = vi.fn();
+const AREA_ID = "11111111-1111-4111-8111-111111111111";
+const CARGO_ID = "22222222-2222-4222-8222-222222222222";
+const CARGO_2_ID = "33333333-3333-4333-8333-333333333333";
+const ROL_ID = "44444444-4444-4444-8444-444444444444";
 
 vi.mock("@/api/client", () => ({
   apiClient: {
     get: (...args: unknown[]) => get(...args),
     put: (...args: unknown[]) => put(...args),
+    post: (...args: unknown[]) => post(...args),
     patch: (...args: unknown[]) => patch(...args),
   },
 }));
 
 const USUARIOS: Usuario[] = [
   {
-    id: 1,
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    idPersona: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     nombre: "Juan Carlos Pérez",
-    dni: "71234567",
+    documento: "71234567",
     correo: "jperez@iestpsuiza.edu.pe",
-    sede: "Sede Principal",
+    areaId: AREA_ID,
     area: "Mesa de Partes",
+    cargoId: CARGO_ID,
     cargo: "Asistente Administrativo",
+    rolId: ROL_ID,
     rol: "Operador",
+    rolIds: [ROL_ID],
+    roles: [{ id: ROL_ID, nombre: "Operador" }],
     estado: "Activo",
     ultimoAcceso: "29/08/2026 09:42",
   },
   {
-    id: 2,
+    id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    idPersona: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     nombre: "María Fernanda López",
-    dni: "74561238",
+    documento: "74561238",
     correo: "mlopez@iestpsuiza.edu.pe",
-    sede: "Sede Principal",
+    areaId: AREA_ID,
     area: "Secretaría Académica",
+    cargoId: CARGO_ID,
     cargo: "Secretaria Académica",
+    rolId: ROL_ID,
     rol: "Responsable de Área",
+    rolIds: [ROL_ID],
+    roles: [{ id: ROL_ID, nombre: "Responsable de Área" }],
     estado: "Inactivo",
     ultimoAcceso: "29/08/2026 08:35",
   },
@@ -78,8 +94,18 @@ function problemaDuplicado(campo: string, motivo: string) {
 
 describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usuarios)", () => {
   beforeEach(() => {
-    get.mockResolvedValue({ data: { data: USUARIOS } });
+    get.mockImplementation((url: string) => url.includes("tablas-maestras")
+      ? Promise.resolve({ data: { catalogos: [
+        { clave: "areas", items: [{ id: AREA_ID, nombre: "Mesa de Partes" }] },
+        { clave: "cargos", items: [
+          { id: CARGO_ID, nombre: "Asistente Administrativo" },
+          { id: CARGO_2_ID, nombre: "Jefe de Mesa de Partes" },
+        ] },
+        { clave: "roles", items: [{ id: ROL_ID, nombre: "Operador" }] },
+      ] } })
+      : Promise.resolve({ data: { datos: USUARIOS } }));
     put.mockResolvedValue({ data: USUARIOS[0] });
+    post.mockResolvedValue({ data: USUARIOS[0] });
     patch.mockResolvedValue({ data: { ...USUARIOS[0], estado: "Inactivo" } });
   });
 
@@ -103,12 +129,11 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     );
   });
 
-  it("expone los filtros de servidor por unidad orgánica, sede, rol y estado", async () => {
+  it("expone los filtros de servidor por unidad orgánica, rol y estado", async () => {
     montarConProvider();
     await screen.findByText("Juan Carlos Pérez");
 
     expect(screen.getByLabelText("Unidad orgánica")).toBeInTheDocument();
-    expect(screen.getByLabelText("Sede")).toBeInTheDocument();
     expect(screen.getByLabelText("Rol asignado")).toBeInTheDocument();
     expect(screen.getByLabelText("Estado")).toBeInTheDocument();
   });
@@ -124,7 +149,7 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
       const ultimaLlamada = get.mock.calls.at(-1)?.[1] as {
         params: Record<string, unknown>;
       };
-      expect(ultimaLlamada.params.estado).toBe("Inactivo");
+      expect(ultimaLlamada.params.estado).toBe("INACTIVO");
     });
   });
 
@@ -167,9 +192,7 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     expect(within(dialogo).getByLabelText("Correo institucional")).toHaveValue(
       "jperez@iestpsuiza.edu.pe",
     );
-    expect(within(dialogo).getByLabelText("Cargo")).toHaveValue(
-      "Asistente Administrativo",
-    );
+    expect(within(dialogo).getByLabelText("Cargo")).toHaveValue(CARGO_ID);
   });
 
   it("persiste la edición con PUT /api/v1/usuarios/:id y refresca la tabla sin F5", async () => {
@@ -181,14 +204,13 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     await usuario.click(within(fila as HTMLElement).getByRole("button", { name: "Administrar" }));
 
     const dialogo = await screen.findByRole("dialog");
-    await usuario.clear(within(dialogo).getByLabelText("Cargo"));
-    await usuario.type(within(dialogo).getByLabelText("Cargo"), "Jefe de Mesa de Partes");
+    await usuario.selectOptions(within(dialogo).getByLabelText("Cargo"), CARGO_2_ID);
     await usuario.click(within(dialogo).getByRole("button", { name: "Guardar cambios" }));
 
     await waitFor(() => {
       expect(put).toHaveBeenCalledWith(
-        "/api/v1/admin/usuarios/1",
-        expect.objectContaining({ cargo: "Jefe de Mesa de Partes" }),
+        "/api/v1/admin/usuarios/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        expect.objectContaining({ cargoId: CARGO_2_ID }),
       );
     });
 

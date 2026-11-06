@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ==============================================================================
 # Dockerfile para Backend API SIGD (Node.js 20 LTS + Express 5 + TypeScript)
 # Multi-stage build optimizado para seguridad, rendimiento y dependencias nativas
@@ -47,4 +48,29 @@ EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=25s --retries=6 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
+=======
+FROM node:24.19-alpine AS dependencies
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+FROM dependencies AS development
+COPY . .
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
+
+FROM dependencies AS build
+COPY . .
+RUN npm run build
+
+FROM node:24.19-alpine AS production
+ENV NODE_ENV=production
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /app/dist ./dist
+COPY migraciones ./migraciones
+COPY knowledge ./knowledge
+EXPOSE 3000
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
 CMD ["npm", "start"]

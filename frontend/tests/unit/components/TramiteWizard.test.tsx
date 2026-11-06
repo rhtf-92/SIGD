@@ -33,11 +33,15 @@ import userEvent from '@testing-library/user-event';
 import { TramiteWizard } from '@/components/tramite/TramiteWizard';
 import { TRAMITE_WIZARD_STORAGE_KEY } from '@/hooks/useTramiteWizardReducer';
 import { apiClient } from '@/api/client';
+import { useAuthStore } from '@/stores/authStore';
+vi.mock('@/hooks/usePresignedUpload',()=>({usePresignedUpload:()=>({upload:async(file:File)=>({file,sha256:'a'.repeat(64),s3Key:'documentos/prueba.pdf'})})}));
 
 describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', () => {
   beforeEach(() => {
     sessionStorage.clear();
     vi.restoreAllMocks();
+    useAuthStore.setState({usuario:{id:'10000000-0000-4000-8000-000000000001',idPersona:'20000000-0000-4000-8000-000000000001',nombreCompleto:'Usuario Prueba',correo:'prueba@example.test',rol:'DIRECTOR'}});
+    vi.spyOn(apiClient,'get').mockResolvedValue({data:[{id:'00000000-0000-0000-0000-000000000001',denominacion:'Certificado',unidad_organica:'Secretaria'},{id:'00000000-0000-0000-0000-000000000002',denominacion:'Titulo',unidad_organica:'Direccion'}]} as never);
   });
 
   afterEach(() => {
@@ -97,12 +101,13 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     }
   ) => {
     const data = {
-      tipoTramiteId: 'TUPA-01',
+      tipoTramiteId: '00000000-0000-0000-0000-000000000001',
       asunto: 'Solicitud formal de certificado oficial de estudios concluidos',
       folios: '4',
       ...overrides,
     };
 
+    await screen.findByRole('option',{name:/Certificado/});
     await user.selectOptions(
       screen.getByLabelText(/Procedimiento Institucional/i),
       data.tipoTramiteId
@@ -113,8 +118,8 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     await user.type(inputFolios, data.folios);
 
     // Cargar archivo PDF de prueba requerido para validación
-    const btnCargarPdf = screen.getByRole('button', { name: /\+ Cargar PDF de prueba/i });
-    await user.click(btnCargarPdf);
+    const input=document.querySelector('input[type=file]') as HTMLInputElement;
+    await user.upload(input,new File(['%PDF-1.4 prueba'],'prueba.pdf',{type:'application/pdf'}));
   };
 
   /**
@@ -241,7 +246,8 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
 
     // Seleccionar TUPA pero sin asunto
     const selectTupa = screen.getByLabelText(/Procedimiento Institucional/i);
-    await user.selectOptions(selectTupa, 'TUPA-01');
+    await screen.findByRole('option',{name:/Certificado/});
+    await user.selectOptions(selectTupa, '00000000-0000-0000-0000-000000000001');
     expect(btnSiguiente).toBeDisabled();
 
     // Asunto muy corto (menos de 10 caracteres)
@@ -262,8 +268,8 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(btnSiguiente).toBeDisabled();
 
     // Cargar archivo probatorio PDF
-    const btnCargarPdf = screen.getByRole('button', { name: /\+ Cargar PDF de prueba/i });
-    await user.click(btnCargarPdf);
+    const input=document.querySelector('input[type=file]') as HTMLInputElement;
+    await user.upload(input,new File(['%PDF-1.4 prueba'],'prueba.pdf',{type:'application/pdf'}));
 
     expect(btnSiguiente).not.toBeDisabled();
   });
@@ -366,7 +372,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
 
     await fillPaso2(user, {
-      tipoTramiteId: 'TUPA-02',
+      tipoTramiteId: '00000000-0000-0000-0000-000000000002',
       asunto: 'Expedición de Constancia de Egresado y No Adeudo Institucional',
       folios: '5',
     });
@@ -387,7 +393,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(screen.getByText('942123456')).toBeInTheDocument();
 
     // 2. Resumen Procedimiento
-    expect(screen.getByText('TUPA-02')).toBeInTheDocument();
+    expect(screen.getByText('00000000-0000-0000-0000-000000000002')).toBeInTheDocument();
     expect(screen.getByText(/Folios:/i)).toBeInTheDocument();
     expect(
       screen.getByText(/Constancia de Egresado y No Adeudo Institucional/i)

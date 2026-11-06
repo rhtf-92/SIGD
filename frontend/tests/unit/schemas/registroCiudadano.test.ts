@@ -254,16 +254,16 @@ describe("juridicalSchema", () => {
     expect(resultado.success).toBe(true);
   });
 
-  it("debe ACEPTAR un RUC válido de persona natural con negocio (10123456781)", () => {
+  it("debe ACEPTAR un RUC válido de persona natural con negocio (10123456780)", () => {
     const resultado = juridicalSchema.safeParse(
-      crearPersonaJuridica({ ruc: "10123456781" })
+      crearPersonaJuridica({ ruc: "10123456780" })
     );
     expect(resultado.success).toBe(true);
   });
 
-  it("debe ACEPTAR un segundo RUC válido con prefijo 10 (10987654321)", () => {
+  it("debe ACEPTAR un segundo RUC válido con prefijo 10 (10987654320)", () => {
     const resultado = juridicalSchema.safeParse(
-      crearPersonaJuridica({ ruc: "10987654321" })
+      crearPersonaJuridica({ ruc: "10987654320" })
     );
     expect(resultado.success).toBe(true);
   });
@@ -271,6 +271,20 @@ describe("juridicalSchema", () => {
   it("debe ACEPTAR un RUC válido de institución pública con prefijo 20 (20987654326)", () => {
     const resultado = juridicalSchema.safeParse(
       crearPersonaJuridica({ ruc: "20987654326" })
+    );
+    expect(resultado.success).toBe(true);
+  });
+
+  it("debe normalizar el resultado Módulo 11 igual a 10 al dígito verificador 1", () => {
+    const resultado = juridicalSchema.safeParse(
+      crearPersonaJuridica({ ruc: "20000000011" })
+    );
+    expect(resultado.success).toBe(true);
+  });
+
+  it("debe normalizar el resultado Módulo 11 igual a 11 al dígito verificador 0", () => {
+    const resultado = juridicalSchema.safeParse(
+      crearPersonaJuridica({ ruc: "20000000060" })
     );
     expect(resultado.success).toBe(true);
   });

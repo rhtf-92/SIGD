@@ -1,0 +1,1 @@
+INSERT INTO sigd_auth.tipos_documento (codigo,descripcion,largo,requiere_ruc) VALUES ('DNI','Documento Nacional de Identidad',8,FALSE),('RUC','Registro Unico de Contribuyentes',11,TRUE) ON CONFLICT (codigo) DO NOTHING;

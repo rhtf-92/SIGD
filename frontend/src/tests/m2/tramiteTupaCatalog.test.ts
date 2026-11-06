@@ -47,5 +47,10 @@ describe("catálogo TUPA del asistente de trámites", () => {
     expect(PROCEDIMIENTOS_TUPA_2026.find(({ codigo }) => codigo === "BIE-16")?.detalleTarifas).toContain(
       "Reproductor: S/. 25.00",
     );
+    for (const codigo of ["ACA-39", "BIE-14"]) {
+      const concepto = PROCEDIMIENTOS_TUPA_2026.find((item) => item.codigo === codigo);
+      expect(concepto?.nota).toContain("Pendiente de confirmación administrativa");
+      expect(concepto?.nota).toContain("No utilizar para cobros automáticos ni liquidaciones definitivas");
+    }
   });
 });

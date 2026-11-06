@@ -5,6 +5,7 @@ import {
 } from "../../../src/services/pdfReportExporter";
 import {
   buildGenuineSpreadsheetXml,
+  buildGenuineXlsxBlob,
   exportExcelReport,
 } from "../../../src/services/excelReportExporter";
 import type { ReportExportRequest } from "../../../src/types/reportExportConfig";
@@ -101,6 +102,17 @@ describe("exportadores de reportes institucionales", () => {
     expect(xml).toContain('<Data ss:Type="Boolean">0</Data>');
   });
 
+  it("empaqueta un libro OOXML XLSX con registros y tildes legibles", async () => {
+    const blob = buildGenuineXlsxBlob(request);
+    expect(blob.type).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    expect(Array.from(bytes.slice(0, 4))).toEqual([0x50, 0x4b, 0x03, 0x04]);
+    const archiveText = new TextDecoder().decode(bytes);
+    expect(archiveText).toContain("xl/workbook.xml");
+    expect(archiveText).toContain("xl/worksheets/sheet1.xml");
+    expect(archiveText).toContain("Dirección");
+  });
+
   it("asigna estilos de semáforo a métricas y estados", () => {
     const xml = buildGenuineSpreadsheetXml(request.records, filters, request.reportName);
     expect(xml).toContain('ss:StyleID="TrafficGreen"><Data ss:Type="Number">95');
@@ -120,7 +132,7 @@ describe("exportadores de reportes institucionales", () => {
     const excel = await exportExcelReport({ ...request, format: "xlsx" });
     expect(pdf.fileName).toMatch(/Gestión|Gestion/);
     expect(pdf.fileName).toMatch(/\.pdf$/);
-    expect(excel.fileName).toMatch(/\.xml$/);
+    expect(excel.fileName).toMatch(/\.xlsx$/);
     expect(pdf.sha256Checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(excel.sha256Checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(2);

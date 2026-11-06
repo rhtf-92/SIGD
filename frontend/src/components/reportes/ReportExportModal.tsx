@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { exportExcelReport } from "@/utils/excelReportExporter";
-import { exportPdfReport } from "@/utils/pdfReportExporter";
+import { exportExcelReport } from "@/services/excelReportExporter";
+import { exportPdfReport } from "@/services/pdfReportExporter";
 import type { ExportableReportRecord, ReportExportFilterState, ReportFormat } from "@/types/reportExportConfig";
 
 interface ReportExportModalProps {
@@ -82,12 +82,12 @@ export default function ReportExportModal({ reportName, filters, records }: Repo
               PDF (A4)
             </button>
           </div>
-          {status !== "idle" && (
-            <p className={`mt-3 text-xs ${status === "error" ? "text-red-700" : "text-slate-600"}`} role="status" aria-live="polite">
-              {message}
-            </p>
-          )}
         </div>
+      )}
+      {status !== "idle" && (
+        <p className={`mt-3 text-xs ${status === "error" ? "text-red-700" : "text-slate-600"}`} role={status === "error" ? "alert" : "status"} aria-live="polite">
+          {message}
+        </p>
       )}
     </div>
   );

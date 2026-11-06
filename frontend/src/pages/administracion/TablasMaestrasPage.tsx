@@ -22,7 +22,14 @@ export default function TablasMaestrasPage() {
     mensaje,
     setMensaje,
     crearRegistro,
+    editarRegistro,
+    cancelarFormulario,
+    registroEditando,
     alternarEstado,
+    isLoading,
+    isSaving,
+    error,
+    recargar,
   } = useTablasMaestras();
 
   return (
@@ -38,6 +45,14 @@ export default function TablasMaestrasPage() {
             {mensaje}
           </div>
         )}
+        {error && (
+          <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            No se pudieron completar las tablas maestras. {error.message}
+            <button type="button" onClick={() => void recargar()} className="ml-3 font-semibold underline">Reintentar</button>
+          </div>
+        )}
+        {isLoading && <div role="status" className="mb-5 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">Cargando tablas maestras...</div>}
+        {isSaving && <div role="status" className="mb-5 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700">Guardando cambios...</div>}
 
         <div className="mb-6 flex flex-wrap gap-2">
           {tipos.map((tipo) => (
@@ -88,10 +103,10 @@ export default function TablasMaestrasPage() {
 
             <button
               type="button"
-              onClick={() => setMostrarFormulario((actual) => !actual)}
+              onClick={() => { if (mostrarFormulario) cancelarFormulario(); else setMostrarFormulario(true); }}
               className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
             >
-              + Nuevo registro
+              {mostrarFormulario ? "Cancelar edición" : "+ Nuevo registro"}
             </button>
           </div>
 
@@ -128,7 +143,7 @@ export default function TablasMaestrasPage() {
               <div className="flex gap-3 md:col-span-3 md:justify-end">
                 <button
                   type="button"
-                  onClick={() => setMostrarFormulario(false)}
+                  onClick={cancelarFormulario}
                   className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
                 >
                   Cancelar
@@ -136,9 +151,10 @@ export default function TablasMaestrasPage() {
                 <button
                   type="button"
                   onClick={crearRegistro}
+                  disabled={isSaving}
                   className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
                 >
-                  Guardar registro
+                  {registroEditando ? "Guardar cambios" : "Guardar registro"}
                 </button>
               </div>
             </div>
@@ -166,6 +182,9 @@ export default function TablasMaestrasPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
+                {!isLoading && registros.length === 0 && (
+                  <tr><td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-500">No existen registros para esta tabla o búsqueda.</td></tr>
+                )}
                 {registros.map((registro) => (
                   <tr key={registro.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 text-sm font-semibold">
@@ -189,10 +208,17 @@ export default function TablasMaestrasPage() {
                     <td className="px-6 py-4">
                       <button
                         type="button"
+                        onClick={() => editarRegistro(registro.id)}
+                        disabled={isSaving}
+                        className="mr-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                      >Editar</button>
+                      <button
+                        type="button"
                         onClick={() => {
                           setMensaje("");
                           alternarEstado(registro.id);
                         }}
+                        disabled={isSaving}
                         className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
                       >
                         {registro.estado === "Activo" ? "Inactivar" : "Activar"}

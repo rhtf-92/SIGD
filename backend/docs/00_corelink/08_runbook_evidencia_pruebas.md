@@ -76,19 +76,19 @@ de Vitest y el `EXIT_CODE`. Al adjuntarse al PR se cumple E1–E4.
 k6 requiere el servidor en ejecución (Docker para Postgres, la app con `npm run dev`):
 
 ```powershell
-# PostgreSQL efímero para la prueba de carga (recrea la base del E2E)
-docker run -d --name sigd-pg-k6 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=sigd_prueba `
-  -p 5432:5432 postgres:18-alpine
+# PostgreSQL aislado para la prueba de carga; nunca usar sigd_prueba compartida.
+$env:SIGD_K6_PG_PASSWORD = '<SECRETO_ALEATORIO_LOCAL>'
+docker run -d --name sigd-pg-k6 -e POSTGRES_USER=sigd_k6 -e "POSTGRES_PASSWORD=$env:SIGD_K6_PG_PASSWORD" -e POSTGRES_DB=sigd_k6_test -p 127.0.0.1:55432:5432 postgres:18-alpine
 
 # Aplicar el esquema de CoreLink
-docker exec -i sigd-pg-k6 psql -U postgres -d sigd_prueba -v ON_ERROR_STOP=1 `
+docker exec -i sigd-pg-k6 psql -U sigd_k6 -d sigd_k6_test -v ON_ERROR_STOP=1 `
   < ..\06_sigd_audit_esquema_ddl.sql
 ```
 
 En otra terminal, iniciar la API (en `implementacion/`):
 
 ```powershell
-$env:DATABASE_URL = "postgres://postgres:postgres@localhost:5432/sigd_prueba"
+$env:DATABASE_URL = "postgres://sigd_k6:<URL_ENCODED_TEST_PASSWORD>@localhost:55432/sigd_k6_test"
 npm run dev
 ```
 

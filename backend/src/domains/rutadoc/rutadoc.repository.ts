@@ -33,35 +33,29 @@ export interface RepositorioRutaDoc {
   obtener(idExpediente: string): Promise<ExpedienteDetalle | null>;
 }
 
-/**
- * Contrato de lectura externo: sigd_tra.expediente y tramite del DDL documental
- * 03_esquema_sigd_tra_cut_foliado.sql. creado_en se expone como fechaRadicacion;
- * no existe una columna fecha_radicacion en ese DDL. El área sólo está disponible
- * si el escritor del último movimiento aporta datos.areaId (decisión RD-03).
- * Solicitante legible y SLA no están disponibles en los contratos actuales.
- */
+/** Lecturas sobre 05_sigd_tra.sql y la proyeccion de 06_sigd_rut.sql. */
 const BASE = `
   FROM sigd_tra.expediente e
-  JOIN sigd_tra.tramite t ON t.id_tramite = e.fk_tramite
+  LEFT JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
   LEFT JOIN sigd_rut.estado_actual_expediente ultimo
-    ON ultimo.expediente_id = e.id_expediente`;
+    ON ultimo.expediente_id = e.expediente_id`;
 
 const FILTROS = `
   WHERE ($1::text IS NULL OR position(lower($1::text) in lower(e.codigo_expediente || ' ' || t.asunto)) > 0)
     AND ($2::text IS NULL OR ultimo.area_actual_id = $2::text)
-    AND ($3::date IS NULL OR e.creado_en >= ($3::date::timestamp AT TIME ZONE 'UTC'))
-    AND ($4::date IS NULL OR e.creado_en < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
+    AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
+    AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
 
 export const SQL_LISTAR_RUTADOC = `
-  SELECT e.id_expediente::text, e.codigo_expediente AS cut, t.asunto,
-         e.creado_en AS fecha_radicacion,
+  SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut, t.asunto,
+         e.fecha_radicacion AS fecha_radicacion,
          COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
          ultimo.area_actual_id
   ${BASE} ${FILTROS}
     AND COALESCE(ultimo.estado_nuevo, 'REGISTRADO') = ANY($5::text[])
     AND ($6::timestamptz IS NULL OR
-         (e.creado_en, e.id_expediente) < ($6::timestamptz, $7::bigint))
-  ORDER BY e.creado_en DESC, e.id_expediente DESC
+         (e.fecha_radicacion, e.expediente_id) < ($6::timestamptz, $7::uuid))
+  ORDER BY e.fecha_radicacion DESC, e.expediente_id DESC
   LIMIT $8`;
 
 const COLUMNAS_CONTEO = `
@@ -82,11 +76,11 @@ export const SQL_CONTADORES_RUTADOC = `SELECT ${COLUMNAS_CONTEO} ${BASE} ${FILTR
 export const SQL_CONTADORES_SIN_TERMINO_RUTADOC = `
   SELECT ${COLUMNAS_CONTEO}
   FROM sigd_tra.expediente e
-  LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.id_expediente
+  LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
   WHERE $1::text IS NULL
     AND ($2::text IS NULL OR ultimo.area_actual_id = $2::text)
-    AND ($3::date IS NULL OR e.creado_en >= ($3::date::timestamp AT TIME ZONE 'UTC'))
-    AND ($4::date IS NULL OR e.creado_en < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
+    AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
+    AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
 
 /** Seis contadores exactos mantenidos por triggers transaccionales en ambos
  * lados del contrato expediente/proyección. La lectura no toca las tablas base.
@@ -99,7 +93,7 @@ export const SQL_CONTADORES_LOCALES_RUTADOC = `
 export const SQL_BANDEJA_LOCAL_RUTADOC = `
   WITH elementos AS MATERIALIZED (${SQL_LISTAR_RUTADOC})
   SELECT COALESCE((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.fecha_radicacion DESC,
-                        p.id_expediente::bigint DESC) FROM elementos p), '[]'::jsonb) AS elementos,
+                        p.id_expediente::uuid DESC) FROM elementos p), '[]'::jsonb) AS elementos,
          CASE WHEN EXISTS (
            SELECT 1 FROM pg_catalog.pg_trigger
             WHERE tgrelid = to_regclass('sigd_tra.expediente')
@@ -169,15 +163,15 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
 
   async obtener(idExpediente: string): Promise<ExpedienteDetalle | null> {
     const fila = await this.pool.query<FilaDetalle>(`
-      SELECT e.id_expediente::text, e.codigo_expediente AS cut, t.asunto,
-             e.creado_en AS fecha_radicacion,
+      SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut, t.asunto,
+             e.fecha_radicacion AS fecha_radicacion,
              COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
              ultimo.area_actual_id,
-             t.fk_remitente::text AS solicitante_id,
+             e.solicitante_id::text AS solicitante_id,
              ultimo.id_movimiento::text, ultimo.evento, ultimo.fecha_hora,
              ultimo.usuario_operador_id::text
       ${BASE}
-      WHERE e.id_expediente = $1::bigint`, [idExpediente]);
+      WHERE e.expediente_id = $1::uuid`, [idExpediente]);
     if (fila.rowCount === 0) return null;
 
     const dato = fila.rows[0];
@@ -187,9 +181,9 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
     if (existeFoliacion.rows[0].existe) {
       const folios = await this.pool.query<{ cantidad: number; total: number }>(`
         SELECT count(DISTINCT id_documento)::integer AS cantidad,
-               COALESCE(sum(total_folios), 0)::integer AS total
+               COALESCE(sum(folio_fin - folio_inicio + 1), 0)::integer AS total
           FROM sigd_tra.expediente_documento_folio
-         WHERE id_expediente = $1::bigint`, [idExpediente]);
+         WHERE expediente_id = $1::uuid`, [idExpediente]);
       resumenDocumentos = {
         cantidadDocumentos: folios.rows[0].cantidad,
         totalFolios: folios.rows[0].total,

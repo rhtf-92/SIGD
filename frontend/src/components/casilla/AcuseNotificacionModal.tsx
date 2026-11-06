@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { apiClient } from "../../api/client";
 import { CASILLA_ENDPOINTS } from "../../services/casillaService";
@@ -58,19 +58,27 @@ export default function AcuseNotificacionModal({
   onClose,
   onAcuseGenerado,
 }: AcuseNotificacionModalProps) {
+  if (!isOpen || !notificacion) return null;
+
+  return (
+    <AcuseNotificacionDialog
+      key={notificacion.id}
+      notificacion={notificacion}
+      onClose={onClose}
+      onAcuseGenerado={onAcuseGenerado}
+    />
+  );
+}
+
+function AcuseNotificacionDialog({
+  notificacion,
+  onClose,
+  onAcuseGenerado,
+}: Omit<AcuseNotificacionModalProps, "isOpen"> & { notificacion: Notificacion }) {
   const [confirmed, setConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [acuse, setAcuse] = useState<AcuseEmitidoServidor | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setConfirmed(false);
-    setIsSubmitting(false);
-    setAcuse(null);
-    setError(null);
-  }, [isOpen, notificacion?.id]);
-
-  if (!isOpen || !notificacion) return null;
   const currentNotification = notificacion;
 
   async function handleConfirm() {
@@ -149,11 +157,11 @@ export default function AcuseNotificacionModal({
                   <dd className="mt-1">{formatFechaHora(acuse.selladoTiempo)}</dd>
                 </div>
                 <div>
-                  <dt className="font-bold text-slate-900">Sello de tiempo ISO-8601</dt>
+                  <dt className="font-bold text-slate-900">Fecha y hora registradas (ISO-8601)</dt>
                   <dd className="mt-1 break-all font-mono text-xs">{acuse.selladoTiempo}</dd>
                 </div>
                 <div>
-                  <dt className="font-bold text-slate-900">Hash criptográfico SHA-256</dt>
+                  <dt className="font-bold text-slate-900">Hash SHA-256 del registro</dt>
                   <dd className="mt-1 break-all rounded-md bg-slate-950 p-3 font-mono text-xs text-emerald-300">
                     {acuse.hashSha256}
                   </dd>

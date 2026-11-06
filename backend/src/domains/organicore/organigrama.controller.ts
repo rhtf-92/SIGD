@@ -1,18 +1,19 @@
-import type { Request, Response, RequestHandler } from 'express';
+import type { RequestHandler } from 'express';
 import { z } from 'zod';
-import { OrganigramaService, CrearUnidadDTO, ActualizarUnidadDTO } from './organigrama.service.js';
-import { DomainError } from '../../shared/domain/errors/index.js';
 
+import { OrganigramaService } from './organigrama.service.js';
+
+const uuid = z.string().uuid();
 const crearUnidadSchema = z.object({
-  sigla: z.string().min(1).max(20),
-  nombre: z.string().min(1).max(255),
-  padre_id: z.string().uuid().nullable(),
-});
-
+  codigo: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9._-]+$/),
+  nombre: z.string().trim().min(1).max(160),
+  padreId: uuid.nullable(),
+}).strict();
 const actualizarUnidadSchema = z.object({
-  nombre: z.string().min(1).max(255).optional(),
-  padre_id: z.string().uuid().nullable().optional(),
-});
+  nombre: z.string().trim().min(1).max(160).optional(),
+  padreId: uuid.nullable().optional(),
+  vigente: z.boolean().optional(),
+}).strict().refine((datos) => Object.keys(datos).length > 0, 'Debe enviar al menos un cambio.');
 
 export function crearControladorOrganigrama(servicio: OrganigramaService): {
   getOrganigrama: RequestHandler;
@@ -20,23 +21,19 @@ export function crearControladorOrganigrama(servicio: OrganigramaService): {
   actualizarUnidad: RequestHandler;
 } {
   return {
-    getOrganigrama: async (req, res) => {
-      res.json(await servicio.obtenerOrganigrama());
+    getOrganigrama: async (_req, res, next) => {
+      try { res.json(await servicio.obtenerOrganigrama()); } catch (error) { next(error); }
     },
-
-    crearUnidad: async (req, res) => {
-      const dto = crearUnidadSchema.parse(req.body);
-      res.status(201).json(await servicio.crearUnidad(dto));
+    crearUnidad: async (req, res, next) => {
+      try {
+        res.status(201).json(await servicio.crearUnidad(crearUnidadSchema.parse(req.body)));
+      } catch (error) { next(error); }
     },
-
-    actualizarUnidad: async (req, res) => {
-      const id = String(req.params.id);
-      if (!z.string().uuid().safeParse(id).success) {
-        res.status(400).json({ error: 'ID de unidad inválido' });
-        return;
-      }
-      const dto = actualizarUnidadSchema.parse(req.body);
-      res.json(await servicio.actualizarUnidad(id, dto));
+    actualizarUnidad: async (req, res, next) => {
+      try {
+        const id = uuid.parse(req.params.id);
+        res.json(await servicio.actualizarUnidad(id, actualizarUnidadSchema.parse(req.body)));
+      } catch (error) { next(error); }
     },
   };
 }

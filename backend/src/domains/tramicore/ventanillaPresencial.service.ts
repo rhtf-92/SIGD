@@ -137,6 +137,7 @@ export class VentanillaPresencialService {
         });
       }
 
+<<<<<<< HEAD
       // 2. Verificar que el tipo de trámite TUPA exista y esté vigente.
       const tupa = await cliente.query(
         `SELECT 1
@@ -154,12 +155,52 @@ export class VentanillaPresencialService {
             },
           ],
         });
+=======
+      // 2. Resolver o registrar persona solicitante
+      let solicitanteId: string;
+      const personaExistente = await cliente.query<{ id_persona: string }>(
+        "SELECT id_persona FROM sigd_auth.persona WHERE tipo = 'NATURAL' AND id_documento = $1 LIMIT 1",
+        [datos.dniSolicitante],
+      );
+
+      if (personaExistente.rows[0]) {
+        solicitanteId = personaExistente.rows[0].id_persona;
+      } else {
+        const nuevaPersona = await cliente.query<{ id_persona: string }>(
+          `INSERT INTO sigd_auth.persona (tipo, id_documento)
+           VALUES ('NATURAL', $1)
+           RETURNING id_persona;`,
+          [datos.dniSolicitante],
+        );
+        solicitanteId = nuevaPersona.rows[0].id_persona;
+
+        await cliente.query(
+          `INSERT INTO sigd_auth.persona_natural (id_persona, nombres, apellidos, nombre_completo)
+           VALUES ($1, $2, 'REGISTRADO', $2)
+           ON CONFLICT DO NOTHING;`,
+          [solicitanteId, datos.datosRemitente],
+        );
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
       }
 
       // 3. Asignación atómica del CUT dentro de la misma transacción.
       const { cut } = await this.cutService.generar(anioFiscal, cliente);
 
+<<<<<<< HEAD
       // 4. Hash de seguridad del acuse (también respalda el adjunto obligatorio).
+=======
+      // Asiento y tramite comparten el UUID del expediente formal.
+      await cliente.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto)
+        VALUES ($1::uuid, $2)`, [expedienteId, datos.asunto]);
+      await cliente.query(`INSERT INTO sigd_tra.asiento_registro
+        (expediente_id, canal_ingreso, asunto, remitente_id)
+        VALUES ($1::uuid, 'MESA_PRESENCIAL', $2, $3::uuid)`,
+        [expedienteId, datos.asunto, solicitanteId]);
+
+      if (debeManejarTx) await cliente.query('COMMIT');
+
+      // 5. Generar cargo y ticket térmico
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
       const hashSeguridad = crypto
         .createHash('sha256')
         .update(`${cut}:${ahora.toISOString()}:${datos.dniSolicitante}`)

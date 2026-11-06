@@ -64,11 +64,14 @@ export default function TimeFilterControls({
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2">
           <label className="min-w-0 text-sm font-medium text-slate-700">
             Desde
-            <input className={fieldClass} type="date" value={rangeStart} max={rangeEnd} onChange={(event) => onRangeStartChange(event.target.value)} />
+            <input className={fieldClass} type="month" value={rangeStart.slice(0,7)} max={rangeEnd.slice(0,7)} onChange={(event) => onRangeStartChange(event.target.value + '-01')} />
           </label>
           <label className="min-w-0 text-sm font-medium text-slate-700">
             Hasta
-            <input className={fieldClass} type="date" value={rangeEnd} min={rangeStart} onChange={(event) => onRangeEndChange(event.target.value)} />
+            <input className={fieldClass} type="month" value={rangeEnd.slice(0,7)} min={rangeStart.slice(0,7)} onChange={(event) => {
+              const [year,month]=event.target.value.split('-').map(Number);
+              if(year&&month)onRangeEndChange(new Date(Date.UTC(year,month,0)).toISOString().slice(0,10));
+            }} />
           </label>
         </div>
       ) : null}

@@ -72,7 +72,7 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     expect(screen.getByLabelText(/Persona Jurídica/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Número de Documento \*/i)).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /Trámite no TUPA \/ documentación general/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /48 - Otros servicios y alquileres/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /BIE-18 - Servicio de empadre/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Cantidad de Folios Físicos \*/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /✓ Registrar y Emitir Cargo CUT/i })).toBeInTheDocument();
   });
@@ -86,11 +86,11 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
       </MemoryRouter>,
     );
 
-    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "01");
+    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "ACA-02");
 
-    expect(screen.getByText("Constancia de No Adeudar", { exact: true })).toBeInTheDocument();
-    expect(screen.getByText(/S\/. 11\.00 por semestre/i)).toBeInTheDocument();
-    expect(screen.getByText(/05 días hábiles/i)).toBeInTheDocument();
+    expect(screen.getByText(/TUPA ACA-02: Constancia de no adeudar para fines de titulación/i)).toBeInTheDocument();
+    expect(screen.getByText(/S\/. 16\.50/i)).toBeInTheDocument();
+    expect(screen.getByText(/Fuente: TUPA 2026 del IESTP Suiza, Ucayali/i)).toBeInTheDocument();
   });
 
   it("CargoDigitalModal: renderiza el ticket térmico con CUT, QR y datos del solicitante", () => {
@@ -123,7 +123,7 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     await user.type(screen.getByLabelText(/Apellidos y Nombres \*/i), "Sergio Serruche");
     await user.type(screen.getByLabelText(/Correo Electrónico para Notificación \*/i), "sergio@correo.pe");
     await user.type(screen.getByLabelText(/Teléfono \/ Celular de Contacto \*/i), "961234567");
-    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "01");
+    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "ACA-25");
     await user.type(screen.getByLabelText(/Asunto \/ Petitorio Concreto \*/i), "Solicitud de convalidación académica");
 
     const botonRegistrar = screen.getByRole("button", { name: /✓ Registrar y Emitir Cargo CUT/i });

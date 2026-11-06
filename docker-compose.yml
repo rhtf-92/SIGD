@@ -17,15 +17,19 @@
 name: sigd
 
 services:
+<<<<<<< HEAD
   # ---------------------------------------------------------------------------
   # 1. Base de datos relacional. PostgreSQL 18 usa PGDATA=/var/lib/postgresql/18/docker,
   #    por eso el volumen se monta en /var/lib/postgresql (y no en .../data).
   # ---------------------------------------------------------------------------
+=======
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
   postgres:
     image: postgres:18-alpine
     container_name: sigd_postgres
     restart: unless-stopped
     environment:
+<<<<<<< HEAD
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env}
       POSTGRES_DB: ${POSTGRES_DB:-sigd_prueba}
@@ -33,10 +37,18 @@ services:
     ports:
       # 5432 suele estar ocupado por un PostgreSQL local; el host usa 5433 por defecto.
       - "${POSTGRES_PORT:-5433}:5432"
+=======
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER es obligatorio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB es obligatorio}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+<<<<<<< HEAD
       interval: 10s
       timeout: 5s
       retries: 10
@@ -47,6 +59,35 @@ services:
   # ---------------------------------------------------------------------------
   # 2. Redis 7. Usado por DocuCore para las sesiones efimeras de firma.
   # ---------------------------------------------------------------------------
+=======
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  s3:
+    image: chrislusf/seaweedfs:4.17@sha256:186de7ef977a20343ee9a5544073f081976a29e2d29ecf8379891e7bf177fbe9
+    container_name: sigd_s3
+    command: mini -dir=/data
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?S3_ACCESS_KEY es obligatorio}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY es obligatorio}
+      S3_BUCKET: ${S3_BUCKET:-sigd-expedientes}
+    ports:
+      - "127.0.0.1:9000:8333"
+      - "127.0.0.1:8888:8888"
+    volumes:
+      - s3data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8888/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
   redis:
     image: redis:7-alpine
     container_name: sigd_redis
@@ -61,6 +102,7 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+<<<<<<< HEAD
       start_period: 5s
     networks:
       - sigd_data
@@ -80,6 +122,37 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Defina MINIO_ROOT_PASSWORD en .env}
+=======
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: sigd_backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL debe usar el rol de aplicación}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET es obligatorio}
+      CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
+      S3_ENDPOINT: http://s3:8333
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?S3_ACCESS_KEY es obligatorio}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY es obligatorio}
+      S3_BUCKET: ${S3_BUCKET:-sigd-expedientes}
+      S3_FORCE_PATH_STYLE: "true"
+      REDIS_URL: redis://redis:6379
+      OUTBOX_POLL_INTERVAL_MS: 5000
+      MIGRATE_ON_BOOT: "false"
+      START_FRONTEND: "false"
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
     ports:
       - "${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
@@ -134,6 +207,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+<<<<<<< HEAD
       redis:
         condition: service_healthy
     healthcheck:
@@ -156,27 +230,55 @@ services:
   # ---------------------------------------------------------------------------
   # 5. Frontend (React 19 + Vite 6 + TypeScript). Servidor de desarrollo Vite.
   # ---------------------------------------------------------------------------
+=======
+      s3:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+<<<<<<< HEAD
     image: sigd-frontend:local
     container_name: sigd_frontend
     restart: unless-stopped
     init: true
+=======
+      target: development
+    container_name: sigd_frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       # URL visible desde el NAVEGADOR (no desde el contenedor).
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000/api/v1}
       VITE_ENABLE_MOCKS: "false"
+<<<<<<< HEAD
       # Destino del proxy /api de Vite (DNS interno de Docker).
       VITE_PROXY_TARGET: http://backend:3000
+=======
+    command: ["npm", "exec", "--", "vite", "--host", "0.0.0.0", "--port", "5173", "--strictPort"]
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
+<<<<<<< HEAD
       test:
         [
           "CMD",
@@ -190,6 +292,14 @@ services:
       start_period: 20s
     networks:
       - sigd_app
+=======
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
 
 # -----------------------------------------------------------------------------
 # Redes: sigd_app aísla la capa web; sigd_data aísla datos y servicios internos.
@@ -209,8 +319,15 @@ networks:
 # -----------------------------------------------------------------------------
 volumes:
   pgdata:
+<<<<<<< HEAD
     name: sigd_pgdata
   redisdata:
     name: sigd_redisdata
   miniodata:
     name: sigd_miniodata
+=======
+  redisdata:
+  s3data:
+  backend_node_modules:
+  frontend_node_modules:
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542

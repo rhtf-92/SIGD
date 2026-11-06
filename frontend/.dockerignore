@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Dependencias y artefactos locales
 node_modules
 dist
@@ -29,3 +30,13 @@ yarn-error.log*
 Thumbs.db
 *.tsbuildinfo
 *.local
+=======
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+npm-debug.log*
+docs
+>>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
