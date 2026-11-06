@@ -51,7 +51,11 @@ function formatoFecha(valor: string): string {
 
 export function useSeguridadPolicies() {
   const queryClient = useQueryClient();
-  const [borrador, setBorrador] = useState<Partial<PoliticasDto>>({});
+
+  const [maxIntentos, setMaxIntentos] = useState<number>(0);
+  const [minutosBloqueo, setMinutosBloqueo] = useState<number>(0);
+  const [minutosSesion, setMinutosSesion] = useState<number>(0);
+
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState<Error | null>(null);
   const [isSaving, setIsSaving] = useState(false);
