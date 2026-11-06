@@ -51,14 +51,14 @@ jobs:
         run: npm exec -- vitest run tests/integration --config vitest.integration.config.ts --configLoader bundle
 
       - name: Pruebas E2E (Omitidas temporalmente)
-        run: echo "::warning title=E2E Pausadas::Las 10 suites E2E están omitidas hasta la integración del PR 167 (Autenticación) según coordinación."
+        run: npm run test:e2e
 
       - name: Construir imágenes Docker de Producción
         working-directory: .
         run: docker compose -f docker-compose.prod.yml build
 
       - name: Escaneo de Seguridad de Imagen (Trivy)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: "sigd-backend:production"
           format: "table"
