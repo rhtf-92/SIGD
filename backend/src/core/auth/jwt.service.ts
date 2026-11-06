@@ -7,6 +7,8 @@ export interface ClaimsJwt {
   iat: number;
   exp: number;
   typ: 'access';
+  scope?: string;
+  resource?: string;
 }
 
 export interface OpcionesFirma {
@@ -15,6 +17,8 @@ export interface OpcionesFirma {
   expiraSegundos?: number;
   ahora?: number;
   secreto?: string;
+  scope?: string;
+  resource?: string;
 }
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
@@ -49,6 +53,8 @@ export function firmarTokenAcceso(opciones: OpcionesFirma): string {
     exp: ahora + (opciones.expiraSegundos ?? 900),
     typ: 'access',
   };
+  if (opciones.scope !== undefined) claims.scope = opciones.scope;
+  if (opciones.resource !== undefined) claims.resource = opciones.resource;
 
   const encabezado = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const cuerpo = base64url(JSON.stringify(claims));
@@ -63,7 +69,10 @@ export function firmarTokenAcceso(opciones: OpcionesFirma): string {
   return `${encabezado}.${cuerpo}.${firma}`;
 }
 
-export function verificarTokenAcceso(token: string, opciones: { ahora?: number; secreto?: string } = {}): ClaimsJwt {
+export function verificarTokenAcceso(
+  token: string,
+  opciones: { ahora?: number; secreto?: string; permitirAlcance?: boolean } = {},
+): ClaimsJwt {
   const partes = token.trim().split('.');
   if (partes.length !== 3 || !partes.every((p) => BASE64URL.test(p))) {
     throw new UnauthorizedError({ detail: 'Token de acceso mal formado.' });
@@ -102,8 +111,43 @@ export function verificarTokenAcceso(token: string, opciones: { ahora?: number; 
   if (typeof claims.exp !== 'number' || claims.exp <= ahora) {
     throw new UnauthorizedError({ detail: 'El token de acceso ha expirado.' });
   }
+  if (claims.scope !== undefined && !opciones.permitirAlcance) {
+    throw new UnauthorizedError({ detail: 'El token está limitado a un recurso específico.' });
+  }
 
   return { ...claims, roles: Array.isArray(claims.roles) ? claims.roles : [] };
+}
+
+export const SCOPE_DESCARGA_DOCUCORE = 'docucore:documento:descargar';
+
+export type ClaimsJwtDescargaDocuCore = ClaimsJwt & {
+  scope: typeof SCOPE_DESCARGA_DOCUCORE;
+  resource: string;
+};
+
+export function firmarTokenDescargaDocuCore(
+  usuarioId: string,
+  expedienteId: string,
+  expiraSegundos = 300,
+): string {
+  return firmarTokenAcceso({
+    sub: usuarioId,
+    expiraSegundos,
+    scope: SCOPE_DESCARGA_DOCUCORE,
+    resource: expedienteId,
+  });
+}
+
+export function verificarTokenDescargaDocuCore(token: string): ClaimsJwtDescargaDocuCore {
+  const claims = verificarTokenAcceso(token, { permitirAlcance: true });
+  if (claims.scope !== SCOPE_DESCARGA_DOCUCORE || !claims.resource) {
+    throw new UnauthorizedError({ detail: 'El token no autoriza la descarga solicitada.' });
+  }
+  return {
+    ...claims,
+    scope: SCOPE_DESCARGA_DOCUCORE,
+    resource: claims.resource,
+  };
 }
 
 export function extraerTokenBearer(cabeceraAuthorization: string | undefined): string | null {

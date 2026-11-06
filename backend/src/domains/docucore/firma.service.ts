@@ -25,6 +25,7 @@ import { a4GeneratorService, type A4GeneratorService } from "./a4Generator.servi
 import type { AlmacenDocumentosFirmables } from "./documentoFirmable.store.js";
 import {
   errorIntegridadDocumento,
+  errorDocumentoFirmadoSinCambios,
   errorPeticionInvalida,
   errorSesionFirmaInvalida,
   type DetalleError,
@@ -52,6 +53,9 @@ export interface FirmanteSolicitado {
 /** Solicitud de invocacion a firma (cuerpo de POST /api/v1/firma/invocar-refirma). */
 export interface SolicitudInvocarRefirma {
   documentoId?: string;
+  usuarioId?: string;
+  expedienteId?: string;
+  tokenDescarga?: string;
   firmante: FirmanteSolicitado;
   /**
    * Contenido A4 a renderizar. Si se omite, se reutiliza el `documentoId` ya
@@ -132,6 +136,7 @@ export class ServicioFirmaService {
       solicitud.hostPublico,
       documentoId,
       token,
+      solicitud.tokenDescarga,
     );
 
     const sesion: SesionFirma = {
@@ -142,6 +147,8 @@ export class ServicioFirmaService {
       firmante: solicitud.firmante,
       creadaEn: creadaEn.toISOString(),
       expiraEn: expiraEn.toISOString(),
+      ...(solicitud.usuarioId ? { usuarioId: solicitud.usuarioId } : {}),
+      ...(solicitud.expedienteId ? { expedienteId: solicitud.expedienteId } : {}),
     };
 
     // NX: si el token ya existiera, la sesion no se sobrescribe. Una colision
@@ -212,6 +219,10 @@ export class ServicioFirmaService {
       throw errorIntegridadDocumento(sesion.hashDocumento, hashRecibido);
     }
 
+    if (hashRecibido === sesion.hashDocumento) {
+      throw errorDocumentoFirmadoSinCambios(hashRecibido);
+    }
+
     // El hash del PDF firmado nunca coincide con el del original: la firma
     // modifica los bytes. Lo que se verifica aqui es la integridad del
     // transporte y el formato del valor recibido. La comprobacion criptografica
@@ -232,10 +243,26 @@ export class ServicioFirmaService {
   async descargarDocumento(
     documentoId: string,
     token: string,
+    identidad?: { usuarioId: string; expedienteId: string },
   ): Promise<{ bytes: Uint8Array; nombreArchivo: string; mimeType: string } | null> {
+    const sesion = await this.dependencias.sesiones.obtener(token);
+    if (
+      sesion === null ||
+      sesion.documentoId !== documentoId ||
+      (identidad !== undefined &&
+        (sesion.usuarioId !== identidad.usuarioId ||
+          sesion.expedienteId !== identidad.expedienteId))
+    ) {
+      return null;
+    }
+
     const documento = await this.dependencias.almacen.recuperar(documentoId, token);
     if (documento === null) {
       return null;
+    }
+    const hashActual = createHash("sha256").update(documento.bytes).digest("hex");
+    if (hashActual !== documento.sha256) {
+      throw errorIntegridadDocumento(documento.sha256, hashActual);
     }
     return {
       bytes: documento.bytes,

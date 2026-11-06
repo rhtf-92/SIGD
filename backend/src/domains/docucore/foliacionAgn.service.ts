@@ -22,6 +22,7 @@ export async function asignarFoliacionContinua(
   expedienteId: string,
   documentoId: string,
   totalFolios: number,
+  usuarioId: string | null = null,
 ): Promise<FoliacionAsignada> {
   if (!Number.isInteger(totalFolios) || totalFolios < 1) {
     throw new ValidationError({
@@ -50,9 +51,9 @@ export async function asignarFoliacionContinua(
 
   const existente = await cliente.query(
     `SELECT 1
-       FROM sigd_doc.foliacion_documento
+       FROM sigd_tra.expediente_documento_folio
       WHERE expediente_id = $1
-        AND documento_id = $2`,
+        AND id_documento = $2`,
     [expedienteId, documentoId],
   );
 
@@ -63,40 +64,17 @@ export async function asignarFoliacionContinua(
     });
   }
 
-  const ultimo = await cliente.query<{ ultimo_folio: number }>(
-    `SELECT COALESCE(MAX(folio_hasta), 0)::integer AS ultimo_folio
-       FROM sigd_doc.foliacion_documento
-      WHERE expediente_id = $1`,
-    [expedienteId],
+  const creada = await cliente.query<{ folio_inicio: number; folio_fin: number }>(
+    `SELECT folio_inicio, folio_fin
+       FROM sigd_tra.agregar_folio_expediente($1, $2, $3, $4)`,
+    [expedienteId, documentoId, totalFolios, usuarioId],
   );
 
-  const folioDesde = ultimo.rows[0].ultimo_folio + 1;
-  const folioHasta = folioDesde + totalFolios - 1;
-
-  const creada = await cliente.query<FoliacionAsignada>(
-    `INSERT INTO sigd_doc.foliacion_documento
-      (
-        expediente_id,
-        documento_id,
-        folio_desde,
-        folio_hasta,
-        total_folios
-      )
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING
-       expediente_id,
-       documento_id,
-       folio_desde,
-       folio_hasta,
-       total_folios`,
-    [
-      expedienteId,
-      documentoId,
-      folioDesde,
-      folioHasta,
-      totalFolios,
-    ],
-  );
-
-  return creada.rows[0];
+  return {
+    expediente_id: expedienteId,
+    documento_id: documentoId,
+    folio_desde: creada.rows[0].folio_inicio,
+    folio_hasta: creada.rows[0].folio_fin,
+    total_folios: totalFolios,
+  };
 }

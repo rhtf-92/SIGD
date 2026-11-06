@@ -1,4 +1,4 @@
-import express, { Express } from 'express';
+import express, { Express, type Request } from 'express';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
@@ -62,6 +62,8 @@ import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/
 import { corsMiddleware } from './middleware/cors.middleware.js';
 import { verificarTokenAcceso } from './core/auth/jwt.service.js';
 import { autenticarJwt, autorizarPermisos, PERMISOS_RBAC } from './core/auth/auth.guard.js';
+import { ForbiddenError, NotFoundError } from './shared/domain/errors/index.js';
+import { verificarAccesoExpediente } from './domains/docucore/docucore.security.js';
 
 export interface AppOptions {
   busSse?: BusSse;
@@ -115,7 +117,14 @@ export function construirApp(
     }
     next();
   });
-  app.use(express.json());
+  app.use(express.json({
+    verify: (req, _res, rawBody) => {
+      if (req.url?.split('?')[0] === '/api/v1/firma/callback-refirma') {
+        // SEC-02: conserva los bytes exactos para validar la firma HMAC del webhook.
+        (req as Request & { rawBody: Buffer }).rawBody = Buffer.from(rawBody);
+      }
+    },
+  }));
   app.use(contextMiddleware);
   app.use(
     '/api/v1/admin',
@@ -196,11 +205,20 @@ export function construirApp(
         const token = auth.slice(7).trim();
         try {
           const claims = verificarTokenAcceso(token);
+          if (claims.scope !== undefined) return null;
           return {
             id: claims.sub,
             roles: claims.roles ?? [],
             unidadOrganicaId: null,
-            puedeVerExpediente: () => true,
+            puedeVerExpediente: async (expedienteId: string) => {
+              try {
+                await verificarAccesoExpediente(pool, claims.sub, expedienteId);
+                return true;
+              } catch (error) {
+                if (error instanceof ForbiddenError || error instanceof NotFoundError) return false;
+                throw error;
+              }
+            },
           };
         } catch {
           return null;
@@ -243,7 +261,7 @@ export function construirApp(
   );
   app.use('/api/v1', crearRouterReportes(pool, actorProviderReportesEfectivo, opts.mgdCache));
   app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
-  app.use('/api/v1/firma', crearFirmaRouter(servicio));
+  app.use('/api/v1/firma', crearFirmaRouter(servicio, pool));
 
   /*
    * OrganiCore - Administración de usuarios

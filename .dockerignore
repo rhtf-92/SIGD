@@ -1,0 +1,23 @@
+# Contexto raiz (solo aplica si se construye desde la raiz)
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+coverage
+**/coverage
+
+.env
+.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+.git
+.gitignore
+*.md
+
+.DS_Store
+Thumbs.db
+*.tsbuildinfo

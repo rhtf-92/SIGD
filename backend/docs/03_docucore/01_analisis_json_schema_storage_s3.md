@@ -131,3 +131,12 @@ Basado en **JSON Schema Draft 2020-12**:
 
 * Confirmar nomenclatura final de roles.
 * Definir punto de integración para firma digital PKI/X.509.
+
+---
+
+## 11. Protección de acceso SEC-02
+
+- Las rutas de presigned upload, confirmación y descarga requieren JWT.
+- La solicitud y confirmación de carga incluyen `idExpediente`; la clave S3 se emite bajo `expedientes/<idExpediente>/<uuid>.pdf`. La confirmación valida el acceso vigente al expediente y comprueba la existencia, tipo y tamaño del objeto antes de registrar el adjunto.
+- La emisión de URL GET busca primero el adjunto registrado y comprueba el permiso activo del usuario sobre su expediente. No se aceptan buckets arbitrarios ni claves ajenas al registro documental.
+- La verificación distingue `401` (sin JWT), `403` (sin permiso vigente) y `404` (expediente o adjunto inexistente).

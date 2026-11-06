@@ -157,9 +157,14 @@ describe('App Routing & Health Verification', () => {
     }
   });
 
-  it('POST /api/v1/storage/presigned-url responde con error de validacion si faltan datos', async () => {
+  it('POST /api/v1/storage/presigned-url requiere JWT antes de procesar la solicitud', async () => {
     const res = await request(app).post('/api/v1/storage/presigned-url').send({});
-    expect([400, 422]).toContain(res.status);
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /api/v1/firma/callback-refirma exige la firma HMAC del webhook', async () => {
+    const res = await request(app).post('/api/v1/firma/callback-refirma').send({});
+    expect(res.status).toBe(403);
   });
 
   it('GET /api/v1/firmas/cola-firmantes responde protegiendo acceso sin autenticacion', async () => {

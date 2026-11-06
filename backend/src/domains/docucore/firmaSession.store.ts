@@ -50,6 +50,8 @@ export interface SesionFirma {
   /** Identificador del documento en el repositorio documental. */
   documentoId: string;
   firmante: Firmante;
+  usuarioId?: string;
+  expedienteId?: string;
   /** Momento de emision, en ISO-8601. */
   creadaEn: string;
   /** Momento exacto de expiracion, en ISO-8601. */
@@ -74,6 +76,9 @@ export interface FirmaSessionStore {
    * Devuelve `null` si no existe, ya fue consumida o expiro.
    */
   consumir(token: string): Promise<SesionFirma | null>;
+
+  /** Lee la sesión sin consumirla; se usa para vincular token, documento e identidad. */
+  obtener(token: string): Promise<SesionFirma | null>;
 
   /** Verifica si un token sigue vigente, sin consumirlo. */
   existe(token: string): Promise<boolean>;
@@ -112,6 +117,7 @@ export interface ClienteRedisMinimo {
     condicion: "NX",
   ): Promise<"OK" | null>;
   getdel(clave: string): Promise<string | null>;
+  get(clave: string): Promise<string | null>;
   exists(clave: string): Promise<number>;
   del(...claves: string[]): Promise<number>;
   quit(): Promise<unknown>;
@@ -181,6 +187,18 @@ export class RedisFirmaSessionStore implements FirmaSessionStore {
     return sesion;
   }
 
+  async obtener(token: string): Promise<SesionFirma | null> {
+    const crudo = await this.redis.get(claveSesionFirma(token, this.prefijo));
+    if (crudo === null) return null;
+
+    try {
+      const sesion = JSON.parse(crudo) as SesionFirma;
+      return igualesEnTiempoConstante(sesion.token, token) ? sesion : null;
+    } catch {
+      return null;
+    }
+  }
+
   async existe(token: string): Promise<boolean> {
     const resultado = await this.redis.exists(claveSesionFirma(token, this.prefijo));
     return resultado === 1;
@@ -227,6 +245,12 @@ export class InMemoryFirmaSessionStore implements FirmaSessionStore {
       return null;
     }
 
+    return igualesEnTiempoConstante(registro.sesion.token, token) ? registro.sesion : null;
+  }
+
+  async obtener(token: string): Promise<SesionFirma | null> {
+    const registro = this.sesiones.get(claveSesionFirma(token));
+    if (registro === undefined || registro.expiraEnMs <= this.reloj()) return null;
     return igualesEnTiempoConstante(registro.sesion.token, token) ? registro.sesion : null;
   }
 

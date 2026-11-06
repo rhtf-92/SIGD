@@ -12,8 +12,15 @@ import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
-import { generarUrlPresigned } from './s3-storage.service.js';
-import { ValidationError } from '../../shared/domain/errors/index.js';
+import { generarUrlPresigned, headObject } from './s3-storage.service.js';
+import {
+  ConflictError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '../../shared/domain/errors/index.js';
+import { autenticarJwt } from '../auth/auth.guard.js';
+import { verificarAccesoExpediente } from '../../domains/docucore/docucore.security.js';
 
 const presignedInputSchema = z.preprocess(
   (val: any) => {
@@ -26,6 +33,7 @@ const presignedInputSchema = z.preprocess(
     return val;
   },
   z.object({
+    idExpediente: z.string().uuid(),
     nombreArchivo: z.string().min(1).max(255),
     tamanoBytes: z.number().int().positive().max(26_214_400), // Máximo 25 MB
     mimeType: z.literal('application/pdf'),
@@ -34,21 +42,30 @@ const presignedInputSchema = z.preprocess(
 );
 
 const confirmarInputSchema = z.object({
+  idExpediente: z.string().uuid(),
+  tipoDocumentalId: z.string().uuid(),
+  nombreArchivo: z.string().min(1).max(255),
+  tamanoBytes: z.number().int().positive().max(26_214_400),
   s3Key: z.string().min(3),
   sha256Hash: z.string().length(64).regex(/^[a-fA-F0-9]{64}$/),
-  idExpediente: z.string().uuid().optional(),
 });
 
-export function crearRouterStorage(pool?: Pool): Router {
+export function crearRouterStorage(pool: Pool): Router {
   const router = Router();
   const config = obtenerConfiguracionS3();
+  router.use('/storage', autenticarJwt);
+  const usuarioAutenticado = (req: Request): string => {
+    const usuarioId = req.cuentaActual?.idUsuario;
+    if (!usuarioId) throw new UnauthorizedError({ detail: 'Autenticación requerida.' });
+    return usuarioId;
+  };
 
   // #18 — POST /storage/presigned-url
-  router.post('/storage/presigned-url', (req: Request, res: Response) => {
+  router.post('/storage/presigned-url', async (req: Request, res: Response) => {
     const datos = presignedInputSchema.parse(req.body);
+    await verificarAccesoExpediente(pool, usuarioAutenticado(req), datos.idExpediente);
     const uuid = crypto.randomUUID();
-    const extension = datos.nombreArchivo.split('.').pop() ?? 'pdf';
-    const s3Key = `expedientes/${new Date().getFullYear()}/${uuid}.${extension}`;
+    const s3Key = `expedientes/${datos.idExpediente}/${uuid}.pdf`;
 
     const uploadUrl = generarUrlPresigned(s3Key, config, {
       metodo: 'PUT',
@@ -67,19 +84,60 @@ export function crearRouterStorage(pool?: Pool): Router {
   // #19 — POST /storage/confirmar-carga
   router.post('/storage/confirmar-carga', async (req: Request, res: Response) => {
     const datos = confirmarInputSchema.parse(req.body);
-    const idAdjunto = crypto.randomUUID();
+    const usuarioId = usuarioAutenticado(req);
+    await verificarAccesoExpediente(pool, usuarioId, datos.idExpediente);
+    if (!new RegExp(
+      `^expedientes/${datos.idExpediente}/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\\.pdf$`,
+      'i',
+    ).test(datos.s3Key)) {
+      throw new ValidationError({
+        invalidParams: [{ name: 's3Key', reason: 'La clave no pertenece al expediente autorizado.' }],
+      });
+    }
 
-    if (pool) {
-      // Registrar en sigd_doc.documento_adjunto si se proporciona pool
-      await pool
-        .query(
-          `INSERT INTO sigd_doc.documento_adjunto
-             (id_documento_adjunto, s3_bucket, s3_key, sha256_hash, creado_en)
-           VALUES ($1, $2, $3, $4, now())
-           ON CONFLICT DO NOTHING;`,
-          [idAdjunto, config.bucket, datos.s3Key, datos.sha256Hash.toLowerCase()],
-        )
-        .catch(() => null);
+    const objeto = await headObject(datos.s3Key, config);
+    if (!objeto.existe) throw new NotFoundError({ detail: 'No se encontró el archivo en el almacenamiento.' });
+    if (objeto.contentType !== 'application/pdf' || objeto.contentLength !== datos.tamanoBytes) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'archivo', reason: 'El tipo o tamaño del objeto no coincide con los datos validados.' }],
+      });
+    }
+
+    const insertado = await pool.query<{ documento_adjunto_id: string }>(
+      `INSERT INTO sigd_doc.documento_adjunto
+         (expediente_id, tipo_documental_id, nombre_archivo, s3_bucket, s3_key,
+          sha256, tamano_bytes, mime_type, subido_por)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'application/pdf', $8)
+       ON CONFLICT DO NOTHING
+       RETURNING documento_adjunto_id`,
+      [
+        datos.idExpediente,
+        datos.tipoDocumentalId,
+        datos.nombreArchivo,
+        config.bucket,
+        datos.s3Key,
+        datos.sha256Hash.toLowerCase(),
+        datos.tamanoBytes,
+        usuarioId,
+      ],
+    );
+    let idAdjunto = insertado.rows[0]?.documento_adjunto_id;
+    if (!idAdjunto) {
+      const existente = await pool.query<{ documento_adjunto_id: string }>(
+        `SELECT documento_adjunto_id
+           FROM sigd_doc.documento_adjunto
+          WHERE expediente_id = $1
+            AND s3_bucket = $2
+            AND s3_key = $3
+            AND sha256 = $4`,
+        [datos.idExpediente, config.bucket, datos.s3Key, datos.sha256Hash.toLowerCase()],
+      );
+      idAdjunto = existente.rows[0]?.documento_adjunto_id;
+      if (!idAdjunto) {
+        throw new ConflictError({
+          detail: 'El archivo ya está registrado con metadatos incompatibles.',
+        });
+      }
     }
 
     res.status(201).json({
@@ -91,7 +149,7 @@ export function crearRouterStorage(pool?: Pool): Router {
   });
 
   // GET /storage/download/:bucket/:key
-  router.get('/storage/download/:bucket/:key', (req: Request, res: Response) => {
+  router.get('/storage/download/:bucket/:key', async (req: Request, res: Response) => {
     const bucket = Array.isArray(req.params.bucket) ? req.params.bucket[0] : req.params.bucket;
     const rawKey = req.params.key;
     const key = Array.isArray(rawKey) ? rawKey.join('/') : rawKey;
@@ -102,16 +160,26 @@ export function crearRouterStorage(pool?: Pool): Router {
       });
     }
 
-    const configBucket = { ...config, bucket };
-    const downloadUrl = generarUrlPresigned(key, configBucket, {
+    if (bucket !== config.bucket) {
+      throw new NotFoundError({ detail: 'El archivo solicitado no existe.' });
+    }
+    const adjunto = await pool.query<{ expediente_id: string }>(
+      `SELECT expediente_id
+         FROM sigd_doc.documento_adjunto
+        WHERE s3_bucket = $1 AND s3_key = $2`,
+      [bucket, key],
+    );
+    const expedienteId = adjunto.rows[0]?.expediente_id;
+    if (!expedienteId) throw new NotFoundError({ detail: 'El archivo solicitado no existe.' });
+
+    // SEC-02: no se emite una URL física hasta comprobar el JWT y el acceso vigente.
+    await verificarAccesoExpediente(pool, usuarioAutenticado(req), expedienteId);
+    const downloadUrl = generarUrlPresigned(key, config, {
       metodo: 'GET',
       expiraSegundos: 900,
     });
 
-    res.status(200).json({
-      downloadUrl,
-      expiraEnSegundos: 900,
-    });
+    res.status(200).json({ downloadUrl, expiraEnSegundos: 900 });
   });
 
   return router;

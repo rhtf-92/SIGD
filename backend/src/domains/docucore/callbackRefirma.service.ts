@@ -1,12 +1,14 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import {
+  ConflictError,
   ForbiddenError,
   NotFoundError,
 } from '../../shared/domain/errors/index.js';
 
 export interface CallbackRefirma {
   documento_id: string;
+  resolucion_id: string;
   sha256_firmado: string;
   firmante: string;
   fecha_sello_tsa: string;
@@ -60,17 +62,63 @@ export async function registrarCallbackRefirma(
     throw new Error('Los datos recibidos desde Refirma son inválidos.');
   }
 
-  const documento = await cliente.query<{ id_documento_adjunto: string }>(
-    `SELECT id_documento_adjunto
+  const documento = await cliente.query<{
+    documento_adjunto_id: string;
+    expediente_id: string;
+    sha256: string;
+    s3_bucket: string;
+    s3_key: string;
+  }>(
+    `SELECT documento_adjunto_id, expediente_id, sha256, s3_bucket, s3_key
        FROM sigd_doc.documento_adjunto
-      WHERE id_documento_adjunto = $1
+      WHERE documento_adjunto_id = $1
       FOR UPDATE`,
     [datos.documento_id],
   );
 
-  if (documento.rowCount !== 1) {
+  const adjunto = documento.rows[0];
+  if (!adjunto) {
     throw new NotFoundError({
       detail: 'El documento a firmar no existe.',
+    });
+  }
+
+  if (
+    datos.sha256_firmado.toLowerCase() === adjunto.sha256.toLowerCase() ||
+    (datos.s3_bucket === adjunto.s3_bucket && datos.s3_key === adjunto.s3_key)
+  ) {
+    throw new ConflictError({
+      code: 'INTEGRIDAD_FIRMA_INVALIDA',
+      detail: 'El archivo firmado debe tener bytes y ubicación distintos del documento original.',
+    });
+  }
+
+  const resoluciones = await cliente.query<{ resolucion_id: string }>(
+    `SELECT resolucion_id
+       FROM sigd_doc.resolucion
+      WHERE resolucion_id = $1
+        AND expediente_id = $2
+        AND estado = 'EN_FIRMA'
+      FOR UPDATE`,
+    [datos.resolucion_id, adjunto.expediente_id],
+  );
+  if (resoluciones.rowCount !== 1) {
+    throw new ConflictError({
+      code: 'RESOLUCION_NO_FIRMABLE',
+      detail: 'La resolución indicada no pertenece al expediente o no está en estado EN_FIRMA.',
+    });
+  }
+
+  const firmaExistente = await cliente.query(
+    `SELECT 1
+       FROM sigd_doc.firma_digital_documento
+      WHERE documento_id = $1`,
+    [datos.documento_id],
+  );
+  if (firmaExistente.rowCount !== 0) {
+    throw new ConflictError({
+      code: 'DOCUMENTO_YA_FIRMADO',
+      detail: 'El documento ya cuenta con evidencia de firma digital.',
     });
   }
 
@@ -86,13 +134,6 @@ export async function registrarCallbackRefirma(
         estado
       )
      VALUES ($1, $2, $3, $4, $5, $6, 'FIRMADO_DIGITALMENTE')
-     ON CONFLICT (documento_id) DO UPDATE SET
-       sha256_firmado = EXCLUDED.sha256_firmado,
-       firmante = EXCLUDED.firmante,
-       fecha_sello_tsa = EXCLUDED.fecha_sello_tsa,
-       s3_bucket = EXCLUDED.s3_bucket,
-       s3_key = EXCLUDED.s3_key,
-       estado = EXCLUDED.estado
      RETURNING cvd`,
     [
       datos.documento_id,
@@ -103,6 +144,22 @@ export async function registrarCallbackRefirma(
       datos.s3_key.trim(),
     ],
   );
+
+  const actualizacion = await cliente.query(
+    `UPDATE sigd_doc.resolucion
+        SET estado = 'FIRMADA',
+            firmado_en = $2,
+            hash_pades = $3
+      WHERE resolucion_id = $1
+        AND estado = 'EN_FIRMA'`,
+    [resoluciones.rows[0].resolucion_id, datos.fecha_sello_tsa, datos.sha256_firmado.toLowerCase()],
+  );
+  if (actualizacion.rowCount !== 1) {
+    throw new ConflictError({
+      code: 'RESOLUCION_ESTADO_CAMBIADO',
+      detail: 'La resolución dejó de estar en estado EN_FIRMA durante el callback.',
+    });
+  }
 
   return resultado.rows[0].cvd;
 }

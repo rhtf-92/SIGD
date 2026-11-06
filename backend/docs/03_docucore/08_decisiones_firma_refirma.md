@@ -111,9 +111,9 @@ Base: `/api/v1/firma`
 
 | Método | Ruta | Propósito |
 |--------|------|-----------|
-| `POST` | `/invocar-refirma` | Genera PDF, crea sesión, devuelve `refirma://` URI, `urlDocumento`, `hashDocumento`, `token`, `sesionId`, `expiraEn`, `ttlSegundos`. |
+| `POST` | `/invocar-refirma` | Requiere JWT, rol activo `DIRECTOR`/`ADMINISTRADOR`, expediente accesible y resolución en `EN_FIRMA`; devuelve `refirma://`, `urlDocumento`, `hashDocumento`, `token`, `sesionId`, `expiraEn`, `ttlSegundos`. |
 | `POST` | `/callback-refirma/:sesionId` | Valida `token` (body) y `hashDocumento` (body); destruye sesión; responde `documentoModificado`, `hashOrigen`, `firmadoEn`. |
-| `GET` | `/documento/:documentoId?token=...` | Entrega PDF si token vigente y coincide; 404/401 en caso contrario. |
+| `GET` | `/documento/:documentoId?token=...&jwt=...` | Requiere JWT de descarga acotado al expediente (TTL 300 s), permiso vigente, sesión coincidente y documento ligado; 401/403/404 según corresponda. |
 
 ### Formato de error unificado
 
@@ -169,5 +169,14 @@ Los nombres exactos de los parámetros (`urlDocumento`, `hashDocumento`, `idSesi
 - Repositorio `jumanor/firmaperu-invoker` (referencia de invocador local).
 
 ---
+
+## 9. Control de acceso SEC-02
+
+- Foliación requiere JWT, rol vigente `ADMINISTRADOR`, `MESA_PARTES`, `SECRETARIO` o `ESPECIALISTA`, acceso vigente al expediente y pertenencia del adjunto al mismo.
+- Proyección de resoluciones requiere JWT y rol vigente `ADMINISTRADOR`, `SECRETARIO` o `ESPECIALISTA`; lectura requiere autorización sobre el expediente vinculado.
+- La firma requiere rol/facultad de despacho vigente y estado de resolución `EN_FIRMA`. Los callbacks consumen la sesión de forma atómica; la evidencia HMAC rechaza estados inválidos, duplicados y hashes sin cambios.
+- Las descargas de firma usan JWT de alcance `docucore:documento:descargar`, ligado a la identidad y expediente, además del token opaco de sesión ligado al documento.
+- Las operaciones de almacenamiento comprueban JWT y acceso actual al expediente antes de emitir URL de carga o descarga; los adjuntos se registran con su expediente y bucket configurado.
+- Los errores distinguen autenticación (`401`), autorización (`403`) y recurso inexistente (`404`). No requiere cambios de esquema.
 
 *Fin del documento.*
