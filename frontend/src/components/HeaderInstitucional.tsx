@@ -202,120 +202,150 @@ export default function HeaderInstitucional() {
               <div
                 role="menu"
                 aria-label="Menú de Trámites y Servicios Ciudadanos"
-                className="absolute left-0 top-full pt-1.5 w-72 sm:w-80 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                className="absolute left-0 top-full pt-2 w-[720px] lg:w-[760px] xl:w-[800px] max-w-[calc(100vw-3rem)] z-50 animate-in fade-in slide-in-from-top-2 duration-150"
               >
-                <div className="rounded-2xl bg-white text-slate-800 shadow-2xl border border-slate-200/90 p-2 overflow-hidden ring-1 ring-black/5">
-                  <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/70 -mx-2 -mt-2 mb-1.5 rounded-t-2xl">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      Servicios Públicos a la Ciudadanía
-                    </p>
-                    <p className="text-[11px] text-slate-500 font-normal">
-                      Trámites y consultas digitales oficiales
-                    </p>
+                <div className="rounded-2xl bg-white text-slate-800 shadow-2xl border border-slate-200/90 p-3.5 sm:p-4 overflow-hidden ring-1 ring-black/5">
+                  {/* Cabecera del panel de opciones horizontales */}
+                  <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                        Servicios Públicos a la Ciudadanía
+                      </p>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      Opciones y trámites institucionales digitales
+                    </span>
                   </div>
 
-                  <div className="space-y-1">
+                  {/* Opciones organizadas de manera horizontal */}
+                  <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
+                    {/* Opción 1: Mesa de Partes Virtual */}
                     <Link
                       to="/tramite"
                       role="menuitem"
                       onClick={() => setTramitesDropdownOpen(false)}
-                      className={`flex items-start gap-3 rounded-xl p-2.5 transition group ${
+                      className={`flex flex-col justify-between rounded-xl p-3 border transition-all duration-150 group ${
                         isActive("/tramite")
-                          ? "bg-blue-50 text-blue-900 font-semibold"
-                          : "hover:bg-slate-50 text-slate-700"
+                          ? "bg-blue-50/80 border-blue-300 shadow-xs"
+                          : "bg-slate-50/60 border-slate-200/80 hover:bg-blue-50/40 hover:border-blue-200 hover:shadow-xs"
                       }`}
                     >
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 group-hover:bg-blue-700 group-hover:text-white transition">
-                        <FileText className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900 group-hover:text-blue-700 transition">
-                            Mesa de Partes Virtual
-                          </span>
-                          <span className="rounded bg-blue-100 px-1.5 py-0.2 text-[9px] font-bold text-blue-800">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition">
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-800">
                             24x7
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                          Radicación de solicitudes y documentos en línea
+                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-blue-700 transition leading-snug">
+                          Mesa de Partes Virtual
+                        </h3>
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                          Radicación de solicitudes y expedientes
                         </p>
                       </div>
+                      <span className="mt-3 inline-flex items-center text-[10px] font-semibold text-blue-700 group-hover:translate-x-0.5 transition">
+                        Ingresar al trámite →
+                      </span>
                     </Link>
 
+                    {/* Opción 2: Consulta Pública CUT */}
                     <Link
                       to="/consulta"
                       role="menuitem"
                       onClick={() => setTramitesDropdownOpen(false)}
-                      className={`flex items-start gap-3 rounded-xl p-2.5 transition group ${
+                      className={`flex flex-col justify-between rounded-xl p-3 border transition-all duration-150 group ${
                         isActive("/consulta")
-                          ? "bg-blue-50 text-blue-900 font-semibold"
-                          : "hover:bg-slate-50 text-slate-700"
+                          ? "bg-emerald-50/80 border-emerald-300 shadow-xs"
+                          : "bg-slate-50/60 border-slate-200/80 hover:bg-emerald-50/40 hover:border-emerald-200 hover:shadow-xs"
                       }`}
                     >
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition">
-                        <Search className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition">
-                            Consulta Pública CUT
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition">
+                            <Search className="h-4 w-4" />
+                          </div>
+                          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
+                            CUT
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                          Seguimiento del estado de expediente por CUT
+                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition leading-snug">
+                          Consulta Pública CUT
+                        </h3>
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                          Seguimiento del estado de expediente
                         </p>
                       </div>
+                      <span className="mt-3 inline-flex items-center text-[10px] font-semibold text-emerald-700 group-hover:translate-x-0.5 transition">
+                        Consultar estado →
+                      </span>
                     </Link>
 
+                    {/* Opción 3: Validador CVD / QR */}
                     <Link
                       to="/validador-cvd"
                       role="menuitem"
                       onClick={() => setTramitesDropdownOpen(false)}
-                      className={`flex items-start gap-3 rounded-xl p-2.5 transition group ${
+                      className={`flex flex-col justify-between rounded-xl p-3 border transition-all duration-150 group ${
                         isActive("/validador-cvd")
-                          ? "bg-blue-50 text-blue-900 font-semibold"
-                          : "hover:bg-slate-50 text-slate-700"
+                          ? "bg-teal-50/80 border-teal-300 shadow-xs"
+                          : "bg-slate-50/60 border-slate-200/80 hover:bg-teal-50/40 hover:border-teal-200 hover:shadow-xs"
                       }`}
                     >
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition">
-                        <ShieldCheck className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition">
-                            Validador CVD / QR
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition">
+                            <ShieldCheck className="h-4 w-4" />
+                          </div>
+                          <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[9px] font-bold text-teal-800">
+                            QR
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                          Cotejo de integridad y autenticidad digital
+                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition leading-snug">
+                          Validador CVD / QR
+                        </h3>
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                          Cotejo de integridad y firma digital
                         </p>
                       </div>
+                      <span className="mt-3 inline-flex items-center text-[10px] font-semibold text-teal-700 group-hover:translate-x-0.5 transition">
+                        Verificar código →
+                      </span>
                     </Link>
 
+                    {/* Opción 4: Registro de Administrados */}
                     <Link
                       to="/registro"
                       role="menuitem"
                       onClick={() => setTramitesDropdownOpen(false)}
-                      className={`flex items-start gap-3 rounded-xl p-2.5 transition group ${
+                      className={`flex flex-col justify-between rounded-xl p-3 border transition-all duration-150 group ${
                         isActive("/registro")
-                          ? "bg-blue-50 text-blue-900 font-semibold"
-                          : "hover:bg-slate-50 text-slate-700"
+                          ? "bg-indigo-50/80 border-indigo-300 shadow-xs"
+                          : "bg-slate-50/60 border-slate-200/80 hover:bg-indigo-50/40 hover:border-indigo-200 hover:shadow-xs"
                       }`}
                     >
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white transition">
-                        <UserCheck className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition">
-                            Registro de Administrados
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white transition">
+                            <UserCheck className="h-4 w-4" />
+                          </div>
+                          <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] font-bold text-indigo-800">
+                            Oficial
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition leading-snug">
+                          Registro de Administrados
+                        </h3>
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
                           Inscripción para casilla y notificaciones
                         </p>
                       </div>
+                      <span className="mt-3 inline-flex items-center text-[10px] font-semibold text-indigo-700 group-hover:translate-x-0.5 transition">
+                        Registrarse ahora →
+                      </span>
                     </Link>
                   </div>
                 </div>
