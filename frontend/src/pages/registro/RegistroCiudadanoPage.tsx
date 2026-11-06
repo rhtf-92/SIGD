@@ -4,6 +4,7 @@ import PersonaNaturalForm from "../../components/registro/PersonaNaturalForm";
 import PersonaJuridicaForm from "../../components/registro/PersonaJuridicaForm";
 import type { Natural, Juridical } from "../../types/registroCiudadano";
 import { apiClient } from "../../api/client";
+import PublicCitizenNav from "../../components/common/PublicCitizenNav";
 
 export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
@@ -113,6 +114,9 @@ export default function RegistroCiudadanoPage() {
             Registro Ciudadano
           </span>
         </nav>
+
+        {/* Navegación unificada de servicios ciudadanos */}
+        <PublicCitizenNav currentPath="/registro" className="mb-5" />
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <Link

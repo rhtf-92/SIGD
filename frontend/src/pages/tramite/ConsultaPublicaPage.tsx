@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
+import PublicCitizenNav from '../../components/common/PublicCitizenNav';
 
 export interface DtoDocumentoPublico {
   nombreArchivo: string;
@@ -100,31 +101,8 @@ export default function ConsultaPublicaPage() {
           </span>
         </nav>
 
-        {/* Píldoras de navegación de servicios ciudadanos */}
-        <nav
-          aria-label="Accesos directos ciudadanos"
-          className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none"
-        >
-          <Link
-            to="/consulta"
-            aria-current="page"
-            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-emerald-700 text-white shadow-xs"
-          >
-            <span>🔍 Consulta Pública CUT</span>
-          </Link>
-          <Link
-            to="/tramite"
-            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 transition"
-          >
-            <span>📝 Mesa de Partes Virtual</span>
-          </Link>
-          <Link
-            to="/validador-cvd"
-            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 transition"
-          >
-            <span>🛡️ Validador CVD / QR</span>
-          </Link>
-        </nav>
+        {/* Navegación unificada de servicios ciudadanos */}
+        <PublicCitizenNav currentPath="/consulta" />
 
         {/* Cabecera Institucional */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8">

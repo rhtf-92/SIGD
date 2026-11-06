@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import CvdIntegrityReport from "../../components/cvd/CvdIntegrityReport";
+import PublicCitizenNav from "../../components/common/PublicCitizenNav";
 import {
   CVD_ALTERADO,
   CVD_VALIDO,
@@ -205,37 +206,8 @@ export default function ValidadorPublicoCvdPage() {
             </Link>
           </div>
 
-          {/* Botones de navegación intermodular */}
-          <nav
-            aria-label="Accesos directos de validación y trámites"
-            className="flex items-center gap-2 overflow-x-auto pt-3 pb-1 mt-4 border-t border-slate-100 scrollbar-none"
-          >
-            <Link
-              to="/validador-cvd"
-              aria-current="page"
-              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-blue-700 text-white shadow-xs"
-            >
-              <span>🛡️ Validador CVD / QR</span>
-            </Link>
-            <Link
-              to="/consulta"
-              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700 transition"
-            >
-              <span>🔍 Consulta CUT</span>
-            </Link>
-            <Link
-              to="/tramite"
-              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700 transition"
-            >
-              <span>📝 Mesa de Partes Virtual</span>
-            </Link>
-            <Link
-              to="/flujo-validez-legal"
-              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700 transition"
-            >
-              <span>📜 Flujo de Validez Legal</span>
-            </Link>
-          </nav>
+          {/* Navegación unificada de servicios ciudadanos */}
+          <PublicCitizenNav currentPath="/validador-cvd" className="mt-4 pt-3 border-t border-slate-100" />
         </div>
       </header>
 
