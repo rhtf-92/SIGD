@@ -3,6 +3,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import {
+  UnauthorizedError,
   ValidationError,
 } from '../../shared/domain/errors/index.js';
 
@@ -18,6 +19,14 @@ import {
 import {
   crearVerificadorCvd,
 } from './validadorCvd.controller.js';
+import { autenticarJwt } from '../../core/auth/auth.guard.js';
+import {
+  requerirRolActivo,
+  ROLES_DOCUCORE,
+  verificarAccesoExpediente,
+  verificarDocumentoDeExpediente,
+  validarIdExpediente,
+} from './docucore.security.js';
 
 type RequestConRawBody = Request & {
   rawBody?: Buffer;
@@ -30,6 +39,7 @@ const foliacionSchema = z.object({
 
 const callbackSchema = z.object({
   documento_id: z.string().uuid(),
+  resolucion_id: z.string().uuid(),
   sha256_firmado: z.string().regex(/^[a-fA-F0-9]{64}$/),
   firmante: z.string().trim().min(1),
   fecha_sello_tsa: z.string().datetime(),
@@ -42,6 +52,8 @@ export function crearRouterDocuCore(pool: Pool): Router {
 
   router.post(
     '/v1/expedientes/:id/foliar-documento',
+    autenticarJwt,
+    requerirRolActivo(pool, ...ROLES_DOCUCORE.FOLIAR),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const idParam = req.params.id;
@@ -56,7 +68,14 @@ export function crearRouterDocuCore(pool: Pool): Router {
           });
         }
 
+        const expedienteId = validarIdExpediente(idParam.trim());
         const datos = foliacionSchema.parse(req.body);
+        const usuarioId = req.cuentaActual?.idUsuario;
+        if (!usuarioId) throw new UnauthorizedError({ detail: 'Autenticación requerida.' });
+
+        // SEC-02: el rol vigente y el acceso al expediente se validan antes de foliar.
+        await verificarAccesoExpediente(pool, usuarioId, expedienteId);
+        await verificarDocumentoDeExpediente(pool, datos.documento_id, expedienteId);
 
         const cliente = await pool.connect();
         try {
@@ -64,9 +83,10 @@ export function crearRouterDocuCore(pool: Pool): Router {
 
           const foliacion = await asignarFoliacionContinua(
             cliente,
-            idParam.trim(),
+            expedienteId,
             datos.documento_id,
             datos.total_folios,
+            usuarioId,
           );
 
           await cliente.query('COMMIT');

@@ -5,6 +5,10 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+// En Docker el backend se resuelve por el nombre del servicio ("backend");
+// en desarrollo local se conserva http://localhost:3000.
+const proxyTarget = process.env.VITE_PROXY_TARGET ?? "http://localhost:3000";
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -15,7 +19,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:3000",
+        target: proxyTarget,
         changeOrigin: true,
         secure: false,
       },

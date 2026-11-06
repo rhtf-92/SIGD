@@ -274,12 +274,13 @@ export class RefirmaGatewayService {
     basePublica: string,
     documentoId: string,
     token: string,
+    tokenJwt?: string,
   ): string {
     const base = basePublica.replace(/\/+$/u, "");
-    return (
+    const url =
       `${base}/api/v1/firma/documento/${encodeURIComponent(documentoId)}` +
-      `?token=${encodeURIComponent(token)}`
-    );
+      `?token=${encodeURIComponent(token)}`;
+    return tokenJwt === undefined ? url : `${url}&jwt=${encodeURIComponent(tokenJwt)}`;
   }
 
   /** Valida el payload lanzando `ErrorFirma` ante el primer incumplimiento. */

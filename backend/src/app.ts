@@ -1,5 +1,5 @@
 import { cuentaActual } from './core/auth/cuenta-actual.js';
-import express, { Express } from 'express';
+import express, { Express, type Request } from 'express';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
@@ -73,6 +73,7 @@ import { crearRouterSalud } from './controllers/health.controller.js';
 import { crearRouterWorkflowAcademico } from './domains/docucore/workflowAcademico.router.js';
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from './shared/domain/errors/index.js';
 import { autenticarJwt, autorizarPermisos, PERMISOS_RBAC } from './core/auth/auth.guard.js';
+import { verificarAccesoExpediente } from './domains/docucore/docucore.security.js';
 
 export interface AppOptions {
   busSse?: BusSse;
@@ -126,7 +127,14 @@ export function construirApp(
     }
     next();
   });
-  app.use(express.json());
+  app.use(express.json({
+    verify: (req, _res, rawBody) => {
+      if (req.url?.split('?')[0] === '/api/v1/firma/callback-refirma') {
+        // SEC-02: conserva los bytes exactos para validar la firma HMAC del webhook.
+        (req as Request & { rawBody: Buffer }).rawBody = Buffer.from(rawBody);
+      }
+    },
+  }));
   app.use(contextMiddleware);
   app.use(
     '/api/v1/admin',
@@ -227,11 +235,19 @@ export function construirApp(
   const jwtActorProvider: ActorProviderRutaDoc = {
     obtenerActor: async (req) => {
       const cuenta = await cuentaActual(pool, req);
-      return { id: cuenta.id_usuario, roles: cuenta.roles, unidadOrganicaId: cuenta.area_id,
-        puedeVerExpediente: async (id: string) => {
-          const {rows} = await pool.query('SELECT solicitante_id,area_destino_id FROM sigd_tra.expediente WHERE expediente_id=$1',[id]);
-          return Boolean(rows[0] && (rows[0].solicitante_id===cuenta.id_persona || cuenta.permisos.includes('EXPEDIENTE_LEER')));
-        }
+      return {
+        id: cuenta.id_usuario,
+        roles: cuenta.roles,
+        unidadOrganicaId: cuenta.area_id,
+        puedeVerExpediente: async (expedienteId: string) => {
+          try {
+            await verificarAccesoExpediente(pool, cuenta.id_usuario, expedienteId);
+            return true;
+          } catch (error) {
+            if (error instanceof ForbiddenError || error instanceof NotFoundError) return false;
+            throw error;
+          }
+        },
       };
     },
   };
@@ -269,7 +285,7 @@ export function construirApp(
   );
   app.use('/api/v1', crearRouterReportes(pool, actorProviderReportesEfectivo, opts.mgdCache));
   app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
-  app.use('/api/v1/firma', crearFirmaRouter(servicio));
+  app.use('/api/v1/firma', crearFirmaRouter(servicio, pool));
 
   /*
    * OrganiCore - Administración de usuarios

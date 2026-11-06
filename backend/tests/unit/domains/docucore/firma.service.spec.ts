@@ -254,6 +254,39 @@ describe("ServicioFirmaService — descarga temporal", () => {
     assert.equal(await servicio.descargarDocumento(documentoId, "token-falso"), null);
   });
 
+  it("vincula el token de descarga al documento, usuario y expediente de la sesion", async () => {
+    const { servicio } = crearServicio();
+    const expedienteId = "00000000-0000-4000-8000-000000000002";
+    const usuarioId = "00000000-0000-4000-8000-000000000001";
+
+    const resultado = await servicio.invocarRefirma(
+      solicitud({ usuarioId, expedienteId }),
+    );
+    const documentoId = resultado.urlDocumento.split("/").pop()?.split("?")[0] ?? "";
+
+    assert.equal(
+      await servicio.descargarDocumento(documentoId, resultado.token, {
+        usuarioId: "00000000-0000-4000-8000-000000000003",
+        expedienteId,
+      }),
+      null,
+    );
+    assert.equal(
+      await servicio.descargarDocumento("otro-documento", resultado.token, {
+        usuarioId,
+        expedienteId,
+      }),
+      null,
+    );
+    assert.notEqual(
+      await servicio.descargarDocumento(documentoId, resultado.token, {
+        usuarioId,
+        expedienteId,
+      }),
+      null,
+    );
+  });
+
   it("la URL expira con la sesion tras los 300 segundos", async () => {
     let ahora = 1_000_000;
     const { servicio } = crearServicio(() => ahora);
@@ -311,6 +344,20 @@ describe("ServicioFirmaService — callback y consumo atomico", () => {
           error.detalles.map((detalle) => detalle.campo),
           ["hashDocumento"],
         );
+        return true;
+      },
+    );
+  });
+
+  it("rechaza un callback que no modifica el documento firmado", async () => {
+    const { servicio } = crearServicio();
+    const resultado = await servicio.invocarRefirma(solicitud());
+
+    await assert.rejects(
+      servicio.recibirCallback(resultado.token, resultado.sesionId, resultado.hashDocumento),
+      (error: unknown) => {
+        assert.ok(error instanceof ErrorFirma);
+        assert.equal(error.codigo, "ERR-FIR-422");
         return true;
       },
     );

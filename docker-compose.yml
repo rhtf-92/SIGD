@@ -128,5 +128,6 @@ volumes:
   pgdata:
   redisdata:
   s3data:
+  miniodata:
   backend_node_modules:
   frontend_node_modules:

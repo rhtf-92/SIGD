@@ -154,3 +154,13 @@ export function errorIntegridadDocumento(
     [{ campo: "hashDocumento", problema: `Esperado ${esperado}; recibido ${recibido}.` }],
   );
 }
+
+export function errorDocumentoFirmadoSinCambios(hash: string): ErrorFirma {
+  return new ErrorFirma(
+    "ERR-FIR-422",
+    "El documento recibido no presenta cambios respecto del original.",
+    "Validation",
+    422,
+    [{ campo: "hashDocumento", problema: `El hash firmado coincide con el original (${hash}).` }],
+  );
+}

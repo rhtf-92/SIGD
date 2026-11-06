@@ -39,6 +39,9 @@ export function autenticarJwt(req: Request, _res: Response, next: NextFunction):
   if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
 
   const claims = verificarTokenAcceso(token);
+  if (claims.scope !== undefined) {
+    throw new UnauthorizedError({ detail: 'El token está limitado a un recurso específico.' });
+  }
   setUsuarioId(claims.sub);
   req.cuentaActual = { idUsuario: claims.sub, roles: claims.roles };
   next();
@@ -99,12 +102,18 @@ export function resolverIdentidad(req: Request): IdentidadAutenticada {
   const bearer = extraerTokenBearer(req.get('authorization'));
   if (bearer) {
     const claims: ClaimsJwt = verificarTokenAcceso(bearer);
+    if (claims.scope !== undefined) {
+      throw new UnauthorizedError({ detail: 'El token está limitado a un recurso específico.' });
+    }
     return { idUsuario: claims.sub, roles: claims.roles, via: 'bearer' };
   }
 
   const tokenQuery = typeof req.query.token === 'string' ? req.query.token : undefined;
   if (tokenQuery) {
     const claims = verificarTokenAcceso(tokenQuery);
+    if (claims.scope !== undefined) {
+      throw new UnauthorizedError({ detail: 'El token está limitado a un recurso específico.' });
+    }
     return { idUsuario: claims.sub, roles: claims.roles, via: 'query' };
   }
 

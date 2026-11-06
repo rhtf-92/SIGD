@@ -167,6 +167,11 @@ describe('App Routing & Health Verification', () => {
     expect(res.status).toBe(401);
   });
 
+  it('POST /api/v1/firma/callback-refirma exige la firma HMAC del webhook', async () => {
+    const res = await request(app).post('/api/v1/firma/callback-refirma').send({});
+    expect(res.status).toBe(403);
+  });
+
   it('GET /api/v1/firmas/cola-firmantes responde protegiendo acceso sin autenticacion', async () => {
     const res = await request(app).get('/api/v1/firmas/cola-firmantes');
     expect([401, 403]).toContain(res.status);

@@ -4,8 +4,12 @@ import request from 'supertest';
 import type { Pool, PoolClient } from 'pg';
 import { crearRouterDocuCore } from '../../../../src/domains/docucore/docucore.router.js';
 import { errorMiddleware } from '../../../../src/middleware/error-middleware.js';
+import { firmarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
 
 describe('docucore.router.ts — Adversarial Route Parameter Verification', () => {
+  const expedienteId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12';
+  const usuarioId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13';
+  const token = firmarTokenAcceso({ sub: usuarioId, roles: ['MESA_PARTES'] });
   const validBody = {
     documento_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
     total_folios: 3,
@@ -17,31 +21,27 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
         if (queryText === 'BEGIN' || queryText === 'COMMIT' || queryText === 'ROLLBACK') {
           return Promise.resolve({ rows: [], rowCount: 0 });
         }
-        if (queryText.includes('SELECT expediente_id')) {
-          // If the expedienteId is a valid non-empty string, simulate found
-          const id = params?.[0];
-          if (id === 'valid-exp-uuid') {
-            return Promise.resolve({ rows: [{ expediente_id: id }], rowCount: 1 });
-          }
+        if (queryText.includes('SELECT DISTINCT r.codigo')) {
+          return Promise.resolve({ rows: [{ codigo: 'MESA_PARTES' }], rowCount: 1 });
+        }
+        if (queryText.includes('SELECT expediente_id FROM sigd_doc.expediente')) {
+          return Promise.resolve({ rows: [{ expediente_id: params?.[0] }], rowCount: 1 });
+        }
+        if (queryText.includes('SELECT') && queryText.includes('AS autorizado')) {
+          return Promise.resolve({ rows: [{ autorizado: true }], rowCount: 1 });
+        }
+        if (queryText.includes('FROM sigd_doc.documento_adjunto')) {
+          return Promise.resolve({ rows: [{ expediente_id: expedienteId }], rowCount: 1 });
+        }
+        if (queryText.includes('FROM sigd_tra.expediente_documento_folio')) {
           return Promise.resolve({ rows: [], rowCount: 0 });
         }
-        if (queryText.includes('SELECT 1 FROM sigd_doc.foliacion_documento')) {
-          return Promise.resolve({ rows: [], rowCount: 0 });
+        if (queryText.includes('FROM sigd_tra.expediente')) {
+          return Promise.resolve({ rows: [{ expediente_id: expedienteId }], rowCount: 1 });
         }
-        if (queryText.includes('SELECT COALESCE(MAX(folio_hasta)')) {
-          return Promise.resolve({ rows: [{ ultimo_folio: 0 }], rowCount: 1 });
-        }
-        if (queryText.includes('INSERT INTO sigd_doc.foliacion_documento')) {
+        if (queryText.includes('agregar_folio_expediente')) {
           return Promise.resolve({
-            rows: [
-              {
-                expediente_id: params?.[0],
-                documento_id: params?.[1],
-                folio_desde: 1,
-                folio_hasta: 3,
-                total_folios: 3,
-              },
-            ],
+            rows: [{ folio_inicio: 1, folio_fin: 3 }],
             rowCount: 1,
           });
         }
@@ -101,10 +101,11 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
     it('returns 201 for valid expediente id and valid body', async () => {
       const { app } = setupApp();
       const res = await request(app)
-        .post('/v1/expedientes/valid-exp-uuid/foliar-documento')
+        .post(`/v1/expedientes/${expedienteId}/foliar-documento`)
+        .set('Authorization', `Bearer ${token}`)
         .send(validBody);
 
-      expect(res.status).toBe(201);
+      expect(res.status, res.text).toBe(201);
       expect(res.body).toHaveProperty('folio_desde', 1);
       expect(res.body).toHaveProperty('folio_hasta', 3);
     });
@@ -117,6 +118,7 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
 
       const res = await request(app)
         .post('/v1/expedientes/placeholder/foliar-documento')
+        .set('Authorization', `Bearer ${token}`)
         .send(validBody);
 
       expect(res.status).toBe(400);
@@ -136,6 +138,7 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
 
       const res = await request(app)
         .post('/v1/expedientes/placeholder/foliar-documento')
+        .set('Authorization', `Bearer ${token}`)
         .send(validBody);
 
       expect(res.status).toBe(400);
@@ -155,6 +158,7 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
 
       const res = await request(app)
         .post('/v1/expedientes/placeholder/foliar-documento')
+        .set('Authorization', `Bearer ${token}`)
         .send(validBody);
 
       expect(res.status).toBe(400);
@@ -172,6 +176,7 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
       // Sending URL encoded spaces as :id: /v1/expedientes/%20%20%20/foliar-documento
       const res = await request(app)
         .post('/v1/expedientes/%20%20%20/foliar-documento')
+        .set('Authorization', `Bearer ${token}`)
         .send(validBody);
 
       // We expect 400 with VALIDATION_ERROR and invalid_params for 'id'
@@ -192,6 +197,7 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
 
       const res = await request(app)
         .post('/v1/expedientes/placeholder/foliar-documento')
+        .set('Authorization', `Bearer ${token}`)
         .send(validBody);
 
       // An array of IDs is not a valid single expediente ID and must be rejected with 400 ValidationError
@@ -271,4 +277,3 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
     });
   });
 });
-

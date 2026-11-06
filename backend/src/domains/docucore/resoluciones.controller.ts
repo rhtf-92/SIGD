@@ -2,11 +2,18 @@ import { Request, Response, Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { getRequestContext } from '../../shared/request-context/request-context.js';
+import { UnauthorizedError } from '../../shared/domain/errors/index.js';
 import {
   crearServicioResoluciones,
   TIPOS_RESOLUCION,
   type ServicioResoluciones,
 } from './resoluciones.service.js';
+import { autenticarJwt } from '../../core/auth/auth.guard.js';
+import {
+  requerirRolActivo,
+  ROLES_DOCUCORE,
+  verificarAccesoExpediente,
+} from './docucore.security.js';
 
 // =============================================================================
 // DocuCore · Controlador REST de Resoluciones Directorales
@@ -37,9 +44,14 @@ const esquemaProyectar = z.object({
 export function crearRouterResoluciones(pool: Pool): Router {
   const router = Router();
   const servicio: ServicioResoluciones = crearServicioResoluciones(pool);
+  router.use(autenticarJwt);
 
   async function proyectar(req: Request, res: Response): Promise<void> {
     const datos = esquemaProyectar.parse(req.body);
+    const usuarioId = req.cuentaActual?.idUsuario;
+    if (!usuarioId) throw new UnauthorizedError({ detail: 'Autenticación requerida.' });
+    // SEC-02: sólo roles institucionales vigentes pueden proyectar en expedientes accesibles.
+    await verificarAccesoExpediente(pool, usuarioId, datos.expedienteId);
     const contexto = getRequestContext();
     const proyecto = await servicio.proyectar({
       expedienteId: datos.expedienteId,
@@ -48,7 +60,7 @@ export function crearRouterResoluciones(pool: Pool): Router {
       considerandos: datos.considerandos,
       articulos: datos.articulos,
       distribucion: datos.distribucion,
-      usuarioId: contexto?.usuario_id ?? null,
+      usuarioId,
     });
     res.status(201).json({
       resolucionId: proyecto.id,
@@ -60,6 +72,10 @@ export function crearRouterResoluciones(pool: Pool): Router {
   async function obtenerProyecto(req: Request, res: Response): Promise<void> {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const proyecto = await servicio.obtenerProyectoPorId(id);
+    const usuarioId = req.cuentaActual?.idUsuario;
+    if (!usuarioId) throw new UnauthorizedError({ detail: 'Autenticación requerida.' });
+    // SEC-02: la consulta valida el acceso sobre el expediente, no sólo el ID de resolución.
+    await verificarAccesoExpediente(pool, usuarioId, proyecto.expedienteId);
     const contexto = getRequestContext();
     res.status(200).json({
       resolucionId: proyecto.id,
@@ -78,7 +94,7 @@ export function crearRouterResoluciones(pool: Pool): Router {
   }
 
   // Se registran primero las rutas específicas para no colisionar con /:id.
-  router.post('/proyectar', (req, res, next) => {
+  router.post('/proyectar', requerirRolActivo(pool, ...ROLES_DOCUCORE.PROYECTAR_RESOLUCION), (req, res, next) => {
     proyectar(req, res).catch(next);
   });
   router.get('/proyectos/:id', (req, res, next) => {
@@ -86,7 +102,7 @@ export function crearRouterResoluciones(pool: Pool): Router {
   });
 
   // Rutas alias (interop frontend y ruta canónica #33 del plan).
-  router.post('/', (req, res, next) => {
+  router.post('/', requerirRolActivo(pool, ...ROLES_DOCUCORE.PROYECTAR_RESOLUCION), (req, res, next) => {
     proyectar(req, res).catch(next);
   });
   router.get('/:id', (req, res, next) => {

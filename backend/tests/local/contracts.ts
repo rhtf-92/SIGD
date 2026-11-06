@@ -30,7 +30,9 @@ try {
     await cliente.query(`INSERT INTO sigd_org.area (area_id, codigo, nombre) VALUES ($1,$2,'Area de validacion')`, [area, 'TEST-' + area.slice(0,8)]);
     const ventanilla = await new VentanillaPresencialService(pool).registrarExpedienteVentanilla({
       dniSolicitante: String(10000000 + Math.floor(Math.random()*80000000)), datosRemitente: 'Validacion Local',
-      asunto: 'Solicitud de validacion real', foliosTotales: 3, areaDestinoId: area,
+      asunto: 'Solicitud de validacion real', foliosTotales: 3,
+      correo: 'validacion.local@iestpsuiza.edu.pe',
+      idTipoTramiteTupa: '00000000-0000-0000-0000-000000000001',
     }, cliente);
     const expediente = ventanilla.expedienteId;
     assert.match(expediente, /^[0-9a-f-]{36}$/);

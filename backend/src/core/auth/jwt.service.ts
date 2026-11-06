@@ -11,6 +11,8 @@ export interface ClaimsJwt {
   iat: number;
   exp: number;
   typ: 'access';
+  scope?: string;
+  resource?: string;
 }
 
 export interface ClaimsSeleccionPerfil {
@@ -40,6 +42,8 @@ export interface OpcionesFirma {
   expiraSegundos?: number;
   ahora?: number;
   secreto?: string;
+  scope?: string;
+  resource?: string;
 }
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
@@ -131,6 +135,8 @@ export function firmarTokenAcceso(opciones: OpcionesFirma): string {
     exp: ahora + (opciones.expiraSegundos ?? 900),
     typ: 'access',
   };
+  if (opciones.scope !== undefined) claims.scope = opciones.scope;
+  if (opciones.resource !== undefined) claims.resource = opciones.resource;
 
   return firmarClaims(claims, opciones.secreto);
 }
@@ -160,7 +166,10 @@ export function firmarTokenRefresco(opciones: OpcionesFirma): string {
   } satisfies ClaimsRefresh, opciones.secreto);
 }
 
-export function verificarTokenAcceso(token: string, opciones: { ahora?: number; secreto?: string } = {}): ClaimsJwt {
+export function verificarTokenAcceso(
+  token: string,
+  opciones: { ahora?: number; secreto?: string; permitirAlcance?: boolean } = {},
+): ClaimsJwt {
   const claims = verificarClaimsFirmados(token, opciones.secreto) as unknown as ClaimsJwt;
 
   if (claims.typ !== 'access' || typeof claims.sub !== 'string' || claims.sub === '') {
@@ -168,6 +177,9 @@ export function verificarTokenAcceso(token: string, opciones: { ahora?: number; 
   }
   if (claims.sid !== undefined && (typeof claims.sid !== 'string' || claims.sid.length < 16)) {
     throw new UnauthorizedError({ detail: 'La sesión asociada al token no es válida.' });
+  }
+  if (claims.scope !== undefined && !opciones.permitirAlcance) {
+    throw new UnauthorizedError({ detail: 'El token está limitado a un recurso específico.' });
   }
 
   verificarExpiracion(claims as unknown as Record<string, unknown>, opciones.ahora);
@@ -193,6 +205,38 @@ export function verificarTokenRefresco(token: string, opciones: { ahora?: number
   }
   verificarExpiracion(claims as unknown as Record<string, unknown>, opciones.ahora);
   return claims;
+}
+
+export const SCOPE_DESCARGA_DOCUCORE = 'docucore:documento:descargar';
+
+export type ClaimsJwtDescargaDocuCore = ClaimsJwt & {
+  scope: typeof SCOPE_DESCARGA_DOCUCORE;
+  resource: string;
+};
+
+export function firmarTokenDescargaDocuCore(
+  usuarioId: string,
+  expedienteId: string,
+  expiraSegundos = 300,
+): string {
+  return firmarTokenAcceso({
+    sub: usuarioId,
+    expiraSegundos,
+    scope: SCOPE_DESCARGA_DOCUCORE,
+    resource: expedienteId,
+  });
+}
+
+export function verificarTokenDescargaDocuCore(token: string): ClaimsJwtDescargaDocuCore {
+  const claims = verificarTokenAcceso(token, { permitirAlcance: true });
+  if (claims.scope !== SCOPE_DESCARGA_DOCUCORE || !claims.resource) {
+    throw new UnauthorizedError({ detail: 'El token no autoriza la descarga solicitada.' });
+  }
+  return {
+    ...claims,
+    scope: SCOPE_DESCARGA_DOCUCORE,
+    resource: claims.resource,
+  };
 }
 
 export function extraerTokenBearer(cabeceraAuthorization: string | undefined): string | null {
