@@ -1,4 +1,4 @@
-Name: SIGD CI
+name: SIGD CI
 
 on:
   pull_request:
@@ -58,7 +58,7 @@ jobs:
         run: docker compose -f docker-compose.prod.yml build
 
       - name: Escaneo de Seguridad de Imagen (Trivy)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: "sigd-backend:production"
           format: "table"
