@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 
 export const rolCanonico = (codigo: string): string =>
   ({
@@ -19,7 +19,7 @@ export interface PerfilRolActivo {
  * se unen sin confiar en datos enviados por el cliente.
  */
 export async function obtenerPerfilesActivos(
-  pool: Pool,
+  pool: Pool | PoolClient,
   idUsuario: string,
 ): Promise<PerfilRolActivo[]> {
   const { rows } = await pool.query<{ rol_codigo: string; permiso_codigo: string | null }>(
@@ -29,6 +29,7 @@ export async function obtenerPerfilesActivos(
        LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
        LEFT JOIN sigd_org.permiso_sistema ps ON ps.permiso_id = rp.permiso_id
       WHERE ur.id_usuario = $1
+        AND r.vigente
         AND ur.vigente_desde <= now()
         AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
       ORDER BY r.codigo, ps.codigo`,

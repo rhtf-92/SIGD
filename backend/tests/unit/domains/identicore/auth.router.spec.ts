@@ -15,6 +15,9 @@ function crearPool(rolesIniciales: Array<{ rol_codigo: string; permiso_codigo: s
   const cuenta = { id_usuario: ID, id_persona: null, usuario: 'persona', correo: 'persona@suiza.edu.pe',
     password_hash: hashValido, activo, nombre_completo: 'Persona Institucional', area_id: null };
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
+    if (sql.includes('SELECT DISTINCT ps.codigo AS permiso_codigo')) {
+      return { rows: roles.filter((rol) => rol.permiso_codigo !== null), rowCount: roles.length };
+    }
     if (sql.includes('FROM sigd_auth.cuenta_usuario c') && sql.includes('password_hash')) {
       return { rows: params[0] === cuenta.usuario || params[0] === cuenta.correo ? [cuenta] : [], rowCount: 1 };
     }
@@ -142,6 +145,24 @@ describe('Auth Router — perfiles institucionales activos', () => {
     expect((await request(app).post('/api/v1/auth/logout')
       .send({ refreshToken: login.body.refreshToken })).status).toBe(200);
     expect((await request(app).get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${token}`)).status).toBe(401);
+  });
+
+  it('rechaza operaciones administrativas después de cerrar la sesión', async () => {
+    const { pool } = crearPool([
+      { rol_codigo: 'ADMINISTRADOR', permiso_codigo: 'admin:acceso' },
+      { rol_codigo: 'ADMINISTRADOR', permiso_codigo: 'roles:leer' },
+    ]);
+    const app = construirApp(pool);
+    const login = await request(app).post('/api/v1/auth/login')
+      .send({ identificador: 'persona', password: PASSWORD });
+    expect(login.status).toBe(200);
+    const token = login.body.accessToken as string;
+    expect((await request(app).get('/api/v1/admin/roles-permisos')
+      .set('Authorization', `Bearer ${token}`)).status).toBe(200);
+    expect((await request(app).post('/api/v1/auth/logout')
+      .send({ refreshToken: login.body.refreshToken })).status).toBe(200);
+    expect((await request(app).get('/api/v1/admin/roles-permisos')
       .set('Authorization', `Bearer ${token}`)).status).toBe(401);
   });
 });

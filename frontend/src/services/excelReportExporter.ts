@@ -139,7 +139,7 @@ function xlsxCell(reference: string, value: unknown): string {
 }
 
 function safeSheetName(reportName: string): string {
-  return reportName.replace(/[\\/*?:\[\]]/g, " ").trim().slice(0, 31) || "Reporte";
+  return reportName.replace(/[\\/*?:\]]|\[/g, " ").trim().slice(0, 31) || "Reporte";
 }
 
 function xlsxSheet(request: ReportExportRequest): string {

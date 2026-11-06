@@ -21,14 +21,17 @@ export async function registrarActuacion(cliente: PoolClient, expedienteId: stri
     invalidParams: [{ name: 'id', reason: 'El expediente debe ser un UUID.' }],
   });
   await bloquearExpedienteRutaDoc(cliente, expedienteId);
-  const actual = await cliente.query<{ estado: string; area_id: string | null }>(`
+  const actual = await cliente.query<{ estado: string; area_id: string | null; destinatario_usuario_id: string | null }>(`
     SELECT COALESCE(p.estado_nuevo, 'REGISTRADO') AS estado,
-           COALESCE(p.area_actual_id, e.area_destino_id::text) AS area_id
+           COALESCE(p.area_actual_id, e.area_destino_id::text) AS area_id,
+           (SELECT CASE WHEN COUNT(*) = 1 THEN MIN(c.id_usuario::text) END
+              FROM sigd_auth.cuenta_usuario c
+             WHERE c.id_persona = e.solicitante_id AND c.activo = TRUE) AS destinatario_usuario_id
       FROM sigd_tra.expediente e
       LEFT JOIN sigd_rut.estado_actual_expediente p ON p.expediente_id = e.expediente_id
      WHERE e.expediente_id = $1::uuid`, [expedienteId]);
   if (!actual.rows[0]) throw new NotFoundError({ detail: 'El expediente no existe.' });
-  const { estado, area_id } = actual.rows[0];
+  const { estado, area_id, destinatario_usuario_id } = actual.rows[0];
   if (exigirArea && (!area_id || contexto.unidad_organica_id !== area_id)) {
     throw new ForbiddenError({ detail: 'El usuario no pertenece al área del expediente.' });
   }
@@ -42,7 +45,8 @@ export async function registrarActuacion(cliente: PoolClient, expedienteId: stri
     contexto.usuario_id, contexto.correlation_id, randomUUID(),
     JSON.stringify({ areaId: area_id, ...datos })]);
   await insertarEvento(cliente, { agregado: 'Expediente', tipo_evento: tipoEvento,
-    payload: { identidad: { expediente_id: expedienteId, movimiento_id: movimiento.rows[0].id_movimiento },
+    payload: { ...(destinatario_usuario_id ? { destinatario_usuario_id } : {}),
+      identidad: { expediente_id: expedienteId, movimiento_id: movimiento.rows[0].id_movimiento },
       contexto: { usuario_actor_id: contexto.usuario_id, area_origen_id: area_id },
       datos_especificos: datos } });
 }

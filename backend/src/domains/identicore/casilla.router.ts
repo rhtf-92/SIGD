@@ -1,22 +1,38 @@
 /**
- * Endpoints #7 al #13 del catálogo REST — Casilla Electrónica y Acuse Legal (Ley N° 29733)
+ * Endpoints #7 al #13 del catálogo REST — Casilla Electrónica y registro de acuses
  * Responsable: B_JAIR (Jair) / Subdominio: IdentiCore (sigd_auth)
  *
  *   #7  GET   /api/v1/casilla/notificaciones                — Bandeja paginada de notificaciones legales
  *   #8  GET   /api/v1/casilla/notificaciones/:id            — Detalle del acto administrativo notificado
- *   #9  PATCH /api/v1/casilla/notificaciones/:id/lectura    — Asiento fehaciente de primera lectura procesal
- *   #10 POST  /api/v1/casilla/notificaciones/:id/acuse      — Generación inmutable de Acuse Notificatorio Digital (SHA-256)
+ *   #9  PATCH /api/v1/casilla/notificaciones/:id/lectura    — Registro de primera lectura
+ *   #10 POST  /api/v1/casilla/notificaciones/:id/acuse      — Registro idempotente de acuse (SHA-256)
  *   #11 GET   /api/v1/casilla/estadisticas                  — Contadores de notificaciones no leídas y plazos
  *   #12 GET   /api/v1/casilla/notificaciones/:id/documento/descargar — Presigned GET URL para PDF del acto notificado
- *   #13 GET   /api/v1/casilla/notificaciones/:id/acuse/descargar     — Presigned GET URL para certificado de acuse legal
+ *   #13 GET   /api/v1/casilla/notificaciones/:id/acuse/descargar     — PDF generado desde los datos registrados del acuse
  */
 
 import crypto from 'node:crypto';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
-import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
-import { NotFoundError } from '../../shared/domain/errors/index.js';
+import { extraerTokenBearer } from '../../core/auth/jwt.service.js';
+import { verificarSesionActiva } from '../../core/auth/sesion-activa.js';
+import { NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+
+const prefijosTipo = {
+  RESOLUCION: ['RESOLUCION%', 'RESOLUCIÓN%'],
+  OFICIO: ['OFICIO%'],
+  NOTIFICACION_OBSERVACION: ['NOTIFICACION DE OBSERVACION%', 'NOTIFICACIÓN DE OBSERVACIÓN%', 'NOTIFICACION_OBSERVACION%', 'NOTIFICACIÓN_OBSERVACIÓN%'],
+  CITACION: ['CITACION%', 'CITACIÓN%'],
+  CONSTANCIA: ['CONSTANCIA%'],
+  INFORME: ['INFORME%'],
+} as const;
+
+const fechaConsulta = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((valor) => {
+  const fecha = new Date(`${valor}T00:00:00Z`);
+  return !Number.isNaN(fecha.getTime()) && fecha.toISOString().slice(0, 10) === valor;
+});
 
 const consultaPaginadaSchema = z
   .object({
@@ -24,19 +40,25 @@ const consultaPaginadaSchema = z
     page: z.coerce.number().int().positive().optional(),
     porPagina: z.coerce.number().int().min(1).max(100).optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
-    estado: z.enum(['LEIDO', 'NO_LEIDO', 'TODOS']).default('TODOS'),
+    estado: z.enum(['LEIDO', 'NO_LEIDO', 'NOTIFICADO', 'TODOS']).default('TODOS'),
+    tipo: z.enum(['RESOLUCION', 'OFICIO', 'NOTIFICACION_OBSERVACION', 'CITACION', 'CONSTANCIA', 'INFORME', 'OTRO']).optional(),
+    fechaInicio: fechaConsulta.optional(),
+    fechaFin: fechaConsulta.optional(),
     busqueda: z.string().optional(),
   })
   .transform((val) => ({
     pagina: val.pagina ?? val.page ?? 1,
     porPagina: val.porPagina ?? val.limit ?? 10,
     estado: val.estado,
+    tipo: val.tipo,
+    fechaInicio: val.fechaInicio,
+    fechaFin: val.fechaFin,
     busqueda: val.busqueda,
   }));
 
 interface FilaNotificacionCasilla {
   id: string;
-  usuario_id: string | null;
+  usuario_id: string;
   correo_destinatario: string | null;
   cut: string | null;
   asunto: string;
@@ -57,31 +79,34 @@ interface FilaNotificacionCasilla {
 }
 
 function mapearNotificacion(fila: FilaNotificacionCasilla) {
-  const anio = new Date().getFullYear();
-  const cut = fila.cut ?? `EXP-${anio}-${fila.id.slice(0, 6).toUpperCase()}`;
-  const numeroDocumento = fila.numero_documento ?? `RD N.° 0${fila.id.slice(0, 3)}-${anio}-DG-IESTP-SUIZA`;
+  const anio = new Date(fila.fecha_deposito).getUTCFullYear();
+  const cut = fila.cut ?? 'No registrado';
+  const numeroDocumento = fila.numero_documento ?? 'No registrado';
   const fechaDeposito = typeof fila.fecha_deposito === 'string' ? fila.fecha_deposito : fila.fecha_deposito.toISOString();
   const fechaLectura = fila.fecha_lectura
     ? typeof fila.fecha_lectura === 'string'
       ? fila.fecha_lectura
       : fila.fecha_lectura.toISOString()
     : null;
-  const hashSha256 = fila.hash_sha256 ?? crypto.createHash('sha256').update(fila.id).digest('hex');
-  const cvd = fila.cvd ?? `CVD-${anio}-RD-${fila.id.slice(0, 6).toUpperCase()}-A4F2`;
+  const hashSha256 = fila.hash_sha256 ?? '';
+  const cvd = fila.cvd ?? '';
 
   return {
     id: fila.id,
-    numeroNotificacion: `NOT-${anio}-${fila.id.slice(0, 6).toUpperCase()}`,
+    numeroNotificacion: fila.id,
     numeroExpediente: cut,
-    usuarioId: fila.usuario_id ?? '00000000-0000-0000-0000-000000000001',
+    usuarioId: fila.usuario_id,
     cut,
     asunto: fila.asunto,
-    tipo: 'RESOLUCION' as const,
+    tipo: Object.keys(prefijosTipo).find((tipo) =>
+      fila.tipo_acto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replaceAll('_', ' ').toUpperCase()
+        .startsWith(tipo === 'NOTIFICACION_OBSERVACION' ? 'NOTIFICACION DE OBSERVACION' : tipo)
+    ) ?? 'OTRO',
     tipoActo: fila.tipo_acto,
     prioridad: 'NORMAL' as const,
-    unidadEmisora: 'Secretaría Académica',
+    unidadEmisora: 'No registrada',
     numeroDocumento,
-    estado: fila.estado === 'LEIDO' ? ('LEIDO' as const) : ('NO_LEIDO' as const),
+    estado: fila.id_acuse ? ('NOTIFICADO' as const) : fila.estado === 'LEIDO' ? ('LEIDO' as const) : ('NO_LEIDO' as const),
     fechaDeposito,
     fechaDepositoIso: fechaDeposito,
     fechaLectura,
@@ -89,7 +114,7 @@ function mapearNotificacion(fila: FilaNotificacionCasilla) {
     fechaNotificadoIso: fila.id_acuse
       ? typeof fila.acuse_sellado_tiempo === 'string'
         ? fila.acuse_sellado_tiempo
-        : fila.acuse_sellado_tiempo?.toISOString() ?? fechaDeposito
+        : fila.acuse_sellado_tiempo?.toISOString() ?? null
       : null,
     requiereAcuse: true,
     hashSha256,
@@ -108,18 +133,11 @@ function mapearNotificacion(fila: FilaNotificacionCasilla) {
       anio,
       asunto: fila.asunto,
       resumenLegal: typeof fila.cuerpo === 'string' ? fila.cuerpo : fila.asunto,
-      nombreArchivoPdf: 'acto_notificado.pdf',
-      tamanoArchivo: '1.2 MB',
+      nombreArchivoPdf: fila.documento_url?.split('/').at(-1) ?? 'No registrado',
+      tamanoArchivo: 'No registrado',
       hashIntegridadSha256: hashSha256,
       cvd,
-      firmantes: [
-        {
-          nombre: 'Lic. Julio César Mori Paredes',
-          cargo: 'Director General',
-          fechaFirma: fechaDeposito,
-          entidadCertificadora: 'RENIEC',
-        },
-      ],
+      firmantes: [],
     },
     acuse: fila.id_acuse
       ? {
@@ -127,55 +145,94 @@ function mapearNotificacion(fila: FilaNotificacionCasilla) {
           idNotificacion: fila.id,
           numeroExpediente: cut,
           destinatario: {
-            nombresCompletos: 'Administrado Institucional',
-            numeroDocumento: '74561238',
-            tipoDocumento: 'DNI' as const,
-            direccionCasilla: '74561238@casilla.iestpsuiza.edu.pe',
+            nombresCompletos: 'No registrado',
+            numeroDocumento: 'No registrado',
+            tipoDocumento: 'NO_REGISTRADO' as const,
+            direccionCasilla: fila.correo_destinatario ?? 'No registrada',
           },
           timestampGeneracionIso:
             typeof fila.acuse_sellado_tiempo === 'string'
               ? fila.acuse_sellado_tiempo
-              : fila.acuse_sellado_tiempo?.toISOString() ?? fechaDeposito,
-          hashSha256Acuse: fila.acuse_hash_sha256 ?? hashSha256,
-          cvdAcuse: `CVD-${anio}-ACU-${fila.id.slice(0, 6).toUpperCase()}-7B12`,
+              : fila.acuse_sellado_tiempo?.toISOString() ?? '',
+          hashSha256Acuse: fila.acuse_hash_sha256 ?? '',
+          cvdAcuse: '',
           entidadEmisora: 'IESTP Suiza',
-          unidadEmisora: 'Secretaría Académica',
-          fechaEfectoLegal: fechaDeposito,
-          plazoImpugnacionDiasHabiles: 15,
-          validezLegalMensaje:
-            'Acuse Notificatorio Digital emitido conforme al Art. 20 del TUO de la Ley N° 27444 y Ley N° 29733.',
+          unidadEmisora: 'No registrada',
+          fechaEfectoLegal: 'No registrada',
+          plazoImpugnacionDiasHabiles: null,
+          validezLegalMensaje: 'Los efectos y plazos deben verificarse en el acto administrativo.',
         }
       : null,
   };
 }
 
+function responderAcuse(res: Response, fila: FilaNotificacionCasilla, nuevo: boolean): void {
+  const notificacionActualizada = mapearNotificacion(fila);
+  const acuse = notificacionActualizada.acuse;
+  if (!acuse) throw new NotFoundError({ detail: 'El acuse no quedó registrado.' });
+  res.status(nuevo ? 201 : 200).json({
+    success: true,
+    message: nuevo ? 'Acuse registrado.' : 'Acuse existente recuperado sin mutación.',
+    data: {
+      ...acuse,
+      selladoTiempo: acuse.timestampGeneracionIso,
+      hashSha256: acuse.hashSha256Acuse,
+      mensajeLegal: acuse.validezLegalMensaje,
+    },
+    notificacionActualizada,
+  });
+}
+
 export function crearRouterCasilla(pool: Pool): Router {
   const router = Router();
 
-  function obtenerUsuarioId(req: Request): string {
-    const token = extraerTokenBearer(req.get('authorization'));
-    if (!token) {
-      return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
-    }
+  router.use('/casilla', async (req: Request, res: Response, next) => {
     try {
-      const claims = verificarTokenAcceso(token);
-      return claims.sub;
-    } catch {
-      return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
+      const token = extraerTokenBearer(req.get('authorization'));
+      if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
+      res.locals.usuarioCasillaId = (await verificarSesionActiva(pool, token)).sub;
+      next();
+    } catch (error) {
+      next(error);
     }
+  });
+
+  function obtenerUsuarioId(res: Response): string {
+    const usuarioId = res.locals.usuarioCasillaId;
+    if (typeof usuarioId !== 'string' || usuarioId.length === 0) {
+      throw new UnauthorizedError({ detail: 'Autenticación requerida.' });
+    }
+    return usuarioId;
   }
 
   // #7 — GET /casilla/notificaciones y alias /casilla/bandeja
   const handlerBandeja = async (req: Request, res: Response) => {
     const query = consultaPaginadaSchema.parse(req.query);
-    const usuarioId = obtenerUsuarioId(req);
+    const usuarioId = obtenerUsuarioId(res);
 
-    const condiciones: string[] = ['(usuario_id = $1 OR usuario_id IS NULL OR $1 = \'00000000-0000-0000-0000-000000000001\')'];
+    const condiciones: string[] = ['usuario_id = $1'];
     const valores: unknown[] = [usuarioId];
 
     if (query.estado !== 'TODOS') {
-      valores.push(query.estado);
-      condiciones.push(`estado = $${valores.length}`);
+      if (query.estado === 'NOTIFICADO') condiciones.push('id_acuse IS NOT NULL');
+      else {
+        valores.push(query.estado);
+        condiciones.push(`estado = $${valores.length} AND id_acuse IS NULL`);
+      }
+    }
+
+    if (query.tipo) {
+      const patrones = Object.values(prefijosTipo).flat();
+      valores.push(query.tipo === 'OTRO' ? patrones : prefijosTipo[query.tipo as keyof typeof prefijosTipo]);
+      condiciones.push(`${query.tipo === 'OTRO' ? 'NOT ' : ''}(tipo_acto ILIKE ANY($${valores.length}::text[]))`);
+    }
+    if (query.fechaInicio) {
+      valores.push(query.fechaInicio);
+      condiciones.push(`fecha_deposito >= $${valores.length}::date`);
+    }
+    if (query.fechaFin) {
+      valores.push(query.fechaFin);
+      condiciones.push(`fecha_deposito < ($${valores.length}::date + interval '1 day')`);
     }
 
     if (query.busqueda) {
@@ -237,10 +294,11 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #8 — GET /casilla/notificaciones/:id
   router.get('/casilla/notificaciones/:id', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(res);
 
     const resultado = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
-      [id],
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId],
     );
 
     if (resultado.rows.length === 0) {
@@ -255,14 +313,15 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #9 — PATCH /casilla/notificaciones/:id/lectura
   router.patch('/casilla/notificaciones/:id/lectura', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(res);
 
-    const resultado = await pool.query<{ id: string; estado: string; fecha_lectura: Date | string }>(
+    const resultado = await pool.query<FilaNotificacionCasilla>(
       `UPDATE sigd_auth.notificacion_casilla
-          SET estado = 'LEIDO',
+          SET estado = CASE WHEN id_acuse IS NULL THEN 'LEIDO' ELSE estado END,
               fecha_lectura = COALESCE(fecha_lectura, now())
-        WHERE id = $1
-        RETURNING id, estado, fecha_lectura`,
-      [id],
+        WHERE id = $1 AND usuario_id = $2
+        RETURNING *`,
+      [id, usuarioId],
     );
 
     if (resultado.rows.length === 0) {
@@ -272,13 +331,14 @@ export function crearRouterCasilla(pool: Pool): Router {
     }
 
     const row = resultado.rows[0];
+    if (!row.fecha_lectura) throw new Error('La lectura no quedó registrada.');
     const leidoEnIso = typeof row.fecha_lectura === 'string'
       ? row.fecha_lectura
       : row.fecha_lectura.toISOString();
 
     res.status(200).json({
+      ...mapearNotificacion(row),
       idNotificacion: row.id,
-      estado: row.estado,
       leidoEn: leidoEnIso,
     });
   });
@@ -286,10 +346,11 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #10 — POST /casilla/notificaciones/:id/acuse
   router.post('/casilla/notificaciones/:id/acuse', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(res);
 
     const notifRes = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1`,
-      [id],
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId],
     );
 
     if (notifRes.rows.length === 0) {
@@ -301,60 +362,7 @@ export function crearRouterCasilla(pool: Pool): Router {
     const notif = notifRes.rows[0];
     const anio = new Date().getFullYear();
 
-    // -------------------------------------------------------------------------
-    // LPAG Art. 20 (Modalidades de Notificación) & Inmutabilidad Forense:
-    // Si la notificación ya cuenta con acuse emitido (id_acuse poblado),
-    // el sello de tiempo (acuse_sellado_tiempo) y el hash criptográfico (acuse_hash_sha256)
-    // son ESTRICTAMENTE INMUTABLES y constituyen plena prueba fehaciente de la fecha cierta.
-    // No debe actualizarse acuse_sellado_tiempo a now(), preservando la fecha original.
-    // -------------------------------------------------------------------------
-    if (notif.id_acuse) {
-      const selladoOriginalIso = notif.acuse_sellado_tiempo
-        ? (typeof notif.acuse_sellado_tiempo === 'string'
-            ? notif.acuse_sellado_tiempo
-            : notif.acuse_sellado_tiempo.toISOString())
-        : (typeof notif.fecha_deposito === 'string'
-            ? notif.fecha_deposito
-            : notif.fecha_deposito.toISOString());
-
-      const hashAcuseExistente = notif.acuse_hash_sha256
-        ?? crypto
-            .createHash('sha256')
-            .update(`${id}:${selladoOriginalIso}:IESTP-SUIZA-ACUSE-LEGAL`)
-            .digest('hex');
-
-      const cvdAcuseExistente = `CVD-${anio}-ACU-${id.slice(0, 6).toUpperCase()}-7B12`;
-
-      return res.status(200).json({
-        success: true,
-        message: 'Acuse digital legal existente recuperado sin mutación (Art. 20 LPAG - Inmutabilidad Fechado).',
-        data: {
-          idAcuse: notif.id_acuse,
-          idNotificacion: id,
-          numeroExpediente: notif.cut ?? `EXP-${anio}-000142`,
-          destinatario: {
-            nombresCompletos: 'Administrado Institucional',
-            numeroDocumento: '74561238',
-            tipoDocumento: 'DNI' as const,
-            direccionCasilla: '74561238@casilla.iestpsuiza.edu.pe',
-          },
-          timestampGeneracionIso: selladoOriginalIso,
-          selladoTiempo: selladoOriginalIso,
-          hashSha256Acuse: hashAcuseExistente,
-          hashSha256: hashAcuseExistente,
-          cvdAcuse: cvdAcuseExistente,
-          entidadEmisora: 'IESTP Suiza',
-          unidadEmisora: 'Secretaría Académica',
-          fechaEfectoLegal: selladoOriginalIso,
-          plazoImpugnacionDiasHabiles: 15,
-          validezLegalMensaje:
-            'Acuse Notificatorio Digital emitido conforme al Art. 20 del TUO de la Ley N° 27444 y Ley N° 29733.',
-          mensajeLegal:
-            'Acuse Notificatorio Digital emitido conforme al Art. 20 del TUO de la Ley N° 27444 y Ley N° 29733.',
-        },
-        notificacionActualizada: mapearNotificacion(notif),
-      });
-    }
+    if (notif.id_acuse) return responderAcuse(res, notif, false);
 
     // Primera emisión: generación y sellado de tiempo inicial
     const ahoraIso = new Date().toISOString();
@@ -362,65 +370,36 @@ export function crearRouterCasilla(pool: Pool): Router {
       .createHash('sha256')
       .update(`${id}:${ahoraIso}:IESTP-SUIZA-ACUSE-LEGAL`)
       .digest('hex');
-    const idAcuse = `ACU-${anio}-${id.slice(0, 8).toUpperCase()}`;
-    const cvdAcuse = `CVD-${anio}-ACU-${id.slice(0, 6).toUpperCase()}-7B12`;
-
-    await pool.query(
+    const idAcuse = `ACU-${anio}-${id}`;
+    const actualizado = await pool.query<FilaNotificacionCasilla>(
       `UPDATE sigd_auth.notificacion_casilla
           SET id_acuse = $1,
               acuse_hash_sha256 = $2,
-              acuse_sellado_tiempo = COALESCE(acuse_sellado_tiempo, now())
-        WHERE id = $3 AND id_acuse IS NULL`,
-      [idAcuse, hashAcuse, id],
+              acuse_sellado_tiempo = $3::timestamptz
+        WHERE id = $4 AND usuario_id = $5 AND id_acuse IS NULL
+        RETURNING *`,
+      [idAcuse, hashAcuse, ahoraIso, id, usuarioId],
     );
-
-    const notificacionActualizada = mapearNotificacion({
-      ...notif,
-      id_acuse: idAcuse,
-      acuse_hash_sha256: hashAcuse,
-      acuse_sellado_tiempo: ahoraIso,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Acuse digital legal emitido y sellado exitosamente.',
-      data: {
-        idAcuse,
-        idNotificacion: id,
-        numeroExpediente: notif.cut ?? `EXP-${anio}-000142`,
-        destinatario: {
-          nombresCompletos: 'Administrado Institucional',
-          numeroDocumento: '74561238',
-          tipoDocumento: 'DNI' as const,
-          direccionCasilla: '74561238@casilla.iestpsuiza.edu.pe',
-        },
-        timestampGeneracionIso: ahoraIso,
-        selladoTiempo: ahoraIso,
-        hashSha256Acuse: hashAcuse,
-        hashSha256: hashAcuse,
-        cvdAcuse,
-        entidadEmisora: 'IESTP Suiza',
-        unidadEmisora: 'Secretaría Académica',
-        fechaEfectoLegal: ahoraIso,
-        plazoImpugnacionDiasHabiles: 15,
-        validezLegalMensaje:
-          'Acuse Notificatorio Digital emitido conforme al Art. 20 del TUO de la Ley N° 27444 y Ley N° 29733.',
-        mensajeLegal:
-          'Acuse Notificatorio Digital emitido conforme al Art. 20 del TUO de la Ley N° 27444 y Ley N° 29733.',
-      },
-      notificacionActualizada,
-    });
+    if (actualizado.rows[0]) return responderAcuse(res, actualizado.rows[0], true);
+    const existente = await pool.query<FilaNotificacionCasilla>(
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId],
+    );
+    if (!existente.rows[0]?.id_acuse) throw new NotFoundError();
+    responderAcuse(res, existente.rows[0], false);
   });
 
   // #11 — GET /casilla/estadisticas
   router.get('/casilla/estadisticas', async (req: Request, res: Response) => {
-    const usuarioId = obtenerUsuarioId(req);
+    const usuarioId = obtenerUsuarioId(res);
 
-    const resultado = await pool.query<{ no_leidas: string; total: string }>(
-      `SELECT COUNT(*) FILTER (WHERE estado = 'NO_LEIDO')::text AS no_leidas,
+    const resultado = await pool.query<{ no_leidas: string; leidas: string; notificadas: string; total: string }>(
+      `SELECT COUNT(*) FILTER (WHERE estado = 'NO_LEIDO' AND id_acuse IS NULL)::text AS no_leidas,
+              COUNT(*) FILTER (WHERE estado = 'LEIDO' AND id_acuse IS NULL)::text AS leidas,
+              COUNT(*) FILTER (WHERE id_acuse IS NOT NULL)::text AS notificadas,
               COUNT(*)::text AS total
          FROM sigd_auth.notificacion_casilla
-        WHERE usuario_id = $1 OR usuario_id IS NULL OR $1 = '00000000-0000-0000-0000-000000000001'`,
+        WHERE usuario_id = $1`,
       [usuarioId],
     );
 
@@ -431,8 +410,8 @@ export function crearRouterCasilla(pool: Pool): Router {
       noLeidas,
       noLeidos: noLeidas,
       total,
-      leidos: Math.max(0, total - noLeidas),
-      notificados: total,
+      leidos: Number(resultado.rows[0]?.leidas ?? 0),
+      notificados: Number(resultado.rows[0]?.notificadas ?? 0),
       urgentes: 0,
       ultimosMovimientos: total > 0 ? 1 : 0,
     });
@@ -441,8 +420,20 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #12 — GET /casilla/notificaciones/:id/documento/descargar
   router.get('/casilla/notificaciones/:id/documento/descargar', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const usuarioId = obtenerUsuarioId(res);
+    const resultado = await pool.query<{ documento_url: string | null }>(
+      `SELECT documento_url FROM sigd_auth.notificacion_casilla WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId],
+    );
+    const referencia = resultado.rows[0]?.documento_url;
+    const recurso = typeof referencia === 'string' ? /^s3:\/\/([a-zA-Z0-9._-]+)\/(.+)$/.exec(referencia) : null;
+    if (!recurso || recurso[2].split('/').some((segmento) => segmento === '.' || segmento === '..' || segmento === '')) {
+      throw new NotFoundError();
+    }
+    const bucket = encodeURIComponent(recurso[1]);
+    const key = recurso[2].split('/').map(encodeURIComponent).join('/');
     res.status(200).json({
-      downloadUrl: `/api/v1/storage/download/sigd-resoluciones/rd-${id}.pdf`,
+      downloadUrl: `/api/v1/storage/download/${bucket}/${key}`,
       expiraEnSegundos: 900,
     });
   });
@@ -450,10 +441,35 @@ export function crearRouterCasilla(pool: Pool): Router {
   // #13 — GET /casilla/notificaciones/:id/acuse/descargar
   router.get('/casilla/notificaciones/:id/acuse/descargar', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    res.status(200).json({
-      downloadUrl: `/api/v1/storage/download/sigd-acuses/acuse-${id}.pdf`,
-      expiraEnSegundos: 900,
-    });
+    const usuarioId = obtenerUsuarioId(res);
+    const resultado = await pool.query<Pick<FilaNotificacionCasilla, 'id_acuse' | 'acuse_hash_sha256' | 'acuse_sellado_tiempo'>>(
+      `SELECT id_acuse, acuse_hash_sha256, acuse_sellado_tiempo
+         FROM sigd_auth.notificacion_casilla
+        WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId],
+    );
+    const acuse = resultado.rows[0];
+    if (!acuse?.id_acuse) throw new NotFoundError();
+
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const fecha = acuse.acuse_sellado_tiempo
+      ? typeof acuse.acuse_sellado_tiempo === 'string'
+        ? acuse.acuse_sellado_tiempo
+        : acuse.acuse_sellado_tiempo.toISOString()
+      : 'Fecha no registrada';
+    page.drawText('Acuse de notificación electrónica', { x: 48, y: 740, size: 18, font });
+    page.drawText(`Notificación: ${id}`, { x: 48, y: 700, size: 12, font });
+    page.drawText(`Acuse: ${acuse.id_acuse}`, { x: 48, y: 680, size: 12, font });
+    page.drawText(`Fecha de emisión: ${fecha}`, { x: 48, y: 660, size: 12, font });
+    page.drawText(`SHA-256: ${acuse.acuse_hash_sha256 ?? 'No registrado'}`, { x: 48, y: 640, size: 9, font });
+    const bytes = Buffer.from(await pdf.save());
+    res.status(200).set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="acuse-${encodeURIComponent(id)}.pdf"`,
+      'Cache-Control': 'no-store, private',
+    }).send(bytes);
   });
 
   return router;

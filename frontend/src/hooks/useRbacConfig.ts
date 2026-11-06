@@ -194,11 +194,17 @@ export function useRbacConfig() {
     } finally { setIsLoading(false); }
   }, []);
 
-  useEffect(() => { void recargar(); }, [recargar]);
+  useEffect(() => {
+    let cancelado = false;
+    queueMicrotask(() => {
+      if (!cancelado) void recargar();
+    });
+    return () => { cancelado = true; };
+  }, [recargar]);
 
   const rolActual: Rol = useMemo(
     () => roles.find((rol) => rol.id === rolSeleccionado) ?? roles[0],
-    [rolSeleccionado],
+    [roles, rolSeleccionado],
   );
 
   const permisosRolActual = permisos[rolSeleccionado] ?? [];
