@@ -58,33 +58,33 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
 
   router.get(
     '/tablas-maestras',
-    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_LEER),
     listarTablasMaestras(deps),
   );
   router.post(
     '/tablas-maestras/:catalogo',
-    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_GESTIONAR),
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_GESTIONAR),
     crearItemTablaMaestra(deps),
   );
   router.put(
     '/tablas-maestras/:catalogo/:id',
-    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_GESTIONAR),
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_GESTIONAR),
     actualizarItemTablaMaestra(deps),
   );
   router.patch(
     '/tablas-maestras/:catalogo/:id/vigencia',
-    autorizarPermisos(PERMISOS_RBAC.MAESTRAS_GESTIONAR),
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_GESTIONAR),
     cambiarVigenciaTablaMaestra(deps),
   );
   router.get(
     '/calendario-laboral',
-    autorizarPermisos(PERMISOS_RBAC.CALENDARIO_LEER),
+    autorizarPermisos(pool, PERMISOS_RBAC.CALENDARIO_LEER),
     listarCalendario(deps),
   );
-  router.get('/calendario-laboral/configuracion', autorizarPermisos(PERMISOS_RBAC.CALENDARIO_LEER), async (_req, res) => {
+  router.get('/calendario-laboral/configuracion', autorizarPermisos(pool, PERMISOS_RBAC.CALENDARIO_LEER), async (_req, res) => {
     res.json({ jornada: await configuracion.obtenerJornada() });
   });
-  router.put('/calendario-laboral/configuracion', autorizarPermisos(PERMISOS_RBAC.CALENDARIO_GESTIONAR), async (req, res) => {
+  router.put('/calendario-laboral/configuracion', autorizarPermisos(pool, PERMISOS_RBAC.CALENDARIO_GESTIONAR), async (req, res) => {
     const entrada = jornadaSchema.parse(req.body);
     const usuarioId = req.cuentaActual?.idUsuario;
     if (!usuarioId) throw new Error('La identidad autenticada es requerida.');
@@ -92,12 +92,12 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
   });
   router.post(
     '/calendario-laboral/feriado-excepcional',
-    autorizarPermisos(PERMISOS_RBAC.CALENDARIO_GESTIONAR),
+    autorizarPermisos(pool, PERMISOS_RBAC.CALENDARIO_GESTIONAR),
     registrarFeriadoExcepcional(deps),
   );
   router.patch(
     '/calendario-laboral/:id/vigencia',
-    autorizarPermisos(PERMISOS_RBAC.CALENDARIO_GESTIONAR),
+    autorizarPermisos(pool, PERMISOS_RBAC.CALENDARIO_GESTIONAR),
     cambiarVigenciaCalendario(deps),
   );
 

@@ -9,8 +9,10 @@ import { Link } from "react-router-dom";
 import NotificationList from "../../components/casilla/NotificacionList";
 import NotificacionDetailModal from "../../components/casilla/NotificacionDetailModal";
 import { useCasilla } from "../../hooks/useCasilla";
+import { useAuthStore } from "../../stores/authStore";
 
 export default function CasillaElectronicaPage() {
+  const usuario = useAuthStore((state) => state.usuario);
   const {
     filtros,
     hasActiveFilters,
@@ -60,8 +62,7 @@ export default function CasillaElectronicaPage() {
               </h1>
 
               <p className="mt-1 text-sm text-slate-600">
-                Recepción oficial de actos administrativos, cédulas y resoluciones
-                con validez legal plena.
+                Consulte las notificaciones y actos administrativos dirigidos a su cuenta.
               </p>
             </div>
 
@@ -69,23 +70,19 @@ export default function CasillaElectronicaPage() {
             <div className="flex items-center gap-3.5">
               <div className="flex items-center gap-3.5 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-3.5 shadow-xs">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-700 font-bold text-white shadow-sm">
-                  SP
+                  @
                 </div>
                 <div className="text-xs">
                   <div className="flex items-center gap-1.5">
                     <p className="font-bold text-slate-900">
-                      Sergio Serruche Panduro
+                      {usuario?.nombreCompleto ?? "Sesión requerida"}
                     </p>
-                    <span className="rounded bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-blue-800">
-                      DNI 74561238
-                    </span>
                   </div>
                   <p className="font-mono text-[11px] text-blue-700 font-semibold mt-0.5">
-                    74561238@casilla.iestpsuiza.edu.pe
+                    {usuario?.correo ?? "Inicie sesión para consultar su Casilla"}
                   </p>
                   <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span>Casilla vinculada y homologada (Ley N° 29733)</span>
+                    <span>La identidad y los permisos se verifican en el servidor.</span>
                   </div>
                 </div>
               </div>
@@ -104,7 +101,7 @@ export default function CasillaElectronicaPage() {
       {/* CONTENIDO PRINCIPAL                                                  */}
       {/* ==================================================================== */}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-7">
-        {/* Banner Legal Normativo (Ley N° 27444) */}
+        {/* Información sobre los datos disponibles en la Casilla. */}
         <section className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-blue-50/40 p-4.5 shadow-xs text-xs sm:text-sm text-slate-700">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-blue-700 text-white font-bold text-xs">
@@ -112,14 +109,12 @@ export default function CasillaElectronicaPage() {
             </div>
             <div className="space-y-1">
               <p className="font-bold text-blue-950">
-                Marco Legal de la Notificación Electrónica — TUO de la Ley N° 27444 (Art. 20)
+                Información sobre las notificaciones
               </p>
               <p className="text-slate-600 leading-relaxed text-xs">
-                La notificación dirigida a su Casilla Electrónica surte plenos
-                efectos legales el <strong>día de su depósito formal</strong> en
-                horario hábil (hasta las 16:30 hrs). Los depósitos efectuados
-                con posterioridad o en días no laborables se entienden surtidos al{" "}
-                <strong>primer día hábil siguiente</strong> a las 08:00 hrs.
+                La fecha de depósito y el registro del acuse se muestran en cada
+                notificación. Consulte el acto administrativo para conocer los
+                efectos y plazos que le correspondan.
               </p>
             </div>
           </div>
@@ -218,7 +213,7 @@ export default function CasillaElectronicaPage() {
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-                Con Acuse Legal
+                Con acuse registrado
               </span>
               <svg
                 className="h-4 w-4 text-emerald-600"
@@ -238,7 +233,7 @@ export default function CasillaElectronicaPage() {
               {isLoadingStats ? "..." : stats.notificados}
             </p>
             <p className="mt-1 text-[11px] text-emerald-700 font-semibold">
-              Con fecha cierta y hash SHA-256
+              Con fecha y hash registrados
             </p>
           </div>
         </section>

@@ -6,7 +6,12 @@ import { firmarTokenAcceso } from '../../src/core/auth/jwt.service.js';
 
 describe('App Routing & Health Verification', () => {
   const fakePool = {
-    query: async () => ({ rows: [], rowCount: 0 }),
+    query: async (sql: string, params?: unknown[]) => ({
+      rows: sql.includes('SELECT DISTINCT ps.codigo AS permiso_codigo') && params?.[1] instanceof Array && (params[1] as string[]).includes('SUPER_ADMIN')
+        ? ['admin:acceso', 'usuarios:leer', 'usuarios:gestionar', 'roles:leer', 'auditoria:leer', 'organigrama:leer', 'organigrama:gestionar', 'maestras:leer', 'maestras:gestionar', 'calendario:leer', 'calendario:gestionar'].map((permiso_codigo) => ({ permiso_codigo }))
+        : [],
+      rowCount: 0,
+    }),
     connect: async () => ({
       query: async () => ({ rows: [], rowCount: 0 }),
       release: () => {},
