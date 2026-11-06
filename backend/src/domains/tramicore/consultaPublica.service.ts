@@ -139,8 +139,8 @@ export class ConsultaPublicaService {
     const resultado = await cliente.query<FilaConsulta>(
       `SELECT e.codigo_expediente AS cut,
               COALESCE(ea.estado_nuevo, e.estado) AS estado_tramite,
-              t.denominacion   AS tipo_tramite,
-              t.unidad_organica AS unidad_organica,
+              COALESCE(tv.denominacion, t.denominacion) AS tipo_tramite,
+              COALESCE(tv.unidad_recibe, t.unidad_organica) AS unidad_organica,
               a.asunto,
               a.fecha_ingreso,
               e.fecha_radicacion,
@@ -151,6 +151,8 @@ export class ConsultaPublicaService {
               pn.apellidos,
               pj.razon_social
          FROM sigd_tra.expediente e
+                  LEFT JOIN sigd_tupa.tramite_version tv
+                ON tv.tramite_version_id = e.tramite_version_id
          LEFT JOIN sigd_doc.tipo_documento td
                 ON td.tipo_documental_id = e.tipo_documental_id
          LEFT JOIN sigd_doc.tipo_tramite_tupa t

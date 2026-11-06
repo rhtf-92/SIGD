@@ -82,7 +82,7 @@ export class RadicacionVirtualService {
       await cliente.query('BEGIN');
       transaccionAbierta = true;
 
-      const tipoDocumentalId = await this.resolverTipoDocumental(cliente, datos.idTipoTramiteTupa);
+      const tramite = await this.resolverTramite(cliente, datos.idTipoTramiteTupa);
       await this.verificarAdministrado(cliente, idPersonaAutenticada);
 
       const horario = await this.evaluarHorario(now);
@@ -91,7 +91,7 @@ export class RadicacionVirtualService {
       const expediente = await this.insertarExpediente(
         cliente,
         datos,
-        tipoDocumentalId,
+        tramite,
         idPersonaAutenticada,
         horario.radicacionLegal,
       );
@@ -130,8 +130,29 @@ export class RadicacionVirtualService {
     const feriados = await this.obtenerFeriados();
     return calcularHorarioCorte(now, feriados);
   }
+    /** Tramite del TUPA vigente; si no, el catalogo de prueba anterior. */
+  private async resolverTramite(
+    cliente: PoolClient,
+    idTipoTramiteTupa: string,
+  ): Promise<{ tramiteVersionId: string | null; tipoDocumentalId: string | null }> {
+    const tupa = await cliente.query<{ tramite_version_id: string }>(
+      `SELECT tv.tramite_version_id
+         FROM sigd_tupa.tramite_version tv
+         JOIN sigd_tupa.version v ON v.version_id = tv.version_id
+        WHERE tv.tramite_version_id = $1
+          AND v.estado = 'VIGENTE'
+        LIMIT 1`,
+      [idTipoTramiteTupa],
+    );
+    const fila = tupa.rows[0];
+    if (fila) {
+      return { tramiteVersionId: fila.tramite_version_id, tipoDocumentalId: null };
+    }
+    const tipoDocumentalId = await this.resolverTipoDocumental(cliente, idTipoTramiteTupa);
+    return { tramiteVersionId: null, tipoDocumentalId };
+  }
 
-  private async resolverTipoDocumental(
+    private async resolverTipoDocumental(
     cliente: PoolClient,
     idTipoTramiteTupa: string,
   ): Promise<string> {
@@ -201,7 +222,7 @@ export class RadicacionVirtualService {
   private async insertarExpediente(
     cliente: PoolClient,
     datos: RadicacionVirtualInput,
-    tipoDocumentalId: string,
+        tramite: { tramiteVersionId: string | null; tipoDocumentalId: string | null },
     idPersona: string,
     fechaRadicacionLegal: Date,
   ): Promise<FilaExpediente> {
@@ -211,13 +232,13 @@ export class RadicacionVirtualService {
     // numero es NOT NULL UNIQUE; el CUT lo genera el trigger y se asigna despues.
     const numeroTemporal = `TMP-${createHash('sha256').update(String(Date.now())).digest('hex').slice(0, 12)}`;
 
-    const resultado = await cliente.query<FilaExpediente>(
+        const resultado = await cliente.query<FilaExpediente>(
       `INSERT INTO sigd_tra.expediente
          (numero, dni_solicitante, tipo_documental_id, solicitante_id,
-          area_destino_id, estado, fecha_radicacion, fecha_limite)
-       VALUES ($1, $2, $3, $4, NULL, 'REGISTRADO', $5, NULL)
+          area_destino_id, estado, fecha_radicacion, fecha_limite, tramite_version_id)
+       VALUES ($1, $2, $3, $4, NULL, 'REGISTRADO', $5, NULL, $6)
        RETURNING expediente_id, codigo_expediente AS cut, fecha_radicacion AS fecha_radicacion_legal`,
-      [numeroTemporal, dniSolicitante, tipoDocumentalId, idPersona, fechaRadicacionLegal],
+      [numeroTemporal, dniSolicitante, tramite.tipoDocumentalId, idPersona, fechaRadicacionLegal, tramite.tramiteVersionId],
     );
     const expediente = resultado.rows[0];
     if (!expediente) {

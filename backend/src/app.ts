@@ -34,6 +34,7 @@ import type { CalendarioLaboralPort } from './domains/rutadoc/sla.types.js';
 import type { ClasificadorCcdPort } from './domains/rutadoc/ccd.types.js';
 import type { DocumentoMetadataPort } from './domains/rutadoc/foliacion.types.js';
 import { crearRouterTramites } from './domains/tramicore/tramites.controller.js';
+import { crearRouterTiposTupaReal } from './domains/tramicore/tiposTupaReal.routes.js';
 import { crearRouterReportes } from './domains/corelink/reportes.router.js';
 
 // Módulos OrganiCore Maestras, Calendario y Organigrama
@@ -186,6 +187,7 @@ export function construirApp(
   app.use('/api/v1', crearRouterCasilla(pool));
   app.use('/api/v1', crearRouterTupa(pool));
   app.use('/api/v1', crearRouterStorage(pool));
+  app.use('/api/v1', crearRouterTiposTupaReal(pool));
   app.use('/api/v1', crearRouterTramites(pool));
   app.use(
     '/api/v1',
