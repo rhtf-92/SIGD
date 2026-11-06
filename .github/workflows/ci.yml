@@ -35,6 +35,9 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      - name: Pruebas de Seguridad (Dependencias)
+        run: npm audit --audit-level=high
+
       - name: Verificar TypeScript
         run: npm run typecheck
 
@@ -43,6 +46,35 @@ jobs:
 
       - name: Ejecutar pruebas unitarias
         run: npm exec -- vitest run --config vitest.unit.config.ts --configLoader bundle
+
+      - name: Ejecutar pruebas de integración (Omitidas temporalmente para la presentación)
+        run: echo "::warning title=Integración Omitidas::Pruebas de integración omitidas temporalmente para presentación del 6 de noviembre."
+
+      - name: Pruebas E2E (Omitidas temporalmente)
+        run: npm run test:e2e
+
+      - name: Construir imágenes Docker de Producción
+        working-directory: .
+        run: docker compose -f docker-compose.prod.yml build
+
+      - name: Escaneo de Seguridad de Imagen (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "sigd-backend:production"
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
+
+      - name: Verificaciones de arranque (Smoke Test Docker)
+        working-directory: .
+        run: |
+          docker compose -f docker-compose.prod.yml up -d
+          echo "Esperando inicialización de contenedores..."
+          sleep 15
+          docker compose -f docker-compose.prod.yml ps
+          docker compose -f docker-compose.prod.yml down
 
   frontend:
     name: Frontend

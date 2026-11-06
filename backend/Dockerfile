@@ -21,4 +21,5 @@ COPY --from=build /app/dist ./dist
 COPY migraciones ./migraciones
 COPY knowledge ./knowledge
 EXPOSE 3000
+USER node
 CMD ["npm", "start"]
