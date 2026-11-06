@@ -1,9 +1,5 @@
-<<<<<<< HEAD
-import express, { Express, type Request } from 'express';
-=======
 import { cuentaActual } from './core/auth/cuenta-actual.js';
-import express, { Express } from 'express';
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
+import express, { Express, type Request } from 'express';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
@@ -77,7 +73,6 @@ import { crearRouterSalud } from './controllers/health.controller.js';
 import { crearRouterWorkflowAcademico } from './domains/docucore/workflowAcademico.router.js';
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from './shared/domain/errors/index.js';
 import { autenticarJwt, autorizarPermisos, PERMISOS_RBAC } from './core/auth/auth.guard.js';
-import { ForbiddenError, NotFoundError } from './shared/domain/errors/index.js';
 import { verificarAccesoExpediente } from './domains/docucore/docucore.security.js';
 
 export interface AppOptions {
@@ -238,39 +233,21 @@ export function construirApp(
 
   // Rutas
   const jwtActorProvider: ActorProviderRutaDoc = {
-<<<<<<< HEAD
-    obtenerActor: (req) => {
-      const auth = req.headers.authorization;
-      if (auth && auth.startsWith('Bearer ')) {
-        const token = auth.slice(7).trim();
-        try {
-          const claims = verificarTokenAcceso(token);
-          if (claims.scope !== undefined) return null;
-          return {
-            id: claims.sub,
-            roles: claims.roles ?? [],
-            unidadOrganicaId: null,
-            puedeVerExpediente: async (expedienteId: string) => {
-              try {
-                await verificarAccesoExpediente(pool, claims.sub, expedienteId);
-                return true;
-              } catch (error) {
-                if (error instanceof ForbiddenError || error instanceof NotFoundError) return false;
-                throw error;
-              }
-            },
-          };
-        } catch {
-          return null;
-=======
     obtenerActor: async (req) => {
       const cuenta = await cuentaActual(pool, req);
-      return { id: cuenta.id_usuario, roles: cuenta.roles, unidadOrganicaId: cuenta.area_id,
-        puedeVerExpediente: async (id: string) => {
-          const {rows} = await pool.query('SELECT solicitante_id,area_destino_id FROM sigd_tra.expediente WHERE expediente_id=$1',[id]);
-          return Boolean(rows[0] && (rows[0].solicitante_id===cuenta.id_persona || cuenta.permisos.includes('EXPEDIENTE_LEER')));
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
-        }
+      return {
+        id: cuenta.id_usuario,
+        roles: cuenta.roles,
+        unidadOrganicaId: cuenta.area_id,
+        puedeVerExpediente: async (expedienteId: string) => {
+          try {
+            await verificarAccesoExpediente(pool, cuenta.id_usuario, expedienteId);
+            return true;
+          } catch (error) {
+            if (error instanceof ForbiddenError || error instanceof NotFoundError) return false;
+            throw error;
+          }
+        },
       };
     },
   };

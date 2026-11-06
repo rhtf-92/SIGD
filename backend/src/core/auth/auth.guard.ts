@@ -39,13 +39,10 @@ export function autenticarJwt(req: Request, _res: Response, next: NextFunction):
   if (!token) throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
 
   const claims = verificarTokenAcceso(token);
-<<<<<<< HEAD
   if (claims.scope !== undefined) {
     throw new UnauthorizedError({ detail: 'El token está limitado a un recurso específico.' });
   }
-=======
   setUsuarioId(claims.sub);
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
   req.cuentaActual = { idUsuario: claims.sub, roles: claims.roles };
   next();
 }

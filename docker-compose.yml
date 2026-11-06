@@ -1,65 +1,17 @@
-# ==============================================================================
-# SIGD - Stack Docker Compose
-# ------------------------------------------------------------------------------
-# Servicios: PostgreSQL 18, Redis 7, Backend (Node.js 20 + Express 5),
-#            Frontend (Node.js 24 + React 19 + Vite 6) y MinIO (perfil opcional).
-#
-# Uso:
-#   docker compose up --build -d        # frontend + backend + postgres + redis
-#   docker compose --profile storage up -d  # agrega MinIO (requiere imagen)
-#   docker compose down                 # detiene y conserva los volumenes
-#   docker compose down -v              # elimina tambien los datos persistidos
-#
-# Las credenciales NO viven en este archivo: se interpolan desde .env
-# (ignorado por git). Copie .env.example a .env y ajuste los valores.
-# ==============================================================================
-
-name: sigd
-
 services:
-<<<<<<< HEAD
-  # ---------------------------------------------------------------------------
-  # 1. Base de datos relacional. PostgreSQL 18 usa PGDATA=/var/lib/postgresql/18/docker,
-  #    por eso el volumen se monta en /var/lib/postgresql (y no en .../data).
-  # ---------------------------------------------------------------------------
-=======
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
   postgres:
     image: postgres:18-alpine
     container_name: sigd_postgres
-    restart: unless-stopped
     environment:
-<<<<<<< HEAD
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env}
-      POSTGRES_DB: ${POSTGRES_DB:-sigd_prueba}
-      TZ: ${TZ:-America/Lima}
-    ports:
-      # 5432 suele estar ocupado por un PostgreSQL local; el host usa 5433 por defecto.
-      - "${POSTGRES_PORT:-5433}:5432"
-=======
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER es obligatorio}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB es obligatorio}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-<<<<<<< HEAD
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
-    networks:
-      - sigd_data
-
-  # ---------------------------------------------------------------------------
-  # 2. Redis 7. Usado por DocuCore para las sesiones efimeras de firma.
-  # ---------------------------------------------------------------------------
-=======
       interval: 5s
       timeout: 5s
       retries: 10
@@ -87,42 +39,18 @@ services:
       start_period: 10s
     restart: unless-stopped
 
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
   redis:
     image: redis:7-alpine
     container_name: sigd_redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 3s
       retries: 10
-<<<<<<< HEAD
-      start_period: 5s
-    networks:
-      - sigd_data
-
-  # ---------------------------------------------------------------------------
-  # 3. MinIO (opcional). El repositorio oficial de Docker Hub ya no publica la
-  #    imagen `minio/minio`; por eso el servicio queda detras del perfil
-  #    "storage" y la imagen es configurable con MINIO_IMAGE.
-  #    Ejemplo: MINIO_IMAGE=quay.io/minio/minio:latest
-  # ---------------------------------------------------------------------------
-  minio:
-    image: ${MINIO_IMAGE:-minio/minio:latest}
-    container_name: sigd_minio
-    profiles: ["storage"]
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Defina MINIO_ROOT_PASSWORD en .env}
-=======
     restart: unless-stopped
 
   backend:
@@ -152,85 +80,11 @@ services:
       OUTBOX_POLL_INTERVAL_MS: 5000
       MIGRATE_ON_BOOT: "false"
       START_FRONTEND: "false"
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    volumes:
-      - miniodata:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    networks:
-      - sigd_data
-
-  # ---------------------------------------------------------------------------
-  # 4. API Backend (Node.js 20 LTS + Express 5 + TypeScript).
-  #    Se construye desde backend/Dockerfile (multi-stage).
-  # ---------------------------------------------------------------------------
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: sigd-backend:local
-    container_name: sigd_backend
-    restart: unless-stopped
-    init: true
-    env_file:
-      - ./.env
-    environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      PORT: 3000
-      # Hostnames internos resueltos por la red de Docker.
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sigd_prueba}
-      REDIS_URL: redis://redis:6379
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: ${S3_REGION:-us-east-1}
-      S3_BUCKET: ${S3_BUCKET:-sigd-expedientes}
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      S3_FORCE_PATH_STYLE: "true"
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-sigd-documentos}
-      AWS_REGION: ${S3_REGION:-us-east-1}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://127.0.0.1:5173}
-      # Regla del proyecto: no ejecutar migraciones automaticamente.
-      # Para inicializar una base Docker vacia, cambie MIGRATE_ON_BOOT=true en .env.
-      MIGRATE_ON_BOOT: ${MIGRATE_ON_BOOT:-false}
-    ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
-<<<<<<< HEAD
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 25s
-    stop_grace_period: 30s
-    networks:
-      - sigd_app
-      - sigd_data
-
-  # ---------------------------------------------------------------------------
-  # 5. Frontend (React 19 + Vite 6 + TypeScript). Servidor de desarrollo Vite.
-  # ---------------------------------------------------------------------------
-=======
       s3:
         condition: service_healthy
       redis:
@@ -243,91 +97,37 @@ services:
       start_period: 30s
     restart: unless-stopped
 
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-<<<<<<< HEAD
-    image: sigd-frontend:local
-    container_name: sigd_frontend
-    restart: unless-stopped
-    init: true
-=======
       target: development
     container_name: sigd_frontend
     working_dir: /app
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      # URL visible desde el NAVEGADOR (no desde el contenedor).
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000/api/v1}
+      VITE_API_BASE_URL: http://localhost:3000/api/v1
       VITE_ENABLE_MOCKS: "false"
-<<<<<<< HEAD
-      # Destino del proxy /api de Vite (DNS interno de Docker).
-      VITE_PROXY_TARGET: http://backend:3000
-=======
     command: ["npm", "exec", "--", "vite", "--host", "0.0.0.0", "--port", "5173", "--strictPort"]
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "5173:5173"
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-<<<<<<< HEAD
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:5173/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 20s
-    networks:
-      - sigd_app
-=======
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/login"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
     restart: unless-stopped
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
 
-# -----------------------------------------------------------------------------
-# Redes: sigd_app aísla la capa web; sigd_data aísla datos y servicios internos.
-# El backend participa en ambas para poder hablar con PostgreSQL/Redis/MinIO.
-# -----------------------------------------------------------------------------
-networks:
-  sigd_app:
-    driver: bridge
-    name: sigd_app
-  sigd_data:
-    driver: bridge
-    name: sigd_data
-
-# -----------------------------------------------------------------------------
-# Volumenes nombrados: sobreviven a `docker compose down`.
-# Solo se eliminan con `docker compose down -v`.
-# -----------------------------------------------------------------------------
 volumes:
   pgdata:
-<<<<<<< HEAD
-    name: sigd_pgdata
-  redisdata:
-    name: sigd_redisdata
-  miniodata:
-    name: sigd_miniodata
-=======
   redisdata:
   s3data:
+  miniodata:
   backend_node_modules:
   frontend_node_modules:
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542

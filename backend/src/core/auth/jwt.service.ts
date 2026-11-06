@@ -75,22 +75,7 @@ export function secretoJwt(env: NodeJS.ProcessEnv = process.env): string {
   return secreto as string;
 }
 
-<<<<<<< HEAD
-export function firmarTokenAcceso(opciones: OpcionesFirma): string {
-  const ahora = Math.floor((opciones.ahora ?? Date.now()) / 1000);
-  const claims: ClaimsJwt = {
-    sub: opciones.sub,
-    roles: opciones.roles ?? [],
-    iat: ahora,
-    exp: ahora + (opciones.expiraSegundos ?? 900),
-    typ: 'access',
-  };
-  if (opciones.scope !== undefined) claims.scope = opciones.scope;
-  if (opciones.resource !== undefined) claims.resource = opciones.resource;
-
-=======
 function firmarClaims(claims: object, secreto?: string): string {
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
   const encabezado = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const cuerpo = base64url(JSON.stringify(claims));
   const firma = crypto
@@ -103,14 +88,7 @@ function firmarClaims(claims: object, secreto?: string): string {
   return `${encabezado}.${cuerpo}.${firma}`;
 }
 
-<<<<<<< HEAD
-export function verificarTokenAcceso(
-  token: string,
-  opciones: { ahora?: number; secreto?: string; permitirAlcance?: boolean } = {},
-): ClaimsJwt {
-=======
 function verificarClaimsFirmados(token: string, secreto?: string): Record<string, unknown> {
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
   const partes = token.trim().split('.');
   if (partes.length !== 3 || !partes.every((p) => BASE64URL.test(p))) {
     throw new UnauthorizedError({ detail: 'Token mal formado.' });
@@ -157,6 +135,8 @@ export function firmarTokenAcceso(opciones: OpcionesFirma): string {
     exp: ahora + (opciones.expiraSegundos ?? 900),
     typ: 'access',
   };
+  if (opciones.scope !== undefined) claims.scope = opciones.scope;
+  if (opciones.resource !== undefined) claims.resource = opciones.resource;
 
   return firmarClaims(claims, opciones.secreto);
 }
@@ -186,7 +166,10 @@ export function firmarTokenRefresco(opciones: OpcionesFirma): string {
   } satisfies ClaimsRefresh, opciones.secreto);
 }
 
-export function verificarTokenAcceso(token: string, opciones: { ahora?: number; secreto?: string } = {}): ClaimsJwt {
+export function verificarTokenAcceso(
+  token: string,
+  opciones: { ahora?: number; secreto?: string; permitirAlcance?: boolean } = {},
+): ClaimsJwt {
   const claims = verificarClaimsFirmados(token, opciones.secreto) as unknown as ClaimsJwt;
 
   if (claims.typ !== 'access' || typeof claims.sub !== 'string' || claims.sub === '') {

@@ -73,36 +73,6 @@ const frontendDir = path.resolve(__dirname, '../../frontend');
 const viteBin = path.resolve(frontendDir, 'node_modules/vite/bin/vite.js');
 
 let viteProc: ReturnType<typeof spawn> | null = null;
-<<<<<<< HEAD
-
-// En Docker el backend no incluye el frontend: se omite el arranque de Vite.
-if (!fs.existsSync(viteBin)) {
-  console.log('[Frontend Vite] No se encontró el frontend en este contenedor; se omite su arranque.');
-} else {
-  try {
-    viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
-      cwd: frontendDir,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
-        VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
-      },
-    });
-
-    viteProc.stdout?.on('data', (data) => {
-      console.log(`[Vite stdout] ${data}`);
-    });
-
-    viteProc.stderr?.on('data', (data) => {
-      console.error(`[Vite stderr] ${data}`);
-    });
-
-    viteProc.on('error', (err) => {
-      console.error('[Frontend Vite] Error al iniciar:', err);
-    });
-
-=======
 if (process.env.START_VITE_WITH_BACKEND === 'true') {
   try {
     viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
@@ -127,7 +97,6 @@ if (process.env.START_VITE_WITH_BACKEND === 'true') {
       console.error('[Frontend Vite] Error al iniciar:', err);
     });
 
->>>>>>> bf78abf3699cee8b42e62cd5100cf60fcaf13542
     viteProc.on('close', (code) => {
       console.log(`[Frontend Vite] Proceso cerrado con código ${code}`);
     });
