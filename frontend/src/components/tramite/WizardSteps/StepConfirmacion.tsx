@@ -18,7 +18,7 @@
  * ==============================================================================
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type {
   TramiteWizardState,
   WizardAction,
@@ -43,6 +43,12 @@ interface RadicacionVirtualResponse {
     qrContenido: string;
   };
   mensajeLegal: string;
+}
+
+interface TipoTramiteCatalogo {
+  id: string;
+  codigo: string;
+  denominacion: string;
 }
 
 
@@ -76,6 +82,15 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
     error,
   } = state;
 
+  const [tiposTramite, setTiposTramite] = useState<TipoTramiteCatalogo[]>([]);
+  const [cargandoTipos, setCargandoTipos] = useState(true);
+
+  const textoTipoTramite = (() => {
+    if (cargandoTipos || !documentos.tipoTramiteId) return 'Procedimiento seleccionado';
+    const encontrado = tiposTramite.find((t) => t.id === documentos.tipoTramiteId);
+    return encontrado ? `${encontrado.codigo} — ${encontrado.denominacion}` : 'Procedimiento seleccionado';
+  })();
+
   const navigateToStep = useCallback(
     (step: WizardStep) => {
       if (onGoToStep) {
@@ -103,6 +118,20 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
     window.print();
   };
 
+  useEffect(() => {
+    let ignorar = false;
+    (async () => {
+      const res = await apiClient.get<TipoTramiteCatalogo[]>('/api/v1/tramites/tipos');
+      if (!ignorar) {
+        setTiposTramite(res.data);
+        setCargandoTipos(false);
+      }
+    })();
+    return () => {
+      ignorar = true;
+    };
+  }, []);
+
   const handleRadicar = async () => {
     if (isSubmitting) return;
 
@@ -118,77 +147,53 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           ? documentos.asunto.trim()
           : `${documentos.asunto.trim()} - Solicitud de Trámite Institucional`;
 
-      let idTipoTramite = documentos.tipoTramiteId;
-      if (
-        !idTipoTramite ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite) ||
-        idTipoTramite === '00000000-0000-0000-0000-000000000001'
-      ) {
-        try {
-          const respTipos = await apiClient.get<Array<{ id: string; codigo?: string; id_tipo_tramite?: string }>>(
-            '/api/v1/tramites/tipos',
-          );
-          if (Array.isArray(respTipos?.data) && respTipos.data.length > 0) {
-            const encontrado = respTipos.data.find(
-              (t) => t.codigo === documentos.tipoTramiteId || t.id === documentos.tipoTramiteId,
-            );
-            const resId = (encontrado ? (encontrado.id || encontrado.id_tipo_tramite) : (respTipos.data[0].id || respTipos.data[0].id_tipo_tramite));
-            if (resId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resId)) {
-              idTipoTramite = resId;
-            }
-          }
-        } catch {
-          // Fallback defensivo si el endpoint no está disponible en entorno aislado
-        }
-      }
-      if (!idTipoTramite || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite)) {
-        idTipoTramite = '00000000-0000-0000-0000-000000000001';
+      const idTipoTramite = documentos.tipoTramiteId;
+      const esUuidValido =
+        Boolean(idTipoTramite) &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite);
+      if (!esUuidValido) {
+        dispatch({ type: 'SET_SUBMITTING', payload: false });
+        dispatch({
+          type: 'SET_ERROR',
+          payload:
+            'El trámite seleccionado no es válido. Elija un procedimiento del catálogo oficial antes de radicar.',
+        });
+        return;
       }
 
-      let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
-      try {
-        if (identificacion.numeroDocumento) {
-          const respPersona = await apiClient.get<{ persona?: { id: number | string } }>(
-            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(identificacion.numeroDocumento)}`
-          );
-          if (respPersona?.data?.persona?.id) {
-            idPersonaNum = Number(respPersona.data.persona.id);
-          }
-        }
-      } catch {
-        // Fallback defensivo
+            if (documentos.archivos.length === 0) {
+        dispatch({ type: 'SET_SUBMITTING', payload: false });
+        dispatch({ type: 'SET_ERROR', payload: 'Debe adjuntar al menos un archivo PDF antes de radicar.' });
+        return;
+      }
+      const archivoInvalido = documentos.archivos.some(
+        (a) => !a.hashSha256 || !/^[0-9a-f]{64}$/i.test(a.hashSha256) || !(Number(a.peso) > 0),
+      );
+      if (archivoInvalido) {
+        dispatch({ type: 'SET_SUBMITTING', payload: false });
+        dispatch({ type: 'SET_ERROR', payload: 'Un archivo no tiene huella o tamano valido. Vuelva a adjuntarlo.' });
+        return;
+      }
+      const correoReal = identificacion.correo.trim().toLowerCase();
+      if (nombreCompleto.length < 2 || !correoReal) {
+        dispatch({ type: 'SET_SUBMITTING', payload: false });
+        dispatch({ type: 'SET_ERROR', payload: 'Faltan el nombre o el correo del solicitante. Vuelva al paso 1.' });
+        return;
       }
 
-      const archivosPayload =
-        documentos.archivos.length > 0
-          ? documentos.archivos.map((a) => ({
-              nombreArchivo: a.nombre,
-              contentType: 'application/pdf',
-              tamanoBytes: Number(a.peso) || 1024,
-              hashSha256:
-                a.hashSha256 && /^[0-9a-f]{64}$/i.test(a.hashSha256)
-                  ? a.hashSha256.toLowerCase()
-                  : 'a'.repeat(64),
-            }))
-          : [
-              {
-                nombreArchivo: 'documento_principal.pdf',
-                contentType: 'application/pdf',
-                tamanoBytes: 2048,
-                hashSha256: 'a'.repeat(64),
-              },
-            ];
+      const archivosPayload = documentos.archivos.map((a) => ({
+        nombreArchivo: a.nombre,
+        contentType: 'application/pdf',
+        tamanoBytes: Number(a.peso),
+        hashSha256: a.hashSha256.toLowerCase(),
+      }));
 
       const payload = {
         asunto: asuntoFinal,
         idTipoTramiteTupa: idTipoTramite,
-        idPersona: idPersonaNum,
-        nombreSolicitante:
-          nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
-        correo:
-          identificacion.correo.trim().toLowerCase() ||
-          'contacto@iestpsuiza.edu.pe',
-        totalFolios: Number(documentos.numeroFolios) || 1,
+        nombreSolicitante: nombreCompleto,
+        correo: correoReal,
+        totalFolios: Number(documentos.numeroFolios),
         documentos: archivosPayload,
       };
 
@@ -205,7 +210,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         asunto: documentos.asunto,
         remitente: nombreCompleto,
         hashTransaccion:
-          serverData.cargoDigital?.hashSha256 || 'a'.repeat(64),
+          serverData.cargoDigital?.hashSha256 ?? '',
         qrValidationUrl: serverData.qrSeguimientoUrl,
       };
 
@@ -426,7 +431,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
             </button>
           </div>
           <p className="text-sm font-bold text-slate-900">
-            {documentos.tipoTramiteId || 'Procedimiento General Institucional'}
+            {textoTipoTramite}
           </p>
           <p className="text-xs text-slate-600">
             <span className="font-semibold">Folios:</span>{' '}

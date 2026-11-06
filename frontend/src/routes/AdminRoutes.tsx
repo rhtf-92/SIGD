@@ -1,39 +1,50 @@
-// Subrutas del Hub de Administración (ENT-M05-01)
+// Subrutas del Hub de Administracion (ENT-M05-01)
 // Se anidan bajo el path "/administracion" protegido en AppRouter.tsx
 import { Route } from "react-router-dom";
 
 import AdministracionPage from "../pages/administracion/AdministracionPage";
 import AuditoriaPage from "../pages/administracion/AuditoriaPage";
 import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
-import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
+import RolesPermisosDirectorioPage from "../pages/administracion/RolesPermisosDirectorioPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
-import UsuariosPage from "../pages/administracion/UsuariosPage";
+import UsuariosDirectorioPage from "../pages/administracion/UsuariosDirectorioPage";
 import ProtectedRoute from "./ProtectedRoute";
+import AtencionPage from "../pages/administracion/AtencionPage";
 
 export default function AdminRoutes() {
   return (
     <>
       <Route index element={<AdministracionPage />} />
-      {/* DoD ENT-M05-02: el directorio de personal solo es accesible para
-          SUPER_ADMIN y DIRECTOR mediante guarda de ruta activa. */}
+      {/* Usuarios, roles y permisos: solo el rol ADMINISTRADOR (el backend responde 403 a otros). */}
       <Route
         path="usuarios"
         element={
-          <ProtectedRoute
-            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
-            requiredModule="Administración"
-            requiredAction="editar"
-          >
-            <UsuariosPage />
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR"]}>
+            <UsuariosDirectorioPage />
           </ProtectedRoute>
         }
       />
-      <Route path="roles-permisos" element={<RolesPermisosPage />} />
+      <Route
+        path="roles-permisos"
+        element={
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR"]}>
+            <RolesPermisosDirectorioPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="auditoria" element={<AuditoriaPage />} />
       <Route path="tablas-maestras" element={<TablasMaestrasPage />} />
       <Route path="calendario-laboral" element={<CalendarioLaboralPage />} />
       <Route path="seguridad" element={<SeguridadPage />} />
+            <Route
+        path="atencion"
+        element={
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "ESPECIALISTA", "MESA_PARTES"]}>
+            <AtencionPage />
+          </ProtectedRoute>
+        }
+      />
     </>
   );
 }

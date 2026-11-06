@@ -4,8 +4,8 @@ import type { JSX, ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import type { ClavePermiso, MatrizPermisos } from "../types/rbacRoles";
+import { useAuthStore } from "../stores/authStore";
 
-const CLAVE_TOKEN = "sigd_token";
 const CLAVE_ROL = "sigd_rol";
 const CLAVE_PERMISOS = "sigd_permisos";
 
@@ -44,10 +44,10 @@ export default function ProtectedRoute({
   requiredAction = "ver",
 }: ProtectedRouteProps): JSX.Element {
   const location = useLocation();
-  const token = window.localStorage.getItem(CLAVE_TOKEN);
+  const { accessToken, isAuthenticated } = useAuthStore();
   const rol = window.localStorage.getItem(CLAVE_ROL);
 
-  if (!token) {
+  if (!isAuthenticated || !accessToken) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 

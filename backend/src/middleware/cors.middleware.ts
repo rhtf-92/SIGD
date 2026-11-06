@@ -7,7 +7,7 @@ const ORIGENES_DEFAULT = [
 
 const METODOS_PERMITIDOS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD';
 const CABECERAS_PERMITIDAS =
-  'Authorization, Content-Type, X-Correlation-ID, x-correlation-id, X-Usuario-ID, x-usuario-id, Accept';
+  'Authorization, Content-Type, X-Correlation-ID, x-correlation-id, X-Usuario-ID, x-usuario-id, X-Nombre-Archivo, Accept';
 const CABECERAS_EXPUESTAS = 'X-Correlation-ID, x-correlation-id, Date';
 
 function parsearOrigenesPermitidos(): string[] {

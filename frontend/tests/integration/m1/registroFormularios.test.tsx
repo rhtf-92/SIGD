@@ -4,8 +4,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
+import { AxiosHeaders, type AxiosResponse } from "axios";
 
 import RegistroCiudadanoPage from "../../../src/pages/registro/RegistroCiudadanoPage";
+import { apiClient } from "../../../src/api/client";
 import PersonaNaturalForm from "../../../src/components/registro/PersonaNaturalForm";
 import PersonaJuridicaForm from "../../../src/components/registro/PersonaJuridicaForm";
 import { DeclaracionJuradaCheckbox } from "../../../src/components/registro/DeclaracionJuradaCheckbox";
@@ -87,7 +89,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
 
     // Verificación de mensaje de error inline emitido por el schema Zod
     const mensajeError = await screen.findByText(
-      /DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos/i,
+      /DNI debe tener exactamente 8 dígitos/i,
     );
     expect(mensajeError).toBeInTheDocument();
     expect(handleSubmit).not.toHaveBeenCalled();
@@ -260,7 +262,13 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
   });
 
   it("h) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Natural y muestra la casilla creada", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({
+      data: { idPersona: "persona-natural-demo", mensaje: "Registro exitoso" },
+      status: 201,
+      statusText: "Created",
+      headers: new AxiosHeaders(),
+      config: { headers: new AxiosHeaders() },
+    } satisfies AxiosResponse);
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -276,6 +284,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     await user.type(screen.getByLabelText(/Correo Electrónico \*/i), "sergio@example.com");
     await user.type(screen.getByLabelText(/Celular \*/i), "961234567");
 
+    await user.type(screen.getByLabelText(/^contraseña \*/i), "Password123!");
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), "Password123!");
     // Seleccionar Ubigeo
     await user.selectOptions(
       screen.getByLabelText(/Seleccionar Provincia de Ucayali/i),
@@ -310,32 +320,17 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "74561238@casilla.iestpsuiza.edu.pe",
-    );
+    expect(mensajeExito).toHaveTextContent(/con tu DNI/i);
 
-    // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
-      expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
-      }),
+    expect(postSpy).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-ciudadano",
+      expect.objectContaining({ direccion: "Jr. Tarapacá N° 645" }),
     );
-
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
+    expect(postSpy.mock.calls[0]?.[1]).toHaveProperty(
+      "direccion",
+      "Jr. Tarapacá N° 645",
     );
-    expect(postCall).toBeDefined();
-    if (!postCall) {
-      throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
-    }
-    const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
-
-    consoleSpy.mockRestore();
+    expect(postSpy.mock.calls[0]?.[1]).not.toHaveProperty("direccion", "");
 
     // Cerrar mensaje de éxito
     const botonCerrarExito = screen.getByLabelText(/Cerrar mensaje de éxito/i);
@@ -346,7 +341,13 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
   }, 30_000);
 
   it("i) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Jurídica y muestra la casilla creada", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({
+      data: { idPersona: "persona-juridica-demo", mensaje: "Registro exitoso" },
+      status: 201,
+      statusText: "Created",
+      headers: new AxiosHeaders(),
+      config: { headers: new AxiosHeaders() },
+    } satisfies AxiosResponse);
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -373,6 +374,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       "contacto@amazonassoft.pe",
     );
     await user.type(screen.getByLabelText(/Celular de Contacto \*/i), "961234567");
+    await user.type(screen.getByLabelText(/^contraseña \*/i), "Password123!");
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), "Password123!");
 
     // Seleccionar Ubigeo
     await user.selectOptions(
@@ -408,32 +411,68 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "20131312955@casilla.iestpsuiza.edu.pe",
-    );
+    expect(mensajeExito).toHaveTextContent(/con tu RUC/i);
 
-    // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
-      expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
-      }),
+    expect(postSpy).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-persona-juridica",
+      expect.objectContaining({ direccion: "Jr. Tarapacá N° 645" }),
     );
-
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
+    expect(postSpy.mock.calls[0]?.[1]).toHaveProperty(
+      "direccion",
+      "Jr. Tarapacá N° 645",
     );
-    expect(postCall).toBeDefined();
-    if (!postCall) {
-      throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
-    }
-    const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
-
-    consoleSpy.mockRestore();
+    expect(postSpy.mock.calls[0]?.[1]).not.toHaveProperty("direccion", "");
     // FIX estabilidad (F_ADRIANO): idem test h) — flujo largo de user-event.
+  }, 30_000);
+
+  it("j) RegistroCiudadanoPage: muestra el error del servidor y no muestra la casilla cuando falla el registro", async () => {
+    const postSpy = vi
+      .spyOn(apiClient, "post")
+      .mockRejectedValueOnce(new Error("Error del servidor"));
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <RegistroCiudadanoPage />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
+    await user.type(screen.getByLabelText(/Nombres \*/i), "Sergio");
+    await user.type(screen.getByLabelText(/Apellidos \*/i), "Serruche Panduro");
+    await user.type(screen.getByLabelText(/Fecha de Nacimiento \*/i), "1998-05-15");
+    await user.type(screen.getByLabelText(/Correo Electrónico \*/i), "sergio@example.com");
+    await user.type(screen.getByLabelText(/Celular \*/i), "961234567");
+    await user.type(screen.getByLabelText(/^contraseña \*/i), "Password123!");
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), "Password123!");
+    await user.selectOptions(
+      screen.getByLabelText(/Seleccionar Provincia de Ucayali/i),
+      "2501",
+    );
+    await user.selectOptions(screen.getByLabelText(/Seleccionar Distrito/i), "250101");
+    await user.type(
+      screen.getByLabelText(/Dirección Exacta/i),
+      "Jr. Tarapacá N° 645",
+    );
+    await user.click(
+      screen.getByRole("checkbox", { name: /Declaro bajo juramento/i }),
+    );
+    await user.click(
+      screen.getByRole("checkbox", { name: /conforme a la Ley N° 29733/i }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /Registrar y Crear Casilla/i }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "No se pudo completar el registro. Error del servidor",
+    );
+    expect(postSpy).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-ciudadano",
+      expect.objectContaining({ dni: "74561238" }),
+    );
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/con tu DNI/i),
+    ).not.toBeInTheDocument();
   }, 30_000);
 });

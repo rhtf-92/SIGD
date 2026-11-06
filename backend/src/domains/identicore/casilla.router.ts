@@ -16,7 +16,7 @@ import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
-import { NotFoundError } from '../../shared/domain/errors/index.js';
+import { NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 
 const consultaPaginadaSchema = z
   .object({
@@ -24,7 +24,7 @@ const consultaPaginadaSchema = z
     page: z.coerce.number().int().positive().optional(),
     porPagina: z.coerce.number().int().min(1).max(100).optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
-    estado: z.enum(['LEIDO', 'NO_LEIDO', 'TODOS']).default('TODOS'),
+    estado: z.enum(['LEIDO', 'NO_LEIDO', 'NOTIFICADO', 'TODOS']).default('TODOS'),
     busqueda: z.string().optional(),
   })
   .transform((val) => ({
@@ -59,7 +59,7 @@ interface FilaNotificacionCasilla {
 function mapearNotificacion(fila: FilaNotificacionCasilla) {
   const anio = new Date().getFullYear();
   const cut = fila.cut ?? `EXP-${anio}-${fila.id.slice(0, 6).toUpperCase()}`;
-  const numeroDocumento = fila.numero_documento ?? `RD N.° 0${fila.id.slice(0, 3)}-${anio}-DG-IESTP-SUIZA`;
+  const numeroDocumento = fila.numero_documento ?? null;
   const fechaDeposito = typeof fila.fecha_deposito === 'string' ? fila.fecha_deposito : fila.fecha_deposito.toISOString();
   const fechaLectura = fila.fecha_lectura
     ? typeof fila.fecha_lectura === 'string'
@@ -79,7 +79,7 @@ function mapearNotificacion(fila: FilaNotificacionCasilla) {
     tipo: 'RESOLUCION' as const,
     tipoActo: fila.tipo_acto,
     prioridad: 'NORMAL' as const,
-    unidadEmisora: 'Secretaría Académica',
+    unidadEmisora: null,
     numeroDocumento,
     estado: fila.estado === 'LEIDO' ? ('LEIDO' as const) : ('NO_LEIDO' as const),
     fechaDeposito,
@@ -112,36 +112,29 @@ function mapearNotificacion(fila: FilaNotificacionCasilla) {
       tamanoArchivo: '1.2 MB',
       hashIntegridadSha256: hashSha256,
       cvd,
-      firmantes: [
-        {
-          nombre: 'Lic. Julio César Mori Paredes',
-          cargo: 'Director General',
-          fechaFirma: fechaDeposito,
-          entidadCertificadora: 'RENIEC',
-        },
-      ],
+      firmantes: [],
     },
     acuse: fila.id_acuse
       ? {
           idAcuse: fila.id_acuse,
           idNotificacion: fila.id,
           numeroExpediente: cut,
-          destinatario: {
-            nombresCompletos: 'Administrado Institucional',
-            numeroDocumento: '74561238',
-            tipoDocumento: 'DNI' as const,
-            direccionCasilla: '74561238@casilla.iestpsuiza.edu.pe',
-          },
+          destinatario: null as {
+  nombresCompletos: string | null;
+  numeroDocumento: string | null;
+  tipoDocumento: 'DNI' | 'RUC' | 'CE' | null;
+  direccionCasilla: string | null;
+} | null,
           timestampGeneracionIso:
             typeof fila.acuse_sellado_tiempo === 'string'
               ? fila.acuse_sellado_tiempo
               : fila.acuse_sellado_tiempo?.toISOString() ?? fechaDeposito,
           hashSha256Acuse: fila.acuse_hash_sha256 ?? hashSha256,
           cvdAcuse: `CVD-${anio}-ACU-${fila.id.slice(0, 6).toUpperCase()}-7B12`,
-          entidadEmisora: 'IESTP Suiza',
-          unidadEmisora: 'Secretaría Académica',
+          entidadEmisora: null,
+          unidadEmisora: null,
           fechaEfectoLegal: fechaDeposito,
-          plazoImpugnacionDiasHabiles: 15,
+          plazoImpugnacionDiasHabiles: null,
           validezLegalMensaje:
             'Acuse Notificatorio Digital emitido conforme al Art. 20 del TUO de la Ley N° 27444 y Ley N° 29733.',
         }
@@ -155,14 +148,40 @@ export function crearRouterCasilla(pool: Pool): Router {
   function obtenerUsuarioId(req: Request): string {
     const token = extraerTokenBearer(req.get('authorization'));
     if (!token) {
-      return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
+      throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
     }
     try {
       const claims = verificarTokenAcceso(token);
       return claims.sub;
     } catch {
-      return req.get('x-usuario-id') ?? '00000000-0000-0000-0000-000000000001';
+      throw new UnauthorizedError({ detail: 'Token de acceso inválido o caducado.' });
     }
+  }
+
+  async function obtenerDestinatario(usuarioId: string) {
+    const resultado = await pool.query(
+      `SELECT pn.nombre_completo,
+              p.id_documento,
+              td.codigo AS tipo_documento,
+              pn.correo
+         FROM sigd_auth.cuenta_usuario c
+         JOIN sigd_auth.persona p ON p.id_persona = c.id_persona
+         JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona AND p.tipo = 'NATURAL'
+         LEFT JOIN sigd_auth.persona_documento_historial pdh ON pdh.id_persona = p.id_persona
+         LEFT JOIN sigd_auth.tipos_documento td ON td.id_tipo_documento = pdh.tipo_documento
+        WHERE c.id_usuario = $1
+        ORDER BY pdh.fecha_registro DESC NULLS LAST
+        LIMIT 1`,
+      [usuarioId],
+    );
+    const fila = resultado.rows[0];
+    if (!fila) return null;
+    return {
+      nombresCompletos: fila.nombre_completo ?? null,
+      numeroDocumento: fila.id_documento ?? null,
+      tipoDocumento: (fila.tipo_documento as 'DNI' | 'RUC' | 'CE') ?? null,
+      direccionCasilla: fila.correo ?? null,
+    };
   }
 
   // #7 — GET /casilla/notificaciones y alias /casilla/bandeja
@@ -174,8 +193,12 @@ export function crearRouterCasilla(pool: Pool): Router {
     const valores: unknown[] = [usuarioId];
 
     if (query.estado !== 'TODOS') {
-      valores.push(query.estado);
-      condiciones.push(`estado = $${valores.length}`);
+      if (query.estado === 'NOTIFICADO') {
+        condiciones.push(`id_acuse IS NOT NULL`);
+      } else {
+        valores.push(query.estado);
+        condiciones.push(`estado = $${valores.length}`);
+      }
     }
 
     if (query.busqueda) {
@@ -249,7 +272,12 @@ export function crearRouterCasilla(pool: Pool): Router {
       });
     }
 
-    res.status(200).json(mapearNotificacion(resultado.rows[0]));
+    const usuarioId = obtenerUsuarioId(req);
+    const notificacion = mapearNotificacion(resultado.rows[0]);
+    if (notificacion.acuse) {
+      notificacion.acuse.destinatario = await obtenerDestinatario(usuarioId);
+    }
+    res.status(200).json(notificacion);
   });
 
   // #9 — PATCH /casilla/notificaciones/:id/lectura
@@ -299,6 +327,7 @@ export function crearRouterCasilla(pool: Pool): Router {
     }
 
     const notif = notifRes.rows[0];
+    const usuarioId = obtenerUsuarioId(req);
     const anio = new Date().getFullYear();
 
     // -------------------------------------------------------------------------
@@ -331,22 +360,17 @@ export function crearRouterCasilla(pool: Pool): Router {
         data: {
           idAcuse: notif.id_acuse,
           idNotificacion: id,
-          numeroExpediente: notif.cut ?? `EXP-${anio}-000142`,
-          destinatario: {
-            nombresCompletos: 'Administrado Institucional',
-            numeroDocumento: '74561238',
-            tipoDocumento: 'DNI' as const,
-            direccionCasilla: '74561238@casilla.iestpsuiza.edu.pe',
-          },
+          numeroExpediente: notif.cut ?? null,
+          destinatario: await obtenerDestinatario(usuarioId),
           timestampGeneracionIso: selladoOriginalIso,
           selladoTiempo: selladoOriginalIso,
           hashSha256Acuse: hashAcuseExistente,
           hashSha256: hashAcuseExistente,
           cvdAcuse: cvdAcuseExistente,
-          entidadEmisora: 'IESTP Suiza',
-          unidadEmisora: 'Secretaría Académica',
+          entidadEmisora: null,
+          unidadEmisora: null,
           fechaEfectoLegal: selladoOriginalIso,
-          plazoImpugnacionDiasHabiles: 15,
+          plazoImpugnacionDiasHabiles: null,
           validezLegalMensaje:
             'Acuse Notificatorio Digital emitido conforme al Art. 20 del TUO de la Ley N° 27444 y Ley N° 29733.',
           mensajeLegal:
@@ -387,22 +411,17 @@ export function crearRouterCasilla(pool: Pool): Router {
       data: {
         idAcuse,
         idNotificacion: id,
-        numeroExpediente: notif.cut ?? `EXP-${anio}-000142`,
-        destinatario: {
-          nombresCompletos: 'Administrado Institucional',
-          numeroDocumento: '74561238',
-          tipoDocumento: 'DNI' as const,
-          direccionCasilla: '74561238@casilla.iestpsuiza.edu.pe',
-        },
+        numeroExpediente: notif.cut ?? null,
+        destinatario: await obtenerDestinatario(usuarioId),
         timestampGeneracionIso: ahoraIso,
         selladoTiempo: ahoraIso,
         hashSha256Acuse: hashAcuse,
         hashSha256: hashAcuse,
         cvdAcuse,
-        entidadEmisora: 'IESTP Suiza',
-        unidadEmisora: 'Secretaría Académica',
+        entidadEmisora: null,
+        unidadEmisora: null,
         fechaEfectoLegal: ahoraIso,
-        plazoImpugnacionDiasHabiles: 15,
+        plazoImpugnacionDiasHabiles: null,
         validezLegalMensaje:
           'Acuse Notificatorio Digital emitido conforme al Art. 20 del TUO de la Ley N° 27444 y Ley N° 29733.',
         mensajeLegal:
@@ -416,9 +435,11 @@ export function crearRouterCasilla(pool: Pool): Router {
   router.get('/casilla/estadisticas', async (req: Request, res: Response) => {
     const usuarioId = obtenerUsuarioId(req);
 
-    const resultado = await pool.query<{ no_leidas: string; total: string }>(
-      `SELECT COUNT(*) FILTER (WHERE estado = 'NO_LEIDO')::text AS no_leidas,
-              COUNT(*)::text AS total
+    const resultado = await pool.query<{ no_leidas: string; total: string; leidos: string; notificados: string }>(
+      `SELECT COUNT(*)::text AS total,
+              COUNT(*) FILTER (WHERE estado = 'NO_LEIDO')::text AS no_leidas,
+              COUNT(*) FILTER (WHERE estado = 'LEIDO')::text AS leidos,
+              COUNT(*) FILTER (WHERE id_acuse IS NOT NULL)::text AS notificados
          FROM sigd_auth.notificacion_casilla
         WHERE usuario_id = $1 OR usuario_id IS NULL OR $1 = '00000000-0000-0000-0000-000000000001'`,
       [usuarioId],
@@ -426,13 +447,15 @@ export function crearRouterCasilla(pool: Pool): Router {
 
     const noLeidas = Number(resultado.rows[0]?.no_leidas ?? 0);
     const total = Number(resultado.rows[0]?.total ?? 0);
+    const leidosCount = Number(resultado.rows[0]?.leidos ?? 0);
+    const notificadosCount = Number(resultado.rows[0]?.notificados ?? 0);
 
     res.status(200).json({
       noLeidas,
       noLeidos: noLeidas,
       total,
-      leidos: Math.max(0, total - noLeidas),
-      notificados: total,
+      leidos: leidosCount,
+      notificados: notificadosCount,
       urgentes: 0,
       ultimosMovimientos: total > 0 ? 1 : 0,
     });

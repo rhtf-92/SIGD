@@ -32,10 +32,10 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS sigd_tra.mv_kpis_mgd_mensual AS
 WITH cierre AS (
     SELECT
         m.expediente_id,
-        m.fecha_movimiento,
-        ROW_NUMBER() OVER (PARTITION BY m.expediente_id ORDER BY m.fecha_movimiento) AS orden
+        m.fecha_hora,
+        ROW_NUMBER() OVER (PARTITION BY m.expediente_id ORDER BY m.fecha_hora) AS orden
     FROM sigd_rut.movimiento_tramite m
-    WHERE m.estado_destino IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO')
+    WHERE m.estado_nuevo IN ('RESUELTO', 'ARCHIVADO')
 ),
 base AS (
     SELECT
@@ -43,12 +43,12 @@ base AS (
         e.expediente_id,
         e.fecha_radicacion,
         e.fecha_limite,
-        a.estado_codigo,
+        a.estado_nuevo,
         a.area_actual_id,
         ar.fecha_ingreso,
-        c.fecha_movimiento AS fecha_cierre
+        c.fecha_hora AS fecha_cierre
     FROM sigd_tra.expediente e
-    LEFT JOIN sigd_rut.estado_actual_tramite a
+    LEFT JOIN sigd_rut.estado_actual_expediente a
            ON a.expediente_id = e.expediente_id
     LEFT JOIN sigd_tra.asiento_registro ar
            ON ar.expediente_id = e.expediente_id
@@ -61,17 +61,17 @@ SELECT
     periodo,
     COUNT(*)::int                                                          AS radicados,
     COUNT(*) FILTER (
-        WHERE estado_codigo IN ('RESUELTO', 'NOTIFICADO')
+        WHERE estado_nuevo = 'RESUELTO'
     )::int                                                                  AS atendidos,
-    COUNT(*) FILTER (WHERE estado_codigo = 'ARCHIVADO')::int                 AS archivados,
-    COUNT(*) FILTER (WHERE estado_codigo = 'OBSERVADO')::int                 AS observados,
+    COUNT(*) FILTER (WHERE estado_nuevo = 'ARCHIVADO')::int                 AS archivados,
+    COUNT(*) FILTER (WHERE estado_nuevo = 'OBSERVADO')::int                 AS observados,
     COUNT(*) FILTER (
-        WHERE estado_codigo IS NULL
-           OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO', 'OBSERVADO')
+        WHERE estado_nuevo IS NULL
+           OR estado_nuevo NOT IN ('RESUELTO', 'ARCHIVADO', 'OBSERVADO')
     )::int                                                                  AS en_tramite,
     COUNT(*) FILTER (
-        WHERE estado_codigo IS NULL
-           OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
+        WHERE estado_nuevo IS NULL
+           OR estado_nuevo NOT IN ('RESUELTO', 'ARCHIVADO')
     )::int                                                                  AS universo_teo,
     COUNT(fecha_cierre)::int                                                AS resueltos,
     COUNT(*) FILTER (WHERE fecha_cierre IS NOT NULL AND fecha_limite IS NOT NULL
@@ -81,7 +81,7 @@ SELECT
     ), 0)::float8                                                           AS horas_calendario_totales,
     ROUND(
         CASE WHEN COUNT(*) = 0 THEN NULL
-             ELSE (COUNT(*) FILTER (WHERE estado_codigo IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO'))::numeric
+             ELSE (COUNT(*) FILTER (WHERE estado_nuevo IN ('RESUELTO', 'ARCHIVADO'))::numeric
                    * 100 / COUNT(*))
         END, 2)::float8                                                    AS vtep,
     ROUND(
@@ -98,14 +98,14 @@ SELECT
     ROUND(
         CASE
             WHEN COUNT(*) FILTER (
-                     WHERE estado_codigo IS NULL
-                        OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO', 'OBSERVADO')
+                     WHERE estado_nuevo IS NULL
+                        OR estado_nuevo NOT IN ('RESUELTO', 'ARCHIVADO', 'OBSERVADO')
                  ) = 0 THEN NULL
-            ELSE (COUNT(*) FILTER (WHERE estado_codigo = 'OBSERVADO')::numeric
+            ELSE (COUNT(*) FILTER (WHERE estado_nuevo = 'OBSERVADO')::numeric
                   * 100
                   / COUNT(*) FILTER (
-                      WHERE estado_codigo IS NULL
-                         OR estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO', 'OBSERVADO')
+                      WHERE estado_nuevo IS NULL
+                         OR estado_nuevo NOT IN ('RESUELTO', 'ARCHIVADO', 'OBSERVADO')
                     ))
         END, 2)::float8                                                    AS teo
 FROM base
@@ -124,34 +124,45 @@ COMMENT ON MATERIALIZED VIEW sigd_tra.mv_kpis_mgd_mensual IS
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW IF NOT EXISTS sigd_tra.mv_tiempos_retencion_area AS
 SELECT
-    COALESCE(ar.area_id, e.area_destino_id)                                   AS area_id,
+    COALESCE(ar.area_id, e.area_destino_id, '00000000-0000-0000-0000-000000000000'::uuid)                                   AS area_id,
     COALESCE(ar.nombre, 'Sin área asignada')                                  AS area,
     e.estado                                                                     AS estado,
     COUNT(*)::int                                                                AS expedientes,
-    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_estado)) / 3600)::numeric, 2)::float8
+    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 3600)::numeric, 2)::float8
                                                                                  AS horas_promedio,
-    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_estado)) / 86400)::numeric, 2)::float8
+    ROUND(AVG(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 86400)::numeric, 2)::float8
                                                                                  AS dias_promedio,
-    ROUND(MAX(EXTRACT(EPOCH FROM (now() - a.fecha_estado)) / 86400)::numeric, 2)::float8
+    ROUND(MAX(EXTRACT(EPOCH FROM (now() - a.fecha_hora)) / 86400)::numeric, 2)::float8
                                                                                  AS dias_maximo,
     COUNT(*) FILTER (WHERE e.fecha_limite IS NOT NULL AND e.fecha_limite < now())::int
                                                                                  AS vencidos,
-    COUNT(*) FILTER (WHERE a.semaforo_sla = 'ROJO')::int                         AS semaforo_rojo,
-    COUNT(*) FILTER (WHERE a.semaforo_sla = 'AMARILLO')::int                     AS semaforo_amarillo,
-    COUNT(*) FILTER (WHERE a.semaforo_sla = 'VERDE')::int                        AS semaforo_verde
-FROM sigd_rut.estado_actual_tramite a
+    COUNT(*) FILTER (
+        WHERE e.fecha_limite IS NOT NULL AND now() > e.fecha_limite
+    )::int                                                                       AS semaforo_rojo,
+    COUNT(*) FILTER (
+        WHERE e.fecha_limite IS NOT NULL
+          AND e.fecha_limite > e.fecha_radicacion
+          AND now() <= e.fecha_limite
+          AND now() >= e.fecha_radicacion + (e.fecha_limite - e.fecha_radicacion) * 0.8
+    )::int                                                                       AS semaforo_amarillo,
+    COUNT(*) FILTER (
+        WHERE e.fecha_limite IS NOT NULL
+          AND e.fecha_limite > e.fecha_radicacion
+          AND now() < e.fecha_radicacion + (e.fecha_limite - e.fecha_radicacion) * 0.8
+    )::int                                                                       AS semaforo_verde
+FROM sigd_rut.estado_actual_expediente a
 JOIN sigd_tra.expediente e
   ON e.expediente_id = a.expediente_id
 LEFT JOIN sigd_org.area ar
-  ON ar.area_id = a.area_actual_id
-WHERE a.estado_codigo NOT IN ('RESUELTO', 'NOTIFICADO', 'ARCHIVADO', 'ANULADO')
+  ON ar.area_id::text = a.area_actual_id
+WHERE a.estado_nuevo NOT IN ('RESUELTO', 'ARCHIVADO')
 GROUP BY 1, 2, 3
 WITH DATA;
 
 -- La clave única combina área y estado: un área puede tener varios estados
 -- vigentes y el refresco concurrente no admite duplicados.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_tiempos_retencion_area_clave
-    ON sigd_tra.mv_tiempos_retencion_area (COALESCE(area_id, '00000000-0000-0000-0000-000000000000'::uuid), estado);
+    ON sigd_tra.mv_tiempos_retencion_area (area_id, estado);
 
 CREATE INDEX IF NOT EXISTS ix_mv_tiempos_retencion_area_dias
     ON sigd_tra.mv_tiempos_retencion_area (dias_promedio DESC);
