@@ -9,251 +9,61 @@
 @source "../index.html";
 
 /* ----------------------------------------------------------------------------
-   SIGD · TEMA FUTURISTA MONOCROMO
-   Toda la paleta cromática se remapea a una escala de grises. Así los cientos
-   de utilidades existentes (blue/cyan/emerald/amber/red...) pierden el color
-   sin necesidad de tocar cada archivo. Las superficies blancas y los textos
-   oscuros se corrigen más abajo con overrides de alta prioridad.
+   SIGD · VIDRIO INSTITUCIONAL
+   Azul marino + celeste + blanco. Las escalas de Tailwind (blue, cyan, emerald,
+   amber, red...) conservan su croma. Aquí solo se reafinan los tokens propios
+   del sistema para que fichas, botones y rail hablen el mismo idioma.
    -------------------------------------------------------------------------- */
 @theme {
-  --color-blue-50: #f8fafc;
-  --color-blue-100: #f1f5f9;
-  --color-blue-200: #e2e8f0;
-  --color-blue-300: #cbd5e1;
-  --color-blue-400: #94a3b8;
-  --color-blue-500: #64748b;
-  --color-blue-600: #475569;
-  --color-blue-700: #334155;
-  --color-blue-800: #1e293b;
-  --color-blue-900: #0f172a;
-  --color-blue-950: #020617;
+  --font-sans:
+    "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
 
-  --color-cyan-50: #f8fafc;
-  --color-cyan-100: #f1f5f9;
-  --color-cyan-200: #e2e8f0;
-  --color-cyan-300: #cbd5e1;
-  --color-cyan-400: #94a3b8;
-  --color-cyan-500: #64748b;
-  --color-cyan-600: #475569;
-  --color-cyan-700: #334155;
-  --color-cyan-800: #1e293b;
-  --color-cyan-900: #0f172a;
-  --color-cyan-950: #020617;
+  /* Tinta: texto y superficies oscuras */
+  --color-tinta-950: #0b1524;
+  --color-tinta-900: #12202e;
+  --color-tinta-800: #1d2c3b;
+  --color-tinta-700: #33465a;
+  --color-tinta-600: #44586d;
+  --color-tinta-500: #5b6b7c;
+  --color-tinta-400: #7c8896;
+  --color-tinta-300: #a3adb8;
 
-  --color-sky-50: #f8fafc;
-  --color-sky-100: #f1f5f9;
-  --color-sky-200: #e2e8f0;
-  --color-sky-300: #cbd5e1;
-  --color-sky-400: #94a3b8;
-  --color-sky-500: #64748b;
-  --color-sky-600: #475569;
-  --color-sky-700: #334155;
-  --color-sky-800: #1e293b;
-  --color-sky-900: #0f172a;
-  --color-sky-950: #020617;
+  /* Azul institucional: único color de acción */
+  --color-vault-azul: #006ec7;
+  --color-vault-azul-profundo: #00529a;
+  --color-vault-azul-tinta: #0b4b85;
+  --color-vault-azul-lavado: #eaf2fa;
 
-  --color-indigo-50: #f8fafc;
-  --color-indigo-100: #f1f5f9;
-  --color-indigo-200: #e2e8f0;
-  --color-indigo-300: #cbd5e1;
-  --color-indigo-400: #94a3b8;
-  --color-indigo-500: #64748b;
-  --color-indigo-600: #475569;
-  --color-indigo-700: #334155;
-  --color-indigo-800: #1e293b;
-  --color-indigo-900: #0f172a;
-  --color-indigo-950: #020617;
+  /* Papel: superficies claras */
+  --color-vault-papel: #f5f3ee;
+  --color-vault-papel-2: #eceae3;
+  --color-vault-papel-3: #ddd9cf;
+  --color-vault-tinta: #1a2530;
 
-  --color-violet-50: #f8fafc;
-  --color-violet-100: #f1f5f9;
-  --color-violet-200: #e2e8f0;
-  --color-violet-300: #cbd5e1;
-  --color-violet-400: #94a3b8;
-  --color-violet-500: #64748b;
-  --color-violet-600: #475569;
-  --color-violet-700: #334155;
-  --color-violet-800: #1e293b;
-  --color-violet-900: #0f172a;
-  --color-violet-950: #020617;
+  /* Estados mínimos */
+  --color-estado-ok: #1f7a4d;
+  --color-estado-ok-lavado: #e9f3ee;
+  --color-estado-alerta: #8a5f08;
+  --color-estado-alerta-lavado: #faf1de;
+  --color-estado-error: #b3261e;
+  --color-estado-error-lavado: #fbeceb;
 
-  --color-purple-50: #f8fafc;
-  --color-purple-100: #f1f5f9;
-  --color-purple-200: #e2e8f0;
-  --color-purple-300: #cbd5e1;
-  --color-purple-400: #94a3b8;
-  --color-purple-500: #64748b;
-  --color-purple-600: #475569;
-  --color-purple-700: #334155;
-  --color-purple-800: #1e293b;
-  --color-purple-900: #0f172a;
-  --color-purple-950: #020617;
-
-  --color-fuchsia-50: #f8fafc;
-  --color-fuchsia-100: #f1f5f9;
-  --color-fuchsia-200: #e2e8f0;
-  --color-fuchsia-300: #cbd5e1;
-  --color-fuchsia-400: #94a3b8;
-  --color-fuchsia-500: #64748b;
-  --color-fuchsia-600: #475569;
-  --color-fuchsia-700: #334155;
-  --color-fuchsia-800: #1e293b;
-  --color-fuchsia-900: #0f172a;
-  --color-fuchsia-950: #020617;
-
-  --color-pink-50: #f8fafc;
-  --color-pink-100: #f1f5f9;
-  --color-pink-200: #e2e8f0;
-  --color-pink-300: #cbd5e1;
-  --color-pink-400: #94a3b8;
-  --color-pink-500: #64748b;
-  --color-pink-600: #475569;
-  --color-pink-700: #334155;
-  --color-pink-800: #1e293b;
-  --color-pink-900: #0f172a;
-  --color-pink-950: #020617;
-
-  --color-rose-50: #f8fafc;
-  --color-rose-100: #f1f5f9;
-  --color-rose-200: #e2e8f0;
-  --color-rose-300: #cbd5e1;
-  --color-rose-400: #94a3b8;
-  --color-rose-500: #64748b;
-  --color-rose-600: #475569;
-  --color-rose-700: #334155;
-  --color-rose-800: #1e293b;
-  --color-rose-900: #0f172a;
-  --color-rose-950: #020617;
-
-  --color-red-50: #f8fafc;
-  --color-red-100: #f1f5f9;
-  --color-red-200: #e2e8f0;
-  --color-red-300: #cbd5e1;
-  --color-red-400: #94a3b8;
-  --color-red-500: #64748b;
-  --color-red-600: #475569;
-  --color-red-700: #334155;
-  --color-red-800: #1e293b;
-  --color-red-900: #0f172a;
-  --color-red-950: #020617;
-
-  --color-orange-50: #f8fafc;
-  --color-orange-100: #f1f5f9;
-  --color-orange-200: #e2e8f0;
-  --color-orange-300: #cbd5e1;
-  --color-orange-400: #94a3b8;
-  --color-orange-500: #64748b;
-  --color-orange-600: #475569;
-  --color-orange-700: #334155;
-  --color-orange-800: #1e293b;
-  --color-orange-900: #0f172a;
-  --color-orange-950: #020617;
-
-  --color-amber-50: #f8fafc;
-  --color-amber-100: #f1f5f9;
-  --color-amber-200: #e2e8f0;
-  --color-amber-300: #cbd5e1;
-  --color-amber-400: #94a3b8;
-  --color-amber-500: #64748b;
-  --color-amber-600: #475569;
-  --color-amber-700: #334155;
-  --color-amber-800: #1e293b;
-  --color-amber-900: #0f172a;
-  --color-amber-950: #020617;
-
-  --color-yellow-50: #f8fafc;
-  --color-yellow-100: #f1f5f9;
-  --color-yellow-200: #e2e8f0;
-  --color-yellow-300: #cbd5e1;
-  --color-yellow-400: #94a3b8;
-  --color-yellow-500: #64748b;
-  --color-yellow-600: #475569;
-  --color-yellow-700: #334155;
-  --color-yellow-800: #1e293b;
-  --color-yellow-900: #0f172a;
-  --color-yellow-950: #020617;
-
-  --color-lime-50: #f8fafc;
-  --color-lime-100: #f1f5f9;
-  --color-lime-200: #e2e8f0;
-  --color-lime-300: #cbd5e1;
-  --color-lime-400: #94a3b8;
-  --color-lime-500: #64748b;
-  --color-lime-600: #475569;
-  --color-lime-700: #334155;
-  --color-lime-800: #1e293b;
-  --color-lime-900: #0f172a;
-  --color-lime-950: #020617;
-
-  --color-green-50: #f8fafc;
-  --color-green-100: #f1f5f9;
-  --color-green-200: #e2e8f0;
-  --color-green-300: #cbd5e1;
-  --color-green-400: #94a3b8;
-  --color-green-500: #64748b;
-  --color-green-600: #475569;
-  --color-green-700: #334155;
-  --color-green-800: #1e293b;
-  --color-green-900: #0f172a;
-  --color-green-950: #020617;
-
-  --color-emerald-50: #f8fafc;
-  --color-emerald-100: #f1f5f9;
-  --color-emerald-200: #e2e8f0;
-  --color-emerald-300: #cbd5e1;
-  --color-emerald-400: #94a3b8;
-  --color-emerald-500: #64748b;
-  --color-emerald-600: #475569;
-  --color-emerald-700: #334155;
-  --color-emerald-800: #1e293b;
-  --color-emerald-900: #0f172a;
-  --color-emerald-950: #020617;
-
-  --color-teal-50: #f8fafc;
-  --color-teal-100: #f1f5f9;
-  --color-teal-200: #e2e8f0;
-  --color-teal-300: #cbd5e1;
-  --color-teal-400: #94a3b8;
-  --color-teal-500: #64748b;
-  --color-teal-600: #475569;
-  --color-teal-700: #334155;
-  --color-teal-800: #1e293b;
-  --color-teal-900: #0f172a;
-  --color-teal-950: #020617;
-
-  /* Tokens institucionales remapeados a monocromo. */
-  --color-vault-azul: #f4f4f5;
-  --color-vault-azul-profundo: #d4d4d8;
-  --color-vault-azul-tinta: #e4e4e7;
-  --color-vault-azul-lavado: rgba(255, 255, 255, 0.07);
-  --color-vault-papel: #09090b;
-  --color-vault-papel-2: #111114;
-  --color-vault-papel-3: #27272a;
-  --color-vault-tinta: #fafafa;
-  --color-tinta-950: #fafafa;
-  --color-tinta-900: #f4f4f5;
-  --color-tinta-800: #e4e4e7;
-  --color-tinta-700: #d4d4d8;
-  --color-tinta-600: #a1a1aa;
-  --color-tinta-500: #a1a1aa;
-  --color-tinta-400: #71717a;
-  --color-tinta-300: #52525b;
-  --color-estado-ok: #e4e4e7;
-  --color-estado-ok-lavado: rgba(255, 255, 255, 0.08);
-  --color-estado-alerta: #d4d4d8;
-  --color-estado-alerta-lavado: rgba(255, 255, 255, 0.08);
-  --color-estado-error: #f4f4f5;
-  --color-estado-error-lavado: rgba(255, 255, 255, 0.08);
-  --shadow-ficha: 0 1px 2px rgba(0, 0, 0, 0.5), 0 18px 42px -28px rgba(0, 0, 0, 0.9);
-  --shadow-ficha-alta: 0 2px 6px rgba(0, 0, 0, 0.55), 0 28px 60px -30px rgba(0, 0, 0, 0.95);
-  --shadow-sello: 0 18px 44px -26px rgba(0, 0, 0, 0.95);
+  /* Elevaciones discretas */
+  --shadow-ficha:
+    0 1px 2px rgba(18, 32, 46, 0.04), 0 6px 18px -12px rgba(18, 32, 46, 0.22);
+  --shadow-ficha-alta:
+    0 2px 4px rgba(18, 32, 46, 0.05), 0 16px 32px -18px rgba(18, 32, 46, 0.3);
+  --shadow-sello: 0 8px 20px -12px rgba(18, 32, 46, 0.45);
 }
 
 @layer base {
   :root {
     --sigd-altura-cabecera: 91px;
     --sigd-ancho-rail: 16.5rem;
-    --cyber-line: rgba(255, 255, 255, 0.12);
-    --cyber-surface: rgba(9, 9, 11, 0.78);
   }
 
   @media (max-width: 767px) {
@@ -268,29 +78,24 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   body {
     min-height: 100vh;
-    background-color: #050506;
-    background-image:
-      radial-gradient(1100px 620px at 12% -12%, rgba(255, 255, 255, 0.085), transparent 62%),
-      radial-gradient(900px 520px at 108% 0%, rgba(255, 255, 255, 0.055), transparent 58%),
-      linear-gradient(180deg, #050506 0%, #08080a 46%, #050506 100%);
-    background-attachment: fixed;
-    color: #f4f4f5;
+    background-image: linear-gradient(to bottom right, #0f172a, #172554, #020617);
+    color: #12202e;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     @apply min-h-screen antialiased;
   }
 
   ::selection {
-    background-color: #fafafa;
-    color: #050506;
+    background-color: #006ec7;
+    color: #ffffff;
   }
 
   :focus-visible {
-    outline: 2px solid rgba(255, 255, 255, 0.75);
+    outline: 2px solid #006ec7;
     outline-offset: 2px;
   }
 
@@ -299,96 +104,92 @@
     height: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: transparent;
+    background: #f1f5f9;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: #cbd5e1;
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.34);
+    background: #94a3b8;
   }
 
   .scroll-tinta {
-    scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+    scrollbar-color: #cbd5e1 #f1f5f9;
     scrollbar-width: thin;
   }
 }
 
 @layer components {
   .glass-card {
-    background: rgba(12, 12, 14, 0.72);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 26px 60px -38px rgba(0, 0, 0, 0.95),
-      inset 0 1px 0 rgba(255, 255, 255, 0.07);
-    @apply rounded-2xl transition-all duration-300 ease-out;
+    background: rgba(15, 23, 42, 0.75); /* slate-900 with 75% opacity */
+    border: 1px solid rgba(6, 182, 212, 0.25); /* cyan-500 with 25% opacity */
+    color: #ffffff; /* bright white text */
+    @apply rounded-xl transition-all duration-300 ease-out;
   }
 
   .glass-card:hover {
-    border-color: rgba(255, 255, 255, 0.28);
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 32px 70px -36px rgba(0, 0, 0, 1),
-      0 0 34px rgba(255, 255, 255, 0.06);
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     transform: translateY(-2px);
   }
 
   .cyber-panel {
-    background: linear-gradient(180deg, rgba(18, 18, 21, 0.86), rgba(8, 8, 10, 0.9));
-    border: 1px solid rgba(255, 255, 255, 0.11);
-    box-shadow: 0 30px 70px -44px rgba(0, 0, 0, 1), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    @apply rounded-2xl;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    @apply rounded-xl;
   }
 
   .cyber-chip {
     @apply inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em];
-    border-color: rgba(255, 255, 255, 0.18);
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.82);
+    border-color: #cbd5e1;
+    background: #f1f5f9;
+    color: #33465a;
   }
 
   .btn-cyber {
     @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-300 active:scale-[0.98];
-    background: #fafafa;
-    color: #09090b;
-    border: 1px solid #fafafa;
-    box-shadow: 0 10px 34px -18px rgba(255, 255, 255, 0.65);
+    background: #006ec7;
+    border: 1px solid #00529a;
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 110, 199, 0.24);
   }
 
   .btn-cyber:hover {
-    background: #e4e4e7;
-    border-color: #e4e4e7;
-    box-shadow: 0 14px 40px -16px rgba(255, 255, 255, 0.45);
+    background: #00529a;
+    border-color: #00407a;
+    box-shadow: 0 4px 12px rgba(0, 110, 199, 0.28);
   }
 
   .btn-ghost-cyber {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 active:scale-[0.98];
-    border-color: rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(10px);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold text-600 transition-all duration-300 active:scale-[0.98];
+    border-color: #cbd5e1;
+    background: #ffffff;
+    color: #33465a;
   }
 
   .btn-ghost-cyber:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.42);
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #006ec7;
   }
 
   .input-cyber {
-    @apply w-full rounded-xl px-4 py-2.5 text-sm text-zinc-100 outline-none transition-all duration-200 placeholder:text-zinc-500;
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    @apply w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all duration-200 placeholder:text-500;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #12202e;
   }
 
   .input-cyber:focus {
-    border-color: rgba(255, 255, 255, 0.62);
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+    border-color: #006ec7;
+    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.12);
   }
 
   .cyber-separator {
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+    background: linear-gradient(90deg, transparent, #cbd5e1, transparent);
   }
 }
 
@@ -399,58 +200,57 @@
 
   .glass-card-dark,
   .dark-glass {
-    background: rgba(9, 9, 11, 0.78);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 18px 45px -30px rgba(0, 0, 0, 0.95);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    @apply rounded-xl;
   }
 
   .admin-dark {
-    color: #e4e4e7;
+    color: #12202e;
   }
   .admin-dark .bg-slate-100,
   .admin-dark .bg-slate-50,
   .admin-dark.bg-slate-100 {
-    background-color: #09090b !important;
+    background-color: #ffffff !important;
   }
   .admin-dark .bg-white,
   .admin-dark.bg-white {
-    background-color: rgba(12, 12, 14, 0.8) !important;
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background-color: rgba(15, 23, 42, 0.6) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
   .admin-dark .border-slate-200,
   .admin-dark .border-slate-100,
   .admin-dark .border-slate-300 {
-    border-color: rgba(255, 255, 255, 0.14) !important;
+    border-color: rgba(6, 182, 212, 0.22) !important;
   }
   .admin-dark .text-slate-900,
-  .admin-dark .text-slate-800 { color: #fafafa !important; }
+  .admin-dark .text-slate-800 { color: #ffffff !important; }
   .admin-dark .text-slate-700,
-  .admin-dark .text-slate-600 { color: #d4d4d8 !important; }
+  .admin-dark .text-slate-600 { color: #cbd5e1 !important; }
   .admin-dark .text-slate-500,
-  .admin-dark .text-slate-400 { color: #a1a1aa !important; }
+  .admin-dark .text-slate-400 { color: #a5f3fc !important; }
   .admin-dark .shadow-sm,
-  .admin-dark .shadow { box-shadow: 0 18px 45px -30px rgba(0,0,0,.95) !important; }
+  .admin-dark .shadow { box-shadow: 0 0 15px rgba(6, 182, 212, 0.15) !important; }
   .admin-dark input,
   .admin-dark select,
   .admin-dark textarea {
-    background-color: rgba(0, 0, 0, 0.4) !important;
-    color: #f4f4f5 !important;
-    border-color: rgba(255, 255, 255, 0.14) !important;
+    background-color: rgba(15, 23, 42, 0.6) !important;
+    color: #ffffff !important;
+    border-color: rgba(6, 182, 212, 0.28) !important;
   }
   .admin-dark input::placeholder,
-  .admin-dark textarea::placeholder { color: #71717a !important; }
-  .admin-dark table thead th { color: #a1a1aa !important; }
-  .admin-dark table tbody tr { border-color: rgba(255,255,255,0.08) !important; }
+  .admin-dark textarea::placeholder { color: #94a3b8 !important; }
+  .admin-dark table thead th { color: #a5f3fc !important; }
+  .admin-dark table tbody tr { border-color: rgba(6, 182, 212, 0.16) !important; }
   .admin-dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
   .admin-dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
-    border-color: rgba(255,255,255,0.08) !important;
+    border-color: rgba(6, 182, 212, 0.16) !important;
   }
   .admin-dark .hover\:bg-slate-50:hover,
   .admin-dark .hover\:bg-slate-100:hover {
-    background-color: rgba(255, 255, 255, 0.08) !important;
+    background-color: rgba(6, 182, 212, 0.1) !important;
   }
 
   .glass-card-hover {
@@ -459,7 +259,7 @@
   .glass-card-hover:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-ficha-alta);
-    border-color: rgba(255, 255, 255, 0.28);
+    border-color: rgba(34, 211, 238, 0.45);
   }
 
   .suiza-badge {
@@ -527,19 +327,19 @@
 
   .cyber-grid {
     background-image:
-      linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+      linear-gradient(rgba(6, 182, 212, 0.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(6, 182, 212, 0.09) 1px, transparent 1px);
     background-size: 52px 52px;
-    -webkit-mask-image: radial-gradient(ellipse at center, #000 12%, transparent 76%);
-    mask-image: radial-gradient(ellipse at center, #000 12%, transparent 76%);
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 18%, transparent 78%);
+    mask-image: radial-gradient(ellipse at center, #000 18%, transparent 78%);
   }
 
   .cyber-glow {
-    box-shadow: 0 0 45px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 28px rgba(6, 182, 212, 0.22), inset 0 1px 0 rgba(165, 243, 252, 0.16);
   }
 
   .cyber-text-glow {
-    text-shadow: 0 0 38px rgba(255, 255, 255, 0.28);
+    text-shadow: 0 0 28px rgba(34, 211, 238, 0.45);
   }
 }
 
@@ -550,7 +350,7 @@
    heredadas que usan superficies claras o acentos cromáticos.
    -------------------------------------------------------------------------- */
 .sigd-cyber {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 /* Superficies claras -> vidrio oscuro */
@@ -568,10 +368,8 @@
 .sigd-cyber .bg-white\/95,
 .sigd-cyber .bg-slate-50\/80,
 .sigd-cyber .bg-slate-100\/80 {
-  background-color: rgba(10, 10, 12, 0.82) !important;
-  border-color: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
 }
 
 /* Acentos cromáticos usados como fondo -> panel neutro */
@@ -593,9 +391,9 @@
 .sigd-cyber [class*="bg-emerald-"],
 .sigd-cyber [class*="bg-teal-"],
 .sigd-cyber [class*="bg-[#"] {
-  background-color: rgba(255, 255, 255, 0.06) !important;
-  color: #fafafa;
-  border-color: rgba(255, 255, 255, 0.14);
+  background-color: #ffffff !important;
+  color: #12202e !important;
+  border-color: #e2e8f0 !important;
 }
 
 /* Botones sólidos heredados: fondo claro + texto oscuro para contraste */

@@ -157,7 +157,7 @@ export default function HomePage() {
   const esInterno = Boolean(rol) && ROLES_ADMIN.includes(rol as string);
 
   return (
-    <main className="relative bg-transparent text-zinc-100">
+    <main className="relative bg-white text-ink">
       <HeroInstitucional />
       {!esInterno && <AccesosCiudadano />}
       <AccesosModulosInternos />
