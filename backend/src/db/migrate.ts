@@ -56,6 +56,8 @@ export const MANIFIESTO_BASELINE = [
   '28_sigd_tupa_versionado_organizacional.sql',
   '29_sigd_tupa_datos_oficiales.sql',
   '30_sigd_devolucion_monto_autorizado_check.sql',
+  '31_sigd_vinculos_institucionales.sql',
+  '32_sigd_vinculos_indice_anulado_por.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }
