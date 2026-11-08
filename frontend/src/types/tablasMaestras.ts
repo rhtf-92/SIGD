@@ -5,7 +5,7 @@ export type TipoTabla = "Sedes" | "Áreas" | "Tipos documentales";
 export type EstadoRegistro = "Activo" | "Inactivo";
 
 export interface RegistroMaestro {
-  id: number;
+  id: string;
   tipo: TipoTabla;
   codigo: string;
   nombre: string;

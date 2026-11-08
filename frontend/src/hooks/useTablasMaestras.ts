@@ -1,4 +1,6 @@
 // Hook de Tablas Maestras y Catálogos Paramétricos (ENT-M05-05)
+// Conectado a la API real del backend (sigd_org.tabla_maestra).
+// Cada creación/inactivación se persiste en PostgreSQL y se refleja inmediatamente.
 import { useEffect, useMemo, useState } from "react";
 
 import { apiClient } from "../api/client";
@@ -24,24 +26,8 @@ export const ORGANIGRAMA_MATERIALIZED_PATH = [
   { id: 6, codigo: "ARE-006", nombre: "Coordinación DSI", ruta: "01.03.02", detalle: "Unidad académica formativa de sistemas.", estado: "Activo" },
 ] satisfies AreaOrganica[];
 
-const registrosIniciales: RegistroMaestro[] = [
-  { id: 1, tipo: "Sedes", codigo: "SED-001", nombre: "Sede Principal", detalle: "Campus central de Pucallpa (Av. Centenario Km 3.5).", estado: "Activo" },
-  { id: 2, tipo: "Áreas", codigo: "ARE-001", nombre: "Dirección General", detalle: "Nivel superior", estado: "Activo" },
-  { id: 3, tipo: "Áreas", codigo: "ARE-002", nombre: "Secretaría Académica", detalle: "Depende de Dirección General", estado: "Activo" },
-  { id: 4, tipo: "Áreas", codigo: "ARE-003", nombre: "Mesa de Partes", detalle: "Depende de Administración", estado: "Activo" },
-  { id: 5, tipo: "Áreas", codigo: "ARE-004", nombre: "Administración", detalle: "Gestión financiera y logística", estado: "Activo" },
-  { id: 6, tipo: "Áreas", codigo: "ARE-005", nombre: "Archivo Central", detalle: "Custodia histórica (AGN)", estado: "Activo" },
-  { id: 7, tipo: "Áreas", codigo: "ARE-006", nombre: "Coordinación DSI", detalle: "Unidad académica formativa", estado: "Activo" },
-  { id: 8, tipo: "Tipos documentales", codigo: "SOL", nombre: "Solicitud", detalle: "Escrito del administrado que inicia un trámite.", estado: "Activo" },
-  { id: 9, tipo: "Tipos documentales", codigo: "OFI", nombre: "Oficio", detalle: "Comunicación externa con otras entidades del Estado.", estado: "Activo" },
-  { id: 10, tipo: "Tipos documentales", codigo: "MEMO", nombre: "Memorando", detalle: "Comunicación interna de gestión.", estado: "Activo" },
-  { id: 11, tipo: "Tipos documentales", codigo: "INF", nombre: "Informe Técnico / Legal", detalle: "Documento de sustento pericial o académico.", estado: "Activo" },
-  { id: 12, tipo: "Tipos documentales", codigo: "RD", nombre: "Resolución Directoral", detalle: "Acto resolutivo de máxima jerarquía institucional.", estado: "Activo" },
-  { id: 13, tipo: "Tipos documentales", codigo: "ACT", nombre: "Acta de Notas / Evaluación", detalle: "Registro oficial e inalterable de calificaciones.", estado: "Inactivo" },
-];
-
 export function useTablasMaestras() {
-  const [registros, setRegistros] = useState(registrosIniciales);
+  const [registros, setRegistros] = useState<RegistroMaestro[]>([]);
   const [tipoActivo, setTipoActivo] = useState<TipoTabla>("Sedes");
   const [busqueda, setBusqueda] = useState("");
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -49,8 +35,13 @@ export function useTablasMaestras() {
   const [nombre, setNombre] = useState("");
   const [detalle, setDetalle] = useState("");
   const [mensaje, setMensaje] = useState("");
+  const [cargando, setCargando] = useState(false);
 
   const [areasOrganicas, setAreasOrganicas] = useState<AreaOrganica[]>(ORGANIGRAMA_MATERIALIZED_PATH);
+
+  /* ------------------------------------------------------------------ */
+  /* Carga inicial de áreas orgánicas (órganigrama)                     */
+  /* ------------------------------------------------------------------ */
 
   useEffect(() => {
     let montado = true;
@@ -87,6 +78,42 @@ export function useTablasMaestras() {
     };
   }, []);
 
+  /* ------------------------------------------------------------------ */
+  /* Cargar registros reales de un tipo desde el backend                */
+  /* ------------------------------------------------------------------ */
+
+  const cargarRegistros = async (tipo: TipoTabla) => {
+    setCargando(true);
+    try {
+      const { data } = await apiClient.get<RegistroMaestro[]>(
+        `/api/v1/admin/tablas-maestras/${encodeURIComponent(tipo)}/registros`,
+      );
+      setRegistros(
+        data.map((r) => ({
+          id: r.id,
+          tipo: r.tipo as TipoTabla,
+          codigo: r.codigo,
+          nombre: r.nombre,
+          detalle: r.detalle ?? "",
+          estado: r.estado as EstadoRegistro,
+        })),
+      );
+    } catch (error) {
+      console.error("[useTablasMaestras] Error cargando registros:", error);
+      setMensaje("No se pudieron cargar los registros de la base de datos.");
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarRegistros(tipoActivo);
+  }, [tipoActivo]);
+
+  /* ------------------------------------------------------------------ */
+  /* Filtros                                                            */
+  /* ------------------------------------------------------------------ */
+
   const filtrados = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
 
@@ -107,54 +134,86 @@ export function useTablasMaestras() {
     setMensaje("");
   }
 
-  // Invariante SIGD-DOC-ADMIN-SEGURIDAD-AUDITORIA-02:
-  // prohibido el borrado físico; solo inactivación (borrado lógico).
-  function alternarEstado(id: number) {
+  /* ------------------------------------------------------------------ */
+  /* Alternar estado (Activo <-> Inactivo) — borrado lógico real         */
+  /* ------------------------------------------------------------------ */
+
+  async function alternarEstado(id: string) {
     setMensaje("");
-    setRegistros((actuales) =>
-      actuales.map((registro) =>
-        registro.id === id
-          ? {
-              ...registro,
-              estado: (registro.estado === "Activo"
-                ? "Inactivo"
-                : "Activo") as EstadoRegistro,
-            }
-          : registro,
-      ),
-    );
-    const registro = registros.find((item) => item.id === id);
-    if (registro) {
-      setMensaje(
-        `Registro ${registro.codigo} ${
-          registro.estado === "Activo" ? "desactivado (borrado lógico)" : "reactivado"
-        }. Los históricos preservan su trazabilidad.`,
+    try {
+      const { data } = await apiClient.patch<RegistroMaistroActualizado>(
+        `/api/v1/admin/tablas-maestras/${id}/estado`,
       );
+
+      setRegistros((actuales) =>
+        actuales.map((registro) =>
+          registro.id === data.id
+            ? {
+                ...registro,
+                estado: data.estado as EstadoRegistro,
+              }
+            : registro,
+        ),
+      );
+
+      const registro = registros.find((item) => item.id === id);
+      if (registro) {
+        setMensaje(
+          `Registro ${registro.codigo} ${
+            data.estado === "Activo" ? "activado" : "inactivado (borrado lógico)"
+          }. Los históricos preservan su trazabilidad.`,
+        );
+      }
+    } catch (error) {
+      console.error("[useTablasMaestras] Error alternando estado:", error);
+      setMensaje("No se pudo cambiar el estado del registro.");
     }
   }
 
-  function crearRegistro() {
+  /* ------------------------------------------------------------------ */
+  /* Crear registro real en el backend                                  */
+  /* ------------------------------------------------------------------ */
+
+  async function crearRegistro() {
     if (!codigo.trim() || !nombre.trim()) return;
 
-    setRegistros((actuales) => [
-      ...actuales,
-      {
-        id: Math.max(0, ...actuales.map((registro) => registro.id)) + 1,
+    setCargando(true);
+    try {
+      const { data } = await apiClient.post<RegistroMaestro>("/api/v1/admin/tablas-maestras", {
         tipo: tipoActivo,
         codigo: codigo.trim().toUpperCase(),
         nombre: nombre.trim(),
-        detalle: detalle.trim() || "Sin detalle",
-        estado: "Activo",
-      },
-    ]);
+        detalle: detalle.trim() || null,
+      });
 
-    setMensaje(
-      `Registro ${codigo.trim().toUpperCase()} creado correctamente en ${tipoActivo}.`,
-    );
-    setCodigo("");
-    setNombre("");
-    setDetalle("");
-    setMostrarFormulario(false);
+      setRegistros((actuales) => [
+        ...actuales,
+        {
+          id: data.id,
+          tipo: data.tipo as TipoTabla,
+          codigo: data.codigo,
+          nombre: data.nombre,
+          detalle: data.detalle ?? "",
+          estado: data.estado as EstadoRegistro,
+        },
+      ]);
+
+      setMensaje(
+        `Registro ${codigo.trim().toUpperCase()} creado correctamente en ${tipoActivo}.`,
+      );
+      setCodigo("");
+      setNombre("");
+      setDetalle("");
+      setMostrarFormulario(false);
+    } catch (error: any) {
+      console.error("[useTablasMaestras] Error creando registro:", error);
+      setMensaje(
+        error?.response?.data?.detail ||
+        "No se pudo crear el registro. Verifique que el código no esté duplicado.",
+      );
+    } finally {
+      setCargando(false);
+    }
   }
 
   return {
@@ -177,5 +236,11 @@ export function useTablasMaestras() {
     setMensaje,
     crearRegistro,
     alternarEstado,
+    cargando,
   };
+}
+
+interface RegistroMaistroActualizado {
+  id: string;
+  estado: string;
 }
