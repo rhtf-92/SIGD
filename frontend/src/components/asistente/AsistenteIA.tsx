@@ -65,7 +65,7 @@ export default function AsistenteIA() {
   const recRef = useRef<ReconocimientoVoz | null>(null);
   const [burbujaVisible, setBurbujaVisible] = useState(false);
   const saludadoRef = useRef(false);
-  const ultimaInteraccionRef = useRef(Date.now());
+  const ultimaInteraccionRef = useRef(0);
   const inactividadRef = useRef<number | null>(null);
 
   const registrarInteraccion = () => {
@@ -100,10 +100,6 @@ export default function AsistenteIA() {
   }, []);
 
   useEffect(() => {
-    if (abierto) setBurbujaVisible(false);
-  }, [abierto]);
-
-  useEffect(() => {
     if (abierto) finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [mensajes.length, abierto, escribiendo]);
 
@@ -120,7 +116,9 @@ export default function AsistenteIA() {
             enviar("Necesito soporte técnico: tengo un bug, error o la página se congeló. Por favor guíame paso a paso para solucionarlo.");
           }
         }, 250);
-      } catch {}
+      } catch {
+        // entorno sin temporizadores disponibles
+      }
     };
     window.addEventListener("sigd:abrir-ayuda", abrir);
     window.addEventListener("sigd:abrir-soporte", abrirSoporte as EventListener);

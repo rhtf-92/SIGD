@@ -83,7 +83,8 @@
 
   body {
     min-height: 100vh;
-    background-image: linear-gradient(to bottom right, #0f172a, #172554, #020617);
+    background-color: #f5f3ee;
+    background-image: radial-gradient(circle at 50% 0%, #ffffff 0%, #f5f3ee 55%, #eceae3 100%);
     color: #12202e;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     @apply min-h-screen antialiased;
@@ -122,15 +123,16 @@
 
 @layer components {
   .glass-card {
-    background: rgba(15, 23, 42, 0.75); /* slate-900 with 75% opacity */
-    border: 1px solid rgba(6, 182, 212, 0.25); /* cyan-500 with 25% opacity */
-    color: #ffffff; /* bright white text */
+    background: #ffffff;
+    border: 1px solid #ddd9cf;
+    color: #12202e;
+    box-shadow: 0 1px 2px rgba(18, 32, 46, 0.04), 0 6px 18px -12px rgba(18, 32, 46, 0.22);
     @apply rounded-xl transition-all duration-300 ease-out;
   }
 
   .glass-card:hover {
-    border-color: #cbd5e1;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #c3bcac;
+    box-shadow: 0 2px 4px rgba(18, 32, 46, 0.05), 0 16px 32px -18px rgba(18, 32, 46, 0.3);
     transform: translateY(-2px);
   }
 
@@ -143,9 +145,9 @@
 
   .cyber-chip {
     @apply inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em];
-    border-color: #cbd5e1;
-    background: #f1f5f9;
-    color: #33465a;
+    border-color: #cfe1f3;
+    background: #eaf2fa;
+    color: #0b4b85;
   }
 
   .btn-cyber {
@@ -163,7 +165,7 @@
   }
 
   .btn-ghost-cyber {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold text-600 transition-all duration-300 active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold transition-all duration-300 active:scale-[0.98];
     border-color: #cbd5e1;
     background: #ffffff;
     color: #33465a;
@@ -176,7 +178,7 @@
   }
 
   .input-cyber {
-    @apply w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all duration-200 placeholder:text-500;
+    @apply w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all duration-200;
     background: #ffffff;
     border: 1px solid #cbd5e1;
     color: #12202e;
@@ -327,19 +329,19 @@
 
   .cyber-grid {
     background-image:
-      linear-gradient(rgba(6, 182, 212, 0.09) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(6, 182, 212, 0.09) 1px, transparent 1px);
+      linear-gradient(rgba(0, 110, 199, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 110, 199, 0.06) 1px, transparent 1px);
     background-size: 52px 52px;
-    -webkit-mask-image: radial-gradient(ellipse at center, #000 18%, transparent 78%);
-    mask-image: radial-gradient(ellipse at center, #000 18%, transparent 78%);
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 12%, transparent 72%);
+    mask-image: radial-gradient(ellipse at center, #000 12%, transparent 72%);
   }
 
   .cyber-glow {
-    box-shadow: 0 0 28px rgba(6, 182, 212, 0.22), inset 0 1px 0 rgba(165, 243, 252, 0.16);
+    box-shadow: 0 0 28px rgba(0, 110, 199, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   }
 
   .cyber-text-glow {
-    text-shadow: 0 0 28px rgba(34, 211, 238, 0.45);
+    text-shadow: 0 0 28px rgba(0, 110, 199, 0.25);
   }
 }
 

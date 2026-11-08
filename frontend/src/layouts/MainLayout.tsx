@@ -17,9 +17,9 @@ interface MainLayoutProps {
  */
 export default function MainLayout({ children }: MainLayoutProps) {
   return (
-    <div className="relative flex min-h-screen flex-col bg-white text-ink">
+    <div className="relative flex min-h-screen flex-col bg-vault-papel text-ink">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="cyber-grid animate-grid absolute inset-0 opacity-30" />
+        <div className="cyber-grid absolute inset-0 opacity-40" />
       </div>
 
       <div className="relative z-10 flex min-h-screen flex-col">
