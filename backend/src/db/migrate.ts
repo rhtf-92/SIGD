@@ -58,6 +58,7 @@ export const MANIFIESTO_BASELINE = [
   '30_sigd_devolucion_monto_autorizado_check.sql',
   '31_sigd_vinculos_institucionales.sql',
   '32_sigd_vinculos_indice_anulado_por.sql',
+  '33_sigd_organizacion_responsabilidades.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }
