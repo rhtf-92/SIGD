@@ -59,6 +59,8 @@ export const MANIFIESTO_BASELINE = [
   '31_sigd_vinculos_institucionales.sql',
   '32_sigd_vinculos_indice_anulado_por.sql',
   '33_sigd_organizacion_responsabilidades.sql',
+  '34_sigd_autorizacion_perfiles_operativos.sql',
+  '35_sigd_autorizador_devolucion_perfil.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }

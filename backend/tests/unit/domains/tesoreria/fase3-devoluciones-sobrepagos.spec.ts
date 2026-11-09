@@ -40,7 +40,36 @@ describe('SIGD 2026 — FASE 3: Devoluciones, Sobrepagos y Pagos Adicionales', (
 
     pool = {
       connect: vi.fn().mockResolvedValue(mockClient),
-      query: vi.fn().mockResolvedValue({ rows: [] }),
+      query: vi.fn().mockImplementation((sql: any, params?: any[]) => {
+        const sqlStr = typeof sql === 'string' ? sql : sql?.text || '';
+        if (sqlStr.includes('FROM sigd_auth.cuenta_usuario')) {
+          const uid = params?.[0] || 'mock-user';
+          return { rows: [{ id_usuario: uid, usuario: 'mock.user', correo: 'user@iestp.edu.pe', activo: true }] };
+        }
+        if (sqlStr.includes('asignacion_perfil_operativo')) {
+          const uid = params?.[0];
+          const isTeso = uid === mockUsuarioTesorero;
+          return {
+            rows: [
+              {
+                id_asignacion_perfil: 'asig-perf-01',
+                perfil_id: isTeso ? 6 : 7,
+                perfil_codigo: isTeso ? 'GESTOR_TESORERIA' : 'AUTORIZADOR_DEVOLUCION',
+                perfil_nombre: isTeso ? 'Gestor de Tesorería' : 'Autorizador de Devolución',
+                area_id: null,
+                scope: 'INSTITUCIONAL',
+                id_responsabilidad: null,
+                estado: 'ACTIVO',
+                vigente_desde: '2026-01-01',
+                vigente_hasta: null,
+                permisos: isTeso ? ['DEVOLUCION_EJECUTAR', 'PAGO_VER'] : ['DEVOLUCION_AUTORIZAR', 'DEVOLUCION_REVISAR'],
+                alcance: null,
+              },
+            ],
+          };
+        }
+        return { rows: [] };
+      }),
     } as unknown as Pool;
 
     repository = new TesoreriaRepository();

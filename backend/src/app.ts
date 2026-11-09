@@ -52,6 +52,7 @@ import { crearRouterAuth } from './domains/identicore/auth.router.js';
 import { crearRouterCasilla } from './domains/identicore/casilla.router.js';
 import { crearRouterVinculosInstitucionales } from './domains/identicore/vinculoInstitucional.router.js';
 import { crearRouterOrganizacion } from './domains/organicore/organizacion.router.js';
+import { crearRouterAutorizacion } from './core/auth/authorization.router.js';
 import { crearRouterTesoreria } from './domains/tesoreria/tesoreria.router.js';
 import { crearRouterCheckoutDemo } from './domains/tesoreria/providers/demo-qr.checkout.js';
 
@@ -232,6 +233,7 @@ export function construirApp(
   app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
   app.use('/api/v1', crearRouterVinculosInstitucionales(pool));
   app.use('/api/v1', crearRouterOrganizacion(pool));
+  app.use('/api/v1', crearRouterAutorizacion(pool));
   app.use('/api/v1', crearRouterAuth(pool));
   app.use('/api/v1', crearRouterCasilla(pool));
   app.use('/api/v1', crearRouterTesoreria(pool));

@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { resolverIdentidad } from '../../core/auth/auth.guard.js';
 import { setUsuarioId } from '../../shared/request-context/request-context.js';
 import { ForbiddenError, ValidationError } from '../../shared/domain/errors/index.js';
+import { AuthorizationService } from '../../core/auth/authorization.service.js';
 import { OrganizacionService } from './organizacion.service.js';
 import type { TipoResponsabilidadTemporal, TipoUnidadOrganica } from './organizacion.types.js';
 
@@ -69,14 +70,24 @@ const anularResponsabilidadSchema = z.object({
   motivoAnulacion: z.string().min(1, 'El motivo de anulación es obligatorio').max(255),
 });
 
-function exigirRolAdministrador(req: Request): string {
+async function exigirAutorizacionOrganizacion(
+  req: Request,
+  authService: AuthorizationService,
+): Promise<string> {
   const identidad = resolverIdentidad(req);
   if (!identidad.roles.includes('ADMINISTRADOR')) {
     throw new ForbiddenError({
       message: 'Acceso restringido: se requiere rol ADMINISTRADOR para mutaciones organizacionales.',
-      detail: 'Esta autorización es provisional sobre el RBAC existente y será refinada en Fase 5D.',
+      detail: 'Filtro preliminar de compatibilidad RBAC.',
     });
   }
+
+  await authService.exigirAutorizacion({
+    usuarioId: identidad.idUsuario,
+    rolesDeclarados: identidad.roles,
+    accion: 'ORGANIZACION_GESTIONAR',
+  });
+
   setUsuarioId(identidad.idUsuario);
   return identidad.idUsuario;
 }
@@ -84,6 +95,7 @@ function exigirRolAdministrador(req: Request): string {
 export function crearRouterOrganizacion(pool: Pool): Router {
   const router = Router();
   const service = new OrganizacionService(pool);
+  const authService = new AuthorizationService(pool);
 
   // ===========================================================================
   // 1. UNIDADES ORGÁNICAS
@@ -103,7 +115,7 @@ export function crearRouterOrganizacion(pool: Pool): Router {
   });
 
   router.post('/organizacion/unidades', async (req: Request, res: Response) => {
-    const usuarioEjecutorId = exigirRolAdministrador(req);
+    const usuarioEjecutorId = await exigirAutorizacionOrganizacion(req, authService);
     const parse = crearUnidadSchema.safeParse(req.body);
     if (!parse.success) {
       throw new ValidationError({
@@ -134,7 +146,7 @@ export function crearRouterOrganizacion(pool: Pool): Router {
   });
 
   router.post('/organizacion/cargos', async (req: Request, res: Response) => {
-    const usuarioEjecutorId = exigirRolAdministrador(req);
+    const usuarioEjecutorId = await exigirAutorizacionOrganizacion(req, authService);
     const parse = crearCargoSchema.safeParse(req.body);
     if (!parse.success) {
       throw new ValidationError({
@@ -164,7 +176,7 @@ export function crearRouterOrganizacion(pool: Pool): Router {
   });
 
   router.post('/organizacion/asignaciones', async (req: Request, res: Response) => {
-    const usuarioEjecutorId = exigirRolAdministrador(req);
+    const usuarioEjecutorId = await exigirAutorizacionOrganizacion(req, authService);
     const parse = crearAsignacionSchema.safeParse(req.body);
     if (!parse.success) {
       throw new ValidationError({
@@ -178,7 +190,7 @@ export function crearRouterOrganizacion(pool: Pool): Router {
   });
 
   router.put('/organizacion/asignaciones/:id/finalizar', async (req: Request, res: Response) => {
-    const usuarioEjecutorId = exigirRolAdministrador(req);
+    const usuarioEjecutorId = await exigirAutorizacionOrganizacion(req, authService);
     const parse = finalizarAsignacionSchema.safeParse(req.body);
     if (!parse.success) {
       throw new ValidationError({
@@ -217,7 +229,7 @@ export function crearRouterOrganizacion(pool: Pool): Router {
   });
 
   router.post('/organizacion/responsabilidades-temporales', async (req: Request, res: Response) => {
-    const usuarioEjecutorId = exigirRolAdministrador(req);
+    const usuarioEjecutorId = await exigirAutorizacionOrganizacion(req, authService);
     const parse = crearResponsabilidadSchema.safeParse(req.body);
     if (!parse.success) {
       throw new ValidationError({
@@ -238,7 +250,7 @@ export function crearRouterOrganizacion(pool: Pool): Router {
   });
 
   router.put('/organizacion/responsabilidades-temporales/:id/finalizar', async (req: Request, res: Response) => {
-    const usuarioEjecutorId = exigirRolAdministrador(req);
+    const usuarioEjecutorId = await exigirAutorizacionOrganizacion(req, authService);
     const parse = finalizarResponsabilidadSchema.safeParse(req.body);
     if (!parse.success) {
       throw new ValidationError({
@@ -258,7 +270,7 @@ export function crearRouterOrganizacion(pool: Pool): Router {
   });
 
   router.put('/organizacion/responsabilidades-temporales/:id/revocar', async (req: Request, res: Response) => {
-    const usuarioEjecutorId = exigirRolAdministrador(req);
+    const usuarioEjecutorId = await exigirAutorizacionOrganizacion(req, authService);
     const parse = revocarResponsabilidadSchema.safeParse(req.body);
     if (!parse.success) {
       throw new ValidationError({
@@ -278,7 +290,7 @@ export function crearRouterOrganizacion(pool: Pool): Router {
   });
 
   router.put('/organizacion/responsabilidades-temporales/:id/anular', async (req: Request, res: Response) => {
-    const usuarioEjecutorId = exigirRolAdministrador(req);
+    const usuarioEjecutorId = await exigirAutorizacionOrganizacion(req, authService);
     const parse = anularResponsabilidadSchema.safeParse(req.body);
     if (!parse.success) {
       throw new ValidationError({

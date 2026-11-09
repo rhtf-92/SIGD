@@ -30,6 +30,7 @@ import type {
 } from './tesoreria.types.js';
 import { TaypiProvider } from './providers/taypi.provider.js';
 import { DemoQrProvider } from './providers/demo-qr.provider.js';
+import { AuthorizationService } from '../../core/auth/authorization.service.js';
 
 export function calcularVencimientoOrdenPago(ahora: Date): Date {
   const horasStr = process.env.PAYMENT_ORDER_EXPIRY_HOURS;
@@ -39,12 +40,17 @@ export function calcularVencimientoOrdenPago(ahora: Date): Date {
 }
 
 export class TesoreriaService {
+  private readonly authorizationService: AuthorizationService;
+
   constructor(
     private readonly pool: Pool,
     private readonly repository: TesoreriaRepository = new TesoreriaRepository(),
     private readonly taypiProvider: TaypiProvider = new TaypiProvider(),
     private readonly demoQrProvider: DemoQrProvider = new DemoQrProvider(),
-  ) {}
+    authorizationService?: AuthorizationService,
+  ) {
+    this.authorizationService = authorizationService ?? new AuthorizationService(pool);
+  }
 
   private mapearFilaADto(fila: FilaOrdenPago): DtoOrdenPago {
     const docStr = fila.numero_documento_solicitante ?? fila.dni_solicitante ?? '';
@@ -1025,11 +1031,15 @@ export class TesoreriaService {
     usuarioActorId: string,
     rolesActor: string[],
   ): Promise<DtoSolicitudDevolucion> {
-    // Principio de Separación de Poderes: Mesa de Partes autoriza documentalmente. Tesorería NO autoriza devoluciones.
-    const esAutorizado = rolesActor.some((r) => ['MESA_PARTES', 'ADMINISTRADOR'].includes(r.toUpperCase()));
-    if (!esAutorizado) {
+    // Principio de Separación de Poderes (Filtro previo):
+    // Solo roles competentes documentalmente. Tesorería NO autoriza devoluciones.
+    const esRolAutorizado = rolesActor.some((r) =>
+      ['MESA_PARTES', 'ADMINISTRADOR', 'DIRECTOR'].includes(r.toUpperCase()),
+    );
+    if (!esRolAutorizado) {
       throw new ForbiddenError({
-        detail: 'Acceso denegado: Solo Mesa de Partes o Administrador tienen competencia para autorizar documentalmente devoluciones.',
+        message: 'No autorizado para realizar esta acción.',
+        detail: 'Acceso denegado: Tesorería no tiene competencia para autorizar documentalmente devoluciones.',
       });
     }
 
@@ -1045,6 +1055,29 @@ export class TesoreriaService {
         throw new NotFoundError({
           message: 'Solicitud de devolución no encontrada.',
           detail: `No existe la solicitud con id ${solicitudDevolucionId}.`,
+        });
+      }
+
+      // Principio de Autorización Contextual y Segregación de Funciones (Fase 5D):
+      // Exige permiso DEVOLUCION_AUTORIZAR validando cuenta activa, perfil operativo vigente (AUTORIZADOR_DEVOLUCION),
+      // scope institucional y prohibición estricta de autoaprobación (solicitante !== autorizador).
+      const autz = await this.authorizationService.exigirAutorizacion({
+        usuarioId: usuarioActorId,
+        rolesDeclarados: rolesActor,
+        accion: 'DEVOLUCION_AUTORIZAR',
+        recurso: {
+          tipo: 'SOLICITUD_DEVOLUCION',
+          id: solicitudDevolucionId,
+          solicitanteUsuarioId: solicitud.cuenta_usuario_id ?? undefined,
+          solicitantePersonaId: solicitud.solicitante_id,
+        },
+      });
+
+      // Principio de Segregación de Funciones: Prohibición estricta de autoaprobación (Fase 5D)
+      if (solicitud.cuenta_usuario_id === usuarioActorId) {
+        throw new ForbiddenError({
+          message: 'No autorizado para realizar esta acción.',
+          detail: 'Principio de Segregación: El solicitante no puede ser el autorizador de su propia devolución (Autoaprobación prohibida).',
         });
       }
 
@@ -1106,6 +1139,11 @@ export class TesoreriaService {
           montoAutorizado,
           fechaAprobacion: ahora.toISOString(),
           aprobadoPorId: usuarioActorId,
+          autorizacion: {
+            perfil: autz.perfilAplicado,
+            permiso: 'DEVOLUCION_AUTORIZAR',
+            scope: autz.scopeAplicado,
+          },
         },
       });
 
@@ -1212,11 +1250,15 @@ export class TesoreriaService {
     usuarioActorId: string,
     rolesActor: string[],
   ): Promise<DtoSolicitudDevolucion> {
-    // Principio de Separación de Poderes: Tesorería ejecuta financieramente. Mesa de Partes NO ejecuta desembolsos.
-    const esAutorizado = rolesActor.some((r) => ['TESORERIA', 'ADMINISTRADOR'].includes(r.toUpperCase()));
-    if (!esAutorizado) {
+    // Principio de Separación de Poderes (Filtro previo):
+    // Solo personal financiero. Mesa de Partes NO ejecuta desembolsos.
+    const esRolFinanciero = rolesActor.some((r) =>
+      ['TESORERIA', 'ADMINISTRADOR'].includes(r.toUpperCase()),
+    );
+    if (!esRolFinanciero) {
       throw new ForbiddenError({
-        detail: 'Acceso denegado: Solo el personal de Tesorería o Administrador pueden ejecutar materialmente el desembolso de devolución.',
+        message: 'No autorizado para realizar esta acción.',
+        detail: 'Acceso denegado: Solo el personal de Tesorería puede ejecutar materialmente el desembolso de devolución.',
       });
     }
 
@@ -1232,6 +1274,30 @@ export class TesoreriaService {
         throw new NotFoundError({
           message: 'Solicitud de devolución no encontrada.',
           detail: `No existe la solicitud con id ${solicitudDevolucionId}.`,
+        });
+      }
+
+      // Principio de Autorización Contextual y Segregación de Funciones (Fase 5D):
+      // Exige permiso DEVOLUCION_EJECUTAR validando cuenta activa, perfil operativo financiero vigente (GESTOR_TESORERIA),
+      // scope institucional y segregación estricta de funciones (autorizador !== ejecutor).
+      const autz = await this.authorizationService.exigirAutorizacion({
+        usuarioId: usuarioActorId,
+        rolesDeclarados: rolesActor,
+        accion: 'DEVOLUCION_EJECUTAR',
+        recurso: {
+          tipo: 'SOLICITUD_DEVOLUCION',
+          id: solicitudDevolucionId,
+          solicitanteUsuarioId: solicitud.cuenta_usuario_id ?? undefined,
+          solicitantePersonaId: solicitud.solicitante_id,
+          autorizadorUsuarioId: solicitud.aprobado_por_id ?? undefined,
+        },
+      });
+
+      // Principio de Segregación de Funciones: Quien autoriza no puede ejecutar materialmente (Fase 5D)
+      if (solicitud.aprobado_por_id === usuarioActorId) {
+        throw new ForbiddenError({
+          message: 'No autorizado para realizar esta acción.',
+          detail: 'Principio de Segregación: Quien autorizó documentalmente la devolución no puede ejecutar materialmente el desembolso.',
         });
       }
 
@@ -1272,6 +1338,11 @@ export class TesoreriaService {
           metodoDevolucion,
           procesadoPorId: usuarioActorId,
           fechaDevolucion: ahora.toISOString(),
+          autorizacion: {
+            perfil: autz.perfilAplicado,
+            permiso: 'DEVOLUCION_EJECUTAR',
+            scope: autz.scopeAplicado,
+          },
         },
       });
 

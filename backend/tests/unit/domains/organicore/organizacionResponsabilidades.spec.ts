@@ -1035,5 +1035,92 @@ describe('SIGD Fase 5C — Estructura Orgánica y Responsabilidades Temporales',
 
       expect(res.status).toBe(403);
     });
+
+    it('POST /api/v1/organizacion/unidades con ADMINISTRADOR legacy sin ADMINISTRADOR_SIGD responde HTTP 403 Forbidden', async () => {
+      const app = crearAppMock(); // defaultQuery retorna [] en asignacion_perfil_operativo
+      const res = await request(app)
+        .post('/api/v1/organizacion/unidades')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({
+          codigo: 'OF_ADMIN',
+          nombre: 'Oficina Administrativa',
+        });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('POST /api/v1/organizacion/unidades con ADMINISTRADOR_SIGD activo responde HTTP 201 Created', async () => {
+      const defaultQuery = async (sql: any, params?: any[]) => {
+        const sqlStr = typeof sql === 'string' ? sql : sql?.text || '';
+        if (sqlStr.includes('FROM sigd_auth.cuenta_usuario')) {
+          return { rows: [{ id_usuario: USUARIO_ADMIN_ID, usuario: 'admin', correo: 'admin@i.pe', activo: true }] };
+        }
+        if (sqlStr.includes('asignacion_perfil_operativo')) {
+          return {
+            rows: [
+              {
+                id_asignacion_perfil: 'asig-admin-01',
+                perfil_id: 1,
+                perfil_codigo: 'ADMINISTRADOR_SIGD',
+                perfil_nombre: 'Administrador SIGD',
+                area_id: null,
+                scope: 'GLOBAL_TECNICO',
+                id_responsabilidad: null,
+                estado: 'ACTIVO',
+                vigente_desde: '2026-01-01',
+                vigente_hasta: null,
+                permisos: ['ORGANIZACION_GESTIONAR', 'CUENTA_GESTIONAR', 'ADMIN_USUARIOS'],
+                alcance: null,
+              },
+            ],
+          };
+        }
+        if (sqlStr.includes('sigd_audit.bitacora_auditoria')) {
+          return { rows: [{ id_auditoria: 'aud-test-001' }] };
+        }
+        if (sqlStr.includes('INSERT INTO sigd_org.area')) {
+          return {
+            rows: [
+              {
+                areaId: 'area-creada-001',
+                codigo: 'OF_NUEVA',
+                nombre: 'Oficina Nueva',
+                tipoUnidad: 'UNIDAD',
+                areaPadreId: null,
+                path: 'a.OF_NUEVA',
+                nivel: 1,
+                vigente: true,
+                creadoEn: new Date('2026-01-01T00:00:00Z'),
+              },
+            ],
+          };
+        }
+        return { rows: [] };
+      };
+
+      const mockClient = {
+        query: vi.fn(defaultQuery),
+        release: vi.fn(),
+      } as unknown as PoolClient;
+
+      const mockPool = {
+        query: vi.fn(defaultQuery),
+        connect: vi.fn().mockResolvedValue(mockClient),
+      } as unknown as Pool;
+
+      const app = construirApp(mockPool);
+
+      const res = await request(app)
+        .post('/api/v1/organizacion/unidades')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({
+          codigo: 'OF_NUEVA',
+          nombre: 'Oficina Nueva',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.unidad).toBeDefined();
+      expect(res.body.unidad.codigo).toBe('OF_NUEVA');
+    });
   });
 });
