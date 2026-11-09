@@ -31,6 +31,7 @@ import { CATEGORIA_TUPA_72 } from './tupa72.categorias.js';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { generarUrlPresigned } from '../../core/storage/s3-storage.service.js';
 import { getCached, setCached, invalidateCache } from '../../core/cache/redis.service.js';
+import type { AuthorizationService } from '../../core/auth/authorization.service.js';
 
 function mapearProcedimientoADto(p: FilaTupaProcedimiento) {
   const montoNum = Number(p.monto) || 0;
@@ -59,8 +60,9 @@ function mapearProcedimientoADto(p: FilaTupaProcedimiento) {
     plazoDiasHabiles: p.plazo_dias,
     requisitos: reqs,
     generaExpediente: p.genera_expediente,
-    admiteRadicacionSigd: p.genera_expediente,
-    admiteRadicacion: p.genera_expediente,
+    estadoGeneraExpediente: p.genera_expediente === true ? 'SI' : p.genera_expediente === false ? 'NO' : 'NO_DETERMINADO',
+    admiteRadicacionSigd: p.genera_expediente === true,
+    admiteRadicacion: p.genera_expediente === true,
     calificacion: p.calificacion,
     versionFuente: 'TUPA 2026',
     estadoValidacion: estadoVal,
@@ -151,6 +153,7 @@ export function crearRouterTramites(
   pool: Pool,
   obtenerFeriados?: ProveedorFeriados,
   s3Client?: S3Client,
+  authService?: AuthorizationService,
 ): Router {
   const router = Router();
   const radicacionService = new RadicacionVirtualService(pool, obtenerFeriados);
@@ -163,6 +166,31 @@ export function crearRouterTramites(
   const tupaRequisitosService = new TupaRequisitosService(pool);
   const mesaPartesDigitalService = new MesaPartesDigitalService(pool, obtenerFeriados);
   const vinculacionService = new VinculacionHistoricaService(pool);
+
+  async function exigirPermisoTupa(req: Request, accion: 'TUPA_GESTIONAR' | 'TUPA_ACTIVAR', idVersion?: string) {
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) {
+      throw new UnauthorizedError({ detail: 'Token de acceso requerido.' });
+    }
+
+    const identidad = await resolverIdentidadPersona(req);
+    if (!identidad) {
+      throw new ForbiddenError({ detail: `Acceso denegado: cuenta de usuario inexistente, inactiva o deshabilitada (fail-closed).` });
+    }
+
+    if (authService) {
+      await authService.exigirAutorizacion({
+        usuarioId: identidad.idUsuario,
+        rolesDeclarados: identidad.roles,
+        accion,
+        recurso: { tipo: 'TUPA', id: idVersion },
+      });
+    } else if (!identidad.roles.includes('ADMINISTRADOR')) {
+      throw new ForbiddenError({ detail: `Se requiere rol ADMINISTRADOR o permiso ${accion} para gestionar el TUPA.` });
+    }
+
+    return identidad;
+  }
 
   async function resolverIdentidadPersona(req: Request): Promise<{
     idUsuario: string;
@@ -725,18 +753,20 @@ export function crearRouterTramites(
     return res.status(200).json(tarifas);
   });
 
-  // Crear nueva versión en borrador (solo ADMINISTRADOR)
+  // Crear nueva versión en borrador (requiere TUPA_GESTIONAR)
   router.post('/admin/tupa/versiones', async (req: Request, res: Response) => {
-    const identidad = await resolverIdentidadPersona(req);
-    if (!identidad || !identidad.roles.includes('ADMINISTRADOR')) {
-      throw new ForbiddenError({ detail: 'Se requiere rol ADMINISTRADOR para gestionar versiones del TUPA.' });
-    }
+    await exigirPermisoTupa(req, 'TUPA_GESTIONAR');
 
     const esquema = z.object({
       anio: z.coerce.number().int().min(2026).max(2050),
       denominacion: z.string().min(5),
+      revision: z.coerce.number().int().min(1).optional(),
+      codigo: z.string().optional(),
       resolucionAprobacion: z.string().optional(),
       clonarDeIdVersion: z.string().uuid().optional(),
+      motivoCambio: z.string().optional(),
+      vigenteDesde: z.string().optional(),
+      uitVigente: z.coerce.number().positive().optional(),
     });
 
     const parsed = esquema.parse(req.body);
@@ -745,12 +775,34 @@ export function crearRouterTramites(
     return res.status(201).json(version);
   });
 
-  // Modificar datos de un procedimiento en versión borrador (solo ADMINISTRADOR)
+  // Clonar versión previa como nuevo borrador (requiere TUPA_GESTIONAR)
+  router.post('/admin/tupa/versiones/:idVersion/clonar', async (req: Request, res: Response) => {
+    await exigirPermisoTupa(req, 'TUPA_GESTIONAR', String(req.params.idVersion));
+
+    const esquema = z.object({
+      nuevoCodigo: z.string().min(3),
+      anio: z.coerce.number().int().min(2026).max(2050),
+      denominacion: z.string().min(5),
+      motivoCambio: z.string().optional(),
+      revision: z.coerce.number().int().min(1).optional(),
+    });
+
+    const parsed = esquema.parse(req.body);
+    const versionClonada = await tupaVersionRepo.clonarVersion(
+      String(req.params.idVersion),
+      parsed.nuevoCodigo,
+      parsed.anio,
+      parsed.denominacion,
+      parsed.motivoCambio,
+      parsed.revision,
+    );
+    void invalidateCache('tupa:catalogo:*');
+    return res.status(201).json(versionClonada);
+  });
+
+  // Modificar datos de un procedimiento en versión borrador (requiere TUPA_GESTIONAR y valida BOLA)
   router.patch('/admin/tupa/versiones/:idVersion/procedimientos/:idProcedimiento', async (req: Request, res: Response) => {
-    const identidad = await resolverIdentidadPersona(req);
-    if (!identidad || !identidad.roles.includes('ADMINISTRADOR')) {
-      throw new ForbiddenError({ detail: 'Se requiere rol ADMINISTRADOR para modificar el TUPA.' });
-    }
+    await exigirPermisoTupa(req, 'TUPA_GESTIONAR', String(req.params.idVersion));
 
     const esquema = z.object({
       denominacion: z.string().min(3).optional(),
@@ -759,19 +811,39 @@ export function crearRouterTramites(
       requisitos: z.array(z.string()).optional(),
       categoria: z.string().optional(),
       tipoFormulario: z.string().optional(),
+      generaExpediente: z.boolean().nullable().optional(),
+      calificacion: z.string().optional(),
+      canalPresentacion: z.string().nullable().optional(),
+      unidadReceptoraId: z.string().uuid().nullable().optional(),
+      unidadResponsableId: z.string().uuid().nullable().optional(),
+      unidadResolutivaId: z.string().uuid().nullable().optional(),
+      unidadFinancieraId: z.string().uuid().nullable().optional(),
+      intervencionFinanciera: z.string().nullable().optional(),
     });
 
     const parsed = esquema.parse(req.body);
-    const proc = await tupaVersionRepo.actualizarProcedimiento(String(req.params.idProcedimiento), parsed);
+    const proc = await tupaVersionRepo.actualizarProcedimiento(
+      String(req.params.idProcedimiento),
+      parsed,
+      String(req.params.idVersion),
+    );
     void invalidateCache('tupa:catalogo:*');
     return res.status(200).json(mapearProcedimientoADto(proc));
   });
 
+  // Comparación (Diff) analítica entre dos versiones de TUPA
+  router.get('/admin/tupa/versiones/:idVersionA/diff/:idVersionB', async (req: Request, res: Response) => {
+    await exigirPermisoTupa(req, 'TUPA_GESTIONAR');
+
+    const diff = await tupaVersionRepo.obtenerDiffVersiones(
+      String(req.params.idVersionA),
+      String(req.params.idVersionB),
+    );
+    return res.status(200).json(diff);
+  });
+
   router.get('/admin/tupa/procedimientos/:idProcedimiento/procedencia', async (req: Request, res: Response) => {
-    const identidad = await resolverIdentidadPersona(req);
-    if (!identidad || !identidad.roles.includes('ADMINISTRADOR')) {
-      throw new ForbiddenError({ detail: 'Se requiere rol ADMINISTRADOR para consultar la procedencia del TUPA.' });
-    }
+    await exigirPermisoTupa(req, 'TUPA_GESTIONAR');
 
     const parametros = z.object({
       idProcedimiento: z.string().uuid(),
@@ -787,10 +859,7 @@ export function crearRouterTramites(
   });
 
   router.post('/admin/tupa/procedimientos/:idProcedimiento/tarifas', async (req: Request, res: Response) => {
-    const identidad = await resolverIdentidadPersona(req);
-    if (!identidad || !identidad.roles.includes('ADMINISTRADOR')) {
-      throw new ForbiddenError({ detail: 'Se requiere rol ADMINISTRADOR para registrar tarifas TUPA.' });
-    }
+    await exigirPermisoTupa(req, 'TUPA_GESTIONAR');
 
     const parametros = z.object({
       idProcedimiento: z.string().uuid(),
@@ -822,42 +891,67 @@ export function crearRouterTramites(
   });
 
   router.post('/admin/tupa/procedimientos/:idProcedimiento/procedencia', async (req: Request, res: Response) => {
-    const identidad = await resolverIdentidadPersona(req);
-    if (!identidad || !identidad.roles.includes('ADMINISTRADOR')) {
-      throw new ForbiddenError({ detail: 'Se requiere rol ADMINISTRADOR para registrar procedencia TUPA.' });
-    }
+    await exigirPermisoTupa(req, 'TUPA_GESTIONAR');
 
     const parametros = z.object({
       idProcedimiento: z.string().uuid(),
     }).parse(req.params);
     const esquema = z.object({
-      idRegistroVersion: z.string().uuid(),
+      idRegistroVersion: z.string().uuid().nullable().optional(),
       campoNombre: z.string().trim().min(1).max(50),
       valor: z.string().nullable().optional(),
-      fuente: z.enum(['OFICIAL', 'DEFAULT', 'PROPUESTA', 'REFERENCIA']),
+      fuente: z.enum([
+        'OFICIAL_SUIZA',
+        'REFERENCIA_EXTERNA',
+        'DISEÑO_SIGD',
+        'NO_DETERMINADO',
+        'OFICIAL',
+        'DEFAULT',
+        'PROPUESTA',
+        'REFERENCIA',
+      ]),
       evidencia: z.string().nullable().optional(),
     });
     const datos = esquema.parse(req.body);
-    const procedencia = await tupaVersionRepo.insertarCampoProcedencia({
-      id_procedimiento: parametros.idProcedimiento,
-      id_registro_version: datos.idRegistroVersion,
-      campo_nombre: datos.campoNombre,
-      valor: datos.valor,
-      fuente: datos.fuente,
-      evidencia: datos.evidencia,
-    });
+    let procedencia;
+    if (datos.idRegistroVersion) {
+      procedencia = await tupaVersionRepo.insertarCampoProcedencia({
+        id_procedimiento: parametros.idProcedimiento,
+        id_registro_version: datos.idRegistroVersion,
+        campo_nombre: datos.campoNombre,
+        valor: datos.valor,
+        fuente: datos.fuente,
+        evidencia: datos.evidencia,
+      });
+    } else {
+      procedencia = await tupaVersionRepo.registrarProcedenciaCampo({
+        idProcedimiento: parametros.idProcedimiento,
+        campoNombre: datos.campoNombre,
+        fuente: datos.fuente,
+        valor: datos.valor,
+        evidencia: datos.evidencia,
+        idRegistroVersion: datos.idRegistroVersion,
+      });
+    }
     void invalidateCache('tupa:catalogo:*');
     return res.status(201).json(procedencia);
   });
 
-  // Publicar y activar versión (solo ADMINISTRADOR)
+  // Publicar y activar versión (requiere exclusivamente TUPA_ACTIVAR)
   router.post('/admin/tupa/versiones/:idVersion/publicar', async (req: Request, res: Response) => {
-    const identidad = await resolverIdentidadPersona(req);
-    if (!identidad || !identidad.roles.includes('ADMINISTRADOR')) {
-      throw new ForbiddenError({ detail: 'Se requiere rol ADMINISTRADOR para publicar versiones del TUPA.' });
-    }
+    const identidad = await exigirPermisoTupa(req, 'TUPA_ACTIVAR', String(req.params.idVersion));
 
-    const versionPublicada = await tupaVersionRepo.publicarVersion(String(req.params.idVersion));
+    const esquema = z.object({
+      fechaVigenciaDesde: z.string().optional(),
+      motivoCambio: z.string().optional(),
+    }).optional();
+    const parsed = esquema.safeParse(req.body).data;
+
+    const versionPublicada = await tupaVersionRepo.publicarVersion(
+      String(req.params.idVersion),
+      parsed?.fechaVigenciaDesde,
+      identidad.idUsuario,
+    );
     await invalidateCache('tupa:catalogo:*');
     return res.status(200).json({
       mensaje: `Versión ${versionPublicada.codigo} publicada y activada exitosamente como vigente.`,

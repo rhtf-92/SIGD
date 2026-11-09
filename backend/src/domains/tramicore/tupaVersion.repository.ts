@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { ConflictError, NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
+import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
 
 export type EstadoTupaVersion = 'BORRADOR' | 'PENDIENTE_VALIDACION' | 'VIGENTE' | 'HISTORICO' | 'ANULADO';
 
@@ -8,6 +9,7 @@ export interface FilaTupaVersion {
   codigo: string;
   denominacion: string;
   anio: number;
+  revision: number;
   estado: EstadoTupaVersion;
   resolucion_aprobacion: string | null;
   fecha_aprobacion: string | null;
@@ -15,6 +17,10 @@ export interface FilaTupaVersion {
   periodo_documento: string | null;
   uit_vigente: number | string | null;
   fuente_documental: string | null;
+  vigente_desde: string | null;
+  vigente_hasta: string | null;
+  motivo_cambio: string | null;
+  version_origen_id: string | null;
   documento_oficial_key?: string | null;
   documento_oficial_nombre?: string | null;
   documento_oficial_sha256?: string | null;
@@ -79,7 +85,7 @@ export interface FilaTupaProcedimiento {
   plazo_dias: number;
   plazo_fuente: TipoOrigenCampo | null;
   requisitos: string[] | unknown[];
-  genera_expediente: boolean;
+  genera_expediente: boolean | null;
   calificacion: string;
   calificacion_fuente: TipoOrigenCampo | null;
   canal_presentacion: string | null;
@@ -98,8 +104,13 @@ export interface FilaTupaProcedimiento {
 export interface CrearVersionDTO {
   anio: number;
   denominacion: string;
+  revision?: number;
+  codigo?: string;
   resolucionAprobacion?: string;
   clonarDeIdVersion?: string;
+  motivoCambio?: string;
+  vigenteDesde?: string;
+  uitVigente?: number;
 }
 
 export interface ActualizarProcedimientoDTO {
@@ -109,6 +120,8 @@ export interface ActualizarProcedimientoDTO {
   requisitos?: string[];
   categoria?: string;
   tipoFormulario?: string;
+  generaExpediente?: boolean | null;
+  calificacion?: string;
   plazoFuente?: TipoOrigenCampo;
   calificacionFuente?: TipoOrigenCampo;
   canalPresentacion?: string | null;
@@ -117,6 +130,24 @@ export interface ActualizarProcedimientoDTO {
   unidadResolutivaId?: string | null;
   unidadFinancieraId?: string | null;
   intervencionFinanciera?: string | null;
+}
+
+export type FuenteProcedenciaCampo =
+  | 'OFICIAL_SUIZA'
+  | 'REFERENCIA_EXTERNA'
+  | 'DISEÑO_SIGD'
+  | 'NO_DETERMINADO'
+  | TipoOrigenCampo;
+
+export interface FilaCampoProcedencia {
+  id_procedencia: string;
+  id_procedimiento: string;
+  id_registro_version?: string | null;
+  campo_nombre: string;
+  valor?: string | null;
+  fuente: FuenteProcedenciaCampo;
+  evidencia?: string | null;
+  creado_en: string;
 }
 
 export interface FilaTarifaVariante {
@@ -146,23 +177,12 @@ export interface InsertarTarifaVarianteDTO {
   fuente: TipoOrigenCampo;
 }
 
-export interface FilaCampoProcedencia {
-  id_procedencia: string;
-  id_procedimiento: string;
-  id_registro_version: string;
-  campo_nombre: string;
-  valor: string | null;
-  fuente: TipoOrigenCampo;
-  evidencia: string | null;
-  creado_en: string;
-}
-
 export interface InsertarCampoProcedenciaDTO {
   id_procedimiento: string;
   id_registro_version: string;
   campo_nombre: string;
   valor?: string | null;
-  fuente: TipoOrigenCampo;
+  fuente: FuenteProcedenciaCampo;
   evidencia?: string | null;
 }
 
@@ -195,77 +215,45 @@ export interface FilaVinculoConSnapshot {
   fuente_datos: unknown | null;
 }
 
-export interface FilaHistorialDocumentoOficial {
-  id_historial: string;
-  upload_id: string | null;
-  id_version: string;
-  storage_key: string;
-  nombre_archivo: string;
-  sha256: string;
-  mime_type: string;
-  tamano_bytes: number | string;
-  cargado_por: string | null;
-  cargado_por_nombre?: string | null;
-  cargado_por_usuario?: string | null;
-  motivo_cambio: string | null;
-  creado_en: string;
+export interface DiferenciaCampo {
+  campo: string;
+  antes: unknown;
+  despues: unknown;
 }
 
-export interface AsociarDocumentoOficialDTO {
-  uploadId: string;
-  storageKey: string;
-  nombreArchivo: string;
-  sha256: string;
-  mimeType?: string;
-  tamanoBytes: number;
-  cargadoPor?: string | null;
-  motivoCambio?: string | null;
-}
-
-export interface CargaDocumentoOficial {
-  upload_id: string;
-  id_version: string;
-  storage_key: string;
-  nombre_archivo: string;
-  emitido_por: string;
-  estado: 'PENDIENTE' | 'CONFIRMADO';
-}
-
-export interface FilaTupaProcedimiento {
-  id_procedimiento: string;
-  id_version: string;
-  codigo_ref: string;
-  codigo_externo: string | null;
+export interface ProcedimientoModificadoDiff {
+  codigoRef: string;
   denominacion: string;
-  categoria: string;
-  tipo_formulario: string;
-  monto: string | number;
-  unidad_cobro: string;
-  plazo_dias: number;
-  requisitos: string[] | unknown[];
-  genera_expediente: boolean;
-  calificacion: string;
-  registro_version_id: string | null;
-  activo: boolean;
-  orden: number;
-  creado_en: string;
-  actualizado_en: string;
+  cambios: DiferenciaCampo[];
 }
 
-export interface CrearVersionDTO {
-  anio: number;
-  denominacion: string;
-  resolucionAprobacion?: string;
-  clonarDeIdVersion?: string;
-}
-
-export interface ActualizarProcedimientoDTO {
-  denominacion?: string;
-  monto?: number;
-  plazoDias?: number;
-  requisitos?: string[];
-  categoria?: string;
-  tipoFormulario?: string;
+export interface DiffVersionesResultado {
+  versionOrigen: {
+    idVersion: string;
+    codigo: string;
+    denominacion: string;
+    estado: string;
+    revision: number;
+  };
+  versionDestino: {
+    idVersion: string;
+    codigo: string;
+    denominacion: string;
+    estado: string;
+    revision: number;
+  };
+  resumen: {
+    totalOrigen: number;
+    totalDestino: number;
+    agregados: number;
+    eliminados: number;
+    modificados: number;
+    sinCambios: number;
+  };
+  agregados: FilaTupaProcedimiento[];
+  eliminados: FilaTupaProcedimiento[];
+  modificados: ProcedimientoModificadoDiff[];
+  sinCambios: string[];
 }
 
 export class TupaVersionRepository {
@@ -273,9 +261,10 @@ export class TupaVersionRepository {
 
   async listarVersiones(): Promise<FilaTupaVersion[]> {
     const res = await this.pool.query<FilaTupaVersion>(
-      `SELECT v.id_version, v.codigo, v.denominacion, v.anio, v.estado,
+      `SELECT v.id_version, v.codigo, v.denominacion, v.anio, v.revision, v.estado,
               v.resolucion_aprobacion, v.fecha_aprobacion, v.total_procedimientos,
               v.periodo_documento, v.uit_vigente, v.fuente_documental,
+              v.vigente_desde, v.vigente_hasta, v.motivo_cambio, v.version_origen_id,
               v.documento_oficial_key, v.documento_oficial_nombre, v.documento_oficial_sha256,
               v.documento_oficial_mime, v.documento_oficial_tamano, v.documento_oficial_fecha_carga,
               v.documento_oficial_cargado_por,
@@ -286,16 +275,51 @@ export class TupaVersionRepository {
     LEFT JOIN sigd_auth.cuenta_usuario u ON u.id_usuario = v.documento_oficial_cargado_por
     LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = u.id_persona
     LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = u.id_persona
-        ORDER BY v.anio DESC`,
+        ORDER BY v.anio DESC, v.revision DESC`,
     );
     return res.rows;
   }
 
-  async obtenerVersionVigente(): Promise<FilaTupaVersion | null> {
-    const res = await this.pool.query<FilaTupaVersion>(
-      `SELECT v.id_version, v.codigo, v.denominacion, v.anio, v.estado,
+  async obtenerVersionVigente(fechaReferencia?: Date | string): Promise<FilaTupaVersion | null> {
+    if (fechaReferencia !== undefined) {
+      const fechaRef = typeof fechaReferencia === 'string' ? new Date(fechaReferencia) : fechaReferencia;
+      if (isNaN(fechaRef.getTime())) {
+        throw new ValidationError({ message: 'Fecha de referencia inválida para resolución temporal TUPA.' });
+      }
+      const res = await this.pool.query<FilaTupaVersion>(
+        `SELECT v.id_version, v.codigo, v.denominacion, v.anio, v.revision, v.estado,
+                v.resolucion_aprobacion, v.fecha_aprobacion, v.total_procedimientos,
+                v.periodo_documento, v.uit_vigente, v.fuente_documental,
+                v.vigente_desde, v.vigente_hasta, v.motivo_cambio, v.version_origen_id,
+                v.documento_oficial_key, v.documento_oficial_nombre, v.documento_oficial_sha256,
+                v.documento_oficial_mime, v.documento_oficial_tamano, v.documento_oficial_fecha_carga,
+                v.documento_oficial_cargado_por,
+                u.usuario AS cargado_por_usuario,
+                COALESCE(pn.nombre_completo, pj.razon_social, u.usuario) AS cargado_por_nombre,
+                v.creado_en, v.actualizado_en
+           FROM sigd_doc.tupa_version v
+      LEFT JOIN sigd_auth.cuenta_usuario u ON u.id_usuario = v.documento_oficial_cargado_por
+      LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = u.id_persona
+      LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = u.id_persona
+          WHERE v.estado IN ('VIGENTE', 'HISTORICO')
+            AND v.vigente_desde IS NOT NULL
+            AND v.vigente_desde <= $1::timestamptz
+            AND (v.vigente_hasta IS NULL OR v.vigente_hasta > $1::timestamptz)
+          ORDER BY CASE WHEN v.estado = 'VIGENTE' THEN 1 ELSE 2 END, v.vigente_desde DESC, v.anio DESC, v.revision DESC
+          LIMIT 1`,
+        [fechaRef.toISOString()],
+      );
+      // Para consultas con fecha de referencia explícita, si no hay versión aplicable que cubra la fecha,
+      // se retorna estrictamente null (sin fallback a versión operativa actual).
+      return res.rows[0] ?? null;
+    }
+
+    // Consulta de versión vigente actual (sin fechaReferencia histórica):
+    const resVigente = await this.pool.query<FilaTupaVersion>(
+      `SELECT v.id_version, v.codigo, v.denominacion, v.anio, v.revision, v.estado,
               v.resolucion_aprobacion, v.fecha_aprobacion, v.total_procedimientos,
               v.periodo_documento, v.uit_vigente, v.fuente_documental,
+              v.vigente_desde, v.vigente_hasta, v.motivo_cambio, v.version_origen_id,
               v.documento_oficial_key, v.documento_oficial_nombre, v.documento_oficial_sha256,
               v.documento_oficial_mime, v.documento_oficial_tamano, v.documento_oficial_fecha_carga,
               v.documento_oficial_cargado_por,
@@ -307,16 +331,18 @@ export class TupaVersionRepository {
     LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = u.id_persona
     LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = u.id_persona
         WHERE v.estado = 'VIGENTE'
+        ORDER BY v.anio DESC, v.revision DESC
         LIMIT 1`,
     );
-    return res.rows[0] ?? null;
+    return resVigente.rows[0] ?? null;
   }
 
   async obtenerVersionPorId(idVersion: string): Promise<FilaTupaVersion | null> {
     const res = await this.pool.query<FilaTupaVersion>(
-      `SELECT v.id_version, v.codigo, v.denominacion, v.anio, v.estado,
+      `SELECT v.id_version, v.codigo, v.denominacion, v.anio, v.revision, v.estado,
               v.resolucion_aprobacion, v.fecha_aprobacion, v.total_procedimientos,
               v.periodo_documento, v.uit_vigente, v.fuente_documental,
+              v.vigente_desde, v.vigente_hasta, v.motivo_cambio, v.version_origen_id,
               v.documento_oficial_key, v.documento_oficial_nombre, v.documento_oficial_sha256,
               v.documento_oficial_mime, v.documento_oficial_tamano, v.documento_oficial_fecha_carga,
               v.documento_oficial_cargado_por,
@@ -384,11 +410,18 @@ export class TupaVersionRepository {
       });
     }
 
-    const codigo = `TUPA-${dto.anio}`;
+    const revision = dto.revision !== undefined ? Number(dto.revision) : 1;
+    if (isNaN(revision) || revision < 1) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'revision', reason: 'La revisión debe ser un número entero mayor o igual a 1.' }],
+      });
+    }
+
+    const codigo = dto.codigo ?? (revision > 1 ? `TUPA-${dto.anio}-R${revision}` : `TUPA-${dto.anio}`);
 
     const existente = await this.pool.query(
-      `SELECT id_version FROM sigd_doc.tupa_version WHERE anio = $1 OR codigo = $2`,
-      [dto.anio, codigo],
+      `SELECT id_version FROM sigd_doc.tupa_version WHERE (anio = $1 AND revision = $2) OR codigo = $3`,
+      [dto.anio, revision, codigo],
     );
     if (existente.rowCount && existente.rowCount > 0) {
       throw new ConflictError({
@@ -401,10 +434,24 @@ export class TupaVersionRepository {
       await cliente.query('BEGIN');
 
       const resVersion = await cliente.query<FilaTupaVersion>(
-        `INSERT INTO sigd_doc.tupa_version (codigo, denominacion, anio, estado, resolucion_aprobacion, periodo_documento, uit_vigente, fuente_documental)
-         VALUES ($1, $2, $3, 'BORRADOR', $4, NULL, NULL, NULL)
+        `INSERT INTO sigd_doc.tupa_version (
+            codigo, denominacion, anio, revision, estado, resolucion_aprobacion,
+            periodo_documento, uit_vigente, fuente_documental, motivo_cambio,
+            version_origen_id, vigente_desde
+         )
+         VALUES ($1, $2, $3, $4, 'BORRADOR', $5, NULL, $6, NULL, $7, $8, $9)
          RETURNING *`,
-        [codigo, dto.denominacion, dto.anio, dto.resolucionAprobacion ?? null],
+        [
+          codigo,
+          dto.denominacion,
+          dto.anio,
+          revision,
+          dto.resolucionAprobacion ?? null,
+          dto.uitVigente ?? null,
+          dto.motivoCambio ?? null,
+          dto.clonarDeIdVersion ?? null,
+          dto.vigenteDesde ? new Date(dto.vigenteDesde) : null,
+        ],
       );
       const nuevaVersion = resVersion.rows[0];
 
@@ -413,11 +460,14 @@ export class TupaVersionRepository {
       if (dto.clonarDeIdVersion) {
         const procClonar = await cliente.query<FilaTupaProcedimiento>(
           `SELECT codigo_ref, codigo_externo, denominacion, categoria, tipo_formulario,
-                  monto, unidad_cobro, plazo_dias, requisitos, genera_expediente, calificacion,
+                  monto, unidad_cobro, plazo_dias, plazo_fuente, requisitos, genera_expediente,
+                  calificacion, calificacion_fuente, canal_presentacion,
+                  unidad_receptora_id, unidad_responsable_id, unidad_resolutiva_id,
+                  unidad_financiera_id, intervencion_financiera,
                   registro_version_id, activo, orden
              FROM sigd_doc.tupa_procedimiento
             WHERE id_version = $1::uuid
-            ORDER BY orden ASC`,
+            ORDER BY orden ASC, codigo_ref ASC`,
           [dto.clonarDeIdVersion],
         );
 
@@ -425,9 +475,19 @@ export class TupaVersionRepository {
           await cliente.query(
             `INSERT INTO sigd_doc.tupa_procedimiento (
                 id_version, codigo_ref, codigo_externo, denominacion, categoria, tipo_formulario,
-                monto, unidad_cobro, plazo_dias, requisitos, genera_expediente, calificacion,
+                monto, unidad_cobro, plazo_dias, plazo_fuente, requisitos, genera_expediente,
+                calificacion, calificacion_fuente, canal_presentacion,
+                unidad_receptora_id, unidad_responsable_id, unidad_resolutiva_id,
+                unidad_financiera_id, intervencion_financiera,
                 registro_version_id, activo, orden
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+             ) VALUES (
+                $1, $2, $3, $4, $5, $6,
+                $7, $8, $9, $10, $11, $12,
+                $13, $14, $15,
+                $16, $17, $18,
+                $19, $20,
+                $21, $22, $23
+             )`,
             [
               nuevaVersion.id_version,
               p.codigo_ref,
@@ -438,9 +498,17 @@ export class TupaVersionRepository {
               p.monto,
               p.unidad_cobro,
               p.plazo_dias,
+              p.plazo_fuente,
               JSON.stringify(p.requisitos || []),
               p.genera_expediente,
               p.calificacion,
+              p.calificacion_fuente,
+              p.canal_presentacion,
+              p.unidad_receptora_id,
+              p.unidad_responsable_id,
+              p.unidad_resolutiva_id,
+              p.unidad_financiera_id,
+              p.intervencion_financiera,
               p.registro_version_id,
               p.activo,
               p.orden,
@@ -456,6 +524,13 @@ export class TupaVersionRepository {
         nuevaVersion.total_procedimientos = total;
       }
 
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_doc',
+        tabla: 'tupa_version',
+        operacion: 'INSERT',
+        datos_despues: nuevaVersion,
+      });
+
       await cliente.query('COMMIT');
       return nuevaVersion;
     } catch (e) {
@@ -466,9 +541,28 @@ export class TupaVersionRepository {
     }
   }
 
+  async clonarVersion(
+    idVersionOrigen: string,
+    nuevoCodigo: string,
+    anio: number,
+    denominacion: string,
+    motivoCambio?: string,
+    revision?: number,
+  ): Promise<FilaTupaVersion> {
+    return this.crearVersionBorrador({
+      anio,
+      denominacion,
+      codigo: nuevoCodigo,
+      clonarDeIdVersion: idVersionOrigen,
+      motivoCambio,
+      revision,
+    });
+  }
+
   async actualizarProcedimiento(
     idProcedimiento: string,
     datos: ActualizarProcedimientoDTO,
+    idVersionEsperada?: string,
   ): Promise<FilaTupaProcedimiento> {
     const proc = await this.pool.query<FilaTupaProcedimiento & { estado_version: string }>(
       `SELECT p.*, v.estado as estado_version
@@ -482,8 +576,16 @@ export class TupaVersionRepository {
       throw new NotFoundError({ message: 'Procedimiento no encontrado.' });
     }
 
-    if (proc.rows[0].estado_version === 'HISTORICO') {
-      throw new ConflictError({ message: 'No se pueden modificar procedimientos de una versión histórica archivada.' });
+    if (idVersionEsperada && proc.rows[0].id_version !== idVersionEsperada) {
+      throw new ConflictError({
+        message: 'El procedimiento no pertenece a la versión indicada (violación de integridad BOLA).',
+      });
+    }
+
+    if (proc.rows[0].estado_version !== 'BORRADOR') {
+      throw new ConflictError({
+        message: `No se pueden modificar procedimientos de una versión en estado ${proc.rows[0].estado_version}. Solo se permite la modificación en versiones en BORRADOR.`,
+      });
     }
 
     const updates: string[] = [];
@@ -509,6 +611,10 @@ export class TupaVersionRepository {
       params.push(JSON.stringify(datos.requisitos));
       updates.push(`requisitos = $${params.length}::jsonb`);
     }
+    if (datos.calificacion !== undefined) {
+      params.push(datos.calificacion);
+      updates.push(`calificacion = $${params.length}`);
+    }
     if (datos.calificacionFuente !== undefined) {
       params.push(datos.calificacionFuente);
       updates.push(`calificacion_fuente = $${params.length}`);
@@ -520,6 +626,10 @@ export class TupaVersionRepository {
     if (datos.tipoFormulario !== undefined) {
       params.push(datos.tipoFormulario);
       updates.push(`tipo_formulario = $${params.length}`);
+    }
+    if (datos.generaExpediente !== undefined) {
+      params.push(datos.generaExpediente);
+      updates.push(`genera_expediente = $${params.length}`);
     }
     if (datos.canalPresentacion !== undefined) {
       params.push(datos.canalPresentacion);
@@ -562,7 +672,11 @@ export class TupaVersionRepository {
     return res.rows[0];
   }
 
-  async publicarVersion(idVersion: string): Promise<FilaTupaVersion> {
+  async publicarVersion(
+    idVersion: string,
+    fechaVigenciaDesde?: string | Date,
+    usuarioId?: string,
+  ): Promise<FilaTupaVersion> {
     const version = await this.obtenerVersionPorId(idVersion);
     if (!version) {
       throw new NotFoundError({ message: 'Versión TUPA no encontrada.' });
@@ -583,22 +697,28 @@ export class TupaVersionRepository {
       // Advisory lock para evitar doble activación concurrente
       await cliente.query('SELECT pg_advisory_xact_lock($1)', [987654330]);
 
+      const vigenciaEfectiva = fechaVigenciaDesde ? new Date(fechaVigenciaDesde) : new Date();
+
       // 1. Archivar la versión vigente actual
       await cliente.query(
         `UPDATE sigd_doc.tupa_version
-            SET estado = 'HISTORICO', actualizado_en = now()
+            SET estado = 'HISTORICO',
+                vigente_hasta = $1,
+                actualizado_en = now()
           WHERE estado = 'VIGENTE'`,
+        [vigenciaEfectiva],
       );
 
-      // 2. Activar la versión seleccionada (misma fila, ya validada por obtenerVersionPorId)
+      // 2. Activar la versión seleccionada
       const res = await cliente.query<FilaTupaVersion>(
         `UPDATE sigd_doc.tupa_version
             SET estado = 'VIGENTE',
+                vigente_desde = $1,
                 fecha_aprobacion = COALESCE(fecha_aprobacion, CURRENT_DATE),
                 actualizado_en = now()
-          WHERE id_version = $1::uuid
+          WHERE id_version = $2::uuid
           RETURNING *`,
-        [idVersion],
+        [vigenciaEfectiva, idVersion],
       );
 
       if (!res.rows[0]) {
@@ -606,6 +726,14 @@ export class TupaVersionRepository {
           message: `La versión candidato no se pudo activar. Verifique que su estado sea BORRADOR o PENDIENTE_VALIDACION.`,
         });
       }
+
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_doc',
+        tabla: 'tupa_version',
+        operacion: 'UPDATE',
+        datos_antes: { id_version: idVersion, estado: version.estado },
+        datos_despues: { id_version: idVersion, estado: 'VIGENTE', vigente_desde: vigenciaEfectiva },
+      });
 
       await cliente.query('COMMIT');
       return res.rows[0];
@@ -615,6 +743,122 @@ export class TupaVersionRepository {
     } finally {
       cliente.release();
     }
+  }
+
+  async obtenerDiffVersiones(idVersionA: string, idVersionB: string): Promise<DiffVersionesResultado> {
+    const versionA = await this.obtenerVersionPorId(idVersionA);
+    if (!versionA) {
+      throw new NotFoundError({ message: `Versión origen no encontrada (${idVersionA}).` });
+    }
+    const versionB = await this.obtenerVersionPorId(idVersionB);
+    if (!versionB) {
+      throw new NotFoundError({ message: `Versión destino no encontrada (${idVersionB}).` });
+    }
+
+    const procsA = await this.listarProcedimientosPorVersion(idVersionA);
+    const procsB = await this.listarProcedimientosPorVersion(idVersionB);
+
+    const mapA = new Map<string, FilaTupaProcedimiento>();
+    for (const p of procsA) {
+      mapA.set(p.codigo_ref, p);
+    }
+
+    const mapB = new Map<string, FilaTupaProcedimiento>();
+    for (const p of procsB) {
+      mapB.set(p.codigo_ref, p);
+    }
+
+    const agregados: FilaTupaProcedimiento[] = [];
+    const eliminados: FilaTupaProcedimiento[] = [];
+    const modificados: ProcedimientoModificadoDiff[] = [];
+    const sinCambios: string[] = [];
+
+    // Detectar modificados, sin cambios y eliminados
+    for (const [codRef, pA] of mapA.entries()) {
+      const pB = mapB.get(codRef);
+      if (!pB) {
+        eliminados.push(pA);
+        continue;
+      }
+
+      const cambios: DiferenciaCampo[] = [];
+      if (pA.denominacion !== pB.denominacion) {
+        cambios.push({ campo: 'denominacion', antes: pA.denominacion, despues: pB.denominacion });
+      }
+      if (Number(pA.monto) !== Number(pB.monto)) {
+        cambios.push({ campo: 'monto', antes: Number(pA.monto), despues: Number(pB.monto) });
+      }
+      if (pA.plazo_dias !== pB.plazo_dias) {
+        cambios.push({ campo: 'plazo_dias', antes: pA.plazo_dias, despues: pB.plazo_dias });
+      }
+      if (pA.categoria !== pB.categoria) {
+        cambios.push({ campo: 'categoria', antes: pA.categoria, despues: pB.categoria });
+      }
+      if (pA.genera_expediente !== pB.genera_expediente) {
+        cambios.push({ campo: 'genera_expediente', antes: pA.genera_expediente, despues: pB.genera_expediente });
+      }
+      if (pA.calificacion !== pB.calificacion) {
+        cambios.push({ campo: 'calificacion', antes: pA.calificacion, despues: pB.calificacion });
+      }
+      if (pA.tipo_formulario !== pB.tipo_formulario) {
+        cambios.push({ campo: 'tipo_formulario', antes: pA.tipo_formulario, despues: pB.tipo_formulario });
+      }
+      if (pA.canal_presentacion !== pB.canal_presentacion) {
+        cambios.push({ campo: 'canal_presentacion', antes: pA.canal_presentacion, despues: pB.canal_presentacion });
+      }
+      if (pA.intervencion_financiera !== pB.intervencion_financiera) {
+        cambios.push({ campo: 'intervencion_financiera', antes: pA.intervencion_financiera, despues: pB.intervencion_financiera });
+      }
+      if (pA.activo !== pB.activo) {
+        cambios.push({ campo: 'activo', antes: pA.activo, despues: pB.activo });
+      }
+
+      if (cambios.length > 0) {
+        modificados.push({
+          codigoRef: codRef,
+          denominacion: pB.denominacion,
+          cambios,
+        });
+      } else {
+        sinCambios.push(codRef);
+      }
+    }
+
+    // Detectar agregados
+    for (const [codRef, pB] of mapB.entries()) {
+      if (!mapA.has(codRef)) {
+        agregados.push(pB);
+      }
+    }
+
+    return {
+      versionOrigen: {
+        idVersion: versionA.id_version,
+        codigo: versionA.codigo,
+        denominacion: versionA.denominacion,
+        estado: versionA.estado,
+        revision: versionA.revision,
+      },
+      versionDestino: {
+        idVersion: versionB.id_version,
+        codigo: versionB.codigo,
+        denominacion: versionB.denominacion,
+        estado: versionB.estado,
+        revision: versionB.revision,
+      },
+      resumen: {
+        totalOrigen: procsA.length,
+        totalDestino: procsB.length,
+        agregados: agregados.length,
+        eliminados: eliminados.length,
+        modificados: modificados.length,
+        sinCambios: sinCambios.length,
+      },
+      agregados,
+      eliminados,
+      modificados,
+      sinCambios,
+    };
   }
 
   async asociarDocumentoOficial(
@@ -1012,5 +1256,41 @@ export class TupaVersionRepository {
       });
     }
     return vinculo;
+  }
+
+  async registrarProcedenciaCampo(params: {
+    idProcedimiento: string;
+    campoNombre: string;
+    fuente: FuenteProcedenciaCampo;
+    valor?: string | null;
+    evidencia?: string | null;
+    idRegistroVersion?: string | null;
+  }): Promise<FilaCampoProcedencia> {
+    const res = await this.pool.query<FilaCampoProcedencia>(
+      `INSERT INTO sigd_doc.tupa_campo_procedencia
+         (id_procedimiento, campo_nombre, fuente, valor, evidencia, id_registro_version)
+       VALUES ($1::uuid, $2, $3, $4, $5, $6::uuid)
+       RETURNING id_procedencia, id_procedimiento, id_registro_version, campo_nombre, valor, fuente, evidencia, creado_en`,
+      [
+        params.idProcedimiento,
+        params.campoNombre,
+        params.fuente,
+        params.valor ?? null,
+        params.evidencia ?? null,
+        params.idRegistroVersion ?? null,
+      ],
+    );
+    return res.rows[0];
+  }
+
+  async obtenerProcedenciasPorProcedimiento(idProcedimiento: string): Promise<FilaCampoProcedencia[]> {
+    const res = await this.pool.query<FilaCampoProcedencia>(
+      `SELECT id_procedencia, id_procedimiento, id_registro_version, campo_nombre, valor, fuente, evidencia, creado_en
+         FROM sigd_doc.tupa_campo_procedencia
+        WHERE id_procedimiento = $1::uuid
+        ORDER BY campo_nombre ASC`,
+      [idProcedimiento],
+    );
+    return res.rows;
   }
 }

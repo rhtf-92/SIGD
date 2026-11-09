@@ -61,6 +61,10 @@ export const MANIFIESTO_BASELINE = [
   '33_sigd_organizacion_responsabilidades.sql',
   '34_sigd_autorizacion_perfiles_operativos.sql',
   '35_sigd_autorizador_devolucion_perfil.sql',
+  '36_sigd_tupa_versionamiento_operativo.sql',
+  '37_sigd_tupa_ajustes_operativos.sql',
+  '38_sigd_tupa_ajustes_operativos_complementarios.sql',
+  '39_sigd_tupa_pendientes_no_determinados.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }

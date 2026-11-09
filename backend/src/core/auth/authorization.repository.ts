@@ -69,10 +69,16 @@ export class AuthorizationRepository {
       id_tipo_documento: number | null;
       numero_documento: string | null;
     }>(
-      `SELECT p.id_persona, p.nombres, p.primer_apellido, p.segundo_apellido,
-              p.id_tipo_documento, p.numero_documento
+      `SELECT p.id_persona,
+              COALESCE(pn.nombres, pj.razon_social, '') AS nombres,
+              COALESCE(pn.apellidos, '') AS primer_apellido,
+              NULL::text AS segundo_apellido,
+              NULL::int AS id_tipo_documento,
+              p.id_documento AS numero_documento
          FROM sigd_auth.cuenta_usuario c
          JOIN sigd_auth.persona p ON p.id_persona = c.id_persona
+    LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+    LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = p.id_persona
         WHERE c.id_usuario = $1::uuid
         LIMIT 1`,
       [idUsuario],
@@ -172,7 +178,7 @@ export class AuthorizationRepository {
       vigente_hasta: string | null;
     }>(
       `SELECT a.id_asignacion, a.cargo_id, c.codigo AS cargo_codigo, c.nombre AS cargo_nombre,
-              a.area_id, ar.codigo AS area_codigo, ar.nombre AS area_nombre, ar.jerarquia::text,
+              a.area_id, ar.codigo AS area_codigo, ar.nombre AS area_nombre, ar.path::text AS jerarquia,
               a.estado, a.vigente_desde::text, a.vigente_hasta::text
          FROM sigd_org.asignacion_personal a
          JOIN sigd_org.cargo c ON c.cargo_id = a.cargo_id
@@ -650,7 +656,7 @@ export class AuthorizationRepository {
   async verificarJerarquiaSubarbol(areaBaseId: string, areaDestinoId: string): Promise<boolean> {
     if (areaBaseId === areaDestinoId) return true;
     const { rows } = await this.pool.query<{ coincide: boolean }>(
-      `SELECT (hijo.jerarquia <@ padre.jerarquia) AS coincide
+      `SELECT (hijo.path <@ padre.path) AS coincide /* hijo.jerarquia <@ padre.jerarquia */
          FROM sigd_org.area padre, sigd_org.area hijo
         WHERE padre.area_id = $1::uuid
           AND hijo.area_id = $2::uuid

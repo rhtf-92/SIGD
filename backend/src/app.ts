@@ -53,6 +53,7 @@ import { crearRouterCasilla } from './domains/identicore/casilla.router.js';
 import { crearRouterVinculosInstitucionales } from './domains/identicore/vinculoInstitucional.router.js';
 import { crearRouterOrganizacion } from './domains/organicore/organizacion.router.js';
 import { crearRouterAutorizacion } from './core/auth/authorization.router.js';
+import { AuthorizationService } from './core/auth/authorization.service.js';
 import { crearRouterTesoreria } from './domains/tesoreria/tesoreria.router.js';
 import { crearRouterCheckoutDemo } from './domains/tesoreria/providers/demo-qr.checkout.js';
 
@@ -232,6 +233,7 @@ export function construirApp(
   app.use('/api', crearRouterReferencia(pool, actorProviderRutaDocEfectivo));
   app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
   app.use('/api/v1', crearRouterVinculosInstitucionales(pool));
+  const authService = new AuthorizationService(pool);
   app.use('/api/v1', crearRouterOrganizacion(pool));
   app.use('/api/v1', crearRouterAutorizacion(pool));
   app.use('/api/v1', crearRouterAuth(pool));
@@ -239,7 +241,7 @@ export function construirApp(
   app.use('/api/v1', crearRouterTesoreria(pool));
   app.use(crearRouterCheckoutDemo(pool));
   app.use('/api/v1', crearRouterStorage(pool, opts.s3Client));
-  app.use('/api/v1', crearRouterTramites(pool, undefined, opts.s3Client));
+  app.use('/api/v1', crearRouterTramites(pool, undefined, opts.s3Client, authService));
   app.use(
     '/api/v1',
     crearRouterRutaDoc(
@@ -390,7 +392,7 @@ export function construirApp(
    * Alias de Interoperabilidad Frontend-Backend (Plan Maestro §4.1)
    */
   // #14: POST /api/v1/tramite/radicacion -> /api/v1/tramites/radicacion-virtual
-  const routerTramites = crearRouterTramites(pool, undefined, opts.s3Client);
+  const routerTramites = crearRouterTramites(pool, undefined, opts.s3Client, authService);
   app.post('/api/v1/tramite/radicacion', (req, res, next) => {
     req.url = '/tramites/radicacion-virtual';
     routerTramites(req, res, next);

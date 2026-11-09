@@ -168,6 +168,7 @@ export class AuthorizationService {
       'EXPEDIENTE_RESOLVER',
       'DEVOLUCION_AUTORIZAR',
       'DEVOLUCION_EJECUTAR',
+      'TUPA_ACTIVAR',
     ];
 
     if (esSoloAdminTecnico && accionesExclusivasNegocio.includes(accion)) {

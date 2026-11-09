@@ -34,6 +34,8 @@ export type AccionPermiso =
   | 'DEVOLUCION_EJECUTAR'
   | 'PAGO_VER'
   | 'PAGO_REGISTRAR'
+  | 'TUPA_GESTIONAR'
+  | 'TUPA_ACTIVAR'
   | 'FIRMA_FIRMAR'
   | 'ADMIN_USUARIOS'
   | 'REPORTE_LEER'
