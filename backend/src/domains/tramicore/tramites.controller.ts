@@ -80,7 +80,7 @@ export function crearRouterTramites(
   const router = Router();
   const radicacionService = new RadicacionVirtualService(pool, obtenerFeriados);
   const ventanillaService = new VentanillaPresencialService(pool);
-  const consultaService = new ConsultaPublicaService(pool);
+  const consultaService = new ConsultaPublicaService(pool, obtenerFeriados);
 
   // #14 — Radicación virtual (Mesa de Partes Virtual 24x7)
   router.post('/tramites/radicacion-virtual', async (req: Request, res: Response) => {

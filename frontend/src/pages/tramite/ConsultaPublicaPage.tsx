@@ -160,14 +160,25 @@ export default function ConsultaPublicaPage() {
                 </span>
                 <h2 className="text-2xl font-mono font-bold">{resultado.cut}</h2>
               </div>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                {resultado.estadoTramite}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {resultado.fueraDeHorario ? (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    ⏰ Fuera de Horario (Corte 4:30 PM)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    ⏱️ En Horario Hábil
+                  </span>
+                )}
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {resultado.estadoTramite}
+                </span>
+              </div>
             </div>
 
             <div className="p-6 sm:p-8 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="sm:col-span-2 lg:col-span-3">
                   <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     Asunto / Petitorio
                   </h3>
@@ -183,7 +194,7 @@ export default function ConsultaPublicaPage() {
                 </div>
                 <div>
                   <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Solicitante (Protección de Datos - Ley 29733)
+                    Solicitante (Ley N° 29733)
                   </h3>
                   <p className="mt-1 text-slate-700 font-mono">
                     {resultado.administrado.nombreEnmascarado ?? 'Ciudadano Administrado'} (
@@ -192,9 +203,27 @@ export default function ConsultaPublicaPage() {
                 </div>
                 <div>
                   <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Fecha de Radicación Legal
+                    Canal y Folios
                   </h3>
-                  <p className="mt-1 text-slate-700">
+                  <p className="mt-1 text-slate-700 font-medium">
+                    {resultado.canalRecepcion === 'MESA_VIRTUAL' ? 'Mesa de Partes Virtual' : 'Ventanilla Presencial'} ({resultado.totalFolios} {resultado.totalFolios === 1 ? 'folio' : 'folios'})
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Fecha y Hora de Recepción Real
+                  </h3>
+                  <p className="mt-1 text-slate-700 font-medium">
+                    {resultado.fechaEnvioReal
+                      ? new Date(resultado.fechaEnvioReal).toLocaleString('es-PE')
+                      : 'En trámite'}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Fecha de Radicación Legal (Art. 138 LPAG)
+                  </h3>
+                  <p className="mt-1 text-slate-700 font-medium">
                     {resultado.fechaRadicacionLegal
                       ? new Date(resultado.fechaRadicacionLegal).toLocaleString('es-PE')
                       : 'En trámite'}
@@ -248,8 +277,27 @@ export default function ConsultaPublicaPage() {
 
               {/* Mensaje Legal */}
               {resultado.mensajeLegal && (
-                <div className="border-t border-slate-100 pt-4 text-xs text-slate-500 italic">
-                  {resultado.mensajeLegal}
+                <div className="border-t border-slate-100 pt-5">
+                  <div className={`p-4 rounded-xl border flex items-start gap-3 ${
+                    resultado.fueraDeHorario
+                      ? 'bg-amber-50/80 border-amber-200/90 text-amber-900'
+                      : 'bg-emerald-50/80 border-emerald-200/90 text-emerald-900'
+                  }`}>
+                    <span className="text-lg leading-none mt-0.5">
+                      {resultado.fueraDeHorario ? '⚖️' : 'ℹ️'}
+                    </span>
+                    <div className="text-xs space-y-1">
+                      <p className="font-semibold text-slate-900">
+                        Régimen de Recepción y Cómputo de Plazos (TUO Ley N° 27444 - LPAG)
+                      </p>
+                      <p className="leading-relaxed text-slate-700">
+                        {resultado.mensajeLegal}
+                      </p>
+                      <p className="text-[11px] text-slate-500 pt-0.5">
+                        Horario de atención institucional presencial: Lunes a Viernes de 08:00 a 16:30 hrs. Las radicaciones virtuales recibidas fuera de este rango inician su cómputo formal el día hábil inmediato siguiente a las 08:00 hrs.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
