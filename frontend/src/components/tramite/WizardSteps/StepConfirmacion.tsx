@@ -157,14 +157,15 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         idTipoTramite = getCanonicalUuidForCodigo(idTipoTramite);
       }
 
-      let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
+      const docNumero = identificacion.numeroDocumento?.trim();
+      let idPersonaFinal: string | number = docNumero || '00000001';
       try {
-        if (identificacion.numeroDocumento) {
+        if (docNumero) {
           const respPersona = await apiClient.get<{ persona?: { id: number | string } }>(
-            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(identificacion.numeroDocumento)}`
+            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(docNumero)}`
           );
           if (respPersona?.data?.persona?.id) {
-            idPersonaNum = Number(respPersona.data.persona.id);
+            idPersonaFinal = respPersona.data.persona.id;
           }
         }
       } catch {
@@ -202,7 +203,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       const payload = {
         asunto: asuntoFinal,
         idTipoTramiteTupa: idTipoTramite,
-        idPersona: idPersonaNum,
+        idPersona: idPersonaFinal,
         nombreSolicitante:
           nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
         correo:

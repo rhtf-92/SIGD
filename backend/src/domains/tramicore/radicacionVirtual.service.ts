@@ -77,7 +77,7 @@ export class RadicacionVirtualService {
       transaccionAbierta = true;
 
       const tipoTramite = await this.verificarTipoTramite(cliente, datos.idTipoTramiteTupa);
-      const solicitanteId = await this.verificarAdministrado(cliente, datos.idPersona);
+      const solicitanteId = await this.verificarAdministrado(cliente, datos.idPersona, datos);
 
       const [{ cut, anio }, horario] = await Promise.all([
         this.cutService.generar(anioDeRecepcion(now), cliente),
@@ -169,7 +169,11 @@ export class RadicacionVirtualService {
     return tipo;
   }
 
-  private async verificarAdministrado(cliente: PoolClient, idPersona: string | number): Promise<string> {
+  private async verificarAdministrado(
+    cliente: PoolClient,
+    idPersona: string | number,
+    datos?: RadicacionVirtualInput,
+  ): Promise<string> {
     const idStr = String(idPersona).trim();
     const esUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idStr);
 
@@ -197,15 +201,43 @@ export class RadicacionVirtualService {
       persona = resPn.rows[0];
     }
 
-    if (!persona) {
-      throw new ValidationError({
-        invalidParams: [
-          { name: 'idPersona', reason: 'ADMINISTRADO_NO_REGISTRADO: el identificador no corresponde a una persona del padron.' },
-        ],
-      });
+    if (persona) {
+      return persona.id_persona;
     }
 
-    return persona.id_persona;
+    // Auto-registro formal de administrado conforme al TUO de la Ley N° 27444
+    const docIdentidad = /^[0-9]{8,12}$/.test(idStr)
+      ? idStr
+      : (/^[0-9]{8,12}$/.test(String(datos?.idPersona ?? '').trim())
+        ? String(datos?.idPersona).trim()
+        : (esUuid ? '00000001' : idStr.slice(0, 20)));
+
+    const nuevaPersona = await cliente.query<{ id_persona: string }>(
+      `INSERT INTO sigd_auth.persona (tipo, id_documento)
+       VALUES ('NATURAL', $1)
+       ON CONFLICT (tipo, id_documento) DO UPDATE SET id_documento = EXCLUDED.id_documento
+       RETURNING id_persona;`,
+      [docIdentidad],
+    );
+
+    const solicitanteId = nuevaPersona.rows[0]?.id_persona;
+    if (solicitanteId) {
+      const nombreCompleto = datos?.nombreSolicitante?.trim() || 'Ciudadano Administrado';
+      const correo = datos?.correo?.trim().toLowerCase() || null;
+      await cliente.query(
+        `INSERT INTO sigd_auth.persona_natural (id_persona, nombres, apellidos, nombre_completo, correo)
+         VALUES ($1, $2, 'REGISTRADO', $2, $3)
+         ON CONFLICT (id_persona) DO UPDATE SET correo = COALESCE(EXCLUDED.correo, persona_natural.correo);`,
+        [solicitanteId, nombreCompleto, correo],
+      );
+      return solicitanteId;
+    }
+
+    throw new ValidationError({
+      invalidParams: [
+        { name: 'idPersona', reason: 'ADMINISTRADO_NO_REGISTRADO: el identificador no corresponde a una persona del padron.' },
+      ],
+    });
   }
 
   private async insertarExpediente(
