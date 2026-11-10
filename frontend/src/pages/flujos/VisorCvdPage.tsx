@@ -26,7 +26,7 @@ export default function VisorCvdPage() {
               ← Volver al módulo
             </Link>
           </div>
-          <p className="text-sm font-bold text-blue-700">ENT-M04-04 · Mayra (R)</p>
+          <p className="text-sm font-bold text-[#00539b]">ENT-M04-04 · Mayra (R)</p>
           <h1 className="text-2xl font-bold">Visor Documental y Códigos QR</h1>
           <p className="mt-1 text-sm text-slate-500">
             Copia auténtica imprimible con estampa lateral CVD y QR de cotejo

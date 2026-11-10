@@ -6,7 +6,6 @@ import type {
   MatrizPermisos,
   PermisoModulo,
   Rol,
-  RoleRBACPayload,
 } from "../types/rbacRoles";
 
 export const MODULOS_SISTEMA = [
@@ -158,13 +157,6 @@ export function useRbacConfig() {
         posicion === indice ? { ...f, [clave]: !f[clave] } : f,
       ),
     }));
-  }
-
-  function construirPayload(): RoleRBACPayload {
-    const permissions = permissionsByModule(
-      permisos[rolSeleccionado] ?? [],
-    );
-    return { roleId: rolSeleccionado, permissions };
   }
 
   function guardarPermisos() {

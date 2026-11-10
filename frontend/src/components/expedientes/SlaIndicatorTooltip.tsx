@@ -22,11 +22,11 @@ export default function SlaIndicatorTooltip({
       {children}
       <div
         role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-normal rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 w-64 text-center leading-relaxed"
+        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-normal rounded-lg border border-[#d7e9f7] bg-white px-3 py-2 text-xs text-[#0b2a4a] opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 w-64 text-center leading-relaxed"
       >
-        <p className="font-semibold text-slate-100">{mensaje}</p>
-        <div className="mt-1.5 border-t border-slate-700 pt-1 text-[11px] text-slate-300">
-          <p>Días hábiles consumidos: <span className="font-bold text-white">{diasConsumidos}</span> / {plazoMaximo}</p>
+        <p className="font-semibold text-[#0b2a4a]">{mensaje}</p>
+        <div className="mt-1.5 border-t border-[#d7e9f7] pt-1 text-[11px] text-[#4b6b85]">
+          <p>Días hábiles consumidos: <span className="font-bold text-[#006ec7]">{diasConsumidos}</span> / {plazoMaximo}</p>
           <p>
             {diasRestantes >= 0
               ? `Días hábiles restantes: `

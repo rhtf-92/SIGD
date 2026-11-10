@@ -31,8 +31,8 @@ export default function CalendarioLaboralPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Calendario Laboral y Feriados Institucionales</h1>
-          <p className="text-sm text-gray-600">Gestión de días no laborables y su impacto directo en el motor de cálculo SLA de expedientes.</p>
+          <h1 className="text-2xl font-bold text-[#0b2a4a]">Calendario Laboral y Feriados Institucionales</h1>
+          <p className="text-sm text-[#4b6b85]">Gestión de días no laborables y su impacto directo en el motor de cálculo SLA de expedientes.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -43,33 +43,33 @@ export default function CalendarioLaboralPage() {
       </div>
 
       {mensajeSla && (
-        <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-700 rounded-r-lg text-sm shadow-sm">
+        <div className="mb-4 p-4 bg-[#e8f4ff] border-l-4 border-[#38bdf8] text-[#00539b] rounded-r-lg text-sm shadow-sm">
           {mensajeSla}
         </div>
       )}
 
       <div className="bg-white shadow rounded-lg overflow-hidden border">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-[#eaf3fb]">
+          <thead className="bg-[#f4f8fb]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Feriado</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Impacto SLA</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#6b8aa5] uppercase tracking-wider">Fecha</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#6b8aa5] uppercase tracking-wider">Descripción</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#6b8aa5] uppercase tracking-wider">Tipo de Feriado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-[#6b8aa5] uppercase tracking-wider">Impacto SLA</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white divide-y divide-[#eaf3fb]">
             {feriados.map((f, idx) => (
-              <tr key={idx} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{f.fecha}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{f.descripcion}</td>
+              <tr key={idx} className="hover:bg-[#f4f8fb]">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#0b2a4a]">{f.fecha}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2f648c]">{f.descripcion}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-[#d7e9f7] text-[#00539b]">
                     {f.tipo}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${f.impactaSla ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${f.impactaSla ? 'bg-green-100 text-green-800' : 'bg-[#e8f4ff] text-[#0b2a4a]'}`}>
                     {f.impactaSla ? 'Activo (Modifica plazos)' : 'Inactivo'}
                   </span>
                 </td>

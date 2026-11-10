@@ -113,7 +113,7 @@ export default function AcuseNotificacionModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0b2a4a]/35 p-4"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !isSubmitting) onClose();
@@ -125,14 +125,14 @@ export default function AcuseNotificacionModal({
         aria-labelledby="acuse-modal-title"
         className="w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
       >
-        <header className="bg-slate-900 px-6 py-5 text-white">
-          <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
+        <header className="bg-[#00539b] px-6 py-5 text-white">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#bae6fd]">
             Constancia digital · Casilla ciudadana
           </p>
           <h2 id="acuse-modal-title" className="mt-2 text-xl font-bold">
             {acuse ? "Acuse registrado" : "Confirmación de notificación"}
           </h2>
-          <p className="mt-1 text-sm text-slate-300">
+          <p className="mt-1 text-sm text-[#d7e9f7]">
             {notificacion.numeroNotificacion} · {notificacion.numeroExpediente}
           </p>
         </header>
@@ -154,7 +154,7 @@ export default function AcuseNotificacionModal({
                 </div>
                 <div>
                   <dt className="font-bold text-slate-900">Hash criptográfico SHA-256</dt>
-                  <dd className="mt-1 break-all rounded-md bg-slate-950 p-3 font-mono text-xs text-emerald-300">
+                  <dd className="mt-1 break-all rounded-md bg-[#f4f8fb] p-3 font-mono text-xs text-emerald-700">
                     {acuse.hashSha256}
                   </dd>
                 </div>
@@ -177,7 +177,7 @@ export default function AcuseNotificacionModal({
                   checked={confirmed}
                   disabled={isSubmitting}
                   onChange={(event) => setConfirmed(event.target.checked)}
-                  className="mt-1 h-4 w-4 accent-blue-800"
+                  className="mt-1 h-4 w-4 accent-[#006ec7]"
                 />
                 <span>
                   Confirmo que he accedido a la cédula y solicito registrar el
@@ -217,7 +217,7 @@ export default function AcuseNotificacionModal({
               type="button"
               onClick={handleConfirm}
               disabled={!confirmed || isSubmitting}
-              className="rounded-lg bg-blue-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-900 disabled:cursor-not-allowed disabled:bg-slate-400"
+              className="rounded-lg bg-[#00539b] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#00539b] disabled:cursor-not-allowed disabled:bg-slate-400"
             >
               {isSubmitting ? "Registrando acuse…" : "Confirmar y registrar acuse"}
             </button>

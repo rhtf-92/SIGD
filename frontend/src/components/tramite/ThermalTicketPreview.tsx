@@ -21,7 +21,7 @@ export const ThermalTicketPreview: React.FC<ThermalTicketPreviewProps> = ({
   return (
     <div
       id="thermal-ticket"
-      className={`${widthClass} bg-white p-2 text-black font-mono text-xs border border-gray-200 mx-auto print:border-none print:p-0`}
+      className={`${widthClass} bg-white p-2 text-black font-mono text-xs border border-[#d7e9f7] mx-auto print:border-none print:p-0`}
     >
       <div className="text-center font-bold uppercase border-b pb-1 mb-2">
         <p className="text-sm">UNIVERSIDAD / SIGD</p>
@@ -39,7 +39,7 @@ export const ThermalTicketPreview: React.FC<ThermalTicketPreviewProps> = ({
 
       <div className="text-center border-t pt-2 my-2">
         {/* Espacio para Código de Barras / QR */}
-        <div className="bg-gray-100 p-2 font-bold tracking-widest text-center">
+        <div className="bg-[#e8f4ff] p-2 font-bold tracking-widest text-center">
           ||||| {ticketData.codigoCUT} |||||
         </div>
       </div>

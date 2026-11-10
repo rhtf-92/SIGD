@@ -49,8 +49,8 @@ export default function FileUploadDropzone({
         disabled={isBusy}
         className={`w-full rounded-xl border-2 border-dashed p-8 text-center transition-colors disabled:cursor-wait disabled:opacity-70 ${
           isDragging
-            ? "border-blue-600 bg-blue-50"
-            : "border-slate-300 bg-slate-50 hover:border-blue-500"
+            ? "border-[#006ec7] bg-[#e8f4ff]"
+            : "border-slate-300 bg-slate-50 hover:border-[#38bdf8]"
         }`}
         onClick={() => inputRef.current?.click()}
         onDragEnter={(event) => {
@@ -74,7 +74,7 @@ export default function FileUploadDropzone({
           PDF de hasta 25 MB. Use Enter o Espacio para seleccionar un archivo.
         </span>
         {demoMode && (
-          <span className="mt-3 inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
+          <span className="mt-3 inline-block rounded-full bg-[#d7e9f7] px-3 py-1 text-xs font-semibold text-[#00539b]">
             Modo demostración: almacenamiento simulado
           </span>
         )}

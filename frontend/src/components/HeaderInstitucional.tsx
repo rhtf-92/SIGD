@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -18,9 +19,14 @@ import {
 import { filtrarModulosPorRol, ROLES_INTERNOS, useSesion } from "../config/accesoModulos";
 import { elementoIconoModulo } from "../config/iconosModulos";
 import { useAuthStore } from "../stores/authStore";
-import SelloInstitucional from "./common/SelloInstitucional";
+import Logo3D from "./common/Logo3D";
 
 type ModalPerfil = null | "info" | "datos" | "ayuda";
+
+function ModalPortal({ children }: { children: ReactNode }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(children, document.body);
+}
 
 function iniciales(nombre?: string | null, rol?: string | null): string {
   if (nombre) {
@@ -119,9 +125,7 @@ export default function HeaderInstitucional() {
             onClick={() => navigate("/")}
             className="flex min-w-0 items-center gap-2.5 text-left"
           >
-            <span className="shrink-0 text-vault-azul">
-              <SelloInstitucional className="h-9 w-9" />
-            </span>
+            <Logo3D size={40} showRings={false} estatico className="shrink-0" />
             <span className="min-w-0">
               <span className="block text-[15px] font-extrabold tracking-[0.02em] text-vault-tinta">
                 SIGD
@@ -165,7 +169,7 @@ export default function HeaderInstitucional() {
               {menuAbierto && (
                 <nav
                   aria-label="Módulos del sistema"
-                  className="absolute right-0 z-50 mt-2 w-[min(94vw,25rem)] overflow-hidden rounded-xl border border-vault-papel-3 bg-white shadow-xl"
+                  className="absolute right-0 top-full z-50 mt-2 w-[min(92vw,25rem)] max-w-[calc(100vw-1rem)] origin-top-right overflow-hidden rounded-xl border border-vault-papel-3 bg-white shadow-xl"
                 >
                   <p className="flex items-center justify-between gap-2 border-b border-vault-papel-2 bg-vault-papel px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-tinta-500">
                     <span>
@@ -276,7 +280,7 @@ export default function HeaderInstitucional() {
                 {perfilAbierto && (
                   <nav
                     aria-label="Menú del perfil"
-                    className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-xl"
+                    className="absolute right-0 top-full z-50 mt-2 w-60 max-w-[calc(100vw-1rem)] origin-top-right overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-xl"
                   >
                     <div className="flex items-center gap-3 border-b border-vault-papel-2 bg-vault-papel px-4 py-3">
                       <span
@@ -323,7 +327,7 @@ export default function HeaderInstitucional() {
                           }}
                           className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition hover:bg-vault-papel hover:text-vault-azul-tinta"
                         >
-                          <Info className="h-4 w-4 text-tinta-500" aria-hidden="true" /> Información
+                          <Info className="h-4 w-4 text-tinta-500" aria-hidden="true" /> Sobre el sistema
                         </button>
                       </li>
                       <li>
@@ -407,15 +411,16 @@ export default function HeaderInstitucional() {
 
       {/* Modal Información del sistema */}
       {modal === "info" && (
+        <ModalPortal>
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Información del sistema"
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-tinta-950/45 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-[#0b2a4a]/30 p-4 backdrop-blur-[2px]"
           onClick={() => setModal(null)}
         >
           <div
-            className="w-full max-w-[640px] overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
+            className="max-h-[90vh] w-full max-w-[640px] overflow-y-auto rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="border-b border-vault-papel-2 bg-vault-papel px-6 py-5">
@@ -481,19 +486,21 @@ export default function HeaderInstitucional() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Modal Ayuda con la página */}
       {modal === "ayuda" && (
+        <ModalPortal>
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Ayuda con la página"
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-tinta-950/45 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-[#0b2a4a]/30 p-4 backdrop-blur-[2px]"
           onClick={() => setModal(null)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="border-b border-vault-papel-2 bg-vault-papel px-6 py-5">
@@ -506,7 +513,7 @@ export default function HeaderInstitucional() {
               </p>
             </div>
             <div className="px-6 py-5">
-              <h2 className="text-xl font-black tracking-tight text-[#003366] mb-3">
+              <h2 className="text-xl font-black tracking-tight text-vault-tinta mb-3">
                 Un sistema digital para gestionar tus documentos con seguridad
               </h2>
               <p className="text-sm leading-relaxed text-slate-600 mb-4">
@@ -552,19 +559,21 @@ export default function HeaderInstitucional() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Modal Datos del usuario */}
       {modal === "datos" && (
+        <ModalPortal>
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Datos del usuario"
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-tinta-950/45 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-[#0b2a4a]/30 p-4 backdrop-blur-[2px]"
           onClick={() => setModal(null)}
         >
           <div
-            className="w-full max-w-sm overflow-hidden rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
+            className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-xl border border-vault-papel-3 bg-white text-vault-tinta shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 border-b border-vault-papel-2 bg-vault-papel px-5 py-4">
@@ -625,6 +634,7 @@ export default function HeaderInstitucional() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </header>
   );

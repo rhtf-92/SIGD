@@ -17,9 +17,13 @@ interface MainLayoutProps {
  */
 export default function MainLayout({ children }: MainLayoutProps) {
   return (
-    <div className="relative flex min-h-screen flex-col bg-vault-papel text-ink">
+    <div className="sigd-cyber relative flex min-h-screen flex-col bg-vault-papel text-ink">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute -left-40 top-[-18rem] h-[34rem] w-[34rem] rounded-full bg-sky-300/25 blur-[140px]" />
+        <div className="absolute -right-32 top-1/3 h-[28rem] w-[28rem] rounded-full bg-cyan-200/30 blur-[130px]" />
+        <div className="absolute bottom-[-16rem] left-1/3 h-[30rem] w-[30rem] rounded-full bg-[#d7e9f7]/25 blur-[150px]" />
         <div className="cyber-grid absolute inset-0 opacity-40" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/70 to-transparent" />
       </div>
 
       <div className="relative z-10 flex min-h-screen flex-col">

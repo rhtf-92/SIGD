@@ -7,23 +7,27 @@ import {
   History,
   Keyboard,
   Loader2,
+  RefreshCw,
   RotateCcw,
   ScanLine,
   ShieldCheck,
   Upload,
+  Usb,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
-  buscarPersonaDni,
   esDniValido,
   extraerDni,
   guardarPersonaDni,
+  normalizarDni,
   obtenerDnisGuardados,
-  type PersonaDniDemo,
-} from "../../data/padronDniDemo";
+  type PersonaDni,
+} from "../../data/personaDni";
+import { useLectorDniFisico, type EstadoLectorFisico } from "../../hooks/useLectorDniFisico";
+import { consultarDniReniec, ReniecConsultaError } from "../../services/reniecService";
 
 interface BarcodeDetectorLike {
   detect(source: unknown): Promise<Array<{ rawValue: string }>>;
@@ -34,7 +38,7 @@ type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDete
 type Vista = "inicio" | "camara" | "manual" | "exito";
 
 export interface LectorDniDigitalProps {
-  onDetected?: (persona: PersonaDniDemo) => void;
+  onDetected?: (persona: PersonaDni) => void;
   label?: string;
   variant?: "solid" | "ghost" | "inline";
   triggerClassName?: string;
@@ -42,6 +46,13 @@ export interface LectorDniDigitalProps {
 }
 
 const FORMATOS = ["pdf417", "qr_code", "code_128", "code_39"];
+
+const COLOR_ESTADO: Record<EstadoLectorFisico, string> = {
+  verificando: "bg-amber-500",
+  disponible: "bg-emerald-500",
+  "sin-agente": "bg-slate-400",
+  error: "bg-red-500",
+};
 
 function obtenerDetector(): BarcodeDetectorCtor | null {
   if (typeof window === "undefined") return null;
@@ -57,7 +68,13 @@ function formatearFecha(fecha: string): string {
 }
 
 function iniciales(nombres: string, apellidos: string): string {
-  return `${nombres.charAt(0)}${apellidos.charAt(0)}`.toUpperCase();
+  const inicialNombre = nombres.charAt(0);
+  const inicialApellido = apellidos.charAt(0);
+  return `${inicialNombre}${inicialApellido}`.toUpperCase() || "DNI";
+}
+
+function unir(...valores: string[]): string {
+  return valores.filter(Boolean).join(" / ") || "—";
 }
 
 export default function LectorDniDigital({
@@ -70,20 +87,19 @@ export default function LectorDniDigital({
   const [abierto, setAbierto] = useState(false);
   const [vista, setVista] = useState<Vista>("inicio");
   const [cargando, setCargando] = useState(false);
-  const [persona, setPersona] = useState<PersonaDniDemo | null>(null);
+  const [persona, setPersona] = useState<PersonaDni | null>(null);
   const [error, setError] = useState("");
   const [dniManual, setDniManual] = useState("");
-  const [guardados, setGuardados] = useState<PersonaDniDemo[]>([]);
+  const [guardados, setGuardados] = useState<PersonaDni[]>([]);
   const [arrastrando, setArrastrando] = useState(false);
   const [camaraLista, setCamaraLista] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const loopRef = useRef<number | null>(null);
-  const timerRef = useRef<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const limpiarCamara = () => {
+  const limpiarCamara = useCallback(() => {
     if (loopRef.current) {
       window.clearTimeout(loopRef.current);
       loopRef.current = null;
@@ -94,60 +110,27 @@ export default function LectorDniDigital({
     }
     if (videoRef.current) videoRef.current.srcObject = null;
     setCamaraLista(false);
-  };
-
-  const limpiarTemporizador = () => {
-    if (timerRef.current) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      limpiarCamara();
-      limpiarTemporizador();
-    };
   }, []);
 
-  const abrir = () => {
+  const cerrar = useCallback(() => {
+    limpiarCamara();
+    setAbierto(false);
+    setCargando(false);
+    setError("");
+  }, [limpiarCamara]);
+
+  const abrir = useCallback(() => {
     setGuardados(obtenerDnisGuardados());
     setVista("inicio");
     setError("");
     setCargando(false);
     setDniManual("");
+    setPersona(null);
     setAbierto(true);
-  };
+  }, []);
 
-  const cerrar = () => {
-    limpiarCamara();
-    limpiarTemporizador();
-    setAbierto(false);
-    setCargando(false);
-    setError("");
-  };
-
-  useEffect(() => {
-    const abrirPorEvento = () => abrir();
-    window.addEventListener("sigd:abrir-lector-dni", abrirPorEvento);
-    return () => window.removeEventListener("sigd:abrir-lector-dni", abrirPorEvento);
-  });
-
-  useEffect(() => {
-    if (!abierto) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") cerrar();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
-  useEffect(() => {
-    if (vista !== "camara") limpiarCamara();
-  }, [vista]);
-
-  const consultarDni = (valor: string) => {
-    const dni = valor.replace(/\D/g, "").slice(0, 8);
+  const consultarDni = useCallback(async (valor: string) => {
+    const dni = normalizarDni(valor);
     if (!esDniValido(dni)) {
       setError("El DNI debe contener exactamente 8 dígitos numéricos.");
       setVista("manual");
@@ -156,77 +139,125 @@ export default function LectorDniDigital({
 
     setError("");
     setCargando(true);
-    limpiarTemporizador();
-    timerRef.current = window.setTimeout(() => {
-      const encontrado = buscarPersonaDni(dni);
-      if (!encontrado) {
-        setError("No se encontraron datos para ese DNI en el padrón demo.");
-        setCargando(false);
-        setVista("manual");
-        return;
-      }
+    try {
+      const encontrado = await consultarDniReniec(dni);
       guardarPersonaDni(encontrado);
       setPersona(encontrado);
       setGuardados(obtenerDnisGuardados());
-      setCargando(false);
       setVista("exito");
-    }, 900);
-  };
+    } catch (fallo) {
+      setError(
+        fallo instanceof ReniecConsultaError
+          ? fallo.message
+          : "No fue posible consultar RENIEC. Verifica la conexión e inténtalo nuevamente.",
+      );
+      setVista("manual");
+    } finally {
+      setCargando(false);
+    }
+  }, []);
 
-  const detectarEnFuente = async (fuente: unknown): Promise<boolean> => {
-    const Detector = obtenerDetector();
-    if (!Detector) return false;
-    try {
-      const detector = new Detector({ formats: FORMATOS });
-      const resultados = await detector.detect(fuente);
-      for (const resultado of resultados) {
-        const dni = extraerDni(resultado.rawValue);
-        if (dni) {
-          consultarDni(dni);
-          return true;
+  const {
+    estado: estadoLector,
+    tarjetaPresente,
+    mensaje: mensajeLector,
+    agenteUrl,
+    webUsbDisponible,
+    lectorUsbAutorizado,
+    verificarAgente,
+    solicitarPermisoWebUsb,
+  } = useLectorDniFisico({
+    activo: abierto,
+    onLeer: ({ dni }) => {
+      void consultarDni(dni);
+    },
+  });
+
+  useEffect(() => {
+    return () => {
+      limpiarCamara();
+    };
+  }, [limpiarCamara]);
+
+  useEffect(() => {
+    const abrirPorEvento = () => abrir();
+    window.addEventListener("sigd:abrir-lector-dni", abrirPorEvento);
+    return () => window.removeEventListener("sigd:abrir-lector-dni", abrirPorEvento);
+  }, [abrir]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") cerrar();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [abierto, cerrar]);
+
+  useEffect(() => {
+    if (vista !== "camara") limpiarCamara();
+  }, [vista, limpiarCamara]);
+
+  const detectarEnFuente = useCallback(
+    async (fuente: unknown): Promise<boolean> => {
+      const Detector = obtenerDetector();
+      if (!Detector) return false;
+      try {
+        const detector = new Detector({ formats: FORMATOS });
+        const resultados = await detector.detect(fuente);
+        for (const resultado of resultados) {
+          const dni = extraerDni(resultado.rawValue);
+          if (dni) {
+            void consultarDni(dni);
+            return true;
+          }
+        }
+      } catch {
+        return false;
+      }
+      return false;
+    },
+    [consultarDni],
+  );
+
+  const procesarArchivo = useCallback(
+    async (archivo: File) => {
+      setError("");
+      setVista("inicio");
+      setCargando(true);
+
+      const dniEnNombre = extraerDni(archivo.name);
+      let detectado = false;
+
+      if (typeof createImageBitmap === "function" && archivo.type.startsWith("image/")) {
+        try {
+          const bitmap = await createImageBitmap(archivo);
+          detectado = await detectarEnFuente(bitmap);
+          bitmap.close?.();
+        } catch {
+          detectado = false;
         }
       }
-    } catch {
-      return false;
-    }
-    return false;
-  };
 
-  const procesarArchivo = async (archivo: File) => {
-    setError("");
-    setVista("inicio");
-    setCargando(true);
+      if (detectado) return;
 
-    const dniEnNombre = extraerDni(archivo.name);
-    let detectado = false;
-
-    if (typeof createImageBitmap === "function" && archivo.type.startsWith("image/")) {
-      try {
-        const bitmap = await createImageBitmap(archivo);
-        detectado = await detectarEnFuente(bitmap);
-        bitmap.close?.();
-      } catch {
-        detectado = false;
+      if (dniEnNombre) {
+        void consultarDni(dniEnNombre);
+        return;
       }
-    }
 
-    if (detectado) return;
+      setCargando(false);
+      setVista("manual");
+      setError(
+        obtenerDetector()
+          ? "No se pudo leer un código PDF417 legible. Acerca la imagen o ingresa el DNI manualmente."
+          : "Este navegador no puede leer PDF417 automáticamente. Ingresa el DNI manualmente.",
+      );
+    },
+    [consultarDni, detectarEnFuente],
+  );
 
-    if (dniEnNombre) {
-      consultarDni(dniEnNombre);
-      return;
-    }
-
-    setCargando(false);
-    setVista("manual");
-    setError(
-      obtenerDetector()
-        ? "No se pudo leer un código PDF417 legible. Acerca la imagen o ingresa el DNI manualmente."
-        : "Este navegador no puede leer PDF417 automáticamente. Ingresa el DNI manualmente para consultar el padrón demo.",
-    );
-  };
-
-  const iniciarCamara = async () => {
+  const iniciarCamara = useCallback(async () => {
     setVista("camara");
     setError("");
     setCargando(false);
@@ -275,7 +306,7 @@ export default function LectorDniDigital({
             const dni = extraerDni(resultado.rawValue);
             if (dni) {
               limpiarCamara();
-              consultarDni(dni);
+              void consultarDni(dni);
               return;
             }
           }
@@ -290,9 +321,9 @@ export default function LectorDniDigital({
       setVista("manual");
       setError("No se pudo acceder a la cámara. Verifica los permisos o ingresa el DNI manualmente.");
     }
-  };
+  }, [consultarDni, limpiarCamara]);
 
-  const capturarFoto = () => {
+  const capturarFoto = useCallback(() => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) {
       setError("La cámara aún no está lista. Espera un momento e inténtalo de nuevo.");
@@ -314,7 +345,7 @@ export default function LectorDniDigital({
       "image/jpeg",
       0.92,
     );
-  };
+  }, [limpiarCamara, procesarArchivo]);
 
   const usarDatos = () => {
     if (!persona) return;
@@ -327,13 +358,30 @@ export default function LectorDniDigital({
     (variant === "solid"
       ? "btn-cyber"
       : variant === "inline"
-        ? "inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:border-white/35 hover:bg-white/10"
+        ? "inline-flex items-center gap-2 rounded-lg border border-[#bfe0f7] bg-white px-3 py-2 text-xs font-semibold text-[#00539b] transition hover:border-[#006ec7] hover:bg-[#e8f4ff]"
         : "btn-ghost-cyber");
+
+  const campos: Array<[string, string]> = persona
+    ? [
+        ["Fecha de nacimiento", formatearFecha(persona.fechaNacimiento)],
+        ["Sexo", persona.sexo || "—"],
+        ["Estado civil", persona.estadoCivil || "—"],
+        ["Nacionalidad", persona.nacionalidad || "—"],
+        ["Teléfono", persona.telefono || "—"],
+        ["Correo", persona.correo || "—"],
+        ["Dirección", persona.direccion || "—"],
+        ["Distrito / provincia", unir(persona.distrito, persona.provincia)],
+        ["Ubigeo", persona.ubigeo || "—"],
+        ["Emisión", formatearFecha(persona.fechaEmision)],
+        ["Caducidad", formatearFecha(persona.fechaCaducidad)],
+        ["Código de verificación", persona.codigoVerificacion || "—"],
+      ]
+    : [];
 
   const modal = abierto
     ? createPortal(
         <div
-          className="fixed inset-0 z-[140] flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-[140] flex items-center justify-center overflow-y-auto bg-[#0b2a4a]/35 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) cerrar();
           }}
@@ -342,20 +390,20 @@ export default function LectorDniDigital({
             role="dialog"
             aria-modal="true"
             aria-labelledby="lector-dni-titulo"
-            className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/15 bg-[#09090b] shadow-[0_40px_120px_-40px_rgba(0,0,0,1)]"
+            className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#d7e9f7] bg-white shadow-[0_30px_90px_-40px_rgba(11,42,74,0.45)]"
           >
-            <header className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-white/10 bg-[#09090b]/95 px-5 py-4 backdrop-blur-xl sm:px-6">
+            <header className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-[#e3eff8] bg-[#f4f8fb] px-5 py-4 sm:px-6">
               <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-xl border border-white/15 bg-white/[0.05]">
-                  <Fingerprint className="h-5 w-5 text-white" />
+                <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#d7e9f7] bg-white text-[#006ec7]">
+                  <Fingerprint className="h-5 w-5" />
                 </span>
                 <div>
-                  <h2 id="lector-dni-titulo" className="text-base font-bold text-white">
+                  <h2 id="lector-dni-titulo" className="text-base font-bold text-[#0b2a4a]">
                     Lector de DNI digital
                   </h2>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
-                    <span className="h-1.5 w-1.5 rounded-full bg-white/70 animate-pulse-soft" />
-                    Modo demostración · padrón local
+                  <p className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#6b8aa5]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#006ec7]" />
+                    Consulta oficial RENIEC
                   </p>
                 </div>
               </div>
@@ -363,7 +411,7 @@ export default function LectorDniDigital({
                 type="button"
                 onClick={cerrar}
                 aria-label="Cerrar lector de DNI"
-                className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-zinc-400 transition hover:border-white/30 hover:text-white"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-[#d7e9f7] bg-white text-[#4b6b85] transition hover:border-[#006ec7] hover:text-[#006ec7]"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -371,23 +419,75 @@ export default function LectorDniDigital({
 
             <div className="relative p-5 sm:p-6">
               {cargando && (
-                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[#09090b]/92 backdrop-blur-sm">
-                  <span className="relative grid h-16 w-16 place-items-center rounded-2xl border border-white/15 bg-white/[0.04]">
-                    <Loader2 className="h-7 w-7 animate-spin text-white" />
-                    <span className="absolute inset-x-2 h-px bg-white/70 animate-scan" />
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-white/92 backdrop-blur-sm">
+                  <span className="relative grid h-16 w-16 place-items-center rounded-2xl border border-[#d7e9f7] bg-[#f4f8fb]">
+                    <Loader2 className="h-7 w-7 animate-spin text-[#006ec7]" />
+                    <span className="absolute inset-x-2 h-px bg-[#006ec7]/70 animate-scan" />
                   </span>
-                  <p className="text-sm font-semibold text-white">Leyendo código PDF417…</p>
-                  <p className="text-xs text-zinc-500">Verificando identidad en el padrón demo</p>
+                  <p className="text-sm font-semibold text-[#0b2a4a]">Consultando RENIEC…</p>
+                  <p className="text-xs text-[#6b8aa5]">Verificando la identidad del titular</p>
                 </div>
               )}
 
               {vista === "inicio" && (
                 <div className="space-y-5">
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                    <p className="text-sm leading-relaxed text-zinc-400">
-                      Acerca el DNI electrónico a la cámara o sube una foto del reverso. Al detectar
-                      el código <span className="font-semibold text-white">PDF417</span> se mostrarán
-                      todos los datos y quedarán guardados en este dispositivo.
+                  <div className="rounded-xl border border-[#d7e9f7] bg-white p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#d7e9f7] bg-[#f4f8fb] text-[#006ec7]">
+                        <Usb className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-2 text-sm font-semibold text-[#0b2a4a]">
+                          <span
+                            className={`h-2 w-2 rounded-full ${COLOR_ESTADO[estadoLector]} ${
+                              estadoLector === "disponible" || estadoLector === "verificando"
+                                ? "animate-pulse-soft"
+                                : ""
+                            }`}
+                          />
+                          Lector físico de DNI
+                          {tarjetaPresente && (
+                            <span className="rounded-full border border-[#bfe0f7] bg-[#e8f4ff] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#00539b]">
+                              Tarjeta detectada
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-[#4b6b85]">
+                          {mensajeLector}
+                        </p>
+                        <p className="mt-1 font-mono text-[10px] text-[#8aa6bd]">
+                          Agente local: {agenteUrl.replace(/^https?:\/\//, "")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void verificarAgente()}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#bfe0f7] bg-white px-3 py-1.5 text-xs font-semibold text-[#00539b] transition hover:border-[#006ec7] hover:bg-[#e8f4ff]"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Reintentar detección
+                      </button>
+                      {webUsbDisponible && !lectorUsbAutorizado && (
+                        <button
+                          type="button"
+                          onClick={() => void solicitarPermisoWebUsb()}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#bfe0f7] bg-white px-3 py-1.5 text-xs font-semibold text-[#00539b] transition hover:border-[#006ec7] hover:bg-[#e8f4ff]"
+                        >
+                          <Usb className="h-3.5 w-3.5" />
+                          Autorizar USB
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#d7e9f7] bg-[#f4f8fb] p-4">
+                    <p className="text-sm leading-relaxed text-[#4b6b85]">
+                      Acerca el DNI electrónico al lector físico o a la cámara, o sube una foto del
+                      reverso. Al detectar el código{" "}
+                      <span className="font-semibold text-[#0b2a4a]">PDF417</span> se consultarán los
+                      datos oficiales en RENIEC.
                     </p>
                   </div>
 
@@ -407,17 +507,17 @@ export default function LectorDniDigital({
                     }}
                     className={`flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-5 py-9 text-center transition ${
                       arrastrando
-                        ? "border-white/60 bg-white/[0.08]"
-                        : "border-white/15 bg-white/[0.02] hover:border-white/35 hover:bg-white/[0.04]"
+                        ? "border-[#006ec7] bg-[#e8f4ff]"
+                        : "border-[#bfe0f7] bg-[#f8fbfe] hover:border-[#006ec7] hover:bg-[#eef7ff]"
                     }`}
                   >
-                    <span className="grid h-14 w-14 place-items-center rounded-2xl border border-white/15 bg-white/[0.04]">
-                      <Upload className="h-6 w-6 text-white" />
+                    <span className="grid h-14 w-14 place-items-center rounded-2xl border border-[#d7e9f7] bg-white text-[#006ec7]">
+                      <Upload className="h-6 w-6" />
                     </span>
-                    <span className="text-sm font-semibold text-white">
+                    <span className="text-sm font-semibold text-[#0b2a4a]">
                       Arrastra o selecciona una imagen del DNI
                     </span>
-                    <span className="text-xs text-zinc-500">JPG, PNG o WEBP · reverso con PDF417</span>
+                    <span className="text-xs text-[#6b8aa5]">JPG, PNG o WEBP · reverso con PDF417</span>
                   </button>
                   <input
                     ref={fileRef}
@@ -432,7 +532,11 @@ export default function LectorDniDigital({
                   />
 
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <button type="button" onClick={() => void iniciarCamara()} className="btn-ghost-cyber justify-start px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => void iniciarCamara()}
+                      className="btn-ghost-cyber justify-start px-4 py-3"
+                    >
                       <Camera className="h-4 w-4" />
                       Usar cámara
                     </button>
@@ -449,30 +553,11 @@ export default function LectorDniDigital({
                     </button>
                   </div>
 
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                    <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
-                      <ScanLine className="h-3.5 w-3.5" />
-                      Probar demo rápida
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {["12345678", "74561234", "45678912"].map((dni) => (
-                        <button
-                          key={dni}
-                          type="button"
-                          onClick={() => consultarDni(dni)}
-                          className="rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 font-mono text-xs font-semibold text-zinc-200 transition hover:border-white/40 hover:bg-white/10"
-                        >
-                          {dni}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   {guardados.length > 0 && (
                     <div>
-                      <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                      <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#6b8aa5]">
                         <History className="h-3.5 w-3.5" />
-                        DNI guardados en este dispositivo
+                        DNI consultados en este dispositivo
                       </p>
                       <div className="mt-3 space-y-2">
                         {guardados.map((item) => (
@@ -483,17 +568,17 @@ export default function LectorDniDigital({
                               setPersona(item);
                               setVista("exito");
                             }}
-                            className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-white/30 hover:bg-white/[0.06]"
+                            className="flex w-full items-center justify-between gap-3 rounded-lg border border-[#e3eff8] bg-white px-3 py-2.5 text-left transition hover:border-[#006ec7] hover:bg-[#f4f8fb]"
                           >
                             <span className="min-w-0">
-                              <span className="block truncate text-sm font-semibold text-white">
+                              <span className="block truncate text-sm font-semibold text-[#0b2a4a]">
                                 {item.nombreCompleto}
                               </span>
-                              <span className="block font-mono text-[11px] text-zinc-500">
+                              <span className="block font-mono text-[11px] text-[#6b8aa5]">
                                 DNI {item.dni}
                               </span>
                             </span>
-                            <CheckCircle2 className="h-4 w-4 shrink-0 text-white/60" />
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-[#006ec7]" />
                           </button>
                         ))}
                       </div>
@@ -501,8 +586,8 @@ export default function LectorDniDigital({
                   )}
 
                   {error && (
-                    <p className="flex items-start gap-2 rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2 text-xs leading-relaxed text-zinc-300">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                       {error}
                     </p>
                   )}
@@ -511,8 +596,14 @@ export default function LectorDniDigital({
 
               {vista === "camara" && (
                 <div className="space-y-4">
-                  <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-black">
-                    <video ref={videoRef} autoPlay playsInline muted className="aspect-[4/3] w-full object-cover" />
+                  <div className="relative overflow-hidden rounded-2xl border border-[#0b2a4a] bg-[#0b2a4a]">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="aspect-[4/3] w-full object-cover"
+                    />
                     {camaraLista && (
                       <>
                         <div className="pointer-events-none absolute inset-6 rounded-xl border border-white/40">
@@ -521,8 +612,8 @@ export default function LectorDniDigital({
                           <span className="absolute -bottom-px -left-px h-5 w-5 border-b-2 border-l-2 border-white" />
                           <span className="absolute -bottom-px -right-px h-5 w-5 border-b-2 border-r-2 border-white" />
                         </div>
-                        <div className="pointer-events-none absolute inset-x-6 h-px bg-white/80 shadow-[0_0_18px_rgba(255,255,255,0.9)] animate-scan" />
-                        <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md">
+                        <div className="pointer-events-none absolute inset-x-6 h-px bg-[#38bdf8] shadow-[0_0_18px_rgba(56,189,248,0.9)] animate-scan" />
+                        <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/30 bg-[#0b2a4a]/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md">
                           Apunta al código PDF417
                         </span>
                       </>
@@ -530,14 +621,19 @@ export default function LectorDniDigital({
                   </div>
 
                   {error && (
-                    <p className="flex items-start gap-2 rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2 text-xs leading-relaxed text-zinc-300">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                       {error}
                     </p>
                   )}
 
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <button type="button" onClick={capturarFoto} className="btn-cyber" disabled={!camaraLista}>
+                    <button
+                      type="button"
+                      onClick={capturarFoto}
+                      className="btn-cyber"
+                      disabled={!camaraLista}
+                    >
                       <Camera className="h-4 w-4" />
                       Capturar y leer
                     </button>
@@ -561,26 +657,29 @@ export default function LectorDniDigital({
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();
-                    consultarDni(dniManual);
+                    void consultarDni(dniManual);
                   }}
                   className="space-y-5"
                 >
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                    <p className="text-sm leading-relaxed text-zinc-400">
-                      Ingresa el DNI de 8 dígitos. El padrón demo generará una identidad completa y
-                      la guardará localmente para futuras lecturas.
+                  <div className="rounded-xl border border-[#d7e9f7] bg-[#f4f8fb] p-4">
+                    <p className="text-sm leading-relaxed text-[#4b6b85]">
+                      Ingresa el DNI de 8 dígitos. Se consultarán los nombres y apellidos oficiales
+                      registrados en RENIEC.
                     </p>
                   </div>
 
                   <div>
-                    <label htmlFor="dni-manual" className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">
+                    <label
+                      htmlFor="dni-manual"
+                      className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-[#6b8aa5]"
+                    >
                       Número de DNI
                     </label>
                     <input
                       id="dni-manual"
                       value={dniManual}
                       onChange={(event) => {
-                        setDniManual(event.target.value.replace(/\D/g, "").slice(0, 8));
+                        setDniManual(normalizarDni(event.target.value));
                         setError("");
                       }}
                       inputMode="numeric"
@@ -590,33 +689,21 @@ export default function LectorDniDigital({
                       className="input-cyber font-mono text-lg tracking-[0.3em]"
                     />
                     {error && (
-                      <p className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-zinc-300">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <p className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-red-700">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                         {error}
                       </p>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {["12345678", "74561234", "45678912"].map((dni) => (
-                      <button
-                        key={dni}
-                        type="button"
-                        onClick={() => {
-                          setDniManual(dni);
-                          consultarDni(dni);
-                        }}
-                        className="rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 font-mono text-xs font-semibold text-zinc-200 transition hover:border-white/40 hover:bg-white/10"
-                      >
-                        {dni}
-                      </button>
-                    ))}
-                  </div>
-
                   <div className="flex flex-col gap-3 sm:flex-row">
-                    <button type="submit" className="btn-cyber flex-1" disabled={dniManual.length !== 8}>
+                    <button
+                      type="submit"
+                      className="btn-cyber flex-1"
+                      disabled={dniManual.length !== 8 || cargando}
+                    >
                       <ScanLine className="h-4 w-4" />
-                      Consultar padrón demo
+                      Consultar RENIEC
                     </button>
                     <button
                       type="button"
@@ -635,54 +722,45 @@ export default function LectorDniDigital({
 
               {vista === "exito" && persona && (
                 <div className="space-y-5">
-                  <div className="flex items-start gap-3 rounded-xl border border-white/20 bg-white/[0.06] p-4">
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />
+                  <div className="flex items-start gap-3 rounded-xl border border-[#bfe0f7] bg-[#eef7ff] p-4">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#006ec7]" />
                     <div>
-                      <p className="text-sm font-bold text-white">Datos guardados exitosamente</p>
-                      <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                        El DNI fue detectado y la identidad quedó almacenada en este dispositivo.
-                        Revisa la información antes de usarla.
+                      <p className="text-sm font-bold text-[#0b2a4a]">
+                        Identidad verificada en RENIEC
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[#4b6b85]">
+                        Los datos oficiales fueron recuperados correctamente. Revisa la información
+                        antes de usarla en el formulario.
                       </p>
                     </div>
                   </div>
 
-                  <div className="overflow-hidden rounded-2xl border border-white/12 bg-white/[0.03]">
-                    <div className="flex items-center gap-4 border-b border-white/10 p-4">
-                      <span className="grid h-16 w-16 place-items-center rounded-2xl border border-white/15 bg-white/[0.06] text-xl font-black text-white">
+                  <div className="overflow-hidden rounded-2xl border border-[#d7e9f7] bg-white">
+                    <div className="flex items-center gap-4 border-b border-[#e3eff8] bg-[#f8fbfe] p-4">
+                      <span className="grid h-16 w-16 place-items-center rounded-2xl border border-[#bfe0f7] bg-[#e8f4ff] text-xl font-black text-[#00539b]">
                         {iniciales(persona.nombres, persona.apellidos)}
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-lg font-bold text-white">{persona.nombreCompleto}</p>
-                        <p className="mt-0.5 font-mono text-xs uppercase tracking-[0.18em] text-zinc-400">
+                        <p className="truncate text-lg font-bold text-[#0b2a4a]">
+                          {persona.nombreCompleto}
+                        </p>
+                        <p className="mt-0.5 font-mono text-xs uppercase tracking-[0.18em] text-[#6b8aa5]">
                           DNI {persona.dni}
                         </p>
-                        <p className="mt-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                        <p className="mt-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#006ec7]">
                           <ShieldCheck className="h-3.5 w-3.5" />
-                          Verificado · padrón demo
+                          Verificado · RENIEC
                         </p>
                       </div>
                     </div>
 
                     <dl className="grid gap-x-5 gap-y-3 p-4 sm:grid-cols-2">
-                      {[
-                        ["Fecha de nacimiento", formatearFecha(persona.fechaNacimiento)],
-                        ["Sexo", persona.sexo],
-                        ["Estado civil", persona.estadoCivil],
-                        ["Nacionalidad", persona.nacionalidad],
-                        ["Teléfono", persona.telefono],
-                        ["Correo", persona.correo],
-                        ["Dirección", persona.direccion],
-                        ["Distrito / provincia", `${persona.distrito} / ${persona.provincia}`],
-                        ["Ubigeo", persona.ubigeo],
-                        ["Emisión", formatearFecha(persona.fechaEmision)],
-                        ["Caducidad", formatearFecha(persona.fechaCaducidad)],
-                        ["Código de verificación", persona.codigoVerificacion],
-                      ].map(([rotulo, valor]) => (
+                      {campos.map(([rotulo, valor]) => (
                         <div key={rotulo} className={rotulo === "Dirección" ? "sm:col-span-2" : ""}>
-                          <dt className="text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+                          <dt className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#6b8aa5]">
                             {rotulo}
                           </dt>
-                          <dd className="mt-1 break-words text-sm text-zinc-200">{valor}</dd>
+                          <dd className="mt-1 break-words text-sm text-[#0b2a4a]">{valor}</dd>
                         </div>
                       ))}
                     </dl>
@@ -703,7 +781,7 @@ export default function LectorDniDigital({
                       className="btn-ghost-cyber flex-1"
                     >
                       <RotateCcw className="h-4 w-4" />
-                      Escanear otro DNI
+                      Consultar otro DNI
                     </button>
                   </div>
                 </div>

@@ -99,9 +99,9 @@ export default function AdministracionPage() {
           {modulos.map((modulo) => (
             <article
               key={modulo.titulo}
-              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl motion-reduce:transition-none"
+              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:border-[#d7e9f7] hover:shadow-xl motion-reduce:transition-none"
             >
-              <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-blue-50 opacity-60 transition-transform duration-300 group-hover:scale-110" />
+              <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#e8f4ff] opacity-60 transition-transform duration-300 group-hover:scale-110" />
 
               <div className="relative flex items-center gap-4">
                 <span
@@ -135,7 +135,7 @@ export default function AdministracionPage() {
                 type="button"
                 onClick={() => navigate(modulo.ruta)}
                 aria-label={`Administrar ${modulo.titulo}`}
-                className="relative mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 motion-reduce:transition-none"
+                className="relative mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006ec7] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#00539b] focus:outline-none focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-2 motion-reduce:transition-none"
               >
                 Administrar
                 <svg

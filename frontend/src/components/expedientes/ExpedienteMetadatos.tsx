@@ -20,7 +20,7 @@ export default function ExpedienteMetadatos({ expediente }: { expediente: Expedi
       <dl className="mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
         <Dato etiqueta="Solicitante">{solicitante.nombreOrazonSocial}</Dato>
         <Dato etiqueta="Documento de identidad">{solicitante.tipoDocumento} {solicitante.numeroDocumento}</Dato>
-        <Dato etiqueta="Estado actual"><span className="inline-flex rounded-full bg-blue-50 px-3 py-0.5 font-semibold text-blue-800">{ETIQUETAS_ESTADO_FLUJO[expediente.estadoFlujo]}</span></Dato>
+        <Dato etiqueta="Estado actual"><span className="inline-flex rounded-full bg-[#e8f4ff] px-3 py-0.5 font-semibold text-[#00539b]">{ETIQUETAS_ESTADO_FLUJO[expediente.estadoFlujo]}</span></Dato>
         <Dato etiqueta="Prioridad"><span className={`inline-flex rounded-full px-3 py-0.5 font-semibold ${expediente.prioridad === "NORMAL" ? "bg-slate-100 text-slate-700" : "bg-amber-50 text-amber-900"}`}>{etiquetaExpediente(expediente.prioridad)}</span></Dato>
         <Dato etiqueta="Área actual">{etiquetaExpediente(expediente.areaActual)}</Dato>
         <Dato etiqueta="Responsable actual">{metadatos.responsableAsignadoNombre ?? "Sin responsable asignado"}</Dato>

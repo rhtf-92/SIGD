@@ -145,22 +145,22 @@ export default function ValidadorPublicoCvdPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="min-h-screen bg-[#e8f4ff] text-slate-900">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-4xl px-6 py-5">
           <Link
             to="/"
-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-[#e8f4ff]"
           >
             ← Volver al inicio
           </Link>
-          <p className="text-sm font-bold text-blue-700">
+          <p className="text-sm font-bold text-[#006ec7]">
             ENT-M04-05 · Adriano David Espinoza Ramírez · Acceso público y anónimo (sin login)
           </p>
           <h1 className="text-2xl font-bold">
             Verificador público de Códigos de Verificación Digital (CVD)
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-[#4b6b85]">
             Empleadores y entidades externas pueden contrastar la autenticidad de resoluciones
             impresas sin apersonarse a Pucallpa · D.S. N° 070-2013-PCM.
           </p>
@@ -172,7 +172,7 @@ export default function ValidadorPublicoCvdPage() {
           <label htmlFor="codigo-cvd" className="text-sm font-bold text-slate-700">
             Código CVD del documento
           </label>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-[#4b6b85]">
             Máscara guiada: <code className="font-mono font-bold">{CVD_INPUT_MASK_HINT}</code>
           </p>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
@@ -193,23 +193,23 @@ export default function ValidadorPublicoCvdPage() {
               maxLength={26}
               aria-describedby="ayuda-cvd"
               aria-invalid={mensaje ? true : undefined}
-              className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-2.5 font-mono text-sm uppercase placeholder:font-sans placeholder:normal-case focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+              className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-2.5 font-mono text-sm uppercase placeholder:font-sans placeholder:normal-case focus:border-[#006ec7] focus:ring-2 focus:ring-[#bfe0f7] focus:outline-none"
             />
             <button
               type="button"
               onClick={() => verificarCodigo()}
               disabled={isValidando}
-              className="rounded-lg bg-blue-700 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg bg-[#006ec7] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#00539b] focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isValidando ? "Verificando..." : "Verificar"}
             </button>
           </div>
-          <p id="ayuda-cvd" className="mt-1 text-xs text-slate-400">
+          <p id="ayuda-cvd" className="mt-1 text-xs text-[#6b8aa5]">
             El código está impreso en la estampa lateral marginal del documento físico.
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
+            <span className="text-xs font-bold uppercase tracking-wide text-[#6b8aa5]">
               Ejemplos:
             </span>
             {[CVD_VALIDO, CVD_ALTERADO].map((ejemplo) => (
@@ -220,7 +220,7 @@ export default function ValidadorPublicoCvdPage() {
                   setCodigo(ejemplo);
                   verificarCodigo(ejemplo);
                 }}
-                className="rounded-full border border-slate-300 px-3 py-1 font-mono text-xs text-slate-600 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
+                className="rounded-full border border-slate-300 px-3 py-1 font-mono text-xs text-slate-600 transition hover:border-[#38bdf8] hover:bg-[#e8f4ff] hover:text-[#006ec7]"
               >
                 {ejemplo}
               </button>
@@ -228,14 +228,14 @@ export default function ValidadorPublicoCvdPage() {
             <button
               type="button"
               onClick={camaraActiva ? detenerCamara : iniciarCamara}
-              className="rounded-full border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+              className="rounded-full border border-[#bfe0f7] bg-[#e8f4ff] px-3 py-1 text-xs font-bold text-[#006ec7] transition hover:bg-[#e8f4ff]"
             >
               {camaraActiva ? "■ Detener cámara" : "◉ Escanear QR con cámara"}
             </button>
           </div>
 
           {camaraActiva && (
-            <div className="mt-4 rounded-xl border border-blue-200 bg-slate-950 p-3">
+            <div className="mt-4 rounded-xl border border-[#d7e9f7] bg-[#f4f8fb] p-3">
               <video
                 ref={videoRef}
                 muted
@@ -243,7 +243,7 @@ export default function ValidadorPublicoCvdPage() {
                 className="h-56 w-full rounded-lg object-cover"
                 aria-label="Vista previa de la cámara para escanear el QR del documento"
               />
-              <p className="mt-2 text-center text-xs text-slate-300">
+              <p className="mt-2 text-center text-xs text-[#4b6b85]">
                 Apunte la cámara al código QR del documento impreso…
               </p>
             </div>
@@ -265,7 +265,7 @@ export default function ValidadorPublicoCvdPage() {
                   entradaArchivoRef.current?.click();
                 }
               }}
-              className="mt-3 flex cursor-pointer items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-sm text-slate-500 transition hover:border-blue-400 hover:bg-blue-50"
+              className="mt-3 flex cursor-pointer items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-sm text-[#4b6b85] transition hover:border-[#38bdf8] hover:bg-[#e8f4ff]"
             >
               <span aria-hidden="true" className="text-2xl">⬆</span>
               <span>
@@ -287,14 +287,14 @@ export default function ValidadorPublicoCvdPage() {
           </div>
 
           {mensaje && (
-            <p role="status" className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            <p role="status" className="mt-4 rounded-lg border border-[#d7e9f7] bg-[#e8f4ff] p-3 text-sm text-[#00539b]">
               {mensaje}
             </p>
           )}
 
           {isValidando && (
             <div role="status" className="mt-5 flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#006ec7] border-t-transparent" />
               Consultando validador institucional…
             </div>
           )}
@@ -334,7 +334,7 @@ export default function ValidadorPublicoCvdPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
+        <p className="mt-6 text-center text-xs text-[#6b8aa5]">
           Validador CVD · ENT-M04-05 · Módulo 04 · Consulta anónima: no se solicitan credenciales
         </p>
       </section>

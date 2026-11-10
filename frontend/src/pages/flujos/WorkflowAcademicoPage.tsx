@@ -11,7 +11,7 @@ import { ETIQUETA_ESTADO_TRAMITE } from "../../types/workflowAcademico";
 
 const ESTILOS_INSIGNIA_TRAMITE: Record<EstadoTramite, string> = {
   BORRADOR: "border-slate-200 bg-slate-100 text-slate-600",
-  REGISTRADO: "border-blue-200 bg-blue-50 text-blue-700",
+  REGISTRADO: "border-[#d7e9f7] bg-[#e8f4ff] text-[#00539b]",
   EN_TRAMITE: "border-indigo-200 bg-indigo-50 text-indigo-700",
   EN_REVISION: "border-purple-200 bg-purple-50 text-purple-700",
   OBSERVADO: "border-amber-200 bg-amber-50 text-amber-700",
@@ -104,13 +104,13 @@ export default function WorkflowAcademicoPage() {
       etiqueta: "Tomar en revisión",
       habilitada: puedeTomar,
       onClick: tomarEnRevision,
-      clases: "bg-blue-700 hover:bg-blue-800 text-white",
+      clases: "bg-[#006ec7] hover:bg-[#00539b] text-white",
     },
     {
       etiqueta: "Aprobar etapa",
       habilitada: puedeAprobar,
       onClick: aprobarEtapaActual,
-      clases: "bg-blue-700 hover:bg-blue-800 text-white",
+      clases: "bg-[#006ec7] hover:bg-[#00539b] text-white",
     },
     {
       etiqueta: "Observar",
@@ -122,13 +122,13 @@ export default function WorkflowAcademicoPage() {
       etiqueta: "Registrar subsanación",
       habilitada: puedeSubsanar,
       onClick: subsanar,
-      clases: "bg-blue-700 hover:bg-blue-800 text-white",
+      clases: "bg-[#006ec7] hover:bg-[#00539b] text-white",
     },
     {
       etiqueta: "Reanudar revisión",
       habilitada: puedeReanudar,
       onClick: reanudarRevision,
-      clases: "bg-blue-700 hover:bg-blue-800 text-white",
+      clases: "bg-[#006ec7] hover:bg-[#00539b] text-white",
     },
     {
       etiqueta: "Firmar documento (PAdES-BES)",
@@ -154,7 +154,7 @@ export default function WorkflowAcademicoPage() {
           >
             ← Volver al módulo
           </Link>
-          <p className="text-sm font-bold text-blue-700">
+          <p className="text-sm font-bold text-[#00539b]">
             ENT-M04-01 · Adriano David Espinoza Ramírez
           </p>
           <h1 className="text-2xl font-bold">
@@ -174,7 +174,7 @@ export default function WorkflowAcademicoPage() {
             </span>
             <span
               data-testid="cut-expediente"
-              className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-mono font-bold text-blue-700"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#d7e9f7] bg-[#e8f4ff] px-3 py-1 font-mono font-bold text-[#00539b]"
             >
               CUT: {workflow.cut}
             </span>
@@ -274,7 +274,7 @@ export default function WorkflowAcademicoPage() {
               type="button"
               onClick={accion.onClick}
               disabled={!accion.habilitada}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${accion.clases} ${accion.habilitada ? "" : "cursor-not-allowed opacity-40"}`}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:outline-none ${accion.clases} ${accion.habilitada ? "" : "cursor-not-allowed opacity-40"}`}
             >
               {accion.etiqueta}
             </button>

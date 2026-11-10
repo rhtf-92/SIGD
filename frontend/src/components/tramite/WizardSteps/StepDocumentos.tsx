@@ -411,7 +411,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           {/* Zona de Drop / Carga de Archivo */}
           <label
             htmlFor={`${formId}-file-upload`}
-            className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white p-5 text-center cursor-pointer hover:border-[#006EC7] hover:bg-blue-50/20 transition"
+            className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white p-5 text-center cursor-pointer hover:border-[#006EC7] hover:bg-[#e8f4ff]/20 transition"
           >
             <svg
               className="h-8 w-8 text-slate-400 mb-1.5"

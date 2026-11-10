@@ -136,7 +136,7 @@ export default function BandejaExpedientesPage() {
             ← Volver al inicio
           </button>
 
-          <p className="text-sm font-bold text-blue-700">SIGD · IESTP "Suiza"</p>
+          <p className="text-sm font-bold text-[#00539b]">SIGD · IESTP "Suiza"</p>
           <h1 className="text-2xl font-bold">Bandeja de Trabajo Diario</h1>
           <p className="mt-1 text-sm text-slate-500">
             Gestión operativa de expedientes, semáforo SLA de 30 días LPAG y taxonomía archivística CCD.
@@ -148,7 +148,7 @@ export default function BandejaExpedientesPage() {
         {/* Panel de KPIs */}
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-            <p className="text-3xl font-bold text-blue-700">{volumenActivo}</p>
+            <p className="text-3xl font-bold text-[#00539b]">{volumenActivo}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Volumen Activo
             </p>
@@ -175,7 +175,7 @@ export default function BandejaExpedientesPage() {
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar por CUT, solicitante o asunto…"
-              className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-[#006ec7] focus:outline-none focus:ring-2 focus:ring-[#d7e9f7]"
             />
           </div>
 
@@ -185,7 +185,7 @@ export default function BandejaExpedientesPage() {
               onClick={() => setMostrarFiltroCcd(!mostrarFiltroCcd)}
               className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                 filtroCcd
-                  ? "border-blue-600 bg-blue-50 text-blue-700"
+                  ? "border-[#006ec7] bg-[#e8f4ff] text-[#00539b]"
                   : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >

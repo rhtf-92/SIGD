@@ -20,7 +20,7 @@ interface TimeFilterControlsProps {
 
 const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-const fieldClass = "mt-1 w-full min-w-0 rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200";
+const fieldClass = "mt-1 w-full min-w-0 rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#006ec7] focus:outline-none focus:ring-2 focus:ring-[#bfe0f7]";
 
 export default function TimeFilterControls({
   year,

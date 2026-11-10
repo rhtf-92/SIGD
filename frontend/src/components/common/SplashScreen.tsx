@@ -1,15 +1,9 @@
 import { useEffect, useState } from "react";
 
-const DURACION_MS = 800;
-const CLAVE_VISTO = "sigd_splash_visto";
+import Logo3D from "./Logo3D";
 
-const LOGOS = [
-  new URL("../../assets/LOGOS ACTUALES/EDITADO 01 .jpg", import.meta.url).href,
-  new URL("../../assets/LOGOS ACTUALES/EDITADO 02.jpg", import.meta.url).href,
-  new URL("../../assets/LOGOS ACTUALES/EDITADO 03.jpg", import.meta.url).href,
-  new URL("../../assets/LOGOS ACTUALES/EDITADO 04.jpg", import.meta.url).href,
-  new URL("../../assets/LOGOS ACTUALES/LOGO PRUEBA .jpg", import.meta.url).href,
-];
+const DURACION_MS = 1100;
+const CLAVE_VISTO = "sigd_splash_visto";
 
 function yaVisto(): boolean {
   try {
@@ -23,13 +17,11 @@ export default function SplashScreen() {
   const [visible, setVisible] = useState(() => !yaVisto());
   const [saliendo, setSaliendo] = useState(false);
   const [progreso, setProgreso] = useState(0);
-  const [logoIndex, setLogoIndex] = useState(0);
 
   useEffect(() => {
     if (!visible) return;
-    setProgreso(0);
     const t0 = window.setTimeout(() => setProgreso(100), 120);
-    const t1 = window.setTimeout(() => setSaliendo(true), DURACION_MS - 300);
+    const t1 = window.setTimeout(() => setSaliendo(true), DURACION_MS - 320);
     const t2 = window.setTimeout(() => {
       setVisible(false);
       try {
@@ -45,109 +37,55 @@ export default function SplashScreen() {
     };
   }, [visible]);
 
-  useEffect(() => {
-    if (!visible) return;
-    const id = window.setInterval(() => {
-      setLogoIndex((i) => (i + 1) % LOGOS.length);
-    }, 600);
-    return () => window.clearInterval(id);
-  }, [visible]);
-
   if (!visible) return null;
 
   return (
     <div
       role="status"
       aria-label="Cargando SIGD"
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-blue-950 via-blue-800 to-slate-900 text-white transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-white via-[#f4f8fb] to-[#eaf3fb] text-ink transition-opacity duration-500 ${
         saliendo ? "opacity-0" : "opacity-100"
       }`}
     >
-      <style>{`
-        @keyframes sigd-flotar { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
-        @keyframes sigd-anillo { to { transform: rotate(360deg); } }
-        @keyframes sigd-rayas { to { background-position: 32px 0; } }
-        @keyframes sigd-puntos { 0% { opacity: .2; } 50% { opacity: 1; } 100% { opacity: .2; } }
-        @keyframes sigd-brillo { 0% { transform: translateX(-100%); } 100% { transform: translateX(220%); } }
-        @keyframes sigd-pulso { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-        @keyframes sigd-zoom-logo { 0% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(0.9); opacity: 0.7; } }
-      `}</style>
-
-      {/* destellos de fondo */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-20 -left-20 h-72 w-72 rounded-full bg-blue-500/25 blur-3xl" />
-        <div className="absolute -right-20 -bottom-20 h-80 w-80 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(56,189,248,0.2),transparent_60%)]" />
+        <div className="absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-sky-200/40 blur-3xl" />
+        <div className="absolute -right-24 bottom-1/4 h-80 w-80 rounded-full bg-[#d7e9f7]/40 blur-3xl" />
+        <div className="cyber-grid absolute inset-0 opacity-30" />
       </div>
 
-      {/* logo rotativo con animación */}
-      <div
-        className="relative grid h-28 w-28 place-items-center"
-        aria-hidden="true"
-      >
-        <div
-          className="absolute inset-0 rounded-full border-4 border-cyan-300/40"
-          style={{ animation: "sigd-anillo 2.4s linear infinite" }}
-        />
-        <div
-          className="absolute inset-1 rounded-full border-2 border-white/20"
-          style={{ animation: "sigd-anillo 3.2s linear infinite reverse" }}
-        />
-        <div
-          className="grid h-20 w-20 place-items-center overflow-hidden rounded-full bg-white shadow-2xl ring-4 ring-white/10"
-          style={{ animation: "sigd-zoom-logo 1.6s ease-in-out infinite" }}
-        >
-          <img src={LOGOS[logoIndex]} alt="" className="h-full w-full object-cover" />
-        </div>
-      </div>
+      <Logo3D size={150} />
 
-      <h1 className="mt-5 text-4xl font-black tracking-[0.2em]">SIGD</h1>
-      <p className="mt-1 max-w-xs text-center text-xs font-medium text-blue-100">
+      <h1 className="mt-6 bg-gradient-to-r from-[#00539b] via-[#006ec7] to-[#38bdf8] bg-clip-text text-4xl font-black tracking-[0.32em] text-transparent">
+        SIGD
+      </h1>
+      <p className="mt-2 max-w-xs text-center text-xs font-medium text-slate-600">
         Sistema Integral de Gestión Documentaria
       </p>
-      <p className="mt-0.5 text-[11px] text-blue-200">IESTP “Suiza” · Pucallpa</p>
+      <p className="mt-1 text-[11px] uppercase tracking-[0.22em] text-slate-400">
+        IESTP “Suiza” · Pucallpa
+      </p>
       <button
         type="button"
         onClick={() => setVisible(false)}
-        className="mt-4 rounded-full border border-white/30 px-4 py-1 text-[11px] font-semibold text-blue-100 hover:bg-white/10"
+        className="mt-5 rounded-full border border-[#bfe0f7] bg-white px-4 py-1 text-[11px] font-semibold text-[#00539b] transition hover:border-[#006ec7] hover:bg-[#e8f4ff]"
       >
         Omitir
       </button>
 
-      {/* barra con rayas en movimiento + brillo */}
-      <div
-        className="relative mt-6 h-2.5 w-56 overflow-hidden rounded-full bg-white/20"
-        aria-hidden="true"
-      >
+      <div className="relative mt-7 h-2 w-64 overflow-hidden rounded-full border border-[#bfe0f7] bg-white">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-white to-cyan-300"
+          className="h-full rounded-full bg-gradient-to-r from-[#00539b] via-[#006ec7] to-[#38bdf8]"
           style={{
             width: `${progreso}%`,
-            transition: `width ${DURACION_MS - 200}ms linear`,
-            backgroundSize: "32px 100%",
-            backgroundImage:
-              "repeating-linear-gradient(45deg, rgba(255,255,255,.55) 0 8px, transparent 8px 16px)",
-            animation: "sigd-rayas 0.7s linear infinite",
+            transition: `width ${DURACION_MS - 200}ms cubic-bezier(0.16, 1, 0.3, 1)`,
           }}
         />
-        <div
-          className="absolute inset-y-0 w-1/3 bg-white/40 blur-sm"
-          style={{ animation: "sigd-brillo 1.4s ease-in-out infinite" }}
-        />
+        <div className="absolute inset-y-0 w-1/3 animate-shimmer bg-white/50 blur-sm" />
       </div>
 
-      {/* puntos animados + porcentaje */}
-      <p className="mt-3 text-[11px] font-semibold text-blue-100">
-        Cargando
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            aria-hidden="true"
-            style={{ animation: `sigd-puntos 1s ease-in-out ${i * 0.2}s infinite` }}
-          >
-            .
-          </span>
-        ))}{" "}
-        <span className="font-mono">{progreso}%</span>
+      <p className="mt-3 font-mono text-[11px] font-semibold tracking-[0.18em] text-[#00539b]/80">
+        INICIALIZANDO · {progreso}%
       </p>
     </div>
   );

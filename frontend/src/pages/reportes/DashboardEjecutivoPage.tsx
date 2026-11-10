@@ -133,7 +133,7 @@ export default function DashboardEjecutivoPage() {
             >
               ← Volver al inicio
             </Link>
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-blue-700">SIGD / Dashboard</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#00539b]">SIGD / Dashboard</p>
             <h1 className="mt-2 text-2xl font-bold md:text-3xl">Tablero Directivo Ejecutivo</h1>
           </div>
           <ReportExportModal
@@ -158,7 +158,7 @@ export default function DashboardEjecutivoPage() {
               <h2 id="trend-title" className="text-lg font-semibold text-slate-900">
                 Tendencia de radicados y resueltos
               </h2>
-              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+              <span className="rounded-full bg-[#e8f4ff] px-2.5 py-1 text-xs font-semibold text-[#00539b]">
                 {trend.length} periodos
               </span>
             </div>
@@ -175,7 +175,7 @@ export default function DashboardEjecutivoPage() {
             </svg>
 
             <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
-              <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-700" />Radicados</span>
+              <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[#006ec7]" />Radicados</span>
               <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Resueltos</span>
             </div>
           </section>

@@ -19,8 +19,8 @@ const ESTILOS_ESTADO_ETAPA: Record<
     texto: "Completada",
   },
   EN_CURSO: {
-    insignia: "bg-blue-50 text-blue-700 border border-blue-200",
-    borde: "border-blue-400",
+    insignia: "bg-[#e8f4ff] text-[#00539b] border border-[#d7e9f7]",
+    borde: "border-[#38bdf8]",
     texto: "En curso",
   },
   BLOQUEADA: {
@@ -90,7 +90,7 @@ export default function StageDetailCard({
 
   return (
     <article
-      className={`rounded-xl border bg-white shadow-sm ${esActual ? "ring-2 ring-blue-200" : ""} ${estilo.borde}`}
+      className={`rounded-xl border bg-white shadow-sm ${esActual ? "ring-2 ring-[#d7e9f7]" : ""} ${estilo.borde}`}
     >
       <header className="flex items-start justify-between gap-3 border-b border-slate-100 p-5">
         <div className="flex items-center gap-3">
@@ -99,7 +99,7 @@ export default function StageDetailCard({
               etapa.estado === "COMPLETADA"
                 ? "bg-emerald-100 text-emerald-700"
                 : etapa.estado === "EN_CURSO"
-                  ? "bg-blue-100 text-blue-700"
+                  ? "bg-[#d7e9f7] text-[#00539b]"
                   : etapa.estado === "OBSERVADA"
                     ? "bg-red-100 text-red-700"
                     : "bg-slate-100 text-slate-500"

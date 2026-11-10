@@ -36,7 +36,7 @@ export function BandejaTabs({
             onClick={() => onCambiarEstado(estado)}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
               activo
-                ? "bg-blue-700 text-white shadow-sm"
+                ? "bg-[#006ec7] text-white shadow-sm"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
@@ -45,7 +45,7 @@ export function BandejaTabs({
               data-testid={`badge-${estado.toLowerCase()}`}
               className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                 activo
-                  ? "bg-white text-blue-800"
+                  ? "bg-white text-[#00539b]"
                   : "bg-slate-200 text-slate-700"
               }`}
             >

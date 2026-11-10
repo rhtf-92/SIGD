@@ -89,7 +89,7 @@ export default function FlujoValidezLegalPage() {
                 key={modulo.codigo}
                 className={`flex flex-col rounded-2xl border bg-white p-6 shadow-sm ${
                   disponible
-                    ? "border-slate-200 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+                    ? "border-slate-200 transition hover:-translate-y-0.5 hover:border-[#bfe0f7] hover:shadow-md"
                     : "border-dashed border-slate-300 opacity-70"
                 }`}
               >
@@ -121,7 +121,7 @@ export default function FlujoValidezLegalPage() {
                   {disponible && modulo.ruta ? (
                     <Link
                       to={modulo.ruta}
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+                      className="inline-flex items-center gap-2 rounded-lg bg-[#006ec7] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#00539b]"
                     >
                       Ir al artefacto →
                     </Link>

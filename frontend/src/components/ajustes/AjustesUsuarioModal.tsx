@@ -44,7 +44,7 @@ function FilaPreferencia({
     <label className="flex cursor-pointer items-start justify-between gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 transition-all hover:bg-white hover:shadow-sm">
       <span className="pr-2">
         <span className="block text-xs font-bold text-slate-900">{titulo}</span>
-        <span className="mt-0.5 block text-xs text-slate-500 leading-relaxed font-medium">
+        <span className="mt-0.5 block text-xs text-[#4b6b85] leading-relaxed font-medium">
           {descripcion}
         </span>
       </span>
@@ -104,27 +104,27 @@ export default function AjustesUsuarioModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="ajustes-titulo"
-      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-[#0b2a4a]/35 p-4 backdrop-blur-md animate-in fade-in duration-200"
       onClick={(evento) => {
         if (evento.target === evento.currentTarget) onClose();
       }}
     >
       <div 
-        className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-950/30 animate-in zoom-in-95 duration-200"
+        className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-2xl shadow-[#0b2a4a]/20 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-6 py-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-700">
+              <span className="rounded-full bg-[#e8f4ff] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#006ec7]">
                 Mi Cuenta
               </span>
               <h2 id="ajustes-titulo" className="text-base font-black text-slate-900">
                 Ajustes y Preferencias
               </h2>
             </div>
-            <p className="mt-0.5 text-xs text-slate-500 font-medium">
+            <p className="mt-0.5 text-xs text-[#4b6b85] font-medium">
               Gestione sus preferencias de sesión y notificaciones institucionales
             </p>
           </div>
@@ -133,7 +133,7 @@ export default function AjustesUsuarioModal({
             type="button"
             onClick={onClose}
             aria-label="Cerrar ventana de ajustes"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-[#4b6b85] shadow-sm transition hover:bg-[#e8f4ff] hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#006ec7]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -142,7 +142,7 @@ export default function AjustesUsuarioModal({
         {/* Modal Content - Scrollable */}
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
           {/* User Profile Card */}
-          <section className="flex items-center gap-3.5 rounded-2xl border border-blue-200/80 bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-blue-50/80 p-4 shadow-sm">
+          <section className="flex items-center gap-3.5 rounded-2xl border border-[#d7e9f7]/80 bg-gradient-to-r from-[#f4f8fb]/80 via-indigo-50/40 to-blue-50/80 p-4 shadow-sm">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-700 font-black text-white shadow-md shadow-blue-600/20 ring-2 ring-white">
               {inicialesNombre(usuario?.nombreCompleto)}
             </div>
@@ -155,8 +155,8 @@ export default function AjustesUsuarioModal({
                   Activo
                 </span>
               </div>
-              <p className="truncate text-xs text-slate-500 font-medium">{usuario?.correo}</p>
-              <div className="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-blue-700">
+              <p className="truncate text-xs text-[#4b6b85] font-medium">{usuario?.correo}</p>
+              <div className="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-[#006ec7]">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 <span>{rolCanonico ? ETIQUETA_ROL[rolCanonico] : "Sin sesión"}</span>
               </div>
@@ -166,7 +166,7 @@ export default function AjustesUsuarioModal({
           {/* Section: Casilla Electronica */}
           <section className="space-y-2.5">
             <div className="flex items-center gap-2 text-slate-700">
-              <Bell className="h-4 w-4 text-blue-600" />
+              <Bell className="h-4 w-4 text-[#006ec7]" />
               <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
                 Notificaciones de Casilla Electrónica
               </h3>
@@ -214,7 +214,7 @@ export default function AjustesUsuarioModal({
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
                 Ley N° 29733 · Protección de Datos Personales
               </p>
-              <p className="mt-1.5 leading-relaxed text-slate-500 font-medium">
+              <p className="mt-1.5 leading-relaxed text-[#4b6b85] font-medium">
                 Sus datos personales y credenciales institucionales están protegidos bajo estrictos protocolos de confidencialidad y custodia segura conforme a la normativa de Gobierno Digital.
               </p>
             </div>
@@ -226,13 +226,13 @@ export default function AjustesUsuarioModal({
                   onClose();
                   navigate("/administracion/seguridad");
                 }}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 transition hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99]"
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 transition hover:from-[#f4f8fb]0 hover:to-indigo-500 active:scale-[0.99]"
               >
                 <Lock className="h-3.5 w-3.5" />
                 <span>Gestionar seguridad y 2FA de la cuenta</span>
               </button>
             ) : (
-              <p className="text-[11px] text-slate-400 font-medium px-1">
+              <p className="text-[11px] text-[#6b8aa5] font-medium px-1">
                 Para cambio de contraseña o activación de 2FA, contacte a Mesa de Partes o Administración.
               </p>
             )}
@@ -241,13 +241,13 @@ export default function AjustesUsuarioModal({
 
         {/* Modal Footer */}
         <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-6 py-4">
-          <span className="text-[11px] text-slate-400 font-medium">
+          <span className="text-[11px] text-[#6b8aa5] font-medium">
             Los cambios se guardan automáticamente
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-slate-900/10 transition hover:bg-slate-800 active:scale-95"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#006ec7] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-[#006ec7]/20 transition hover:bg-[#00539b] active:scale-95"
           >
             <Check className="h-3.5 w-3.5" />
             <span>Hecho</span>

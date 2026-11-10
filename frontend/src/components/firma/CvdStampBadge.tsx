@@ -18,7 +18,7 @@ export default function CvdStampBadge({
         <div className="flex gap-4 items-center">
           <QrCodeGenerator value={urlCompleta} size={120} ariaLabel="QR de verificación de CVD" />
           <div className="space-y-1">
-            <span className="inline-block rounded bg-blue-100 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-800">
+            <span className="inline-block rounded bg-[#d7e9f7] px-2 py-0.5 font-mono text-[11px] font-bold text-[#00539b]">
               {estampa.codigoCvd}
             </span>
             <p className="font-semibold text-slate-900">{estampa.firmanteNombre}</p>
@@ -65,7 +65,7 @@ export default function CvdStampBadge({
 
         <div className="rounded bg-white p-1 border border-slate-200">
           <p className="text-[8px] text-slate-500 uppercase font-bold">Código CVD</p>
-          <p className="font-mono text-[10px] font-bold text-blue-800 break-all">
+          <p className="font-mono text-[10px] font-bold text-[#00539b] break-all">
             {estampa.codigoCvd}
           </p>
         </div>
@@ -91,7 +91,7 @@ export default function CvdStampBadge({
         <p>
           Esta es una representación impresa cuya autenticidad e integridad puede ser
           contrastada a través de la siguiente dirección web:{" "}
-          <span className="font-mono text-blue-700 underline">{estampa.urlValidacion}</span>{" "}
+          <span className="font-mono text-[#00539b] underline">{estampa.urlValidacion}</span>{" "}
           ingresando la clave CVD indicada conforme al D.S. N.° 070-2013-PCM.
         </p>
       </div>

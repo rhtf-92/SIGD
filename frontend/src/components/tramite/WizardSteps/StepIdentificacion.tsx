@@ -22,7 +22,7 @@ import type {
   TipoDocumentoIdentidad,
   WizardAction,
 } from '../../../types/tramiteWizardState';
-import type { PersonaDniDemo } from '../../../data/padronDniDemo';
+import type { PersonaDni } from '../../../data/personaDni';
 import LectorDniDigital from '../../dni/LectorDniDigital';
 
 export interface StepIdentificacionProps {
@@ -149,7 +149,7 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
     });
   };
 
-  const autocompletarConDni = (persona: PersonaDniDemo) => {
+  const autocompletarConDni = (persona: PersonaDni) => {
     dispatch({
       type: 'UPDATE_IDENTIFICACION',
       payload: {
@@ -157,9 +157,9 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
         numeroDocumento: persona.dni,
         nombres: persona.nombres,
         apellidos: persona.apellidos,
-        correo: persona.correo,
-        telefono: persona.telefono,
-        direccion: persona.direccion,
+        ...(persona.correo ? { correo: persona.correo } : {}),
+        ...(persona.telefono ? { telefono: persona.telefono } : {}),
+        ...(persona.direccion ? { direccion: persona.direccion } : {}),
       },
     });
     setTouched((prev) => ({
@@ -207,13 +207,13 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
         </p>
       </header>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-[#d7e9f7] bg-[#f4f8fb] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="flex items-center gap-2 text-sm font-semibold text-white">
-            <span className="h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse-soft" />
+          <p className="flex items-center gap-2 text-sm font-semibold text-[#0b2a4a]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#006ec7] animate-pulse-soft" />
             Lector de DNI digital
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+          <p className="mt-1 text-xs leading-relaxed text-[#4b6b85]">
             Detecta el código PDF417 y completa automáticamente tus datos de identidad y contacto.
           </p>
         </div>

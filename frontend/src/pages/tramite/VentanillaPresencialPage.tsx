@@ -132,16 +132,16 @@ export default function VentanillaPresencialPage() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
           <nav className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <Link to="/" className="hover:text-blue-700">Inicio</Link>
+            <Link to="/" className="hover:text-[#00539b]">Inicio</Link>
             <span>/</span>
-            <Link to="/tramite" className="hover:text-blue-700">Trámite Documentario</Link>
+            <Link to="/tramite" className="hover:text-[#00539b]">Trámite Documentario</Link>
             <span>/</span>
             <span className="text-slate-800">Ventanilla Presencial</span>
           </nav>
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#00539b]">
                 Módulo 02 · Mesa de Partes y Registro Documentario
               </p>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
@@ -203,7 +203,7 @@ export default function VentanillaPresencialPage() {
                   setTipoPersona("NATURAL");
                   setTipoDoc("DNI");
                 }}
-                className="text-blue-600 focus:ring-blue-500"
+                className="text-[#006ec7] focus:ring-[#006ec7]"
               />
               Persona Natural
             </label>
@@ -216,7 +216,7 @@ export default function VentanillaPresencialPage() {
                   setTipoPersona("JURIDICA");
                   setTipoDoc("RUC");
                 }}
-                className="text-blue-600 focus:ring-blue-500"
+                className="text-[#006ec7] focus:ring-[#006ec7]"
               />
               Persona Jurídica
             </label>
@@ -231,7 +231,7 @@ export default function VentanillaPresencialPage() {
                 id="tipo-doc-select"
                 value={tipoDoc}
                 onChange={(e) => setTipoDoc(e.target.value as "DNI" | "RUC" | "CE")}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none"
               >
                 {tipoPersona === "NATURAL" ? (
                   <>
@@ -255,7 +255,7 @@ export default function VentanillaPresencialPage() {
                 value={numeroDoc}
                 onChange={(e) => setNumeroDoc(e.target.value)}
                 placeholder={tipoDoc === "DNI" ? "8 dígitos" : "11 dígitos"}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-[#006ec7] focus:outline-none"
               />
             </div>
 
@@ -269,7 +269,7 @@ export default function VentanillaPresencialPage() {
                 required
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none"
               />
             </div>
           </div>
@@ -286,7 +286,7 @@ export default function VentanillaPresencialPage() {
                 value={correo}
                 onChange={(e) => setCorreo(e.target.value)}
                 placeholder="ejemplo@correo.com"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none"
               />
             </div>
 
@@ -301,7 +301,7 @@ export default function VentanillaPresencialPage() {
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
                 placeholder="9XXXXXXXX"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none"
               />
             </div>
           </div>
@@ -319,7 +319,7 @@ export default function VentanillaPresencialPage() {
                   setProcedimientoTupa(e.target.value);
                   setRequisitosRecibidos(new Set());
                 }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none"
               >
                 <option value="">Seleccione un procedimiento o servicio</option>
                 <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
@@ -348,7 +348,7 @@ export default function VentanillaPresencialPage() {
                 id="tipo-documento-select"
                 value={tipoDocumento}
                 onChange={(e) => setTipoDocumento(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none"
               >
                 <option value="SOLICITUD">Solicitud Simple / Formato Único</option>
                 <option value="OFICIO">Oficio Institucional</option>
@@ -370,7 +370,7 @@ export default function VentanillaPresencialPage() {
                 required
                 value={cantidadFolios}
                 onChange={(e) => setCantidadFolios(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-[#006ec7] focus:outline-none"
               />
             </div>
           </div>
@@ -378,9 +378,9 @@ export default function VentanillaPresencialPage() {
           {procedimientoSeleccionado && (
             <section
               aria-labelledby="detalle-tupa-heading"
-              className="rounded-lg border border-blue-200 bg-blue-50/60 p-4"
+              className="rounded-lg border border-[#d7e9f7] bg-[#e8f4ff]/60 p-4"
             >
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-200 pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#d7e9f7] pb-3">
                 <div>
                   <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
                     {esServicioProductivo ? "Servicio productivo" : "TUPA"} {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
@@ -421,7 +421,7 @@ export default function VentanillaPresencialPage() {
                                 return siguientes;
                               });
                             }}
-                            className="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
+                            className="mt-0.5 rounded border-slate-300 text-[#00539b] focus:ring-[#006ec7]"
                           />
                           <span>{requisito}</span>
                         </label>
@@ -443,7 +443,7 @@ export default function VentanillaPresencialPage() {
               )}
 
               {(procedimientoSeleccionado.dependencia || procedimientoSeleccionado.autoridad || procedimientoSeleccionado.tiempoMaximo) && (
-                <dl className="mt-3 grid gap-2 border-t border-blue-200 pt-3 text-xs sm:grid-cols-3">
+                <dl className="mt-3 grid gap-2 border-t border-[#d7e9f7] pt-3 text-xs sm:grid-cols-3">
                   {procedimientoSeleccionado.dependencia && (
                     <div><dt className="font-bold text-slate-700">Dependencia</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.dependencia}</dd></div>
                   )}
@@ -472,7 +472,7 @@ export default function VentanillaPresencialPage() {
               value={asunto}
               onChange={(e) => setAsunto(e.target.value)}
               placeholder="Describa brevemente el petitorio del administrado..."
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none"
             />
           </div>
 
@@ -486,7 +486,7 @@ export default function VentanillaPresencialPage() {
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-800 transition"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#006ec7] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#00539b] transition"
             >
               ✓ Registrar y Emitir Cargo CUT
             </button>

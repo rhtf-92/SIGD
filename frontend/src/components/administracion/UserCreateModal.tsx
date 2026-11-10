@@ -45,20 +45,20 @@ export default function UserCreateModal({ onClose, onCreated }: Props) {
   }
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
-  const inputCls = "w-full rounded-xl border border-cyan-400/40 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-cyan-400/60";
+  const inputCls = "w-full rounded-xl border border-[#bfe0f7] bg-white px-3 py-2 text-sm text-[#0b2a4a] placeholder:text-[#4b6b85] outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-[#006ec7]";
   const campo = (label: string, key: string, placeholder: string, tipo = "text", requerido = true) => (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-semibold text-slate-300">{label}{requerido && <span className="text-cyan-400"> *</span>}</label>
+      <label className="text-xs font-semibold text-[#4b6b85]">{label}{requerido && <span className="text-[#006ec7]"> *</span>}</label>
       <input type={tipo} placeholder={placeholder} value={(form as any)[key]} onChange={(e) => set(key, e.target.value)} required={requerido} className={inputCls} />
     </div>
   );
 
   return (
-    <div className="sigd-fade-in fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
-      <div className="sigd-fade-in w-full max-w-2xl overflow-hidden rounded-2xl border border-cyan-400/40 bg-[rgba(15,23,42,0.68)] shadow-[0_0_15px_rgba(6,182,212,0.15)] backdrop-blur-[12px]">
-        <div className="border-b border-cyan-400/25 px-6 py-4">
-          <h3 className="text-xl font-semibold text-slate-100">Nuevo usuario institucional</h3>
-          <p className="mt-1 text-xs text-slate-400">Correo @iestpsuiza.edu.pe. Contraseña mínimo 8 caracteres.</p>
+    <div className="sigd-fade-in fixed inset-0 z-50 flex items-center justify-center bg-[#0b2a4a]/35 p-4">
+      <div className="sigd-fade-in max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#bfe0f7] bg-white shadow-[0_18px_45px_-24px_rgba(0,110,199,0.4)] backdrop-blur-[12px]">
+        <div className="border-b border-[#d7e9f7] px-6 py-4">
+          <h3 className="text-xl font-semibold text-[#0b2a4a]">Nuevo usuario institucional</h3>
+          <p className="mt-1 text-xs text-[#6b8aa5]">Correo @iestpsuiza.edu.pe. Contraseña mínimo 8 caracteres.</p>
         </div>
         <form className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2" onSubmit={submit}>
           {campo("Nombres", "nombres", "Ej. Juan Carlos")}
@@ -70,15 +70,15 @@ export default function UserCreateModal({ onClose, onCreated }: Props) {
           {campo("Contraseña inicial", "password", "Mínimo 8 caracteres", "password")}
           {campo("Teléfono (opcional)", "telefono", "999999999", "text", false)}
           <div className="flex flex-col gap-1">
-            <label htmlFor="select-rol-institucional" className="text-xs font-semibold text-slate-300">Rol institucional <span className="text-cyan-400">*</span></label>
+            <label htmlFor="select-rol-institucional" className="text-xs font-semibold text-[#4b6b85]">Rol institucional <span className="text-[#006ec7]">*</span></label>
             <select id="select-rol-institucional" value={form.rolClave} onChange={(e) => set("rolClave", e.target.value)} required className={inputCls}>
-              {rolesOpciones.map((r) => <option key={r.clave} value={r.clave} className="bg-slate-900">{r.etiqueta}</option>)}
+              {rolesOpciones.map((r) => <option key={r.clave} value={r.clave} className="bg-white">{r.etiqueta}</option>)}
             </select>
           </div>
-          {error && <p className="rounded-xl border border-red-500/30 bg-red-950/30 px-3 py-2 text-sm text-red-200 sm:col-span-2">{error}</p>}
+          {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2">{error}</p>}
           <div className="mt-2 flex justify-end gap-3 sm:col-span-2">
-            <button type="button" onClick={onClose} className="rounded-xl border border-cyan-400/40 bg-slate-900/40 px-4 py-2 text-sm font-semibold text-slate-200 transition-all duration-300 ease-out hover:brightness-110">Cancelar</button>
-            <button type="submit" disabled={loading} className="rounded-xl border border-cyan-400/40 bg-cyan-600/25 px-4 py-2 text-sm font-semibold text-cyan-100 transition-all duration-300 ease-out hover:brightness-125 disabled:opacity-60">{loading ? "Guardando..." : "Crear usuario"}</button>
+            <button type="button" onClick={onClose} className="rounded-xl border border-[#bfe0f7] bg-[#e8f4ff] px-4 py-2 text-sm font-semibold text-[#2f648c] transition-all duration-300 ease-out hover:brightness-110">Cancelar</button>
+            <button type="submit" disabled={loading} className="rounded-xl bg-[#006ec7] px-4 py-2 text-sm font-semibold text-white transition-all duration-300 ease-out hover:bg-[#00539b] disabled:opacity-60">{loading ? "Guardando..." : "Crear usuario"}</button>
           </div>
         </form>
       </div>

@@ -67,7 +67,7 @@ export function ConsentimientoLey29733Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b2a4a]/35 p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !isSubmitting) onClose();
       }}
@@ -78,8 +78,8 @@ export function ConsentimientoLey29733Modal({
         aria-labelledby="consentimiento-29733-title"
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl"
       >
-        <header className="border-b border-slate-200 bg-slate-900 px-6 py-5 text-white">
-          <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
+        <header className="border-b border-slate-200 bg-[#00539b] px-6 py-5 text-white">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#00539b]">
             Protección de datos personales · Ley N° 29733
           </p>
           <h2 id="consentimiento-29733-title" className="mt-2 text-xl font-bold">
@@ -144,7 +144,7 @@ export function ConsentimientoLey29733Modal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-[#e8f4ff] disabled:cursor-not-allowed disabled:opacity-60"
           >
             Cancelar
           </button>
@@ -152,7 +152,7 @@ export function ConsentimientoLey29733Modal({
             type="button"
             onClick={handleSubmit}
             disabled={!consentimiento || isSubmitting}
-            className="rounded-lg bg-blue-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-900 disabled:cursor-not-allowed disabled:bg-slate-400"
+            className="rounded-lg bg-[#00539b] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#00539b] disabled:cursor-not-allowed disabled:bg-slate-400"
           >
             {isSubmitting ? "Registrando…" : "Aceptar y continuar"}
           </button>

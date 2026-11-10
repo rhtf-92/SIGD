@@ -50,7 +50,7 @@ function Ramas({ nodos, expandidos, onAlternar }: RamasProps) {
           <li key={nodo.ruta}>
             <div
               className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2.5 ${
-                expandido ? "border-blue-200 bg-blue-50/50" : "border-slate-200 bg-white"
+                expandido ? "border-[#d7e9f7] bg-[#f4f8fb]" : "border-[#d7e9f7] bg-white"
               }`}
             >
               {tieneHijos ? (
@@ -62,7 +62,7 @@ function Ramas({ nodos, expandidos, onAlternar }: RamasProps) {
                       ? `Contraer ${nodo.nombre}`
                       : `Expandir ${nodo.nombre}`
                   }
-                  className="flex h-6 w-6 items-center justify-center rounded text-sm font-bold text-slate-500 hover:bg-slate-200"
+                  className="flex h-6 w-6 items-center justify-center rounded text-sm font-bold text-[#4b6b85] hover:bg-[#d7e9f7]"
                 >
                   {expandido ? "−" : "+"}
                 </button>
@@ -70,20 +70,20 @@ function Ramas({ nodos, expandidos, onAlternar }: RamasProps) {
                 <span className="h-6 w-6" aria-hidden="true" />
               )}
 
-              <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-600">
+              <span className="rounded bg-[#e8f4ff] px-2 py-0.5 font-mono text-xs font-semibold text-[#4b6b85]">
                 {nodo.ruta}
               </span>
-              <span className="rounded bg-blue-100 px-2 py-0.5 font-mono text-xs font-semibold text-blue-700">
+              <span className="rounded bg-[#e8f4ff] px-2 py-0.5 font-mono text-xs font-semibold text-[#006ec7]">
                 {nodo.codigo}
               </span>
               <span className="text-sm font-semibold">{nodo.nombre}</span>
-              <span className="text-xs text-slate-500">{nodo.detalle}</span>
+              <span className="text-xs text-[#4b6b85]">{nodo.detalle}</span>
 
               <span
                 className={`ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ${
                   nodo.estado === "Activo"
                     ? "bg-emerald-100 text-emerald-700"
-                    : "bg-slate-200 text-slate-700"
+                    : "bg-[#d7e9f7] text-[#2f648c]"
                 }`}
               >
                 {nodo.estado}
@@ -91,7 +91,7 @@ function Ramas({ nodos, expandidos, onAlternar }: RamasProps) {
             </div>
 
             {tieneHijos && expandido && (
-              <div className="ml-6 mt-2 border-l-2 border-slate-200 pl-4">
+              <div className="ml-6 mt-2 border-l-2 border-[#d7e9f7] pl-4">
                 <Ramas
                   nodos={nodo.children}
                   expandidos={expandidos}

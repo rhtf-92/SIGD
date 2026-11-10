@@ -43,7 +43,7 @@ export default function DocumentoCvdViewer({
         <div className="flex items-center gap-2">
           <Link
             to={`/validador-cvd?cvd=${encodeURIComponent(estampa.codigoCvd)}`}
-            className="rounded-lg border border-blue-600 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition"
+            className="rounded-lg border border-[#006ec7] bg-[#e8f4ff] px-3 py-1.5 text-xs font-semibold text-[#00539b] hover:bg-[#d7e9f7] transition"
           >
             Verificar en Portal Público CVD →
           </Link>

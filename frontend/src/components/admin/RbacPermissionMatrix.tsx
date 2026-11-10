@@ -53,23 +53,23 @@ export default function RbacPermissionMatrix({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 border">
-        <thead className="bg-gray-50">
+      <table className="min-w-full divide-y divide-[#eaf3fb] border">
+        <thead className="bg-[#f4f8fb]">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
+            <th className="px-6 py-3 text-left text-xs font-medium text-[#6b8aa5] uppercase tracking-wider border-r">
               Permisos / Roles
             </th>
             {roles.map((rol) => (
-              <th key={rol} className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th key={rol} className="px-6 py-3 text-center text-xs font-medium text-[#6b8aa5] uppercase tracking-wider">
                 {rol}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white divide-y divide-[#eaf3fb]">
           {permisos.map((permiso) => (
-            <tr key={permiso} className="hover:bg-gray-50">
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
+            <tr key={permiso} className="hover:bg-[#f4f8fb]">
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#0b2a4a] border-r">
                 {permiso}
               </td>
               {roles.map((rol) => (
@@ -78,7 +78,7 @@ export default function RbacPermissionMatrix({
                     type="checkbox"
                     checked={matriz[rol]?.[permiso] || false}
                     onChange={() => handleCheckboxChange(rol, permiso)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                    className="h-4 w-4 text-[#006ec7] focus:ring-[#006ec7] border-[#bfe0f7] rounded cursor-pointer"
                   />
                 </td>
               ))}

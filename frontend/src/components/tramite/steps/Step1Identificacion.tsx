@@ -105,7 +105,7 @@ export const Step1Identificacion: React.FC<Step1IdentificacionProps> = ({
             onClick={() => handleTipoPersonaChange("NATURAL")}
             className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition cursor-pointer ${
               data.tipoPersona === "NATURAL"
-                ? "border-[#006EC7] bg-blue-50/60 text-[#006EC7] font-semibold shadow-xs"
+                ? "border-[#006EC7] bg-[#e8f4ff]/60 text-[#006EC7] font-semibold shadow-xs"
                 : "border-slate-200 hover:border-slate-300 text-slate-700 bg-white"
             }`}
           >
@@ -113,7 +113,7 @@ export const Step1Identificacion: React.FC<Step1IdentificacionProps> = ({
               <p className="text-sm font-bold text-slate-900">Persona Natural</p>
               <p className="text-xs text-slate-500">Estudiantes, egresados, docentes y ciudadanos</p>
             </div>
-            <span className="text-xs font-bold px-2.5 py-1 rounded bg-blue-100/80 text-blue-800">
+            <span className="text-xs font-bold px-2.5 py-1 rounded bg-[#d7e9f7]/80 text-[#00539b]">
               DNI
             </span>
           </button>
@@ -123,7 +123,7 @@ export const Step1Identificacion: React.FC<Step1IdentificacionProps> = ({
             onClick={() => handleTipoPersonaChange("JURIDICA")}
             className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition cursor-pointer ${
               data.tipoPersona === "JURIDICA"
-                ? "border-[#006EC7] bg-blue-50/60 text-[#006EC7] font-semibold shadow-xs"
+                ? "border-[#006EC7] bg-[#e8f4ff]/60 text-[#006EC7] font-semibold shadow-xs"
                 : "border-slate-200 hover:border-slate-300 text-slate-700 bg-white"
             }`}
           >
@@ -131,7 +131,7 @@ export const Step1Identificacion: React.FC<Step1IdentificacionProps> = ({
               <p className="text-sm font-bold text-slate-900">Persona Jurídica</p>
               <p className="text-xs text-slate-500">Empresas, instituciones públicas y privadas</p>
             </div>
-            <span className="text-xs font-bold px-2.5 py-1 rounded bg-blue-100/80 text-blue-800">
+            <span className="text-xs font-bold px-2.5 py-1 rounded bg-[#d7e9f7]/80 text-[#00539b]">
               RUC
             </span>
           </button>
@@ -218,7 +218,7 @@ export const Step1Identificacion: React.FC<Step1IdentificacionProps> = ({
 
       {/* 4. Programa de Estudios: SearchableSelect con las 11 Carreras Oficiales del IESTP Suiza */}
       {data.tipoPersona === "NATURAL" && (
-        <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-2">
+        <div className="rounded-xl border border-[#eaf3fb] bg-[#e8f4ff]/40 p-4 space-y-2">
           <SearchableSelect
             label="Programa de Estudios (Carrera Profesional)"
             required

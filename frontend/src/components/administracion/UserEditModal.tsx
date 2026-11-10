@@ -112,22 +112,22 @@ export default function UserEditModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 sigd-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b2a4a]/35 p-4 sigd-fade-in"
       role="dialog"
       aria-modal="true"
       aria-label={`Administrar cuenta de ${usuario.nombre}`}
     >
-      <div className="sigd-fade-in w-full max-w-lg rounded-2xl border border-cyan-400/40 bg-[rgba(15,23,42,0.68)] p-6 shadow-[0_0_15px_rgba(6,182,212,0.15)] backdrop-blur-[12px]">
+      <div className="sigd-fade-in max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#bfe0f7] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(0,110,199,0.4)] backdrop-blur-[12px]">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h3 className="text-xl font-bold">Administrar cuenta</h3>
-            <p className="mt-1 text-sm text-slate-400">{usuario.nombre}</p>
-            <p className="mt-0.5 text-xs text-slate-400">DNI: {usuario.dni}</p>
+            <p className="mt-1 text-sm text-[#6b8aa5]">{usuario.nombre}</p>
+            <p className="mt-0.5 text-xs text-[#6b8aa5]">DNI: {usuario.dni}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-400 hover:bg-slate-900/50"
+            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-[#6b8aa5] hover:bg-[#e8f4ff]"
           >
             Cerrar
           </button>
@@ -149,10 +149,10 @@ export default function UserEditModal({
                   message: "El nombre completo debe tener al menos 3 caracteres.",
                 },
               })}
-              className="w-full rounded-xl border border-cyan-400/40 bg-slate-950/40 px-3 py-2.5 text-sm text-slate-100 outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-cyan-400/60"
+              className="w-full rounded-xl border border-[#bfe0f7] bg-white px-3 py-2.5 text-sm text-[#0b2a4a] outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-[#006ec7]"
             />
             {errors.nombre && (
-              <p id="error-usuario-nombre" className="mt-1 text-xs text-red-300">
+              <p id="error-usuario-nombre" className="mt-1 text-xs text-red-600">
                 {errors.nombre.message}
               </p>
             )}
@@ -173,10 +173,10 @@ export default function UserEditModal({
                   message: "El DNI debe contener exactamente 8 dígitos.",
                 },
               })}
-              className="w-full rounded-xl border border-cyan-400/40 bg-slate-950/40 px-3 py-2.5 text-sm text-slate-100 outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-cyan-400/60"
+              className="w-full rounded-xl border border-[#bfe0f7] bg-white px-3 py-2.5 text-sm text-[#0b2a4a] outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-[#006ec7]"
             />
             {errors.dni && (
-              <p id="error-usuario-dni" className="mt-1 text-xs text-red-300">
+              <p id="error-usuario-dni" className="mt-1 text-xs text-red-600">
                 {errors.dni.message}
               </p>
             )}
@@ -191,7 +191,7 @@ export default function UserEditModal({
               aria-invalid={errors.area ? "true" : "false"}
               aria-describedby={errors.area ? "error-usuario-area" : undefined}
               {...register("area", { required: "Debe seleccionar un área orgánica." })}
-              className="w-full rounded-xl border border-cyan-400/40 bg-slate-950/40 px-3 py-2.5 text-sm text-slate-100 outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-cyan-400/60"
+              className="w-full rounded-xl border border-[#bfe0f7] bg-white px-3 py-2.5 text-sm text-[#0b2a4a] outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-[#006ec7]"
             >
               {areas.map((area) => (
                 <option key={area} value={area}>
@@ -200,7 +200,7 @@ export default function UserEditModal({
               ))}
             </select>
             {errors.area && (
-              <p id="error-usuario-area" className="mt-1 text-xs text-red-300">
+              <p id="error-usuario-area" className="mt-1 text-xs text-red-600">
                 {errors.area.message}
               </p>
             )}
@@ -215,7 +215,7 @@ export default function UserEditModal({
               aria-invalid={errors.sede ? "true" : "false"}
               aria-describedby={errors.sede ? "error-usuario-sede" : undefined}
               {...register("sede", { required: "Debe seleccionar una sede." })}
-              className="w-full rounded-xl border border-cyan-400/40 bg-slate-950/40 px-3 py-2.5 text-sm text-slate-100 outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-cyan-400/60"
+              className="w-full rounded-xl border border-[#bfe0f7] bg-white px-3 py-2.5 text-sm text-[#0b2a4a] outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-[#006ec7]"
             >
               {sedes.map((sede) => (
                 <option key={sede} value={sede}>
@@ -224,7 +224,7 @@ export default function UserEditModal({
               ))}
             </select>
             {errors.sede && (
-              <p id="error-usuario-sede" className="mt-1 text-xs text-red-300">
+              <p id="error-usuario-sede" className="mt-1 text-xs text-red-600">
                 {errors.sede.message}
               </p>
             )}
@@ -245,10 +245,10 @@ export default function UserEditModal({
                   message: "El cargo debe tener al menos 3 caracteres.",
                 },
               })}
-              className="w-full rounded-xl border border-cyan-400/40 bg-slate-950/40 px-3 py-2.5 text-sm text-slate-100 outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-cyan-400/60"
+              className="w-full rounded-xl border border-[#bfe0f7] bg-white px-3 py-2.5 text-sm text-[#0b2a4a] outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-[#006ec7]"
             />
             {errors.cargo && (
-              <p id="error-usuario-cargo" className="mt-1 text-xs text-red-300">
+              <p id="error-usuario-cargo" className="mt-1 text-xs text-red-600">
                 {errors.cargo.message}
               </p>
             )}
@@ -263,7 +263,7 @@ export default function UserEditModal({
               aria-invalid={errors.rol ? "true" : "false"}
               aria-describedby={errors.rol ? "error-usuario-rol" : undefined}
               {...register("rol", { required: "Debe asignar un rol institucional." })}
-              className="w-full rounded-xl border border-cyan-400/40 bg-slate-950/40 px-3 py-2.5 text-sm text-slate-100 outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-cyan-400/60"
+              className="w-full rounded-xl border border-[#bfe0f7] bg-white px-3 py-2.5 text-sm text-[#0b2a4a] outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-[#006ec7]"
             >
               {rolesDisponibles.map((rol) => (
                 <option key={rol} value={rol}>
@@ -272,7 +272,7 @@ export default function UserEditModal({
               ))}
             </select>
             {errors.rol && (
-              <p id="error-usuario-rol" className="mt-1 text-xs text-red-300">
+              <p id="error-usuario-rol" className="mt-1 text-xs text-red-600">
                 {errors.rol.message}
               </p>
             )}
@@ -300,10 +300,10 @@ export default function UserEditModal({
                   MENSAJE_DOMINIO,
               })}
               placeholder={`@${CORREO_INSTITUCIONAL_DOMINIO}`}
-              className="w-full rounded-xl border border-cyan-400/40 bg-slate-950/40 px-3 py-2.5 text-sm text-slate-100 outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-cyan-400/60"
+              className="w-full rounded-xl border border-[#bfe0f7] bg-white px-3 py-2.5 text-sm text-[#0b2a4a] outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-[#006ec7]"
             />
             {errors.correo && (
-              <p id="error-usuario-correo" className="mt-1 text-xs text-red-300">
+              <p id="error-usuario-correo" className="mt-1 text-xs text-red-600">
                 {errors.correo.message}
               </p>
             )}
@@ -323,7 +323,7 @@ export default function UserEditModal({
                   (ESTADOS as string[]).includes(valor) ||
                   "El estado debe ser Activo, Inactivo o Bloqueado.",
               })}
-              className="w-full rounded-xl border border-cyan-400/40 bg-slate-950/40 px-3 py-2.5 text-sm text-slate-100 outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-cyan-400/60"
+              className="w-full rounded-xl border border-[#bfe0f7] bg-white px-3 py-2.5 text-sm text-[#0b2a4a] outline-none transition-all duration-300 ease-out hover:brightness-110 focus:border-[#006ec7]"
             >
               {ESTADOS.map((item) => (
                 <option key={item} value={item}>
@@ -332,7 +332,7 @@ export default function UserEditModal({
               ))}
             </select>
             {errors.estado && (
-              <p id="error-usuario-estado" className="mt-1 text-xs text-red-300">
+              <p id="error-usuario-estado" className="mt-1 text-xs text-red-600">
                 {errors.estado.message}
               </p>
             )}
@@ -342,14 +342,14 @@ export default function UserEditModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-cyan-400/40 px-4 py-2 text-sm font-semibold hover:bg-slate-900/50"
+              className="rounded-lg border border-[#bfe0f7] px-4 py-2 text-sm font-semibold hover:bg-[#e8f4ff]"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+              className="rounded-lg bg-[#006ec7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#00539b] disabled:opacity-60"
             >
               {isSubmitting ? "Guardando..." : "Guardar cambios"}
             </button>

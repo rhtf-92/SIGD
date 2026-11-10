@@ -289,7 +289,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                       opt.disabled
                         ? "opacity-50 cursor-not-allowed bg-slate-50"
                         : isSelected
-                        ? "bg-blue-50/80 text-[#006EC7] font-semibold"
+                        ? "bg-[#e8f4ff]/80 text-[#006EC7] font-semibold"
                         : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                     }`}
                   >

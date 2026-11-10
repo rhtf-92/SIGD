@@ -81,28 +81,28 @@ export default function PasarelaFirmaPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="min-h-screen bg-[#e8f4ff] text-slate-900">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-5">
           <Link
             to="/"
-            className="mb-4 mr-3 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            className="mb-4 mr-3 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-[#e8f4ff]"
           >
             ← Volver al inicio
           </Link>
           <Link
             to="/flujo-validez-legal"
-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-[#e8f4ff]"
           >
             ← Volver al módulo
           </Link>
-          <p className="text-sm font-bold text-blue-700">
+          <p className="text-sm font-bold text-[#006ec7]">
             ENT-M04-03 · Adriano David Espinoza Ramírez (R/A) · Mayra (R)
           </p>
           <h1 className="text-2xl font-bold">
             Pasarela Frontend de Despacho de Firma Digital (Refirma RENIEC)
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-[#4b6b85]">
             Invocación del agente local mediante el protocolo{" "}
             <code>refirma://sign?token=&hash=&callback=</code> · Firma PAdES-BES
             con sellado de tiempo TSA (RFC 3161).
@@ -114,7 +114,7 @@ export default function PasarelaFirmaPage() {
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <div className="mr-auto">
             <h2 className="text-lg font-bold">Documentos pendientes de suscripción</h2>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-[#4b6b85]">
               Bandeja criptográfica de la Dirección General y Secretaría Académica.
             </p>
           </div>
@@ -122,7 +122,7 @@ export default function PasarelaFirmaPage() {
           <button
             type="button"
             onClick={() => setDrawerAbierto(true)}
-            className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="rounded-lg bg-[#00539b] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#00539b] focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:outline-none"
           >
             Firmar en lote (Secretaría)
           </button>
@@ -131,7 +131,7 @@ export default function PasarelaFirmaPage() {
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <thead className="bg-slate-50 text-xs uppercase text-[#4b6b85]">
                 <tr>
                   <th className="px-5 py-3" scope="col">
                     Documento
@@ -154,7 +154,7 @@ export default function PasarelaFirmaPage() {
                       <p className="text-sm font-bold text-slate-800">
                         {documento.tipoActo} · {documento.numeroCorrelativo}
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-[#4b6b85]">
                         HASH: {documento.hashSha256.slice(0, 12)}…
                       </p>
                     </td>
@@ -178,7 +178,7 @@ export default function PasarelaFirmaPage() {
                         <button
                           type="button"
                           onClick={() => abrirFirmaUnica(documento)}
-                          className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                          className="rounded-lg bg-[#006ec7] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#00539b] focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:outline-none"
                         >
                           Firmar
                         </button>
@@ -196,7 +196,7 @@ export default function PasarelaFirmaPage() {
           </div>
         </div>
 
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-xs leading-5 text-slate-500">
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-xs leading-5 text-[#4b6b85]">
           La pasarela nunca solicita, intercepta ni almacena la clave privada o
           el PIN del firmante: la operación criptográfica ocurre en el
           dispositivo seguro (DNIe / Token). El backend valida la vigencia del

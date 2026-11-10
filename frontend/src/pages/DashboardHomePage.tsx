@@ -13,7 +13,7 @@ export default function DashboardHomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6 py-12 text-slate-900">
       <div className="text-center space-y-2 max-w-2xl">
-        <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800">
+        <div className="inline-flex items-center gap-2 rounded-full bg-[#d7e9f7] px-3 py-1 text-xs font-bold text-[#00539b]">
           IESTP &quot;Suiza&quot; — Pucallpa
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
@@ -49,7 +49,7 @@ export default function DashboardHomePage() {
               </span>
               <Link
                 to="/login"
-                className="rounded-full bg-blue-700 px-3 py-1 text-white hover:bg-blue-800"
+                className="rounded-full bg-[#006ec7] px-3 py-1 text-white hover:bg-[#00539b]"
               >
                 Iniciar sesión para ver tus módulos
               </Link>
@@ -71,16 +71,16 @@ export default function DashboardHomePage() {
             to={seccion.ruta}
             className={`group rounded-xl border p-6 shadow-sm transition duration-200 ease-out hover:shadow-md motion-safe:hover:-translate-y-1 motion-reduce:transition-none ${
               seccion.destacado
-                ? "border-blue-300 bg-blue-50/50 hover:border-blue-400"
+                ? "border-[#bfe0f7] bg-[#e8f4ff]/50 hover:border-[#38bdf8]"
                 : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
             {seccion.subtitulo && (
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#006ec7]">
                 {seccion.subtitulo}
               </span>
             )}
-            <h2 className="mt-1 text-lg font-bold text-slate-900 group-hover:text-blue-700">
+            <h2 className="mt-1 text-lg font-bold text-slate-900 group-hover:text-[#00539b]">
               {seccion.titulo}
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">

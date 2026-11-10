@@ -5,7 +5,7 @@ import { naturalSchema } from "../../schemas/registroCiudadano.schema";
 import type { Natural } from "../../types/registroCiudadano";
 import { UbigeoSelector } from "../common/UbigeoSelector";
 import type { UbigeoDTO } from "../../data/ucayali";
-import type { PersonaDniDemo } from "../../data/padronDniDemo";
+import type { PersonaDni } from "../../data/personaDni";
 import LectorDniDigital from "../dni/LectorDniDigital";
 import { DeclaracionJuradaCheckbox } from "./DeclaracionJuradaCheckbox";
 import { ConsentimientoLey29733Modal } from "./ConsentimientoLey29733Modal";
@@ -77,23 +77,31 @@ export default function PersonaNaturalForm({
     });
   };
 
-  const autocompletarConDni = (persona: PersonaDniDemo) => {
+  const autocompletarConDni = (persona: PersonaDni) => {
     const opciones = { shouldValidate: true, shouldDirty: true };
     setValue("tipoDocumento", "DNI", opciones);
     setValue("numeroDocumento", persona.dni, opciones);
     setValue("nombres", persona.nombres, opciones);
     setValue("apellidos", persona.apellidos, opciones);
-    setValue("fechaNacimiento", persona.fechaNacimiento, opciones);
-    setValue("correo", persona.correo, opciones);
-    setValue("celular", persona.telefono, opciones);
-    setValue(
-      "domicilio",
-      {
-        ...domicilioValue,
-        direccionExacta: persona.direccion,
-      },
-      opciones,
-    );
+    if (persona.fechaNacimiento) {
+      setValue("fechaNacimiento", persona.fechaNacimiento, opciones);
+    }
+    if (persona.correo) {
+      setValue("correo", persona.correo, opciones);
+    }
+    if (persona.telefono) {
+      setValue("celular", persona.telefono, opciones);
+    }
+    if (persona.direccion) {
+      setValue(
+        "domicilio",
+        {
+          ...domicilioValue,
+          direccionExacta: persona.direccion,
+        },
+        opciones,
+      );
+    }
   };
 
   return (
@@ -102,14 +110,14 @@ export default function PersonaNaturalForm({
       className="space-y-6"
       noValidate
     >
-      <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-[#d7e9f7] bg-[#f4f8fb] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="flex items-center gap-2 text-sm font-semibold text-white">
-            <span className="h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse-soft" />
+          <p className="flex items-center gap-2 text-sm font-semibold text-[#0b2a4a]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#006ec7] animate-pulse-soft" />
             Autocompletar con DNI digital
           </p>
-          <p className="mt-1 text-xs text-zinc-400">
-            Escanea el PDF417 del DNI electrónico o ingresa el número para recuperar tus datos.
+          <p className="mt-1 text-xs text-[#4b6b85]">
+            Escanea el PDF417 del DNI electrónico o ingresa el número para consultar tus datos en RENIEC.
           </p>
         </div>
         <LectorDniDigital
@@ -124,14 +132,14 @@ export default function PersonaNaturalForm({
         <div>
           <label
             htmlFor="tipoDocumento"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Tipo de Documento *
           </label>
           <select
             id="tipoDocumento"
             {...register("tipoDocumento")}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] focus:border-[#006EC7] outline-none"
+            className="w-full px-3 py-2 text-sm border border-[#bfe0f7] rounded-md focus:ring-2 focus:ring-[#006EC7] focus:border-[#006EC7] outline-none"
           >
             <option value="DNI">DNI</option>
           </select>
@@ -145,7 +153,7 @@ export default function PersonaNaturalForm({
         <div>
           <label
             htmlFor="numeroDocumento"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Número de Documento *
           </label>
@@ -154,7 +162,7 @@ export default function PersonaNaturalForm({
             type="text"
             {...register("numeroDocumento")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.numeroDocumento ? "border-red-500" : "border-gray-300"
+              errors.numeroDocumento ? "border-red-500" : "border-[#bfe0f7]"
             }`}
             placeholder="DNI: 8 dígitos o CE: 9-12 caracteres"
           />
@@ -171,7 +179,7 @@ export default function PersonaNaturalForm({
         <div>
           <label
             htmlFor="nombres"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Nombres *
           </label>
@@ -180,7 +188,7 @@ export default function PersonaNaturalForm({
             type="text"
             {...register("nombres")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.nombres ? "border-red-500" : "border-gray-300"
+              errors.nombres ? "border-red-500" : "border-[#bfe0f7]"
             }`}
           />
           {errors.nombres && (
@@ -193,7 +201,7 @@ export default function PersonaNaturalForm({
         <div>
           <label
             htmlFor="apellidos"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Apellidos *
           </label>
@@ -202,7 +210,7 @@ export default function PersonaNaturalForm({
             type="text"
             {...register("apellidos")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.apellidos ? "border-red-500" : "border-gray-300"
+              errors.apellidos ? "border-red-500" : "border-[#bfe0f7]"
             }`}
           />
           {errors.apellidos && (
@@ -218,7 +226,7 @@ export default function PersonaNaturalForm({
         <div>
           <label
             htmlFor="fechaNacimiento"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Fecha de Nacimiento *
           </label>
@@ -227,7 +235,7 @@ export default function PersonaNaturalForm({
             type="date"
             {...register("fechaNacimiento")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.fechaNacimiento ? "border-red-500" : "border-gray-300"
+              errors.fechaNacimiento ? "border-red-500" : "border-[#bfe0f7]"
             }`}
           />
           {errors.fechaNacimiento && (
@@ -240,7 +248,7 @@ export default function PersonaNaturalForm({
         <div>
           <label
             htmlFor="correo"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Correo Electrónico *
           </label>
@@ -249,7 +257,7 @@ export default function PersonaNaturalForm({
             type="email"
             {...register("correo")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.correo ? "border-red-500" : "border-gray-300"
+              errors.correo ? "border-red-500" : "border-[#bfe0f7]"
             }`}
           />
           {errors.correo && (
@@ -264,7 +272,7 @@ export default function PersonaNaturalForm({
       <div>
         <label
           htmlFor="celular"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-[#2f648c] mb-1"
         >
           Celular *
         </label>
@@ -273,7 +281,7 @@ export default function PersonaNaturalForm({
           type="tel"
           {...register("celular")}
           className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-            errors.celular ? "border-red-500" : "border-gray-300"
+            errors.celular ? "border-red-500" : "border-[#bfe0f7]"
           }`}
           placeholder="987654321"
         />
@@ -295,7 +303,7 @@ export default function PersonaNaturalForm({
       <div>
         <label
           htmlFor="direccionExacta"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-[#2f648c] mb-1"
         >
           Dirección Exacta *
         </label>
@@ -304,7 +312,7 @@ export default function PersonaNaturalForm({
           type="text"
           {...register("domicilio.direccionExacta")}
           className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-            errors.domicilio?.direccionExacta ? "border-red-500" : "border-gray-300"
+            errors.domicilio?.direccionExacta ? "border-red-500" : "border-[#bfe0f7]"
           }`}
           placeholder="Ej. Jr. Tarapacá N° 645"
         />
@@ -319,7 +327,7 @@ export default function PersonaNaturalForm({
       <div>
         <label
           htmlFor="referencia"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-[#2f648c] mb-1"
         >
           Referencia
         </label>
@@ -327,7 +335,7 @@ export default function PersonaNaturalForm({
           id="referencia"
           type="text"
           {...register("domicilio.referencia")}
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none"
+          className="w-full px-3 py-2 text-sm border border-[#bfe0f7] rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none"
         />
       </div>
 
@@ -350,9 +358,9 @@ export default function PersonaNaturalForm({
               type="checkbox"
               checked={consentimientoLey29733}
               onChange={(e) => handleConsentimientoChange(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-[#006EC7] focus:ring-[#006EC7]"
+              className="mt-1 h-4 w-4 rounded border-[#bfe0f7] text-[#006EC7] focus:ring-[#006EC7]"
             />
-            <span className="text-sm text-gray-700">
+            <span className="text-sm text-[#2f648c]">
               He leído y acepto el consentimiento de tratamiento de datos
               personales conforme a la Ley N° 29733 *
             </span>
@@ -389,7 +397,7 @@ export default function PersonaNaturalForm({
           !declaracionJuradaAceptada ||
           !consentimientoLey29733 ||
           isSubmitting
-            ? "bg-gray-400 cursor-not-allowed"
+            ? "bg-[#bfe0f7] cursor-not-allowed"
             : "bg-[#006EC7] hover:bg-[#005ba8]"
         }`}
       >

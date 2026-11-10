@@ -1,4 +1,6 @@
+import { isAxiosError } from "axios";
 import { useSyncExternalStore } from "react";
+
 import { apiClient } from "../api/client";
 import { notificarCambioSesion } from "../config/accesoModulos";
 import { permisosIniciales } from "../hooks/useRbacConfig";
@@ -37,8 +39,33 @@ const ROL_CANONICO: Record<string, UsuarioPerfil['rol']> = {
   INVITADO: 'ESTUDIANTE',
 };
 
-function normalizarRol(rol: string): UsuarioPerfil['rol'] {
-  return ROL_CANONICO[rol?.toUpperCase()] ?? 'ESTUDIANTE';
+function normalizarRol(rol: string | null | undefined): UsuarioPerfil['rol'] {
+  return ROL_CANONICO[(rol ?? '').toUpperCase()] ?? 'ESTUDIANTE';
+}
+
+function mensajeDeError(error: unknown): string {
+  if (isAxiosError(error)) {
+    const data = error.response?.data as
+      | { detail?: string; message?: string; error?: string }
+      | undefined;
+    const detalle = data?.detail ?? data?.message ?? data?.error;
+    if (detalle) return detalle;
+    if (error.code === 'ECONNABORTED') {
+      return 'El servidor tardó demasiado en responder. Inténtalo nuevamente.';
+    }
+    if (!error.response) {
+      return 'No se pudo conectar con el servidor SIGD. Verifica que el backend esté en línea.';
+    }
+    if (error.response.status === 401) {
+      return 'Credenciales inválidas. Verifica tu usuario o contraseña institucional.';
+    }
+    if (error.response.status === 403) {
+      return 'Tu cuenta se encuentra deshabilitada o sin permisos para ingresar.';
+    }
+    return `No se pudo iniciar sesión (HTTP ${error.response.status}).`;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return 'No se pudo iniciar sesión. Inténtalo nuevamente.';
 }
 
 export interface AuthState {
@@ -70,16 +97,18 @@ function createStore() {
         if (item) {
           const parsed = JSON.parse(item);
           const state = parsed.state ?? parsed;
+          const tokenDirecto = window.localStorage.getItem("sigd_token");
+          const accessToken = state.accessToken ?? tokenDirecto ?? null;
           return {
-            accessToken: state.accessToken ?? null,
+            accessToken,
             refreshToken: state.refreshToken ?? null,
             usuario: state.usuario ?? null,
-            isAuthenticated: state.isAuthenticated ?? Boolean(state.accessToken),
+            isAuthenticated: state.isAuthenticated ?? Boolean(accessToken),
           };
         }
       }
     } catch {
-      // Fallback
+      // Almacenamiento no disponible: se opera en memoria.
     }
     return {
       accessToken: null,
@@ -106,7 +135,24 @@ function createStore() {
         );
       }
     } catch {
-      // Ignore
+      // Ignorar cuotas o modo privado.
+    }
+  };
+
+  const persistirSesionLocal = (
+    accessToken: string,
+    usuario: UsuarioPerfil | null,
+  ) => {
+    try {
+      if (typeof window === "undefined" || !window.localStorage) return;
+      window.localStorage.setItem("sigd_token", accessToken);
+      window.localStorage.setItem("token", accessToken);
+      window.localStorage.setItem("sigd_rol", usuario?.rol ?? "ESTUDIANTE");
+      if (!window.localStorage.getItem("sigd_permisos")) {
+        window.localStorage.setItem("sigd_permisos", JSON.stringify(permisosIniciales));
+      }
+    } catch {
+      // Ignorar errores de almacenamiento.
     }
   };
 
@@ -115,89 +161,51 @@ function createStore() {
   let state: AuthState = {
     ...initialPersisted,
     login: async (credentials: LoginCredentials) => {
-      // Modo local: si el backend no responde, usar autenticación local
-      const credencialesDemo: Record<string, string> = {
-        admin: "123",
-        director: "123",
-        docente: "123",
-        mesa_partes: "123",
-        estudiante: "123",
-      };
-
-      const tokenLocal = `sigd_token_${credentials.identificador}_${Date.now()}`;
-      const usuarioLocal: UsuarioPerfil = {
-        id: `usr_${credentials.identificador}`,
-        nombreCompleto: credentials.identificador.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        correo: `${credentials.identificador}@iestp-suiza.edu.pe`,
-        rol: credentials.identificador === "admin" ? "SUPER_ADMIN"
-          : credentials.identificador === "director" ? "DIRECTOR"
-          : credentials.identificador === "docente" ? "DOCENTE"
-          : credentials.identificador === "mesa_partes" ? "MESA_PARTES"
-          : "ESTUDIANTE",
-        rolCodigo: credentials.identificador.toUpperCase(),
-      };
-
       try {
         const { data } = await apiClient.post("/api/v1/auth/login", credentials);
-        const usuarioCanonico: UsuarioPerfil | null = data.usuario
+
+        const accessToken: string | null =
+          data?.accessToken ?? data?.access_token ?? data?.token ?? null;
+        const refreshToken: string | null =
+          data?.refreshToken ?? data?.refresh_token ?? null;
+
+        if (!accessToken) {
+          throw new Error(
+            'El servidor autenticó la solicitud pero no devolvió un token de acceso válido.',
+          );
+        }
+
+        const perfil = data?.usuario ?? data?.user ?? null;
+        const usuarioCanonico: UsuarioPerfil | null = perfil
           ? {
-              ...(data.usuario as UsuarioPerfil),
-              rol: normalizarRol(data.usuario.rol),
+              ...(perfil as Omit<UsuarioPerfil, "rol">),
+              rol: normalizarRol(perfil.rolCodigo ?? perfil.rol),
             }
           : null;
-        const accessToken = data.access_token ?? data.token ?? null;
-        const refreshToken = data.refresh_token ?? null;
+
         set({
           accessToken,
           refreshToken,
           usuario: usuarioCanonico,
           isAuthenticated: true,
         });
-        try {
-          if (typeof window !== "undefined" && window.localStorage) {
-            if (accessToken) {
-              window.localStorage.setItem("sigd_token", accessToken);
-              window.localStorage.setItem("token", accessToken);
-            }
-            const rolCanonico = usuarioCanonico?.rol ?? "ESTUDIANTE";
-            window.localStorage.setItem("sigd_rol", rolCanonico);
-            if (!window.localStorage.getItem("sigd_permisos")) {
-              window.localStorage.setItem("sigd_permisos", JSON.stringify(permisosIniciales));
-            }
-          }
-          notificarCambioSesion();
-        } catch {
-          // Ignore storage errors
-        }
-      } catch {
-        // Fallback local: autenticación sin backend
-        const passwordValida = credencialesDemo[credentials.identificador];
-        if (passwordValida && credentials.password === passwordValida) {
-          set({
-            accessToken: tokenLocal,
-            refreshToken: tokenLocal,
-            usuario: usuarioLocal,
-            isAuthenticated: true,
-          });
-          try {
-            if (typeof window !== "undefined" && window.localStorage) {
-              window.localStorage.setItem("sigd_token", tokenLocal);
-              window.localStorage.setItem("token", tokenLocal);
-              window.localStorage.setItem("sigd_rol", usuarioLocal.rol);
-              if (!window.localStorage.getItem("sigd_permisos")) {
-                window.localStorage.setItem("sigd_permisos", JSON.stringify(permisosIniciales));
-              }
-            }
-            notificarCambioSesion();
-          } catch {
-            // Ignore storage errors
-          }
-        } else {
-          throw new Error("Credenciales inválidas");
-        }
+
+        persistirSesionLocal(accessToken, usuarioCanonico);
+        notificarCambioSesion();
+      } catch (error) {
+        throw new Error(mensajeDeError(error));
       }
     },
     logout: () => {
+      const refreshToken = state.refreshToken;
+      if (refreshToken) {
+        void apiClient
+          .post("/api/v1/auth/logout", { refreshToken })
+          .catch(() => {
+            // La revocación es best-effort: la sesión local se cierra igual.
+          });
+      }
+
       set({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false });
       try {
         if (typeof window !== "undefined" && window.localStorage) {
@@ -209,7 +217,7 @@ function createStore() {
         }
         notificarCambioSesion();
       } catch {
-        // Ignore storage errors
+        // Ignorar errores de almacenamiento.
       }
       // Sin window.location.href: la navegación la hace el llamador con
       // navigate("/login") para evitar recarga completa de página.
@@ -220,15 +228,8 @@ function createStore() {
         refreshToken: refreshToken ?? s.refreshToken,
         isAuthenticated: true,
       }));
-      try {
-        if (typeof window !== "undefined" && window.localStorage) {
-          window.localStorage.setItem("sigd_token", accessToken);
-          window.localStorage.setItem("token", accessToken);
-        }
-        notificarCambioSesion();
-      } catch {
-        // Ignore storage errors
-      }
+      persistirSesionLocal(accessToken, state.usuario);
+      notificarCambioSesion();
     },
   };
 

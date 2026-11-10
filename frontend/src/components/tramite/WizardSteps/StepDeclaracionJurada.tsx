@@ -114,8 +114,8 @@ export const StepDeclaracionJurada: React.FC<StepDeclaracionJuradaProps> = ({
       </header>
 
       {/* Recuadro de Advertencia Legal LPAG */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4.5 text-xs text-blue-900 space-y-2">
-        <div className="flex items-center gap-2 font-bold text-blue-800 text-sm">
+      <div className="rounded-xl border border-[#d7e9f7] bg-[#e8f4ff]/70 p-4.5 text-xs text-[#0b2a4a] space-y-2">
+        <div className="flex items-center gap-2 font-bold text-[#00539b] text-sm">
           <svg
             className="h-5 w-5 shrink-0 text-[#006EC7]"
             fill="none"

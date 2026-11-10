@@ -20,7 +20,7 @@ export default function HeaderLanding() {
       </span>
       <Link
         to="/dashboard"
-        className="inline-flex items-center gap-1.5 rounded-lg bg-[#003366] px-3 py-2 text-[11px] font-bold text-white transition hover:bg-[#00264d]"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-[#00539b] px-3 py-2 text-[11px] font-bold text-white transition hover:bg-[#00539b]"
       >
         <LayoutDashboard aria-hidden="true" className="h-3.5 w-3.5" />
         Panel
@@ -41,7 +41,7 @@ export default function HeaderLanding() {
   ) : (
     <Link
       to="/login"
-      className="inline-flex items-center gap-1.5 rounded-lg bg-[#003366] px-3 py-2 text-[11px] font-bold text-white transition hover:bg-[#00264d]"
+      className="inline-flex items-center gap-1.5 rounded-lg bg-[#00539b] px-3 py-2 text-[11px] font-bold text-white transition hover:bg-[#00539b]"
     >
       <LogIn aria-hidden="true" className="h-3.5 w-3.5" />
       Ingresar

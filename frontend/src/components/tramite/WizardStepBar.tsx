@@ -145,7 +145,7 @@ export const WizardStepBar: React.FC<WizardStepBarProps> = ({
                         status === "completed"
                           ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
                           : status === "active"
-                          ? "bg-[#006EC7] text-white ring-4 ring-blue-100 shadow-md"
+                          ? "bg-[#006EC7] text-white ring-4 ring-[#d7e9f7] shadow-md"
                           : "bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200"
                       }`}
                     >
@@ -165,7 +165,7 @@ export const WizardStepBar: React.FC<WizardStepBarProps> = ({
                         status === "completed"
                           ? "bg-emerald-600 text-white shadow-sm"
                           : status === "active"
-                          ? "bg-[#006EC7] text-white ring-4 ring-blue-100 shadow-md"
+                          ? "bg-[#006EC7] text-white ring-4 ring-[#d7e9f7] shadow-md"
                           : "bg-slate-100 text-slate-400 border border-slate-200"
                       }`}
                     >
@@ -220,7 +220,7 @@ export const WizardStepBar: React.FC<WizardStepBarProps> = ({
                     </span>
                   )}
                   {status === "active" && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-[#006EC7]">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#d7e9f7] text-[#006EC7]">
                       En curso
                     </span>
                   )}

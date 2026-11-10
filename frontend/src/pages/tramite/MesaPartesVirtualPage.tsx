@@ -68,13 +68,13 @@ export default function MesaPartesVirtualPage() {
     <main className="min-h-screen px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
         {/* Executive Header Banner */}
-        <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-[#0A192F] p-7 text-white shadow-xl shadow-slate-950/20 border border-slate-800">
-          <div className="absolute right-0 top-0 -mt-12 -mr-12 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
+        <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#00539b] via-[#006ec7] to-[#38bdf8] p-7 text-white shadow-xl shadow-[#0b2a4a]/20 border border-[#00539b]">
+          <div className="absolute right-0 top-0 -mt-12 -mr-12 h-64 w-64 rounded-full bg-[#38bdf8]/10 blur-3xl" />
 
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-blue-500/20 border border-blue-400/30 px-3 py-0.5 text-xs font-bold uppercase tracking-wider text-blue-300">
+                <span className="rounded-full bg-[#38bdf8]/20 border border-[#38bdf8]/30 px-3 py-0.5 text-xs font-bold uppercase tracking-wider text-[#d7e9f7]">
                   SIGD · Módulo 2
                 </span>
                 <span className="rounded-full border border-amber-300/40 bg-amber-400/10 px-3 py-0.5 text-xs font-bold text-amber-200">
@@ -84,7 +84,7 @@ export default function MesaPartesVirtualPage() {
               <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
                 Mesa de Partes Virtual
               </h1>
-              <p className="mt-2 max-w-3xl text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
+              <p className="mt-2 max-w-3xl text-xs sm:text-sm text-[#d7e9f7] font-medium leading-relaxed">
                 Recepción y radicación digital con verificación de integridad Magic Bytes (%PDF), hash criptográfico local SHA-256 y control normativo de horario LPAG (Ley 27444).
               </p>
             </div>
@@ -100,10 +100,10 @@ export default function MesaPartesVirtualPage() {
         </header>
 
         {/* Security & Protocol notice */}
-        <section className="flex items-start gap-3 rounded-2xl border border-blue-200/80 bg-blue-50/70 p-4 text-xs font-medium text-blue-900 shadow-sm backdrop-blur-sm">
-          <Info className="h-5 w-5 shrink-0 text-blue-600 mt-0.5" />
+        <section className="flex items-start gap-3 rounded-2xl border border-[#d7e9f7]/80 bg-[#e8f4ff]/70 p-4 text-xs font-medium text-[#0b2a4a] shadow-sm backdrop-blur-sm">
+          <Info className="h-5 w-5 shrink-0 text-[#006ec7] mt-0.5" />
           <p className="leading-relaxed">
-            <strong>Arquitectura de Cero Confianza:</strong> Los Magic Bytes y el hash SHA-256 se calculan directamente en su navegador antes de la transmisión. La carga solicita una URL firmada (<code className="font-mono bg-blue-100/70 px-1 py-0.5 rounded text-blue-800">POST /v1/storage/presigned-url</code>) y transfiere el documento de forma cifrada al bucket de almacenamiento.
+            <strong>Arquitectura de Cero Confianza:</strong> Los Magic Bytes y el hash SHA-256 se calculan directamente en su navegador antes de la transmisión. La carga solicita una URL firmada (<code className="font-mono bg-[#e8f4ff]/70 px-1 py-0.5 rounded text-[#00539b]">POST /v1/storage/presigned-url</code>) y transfiere el documento de forma cifrada al bucket de almacenamiento.
           </p>
         </section>
 
@@ -111,14 +111,14 @@ export default function MesaPartesVirtualPage() {
         <section className="rounded-2xl border border-slate-200/90 bg-white/95 p-6 shadow-sm backdrop-blur-sm">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#006ec7]">
                 Paso 01 · Datos del trámite
               </p>
               <h2 className="mt-0.5 text-lg font-bold text-slate-900">
                 Identificación de la solicitud
               </h2>
             </div>
-            <span className="rounded-full bg-slate-100 p-2 text-slate-500">
+            <span className="rounded-full bg-[#e8f4ff] p-2 text-[#4b6b85]">
               <FileText className="h-4 w-4" />
             </span>
           </div>
@@ -133,7 +133,7 @@ export default function MesaPartesVirtualPage() {
                 value={solicitante}
                 onChange={(event) => setSolicitante(event.target.value)}
                 placeholder="Nombre completo o razón social del administrado"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-sm placeholder:text-[#6b8aa5] focus:border-[#006ec7] focus:outline-none focus:ring-4 focus:ring-[#d7e9f7] transition-all"
               />
             </div>
             <div>
@@ -145,7 +145,7 @@ export default function MesaPartesVirtualPage() {
                 value={asunto}
                 onChange={(event) => setAsunto(event.target.value)}
                 placeholder="Descripción breve del trámite o petición formal"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-sm placeholder:text-[#6b8aa5] focus:border-[#006ec7] focus:outline-none focus:ring-4 focus:ring-[#d7e9f7] transition-all"
               />
             </div>
           </div>
@@ -158,14 +158,14 @@ export default function MesaPartesVirtualPage() {
             <div>
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700">
+                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#006ec7]">
                     Paso 02 · Carga documentaria
                   </p>
                   <h2 className="mt-0.5 text-lg font-bold text-slate-900">
                     Magic Bytes, SHA-256 y MinIO/S3
                   </h2>
                 </div>
-                <span className="rounded-full bg-blue-50 p-2 text-blue-600">
+                <span className="rounded-full bg-[#e8f4ff] p-2 text-[#006ec7]">
                   <UploadCloud className="h-4 w-4" />
                 </span>
               </div>
@@ -201,7 +201,7 @@ export default function MesaPartesVirtualPage() {
           <section className="rounded-2xl border border-slate-200/90 bg-white/95 p-6 shadow-sm backdrop-blur-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700">
+                <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#006ec7]">
                   Paso 03 · Control de horario LPAG
                 </p>
                 <h2 className="mt-0.5 text-lg font-bold text-slate-900">
@@ -216,25 +216,25 @@ export default function MesaPartesVirtualPage() {
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
               Simular fecha y hora de recepción
               <div className="relative mt-1.5 flex items-center">
-                <Calendar className="absolute left-3.5 h-4 w-4 text-slate-400" />
+                <Calendar className="absolute left-3.5 h-4 w-4 text-[#6b8aa5]" />
                 <input
                   type="datetime-local"
                   value={simulationTime}
                   onChange={(event) => setSimulationTime(event.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-10 pr-3 text-xs font-medium text-slate-900 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all"
+                  className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-10 pr-3 text-xs font-medium text-slate-900 shadow-sm focus:border-[#006ec7] focus:outline-none focus:ring-4 focus:ring-[#d7e9f7] transition-all"
                 />
               </div>
             </label>
 
-            <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500">
+            <div className="mt-2.5 flex items-center justify-between text-[11px] text-[#4b6b85]">
               <span>Huso oficial: <strong>America/Lima</strong></span>
-              <span>Corte LPAG: <strong className="text-blue-700">16:30 hrs</strong></span>
+              <span>Corte LPAG: <strong className="text-[#006ec7]">16:30 hrs</strong></span>
             </div>
 
             {simulationTime && (
               <button
                 type="button"
-                className="mt-3 inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="mt-3 inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-[#e8f4ff]"
                 onClick={() => setSimulationTime("")}
               >
                 Restablecer a hora actual
@@ -267,7 +267,7 @@ export default function MesaPartesVirtualPage() {
         <section className="rounded-2xl border border-slate-200/90 bg-white/95 p-6 shadow-sm backdrop-blur-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#006ec7]">
                 Paso 04 · Resultado de radicación
               </p>
               <h2 className="mt-0.5 text-lg font-bold text-slate-900">
@@ -311,9 +311,9 @@ export default function MesaPartesVirtualPage() {
         </section>
 
         {/* Information badge */}
-        <footer className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 text-xs text-slate-500 shadow-sm backdrop-blur-sm">
+        <footer className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 text-xs text-[#4b6b85] shadow-sm backdrop-blur-sm">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-blue-600" />
+            <span className="h-2 w-2 rounded-full bg-[#006ec7]" />
             <span>
               <strong>Validación Normativa:</strong> Control riguroso de acuerdo a los estándares del Modelo de Gestión Documental (MGD) y la Ley de Procedimiento Administrativo General (LPAG Ley N° 27444).
             </span>
@@ -335,12 +335,12 @@ function EvidenceItem({
     <div className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
       complete 
         ? "border-emerald-200 bg-emerald-50/70 text-emerald-800" 
-        : "border-slate-200 bg-slate-50/80 text-slate-500"
+        : "border-slate-200 bg-slate-50/80 text-[#4b6b85]"
     }`}>
       <span
         aria-hidden="true"
         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-          complete ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-400"
+          complete ? "bg-emerald-600 text-white" : "bg-slate-200 text-[#6b8aa5]"
         }`}
       >
         {complete ? "✓" : "○"}
@@ -353,7 +353,7 @@ function EvidenceItem({
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-      <dt className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+      <dt className="text-[10px] font-extrabold uppercase tracking-wider text-[#6b8aa5]">
         {label}
       </dt>
       <dd className="mt-1 break-words text-xs font-semibold text-slate-800">{value}</dd>

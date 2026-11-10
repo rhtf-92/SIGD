@@ -1,7 +1,6 @@
 /* `source(none)` desactiva la detección automática de fuentes: el alcance se
    declara de forma explícita para que el escáner no lea los propios CSS del
-   proyecto (de ahí salían utilidades fantasma como
-   `bg-[linear-gradient(90deg,#006EC7,#E6007E,#F9E000)]`). */
+   proyecto (de ahí salían utilidades fantasma). */
 @import "tailwindcss" source(none);
 @import "./styles/theme.css";
 
@@ -9,56 +8,11 @@
 @source "../index.html";
 
 /* ----------------------------------------------------------------------------
-   SIGD · VIDRIO INSTITUCIONAL
-   Azul marino + celeste + blanco. Las escalas de Tailwind (blue, cyan, emerald,
-   amber, red...) conservan su croma. Aquí solo se reafinan los tokens propios
-   del sistema para que fichas, botones y rail hablen el mismo idioma.
+   SIGD · LIENZO INSTITUCIONAL CLARO
+   Azul vibrante + celeste + blanco. El layout conserva la clase `.sigd-cyber`
+   por compatibilidad, pero ahora reinterpreta las superficies heredadas en
+   clave clara: paneles blancos, filetes celestes y texto azul marino.
    -------------------------------------------------------------------------- */
-@theme {
-  --font-sans:
-    "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, sans-serif;
-  --font-mono:
-    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    monospace;
-
-  /* Tinta: texto y superficies oscuras */
-  --color-tinta-950: #0b1524;
-  --color-tinta-900: #12202e;
-  --color-tinta-800: #1d2c3b;
-  --color-tinta-700: #33465a;
-  --color-tinta-600: #44586d;
-  --color-tinta-500: #5b6b7c;
-  --color-tinta-400: #7c8896;
-  --color-tinta-300: #a3adb8;
-
-  /* Azul institucional: único color de acción */
-  --color-vault-azul: #006ec7;
-  --color-vault-azul-profundo: #00529a;
-  --color-vault-azul-tinta: #0b4b85;
-  --color-vault-azul-lavado: #eaf2fa;
-
-  /* Papel: superficies claras */
-  --color-vault-papel: #f5f3ee;
-  --color-vault-papel-2: #eceae3;
-  --color-vault-papel-3: #ddd9cf;
-  --color-vault-tinta: #1a2530;
-
-  /* Estados mínimos */
-  --color-estado-ok: #1f7a4d;
-  --color-estado-ok-lavado: #e9f3ee;
-  --color-estado-alerta: #8a5f08;
-  --color-estado-alerta-lavado: #faf1de;
-  --color-estado-error: #b3261e;
-  --color-estado-error-lavado: #fbeceb;
-
-  /* Elevaciones discretas */
-  --shadow-ficha:
-    0 1px 2px rgba(18, 32, 46, 0.04), 0 6px 18px -12px rgba(18, 32, 46, 0.22);
-  --shadow-ficha-alta:
-    0 2px 4px rgba(18, 32, 46, 0.05), 0 16px 32px -18px rgba(18, 32, 46, 0.3);
-  --shadow-sello: 0 8px 20px -12px rgba(18, 32, 46, 0.45);
-}
 
 @layer base {
   :root {
@@ -79,20 +33,26 @@
     text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
     color-scheme: light;
+    background-color: #f4f8fb;
   }
 
   body {
     min-height: 100vh;
-    background-color: #f5f3ee;
-    background-image: radial-gradient(circle at 50% 0%, #ffffff 0%, #f5f3ee 55%, #eceae3 100%);
-    color: #12202e;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #f4f8fb;
+    background-image:
+      radial-gradient(ellipse 85% 55% at 50% -12%, rgba(56, 189, 248, 0.16) 0%, transparent 62%),
+      radial-gradient(ellipse 55% 45% at 100% 0%, rgba(0, 110, 199, 0.08) 0%, transparent 58%),
+      radial-gradient(ellipse 60% 50% at 0% 100%, rgba(56, 189, 248, 0.08) 0%, transparent 60%),
+      linear-gradient(180deg, #f8fbfe 0%, #f4f8fb 48%, #eaf3fb 100%);
+    background-attachment: fixed;
+    color: #0b2a4a;
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
     @apply min-h-screen antialiased;
   }
 
   ::selection {
-    background-color: #006ec7;
-    color: #ffffff;
+    background-color: rgba(0, 110, 199, 0.18);
+    color: #06213a;
   }
 
   :focus-visible {
@@ -101,158 +61,197 @@
   }
 
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
   }
   ::-webkit-scrollbar-track {
-    background: #f1f5f9;
+    background: #eaf3fb;
   }
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: linear-gradient(180deg, #006ec7, #38bdf8);
     border-radius: 9999px;
+    border: 2px solid #eaf3fb;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #00539b;
   }
 
   .scroll-tinta {
-    scrollbar-color: #cbd5e1 #f1f5f9;
+    scrollbar-color: #006ec7 #eaf3fb;
     scrollbar-width: thin;
   }
 }
 
 @layer components {
   .glass-card {
-    background: #ffffff;
-    border: 1px solid #ddd9cf;
-    color: #12202e;
-    box-shadow: 0 1px 2px rgba(18, 32, 46, 0.04), 0 6px 18px -12px rgba(18, 32, 46, 0.22);
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #d7e9f7;
+    color: #0b2a4a;
+    box-shadow: var(--shadow-ficha);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     @apply rounded-xl transition-all duration-300 ease-out;
   }
 
   .glass-card:hover {
-    border-color: #c3bcac;
-    box-shadow: 0 2px 4px rgba(18, 32, 46, 0.05), 0 16px 32px -18px rgba(18, 32, 46, 0.3);
+    border-color: #8cc8f0;
+    box-shadow: var(--shadow-ficha-alta);
     transform: translateY(-2px);
   }
 
   .cyber-panel {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #d7e9f7;
+    box-shadow: var(--shadow-ficha);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     @apply rounded-xl;
   }
 
   .cyber-chip {
     @apply inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em];
-    border-color: #cfe1f3;
-    background: #eaf2fa;
-    color: #0b4b85;
+    border-color: #bfe0f7;
+    background: #e8f4ff;
+    color: #00539b;
   }
 
   .btn-cyber {
     @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-300 active:scale-[0.98];
-    background: #006ec7;
-    border: 1px solid #00529a;
+    background: linear-gradient(135deg, #006ec7 0%, #0b8fe0 100%);
+    border: 1px solid #00539b;
     color: #ffffff;
-    box-shadow: 0 1px 3px rgba(0, 110, 199, 0.24);
+    box-shadow: 0 12px 28px -16px rgba(0, 110, 199, 0.7);
   }
 
   .btn-cyber:hover {
-    background: #00529a;
-    border-color: #00407a;
-    box-shadow: 0 4px 12px rgba(0, 110, 199, 0.28);
+    background: linear-gradient(135deg, #00539b 0%, #006ec7 100%);
+    box-shadow: 0 16px 34px -16px rgba(0, 110, 199, 0.75);
   }
 
   .btn-ghost-cyber {
     @apply inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold transition-all duration-300 active:scale-[0.98];
-    border-color: #cbd5e1;
+    border-color: #bfe0f7;
     background: #ffffff;
-    color: #33465a;
+    color: #00539b;
+    backdrop-filter: blur(10px);
   }
 
   .btn-ghost-cyber:hover {
-    background: #f1f5f9;
-    border-color: #94a3b8;
+    background: #e8f4ff;
+    border-color: #006ec7;
     color: #006ec7;
   }
 
   .input-cyber {
     @apply w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all duration-200;
     background: #ffffff;
-    border: 1px solid #cbd5e1;
-    color: #12202e;
+    border: 1px solid #c9deef;
+    color: #0b2a4a;
+  }
+
+  .input-cyber::placeholder {
+    color: #8aa6bd;
   }
 
   .input-cyber:focus {
     border-color: #006ec7;
-    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.12);
+    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.14);
   }
 
   .cyber-separator {
     height: 1px;
-    background: linear-gradient(90deg, transparent, #cbd5e1, transparent);
+    background: linear-gradient(90deg, transparent, #bfe0f7, transparent);
   }
 }
 
 @layer utilities {
   .bg-mesh-pattern {
-    background-color: var(--color-vault-papel);
+    background-color: transparent;
+    background-image:
+      radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.12), transparent 55%),
+      linear-gradient(rgba(0, 110, 199, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 110, 199, 0.05) 1px, transparent 1px);
+    background-size: 100% 100%, 48px 48px, 48px 48px;
   }
 
   .glass-card-dark,
   .dark-glass {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #d7e9f7;
+    box-shadow: var(--shadow-ficha);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     @apply rounded-xl;
   }
 
   .admin-dark {
-    color: #12202e;
+    color: #0b2a4a;
   }
   .admin-dark .bg-slate-100,
   .admin-dark .bg-slate-50,
   .admin-dark.bg-slate-100 {
-    background-color: #ffffff !important;
+    background-color: #f4f8fb !important;
   }
   .admin-dark .bg-white,
   .admin-dark.bg-white {
-    background-color: rgba(15, 23, 42, 0.6) !important;
+    background-color: #ffffff !important;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
   .admin-dark .border-slate-200,
   .admin-dark .border-slate-100,
   .admin-dark .border-slate-300 {
-    border-color: rgba(6, 182, 212, 0.22) !important;
+    border-color: #d7e9f7 !important;
   }
   .admin-dark .text-slate-900,
-  .admin-dark .text-slate-800 { color: #ffffff !important; }
+  .admin-dark .text-slate-800 { color: #0b2a4a !important; }
   .admin-dark .text-slate-700,
-  .admin-dark .text-slate-600 { color: #cbd5e1 !important; }
+  .admin-dark .text-slate-600 { color: #2f648c !important; }
   .admin-dark .text-slate-500,
-  .admin-dark .text-slate-400 { color: #a5f3fc !important; }
+  .admin-dark .text-slate-400 { color: #6b8aa5 !important; }
   .admin-dark .shadow-sm,
-  .admin-dark .shadow { box-shadow: 0 0 15px rgba(6, 182, 212, 0.15) !important; }
+  .admin-dark .shadow { box-shadow: var(--shadow-ficha) !important; }
   .admin-dark input,
   .admin-dark select,
   .admin-dark textarea {
-    background-color: rgba(15, 23, 42, 0.6) !important;
-    color: #ffffff !important;
-    border-color: rgba(6, 182, 212, 0.28) !important;
+    background-color: #ffffff !important;
+    color: #0b2a4a !important;
+    border-color: #c9deef !important;
   }
   .admin-dark input::placeholder,
-  .admin-dark textarea::placeholder { color: #94a3b8 !important; }
-  .admin-dark table thead th { color: #a5f3fc !important; }
-  .admin-dark table tbody tr { border-color: rgba(6, 182, 212, 0.16) !important; }
+  .admin-dark textarea::placeholder { color: #8aa6bd !important; }
+  .admin-dark table thead th { color: #00539b !important; background: #eaf3fb !important; }
+  .admin-dark table tbody tr { border-color: #eaf3fb !important; }
   .admin-dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
   .admin-dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
-    border-color: rgba(6, 182, 212, 0.16) !important;
+    border-color: #eaf3fb !important;
   }
   .admin-dark .hover\:bg-slate-50:hover,
   .admin-dark .hover\:bg-slate-100:hover {
-    background-color: rgba(6, 182, 212, 0.1) !important;
+    background-color: #e8f4ff !important;
+  }
+
+  .sigd-cyber .admin-dark,
+  .sigd-cyber .admin-dark[class*="text-slate-1"],
+  .sigd-cyber .admin-dark[class*="text-slate-2"] {
+    color: #0b2a4a !important;
+  }
+
+  .sigd-cyber .admin-dark [class*="text-slate-1"],
+  .sigd-cyber .admin-dark [class*="text-slate-2"] {
+    color: #0b2a4a !important;
+  }
+
+  .sigd-cyber .admin-dark [class*="text-slate-3"],
+  .sigd-cyber .admin-dark [class*="text-slate-4"] {
+    color: #4b6b85 !important;
+  }
+
+  .sigd-cyber .admin-dark [class*="text-cyan-"],
+  .sigd-cyber .admin-dark [class*="text-sky-"],
+  .sigd-cyber [class*="bg-[rgba(15,23,42"] [class*="text-cyan-"],
+  .sigd-cyber [class*="bg-[rgba(15,23,42"] [class*="text-sky-"] {
+    color: #006ec7 !important;
   }
 
   .glass-card-hover {
@@ -261,7 +260,7 @@
   .glass-card-hover:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-ficha-alta);
-    border-color: rgba(34, 211, 238, 0.45);
+    border-color: #8cc8f0;
   }
 
   .suiza-badge {
@@ -337,84 +336,138 @@
   }
 
   .cyber-glow {
-    box-shadow: 0 0 28px rgba(0, 110, 199, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    box-shadow:
+      0 18px 38px -24px rgba(0, 110, 199, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 
   .cyber-text-glow {
-    text-shadow: 0 0 28px rgba(0, 110, 199, 0.25);
+    text-shadow: 0 0 18px rgba(56, 189, 248, 0.25);
   }
 }
 
 /* ----------------------------------------------------------------------------
-   OVERRIDES GLOBALES MONOCROMOS
-   Se aplican bajo `.sigd-cyber` (raíz de MainLayout). El CSS sin capa gana a
-   las utilidades de Tailwind, y `!important` asegura consistencia en páginas
-   heredadas que usan superficies claras o acentos cromáticos.
+   OVERRIDES GLOBALES · LIENZO CLARO
+   Se aplican bajo `.sigd-cyber` (raíz de MainLayout). No convierten los paneles
+   blancos en oscuros: al contrario, aseguran superficies claras y convierten
+   cualquier utilidad oscura heredada a azul institucional.
    -------------------------------------------------------------------------- */
 .sigd-cyber {
   color-scheme: light;
+  color: #0b2a4a;
+  background-color: #f4f8fb;
 }
 
-/* Superficies claras -> vidrio oscuro */
+/* Superficies blancas siempre limpias */
 .sigd-cyber .bg-white,
-.sigd-cyber .bg-slate-50,
-.sigd-cyber .bg-slate-100,
-.sigd-cyber .bg-gray-50,
-.sigd-cyber .bg-gray-100,
-.sigd-cyber .bg-zinc-50,
-.sigd-cyber .bg-neutral-50,
-.sigd-cyber .bg-stone-50,
 .sigd-cyber .bg-white\/70,
 .sigd-cyber .bg-white\/80,
 .sigd-cyber .bg-white\/90,
-.sigd-cyber .bg-white\/95,
-.sigd-cyber .bg-slate-50\/80,
-.sigd-cyber .bg-slate-100\/80 {
+.sigd-cyber .bg-white\/95 {
   background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
 }
 
-/* Acentos cromáticos usados como fondo -> panel neutro */
-.sigd-cyber [class*="bg-blue-"],
-.sigd-cyber [class*="bg-cyan-"],
-.sigd-cyber [class*="bg-sky-"],
-.sigd-cyber [class*="bg-indigo-"],
-.sigd-cyber [class*="bg-violet-"],
-.sigd-cyber [class*="bg-purple-"],
-.sigd-cyber [class*="bg-fuchsia-"],
-.sigd-cyber [class*="bg-pink-"],
-.sigd-cyber [class*="bg-rose-"],
-.sigd-cyber [class*="bg-red-"],
-.sigd-cyber [class*="bg-orange-"],
-.sigd-cyber [class*="bg-amber-"],
-.sigd-cyber [class*="bg-yellow-"],
-.sigd-cyber [class*="bg-lime-"],
-.sigd-cyber [class*="bg-green-"],
-.sigd-cyber [class*="bg-emerald-"],
-.sigd-cyber [class*="bg-teal-"],
-.sigd-cyber [class*="bg-[#"] {
-  background-color: #ffffff !important;
-  color: #12202e !important;
-  border-color: #e2e8f0 !important;
+.sigd-cyber .bg-slate-50,
+.sigd-cyber .bg-gray-50,
+.sigd-cyber .bg-zinc-50,
+.sigd-cyber .bg-neutral-50,
+.sigd-cyber .bg-stone-50 {
+  background-color: #f4f8fb !important;
 }
 
-/* Botones sólidos heredados: fondo claro + texto oscuro para contraste */
-.sigd-cyber .btn-primary,
-.sigd-cyber [class*="bg-[#006EC7]"],
-.sigd-cyber [class*="bg-[#005"],
-.sigd-cyber [class*="bg-[#00AEEF]"],
-.sigd-cyber [class*="bg-[#0072CE]"],
-.sigd-cyber [class*="bg-[#003366]"] {
-  background-color: #fafafa !important;
-  color: #09090b !important;
-  border-color: #fafafa !important;
+.sigd-cyber .bg-slate-100,
+.sigd-cyber .bg-gray-100,
+.sigd-cyber .bg-zinc-100,
+.sigd-cyber .bg-neutral-100,
+.sigd-cyber .bg-stone-100 {
+  background-color: #eaf3fb !important;
 }
 
-.sigd-cyber .btn-primary:hover {
-  background-color: #e4e4e7 !important;
+/* Fondos oscuros heredados -> azul institucional (nunca negro/gris) */
+.sigd-cyber .bg-black,
+.sigd-cyber .bg-slate-950,
+.sigd-cyber .bg-slate-900,
+.sigd-cyber .bg-slate-800,
+.sigd-cyber .bg-gray-950,
+.sigd-cyber .bg-gray-900,
+.sigd-cyber .bg-gray-800,
+.sigd-cyber .bg-zinc-950,
+.sigd-cyber .bg-zinc-900,
+.sigd-cyber .bg-zinc-800,
+.sigd-cyber .bg-neutral-950,
+.sigd-cyber .bg-neutral-900,
+.sigd-cyber .bg-neutral-800,
+.sigd-cyber .bg-stone-950,
+.sigd-cyber .bg-stone-900,
+.sigd-cyber .bg-stone-800,
+.sigd-cyber [class*="bg-[#03"],
+.sigd-cyber [class*="bg-[#04"],
+.sigd-cyber [class*="bg-[#06"],
+.sigd-cyber [class*="bg-[#07"],
+.sigd-cyber [class*="bg-[#09"],
+.sigd-cyber [class*="bg-[#0a"],
+.sigd-cyber [class*="bg-[#0A"] {
+  background-color: #0b3e6b !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
 }
 
-/* Textos oscuros -> claros */
+.sigd-cyber .bg-slate-700,
+.sigd-cyber .bg-gray-700,
+.sigd-cyber .bg-zinc-700 {
+  background-color: #0b4f8a !important;
+}
+
+/* Acciones heredadas en cian/azul -> azul institucional */
+.sigd-cyber [class*="bg-cyan-6"],
+.sigd-cyber .bg-blue-700,
+.sigd-cyber .bg-blue-600 {
+  background-color: #006ec7 !important;
+}
+
+/* Overlays de modales: azul marino translúcido, nunca negro */
+.sigd-cyber .fixed.inset-0[class*="bg-black/"],
+.sigd-cyber .fixed.inset-0[class*="bg-slate-950/"],
+.sigd-cyber .fixed.inset-0[class*="bg-slate-900/"],
+.sigd-cyber .fixed.inset-0[class*="bg-[#06"] {
+  background-color: rgba(11, 42, 74, 0.45) !important;
+  border-color: transparent !important;
+}
+
+/* Gradientes oscuros heredados -> gradiente azul institucional */
+.sigd-cyber [class*="from-slate-9"],
+.sigd-cyber [class*="from-slate-8"],
+.sigd-cyber [class*="from-gray-9"],
+.sigd-cyber [class*="from-gray-8"],
+.sigd-cyber [class*="from-zinc-9"],
+.sigd-cyber [class*="from-zinc-8"],
+.sigd-cyber [class*="from-neutral-9"],
+.sigd-cyber [class*="from-stone-9"] {
+  --tw-gradient-from: #0b3e6b !important;
+  --tw-gradient-to: rgba(11, 62, 107, 0) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.sigd-cyber [class*="via-slate-9"],
+.sigd-cyber [class*="via-slate-8"],
+.sigd-cyber [class*="via-gray-9"],
+.sigd-cyber [class*="via-zinc-9"],
+.sigd-cyber [class*="via-neutral-9"] {
+  --tw-gradient-via: #0b4f8a !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+}
+
+.sigd-cyber [class*="to-slate-9"],
+.sigd-cyber [class*="to-slate-8"],
+.sigd-cyber [class*="to-gray-9"],
+.sigd-cyber [class*="to-gray-8"],
+.sigd-cyber [class*="to-zinc-9"],
+.sigd-cyber [class*="to-zinc-8"],
+.sigd-cyber [class*="to-neutral-9"],
+.sigd-cyber [class*="to-stone-9"] {
+  --tw-gradient-to: #0b4f8a !important;
+}
+
+/* Textos neutros: se mantienen legibles sobre blanco */
 .sigd-cyber .text-slate-900,
 .sigd-cyber .text-slate-800,
 .sigd-cyber .text-gray-900,
@@ -423,8 +476,9 @@
 .sigd-cyber .text-zinc-800,
 .sigd-cyber .text-neutral-900,
 .sigd-cyber .text-neutral-800,
-.sigd-cyber [class*="text-[#"] {
-  color: #fafafa !important;
+.sigd-cyber .text-stone-900,
+.sigd-cyber .text-stone-800 {
+  color: #0b2a4a !important;
 }
 
 .sigd-cyber .text-slate-700,
@@ -433,9 +487,33 @@
 .sigd-cyber .text-gray-600,
 .sigd-cyber .text-zinc-700,
 .sigd-cyber .text-zinc-600,
+.sigd-cyber .text-stone-700,
+.sigd-cyber .text-stone-600,
 .sigd-cyber .text-tinta-600,
 .sigd-cyber .text-tinta-700 {
-  color: #d4d4d8 !important;
+  color: #2f648c !important;
+}
+
+/* Textos claros heredados de paneles oscuros: sobre blanco pasan a tinta azul */
+.sigd-cyber .text-slate-100,
+.sigd-cyber .text-slate-200,
+.sigd-cyber .text-gray-100,
+.sigd-cyber .text-gray-200,
+.sigd-cyber .text-zinc-100,
+.sigd-cyber .text-zinc-200,
+.sigd-cyber .text-neutral-100,
+.sigd-cyber .text-neutral-200,
+.sigd-cyber .text-stone-100,
+.sigd-cyber .text-stone-200 {
+  color: #0b2a4a !important;
+}
+
+.sigd-cyber .text-slate-300,
+.sigd-cyber .text-gray-300,
+.sigd-cyber .text-zinc-300,
+.sigd-cyber .text-neutral-300,
+.sigd-cyber .text-stone-300 {
+  color: #4b6b85 !important;
 }
 
 .sigd-cyber .text-slate-500,
@@ -444,35 +522,27 @@
 .sigd-cyber .text-gray-400,
 .sigd-cyber .text-zinc-500,
 .sigd-cyber .text-zinc-400,
+.sigd-cyber .text-stone-500,
+.sigd-cyber .text-stone-400,
 .sigd-cyber .text-tinta-400,
 .sigd-cyber .text-tinta-500 {
-  color: #a1a1aa !important;
+  color: #6b8aa5 !important;
 }
 
-.sigd-cyber [class*="text-blue-"],
-.sigd-cyber [class*="text-cyan-"],
-.sigd-cyber [class*="text-sky-"],
-.sigd-cyber [class*="text-indigo-"],
-.sigd-cyber [class*="text-violet-"],
-.sigd-cyber [class*="text-purple-"],
-.sigd-cyber [class*="text-fuchsia-"],
-.sigd-cyber [class*="text-pink-"],
-.sigd-cyber [class*="text-rose-"],
-.sigd-cyber [class*="text-emerald-"],
-.sigd-cyber [class*="text-teal-"] {
-  color: #f4f4f5 !important;
+/* Paneles oscuros con texto blanco -> tarjeta blanca con tinta institucional */
+.sigd-cyber .bg-slate-900.text-white,
+.sigd-cyber .bg-slate-950.text-white,
+.sigd-cyber .bg-gray-900.text-white,
+.sigd-cyber .bg-gray-950.text-white,
+.sigd-cyber .bg-zinc-900.text-white,
+.sigd-cyber .bg-zinc-950.text-white,
+.sigd-cyber .bg-black.text-white {
+  background-color: #ffffff !important;
+  color: #0b2a4a !important;
+  border-color: #d7e9f7 !important;
 }
 
-/* Errores y alertas: blanco con subrayado punteado, sin croma */
-.sigd-cyber [class*="text-red-"],
-.sigd-cyber [class*="text-orange-"],
-.sigd-cyber [class*="text-amber-"],
-.sigd-cyber [class*="text-yellow-"] {
-  color: #f4f4f5 !important;
-  text-decoration-color: rgba(255, 255, 255, 0.45);
-}
-
-/* Bordes institucionales -> filetes blancos */
+/* Bordes neutros -> filetes celestes */
 .sigd-cyber .border-slate-100,
 .sigd-cyber .border-slate-200,
 .sigd-cyber .border-slate-300,
@@ -483,100 +553,93 @@
 .sigd-cyber .border-zinc-300,
 .sigd-cyber .border-vault-papel-2,
 .sigd-cyber .border-vault-papel-3,
-.sigd-cyber [class*="border-blue-"],
-.sigd-cyber [class*="border-cyan-"],
-.sigd-cyber [class*="border-sky-"],
-.sigd-cyber [class*="border-indigo-"],
-.sigd-cyber [class*="border-violet-"],
-.sigd-cyber [class*="border-purple-"],
-.sigd-cyber [class*="border-fuchsia-"],
-.sigd-cyber [class*="border-rose-"],
-.sigd-cyber [class*="border-red-"],
-.sigd-cyber [class*="border-amber-"],
-.sigd-cyber [class*="border-emerald-"],
-.sigd-cyber [class*="border-[#"] {
-  border-color: rgba(255, 255, 255, 0.14) !important;
+.sigd-cyber .border-line {
+  border-color: #d7e9f7 !important;
+}
+
+.sigd-cyber .border-slate-700,
+.sigd-cyber .border-slate-800,
+.sigd-cyber .border-slate-900,
+.sigd-cyber .border-gray-700,
+.sigd-cyber .border-gray-800,
+.sigd-cyber .border-zinc-700,
+.sigd-cyber .border-zinc-800 {
+  border-color: rgba(255, 255, 255, 0.18) !important;
 }
 
 .sigd-cyber .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
 .sigd-cyber .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
 .sigd-cyber .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
 .sigd-cyber .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: #eaf3fb !important;
+}
+
+.sigd-cyber .divide-slate-700 > :not([hidden]) ~ :not([hidden]),
+.sigd-cyber .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255, 255, 255, 0.14) !important;
 }
 
 /* Formularios */
 .sigd-cyber input:not([type="checkbox"]):not([type="radio"]),
 .sigd-cyber select,
 .sigd-cyber textarea {
-  background-color: rgba(0, 0, 0, 0.42) !important;
-  color: #f4f4f5 !important;
-  border-color: rgba(255, 255, 255, 0.16) !important;
+  background-color: #ffffff !important;
+  color: #0b2a4a !important;
+  border-color: #c9deef !important;
 }
 
 .sigd-cyber input::placeholder,
 .sigd-cyber textarea::placeholder {
-  color: #71717a !important;
+  color: #8aa6bd !important;
 }
 
 .sigd-cyber input:focus,
 .sigd-cyber select:focus,
 .sigd-cyber textarea:focus {
-  border-color: rgba(255, 255, 255, 0.62) !important;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08) !important;
+  border-color: #006ec7 !important;
+  box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.14) !important;
 }
 
 .sigd-cyber select option {
-  background-color: #09090b;
-  color: #f4f4f5;
+  background-color: #ffffff;
+  color: #0b2a4a;
 }
 
 .sigd-cyber input[type="checkbox"],
 .sigd-cyber input[type="radio"] {
-  accent-color: #fafafa;
+  accent-color: #006ec7;
 }
 
 /* Tablas */
 .sigd-cyber table {
-  color: #e4e4e7;
+  color: #0b2a4a;
 }
 .sigd-cyber table thead,
 .sigd-cyber table thead tr,
 .sigd-cyber table thead th {
-  background-color: rgba(255, 255, 255, 0.04) !important;
-  color: #a1a1aa !important;
+  background-color: #eaf3fb !important;
+  color: #00539b !important;
 }
 .sigd-cyber table tbody tr {
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: #eaf3fb !important;
 }
 .sigd-cyber table tbody tr:hover {
-  background-color: rgba(255, 255, 255, 0.045) !important;
+  background-color: #f4f8fb !important;
 }
 
 /* Componentes institucionales */
 .sigd-cyber .header-sigd {
-  background: rgba(7, 7, 9, 0.82) !important;
-  color: #fafafa !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: #0b2a4a !important;
+  border-bottom: 1px solid #d7e9f7 !important;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
 
-.sigd-cyber .header-sigd::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
-  animation: cyberHeaderScan 7s linear infinite;
-}
-
 .sigd-cyber .tira-estado {
-  background: rgba(255, 255, 255, 0.035) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
-  color: #a1a1aa !important;
+  background: #eaf3fb !important;
+  border-color: #d7e9f7 !important;
+  color: #4b6b85 !important;
 }
 
 .sigd-cyber .lienzo-oficio,
@@ -586,113 +649,151 @@
 }
 
 .sigd-cyber .footer-sigd {
-  background: rgba(5, 5, 7, 0.78) !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #a1a1aa !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: #ffffff !important;
+  border-top: 1px solid #d7e9f7 !important;
+  color: #4b6b85 !important;
 }
 
 .sigd-cyber .ficha-modulo,
 .sigd-cyber .card-sigd,
 .sigd-cyber .portada,
 .sigd-cyber .dato-resumen,
-.sigd-cyber .table-sigd {
-  background: rgba(12, 12, 14, 0.78) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
+.sigd-cyber .table-sigd,
+.sigd-cyber .glass-card,
+.sigd-cyber .cyber-panel {
+  background: #ffffff !important;
+  border-color: #d7e9f7 !important;
   box-shadow: var(--shadow-ficha) !important;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .sigd-cyber .ficha-modulo:hover,
-.sigd-cyber .card-sigd:hover {
-  border-color: rgba(255, 255, 255, 0.32) !important;
+.sigd-cyber .card-sigd:hover,
+.sigd-cyber .glass-card:hover {
+  border-color: #8cc8f0 !important;
+  box-shadow: var(--shadow-ficha-alta) !important;
 }
 
 .sigd-cyber .ficha-icono,
 .sigd-cyber .icono-modulo {
-  background: rgba(255, 255, 255, 0.06) !important;
-  color: #e4e4e7 !important;
-  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: #e8f4ff !important;
+  color: #006ec7 !important;
+  border-color: #bfe0f7 !important;
 }
 
 .sigd-cyber .ficha-modulo:hover .ficha-icono,
 .sigd-cyber .icono-modulo:hover {
-  background: #fafafa !important;
-  color: #09090b !important;
+  background: #006ec7 !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 22px -14px rgba(0, 110, 199, 0.65);
 }
 
 .sigd-cyber .ficha-titulo,
-.sigd-cyber .ficha-codigo,
-.sigd-cyber .ficha-descripcion,
-.sigd-cyber .ficha-sello,
-.sigd-cyber .dato-cifra,
-.sigd-cyber .dato-rotulo {
-  color: #e4e4e7 !important;
+.sigd-cyber .dato-cifra {
+  color: #0b2a4a !important;
 }
 
-.sigd-cyber .ficha-descripcion,
+.sigd-cyber .ficha-codigo,
+.sigd-cyber .ficha-sello,
 .sigd-cyber .dato-rotulo {
-  color: #a1a1aa !important;
+  color: #00539b !important;
+}
+
+.sigd-cyber .ficha-descripcion {
+  color: #4b6b85 !important;
 }
 
 .sigd-cyber .ficha-division,
 .sigd-cyber .dato-institucion {
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: #eaf3fb !important;
 }
 
 .sigd-cyber .input-sigd,
 .sigd-cyber .btn-secondary {
-  background: rgba(0, 0, 0, 0.4) !important;
-  border-color: rgba(255, 255, 255, 0.16) !important;
-  color: #f4f4f5 !important;
+  background: #ffffff !important;
+  border-color: #bfe0f7 !important;
+  color: #00539b !important;
 }
 
 .sigd-cyber .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.09) !important;
-  border-color: rgba(255, 255, 255, 0.34) !important;
+  background: #e8f4ff !important;
+  border-color: #006ec7 !important;
+  color: #006ec7 !important;
 }
 
 .sigd-cyber .badge-sigd {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: rgba(255, 255, 255, 0.16) !important;
-  color: #e4e4e7 !important;
+  background: #e8f4ff !important;
+  border-color: #bfe0f7 !important;
+  color: #00539b !important;
 }
 
 .sigd-cyber .rail-modulos {
-  background: rgba(7, 7, 9, 0.9) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: #ffffff !important;
+  border-right: 1px solid #d7e9f7 !important;
 }
 
 .sigd-cyber .rail-item[aria-current="page"] {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(0, 110, 199, 0.1) !important;
 }
 
 .sigd-cyber .rail-item[aria-current="page"]::before {
-  background: #fafafa !important;
+  background: #006ec7 !important;
+  box-shadow: none;
 }
 
 .sigd-cyber .rail-item[aria-current="page"] .rail-icono {
-  background: #fafafa !important;
-  color: #09090b !important;
+  background: #006ec7 !important;
+  color: #ffffff !important;
 }
 
 .sigd-cyber .item-modulo:hover {
-  background: rgba(255, 255, 255, 0.07) !important;
+  background: #e8f4ff !important;
 }
 
 .sigd-cyber .section-title,
 .sigd-cyber .ficha-cta {
-  color: #f4f4f5 !important;
+  color: #006ec7 !important;
 }
 
-/* Utilidades oscuras existentes conservan legibilidad */
-.sigd-cyber .bg-slate-900,
-.sigd-cyber .bg-slate-950,
-.sigd-cyber .bg-zinc-900,
-.sigd-cyber .bg-zinc-950 {
-  background-color: rgba(5, 5, 7, 0.9) !important;
+/* Legado admin/casilla: paneles de vidrio oscuro -> tarjetas blancas */
+.sigd-cyber [class*="bg-[rgba(15,23,42"] {
+  background-color: #ffffff !important;
+  border-color: #d7e9f7 !important;
+  color: #0b2a4a !important;
+  box-shadow: var(--shadow-ficha) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.sigd-cyber [class*="bg-[rgba(15,23,42"][class*="text-white"],
+.sigd-cyber [class*="bg-[rgba(15,23,42"] [class*="text-slate-1"],
+.sigd-cyber [class*="bg-[rgba(15,23,42"] [class*="text-slate-2"] {
+  color: #0b2a4a !important;
+}
+
+.sigd-cyber [class*="bg-[rgba(15,23,42"] [class*="text-slate-3"],
+.sigd-cyber [class*="bg-[rgba(15,23,42"] [class*="text-slate-4"] {
+  color: #4b6b85 !important;
+}
+
+.sigd-cyber [class*="bg-[rgba(15,23,42"] input:not([type="checkbox"]):not([type="radio"]),
+.sigd-cyber [class*="bg-[rgba(15,23,42"] select,
+.sigd-cyber [class*="bg-[rgba(15,23,42"] textarea {
+  background-color: #ffffff !important;
+  color: #0b2a4a !important;
+  border-color: #c9deef !important;
+}
+
+.sigd-cyber [class*="bg-[rgba(15,23,42"] [class*="bg-slate-900/"],
+.sigd-cyber [class*="bg-[rgba(15,23,42"] [class*="bg-slate-950/"] {
+  background-color: #e8f4ff !important;
+  color: #00539b !important;
+  border-color: #bfe0f7 !important;
+}
+
+.sigd-cyber [class*="bg-[rgba(15,23,42"] [class*="border-cyan-400"] {
+  border-color: #d7e9f7 !important;
 }
 
 /* ----------------------------------------------------------------------------
@@ -738,16 +839,76 @@
   to { transform: rotate(360deg); }
 }
 
-@keyframes cyberHeaderScan {
-  0% { transform: translateX(-60%); opacity: 0; }
-  12% { opacity: 1; }
-  88% { opacity: 1; }
-  100% { transform: translateX(60%); opacity: 0; }
-}
-
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
+}
+
+/* Logo 3D */
+@keyframes sigd-orbit-x {
+  to { transform: rotateX(360deg); }
+}
+
+@keyframes sigd-orbit-y {
+  to { transform: rotateY(360deg); }
+}
+
+@keyframes sigd-orbit-z {
+  to { transform: rotateZ(360deg); }
+}
+
+@keyframes sigd-float-logo {
+  0%, 100% { transform: translateY(0) translateZ(0) rotateZ(-1.5deg) scale(1); }
+  50% { transform: translateY(-13px) translateZ(10px) rotateZ(1.5deg) scale(1.035); }
+}
+
+@keyframes sigd-halo {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.14); }
+}
+
+@keyframes sigd-logo-sway {
+  0% {
+    transform: rotateX(10deg) rotateY(-18deg) rotateZ(-2deg);
+  }
+  25% {
+    transform: rotateX(-9deg) rotateY(20deg) rotateZ(2deg);
+  }
+  50% {
+    transform: rotateX(14deg) rotateY(10deg) rotateZ(-2deg);
+  }
+  75% {
+    transform: rotateX(-12deg) rotateY(-20deg) rotateZ(2deg);
+  }
+  100% {
+    transform: rotateX(10deg) rotateY(-18deg) rotateZ(-2deg);
+  }
+}
+
+@keyframes sigd-core-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 5px rgba(255, 255, 255, 0.7),
+      0 16px 34px -16px rgba(0, 110, 199, 0.42),
+      inset 0 0 24px rgba(255, 255, 255, 0.9);
+  }
+  50% {
+    box-shadow:
+      0 0 0 8px rgba(255, 255, 255, 0.85),
+      0 22px 46px -14px rgba(56, 189, 248, 0.62),
+      inset 0 0 30px rgba(255, 255, 255, 1);
+  }
+}
+
+@keyframes sigd-sheen-sweep {
+  0% { background-position: -160% 0; opacity: 0.35; }
+  45% { opacity: 0.9; }
+  100% { background-position: 260% 0; opacity: 0.35; }
+}
+
+@keyframes sigd-spark-float {
+  0%, 100% { transform: translateY(0) scale(0.8); opacity: 0.35; }
+  50% { transform: translateY(-8px) scale(1.35); opacity: 1; }
 }
 
 .animate-fade-in {
@@ -786,6 +947,152 @@
   animation: blink 1.4s steps(2, start) infinite;
 }
 
+/* ----------------------------------------------------------------------------
+   LOGO 3D · ANIMACIÓN AUTOMÁTICA
+   -------------------------------------------------------------------------- */
+.sigd-logo3d {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sigd-logo3d-scene {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: sigd-logo-sway 9s ease-in-out infinite;
+  will-change: transform;
+}
+
+.sigd-logo3d-float {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  animation: sigd-float-logo 4.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.sigd-logo3d--estatico .sigd-logo3d-scene,
+.sigd-logo3d--estatico .sigd-logo3d-float,
+.sigd-logo3d--estatico .sigd-logo3d-ring,
+.sigd-logo3d--estatico .sigd-logo3d-halo,
+.sigd-logo3d--estatico .sigd-logo3d-core,
+.sigd-logo3d--estatico .sigd-logo3d-sheen,
+.sigd-logo3d--estatico .sigd-logo3d-spark {
+  animation: none !important;
+  will-change: auto;
+}
+
+.sigd-logo3d-halo {
+  position: absolute;
+  inset: 2%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(56, 189, 248, 0.5) 0%,
+    rgba(0, 110, 199, 0.18) 42%,
+    transparent 72%
+  );
+  filter: blur(16px);
+  animation: sigd-halo 3.8s ease-in-out infinite;
+}
+
+.sigd-logo3d-ring-wrap {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.sigd-logo3d-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 110, 199, 0.25);
+  box-shadow:
+    0 0 18px rgba(56, 189, 248, 0.18),
+    inset 0 0 18px rgba(56, 189, 248, 0.08);
+}
+
+.sigd-logo3d-ring--neon {
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow:
+    0 0 24px rgba(56, 189, 248, 0.28),
+    inset 0 0 22px rgba(56, 189, 248, 0.12);
+}
+
+.sigd-logo3d-core {
+  position: absolute;
+  inset: 18%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1px solid #bfe0f7;
+  background: radial-gradient(circle at 30% 22%, #ffffff 0%, #e8f4ff 72%);
+  box-shadow:
+    0 0 0 6px rgba(255, 255, 255, 0.7),
+    0 18px 40px -18px rgba(0, 110, 199, 0.45),
+    inset 0 0 26px rgba(255, 255, 255, 0.9);
+  transform: translateZ(28px);
+  animation: sigd-core-glow 4.2s ease-in-out infinite;
+}
+
+.sigd-logo3d-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  filter: saturate(1.05) contrast(1.02);
+}
+
+.sigd-logo3d-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.7) 34%,
+    rgba(56, 189, 248, 0.35) 48%,
+    transparent 62%,
+    transparent 100%
+  );
+  background-size: 260% 100%;
+  background-repeat: no-repeat;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: sigd-sheen-sweep 3.2s ease-in-out infinite;
+}
+
+.sigd-logo3d-spark {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 1);
+  animation: sigd-spark-float 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sigd-logo3d-scene,
+  .sigd-logo3d-float,
+  .sigd-logo3d-halo,
+  .sigd-logo3d-ring,
+  .sigd-logo3d-spark,
+  .sigd-logo3d-core,
+  .sigd-logo3d-sheen {
+    animation: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,
   .animate-fade-up,
@@ -795,8 +1102,23 @@
   .animate-shimmer,
   .animate-pulse-soft,
   .animate-spin-slow,
-  .animate-blink,
-  .sigd-cyber .header-sigd::after {
+  .animate-blink {
     animation: none !important;
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+  .sigd-cyber main,
+  .sigd-cyber section,
+  .sigd-cyber .card-sigd,
+  .sigd-cyber .glass-card {
+    background: #ffffff !important;
+    color: #111827 !important;
+    box-shadow: none !important;
   }
 }

@@ -10,11 +10,11 @@ export default function ExpedienteVersiones({ versiones }: { versiones: readonly
       {ordenadas.length === 0 ? <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">No hay versiones documentales registradas.</p> : (
         <ol aria-label="Historial de versiones documentales" className="mt-5 space-y-4">
           {ordenadas.map((version) => (
-            <li key={version.versionId} className={`min-w-0 rounded-lg border p-4 ${version.estado === "VIGENTE" ? "border-blue-200 bg-blue-50/50" : "border-slate-200 bg-white"}`}>
+            <li key={version.versionId} className={`min-w-0 rounded-lg border p-4 ${version.estado === "VIGENTE" ? "border-[#d7e9f7] bg-[#e8f4ff]/50" : "border-slate-200 bg-white"}`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <h3 className="font-bold text-slate-900">Versión {version.versionId.replace(/^v/, "")}</h3>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${version.estado === "VIGENTE" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600"}`}>{version.estado === "VIGENTE" ? "Vigente" : "Histórica"}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${version.estado === "VIGENTE" ? "bg-[#d7e9f7] text-[#00539b]" : "bg-slate-100 text-slate-600"}`}>{version.estado === "VIGENTE" ? "Vigente" : "Histórica"}</span>
                 </div>
                 <time dateTime={version.fechaRegistro} className="text-xs text-slate-500">{fechaExpediente(version.fechaRegistro, true)} · Lima</time>
               </div>

@@ -42,7 +42,7 @@ export default function ExecutiveKpiCard({ metric }: ExecutiveKpiCardProps) {
 
   return (
     <article
-      className="flex min-h-[220px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500"
+      className="flex min-h-[220px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md focus-within:ring-2 focus-within:ring-[#006ec7]"
       aria-label={`${metric.title}: ${metric.value.toFixed(1)} ${metric.unit}, variación ${metric.deltaLabel}`}
       tabIndex={0}
     >

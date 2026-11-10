@@ -47,7 +47,7 @@ export default function AuditoriaPage() {
   } = useAuditLogs();
 
   return (
-    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-[#0b2a4a]">
       <AdminPageHeader
         title="Logs de Auditoría"
         description="Trazabilidad inmutable (WORM), acciones, accesos y correlación X-Correlation-ID."
@@ -69,7 +69,7 @@ export default function AuditoriaPage() {
       )}
 
       <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 rounded-xl border border-cyan-400/40 bg-cyan-500/10 p-4 text-sm text-cyan-200">
+        <div className="mb-6 rounded-xl border border-[#bfe0f7] bg-[#e8f4ff] p-4 text-sm text-[#00539b]">
           Los registros de auditoría son de solo lectura. La inmutabilidad real
           se garantiza en backend y base de datos (append-only + hash
           encadenado SHA-256). Cada registro incluye su X-Correlation-ID para
@@ -103,7 +103,7 @@ export default function AuditoriaPage() {
           </article>
         </div>
 
-        <section className="mb-6 rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-5 shadow-sm">
+        <section className="mb-6 rounded-xl border border-[#bfe0f7] bg-white backdrop-blur-[12px] p-5 shadow-sm">
           <div className="grid gap-4 lg:grid-cols-[1fr_220px_220px_auto]">
             <div>
               <label className="mb-2 block text-sm font-semibold">Buscar</label>
@@ -111,7 +111,7 @@ export default function AuditoriaPage() {
                 value={busqueda}
                 onChange={(event) => setBusqueda(event.target.value)}
                 placeholder="Usuario, acción, expediente, ID o X-Correlation-ID"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-400/60"
+                className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm outline-none focus:border-[#006ec7]"
               />
             </div>
 
@@ -120,7 +120,7 @@ export default function AuditoriaPage() {
               <select
                 value={modulo}
                 onChange={(event) => setModulo(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm"
               >
                 <option>Todos</option>
                 <option>Expedientes</option>
@@ -142,7 +142,7 @@ export default function AuditoriaPage() {
                     event.target.value as "Exitoso" | "Denegado" | "Error" | "Todos",
                   )
                 }
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm"
               >
                 <option value="Todos">Todos</option>
                 <option value="Exitoso">Exitoso</option>
@@ -156,7 +156,7 @@ export default function AuditoriaPage() {
                 type="button"
                 onClick={exportarCsv}
                 disabled={cargando}
-                className="w-full rounded-lg bg-cyan-600/90 px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-lg bg-[#006ec7] px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Exportar CSV
               </button>
@@ -164,30 +164,30 @@ export default function AuditoriaPage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+        <section className="overflow-hidden rounded-xl border border-[#bfe0f7] bg-white backdrop-blur-[12px] shadow-sm">
+          <div className="border-b border-[#d7e9f7] px-6 py-4 flex items-center justify-between">
             <div>
               <h2 className="font-bold">Registro de eventos</h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-[#4b6b85]">
                 {total} registro total · {filtrados.length} mostrado
                 {filtrados.length !== 1 ? "s" : ""}
               </p>
             </div>
             {cargando && (
-              <span className="flex items-center gap-2 text-xs text-slate-500 animate-pulse">
+              <span className="flex items-center gap-2 text-xs text-[#4b6b85] animate-pulse">
                 Cargando…
               </span>
             )}
           </div>
 
           {cargando && filtrados.length === 0 ? (
-            <div className="px-6 py-10 text-center text-slate-500">
+            <div className="px-6 py-10 text-center text-[#4b6b85]">
               Cargando registros de auditoría…
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1500px] text-left">
-                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <thead className="bg-[#f4f8fb] text-xs uppercase text-[#4b6b85]">
                   <tr>
                     <th className="px-5 py-3">ID / Fecha</th>
                     <th className="px-5 py-3">Usuario</th>
@@ -204,16 +204,16 @@ export default function AuditoriaPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filtrados.map((registro) => (
-                    <tr key={registro.id} className="hover:bg-slate-50">
+                    <tr key={registro.id} className="hover:bg-[#f4f8fb]">
                       <td className="px-5 py-4">
                         <p className="text-sm font-semibold">{registro.id}</p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-[#4b6b85]">
                           {formatearFecha(registro.fecha)}
                         </p>
                       </td>
                       <td className="px-5 py-4">
                         <p className="text-sm font-semibold">{registro.usuario}</p>
-                        <p className="text-xs text-slate-500">{registro.rol}</p>
+                        <p className="text-xs text-[#4b6b85]">{registro.rol}</p>
                       </td>
                       <td className="px-5 py-4 text-sm">{registro.area}</td>
                       <td className="px-5 py-4 text-sm">{registro.accion}</td>
@@ -230,20 +230,20 @@ export default function AuditoriaPage() {
                           {registro.resultado}
                         </span>
                       </td>
-                      <td className="px-5 py-4 font-mono text-xs text-slate-600">
+                      <td className="px-5 py-4 font-mono text-xs text-[#4b6b85]">
                         {registro.ip}
                       </td>
-                      <td className="px-5 py-4 font-mono text-xs text-slate-600 truncate">
+                      <td className="px-5 py-4 font-mono text-xs text-[#4b6b85] truncate">
                         {registro.correlationId ?? "—"}
                       </td>
-                      <td className="px-5 py-4 font-mono text-xs text-slate-600 truncate max-w-[120px]">
+                      <td className="px-5 py-4 font-mono text-xs text-[#4b6b85] truncate max-w-[120px]">
                         {registro.hash ?? "—"}
                       </td>
                       <td className="px-5 py-4">
                         <button
                           type="button"
                           onClick={() => setSeleccionado(registro)}
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                          className="rounded-lg border border-[#bfe0f7] px-3 py-2 text-xs font-semibold text-[#4b6b85] hover:bg-[#e8f4ff]"
                         >
                           Ver
                         </button>
@@ -252,7 +252,7 @@ export default function AuditoriaPage() {
                   ))}
                   {filtrados.length === 0 && !cargando && (
                     <tr>
-                      <td colSpan={11} className="px-5 py-8 text-center text-slate-500">
+                      <td colSpan={11} className="px-5 py-8 text-center text-[#4b6b85]">
                         No se encontraron registros de auditoría con los filtros aplicados.
                       </td>
                     </tr>
@@ -266,7 +266,7 @@ export default function AuditoriaPage() {
         {/* Paginación simple */}
         {total > PAGE_SIZE && (
           <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-[#4b6b85]">
               Mostrando {filtrados.length} de {total} registros
             </div>
             <div className="flex gap-2">
@@ -274,16 +274,16 @@ export default function AuditoriaPage() {
                 type="button"
                 disabled={pagina <= 1 || cargando}
                 onClick={() => setPagina((p) => Math.max(1, p - 1))}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-lg border border-[#bfe0f7] px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Anterior
               </button>
-              <span className="text-xs text-slate-500">Página {pagina}</span>
+              <span className="text-xs text-[#4b6b85]">Página {pagina}</span>
               <button
                 type="button"
                 disabled={(pagina * PAGE_SIZE) >= total || cargando}
                 onClick={() => setPagina((p) => p + 1)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-lg border border-[#bfe0f7] px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Siguiente
               </button>

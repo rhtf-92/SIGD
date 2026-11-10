@@ -14,7 +14,7 @@ const modulos = [
         <path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2" />
       </>
     ),
-    acento: "from-blue-500 to-blue-700",
+    acento: "from-[#006ec7] to-[#00539b]",
   },
   {
     titulo: "Roles y Permisos",
@@ -27,7 +27,7 @@ const modulos = [
         <path d="m8 12 3 3 5-5" />
       </>
     ),
-    acento: "from-indigo-500 to-blue-700",
+    acento: "from-indigo-500 to-[#00539b]",
   },
   {
     titulo: "Auditoría",
@@ -41,7 +41,7 @@ const modulos = [
         <path d="m19 19 3 3" />
       </>
     ),
-    acento: "from-cyan-500 to-blue-700",
+    acento: "from-[#38bdf8] to-[#00539b]",
   },
   {
     titulo: "Tablas Maestras",
@@ -54,7 +54,7 @@ const modulos = [
         <path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
       </>
     ),
-    acento: "from-sky-500 to-blue-700",
+    acento: "from-[#38bdf8] to-[#00539b]",
   },
   {
     titulo: "Calendario Laboral",
@@ -67,7 +67,7 @@ const modulos = [
         <path d="M8 3v4m8-4v4M3 11h18M7 15h2m3 0h2m3 0h1M7 18h2m3 0h2" />
       </>
     ),
-    acento: "from-blue-600 to-indigo-700",
+    acento: "from-[#00539b] to-indigo-700",
   },
   {
     titulo: "Seguridad",
@@ -80,7 +80,7 @@ const modulos = [
         <path d="M8 10V7a4 4 0 0 1 8 0v3M12 15v2" />
       </>
     ),
-    acento: "from-slate-600 to-blue-700",
+    acento: "from-[#0b3e6b] to-[#006ec7]",
   },
 ];
 
@@ -88,7 +88,7 @@ export default function AdministracionPage() {
   const navigate = useNavigate();
 
   return (
-    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-[#0b2a4a]">
       <AdminPageHeader
         title="Panel de Administración"
         description="Administración, Seguridad y Auditoría: configuración y control administrativo del sistema."
@@ -99,9 +99,9 @@ export default function AdministracionPage() {
           {modulos.map((modulo) => (
             <article
               key={modulo.titulo}
-              className="group relative overflow-hidden rounded-2xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-6 shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:border-cyan-400/40 hover:shadow-xl motion-reduce:transition-none"
+              className="group relative overflow-hidden rounded-2xl border border-[#d7e9f7] bg-white p-6 shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:border-[#8cc8f0] hover:shadow-xl motion-reduce:transition-none"
             >
-              <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-cyan-500/10 opacity-40" />
+              <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[#e8f4ff] opacity-80" />
 
               <div className="relative flex items-center gap-4">
                 <span
@@ -122,12 +122,12 @@ export default function AdministracionPage() {
                     {modulo.icono}
                   </svg>
                 </span>
-                <h3 className="text-lg font-bold text-slate-100">
+                <h3 className="text-lg font-bold text-[#0b2a4a]">
                   {modulo.titulo}
                 </h3>
               </div>
 
-              <p className="relative mt-3 min-h-12 text-sm leading-6 text-slate-300">
+              <p className="relative mt-3 min-h-12 text-sm leading-6 text-[#4b6b85]">
                 {modulo.descripcion}
               </p>
 
@@ -135,7 +135,7 @@ export default function AdministracionPage() {
                 type="button"
                 onClick={() => navigate(modulo.ruta)}
                 aria-label={`Administrar ${modulo.titulo}`}
-                className="relative mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600/90 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-125 transition-all duration-300 ease-out"
+                className="relative mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006ec7] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-out hover:bg-[#00539b]"
               >
                 Administrar
                 <svg

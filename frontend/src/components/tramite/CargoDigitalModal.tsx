@@ -114,7 +114,7 @@ export default function CargoDigitalModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="titulo-cargo-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#0b2a4a]/35 p-4 backdrop-blur-sm"
     >
       <div
         ref={dialogRef}
@@ -126,12 +126,12 @@ export default function CargoDigitalModal({
             <h3 id="titulo-cargo-modal" className="text-sm font-bold text-slate-900">
               Cargo de Recepción Digital (CUT)
             </h3>
-            <p className="text-xs text-slate-500">Mesa de Partes / Ventanilla Presencial</p>
+            <p className="text-xs text-[#4b6b85]">Mesa de Partes / Ventanilla Presencial</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition"
+            className="rounded-lg p-1.5 text-[#6b8aa5] hover:bg-slate-200 hover:text-slate-700 transition"
             aria-label="Cerrar ventana de cargo"
           >
             ✕
@@ -144,14 +144,14 @@ export default function CargoDigitalModal({
           <div className="text-center border-b border-dashed border-slate-400 pb-3">
             <p className="font-bold text-sm tracking-wide">IESTP &ldquo;SUIZA&rdquo;</p>
             <p className="text-[10px] text-slate-600">PUCALLPA — UCAYALI</p>
-            <p className="text-[9px] text-slate-500 mt-0.5">Mesa de Partes y Trámite Documentario</p>
-            <p className="text-[9px] text-slate-500">RUC: 20131312955</p>
+            <p className="text-[9px] text-[#4b6b85] mt-0.5">Mesa de Partes y Trámite Documentario</p>
+            <p className="text-[9px] text-[#4b6b85]">RUC: 20131312955</p>
           </div>
 
           {/* Código CUT Destacado */}
           <div className="text-center py-2 bg-slate-50 rounded border border-slate-200 print:bg-transparent print:border-black">
-            <p className="text-[10px] font-sans font-semibold text-slate-500">CÓDIGO ÚNICO DE TRÁMITE</p>
-            <p className="text-lg font-black text-blue-700 print:text-black tracking-wider font-mono">
+            <p className="text-[10px] font-sans font-semibold text-[#4b6b85]">CÓDIGO ÚNICO DE TRÁMITE</p>
+            <p className="text-lg font-black text-[#006ec7] print:text-black tracking-wider font-mono">
               {codigoCut}
             </p>
           </div>
@@ -164,7 +164,7 @@ export default function CargoDigitalModal({
               ariaLabel={`QR para seguimiento del trámite ${codigoCut}`}
             />
           </div>
-          <p className="text-center text-[9px] text-slate-500">
+          <p className="text-center text-[9px] text-[#4b6b85]">
             Escanee para consultar estado en línea 24/7
           </p>
 
@@ -211,7 +211,7 @@ export default function CargoDigitalModal({
           )}
 
           {/* Hash de Integridad y Pie */}
-          <div className="text-[9px] text-slate-500 text-center space-y-1 pt-1">
+          <div className="text-[9px] text-[#4b6b85] text-center space-y-1 pt-1">
             <p className="font-mono break-all">
               Hash: {hashSha256 ? hashSha256.slice(0, 32) : "n/a"}…
             </p>
@@ -225,35 +225,35 @@ export default function CargoDigitalModal({
           <button
             type="button"
             onClick={handleCopiarCut}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-[#e8f4ff] transition cursor-pointer"
           >
             {copiado ? "✓ ¡Copiado!" : "Copiar CUT"}
           </button>
           <button
             type="button"
             onClick={handleDescargarPdf}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-[#e8f4ff] transition cursor-pointer"
           >
             Descargar Cargo Digital (PDF)
           </button>
           <button
             type="button"
             onClick={handleAccederCasilla}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-[#e8f4ff] transition cursor-pointer"
           >
             Acceder a Casilla Electrónica
           </button>
           <button
             type="button"
             onClick={handleImprimirTicket}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#006ec7] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#00539b] transition cursor-pointer"
           >
             🖨️ Imprimir Ticket Térmico
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-[#e8f4ff] transition cursor-pointer"
           >
             Finalizar y Cerrar
           </button>

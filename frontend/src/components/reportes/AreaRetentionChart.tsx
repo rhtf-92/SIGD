@@ -148,7 +148,7 @@ export default function AreaRetentionChart({
                   role="row"
                   tabIndex={0}
                   aria-label={`${areaName}. Tiene ${expedientes} expedientes retenidos. ${diasRetencion} días de retención. Nivel de riesgo ${risk.label}.`}
-                  className="grid grid-cols-[minmax(0,1.9fr)_120px_140px_120px] gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                  className="grid grid-cols-[minmax(0,1.9fr)_120px_140px_120px] gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#006ec7]"
                 >
                   <div role="cell" className="font-medium text-slate-900">
                     {areaName}

@@ -1,8 +1,8 @@
-import {
+﻿import {
   ChevronDown,
   FileSearch,
-  Fingerprint,
   Gauge,
+  Lock,
   MessagesSquare,
   ShieldCheck,
   Workflow,
@@ -13,28 +13,32 @@ import { PREGUNTAS_FRECUENTES } from "../../data/landingInstitucional";
 
 const PILARES = [
   {
-    icono: Fingerprint,
-    codigo: "01",
-    titulo: "Identidad digital",
-    descripcion: "Lectura del DNI electrónico y autocompletado seguro de tus datos.",
+    icono: Lock,
+    codigo: "404",
+    titulo: "EN MANTENIMIENTO",
+    descripcion: "Error 404 - Módulo en Mantenimiento",
+    alerta: true,
   },
   {
     icono: Workflow,
     codigo: "02",
     titulo: "Trámites guiados",
     descripcion: "Un asistente paso a paso con validación en tiempo real y cargo digital.",
+    alerta: false,
   },
   {
     icono: FileSearch,
     codigo: "03",
     titulo: "Trazabilidad total",
     descripcion: "Consulta el estado de tu expediente con el CUT en cualquier momento.",
+    alerta: false,
   },
   {
     icono: MessagesSquare,
     codigo: "04",
     titulo: "Asistente SIGI",
     descripcion: "Orientación inmediata 24/7 sobre requisitos, plazos y soporte técnico.",
+    alerta: false,
   },
 ];
 
@@ -69,13 +73,26 @@ export default function SeccionBienvenida() {
           </div>
 
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {PILARES.map(({ icono: Icono, codigo, titulo, descripcion }) => (
-              <article key={codigo} className="ficha-modulo group p-5">
+            {PILARES.map(({ icono: Icono, codigo, titulo, descripcion, alerta }) => (
+              <article
+                key={codigo}
+                className={`ficha-modulo group p-5 ${
+                  alerta ? "border-amber-200 bg-amber-50/60" : ""
+                }`}
+              >
                 <div className="flex items-center justify-between">
-                  <span className="ficha-icono">
+                  <span
+                    className={`ficha-icono ${
+                      alerta ? "border-amber-200 bg-amber-100 text-amber-700" : ""
+                    }`}
+                  >
                     <Icono className="h-5 w-5" aria-hidden="true" />
                   </span>
-                  <span className="font-mono text-[10px] font-semibold tracking-[0.16em] text-tinta-300">
+                  <span
+                    className={`font-mono text-[10px] font-semibold tracking-[0.16em] ${
+                      alerta ? "text-amber-600" : "text-tinta-300"
+                    }`}
+                  >
                     {codigo}
                   </span>
                 </div>

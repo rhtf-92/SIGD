@@ -102,7 +102,7 @@ export default function BuscadorExpedientes({
             onKeyDown={(e) => manejarTecla(e.key)}
             placeholder="Ej. 413, EXP-2026-000413, certificado, Torres…"
             aria-label="Buscar expediente por número, CUT, trámite o solicitante"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-[#006ec7] focus:ring-2 focus:ring-[#bfe0f7]"
           />
         </label>
       </div>
@@ -124,14 +124,14 @@ export default function BuscadorExpedientes({
               <li
                 key={e.idTramite}
                 className={`flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between ${
-                  esActual ? "bg-blue-50/60" : "bg-white"
+                  esActual ? "bg-[#e8f4ff]/60" : "bg-white"
                 }`}
               >
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-slate-800">
                     N.° {e.idTramite} · <span className="font-mono">{e.cut}</span>
                     {esActual && (
-                      <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-[0.65rem] font-bold text-white">
+                      <span className="ml-2 rounded-full bg-[#006ec7] px-2 py-0.5 text-[0.65rem] font-bold text-white">
                         En visualizador
                       </span>
                     )}
@@ -151,7 +151,7 @@ export default function BuscadorExpedientes({
                       ? "Cargar en el visualizador para tomar en revisión"
                       : "Cargar en el visualizador (ver detalle)"
                   }
-                  className="shrink-0 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+                  className="shrink-0 rounded-lg bg-[#006ec7] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#00539b] focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {esActual ? "Cargado" : "Cargar para revisión"}
                 </button>

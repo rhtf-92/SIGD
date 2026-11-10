@@ -18,7 +18,7 @@ const ETIQUETA_ESTADO: Record<EstadoResolucion, string> = {
 const COLOR_ESTADO: Record<EstadoResolucion, string> = {
   BORRADOR: "border-slate-200 bg-slate-100 text-slate-700",
   EN_REVISION: "border-amber-200 bg-amber-50 text-amber-700",
-  APROBADO_PARA_FIRMA: "border-blue-200 bg-blue-50 text-blue-700",
+  APROBADO_PARA_FIRMA: "border-[#d7e9f7] bg-[#e8f4ff] text-[#00539b]",
   FIRMADO_DIGITALMENTE: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
@@ -96,16 +96,16 @@ export default function ProyectorResolucionesPage() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
           <nav className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <Link to="/" className="hover:text-blue-700">Inicio</Link>
+            <Link to="/" className="hover:text-[#00539b]">Inicio</Link>
             <span>/</span>
-            <Link to="/flujo-validez-legal" className="hover:text-blue-700">Flujo de Validez Legal</Link>
+            <Link to="/flujo-validez-legal" className="hover:text-[#00539b]">Flujo de Validez Legal</Link>
             <span>/</span>
             <span className="text-slate-800">Proyector de Resoluciones</span>
           </nav>
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#00539b]">
                 Módulo 04 · Validez Legal y Firma Digital
               </p>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
@@ -125,7 +125,7 @@ export default function ProyectorResolucionesPage() {
               <button
                 type="button"
                 onClick={handleNuevo}
-                className="rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-800"
+                className="rounded-lg bg-[#006ec7] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#00539b]"
               >
                 + Nuevo proyecto
               </button>
@@ -179,7 +179,7 @@ export default function ProyectorResolucionesPage() {
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 placeholder="Buscar por RD, administrado, CUT…"
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none md:col-span-2"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#006ec7] focus:outline-none md:col-span-2"
               />
               <select
                 value={filtroEstado}
@@ -215,7 +215,7 @@ export default function ProyectorResolucionesPage() {
                 <button
                   type="button"
                   onClick={handleNuevo}
-                  className="mt-4 rounded-lg bg-blue-700 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-800"
+                  className="mt-4 rounded-lg bg-[#006ec7] px-4 py-2 text-xs font-semibold text-white hover:bg-[#00539b]"
                 >
                   + Nuevo proyecto
                 </button>
@@ -226,7 +226,7 @@ export default function ProyectorResolucionesPage() {
                   <li key={p.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-blue-700">{p.numeroResolucion}</span>
+                        <span className="font-mono text-xs font-bold text-[#00539b]">{p.numeroResolucion}</span>
                         <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${COLOR_ESTADO[p.estado]}`}>
                           {ETIQUETA_ESTADO[p.estado]}
                         </span>
@@ -254,7 +254,7 @@ export default function ProyectorResolucionesPage() {
                             avanzarEstado(p.id);
                             mostrarAviso(`${p.numeroResolucion} avanzó a ${ETIQUETA_ESTADO[p.estado]}.`);
                           }}
-                          className="rounded-lg border border-blue-600 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                          className="rounded-lg border border-[#006ec7] px-3 py-1.5 text-xs font-semibold text-[#00539b] hover:bg-[#e8f4ff]"
                         >
                           Avanzar →
                         </button>
@@ -283,7 +283,7 @@ export default function ProyectorResolucionesPage() {
                         <button
                           type="button"
                           onClick={() => handleProcederFirma(p)}
-                          className="rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800"
+                          className="rounded-lg bg-[#006ec7] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#00539b]"
                         >
                           A firma →
                         </button>

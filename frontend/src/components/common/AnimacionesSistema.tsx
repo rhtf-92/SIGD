@@ -90,20 +90,20 @@ export function PageLoader({ onReady }: { onReady?: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#04213f] pointer-events-none"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#f4f8fb] pointer-events-none"
       aria-hidden="true"
     >
       <div className="relative flex flex-col items-center gap-4 pointer-events-auto">
         {logoActual && (
           <div
-            className="relative h-32 w-32 overflow-hidden rounded-2xl border-2 border-[#F9E000]/40 bg-[#003366]/20 shadow-[0_0_40px_rgba(249,224,0,0.25)] animate-[logo-fade_900ms_ease-in-out]"
+            className="relative h-32 w-32 overflow-hidden rounded-2xl border-2 border-[#bfe0f7] bg-white shadow-[0_0_40px_rgba(0,110,199,0.18)] animate-[logo-fade_900ms_ease-in-out]"
           >
             <img
               src={logoActual}
               alt="Logo institucional"
               className="h-full w-full object-contain p-2 opacity-0 animate-[logo-fade-in_700ms_ease-out]"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#04213f]/10 to-[#04213f]/60" />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-[#006ec7]/20" />
           </div>
         )}
         {!logoActual && (
@@ -123,10 +123,10 @@ export function PageLoader({ onReady }: { onReady?: () => void }) {
             </svg>
           </div>
         )}
-        <h2 className="text-xl font-extrabold tracking-tight text-white">
+        <h2 className="text-xl font-extrabold tracking-tight text-[#0b2a4a]">
           Cargando SIGD
         </h2>
-        <p className="text-[12px] font-medium text-blue-100/80 uppercase tracking-[0.15em]">
+        <p className="text-[12px] font-medium text-[#4b6b85] uppercase tracking-[0.15em]">
           Sistema Integral de Gestión Documentaria
         </p>
       </div>

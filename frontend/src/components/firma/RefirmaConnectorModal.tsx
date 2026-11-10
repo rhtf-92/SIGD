@@ -65,8 +65,8 @@ function EstadoCasilla({ fase, indice }: { fase: number; indice: number }) {
         indice < fase
           ? "bg-emerald-100 text-emerald-700"
           : indice === fase
-            ? "bg-blue-600 text-white"
-            : "border border-slate-200 bg-slate-50 text-slate-400"
+            ? "bg-[#006ec7] text-white"
+            : "border border-slate-200 bg-slate-50 text-[#6b8aa5]"
       }`}
       aria-hidden="true"
     >
@@ -137,7 +137,7 @@ export default function RefirmaConnectorModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b2a4a]/35 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="refirma-modal-titulo"
@@ -154,7 +154,7 @@ export default function RefirmaConnectorModal({
             >
               Firma Digital con Refirma RENIEC
             </h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
+            <p className="mt-1 text-xs leading-5 text-[#4b6b85]">
               La suscripción digital ostenta plena validez conforme a la Ley N°
               27269 (Firmas y Certificados Digitales) y su Reglamento D.S. N°
               052-2008-PCM. Las claves privadas nunca abandonan el dispositivo
@@ -165,13 +165,13 @@ export default function RefirmaConnectorModal({
 
         <div className="space-y-4 p-5">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+            <p className="text-xs font-bold uppercase tracking-wide text-[#6b8aa5]">
               Documento a firmar
             </p>
             <p className="mt-1 font-bold text-slate-800">
               {documento.tipoActo} · {documento.numeroCorrelativo}
             </p>
-            <p className="text-xs text-slate-500">{documento.asunto}</p>
+            <p className="text-xs text-[#4b6b85]">{documento.asunto}</p>
           </div>
 
           {estado === "INACTIVO" && (
@@ -183,7 +183,7 @@ export default function RefirmaConnectorModal({
                 {MECANISMOS.map((opcion) => (
                   <label
                     key={opcion.clave}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm transition hover:border-blue-300 has-checked:border-blue-500 has-checked:bg-blue-50"
+                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm transition hover:border-[#bfe0f7] has-checked:border-[#38bdf8] has-checked:bg-[#e8f4ff]"
                   >
                     <input
                       type="radio"
@@ -214,23 +214,23 @@ export default function RefirmaConnectorModal({
                   <span
                     className={`text-sm ${
                       indice < fase
-                        ? "text-slate-500 line-through"
+                        ? "text-[#4b6b85] line-through"
                         : indice === fase
                           ? "font-semibold text-slate-900"
-                          : "text-slate-400"
+                          : "text-[#6b8aa5]"
                     }`}
                   >
                     {paso.etiqueta}
                   </span>
                 </div>
               ))}
-              <p className="pt-1 text-xs text-slate-400" role="status">
+              <p className="pt-1 text-xs text-[#6b8aa5]" role="status">
                 Firma PAdES-BES · Sellado de tiempo criptográfico TSA (RFC 3161)
               </p>
               {/* T-FE-DOC-11: barra de espera de 5 minutos con cuenta regresiva */}
               {segundosRestantes !== null && (
                 <div className="pt-1" aria-live="polite">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
+                  <div className="flex items-center justify-between text-xs text-[#4b6b85]">
                     <span>
                       1. Agente Refirma invocado → 2. Ingrese su PIN en su
                       computadora → 3. Esperando confirmación de RENIEC…
@@ -241,7 +241,7 @@ export default function RefirmaConnectorModal({
                     </span>
                   </div>
                   <div
-                    className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100"
+                    className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e8f4ff]"
                     role="progressbar"
                     aria-valuemin={0}
                     aria-valuemax={100}
@@ -249,7 +249,7 @@ export default function RefirmaConnectorModal({
                     aria-label="Tiempo restante de espera de firma"
                   >
                     <div
-                      className="h-full rounded-full bg-blue-600 transition-all"
+                      className="h-full rounded-full bg-[#006ec7] transition-all"
                       style={{ width: `${progresoTimeout}%` }}
                     />
                   </div>
@@ -290,14 +290,14 @@ export default function RefirmaConnectorModal({
               <button
                 type="button"
                 onClick={cerrarConLimpieza}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-[#e8f4ff] focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:outline-none"
               >
                 Cerrar
               </button>
               <button
                 type="button"
                 onClick={() => iniciarFirma(documento, firmanteDni)}
-                className="rounded-lg bg-blue-700 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                className="rounded-lg bg-[#006ec7] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#00539b] focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:outline-none"
               >
                 Conectar con Refirma
               </button>
@@ -308,7 +308,7 @@ export default function RefirmaConnectorModal({
             <button
               type="button"
               onClick={cerrarConLimpieza}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-[#e8f4ff] focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:outline-none"
             >
               Cancelar
             </button>
@@ -319,14 +319,14 @@ export default function RefirmaConnectorModal({
               <button
                 type="button"
                 onClick={cerrarConLimpieza}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-[#e8f4ff] focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:outline-none"
               >
                 Cerrar
               </button>
               <button
                 type="button"
                 onClick={reintentar}
-                className="rounded-lg bg-blue-700 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                className="rounded-lg bg-[#006ec7] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#00539b] focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:outline-none"
               >
                 Reintentar conexión
               </button>

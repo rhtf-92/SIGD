@@ -131,7 +131,7 @@ function TarjetaModulo({ modulo, onToggleFavorito, compact = false }: TarjetaMod
       className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
         modulo.isFavorite
           ? "border-amber-300/80"
-          : "border-slate-200 hover:border-[#006EC7]/50"
+          : "border-slate-200 hover:border-[#006ec7]/50"
       }`}
     >
       <Link
@@ -145,17 +145,17 @@ function TarjetaModulo({ modulo, onToggleFavorito, compact = false }: TarjetaMod
               compact ? "h-10 w-10" : "h-11 w-11"
             } ${
               modulo.principal
-                ? "bg-[#003366] text-white transition group-hover:bg-[#006EC7]"
-                : "bg-blue-50 text-[#003366]"
+                ? "bg-[#00539b] text-white transition group-hover:bg-[#006ec7]"
+                : "bg-[#e8f4ff] text-[#00539b]"
             }`}
           >
             <Icono aria-hidden="true" className="h-5 w-5" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#006EC7]">
+            <span className="block truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#006ec7]">
               {modulo.code}
             </span>
-            <span className="mt-1 block text-sm font-black leading-snug text-[#003366]">
+            <span className="mt-1 block text-sm font-black leading-snug text-[#00539b]">
               {modulo.title}
             </span>
           </span>
@@ -174,7 +174,7 @@ function TarjetaModulo({ modulo, onToggleFavorito, compact = false }: TarjetaMod
             </span>
           )}
           {modulo.principal && (
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#006EC7]">
+            <span className="rounded-full bg-[#e8f4ff] px-2 py-0.5 text-[10px] font-bold text-[#006ec7]">
               Principal
             </span>
           )}
@@ -183,7 +183,7 @@ function TarjetaModulo({ modulo, onToggleFavorito, compact = false }: TarjetaMod
               {pendientes} {pendientes === 1 ? "pendiente" : "pendientes"}
             </span>
           )}
-          <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-bold text-[#E6007E]">
+          <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-bold text-[#006ec7]">
             Abrir
             <ArrowRight
               aria-hidden="true"
@@ -343,11 +343,11 @@ export default function SeccionAccesoSigd() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-2xl">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#006EC7]">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e8f4ff] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#006ec7]">
               <Landmark aria-hidden="true" className="h-3.5 w-3.5" />
               Gobierno digital
             </span>
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-[#003366] sm:text-3xl">
+            <h2 className="mt-2 text-2xl font-black tracking-tight text-[#00539b] sm:text-3xl">
               Accesos al Sistema SIGD
             </h2>
             <p className="mt-1 text-sm text-slate-500">
@@ -373,7 +373,7 @@ export default function SeccionAccesoSigd() {
           ) : (
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 rounded-lg bg-[#003366] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#00264d]"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#00539b] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#00539b]"
             >
               <LogIn aria-hidden="true" className="h-4 w-4" />
               Iniciar sesión
@@ -436,7 +436,7 @@ export default function SeccionAccesoSigd() {
                   placeholder="Buscar módulo, código o servicio…"
                   aria-label="Buscar módulos del SIGD"
                   aria-keyshortcuts="Control+K /"
-                  className="w-full rounded-lg border border-slate-300 bg-slate-50 py-2.5 pl-9 pr-20 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#006EC7] focus:bg-white focus:ring-2 focus:ring-[#006EC7]/20"
+                  className="w-full rounded-lg border border-slate-300 bg-slate-50 py-2.5 pl-9 pr-20 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#006ec7] focus:bg-white focus:ring-2 focus:ring-[#006ec7]/20"
                 />
                 {busqueda ? (
                   <button
@@ -463,7 +463,7 @@ export default function SeccionAccesoSigd() {
                     aria-pressed={filtro === opcion.id}
                     className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
                       filtro === opcion.id
-                        ? "bg-[#003366] text-white"
+                        ? "bg-[#00539b] text-white"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
@@ -486,7 +486,7 @@ export default function SeccionAccesoSigd() {
                 <button
                   type="button"
                   onClick={limpiarFiltros}
-                  className="mt-3 text-sm font-bold text-[#006EC7] hover:underline"
+                  className="mt-3 text-sm font-bold text-[#006ec7] hover:underline"
                 >
                   Limpiar búsqueda y filtros
                 </button>

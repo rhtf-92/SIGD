@@ -91,7 +91,7 @@ export default function PersonaJuridicaForm({
         <div>
           <label
             htmlFor="ruc"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             RUC *
           </label>
@@ -100,7 +100,7 @@ export default function PersonaJuridicaForm({
             type="text"
             {...register("ruc")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.ruc ? "border-red-500" : "border-gray-300"
+              errors.ruc ? "border-red-500" : "border-[#bfe0f7]"
             }`}
             placeholder="10XXXXXXXXX o 20XXXXXXXXX"
             maxLength={11}
@@ -115,7 +115,7 @@ export default function PersonaJuridicaForm({
         <div>
           <label
             htmlFor="razonSocial"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Razón Social *
           </label>
@@ -124,7 +124,7 @@ export default function PersonaJuridicaForm({
             type="text"
             {...register("razonSocial")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.razonSocial ? "border-red-500" : "border-gray-300"
+              errors.razonSocial ? "border-red-500" : "border-[#bfe0f7]"
             }`}
           />
           {errors.razonSocial && (
@@ -140,14 +140,14 @@ export default function PersonaJuridicaForm({
         <div>
           <label
             htmlFor="representanteTipoDocumento"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Tipo de Documento *
           </label>
           <select
             id="representanteTipoDocumento"
             {...register("representanteLegal.tipoDocumento")}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] focus:border-[#006EC7] outline-none"
+            className="w-full px-3 py-2 text-sm border border-[#bfe0f7] rounded-md focus:ring-2 focus:ring-[#006EC7] focus:border-[#006EC7] outline-none"
           >
             <option value="DNI">DNI</option>
             <option value="CE">CE</option>
@@ -162,7 +162,7 @@ export default function PersonaJuridicaForm({
         <div>
           <label
             htmlFor="representanteNumeroDocumento"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Número de Documento *
           </label>
@@ -171,7 +171,7 @@ export default function PersonaJuridicaForm({
             type="text"
             {...register("representanteLegal.numeroDocumento")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.representanteLegal?.numeroDocumento ? "border-red-500" : "border-gray-300"
+              errors.representanteLegal?.numeroDocumento ? "border-red-500" : "border-[#bfe0f7]"
             }`}
             placeholder="DNI: 8 dígitos o CE: 9-12 caracteres"
           />
@@ -187,7 +187,7 @@ export default function PersonaJuridicaForm({
         <div>
           <label
             htmlFor="representanteNombres"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Nombres *
           </label>
@@ -196,7 +196,7 @@ export default function PersonaJuridicaForm({
             type="text"
             {...register("representanteLegal.nombres")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.representanteLegal?.nombres ? "border-red-500" : "border-gray-300"
+              errors.representanteLegal?.nombres ? "border-red-500" : "border-[#bfe0f7]"
             }`}
           />
           {errors.representanteLegal?.nombres && (
@@ -209,7 +209,7 @@ export default function PersonaJuridicaForm({
         <div>
           <label
             htmlFor="representanteApellidos"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Apellidos *
           </label>
@@ -218,7 +218,7 @@ export default function PersonaJuridicaForm({
             type="text"
             {...register("representanteLegal.apellidos")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.representanteLegal?.apellidos ? "border-red-500" : "border-gray-300"
+              errors.representanteLegal?.apellidos ? "border-red-500" : "border-[#bfe0f7]"
             }`}
           />
           {errors.representanteLegal?.apellidos && (
@@ -232,7 +232,7 @@ export default function PersonaJuridicaForm({
       <div>
         <label
           htmlFor="cargo"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-[#2f648c] mb-1"
         >
           Cargo *
         </label>
@@ -241,7 +241,7 @@ export default function PersonaJuridicaForm({
           type="text"
           {...register("representanteLegal.cargo")}
           className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-            errors.representanteLegal?.cargo ? "border-red-500" : "border-gray-300"
+            errors.representanteLegal?.cargo ? "border-red-500" : "border-[#bfe0f7]"
           }`}
           placeholder="Ej. Gerente General"
         />
@@ -256,7 +256,7 @@ export default function PersonaJuridicaForm({
       <div>
         <label
           htmlFor="partidaSunarp"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-[#2f648c] mb-1"
         >
           Partida SUNARP
         </label>
@@ -265,7 +265,7 @@ export default function PersonaJuridicaForm({
           type="text"
           {...register("partidaSunarp")}
           className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-            errors.partidaSunarp ? "border-red-500" : "border-gray-300"
+            errors.partidaSunarp ? "border-red-500" : "border-[#bfe0f7]"
           }`}
         />
         {errors.partidaSunarp && (
@@ -280,7 +280,7 @@ export default function PersonaJuridicaForm({
         <div>
           <label
             htmlFor="correoCorporativo"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Correo Corporativo *
           </label>
@@ -289,7 +289,7 @@ export default function PersonaJuridicaForm({
             type="email"
             {...register("correoCorporativo")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.correoCorporativo ? "border-red-500" : "border-gray-300"
+              errors.correoCorporativo ? "border-red-500" : "border-[#bfe0f7]"
             }`}
           />
           {errors.correoCorporativo && (
@@ -302,7 +302,7 @@ export default function PersonaJuridicaForm({
         <div>
           <label
             htmlFor="celularContacto"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#2f648c] mb-1"
           >
             Celular de Contacto *
           </label>
@@ -311,7 +311,7 @@ export default function PersonaJuridicaForm({
             type="tel"
             {...register("celularContacto")}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.celularContacto ? "border-red-500" : "border-gray-300"
+              errors.celularContacto ? "border-red-500" : "border-[#bfe0f7]"
             }`}
             placeholder="987654321"
           />
@@ -334,7 +334,7 @@ export default function PersonaJuridicaForm({
       <div>
         <label
           htmlFor="direccionExacta"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-[#2f648c] mb-1"
         >
           Dirección Exacta *
         </label>
@@ -343,7 +343,7 @@ export default function PersonaJuridicaForm({
           type="text"
           {...register("domicilio.direccionExacta")}
           className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-            errors.domicilio?.direccionExacta ? "border-red-500" : "border-gray-300"
+            errors.domicilio?.direccionExacta ? "border-red-500" : "border-[#bfe0f7]"
           }`}
           placeholder="Ej. Jr. Tarapacá N° 645"
         />
@@ -358,7 +358,7 @@ export default function PersonaJuridicaForm({
       <div>
         <label
           htmlFor="referencia"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-[#2f648c] mb-1"
         >
           Referencia
         </label>
@@ -366,7 +366,7 @@ export default function PersonaJuridicaForm({
           id="referencia"
           type="text"
           {...register("domicilio.referencia")}
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none"
+          className="w-full px-3 py-2 text-sm border border-[#bfe0f7] rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none"
         />
       </div>
 
@@ -389,9 +389,9 @@ export default function PersonaJuridicaForm({
               type="checkbox"
               checked={consentimientoLey29733}
               onChange={(e) => handleConsentimientoChange(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-[#006EC7] focus:ring-[#006EC7]"
+              className="mt-1 h-4 w-4 rounded border-[#bfe0f7] text-[#006EC7] focus:ring-[#006EC7]"
             />
-            <span className="text-sm text-gray-700">
+            <span className="text-sm text-[#2f648c]">
               He leído y acepto el consentimiento de tratamiento de datos
               personales conforme a la Ley N° 29733 *
             </span>
@@ -428,7 +428,7 @@ export default function PersonaJuridicaForm({
           !declaracionJuradaAceptada ||
           !consentimientoLey29733 ||
           isSubmitting
-            ? "bg-gray-400 cursor-not-allowed"
+            ? "bg-[#bfe0f7] cursor-not-allowed"
             : "bg-[#006EC7] hover:bg-[#005ba8]"
         }`}
       >

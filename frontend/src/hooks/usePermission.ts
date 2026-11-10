@@ -11,8 +11,10 @@ export function usePermission(modulo: string, accion: ClavePermiso): boolean {
   if (!crudo) return false;
 
   try {
-    const matriz: Record<string, { modulo: string; [key: string]: boolean }[]> =
-      JSON.parse(crudo);
+    const matriz = JSON.parse(crudo) as Record<
+      string,
+      Array<Record<string, boolean | string>>
+    >;
     const filas = matriz[usuario.rol];
     if (!filas) return false;
 

@@ -26,7 +26,7 @@ export default function TimelineItemCard({
       <span
         className={`absolute left-0 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 ${
           esMasReciente
-            ? "border-blue-700 bg-blue-700"
+            ? "border-[#006ec7] bg-[#006ec7]"
             : "border-slate-300 bg-white"
         }`}
         aria-hidden="true"

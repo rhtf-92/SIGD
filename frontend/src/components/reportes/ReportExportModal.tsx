@@ -51,7 +51,7 @@ export default function ReportExportModal({ reportName, filters, records }: Repo
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
-        className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+        className="rounded-xl bg-[#006ec7] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#00539b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006ec7] focus-visible:ring-offset-2"
         aria-label="Abrir opciones de exportación del dashboard"
       >
         Exportar

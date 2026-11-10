@@ -11,11 +11,11 @@ function BloqueJson({ titulo, valor }: { titulo: string; valor: unknown }) {
   if (valor === undefined || valor === null) return null;
 
   return (
-    <div className="rounded-lg border border-cyan-400/25 bg-slate-950/30">
-      <p className="border-b border-cyan-400/25 bg-slate-900/50 px-3 py-2 text-xs font-bold uppercase text-slate-400">
+    <div className="rounded-lg border border-[#d7e9f7] bg-[#f4f8fb]">
+      <p className="border-b border-[#d7e9f7] bg-[#e8f4ff] px-3 py-2 text-xs font-bold uppercase text-[#6b8aa5]">
         {titulo}
       </p>
-      <pre className="overflow-x-auto p-3 text-xs leading-5 text-slate-200">
+      <pre className="overflow-x-auto p-3 text-xs leading-5 text-[#2f648c]">
         {JSON.stringify(valor, null, 2)}
       </pre>
     </div>
@@ -37,26 +37,26 @@ export default function AuditDetailDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 sigd-fade-in"
+      className="fixed inset-0 z-50 flex justify-end bg-[#0b2a4a]/35 sigd-fade-in"
       role="dialog"
       aria-modal="true"
       aria-label={`Detalle del registro ${registro.id}`}
     >
-      <div className="sigd-fade-in flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-cyan-400/40 bg-[rgba(15,23,42,0.72)] shadow-xl backdrop-blur-[12px]">
-        <div className="flex items-start justify-between gap-4 border-b border-cyan-400/25 p-6">
+      <div className="sigd-fade-in flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-[#bfe0f7] bg-white shadow-xl backdrop-blur-[12px]">
+        <div className="flex items-start justify-between gap-4 border-b border-[#d7e9f7] p-6">
           <div>
-            <p className="text-xs font-bold uppercase text-cyan-400">
+            <p className="text-xs font-bold uppercase text-[#006ec7]">
               Registro {registro.id}
             </p>
             <h3 className="mt-1 text-xl font-bold">{registro.accion}</h3>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-[#6b8aa5]">
               {registro.fecha} · {registro.modulo}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-400 hover:bg-slate-900/50"
+            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-[#6b8aa5] hover:bg-[#e8f4ff]"
           >
             Cerrar
           </button>
@@ -65,13 +65,13 @@ export default function AuditDetailDrawer({
         <div className="space-y-5 p-6">
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-400">
+              <dt className="text-xs font-semibold uppercase text-[#6b8aa5]">
                 Usuario
               </dt>
               <dd className="mt-1 font-semibold">{registro.usuario}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-400">
+              <dt className="text-xs font-semibold uppercase text-[#6b8aa5]">
                 Rol / Área
               </dt>
               <dd className="mt-1">
@@ -79,13 +79,13 @@ export default function AuditDetailDrawer({
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-400">
+              <dt className="text-xs font-semibold uppercase text-[#6b8aa5]">
                 Recurso
               </dt>
               <dd className="mt-1">{registro.registro}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-400">
+              <dt className="text-xs font-semibold uppercase text-[#6b8aa5]">
                 Resultado
               </dt>
               <dd className="mt-1">
@@ -95,7 +95,7 @@ export default function AuditDetailDrawer({
                       ? "bg-emerald-100 text-emerald-700"
                       : registro.resultado === "Denegado"
                         ? "bg-amber-100 text-amber-700"
-                        : "bg-red-100 text-red-300"
+                        : "bg-red-100 text-red-600"
                   }`}
                 >
                   {registro.resultado}
@@ -103,35 +103,35 @@ export default function AuditDetailDrawer({
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-400">
+              <dt className="text-xs font-semibold uppercase text-[#6b8aa5]">
                 IP de origen
               </dt>
               <dd className="mt-1 font-mono">{registro.ip}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-400">
+              <dt className="text-xs font-semibold uppercase text-[#6b8aa5]">
                 X-Correlation-ID
               </dt>
-              <dd className="mt-1 break-all font-mono text-xs text-slate-300">
+              <dd className="mt-1 break-all font-mono text-xs text-[#4b6b85]">
                 {registro.correlationId ?? "—"}
               </dd>
             </div>
             {registro.hash && (
               <div>
-                <dt className="text-xs font-semibold uppercase text-slate-400">
+                <dt className="text-xs font-semibold uppercase text-[#6b8aa5]">
                   Hash WORM (SHA-256)
                 </dt>
-                <dd className="mt-1 break-all font-mono text-xs text-slate-300">
+                <dd className="mt-1 break-all font-mono text-xs text-[#4b6b85]">
                   {registro.hash}
                 </dd>
               </div>
             )}
             {registro.hashAnterior && (
               <div>
-                <dt className="text-xs font-semibold uppercase text-slate-400">
+                <dt className="text-xs font-semibold uppercase text-[#6b8aa5]">
                   Hash Anterior (encadenamiento)
                 </dt>
-                <dd className="mt-1 break-all font-mono text-xs text-slate-300">
+                <dd className="mt-1 break-all font-mono text-xs text-[#4b6b85]">
                   {registro.hashAnterior}
                 </dd>
               </div>
@@ -140,7 +140,7 @@ export default function AuditDetailDrawer({
 
           {(anterior !== undefined || nuevo !== undefined) && (
             <section>
-              <h4 className="mb-3 text-sm font-bold uppercase text-slate-400">
+              <h4 className="mb-3 text-sm font-bold uppercase text-[#6b8aa5]">
                 Diferencias JSON (antes / después)
               </h4>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -152,7 +152,7 @@ export default function AuditDetailDrawer({
 
           {resto.length > 0 && (
             <section>
-              <h4 className="mb-3 text-sm font-bold uppercase text-slate-400">
+              <h4 className="mb-3 text-sm font-bold uppercase text-[#6b8aa5]">
                 Detalles técnicos (RFC 7807)
               </h4>
               <div className="grid gap-3 sm:grid-cols-2">

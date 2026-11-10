@@ -50,10 +50,10 @@ export default function NavbarInstitucional({ acciones }: NavbarInstitucionalPro
             <img src={new URL("../../assets/LOGOS ACTUALES/EDITADO 01 .jpg", import.meta.url).href} alt="SIGD" className="h-full w-full object-contain animate-pulse" />
           </span>
           <span className="min-w-0 leading-tight">
-            <span className="block truncate text-[15px] font-black tracking-tight text-[#003366]">
+            <span className="block truncate text-[15px] font-black tracking-tight text-[#00539b]">
               SIGD
             </span>
-            <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#006EC7]">
+            <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[#006ec7]">
               Gestión Documental
             </span>
           </span>
@@ -67,7 +67,7 @@ export default function NavbarInstitucional({ acciones }: NavbarInstitucionalPro
                 <EnlaceLanding
                   key={grupo.etiqueta}
                   enlace={{ etiqueta: grupo.etiqueta, to: grupo.to }}
-                  className="rounded-lg px-2.5 py-2 text-[12px] font-bold text-slate-700 transition hover:bg-blue-50 hover:text-[#003366]"
+                  className="rounded-lg px-2.5 py-2 text-[12px] font-bold text-slate-700 transition hover:bg-[#e8f4ff] hover:text-[#00539b]"
                 />
               );
             }
@@ -84,7 +84,7 @@ export default function NavbarInstitucional({ acciones }: NavbarInstitucionalPro
                   aria-haspopup="menu"
                   onClick={() => setAbierto(grupo.etiqueta)}
                   className={`flex items-center gap-1 rounded-lg px-2.5 py-2 text-[12px] font-bold transition ${
-                    activo ? "bg-blue-50 text-[#003366]" : "text-slate-700 hover:bg-blue-50 hover:text-[#003366]"
+                    activo ? "bg-[#e8f4ff] text-[#00539b]" : "text-slate-700 hover:bg-[#e8f4ff] hover:text-[#00539b]"
                   }`}
                 >
                   {grupo.etiqueta}
@@ -103,7 +103,7 @@ export default function NavbarInstitucional({ acciones }: NavbarInstitucionalPro
                         key={enlace.etiqueta}
                         enlace={enlace}
                         onClick={cerrar}
-                        className="flex items-center justify-between gap-2 px-4 py-2 text-left text-[12.5px] font-semibold transition hover:bg-blue-50 hover:text-[#003366]"
+                        className="flex items-center justify-between gap-2 px-4 py-2 text-left text-[12.5px] font-semibold transition hover:bg-[#e8f4ff] hover:text-[#00539b]"
                       >
                         <span className="flex items-center gap-1.5">
                           {enlace.etiqueta}
@@ -175,7 +175,7 @@ export default function NavbarInstitucional({ acciones }: NavbarInstitucionalPro
                           <EnlaceLanding
                             enlace={enlace}
                             onClick={cerrar}
-                            className="block rounded-md px-3 py-2 text-[13px] font-semibold text-slate-600 transition hover:bg-blue-50 hover:text-[#003366]"
+                            className="block rounded-md px-3 py-2 text-[13px] font-semibold text-slate-600 transition hover:bg-[#e8f4ff] hover:text-[#00539b]"
                           />
                         </li>
                       ))}

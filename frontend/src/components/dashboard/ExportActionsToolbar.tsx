@@ -51,7 +51,7 @@ export default function ExportActionsToolbar({
         type="button"
         onClick={() => void handleExport("pdf")}
         disabled={isExportingPdf}
-        className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#124E5A] px-3 text-sm font-semibold text-white transition hover:bg-[#0D3D47] disabled:cursor-wait disabled:opacity-65"
+        className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#006ec7] px-3 text-sm font-semibold text-white transition hover:bg-[#00539b] disabled:cursor-wait disabled:opacity-65"
         aria-label={isExportingPdf ? "Generando PDF" : "Descargar reporte PDF"}
       >
         {isExportingPdf ? <LoaderCircle className="size-4 animate-spin" /> : <FileText className="size-4" />}

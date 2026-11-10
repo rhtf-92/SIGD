@@ -15,7 +15,7 @@ export default function AccesoDenegadoPage() {
 
         <Link
           to="/"
-          className="mt-6 inline-block rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+          className="mt-6 inline-block rounded-lg bg-[#006ec7] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#00539b]"
         >
           Volver al inicio
         </Link>

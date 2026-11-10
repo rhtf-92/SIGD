@@ -29,14 +29,14 @@ export default function CalendarioLaboralPage() {
   } = useCalendarioLaboral();
 
   return (
-    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-[#0b2a4a]">
       <AdminPageHeader
         title="Calendario Laboral"
         description="Configuración de jornada, corte de recepción LPAG y feriados de Ucayali."
       />
 
       <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 rounded-xl border border-cyan-400/40 bg-cyan-500/10 p-4 text-sm text-cyan-200">
+        <div className="mb-6 rounded-xl border border-[#bfe0f7] bg-[#e8f4ff] p-4 text-sm text-[#00539b]">
           <p>
             <strong>Hora de corte normativa: {HORA_CORTE_LPAG} hrs</strong>.
             Los documentos ingresados después de las 16:30 hrs (o en día
@@ -52,9 +52,9 @@ export default function CalendarioLaboralPage() {
         )}
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <section className="rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-6 shadow-sm">
+          <section className="rounded-xl border border-[#bfe0f7] bg-white backdrop-blur-[12px] p-6 shadow-sm">
             <h2 className="text-xl font-bold">Jornada laboral</h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-[#4b6b85]">
               Los valores son configurables y no están fijados por código.
             </p>
 
@@ -62,7 +62,7 @@ export default function CalendarioLaboralPage() {
               {dias.map((dia, indice) => (
                 <label
                   key={dia.nombre}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3"
+                  className="flex items-center justify-between rounded-lg border border-[#d7e9f7] px-4 py-3"
                 >
                   <span className="text-sm font-semibold">{dia.nombre}</span>
                   <input
@@ -84,7 +84,7 @@ export default function CalendarioLaboralPage() {
                   type="time"
                   value={horaInicio}
                   onChange={(event) => setHoraInicio(event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                  className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
@@ -95,7 +95,7 @@ export default function CalendarioLaboralPage() {
                   type="time"
                   value={horaFin}
                   onChange={(event) => setHoraFin(event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                  className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
@@ -119,7 +119,7 @@ export default function CalendarioLaboralPage() {
                   <button
                     type="button"
                     onClick={() => setHoraCorteRecepcion(HORA_CORTE_LPAG)}
-                    className="mt-1 text-xs font-semibold text-cyan-400 hover:underline"
+                    className="mt-1 text-xs font-semibold text-[#006ec7] hover:underline"
                   >
                     Restaurar corte normativo {HORA_CORTE_LPAG} hrs
                   </button>
@@ -134,7 +134,7 @@ export default function CalendarioLaboralPage() {
               <select
                 value={zonaHoraria}
                 onChange={(event) => setZonaHoraria(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm"
               >
                 <option value="America/Lima">America/Lima (UTC-05:00)</option>
                 <option value="UTC">UTC</option>
@@ -142,9 +142,9 @@ export default function CalendarioLaboralPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-6 shadow-sm">
+          <section className="rounded-xl border border-[#bfe0f7] bg-white backdrop-blur-[12px] p-6 shadow-sm">
             <h2 className="text-xl font-bold">Feriados y días no laborables</h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-[#4b6b85]">
               Feriados nacionales (D. Leg. N° 713) y regionales de Ucayali.
             </p>
 
@@ -153,18 +153,18 @@ export default function CalendarioLaboralPage() {
                 type="date"
                 value={fechaNueva}
                 onChange={(event) => setFechaNueva(event.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                className="rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm"
               />
               <input
                 value={nombreNuevo}
                 onChange={(event) => setNombreNuevo(event.target.value)}
                 placeholder="Descripción"
-                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                className="rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm"
               />
               <button
                 type="button"
                 onClick={agregarFeriado}
-                className="rounded-lg bg-cyan-600/90 px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
+                className="rounded-lg bg-[#006ec7] px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
               >
                 Agregar
               </button>
@@ -174,16 +174,16 @@ export default function CalendarioLaboralPage() {
               {feriados.map((feriado) => (
                 <div
                   key={feriado.id}
-                  className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3"
+                  className="flex items-center justify-between gap-4 rounded-lg border border-[#d7e9f7] px-4 py-3"
                 >
                   <div>
                     <p className="text-sm font-semibold">{feriado.nombre}</p>
-                    <p className="text-xs text-slate-500">{feriado.fecha}</p>
+                    <p className="text-xs text-[#4b6b85]">{feriado.fecha}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => quitarFeriado(feriado.id)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
+                    className="rounded-lg border border-[#bfe0f7] px-3 py-2 text-xs font-semibold hover:bg-[#e8f4ff]"
                   >
                     Quitar
                   </button>
@@ -197,7 +197,7 @@ export default function CalendarioLaboralPage() {
           <button
             type="button"
             onClick={guardarConfiguracion}
-            className="rounded-lg bg-cyan-600/90 px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
+            className="rounded-lg bg-[#006ec7] px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
           >
             Guardar calendario
           </button>

@@ -265,8 +265,8 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           </p>
 
           {/* Tarjeta Destacada del CUT */}
-          <div className="mt-5 inline-block rounded-xl border-2 border-dashed border-[#006EC7] bg-blue-50/70 px-6 py-4">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-blue-800">
+          <div className="mt-5 inline-block rounded-xl border-2 border-dashed border-[#006EC7] bg-[#e8f4ff]/70 px-6 py-4">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#00539b]">
               Código Único de Trámite
             </p>
             <p className="text-2xl sm:text-3xl font-black tracking-tight text-[#006EC7] mt-1 font-mono">

@@ -263,7 +263,7 @@ export const DynamicSchemaForm: React.FC<DynamicSchemaFormProps> = ({
     >
       {/* Encabezado descriptivo del esquema si dispone de título o descripción */}
       {(schema.title || schema.description) && (
-        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 transition-colors">
+        <div className="rounded-xl border border-[#eaf3fb] bg-[#e8f4ff]/50 p-4 transition-colors">
           {schema.title && (
             <h3 className="text-sm font-bold text-slate-800 tracking-tight">
               {schema.title}

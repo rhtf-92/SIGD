@@ -60,19 +60,19 @@ export function ErrorConexion() {
     <div
       role="alert"
       aria-label="Error de conexión con el servidor"
-      className="fixed inset-0 z-[120] flex overflow-y-auto bg-[#060f24]/95 px-4 py-8 backdrop-blur-sm transition-opacity duration-500"
+      className="fixed inset-0 z-[120] flex overflow-y-auto bg-[#f4f8fb]/95 px-4 py-8 backdrop-blur-sm transition-opacity duration-500"
     >
-      <div className="m-auto w-full max-w-3xl shrink-0 overflow-hidden rounded-2xl shadow-2xl shadow-black/50 border border-amber-500/30">
-        <div className="p-8 bg-[#04213f]/40 rounded-xl border border-amber-500/20">
+      <div className="m-auto w-full max-w-3xl shrink-0 overflow-hidden rounded-2xl shadow-2xl shadow-[#0b2a4a]/20 border border-amber-300">
+        <div className="p-8 bg-white rounded-xl border border-amber-200">
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-amber-400 bg-amber-900 animate-ping">
-              <RefreshCw className="h-4 w-4 text-amber-300 animate-spin" aria-hidden="true" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-amber-400 bg-amber-100 animate-ping">
+              <RefreshCw className="h-4 w-4 text-amber-700 animate-spin" aria-hidden="true" />
             </div>
-            <span className="text-sm font-bold uppercase tracking-wider text-amber-100">
+            <span className="text-sm font-bold uppercase tracking-wider text-amber-800">
               Error de conexión con el servidor
             </span>
           </div>
-          <p className="text-sm text-amber-200/90 mb-6 leading-relaxed">
+          <p className="text-sm text-amber-800 mb-6 leading-relaxed">
             El navegador se quedó sin salida a internet o el servidor no responde.
             Revisa tu conexión (router, cable de red o datos móviles). La pantalla
             se cerrará sola en cuanto vuelva la red.
@@ -89,7 +89,7 @@ export function ErrorConexion() {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="w-full sm:w-auto px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-200 font-semibold text-sm hover:bg-amber-500/20"
+              className="w-full sm:w-auto px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 font-semibold text-sm hover:bg-amber-100"
             >
               Recargar página
             </button>

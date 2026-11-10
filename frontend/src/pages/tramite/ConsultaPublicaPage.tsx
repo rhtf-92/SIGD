@@ -91,7 +91,7 @@ export default function ConsultaPublicaPage() {
               <h1 className="text-2xl font-bold text-slate-900">
                 Consulta Pública de Trámites y Expedientes
               </h1>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-sm text-[#4b6b85] mt-1">
                 IESTP "Suiza" — Sede Digital y Transparencia Documentaria (Ley N° 27444 / Ley N° 29733)
               </p>
             </div>
@@ -137,7 +137,7 @@ export default function ConsultaPublicaPage() {
         {/* Detalle del Expediente */}
         {resultado && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-slate-900 px-6 py-5 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div className="bg-[#00539b] px-6 py-5 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <div>
                 <span className="text-xs uppercase tracking-wider text-emerald-400 font-semibold">
                   Expediente Encontrado
@@ -152,13 +152,13 @@ export default function ConsultaPublicaPage() {
             <div className="p-6 sm:p-8 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <h3 className="text-xs font-semibold text-[#6b8aa5] uppercase tracking-wider">
                     Asunto / Petitorio
                   </h3>
                   <p className="mt-1 text-slate-800 font-medium">{resultado.asunto}</p>
                 </div>
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <h3 className="text-xs font-semibold text-[#6b8aa5] uppercase tracking-wider">
                     Tipo de Procedimiento
                   </h3>
                   <p className="mt-1 text-slate-800 font-medium">
@@ -166,7 +166,7 @@ export default function ConsultaPublicaPage() {
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <h3 className="text-xs font-semibold text-[#6b8aa5] uppercase tracking-wider">
                     Solicitante (Protección de Datos - Ley 29733)
                   </h3>
                   <p className="mt-1 text-slate-700 font-mono">
@@ -175,7 +175,7 @@ export default function ConsultaPublicaPage() {
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <h3 className="text-xs font-semibold text-[#6b8aa5] uppercase tracking-wider">
                     Fecha de Radicación Legal
                   </h3>
                   <p className="mt-1 text-slate-700">
@@ -197,7 +197,7 @@ export default function ConsultaPublicaPage() {
                       <div key={idx} className="p-4 flex items-center justify-between text-sm bg-slate-50/50">
                         <div>
                           <p className="font-medium text-slate-800">{doc.nombreArchivo}</p>
-                          <p className="text-xs text-slate-400 font-mono">
+                          <p className="text-xs text-[#6b8aa5] font-mono">
                             SHA-256: {doc.hashSha256.slice(0, 16)}...
                           </p>
                         </div>
@@ -232,7 +232,7 @@ export default function ConsultaPublicaPage() {
 
               {/* Mensaje Legal */}
               {resultado.mensajeLegal && (
-                <div className="border-t border-slate-100 pt-4 text-xs text-slate-500 italic">
+                <div className="border-t border-slate-100 pt-4 text-xs text-[#4b6b85] italic">
                   {resultado.mensajeLegal}
                 </div>
               )}

@@ -139,7 +139,7 @@ export default function PlantillaResolucionEditor({
       {/* Barra de control superior */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <span className="rounded-lg bg-blue-50 px-3 py-1 font-mono text-xs font-bold text-blue-700">
+          <span className="rounded-lg bg-[#e8f4ff] px-3 py-1 font-mono text-xs font-bold text-[#00539b]">
             {resolucion.numeroResolucion}
           </span>
           <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
@@ -158,14 +158,14 @@ export default function PlantillaResolucionEditor({
           <button
             type="button"
             onClick={() => onGuardarBorrador(resolucion)}
-            className="rounded-lg border border-blue-600 bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
+            className="rounded-lg border border-[#006ec7] bg-white px-3 py-1.5 text-xs font-semibold text-[#006ec7] transition hover:bg-[#e8f4ff]"
           >
             Guardar Borrador
           </button>
           <button
             type="button"
             onClick={() => onProcederFirma(resolucion)}
-            className="rounded-lg bg-blue-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800"
+            className="rounded-lg bg-[#006ec7] px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#00539b]"
           >
             Aprobar y Pasar a Firma Digital →
           </button>
@@ -190,7 +190,7 @@ export default function PlantillaResolucionEditor({
                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                   handleCampoChange("tipo", e.target.value as TipoResolucion)
                 }
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none"
               >
                 <option value="TITULACION">Titulación Profesional Técnica</option>
                 <option value="GRADO_ACADEMICO">Grado Académico</option>
@@ -210,7 +210,7 @@ export default function PlantillaResolucionEditor({
                 value={resolucion.expedienteRelacionado || ""}
                 onChange={(e) => handleCampoChange("expedienteRelacionado", e.target.value)}
                 placeholder="EXP-2026-XXXXXX"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none font-mono"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none font-mono"
               />
             </div>
           </div>
@@ -225,7 +225,7 @@ export default function PlantillaResolucionEditor({
                 type="text"
                 value={resolucion.administradoNombre}
                 onChange={(e) => handleCampoChange("administradoNombre", e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none"
               />
             </div>
             <div>
@@ -238,7 +238,7 @@ export default function PlantillaResolucionEditor({
                 maxLength={8}
                 value={resolucion.administradoDocumento}
                 onChange={(e) => handleCampoChange("administradoDocumento", e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none font-mono"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none font-mono"
               />
             </div>
           </div>
@@ -252,7 +252,7 @@ export default function PlantillaResolucionEditor({
               type="text"
               value={resolucion.programaEstudios}
               onChange={(e) => handleCampoChange("programaEstudios", e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none"
             />
           </div>
 
@@ -266,7 +266,7 @@ export default function PlantillaResolucionEditor({
               rows={3}
               value={resolucion.visto}
               onChange={(e) => handleCampoChange("visto", e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none leading-relaxed"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-[#006ec7] focus:outline-none leading-relaxed"
             />
           </div>
 
@@ -279,7 +279,7 @@ export default function PlantillaResolucionEditor({
               <button
                 type="button"
                 onClick={agregarConsiderando}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                className="text-xs font-semibold text-[#006ec7] hover:text-[#00539b]"
               >
                 + Añadir Considerando
               </button>
@@ -292,7 +292,7 @@ export default function PlantillaResolucionEditor({
                     rows={2}
                     value={item}
                     onChange={(e) => handleConsiderandoChange(idx, e.target.value)}
-                    className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-800 focus:border-[#006ec7] focus:outline-none"
                   />
                   {resolucion.considerandos.length > 1 && (
                     <button
@@ -318,7 +318,7 @@ export default function PlantillaResolucionEditor({
               <button
                 type="button"
                 onClick={agregarArticulo}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                className="text-xs font-semibold text-[#006ec7] hover:text-[#00539b]"
               >
                 + Añadir Artículo
               </button>
@@ -333,7 +333,7 @@ export default function PlantillaResolucionEditor({
                     rows={2}
                     value={art.texto}
                     onChange={(e) => handleArticuloChange(idx, e.target.value)}
-                    className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-800 focus:border-[#006ec7] focus:outline-none"
                   />
                   {resolucion.articulos.length > 1 && (
                     <button

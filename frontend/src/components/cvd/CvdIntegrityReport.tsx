@@ -66,7 +66,7 @@ function descargarDocumentoOriginal(resultado: ValidacionCVDResult) {
 function EscudoSuiza() {
   return (
     <span
-      className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 border-blue-800 bg-white text-xl font-black text-blue-800"
+      className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 border-[#00539b] bg-white text-xl font-black text-[#00539b]"
       aria-hidden="true"
       title="Escudo institucional IESTP Suiza"
     >
@@ -191,7 +191,7 @@ export default function CvdIntegrityReport({ resultado }: CvdIntegrityReportProp
                 {...(esInterna
                   ? {}
                   : { target: "_blank", rel: "noreferrer" })}
-                className="mt-3 inline-block text-sm font-bold text-blue-700 underline"
+                className="mt-3 inline-block text-sm font-bold text-[#00539b] underline"
               >
                 Abrir documento original cotejado ↗
               </a>

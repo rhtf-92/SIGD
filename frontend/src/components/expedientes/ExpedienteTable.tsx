@@ -43,7 +43,7 @@ export default function ExpedienteTable({
           {expedientes.map((expediente) => {
             return (
               <tr key={expediente.id} className="hover:bg-slate-50">
-                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold text-blue-700">
+                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold text-[#00539b]">
                   {expediente.codigoExpediente}
                 </td>
                 <td className="max-w-xs px-4 py-3 text-slate-800">

@@ -44,7 +44,7 @@ export function mapearEstadoVisual(
 
 const ESTILOS_PASO: Record<EstadoVisualPaso, string> = {
   completado: "border-emerald-500 bg-emerald-50",
-  en_curso: "border-blue-500 bg-blue-50",
+  en_curso: "border-[#38bdf8] bg-[#e8f4ff]",
   pendiente: "border-dashed border-slate-300 bg-slate-50",
   rechazado: "border-red-400 bg-red-50",
 };
@@ -85,7 +85,7 @@ function IconoPaso({ estado }: { estado: EstadoVisualPaso }) {
     );
   }
   if (estado === "en_curso") {
-    return <span className="text-sm font-bold text-blue-700" aria-hidden="true">●</span>;
+    return <span className="text-sm font-bold text-[#00539b]" aria-hidden="true">●</span>;
   }
   return (
     <svg className="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -110,7 +110,7 @@ export default function EtapasStepper({
     >
       <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-bold">Workflow académico — 5 etapas</h2>
-        <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+        <span className="rounded-full border border-[#d7e9f7] bg-[#e8f4ff] px-3 py-1 text-xs font-bold text-[#00539b]">
           PROC-ACA-01 · Expedientes Académicos
         </span>
       </div>
@@ -136,7 +136,7 @@ export default function EtapasStepper({
                   title={`Etapa ${indice + 1}: ${visual}`}
                 >
                   {visual === "en_curso" ? (
-                    <span className="text-sm font-bold text-blue-700">{indice + 1}</span>
+                    <span className="text-sm font-bold text-[#00539b]">{indice + 1}</span>
                   ) : (
                     <IconoPaso estado={visual} />
                   )}
@@ -178,7 +178,7 @@ export default function EtapasStepper({
           Completado
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-blue-500" aria-hidden="true" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[#38bdf8]" aria-hidden="true" />
           En curso
         </span>
         <span className="inline-flex items-center gap-1.5">

@@ -46,7 +46,7 @@ export const DynamicSchemaForm: React.FC<DynamicSchemaFormProps> = ({
       return (
         <select
           {...register(key, { required: isRequired ? 'Este campo es requerido' : false })}
-          className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+          className="w-full rounded-md border border-[#bfe0f7] p-2 focus:border-[#006ec7] focus:outline-none"
         >
           <option value="">Seleccione una opción...</option>
           {field.enum.map((option) => (
@@ -66,9 +66,9 @@ export const DynamicSchemaForm: React.FC<DynamicSchemaFormProps> = ({
             <input
               type="checkbox"
               {...register(key)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="h-4 w-4 rounded border-[#bfe0f7] text-[#006ec7] focus:ring-[#006ec7]"
             />
-            <span className="text-sm text-gray-700">{field.title || key}</span>
+            <span className="text-sm text-[#2f648c]">{field.title || key}</span>
           </div>
         );
 
@@ -85,7 +85,7 @@ export const DynamicSchemaForm: React.FC<DynamicSchemaFormProps> = ({
                 : undefined,
             })}
             placeholder={field.description || ''}
-            className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-md border border-[#bfe0f7] p-2 focus:border-[#006ec7] focus:outline-none"
           />
         );
       }
@@ -96,7 +96,7 @@ export const DynamicSchemaForm: React.FC<DynamicSchemaFormProps> = ({
           <input
             type="number"
             {...register(key, { required: isRequired ? 'Este campo es requerido' : false })}
-            className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-md border border-[#bfe0f7] p-2 focus:border-[#006ec7] focus:outline-none"
           />
         );
 
@@ -105,7 +105,7 @@ export const DynamicSchemaForm: React.FC<DynamicSchemaFormProps> = ({
           <input
             type="text"
             {...register(key, { required: isRequired ? 'Este campo es requerido' : false })}
-            className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-md border border-[#bfe0f7] p-2 focus:border-[#006ec7] focus:outline-none"
           />
         );
     }
@@ -119,7 +119,7 @@ export const DynamicSchemaForm: React.FC<DynamicSchemaFormProps> = ({
         return (
           <div key={key} className="flex flex-col space-y-1">
             {field.type !== 'boolean' && (
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-sm font-medium text-[#2f648c]">
                 {field.title || key}
                 {isRequired && <span className="ml-1 text-red-500">*</span>}
               </label>
@@ -139,7 +139,7 @@ export const DynamicSchemaForm: React.FC<DynamicSchemaFormProps> = ({
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-md bg-blue-600 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+        className="w-full rounded-md bg-[#006ec7] py-2 text-white transition-colors hover:bg-[#00539b] disabled:opacity-50"
       >
         {isSubmitting ? 'Procesando...' : 'Registrar Trámite'}
       </button>

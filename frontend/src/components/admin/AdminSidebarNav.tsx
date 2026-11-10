@@ -92,7 +92,7 @@ export default function AdminSidebarNav() {
         <button
           type="button"
           onClick={toggleColapsado}
-          className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+          className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-2"
           aria-label={colapsado ? "Expandir menú lateral" : "Colapsar menú lateral"}
           aria-expanded={!colapsado}
         >
@@ -114,15 +114,15 @@ export default function AdminSidebarNav() {
               <button
                 type="button"
                 onClick={() => navigate(rutaItem.ruta)}
-                className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 ${esActiva
-                    ? "bg-blue-50 text-blue-700 shadow-sm"
+                className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-2 ${esActiva
+                    ? "bg-[#e8f4ff] text-[#00539b] shadow-sm"
                     : "text-slate-700 hover:bg-slate-50"
                   }`}
                 aria-current={esActiva ? "page" : undefined}
                 title={colapsado ? rutaItem.titulo : undefined}
               >
                 <Icono
-                  className={`h-5 w-5 shrink-0 ${esActiva ? "text-blue-700" : "text-slate-500"
+                  className={`h-5 w-5 shrink-0 ${esActiva ? "text-[#00539b]" : "text-slate-500"
                     }`}
                   aria-hidden="true"
                 />

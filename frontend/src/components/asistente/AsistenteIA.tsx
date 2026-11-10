@@ -216,19 +216,19 @@ export default function AsistenteIA() {
               type="button"
               onClick={descartarBurbuja}
               aria-label="Cerrar mensaje de bienvenida"
-              className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-lg text-zinc-500 transition hover:bg-white/10 hover:text-white"
+              className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition hover:bg-[#e8f4ff] hover:text-[#006ec7]"
             >
               <X className="h-3.5 w-3.5" />
             </button>
             <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/[0.06] text-white">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[#bfe0f7] bg-[#e8f4ff] text-[#006ec7]">
                 <Bot className="h-4 w-4" />
               </span>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
                   SIGI · asistente institucional
                 </p>
-                <p className="mt-1.5 text-sm leading-relaxed text-zinc-200">
+                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
                   Hola, soy SIGI. Puedo guiarte con tu DNI, un trámite, tu casilla electrónica o
                   soporte técnico.
                 </p>
@@ -241,7 +241,7 @@ export default function AsistenteIA() {
               <button
                 type="button"
                 onClick={descartarBurbuja}
-                className="rounded-lg px-2.5 py-2 text-xs font-semibold text-zinc-400 transition hover:text-white"
+                className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 transition hover:text-[#006ec7]"
               >
                 Ahora no
               </button>
@@ -261,7 +261,7 @@ export default function AsistenteIA() {
           }
         }}
         aria-label={abierto ? "Cerrar asistente" : "Abrir asistente virtual SIGI"}
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-zinc-100 text-black shadow-[0_0_38px_rgba(255,255,255,0.35)] transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-white/30 print:hidden"
+        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-[#bfe0f7] bg-white text-[#006ec7] shadow-[0_14px_34px_-16px_rgba(0,110,199,0.55)] transition hover:-translate-y-0.5 hover:bg-[#e8f4ff] focus:outline-none focus:ring-4 focus:ring-[#bfe0f7] print:hidden"
       >
         {abierto ? <X className="h-5 w-5" /> : <Bot className="h-6 w-6" />}
       </button>
@@ -269,12 +269,12 @@ export default function AsistenteIA() {
       {abierto && (
         <section
           aria-label="Asistente virtual SIGI - Soporte y Ayuda"
-          className="fixed right-5 z-50 flex h-[560px] max-h-[85vh] w-[min(94vw,400px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl print:hidden"
+          className="fixed right-5 z-50 flex h-[560px] max-h-[85vh] w-[min(94vw,400px)] flex-col overflow-hidden rounded-2xl border border-[#d7e9f7] bg-white shadow-[0_28px_70px_-30px_rgba(0,110,199,0.45)] print:hidden"
           style={{ bottom: "5.5rem" }}
         >
-          <header className="flex items-center justify-between gap-2 bg-gradient-to-r from-blue-800 to-blue-900 px-4 py-3 text-white">
+          <header className="flex items-center justify-between gap-2 border-b border-[#d7e9f7] bg-white px-4 py-3 text-vault-tinta">
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-black">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#bfe0f7] bg-[#e8f4ff] text-[#006ec7]">
                 <Bot className="h-4 w-4" />
               </span>
               <div>
@@ -282,13 +282,13 @@ export default function AsistenteIA() {
                   SIGI • Soporte IA SIGD
                   <span
                     title={iaDisponible ? "IA en la nube disponible + respaldo local" : "Modo local (sin clave de IA)"}
-                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${iaDisponible ? "bg-emerald-400/20 text-emerald-100" : "bg-white/15 text-blue-100"}`}
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${iaDisponible ? "bg-emerald-50 text-emerald-700" : "bg-[#e8f4ff] text-[#00539b]"}`}
                   >
                     {iaDisponible ? "IA + Local" : "Local"}
                   </span>
                 </p>
-                <p className="flex items-center gap-1 text-[11px] text-emerald-200">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <p className="flex items-center gap-1 text-[11px] text-[#2f648c]">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   {fuenteIA === "ia" ? "Respuesta con IA en la nube" : "Soporte y orientación en tiempo real"}
                 </p>
               </div>
@@ -300,7 +300,7 @@ export default function AsistenteIA() {
                   limpiar();
                 }}
                 title="Reiniciar conversación"
-              className="rounded-lg bg-white/10 px-2 py-1 text-xs font-semibold hover:bg-white/20"
+              className="rounded-lg border border-[#d7e9f7] bg-[#e8f4ff] px-2 py-1 text-xs font-semibold text-[#00539b] hover:bg-[#d7e9f7]"
             >
               ↻
             </button>
@@ -312,7 +312,7 @@ export default function AsistenteIA() {
                 <div
                   className={`max-w-[88%] rounded-2xl px-3 py-2 text-[13px] leading-5 shadow-sm ${
                     m.rol === "usuario"
-                      ? "rounded-br-sm bg-blue-700 text-white"
+                      ? "rounded-br-sm bg-[#006ec7] text-white"
                       : "rounded-bl-sm border border-slate-200 bg-white text-slate-800"
                   }`}
                 >
@@ -332,7 +332,7 @@ export default function AsistenteIA() {
                           key={e.ruta + e.etiqueta}
                           type="button"
                           onClick={() => irA(e.ruta)}
-                          className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100"
+                          className="rounded-full bg-[#e8f4ff] px-2.5 py-1 text-[11px] font-bold text-[#00539b] ring-1 ring-[#d7e9f7] hover:bg-[#d7e9f7]"
                         >
                           {e.etiqueta} →
                         </button>
@@ -372,7 +372,7 @@ export default function AsistenteIA() {
                             key={s.titulo + s.ejemplo}
                             type="button"
                             onClick={() => elegirSugerencia(s.ejemplo)}
-                            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-800"
+                            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-[#e8f4ff] hover:text-[#00539b]"
                           >
                             {s.ejemplo}
                           </button>
@@ -402,7 +402,7 @@ export default function AsistenteIA() {
                   registrarInteraccion();
                   elegirSugerencia(s);
                 }}
-                className="whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-800"
+                className="whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-[#e8f4ff] hover:text-[#00539b]"
               >
                 {s}
               </button>
@@ -415,21 +415,21 @@ export default function AsistenteIA() {
               onChange={(e) => setEntrada(e.target.value)}
               placeholder={escuchando ? "Escuchando… hable ahora" : "Escriba o dicte su consulta…"}
               aria-label="Escribe tu pregunta"
-              className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#006ec7] focus:ring-2 focus:ring-[#bfe0f7]"
             />
             <button
               type="button"
               onClick={alternarVoz}
               title="Dictar por voz"
               aria-label="Dictar por voz"
-              className={`rounded-xl px-3 py-2 text-sm font-bold ${escuchando ? "bg-rose-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+              className={`rounded-xl px-3 py-2 text-sm font-bold ${escuchando ? "bg-rose-600 text-white" : "bg-[#e8f4ff] text-[#00539b] hover:bg-[#d7e9f7]"}`}
             >
               🎙
             </button>
             <button
               type="submit"
               disabled={!entrada.trim() || escribiendo}
-              className="rounded-xl bg-blue-700 px-3 py-2 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-40"
+              className="rounded-xl bg-[#006ec7] px-3 py-2 text-sm font-bold text-white hover:bg-[#00539b] disabled:opacity-40"
             >
               ➤
             </button>

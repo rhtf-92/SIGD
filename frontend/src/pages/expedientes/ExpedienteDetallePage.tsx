@@ -123,7 +123,7 @@ export default function ExpedienteDetallePage() {
             )}
           </div>
 
-          <p className="text-sm font-bold text-blue-700">SIGD · IESTP "Suiza"</p>
+          <p className="text-sm font-bold text-[#00539b]">SIGD · IESTP "Suiza"</p>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="break-words text-2xl font-bold">
@@ -139,7 +139,7 @@ export default function ExpedienteDetallePage() {
                 <button
                   type="button"
                   onClick={() => setModalActivo("derivacion")}
-                  className="rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 transition"
+                  className="rounded-lg bg-[#006ec7] px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#00539b] transition"
                 >
                   Derivar Expediente
                 </button>

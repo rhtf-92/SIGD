@@ -20,7 +20,7 @@ export function ConsentimientoLey29733Modal({ isOpen, onClose }: ConsentimientoL
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-[#0b2a4a]/35 flex items-center justify-center z-50" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
@@ -34,22 +34,22 @@ export function ConsentimientoLey29733Modal({ isOpen, onClose }: ConsentimientoL
           </h2>
           <button
             aria-label="Cerrar"
-            className="text-gray-500 hover:text-gray-700"
+            className="text-[#6b8aa5] hover:text-[#2f648c]"
             onClick={onClose}
           >
             ×
           </button>
         </div>
 
-        <p className="mb-4 text-gray-700">
+        <p className="mb-4 text-[#2f648c]">
           El IESTP "Suiza" trata los datos personales de los postulantes conforme a la Ley N° 29733 (Ley de Protección de Datos Personales) y su reglamento, con fines exclusivos del proceso de admisión y matrícula.
         </p>
 
-        <p className="mb-4 text-gray-700">
+        <p className="mb-4 text-[#2f648c]">
           La "Casilla Electrónica Institucional" constituye el domicilio digital del postulante en el proceso de admisión. Las notificaciones oficiales (resultados, observaciones, requerimientos) se remiten válidamente a esa casilla, conforme al Art. 20 del TUO de la Ley N° 27444, y es responsabilidad del postulante revisarla periódicamente.
         </p>
 
-        <p className="mb-6 text-gray-700">
+        <p className="mb-6 text-[#2f648c]">
           Usted puede ejercer en cualquier momento sus derechos de acceso, rectificación, cancelación y oposición respecto a sus datos personales dirigiéndose a la Mesa de Partes del IESTP Suiza o mediante comunicación formal a datos.personales@iestpsuiza.edu.pe, de conformidad con la Ley N° 29733.
         </p>
 

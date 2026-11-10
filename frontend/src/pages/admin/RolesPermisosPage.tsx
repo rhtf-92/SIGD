@@ -54,10 +54,10 @@ export default function RolesPermisosPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Gestión de Matriz RBAC (5 Roles)</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-[#0b2a4a]">Gestión de Matriz RBAC (5 Roles)</h1>
+          <p className="text-sm text-[#4b6b85]">
             Configure los accesos y permisos dinámicos por rol institucional. Los cambios se envían al endpoint
-            <code className="text-blue-600">PUT /api/v1/admin/roles-permisos</code> y se persisten en la base de datos.
+            <code className="text-[#006ec7]">PUT /api/v1/admin/roles-permisos</code> y se persisten en la base de datos.
           </p>
         </div>
         <button
@@ -71,7 +71,7 @@ export default function RolesPermisosPage() {
             }
           }}
           disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg shadow transition-all disabled:opacity-50"
+          className="bg-[#006ec7] hover:bg-[#00539b] text-white font-medium px-4 py-2 rounded-lg shadow transition-all disabled:opacity-50"
         >
           {loading ? 'Guardando...' : 'Guardar Cambios Masivos'}
         </button>

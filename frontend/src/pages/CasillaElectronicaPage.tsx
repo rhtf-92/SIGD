@@ -151,29 +151,29 @@ export default function CasillaElectronicaPage() {
   const plazoVencido = diasHabiles > 5;
 
   return (
-    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
-      <header className="border-b border-cyan-400/25 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px]">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-[#0b2a4a]">
+      <header className="border-b border-[#d7e9f7] bg-white backdrop-blur-[12px]">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-blue-800">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#00539b]">
               IESTP Suiza · Casilla ciudadana
             </p>
             <h1 className="mt-2 text-2xl font-black sm:text-3xl">
               Casilla Electrónica
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-slate-300">
+            <p className="mt-1 max-w-2xl text-sm text-[#4b6b85]">
               Notificaciones oficiales, actos administrativos y constancias de recepción.
             </p>
           </div>
-          <p className="text-sm font-semibold text-slate-300">
-            Plazo de lectura: <span className="text-blue-900">5 días hábiles</span>
+          <p className="text-sm font-semibold text-[#4b6b85]">
+            Plazo de lectura: <span className="text-[#0b2a4a]">5 días hábiles</span>
           </p>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:px-8">
         <section aria-label="Bandeja de notificaciones" className="min-w-0">
-          <div role="tablist" aria-label="Estado legal de notificaciones" className="flex flex-wrap border-b border-cyan-400/40">
+          <div role="tablist" aria-label="Estado legal de notificaciones" className="flex flex-wrap border-b border-[#d7e9f7]">
             {PESTAÑAS.map((item) => (
               <button
                 key={item.id}
@@ -183,8 +183,8 @@ export default function CasillaElectronicaPage() {
                 onClick={() => cambiarPestaña(item.id)}
                 className={`border-b-2 px-3 py-3 text-xs font-bold sm:px-4 ${
                   pestaña === item.id
-                    ? "border-blue-800 text-blue-900"
-                    : "border-transparent text-slate-300 hover:text-slate-100"
+                    ? "border-[#00539b] text-[#0b2a4a]"
+                    : "border-transparent text-[#4b6b85] hover:text-[#0b2a4a]"
                 }`}
               >
                 {item.id}
@@ -218,36 +218,36 @@ export default function CasillaElectronicaPage() {
           </div>
         </section>
 
-        <section aria-label="Visor del acto administrativo" className="min-w-0 border-t border-cyan-400/40 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+        <section aria-label="Visor del acto administrativo" className="min-w-0 border-t border-[#d7e9f7] pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
           {seleccionada ? (
             <article className="space-y-5">
-              <header className="border-b border-cyan-400/40 pb-4">
+              <header className="border-b border-[#d7e9f7] pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className={`inline-flex items-center border px-3 py-1 text-xs font-black ${clasesEstado(seleccionada.estado)}`}>
                     {etiquetaEstado(seleccionada.estado)}
                   </span>
-                  <span className="font-mono text-xs font-semibold text-slate-300">
+                  <span className="font-mono text-xs font-semibold text-[#4b6b85]">
                     {seleccionada.numeroNotificacion}
                   </span>
                 </div>
                 <h2 className="mt-4 text-xl font-bold">{seleccionada.asunto}</h2>
-                <p className="mt-2 text-sm text-slate-300">
+                <p className="mt-2 text-sm text-[#4b6b85]">
                   {seleccionada.actoAdministrativo.numeroDocumento} · {seleccionada.unidadEmisora}
                 </p>
               </header>
 
               <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <dt className="font-bold text-slate-300">Depositada</dt>
+                  <dt className="font-bold text-[#4b6b85]">Depositada</dt>
                   <dd className="mt-1">{formatFecha(seleccionada.fechaDepositoIso)}</dd>
                 </div>
                 <div>
-                  <dt className="font-bold text-slate-300">Expediente</dt>
+                  <dt className="font-bold text-[#4b6b85]">Expediente</dt>
                   <dd className="mt-1 font-mono">{seleccionada.numeroExpediente}</dd>
                 </div>
               </dl>
 
-              <div className={`border p-4 ${plazoVencido ? "border-red-800 bg-red-50 text-red-950" : "border-blue-800 bg-blue-50 text-blue-950"}`}>
+              <div className={`border p-4 ${plazoVencido ? "border-red-800 bg-red-50 text-red-950" : "border-[#00539b] bg-[#e8f4ff] text-[#0b2a4a]"}`}>
                 <p className="text-xs font-black uppercase tracking-wide">
                   Cómputo del plazo legal de lectura
                 </p>
@@ -263,18 +263,18 @@ export default function CasillaElectronicaPage() {
               </div>
 
               <section className="space-y-3">
-                <h3 className="text-sm font-black uppercase tracking-wide text-slate-200">
+                <h3 className="text-sm font-black uppercase tracking-wide text-[#2f648c]">
                   Acto administrativo
                 </h3>
-                <p className="text-sm leading-6 text-slate-300">
+                <p className="text-sm leading-6 text-[#4b6b85]">
                   {seleccionada.actoAdministrativo.resumenLegal}
                 </p>
                 {seleccionada.actoAdministrativo.textoCompleto && (
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-4 font-sans text-sm leading-6 text-slate-200">
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap border border-[#d7e9f7] bg-white backdrop-blur-[12px] p-4 font-sans text-sm leading-6 text-[#2f648c]">
                     {seleccionada.actoAdministrativo.textoCompleto}
                   </pre>
                 )}
-                <p className="break-all border-l-4 border-slate-500 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-3 font-mono text-xs text-slate-300">
+                <p className="break-all border-l-4 border-[#8cc8f0] bg-white backdrop-blur-[12px] p-3 font-mono text-xs text-[#4b6b85]">
                   SHA-256 del acto: {seleccionada.actoAdministrativo.hashIntegridadSha256}
                 </p>
               </section>
@@ -295,14 +295,14 @@ export default function CasillaElectronicaPage() {
                 <button
                   type="button"
                   onClick={() => setAcuseAbierto(true)}
-                  className="w-full bg-cyan-600/30 border border-cyan-400/40 px-4 py-3 text-sm font-bold text-white hover:brightness-125 transition-all duration-300 ease-out"
+                  className="w-full bg-cyan-600/30 border border-[#d7e9f7] px-4 py-3 text-sm font-bold text-white hover:brightness-125 transition-all duration-300 ease-out"
                 >
                   Confirmar lectura y emitir acuse
                 </button>
               ) : null}
             </article>
           ) : (
-            <div className="flex min-h-72 items-center justify-center border border-dashed border-slate-400 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-8 text-center text-sm text-slate-300">
+            <div className="flex min-h-72 items-center justify-center border border-dashed border-[#bfe0f7] bg-white backdrop-blur-[12px] p-8 text-center text-sm text-[#4b6b85]">
               Seleccione una cédula para consultar el acto administrativo y su plazo legal.
             </div>
           )}

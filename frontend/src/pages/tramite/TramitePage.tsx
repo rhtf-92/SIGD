@@ -26,7 +26,7 @@ export default function TramitePage() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
         {/* CABECERA INSTITUCIONAL OFICIAL */}
-        <header className="rounded-2xl border border-blue-200/80 bg-linear-to-r from-blue-50 via-sky-50/50 to-indigo-50/40 p-6 sm:p-8 shadow-xs">
+        <header className="rounded-2xl border border-[#d7e9f7]/80 bg-linear-to-r from-blue-50 via-sky-50/50 to-indigo-50/40 p-6 sm:p-8 shadow-xs">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -53,7 +53,7 @@ export default function TramitePage() {
               >
                 ← Volver al inicio
               </Link>
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-xs">
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#d7e9f7] bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-xs">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Ventanilla Virtual Abierta
               </span>

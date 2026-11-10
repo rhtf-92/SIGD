@@ -19,7 +19,7 @@ import {
 function estiloEstado(estado: EstadoUsuario) {
   if (estado === "Activo") return "bg-emerald-100 text-emerald-700";
   if (estado === "Bloqueado") return "bg-red-100 text-red-700";
-  return "bg-slate-200 text-slate-700";
+  return "bg-[#d7e9f7] text-[#2f648c]";
 }
 
 export default function UsuariosPage() {
@@ -81,7 +81,7 @@ export default function UsuariosPage() {
   }
 
   return (
-    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-slate-100">
+    <main className="sigd-fade-in admin-dark min-h-screen bg-transparent text-[#0b2a4a]">
       <AdminPageHeader
         title="Gestión de Usuarios"
         description="Administración de cuentas, áreas, cargos, roles y estados."
@@ -89,14 +89,14 @@ export default function UsuariosPage() {
 
       <section className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-[#4b6b85]">
             Directorio institucional de {totalUsuarios} cuentas registradas.
             Búsqueda en tiempo real y filtro por estado operativo.
           </p>
           <button
             type="button"
             onClick={() => setMostrarCrear(true)}
-            className="rounded-lg bg-cyan-600/90 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
+            className="rounded-lg bg-[#006ec7] px-4 py-2 text-sm font-semibold text-white hover:brightness-110 transition-all duration-300 ease-out"
           >
             + Nuevo usuario
           </button>
@@ -132,10 +132,10 @@ export default function UsuariosPage() {
           </div>
         )}
 
-        <section className="mb-6 rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] p-5 text-white shadow-sm">
+        <section className="mb-6 rounded-xl border border-[#bfe0f7] bg-white backdrop-blur-[12px] p-5 text-[#0b2a4a] shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <div>
-              <label htmlFor="busqueda" className="mb-2 block text-sm font-semibold text-slate-200">
+              <label htmlFor="busqueda" className="mb-2 block text-sm font-semibold text-[#2f648c]">
                 Buscar usuario
               </label>
               <input
@@ -143,19 +143,19 @@ export default function UsuariosPage() {
                 value={busqueda}
                 onChange={(event) => setBusqueda(event.target.value)}
                 placeholder="Nombre, DNI, correo o área"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-blue-300 outline-none focus:border-cyan-400/60"
+                className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm text-[#0b2a4a] placeholder:text-[#6b8aa5] outline-none focus:border-[#006ec7]"
               />
             </div>
 
             <div>
-              <label htmlFor="area" className="mb-2 block text-sm font-semibold text-slate-200">
+              <label htmlFor="area" className="mb-2 block text-sm font-semibold text-[#2f648c]">
                 Unidad orgánica
               </label>
               <select
                 id="area"
                 value={area}
                 onChange={(event) => setArea(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900"
+                className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm text-[#0b2a4a]"
               >
                 <option value="">Todas</option>
                 {CATALOGO_AREAS.map((item) => (
@@ -167,14 +167,14 @@ export default function UsuariosPage() {
             </div>
 
             <div>
-              <label htmlFor="sede" className="mb-2 block text-sm font-semibold text-slate-200">
+              <label htmlFor="sede" className="mb-2 block text-sm font-semibold text-[#2f648c]">
                 Sede
               </label>
               <select
                 id="sede"
                 value={sede}
                 onChange={(event) => setSede(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900"
+                className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm text-[#0b2a4a]"
               >
                 <option value="">Todas</option>
                 {CATALOGO_SEDES.map((item) => (
@@ -186,14 +186,14 @@ export default function UsuariosPage() {
             </div>
 
             <div>
-              <label htmlFor="rol" className="mb-2 block text-sm font-semibold text-slate-200">
+              <label htmlFor="rol" className="mb-2 block text-sm font-semibold text-[#2f648c]">
                 Rol asignado
               </label>
               <select
                 id="rol"
                 value={rol}
                 onChange={(event) => setRol(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900"
+                className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm text-[#0b2a4a]"
               >
                 <option value="">Todos</option>
                 {CATALOGO_ROLES_USUARIOS.map((item) => (
@@ -205,7 +205,7 @@ export default function UsuariosPage() {
             </div>
 
             <div>
-              <label htmlFor="estado" className="mb-2 block text-sm font-semibold text-slate-200">
+              <label htmlFor="estado" className="mb-2 block text-sm font-semibold text-[#2f648c]">
                 Estado
               </label>
               <select
@@ -214,7 +214,7 @@ export default function UsuariosPage() {
                 onChange={(event) =>
                   setEstado(event.target.value as EstadoUsuario | "Todos")
                 }
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900"
+                className="w-full rounded-lg border border-[#bfe0f7] px-3 py-2.5 text-sm text-[#0b2a4a]"
               >
                 <option value="Todos">Todos</option>
                 <option value="Activo">Activo</option>
@@ -225,12 +225,12 @@ export default function UsuariosPage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
+        <section className="overflow-hidden rounded-xl border border-[#bfe0f7] bg-white backdrop-blur-[12px] shadow-sm">
+          <div className="border-b border-[#d7e9f7] px-6 py-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <h3 className="font-bold">Usuarios registrados</h3>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-[#4b6b85]">
                   {usuarios.length} resultado
                   {usuarios.length === 1 ? "" : "s"}
                 </p>
@@ -244,7 +244,7 @@ export default function UsuariosPage() {
                   <span
                     aria-hidden="true"
                     className={`h-2 w-2 rounded-full ${
-                      isFetching ? "animate-pulse bg-[rgba(15,23,42,0.62)] backdrop-blur-[12px] border border-cyan-400/40" : "bg-emerald-500"
+                      isFetching ? "animate-pulse bg-white backdrop-blur-[12px] border border-[#bfe0f7]" : "bg-emerald-500"
                     }`}
                   />
                   {isFetching
@@ -275,7 +275,7 @@ export default function UsuariosPage() {
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1200px] text-left">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <thead className="bg-[#f4f8fb] text-xs uppercase text-[#4b6b85]">
                 <tr>
                   <th className="px-6 py-3">Usuario</th>
                   <th className="px-6 py-3">DNI</th>
@@ -299,7 +299,7 @@ export default function UsuariosPage() {
                         {[0, 1, 2].map((fila) => (
                           <div
                             key={fila}
-                            className="h-10 animate-pulse rounded-lg bg-slate-200"
+                            className="h-10 animate-pulse rounded-lg bg-[#d7e9f7]"
                           />
                         ))}
                       </div>
@@ -310,7 +310,7 @@ export default function UsuariosPage() {
                 {!isLoading && usuarios.length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-6 py-10 text-center">
-                      <div className="rounded-lg bg-cyan-500/10 px-6 py-8 text-blue-600">
+                      <div className="rounded-lg bg-[#e8f4ff] px-6 py-8 text-[#006ec7]">
                         <p className="font-semibold">
                           No se registran usuarios institucionales
                         </p>
@@ -325,17 +325,17 @@ export default function UsuariosPage() {
 
                 {!isLoading &&
                   usuarios.map((usuario) => (
-                    <tr key={usuario.id} className="hover:bg-slate-50">
+                    <tr key={usuario.id} className="hover:bg-[#f4f8fb]">
                       <td className="px-6 py-4">
                         <p className="text-sm font-semibold">{usuario.nombre}</p>
-                        <p className="text-xs text-slate-500">{usuario.correo}</p>
+                        <p className="text-xs text-[#4b6b85]">{usuario.correo}</p>
                       </td>
                       <td className="px-6 py-4 text-sm">{usuario.dni}</td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium">{usuario.area}</p>
-                        <p className="text-xs text-slate-500">{usuario.sede}</p>
+                        <p className="text-xs text-[#4b6b85]">{usuario.sede}</p>
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">
+                      <td className="px-6 py-4 text-sm text-[#4b6b85]">
                         {usuario.cargo}
                       </td>
                       <td className="px-6 py-4 text-sm">{usuario.rol}</td>
@@ -348,7 +348,7 @@ export default function UsuariosPage() {
                           {usuario.estado}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">
+                      <td className="px-6 py-4 text-sm text-[#4b6b85]">
                         {usuario.ultimoAcceso}
                       </td>
                       <td className="px-6 py-4">
@@ -360,7 +360,7 @@ export default function UsuariosPage() {
                               setErrorServidor("");
                               setUsuarioEditando({ ...usuario });
                             }}
-                            className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-cyan-400 hover:bg-cyan-500/10"
+                            className="rounded-lg border border-[#bfe0f7] px-3 py-2 text-xs font-semibold text-[#006ec7] hover:bg-[#e8f4ff]"
                           >
                             Administrar
                           </button>
@@ -368,7 +368,7 @@ export default function UsuariosPage() {
                             type="button"
                             onClick={() => void alternarEstado(usuario.id)}
                             disabled={guardarPendiente}
-                            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+                            className="rounded-lg border border-[#bfe0f7] px-3 py-2 text-xs font-semibold text-[#4b6b85] hover:bg-[#e8f4ff] disabled:opacity-60"
                             title="Conmutar estado (Activo → Inactivo → Bloqueado)"
                           >
                             Conmutar estado

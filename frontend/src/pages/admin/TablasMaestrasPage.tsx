@@ -55,7 +55,7 @@ export default function TablasMaestrasPage() {
                 onClick={() => cambiarTipo(tipo)}
                 className={`rounded-lg px-4 py-2 text-sm font-semibold ${
                   tipoActivo === tipo
-                    ? "bg-blue-700 text-white"
+                    ? "bg-[#006ec7] text-white"
                     : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
                 aria-pressed={tipoActivo === tipo}
@@ -95,14 +95,14 @@ export default function TablasMaestrasPage() {
                   value={busqueda}
                   onChange={(event) => setBusqueda(event.target.value)}
                   placeholder="Código, nombre o detalle"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600 focus:ring-offset-1"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#006ec7] focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-1"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={() => setMostrarFormulario((actual) => !actual)}
-                className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                className="rounded-lg bg-[#006ec7] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#00539b] focus:outline-none focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-2"
               >
                 + Nuevo registro
               </button>
@@ -122,7 +122,7 @@ export default function TablasMaestrasPage() {
                     value={codigo}
                     onChange={(event) => setCodigo(event.target.value)}
                     placeholder="Ej. ARE-007"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-1"
                   />
                 </div>
                 <div>
@@ -137,7 +137,7 @@ export default function TablasMaestrasPage() {
                     value={nombre}
                     onChange={(event) => setNombre(event.target.value)}
                     placeholder="Nombre del registro"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-1"
                   />
                 </div>
                 <div>
@@ -152,7 +152,7 @@ export default function TablasMaestrasPage() {
                     value={detalle}
                     onChange={(event) => setDetalle(event.target.value)}
                     placeholder="Dependencia, descripción, etc."
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-1"
                   />
                 </div>
 
@@ -160,14 +160,14 @@ export default function TablasMaestrasPage() {
                   <button
                     type="button"
                     onClick={() => setMostrarFormulario(false)}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-2"
                   >
                     Cancelar
                   </button>
                   <button
                     type="button"
                     onClick={crearRegistro}
-                    className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                    className="rounded-lg bg-[#006ec7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#00539b] focus:outline-none focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-2"
                   >
                     Guardar registro
                   </button>
@@ -224,7 +224,7 @@ export default function TablasMaestrasPage() {
                             setMensaje("");
                             alternarEstado(registro.id);
                           }}
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#006ec7] focus:ring-offset-2"
                         >
                           {registro.estado === "Activo"
                             ? "Inactivar"

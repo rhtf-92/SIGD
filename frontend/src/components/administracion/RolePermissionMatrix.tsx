@@ -32,7 +32,7 @@ export default function RolePermissionMatrix({
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[900px] text-left">
-        <thead className="bg-slate-950/30 text-xs uppercase text-slate-400">
+        <thead className="bg-[#f4f8fb] text-xs uppercase text-[#6b8aa5]">
           <tr>
             <th className="px-5 py-3">Módulo</th>
             {columnasPermisos.map((columna) => (
@@ -73,7 +73,7 @@ export default function RolePermissionMatrix({
           ))}
         </tbody>
       </table>
-      <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">
+      <p className="border-t border-[#eaf3fb] px-5 py-3 text-xs text-[#6b8aa5]">
         El módulo Auditoría mantiene las acciones crear, editar, derivar y
         eliminar deshabilitadas incluso para el Administrador (principio WORM).
       </p>

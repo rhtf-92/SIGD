@@ -100,25 +100,25 @@ export default function RegistroCiudadanoPage() {
 
   return (
     <div className="sigd-fade-in admin-dark min-h-screen bg-transparent flex items-center justify-center p-4">
-      <div className="rounded-2xl border border-cyan-400/40 bg-[rgba(15,23,42,0.62)] shadow-[0_0_15px_rgba(6,182,212,0.15)] backdrop-blur-[12px] max-w-2xl w-full p-8 transition-all duration-300 ease-out">
+      <div className="rounded-2xl border border-[#d7e9f7] bg-white shadow-[0_0_15px_rgba(6,182,212,0.15)] backdrop-blur-[12px] max-w-2xl w-full p-8 transition-all duration-300 ease-out">
         <Link
           to="/"
-          className="mb-4 inline-flex items-center gap-2 rounded-xl border border-cyan-400/40 bg-slate-950/30 px-4 py-2.5 text-sm font-semibold text-slate-200 transition-all duration-300 ease-out hover:brightness-110 hover:border-cyan-300/60"
+          className="mb-4 inline-flex items-center gap-2 rounded-xl border border-[#d7e9f7] bg-[#e8f4ff] px-4 py-2.5 text-sm font-semibold text-[#2f648c] transition-all duration-300 ease-out hover:brightness-110 hover:border-[#8cc8f0]"
         >
           ← Volver al inicio
         </Link>
-        <h1 className="text-2xl font-bold text-slate-100 mb-2">Registro de Usuario Externo</h1>
-        <p className="text-sm text-slate-300 mb-8">Complete sus datos para crear su cuenta y Casilla Electrónica Institucional</p>
+        <h1 className="text-2xl font-bold text-[#0b2a4a] mb-2">Registro de Usuario Externo</h1>
+        <p className="text-sm text-[#4b6b85] mb-8">Complete sus datos para crear su cuenta y Casilla Electrónica Institucional</p>
 
-        <div role="tablist" aria-label="Tipo de persona" className="flex gap-1 mb-8 border-b border-cyan-400/25">
+        <div role="tablist" aria-label="Tipo de persona" className="flex gap-1 mb-8 border-b border-[#d7e9f7]">
           <button role="tab" aria-selected={activeTab === "NATURAL"} aria-controls="panel-natural" id="tab-natural"
             onClick={() => { setActiveTab("NATURAL"); setSuccessMessage(null); setErrorMessage(null); }}
-            className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-all duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-cyan-400/50 ${activeTab === "NATURAL" ? "text-cyan-300 border-b-2 border-cyan-400" : "text-slate-400 hover:text-slate-200 border-b-2 border-transparent"}`}>
+            className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-all duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-[#bfe0f7] ${activeTab === "NATURAL" ? "text-[#00539b] border-b-2 border-[#006ec7]" : "text-[#6b8aa5] hover:text-[#2f648c] border-b-2 border-transparent"}`}>
             Persona Natural
           </button>
           <button role="tab" aria-selected={activeTab === "JURIDICA"} aria-controls="panel-juridica" id="tab-juridica"
             onClick={() => { setActiveTab("JURIDICA"); setSuccessMessage(null); setErrorMessage(null); }}
-            className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-all duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-cyan-400/50 ${activeTab === "JURIDICA" ? "text-cyan-300 border-b-2 border-cyan-400" : "text-slate-400 hover:text-slate-200 border-b-2 border-transparent"}`}>
+            className={`px-5 py-2.5 text-sm font-medium rounded-t-md transition-all duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-[#bfe0f7] ${activeTab === "JURIDICA" ? "text-[#00539b] border-b-2 border-[#006ec7]" : "text-[#6b8aa5] hover:text-[#2f648c] border-b-2 border-transparent"}`}>
             Persona Jurídica
           </button>
         </div>

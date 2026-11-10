@@ -96,7 +96,7 @@ function renderTipoBadge(tipo: TipoNotificacion) {
   switch (tipo) {
     case "RESOLUCION":
       return (
-        <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
+        <span className="rounded-md bg-[#d7e9f7] px-2 py-0.5 text-xs font-semibold text-[#00539b]">
           Resolución
         </span>
       );
@@ -182,7 +182,7 @@ export default function NotificationList({
         <div className="mb-4 flex flex-col justify-between gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
             <svg
-              className="h-5 w-5 text-blue-700"
+              className="h-5 w-5 text-[#00539b]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -203,7 +203,7 @@ export default function NotificationList({
             <button
               type="button"
               onClick={onResetFiltros}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900 hover:underline"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[#00539b] hover:text-[#0b2a4a] hover:underline"
             >
               <svg
                 className="h-3.5 w-3.5"
@@ -239,7 +239,7 @@ export default function NotificationList({
                 value={filtros.busqueda || ""}
                 onChange={(e) => onSetBusqueda(e.target.value)}
                 placeholder="Ej. EXP-2026-000184, Titulación, RD 0412..."
-                className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#006ec7] focus:ring-2 focus:ring-[#d7e9f7]"
               />
               <svg
                 className="absolute left-3 top-3 h-4 w-4 text-slate-400"
@@ -271,7 +271,7 @@ export default function NotificationList({
               onChange={(e) =>
                 onSetTipo(e.target.value as TipoNotificacion | "TODOS")
               }
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#006ec7] focus:ring-2 focus:ring-[#d7e9f7]"
             >
               <option value="TODOS">Todos los tipos</option>
               <option value="RESOLUCION">Resoluciones</option>
@@ -299,7 +299,7 @@ export default function NotificationList({
               onChange={(e) =>
                 onSetEstado(e.target.value as EstadoNotificacion | "TODOS")
               }
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#006ec7] focus:ring-2 focus:ring-[#d7e9f7]"
             >
               <option value="TODOS">Todos los estados</option>
               <option value="NO_LEIDO">No Leído</option>
@@ -321,7 +321,7 @@ export default function NotificationList({
               type="date"
               value={filtros.fechaInicio || ""}
               onChange={(e) => onSetFechaInicio(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-[#006ec7] focus:ring-2 focus:ring-[#d7e9f7]"
             />
           </div>
 
@@ -338,7 +338,7 @@ export default function NotificationList({
               type="date"
               value={filtros.fechaFin || ""}
               onChange={(e) => onSetFechaFin(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-[#006ec7] focus:ring-2 focus:ring-[#d7e9f7]"
             />
           </div>
 
@@ -355,7 +355,7 @@ export default function NotificationList({
                 id="filtro-limit"
                 value={filtros.limit || 5}
                 onChange={(e) => onSetLimit(Number(e.target.value))}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-600"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#006ec7]"
               >
                 <option value={5}>5 por página</option>
                 <option value={10}>10 por página</option>
@@ -431,7 +431,7 @@ export default function NotificationList({
       {/* ==================================================================== */}
       {!isLoading && !isError && notificaciones.length === 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#e8f4ff] text-[#006ec7]">
             <svg
               className="h-8 w-8"
               fill="none"
@@ -458,7 +458,7 @@ export default function NotificationList({
             <button
               type="button"
               onClick={onResetFiltros}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#006ec7] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#00539b]"
             >
               Restablecer todos los filtros
             </button>
@@ -497,7 +497,7 @@ export default function NotificationList({
                   tabIndex={0}
                   role="button"
                   aria-label={`Notificación ${notif.numeroNotificacion}, expediente ${notif.numeroExpediente}, ${notif.asunto}`}
-                  className={`group relative cursor-pointer rounded-2xl border bg-white p-5 shadow-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+                  className={`group relative cursor-pointer rounded-2xl border bg-white p-5 shadow-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#006ec7] ${
                     isNoLeido
                       ? "border-amber-300 ring-1 ring-amber-100 bg-gradient-to-r from-amber-50/40 via-white to-white"
                       : isNotificado
@@ -513,7 +513,7 @@ export default function NotificationList({
                         {notif.numeroNotificacion}
                       </span>
                       <span className="text-slate-300">•</span>
-                      <span className="text-xs font-semibold text-blue-700">
+                      <span className="text-xs font-semibold text-[#00539b]">
                         Expediente: {notif.numeroExpediente}
                       </span>
                       {notif.prioridad === "URGENTE" && (
@@ -530,7 +530,7 @@ export default function NotificationList({
 
                   {/* Cuerpo: Asunto y Resumen del Acto */}
                   <div className="mt-3">
-                    <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors line-clamp-2">
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-[#00539b] transition-colors line-clamp-2">
                       {notif.asunto}
                     </h3>
 
@@ -584,7 +584,7 @@ export default function NotificationList({
                         </span>
                       </div>
 
-                      <span className="inline-flex items-center gap-1 font-semibold text-blue-700 group-hover:translate-x-0.5 transition-transform">
+                      <span className="inline-flex items-center gap-1 font-semibold text-[#00539b] group-hover:translate-x-0.5 transition-transform">
                         Ver acto completo &rarr;
                       </span>
                     </div>
@@ -626,7 +626,7 @@ export default function NotificationList({
                         onClick={() => onSetPage(pageNum)}
                         className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition ${
                           isCurrent
-                            ? "bg-blue-700 text-white shadow"
+                            ? "bg-[#006ec7] text-white shadow"
                             : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
                         }`}
                       >
