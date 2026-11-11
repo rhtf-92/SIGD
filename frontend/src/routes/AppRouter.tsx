@@ -4,7 +4,7 @@ import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
 import NotFoundPage from "../pages/NotFoundPage";
 
-import SeguridadPage from "../pages/administracion/SeguridadPage";
+import AtencionPage from "../pages/administracion/AtencionPage";
 import DashboardEjecutivoPage from "../pages/DashboardEjecutivoPage";
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
 import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
@@ -84,7 +84,16 @@ export default function AppRouter() {
         path="/ventanilla"
         element={<VentanillaPresencialPage />}
       />
-      <Route path="/administracion/seguridad" element={<SeguridadPage />} />
+            <Route
+        path="/administracion/atencion"
+        element={
+          <ProtectedRoute
+            requiredRoles={["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "ESPECIALISTA", "MESA_PARTES"]}
+          >
+            <AtencionPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
       <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
       <Route

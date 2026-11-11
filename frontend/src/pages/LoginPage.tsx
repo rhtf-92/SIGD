@@ -48,7 +48,14 @@ export default function LoginPage() {
     setCargando(true);
     try {
       await login({ identificador: identificador.trim(), password });
-      const rolSesion = String(useAuthStore.getState().usuario?.rol ?? ""); navigate(!location.state?.from && (rolSesion === "ADMINISTRADOR" || rolSesion === "DIRECTOR") ? "/administracion" : rutaDestino(), { replace: true });
+      const rolSesion = String(useAuthStore.getState().usuario?.rol ?? "");       const rolesAtencion = ["MESA_PARTES", "SECRETARIO", "ESPECIALISTA"];
+      const destinoPorRol =
+        rolSesion === "ADMINISTRADOR" || rolSesion === "DIRECTOR"
+          ? "/administracion"
+          : rolesAtencion.includes(rolSesion)
+            ? "/administracion/atencion"
+            : null;
+      navigate(!location.state?.from && destinoPorRol ? destinoPorRol : rutaDestino(), { replace: true });
     } catch (cause) {
       const status =
         cause instanceof ApiHttpError
