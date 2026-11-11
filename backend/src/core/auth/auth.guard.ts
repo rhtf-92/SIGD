@@ -48,7 +48,7 @@ export function resolverIdentidad(req: Request): IdentidadAutenticada {
   });
 }
 
-export const ROLES_FIRMA = ['DIRECTOR', 'ADMINISTRADOR'] as const;
+export const ROLES_FIRMA = ['DIRECTOR'] as const;
 
 export interface FacultadFirma {
   puedeFirmar: boolean;
@@ -90,7 +90,17 @@ export async function verificarFacultadFirma(
       WHERE e.usuario_id = $1
         AND e.vigente
         AND e.inicio <= now()
-        AND (e.fin IS NULL OR e.fin > now())`,
+        AND (e.fin IS NULL OR e.fin > now())
+     UNION ALL
+     SELECT NULL AS rol_codigo, NULL::text AS tipo_resolucion, (rt.estado = 'ACTIVO') AS vigente, rt.motivo_revocacion AS motivo_no_habilitado
+       FROM sigd_org.responsabilidad_temporal rt
+       JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = $1
+       JOIN sigd_org.cargo c ON c.cargo_id = rt.cargo_id
+      WHERE (rt.id_usuario = $1 OR rt.id_persona = cu.id_persona)
+        AND rt.estado = 'ACTIVO'
+        AND (c.codigo = 'DIRECTOR' OR (rt.alcance->>'facultaFirma')::boolean = true)
+        AND rt.vigente_desde <= now()
+        AND (rt.vigente_hasta IS NULL OR rt.vigente_hasta > now())`,
     [idUsuario],
   );
 

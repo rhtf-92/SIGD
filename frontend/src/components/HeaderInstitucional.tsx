@@ -1,26 +1,61 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, LogOut, User } from "lucide-react";
-import { useAuthStore } from "../stores/authStore";
+import { useAuthStore, type ContextoOperativo } from "../stores/authStore";
 import { obtenerInfoArea } from "../utils/areaPresentacion";
 import {
   NAV_ITEMS_PUBLICOS,
   NAV_ITEMS_POR_ROL,
+  canAccessRoute,
   type RolCanonica,
   type NavItem,
 } from "../config/navigation.config";
+
+export const NAV_ITEMS_PERSONAL: readonly NavItem[] = [
+  { etiqueta: "Inicio", ruta: "/" },
+  { etiqueta: "Nuevo Trámite", ruta: "/tramite" },
+  { etiqueta: "Mis Expedientes", ruta: "/mis-expedientes" },
+  { etiqueta: "Casilla Electrónica", ruta: "/casilla" },
+  { etiqueta: "Catálogo TUPA", ruta: "/tupa" },
+  { etiqueta: "Consulta CUT", ruta: "/consulta" },
+];
 
 export default function HeaderInstitucional() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [cambiandoContexto, setCambiandoContexto] = useState(false);
+
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const usuario = useAuthStore((state) => state.usuario);
+  const contextoActivo = useAuthStore((state) => state.contextoActivo);
+  const contextosDisponibles = useAuthStore((state) => state.contextosDisponibles);
+  const cambiarContexto = useAuthStore((state) => state.cambiarContexto);
   const logout = useAuthStore((state) => state.logout);
 
-  const navItems: readonly NavItem[] = isAuthenticated && usuario?.rol
-    ? NAV_ITEMS_POR_ROL[usuario.rol as RolCanonica] || []
-    : NAV_ITEMS_PUBLICOS;
+  const tieneMultiplesContextos = isAuthenticated && contextosDisponibles.length > 1;
+  const esContextoInstitucional =
+    usuario?.contexto === "INSTITUCIONAL" ||
+    contextoActivo === "INSTITUCIONAL" ||
+    Boolean(usuario && usuario.rol !== "CIUDADANO" && !tieneMultiplesContextos);
+
+  let navItems: readonly NavItem[] = NAV_ITEMS_PUBLICOS;
+  if (isAuthenticated && usuario?.rol) {
+    if (usuario.rol === "CIUDADANO" || !esContextoInstitucional) {
+      navItems = NAV_ITEMS_PERSONAL;
+    } else {
+      const baseItems = [...(NAV_ITEMS_POR_ROL[usuario.rol as RolCanonica] || [])];
+      if (usuario.perfiles?.includes("GESTOR_TESORERIA") && !baseItems.some((i) => i.ruta === "/tesoreria")) {
+        baseItems.push({ etiqueta: "Módulo Tesorería", ruta: "/tesoreria" });
+      }
+      navItems = baseItems.filter((item) =>
+        canAccessRoute(usuario.rol as RolCanonica, item.ruta, {
+          contexto: "INSTITUCIONAL",
+          perfiles: usuario.perfiles,
+        })
+      );
+    }
+  }
 
   const handleLogout = () => {
     logout();
@@ -30,10 +65,27 @@ export default function HeaderInstitucional() {
 
   const handleNavigate = (ruta: string) => {
     setIsMobileMenuOpen(false);
-    if (ruta === '/tramite') {
-      navigate('/tramite', { state: { nuevoTramite: true, t: Date.now() } });
+    if (ruta === "/tramite") {
+      navigate("/tramite", { state: { nuevoTramite: true, t: Date.now() } });
     } else {
       navigate(ruta);
+    }
+  };
+
+  const handleCambiarContexto = async (nuevo: ContextoOperativo) => {
+    if (nuevo === contextoActivo || cambiandoContexto) return;
+    setCambiandoContexto(true);
+    try {
+      await cambiarContexto(nuevo);
+      if (nuevo === "PERSONAL") {
+        navigate("/mis-expedientes");
+      } else {
+        navigate("/expedientes");
+      }
+    } catch {
+      // Error manejado en store
+    } finally {
+      setCambiandoContexto(false);
     }
   };
 
@@ -84,16 +136,62 @@ export default function HeaderInstitucional() {
             );
           })}
 
+          {/* Selector de Contexto Operativo Desktop (Fase 5H) */}
+          {tieneMultiplesContextos && (
+            <div
+              role="group"
+              aria-label="Selector de contexto operativo"
+              className="ml-2 flex items-center rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-[11px]"
+            >
+              <button
+                type="button"
+                disabled={cambiandoContexto}
+                onClick={() => void handleCambiarContexto("PERSONAL")}
+                className={`rounded-md px-2.5 py-1 font-bold transition cursor-pointer ${
+                  contextoActivo === "PERSONAL"
+                    ? "bg-blue-600 text-white shadow-2xs"
+                    : "text-slate-400 hover:text-white"
+                }`}
+                aria-pressed={contextoActivo === "PERSONAL"}
+                title="Modo personal: trámites y expedientes propios"
+              >
+                Personal
+              </button>
+              <button
+                type="button"
+                disabled={cambiandoContexto}
+                onClick={() => void handleCambiarContexto("INSTITUCIONAL")}
+                className={`rounded-md px-2.5 py-1 font-bold transition cursor-pointer ${
+                  contextoActivo === "INSTITUCIONAL"
+                    ? "bg-amber-400 text-slate-950 shadow-2xs"
+                    : "text-slate-400 hover:text-white"
+                }`}
+                aria-pressed={contextoActivo === "INSTITUCIONAL"}
+                title="Modo institucional: funciones y bandejas de área"
+              >
+                Institucional
+              </button>
+            </div>
+          )}
+
           {isAuthenticated && usuario && (
             <div className="ml-2 flex items-center gap-2 border-l border-slate-800 pl-3">
               <div className="text-right">
-                {usuario.rol === 'CIUDADANO' ?
-                  <Link to="/mi-perfil" className="text-[11px] font-bold text-white leading-tight hover:underline">Mi cuenta</Link> :
-                  <p className="text-[11px] font-bold text-white leading-tight max-w-[140px] lg:max-w-none truncate">{usuario.nombreCompleto}</p>}
+                {usuario.rol === "CIUDADANO" ? (
+                  <Link to="/mi-perfil" className="text-[11px] font-bold text-white leading-tight hover:underline">
+                    Mi cuenta
+                  </Link>
+                ) : (
+                  <p className="text-[11px] font-bold text-white leading-tight max-w-[140px] lg:max-w-none truncate">
+                    {usuario.nombreCompleto}
+                  </p>
+                )}
                 <div className="flex items-center gap-1 justify-end">
-                  {usuario.rol !== 'CIUDADANO' && <span className="inline-block rounded bg-amber-400/90 border border-amber-300 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-950">
-                    {usuario.rol}
-                  </span>}
+                  {usuario.rol !== "CIUDADANO" && (
+                    <span className="inline-block rounded bg-amber-400/90 border border-amber-300 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-950">
+                      {usuario.rol}
+                    </span>
+                  )}
                   {usuario.rol !== "CIUDADANO" && (() => {
                     const infoArea = obtenerInfoArea(usuario.areaId, null, usuario.rol);
                     return (
@@ -107,11 +205,11 @@ export default function HeaderInstitucional() {
                   })()}
                 </div>
               </div>
+
               <button
                 type="button"
                 onClick={handleLogout}
-                className="rounded-lg bg-rose-600/80 hover:bg-rose-600 border border-rose-500/50 px-2.5 py-1 text-white transition text-[11px] whitespace-nowrap shadow-xs"
-                title="Cerrar sesión"
+                className="rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-slate-700 transition"
               >
                 Salir
               </button>
@@ -119,14 +217,20 @@ export default function HeaderInstitucional() {
           )}
         </nav>
 
-        {/* Controles Mobile */}
+        {/* Acciones Mobile */}
         <div className="flex md:hidden items-center gap-1.5">
           {isAuthenticated && usuario && (
             <div className="flex items-center gap-1 rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-white text-[11px]" title={`Sesión: ${usuario.rol}`}>
               <User className="h-3.5 w-3.5 text-amber-300" />
-              {usuario.rol === 'CIUDADANO' ?
-                <Link to="/mi-perfil" className="font-bold text-[10px] hover:underline">Mi cuenta</Link> :
-                <span className="font-bold text-[10px] truncate max-w-[90px]">{usuario.nombreCompleto.split(" ")[0]}</span>}
+              {usuario.rol === "CIUDADANO" ? (
+                <Link to="/mi-perfil" className="font-bold text-[10px] hover:underline">
+                  Mi cuenta
+                </Link>
+              ) : (
+                <span className="font-bold text-[10px] truncate max-w-[90px]">
+                  {usuario.nombreCompleto.split(" ")[0]}
+                </span>
+              )}
             </div>
           )}
           <button
@@ -152,9 +256,11 @@ export default function HeaderInstitucional() {
                   <p className="text-[10px] text-cyan-200">{usuario.correo ?? "Usuario SIGD"}</p>
                 </div>
                 <div className="text-right">
-                  {usuario.rol !== 'CIUDADANO' && <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-900 block">
-                    {usuario.rol}
-                  </span>}
+                  {usuario.rol !== "CIUDADANO" && (
+                    <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-900 block">
+                      {usuario.rol}
+                    </span>
+                  )}
                   {usuario.rol !== "CIUDADANO" && (() => {
                     const infoArea = obtenerInfoArea(usuario.areaId, null, usuario.rol);
                     return (
@@ -165,6 +271,46 @@ export default function HeaderInstitucional() {
                   })()}
                 </div>
               </div>
+
+              {/* Selector de Contexto en Menú Móvil */}
+              {tieneMultiplesContextos && (
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400 font-medium">Contexto activo:</span>
+                  <div
+                    role="group"
+                    aria-label="Selector de contexto operativo móvil"
+                    className="flex items-center rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-[11px]"
+                  >
+                    <button
+                      type="button"
+                      disabled={cambiandoContexto}
+                      onClick={() => void handleCambiarContexto("PERSONAL")}
+                      className={`rounded-md px-2 py-0.5 font-bold transition ${
+                        contextoActivo === "PERSONAL"
+                          ? "bg-blue-600 text-white"
+                          : "text-slate-400"
+                      }`}
+                      aria-pressed={contextoActivo === "PERSONAL"}
+                    >
+                      Personal
+                    </button>
+                    <button
+                      type="button"
+                      disabled={cambiandoContexto}
+                      onClick={() => void handleCambiarContexto("INSTITUCIONAL")}
+                      className={`rounded-md px-2 py-0.5 font-bold transition ${
+                        contextoActivo === "INSTITUCIONAL"
+                          ? "bg-amber-400 text-slate-950"
+                          : "text-slate-400"
+                      }`}
+                      aria-pressed={contextoActivo === "INSTITUCIONAL"}
+                    >
+                      Institucional
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handleLogout}

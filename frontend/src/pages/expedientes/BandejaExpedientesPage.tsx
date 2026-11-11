@@ -33,11 +33,24 @@ export default function BandejaExpedientesPage() {
   const esAdminOGlobal = rol === "ADMINISTRADOR" || rol === "DIRECTOR";
   const esOperadorSDA = rol === "ESPECIALISTA" || rol === "SECRETARIO";
 
+  const [tipoBandeja, setTipoBandeja] = useState<"AREA" | "PERSONAL">("AREA");
+
   const [filtros, setFiltros] = useState<Filtros>(() => ({
     pestana: "PENDIENTES",
     limite: 20,
     areaId: undefined,
+    bandeja: "AREA",
   }));
+
+  const handleCambiarTipoBandeja = (nuevoTipo: "AREA" | "PERSONAL") => {
+    setTipoBandeja(nuevoTipo);
+    setAnteriores([]);
+    setFiltros((prev) => ({
+      ...prev,
+      bandeja: nuevoTipo,
+      cursor: undefined,
+    }));
+  };
 
   const [anteriores, setAnteriores] = useState<(string | undefined)[]>([]);
   const consulta = useBandejaExpedientes(filtros);
@@ -134,6 +147,7 @@ export default function BandejaExpedientesPage() {
       areaId: areaIdFiltro,
       fechaDesde: texto("fechaDesde"),
       fechaHasta: texto("fechaHasta"),
+      bandeja: tipoBandeja,
     });
   }
 
@@ -238,6 +252,47 @@ export default function BandejaExpedientesPage() {
         <h1 className="text-2xl font-bold text-slate-900">{infoRol.titulo}</h1>
         <p className="text-sm text-slate-600">{infoRol.subtitulo}</p>
       </header>
+
+      {/* Selector de Bandeja de Área vs Mi Bandeja (Regla 22 y 23 Fase 5H) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div
+          role="tablist"
+          aria-label="Tipo de bandeja institucional"
+          className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tipoBandeja === "AREA"}
+            onClick={() => handleCambiarTipoBandeja("AREA")}
+            className={`rounded-lg px-3.5 py-1.5 transition cursor-pointer ${
+              tipoBandeja === "AREA"
+                ? "bg-white text-slate-900 shadow-xs border border-slate-200/80 font-extrabold"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            🏢 Bandeja de Área (Custodia)
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tipoBandeja === "PERSONAL"}
+            onClick={() => handleCambiarTipoBandeja("PERSONAL")}
+            className={`rounded-lg px-3.5 py-1.5 transition cursor-pointer ${
+              tipoBandeja === "PERSONAL"
+                ? "bg-white text-slate-900 shadow-xs border border-slate-200/80 font-extrabold"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            👤 Mi Bandeja (Asignados a Mí)
+          </button>
+        </div>
+        <span className="text-xs text-slate-500 font-medium">
+          {tipoBandeja === "AREA"
+            ? "Mostrando expedientes bajo custodia formal de la unidad orgánica"
+            : "Mostrando únicamente expedientes asignados para su despacho personal"}
+        </span>
+      </div>
 
       {mostrarDevoluciones && (rol === 'MESA_PARTES' || rol === 'ADMINISTRADOR') && (
         <section className="rounded-xl border border-slate-200 bg-white p-4" aria-label="Bandeja de devoluciones">

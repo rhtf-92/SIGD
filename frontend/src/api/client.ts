@@ -7,6 +7,7 @@ import {
   ApiHttpError,
   type ProblemCategory,
 } from "../types/api";
+import { obtenerClaveIdempotenciaActiva } from "../utils/idempotency";
 
 function generateCorrelationId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -35,7 +36,7 @@ export const apiClient = axios.create({
   },
 });
 
-// Interceptor de Petición: Inyección de X-Correlation-ID y Bearer Token
+// Interceptor de Petición: Inyección de X-Correlation-ID, Bearer Token y X-Contexto-Operacion
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const correlationId = generateCorrelationId();
@@ -52,6 +53,33 @@ apiClient.interceptors.request.use(
 
     if (token && !config.headers["Authorization"]) {
       config.headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    // Fase 5H: Inyección del contexto operativo activo (PERSONAL | INSTITUCIONAL)
+    try {
+      const contexto = useAuthStore.getState().contextoActivo;
+      if (contexto && !config.headers["X-Contexto-Operacion"]) {
+        config.headers["X-Contexto-Operacion"] = contexto;
+      }
+    } catch {
+      // Ignorar en entornos sin store inicializado
+    }
+
+    // Fase 5H / Regla 42: Inyección de Idempotency-Key en operaciones mutantes
+    // Semántica: si existe una intención activa (formulario/hook), se usa su clave estable
+    // para garantizar que los reintentos conserven la misma clave. Si no hay intención activa,
+    // se utiliza correlationId como clave fallback.
+    const esMutacion =
+      config.method === "post" ||
+      config.method === "POST" ||
+      config.method === "put" ||
+      config.method === "PUT" ||
+      config.method === "patch" ||
+      config.method === "PATCH";
+
+    if (esMutacion && !config.headers["Idempotency-Key"]) {
+      const claveIntencion = obtenerClaveIdempotenciaActiva();
+      config.headers["Idempotency-Key"] = claveIntencion || correlationId;
     }
 
     return config;
@@ -71,7 +99,6 @@ function procesarCola(error: unknown, token: string | null) {
   pendingQueue = [];
 }
 
-// Interceptor de Respuesta: Tratamiento centralizado y tipado RFC 7807 (Problem Details)
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: unknown) => {
@@ -116,6 +143,28 @@ apiClient.interceptors.response.use(
     if (axios.isAxiosError(error)) {
       const status = error.response?.status ?? 500;
       const responseData = error.response?.data as Record<string, unknown> | undefined;
+      const code = (typeof responseData?.code === "string" && responseData.code) || `ERR_HTTP_${status}`;
+
+      // Regla 17 (Fase 5H): Si backend devuelve 403 CUENTA_INACTIVA, ACCOUNT_DISABLED, SESION_REVOCADA -> cerrar sesión inmediatamente
+      if (status === 403 && (code === "ACCOUNT_DISABLED" || code === "CUENTA_INACTIVA" || code === "SESION_REVOCADA")) {
+        try {
+          useAuthStore.getState().logout();
+        } catch {
+          // Ignorar
+        }
+      }
+
+      // Regla 54 (Fase 5H): Si la autoridad institucional expira o no está disponible, revertir a contexto PERSONAL
+      if (status === 403 && code === "INSTITUTIONAL_CONTEXT_NOT_AVAILABLE") {
+        try {
+          const store = useAuthStore.getState();
+          if (store.contextoActivo === "INSTITUCIONAL") {
+            void store.cambiarContexto("PERSONAL");
+          }
+        } catch {
+          // Ignorar
+        }
+      }
 
       const correlationId =
         (typeof responseData?.correlationId === "string" && responseData.correlationId) ||
@@ -146,10 +195,6 @@ apiClient.interceptors.response.use(
         (typeof responseData?.instance === "string" && responseData.instance) ||
         error.config?.url ||
         "";
-
-      const code =
-        (typeof responseData?.code === "string" && responseData.code) ||
-        `ERR_HTTP_${status}`;
 
       const retryable =
         typeof responseData?.retryable === "boolean"

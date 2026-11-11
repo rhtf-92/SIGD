@@ -46,7 +46,9 @@ export interface CargoInstitucionalModel {
 
 export interface AsignacionPersonalModel {
   idAsignacion: string;
-  idUsuario: string;
+  idUsuario: string | null;
+  idPersona?: string;
+  idVinculo?: string | null;
   usuarioNombre?: string;
   usuarioUsername?: string;
   cargoId: string;
@@ -80,10 +82,12 @@ export interface AlcanceDelegacion {
 export interface ResponsabilidadTemporalModel {
   idResponsabilidad: string;
   tipoResponsabilidad: TipoResponsabilidadTemporal;
-  idUsuario: string;
+  idUsuario: string | null;
+  idPersona?: string;
   usuarioNombre?: string;
   usuarioUsername?: string;
   titularUsuarioId: string | null;
+  titularPersonaId?: string | null;
   titularNombre?: string;
   titularUsername?: string;
   cargoId: string;
@@ -126,7 +130,9 @@ export interface CrearCargoInput {
 }
 
 export interface CrearAsignacionInput {
-  idUsuario: string;
+  idUsuario?: string | null;
+  idPersona?: string | null;
+  idVinculo?: string | null;
   cargoId: string;
   areaId: string;
   vigenteDesde?: string | Date;
@@ -144,8 +150,10 @@ export interface FinalizarAsignacionInput {
 
 export interface CrearResponsabilidadTemporalInput {
   tipoResponsabilidad: TipoResponsabilidadTemporal;
-  idUsuario: string;
+  idUsuario?: string | null;
+  idPersona?: string | null;
   titularUsuarioId?: string | null;
+  titularPersonaId?: string | null;
   cargoId: string;
   areaId: string;
   vigenteDesde?: string | Date;

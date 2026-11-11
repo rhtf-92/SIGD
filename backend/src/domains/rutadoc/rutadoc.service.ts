@@ -27,10 +27,25 @@ export class ServicioRutaDoc {
       filtrosEfectivos.areaId = actor.unidadOrganicaId;
     }
 
+    if (filtrosEfectivos.bandeja === 'PERSONAL') {
+      filtrosEfectivos.usuarioAsignadoId = actor.id;
+      if (actor.idPersona) {
+        filtrosEfectivos.personaAsignadaId = actor.idPersona;
+      }
+    }
+
     const posicion = filtrosEfectivos.cursor ? decodificarCursor(filtrosEfectivos.cursor, filtrosEfectivos) : null;
     const resultado = await this.repositorio.listar(filtrosEfectivos, ESTADOS_POR_PESTANA[filtrosEfectivos.pestana], posicion);
-    const tieneMas = resultado.elementos.length > filtrosEfectivos.limite;
-    const elementos = resultado.elementos.slice(0, filtrosEfectivos.limite);
+    let elementos = resultado.elementos;
+    if (filtrosEfectivos.bandeja === 'PERSONAL') {
+      elementos = elementos.filter(
+        (e) =>
+          e.usuarioAsignadoId === actor.id ||
+          (Boolean(actor.idPersona) && e.personaAsignadaId === actor.idPersona),
+      );
+    }
+    const tieneMas = elementos.length > filtrosEfectivos.limite;
+    elementos = elementos.slice(0, filtrosEfectivos.limite);
     const ultimo = elementos.at(-1);
     const contadores = resultado.porPestana ?? Object.fromEntries(Object.entries(ESTADOS_POR_PESTANA).map(
       ([pestana, estados]) => [pestana, estados.reduce(

@@ -114,13 +114,9 @@ export class ConsultaPublicaService {
     try {
       const expediente = await this.leerExpediente(cliente, params.cut);
       if (!expediente) {
-        // Se responde 404 tambien cuando el expediente existe pero esta anulado
-        // logicamente, para no confirmar la existencia de un CUT cancelado.
         throw new NotFoundError({
-          message: 'No existe un expediente con el CUT consultado.',
-          detail:
-            'No se encontro ningun expediente vigente con ese CUT. Si el expediente fue ' +
-            'anulado se responde igual, para no confirmar la existencia de un CUT cancelado.',
+          message: 'Consulta no disponible para los datos proporcionados.',
+          detail: 'Consulta no disponible para los datos proporcionados.',
         });
       }
 
@@ -130,8 +126,8 @@ export class ConsultaPublicaService {
         const docExpediente = (expediente.numero_documento || '').trim().replace(/[-\s]/g, '').toLowerCase();
         if (docIngresado !== docExpediente) {
           throw new NotFoundError({
-            message: 'No se encontró ningún expediente con los datos provistos o los datos no coinciden.',
-            detail: 'El documento de identidad no coincide con el registrado para este CUT.',
+            message: 'Consulta no disponible para los datos proporcionados.',
+            detail: 'Consulta no disponible para los datos proporcionados.',
           });
         }
       }

@@ -4,7 +4,15 @@
  * Normativa: TUO de la Ley N° 27444 (LPAG) y Ley N° 29733 (Protección de Datos Personales)
  */
 
-export type EstadoNotificacion = "NO_LEIDO" | "LEIDO" | "NOTIFICADO";
+export type EstadoNotificacion =
+  | "NO_LEIDO"
+  | "LEIDO"
+  | "NOTIFICADO"
+  | "GENERADA"
+  | "PUESTA_A_DISPOSICION"
+  | "VISUALIZADA"
+  | "DESCARGADA"
+  | "ERROR_ENVIO";
 
 export type TipoNotificacion =
   | "RESOLUCION"

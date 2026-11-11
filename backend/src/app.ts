@@ -8,6 +8,7 @@ import { crearUsuariosAdminRouter } from './domains/organicore/usuariosAdmin.rou
 
 // Módulos de DocuCore / Firma Digital (B_VALENTIN)
 import { crearFirmaRouter } from './domains/docucore/firma.controller.js';
+import { crearRouterDnieFirma } from './domains/docucore/dnieFirma.router.js';
 import {
   InMemoryFirmaSessionStore,
   RedisFirmaSessionStore,
@@ -257,10 +258,12 @@ export function construirApp(
         documentoMetadata: opts.documentoMetadataRutaDoc,
         porcentajeAmarilloSlaDesde: opts.porcentajeAmarilloSlaRutaDocDesde,
       },
+      authService,
     ),
   );
   app.use('/api/v1', crearRouterReportes(pool, actorProviderReportesEfectivo, opts.mgdCache));
   app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
+  app.use('/api/v1/firma/dnie', crearRouterDnieFirma(pool));
   app.use('/api/v1/firma', crearFirmaRouter(servicio));
 
   /*

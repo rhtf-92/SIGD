@@ -42,6 +42,8 @@ export const rutaDoc = {
         clasificacion: string;
         plazoDias: number;
         costo: number;
+        unidadResponsableId?: string | null;
+        unidadResponsableNombre?: string | null;
       } | null;
       documentos?: DocumentoAdjuntoDto[];
       solicitanteResumen?: SolicitanteResumenDto | null;

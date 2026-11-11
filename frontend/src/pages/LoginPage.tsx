@@ -82,10 +82,21 @@ export default function LoginPage() {
         }
       }
 
-      const destinoCanonico = rol ? DESTINO_POR_ROL[rol] : undefined;
-      navigate(rol && fromPath && canAccessRoute(rol, fromPath)
-        ? fromPath
-        : destinoCanonico || "/", { replace: true });
+      const contextosDisponibles = useAuthStore.getState().contextosDisponibles;
+      const tieneMultiplesContextos = contextosDisponibles && contextosDisponibles.length > 1;
+      const contexto = useAuthStore.getState().contextoActivo;
+
+      const contextoEfectivo = tieneMultiplesContextos ? contexto : undefined;
+      const destinoCanonico = (tieneMultiplesContextos && contexto === 'PERSONAL')
+        ? '/tramite'
+        : (rol ? DESTINO_POR_ROL[rol] : '/');
+
+      navigate(
+        rol && fromPath && canAccessRoute(rol, fromPath, contextoEfectivo)
+          ? fromPath
+          : destinoCanonico,
+        { replace: true }
+      );
     } catch (cause) {
       setError(cause instanceof ApiHttpError
         ? cause.problemDetails.detail || "No fue posible iniciar sesión."

@@ -14,6 +14,7 @@ const DestinoDerivacionSchema = z.object({
 
   // Requerido funcionalmente para "Asignación de Responsable" (T-BE-RD-06)
   usuario_asignado_id: z.string().trim().regex(REGEX_UUID, { message: 'El ID del usuario asignado debe ser un UUID válido.' }).optional(),
+  persona_asignada_id: z.string().trim().regex(REGEX_UUID, { message: 'El ID de la persona asignada debe ser un UUID válido.' }).optional(),
 });
 
 /**
@@ -26,6 +27,9 @@ export const DerivarExpedienteSchema = z.object({
   // Representa el requerimiento de "Proveído de atención" (T-BE-RD-06).
   // Se mapeará funcionalmente a la columna 'motivo' de la tabla derivacion_tramite.
   proveido: z.string().min(1, { message: 'El proveído o motivo de la derivación es obligatorio.' }),
+  clave_idempotencia: z.string().trim().optional(),
+  es_correccion: z.boolean().default(false).optional(),
+  motivo: z.string().optional(),
 });
 
 // Tipos estáticos inferidos para utilizarlos de forma fuertemente tipada en Controller y Service

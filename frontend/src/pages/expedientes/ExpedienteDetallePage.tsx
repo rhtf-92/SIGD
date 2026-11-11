@@ -16,6 +16,8 @@ import ObservacionModal from "../../components/expedientes/ObservacionModal";
 import SubsanacionModal from "../../components/expedientes/SubsanacionModal";
 import AcumulacionModal from "../../components/expedientes/AcumulacionModal";
 import AtencionModal from "../../components/expedientes/AtencionModal";
+import EnviarAFirmaModal from "../../components/expedientes/EnviarAFirmaModal";
+import ResolverModal from "../../components/expedientes/ResolverModal";
 import ArchivadoModal from "../../components/expedientes/ArchivadoModal";
 import ExpedienteActionToast from "../../components/expedientes/ExpedienteActionToast";
 import { useExpedienteActions } from "../../hooks/useExpedienteActions";
@@ -254,8 +256,96 @@ export default function ExpedienteDetallePage() {
   const slaResumen = usaResumen ? (resumen.data?.slaResumen ?? null) : null;
 
   const usuario = useAuthStore((s) => s.usuario);
-  const [modal, setModal] = useState<"derivacion" | "observacion" | "subsanacion" | "acumulacion" | "atender" | "archivar" | null>(null);
-  const puedeOperar = Boolean(usuario && ["ADMINISTRADOR", "DIRECTOR", "ESPECIALISTA", "SECRETARIO", "MESA_PARTES"].includes(usuario.rol));
+  const contextoActivo = useAuthStore((s) => s.contextoActivo);
+  const contextosDisponibles = useAuthStore((s) => s.contextosDisponibles);
+  const tieneMultiplesContextos = Boolean(contextosDisponibles && contextosDisponibles.length > 1);
+  const esContextoInstitucional =
+    usuario?.contexto === "INSTITUCIONAL" ||
+    (contextoActivo === "INSTITUCIONAL") ||
+    Boolean(usuario && usuario.rol !== "CIUDADANO" && !tieneMultiplesContextos);
+  // Regla PM-5H-25 / PM-5H-26: La comparación de autoatención debe ser estrictamente PERSONA_ID <-> PERSONA_ID
+  // sigd_tra.expediente.solicitante_id referencia sigd_auth.persona(id_persona). Nunca comparar con id_usuario.
+  const esTitular = Boolean(
+    usuario?.idPersona &&
+    detalleData?.solicitanteId &&
+    usuario.idPersona === detalleData.solicitanteId
+  );
+  const tieneRolOperativo = Boolean(
+    usuario && ["ADMINISTRADOR", "DIRECTOR", "ESPECIALISTA", "SECRETARIO", "MESA_PARTES"].includes(usuario.rol)
+  );
+  const puedeOperar = esContextoInstitucional && tieneRolOperativo && !esTitular;
+
+  // Regla PM-5H-21: Facultad de firma y resolución reservada a autoridad directiva/aprobador
+  const tieneFacultadFirmaResolucion = Boolean(
+    usuario &&
+    (usuario.rol === "DIRECTOR" ||
+     usuario.perfiles?.includes("APROBADOR_DIRECCION") ||
+     usuario.permisos?.includes("FIRMA_FIRMAR") ||
+     usuario.permisos?.includes("EXPEDIENTE_RESOLVER"))
+  );
+  const puedeResolver = puedeOperar && tieneFacultadFirmaResolucion;
+
+  // Regla PM-5H-21: Módulo y acciones financieras requieren perfil operativo explícito
+  const tieneCapacidadTesoreria = Boolean(
+    usuario &&
+    (usuario.rol === "TESORERIA" || usuario.perfiles?.includes("GESTOR_TESORERIA"))
+  );
+  const puedeGestionarDevoluciones = Boolean(
+    usuario &&
+    (usuario.rol === "MESA_PARTES" ||
+     usuario.perfiles?.includes("AUTORIZADOR_DEVOLUCION") ||
+     usuario.perfiles?.includes("GESTOR_RECEPCION_DOCUMENTAL"))
+  );
+
+  const [modal, setModal] = useState<"derivacion" | "observacion" | "subsanacion" | "acumulacion" | "atender" | "enviar-a-firma" | "resolver" | "archivar" | null>(null);
+  const [verRequisitos, setVerRequisitos] = useState(false);
+
+  const requisitosQuery = useQuery({
+    queryKey: ["tramites", id, "requisitos"],
+    queryFn: async ({ signal }) => {
+      const { apiClient } = await import("../../api/client");
+      const { data } = await apiClient.get<{
+        expedienteId: string;
+        totalRequisitos: number;
+        requisitosAplicables: number;
+        satisfechos: number;
+        pendientes: number;
+        observados: number;
+        noAplica: number;
+        porcentajeCumplimiento: number;
+        cumplimientoCompleto: boolean;
+        requisitos: Array<{
+          idRequisito: string;
+          codigo: string | null;
+          nombre: string;
+          descripcion: string | null;
+          tipoRequisito: string;
+          obligatorio: boolean;
+          aplica: boolean;
+          estado: string;
+          cumplido: boolean;
+          estadoHomologacion?: string;
+          proveniencia?: string;
+          anexo?: { codigo: string; nombre: string; nombreArchivo: string } | null;
+          evidencias: Array<{
+            idEvidencia: string;
+            tipoEvidencia: string;
+            estadoValidacion: string;
+            esSubsanacion: boolean;
+            evidenciaPreviaId: string | null;
+            observacion: string | null;
+            creadoEn: string;
+            documento?: { nombreArchivo: string } | null;
+            ordenPago?: { codigoPago: string; monto: number; estado: string } | null;
+          }>;
+        }>;
+      }>(`/api/v1/tramites/expedientes/${encodeURIComponent(id!)}/requisitos`, { signal });
+      return data;
+    },
+    enabled: Boolean(id) && verRequisitos,
+    retry: false,
+  });
+
   const unidadesQuery = useQuery({
     queryKey: ["organigrama", "areas-activas"],
     queryFn: async ({ signal }) => {
@@ -278,13 +368,13 @@ export default function ExpedienteDetallePage() {
         ["rutadoc", expId, "sla"],
         ["rutadoc", expId, "acumulaciones"],
         ["tramicore", expId, "tupa"],
+        ["tramites", expId, "requisitos"],
         ["rutadoc", "bandeja"],
       ]),
   });
 
-  const esTitular = Boolean(usuario?.idPersona && usuario.idPersona === detalleData?.solicitanteId);
   const rolSubsanacionInstitucional = Boolean(usuario && ["ADMINISTRADOR", "DIRECTOR", "MESA_PARTES"].includes(usuario.rol));
-  const tienePermisoSubsanacion = esTitular || rolSubsanacionInstitucional;
+  const tienePermisoSubsanacion = esTitular || (esContextoInstitucional && rolSubsanacionInstitucional);
   const puedeSubsanar = tienePermisoSubsanacion && detalleData?.estadoActual === "OBSERVADO";
 
   const refExpediente: ExpedienteAccionReferencia = {
@@ -671,11 +761,15 @@ export default function ExpedienteDetallePage() {
       nombre: "Derivar",
       tipo: "derivacion" as const,
       ayuda: !puedeOperar
-        ? "No cuenta con permisos para derivar este expediente."
+        ? esTitular
+          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
+          : !esContextoInstitucional && tieneMultiplesContextos
+            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
+            : "No cuenta con permisos para derivar este expediente."
         : bloqueadoPorPago
           ? "El expediente requiere pago confirmado en Tesorería antes de continuar."
           : "Derivar el expediente hacia otra unidad orgánica para su atención.",
-      habilitado: puedeOperar && !bloqueadoPorPago,
+      habilitado: puedeOperar && !bloqueadoPorPago && detalleData?.estadoActual !== "RESUELTO" && detalleData?.estadoActual !== "ARCHIVADO" && detalleData?.estadoActual !== "OBSERVADO",
       clase: "border-blue-800 bg-blue-800 text-white hover:bg-blue-900 focus-visible:outline-blue-700 shadow-xs",
     },
     {
@@ -683,8 +777,12 @@ export default function ExpedienteDetallePage() {
       tipo: "observacion" as const,
       ayuda: puedeOperar
         ? "Registrar pliego de observaciones formales para el administrado."
-        : "No cuenta con permisos para observar este expediente.",
-      habilitado: puedeOperar,
+        : esTitular
+          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
+          : !esContextoInstitucional && tieneMultiplesContextos
+            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
+            : "No cuenta con permisos para observar este expediente.",
+      habilitado: puedeOperar && detalleData?.estadoActual !== "RESUELTO" && detalleData?.estadoActual !== "ARCHIVADO",
       clase: "border-amber-700 bg-amber-700 text-white hover:bg-amber-800 focus-visible:outline-amber-700 shadow-xs",
     },
     {
@@ -699,25 +797,50 @@ export default function ExpedienteDetallePage() {
       clase: "border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 focus-visible:outline-emerald-700 shadow-xs",
     },
     {
-      nombre: "Atender",
-      tipo: "atender" as const,
+      nombre: "Enviar a Firma",
+      tipo: "enviar-a-firma" as const,
       ayuda: !puedeOperar
-        ? "No cuenta con permisos para atender este expediente."
-        : detalleData?.estadoActual !== "EN_REVISION" && detalleData?.estadoActual !== "DERIVADO"
-          ? "Solo se pueden atender expedientes en estado EN_REVISION o DERIVADO."
-          : "Emitir acto resolutivo formal y notificar a Casilla Electrónica.",
-      habilitado: puedeOperar && (detalleData?.estadoActual === "EN_REVISION" || detalleData?.estadoActual === "DERIVADO"),
+        ? esTitular
+          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
+          : !esContextoInstitucional && tieneMultiplesContextos
+            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
+            : "No cuenta con permisos para enviar a firma."
+        : detalleData?.estadoActual !== "EN_REVISION"
+          ? "Solo se puede enviar a firma cuando el expediente se encuentra EN_REVISION."
+          : "Elevar expediente evaluado a Despacho de Dirección para suscripción formal.",
+      habilitado: puedeOperar && detalleData?.estadoActual === "EN_REVISION",
+      clase: "border-violet-700 bg-violet-700 text-white hover:bg-violet-800 focus-visible:outline-violet-700 shadow-xs",
+    },
+    {
+      nombre: "Resolver con Firma",
+      tipo: "resolver" as const,
+      ayuda: !puedeResolver
+        ? esTitular
+          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
+          : !esContextoInstitucional && tieneMultiplesContextos
+            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
+            : !tieneFacultadFirmaResolucion
+              ? "No cuenta con facultades resolutivas institucionales."
+              : "No cuenta con facultades resolutivas institucionales."
+        : detalleData?.estadoActual !== "EN_FIRMA"
+          ? "Solo se pueden resolver expedientes en estado EN_FIRMA."
+          : "Emitir acto resolutivo formal suscrito y notificar a Casilla Electrónica.",
+      habilitado: puedeResolver && detalleData?.estadoActual === "EN_FIRMA",
       clase: "border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900 focus-visible:outline-emerald-700 shadow-xs",
     },
     {
       nombre: "Archivar",
       tipo: "archivar" as const,
-      ayuda: !Boolean(usuario && ["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "MESA_PARTES"].includes(usuario.rol))
-        ? "No cuenta con facultades para archivar formalmente el expediente."
+      ayuda: !puedeOperar
+        ? esTitular
+          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
+          : !esContextoInstitucional && tieneMultiplesContextos
+            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
+            : "No cuenta con facultades para archivar formalmente el expediente."
         : detalleData?.estadoActual !== "RESUELTO"
           ? "Solo se pueden archivar expedientes en estado RESUELTO."
           : "Registrar ubicación de inventario físico y archivar expediente.",
-      habilitado: Boolean(usuario && ["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "MESA_PARTES"].includes(usuario.rol)) && detalleData?.estadoActual === "RESUELTO",
+      habilitado: puedeOperar && detalleData?.estadoActual === "RESUELTO",
       clase: "border-amber-800 bg-amber-800 text-white hover:bg-amber-900 focus-visible:outline-amber-700 shadow-xs",
     },
     {
@@ -725,8 +848,12 @@ export default function ExpedienteDetallePage() {
       tipo: "acumulacion" as const,
       ayuda: puedeOperar
         ? "Acumular expedientes conexos bajo este expediente principal (Art. 160 LPAG)."
-        : "No cuenta con permisos para acumular este expediente.",
-      habilitado: puedeOperar,
+        : esTitular
+          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
+          : !esContextoInstitucional && tieneMultiplesContextos
+            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
+            : "No cuenta con permisos para acumular este expediente.",
+      habilitado: puedeOperar && detalleData?.estadoActual !== "ARCHIVADO",
       clase: "border-slate-700 bg-slate-700 text-white hover:bg-slate-800 focus-visible:outline-slate-700 shadow-xs",
     },
   ];
@@ -766,11 +893,8 @@ export default function ExpedienteDetallePage() {
     if (detalleData?.estadoActual === "DERIVADO" || detalleData?.estadoActual === "EN_REVISION" || detalleData?.estadoActual === "RESUELTO") {
       return resolverNombreArea(detalleData.areaActualId);
     }
-    if (tupaResumen?.codigo === "p1-fila-06" || tupaResumen?.denominacion?.toLowerCase().includes("inglés")) {
-      return "Subdirección Académica (SDA)";
-    }
     return "Mesa de Partes";
-  }, [detalleData, tupaResumen, unidadesQuery.data]);
+  }, [detalleData, unidadesQuery.data]);
 
   const responsableActual = useMemo(() => {
     if (detalleData?.estadoActual === "ARCHIVADO") {
@@ -780,10 +904,10 @@ export default function ExpedienteDetallePage() {
       return "Secretario Académico / Director";
     }
     if (detalleData?.estadoActual === "EN_REVISION") {
-      return "Especialista Académico (SDA)";
+      return "Especialista asignado";
     }
     if (detalleData?.estadoActual === "DERIVADO") {
-      return "Jefatura / Mesa de Entrada SDA";
+      return "Mesa de entrada / Despacho de área receptora";
     }
     return "Operador de Mesa de Partes";
   }, [detalleData]);
@@ -799,7 +923,9 @@ export default function ExpedienteDetallePage() {
       return "Expediente recepcionado y en calificación técnica";
     }
     if (detalleData?.estadoActual === "DERIVADO") {
-      return "Derivado formalmente a Subdirección Académica";
+      return detalleData?.areaActualId
+        ? `Derivado formalmente a ${resolverNombreArea(detalleData.areaActualId)}`
+        : "Derivado formalmente a la unidad orgánica correspondiente";
     }
     if (pagoConfirmado) {
       return "Pago de derecho verificado y confirmado por Tesorería";
@@ -821,10 +947,12 @@ export default function ExpedienteDetallePage() {
       return "Evaluar expediente y emitir documento de resolución";
     }
     if (detalleData?.estadoActual === "DERIVADO") {
-      return "Confirmar recepción formal en Subdirección Académica";
+      return detalleData?.areaActualId
+        ? `Confirmar recepción formal en ${resolverNombreArea(detalleData.areaActualId)}`
+        : "Confirmar recepción formal en la unidad correspondiente";
     }
     if (pagoConfirmado) {
-      return "Derivar expediente a Subdirección Académica";
+      return "Derivar expediente a área técnica competente";
     }
     if (bloqueadoPorPago) {
       return "Esperar confirmación de pago en Tesorería";
@@ -832,15 +960,11 @@ export default function ExpedienteDetallePage() {
     return "Derivar expediente a área técnica competente";
   }, [detalleData, pagoConfirmado, bloqueadoPorPago]);
 
-  // Destino sugerido según TUPA
-  const esTramiteSDA = Boolean(
-    tupaResumen?.codigo === "p1-fila-06" ||
-    tupaResumen?.denominacion?.toLowerCase().includes("inglés") ||
-    tupaResumen?.clasificacion === "PROCEDIMIENTO_APROBADO" ||
-    tupaResumen?.clasificacion === "SERVICIO_ACADEMICO"
-  );
-  const destinoSugeridoId = esTramiteSDA ? "a0000000-0000-0000-0000-000000000001" : undefined;
-  const destinoSugeridoNombre = esTramiteSDA ? "Subdirección Académica" : undefined;
+  // Regla PM-5H-23 / PM-5H-24: Solo sugerir destino si proviene de configuración explícita verificable
+  const destinoSugeridoId = tupaResumen?.unidadResponsableId ?? undefined;
+  const destinoSugeridoNombre =
+    tupaResumen?.unidadResponsableNombre ??
+    (destinoSugeridoId ? resolverNombreArea(destinoSugeridoId) : undefined);
 
   const estadoInfo = humanizarEstado(detalleData?.estadoActual);
   const cantidadDocs = foliacionResumen?.cantidadDocumentos ?? detalleData?.resumenDocumentos?.cantidadDocumentos ?? documentosAdjuntos.length ?? 0;
@@ -852,12 +976,39 @@ export default function ExpedienteDetallePage() {
       {/* 1. Volver a la bandeja */}
       <nav aria-label="Navegación secundaria">
         <Link
-          to="/expedientes"
+          to={contextoActivo === "PERSONAL" ? "/mis-expedientes" : "/expedientes"}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-800 hover:text-blue-900 underline transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
         >
-          ← Volver a la bandeja
+          {contextoActivo === "PERSONAL" ? "← Volver a Mis Expedientes" : "← Volver a la bandeja"}
         </Link>
       </nav>
+
+      {/* BANNER DE AUTOATENCIÓN PROHIBIDA (REGLA 49) */}
+      {esTitular && (
+        <aside aria-label="Aviso de autoatención prohibida" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 sm:p-5 flex items-start gap-3 shadow-xs">
+          <span className="text-xl shrink-0" aria-hidden="true">🛡️</span>
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-amber-950 uppercase tracking-wide">
+              Autoatención no permitida (Titular del expediente)
+            </h3>
+            <p className="text-xs text-amber-900">
+              Usted es el titular o administrado solicitante de este expediente. Conforme a las normas de probidad y el sistema de control institucional (Regla 49), las facultades operativas de derivación, calificación, resolución o archivo sobre este trámite quedan inhabilitadas para evitar conflicto de interés.
+            </p>
+          </div>
+        </aside>
+      )}
+
+      {/* BANNER DE MODO PERSONAL */}
+      {!esContextoInstitucional && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3 sm:p-4 text-xs text-blue-900 flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2">
+            <span>👤</span>
+            <span>
+              Vista en <strong>Modo Personal</strong>: Está consultando el expediente como administrado. Las acciones de gestión interna institucional están reservadas para el portal institucional.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Manejo de estado de carga y error principal */}
       <RutaDocEstado
@@ -1043,7 +1194,7 @@ export default function ExpedienteDetallePage() {
                       </p>
                       {destinoSugeridoNombre && (
                         <p className="text-xs font-bold text-emerald-800 pt-0.5">
-                          💡 Destino sugerido: <span className="underline">{destinoSugeridoNombre}</span> ({tupaResumen?.codigo || "p1-fila-06"})
+                          💡 Destino sugerido institucional: <span className="underline">{destinoSugeridoNombre}</span>
                         </p>
                       )}
                     </div>
@@ -1464,76 +1615,187 @@ export default function ExpedienteDetallePage() {
                 )}
               </section>
 
-              {/* 5. CHECKLIST OPERACIONAL (REVISIÓN DEL EXPEDIENTE) */}
-              <section aria-label="Revisión operacional" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-3">
-                <div className="border-b border-slate-100 pb-2">
-                  <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide">
-                    Revisión del expediente
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Control operacional rápido de requisitos iniciales para Mesa de Partes
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-emerald-600 font-bold text-sm">✓</span>
-                    <div>
-                      <span className="font-semibold text-slate-800 block">Solicitante identificado</span>
-                      <span className="text-slate-500">
-                        {solicitanteResumen?.nombreCompleto ? formatoNombre(solicitanteResumen.nombreCompleto) : "Identidad certificada"}
+              {/* 5. REQUISITOS TUPA Y EVIDENCIAS DE TRAMITACIÓN */}
+              <section aria-label="Requisitos del procedimiento" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide">
+                      Requisitos del Procedimiento
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Cumplimiento normativo, evidencias presentadas y control de homologación institucional
+                    </p>
+                  </div>
+                  {!verRequisitos ? (
+                    <button
+                      type="button"
+                      onClick={() => setVerRequisitos(true)}
+                      className="rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 px-3.5 py-1.5 text-xs font-semibold text-slate-700 transition"
+                    >
+                      Consultar requisitos y evidencias →
+                    </button>
+                  ) : requisitosQuery.data ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-700">
+                        {requisitosQuery.data.satisfechos} de {requisitosQuery.data.requisitosAplicables} requisitos satisfechos
+                      </span>
+                      <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800">
+                        {requisitosQuery.data.porcentajeCumplimiento}%
                       </span>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-emerald-600 font-bold text-sm">✓</span>
-                    <div>
-                      <span className="font-semibold text-slate-800 block">Procedimiento TUPA identificado</span>
-                      <span className="text-slate-500">
-                        {tupaResumen?.denominacion ? `Vinculado: ${tupaResumen.codigo || 'TUPA'}` : "Trámite identificado"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-emerald-600 font-bold text-sm">✓</span>
-                    <div>
-                      <span className="font-semibold text-slate-800 block">Documento recibido</span>
-                      <span className="text-slate-500">
-                        {documentosAdjuntos.length} {documentosAdjuntos.length === 1 ? 'documento presentado' : 'documentos presentados'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className={esFoliadoCompleto ? "text-emerald-600 font-bold text-sm" : "text-amber-500 font-bold text-sm"}>
-                      {esFoliadoCompleto ? "✓" : "○"}
-                    </span>
-                    <div>
-                      <span className="font-semibold text-slate-800 block">
-                        {esFoliadoCompleto ? "Foliación completa" : "Pendiente de foliación"}
-                      </span>
-                      <span className="text-slate-500">
-                        {foliosAsignados} folios asignados formalmente
-                      </span>
-                    </div>
-                  </div>
+                  ) : null}
                 </div>
 
-                {tupaResumen && (
-                  <div className="pt-1 text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100">
-                    <span>
-                      {tupaResumen.costo > 0
-                        ? `Arancel TUPA: S/ ${tupaResumen.costo.toFixed(2)}`
-                        : "Trámite gratuito (Exento de arancel institucional)"}
-                    </span>
-                    <span className={bloqueadoPorPago ? "text-amber-700 font-semibold" : "text-emerald-700 font-semibold"}>
-                      {bloqueadoPorPago
-                        ? "⚠ Requiere pago confirmado antes de derivación"
-                        : tieneCostoTupa
-                          ? "✓ Arancel confirmado por Tesorería"
-                          : "✓ Trámite gratuito sin arancel"}
-                    </span>
+                {/* Barra de progreso de requisitos */}
+                {verRequisitos && requisitosQuery.data && (
+                  <div className="space-y-1">
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          requisitosQuery.data.cumplimientoCompleto ? "bg-emerald-600" : "bg-blue-600"
+                        }`}
+                        style={{ width: `${Math.min(Math.max(requisitosQuery.data.porcentajeCumplimiento, 0), 100)}%` }}
+                        aria-valuenow={requisitosQuery.data.porcentajeCumplimiento}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        role="progressbar"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 text-right">
+                      {requisitosQuery.data.cumplimientoCompleto
+                        ? "✓ Todos los requisitos homologados satisfechos"
+                        : `${requisitosQuery.data.pendientes} requisito(s) pendiente(s)`}
+                    </p>
+                  </div>
+                )}
+
+                {/* Lista de Requisitos */}
+                {!verRequisitos ? (
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+                    <div>
+                      <p className="font-semibold text-slate-800">Evaluación de requisitos normativos TUPA</p>
+                      <p className="text-slate-500">Consulte el estado detallado de homologación, documentos y evidencias presentadas.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setVerRequisitos(true)}
+                      className="shrink-0 rounded-xl bg-blue-800 hover:bg-blue-900 px-3.5 py-2 text-xs font-bold text-white transition shadow-xs"
+                    >
+                      Ver requisitos completos
+                    </button>
+                  </div>
+                ) : requisitosQuery.isPending ? (
+                  <div className="p-4 text-center text-xs text-slate-500 animate-pulse">
+                    Cargando requisitos del procedimiento...
+                  </div>
+                ) : requisitosQuery.data?.requisitos && requisitosQuery.data.requisitos.length > 0 ? (
+                  <div className="space-y-3">
+                    {requisitosQuery.data.requisitos.map((req, idx) => (
+                      <div
+                        key={req.idRequisito || idx}
+                        className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-2.5"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${req.cumplido ? "bg-emerald-500" : "bg-amber-500"}`} />
+                            <span className="text-xs font-bold text-slate-900">
+                              {req.nombre}
+                            </span>
+                            {req.obligatorio && (
+                              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                                Obligatorio
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {/* Homologación Badge */}
+                            {req.estadoHomologacion === "HOMOLOGADO" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                ✓ Oficial Homologado
+                              </span>
+                            ) : (
+                              <span
+                                title="Configuración pendiente de validación institucional — No bloquea la tramitación"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-300"
+                              >
+                                ⚠ Configuración pendiente de validación institucional — No bloquea la tramitación
+                              </span>
+                            )}
+                            {/* Estado Validación */}
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${
+                                req.estado === "VALIDADO" || req.estado === "PRESENTADO" || req.estado === "SUBSANADO"
+                                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                  : req.estado === "OBSERVADO"
+                                    ? "bg-rose-50 text-rose-800 border border-rose-200"
+                                    : "bg-slate-100 text-slate-700 border border-slate-300"
+                              }`}
+                            >
+                              {req.estado === "VALIDADO"
+                                ? "Validado"
+                                : req.estado === "PRESENTADO"
+                                  ? "Presentado"
+                                  : req.estado === "SUBSANADO"
+                                    ? "Subsanado"
+                                    : req.estado === "OBSERVADO"
+                                      ? "Observado"
+                                      : "Pendiente"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {req.descripcion && (
+                          <p className="text-xs text-slate-600 pl-4">{req.descripcion}</p>
+                        )}
+
+                        {/* Historial de Evidencias */}
+                        {req.evidencias && req.evidencias.length > 0 && (
+                          <div className="pl-4 pt-1 space-y-1.5 border-t border-slate-200/60">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                              Historial de Evidencias Presentadas ({req.evidencias.length})
+                            </span>
+                            <div className="space-y-1">
+                              {req.evidencias.map((evid, eIdx) => (
+                                <div
+                                  key={evid.idEvidencia || eIdx}
+                                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs p-2 rounded-lg bg-white border border-slate-200 gap-1.5"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-slate-800">
+                                      {evid.esSubsanacion ? `Subsanación #${eIdx + 1}` : `Evidencia Inicial #${eIdx + 1}`}
+                                    </span>
+                                    {evid.documento?.nombreArchivo && (
+                                      <span className="text-slate-600 font-mono text-[11px]">
+                                        📄 {evid.documento.nombreArchivo}
+                                      </span>
+                                    )}
+                                    {evid.ordenPago && (
+                                      <span className="text-slate-600 font-mono text-[11px]">
+                                        💳 Recibo {evid.ordenPago.codigoPago} (S/ {evid.ordenPago.monto.toFixed(2)}) - {evid.ordenPago.estado}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {evid.observacion && (
+                                      <span className="text-amber-800 italic text-[11px]">
+                                        "{evid.observacion}"
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-slate-400">
+                                      {formatearFechaLarga(evid.creadoEn)}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-500">
+                    No se registran requisitos específicos asociados al procedimiento de este expediente.
                   </div>
                 )}
               </section>
@@ -1901,7 +2163,7 @@ export default function ExpedienteDetallePage() {
                                   </button>
                                 )}
 
-                                {(usuario?.rol === "MESA_PARTES" || usuario?.rol === "ADMINISTRADOR") && (
+                                {puedeGestionarDevoluciones && (
                                   <>
                                     {dev.estado === "SOLICITADA" && (
                                       <button
@@ -1940,7 +2202,7 @@ export default function ExpedienteDetallePage() {
                                   </>
                                 )}
 
-                                {dev.estado === "PENDIENTE_TESORERIA" && (usuario?.rol === "TESORERIA" || usuario?.rol === "ADMINISTRADOR") && (
+                                {dev.estado === "PENDIENTE_TESORERIA" && tieneCapacidadTesoreria && (
                                   <Link
                                     to="/tesoreria"
                                     className="rounded-lg bg-teal-800 px-3 py-1 text-xs font-bold text-white hover:bg-teal-900 shadow-xs"
@@ -2282,6 +2544,18 @@ export default function ExpedienteDetallePage() {
             onClose={() => setModal(null)}
             expediente={refExpediente}
             accion={acciones.atencion}
+          />
+          <EnviarAFirmaModal
+            open={modal === "enviar-a-firma"}
+            onClose={() => setModal(null)}
+            expediente={refExpediente}
+            accion={acciones.enviarAFirma}
+          />
+          <ResolverModal
+            open={modal === "resolver"}
+            onClose={() => setModal(null)}
+            expediente={refExpediente}
+            accion={acciones.resolver}
           />
           <ArchivadoModal
             open={modal === "archivar"}

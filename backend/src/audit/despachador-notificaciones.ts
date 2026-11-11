@@ -13,6 +13,8 @@ const EVENTOS_CASILLA = new Set([
   'expediente_observado',
   'expediente_resuelto',
   'resolucion_emitida',
+  'ExpedienteAtendido',
+  'ExpedienteObservado',
 ]);
 
 export interface DestinoSseOptions {
@@ -85,19 +87,189 @@ export class DestinoCasilla implements DestinoNotificacion {
     if (!(await this.disponible())) return;
 
     const payload = (evento.payload ?? {}) as Record<string, unknown>;
+    const datosEsp = (payload.datos_especificos ?? {}) as Record<string, unknown>;
+    const identidad = (payload.identidad ?? {}) as Record<string, unknown>;
+
+    const cut = (typeof payload.cut === 'string' ? payload.cut : null)
+      ?? (typeof datosEsp.cut === 'string' ? datosEsp.cut : null)
+      ?? (typeof datosEsp.codigo_expediente === 'string' ? datosEsp.codigo_expediente : null)
+      ?? (typeof identidad.codigo_expediente === 'string' ? identidad.codigo_expediente : null);
+
+    let personaId = (typeof payload.persona_id === 'string' ? payload.persona_id : null)
+      ?? (typeof payload.solicitante_id === 'string' ? payload.solicitante_id : null)
+      ?? (typeof datosEsp.persona_id === 'string' ? datosEsp.persona_id : null)
+      ?? (typeof identidad.persona_id === 'string' ? identidad.persona_id : null);
+
+    let usuarioId = (typeof payload.usuario_id === 'string' ? payload.usuario_id : null)
+      ?? (typeof identidad.usuario_id === 'string' ? identidad.usuario_id : null);
+
+    const correo = typeof payload.correo_destinatario === 'string' ? payload.correo_destinatario : null;
+
+    // Validación fail-closed de evento notificable (Sección 13 y 14 / TC-5K-14)
+    // Para un evento que ES notificable pero carece de destinatario resoluble: lanzar error para dead-letter/retry
+    if (!correo && !usuarioId && !personaId && !cut) {
+      throw new Error(
+        `[DestinoCasilla] Evento notificable '${evento.tipo_evento}' (${evento.id_evento}) carece de destinatario resoluble (cut, persona_id, usuario_id o correo).`,
+      );
+    }
+
+    // Resolución de usuario_id activo si la persona tiene cuenta (Sección 8, 9, 10 / TC-5K-06, TC-5K-07)
+    if (personaId && !usuarioId) {
+      try {
+        const resCuenta = await this.pool.query<{ id_usuario: string }>(
+          `SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_persona = $1::uuid AND activo = true ORDER BY creado_en DESC LIMIT 1`,
+          [personaId],
+        );
+        if (resCuenta.rows.length > 0 && resCuenta.rows[0].id_usuario) {
+          usuarioId = resCuenta.rows[0].id_usuario;
+        }
+      } catch {
+        // En caso de error de consulta auxiliar, continuar con usuarioId = null
+      }
+    }
+
+    // Clave de idempotencia canónica e inequívoca basada directamente en el evento inmutable (Sección 6 / 5K.2)
+    const idempotencyKey = `notif:${evento.id_evento}:casilla`;
+
+    // 1. Idempotencia: Verificar si ya existe una entrada con esta clave
+    const existente = await this.pool.query<{ id: string }>(
+      `SELECT id FROM ${this.tabla} WHERE idempotency_key = $1`,
+      [idempotencyKey],
+    ).catch(() => ({ rows: [] }));
+    if (existente.rows.length > 0) {
+      return; // Ya despachado, no duplicar entrada en casillero
+    }
+
+    // Sanitización estricta de privacidad (Ley 29733 / Sección 7 y 41 / TC-5K-10)
+    const cuerpoParaCasilla = { ...payload };
+    delete cuerpoParaCasilla.observacion_interna;
+    delete cuerpoParaCasilla.nota_interna;
+    delete cuerpoParaCasilla.deliberacion;
+    delete cuerpoParaCasilla.comentarios_privados;
+    if (cuerpoParaCasilla.datos_especificos && typeof cuerpoParaCasilla.datos_especificos === 'object') {
+      const de = { ...(cuerpoParaCasilla.datos_especificos as Record<string, unknown>) };
+      delete de.observacion_interna;
+      delete de.nota_interna;
+      cuerpoParaCasilla.datos_especificos = de;
+    }
+
+    let tipoActo = typeof payload.tipo_acto === 'string' ? payload.tipo_acto : 'RESOLUCION';
+    if (evento.tipo_evento === 'ExpedienteObservado' || evento.tipo_evento === 'expediente_observado') {
+      tipoActo = 'NOTIFICACION_OBSERVACION';
+    }
+
+    const asunto = typeof payload.asunto === 'string'
+      ? payload.asunto
+      : (tipoActo === 'RESOLUCION' ? `Resolución de Trámite: ${cut ?? ''}`.trim() : `Notificación de trámite ${cut ?? ''}`.trim());
+
+    const documentoUrl = typeof payload.documento_url === 'string' ? payload.documento_url : null;
+    const cvd = typeof payload.cvd === 'string' ? payload.cvd : null;
+    const hashSha256 = typeof payload.sha256 === 'string' ? payload.sha256 : null;
+
+    const insertRes = await this.pool.query<{ id: string }>(
+      `INSERT INTO ${this.tabla} (
+         usuario_id, persona_id, correo_destinatario, cut, asunto, tipo_acto,
+         cuerpo, referencia, estado, fecha_deposito, idempotency_key, documento_url, cvd, hash_sha256
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, 'PUESTA_A_DISPOSICION', now(), $9, $10, $11, $12)
+       RETURNING id`,
+      [
+        usuarioId,
+        personaId,
+        correo,
+        cut,
+        asunto,
+        tipoActo,
+        JSON.stringify(cuerpoParaCasilla),
+        evento.correlation_id ?? evento.id_evento,
+        idempotencyKey,
+        documentoUrl,
+        cvd,
+        hashSha256,
+      ],
+    ).catch(async (err: any) => {
+      if (err?.code === '23505' || String(err?.message).includes('idempotency')) {
+        return { rows: [] };
+      }
+      // Fallback si columnas cvd o hash_sha256 no existieran
+      return this.pool.query<{ id: string }>(
+        `INSERT INTO ${this.tabla} (
+           usuario_id, persona_id, correo_destinatario, cut, asunto, tipo_acto,
+           cuerpo, referencia, estado, fecha_deposito, idempotency_key, documento_url
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, 'PUESTA_A_DISPOSICION', now(), $9, $10)
+         RETURNING id`,
+        [
+          usuarioId,
+          personaId,
+          correo,
+          cut,
+          asunto,
+          tipoActo,
+          JSON.stringify(cuerpoParaCasilla),
+          evento.correlation_id ?? evento.id_evento,
+          idempotencyKey,
+          documentoUrl,
+        ],
+      ).catch((fallbackErr: any) => {
+        if (fallbackErr?.code === '23505' || String(fallbackErr?.message).includes('idempotency')) {
+          return { rows: [] };
+        }
+        throw fallbackErr;
+      });
+    });
+
+    const notifId = insertRes.rows[0]?.id;
+    if (notifId) {
+      await this.pool.query(
+        `INSERT INTO sigd_auth.notificacion_trazabilidad_evento (
+           notificacion_id, tipo_evento, canal, estado, detalles, registrado_en
+         ) VALUES ($1, 'PUESTA_A_DISPOSICION', 'CASILLA', 'REGISTRADO', $2::jsonb, now())`,
+        [notifId, JSON.stringify({ eventoId: evento.id_evento, correlationId: evento.correlation_id })],
+      );
+    }
+  }
+}
+
+
+export class DestinoEmail implements DestinoNotificacion {
+  readonly nombre = 'email';
+  private readonly pool: Pool;
+
+  constructor(pool: Pool) {
+    this.pool = pool;
+  }
+
+  async despachar(evento: EventoPendiente): Promise<void> {
+    const payload = (evento.payload ?? {}) as Record<string, unknown>;
     const correo = typeof payload.correo_destinatario === 'string' ? payload.correo_destinatario : null;
     if (!correo) return;
 
-    await this.pool.query(
-      `INSERT INTO ${this.tabla} (correo_destinatario, asunto, cuerpo, referencia, estado)
-       VALUES ($1, $2, $3::jsonb, $4, 'PENDIENTE')`,
-      [
-        correo,
-        typeof payload.asunto === 'string' ? payload.asunto : evento.tipo_evento,
-        JSON.stringify(payload),
-        evento.correlation_id ?? evento.id_evento,
-      ],
-    );
+    // Comprobar infraestructura SMTP
+    const smtpHost = process.env.SMTP_HOST;
+    if (!smtpHost) {
+      // Fallo de email NO revierte la resolución ni el negocio (PM-5J-16)
+      // Registro explícito EMAIL_PROVIDER_NO_CONFIGURADO sin fake success (PM-5J-17)
+      console.warn(`[OUTBOX_EMAIL] Proveedor de correo no configurado (EMAIL_PROVIDER_NO_CONFIGURADO). Destinatario: ${correo}`);
+
+      const notifRes = await this.pool.query<{ id: string }>(
+        `SELECT id FROM sigd_auth.notificacion_casilla
+          WHERE (cut = $1 OR correo_destinatario = $2)
+          ORDER BY fecha_deposito DESC LIMIT 1`,
+        [payload.cut ?? '', correo],
+      ).catch(() => ({ rows: [] }));
+
+      if (notifRes.rows[0]?.id) {
+        await this.pool.query(
+          `INSERT INTO sigd_auth.notificacion_trazabilidad_evento (
+             notificacion_id, tipo_evento, canal, estado, detalles
+           ) VALUES ($1, 'INTENTO_ENVIO_EMAIL', 'EMAIL', 'EMAIL_PROVIDER_NO_CONFIGURADO', $2::jsonb)`,
+          [
+            notifRes.rows[0].id,
+            JSON.stringify({ destinatario: correo, motivo: 'EMAIL_PROVIDER_NO_CONFIGURADO' }),
+          ],
+        ).catch(() => undefined);
+      }
+      return;
+    }
   }
 }
 
@@ -156,5 +328,6 @@ export function crearDespachadorPorDefecto(
   return new DespachadorNotificaciones([
     new DestinoSse(bus, bridge),
     new DestinoCasilla(pool),
+    new DestinoEmail(pool),
   ]);
 }

@@ -216,8 +216,10 @@ export class OrganizacionRepository {
     const res = await c.query(
       `SELECT a.id_asignacion::text AS "idAsignacion",
               a.id_usuario::text AS "idUsuario",
+              a.id_persona::text AS "idPersona",
+              a.id_vinculo::text AS "idVinculo",
               u.usuario AS "usuarioUsername",
-              TRIM(CONCAT(p.nombres, ' ', p.primer_apellido, ' ', COALESCE(p.segundo_apellido, ''))) AS "usuarioNombre",
+              COALESCE(pn.nombre_completo, pj.razon_social, u.usuario, 'Sin cuenta asignada') AS "usuarioNombre",
               a.cargo_id::text AS "cargoId",
               cg.codigo AS "cargoCodigo",
               cg.nombre AS "cargoNombre",
@@ -237,8 +239,10 @@ export class OrganizacionRepository {
               a.creado_en AS "creadoEn",
               a.actualizado_en AS "actualizadoEn"
          FROM sigd_org.asignacion_personal a
-         JOIN sigd_auth.cuenta_usuario u ON u.id_usuario = a.id_usuario
-         JOIN sigd_auth.persona p ON p.id_persona = u.id_persona
+         LEFT JOIN sigd_auth.cuenta_usuario u ON u.id_usuario = a.id_usuario
+         JOIN sigd_auth.persona p ON p.id_persona = COALESCE(a.id_persona, u.id_persona)
+         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = p.id_persona
          JOIN sigd_org.cargo cg ON cg.cargo_id = a.cargo_id
          JOIN sigd_org.area ar ON ar.area_id = a.area_id
         WHERE a.id_asignacion = $1::uuid`,
@@ -278,8 +282,10 @@ export class OrganizacionRepository {
     const sql = `
       SELECT a.id_asignacion::text AS "idAsignacion",
              a.id_usuario::text AS "idUsuario",
+             a.id_persona::text AS "idPersona",
+             a.id_vinculo::text AS "idVinculo",
              u.usuario AS "usuarioUsername",
-             TRIM(CONCAT(p.nombres, ' ', p.primer_apellido, ' ', COALESCE(p.segundo_apellido, ''))) AS "usuarioNombre",
+             COALESCE(pn.nombre_completo, pj.razon_social, u.usuario, 'Sin cuenta asignada') AS "usuarioNombre",
              a.cargo_id::text AS "cargoId",
              cg.codigo AS "cargoCodigo",
              cg.nombre AS "cargoNombre",
@@ -299,8 +305,10 @@ export class OrganizacionRepository {
              a.creado_en AS "creadoEn",
              a.actualizado_en AS "actualizadoEn"
         FROM sigd_org.asignacion_personal a
-        JOIN sigd_auth.cuenta_usuario u ON u.id_usuario = a.id_usuario
-        JOIN sigd_auth.persona p ON p.id_persona = u.id_persona
+        LEFT JOIN sigd_auth.cuenta_usuario u ON u.id_usuario = a.id_usuario
+        JOIN sigd_auth.persona p ON p.id_persona = COALESCE(a.id_persona, u.id_persona)
+        LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+        LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = p.id_persona
         JOIN sigd_org.cargo cg ON cg.cargo_id = a.cargo_id
         JOIN sigd_org.area ar ON ar.area_id = a.area_id
        ${where}
@@ -313,7 +321,9 @@ export class OrganizacionRepository {
   async insertarAsignacion(
     c: PoolClient,
     datos: {
-      idUsuario: string;
+      idUsuario?: string | null;
+      idPersona?: string | null;
+      idVinculo?: string | null;
       cargoId: string;
       areaId: string;
       vigenteDesde: Date;
@@ -326,12 +336,14 @@ export class OrganizacionRepository {
   ): Promise<AsignacionPersonalModel> {
     const res = await c.query(
       `INSERT INTO sigd_org.asignacion_personal (
-         id_usuario, cargo_id, area_id, vigente_desde, vigente_hasta,
+         id_usuario, id_persona, id_vinculo, cargo_id, area_id, vigente_desde, vigente_hasta,
          estado, tipo_documento_sustento, numero_documento_sustento, fecha_documento_sustento
-       ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, 'ACTIVO', $6, $7, $8)
+       ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, $6, $7, 'ACTIVO', $8, $9, $10)
        RETURNING id_asignacion::text AS "idAsignacion"`,
       [
-        datos.idUsuario,
+        datos.idUsuario ?? null,
+        datos.idPersona ?? null,
+        datos.idVinculo ?? null,
         datos.cargoId,
         datos.areaId,
         datos.vigenteDesde,
@@ -403,10 +415,10 @@ export class OrganizacionRepository {
               r.tipo_responsabilidad AS "tipoResponsabilidad",
               r.id_usuario::text AS "idUsuario",
               u.usuario AS "usuarioUsername",
-              TRIM(CONCAT(p.nombres, ' ', p.primer_apellido, ' ', COALESCE(p.segundo_apellido, ''))) AS "usuarioNombre",
+              COALESCE(pn.nombre_completo, pj.razon_social, u.usuario, 'Sin cuenta asignada') AS "usuarioNombre",
               r.titular_usuario_id::text AS "titularUsuarioId",
               ut.usuario AS "titularUsername",
-              TRIM(CONCAT(pt.nombres, ' ', pt.primer_apellido, ' ', COALESCE(pt.segundo_apellido, ''))) AS "titularNombre",
+              COALESCE(pnt.nombre_completo, ut.usuario, 'Sin titular asignado') AS "titularNombre",
               r.cargo_id::text AS "cargoId",
               cg.codigo AS "cargoCodigo",
               cg.nombre AS "cargoNombre",
@@ -428,10 +440,13 @@ export class OrganizacionRepository {
               r.creado_en AS "creadoEn",
               r.actualizado_en AS "actualizadoEn"
          FROM sigd_org.responsabilidad_temporal r
-         JOIN sigd_auth.cuenta_usuario u ON u.id_usuario = r.id_usuario
-         JOIN sigd_auth.persona p ON p.id_persona = u.id_persona
+         LEFT JOIN sigd_auth.cuenta_usuario u ON u.id_usuario = r.id_usuario
+         JOIN sigd_auth.persona p ON p.id_persona = COALESCE(r.id_persona, u.id_persona)
+         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = p.id_persona
          LEFT JOIN sigd_auth.cuenta_usuario ut ON ut.id_usuario = r.titular_usuario_id
-         LEFT JOIN sigd_auth.persona pt ON pt.id_persona = ut.id_persona
+         LEFT JOIN sigd_auth.persona pt ON pt.id_persona = COALESCE(r.titular_persona_id, ut.id_persona)
+         LEFT JOIN sigd_auth.persona_natural pnt ON pnt.id_persona = pt.id_persona
          JOIN sigd_org.cargo cg ON cg.cargo_id = r.cargo_id
          JOIN sigd_org.area ar ON ar.area_id = r.area_id
         WHERE r.id_responsabilidad = $1::uuid`,
@@ -478,10 +493,10 @@ export class OrganizacionRepository {
              r.tipo_responsabilidad AS "tipoResponsabilidad",
              r.id_usuario::text AS "idUsuario",
              u.usuario AS "usuarioUsername",
-             TRIM(CONCAT(p.nombres, ' ', p.primer_apellido, ' ', COALESCE(p.segundo_apellido, ''))) AS "usuarioNombre",
+             COALESCE(pn.nombre_completo, pj.razon_social, u.usuario, 'Sin cuenta asignada') AS "usuarioNombre",
              r.titular_usuario_id::text AS "titularUsuarioId",
              ut.usuario AS "titularUsername",
-             TRIM(CONCAT(pt.nombres, ' ', pt.primer_apellido, ' ', COALESCE(pt.segundo_apellido, ''))) AS "titularNombre",
+             COALESCE(pnt.nombre_completo, ut.usuario, 'Sin titular asignado') AS "titularNombre",
              r.cargo_id::text AS "cargoId",
              cg.codigo AS "cargoCodigo",
              cg.nombre AS "cargoNombre",
@@ -503,10 +518,13 @@ export class OrganizacionRepository {
              r.creado_en AS "creadoEn",
              r.actualizado_en AS "actualizadoEn"
         FROM sigd_org.responsabilidad_temporal r
-        JOIN sigd_auth.cuenta_usuario u ON u.id_usuario = r.id_usuario
-        JOIN sigd_auth.persona p ON p.id_persona = u.id_persona
+        LEFT JOIN sigd_auth.cuenta_usuario u ON u.id_usuario = r.id_usuario
+        JOIN sigd_auth.persona p ON p.id_persona = COALESCE(r.id_persona, u.id_persona)
+        LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+        LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = p.id_persona
         LEFT JOIN sigd_auth.cuenta_usuario ut ON ut.id_usuario = r.titular_usuario_id
-        LEFT JOIN sigd_auth.persona pt ON pt.id_persona = ut.id_persona
+        LEFT JOIN sigd_auth.persona pt ON pt.id_persona = COALESCE(r.titular_persona_id, ut.id_persona)
+        LEFT JOIN sigd_auth.persona_natural pnt ON pnt.id_persona = pt.id_persona
         JOIN sigd_org.cargo cg ON cg.cargo_id = r.cargo_id
         JOIN sigd_org.area ar ON ar.area_id = r.area_id
        ${where}
@@ -520,8 +538,10 @@ export class OrganizacionRepository {
     c: PoolClient,
     datos: {
       tipoResponsabilidad: string;
-      idUsuario: string;
+      idUsuario?: string | null;
+      idPersona?: string | null;
       titularUsuarioId?: string | null;
+      titularPersonaId?: string | null;
       cargoId: string;
       areaId: string;
       vigenteDesde: Date;
@@ -535,15 +555,17 @@ export class OrganizacionRepository {
   ): Promise<ResponsabilidadTemporalModel> {
     const res = await c.query(
       `INSERT INTO sigd_org.responsabilidad_temporal (
-         tipo_responsabilidad, id_usuario, titular_usuario_id, cargo_id, area_id,
+         tipo_responsabilidad, id_usuario, id_persona, titular_usuario_id, titular_persona_id, cargo_id, area_id,
          vigente_desde, vigente_hasta, tipo_documento_sustento, numero_documento_sustento,
          fecha_documento_sustento, alcance, estado
-       ) VALUES ($1, $2::uuid, $3::uuid, $4::uuid, $5::uuid, $6, $7, $8, $9, $10, $11, 'ACTIVO')
+       ) VALUES ($1, $2::uuid, $3::uuid, $4::uuid, $5::uuid, $6::uuid, $7::uuid, $8, $9, $10, $11, $12, $13, 'ACTIVO')
        RETURNING id_responsabilidad::text AS "idResponsabilidad"`,
       [
         datos.tipoResponsabilidad,
-        datos.idUsuario,
+        datos.idUsuario ?? null,
+        datos.idPersona ?? null,
         datos.titularUsuarioId ?? null,
+        datos.titularPersonaId ?? null,
         datos.cargoId,
         datos.areaId,
         datos.vigenteDesde,

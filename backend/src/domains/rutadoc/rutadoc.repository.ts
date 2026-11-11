@@ -11,6 +11,8 @@ interface FilaBandeja {
   area_actual_id: string | null;
   area_actual_nombre?: string | null;
   area_actual_codigo?: string | null;
+  persona_asignada_id?: string | null;
+  usuario_asignado_id?: string | null;
 }
 
 interface FilaBandejaConContadores {
@@ -57,7 +59,9 @@ export const SQL_LISTAR_RUTADOC = `
          COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
          COALESCE(ultimo.area_actual_id, e.area_destino_id::text) AS area_actual_id,
          a.nombre AS area_actual_nombre,
-         a.codigo AS area_actual_codigo
+         a.codigo AS area_actual_codigo,
+         ultimo.persona_asignada_id::text AS persona_asignada_id,
+         ultimo.usuario_asignado_id::text AS usuario_asignado_id
   ${BASE} ${FILTROS}
     AND COALESCE(ultimo.estado_nuevo, 'REGISTRADO') = ANY($5::text[])
     AND ($6::timestamptz IS NULL OR
@@ -131,6 +135,8 @@ function mapearResumen(fila: FilaBandeja): ExpedienteResumen {
     areaActualId: fila.area_actual_id,
     areaActualNombre: fila.area_actual_nombre ?? null,
     areaActualCodigo: fila.area_actual_codigo ?? null,
+    personaAsignadaId: fila.persona_asignada_id ?? null,
+    usuarioAsignadoId: fila.usuario_asignado_id ?? null,
   };
 }
 

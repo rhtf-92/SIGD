@@ -182,6 +182,11 @@ describe('SIGD 2026 — Tesorería HTTP, RBAC y Salvaguardas BOLA / IDOR', () =>
         query: vi.fn().mockImplementation((sql: string) => {
           if (sql === 'BEGIN') return Promise.resolve();
           if (sql === 'ROLLBACK') return Promise.resolve();
+          if (sql.includes('sigd_doc.tupa_requisito_documental') || sql.includes('FROM sigd_doc.expediente_tupa_vinculo')) {
+            return Promise.resolve({
+              rows: [{ id_requisito: 'req-fin-1', nombre: 'Derecho de Trámite TUPA', estado_homologacion: 'HOMOLOGADO' }],
+            });
+          }
           if (sql.includes('FROM sigd_tra.orden_pago')) {
             return Promise.resolve({
               rows: [{ estado: 'PENDIENTE', monto: '100.00' }],
@@ -210,11 +215,13 @@ describe('SIGD 2026 — Tesorería HTTP, RBAC y Salvaguardas BOLA / IDOR', () =>
         query: vi.fn().mockImplementation((sql: string) => {
           if (sql === 'BEGIN') return Promise.resolve();
           if (sql === 'ROLLBACK') return Promise.resolve();
+          if (sql.includes('sigd_doc.tupa_requisito_documental') || sql.includes('FROM sigd_doc.expediente_tupa_vinculo')) {
+            return Promise.resolve({
+              rows: [{ id_requisito: 'req-fin-1', nombre: 'Derecho de Trámite TUPA', estado_homologacion: 'HOMOLOGADO' }],
+            });
+          }
           if (sql.includes('FROM sigd_tra.orden_pago')) {
             return Promise.resolve({ rows: [] });
-          }
-          if (sql.includes('FROM sigd_doc.expediente_tupa_vinculo')) {
-            return Promise.resolve({ rows: [{ monto: '100.00' }] });
           }
           return Promise.resolve({ rows: [] });
         }),

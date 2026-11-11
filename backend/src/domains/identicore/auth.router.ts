@@ -30,6 +30,7 @@ import { actualizarPerfilSchema, cambiarPasswordSchema, PerfilCiudadanoService }
 const loginSchema = z.object({
   identificador: z.string().min(3).max(100),
   password: z.string().min(6).max(128),
+  contexto: z.enum(['PERSONAL', 'INSTITUCIONAL']).optional(),
 });
 
 const refreshSchema = z.object({
@@ -97,17 +98,119 @@ export function crearRouterAuth(pool: Pool): Router {
     }
 
     const rol = usuario.rol_codigo ?? 'CIUDADANO';
+    // Descubrimiento no arbitrario de roles y contextos vigentes
+    const { rows: rolesRows } = await pool.query<{ codigo: string; area_id: string | null }>(
+      `SELECT r.codigo, ur.area_id
+         FROM sigd_org.usuario_rol ur
+         JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+        WHERE ur.id_usuario = $1::uuid
+          AND ur.vigente_desde <= now()
+          AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+        ORDER BY CASE r.codigo
+          WHEN 'ADMINISTRADOR' THEN 1 WHEN 'DIRECTOR' THEN 2
+          WHEN 'SECRETARIO' THEN 3 WHEN 'ESPECIALISTA' THEN 4
+          WHEN 'TESORERIA' THEN 5 WHEN 'MESA_PARTES' THEN 5 WHEN 'CIUDADANO' THEN 6 ELSE 7 END`,
+      [usuario.id_usuario]
+    );
+
+    // Descubrimiento de perfiles operativos asignados vigentes
+    const { rows: perfilesRows } = await pool.query<{ codigo: string; area_id: string | null; scope: string }>(
+      `SELECT p.codigo, ap.area_id, ap.scope
+         FROM sigd_org.asignacion_perfil_operativo ap
+         JOIN sigd_org.perfil_operativo p ON p.perfil_id = ap.perfil_id
+        WHERE ap.id_usuario = $1::uuid
+          AND ap.estado = 'ACTIVO'
+          AND p.vigente = TRUE
+          AND ap.vigente_desde <= now()
+          AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())`,
+      [usuario.id_usuario]
+    );
+
+    // Descubrimiento de asignaciones ordinarias y responsabilidades
+    const { rows: asigRows } = await pool.query<{ area_id: string }>(
+      `SELECT a.area_id
+         FROM sigd_org.asignacion_personal a
+        WHERE (a.id_usuario = $1::uuid OR a.id_persona = $2::uuid)
+          AND a.estado = 'ACTIVO'
+          AND a.vigente_desde <= now()
+          AND (a.vigente_hasta IS NULL OR a.vigente_hasta > now())`,
+      [usuario.id_usuario, usuario.id_persona]
+    );
+
+    const tieneCapacidadInstitucional =
+      (usuario.rol_codigo && usuario.rol_codigo !== 'CIUDADANO') ||
+      rolesRows.some((r) => r.codigo !== 'CIUDADANO') ||
+      perfilesRows.length > 0 ||
+      asigRows.length > 0;
+
+    const contextosDisponibles: Array<{
+      tipo: 'PERSONAL' | 'INSTITUCIONAL';
+      descripcion: string;
+      rol?: string;
+      areaId?: string;
+      perfiles?: string[];
+    }> = [
+      {
+        tipo: 'PERSONAL',
+        descripcion: 'Trámites personales, consulta ciudadana y casilla electrónica',
+        rol: 'CIUDADANO',
+      },
+    ];
+
+    let rolInstitucional =
+      rolesRows.find((r) => r.codigo !== 'CIUDADANO')?.codigo ??
+      (usuario.rol_codigo !== 'CIUDADANO' ? usuario.rol_codigo : undefined);
+    let areaIdInstitucional =
+      rolesRows.find((r) => r.codigo !== 'CIUDADANO')?.area_id ??
+      usuario.area_id ??
+      perfilesRows.find((p) => p.area_id)?.area_id ??
+      asigRows[0]?.area_id;
+
+    if (tieneCapacidadInstitucional) {
+      contextosDisponibles.push({
+        tipo: 'INSTITUCIONAL',
+        descripcion: 'Gestión institucional, despacho y operación funcional',
+        rol: rolInstitucional ?? 'ESPECIALISTA',
+        areaId: areaIdInstitucional ?? undefined,
+        perfiles: perfilesRows.map((p) => p.codigo),
+      });
+    }
+
+    // Selección de contexto seguro (Opción B: PERSONAL por defecto)
+    const contextoSolicitado = datos.contexto;
+    let contextoEfectivo: 'PERSONAL' | 'INSTITUCIONAL' = 'PERSONAL';
+    let rolEfectivo = 'CIUDADANO';
+    let areaIdEfectivo: string | undefined = undefined;
+
+    if (contextoSolicitado === 'INSTITUCIONAL') {
+      if (!tieneCapacidadInstitucional) {
+        throw new AppError({
+          status: 403,
+          code: 'INSTITUTIONAL_CONTEXT_NOT_AVAILABLE',
+          message: 'Contexto institucional no disponible.',
+          detail: 'La cuenta no posee roles, asignaciones ni perfiles operativos institucionales vigentes.',
+        });
+      }
+      contextoEfectivo = 'INSTITUCIONAL';
+      rolEfectivo = rolInstitucional ?? 'ESPECIALISTA';
+      areaIdEfectivo = areaIdInstitucional ?? undefined;
+    } else {
+      // Por defecto y para contexto PERSONAL: siempre contexto seguro PERSONAL
+      contextoEfectivo = 'PERSONAL';
+      rolEfectivo = 'CIUDADANO';
+      areaIdEfectivo = undefined;
+    }
+
     const accessToken = firmarTokenAcceso({
       sub: usuario.id_usuario,
-      roles: [rol],
-      expiraSegundos: 900, // 15 minutos
+      roles: [rolEfectivo],
+      expiraSegundos: 900,
     });
 
     const refreshToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = hashRefreshToken(refreshToken);
-    const expiraEn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 días
+    const expiraEn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    // Registrar sesión en base de datos almacenando el digest hash (SEC-05) con propagación y registro explícito de errores
     try {
       await pool.query(
         `INSERT INTO sigd_auth.sesion_usuario (id_usuario, refresh_token, ip_origen, user_agent, expira_en)
@@ -123,13 +226,133 @@ export function crearRouterAuth(pool: Pool): Router {
     res.status(200).json({
       accessToken,
       refreshToken,
+      contextoActivo: contextoEfectivo,
+      contextos: contextosDisponibles,
       usuario: {
         id: usuario.id_usuario,
         idPersona: usuario.id_persona,
         nombreCompleto: usuario.nombre_completo,
         correo: usuario.correo ?? `${usuario.usuario}@iestp-suiza.edu.pe`,
-        rol: rol,
-        areaId: usuario.area_id ?? undefined,
+        rol: rolEfectivo,
+        contexto: contextoEfectivo,
+        areaId: areaIdEfectivo,
+      },
+    });
+  });
+
+  // #1.1 — POST /auth/contexto (cambio explícito de contexto operativo)
+  router.post('/auth/contexto', async (req: Request, res: Response) => {
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) {
+      throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
+    }
+    const claims = verificarTokenAcceso(token);
+    const schema = z.object({
+      contexto: z.enum(['PERSONAL', 'INSTITUCIONAL']),
+    });
+    const { contexto } = schema.parse(req.body);
+
+    const { rows: uRows } = await pool.query<{
+      id_usuario: string;
+      id_persona: string;
+      usuario: string;
+      correo: string;
+      activo: boolean;
+      nombre_completo: string;
+    }>(
+      `SELECT c.id_usuario, c.id_persona, c.usuario, c.correo, c.activo,
+              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo
+         FROM sigd_auth.cuenta_usuario c
+         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
+         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
+        WHERE c.id_usuario = $1::uuid`,
+      [claims.sub]
+    );
+    const user = uRows[0];
+    if (!user || !user.activo) {
+      throw new AppError({
+        status: 403,
+        code: 'ACCOUNT_DISABLED',
+        message: 'Cuenta deshabilitada.',
+      });
+    }
+
+    if (contexto === 'PERSONAL') {
+      const nuevoToken = firmarTokenAcceso({
+        sub: user.id_usuario,
+        roles: ['CIUDADANO'],
+        expiraSegundos: 900,
+      });
+      res.status(200).json({
+        ok: true,
+        accessToken: nuevoToken,
+        contextoActivo: 'PERSONAL',
+        usuario: {
+          id: user.id_usuario,
+          idPersona: user.id_persona,
+          nombreCompleto: user.nombre_completo,
+          rol: 'CIUDADANO',
+          contexto: 'PERSONAL',
+        },
+      });
+      return;
+    }
+
+    // Contexto INSTITUCIONAL: verificar que posea credenciales activas
+    const { rows: rRows } = await pool.query<{ codigo: string; area_id: string | null }>(
+      `SELECT r.codigo, ur.area_id
+         FROM sigd_org.usuario_rol ur
+         JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+        WHERE ur.id_usuario = $1::uuid
+          AND ur.vigente_desde <= now()
+          AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+        ORDER BY CASE r.codigo
+          WHEN 'ADMINISTRADOR' THEN 1 WHEN 'DIRECTOR' THEN 2
+          WHEN 'SECRETARIO' THEN 3 WHEN 'ESPECIALISTA' THEN 4
+          WHEN 'TESORERIA' THEN 5 WHEN 'MESA_PARTES' THEN 5 ELSE 6 END`,
+      [user.id_usuario]
+    );
+
+    const { rows: apRows } = await pool.query<{ codigo: string; area_id: string | null }>(
+      `SELECT p.codigo, ap.area_id
+         FROM sigd_org.asignacion_perfil_operativo ap
+         JOIN sigd_org.perfil_operativo p ON p.perfil_id = ap.perfil_id
+        WHERE ap.id_usuario = $1::uuid
+          AND ap.estado = 'ACTIVO'
+          AND p.vigente = TRUE
+          AND ap.vigente_desde <= now()
+          AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())`,
+      [user.id_usuario]
+    );
+
+    if (rRows.length === 0 && apRows.length === 0) {
+      throw new AppError({
+        status: 403,
+        code: 'INSTITUTIONAL_CONTEXT_NOT_AVAILABLE',
+        message: 'No posee facultades institucionales activas.',
+      });
+    }
+
+    const rolInst = rRows.find((r) => r.codigo !== 'CIUDADANO')?.codigo ?? 'ESPECIALISTA';
+    const areaInst = rRows.find((r) => r.codigo !== 'CIUDADANO')?.area_id ?? apRows[0]?.area_id;
+
+    const nuevoToken = firmarTokenAcceso({
+      sub: user.id_usuario,
+      roles: [rolInst],
+      expiraSegundos: 900,
+    });
+
+    res.status(200).json({
+      ok: true,
+      accessToken: nuevoToken,
+      contextoActivo: 'INSTITUCIONAL',
+      usuario: {
+        id: user.id_usuario,
+        idPersona: user.id_persona,
+        nombreCompleto: user.nombre_completo,
+        rol: rolInst,
+        contexto: 'INSTITUCIONAL',
+        areaId: areaInst ?? undefined,
       },
     });
   });
@@ -164,9 +387,10 @@ export function crearRouterAuth(pool: Pool): Router {
       await cliente.query('BEGIN');
 
       const query = `
-        SELECT s.id_usuario, s.expira_en, s.revocado_en,
+        SELECT s.id_usuario, s.expira_en, s.revocado_en, c.activo,
                COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo
           FROM sigd_auth.sesion_usuario s
+          JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
           LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
           LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
          WHERE (s.refresh_token = $1 OR s.refresh_token = $2)
@@ -185,6 +409,16 @@ export function crearRouterAuth(pool: Pool): Router {
         await cliente.query('ROLLBACK');
         throw new UnauthorizedError({
           detail: 'El token de refresco es inválido o ha expirado. Inicie sesión nuevamente.',
+        });
+      }
+
+      if (sesion.activo === false) {
+        await cliente.query('ROLLBACK');
+        throw new AppError({
+          status: 403,
+          code: 'ACCOUNT_DISABLED',
+          message: 'Cuenta deshabilitada.',
+          detail: 'Su cuenta institucional se encuentra suspendida o deshabilitada.',
         });
       }
 

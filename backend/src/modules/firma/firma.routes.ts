@@ -148,6 +148,19 @@ export async function listarPendientesFirma(
                AND ed.titular_usuario_id IS DISTINCT FROM $1
                AND (ed.tipo_resolucion IS NULL OR ed.tipo_resolucion = r.tipo_resolucion)
           )
+          OR EXISTS (
+            SELECT 1
+              FROM sigd_org.responsabilidad_temporal rt
+              JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = $1
+              JOIN sigd_org.cargo c ON c.cargo_id = rt.cargo_id
+             WHERE (rt.id_usuario = $1 OR rt.id_persona = cu.id_persona)
+               AND rt.estado = 'ACTIVO'
+               AND (c.codigo = 'DIRECTOR' OR (rt.alcance->>'facultaFirma')::boolean = true)
+               AND rt.vigente_desde <= now()
+               AND (rt.vigente_hasta IS NULL OR rt.vigente_hasta > now())
+               AND (rt.titular_usuario_id IS NULL OR rt.titular_usuario_id <> $1)
+               AND (rt.titular_persona_id IS NULL OR rt.titular_persona_id <> cu.id_persona)
+          )
         ) AS puede_firmar,
         COALESCE(
           (

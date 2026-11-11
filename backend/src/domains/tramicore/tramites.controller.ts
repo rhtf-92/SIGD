@@ -149,6 +149,15 @@ const ventanillaPresencialSchema = z.object({
  *   * `GET  /api/v1/tramites/expedientes/:expedienteId` — detalle del expediente con contexto TUPA
  *   * `GET  /api/v1/tramites/expedientes/:expedienteId/tupa` — contexto TUPA persistido del expediente
  */
+function sanitizarAnexoParaPublico<T extends Record<string, any>>(anexo: T): Record<string, any> {
+  const { s3Bucket, s3Key, ...resto } = anexo;
+  return resto;
+}
+
+const consultasPublicasRateLimit = new Map<string, { count: number; ventanaInicio: number }>();
+const VENTANA_RATE_LIMIT_MS = 60_000;
+const MAX_CONSULTAS_RATE_LIMIT = 60;
+
 export function crearRouterTramites(
   pool: Pool,
   obtenerFeriados?: ProveedorFeriados,
@@ -738,11 +747,213 @@ export function crearRouterTramites(
     }
   });
 
-  // Requisitos estructurados por procedimiento TUPA
+  // Requisitos estructurados por procedimiento TUPA (Sanitizado sin S3 keys PM-5J-23)
   router.get('/tramites/tupa/procedimientos/:id/requisitos', async (req: Request, res: Response) => {
     const idOIdentificador = String(req.params.id);
     const info = await tupaRequisitosService.obtenerRequisitosPorProcedimiento(idOIdentificador);
-    return res.status(200).json(info);
+    const infoSanitizada = {
+      ...info,
+      requisitos: info.requisitos.map((r) => ({
+        ...r,
+        anexo: r.anexo ? sanitizarAnexoParaPublico(r.anexo) : r.anexo,
+      })),
+      anexosDigitales: info.anexosDigitales.map((r) => ({
+        ...r,
+        anexo: r.anexo ? sanitizarAnexoParaPublico(r.anexo) : r.anexo,
+      })),
+    };
+    return res.status(200).json(infoSanitizada);
+  });
+
+  // Catálogo de anexos y formatos descargables institucionales (Sanitizado sin S3 keys PM-5J-23)
+  router.get('/tramites/tupa/anexos', async (_req: Request, res: Response) => {
+    const anexos = await tupaRequisitosService.listarAnexos();
+    return res.status(200).json(anexos.map(sanitizarAnexoParaPublico));
+  });
+
+  router.get('/tramites/tupa/anexos/:codigo', async (req: Request, res: Response) => {
+    const codigo = String(req.params.codigo).trim();
+    const anexo = await tupaRequisitosService.obtenerAnexoPorCodigo(codigo);
+    if (!anexo) {
+      throw new NotFoundError({
+        message: 'Anexo institucional no encontrado.',
+        detail: `No existe anexo con código '${codigo}'.`,
+      });
+    }
+    return res.status(200).json(sanitizarAnexoParaPublico(anexo));
+  });
+
+  // Progreso consolidado de requisitos por expediente (Fase 5F)
+  router.get('/tramites/expedientes/:expedienteId/requisitos', async (req: Request, res: Response) => {
+    const expedienteId = String(req.params.expedienteId);
+    if (!z.string().uuid().safeParse(expedienteId).success) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'expedienteId', reason: 'El identificador del expediente debe ser un UUID válido.' }],
+      });
+    }
+
+    const expRes = await pool.query<{
+      expediente_id: string;
+      solicitante_id: string;
+      id_usuario_creador: string | null;
+    }>(
+      `SELECT expediente_id, solicitante_id, id_usuario_creador
+         FROM sigd_tra.expediente
+        WHERE expediente_id = $1::uuid`,
+      [expedienteId],
+    );
+
+    if (!expRes.rows[0]) {
+      throw new NotFoundError({
+        message: 'Expediente no encontrado.',
+        detail: `No existe expediente con identificador ${expedienteId}.`,
+      });
+    }
+
+    const exp = expRes.rows[0];
+    const identidad = await resolverIdentidadPersona(req);
+    if (!identidad) {
+      throw new UnauthorizedError({ detail: 'Debe iniciar sesión para consultar los requisitos de este expediente.' });
+    }
+
+    const esTitular = (
+      identidad.idPersona === exp.solicitante_id ||
+      identidad.idUsuario === exp.id_usuario_creador
+    );
+
+    // Autorización canónica mediante AuthorizationService (Fase 5D/5E.5)
+    if (authService) {
+      const contextoHeader = req.get('x-contexto-operacion')?.toUpperCase();
+      const contextoOperacion = contextoHeader === 'INSTITUCIONAL' ? 'INSTITUCIONAL' : 'PERSONAL';
+
+      const resultado = await authService.autorizar({
+        usuarioId: identidad.idUsuario,
+        accion: 'EXPEDIENTE_VER',
+        contextoOperacion,
+        recurso: {
+          tipo: 'EXPEDIENTE',
+          id: expedienteId,
+          propietarioPersonaId: exp.solicitante_id,
+          propietarioUsuarioId: exp.id_usuario_creador ?? undefined,
+        },
+      });
+
+      if (!resultado.autorizado) {
+        throw new ForbiddenError({
+          detail: resultado.motivoInterno ?? 'No tiene autorización para consultar los requisitos de este expediente (protección BOLA).',
+        });
+      }
+    } else {
+      // Fallback estricto de titularidad ciudadana
+      if (!esTitular) {
+        throw new ForbiddenError({
+          detail: 'No tiene autorización para consultar los requisitos de este expediente (protección BOLA).',
+        });
+      }
+    }
+
+    const progreso = await tupaRequisitosService.obtenerProgresoExpediente(expedienteId);
+    return res.status(200).json(progreso);
+  });
+
+  // Subsanación de requisito observado (Fase 5F)
+  router.post('/tramites/expedientes/:expedienteId/subsanaciones', async (req: Request, res: Response) => {
+    const expedienteId = String(req.params.expedienteId);
+    if (!z.string().uuid().safeParse(expedienteId).success) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'expedienteId', reason: 'El identificador del expediente debe ser un UUID válido.' }],
+      });
+    }
+
+    const identidad = await resolverIdentidadPersona(req);
+    if (!identidad) {
+      throw new UnauthorizedError({ detail: 'Debe iniciar sesión para presentar una subsanación.' });
+    }
+
+    const expRes = await pool.query<{
+      expediente_id: string;
+      solicitante_id: string;
+      id_usuario_creador: string | null;
+    }>(
+      `SELECT expediente_id, solicitante_id, id_usuario_creador
+         FROM sigd_tra.expediente
+        WHERE expediente_id = $1::uuid`,
+      [expedienteId],
+    );
+
+    if (!expRes.rows[0]) {
+      throw new NotFoundError({
+        message: 'Expediente no encontrado.',
+        detail: `No existe expediente con identificador ${expedienteId}.`,
+      });
+    }
+
+    const exp = expRes.rows[0];
+    const esTitular = identidad.idPersona === exp.solicitante_id || identidad.idUsuario === exp.id_usuario_creador;
+
+    if (authService) {
+      const contextoHeader = req.get('x-contexto-operacion')?.toUpperCase();
+      const contextoOperacion = contextoHeader === 'INSTITUCIONAL' ? 'INSTITUCIONAL' : 'PERSONAL';
+
+      if (contextoOperacion === 'PERSONAL') {
+        if (!esTitular) {
+          throw new ForbiddenError({
+            detail: 'En contexto PERSONAL sólo el titular del expediente puede presentar subsanaciones.',
+          });
+        }
+      } else {
+        const resultado = await authService.autorizar({
+          usuarioId: identidad.idUsuario,
+          accion: 'EXPEDIENTE_RECIBIR',
+          contextoOperacion: 'INSTITUCIONAL',
+          recurso: {
+            tipo: 'EXPEDIENTE',
+            id: expedienteId,
+            propietarioPersonaId: exp.solicitante_id,
+          },
+        });
+        if (!resultado.autorizado) {
+          throw new ForbiddenError({
+            detail: resultado.motivoInterno ?? 'Se requiere permiso institucional EXPEDIENTE_RECIBIR para subsanar requisitos en expedientes ajenos.',
+          });
+        }
+      }
+    } else {
+      if (!esTitular) {
+        throw new ForbiddenError({
+          detail: 'No tiene autorización para subsanar requisitos en este expediente.',
+        });
+      }
+    }
+
+    const subsanacionSchema = z.object({
+      idRequisito: z.string().uuid('idRequisito debe ser un UUID válido.'),
+      evidenciaPreviaId: z.string().uuid('evidenciaPreviaId debe ser un UUID válido.'),
+      tipoEvidencia: z.enum(['DOCUMENTO', 'PAGO', 'DECLARACION', 'DATO_INTERNO', 'GENERADO_INSTITUCION']).optional(),
+      documentoAdjuntoId: z.string().uuid().optional().nullable(),
+      ordenPagoId: z.string().uuid().optional().nullable(),
+      datosDeclaracion: z.record(z.string(), z.unknown()).optional().nullable(),
+      observacion: z.string().max(1000).optional().nullable(),
+      canal: z.enum(['VIRTUAL', 'PRESENCIAL']).optional(),
+    });
+
+    const datos = subsanacionSchema.parse(req.body);
+
+    const nuevaEvidencia = await tupaRequisitosService.subsanarRequisito({
+      expedienteId,
+      idRequisito: datos.idRequisito,
+      evidenciaPreviaId: datos.evidenciaPreviaId,
+      tipoEvidencia: datos.tipoEvidencia,
+      documentoAdjuntoId: datos.documentoAdjuntoId,
+      ordenPagoId: datos.ordenPagoId,
+      datosDeclaracion: datos.datosDeclaracion,
+      idPersona: esTitular ? identidad.idPersona : exp.solicitante_id,
+      idUsuario: identidad.idUsuario,
+      canal: datos.canal ?? (!esTitular ? 'PRESENCIAL' : 'VIRTUAL'),
+      observacion: datos.observacion ?? 'Subsanación presentada.',
+    });
+
+    return res.status(201).json(nuevaEvidencia);
   });
 
   router.get('/tramites/tupa/procedimientos/:id/tarifas', async (req: Request, res: Response) => {
@@ -1735,8 +1946,24 @@ export function crearRouterTramites(
 
   router.get('/tramites/tipos', handlerTiposTupa);
 
-  // #16 — Consulta pública por CUT + documento de identidad
+  // #16 — Consulta pública por CUT + documento de identidad (Con protección anti-enumeración PM-5J-04)
   router.get('/tramites/consulta-publica/:cut', async (req: Request, res: Response) => {
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || req.socket.remoteAddress || 'unknown';
+    const ahora = Date.now();
+    const reg = consultasPublicasRateLimit.get(ip);
+    if (!reg || ahora - reg.ventanaInicio > VENTANA_RATE_LIMIT_MS) {
+      consultasPublicasRateLimit.set(ip, { count: 1, ventanaInicio: ahora });
+    } else {
+      reg.count++;
+      if (reg.count > MAX_CONSULTAS_RATE_LIMIT) {
+        return res.status(429).json({
+          error: 'TOO_MANY_REQUESTS',
+          message: 'Demasiadas consultas de seguimiento. Por favor intente más tarde.',
+          correlationId: req.headers['x-correlation-id'] || crypto.randomUUID(),
+        });
+      }
+    }
+
     const params = consultaPublicaParamsSchema.parse({ cut: req.params.cut });
     const query = consultaPublicaQuerySchema.parse(req.query);
     const documento = query.documento || query.numeroDocumento || (req.headers['x-documento-identidad'] as string | undefined);
@@ -1749,7 +1976,39 @@ export function crearRouterTramites(
     }
 
     const consulta = await consultaService.consultarPorCut({ cut: params.cut, documento: String(documento) });
-    res.status(200).json(consulta);
+
+    // Mapper de presentación a estado público estándar (Fase 5J - Auditoría Correctiva Punto 7)
+    const mapearEstadoPublico = (estado: string): string => {
+      switch (estado) {
+        case 'REGISTRADO':
+          return 'REGISTRADO';
+        case 'EN_REVISION':
+        case 'EN_TRAMITE':
+        case 'DERIVADO':
+        case 'EN_FIRMA':
+          return 'EN PROCESO';
+        case 'OBSERVADO':
+        case 'OBSERVACION_SUBSANADA':
+          return 'OBSERVADO';
+        case 'RESUELTO':
+        case 'ATENDIDO':
+          return 'RESUELTO';
+        case 'ARCHIVADO':
+          return 'ARCHIVADO';
+        default:
+          return estado;
+      }
+    };
+
+    // Minimización estricta de privacidad en consulta pública (PM-5J-31, PM-5J-32, PM-5J-33):
+    // La respuesta pública NUNCA debe devolver identidad del solicitante (DNI ni nombre, ni siquiera enmascarados),
+    // ni estructura interna de routing (área actual, área de destino o unidades internas).
+    const { administrado, areaActual, ...restoConsulta } = consulta as any;
+
+    res.status(200).json({
+      ...restoConsulta,
+      estadoTramite: mapearEstadoPublico(consulta.estadoTramite),
+    });
   });
 
   // Mesa de Partes Digital Pública (radicación sin requerir cuenta previa)

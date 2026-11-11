@@ -703,6 +703,22 @@ export class VentanillaPresencialService {
           );
           const idDocAdjunto = docAdjuntoRes.rows[0].documento_adjunto_id;
 
+          if (doc.idRequisito) {
+            await this.tupaRequisitosService.registrarEvidencia(
+              {
+                expedienteId,
+                idRequisito: doc.idRequisito,
+                tipoEvidencia: 'DOCUMENTO',
+                documentoAdjuntoId: idDocAdjunto,
+                idPersona: solicitanteId,
+                idUsuario: datos.idOperadorVentanilla ?? null,
+                canal: 'PRESENCIAL',
+                estadoValidacion: 'PRESENTADO',
+              },
+              cliente,
+            );
+          }
+
           const maxFolioRes = await cliente.query<{ max_folio: number | null }>(
             `SELECT MAX(folio_fin) AS max_folio
                FROM sigd_tra.expediente_documento_folio

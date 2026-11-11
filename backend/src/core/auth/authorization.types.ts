@@ -20,6 +20,8 @@ export type ScopeOperativo =
 
 export type EstadoAsignacionPerfil = 'ACTIVO' | 'FINALIZADO' | 'REVOCADO' | 'ANULADO';
 
+export type ContextoOperacion = 'PERSONAL' | 'INSTITUCIONAL';
+
 export type AccionPermiso =
   | 'ORGANIZACION_GESTIONAR'
   | 'CUENTA_GESTIONAR'
@@ -169,6 +171,7 @@ export interface SolicitudAutorizacion {
   accion: AccionPermiso;
   recurso?: RecursoAutorizacion;
   fechaReferencia?: Date;
+  contextoOperacion?: ContextoOperacion;
   reglasSegregacion?: {
     prohibirAutoaprobacion?: boolean;
     prohibirAutorizadorComoEjecutor?: boolean;

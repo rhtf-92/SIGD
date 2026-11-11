@@ -114,6 +114,41 @@ export class AuthorizationService {
     }
 
     const { recurso, accion } = solicitud;
+    const contextoOperacion = solicitud.contextoOperacion ?? 'INSTITUCIONAL';
+
+    // 2.1 CONTEXTO PERSONAL: Trámites personales y consulta ciudadana sin facultades institucionales (FAIL-CLOSED)
+    if (contextoOperacion === 'PERSONAL') {
+      // En contexto personal sólo se autorizan consultas de recursos propios (BOLA)
+      if (accion === 'EXPEDIENTE_VER' || accion === 'PAGO_VER') {
+        if (!recurso) return { autorizado: false, codigoDenegacion: 'RECURSO_REQUERIDO' };
+        const esPropioPersona =
+          Boolean(recurso.propietarioPersonaId) &&
+          recurso.propietarioPersonaId === contexto.persona?.idPersona;
+        const esPropioUsuario =
+          Boolean(recurso.propietarioUsuarioId) &&
+          recurso.propietarioUsuarioId === contexto.cuenta.idUsuario;
+        if (esPropioPersona || esPropioUsuario) {
+          return {
+            autorizado: true,
+            perfilAplicado: 'CONTEXTO_PERSONAL:CIUDADANO',
+            scopeAplicado: 'PROPIO',
+          };
+        }
+        return {
+          autorizado: false,
+          codigoDenegacion: 'BOLA_VIOLATION_RECURSO_AJENO',
+          motivoInterno: 'El administrado solo puede consultar recursos propios en contexto PERSONAL.',
+        };
+      }
+
+      // Cualquier otra acción institucional queda estrictamente bloqueada por diseño fail-closed
+      return {
+        autorizado: false,
+        codigoDenegacion: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
+        motivoInterno:
+          'En contexto PERSONAL el usuario únicamente dispone de facultades ciudadanas sobre sus propios trámites. Las acciones institucionales están bloqueadas.',
+      };
+    }
 
     // 3. REGLAS DE SEGREGACIÓN DE FUNCIONES (Segregación y Autoaprobación)
 
@@ -137,6 +172,37 @@ export class AuthorizationService {
           codigoDenegacion: 'AUTOAPROBACION_PROHIBIDA',
           motivoInterno:
             'Principio de Segregación: El solicitante no puede ser el autorizador de su propio trámite o devolución.',
+        };
+      }
+    }
+
+    // 3.2 Conflicto de Interés: Prohibición de actuar institucionalmente sobre expediente propio
+    const accionesInstitucionalesSobreExpediente: AccionPermiso[] = [
+      'EXPEDIENTE_RECIBIR',
+      'EXPEDIENTE_OBSERVAR',
+      'EXPEDIENTE_CALIFICAR',
+      'EXPEDIENTE_DERIVAR',
+      'EXPEDIENTE_ATENDER',
+      'EXPEDIENTE_RESOLVER',
+      'FIRMA_FIRMAR',
+      'DEVOLUCION_AUTORIZAR',
+    ];
+
+    if (accionesInstitucionalesSobreExpediente.includes(accion) && recurso) {
+      const solicitanteId = recurso.solicitanteUsuarioId;
+      const solicitantePersonaId = recurso.solicitantePersonaId;
+      const esExpedientePropio =
+        (solicitanteId && solicitanteId === solicitud.usuarioId) ||
+        (solicitantePersonaId &&
+          contexto.persona &&
+          solicitantePersonaId === contexto.persona.idPersona);
+
+      if (esExpedientePropio) {
+        return {
+          autorizado: false,
+          codigoDenegacion: 'CONFLICTO_INTERES_EXPEDIENTE_PROPIO',
+          motivoInterno:
+            'Conflicto de interés detectado: Un funcionario no puede auto-recibir, auto-observar, auto-calificar, auto-derivar, auto-resolver ni auto-firmar su propio expediente o solicitud personal.',
         };
       }
     }
@@ -471,6 +537,25 @@ export class AuthorizationService {
       throw new ConflictError({
         message: 'Cuenta deshabilitada.',
         detail: 'No se pueden asignar perfiles operativos a una cuenta inactiva.',
+      });
+    }
+
+    const perfilesPrivilegiados = [
+      'ADMINISTRADOR_SIGD',
+      'APROBADOR_DIRECCION',
+      'AUTORIZADOR_DEVOLUCION',
+      'APROBADOR_TUPA',
+    ];
+    if (perfilesPrivilegiados.includes(datos.perfilCodigo)) {
+      if (datos.idUsuario === autorId) {
+        throw new ForbiddenError({
+          message: 'Autoasignación de privilegios prohibida.',
+          detail: `No está permitido autoasignarse el perfil privilegiado ${datos.perfilCodigo}. Principio de separación de funciones.`,
+        });
+      }
+      throw new ForbiddenError({
+        message: 'Asignación de perfil privilegiado no permitida.',
+        detail: `La autoridad institucional para conceder el perfil privilegiado ${datos.perfilCodigo} se encuentra NO_DETERMINADA. Principio de menor privilegio (fail-closed).`,
       });
     }
 

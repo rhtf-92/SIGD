@@ -36,6 +36,16 @@ export function adaptarErrorAccion(error: unknown): ErrorAccionExpediente {
   const problema = error instanceof ApiHttpError ? error.problemDetails : error.response?.data;
   const statusHttp = error instanceof ApiHttpError ? error.status : error.response?.status;
   const status = statusHttp || (esObjeto(problema) && typeof problema.status === "number" ? problema.status : 0);
+
+  if (status === 409 && esObjeto(problema)) {
+    const code = String(problema.code || problema.error || problema.codigo || problema.title || "");
+    if (code === "EVIDENCIA_FIRMA_REQUERIDA") {
+      return new ErrorAccionExpediente("El expediente todavía no cuenta con una firma válida.", "http", 409);
+    }
+    if (code === "CONFLICTO_CONCURRENCIA") {
+      return new ErrorAccionExpediente("El expediente cambió mientras trabajabas. Actualiza la información.", "concurrencia", 409);
+    }
+  }
   const mensajes: Readonly<Record<number, string>> = {
     400: "Revise los datos ingresados. La solicitud no es válida.",
     401: "La sesión no es válida o ha caducado. Inicie sesión nuevamente.",

@@ -179,6 +179,7 @@ describe('TUPA 2026: Requisitos Documentales Estructurados y Foliación Automát
               formatos_permitidos: 'PDF',
               activo: true,
               fuente_original: 'Solicitud en FUT dirigida al Director.',
+              estado_homologacion: 'HOMOLOGADO',
             },
           ],
         });

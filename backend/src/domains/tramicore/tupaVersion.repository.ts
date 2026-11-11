@@ -458,13 +458,13 @@ export class TupaVersionRepository {
       // Si se solicita clonar de una versión previa
       let total = 0;
       if (dto.clonarDeIdVersion) {
-        const procClonar = await cliente.query<FilaTupaProcedimiento>(
+        const procClonar = await cliente.query<FilaTupaProcedimiento & { id_procedimiento: string }>(
           `SELECT codigo_ref, codigo_externo, denominacion, categoria, tipo_formulario,
                   monto, unidad_cobro, plazo_dias, plazo_fuente, requisitos, genera_expediente,
                   calificacion, calificacion_fuente, canal_presentacion,
                   unidad_receptora_id, unidad_responsable_id, unidad_resolutiva_id,
                   unidad_financiera_id, intervencion_financiera,
-                  registro_version_id, activo, orden
+                  registro_version_id, activo, orden, id_procedimiento
              FROM sigd_doc.tupa_procedimiento
             WHERE id_version = $1::uuid
             ORDER BY orden ASC, codigo_ref ASC`,
@@ -472,7 +472,7 @@ export class TupaVersionRepository {
         );
 
         for (const p of procClonar.rows) {
-          await cliente.query(
+          const insRes = await cliente.query<{ id_procedimiento: string }>(
             `INSERT INTO sigd_doc.tupa_procedimiento (
                 id_version, codigo_ref, codigo_externo, denominacion, categoria, tipo_formulario,
                 monto, unidad_cobro, plazo_dias, plazo_fuente, requisitos, genera_expediente,
@@ -487,7 +487,7 @@ export class TupaVersionRepository {
                 $16, $17, $18,
                 $19, $20,
                 $21, $22, $23
-             )`,
+             ) RETURNING id_procedimiento`,
             [
               nuevaVersion.id_version,
               p.codigo_ref,
@@ -514,6 +514,24 @@ export class TupaVersionRepository {
               p.orden,
             ],
           );
+          const nuevoProcId = insRes?.rows?.[0]?.id_procedimiento;
+
+          // Clonar requisitos documentales estructurados al nuevo procedimiento si existen identificadores (Fase 5F)
+          if (nuevoProcId && p.id_procedimiento) {
+            await cliente.query(
+              `INSERT INTO sigd_doc.tupa_requisito_documental (
+                  id_procedimiento, registro_version_id, nombre, descripcion, tipo_requisito,
+                  es_anexo_digital, obligatorio, orden, formatos_permitidos, activo, fuente_original,
+                  id_anexo, codigo, regla_condicional, proveniencia, estado_homologacion
+               )
+               SELECT $1::uuid, registro_version_id, nombre, descripcion, tipo_requisito,
+                      es_anexo_digital, obligatorio, orden, formatos_permitidos, activo, fuente_original,
+                      id_anexo, codigo, regla_condicional, proveniencia, estado_homologacion
+                 FROM sigd_doc.tupa_requisito_documental
+                WHERE id_procedimiento = $2::uuid`,
+              [nuevoProcId, p.id_procedimiento],
+            );
+          }
         }
         total = procClonar.rowCount ?? 0;
 

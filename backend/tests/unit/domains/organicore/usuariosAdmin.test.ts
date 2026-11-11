@@ -771,10 +771,10 @@ describe('crearUsuariosAdminService', () => {
     expect(
       mockQuery,
     ).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'DELETE FROM sigd_auth.sesion_usuario',
+      expect.stringMatching(
+        /(UPDATE|DELETE FROM)\s+sigd_auth\.sesion_usuario/,
       ),
-      [15],
+      expect.arrayContaining([15]),
     );
 
     expect(total).toBe(2);

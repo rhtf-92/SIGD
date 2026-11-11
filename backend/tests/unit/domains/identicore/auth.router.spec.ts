@@ -56,6 +56,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
       .send({
         identificador: 'admin.institucional',
         password: 'PasswordValida123!',
+        contexto: 'INSTITUCIONAL',
       });
 
     expect(res.status).toBe(200);
@@ -126,6 +127,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
       .send({
         identificador: 'admin.institucional',
         password: 'PasswordValida123!',
+        contexto: 'INSTITUCIONAL',
       });
 
     // No debe tragar el error con 200

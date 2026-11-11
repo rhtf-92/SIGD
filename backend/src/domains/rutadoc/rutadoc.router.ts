@@ -20,6 +20,7 @@ import { UnauthorizedError } from '../../shared/domain/errors/index.js';
 import type { CalendarioLaboralPort } from './sla.types.js';
 import type { ClasificadorCcdPort } from './ccd.types.js';
 import type { DocumentoMetadataPort } from './foliacion.types.js';
+import type { AuthorizationService } from '../../core/auth/authorization.service.js';
 
 /** Montar en /api/v1. Sin IdentiCore, la resolución predeterminada deniega acceso. */
 export function crearRouterRutaDoc(
@@ -35,6 +36,7 @@ export function crearRouterRutaDoc(
     documentoMetadata?: DocumentoMetadataPort;
     porcentajeAmarilloSlaDesde?: number;
   } = {},
+  authService?: AuthorizationService,
 ): Router {
   const router = Router();
   const servicio = new ServicioRutaDoc(new RepositorioPostgresRutaDoc(pool));
@@ -88,7 +90,7 @@ export function crearRouterRutaDoc(
       next(err);
     }
   });
-  derivaciones.use(crearRouterDerivaciones(pool, proveedorActor));
+  derivaciones.use(crearRouterDerivaciones(pool, proveedorActor, authService));
   router.use('/expedientes', derivaciones);
 
   return router;

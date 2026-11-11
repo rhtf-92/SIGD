@@ -345,6 +345,22 @@ export class MesaPartesDigitalService {
 
         const idDocAdjunto = docAdjuntoRes.rows[0].documento_adjunto_id;
 
+        if (doc.idRequisito) {
+          await this.tupaRequisitosService.registrarEvidencia(
+            {
+              expedienteId,
+              idRequisito: doc.idRequisito,
+              tipoEvidencia: 'DOCUMENTO',
+              documentoAdjuntoId: idDocAdjunto,
+              idPersona: personaId,
+              idUsuario: null,
+              canal: 'VIRTUAL',
+              estadoValidacion: 'PRESENTADO',
+            },
+            cliente,
+          );
+        }
+
         // Foliación continua
         const maxFolioRes = await cliente.query<{ max_folio: number | null }>(
           `SELECT MAX(folio_fin) AS max_folio FROM sigd_tra.expediente_documento_folio WHERE expediente_id = $1::uuid;`,
@@ -394,6 +410,30 @@ export class MesaPartesDigitalService {
           concepto: contextoPago.concepto,
           fechaVencimiento: vencimiento.toISOString(),
         };
+
+        const reqFinanciero = await cliente.query<{ id_requisito: string }>(
+          `SELECT id_requisito FROM sigd_doc.tupa_requisito_documental
+            WHERE (id_procedimiento = $1::uuid OR registro_version_id = $1::uuid)
+              AND tipo_requisito = 'FINANCIERO'
+              AND activo = true
+            LIMIT 1`,
+          [datos.registroVersionId],
+        );
+        if (reqFinanciero.rows[0]) {
+          await this.tupaRequisitosService.registrarEvidencia(
+            {
+              expedienteId,
+              idRequisito: reqFinanciero.rows[0].id_requisito,
+              tipoEvidencia: 'PAGO',
+              ordenPagoId: orden.orden_pago_id,
+              idPersona: personaId,
+              idUsuario: null,
+              canal: 'VIRTUAL',
+              estadoValidacion: 'PENDIENTE',
+            },
+            cliente,
+          );
+        }
       }
 
       // 9. Generar y almacenar Cargo Digital oficial en MinIO

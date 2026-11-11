@@ -13,6 +13,8 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", "dist"],
     testTimeout: 10000,
+    // Limita la concurrencia a 3 workers en Windows/CI para evitar saturación de CPU al instanciar jsdom
+    maxWorkers: 3,
     restoreMocks: true,
     coverage: {
       provider: "v8",

@@ -165,6 +165,7 @@ export class RadicacionVirtualService {
       await this.insertarTramite(cliente, expediente.expediente_id, datos.asunto);
       await this.insertarAsiento(cliente, expediente.expediente_id, persona, datos.asunto, horario, datos.canalIngreso ?? 'MESA_VIRTUAL');
 
+      let ordenPagoCreadaId: string | undefined;
       if (datos.registroVersionId) {
         await this.insertarVinculoTupa(cliente, expediente.expediente_id, datos.registroVersionId);
         const contextoPago = await this.tesoreriaRepository.obtenerContextoExpedienteParaPago(cliente, expediente.expediente_id);
@@ -182,6 +183,7 @@ export class RadicacionVirtualService {
             moneda: 'PEN',
             fechaVencimiento: calcularVencimientoOrdenPago(now),
           });
+          ordenPagoCreadaId = orden.orden_pago_id;
           await cliente.query(
             `UPDATE sigd_tra.expediente SET estado = 'PENDIENTE_PAGO'
               WHERE expediente_id = $1::uuid AND estado = 'REGISTRADO'`,
@@ -192,6 +194,78 @@ export class RadicacionVirtualService {
             datos_despues: { ordenPagoId: orden.orden_pago_id, codigoPago, expedienteId: expediente.expediente_id,
               monto: contextoPago.costoOficial, fechaVencimiento: orden.fecha_vencimiento },
           });
+        }
+
+        // Registrar evidencias documentales asociadas a requisitos (Fase 5F)
+        if (datos.documentos && datos.documentos.length > 0) {
+          for (const doc of datos.documentos) {
+            if (doc.idRequisito) {
+              const resAdj = await cliente.query<{ documento_adjunto_id: string }>(
+                `INSERT INTO sigd_doc.documento_adjunto (
+                   documento_adjunto_id, expediente_tra_id, tipo_documental_id, nombre_archivo,
+                   s3_bucket, s3_key, sha256, tamano_bytes, mime_type, magic_bytes, subido_por, id_requisito, creado_en
+                 ) VALUES (
+                   gen_random_uuid(), $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10::uuid, $11::uuid, $12
+                 ) RETURNING documento_adjunto_id;`,
+                [
+                  expediente.expediente_id,
+                  tipoDocId,
+                  doc.nombreArchivo,
+                  'sigd-expedientes',
+                  doc.storagePath ?? `presentados/${expediente.expediente_id}/${doc.nombreArchivo}`,
+                  doc.hashSha256 ?? '0000000000000000000000000000000000000000000000000000000000000000',
+                  doc.tamanoBytes ?? 1024,
+                  doc.contentType ?? 'application/pdf',
+                  '25504446',
+                  persona.id_persona,
+                  doc.idRequisito,
+                  horario.radicacionLegal,
+                ],
+              );
+              const idDocAdjunto = resAdj.rows[0]?.documento_adjunto_id;
+
+              await this.tupaRequisitosService.registrarEvidencia(
+                {
+                  expedienteId: expediente.expediente_id,
+                  idRequisito: doc.idRequisito,
+                  tipoEvidencia: 'DOCUMENTO',
+                  documentoAdjuntoId: idDocAdjunto,
+                  idPersona: persona.id_persona,
+                  idUsuario: datos.idUsuarioCreador ?? null,
+                  canal: 'VIRTUAL',
+                  estadoValidacion: 'PRESENTADO',
+                },
+                cliente,
+              );
+            }
+          }
+        }
+
+        // Si se generó orden de pago, asociar automáticamente al requisito FINANCIERO del procedimiento (Fase 5F)
+        if (ordenPagoCreadaId) {
+          const reqFinanciero = await cliente.query<{ id_requisito: string }>(
+            `SELECT id_requisito FROM sigd_doc.tupa_requisito_documental
+              WHERE (id_procedimiento = $1::uuid OR registro_version_id = $1::uuid)
+                AND tipo_requisito = 'FINANCIERO'
+                AND activo = true
+              LIMIT 1`,
+            [datos.registroVersionId],
+          );
+          if (reqFinanciero.rows[0]) {
+            await this.tupaRequisitosService.registrarEvidencia(
+              {
+                expedienteId: expediente.expediente_id,
+                idRequisito: reqFinanciero.rows[0].id_requisito,
+                tipoEvidencia: 'PAGO',
+                ordenPagoId: ordenPagoCreadaId,
+                idPersona: persona.id_persona,
+                idUsuario: datos.idUsuarioCreador ?? null,
+                canal: 'VIRTUAL',
+                estadoValidacion: 'PENDIENTE',
+              },
+              cliente,
+            );
+          }
         }
       }
       const cargo = this.emitirCargoDigital(expediente.expediente_id, datos, now);

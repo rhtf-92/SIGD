@@ -282,7 +282,21 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
       expect(await screen.findByText(/Bandeja de expedientes/i)).toBeInTheDocument();
     });
 
-    it('permite acceso a /tesoreria para ADMINISTRADOR', async () => {
+    it('bloquea acceso a /tesoreria para ADMINISTRADOR sin perfil GESTOR_TESORERIA', () => {
+      renderWithProviders('/tesoreria');
+      expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
+    });
+
+    it('permite acceso a /tesoreria para ADMINISTRADOR con perfil GESTOR_TESORERIA', async () => {
+      useAuthStore.setState({
+        usuario: {
+          id: 'u-admin',
+          nombreCompleto: 'Admin Sistema',
+          correo: 'admin@example.test',
+          rol: 'ADMINISTRADOR',
+          perfiles: ['GESTOR_TESORERIA'],
+        },
+      });
       renderWithProviders('/tesoreria');
       expect((await screen.findAllByText(/Módulo de Tesorería/i)).length).toBeGreaterThan(0);
     });

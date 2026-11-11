@@ -18,6 +18,9 @@ export interface FiltrosRutaDoc {
   limite: number;
   terminoBusqueda?: string;
   areaId?: string;
+  usuarioAsignadoId?: string;
+  personaAsignadaId?: string;
+  bandeja?: 'AREA' | 'PERSONAL' | 'GENERAL';
   fechaDesde?: string;
   fechaHasta?: string;
   cursor?: string;
@@ -38,6 +41,8 @@ export interface ExpedienteResumen {
   areaActualId: string | null;
   areaActualNombre?: string | null;
   areaActualCodigo?: string | null;
+  personaAsignadaId?: string | null;
+  usuarioAsignadoId?: string | null;
 }
 
 export interface UltimoMovimiento {

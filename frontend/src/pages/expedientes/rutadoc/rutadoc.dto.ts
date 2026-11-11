@@ -96,4 +96,5 @@ export type SolicitanteResumenDto = z.infer<typeof solicitanteResumenSchema>;
 export interface Filtros {
   pestana: Pestana; limite: number; terminoBusqueda?: string;
   areaId?: string; fechaDesde?: string; fechaHasta?: string; cursor?: string;
+  bandeja?: "PERSONAL" | "AREA";
 }

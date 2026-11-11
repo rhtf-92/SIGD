@@ -13,6 +13,8 @@ import type {
   SolicitudArchivado,
   SolicitudObservacion,
   SolicitudSubsanacion,
+  SolicitudEnviarAFirma,
+  SolicitudResolver,
   UseExpedienteActionsOptions
 } from "../types/expedienteActions";
 import { adaptarErrorAccion } from "../utils/expedienteActions";
@@ -22,6 +24,8 @@ const bloqueos = new WeakMap<QueryClient, Set<string>>();
 const idsDerivacion = (entrada: SolicitudDerivacion) => [entrada.expediente.id];
 const idsRecepcion = (entrada: SolicitudRecepcion) => [entrada.expediente.id];
 const idsAtencion = (entrada: SolicitudAtencion) => [entrada.expediente.id];
+const idsEnviarAFirma = (entrada: SolicitudEnviarAFirma) => [entrada.expediente.id];
+const idsResolver = (entrada: SolicitudResolver) => [entrada.expediente.id];
 const idsArchivado = (entrada: SolicitudArchivado) => [entrada.expediente.id];
 const idsObservacion = (entrada: SolicitudObservacion) => [entrada.expediente.id];
 const idsSubsanacion = (entrada: SolicitudSubsanacion) => [entrada.expediente.id];
@@ -80,9 +84,11 @@ export function useExpedienteActions(opciones: UseExpedienteActionsOptions) {
   const derivacion = useAccion(servicio.derivar, idsDerivacion, "La derivación fue registrada correctamente.", opciones, notificar);
   const recepcion = useAccion(servicio.recepcionar, idsRecepcion, "El expediente fue recepcionado correctamente.", opciones, notificar);
   const atencion = useAccion(servicio.atender, idsAtencion, "La atención resolutiva fue emitida y notificada a la Casilla Electrónica.", opciones, notificar);
+  const enviarAFirma = useAccion(servicio.enviarAFirma, idsEnviarAFirma, "El expediente fue enviado a despacho para firma.", opciones, notificar);
+  const resolver = useAccion(servicio.resolver, idsResolver, "El expediente fue resuelto con firma y notificado a la Casilla Electrónica.", opciones, notificar);
   const archivado = useAccion(servicio.archivar, idsArchivado, "El expediente fue archivado físicamente de forma formal.", opciones, notificar);
   const observacion = useAccion(servicio.observar, idsObservacion, "La observación fue registrada. El servidor confirmó la suspensión temporal del SLA.", opciones, notificar);
   const subsanacion = useAccion(servicio.subsanar, idsSubsanacion, "La subsanación fue registrada correctamente.", opciones, notificar);
   const acumulacion = useAccion(servicio.acumular, idsAcumulacion, "La acumulación fue registrada correctamente.", opciones, notificar);
-  return { derivacion, recepcion, atencion, archivado, observacion, subsanacion, acumulacion, notificacion, limpiarNotificacion: () => setNotificacion(null) };
+  return { derivacion, recepcion, atencion, enviarAFirma, resolver, archivado, observacion, subsanacion, acumulacion, notificacion, limpiarNotificacion: () => setNotificacion(null) };
 }

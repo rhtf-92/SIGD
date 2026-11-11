@@ -25,12 +25,12 @@ export interface DtoConsultaPublica {
   fueraDeHorario: boolean;
   canalRecepcion: string;
   totalFolios: number;
-  areaActual: string;
+  areaActual?: string;
   pasoSiguiente: string;
   estadoPago: string;
-  administrado: {
-    documentoEnmascarado: string | null;
-    nombreEnmascarado: string | null;
+  administrado?: {
+    documentoEnmascarado?: string | null;
+    nombreEnmascarado?: string | null;
   };
   documentos: DtoDocumentoPublico[];
   proveidos: DtoProveidoPublico[];
@@ -243,13 +243,15 @@ export default function ConsultaPublicaPage() {
             {/* Banner de Orientación y Próximo Paso */}
             <div className="bg-gradient-to-r from-cyan-50 via-teal-50/50 to-white p-6 border-b border-cyan-100">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-cyan-200/60 shadow-2xs">
-                  <span className="text-xs font-bold uppercase tracking-wider text-cyan-800">Ubicación Actual</span>
-                  <p className="text-base font-semibold text-slate-900 mt-1">{resultado.areaActual}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">Área institucional a cargo</p>
-                </div>
+                {resultado.areaActual && (
+                  <div className="bg-white p-4 rounded-xl border border-cyan-200/60 shadow-2xs">
+                    <span className="text-xs font-bold uppercase tracking-wider text-cyan-800">Ubicación Actual</span>
+                    <p className="text-base font-semibold text-slate-900 mt-1">{resultado.areaActual}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Área institucional a cargo</p>
+                  </div>
+                )}
 
-                <div className="bg-white p-4 rounded-xl border border-cyan-200/60 shadow-2xs md:col-span-2">
+                <div className={`bg-white p-4 rounded-xl border border-cyan-200/60 shadow-2xs ${resultado.areaActual ? 'md:col-span-2' : 'md:col-span-3'}`}>
                   <span className="text-xs font-bold uppercase tracking-wider text-teal-800">Próximo Paso / Orientación</span>
                   <p className="text-sm font-medium text-slate-800 mt-1">{resultado.pasoSiguiente}</p>
                 </div>
@@ -284,17 +286,19 @@ export default function ConsultaPublicaPage() {
                   </p>
                 </div>
 
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Solicitante (Ley 29733)
-                  </h3>
-                  <p className="mt-1 text-slate-700 font-mono">
-                    {resultado.administrado.nombreEnmascarado ?? 'Ciudadano Administrado'}
-                  </p>
-                  <p className="text-xs text-slate-400 font-mono">
-                    Doc: {resultado.administrado.documentoEnmascarado ?? 'Reservado'}
-                  </p>
-                </div>
+                {resultado.administrado && (resultado.administrado.nombreEnmascarado || resultado.administrado.documentoEnmascarado) && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      Solicitante (Ley 29733)
+                    </h3>
+                    <p className="mt-1 text-slate-700 font-mono">
+                      {resultado.administrado.nombreEnmascarado ?? 'Ciudadano Administrado'}
+                    </p>
+                    <p className="text-xs text-slate-400 font-mono">
+                      Doc: {resultado.administrado.documentoEnmascarado ?? 'Reservado'}
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">

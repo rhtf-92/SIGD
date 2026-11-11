@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import {
+  ConflictError,
   ForbiddenError,
   NotFoundError,
 } from '../../shared/domain/errors/index.js';
@@ -45,6 +46,10 @@ export function verificarFirmaWebhook(
 /**
  * Guarda la evidencia de firma devuelta por Refirma.
  * Esta función debe invocarse dentro de una transacción.
+ * Cumple política WORM:
+ * - Si ya existe firma con la misma evidencia (hash y almacenamiento) -> Retorno idempotente del CVD.
+ * - Si ya existe firma con evidencia diferente -> Conflicto (prohibida la mutación).
+ * - Si no existe -> Inserción limpia sin sentencias UPDATE.
  */
 export async function registrarCallbackRefirma(
   cliente: PoolClient,
@@ -74,6 +79,37 @@ export async function registrarCallbackRefirma(
     });
   }
 
+  // 1. Verificación previa de firma existente para garantizar inmutabilidad WORM e idempotencia
+  const firmaExistente = await cliente.query<{
+    cvd: string;
+    sha256_firmado: string;
+    s3_bucket: string;
+    s3_key: string;
+  }>(
+    `SELECT cvd, sha256_firmado, s3_bucket, s3_key
+       FROM sigd_doc.firma_digital_documento
+      WHERE documento_id = $1::uuid`,
+    [datos.documento_id],
+  );
+
+  if (firmaExistente.rowCount && firmaExistente.rowCount > 0) {
+    const reg = firmaExistente.rows[0];
+    const shaIgual = reg.sha256_firmado.toLowerCase() === datos.sha256_firmado.toLowerCase();
+    const storageIgual = reg.s3_bucket === datos.s3_bucket.trim() && reg.s3_key === datos.s3_key.trim();
+
+    if (shaIgual && storageIgual) {
+      // Misma evidencia exacta -> retorno idempotente sin ejecutar UPDATE (WORM compliant)
+      return reg.cvd;
+    }
+
+    // Evidencia diferente -> intento de mutación sobre registro firmado protegido
+    throw new ConflictError({
+      code: 'EVIDENCIA_FIRMA_CONFLICTO',
+      detail: 'El documento ya cuenta con una firma digital asentada con evidencia diferente. Modificación prohibida bajo política WORM.',
+    });
+  }
+
+  // 2. Inserción canónica sin cláusula DO UPDATE para respetar el trigger WORM
   const resultado = await cliente.query<{ cvd: string }>(
     `INSERT INTO sigd_doc.firma_digital_documento
       (
@@ -85,14 +121,7 @@ export async function registrarCallbackRefirma(
         s3_key,
         estado
       )
-     VALUES ($1, $2, $3, $4, $5, $6, 'FIRMADO_DIGITALMENTE')
-     ON CONFLICT (documento_id) DO UPDATE SET
-       sha256_firmado = EXCLUDED.sha256_firmado,
-       firmante = EXCLUDED.firmante,
-       fecha_sello_tsa = EXCLUDED.fecha_sello_tsa,
-       s3_bucket = EXCLUDED.s3_bucket,
-       s3_key = EXCLUDED.s3_key,
-       estado = EXCLUDED.estado
+     VALUES ($1::uuid, $2, $3, $4, $5, $6, 'FIRMADO_DIGITALMENTE')
      RETURNING cvd`,
     [
       datos.documento_id,

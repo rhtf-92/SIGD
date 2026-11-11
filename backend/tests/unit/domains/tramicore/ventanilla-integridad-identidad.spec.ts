@@ -658,20 +658,10 @@ describe('Ventanilla Presencial: Integridad Documental, Identidad y Cronología'
       });
     });
 
-    // B. cliente envía s3_key en resolución -> rechazado/ignorado
-    it('Test B: Cliente envía s3_key en resolución -> s3_key es ignorado y se genera key canónica server-side', async () => {
-      const spyKey = vi.spyOn(documentoStorageService, 'generarKeyResolucion');
-      const spySubir = vi.spyOn(documentoStorageService, 'subirDocumentoPdf').mockResolvedValue({
-        s3Bucket: 'sigd-expedientes',
-        s3Key: 'expedientes/exp-target/resoluciones/server-uuid.pdf',
-        tamanoBytes: 1500,
-        sha256: 'sha-resolucion',
-        magicBytes: '25504446',
-        mimeType: 'application/pdf',
-      });
-      const spyPdf = vi.spyOn(documentoStorageService, 'generarResolucionPdf').mockResolvedValue(Buffer.from('%PDF-1.4 test'));
-
+    // B. Intento de atención resolutiva directa -> Rechazado por Invariante de Firma Digital 5K.1
+    it('Test B: atenderExpediente rechaza resolución directa en EN_REVISION exigiendo pase formal a firma (Invariante 5K.1)', async () => {
       mockQuery.mockResolvedValueOnce({
+        rowCount: 1,
         rows: [{
           estado_actual_id: 'EN_REVISION',
           area_contexto_id: 'area-sda',
@@ -679,35 +669,19 @@ describe('Ventanilla Presencial: Integridad Documental, Identidad y Cronología'
           solicitante_id: 'solicitante-uuid',
           tipo_documental_id: 'tipo-doc-uuid',
         }],
-      }); // resEstadoActual
-      mockQuery.mockResolvedValueOnce({}); // pase a firma
-      mockQuery.mockResolvedValueOnce({ rows: [{ movimiento_id: 'mov-1' }] }); // resolucion fsm
-      mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // update estado a RESUELTO
-      mockQuery.mockResolvedValueOnce({}); // insert documento_adjunto
-      mockQuery.mockResolvedValueOnce({ rows: [{ id_usuario: 'user-dest' }] }); // usuario solicitante
-      mockQuery.mockResolvedValueOnce({ rows: [{ correo: 'destinatario@prueba.pe' }] }); // correo solicitante
-      mockQuery.mockResolvedValueOnce({}); // casilla
-      mockQuery.mockResolvedValueOnce({ rows: [{ id_evento: 'evento-1' }] }); // outbox
+      });
 
       await runWithContext(
         { correlation_id: 'corr-1', usuario_id: 'operador-sda', ip_origen: '127.0.0.1', user_agent: 'vitest' },
         async () => {
-          await atenderExpediente(mockClient, 'exp-target', {
-            resultado_resumen: 'Aprobado formalmente',
-            s3_key: 'expedientes/otro-expediente/resoluciones/inyeccion.pdf',
-          });
+          await expect(
+            atenderExpediente(mockClient, 'exp-target', {
+              resultado_resumen: 'Aprobado formalmente',
+              s3_key: 'expedientes/otro-expediente/resoluciones/inyeccion.pdf',
+            })
+          ).rejects.toThrow(/FLUJO_RESOLUTIVO_REQUIERE_FIRMA/);
         },
       );
-
-      // Verificamos que generarKeyResolucion fue llamado con 'exp-target' y NO se usó la clave del cliente
-      expect(spyKey).toHaveBeenCalledWith('exp-target');
-      expect(spySubir).toHaveBeenCalledWith(expect.objectContaining({
-        s3Key: expect.stringMatching(/^expedientes\/exp-target\/resoluciones\/.+\.pdf$/),
-      }));
-
-      spyKey.mockRestore();
-      spySubir.mockRestore();
-      spyPdf.mockRestore();
     });
 
     // C. documentId de otro expediente -> rechazo ownership

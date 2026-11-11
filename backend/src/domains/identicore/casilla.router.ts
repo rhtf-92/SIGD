@@ -16,7 +16,7 @@ import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
-import { NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { generarUrlPresigned } from '../../core/storage/s3-storage.service.js';
 
@@ -190,7 +190,7 @@ export function crearRouterCasilla(pool: Pool): Router {
     const query = consultaPaginadaSchema.parse(req.query);
     const usuarioId = obtenerUsuarioId(req);
 
-    const condiciones: string[] = ['usuario_id = $1::uuid'];
+    const condiciones: string[] = ['(usuario_id = $1::uuid OR persona_id IN (SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1::uuid))'];
     const valores: unknown[] = [usuarioId];
 
     if (query.estado !== 'TODOS') {
@@ -261,7 +261,7 @@ export function crearRouterCasilla(pool: Pool): Router {
     const usuarioId = obtenerUsuarioId(req);
 
     const resultado = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND usuario_id = $2::uuid`,
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND (usuario_id = $2::uuid OR persona_id IN (SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $2::uuid))`,
       [id, usuarioId],
     );
 
@@ -283,7 +283,7 @@ export function crearRouterCasilla(pool: Pool): Router {
       `UPDATE sigd_auth.notificacion_casilla
           SET estado = 'LEIDO',
               fecha_lectura = COALESCE(fecha_lectura, now())
-        WHERE id = $1::uuid AND usuario_id = $2::uuid
+        WHERE id = $1::uuid AND (usuario_id = $2::uuid OR persona_id IN (SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $2::uuid))
         RETURNING id, estado, fecha_lectura`,
       [id, usuarioId],
     );
@@ -299,6 +299,14 @@ export function crearRouterCasilla(pool: Pool): Router {
       ? row.fecha_lectura
       : row.fecha_lectura.toISOString();
 
+    // Auditoría WORM de visualización fehaciente (PM-5J-14)
+    await pool.query(
+      `INSERT INTO sigd_auth.notificacion_trazabilidad_evento (
+         notificacion_id, tipo_evento, canal, estado, detalles, ip_origen
+       ) VALUES ($1, 'VISUALIZADA', 'CASILLA', 'EXITOSO', $2::jsonb, $3)`,
+      [row.id, JSON.stringify({ visualizadoEn: leidoEnIso }), req.ip ?? null],
+    ).catch(() => undefined);
+
     res.status(200).json({
       idNotificacion: row.id,
       estado: row.estado,
@@ -312,7 +320,7 @@ export function crearRouterCasilla(pool: Pool): Router {
     const usuarioId = obtenerUsuarioId(req);
 
     const notifRes = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND usuario_id = $2::uuid`,
+      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND (usuario_id = $2::uuid OR persona_id IN (SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $2::uuid))`,
       [id, usuarioId],
     );
 
@@ -457,19 +465,85 @@ export function crearRouterCasilla(pool: Pool): Router {
   router.get('/casilla/notificaciones/:id/documento/descargar', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const usuarioId = obtenerUsuarioId(req);
-    const documento = await pool.query<{ documento_url: string | null }>(
-      `SELECT documento_url FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND usuario_id = $2::uuid`,
+    const documento = await pool.query<{
+      documento_url: string | null;
+      cut: string | null;
+      tipo_acto: string;
+      asunto: string;
+      cvd: string | null;
+    }>(
+      `SELECT documento_url, cut, tipo_acto, asunto, cvd
+         FROM sigd_auth.notificacion_casilla
+        WHERE id = $1::uuid AND (usuario_id = $2::uuid OR persona_id IN (SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $2::uuid))`,
       [id, usuarioId],
     );
-    if (!documento.rows[0]?.documento_url) throw new NotFoundError({ detail: 'Documento no disponible para esta cuenta.' });
-    let downloadUrl = documento.rows[0].documento_url;
+    if (!documento.rows[0]) {
+      throw new NotFoundError({ detail: 'Notificación no encontrada o no autorizada para esta cuenta.' });
+    }
+    const notif = documento.rows[0];
+    if (!notif.documento_url) {
+      throw new NotFoundError({ detail: 'Documento no disponible para esta cuenta.' });
+    }
+    const docUrl: string = notif.documento_url;
+
+    // Control canónico de firma 5I: El documento debe constar con estado FIRMADO_DIGITALMENTE en sigd_doc.firma_digital_documento (PM-5J-35)
+    if (notif.cvd) {
+      const firmaCanonica = await pool.query<{ estado: string }>(
+        `SELECT estado FROM sigd_doc.firma_digital_documento WHERE cvd = $1`,
+        [notif.cvd],
+      );
+      if (!firmaCanonica.rows[0] || firmaCanonica.rows[0].estado !== 'FIRMADO_DIGITALMENTE') {
+        throw new ConflictError({
+          code: 'DOCUMENTO_NO_ENTREGABLE',
+          message: 'El documento no cuenta con evidencia válida en el registro canónico de firmas digitales.',
+        });
+      }
+    }
+
+    // Control de entrega: Prohibido entregar resoluciones en estado BORRADOR o EN_FIRMA (PM-5J-08, PM-5J-09)
+    if (notif.cut) {
+      const resExp = await pool.query<{ estado: string }>(
+        `SELECT r.estado
+           FROM sigd_doc.resolucion r
+           JOIN sigd_tra.expediente e ON (e.expediente_id = r.expediente_tra_id OR e.expediente_id = r.expediente_id)
+          WHERE e.codigo_expediente = $1
+          ORDER BY r.creado_en DESC LIMIT 1`,
+        [notif.cut],
+      );
+      if (resExp.rows[0] && ['BORRADOR', 'BORRADOR_PENDIENTE_FIRMA', 'EN_FIRMA'].includes(resExp.rows[0].estado)) {
+        throw new ConflictError({
+          code: 'DOCUMENTO_NO_ENTREGABLE',
+          message: 'El documento se encuentra en borrador o en proceso de firma y aún no es entregable al administrado.',
+        });
+      }
+    }
+
+    let downloadUrl = docUrl;
     if (!downloadUrl.startsWith('http://') && !downloadUrl.startsWith('https://')) {
       const configS3 = obtenerConfiguracionS3();
       downloadUrl = generarUrlPresigned(downloadUrl, configS3, { metodo: 'GET', expiraSegundos: 900 });
     }
+
+    // Registrar evento de descarga auditado con semántica exacta: ENLACE_DE_DESCARGA_GENERADO (PM-5J-15)
+    // No modifica el estado FSM del expediente (PM-5J-30)
+    await pool.query(
+      `UPDATE sigd_auth.notificacion_casilla
+          SET estado = CASE WHEN estado IN ('NO_LEIDO', 'GENERADA', 'PUESTA_A_DISPOSICION') THEN 'LEIDO' ELSE estado END
+        WHERE id = $1::uuid`,
+      [id],
+    );
+
+    await pool.query(
+      `INSERT INTO sigd_auth.notificacion_trazabilidad_evento (
+         notificacion_id, tipo_evento, canal, estado, detalles, ip_origen
+       ) VALUES ($1, 'ENLACE_DE_DESCARGA_GENERADO', 'CASILLA', 'EXITOSO', $2::jsonb, $3)`,
+      [id, JSON.stringify({ expiraSegundos: 900, enlaceGenerado: true }), req.ip ?? null],
+    ).catch(() => undefined);
+
     res.status(200).json({
       downloadUrl,
       expiraEnSegundos: 900,
+      evento: 'ENLACE_DE_DESCARGA_GENERADO',
     });
   });
 

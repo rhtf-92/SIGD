@@ -4,6 +4,7 @@ import {
   derivarExpediente,
   recepcionarExpediente,
   atenderExpediente,
+  resolverExpedienteConFirma,
   archivarExpediente,
   observarExpediente,
   subsanarExpediente,
@@ -325,7 +326,7 @@ describe('T-BE-RD-07: Atención Resolutiva', () => {
     expect(insertarEvento).not.toHaveBeenCalled();
   });
 
-  it('2. Debe procesar exitosamente la atención y emitir al Outbox y Casilla', async () => {
+  it('2. Debe rechazar atención directa en EN_REVISION exigiendo pase formal a firma (Invariante 5K.1)', async () => {
     vi.mocked(getRequestContext).mockReturnValueOnce({
       usuario_id: 'usr-123',
       unidad_organica_id: 'area-origen-1',
@@ -333,25 +334,70 @@ describe('T-BE-RD-07: Atención Resolutiva', () => {
       ip_origen: 'ip',
       user_agent: 'ua',
     });
-    setupMockQueriesAtencion('EN_REVISION');
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{
+        estado_actual_id: 'EN_REVISION',
+        area_contexto_id: 'area-origen-1',
+        codigo_expediente: 'EXP-2026-000001',
+        solicitante_id: 'sol-123-uuid',
+        tipo_documental_id: 'tipo-doc-123',
+      }],
+    });
 
     const dto: AtenderExpedienteDTO = { resultado_resumen: 'Resolución Aprobada' };
-    await atenderExpediente(mockCliente, mockExpedienteId, dto);
+    await expect(atenderExpediente(mockCliente, mockExpedienteId, dto)).rejects.toThrow(DomainError);
+  });
 
-    // Assert Outbox
+  it('2b. resolverExpedienteConFirma procesa formalmente con firma, emite ExpedienteAtendido enriquecido y no hace insert directo a casilla', async () => {
+    vi.mocked(getRequestContext).mockReturnValueOnce({
+      usuario_id: 'usr-123',
+      unidad_organica_id: 'area-origen-1',
+      correlation_id: 'c1',
+      ip_origen: 'ip',
+      user_agent: 'ua',
+    });
+    mockQuery.mockReset();
+    // 1. SELECT sigd_tra.expediente
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{
+        estado_actual_id: 'EN_FIRMA',
+        area_contexto_id: 'area-origen-1',
+        codigo_expediente: 'EXP-2026-000001',
+        solicitante_id: 'sol-123-uuid',
+      }],
+    });
+    // 2. SELECT evidencia firma sigd_doc.firma_digital_documento
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ documento_id: 'doc-firmado-uuid', cvd: 'CVD-TEST-123' }],
+    });
+    // 3. INSERT movimiento FIRMA -> RESUELTO
+    mockQuery.mockResolvedValueOnce({ rows: [{ movimiento_id: 'mov-resuelto-1' }] });
+    // 4. UPDATE sigd_tra.expediente
+    mockQuery.mockResolvedValueOnce({ rowCount: 1 });
+
+    const dto: AtenderExpedienteDTO = { resultado_resumen: 'Resolución Firmada y Aprobada' };
+    const resultado = await resolverExpedienteConFirma(mockCliente, mockExpedienteId, dto);
+
+    expect(resultado.estado).toBe('RESUELTO');
     expect(insertarEvento).toHaveBeenCalledTimes(1);
     expect(insertarEvento).toHaveBeenCalledWith(mockCliente, expect.objectContaining({
       tipo_evento: 'ExpedienteAtendido',
       payload: expect.objectContaining({
-        datos_especificos: expect.objectContaining({ resultado_resumen: 'Resolución Aprobada' }),
+        cut: 'EXP-2026-000001',
+        persona_id: 'sol-123-uuid',
+        subtipo: 'RESOLUCION_FIRMADA',
+        tipo_acto: 'RESOLUCION',
+        cvd: 'CVD-TEST-123',
+        documento_id: 'doc-firmado-uuid',
       }),
     }));
 
-    // Verificamos los INSERTs requeridos
+    // REGLA 5K.1: Ningún query debe ser INSERT INTO sigd_auth.notificacion_casilla
     const queries = mockQuery.mock.calls.map(call => call[0].toString().toUpperCase());
-    expect(queries.some(q => q.includes('INSERT INTO SIGD_RUT.MOVIMIENTO_TRAMITE'))).toBe(true);
-    expect(queries.some(q => q.includes('INSERT INTO SIGD_AUTH.NOTIFICACION_CASILLA'))).toBe(true);
-    expect(queries.some(q => q.includes('UPDATE SIGD_TRA.EXPEDIENTE'))).toBe(true);
+    expect(queries.some(q => q.includes('INSERT INTO SIGD_AUTH.NOTIFICACION_CASILLA'))).toBe(false);
   });
 
   it('3. Debe rechazar si el expediente no está en estado atendible', async () => {

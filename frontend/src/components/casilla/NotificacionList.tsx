@@ -36,6 +36,35 @@ interface NotificationListProps {
 // ============================================================================
 function renderEstadoBadge(estado: EstadoNotificacion) {
   switch (estado) {
+    case "PUESTA_A_DISPOSICION":
+    case "GENERADA":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-800 shadow-sm">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+          </span>
+          {estado === "PUESTA_A_DISPOSICION" ? "Puesta a disposición" : "No Leído"}
+        </span>
+      );
+    case "VISUALIZADA":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+          Visualizada
+        </span>
+      );
+    case "DESCARGADA":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300 bg-sky-50 px-2.5 py-0.5 text-xs font-bold text-sky-800 shadow-sm">
+          Descargada
+        </span>
+      );
+    case "ERROR_ENVIO":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+          Error Envío
+        </span>
+      );
     case "NO_LEIDO":
       return (
         <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-800 shadow-sm">

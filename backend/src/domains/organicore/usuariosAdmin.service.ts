@@ -447,14 +447,26 @@ export function crearUsuariosAdminService(pool: Pool) {
    */
   async function revocarSesionesUsuario(
     usuarioId: string | number,
+    motivo: string = 'Revocación administrativa de sesiones',
+    revocadoPor?: string,
   ): Promise<number> {
     const idParam = String(usuarioId);
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam);
     const resultado = await pool.query(
       isUuid
-        ? `DELETE FROM sigd_auth.sesion_usuario WHERE id_usuario = $1::uuid`
-        : `DELETE FROM sigd_auth.sesion_usuario WHERE id_usuario::text = $1`,
-      [usuarioId],
+        ? `UPDATE sigd_auth.sesion_usuario
+              SET revocado_en = now(),
+                  motivo_revocacion = $2,
+                  revocado_por = $3::uuid
+            WHERE id_usuario = $1::uuid
+              AND revocado_en IS NULL`
+        : `UPDATE sigd_auth.sesion_usuario
+              SET revocado_en = now(),
+                  motivo_revocacion = $2,
+                  revocado_por = $3::uuid
+            WHERE id_usuario::text = $1
+              AND revocado_en IS NULL`,
+      [usuarioId, motivo, revocadoPor ?? null],
     );
 
     return resultado.rowCount ?? 0;

@@ -33,7 +33,7 @@ export const ROLES_VENTANILLA: readonly RolCanonica[] = ROLES_INSTITUCIONALES;
 export const ROLES_REPORTES: readonly RolCanonica[] = ['DIRECTOR', 'ADMINISTRADOR'];
 export const ROLES_ADMIN: readonly RolCanonica[] = ['ADMINISTRADOR'];
 export const ROLES_CIUDADANO: readonly RolCanonica[] = ['CIUDADANO'];
-export const ROLES_TESORERIA: readonly RolCanonica[] = ['TESORERIA', 'ADMINISTRADOR'];
+export const ROLES_TESORERIA: readonly RolCanonica[] = ['TESORERIA'];
 
 export const RUTAS_PERSONALES_CIUDADANO = [
   '/mi-perfil',
@@ -85,16 +85,94 @@ export function rolesPermitidosParaRuta(pathname: string): readonly RolCanonica[
   return null;
 }
 
-export function canAccessRoute(rol: RolCanonica, pathname: string): boolean {
+export type ContextoOperativo = 'PERSONAL' | 'INSTITUCIONAL';
+
+export interface AccesoRouteOptions {
+  contexto?: ContextoOperativo;
+  perfiles?: string[];
+  permisos?: string[];
+}
+
+export function canAccessRoute(
+  rol: RolCanonica,
+  pathname: string,
+  contextoOrOptions?: ContextoOperativo | AccesoRouteOptions,
+  perfilesLegacy?: string[]
+): boolean {
   const ruta = normalizarRuta(pathname);
 
-  // 1. Aislamiento estricto de vistas personales ciudadanas (mis expedientes, casilla electrónica)
+  const options: AccesoRouteOptions =
+    typeof contextoOrOptions === 'object' && contextoOrOptions !== null
+      ? contextoOrOptions
+      : {
+          contexto: contextoOrOptions,
+          perfiles: perfilesLegacy,
+        };
+
+  const { contexto, perfiles } = options;
+
+  // 1. Si se evalúa explícitamente bajo contexto PERSONAL (Regla 8 y 9 Fase 5H)
+  if (contexto === 'PERSONAL') {
+    // Permite rutas públicas y personales ciudadanas
+    if (
+      esRutaPersonalCiudadano(ruta) ||
+      ruta === '/tramite' ||
+      ruta === '/tramite/mesa-partes-virtual' ||
+      ruta === '/' ||
+      ruta === '/tupa' ||
+      ruta === '/consulta' ||
+      ruta.startsWith('/consulta/') ||
+      ruta === '/validador-cvd' ||
+      ruta === '/flujo-validez-legal' ||
+      ruta === '/solicitud-acceso-tupa' ||
+      ruta === '/login' ||
+      ruta === '/registro' ||
+      ruta === '/acceso-denegado'
+    ) {
+      return true;
+    }
+    // Bloqueo estricto de cualquier módulo institucional en contexto PERSONAL
+    return false;
+  }
+
+  // 2. Si se evalúa explícitamente bajo contexto INSTITUCIONAL (Regla 10 Fase 5H)
+  if (contexto === 'INSTITUCIONAL') {
+    // Excluido de la creación ciudadana en /tramite
+    if (ruta === '/tramite' || ruta === '/tramite/mesa-partes-virtual') {
+      return false;
+    }
+    // Aislamiento estricto de vistas personales ciudadanas (debe cambiar a PERSONAL)
+    if (esRutaPersonalCiudadano(ruta)) {
+      return false;
+    }
+
+    // Regla PM-5H-21 / PM-5H-22: Módulo de Tesorería requiere capacidad explícita
+    if (ruta === '/tesoreria' || ruta.startsWith('/tesoreria/')) {
+      if (perfiles?.includes('GESTOR_TESORERIA')) return true;
+      return rol === 'TESORERIA';
+    }
+
+    if (rol === 'ADMINISTRADOR') {
+      return true;
+    }
+    const permitidos = rolesPermitidosParaRuta(ruta);
+    if (permitidos === null) return true;
+    return permitidos.includes(rol);
+  }
+
+  // 3. Fallback canónico sin contexto explícito (compatibilidad total)
+  // Aislamiento estricto de vistas personales ciudadanas
   if (esRutaPersonalCiudadano(ruta)) {
     return rol === 'CIUDADANO';
   }
 
-  // 2. ADMINISTRADOR: rol institucional superior. Acceso irrestricto a todos los módulos institucionales y públicos.
-  // Queda excluido de la creación ciudadana en /tramite (el administrador utiliza Ventanilla Presencial).
+  // Módulo de Tesorería en fallback: requiere GESTOR_TESORERIA o rol TESORERIA
+  if (ruta === '/tesoreria' || ruta.startsWith('/tesoreria/')) {
+    if (perfiles?.includes('GESTOR_TESORERIA')) return true;
+    return rol === 'TESORERIA';
+  }
+
+  // ADMINISTRADOR: rol institucional superior técnico
   if (rol === 'ADMINISTRADOR') {
     if (ruta === '/tramite' || ruta === '/tramite/mesa-partes-virtual') {
       return false;
@@ -102,7 +180,7 @@ export function canAccessRoute(rol: RolCanonica, pathname: string): boolean {
     return true;
   }
 
-  // 3. Demás roles: verificar lista canónica de permitidos
+  // Demás roles: verificar lista canónica de permitidos
   const permitidos = rolesPermitidosParaRuta(ruta);
   if (permitidos === null) return true;
   return permitidos.includes(rol);

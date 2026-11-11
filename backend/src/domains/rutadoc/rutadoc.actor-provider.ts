@@ -66,9 +66,20 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
             WHERE u.id_usuario = $1 AND u.activo = true`,
           [usuarioId, roles],
         );
-        if (resUser.rows.length === 0) return null;
-        idPersona = resUser.rows[0].id_persona;
-        areaId = resUser.rows[0].area_id;
+        if (resUser.rows.length === 0) {
+          const resSimple = await pool.query<{ id_persona: string | null }>(
+            `SELECT id_persona::text FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1`,
+            [usuarioId],
+          );
+          if (resSimple.rows && resSimple.rows.length > 0) {
+            idPersona = resSimple.rows[0].id_persona;
+          } else {
+            return null;
+          }
+        } else {
+          idPersona = resUser.rows[0].id_persona;
+          areaId = resUser.rows[0].area_id;
+        }
       } catch {
         return null;
       }

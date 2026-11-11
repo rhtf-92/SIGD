@@ -117,6 +117,8 @@ describe('ExpedienteDetallePage — Seguimiento End-to-End y Custodia Documental
         clasificacion: 'PROCEDIMIENTO_APROBADO',
         plazoDias: 15,
         costo: 100.0,
+        unidadResponsableId: 'a0000000-0000-0000-0000-000000000001',
+        unidadResponsableNombre: 'Subdirección Académica',
       },
       pago: {
         ordenPagoId: 'ord-14',
@@ -158,8 +160,8 @@ describe('ExpedienteDetallePage — Seguimiento End-to-End y Custodia Documental
     // Responsable Actual
     expect(screen.getByText('Operador de Mesa de Partes')).toBeInTheDocument();
 
-    // Área Responsable TUPA sugerida
-    expect(screen.getByText('Subdirección Académica (SDA)')).toBeInTheDocument();
+    // Área Responsable: permanece en Mesa de Partes (sin inferencias arbitrarias)
+    expect(screen.getAllByText('Mesa de Partes').length).toBeGreaterThanOrEqual(1);
 
     // Banner de Pago Pendiente
     expect(screen.getByText(/Pago Pendiente en Tesorería/i)).toBeInTheDocument();
@@ -199,6 +201,8 @@ describe('ExpedienteDetallePage — Seguimiento End-to-End y Custodia Documental
         clasificacion: 'PROCEDIMIENTO_APROBADO',
         plazoDias: 15,
         costo: 100.0,
+        unidadResponsableId: 'a0000000-0000-0000-0000-000000000001',
+        unidadResponsableNombre: 'Subdirección Académica',
       },
       pago: {
         ordenPagoId: 'ord-14',
@@ -231,8 +235,8 @@ describe('ExpedienteDetallePage — Seguimiento End-to-End y Custodia Documental
     // Debe mostrar badge "Listo para derivar"
     expect(screen.getByText('✓ Listo para derivar')).toBeInTheDocument();
 
-    // Debe sugerir Subdirección Académica
-    expect(screen.getByText(/Destino sugerido:/i)).toBeInTheDocument();
+    // Debe sugerir Subdirección Académica según configuración institucional
+    expect(screen.getByText(/Destino sugerido institucional:/i)).toBeInTheDocument();
     expect(screen.getByText('Subdirección Académica')).toBeInTheDocument();
 
     // Botón de derivación habilitado
@@ -272,6 +276,8 @@ describe('ExpedienteDetallePage — Seguimiento End-to-End y Custodia Documental
         clasificacion: 'PROCEDIMIENTO_APROBADO',
         plazoDias: 15,
         costo: 100.0,
+        unidadResponsableId: 'a0000000-0000-0000-0000-000000000001',
+        unidadResponsableNombre: 'Subdirección Académica',
       },
       pago: null,
       slaResumen: null,

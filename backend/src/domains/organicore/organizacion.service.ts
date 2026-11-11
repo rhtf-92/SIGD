@@ -8,6 +8,7 @@ import {
   ValidationError,
   NotFoundError,
   ConflictError,
+  ForbiddenError,
 } from '../../shared/domain/errors/index.js';
 import { OrganizacionRepository } from './organizacion.repository.js';
 import type {
@@ -220,22 +221,65 @@ export class OrganizacionService {
   }
 
   async crearAsignacion(input: CrearAsignacionInput, usuarioIdAudit?: string): Promise<AsignacionPersonalModel> {
-    this.validarUuid(input.idUsuario, 'idUsuario');
+    if (!input.idUsuario && !input.idPersona) {
+      throw new ValidationError({
+        message: 'Debe especificar al menos un identificador de persona (idPersona) o de cuenta (idUsuario).',
+        invalidParams: [{ name: 'idPersona', reason: 'Requerido si no se envía idUsuario' }],
+      });
+    }
+
+    let idPersonaEfectivo = input.idPersona ?? null;
+    let idUsuarioEfectivo = input.idUsuario ?? null;
+
+
+    if (idUsuarioEfectivo) {
+      this.validarUuid(idUsuarioEfectivo, 'idUsuario');
+      const cuenta = await this.repo.obtenerCuentaUsuario(this.pool, idUsuarioEfectivo);
+      if (!cuenta) {
+        throw new NotFoundError({
+          message: 'La cuenta de usuario especificada no existe.',
+          detail: `id_usuario: ${idUsuarioEfectivo}`,
+        });
+      }
+      if (!cuenta.activo) {
+        throw new ConflictError({
+          message: 'No se puede asignar un puesto o cargo a una cuenta de usuario inactiva o deshabilitada.',
+        });
+      }
+      idPersonaEfectivo = cuenta.personaId;
+    } else if (idPersonaEfectivo) {
+      this.validarUuid(idPersonaEfectivo, 'idPersona');
+      const { rows: pRows } = await this.pool.query('SELECT id_persona FROM sigd_auth.persona WHERE id_persona = $1::uuid', [idPersonaEfectivo]);
+      if (pRows.length === 0) {
+        throw new NotFoundError({
+          message: 'La persona especificada no existe.',
+          detail: `id_persona: ${idPersonaEfectivo}`,
+        });
+      }
+    }
+
+    if (input.idVinculo) {
+      this.validarUuid(input.idVinculo, 'idVinculo');
+      const { rows: vRows } = await this.pool.query(
+        'SELECT id_vinculo, id_persona, estado FROM sigd_auth.vinculo_institucional WHERE id_vinculo = $1::uuid',
+        [input.idVinculo]
+      );
+      if (vRows.length === 0) {
+        throw new NotFoundError({
+          message: 'El vínculo institucional especificado no existe.',
+          detail: `id_vinculo: ${input.idVinculo}`,
+        });
+      }
+      if (idPersonaEfectivo && vRows[0].id_persona !== idPersonaEfectivo) {
+        throw new ValidationError({
+          message: 'El vínculo institucional no pertenece a la persona asignada.',
+          invalidParams: [{ name: 'idVinculo', reason: 'Vínculo pertenece a otra persona' }],
+        });
+      }
+    }
+
     this.validarUuid(input.cargoId, 'cargoId');
     this.validarUuid(input.areaId, 'areaId');
-
-    const cuenta = await this.repo.obtenerCuentaUsuario(this.pool, input.idUsuario);
-    if (!cuenta) {
-      throw new NotFoundError({
-        message: 'La cuenta de usuario especificada no existe.',
-        detail: `id_usuario: ${input.idUsuario}`,
-      });
-    }
-    if (!cuenta.activo) {
-      throw new ConflictError({
-        message: 'No se puede asignar un puesto o cargo a una cuenta de usuario inactiva o deshabilitada.',
-      });
-    }
 
     const cargo = await this.repo.obtenerCargoPorId(this.pool, input.cargoId);
     if (!cargo || !cargo.vigente) {
@@ -284,7 +328,9 @@ export class OrganizacionService {
       const asignacion = await this.repo.insertarAsignacion(
         cliente,
         {
-          idUsuario: input.idUsuario,
+          idUsuario: idUsuarioEfectivo,
+          idPersona: idPersonaEfectivo,
+          idVinculo: input.idVinculo ?? null,
           cargoId: input.cargoId,
           areaId: input.areaId,
           vigenteDesde: fechaDesde,
@@ -387,20 +433,91 @@ export class OrganizacionService {
       });
     }
 
-    this.validarUuid(input.idUsuario, 'idUsuario');
+    if (!input.idUsuario && !input.idPersona) {
+      throw new ValidationError({
+        message: 'Debe especificar al menos un identificador de persona (idPersona) o de cuenta (idUsuario).',
+        invalidParams: [{ name: 'idPersona', reason: 'Requerido si no se envía idUsuario' }],
+      });
+    }
+
+    let idPersonaEfectivo = input.idPersona ?? null;
+    let idUsuarioEfectivo = input.idUsuario ?? null;
+
+    let idPersonaAudit: string | null = null;
+    if (usuarioIdAudit) {
+      this.validarUuid(usuarioIdAudit, 'usuarioIdAudit');
+      const cuentaAudit = await this.repo.obtenerCuentaUsuario(this.pool, usuarioIdAudit);
+      if (cuentaAudit) {
+        idPersonaAudit = cuentaAudit.personaId;
+      }
+    }
+
+    if (idUsuarioEfectivo) {
+      this.validarUuid(idUsuarioEfectivo, 'idUsuario');
+      const cuenta = await this.repo.obtenerCuentaUsuario(this.pool, idUsuarioEfectivo);
+      if (!cuenta) {
+        throw new NotFoundError({
+          message: 'La cuenta de usuario designada no existe.',
+          detail: `id_usuario: ${idUsuarioEfectivo}`,
+        });
+      }
+      if (!cuenta.activo) {
+        throw new ConflictError({
+          message: 'No se puede encomendar una responsabilidad temporal a una cuenta de usuario inactiva o deshabilitada.',
+        });
+      }
+      idPersonaEfectivo = cuenta.personaId;
+    } else if (idPersonaEfectivo) {
+      this.validarUuid(idPersonaEfectivo, 'idPersona');
+      const { rows: pRows } = await this.pool.query('SELECT id_persona FROM sigd_auth.persona WHERE id_persona = $1::uuid', [idPersonaEfectivo]);
+      if (pRows.length === 0) {
+        throw new NotFoundError({
+          message: 'La persona designada no existe.',
+          detail: `id_persona: ${idPersonaEfectivo}`,
+        });
+      }
+    }
+
+    let titularPersonaIdEfectivo = input.titularPersonaId ?? null;
+    let titularUsuarioIdEfectivo = input.titularUsuarioId ?? null;
+
+    if (titularUsuarioIdEfectivo) {
+      this.validarUuid(titularUsuarioIdEfectivo, 'titularUsuarioId');
+      const titularCuenta = await this.repo.obtenerCuentaUsuario(this.pool, titularUsuarioIdEfectivo);
+      if (titularCuenta) {
+        titularPersonaIdEfectivo = titularCuenta.personaId;
+      }
+    }
+
     this.validarUuid(input.cargoId, 'cargoId');
     this.validarUuid(input.areaId, 'areaId');
 
-    const cuenta = await this.repo.obtenerCuentaUsuario(this.pool, input.idUsuario);
-    if (!cuenta) {
-      throw new NotFoundError({
-        message: 'La cuenta de usuario designada no existe.',
-        detail: `id_usuario: ${input.idUsuario}`,
+    // Regla Anti-Auto-Reemplazo (a nivel de cuenta y a nivel de persona)
+    if (input.titularUsuarioId && input.idUsuario && input.titularUsuarioId === input.idUsuario) {
+      throw new ValidationError({
+        message: 'Un usuario no puede ser titular y reemplazante/suplente de sí mismo simultáneamente.',
+        invalidParams: [{ name: 'titularUsuarioId', reason: 'titular y suplente deben ser distintos' }],
       });
     }
-    if (!cuenta.activo) {
-      throw new ConflictError({
-        message: 'No se puede encomendar una responsabilidad temporal a una cuenta de usuario inactiva o deshabilitada.',
+
+    if (input.titularPersonaId && input.idPersona && input.titularPersonaId === input.idPersona) {
+      throw new ValidationError({
+        message: 'Una persona no puede ser titular y reemplazante/suplente de sí misma simultáneamente.',
+        invalidParams: [{ name: 'titularPersonaId', reason: 'titular y suplente deben corresponder a personas distintas' }],
+      });
+    }
+
+    if (input.titularPersonaId && idPersonaEfectivo && input.titularPersonaId === idPersonaEfectivo) {
+      throw new ValidationError({
+        message: 'Una persona no puede ser titular y reemplazante/suplente de sí misma simultáneamente.',
+        invalidParams: [{ name: 'titularPersonaId', reason: 'titular y suplente corresponden a la misma persona' }],
+      });
+    }
+
+    if (input.idPersona && titularPersonaIdEfectivo && input.idPersona === titularPersonaIdEfectivo) {
+      throw new ValidationError({
+        message: 'Una persona no puede ser titular y reemplazante/suplente de sí misma simultáneamente.',
+        invalidParams: [{ name: 'idPersona', reason: 'titular y suplente corresponden a la misma persona' }],
       });
     }
 
@@ -420,14 +537,6 @@ export class OrganizacionService {
           detail: `titular_usuario_id: ${input.titularUsuarioId}`,
         });
       }
-    }
-
-    // Regla Anti-Auto-Reemplazo
-    if (input.titularUsuarioId && input.titularUsuarioId === input.idUsuario) {
-      throw new ValidationError({
-        message: 'Un usuario no puede ser titular y reemplazante/suplente de sí mismo simultáneamente.',
-        invalidParams: [{ name: 'titularUsuarioId', reason: 'titular y suplente deben ser distintos' }],
-      });
     }
 
     const cargo = await this.repo.obtenerCargoPorId(this.pool, input.cargoId);
@@ -481,6 +590,40 @@ export class OrganizacionService {
       }
     }
 
+    // Auditoría de Seguridad: Concesión de facultaFirma (Fail-Closed)
+    if (input.alcance && (input.alcance as any).facultaFirma === true) {
+      throw new ForbiddenError({
+        message: 'Concesión de facultad de firma no autorizada.',
+        detail: 'La autoridad institucional para delegar la potestad de firma documental (facultaFirma: true) se encuentra NO_DETERMINADA. Principio de menor privilegio (fail-closed).',
+      });
+    }
+
+    // Auditoría de Seguridad: Prevención de asignación o encargatura de Dirección General (Fail-Closed)
+    const esMismoUsuario = Boolean(
+      usuarioIdAudit &&
+      idUsuarioEfectivo &&
+      idUsuarioEfectivo === usuarioIdAudit
+    );
+
+    const esMismaPersona = Boolean(
+      idPersonaAudit &&
+      idPersonaEfectivo &&
+      idPersonaEfectivo === idPersonaAudit
+    );
+
+    if (cargo.codigo === 'DIRECTOR') {
+      if (esMismoUsuario || esMismaPersona) {
+        throw new ForbiddenError({
+          message: 'Autoasignación de cargo directivo prohibida.',
+          detail: 'No está permitido autoasignarse la responsabilidad temporal del cargo DIRECTOR. Principio de separación de funciones.',
+        });
+      }
+      throw new ForbiddenError({
+        message: 'Designación de cargo directivo no autorizada.',
+        detail: 'La autoridad institucional para encargar, suplir o delegar el cargo DIRECTOR se encuentra NO_DETERMINADA. El permiso de administración técnica ORGANIZACION_GESTIONAR no confiere potestad para originar autoridad directiva sustantiva.',
+      });
+    }
+
     const cliente = await this.pool.connect();
     try {
       await cliente.query('BEGIN');
@@ -488,8 +631,10 @@ export class OrganizacionService {
         cliente,
         {
           tipoResponsabilidad: input.tipoResponsabilidad,
-          idUsuario: input.idUsuario,
-          titularUsuarioId: input.titularUsuarioId,
+          idUsuario: idUsuarioEfectivo,
+          idPersona: idPersonaEfectivo,
+          titularUsuarioId: titularUsuarioIdEfectivo,
+          titularPersonaId: titularPersonaIdEfectivo,
           cargoId: input.cargoId,
           areaId: input.areaId,
           vigenteDesde: fechaDesde,
@@ -729,4 +874,154 @@ export class OrganizacionService {
       }
     }
   }
+
+  // ===========================================================================
+  // 5. GOBIERNO DE CICLO LABORAL — DESVINCULACIÓN (OFFBOARDING SEGURO)
+  // ===========================================================================
+
+  async desvincularPersonal(
+    input: {
+      idPersona: string;
+      idVinculoLaboral: string;
+      fechaFin?: string | Date;
+      motivo?: string;
+    },
+    usuarioIdAudit?: string
+  ): Promise<{
+    idPersona: string;
+    idVinculoLaboral: string;
+    asignacionesFinalizadas: number;
+    responsabilidadesFinalizadas: number;
+    perfilesFinalizados: number;
+    sesionesRevocadas: number;
+  }> {
+    this.validarUuid(input.idPersona, 'idPersona');
+    this.validarUuid(input.idVinculoLaboral, 'idVinculoLaboral');
+
+    const fechaCese = input.fechaFin ? new Date(input.fechaFin) : new Date();
+    const motivoCese = input.motivo ?? 'Cese / Fin de contrato laboral';
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+
+      // 1. Verificar persona
+      const { rows: pRows } = await cliente.query(
+        'SELECT id_persona FROM sigd_auth.persona WHERE id_persona = $1::uuid',
+        [input.idPersona]
+      );
+      if (pRows.length === 0) {
+        throw new NotFoundError({
+          message: 'La persona indicada no existe.',
+          detail: `id_persona: ${input.idPersona}`,
+        });
+      }
+
+      // 2. Verificar vínculo laboral (debe ser de categoría PERSONAL_INSTITUCIONAL)
+      const { rows: vRows } = await cliente.query(
+        `SELECT v.id_vinculo, t.codigo, t.categoria_actor, v.estado
+           FROM sigd_auth.vinculo_institucional v
+           JOIN sigd_auth.tipo_vinculo_institucional t ON t.id_tipo_vinculo = v.id_tipo_vinculo
+          WHERE v.id_vinculo = $1::uuid AND v.id_persona = $2::uuid`,
+        [input.idVinculoLaboral, input.idPersona]
+      );
+      if (vRows.length === 0) {
+        throw new NotFoundError({
+          message: 'El vínculo institucional indicado no pertenece a la persona o no existe.',
+          detail: `id_vinculo: ${input.idVinculoLaboral}`,
+        });
+      }
+      const vinculo = vRows[0];
+      if (vinculo.categoria_actor !== 'PERSONAL_INSTITUCIONAL') {
+        throw new ValidationError({
+          message: `El vínculo seleccionado (${vinculo.codigo}) no es de naturaleza laboral (${vinculo.categoria_actor}).`,
+          invalidParams: [{ name: 'idVinculoLaboral', reason: 'Debe ser de categoría PERSONAL_INSTITUCIONAL' }],
+        });
+      }
+
+      // 3. Finalizar el vínculo laboral (NO afecta vínculos académicos como TITULADO o EGRESADO)
+      await cliente.query(
+        `UPDATE sigd_auth.vinculo_institucional
+             SET estado = 'FINALIZADO',
+                 vigente_hasta = $2,
+                 motivo_finalizacion = $3,
+                 actualizado_en = now()
+           WHERE id_vinculo = $1::uuid`,
+        [input.idVinculoLaboral, fechaCese, motivoCese]
+      );
+
+      // 4. Finalizar asignaciones ordinarias de personal activas
+      const resAsigs = await cliente.query(
+        `UPDATE sigd_org.asignacion_personal
+             SET estado = 'FINALIZADO',
+                 vigente_hasta = $2,
+                 motivo_finalizacion = $3,
+                 actualizado_en = now()
+           WHERE (id_persona = $1::uuid OR id_usuario IN (SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_persona = $1::uuid))
+             AND estado = 'ACTIVO'`,
+        [input.idPersona, fechaCese, motivoCese]
+      );
+
+      // 5. Finalizar responsabilidades temporales activas (encargaturas, suplencias, delegaciones)
+      const resResps = await cliente.query(
+        `UPDATE sigd_org.responsabilidad_temporal
+             SET estado = 'FINALIZADO',
+                 vigente_hasta = $2,
+                 motivo_finalizacion = $3,
+                 actualizado_en = now()
+           WHERE (id_persona = $1::uuid OR id_usuario IN (SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_persona = $1::uuid))
+             AND estado = 'ACTIVO'`,
+        [input.idPersona, fechaCese, motivoCese]
+      );
+
+      // 6. Finalizar asignaciones de perfiles operativos institucionales
+      const resPerfiles = await cliente.query(
+        `UPDATE sigd_org.asignacion_perfil_operativo
+             SET estado = 'FINALIZADO',
+                 vigente_hasta = $2,
+                 motivo_finalizacion = $3,
+                 actualizado_en = now()
+           WHERE id_usuario IN (SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_persona = $1::uuid)
+             AND estado = 'ACTIVO'`,
+        [input.idPersona, fechaCese, motivoCese]
+      );
+
+      // 7. Finalizar roles RBAC vigentes
+      await cliente.query(
+        `UPDATE sigd_org.usuario_rol
+             SET vigente_hasta = $2
+           WHERE id_usuario IN (SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_persona = $1::uuid)
+             AND (vigente_hasta IS NULL OR vigente_hasta > $2)`,
+        [input.idPersona, fechaCese]
+      );
+
+      // 8. Revocar sesiones activas registrando motivo y autor (sin DELETE para preservar auditoría)
+      const resSesiones = await cliente.query(
+        `UPDATE sigd_auth.sesion_usuario
+             SET revocado_en = now(),
+                 motivo_revocacion = $2,
+                 revocado_por = $3
+           WHERE id_usuario IN (SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_persona = $1::uuid)
+             AND revocado_en IS NULL`,
+        [input.idPersona, motivoCese, usuarioIdAudit ?? null]
+      );
+
+      await cliente.query('COMMIT');
+
+      return {
+        idPersona: input.idPersona,
+        idVinculoLaboral: input.idVinculoLaboral,
+        asignacionesFinalizadas: resAsigs.rowCount ?? 0,
+        responsabilidadesFinalizadas: resResps.rowCount ?? 0,
+        perfilesFinalizados: resPerfiles.rowCount ?? 0,
+        sesionesRevocadas: resSesiones.rowCount ?? 0,
+      };
+    } catch (err) {
+      await cliente.query('ROLLBACK');
+      throw err;
+    } finally {
+      cliente.release();
+    }
+  }
+
 }

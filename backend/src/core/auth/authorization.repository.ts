@@ -183,7 +183,8 @@ export class AuthorizationRepository {
          FROM sigd_org.asignacion_personal a
          JOIN sigd_org.cargo c ON c.cargo_id = a.cargo_id
          JOIN sigd_org.area ar ON ar.area_id = a.area_id
-        WHERE a.id_usuario = $1::uuid
+         JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = $1::uuid
+        WHERE (a.id_usuario = $1::uuid OR a.id_persona = cu.id_persona)
           AND a.estado = 'ACTIVO'
           AND a.vigente_desde <= $2::timestamptz
           AND (a.vigente_hasta IS NULL OR a.vigente_hasta > $2::timestamptz)
@@ -235,15 +236,135 @@ export class AuthorizationRepository {
       vigente_hasta: string | null;
       alcance: Record<string, unknown> | null;
     }>(
-      `SELECT id_responsabilidad, tipo_responsabilidad, titular_usuario_id, cargo_id, area_id,
-              estado, vigente_desde::text, vigente_hasta::text, alcance
-         FROM sigd_org.responsabilidad_temporal
-        WHERE id_usuario = $1::uuid
-          AND estado = 'ACTIVO'
-          AND vigente_desde <= $2::timestamptz
-          AND (vigente_hasta IS NULL OR vigente_hasta > $2::timestamptz)
-        ORDER BY vigente_desde DESC`,
+      `SELECT r.id_responsabilidad, r.tipo_responsabilidad, r.titular_usuario_id, r.cargo_id, r.area_id,
+              r.estado, r.vigente_desde::text, r.vigente_hasta::text, r.alcance
+         FROM sigd_org.responsabilidad_temporal r
+         JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = $1::uuid
+        WHERE (r.id_usuario = $1::uuid OR r.id_persona = cu.id_persona)
+          AND r.estado = 'ACTIVO'
+          AND r.vigente_desde <= $2::timestamptz
+          AND (r.vigente_hasta IS NULL OR r.vigente_hasta > $2::timestamptz)
+        ORDER BY r.vigente_desde DESC`,
       [idUsuario, fechaCorte.toISOString()],
+    );
+    return rows.map((r) => ({
+      idResponsabilidad: r.id_responsabilidad,
+      tipo: r.tipo_responsabilidad as
+        | 'ENCARGATURA'
+        | 'SUPLENCIA'
+        | 'DELEGACION'
+        | 'DESIGNACION_ESPECIFICA',
+      titularUsuarioId: r.titular_usuario_id,
+      cargoId: r.cargo_id,
+      areaId: r.area_id,
+      estado: r.estado,
+      vigenteDesde: r.vigente_desde,
+      vigenteHasta: r.vigente_hasta,
+      alcance: r.alcance,
+    }));
+  }
+
+  /**
+   * Lista asignaciones ordinarias de personal directamente por idPersona (sin requerir cuenta).
+   */
+  async listarAsignacionesPorPersona(
+    idPersona: string,
+    fechaCorte: Date,
+  ): Promise<
+    Array<{
+      idAsignacion: string;
+      cargoId: string;
+      cargoCodigo: string;
+      cargoNombre: string;
+      areaId: string;
+      areaCodigo: string;
+      areaNombre: string;
+      areaJerarquia: string | null;
+      estado: string;
+      vigenteDesde: string;
+      vigenteHasta: string | null;
+    }>
+  > {
+    const { rows } = await this.pool.query<{
+      id_asignacion: string;
+      cargo_id: string;
+      cargo_codigo: string;
+      cargo_nombre: string;
+      area_id: string;
+      area_codigo: string;
+      area_nombre: string;
+      jerarquia: string | null;
+      estado: string;
+      vigente_desde: string;
+      vigente_hasta: string | null;
+    }>(
+      `SELECT a.id_asignacion, a.cargo_id, c.codigo AS cargo_codigo, c.nombre AS cargo_nombre,
+              a.area_id, ar.codigo AS area_codigo, ar.nombre AS area_nombre, ar.path::text AS jerarquia,
+              a.estado, a.vigente_desde::text, a.vigente_hasta::text
+         FROM sigd_org.asignacion_personal a
+         JOIN sigd_org.cargo c ON c.cargo_id = a.cargo_id
+         JOIN sigd_org.area ar ON ar.area_id = a.area_id
+        WHERE a.id_persona = $1::uuid
+          AND a.estado = 'ACTIVO'
+          AND a.vigente_desde <= $2::timestamptz
+          AND (a.vigente_hasta IS NULL OR a.vigente_hasta > $2::timestamptz)
+        ORDER BY a.vigente_desde DESC`,
+      [idPersona, fechaCorte.toISOString()],
+    );
+    return rows.map((r) => ({
+      idAsignacion: r.id_asignacion,
+      cargoId: r.cargo_id,
+      cargoCodigo: r.cargo_codigo,
+      cargoNombre: r.cargo_nombre,
+      areaId: r.area_id,
+      areaCodigo: r.area_codigo,
+      areaNombre: r.area_nombre,
+      areaJerarquia: r.jerarquia,
+      estado: r.estado,
+      vigenteDesde: r.vigente_desde,
+      vigenteHasta: r.vigente_hasta,
+    }));
+  }
+
+  /**
+   * Lista responsabilidades temporales directamente por idPersona.
+   */
+  async listarResponsabilidadesPorPersona(
+    idPersona: string,
+    fechaCorte: Date,
+  ): Promise<
+    Array<{
+      idResponsabilidad: string;
+      tipo: 'ENCARGATURA' | 'SUPLENCIA' | 'DELEGACION' | 'DESIGNACION_ESPECIFICA';
+      titularUsuarioId: string | null;
+      cargoId: string;
+      areaId: string;
+      estado: string;
+      vigenteDesde: string;
+      vigenteHasta: string | null;
+      alcance: Record<string, unknown> | null;
+    }>
+  > {
+    const { rows } = await this.pool.query<{
+      id_responsabilidad: string;
+      tipo_responsabilidad: string;
+      titular_usuario_id: string | null;
+      cargo_id: string;
+      area_id: string;
+      estado: string;
+      vigente_desde: string;
+      vigente_hasta: string | null;
+      alcance: Record<string, unknown> | null;
+    }>(
+      `SELECT r.id_responsabilidad, r.tipo_responsabilidad, r.titular_usuario_id, r.cargo_id, r.area_id,
+              r.estado, r.vigente_desde::text, r.vigente_hasta::text, r.alcance
+         FROM sigd_org.responsabilidad_temporal r
+        WHERE r.id_persona = $1::uuid
+          AND r.estado = 'ACTIVO'
+          AND r.vigente_desde <= $2::timestamptz
+          AND (r.vigente_hasta IS NULL OR r.vigente_hasta > $2::timestamptz)
+        ORDER BY r.vigente_desde DESC`,
+      [idPersona, fechaCorte.toISOString()],
     );
     return rows.map((r) => ({
       idResponsabilidad: r.id_responsabilidad,
