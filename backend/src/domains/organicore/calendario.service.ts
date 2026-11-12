@@ -552,6 +552,7 @@ export interface FilaCalendario {
 }
 
 const SELECCION = `
+  SELECT
     c.id_calendario,
     to_char(c.fecha, 'YYYY-MM-DD') AS fecha,
     c.anio,

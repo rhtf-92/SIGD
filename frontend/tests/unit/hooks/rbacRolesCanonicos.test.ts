@@ -2,28 +2,27 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach } from "vitest";
 import { useRbacConfig } from "../../../src/hooks/useRbacConfig";
 
-describe("Suite de Pruebas de Gobernanza RBAC y 5 Roles Canónicos Institucionales (BR-08 / ENT-M05-03)", () => {
+describe("Suite de Pruebas de Gobernanza RBAC y roles heredados de la matriz (BR-08 / ENT-M05-03)", () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it("incluye exactamente los 5 roles canónicos institucionales del IESTP Suiza", () => {
+  it("incluye exactamente los 4 roles heredados de la matriz", () => {
     const { result } = renderHook(() => useRbacConfig());
     const ids = result.current.roles.map((r) => r.id);
 
-    expect(ids).toContain("SUPER_ADMIN");
+    expect(ids).toContain("ADMINISTRADOR");
     expect(ids).toContain("DIRECTOR");
-    expect(ids).toContain("DOCENTE");
     expect(ids).toContain("MESA_PARTES");
-    expect(ids).toContain("ESTUDIANTE");
-    expect(result.current.roles).toHaveLength(5);
+    expect(ids).toContain("CIUDADANO");
+    expect(result.current.roles).toHaveLength(4);
   });
 
-  it("SUPER_ADMIN inicia como rol seleccionado por defecto con permisos completos", () => {
+  it("ADMINISTRADOR inicia como rol seleccionado por defecto con permisos completos", () => {
     const { result } = renderHook(() => useRbacConfig());
 
-    expect(result.current.rolSeleccionado).toBe("SUPER_ADMIN");
-    expect(result.current.rolActual.nombre).toBe("Super Administrador");
+    expect(result.current.rolSeleccionado).toBe("ADMINISTRADOR");
+    expect(result.current.rolActual.nombre).toBe("Administrador");
 
     const permisoExpedientes = result.current.permisosRolActual.find(
       (p) => p.modulo === "Expedientes",
@@ -58,10 +57,10 @@ describe("Suite de Pruebas de Gobernanza RBAC y 5 Roles Canónicos Institucional
     const { result } = renderHook(() => useRbacConfig());
 
     act(() => {
-      result.current.setRolSeleccionado("DOCENTE");
+      result.current.setRolSeleccionado("CIUDADANO");
     });
 
-    expect(result.current.rolActual.nombre).toBe("Docente / Coordinador");
+    expect(result.current.rolActual.nombre).toBe("Ciudadano / Administrado");
 
     // Alternar permiso 'exportar' en índice 0 (Expedientes)
     act(() => {
@@ -69,6 +68,6 @@ describe("Suite de Pruebas de Gobernanza RBAC y 5 Roles Canónicos Institucional
     });
 
     const permisoActualizado = result.current.permisosRolActual[0];
-    expect(permisoActualizado?.exportar).toBe(false);
+    expect(permisoActualizado?.exportar).toBe(true);
   });
 });

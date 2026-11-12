@@ -31,6 +31,11 @@ export default function AuditoriaPage() {
       />
 
       <section className="mx-auto max-w-7xl px-6 py-8">
+                <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="status">
+          Módulo en proceso: los registros de esta pantalla son datos de ejemplo y
+          todavía no vienen de la base de datos. Las acciones de administración
+          aún no se registran aquí.
+        </div>
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
           Los registros de auditoría son de solo lectura. La inmutabilidad real
           debe garantizarse en backend y base de datos (append-only + hash

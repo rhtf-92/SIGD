@@ -76,6 +76,30 @@ const modulos = [
       </>
     ),
   },
+    {
+    titulo: "Versiones del TUPA",
+    descripcion:
+      "Crea borradores, edita trámites y requisitos, y publica nuevas versiones del TUPA.",
+    ruta: "/tupa/gestion",
+    icono: (
+      <>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" />
+        <path d="M14 2v6h6M8 13h8M8 17h8" />
+      </>
+    ),
+  },
+    {
+    titulo: "Atencion de expedientes",
+    descripcion:
+      "Avanza un expediente por su recorrido y consulta la trazabilidad con fecha, hora y usuario.",
+    ruta: "/administracion/atencion",
+    icono: (
+      <>
+        <path d="M9 11l3 3L22 4" />
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      </>
+    ),
+  },
 ];
 
 export default function AdministracionPage() {
