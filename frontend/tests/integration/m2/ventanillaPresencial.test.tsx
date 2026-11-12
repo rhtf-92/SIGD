@@ -9,56 +9,77 @@ import CargoDigitalModal from "../../../src/components/tramite/CargoDigitalModal
 import type { CargoOficialTramite } from "../../../src/types/cargoOficial";
 import { apiClient } from "@/api/client";
 
+vi.mock("@/api/client", () => ({ apiClient: { get: vi.fn(), post: vi.fn() } }));
+
+const tramitesAuditoria = [
+  {
+    id: "00000000-0000-4000-8000-000000000001",
+    codigo: "AUDITORIA-01",
+    denominacion: "AUDITORIA Constancia de prueba",
+    unidad_organica: "AUDITORIA Unidad de prueba",
+    plazo_dias_habiles: 5,
+  },
+  {
+    id: "00000000-0000-4000-8000-000000000002",
+    codigo: "AUDITORIA-02",
+    denominacion: "AUDITORIA Informe de prueba",
+    unidad_organica: "AUDITORIA Unidad de prueba",
+    plazo_dias_habiles: 10,
+  },
+];
+
 const mockRespuestaVentanilla = {
   data: {
-    expedienteId: "00000000-0000-0000-0000-000000000001",
-    cut: "EXP-2026-000155",
+    expedienteId: "00000000-0000-4000-8000-000000000099",
+    cut: "EXP-2026-000099",
     anioFiscal: 2026,
-    fechaRadicacion: "2026-09-23T10:30:00.000Z",
-    ticketImpresion: "TICKET",
+    fechaRadicacion: "2026-11-10T15:00:00.000Z",
+    ticketImpresion: "AUDITORIA-TICKET",
     cargo: {
-      cut: "EXP-2026-000155",
-      remitente: "Sergio Serruche",
-      dni: "74561238",
-      asunto: "Solicitud de convalidación académica",
+      cut: "EXP-2026-000099",
+      remitente: "AUDITORIA Solicitante",
+      dni: "AUDITORIA-DNI",
+      asunto: "AUDITORIA solicitud de prueba",
       folios: 1,
-      fechaRecepcion: "2026-09-23T10:30:00.000Z",
-      hashSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      qrSeguimientoUrl: "https://sigd.iestpsuiza.edu.pe/tramite?cut=EXP-2026-000155",
+      fechaRecepcion: "2026-11-10T15:00:00.000Z",
+      hashSha256: "AUDITORIA-HASH-DE-PRUEBA",
+      qrSeguimientoUrl: "/AUDITORIA/seguimiento?cut=EXP-2026-000099",
     },
   },
 };
 
 const cargoMuestra: CargoOficialTramite = {
-  codigoExpediente: "EXP-2026-000155",
-  fechaRecepcionIso: "2026-09-23T10:30:00.000Z",
-  fechaIngresoFormalIso: "2026-09-23T10:30:00.000Z",
-  horaRecepcion: "10:30:00",
-  operadorVentanillaNombre: "Operador de Mesa de Partes (Ventanilla 1)",
-  sedeInstitucional: "Sede Central - Jr. Tarapacá N° 645, Pucallpa",
+  codigoExpediente: "AUDITORIA-EXP-001",
+  fechaRecepcionIso: "2026-11-10T15:00:00.000Z",
+  fechaIngresoFormalIso: "2026-11-10T15:00:00.000Z",
+  horaRecepcion: "2026-11-10T15:00:00.000Z",
+  operadorVentanillaNombre: "AUDITORIA Operador",
+  sedeInstitucional: "AUDITORIA Sede",
   solicitante: {
     tipoPersona: "NATURAL",
     tipoDocumento: "DNI",
-    numeroDocumento: "74561238",
-    nombreOrazonSocial: "Carlos Mendoza Ríos",
-    correoElectronico: "carlos@gmail.com",
-    telefono: "961234567",
+    numeroDocumento: "AUDITORIA-DNI",
+    nombreOrazonSocial: "AUDITORIA Solicitante",
+    correoElectronico: "auditoria@example.test",
+    telefono: "AUDITORIA-TELEFONO",
   },
-  asunto: "Solicitud de Certificado de Estudios",
-  documentoPrincipalTipo: "SOLICITUD",
+  asunto: "AUDITORIA solicitud de prueba",
+  documentoPrincipalTipo: "AUDITORIA-SOLICITUD",
   cantidadFolios: 3,
-  hashSha256Recepcion: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  hashSha256Recepcion: "AUDITORIA-HASH-DE-PRUEBA",
   horaCorteAplicada: "16:30",
   radicadoDiaSiguiente: false,
-  urlSeguimiento: "https://sigd.iestpsuiza.edu.pe/tramite?cut=EXP-2026-000155",
+  urlSeguimiento: "/AUDITORIA/seguimiento?cut=AUDITORIA-EXP-001",
 };
 
 describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-05)", () => {
   beforeEach(() => {
-    vi.spyOn(apiClient, "post").mockResolvedValue(mockRespuestaVentanilla as any);
+    vi.clearAllMocks();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: tramitesAuditoria } as never);
+    vi.mocked(apiClient.post).mockResolvedValue(mockRespuestaVentanilla as never);
   });
 
-  it("renderiza el formulario de ventanilla presencial con campos obligatorios y conmutador de persona", () => {
+  it("renderiza el formulario con campos obligatorios, conmutador de persona y catálogo TUPA", async () => {
     render(
       <MemoryRouter>
         <VentanillaPresencialPage />
@@ -70,14 +91,22 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/Persona Natural/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Persona Jurídica/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Tipo Documento Identidad/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Número de Documento \*/i)).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /Trámite no TUPA \/ documentación general/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /48 - Otros servicios y alquileres/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Nombres \*/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Apellidos \*/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Correo Electrónico para Notificación \*/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Teléfono \/ Celular de Contacto \*/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Procedimiento TUPA 2026 \*/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Tipo de Documento Presentado \*/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Cantidad de Folios Físicos \*/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Asunto \/ Petitorio Concreto \*/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /✓ Registrar y Emitir Cargo CUT/i })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "AUDITORIA-01 - AUDITORIA Constancia de prueba" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "AUDITORIA-02 - AUDITORIA Informe de prueba" })).toBeInTheDocument();
   });
 
-  it("muestra requisitos, tarifas y datos del procedimiento TUPA seleccionado", async () => {
+  it("muestra los datos del procedimiento TUPA seleccionado", async () => {
     const user = userEvent.setup();
 
     render(
@@ -86,11 +115,36 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
       </MemoryRouter>,
     );
 
-    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "01");
+    const procedimiento = screen.getByLabelText(/Procedimiento TUPA 2026/i);
+    await screen.findByRole("option", { name: "AUDITORIA-01 - AUDITORIA Constancia de prueba" });
+    await user.selectOptions(procedimiento, tramitesAuditoria[0].id);
 
-    expect(screen.getByText("Constancia de No Adeudar", { exact: true })).toBeInTheDocument();
-    expect(screen.getByText(/S\/. 11\.00 por semestre/i)).toBeInTheDocument();
-    expect(screen.getByText(/05 días hábiles/i)).toBeInTheDocument();
+    expect(screen.getByText("AUDITORIA-01: AUDITORIA Constancia de prueba", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText(/Fuente: TUPA vigente del sistema/i)).toBeInTheDocument();
+  });
+
+  it("rechaza un DNI de 7 dígitos sin llamar al servidor", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <VentanillaPresencialPage />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText(/Número de Documento \*/i), "1234567");
+    await user.type(screen.getByLabelText(/Nombres \*/i), "AUDITORIA Nombre");
+    await user.type(screen.getByLabelText(/Apellidos \*/i), "AUDITORIA Apellido");
+    await user.type(screen.getByLabelText(/Correo Electrónico para Notificación \*/i), "auditoria@example.test");
+    await user.type(screen.getByLabelText(/Teléfono \/ Celular de Contacto \*/i), "AUDITORIA-TELEFONO");
+    await screen.findByRole("option", { name: "AUDITORIA-01 - AUDITORIA Constancia de prueba" });
+    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), tramitesAuditoria[0].id);
+    await user.type(screen.getByLabelText(/Asunto \/ Petitorio Concreto \*/i), "AUDITORIA asunto de prueba");
+
+    await user.click(screen.getByRole("button", { name: /✓ Registrar y Emitir Cargo CUT/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/DNI debe tener exactamente 8 dígitos/i);
+    expect(apiClient.post).not.toHaveBeenCalled();
   });
 
   it("CargoDigitalModal: renderiza el ticket térmico con CUT, QR y datos del solicitante", () => {
@@ -103,8 +157,8 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     );
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText("EXP-2026-000155")).toBeInTheDocument();
-    expect(screen.getByText(/Carlos Mendoza Ríos/i)).toBeInTheDocument();
+    expect(screen.getByText("AUDITORIA-EXP-001")).toBeInTheDocument();
+    expect(screen.getByText(/AUDITORIA Solicitante/i)).toBeInTheDocument();
     expect(screen.getByText(/3 foja\(s\)/i)).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /QR para seguimiento del trámite/i })).toBeInTheDocument();
     expect(screen.getByText(/🖨️ Imprimir Ticket Térmico/i)).toBeInTheDocument();
@@ -119,19 +173,23 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
       </MemoryRouter>,
     );
 
-    await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
-    await user.type(screen.getByLabelText(/Apellidos y Nombres \*/i), "Sergio Serruche");
-    await user.type(screen.getByLabelText(/Correo Electrónico para Notificación \*/i), "sergio@correo.pe");
-    await user.type(screen.getByLabelText(/Teléfono \/ Celular de Contacto \*/i), "961234567");
-    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "01");
-    await user.type(screen.getByLabelText(/Asunto \/ Petitorio Concreto \*/i), "Solicitud de convalidación académica");
+    await user.type(screen.getByLabelText(/Número de Documento \*/i), "12345678");
+    await user.type(screen.getByLabelText(/Nombres \*/i), "AUDITORIA Nombre");
+    await user.type(screen.getByLabelText(/Apellidos \*/i), "AUDITORIA Apellido");
+    await user.type(screen.getByLabelText(/Correo Electrónico para Notificación \*/i), "auditoria@example.test");
+    await user.type(screen.getByLabelText(/Teléfono \/ Celular de Contacto \*/i), "AUDITORIA-TELEFONO");
+    await screen.findByRole("option", { name: "AUDITORIA-02 - AUDITORIA Informe de prueba" });
+    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), tramitesAuditoria[1].id);
+    await user.type(screen.getByLabelText(/Asunto \/ Petitorio Concreto \*/i), "AUDITORIA asunto de prueba");
 
     const botonRegistrar = screen.getByRole("button", { name: /✓ Registrar y Emitir Cargo CUT/i });
     await user.click(botonRegistrar);
 
-    // Debe abrir el modal de cargo con el CUT generado
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText(/Sergio Serruche/i)).toBeInTheDocument();
-    expect(screen.getByText(/EXP-2026-/i)).toBeInTheDocument();
+    expect(screen.getByText("EXP-2026-000099")).toBeInTheDocument();
+    expect(apiClient.post).toHaveBeenCalledWith(
+      "/api/v1/tramites/ventanilla-presencial",
+      expect.objectContaining({ idTipoTramiteTupa: tramitesAuditoria[1].id }),
+    );
   });
 });

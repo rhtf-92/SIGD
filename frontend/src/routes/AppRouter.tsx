@@ -78,11 +78,23 @@ export default function AppRouter() {
       />
       <Route
         path="/tramite/ventanilla-presencial"
-        element={<VentanillaPresencialPage />}
+                element={
+          <ProtectedRoute
+            requiredRoles={["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "ESPECIALISTA", "MESA_PARTES"]}
+          >
+            <VentanillaPresencialPage />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/ventanilla"
-        element={<VentanillaPresencialPage />}
+                element={
+          <ProtectedRoute
+            requiredRoles={["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "ESPECIALISTA", "MESA_PARTES"]}
+          >
+            <VentanillaPresencialPage />
+          </ProtectedRoute>
+        }
       />
             <Route
         path="/administracion/atencion"
