@@ -75,7 +75,23 @@ const cargoMuestra: CargoOficialTramite = {
 describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-05)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: tramitesAuditoria } as never);
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === "/api/v1/tramites/tipos") {
+        return Promise.resolve({ data: tramitesAuditoria } as never);
+      }
+      if (url === `/api/v1/tramites/tipos/${tramitesAuditoria[0].id}/requisitos`) {
+        return Promise.resolve({
+          data: [
+            { orden: 1, texto: "AUDITORIA requisito uno" },
+            { orden: 2, texto: "AUDITORIA requisito dos" },
+          ],
+        } as never);
+      }
+      if (url === `/api/v1/tramites/tipos/${tramitesAuditoria[1].id}/requisitos`) {
+        return Promise.resolve({ data: [] } as never);
+      }
+      return Promise.resolve({ data: [] } as never);
+    });
     vi.mocked(apiClient.post).mockResolvedValue(mockRespuestaVentanilla as never);
   });
 
@@ -121,6 +137,50 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
 
     expect(screen.getByText("AUDITORIA-01: AUDITORIA Constancia de prueba", { exact: true })).toBeInTheDocument();
     expect(screen.getByText(/Fuente: TUPA vigente del sistema/i)).toBeInTheDocument();
+  });
+
+  it("muestra y permite verificar los requisitos documentarios del procedimiento", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <VentanillaPresencialPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole("option", { name: "AUDITORIA-01 - AUDITORIA Constancia de prueba" });
+    await user.selectOptions(
+      screen.getByLabelText(/Procedimiento TUPA 2026/i),
+      tramitesAuditoria[0].id,
+    );
+
+    expect(await screen.findByText("AUDITORIA requisito uno")).toBeInTheDocument();
+    expect(screen.getByText("AUDITORIA requisito dos")).toBeInTheDocument();
+    expect(screen.getByText("0 de 2 verificados")).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("AUDITORIA requisito uno"));
+
+    expect(screen.getByText("1 de 2 verificados")).toBeInTheDocument();
+  });
+
+  it("indica cuando el procedimiento no tiene requisitos documentarios", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <VentanillaPresencialPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole("option", { name: "AUDITORIA-02 - AUDITORIA Informe de prueba" });
+    await user.selectOptions(
+      screen.getByLabelText(/Procedimiento TUPA 2026/i),
+      tramitesAuditoria[1].id,
+    );
+
+    expect(
+      await screen.findByText("Este procedimiento no tiene requisitos cargados en el TUPA."),
+    ).toBeInTheDocument();
   });
 
   it("rechaza un DNI de 7 dígitos sin llamar al servidor", async () => {

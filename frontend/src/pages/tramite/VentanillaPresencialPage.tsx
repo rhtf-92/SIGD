@@ -14,6 +14,11 @@ interface TramiteTupa {
   plazo_dias_habiles: number | null;
 }
 
+interface RequisitoTupa {
+  orden: number;
+  texto: string;
+}
+
 interface VentanillaPresencialResultado {
   expedienteId: string;
   cut: string;
@@ -53,6 +58,10 @@ export default function VentanillaPresencialPage() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [tramites, setTramites] = useState<TramiteTupa[]>([]);
   const [errorCatalogo, setErrorCatalogo] = useState("");
+  const [requisitos, setRequisitos] = useState<RequisitoTupa[]>([]);
+  const [requisitosRecibidos, setRequisitosRecibidos] = useState<Set<number>>(new Set());
+  const [cargandoRequisitos, setCargandoRequisitos] = useState(false);
+  const [errorRequisitos, setErrorRequisitos] = useState("");
   const [errorEnvio, setErrorEnvio] = useState("");
   const [enviando, setEnviando] = useState(false);
 
@@ -70,6 +79,46 @@ export default function VentanillaPresencialPage() {
       ignorar = true;
     };
   }, []);
+
+  useEffect(() => {
+    let ignorar = false;
+    if (!procedimientoTupa) {
+      setRequisitos([]);
+      setRequisitosRecibidos(new Set());
+      setCargandoRequisitos(false);
+      setErrorRequisitos("");
+      return () => {
+        ignorar = true;
+      };
+    }
+
+    setRequisitos([]);
+    setRequisitosRecibidos(new Set());
+    setErrorRequisitos("");
+    setCargandoRequisitos(true);
+    apiClient
+      .get<RequisitoTupa[]>(
+        `/api/v1/tramites/tipos/${encodeURIComponent(procedimientoTupa)}/requisitos`,
+      )
+      .then((respuesta) => {
+        if (!ignorar) {
+          setRequisitos(Array.isArray(respuesta.data) ? respuesta.data : []);
+          setRequisitosRecibidos(new Set());
+        }
+      })
+      .catch(() => {
+        if (!ignorar) {
+          setRequisitos([]);
+          setErrorRequisitos("No se pudieron cargar los requisitos del procedimiento.");
+        }
+      })
+      .finally(() => {
+        if (!ignorar) setCargandoRequisitos(false);
+      });
+    return () => {
+      ignorar = true;
+    };
+  }, [procedimientoTupa]);
 
   const procedimientoSeleccionado = tramites.find((tramite) => tramite.id === procedimientoTupa);
 
@@ -164,6 +213,7 @@ export default function VentanillaPresencialPage() {
     setCorreo("");
     setTelefono("");
     setProcedimientoTupa("");
+    setRequisitosRecibidos(new Set());
     setAsunto("");
     setCantidadFolios(1);
     setErrorEnvio("");
@@ -433,7 +483,50 @@ export default function VentanillaPresencialPage() {
                 <p className="mt-1 text-xs">Plazo: {procedimientoSeleccionado.plazo_dias_habiles} días hábiles</p>
               ) : null}
               <p className="mt-2 text-xs text-slate-600">
-                Fuente: TUPA vigente del sistema. La lista de requisitos del procedimiento se incorporará en la siguiente etapa.
+                Fuente: TUPA vigente del sistema.
+              </p>
+              <div className="mt-3">
+                {cargandoRequisitos ? (
+                  <p>Cargando requisitos...</p>
+                ) : errorRequisitos ? (
+                  <p role="alert">{errorRequisitos}</p>
+                ) : requisitos.length > 0 ? (
+                  <>
+                    <h2 className="font-bold text-slate-900">Requisitos documentarios</h2>
+                    <p className="mt-1 text-xs">
+                      {requisitosRecibidos.size} de {requisitos.length} verificados
+                    </p>
+                    <ul className="mt-2 space-y-2">
+                      {requisitos.map((requisito) => (
+                        <li key={requisito.orden}>
+                          <label className="flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              checked={requisitosRecibidos.has(requisito.orden)}
+                              onChange={(e) => {
+                                setRequisitosRecibidos((actuales) => {
+                                  const siguientes = new Set(actuales);
+                                  if (e.target.checked) {
+                                    siguientes.add(requisito.orden);
+                                  } else {
+                                    siguientes.delete(requisito.orden);
+                                  }
+                                  return siguientes;
+                                });
+                              }}
+                            />
+                            <span>{requisito.texto}</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p>Este procedimiento no tiene requisitos cargados en el TUPA.</p>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                La verificación es visual para el operador y no se guarda en el expediente.
               </p>
             </section>
           )}
