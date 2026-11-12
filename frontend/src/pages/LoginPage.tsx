@@ -10,11 +10,12 @@ const CLAVE_ROL = "sigd_rol";
 const CLAVE_PERMISOS = "sigd_permisos";
 
 export const ROLES_CANONICOS = [
-  { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", destino: "/administracion" },
-  { id: "DIRECTOR", label: "DIRECTOR — Director General", destino: "/administracion" },
-  { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", destino: "/flujos/titulacion" },
-  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", destino: "/tramite/ventanilla-presencial" },
-  { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", destino: "/casilla" },
+  { id: "ADMINISTRADOR", label: "ADMINISTRADOR - Administrador", destino: "/administracion" },
+  { id: "DIRECTOR", label: "DIRECTOR - Director", destino: "/administracion" },
+  { id: "SECRETARIO", label: "SECRETARIO - Secretario", destino: "/administracion/atencion" },
+  { id: "ESPECIALISTA", label: "ESPECIALISTA - Especialista", destino: "/administracion/atencion" },
+  { id: "MESA_PARTES", label: "MESA_PARTES - Mesa de Partes", destino: "/administracion/atencion" },
+  { id: "CIUDADANO", label: "CIUDADANO - Ciudadano", destino: "/casilla" },
 ];
 
 export default function LoginPage() {
@@ -26,7 +27,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
-  const [rol, setRol] = useState("SUPER_ADMIN");
+  const [rol, setRol] = useState("ADMINISTRADOR");
 
   function rutaDestino(): string {
     const desde = location.state?.from as

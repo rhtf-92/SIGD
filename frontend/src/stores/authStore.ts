@@ -3,11 +3,19 @@ import { apiClient } from "../api/client";
 import { env } from "../config/env";
 import { permisosIniciales } from "../hooks/useRbacConfig";
 
+export type RolSistema =
+  | 'ADMINISTRADOR'
+  | 'DIRECTOR'
+  | 'SECRETARIO'
+  | 'ESPECIALISTA'
+  | 'MESA_PARTES'
+  | 'CIUDADANO';
+
 export interface UsuarioPerfil {
   id: string;
   nombreCompleto: string;
   correo: string;
-  rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE';
+  rol: RolSistema;
   areaId?: string;
 }
 

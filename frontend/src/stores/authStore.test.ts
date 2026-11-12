@@ -12,7 +12,7 @@ describe("authStore", () => {
   });
 
   it("login() exitoso guarda accessToken, refreshToken, usuario e isAuthenticated en true", async () => {
-    const mockUsuario = { id: "u1", nombreCompleto: "Juan Perez", correo: "juan@inst.edu.pe", rol: "DOCENTE", permisos: {} };
+    const mockUsuario = { id: "u1", nombreCompleto: "Juan Perez", correo: "juan@inst.edu.pe", rol: "ESPECIALISTA", permisos: {} };
     vi.mocked(apiClient.post).mockResolvedValueOnce({
       data: { accessToken: "tok-1", refreshToken: "rtok-1", usuario: mockUsuario },
     });
@@ -27,7 +27,7 @@ describe("authStore", () => {
   });
 
   it("logout() limpia todos los campos a null/false", () => {
-    useAuthStore.setState({ accessToken: "tok", refreshToken: "rtok", usuario: { id: "1", nombreCompleto: "X", correo: "x@x.pe", rol: "DOCENTE" }, isAuthenticated: true });
+    useAuthStore.setState({ accessToken: "tok", refreshToken: "rtok", usuario: { id: "1", nombreCompleto: "X", correo: "x@x.pe", rol: "ESPECIALISTA" }, isAuthenticated: true });
 
     useAuthStore.getState().logout();
 

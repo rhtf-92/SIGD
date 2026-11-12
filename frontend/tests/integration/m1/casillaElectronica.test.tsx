@@ -600,7 +600,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
         id: "usuario-prueba",
         nombreCompleto: "AUDITORIA Prueba",
         correo: "74561238@casilla.iestpsuiza.edu.pe",
-        rol: "ESTUDIANTE",
+        rol: "CIUDADANO",
 
       },
       
