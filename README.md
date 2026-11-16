@@ -1,6 +1,57 @@
 # Sistema Integral de Gestión Documentaria (SIGD)
 ## Instituto de Educación Superior Tecnológico Público "Suiza" (Pucallpa, Ucayali, Perú)
 
+### Estado del catálogo TUPA Suiza 2026 y reproducción del entorno
+
+- El catálogo informativo `frontend/src/data/tupaSuiza2026.ts` contiene 75 conceptos. No equivale a 75 procedimientos radicables ni sustituye al catálogo PostgreSQL.
+- El entorno de desarrollo verificado `sigd_prueba` contiene 19 procedimientos SUZ26 vigentes y tres registros históricos TUPA-01..03 inactivos. El Wizard consulta `/api/v1/tramites/tipos`; `/api/v1/tramites/tupa` expone el mismo catálogo formal. La selección y la radicación utilizan el UUID real de PostgreSQL, sin convertir códigos SUZ26 en UUID.
+- La fuente institucional contrastada es `TUPA_2026_IESTP_Suiza.pdf` (6 páginas), SHA-256 `377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622`. Ese PDF no está incluido en este repositorio. Los códigos SUZ26 son identificadores técnicos del catálogo y no códigos impresos en el documento.
+- El PDF no especifica plazos de atención ni silencio administrativo para los 19 procedimientos. Los valores almacenados `30 / POSITIVO` son defaults técnicos obligatorios del esquema, pendientes de validación institucional; no acreditan disposiciones administrativas oficiales. La unidad orgánica y la base legal transcritas corresponden al encabezado general. Deben conservarse las advertencias de las descripciones. La tarifa de SUZ26-068 requiere aclaración institucional.
+- **Carga de datos reproducible:** `backend/carga_tupa_suiza_2026.sql` contiene los 19 procedimientos SUZ26, los dos tipos documentales y las 17 menciones/relaciones verificadas. Conserva los UUID de la configuración existente y desactiva exclusivamente los tres registros históricos de la semilla original. Es una carga posterior al esquema, no una migración estructural: no contiene DDL ni debe colocarse en `backend/migraciones`.
+- El ejecutor existente `backend/src/db/migrate.ts` aplica los SQL originales de `backend/migraciones`; no aplica automáticamente esta carga ni importa el catálogo TypeScript. La carga aborta transaccionalmente ante diferencias de UUID, datos o asociaciones, sin sobrescribirlas; ejecutarla dos veces sobre datos coincidentes no los cambia. No usar `migraciones_v2` como sustituto ni copiar UUID de demostración a identidades ajenas.
+- El documento `frontend/docs/04_registro-documentario/documentacion/TUPA/tupa.md` es una referencia histórica de Pasco, no una fuente institucional de Suiza. Los datos locales y los cambios de código no actualizan automáticamente las imágenes Docker ya desplegadas.
+- La presencia de 19 procedimientos en el selector no acredita que todos puedan radicarse: la clasificación actual solo acepta un archivo y exactamente un tipo documental vigente, sin condición pendiente. En el entorno verificado, 15 procedimientos tienen un tipo asociado; SUZ26-050, SUZ26-051 y SUZ26-054 no tienen ninguno, y SUZ26-066 tiene dos tipos posibles. Deben conservarse los rechazos controlados hasta disponer de información suficiente; no clasificar por nombre, MIME, extensión ni orden de archivos.
+- Los cálculos internos de 30 días en RutaDoc (`sla.service.ts`), firma (`firma.routes.ts`) y los indicadores (`mgdAnalytics.service.ts`) no prueban que ese sea el plazo institucional de un procedimiento SUZ26. Su interpretación administrativa requiere definición institucional. No modificar calendarios, reglas de prioridad ni contratos para suplir ese dato ausente.
+
+#### Aplicación de los datos Suiza por los compañeros
+
+1. Recibir los archivos de esta integración, incluido `backend/carga_tupa_suiza_2026.sql` y el catálogo informativo Suiza. Configurar la conexión mediante los archivos de entorno existentes, sin compartir credenciales ni copiar las del autor.
+2. Verificar el destino con `SELECT current_database(), current_user, inet_server_addr(), inet_server_port();`. El SQL de datos solo admite `sigd_prueba`, `sigd_migraciones_test` o bases cuyo nombre comience por `sigd_suiza_repro_`. Comprobar además el servidor: el nombre de base por sí solo no acredita que sea un entorno seguro.
+3. En una instalación nueva, utilizar el procedimiento original `npm run migrate` desde `backend`, exclusivamente contra su propia base de desarrollo previamente verificada. La corrección actual de `07_sigd_reportes.sql` supera 01–07 y produce las salidas de los consumidores activos de CoreLink sin modificar sus servicios. Se conservan las correcciones anteriores de 02 y 06. La migración 06 contiene un `COMMIT` interno: no debe suponerse rollback global si una instalación falla. Para una base existente, comparar primero los checksums registrados: no sobrescribir `sigd_migraciones`, reaplicar SQL manualmente ni reemplazar objetos MGD previos. La nueva 07 rechaza esos reemplazos; instalaciones que ya aplicaron otra versión requieren revisión y autorización separadas.
+4. En una base de desarrollo ya inicializada y compatible, respaldar antes de aplicar datos. Con las herramientas PostgreSQL existentes, configurar `PGHOST`, `PGPORT`, `PGDATABASE` y `PGUSER` para el destino verificado; usar la solicitud interactiva de contraseña (`-W`), sin escribirla en comandos ni archivos compartidos. Ejemplo desde la raíz del repositorio (elegir un nombre de respaldo nuevo fuera del repositorio):
+
+   ```powershell
+   $env:PGHOST = "127.0.0.1"
+   $env:PGPORT = "5433"
+   $env:PGDATABASE = "sigd_prueba"
+   $env:PGUSER = "postgres"
+   $respaldoTupa = Join-Path $env:TEMP ("sigd-tupa-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".sql")
+   pg_dump -W --data-only --table=sigd_doc.tipo_tramite_tupa --table=sigd_doc.tipo_documento --table=sigd_doc.requisito --table=sigd_doc.tipo_documento_requisito --file=$respaldoTupa
+   if ($LASTEXITCODE -ne 0) { throw "El respaldo falló; no continuar" }
+   Get-FileHash -LiteralPath $respaldoTupa -Algorithm SHA256
+   psql -X -W -v ON_ERROR_STOP=1 -f backend/carga_tupa_suiza_2026.sql
+   if ($LASTEXITCODE -ne 0) { throw "La carga falló; revisar el conflicto sin sobrescribir datos" }
+   ```
+
+   El ejemplo usa el entorno local documentado; cada compañero debe confirmar sus propios host, puerto y usuario. No ejecutar en producción. Si faltan herramientas o el esquema compatible, detenerse; no inicializar ni reemplazar la base por conveniencia.
+5. Verificar con SELECT: 19 SUZ26 vigentes, TUPA-01..03 inactivos, dos tipos documentales, 17 requisitos y 17 relaciones de esta carga. Comparar códigos y UUID entre `/api/v1/tramites/tipos` y `/api/v1/tramites/tupa`. En una base que ya tenía otros tipos/requisitos, contar exclusivamente las filas correspondientes a los UUID/códigos de la carga, no todo el catálogo institucional. La segunda ejecución debe conservar los mismos datos. La carga no crea personas, cuentas, expedientes ni archivos.
+6. Arrancar mediante los scripts existentes `npm run dev` del backend y frontend, con la configuración segura ya prevista (`MIGRATE_ON_BOOT=false`, `SIGD_SAFE_BOOT=true` donde corresponda). Esas opciones no aplican 07 a una base existente ni acreditan por sí mismas una instalación completa. El frontend debe consultar los UUID desde el backend. Las imágenes Docker antiguas requieren una actualización explícitamente autorizada; modificar el código local no las actualiza.
+
+Verificación de consolidación del 17/10/2026: instalación limpia mediante el runner existente, 01–07 aprobadas en la base aislada `sigd_suiza_repro_1792273661064` del puerto `5434`; segunda ejecución del runner sin migraciones nuevas. Carga Suiza aplicada dos veces con contenido idéntico, 22/2/17/17 filas en los cuatro catálogos, 19 procedimientos vigentes y tres históricos inactivos. Refresco concurrente de ambas vistas aprobado y cero expedientes en esa base. Se utilizó el contenido actual de B_JACOBO, incluidas las correcciones anteriores de 02, 06 y 07; no equivale a probar solamente el HEAD sin los cambios locales. La consolidación no volvió a modificar migraciones.
+
+Se verificaron idempotencia, rechazo de conflictos, rollback por FK y ambos endpoints existentes con PostgreSQL real mediante `backend/tests/unit/domains/organicore/tablas-maestras-tupa-ddl.spec.ts`. Esta suite distingue la prueba aislada opcional (`SIGD_SUIZA_REPRO_DATABASE_URL`) de las pruebas unitarias y rechaza cualquier destino distinto de `127.0.0.1:5434/sigd_suiza_repro_<número>`. No se escribió en la base principal ni se generaron expedientes.
+
+#### Revisión docente del prototipo B_JACOBO
+
+- Entorno local: backend `http://localhost:3001`, frontend `http://localhost:5174`, PostgreSQL de desarrollo `5433`; Docker mantiene backend `3000` y frontend `5173`. No compartir archivos `.env`, credenciales, tokens ni bases locales como parte de la integración.
+- La base principal `sigd_prueba` registra 01–06; no se aplicó allí la corrección de 07. La instalación y reportes CoreLink de 07 están verificados en PostgreSQL aislado, no desplegados en la base principal. La carga TUPA de datos sí está presente en la base principal.
+- Los expedientes ficticios de demostración `EXP-2026-000001` y `EXP-2026-000002` siguen consultables mediante `/api/v1/tramites/consulta-publica/:cut`. La lectura de ambos PDF desde MinIO confirma tamaño y SHA-256 registrados. Estas comprobaciones no constituyen una nueva radicación; no se crearon expedientes durante la consolidación.
+- Ambos backends exponen 19 SUZ26 con los mismos UUID, y ambos frontends sirven 75 conceptos. Docker conserva código anterior en la presentación referencial de plazos y del catálogo administrativo; su actualización queda pendiente de autorización. La demostración del código local actualizado debe utilizar `5174`/`3001`.
+- El UUID formal TUPA se conserva en el Wizard. En Ventanilla, el selector de 75 conceptos es informativo y su denominación se incorpora al asunto; su request actual no transporta ese UUID TUPA. No presentar esa selección como una asociación formal equivalente ni convertir los 75 conceptos en trámites radicables.
+- Revisar conjuntamente: catálogo informativo Suiza, carga de datos, consumidores Wizard/Ventanilla y sus pruebas, consultas TUPA, advertencias administrativas y las dependencias previas de radicación/almacenamiento necesarias para el flujo ya demostrado. No seleccionar automáticamente todos los cambios del repositorio: otros trabajos de identidad, RutaDoc, Docker y documentación requieren revisión separada. No usar `migraciones_v2` para sustituir el mecanismo original.
+- Las referencias técnicas de 30 días de los indicadores CoreLink no validan un plazo legal Suiza. El profesor debe revisar las limitaciones documentales de SUZ26-050/051/054/066, la tarifa ambigua de SUZ26-068 y la falta de plazos/silencios institucionales antes de aprobar el alcance. Reemplazo operativo del catálogo y validación institucional son conclusiones distintas.
+- No se publicaron cambios ni se preparó staging. La revisión y cualquier futura incorporación al proyecto del equipo corresponden al profesor y al autor de B_JACOBO.
+
 [![React 19](https://img.shields.io/badge/React-19.1.1-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Express 5](https://img.shields.io/badge/Express-5.1.0-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
 [![PostgreSQL 18](https://img.shields.io/badge/PostgreSQL-18.3%2F18.6-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
