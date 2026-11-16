@@ -258,6 +258,9 @@ CREATE INDEX IF NOT EXISTS idx_firma_digital_sha256
 -- -----------------------------------------------------------------------------
 -- 4.10 Semillas canónicas TUPA IESTP Suiza
 -- -----------------------------------------------------------------------------
+-- B_JACOBO carga los 72 conceptos con la migración 14; no reinstalar el catálogo de ejemplo.
+DO $semilla_tupa$ BEGIN
+IF current_database() = 'sigd_jacobo_demo' THEN RETURN; END IF;
 INSERT INTO sigd_doc.tipo_tramite_tupa (
     tipo_tramite_id, codigo, denominacion, descripcion, unidad_organica, plazo_dias, silencio_administrativo, base_legal, vigente
 ) VALUES
@@ -265,4 +268,5 @@ INSERT INTO sigd_doc.tipo_tramite_tupa (
 ('00000000-0000-0000-0000-000000000002', 'TUPA-02', 'Expedición de Título Profesional Técnico', 'Tramitación de título a nombre de la Nación', 'Dirección General', 30, 'NEGATIVO', 'Ley N° 30512', TRUE),
 ('00000000-0000-0000-0000-000000000003', 'TUPA-03', 'Convalidación de Créditos y Prácticas Pre-Profesionales', 'Convalidación de módulos formativos y EFSRT', 'Jefatura de Unidad Académica', 15, 'POSITIVO', 'RVM N° 277-2019-MINEDU', TRUE)
 ON CONFLICT (codigo) DO NOTHING;
+END $semilla_tupa$;
 

@@ -207,7 +207,7 @@ INSERT INTO sigd_auth.notificacion_casilla (
     estado, fecha_deposito, hash_sha256, cvd
 ) VALUES (
     '00000000-0000-0000-0000-000000000101',
-    '00000000-0000-0000-0000-000000000001',
+    NULL,
     'EXP-2026-000142',
     'Notificación de Resolución Directoral de Matrícula',
     'Resolución Directoral',
