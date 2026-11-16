@@ -28,11 +28,11 @@ const resultadoDoble: ResultadoVentanilla = {
 };
 
 function token(roles = ['MESA_PARTES'], expiraSegundos = 900, secreto = secretoPrueba) {
-  return firmarTokenAcceso({ sub: 'operador-unitario', roles, expiraSegundos, secreto });
+  return firmarTokenAcceso({ sub: '10000000-0000-4000-8000-000000000001', roles, expiraSegundos, secreto });
 }
 
-function crearApp() {
-  const query = vi.fn();
+function crearApp(rolesPersistidos: string[] | null = ['MESA_PARTES']) {
+  const query = vi.fn().mockResolvedValue({ rows: rolesPersistidos === null ? [] : [{ roles: rolesPersistidos, permisos: [] }] });
   const connect = vi.fn();
   const registro = vi.spyOn(VentanillaPresencialService.prototype, 'registrarExpedienteVentanilla')
     .mockResolvedValue(resultadoDoble);
@@ -44,6 +44,25 @@ function crearApp() {
 }
 
 describe('Ventanilla · autorización del registro presencial', () => {
+  it.each([[], null])('rechaza MESA_PARTES afirmado en JWT sin asignación vigente: %s', async roles => {
+    const { app, registro, connect } = crearApp(roles);
+    expect((await request(app).post(ruta).set('Authorization', `Bearer ${token()}`).send(datos)).status).toBe(403);
+    expect(registro).not.toHaveBeenCalled();
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('acepta la asignación vigente aunque el JWT antiguo no contenga el rol', async () => {
+    const { app, registro } = crearApp();
+    expect((await request(app).post(ruta).set('Authorization', `Bearer ${token([])}`).send(datos)).status).toBe(201);
+    expect(registro).toHaveBeenCalledOnce();
+  });
+
+  it('permite al ADMINISTRADOR vigente acceder a Ventanilla', async () => {
+    const { app, registro } = crearApp(['ADMINISTRADOR']);
+    const res = await request(app).post(ruta).set('Authorization', `Bearer ${token(['ADMINISTRADOR'])}`).send(datos);
+    expect(res.status).toBe(201);
+    expect(registro).toHaveBeenCalledOnce();
+  });
   beforeEach(() => vi.stubEnv('AUTH_JWT_SECRET', secretoPrueba));
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
@@ -54,8 +73,16 @@ describe('Ventanilla · autorización del registro presencial', () => {
     expect(res.status).toBe(201);
     expect(res.body).toEqual(resultadoDoble);
     expect(registro).toHaveBeenCalledExactlyOnceWith(datos);
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledOnce();
     expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('transporta el identificador TUPA opcional hasta el servicio sin cambiar la respuesta', async () => {
+    const { app, registro } = crearApp();
+    const payload = { ...datos, idTipoTramiteTupa: '50000000-0000-4000-8000-000000000001' };
+    const res = await request(app).post(ruta).set('Authorization', `Bearer ${token()}`).send(payload);
+    expect(res.status).toBe(201); expect(res.body).toEqual(resultadoDoble);
+    expect(registro).toHaveBeenCalledExactlyOnceWith(payload);
   });
 
   it.each([
@@ -90,12 +117,12 @@ describe('Ventanilla · autorización del registro presencial', () => {
 
   it.each([{ roles: ['CIUDADANO'] }, { roles: ['DIRECTOR'] }, { roles: [] }])(
     'responde 403 a un JWT válido sin MESA_PARTES ($roles) antes de procesar el registro', async ({ roles }) => {
-      const { app, registro, query, connect } = crearApp();
+      const { app, registro, query, connect } = crearApp(roles);
       const res = await request(app).post(ruta).set('Authorization', `Bearer ${token(roles)}`).send({});
       expect(res.status).toBe(403);
       expect(res.body).toMatchObject({ status: 403, code: 'FORBIDDEN' });
       expect(registro).not.toHaveBeenCalled();
-      expect(query).not.toHaveBeenCalled();
+      expect(query).toHaveBeenCalledOnce();
       expect(connect).not.toHaveBeenCalled();
     },
   );
@@ -117,7 +144,7 @@ describe('Ventanilla · autorización del registro presencial', () => {
       .send({ ...datos, foliosTotales: 0 });
     expect(res.status).toBe(400);
     expect(registro).not.toHaveBeenCalled();
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledOnce();
     expect(connect).not.toHaveBeenCalled();
   });
 });

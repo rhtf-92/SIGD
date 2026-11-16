@@ -16,6 +16,7 @@
  */
 
 import type { FirmaSessionStore } from "./firmaSession.store.js";
+import { createHash } from 'node:crypto';
 
 /** Documento almacenado de forma temporal. */
 export interface DocumentoFirmable {
@@ -58,6 +59,7 @@ export interface AlmacenDocumentosFirmables {
  */
 export class InMemoryAlmacenDocumentosFirmables implements AlmacenDocumentosFirmables {
   private readonly documentos = new Map<string, DocumentoFirmable>();
+  private readonly enlaces = new Map<string, { documentoId: string; expira: number }>();
 
   constructor(private readonly sesiones: FirmaSessionStore) {}
 
@@ -70,7 +72,9 @@ export class InMemoryAlmacenDocumentosFirmables implements AlmacenDocumentosFirm
     token: string,
     ttlSegundos: number,
   ): Promise<string> {
-    void ttlSegundos;
+    for (const [clave, enlace] of this.enlaces) {
+      if (enlace.expira <= Date.now()) this.enlaces.delete(clave);
+    }
 
     const documento = this.documentos.get(documentoId);
     if (documento === undefined) {
@@ -81,6 +85,10 @@ export class InMemoryAlmacenDocumentosFirmables implements AlmacenDocumentosFirm
     if (!(await this.sesiones.existe(token))) {
       throw new Error("La sesion de firma asociada al enlace no esta vigente.");
     }
+    const clave = createHash('sha256').update(token).digest('hex');
+    const previo = this.enlaces.get(clave);
+    if (previo && previo.documentoId !== documentoId) throw new Error('Token asociado a otro documento.');
+    this.enlaces.set(clave, { documentoId, expira: Date.now() + ttlSegundos * 1000 });
 
     return (
       `/api/v1/firma/documento/${encodeURIComponent(documentoId)}` +
@@ -101,13 +109,17 @@ export class InMemoryAlmacenDocumentosFirmables implements AlmacenDocumentosFirm
     token: string,
     permitirConsultaDirecta = false,
   ): Promise<DocumentoFirmable | null> {
-    if (!permitirConsultaDirecta && !(await this.sesiones.existe(token))) {
-      return null;
+    if (!permitirConsultaDirecta) {
+      const clave = createHash('sha256').update(token).digest('hex');
+      const enlace = this.enlaces.get(clave);
+      if (!enlace || enlace.documentoId !== documentoId || enlace.expira <= Date.now() ||
+          !(await this.sesiones.existe(token))) return null;
     }
     return this.documentos.get(documentoId) ?? null;
   }
 
   async cerrar(): Promise<void> {
     this.documentos.clear();
+    this.enlaces.clear();
   }
 }

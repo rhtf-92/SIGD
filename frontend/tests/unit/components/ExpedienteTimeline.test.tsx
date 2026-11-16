@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { BitacoraEventoExpediente } from "../../../src/types/trazabilidadExpediente";
+import type { ActuacionRutaDoc, BitacoraEventoExpediente } from "../../../src/types/trazabilidadExpediente";
 import ExpedienteTimeline from "../../../src/components/expedientes/ExpedienteTimeline";
 
 const eventos: readonly BitacoraEventoExpediente[] = [
@@ -32,6 +32,22 @@ const eventos: readonly BitacoraEventoExpediente[] = [
 ];
 
 describe("ExpedienteTimeline", () => {
+  it("representa actuaciones RutaDoc con fechaHora e identificadores sin fabricar nombres ni hashes", () => {
+    const actuacion: ActuacionRutaDoc = Object.freeze({
+      movimientoId: "uuid-movimiento", secuencia: "1", fechaHora: "2026-10-18T12:00:00.000Z",
+      estadoAnterior: "REGISTRADO", evento: "RECEPCIONAR", estadoNuevo: "RECEPCIONADO",
+      usuarioOperadorId: "uuid-operador", areaAnteriorId: null, areaDestinoId: null,
+      remitente: null, destinatario: null, proveido: null, datosAsociados: {},
+      duracionMs: null, duracionMinutos: null, tipoActuacion: "NORMAL",
+    });
+    const { container } = render(<ExpedienteTimeline eventos={[actuacion]} />);
+    expect(screen.getByText("RECEPCIONAR")).toBeInTheDocument();
+    expect(screen.getByText("uuid-operador")).toBeInTheDocument();
+    expect(screen.getByText("REGISTRADO → RECEPCIONADO")).toBeInTheDocument();
+    expect(container.querySelector("time")).toHaveAttribute("datetime", actuacion.fechaHora);
+    expect(screen.queryByText(/Hash SHA-256|Área destino/)).not.toBeInTheDocument();
+    expect(actuacion).not.toHaveProperty("timestamp");
+  });
   it("respeta el orden recibido y muestra los datos esenciales y el hash", () => {
     const entrada = [...eventos];
     render(<ExpedienteTimeline eventos={entrada} />);

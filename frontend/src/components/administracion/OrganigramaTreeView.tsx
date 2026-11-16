@@ -122,5 +122,19 @@ export default function OrganigramaTreeView({ areas }: OrganigramaTreeViewProps)
     });
   }
 
+  if (areas.length === 0) {
+    return (
+      <div
+        role="status"
+        className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-8 text-center text-sm text-slate-500"
+      >
+        <p className="font-semibold text-slate-700">No hay áreas registradas en el organigrama institucional.</p>
+        <p className="mt-1 text-xs text-slate-500">
+          El catálogo de unidades orgánicas de la base de datos se encuentra vacío.
+        </p>
+      </div>
+    );
+  }
+
   return <Ramas nodos={arbol} expandidos={expandidos} onAlternar={alternarRuta} />;
 }

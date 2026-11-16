@@ -27,6 +27,7 @@ import {
   StepConfirmacion,
 } from "./WizardSteps";
 import CargoDigitalModal from "./CargoDigitalModal";
+import { useAuthStore } from '../../stores/authStore';
 import type {
   WizardStep,
   CargoDigitalResponse,
@@ -48,6 +49,7 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
   className = "",
 }) => {
   const { state, dispatch } = useTramiteWizardReducer();
+  const esPublico = !useAuthStore(auth => auth.isAuthenticated);
   const [modalAbierto, setModalAbierto] = useState(false);
 
   // Apertura automática del modal institucional de cargo cuando se asienta el trámite
@@ -109,6 +111,7 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
         {state.currentStep === 2 && (
           <StepDocumentos
             data={state.documentos}
+            identidadPublica={state.identificacion}
             dispatch={dispatch}
             onNext={handleNext}
             onBack={handleBack}
@@ -143,6 +146,7 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
           isOpen={modalAbierto}
           onClose={() => setModalAbierto(false)}
           cargo={state.cargoEmitido}
+          modoPublico={esPublico}
         />
       )}
     </div>

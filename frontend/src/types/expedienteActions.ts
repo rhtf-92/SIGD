@@ -33,6 +33,17 @@ export interface SolicitudAcumulacion {
 /** Formas de respuesta documentadas en el plan, verificadas en tiempo de ejecución. */
 export interface ResultadoDerivacion { derivacionId: string; nuevoEstado: string }
 export interface ResultadoObservacion { estado: "OBSERVADO"; slaPaused: true }
+export interface SolicitudRecepcion {
+  readonly expediente: ExpedienteAccionReferencia;
+  readonly observaciones?: string;
+}
+export interface ResultadoRecepcion {
+  readonly ok: boolean;
+  readonly expediente_id: string;
+  readonly movimientoId: string;
+  readonly nuevoEstado: string;
+  readonly secuencia: string | number;
+}
 
 export type TipoErrorAccion = "http" | "red" | "integracion" | "respuesta" | "concurrencia";
 
@@ -48,6 +59,7 @@ export interface ServicioExpedienteActions {
   observar?: (entrada: SolicitudObservacion) => Promise<ResultadoObservacion>;
   /** Adaptador futuro: solo resuelve cuando el servidor confirma la operación. */
   acumular?: (entrada: SolicitudAcumulacion) => Promise<void>;
+  recepcionar?: (entrada: SolicitudRecepcion) => Promise<ResultadoRecepcion>;
 }
 
 export interface AccionExpediente<Entrada, Salida> {

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-import { generarCvdDocumento } from "../../hooks/useRefirmaGateway";
 import type {
   DocumentoOficial,
   EstadoFirmaLote,
@@ -38,7 +37,7 @@ export default function FirmaBatchDrawer({
   onCerrar,
 }: FirmaBatchDrawerProps) {
   const [items, setItems] = useState<ItemLote[]>([]);
-  const [seleccionados, setSeleccionados] = useState<number[]>([]);
+  const [seleccionados, setSeleccionados] = useState<DocumentoOficial["idDocumento"][]>([]);
   const [procesando, setProcesando] = useState(false);
   const cronometroRef = useRef<number | null>(null);
 
@@ -77,7 +76,7 @@ export default function FirmaBatchDrawer({
 
   if (!abierto) return null;
 
-  const alternarSeleccion = (idDocumento: number) => {
+  const alternarSeleccion = (idDocumento: DocumentoOficial["idDocumento"]) => {
     if (procesando) return;
     setSeleccionados((actuales) =>
       actuales.includes(idDocumento)
@@ -91,41 +90,10 @@ export default function FirmaBatchDrawer({
     const seleccion = [...seleccionados];
     if (seleccion.length === 0) return;
 
-    setProcesando(true);
-    let indice = 0;
-
-    const paso = (): void => {
-      if (indice >= seleccion.length) {
-        setProcesando(false);
-        return;
-      }
-      const idDocumento = seleccion[indice];
-      setItems((actuales) =>
-        actuales.map((item) =>
-          item.documento.idDocumento === idDocumento
-            ? { ...item, estado: "EN_FIRMA", cvd: null }
-            : item,
-        ),
-      );
-
-      cronometroRef.current = window.setTimeout(() => {
-        setItems((actuales) =>
-          actuales.map((item) =>
-            item.documento.idDocumento === idDocumento
-              ? {
-                  ...item,
-                  estado: "FIRMADO",
-                  cvd: generarCvdDocumento(item.documento),
-                }
-              : item,
-          ),
-        );
-        indice += 1;
-        cronometroRef.current = window.setTimeout(paso, 1100);
-      }, 1100);
-    };
-
-    cronometroRef.current = window.setTimeout(paso, 350);
+    // No existe confirmación de firma en lote en el contrato actual.
+    // Mantener los documentos pendientes evita producir firmas o CVD ficticios.
+    setItems(actuales => actuales.map(item => seleccion.includes(item.documento.idDocumento)
+      ? { ...item, estado: "ERROR", cvd: null } : item));
   };
 
   const firmados = items.filter((item) => item.estado === "FIRMADO").length;
@@ -143,7 +111,7 @@ export default function FirmaBatchDrawer({
                 Firma de documentos en lote
               </h2>
               <p className="mt-1 text-xs text-slate-500">
-                Emisión masiva de actas · Secretaría Académica
+                La firma en lote requiere confirmación del servicio; no se generan CVD locales.
               </p>
             </div>
             <button
@@ -226,7 +194,7 @@ export default function FirmaBatchDrawer({
                 : `${firmados} de ${totalSeleccionados} documentos firmados`}
             </span>
             <span className="text-xs font-bold text-slate-500">
-              Temporizador: {totalSeleccionados > 0 ? `~${totalSeleccionados * 1.1}s` : "—"}
+              Sin confirmación del servicio de firma
             </span>
           </div>
 

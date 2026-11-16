@@ -2,13 +2,21 @@ import { useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AUTH_RETURN_TO_STORAGE_KEY, useAuthStore } from "../stores/authStore";
 import { ApiHttpError } from "../types/api";
+import SelectorContextoModal from "../components/auth/SelectorContextoModal";
 
 const DESTINOS_POR_ROL: Record<string, string> = {
+  ADMINISTRADOR: "/administracion",
+  CIUDADANO: "/casilla",
+  SECRETARIO: "/expedientes",
   SUPER_ADMIN: "/administracion",
   DIRECTOR: "/administracion",
+  JEFE_UNIDAD_ACADEMICA: "/expedientes",
+  COORDINADOR_AREA: "/expedientes",
   DOCENTE: "/flujos/titulacion",
   MESA_PARTES: "/tramite/ventanilla-presencial",
   ESTUDIANTE: "/casilla",
+  GESTOR_APOYO_AREA: "/expedientes",
+  TESORERO: "/tesoreria",
 };
 
 export default function LoginPage() {
@@ -19,7 +27,46 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mostrarSelector, setMostrarSelector] = useState(false);
   const enviando = useRef(false);
+
+  function redirigirSegunContexto() {
+    const usuario = useAuthStore.getState().usuario;
+    const rol = usuario?.rol ?? usuario?.contextoActivo?.codigo;
+    const esAdministrador = Boolean(
+      usuario?.roles?.some((r) => r === "ADMINISTRADOR" || r === "SUPER_ADMIN") ||
+      rol === "ADMINISTRADOR" ||
+      rol === "SUPER_ADMIN" ||
+      usuario?.permisos?.some(
+        (p) => p.codigo === "ADMIN_USUARIOS" && p.ambito === "GLOBAL" && p.areaId === null,
+      ),
+    );
+    const routeState = location.state as { from?: { pathname?: unknown; search?: unknown; hash?: unknown } } | null;
+    const statePath = routeState?.from;
+    const returnFromState = statePath && typeof statePath.pathname === "string"
+      ? `${statePath.pathname}${typeof statePath.search === "string" ? statePath.search : ""}${typeof statePath.hash === "string" ? statePath.hash : ""}`
+      : null;
+    let storedReturn: string | null = null;
+    try {
+      storedReturn = window.sessionStorage.getItem(AUTH_RETURN_TO_STORAGE_KEY);
+    } catch {
+    }
+    const returnTo = returnFromState ?? storedReturn;
+    const safeReturnTo = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") &&
+      !returnTo.startsWith("/login") && !returnTo.includes("\\")
+      ? returnTo
+      : null;
+    try {
+      window.sessionStorage.removeItem(AUTH_RETURN_TO_STORAGE_KEY);
+    } catch {
+    }
+    navigate(
+      esAdministrador
+        ? "/administracion"
+        : safeReturnTo ?? (rol ? DESTINOS_POR_ROL[rol] ?? "/" : "/"),
+      { replace: true },
+    );
+  }
 
   async function iniciarSesion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,27 +77,16 @@ export default function LoginPage() {
 
     try {
       await login({ identificador: identificador.trim(), password });
-      const rol = useAuthStore.getState().usuario?.rol;
-      const routeState = location.state as { from?: { pathname?: unknown; search?: unknown; hash?: unknown } } | null;
-      const statePath = routeState?.from;
-      const returnFromState = statePath && typeof statePath.pathname === "string"
-        ? `${statePath.pathname}${typeof statePath.search === "string" ? statePath.search : ""}${typeof statePath.hash === "string" ? statePath.hash : ""}`
-        : null;
-      let storedReturn: string | null = null;
-      try {
-        storedReturn = window.sessionStorage.getItem(AUTH_RETURN_TO_STORAGE_KEY);
-      } catch {
+      const usuario = useAuthStore.getState().usuario;
+
+      // Regla TSK-1.0A: Si la cuenta tiene múltiples asignaciones y no hay contexto activo,
+      // exigir selección explícita mediante el modal bloqueante antes de ingresar.
+      if (!usuario?.contextoActivo && usuario?.contextosDisponibles && usuario.contextosDisponibles.length > 1) {
+        setMostrarSelector(true);
+        return;
       }
-      const returnTo = returnFromState ?? storedReturn;
-      const safeReturnTo = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") &&
-        !returnTo.startsWith("/login") && !returnTo.includes("\\")
-        ? returnTo
-        : null;
-      try {
-        window.sessionStorage.removeItem(AUTH_RETURN_TO_STORAGE_KEY);
-      } catch {
-      }
-      navigate(safeReturnTo ?? (rol ? DESTINOS_POR_ROL[rol] ?? "/" : "/"), { replace: true });
+
+      redirigirSegunContexto();
     } catch (errorLogin: unknown) {
       if (errorLogin instanceof ApiHttpError && errorLogin.status === 401) {
         setError("Credenciales incorrectas. Verifique su usuario y contraseña.");
@@ -120,12 +156,28 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={cargando}
-            className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition disabled:opacity-60"
+            className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition disabled:opacity-60 cursor-pointer"
           >
             {cargando ? "Ingresando…" : "Ingresar al sistema"}
           </button>
         </form>
+        <p className="mt-4 text-center text-sm text-slate-500">
+          ¿No tienes una cuenta?{" "}
+          <Link to="/registro" className="font-semibold text-blue-700 hover:text-blue-800 hover:underline">
+            Crear cuenta
+          </Link>
+        </p>
       </section>
+
+      {/* Selector de Contexto Obligatorio para cuentas con múltiples roles */}
+      <SelectorContextoModal
+        abierto={mostrarSelector}
+        alCerrar={() => {
+          setMostrarSelector(false);
+          redirigirSegunContexto();
+        }}
+        bloqueante
+      />
     </main>
   );
 }

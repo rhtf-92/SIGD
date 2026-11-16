@@ -81,4 +81,82 @@ describe('OrganigramaService (ltree)', () => {
       expect(resultado.path).toBe('DIR.NUEVA');
     });
   });
+
+  describe('compatibilidad con PostgreSQL sigd_org.area', () => {
+    it('consulta la tabla sigd_org.area con las columnas originales y filtro de vigencia', async () => {
+      const mockQuery = vi.fn().mockResolvedValue({
+        rows: [
+          {
+            id: 'd9b8979a-14d2-43bb-a80d-85265a711101',
+            sigla: 'DG',
+            nombre: 'Dirección General',
+            padre_id: null,
+            path: 'a.DG',
+            estado: true,
+          },
+        ],
+      });
+      pool = { query: mockQuery };
+
+      const servicio = new OrganigramaService(pool as Pool);
+      const resultado = await servicio.obtenerOrganigrama();
+
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+      const sql = mockQuery.mock.calls[0][0];
+      expect(sql).toContain('FROM sigd_org.area');
+      expect(sql).toContain('area_id AS id');
+      expect(sql).toContain('codigo AS sigla');
+      expect(sql).toContain('area_padre_id AS padre_id');
+      expect(sql).toContain('path::text AS path');
+      expect(sql).toContain('vigente AS estado');
+      expect(sql).toContain('WHERE vigente = TRUE');
+      expect(sql).toContain('ORDER BY path ASC');
+
+      expect(resultado).toHaveLength(1);
+      expect(resultado[0].id).toBe('d9b8979a-14d2-43bb-a80d-85265a711101');
+      expect(typeof resultado[0].id).toBe('string');
+      expect(resultado[0].sigla).toBe('DG');
+    });
+
+    it('maneja un catálogo de áreas vacío devolviendo un arreglo vacío sin errores ni stubs', async () => {
+      const mockQuery = vi.fn().mockResolvedValue({ rows: [] });
+      pool = { query: mockQuery };
+
+      const servicio = new OrganigramaService(pool as Pool);
+      const resultado = await servicio.obtenerOrganigrama();
+
+      expect(resultado).toEqual([]);
+      expect(resultado).toHaveLength(0);
+    });
+
+    it('crearUnidad inserta en sigd_org.area respetando columnas oficiales', async () => {
+      const mockQuery = vi.fn().mockResolvedValue({
+        rows: [
+          {
+            id: 'e1234567-1111-2222-3333-444455556666',
+            sigla: 'SA',
+            nombre: 'Secretaría Académica',
+            padre_id: 'd9b8979a-14d2-43bb-a80d-85265a711101',
+            path: 'a.DG.a.SA',
+            estado: true,
+          },
+        ],
+      });
+      pool = { query: mockQuery };
+
+      const servicio = new OrganigramaService(pool as Pool);
+      const nueva = await servicio.crearUnidad({
+        sigla: 'SA',
+        nombre: 'Secretaría Académica',
+        padre_id: 'd9b8979a-14d2-43bb-a80d-85265a711101',
+      });
+
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockQuery.mock.calls[0];
+      expect(sql).toContain('INSERT INTO sigd_org.area (codigo, nombre, area_padre_id)');
+      expect(sql).toContain('RETURNING area_id AS id, codigo AS sigla, nombre, area_padre_id AS padre_id');
+      expect(params).toEqual(['SA', 'Secretaría Académica', 'd9b8979a-14d2-43bb-a80d-85265a711101']);
+      expect(nueva.id).toBe('e1234567-1111-2222-3333-444455556666');
+    });
+  });
 });

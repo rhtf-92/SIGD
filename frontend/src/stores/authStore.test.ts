@@ -46,4 +46,34 @@ describe("authStore", () => {
     expect(useAuthStore.getState().refreshToken).toBe("old-rt");
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
   });
+
+  it("seleccionarContexto() conmuta el contexto activo y actualiza permisos y rol", async () => {
+    const mockUsuario = { id: "u1", nombreCompleto: "Juan Perez", correo: "juan@inst.edu.pe", rol: "DOCENTE" };
+    useAuthStore.setState({ accessToken: "tok-antiguo", usuario: mockUsuario, isAuthenticated: true });
+
+    const nuevoContexto = {
+      idAsignacion: "asig-coord-1",
+      tipo: "ROL" as const,
+      codigo: "COORDINADOR_AREA",
+      nombre: "Coordinador de Área",
+      areaId: "area-1",
+      areaNombre: "Desarrollo de Sistemas",
+      permisos: [{ codigo: "EXPEDIENTE_RESOLVER", ambito: "AREA" as const, areaId: "area-1" }],
+      vigenteDesde: "2026-01-01T00:00:00Z",
+      vigenteHasta: null,
+      activo: true,
+    };
+
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      data: { ok: true, contextoActivo: nuevoContexto, accessToken: "tok-nuevo", mensaje: "Cambiado" },
+    });
+
+    await useAuthStore.getState().seleccionarContexto("asig-coord-1");
+
+    expect(useAuthStore.getState().accessToken).toBe("tok-nuevo");
+    expect(useAuthStore.getState().usuario?.rol).toBe("COORDINADOR_AREA");
+    expect(useAuthStore.getState().usuario?.permisos).toEqual(nuevoContexto.permisos);
+    expect(useAuthStore.getState().usuario?.contextoActivo).toEqual(nuevoContexto);
+    expect(apiClient.post).toHaveBeenCalledWith("/api/v1/auth/seleccionar-contexto", { idAsignacion: "asig-coord-1" });
+  });
 });

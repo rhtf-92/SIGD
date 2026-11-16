@@ -1,4 +1,5 @@
 import express from 'express';
+import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,7 +17,10 @@ const asientoDoble = {
   folios: 2, fecha_asiento: new Date('2026-10-11T15:00:00.000Z'),
 };
 
-function crearApp(query = vi.fn(async (_sql: string, _params: unknown[]) => ({ rows: [asientoDoble] }))) {
+function crearApp(queryCargo = vi.fn(async (_sql: string, _params: unknown[]) => ({ rows: [asientoDoble] })), rolesPersistidos: string[] | null = ['MESA_PARTES']) {
+  const query = vi.fn(async (sql: string, params: unknown[]) => sql.includes('AS permisos')
+    ? { rows: rolesPersistidos === null ? [] : [{ roles: rolesPersistidos, permisos: [] }] }
+    : queryCargo(sql, params));
   const app = express();
   app.use('/api/v1', crearRouterTramites({ query } as unknown as Pool));
   app.use(errorMiddleware);
@@ -24,10 +28,16 @@ function crearApp(query = vi.fn(async (_sql: string, _params: unknown[]) => ({ r
 }
 
 function token(roles: string[] = ['MESA_PARTES'], expiraSegundos = 900) {
-  return firmarTokenAcceso({ sub: 'operador-unitario', roles, expiraSegundos, secreto: secretoPrueba });
+  return firmarTokenAcceso({ sub: '10000000-0000-4000-8000-000000000001', roles, expiraSegundos, secreto: secretoPrueba });
 }
 
 describe('Ventanilla · autorización de recuperación del cargo', () => {
+  it.each([[], null])('un claim MESA_PARTES no permite leer cargos tras perder el rol: %s', async roles => {
+    const { app, query } = crearApp(undefined, roles);
+    expect((await request(app).get(ruta).set('Authorization', `Bearer ${token()}`)).status).toBe(403);
+    expect(query).toHaveBeenCalledOnce();
+    expect(query.mock.calls[0][0]).toContain('cu.activo = TRUE');
+  });
   beforeEach(() => vi.stubEnv('AUTH_JWT_SECRET', secretoPrueba));
   afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
@@ -36,8 +46,8 @@ describe('Ventanilla · autorización de recuperación del cargo', () => {
     const res = await request(app).get(ruta).set('Authorization', `Bearer ${token()}`);
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ cut: asientoDoble.cut, dni: asientoDoble.remitente_documento, folios: 2 });
-    expect(query).toHaveBeenCalledOnce();
-    expect(query.mock.calls[0][1]).toEqual([asientoDoble.cut]);
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[1][1]).toEqual([asientoDoble.cut]);
     // El doble ejercita la autorización; no acredita compatibilidad del SQL con V2.
   });
 
@@ -59,7 +69,7 @@ describe('Ventanilla · autorización de recuperación del cargo', () => {
 
   it('rechaza con 401 un JWT firmado con otra clave', async () => {
     const { app, query } = crearApp();
-    const falso = firmarTokenAcceso({ sub: 'operador-unitario', roles: ['MESA_PARTES'], secreto: 'otra-clave-unitaria-de-al-menos-32-caracteres' });
+    const falso = firmarTokenAcceso({ sub: '10000000-0000-4000-8000-000000000001', roles: ['MESA_PARTES'], secreto: 'otra-clave-unitaria-de-al-menos-32-caracteres' });
     const res = await request(app).get(ruta).set('Authorization', `Bearer ${falso}`);
     expect(res.status).toBe(401);
     expect(query).not.toHaveBeenCalled();
@@ -73,12 +83,12 @@ describe('Ventanilla · autorización de recuperación del cargo', () => {
   });
 
   it.each([{ roles: ['CIUDADANO'] }, { roles: [] }])('devuelve 403 a un JWT válido sin el rol MESA_PARTES ($roles)', async ({ roles }) => {
-    const { app, query } = crearApp();
+    const { app, query } = crearApp(undefined, roles);
     const res = await request(app).get(ruta).set('Authorization', `Bearer ${token(roles)}`);
     expect(res.status).toBe(403);
     expect(res.body).toMatchObject({ status: 403, code: 'FORBIDDEN' });
     expect(res.headers['content-type']).toContain('application/problem+json');
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledOnce();
     expect(res.body).not.toHaveProperty('dni');
   });
 
@@ -102,7 +112,7 @@ describe('Ventanilla · autorización de recuperación del cargo', () => {
     expect(res.body).not.toHaveProperty('ticketTermicoTexto');
   });
 
-  it('mantiene accesible la consulta pública por CUT sin credenciales', async () => {
+  it('mantiene accesible la consulta pública con la capacidad del cargo, sin exponerla por CUT solamente', async () => {
     const consulta = vi.spyOn(ConsultaPublicaService.prototype, 'consultarPorCut').mockResolvedValue({
       cut: asientoDoble.cut, anioFiscal: 2026, estadoTramite: 'RECEPCIONADO', tipoTramite: null,
       asunto: 'Asunto del doble público', fechaEnvioReal: asientoDoble.fecha_asiento.toISOString(),
@@ -111,10 +121,21 @@ describe('Ventanilla · autorización de recuperación del cargo', () => {
       administrado: { documentoEnmascarado: '00***000', nombreEnmascarado: 'S**********' },
       documentos: [], proveidos: [], mensajeLegal: 'Texto unitario',
     });
-    const { app, query } = crearApp();
-    const res = await request(app).get(`/api/v1/tramites/consulta-publica/${asientoDoble.cut}`);
+    const capacidad = 'e'.repeat(64);
+    const hash = createHash('sha256').update(capacidad).digest('hex');
+    const { app, query } = crearApp(vi.fn(async () => ({ rows: [{ sesion_hash: hash }] })) as never);
+    const endpoint = `/api/v1/tramites/consulta-publica/${asientoDoble.cut}`;
+    expect((await request(app).get(endpoint)).status).toBe(404);
+    expect((await request(app).get(endpoint).set('X-SIGD-Public-Session', 'f'.repeat(64))).status).toBe(404);
+    expect(consulta).not.toHaveBeenCalled();
+    const res = await request(app).get(endpoint).set('X-SIGD-Public-Session', capacidad);
     expect(res.status).toBe(200);
     expect(consulta).toHaveBeenCalledWith({ cut: asientoDoble.cut });
-    expect(query).not.toHaveBeenCalled();
+    expect(consulta).toHaveBeenCalledOnce();
+    expect(query).toHaveBeenCalledTimes(3);
+    for (const [sql, values] of query.mock.calls) {
+      expect(sql).toContain('sigd_tra.radicacion_publica');
+      expect(values).toEqual([asientoDoble.cut]);
+    }
   });
 });

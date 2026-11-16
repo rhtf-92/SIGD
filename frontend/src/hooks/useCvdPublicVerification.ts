@@ -1,186 +1,45 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
-
 import { apiClient } from "../api/client";
-import { env } from "../config/env";
-import type { ApiProblemDetails } from "../types/api";
+import { ApiHttpError, type ApiProblemDetails } from "../types/api";
 import type { ErrorValidacionCvd, ValidacionCVDResult } from "../types/validadorCvd";
-import { normalizarCvd, validarCvd } from "../utils/cvdValidator";
-
-export const CVD_VALIDO = "CVD-2026-RD-000412-892F";
-export const CVD_ALTERADO = "CVD-2026-RD-000413-ALTE";
-const USAR_MOCKS = env.enableMocks;
+import { validarCvd } from "../utils/cvdValidator";
 
 export class CvdError extends Error implements ErrorValidacionCvd {
-  readonly titulo: string;
-  readonly detalle: string;
-  readonly codigoEstado: number;
-
-  constructor(titulo: string, detalle: string, codigoEstado: number) {
+  constructor(readonly titulo: string, readonly detalle: string, readonly codigoEstado: number) {
     super(detalle);
     this.name = "CvdError";
-    this.titulo = titulo;
-    this.detalle = detalle;
-    this.codigoEstado = codigoEstado;
   }
 }
 
-function convertirError(origen: unknown): CvdError {
-  if (origen instanceof CvdError) return origen;
-
-  if (axios.isAxiosError<ApiProblemDetails>(origen)) {
-    const problema = origen.response?.data;
-    return new CvdError(
-      problema?.title ?? "Error de validación",
-      problema?.detail ?? origen.message,
-      origen.response?.status ?? 500,
-    );
-  }
-
-  return new CvdError(
-    "Error inesperado",
-    "Ocurrió un error al consultar el validador público de CVD.",
-    500,
-  );
+function convertirError(error: unknown): CvdError {
+  if (error instanceof CvdError) return error;
+  const status = error instanceof ApiHttpError ? error.status
+    : axios.isAxiosError<ApiProblemDetails>(error) ? error.response?.status ?? 503 : 503;
+  if (status === 404) return new CvdError("CVD no encontrado", "No existe un documento registrado para ese código CVD.", 404);
+  if (status === 400 || status === 422) return new CvdError("Código CVD inválido", "Revise el formato del código ingresado.", status);
+  return new CvdError("Verificación no disponible", "No se pudo completar la consulta. Intente nuevamente.", status);
 }
 
-function crearResultadoValido(): ValidacionCVDResult {
-  return {
-    esValido: true,
-    cvd: CVD_VALIDO,
-    documento: {
-      numeroDocumento: "RD N.° 0412-2026-DG-IESTP-SUIZA",
-      tipo: "RD",
-      asunto:
-        "Confiere Título Profesional Técnico en Desarrollo de Sistemas de Información al administrado Carlos Mendoza Ríos.",
-      fechaEmision: "2026-09-05T11:42:15-05:00",
-      firmantes: [
-        {
-          nombre: "Lic. Julio César Mori Paredes",
-          cargo: "Director General",
-          fechaFirma: "2026-09-05T11:42:15-05:00",
-          entidadCertificadora: "RENIEC / IOFE INDECOPI",
-        },
-        {
-          nombre: "Dra. Rosa Luz Cárdenas Vela",
-          cargo: "Secretaria Académica",
-          fechaFirma: "2026-09-05T11:42:13-05:00",
-          entidadCertificadora: "RENIEC / IOFE INDECOPI",
-        },
-      ],
-      hashIntegridadSha256:
-        "c1f2a3b4d5e6f708192a3b4c5d6e7f80a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d",
-      // Ruta interna al visor de representación impresa (ENT-M04-04): el PDF
-      // externo no existe en este entorno, así el enlace siempre abre.
-      urlDescargaAutentica: `/flujo-validez-legal/visor-cvd?cvd=${CVD_VALIDO}`,
-    },
-    selloTiempoTsa: "2026-09-05T11:42:16-05:00",
-    mensajeSeguridad:
-      "Documento oficial emitido por el IESTP Suiza. La integridad criptográfica y las firmas digitales son plenamente válidas.",
-  };
-}
-
-function crearResultadoAlterado(codigoCvd: string): ValidacionCVDResult {
-  return {
-    esValido: false,
-    cvd: codigoCvd,
-    documento: null,
-    selloTiempoTsa: null,
-    mensajeSeguridad:
-      "El documento ingresado no coincide con ningún registro institucional legítimo o su contenido ha sido alterado tras la emisión.",
-  };
-}
-
-async function consultarMock(codigoCvd: string): Promise<ValidacionCVDResult> {
-  await new Promise((resolver) => setTimeout(resolver, 800));
-  const normalizado = codigoCvd.trim().toUpperCase();
-
-  if (normalizado === CVD_VALIDO) return crearResultadoValido();
-  if (normalizado === CVD_ALTERADO) return crearResultadoAlterado(normalizado);
-
-  throw new CvdError(
-    "CVD no encontrado",
-    `El código ${normalizado} no corresponde a ningún documento oficial emitido por el IESTP Suiza.`,
-    404,
-  );
-}
-
-async function consultarApi(codigoCvd: string): Promise<ValidacionCVDResult> {
-  const normalizado = normalizarCvd(codigoCvd);
-  const { data } = await apiClient.get<any>(
-    `/api/v1/validador/cvd/${encodeURIComponent(normalizado)}`,
-  );
-  const esValido = Boolean(data.esValido ?? data.valido);
-  const selloTiempoTsa =
-    data.selloTiempoTsa ??
-    (data.fecha_sello_tsa ? new Date(data.fecha_sello_tsa).toISOString() : null);
-
-  let documento = data.documento ?? null;
-  if (!documento && esValido) {
-    documento = {
-      numeroDocumento: `RD N.° ${normalizado.slice(-6)}-2026-DG-IESTP-SUIZA`,
-      tipo: "RD" as const,
-      asunto: "Documento Oficial con Firma Digital Verificada - IESTP Suiza",
-      fechaEmision: selloTiempoTsa ?? new Date().toISOString(),
-      firmantes: [
-        {
-          nombre: data.firmante || "Dirección General IESTP Suiza",
-          cargo: "Director General",
-          fechaFirma: selloTiempoTsa ?? new Date().toISOString(),
-          entidadCertificadora: "RENIEC / PKI Estado Peruano",
-        },
-      ],
-      hashIntegridadSha256: data.sha256_firmado || "",
-      urlDescargaAutentica: data.descarga_copia_certificada || "",
-    };
-  }
-
-  return {
-    esValido,
-    cvd: data.cvd ?? normalizado,
-    documento,
-    selloTiempoTsa,
-    mensajeSeguridad:
-      data.mensajeSeguridad ??
-      (esValido
-        ? "Documento íntegro y verificado conforme al marco legal D.S. N° 070-2013-PCM."
-        : "El documento ingresado no coincide con ningún registro institucional legítimo o su contenido ha sido alterado tras la emisión."),
-  };
-}
-
-async function consultarCvd(codigoCvd: string): Promise<ValidacionCVDResult> {
-  // T-FE-DOC-05: rechazo temprano en cliente de códigos con formato apócrifo,
-  // sin siquiera disparar la petición HTTP.
-  const chequeo = validarCvd(codigoCvd);
-  if (!chequeo.valido) {
-    throw new CvdError(
-      "Código CVD inválido",
-      chequeo.motivo ?? "El código ingresado no tiene un formato CVD válido.",
-      400,
-    );
-  }
-  const normalizado = chequeo.normalizado;
-  // Códigos con formato válido pero inexistentes resuelven dictamen "alterado"
-  // en modo mock para la alerta roja formal (no un 404 crudo).
-  if (USAR_MOCKS) {
-    if (normalizado !== CVD_VALIDO && normalizado !== CVD_ALTERADO) {
-      await new Promise((r) => setTimeout(r, 800));
-      return {
-        esValido: false,
-        cvd: normalizado,
-        documento: null,
-        selloTiempoTsa: null,
-        mensajeSeguridad:
-          "El documento ingresado no coincide con ningún registro institucional legítimo o su contenido ha sido alterado tras la emisión.",
-      };
-    }
-    return await consultarMock(normalizado);
-  }
+async function consultarCvd(codigo: string): Promise<ValidacionCVDResult> {
+  const chequeo = validarCvd(codigo);
+  if (!chequeo.valido) throw new CvdError("Código CVD inválido", chequeo.motivo ?? "Revise el código.", 400);
   try {
-    return await consultarApi(normalizado);
-  } catch (origen) {
-    throw convertirError(origen);
+    const { data } = await apiClient.get<ValidacionCVDResult>(
+      `/api/v1/validador/cvd/${encodeURIComponent(chequeo.normalizado)}`,
+    );
+    if (!data || typeof data.esValido !== "boolean" || data.cvd !== chequeo.normalizado
+      || typeof data.mensajeSeguridad !== "string") {
+      throw new CvdError("Respuesta no verificable", "El servidor no devolvió un resultado de verificación válido.", 502);
+    }
+    if (data.esValido && (!data.documento || !/^[a-f0-9]{64}$/i.test(data.documento.hashIntegridadSha256)
+      || !Array.isArray(data.documento.firmantes) || data.documento.firmantes.length === 0)) {
+      throw new CvdError("Respuesta no verificable", "Falta evidencia documental en la respuesta del servidor.", 502);
+    }
+    return { ...data, documento: data.esValido ? data.documento : null };
+  } catch (error) {
+    throw convertirError(error);
   }
 }
 
@@ -193,23 +52,20 @@ export interface UseCvdPublicVerificationResultado {
 }
 
 export function useCvdPublicVerification(): UseCvdPublicVerificationResultado {
+  const enviando = useRef(false);
   const mutation = useMutation<ValidacionCVDResult, CvdError, string>({
-    mutationFn: consultarCvd,
-  });
-
-  const verificar = useCallback(
-    (codigoCvd: string) => {
-      mutation.reset();
-      mutation.mutate(codigoCvd);
+    mutationFn: async (codigo) => {
+      try { return await consultarCvd(codigo); }
+      finally { enviando.current = false; }
     },
-    [mutation],
-  );
-
-  return {
-    resultado: mutation.data ?? null,
-    error: mutation.error,
-    isValidando: mutation.isPending,
-    verificar,
-    limpiar: mutation.reset,
-  };
+    retry: false,
+  });
+  const verificar = useCallback((codigo: string) => {
+    if (enviando.current) return;
+    enviando.current = true;
+    mutation.reset();
+    mutation.mutate(codigo);
+  }, [mutation]);
+  return { resultado: mutation.data ?? null, error: mutation.error,
+    isValidando: mutation.isPending, verificar, limpiar: mutation.reset };
 }

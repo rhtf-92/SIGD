@@ -20,6 +20,9 @@
  */
 
 import { createHash } from "node:crypto";
+import type { Pool } from 'pg';
+import { AppError } from '../../shared/domain/errors/index.js';
+import { cotejarPdfFirmado } from './callbackRefirma.service.js';
 
 import { a4GeneratorService, type A4GeneratorService } from "./a4Generator.service.js";
 import type { AlmacenDocumentosFirmables } from "./documentoFirmable.store.js";
@@ -86,8 +89,8 @@ export interface ResultadoCallback {
   hashOrigen: string;
   firmadoEn: string;
   /**
-   * `true` cuando el hash firmado difiere del original, lo que confirma que el
-   * agente aplico la firma sobre el documento.
+   * Indica únicamente que el hash declarado difiere del original.
+   * No demuestra una firma criptográfica ni acredita un sello de tiempo.
    */
   documentoModificado: boolean;
 }
@@ -108,6 +111,30 @@ export class ServicioFirmaService {
 
   constructor(private readonly dependencias: DependenciasServicioFirma) {
     this.generador = dependencias.generador ?? a4GeneratorService;
+  }
+
+  /** Lee únicamente la evidencia confirmada por el callback transaccional.
+   * La ausencia de fila no acredita rechazo, vencimiento ni una solicitud pendiente.
+   */
+  async consultarResultadoPersistido(pool: Pick<Pool, 'query'>, documentoId: string) {
+    const registro = await pool.query<{
+      estado: string; cvd: string; sha256_firmado: string; firmante: string;
+      fecha_sello_tsa: Date | string; s3_bucket: string; s3_key: string;
+    }>(`SELECT estado, cvd, sha256_firmado, firmante, fecha_sello_tsa, s3_bucket, s3_key
+        FROM sigd_doc.firma_digital_documento WHERE documento_id = $1::uuid`, [documentoId]);
+    if (registro.rows.length === 0) return null;
+    const evidencia = registro.rows[0];
+    const fecha = new Date(evidencia.fecha_sello_tsa);
+    if (registro.rows.length !== 1 || evidencia.estado !== 'FIRMADO_DIGITALMENTE' ||
+        !/^CVD-[A-Z0-9-]{6,36}$/.test(evidencia.cvd ?? '') ||
+        !/^[a-f0-9]{64}$/i.test(evidencia.sha256_firmado ?? '') ||
+        !evidencia.firmante?.trim() || !evidencia.fecha_sello_tsa || !Number.isFinite(fecha.getTime()) ||
+        !evidencia.s3_bucket || !evidencia.s3_key) {
+      throw new AppError({ status: 409, code: 'SIGN_EVIDENCE_INCOMPLETE', message: 'La evidencia de firma registrada no está completa.' });
+    }
+    await cotejarPdfFirmado(evidencia);
+    return { estado: 'FIRMADO_DIGITALMENTE' as const, cvd: evidencia.cvd,
+      timestamp: fecha.toISOString(), bucket: evidencia.s3_bucket, key: evidencia.s3_key };
   }
 
   /** Ejecuta la invocacion completa y devuelve los datos que requiere el frontend. */
@@ -199,6 +226,10 @@ export class ServicioFirmaService {
     sesionId: string,
     hashDocumentoFirmado: string,
   ): Promise<ResultadoCallback> {
+    // Validar antes de GETDEL: un callback mal formado no consume una sesion valida.
+    const hashRecibido = hashDocumentoFirmado.toLowerCase();
+    if (!esHashSha256(hashRecibido)) throw errorIntegridadDocumento('', hashRecibido);
+    if (this.construirSesionId(token) !== sesionId) throw errorSesionFirmaInvalida();
     const sesion = await this.dependencias.sesiones.consumir(token);
     if (sesion === null || sesion.id !== sesionId) {
       // La sesion se consumio igual que fallara el cotejo: un token no puede
@@ -206,16 +237,9 @@ export class ServicioFirmaService {
       throw errorSesionFirmaInvalida();
     }
 
-    const hashRecibido = hashDocumentoFirmado.toLowerCase();
-
-    if (!esHashSha256(hashRecibido)) {
-      throw errorIntegridadDocumento(sesion.hashDocumento, hashRecibido);
-    }
-
-    // El hash del PDF firmado nunca coincide con el del original: la firma
-    // modifica los bytes. Lo que se verifica aqui es la integridad del
-    // transporte y el formato del valor recibido. La comprobacion criptografica
-    // del documento firmado (PAdES) corresponde a ReFirma Validator.
+    // Este callback consume la sesión y valida el formato del hash declarado.
+    // No coteja bytes, firma PAdES ni TSA. No sustituye al callback autenticado
+    // que persiste la evidencia en firma_digital_documento.
     const documentoDistinto = hashRecibido !== sesion.hashDocumento;
 
     return {

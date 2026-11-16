@@ -31,12 +31,11 @@ function validarArranqueSeguro(env: NodeJS.ProcessEnv): 'local' | 'docker' {
   // Sin parámetros: pg puede usarlos para sustituir el host, puerto o base.
   const destinoLocal =
     destino.hostname === '127.0.0.1' &&
-    ((destino.port === '5434' && destino.pathname === '/sigd_backend_v2_test') ||
-      (destino.port === '5433' && destino.pathname === '/sigd_prueba'));
+    ((destino.port === '5434' || destino.port === '5433') && destino.pathname === '/sigd_jacobo_demo');
   const destinoDocker =
     destino.hostname === 'postgres' &&
     destino.port === '5432' &&
-    destino.pathname === '/sigd_prueba';
+    destino.pathname === '/sigd_jacobo_demo';
   if (
     !['postgres:', 'postgresql:'].includes(destino.protocol) ||
     (!destinoLocal && !destinoDocker) ||
@@ -44,7 +43,7 @@ function validarArranqueSeguro(env: NodeJS.ProcessEnv): 'local' | 'docker' {
     destino.hash !== ''
   ) {
     throw new Error(
-      '[SAFE_BOOT] El destino debe ser 127.0.0.1:5433/sigd_prueba, 127.0.0.1:5434/sigd_backend_v2_test o postgres:5432/sigd_prueba, sin parámetros ni fragmentos.',
+      '[SAFE_BOOT] El destino debe ser la base oficial sigd_jacobo_demo (puerto 5433 o 5434 en 127.0.0.1, o postgres:5432/sigd_jacobo_demo en Docker), sin parámetros ni fragmentos.',
     );
   }
   return destinoDocker ? 'docker' : 'local';
@@ -54,8 +53,8 @@ const modoSeguro = process.env.SIGD_SAFE_BOOT === 'true';
 const destinoSeguro = modoSeguro ? validarArranqueSeguro(process.env) : null;
 
 const databaseUrl =
-  process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
-const port = Number(process.env.PORT ?? 3000);
+  process.env.DATABASE_URL ?? 'postgres://postgres:postgres_password@127.0.0.1:5433/sigd_jacobo_demo';
+const port = Number(process.env.PORT ?? 3008);
 
 const pool = crearPool(databaseUrl);
 const busSse = new BusSse();
@@ -72,7 +71,7 @@ const anunciarInicio = (): void => {
 };
 const servidor = modoSeguro
   ? app.listen(port, destinoSeguro === 'docker' ? '0.0.0.0' : '127.0.0.1', anunciarInicio)
-  : app.listen(port, anunciarInicio);
+  : app.listen(port, process.env.HOST ?? '0.0.0.0', anunciarInicio);
 
 const intervaloHeartbeat = setInterval(
   () => busSse.emitirHeartbeat(),
@@ -86,7 +85,12 @@ const bridge = new BridgeNotificacion(databaseUrl, busSse);
 await bridge.iniciar();
 
 let outboxWorker: OutboxWorker | null = null;
-if (!modoSeguro) {
+const habilitarOutboxWorker =
+  !modoSeguro ||
+  process.env.OUTBOX_WORKER_ENABLED === 'true' ||
+  (destinoSeguro === 'docker' && process.env.OUTBOX_WORKER_ENABLED !== 'false');
+
+if (habilitarOutboxWorker) {
   outboxWorker = new OutboxWorker(
     pool,
     crearDespachadorPorDefecto(busSse, pool, bridge),
@@ -117,7 +121,7 @@ const frontendDir = path.resolve(__dirname, '../../frontend');
 const viteBin = path.resolve(frontendDir, 'node_modules/vite/bin/vite.js');
 
 let viteProc: ReturnType<typeof spawn> | null = null;
-if (!modoSeguro) {
+if (!modoSeguro && process.env.VITE_AUTOSTART !== 'false') {
   try {
     viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
       cwd: frontendDir,

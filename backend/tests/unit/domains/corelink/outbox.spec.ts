@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { OutboxWorker, type EventoPendiente, type DespachadorEvento } from '../../../../src/audit/outbox-worker.js';
 
-const URL_BASE = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+const URL_BASE = process.env.DATABASE_URL ?? process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres_password@127.0.0.1:5433/sigd_jacobo_demo';
+const AGREGADO_TEST = 'test_suite_outbox';
 
 class DespachadorMemoria implements DespachadorEvento {
   public readonly recibidos: EventoPendiente[] = [];
@@ -22,20 +23,23 @@ class DespachadorFallo implements DespachadorEvento {
   }
 }
 
-const suiteDb = URL_BASE ? describe : describe.skip;
-
-suiteDb('OutboxWorker · Entrega at-least-once y concurrencia', () => {
+describe('OutboxWorker · Entrega at-least-once y concurrencia', () => {
   let pool: Pool;
 
   beforeAll(() => {
     pool = new Pool({ connectionString: URL_BASE, max: 10 });
   });
 
+  beforeEach(async () => {
+    await pool.query('DELETE FROM sigd_audit.evento_outbox WHERE agregado = $1', [AGREGADO_TEST]);
+  });
+
   afterEach(async () => {
-    await pool.query('DELETE FROM sigd_audit.evento_outbox');
+    await pool.query('DELETE FROM sigd_audit.evento_outbox WHERE agregado = $1', [AGREGADO_TEST]);
   });
 
   afterAll(async () => {
+    await pool.query('DELETE FROM sigd_audit.evento_outbox WHERE agregado = $1', [AGREGADO_TEST]);
     await pool.end();
   });
 
@@ -45,8 +49,8 @@ suiteDb('OutboxWorker · Entrega at-least-once y concurrencia', () => {
       const correlationId = randomUUID();
       await pool.query(
         `INSERT INTO sigd_audit.evento_outbox (correlation_id, agregado, tipo_evento, payload, estado)
-         VALUES ($1, 'expediente', $2, $3::jsonb, 'PENDIENTE')`,
-        [correlationId, tipoEvento, JSON.stringify({ indice: i, correlation_id: correlationId })],
+         VALUES ($1, $2, $3, $4::jsonb, 'PENDIENTE')`,
+        [correlationId, AGREGADO_TEST, tipoEvento, JSON.stringify({ indice: i, correlation_id: correlationId })],
       );
       correlaciones.push(correlationId);
     }
@@ -65,12 +69,14 @@ suiteDb('OutboxWorker · Entrega at-least-once y concurrencia', () => {
     expect(despachador.recibidos).toHaveLength(4);
 
     const resumen = await pool.query<{ estado: string; total: number }>(
-      `SELECT estado, COUNT(*)::int AS total FROM sigd_audit.evento_outbox GROUP BY estado`,
+      `SELECT estado, COUNT(*)::int AS total FROM sigd_audit.evento_outbox WHERE agregado = $1 GROUP BY estado`,
+      [AGREGADO_TEST],
     );
     expect(resumen.rows).toEqual([{ estado: 'PROCESADO', total: 4 }]);
 
     const sinFecha = await pool.query<{ n: number }>(
-      `SELECT COUNT(*)::int AS n FROM sigd_audit.evento_outbox WHERE procesado_en IS NULL`,
+      `SELECT COUNT(*)::int AS n FROM sigd_audit.evento_outbox WHERE agregado = $1 AND procesado_en IS NULL`,
+      [AGREGADO_TEST],
     );
     expect(sinFecha.rows[0].n).toBe(0);
   });
@@ -101,7 +107,8 @@ suiteDb('OutboxWorker · Entrega at-least-once y concurrencia', () => {
     expect(despachador.recibidos).toHaveLength(2);
 
     const pendientes = await pool.query<{ n: number }>(
-      `SELECT COUNT(*)::int AS n FROM sigd_audit.evento_outbox WHERE estado = 'PENDIENTE'`,
+      `SELECT COUNT(*)::int AS n FROM sigd_audit.evento_outbox WHERE estado = 'PENDIENTE' AND agregado = $1`,
+      [AGREGADO_TEST],
     );
     expect(pendientes.rows[0].n).toBe(3);
   });
@@ -121,7 +128,8 @@ suiteDb('OutboxWorker · Entrega at-least-once y concurrencia', () => {
     expect(procesados).toBe(0);
 
     const fila = await pool.query<{ estado: string; intentos: number }>(
-      `SELECT estado, intentos FROM sigd_audit.evento_outbox`,
+      `SELECT estado, intentos FROM sigd_audit.evento_outbox WHERE agregado = $1`,
+      [AGREGADO_TEST],
     );
     expect(fila.rows[0].estado).toBe('PENDIENTE');
     expect(fila.rows[0].intentos).toBe(1);
@@ -140,7 +148,8 @@ suiteDb('OutboxWorker · Entrega at-least-once y concurrencia', () => {
     await worker.ciclo();
 
     const fila = await pool.query<{ estado: string; intentos: number }>(
-      `SELECT estado, intentos FROM sigd_audit.evento_outbox`,
+      `SELECT estado, intentos FROM sigd_audit.evento_outbox WHERE agregado = $1`,
+      [AGREGADO_TEST],
     );
     expect(fila.rows[0].estado).toBe('FALLIDO');
     expect(fila.rows[0].intentos).toBe(1);
@@ -164,7 +173,8 @@ suiteDb('OutboxWorker · Entrega at-least-once y concurrencia', () => {
     expect(idsUnicos.size).toBe(total);
 
     const pendientes = await pool.query<{ n: number }>(
-      `SELECT COUNT(*)::int AS n FROM sigd_audit.evento_outbox WHERE estado = 'PENDIENTE'`,
+      `SELECT COUNT(*)::int AS n FROM sigd_audit.evento_outbox WHERE estado = 'PENDIENTE' AND agregado = $1`,
+      [AGREGADO_TEST],
     );
     expect(pendientes.rows[0].n).toBe(0);
   });

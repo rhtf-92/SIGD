@@ -1,9 +1,7 @@
+/**
+ * Global Teardown institucional para B_JACOBO.
+ * Cierre limpio y sin efectos colaterales sobre sigd_jacobo_demo.
+ */
 export default async function globalTeardown(): Promise<void> {
-  const container = (globalThis as Record<string, unknown>).__SIGD_CONTAINER__ as
-    | { stop: () => Promise<void> }
-    | undefined;
-
-  if (container) {
-    await container.stop();
-  }
+  console.log('[GLOBAL-TEARDOWN] Cierre ordenado de suite de pruebas finalizado.');
 }

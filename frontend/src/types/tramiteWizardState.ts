@@ -107,12 +107,20 @@ export interface ArchivoTramite {
   peso: number;
   hashSha256: string;
   storageUrl?: string;
+  tipoDocumentalCodigo?: string;
+  tipoDocumentalId?: string;
+  clasificacion?: 'EXPEDIENTE' | 'ANEXO';
+  requisitoId?: string;
+  paginas?: number;
+  folioInicio?: number;
+  folioFin?: number;
 }
 
 /**
  * Datos correspondientes al Paso 2: Documentos del Trámite.
  */
 export interface DocumentosData {
+  ordenPagoId?: string;
   tipoTramiteId: string;
   asunto: string;
   numeroFolios: number;
@@ -134,6 +142,7 @@ export interface DeclaracionJuradaData {
  * Contiene el Código Único de Trámite (CUT) inmutable y trazabilidad.
  */
 export interface CargoDigitalResponse {
+  mensajeLegal?: string;
   cut: string;
   fechaRadicacion: string;
   fechaRecepcionOficial: string;
@@ -186,6 +195,7 @@ export const INITIAL_IDENTIFICACION: IdentificacionData = {
  * Valores iniciales por defecto para el estado de Documentos.
  */
 export const INITIAL_DOCUMENTOS: DocumentosData = {
+  ordenPagoId: undefined,
   tipoTramiteId: '',
   asunto: '',
   numeroFolios: 1,

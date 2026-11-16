@@ -18,7 +18,7 @@ const dashboardResponse = {
   saludMesasPartes: "Operativa",
   tendencia: [{ fechaLabel: "Enero", radicados: 10, resueltos: 8 }],
   estados: [{ estado: "En trámite", porcentaje: 100 }],
-  unidades: [{ id: "unidad-1", nombre: "Secretaría Académica" }],
+  unidades: [{ id: "a0b00000-0000-4000-8000-000000000001", nombre: "Secretaría Académica" }],
   cuellosBotella: [],
 };
 
@@ -43,6 +43,32 @@ function respondWithDashboard() {
 afterEach(() => vi.clearAllMocks());
 
 describe("DashboardEjecutivoPage filtros reactivos", () => {
+  it('una respuesta desconocida no se convierte en estadísticas con ceros', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} } as never);
+    renderDashboard();
+    const alerta = await screen.findByRole('alert', {}, { timeout: 4000 });
+    expect(alerta).toHaveTextContent('La API no devolvió indicadores reconocidos.');
+    expect(screen.queryByText('Expedientes procesados')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Volver a consultar' })).toBeInTheDocument();
+  });
+  it("representa el DTO MGD real sin inventar comparaciones ni indicadores sin denominador", async () => {
+    vi.mocked(apiClient.get).mockImplementation(async (url) => ({ data:
+      String(url).endsWith('/resumen') ? {
+        vtep: { valor: 20, cumple: false }, tprHorasHabiles: { valor: 0, cumple: true },
+        tro: { valor: 0, cumple: false }, teo: { valor: 0, cumple: true },
+        disponibilidad: { vtep: true, tprHorasHabiles: false, tro: false, teo: true },
+      } : String(url).endsWith('/tendencias') ? [{ mes: 10, radicados: 5, atendidos: 1 }] : [],
+    }) as never);
+    const { container } = renderDashboard();
+    await screen.findByText('Volumen de expedientes atendidos (VTEP)');
+    expect(screen.getAllByText('Sin datos suficientes')).toHaveLength(2);
+    expect(screen.queryByLabelText('Resumen ejecutivo')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Δ vs/)).not.toBeInTheDocument();
+    expect(screen.getByText('Distribución por estado no disponible en esta fuente.')).toBeInTheDocument();
+    expect(container.querySelectorAll('svg[role="img"] circle')).toHaveLength(2);
+    const params = vi.mocked(apiClient.get).mock.calls.find(([url]) => String(url).endsWith('/resumen'))?.[1]?.params;
+    expect(params).toEqual({ fechaInicio: '2026-01-01', fechaFin: '2026-12-31', unidadOrganicaId: undefined });
+  });
   it("consulta el endpoint canónico con el año completo predeterminado", async () => {
     respondWithDashboard();
     renderDashboard();
@@ -52,8 +78,6 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
       params: expect.objectContaining({
         fechaInicio: "2026-01-01",
         fechaFin: "2026-12-31",
-        periodo: "anual",
-        anio: 2026,
       }),
     });
   });
@@ -80,7 +104,7 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
 
     await waitFor(() => expect(apiClient.get).toHaveBeenLastCalledWith(
       "/api/v1/reportes/dashboard/resumen",
-      { params: expect.objectContaining({ periodo: "mensual", fechaInicio: "2026-01-01", fechaFin: "2026-01-31", mes: "01" }) },
+      { params: expect.objectContaining({ fechaInicio: "2026-01-01", fechaFin: "2026-01-31" }) },
     ));
   });
 
@@ -95,7 +119,7 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
 
     await waitFor(() => expect(apiClient.get).toHaveBeenLastCalledWith(
       "/api/v1/reportes/dashboard/resumen",
-      { params: expect.objectContaining({ fechaInicio: "2026-02-01", fechaFin: "2026-02-28", mes: "02" }) },
+      { params: expect.objectContaining({ fechaInicio: "2026-02-01", fechaFin: "2026-02-28" }) },
     ));
   });
 
@@ -111,7 +135,7 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
 
     await waitFor(() => expect(apiClient.get).toHaveBeenLastCalledWith(
       "/api/v1/reportes/dashboard/resumen",
-      { params: expect.objectContaining({ periodo: "personalizado", fechaInicio: "2026-03-04", fechaFin: "2026-03-20" }) },
+      { params: expect.objectContaining({ fechaInicio: "2026-03-04", fechaFin: "2026-03-20" }) },
     ));
   });
 
@@ -121,11 +145,11 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
     renderDashboard();
 
     await screen.findByText("Expedientes procesados");
-    await user.selectOptions(screen.getByLabelText("Unidad orgánica"), "unidad-1");
+    await user.selectOptions(screen.getByLabelText("Unidad orgánica"), "a0b00000-0000-4000-8000-000000000001");
 
     await waitFor(() => expect(apiClient.get).toHaveBeenLastCalledWith(
       "/api/v1/reportes/dashboard/resumen",
-      { params: expect.objectContaining({ unidadOrganicaId: "unidad-1" }) },
+      { params: expect.objectContaining({ unidadOrganicaId: "a0b00000-0000-4000-8000-000000000001" }) },
     ));
   });
 
@@ -133,7 +157,7 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
     vi.mocked(apiClient.get).mockImplementation(async (_url, config) => ({
       data: {
         ...dashboardResponse,
-        tendencia: Array.from({ length: (config?.params as { mes?: string } | undefined)?.mes === "03" ? 3 : 1 }, (_, index) => ({
+        tendencia: Array.from({ length: (config?.params as { fechaInicio?: string } | undefined)?.fechaInicio === "2026-03-01" ? 3 : 1 }, (_, index) => ({
           fechaLabel: `P${index + 1}`,
           radicados: index + 1,
           resueltos: index,
@@ -156,5 +180,19 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
 
     expect(screen.getByRole("main")).toHaveAttribute("aria-busy", "true");
     expect(screen.getByText("Cargando tablero ejecutivo.")).toBeInTheDocument();
+  });
+
+  it("muestra estados vacíos informativos en tendencias y cuellos de botella cuando no hay registros", async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        ...dashboardResponse,
+        tendencia: [],
+        cuellosBotella: [],
+      },
+    } as never);
+    renderDashboard();
+
+    expect(await screen.findByText("No hay datos de tendencia registrados para el periodo seleccionado.")).toBeInTheDocument();
+    expect(screen.getByText("No se registran cuellos de botella para el periodo seleccionado.")).toBeInTheDocument();
   });
 });

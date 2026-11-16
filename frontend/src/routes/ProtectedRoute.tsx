@@ -3,11 +3,12 @@
 import type { JSX, ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
-import type { ClavePermiso, MatrizPermisos } from "../types/rbacRoles";
+import type { ClavePermiso } from "../types/rbacRoles";
+import { useAuthStore } from "../stores/authStore";
 
 const CLAVE_TOKEN = "sigd_token";
 const CLAVE_ROL = "sigd_rol";
-const CLAVE_PERMISOS = "sigd_permisos";
+const CLAVE_PERMISOS = "sigd_facultades";
 
 interface ProtectedRouteProps {
   children?: ReactNode;
@@ -20,18 +21,16 @@ export function tienePermisoAlmacenado(
   modulo: string,
   accion: string,
 ): boolean {
-  const rol = window.localStorage.getItem(CLAVE_ROL) ?? "";
   const crudo = window.localStorage.getItem(CLAVE_PERMISOS);
   if (!crudo) return false;
 
   try {
-    const matriz = JSON.parse(crudo) as MatrizPermisos;
-    const filas = matriz[rol] ?? [];
-    const fila = filas.find(
-      (item) => item.modulo.toLowerCase() === modulo.toLowerCase(),
-    );
-    if (!fila) return false;
-    return accion in fila ? Boolean((fila as never)[accion]) : false;
+    const facultades: unknown = JSON.parse(crudo);
+    if (!Array.isArray(facultades)) return false;
+    const codigo = modulo.toLowerCase() === 'administración' ? 'ADMIN_USUARIOS'
+      : modulo.toLowerCase() === 'reportes' && accion === 'ver' ? 'REPORTE_LEER'
+      : modulo.toLowerCase() === 'expedientes' && accion === 'ver' ? 'EXPEDIENTE_LEER' : null;
+    return codigo !== null && facultades.some(p => p && p.codigo === codigo && p.ambito === 'GLOBAL' && p.areaId === null);
   } catch {
     return false;
   }
@@ -43,6 +42,7 @@ export default function ProtectedRoute({
   requiredModule,
   requiredAction = "ver",
 }: ProtectedRouteProps): JSX.Element {
+  useAuthStore();
   const location = useLocation();
   const token = window.localStorage.getItem(CLAVE_TOKEN);
   const rol = window.localStorage.getItem(CLAVE_ROL);
@@ -51,7 +51,14 @@ export default function ProtectedRoute({
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (requiredRoles.length > 0 && !requiredRoles.includes(rol ?? "")) {
+  let roles: string[] = rol ? [rol] : [];
+  try {
+    const actuales: unknown = JSON.parse(window.localStorage.getItem('sigd_roles') ?? 'null');
+    if (Array.isArray(actuales)) roles = actuales.filter((r): r is string => typeof r === 'string');
+  } catch { roles = []; }
+  const solicitaAccesoAdministrador = requiredRoles.some(r => r === 'ADMINISTRADOR' || r === 'SUPER_ADMIN');
+  const accesoAdministradorGlobal = solicitaAccesoAdministrador && tienePermisoAlmacenado('Administración', 'ver');
+  if (requiredRoles.length > 0 && !requiredRoles.some(requerido => roles.includes(requerido)) && !accesoAdministradorGlobal) {
     return <Navigate to="/acceso-denegado" replace />;
   }
 

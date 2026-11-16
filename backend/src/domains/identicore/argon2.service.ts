@@ -45,6 +45,17 @@ async function getArgon2Module(): Promise<Argon2NativeModule | null> {
  * para entornos Windows con directivas WDAC / AppLocker que bloquean módulos .node.
  */
 export class Argon2Service {
+  /** Autorregistro: requiere Argon2id real; nunca utiliza el fallback heredado. */
+  static async hashArgon2id(password: string): Promise<string> {
+    const argon2 = await getArgon2Module();
+    if (!argon2 || typeof argon2.hash !== 'function') {
+      throw new Error('Argon2id nativo no disponible.');
+    }
+    return argon2.hash(password, {
+      type: 2, memoryCost: 65_536, timeCost: 3, parallelism: 4,
+    });
+  }
+
   /**
    * Hashea una contraseña plana.
    * Utiliza Argon2id nativo si está disponible; de lo contrario recurre a scrypt formateado

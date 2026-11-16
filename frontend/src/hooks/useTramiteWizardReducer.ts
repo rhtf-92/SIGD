@@ -22,7 +22,9 @@
  * ==============================================================================
  */
 
-import { useReducer, useEffect, useCallback } from 'react';
+import { useReducer, useEffect, useCallback, useRef } from 'react';
+import { useAuthStore } from '../stores/authStore';
+import { publicDraftOwner, resetPublicSubmission } from '../services/radicacionPublicaService';
 import type {
   TramiteWizardState,
   WizardAction,
@@ -48,7 +50,14 @@ export const TRAMITE_WIZARD_STORAGE_KEY = 'SIGD_TRAMITE_WIZARD_DRAFT';
  * Recuperación segura y defensiva del estado persistido en sessionStorage.
  * Implementa lazy initialization para evitar lecturas sincrónicas innecesarias.
  */
-export function getPersistedWizardState(): TramiteWizardState {
+interface PersistedWizardDraft {
+  version: 1;
+  ownerId: string;
+  procedureId: string | null;
+  state: Partial<TramiteWizardState>;
+}
+
+export function getPersistedWizardState(authenticatedUserId: string | null = null): TramiteWizardState {
   if (typeof window === 'undefined' || !window.sessionStorage) {
     return INITIAL_WIZARD_STATE;
   }
@@ -59,18 +68,33 @@ export function getPersistedWizardState(): TramiteWizardState {
       return INITIAL_WIZARD_STATE;
     }
 
-    const parsed = JSON.parse(raw) as Partial<TramiteWizardState>;
+    const parsed = JSON.parse(raw) as Partial<PersistedWizardDraft> & Partial<TramiteWizardState>;
     if (!parsed || typeof parsed !== 'object') {
+      return INITIAL_WIZARD_STATE;
+    }
+
+    // Support both envelope format { version: 1, ownerId, state } and flat format { identificacion, documentos }
+    const draftState = (parsed.state && typeof parsed.state === 'object') ? parsed.state : parsed;
+
+    if (parsed.version === 1 && authenticatedUserId && parsed.ownerId && parsed.ownerId !== authenticatedUserId) {
+      return INITIAL_WIZARD_STATE;
+    }
+
+    const persistedProcedureId = typeof parsed.procedureId === 'string' ? parsed.procedureId : null;
+    const stateProcedureId = draftState.documentos?.tipoTramiteId || null;
+    // A successful cargo is not a resumable draft, and the envelope must match
+    // the selected procedure contained in its state.
+    if (draftState.cargoEmitido || (persistedProcedureId && stateProcedureId && persistedProcedureId !== stateProcedureId)) {
       return INITIAL_WIZARD_STATE;
     }
 
     // Validación defensiva del paso canónico restaurado
     const validStep: WizardStep =
-      parsed.currentStep === 1 ||
-      parsed.currentStep === 2 ||
-      parsed.currentStep === 3 ||
-      parsed.currentStep === 4
-        ? parsed.currentStep
+      draftState.currentStep === 1 ||
+      draftState.currentStep === 2 ||
+      draftState.currentStep === 3 ||
+      draftState.currentStep === 4
+        ? draftState.currentStep
         : 1;
 
     // Fusión defensiva con los estados iniciales canónicos
@@ -78,20 +102,20 @@ export function getPersistedWizardState(): TramiteWizardState {
       currentStep: validStep,
       identificacion: {
         ...INITIAL_IDENTIFICACION,
-        ...(parsed.identificacion ?? {}),
+        ...(draftState.identificacion ?? {}),
       },
       documentos: {
         ...INITIAL_DOCUMENTOS,
-        ...(parsed.documentos ?? {}),
-        archivos: Array.isArray(parsed.documentos?.archivos)
-          ? parsed.documentos.archivos
+        ...(draftState.documentos ?? {}),
+        archivos: Array.isArray(draftState.documentos?.archivos)
+          ? draftState.documentos.archivos
           : [],
       },
       declaracionJurada: {
         ...INITIAL_DECLARACION,
-        ...(parsed.declaracionJurada ?? {}),
+        ...(draftState.declaracionJurada ?? {}),
       },
-      cargoEmitido: parsed.cargoEmitido ?? null,
+      cargoEmitido: null,
       isSubmitting: false, // Estados transitorios se reinician siempre
       error: null,
     };
@@ -129,6 +153,9 @@ export function wizardReducer(
     case 'UPDATE_IDENTIFICACION':
       return {
         ...state,
+        ...((action.payload.numeroDocumento !== undefined && action.payload.numeroDocumento !== state.identificacion.numeroDocumento) ||
+          (action.payload.tipoDocumento !== undefined && action.payload.tipoDocumento !== state.identificacion.tipoDocumento)
+          ? { documentos: { ...state.documentos, archivos: [], numeroFolios: 1 }, declaracionJurada: INITIAL_DECLARACION, cargoEmitido: null } : {}),
         identificacion: {
           ...state.identificacion,
           ...action.payload,
@@ -141,8 +168,16 @@ export function wizardReducer(
         ...state,
         documentos: {
           ...state.documentos,
+          ...(action.payload.tipoTramiteId !== undefined &&
+              action.payload.tipoTramiteId !== state.documentos.tipoTramiteId
+            ? INITIAL_DOCUMENTOS
+            : {}),
           ...action.payload,
         },
+        ...(action.payload.tipoTramiteId !== undefined &&
+            action.payload.tipoTramiteId !== state.documentos.tipoTramiteId
+          ? { declaracionJurada: INITIAL_DECLARACION, cargoEmitido: null }
+          : {}),
         error: null,
       };
 
@@ -179,6 +214,7 @@ export function wizardReducer(
       };
 
     case 'RESET': {
+      resetPublicSubmission();
       if (typeof window !== 'undefined' && window.sessionStorage) {
         try {
           window.sessionStorage.removeItem(TRAMITE_WIZARD_STORAGE_KEY);
@@ -198,11 +234,20 @@ export function wizardReducer(
  * Hook orquestador de la máquina de estados y persistencia del asistente.
  */
 export function useTramiteWizardReducer() {
+  const authenticatedUserId = useAuthStore((auth) =>
+    auth.isAuthenticated ? auth.usuario?.id ?? null : publicDraftOwner(),
+  );
   const [state, dispatch] = useReducer(
     wizardReducer,
-    undefined,
+    authenticatedUserId,
     getPersistedWizardState
   );
+  const draftOwnerId = useRef(authenticatedUserId);
+  // Mask the previous account's in-memory form immediately on the render
+  // caused by an identity switch; the effect below then resets the reducer.
+  const stateForAuthenticatedUser = draftOwnerId.current === authenticatedUserId
+    ? state
+    : INITIAL_WIZARD_STATE;
 
   // Sincronización defensiva con sessionStorage ante cualquier cambio de estado
   useEffect(() => {
@@ -211,11 +256,33 @@ export function useTramiteWizardReducer() {
     }
 
     try {
+      // If the active account changed, discard the previous account's in-memory
+      // state before allowing any persistence under the new identity.
+      if (draftOwnerId.current !== authenticatedUserId) {
+        draftOwnerId.current = authenticatedUserId;
+        window.sessionStorage.removeItem(TRAMITE_WIZARD_STORAGE_KEY);
+        dispatch({ type: 'RESET' });
+        return;
+      }
+
+      if (state.cargoEmitido) {
+        window.sessionStorage.removeItem(TRAMITE_WIZARD_STORAGE_KEY);
+        return;
+      }
+
       // No persistir estados transitorios
-      const toPersist: TramiteWizardState = {
+      const toPersist = {
+        version: 1,
+        ownerId: authenticatedUserId || 'anonymous',
+        procedureId: state.documentos.tipoTramiteId || null,
         ...state,
         isSubmitting: false,
         error: null,
+        state: {
+          ...state,
+          isSubmitting: false,
+          error: null,
+        },
       };
       window.sessionStorage.setItem(
         TRAMITE_WIZARD_STORAGE_KEY,
@@ -228,7 +295,7 @@ export function useTramiteWizardReducer() {
         err
       );
     }
-  }, [state]);
+  }, [state, authenticatedUserId]);
 
   // Despachadores atómicos con useCallback para evitar re-renders en componentes hijos
   const setStep = useCallback((step: WizardStep) => {
@@ -284,7 +351,7 @@ export function useTramiteWizardReducer() {
   }, []);
 
   return {
-    state,
+    state: stateForAuthenticatedUser,
     dispatch,
     setStep,
     nextStep,

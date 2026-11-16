@@ -8,8 +8,8 @@ export type TipoActoAdministrativo =
 export type EstadoFirmaDocumento = "PENDIENTE" | "FIRMADO" | "OBSERVADO";
 
 export interface DocumentoOficial {
-  idDocumento: number;
-  idTramite: number;
+  idDocumento: number | string;
+  idTramite: number | string;
   tipoActo: TipoActoAdministrativo;
   numeroCorrelativo: string;
   anio: number;
@@ -20,6 +20,8 @@ export interface DocumentoOficial {
   cvd?: string;
   estadoFirma: EstadoFirmaDocumento;
   fechaGeneracion: string;
+  puedeFirmar?: boolean;
+  motivoNoHabilitado?: string;
 }
 
 export type ProveedorFirma = "REFIRMA_RENIEC" | "IOFE_INDECOPI";
@@ -57,6 +59,15 @@ export interface RefirmaRespuestaDTO {
   cvd: string;
   urlFirmado: string;
   timestamp: string;
+}
+
+/** Ausencia de registro no significa rechazo ni una solicitud pendiente persistida. */
+export interface EstadoFirmaPersistidaDTO {
+  documentoId: string;
+  estado: 'FIRMADO_DIGITALMENTE' | null;
+  resultado: RefirmaRespuestaDTO | null;
+  integridadVerificada: boolean;
+  validacionCriptografica: false;
 }
 
 export type EstadoGatewayRefirma =

@@ -18,7 +18,8 @@
  * ==============================================================================
  */
 
-import React, { useId, useMemo, useState } from 'react';
+import React, { useId, useMemo, useState, useEffect } from 'react';
+import { useAuthStore } from '../../../stores/authStore';
 import type {
   DeclaracionJuradaData,
   WizardAction,
@@ -45,6 +46,10 @@ export const StepDeclaracionJurada: React.FC<StepDeclaracionJuradaProps> = ({
   isSubmitting = false,
 }) => {
   const formId = useId();
+  const isAuthenticated = useAuthStore(auth => auth.isAuthenticated);
+  useEffect(() => {
+    if (!isAuthenticated && data.autorizaNotificacionCasilla) dispatch({ type: 'UPDATE_DECLARACION', payload: { autorizaNotificacionCasilla: false } });
+  }, [isAuthenticated, data.autorizaNotificacionCasilla, dispatch]);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // ===========================================================================
@@ -245,7 +250,7 @@ export const StepDeclaracionJurada: React.FC<StepDeclaracionJuradaProps> = ({
         </div>
 
         {/* Checkbox 3: Notificación en Casilla Electrónica */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4.5 hover:border-[#006EC7] transition">
+        {isAuthenticated && <div className="rounded-xl border border-slate-200 bg-white p-4.5 hover:border-[#006EC7] transition">
           <div className="flex items-start gap-3">
             <input
               id={`${formId}-autorizaNotificacionCasilla`}
@@ -269,7 +274,8 @@ export const StepDeclaracionJurada: React.FC<StepDeclaracionJuradaProps> = ({
               Autorizo de forma expresa y voluntaria al IESTP &ldquo;Suiza&rdquo; a notificar válidamente las resoluciones, proveídos y actos administrativos vinculados al presente trámite a través del buzón de mi Casilla Electrónica Institucional y correo electrónico consignado.
             </label>
           </div>
-        </div>
+        </div>}
+        {!isAuthenticated && <p className="text-xs text-slate-600">No se creará una casilla electrónica. Conserve su CUT y la constancia; el correo declarado quedará registrado como contacto para atención institucional.</p>}
       </div>
 
       {/* BOTONERA DE NAVEGACIÓN ACCESIBLE */}

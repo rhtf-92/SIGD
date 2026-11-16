@@ -15,6 +15,10 @@ export const TIPOS_RESOLUCION = [
 export type TipoResolucion = (typeof TIPOS_RESOLUCION)[number];
 
 export interface DocumentoPendienteFirma {
+  documentoId?: string;
+  hashSha256?: string;
+  /** Solo indica que existe un registro; la consulta de estado coteja el PDF. */
+  estadoFirma?: 'FIRMADO_DIGITALMENTE';
   resolucionId: string;
   expedienteId: string;
   cut: string;
@@ -77,6 +81,9 @@ export function diasHabilesRestantes(fechaVencimiento: Date, referencia: Date): 
 }
 
 interface FilaPendiente {
+  documento_id: string | null;
+  sha256: string | null;
+  estado_firma: string | null;
   resolucion_id: string;
   expediente_id: string;
   cut: string;
@@ -101,7 +108,10 @@ export async function listarPendientesFirma(
 ): Promise<ColaFirmaPendientes> {
   const cliente = await pool.connect();
   try {
-    const filtros: string[] = ["r.estado = 'BORRADOR_PENDIENTE_FIRMA'"];
+    const filtros: string[] = [
+      "r.estado = 'BORRADOR_PENDIENTE_FIRMA'",
+      "rut_estado.estado_nuevo = 'EN_FIRMA'",
+    ];
     const valores: unknown[] = [usuarioId];
 
     if (parametros.tipoResolucion !== 'TODOS') {
@@ -132,6 +142,9 @@ export async function listarPendientesFirma(
         COALESCE(e.fecha_limite, r.fecha_proyeccion + 30) AS fecha_limite,
         COALESCE(fol.folios_total, 0)::int AS folios_total,
         adj.s3_referencia,
+        adj.documento_id,
+        adj.sha256,
+        firma.estado AS estado_firma,
         (
           EXISTS (
             SELECT 1
@@ -173,6 +186,8 @@ export async function listarPendientesFirma(
       FROM sigd_doc.resolucion r
       JOIN sigd_doc.expediente e
         ON e.expediente_id = r.expediente_id
+      JOIN sigd_rut.estado_actual_expediente rut_estado
+        ON rut_estado.expediente_id = r.expediente_id
       LEFT JOIN sigd_auth.persona_natural s
         ON s.id_persona = e.solicitante_id
       LEFT JOIN LATERAL (
@@ -180,13 +195,20 @@ export async function listarPendientesFirma(
         FROM sigd_tra.expediente_documento_folio x
         WHERE x.expediente_id = r.expediente_id
       ) fol ON TRUE
-      LEFT JOIN LATERAL (
-        SELECT 's3://' || a.s3_bucket || '/' || a.s3_key AS s3_referencia
+      JOIN LATERAL (
+        SELECT 's3://' || a.s3_bucket || '/' || a.s3_key AS s3_referencia,
+               a.documento_adjunto_id AS documento_id,
+               a.sha256
         FROM sigd_doc.documento_adjunto a
         WHERE a.expediente_id = r.expediente_id
+          AND a.s3_key = ('resoluciones/' || r.numero_borrador || '.pdf')
+          AND a.mime_type = 'application/pdf'
+          AND a.sha256 IS NOT NULL
+          AND LENGTH(TRIM(a.sha256)) > 0
         ORDER BY a.creado_en DESC
         LIMIT 1
       ) adj ON TRUE
+      LEFT JOIN sigd_doc.firma_digital_documento firma ON firma.documento_id = adj.documento_id
       WHERE ${filtros.join(' AND ')}
       ORDER BY fecha_limite ASC, r.numero_borrador ASC
       LIMIT ${limite} OFFSET ${desplazamiento}
@@ -203,6 +225,10 @@ export async function listarPendientesFirma(
       // de MinIO ni sirva el binario.
       const clave = extraerClaveDeReferencia(fila.s3_referencia ?? '');
       return {
+        ...(fila.estado_firma === 'FIRMADO_DIGITALMENTE'
+          ? { estadoFirma: 'FIRMADO_DIGITALMENTE' as const } : {}),
+        ...(fila.documento_id && fila.sha256
+          ? { documentoId: fila.documento_id, hashSha256: fila.sha256 } : {}),
         resolucionId: fila.resolucion_id,
         expedienteId: fila.expediente_id,
         cut: fila.cut,

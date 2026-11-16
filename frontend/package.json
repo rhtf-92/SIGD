@@ -5,7 +5,8 @@
   "description": "Estructura base del frontend académico del SIGD del Instituto Suiza.",
   "type": "module",
   "scripts": {
-    "dev": "vite --open /tramite/mesa-partes-virtual",
+    "dev": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ../scripts/iniciar-sigd-local.ps1",
+    "dev:ui": "vite --open /tramite/mesa-partes-virtual",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -23,6 +24,7 @@
     "@tanstack/react-query": "^5.83.0",
     "axios": "^1.11.0",
     "lucide-react": "^1.46.0",
+    "pdfjs-dist": "^6.4.299",
     "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

@@ -5,6 +5,8 @@ import axios, { type AxiosRequestConfig } from "axios";
 import { apiClient } from "../api/client";
 import { calculateFileSha256 } from "../services/storageService";
 import { validatePdfFile } from "../utils/fileValidation";
+import { uploadPublicFile } from '../services/radicacionPublicaService';
+import { ApiHttpError } from '../types/api';
 
 export interface PresignedUrlRequest {
   nombreArchivo: string;
@@ -57,6 +59,8 @@ export class UploadError extends Error {
 }
 
 interface UsePresignedUploadOptions {
+  publicMode?: boolean;
+  publicProcedureId?: string;
   categoria?: string;
   demoMode?: boolean;
   /** La radicación registra los metadatos dentro de su transacción, cuando existe el expediente. */
@@ -67,6 +71,8 @@ interface UploadResult {
   file: File;
   sha256: string;
   s3Key: string;
+  /** Conteo calculado por el backend; nunca se recibe como dato autoritativo del navegador. */
+  paginas?: number;
 }
 
 export async function uploadToPresignedUrl(
@@ -121,6 +127,9 @@ export function usePresignedUpload(
           );
         }
 
+        if ((options.publicMode || options.diferirRegistroAdjunto) && file.size > 20 * 1024 * 1024) {
+          throw new UploadError('El PDF supera el máximo permitido de 20 MB.', 'invalid-file');
+        }
         const validation = await validatePdfFile(file);
         if (!validation.valid) {
           throw new UploadError(
@@ -151,6 +160,19 @@ export function usePresignedUpload(
         }
 
         setStatus("requesting-url");
+        if (options.publicMode && !options.demoMode) {
+          setStatus('uploading');
+          if (!options.publicProcedureId) throw new Error('Seleccione primero el procedimiento.');
+          const uploaded = await uploadPublicFile(file, controller.signal, options.publicProcedureId);
+          if (uploaded.sha256 !== sha256 || uploaded.tamanoBytes !== file.size) throw new UploadError('El almacenamiento no confirmó la integridad del PDF.', 'confirmation');
+          if (controller.signal.aborted) throw new UploadError('La carga fue cancelada.', 'cancelled');
+          if (!/^expedientes\/\d{4}\/[0-9a-f-]+\.pdf$/i.test(uploaded.s3Key)) {
+            throw new UploadError('El almacenamiento no confirmó una referencia válida para el PDF.', 'confirmation');
+          }
+          const result: UploadResult = { file, sha256, s3Key: uploaded.s3Key, paginas: uploaded.paginas ?? 1 };
+          setResult(result); setProgress(100); setStatus('success');
+          return result;
+        }
         let presigned: PresignedUrlResponse;
         if (options.demoMode) {
           await new Promise<void>((resolve, reject) => {
@@ -270,16 +292,32 @@ export function usePresignedUpload(
           }
         }
 
-        const uploaded: UploadResult = { file, sha256, s3Key: presigned.s3Key };
+        let paginas = 1;
+try {
+  const form = new FormData();
+  form.append("archivo", file);
+  const res = await apiClient.post<{ paginas: number }>("/api/v1/tramites/analizar-pdf", form, { signal: controller.signal });
+  if (res.data?.paginas) paginas = res.data.paginas;
+} catch { paginas = 1; }
+const uploaded: UploadResult = { file, sha256, s3Key: presigned.s3Key, paginas };
         setProgress(100);
         setResult(uploaded);
         setStatus("success");
         return uploaded;
       } catch (cause) {
+        if (options.publicMode && cause instanceof ApiHttpError) {
+          const detalles = cause.problemDetails.invalidParams?.slice(0, 3).map(p => p.reason).join(' ');
+          const referencia = /^[0-9a-f-]{32,36}$/i.test(cause.correlationId) ? ` Referencia: ${cause.correlationId}.` : '';
+          const publicError = new UploadError(`${detalles || cause.message}${referencia}`, 'upload');
+          setError(publicError); setStatus('error'); return null;
+        }
         const uploadError =
           cause instanceof UploadError
             ? cause
-            : new UploadError("La operación de carga falló.", "upload");
+            : new UploadError(options.publicMode
+              ? (controller.signal.aborted ? 'La carga fue cancelada.' : cause instanceof Error && !(cause instanceof TypeError) && !(cause instanceof SyntaxError)
+                ? cause.message : 'No se pudo contactar con el servicio de carga pública. Compruebe su conexión y vuelva a intentarlo.')
+              : 'La operación de carga falló.', controller.signal.aborted ? 'cancelled' : 'upload');
         setError(uploadError);
         setStatus(uploadError.kind === "cancelled" ? "cancelled" : "error");
         return null;
@@ -287,7 +325,7 @@ export function usePresignedUpload(
         controllerRef.current = null;
       }
     },
-    [options.categoria, options.demoMode, options.diferirRegistroAdjunto],
+    [options.categoria, options.demoMode, options.diferirRegistroAdjunto, options.publicMode, options.publicProcedureId],
   );
 
   return { upload, cancel, status, progress, error, result };

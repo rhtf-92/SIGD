@@ -1,0 +1,22 @@
+name: sigd-validacion
+
+services:
+  postgres_test:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: sigd_test_user
+      # Credencial ficticia exclusiva del entorno local de pruebas.
+      POSTGRES_PASSWORD: sigd_test_only_password
+      POSTGRES_DB: sigd_migraciones_test
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - pgdata_test:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sigd_test_user -d sigd_migraciones_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata_test:

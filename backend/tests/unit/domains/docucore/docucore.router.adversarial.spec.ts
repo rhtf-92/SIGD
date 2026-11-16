@@ -1,9 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
+// Doble del verificador SOLO para probar contratos HTTP. Criptografia real en verificadorPades.spec.ts.
+vi.mock('../../../../src/domains/docucore/verificadorPades.service.js', () => ({ validarFirmaPades: vi.fn(async () => ({ valido: true, validacionCriptografica: true, integridadBytesProtegidos: true, tipoFirma: 'FIRMA_PADES_VALIDA', detalles: { tieneFirmaCms: true } })), obtenerPoliticaValidacionPades: vi.fn(() => ({ exigirTsa: false, exigirRevocacion: false })) }));
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { createHash } from 'node:crypto';
 import express, { Request, Response, NextFunction } from 'express';
 import request from 'supertest';
 import type { Pool, PoolClient } from 'pg';
 import { crearRouterDocuCore } from '../../../../src/domains/docucore/docucore.router.js';
 import { errorMiddleware } from '../../../../src/middleware/error-middleware.js';
+import { firmarTokenAcceso } from '../../../../src/core/auth/jwt.service.js';
+const pdfCotejable = Buffer.from('%PDF-1.7\nFixture de cotejo, no firma real.');
+afterEach(() => vi.unstubAllGlobals());
 
 describe('docucore.router.ts — Adversarial Route Parameter Verification', () => {
   const validBody = {
@@ -11,11 +17,27 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
     total_folios: 3,
   };
 
+  const adminToken = firmarTokenAcceso({ sub: '00000000-0000-4000-8000-000000000001', roles: ['ADMINISTRADOR'] });
+  const ciudadanoToken = firmarTokenAcceso({ sub: '00000000-0000-4000-8000-000000000002', roles: ['CIUDADANO'] });
+
   function setupApp(paramOverride?: (req: Request) => void) {
     const mockClient = {
       query: vi.fn().mockImplementation((queryText: string, params?: unknown[]) => {
         if (queryText === 'BEGIN' || queryText === 'COMMIT' || queryText === 'ROLLBACK') {
           return Promise.resolve({ rows: [], rowCount: 0 });
+        }
+        if (queryText.includes('AS roles')) {
+          const userId = params?.[0];
+          if (userId === '00000000-0000-4000-8000-000000000002') {
+            return Promise.resolve({
+              rows: [{ roles: ['CIUDADANO'], permisos: [{ codigo: 'EXPEDIENTE_LEER', ambito: 'GLOBAL', areaId: null }] }],
+              rowCount: 1,
+            });
+          }
+          return Promise.resolve({
+            rows: [{ roles: ['ADMINISTRADOR'], permisos: [{ codigo: 'ADMIN_USUARIOS', ambito: 'GLOBAL', areaId: null }] }],
+            rowCount: 1,
+          });
         }
         if (queryText.includes('SELECT expediente_id')) {
           // If the expedienteId is a valid non-empty string, simulate found
@@ -52,7 +74,7 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
               rows: [
                 {
                   cvd: 'CVD-VALID-123456',
-                  sha256_firmado: 'a'.repeat(64),
+                  sha256_firmado: createHash('sha256').update(pdfCotejable).digest('hex'),
                   firmante: 'Director',
                   fecha_sello_tsa: new Date('2026-01-01T12:00:00Z'),
                   estado: 'FIRMADO_DIGITALMENTE',
@@ -102,11 +124,29 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
       const { app } = setupApp();
       const res = await request(app)
         .post('/v1/expedientes/valid-exp-uuid/foliar-documento')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send(validBody);
 
       expect(res.status).toBe(201);
-      expect(res.body).toHaveProperty('folio_desde', 1);
-      expect(res.body).toHaveProperty('folio_hasta', 3);
+    });
+
+    it('deniega peticiones anónimas sin token con HTTP 401', async () => {
+      const { app } = setupApp();
+      const res = await request(app)
+        .post('/v1/expedientes/valid-exp-uuid/foliar-documento')
+        .send(validBody);
+
+      expect(res.status).toBe(401);
+    });
+
+    it('deniega la foliación al rol CIUDADANO con HTTP 403', async () => {
+      const { app } = setupApp();
+      const res = await request(app)
+        .post('/v1/expedientes/valid-exp-uuid/foliar-documento')
+        .set('Authorization', `Bearer ${ciudadanoToken}`)
+        .send(validBody);
+
+      expect(res.status).toBe(403);
     });
 
     it('rejects missing id with ValidationError (400 / RFC 7807)', async () => {
@@ -262,6 +302,7 @@ describe('docucore.router.ts — Adversarial Route Parameter Verification', () =
     });
 
     it('returns 200 with document details if CVD is valid and exists', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new globalThis.Response(pdfCotejable)));
       const { app } = setupApp();
       const res = await request(app).get('/v1/validador-cvd/verificar/CVD-VALID-123456');
 

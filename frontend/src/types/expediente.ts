@@ -158,3 +158,98 @@ export const ORDEN_PESTANAS_BANDEJA: EstadoFlujoExpediente[] = [
   "NOTIFICADO",
   "ARCHIVADO",
 ];
+
+/** DTO de lectura de RutaDoc. No completa metadatos que la API no entrega. */
+export const PESTANAS_RUTADOC = ["PENDIENTES", "EN_TRAMITE", "DERIVADOS", "POR_FIRMAR", "ATENDIDOS", "ARCHIVADOS"] as const;
+export type PestanaRutaDoc = typeof PESTANAS_RUTADOC[number];
+export const ETIQUETAS_PESTANA_RUTADOC: Record<PestanaRutaDoc, string> = {
+  PENDIENTES: "Pendientes", EN_TRAMITE: "En trámite", DERIVADOS: "Derivados",
+  POR_FIRMAR: "Por firmar", ATENDIDOS: "Atendidos", ARCHIVADOS: "Archivados",
+};
+export interface ExpedienteResumenRutaDoc {
+  idExpediente: string;
+  cut: string;
+  asunto: string;
+  fechaRadicacion: string;
+  /** Recepción real; no confundir con el inicio legal proyectado de los plazos. */
+  fechaIngreso?: string | null;
+  estadoActual: string;
+  areaActualId: string | null;
+}
+export interface ExpedienteDetalleRutaDoc extends ExpedienteResumenRutaDoc {
+  solicitanteId: string | null;
+  resumenDocumentos: { cantidadDocumentos: number; totalFolios: number } | null;
+  documentos?: { idDocumento: string; nombre: string; mimeType: string; folioInicio: number; folioFin: number; tieneFirmaDigital?: boolean }[];
+  ultimoMovimiento: { idMovimiento: string; evento: string; estadoNuevo: string;
+    fechaHora: string; usuarioOperadorId: string } | null;
+  sla: null;
+}
+export interface ResultadoBandejaRutaDoc {
+  elementos: ExpedienteResumenRutaDoc[];
+  siguienteCursor: string | null;
+  tieneMas: boolean;
+  contadores: Record<PestanaRutaDoc, number>;
+}
+
+export interface EvaluadorActivoInfo {
+  idAsignacion: string;
+  idUsuarioDocente: string;
+  docenteNombre: string;
+  docenteEmail: string;
+  areaId: string;
+  areaNombre?: string;
+  asignadoPor: string;
+  asignadorNombre?: string;
+  motivoAsignacion: string;
+  esReasignacion: boolean;
+  justificacionReasignacion?: string | null;
+  asignadoEn: string;
+  estadoEvaluacion: string;
+  observaciones?: string | null;
+}
+
+export interface HistorialEvaluadorItem {
+  idAsignacion: string;
+  idUsuarioDocente: string;
+  docenteNombre: string;
+  docenteEmail: string;
+  areaId: string;
+  asignadoPor: string;
+  asignadorNombre?: string;
+  motivoAsignacion: string;
+  esReasignacion: boolean;
+  justificacionReasignacion?: string | null;
+  asignacionAnteriorId?: string | null;
+  activo: boolean;
+  asignadoEn: string;
+  estadoEvaluacion: string;
+  desactivadoPor?: string | null;
+  desactivadorNombre?: string | null;
+  desactivadoEn?: string | null;
+  motivoDesasignacion?: string | null;
+  observaciones?: string | null;
+}
+
+export interface DocenteElegible {
+  idUsuario: string;
+  nombreCompleto: string;
+  correo: string;
+  rol: string;
+  areaId?: string | null;
+  areaNombre?: string | null;
+}
+
+export interface ReasignacionMasivaResultado {
+  ok: boolean;
+  mensaje: string;
+  total: number;
+  exitosos: number;
+  fallidos: number;
+  resultados: Array<{
+    expedienteId: string;
+    ok: boolean;
+    idAsignacion?: string;
+    evaluadorAnteriorId?: string;
+    error?: string;
+  }>;
+}

@@ -298,7 +298,7 @@ describe("ServicioFirmaService — callback y consumo atomico", () => {
   });
 
   it("rechaza un callback con hash mal formado", async () => {
-    const { servicio } = crearServicio();
+    const { servicio, sesiones } = crearServicio();
 
     const resultado = await servicio.invocarRefirma(solicitud());
 
@@ -314,10 +314,11 @@ describe("ServicioFirmaService — callback y consumo atomico", () => {
         return true;
       },
     );
+    assert.equal(await sesiones.existe(resultado.token), true);
   });
 
   it("rechaza un callback cuyo token no corresponde a la sesion indicada", async () => {
-    const { servicio } = crearServicio();
+    const { servicio, sesiones } = crearServicio();
 
     const resultado = await servicio.invocarRefirma(solicitud());
 
@@ -325,6 +326,7 @@ describe("ServicioFirmaService — callback y consumo atomico", () => {
       servicio.recibirCallback(resultado.token, "ses_9999999999999999", "a".repeat(64)),
       /no es valida/u,
     );
+    assert.equal(await sesiones.existe(resultado.token), true);
   });
 
   it("rechaza el callback una vez expirada la sesion", async () => {
@@ -389,5 +391,16 @@ describe("ServicioFirmaService — reutilizacion de documentos", () => {
         return true;
       },
     );
+  });
+});
+
+
+describe("Enlaces de firma acotados al documento", () => {
+  it("un token no descarga otro documento del almacen", async () => {
+    const { servicio, almacen } = crearServicio();
+    const invocacion = await servicio.invocarRefirma(solicitud());
+    await almacen.guardar({ id: "documento-ajeno", nombreArchivo: "ajeno.pdf", mimeType: "application/pdf", bytes: new Uint8Array([1]), sha256: "b".repeat(64) });
+    assert.equal(await servicio.descargarDocumento("documento-ajeno", invocacion.token), null);
+    await assert.rejects(almacen.emitirUrlTemporal("documento-ajeno", invocacion.token, 300));
   });
 });

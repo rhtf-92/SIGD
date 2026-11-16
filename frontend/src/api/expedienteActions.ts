@@ -1,5 +1,5 @@
 import { ErrorAccionExpediente } from "../types/expedienteActions";
-import type { ResultadoDerivacion, ResultadoObservacion, ServicioExpedienteActions, SolicitudDerivacion, SolicitudObservacion } from "../types/expedienteActions";
+import type { ResultadoDerivacion, ResultadoObservacion, ResultadoRecepcion, ServicioExpedienteActions, SolicitudDerivacion, SolicitudObservacion, SolicitudRecepcion } from "../types/expedienteActions";
 
 /** Implementar únicamente después de verificar el DTO real y sus consumidores. */
 export interface AdaptadorPayload<Entrada> {
@@ -10,6 +10,7 @@ export interface ContratosExpedienteActions {
   derivacion?: AdaptadorPayload<SolicitudDerivacion>;
   observacion?: AdaptadorPayload<SolicitudObservacion>;
   acumulacion?: ServicioExpedienteActions["acumular"];
+  recepcion?: AdaptadorPayload<SolicitudRecepcion> | boolean;
 }
 
 function esObjeto(valor: unknown): valor is Record<string, unknown> {
@@ -20,7 +21,7 @@ function respuestaNoConfirmada(): never {
   throw new ErrorAccionExpediente("El servidor devolvió una respuesta no reconocida. Compruebe el expediente antes de repetir la acción.", "respuesta");
 }
 
-function urlMovimiento(id: string, accion: "derivar" | "observar", baseURL: string | undefined): string {
+function urlMovimiento(id: string, accion: "derivar" | "observar" | "recepcionar", baseURL: string | undefined): string {
   // Ruta absoluta: evita duplicar el prefijo si el baseURL ya incluye /api o /api/v1.
   const base = new URL(baseURL ?? "/", window.location.origin);
   return new URL(`/api/v1/expedientes/${encodeURIComponent(id)}/movimientos/${accion}`, base).href;
@@ -29,7 +30,7 @@ function urlMovimiento(id: string, accion: "derivar" | "observar", baseURL: stri
 /** Rutas documentadas; no se habilitan sin un adaptador del DTO canónico. */
 export function crearServicioExpedienteActions(contratos: ContratosExpedienteActions = {}): ServicioExpedienteActions {
   const servicio: ServicioExpedienteActions = {};
-  const { derivacion, observacion, acumulacion } = contratos;
+  const { derivacion, observacion, acumulacion, recepcion } = contratos;
   if (derivacion) servicio.derivar = async (entrada): Promise<ResultadoDerivacion> => {
     const { apiClient } = await import("./client");
     const { data } = await apiClient.post<unknown>(urlMovimiento(entrada.expediente.id, "derivar", apiClient.defaults.baseURL), derivacion.construirPayload(entrada));
@@ -43,5 +44,14 @@ export function crearServicioExpedienteActions(contratos: ContratosExpedienteAct
     return { estado: "OBSERVADO", slaPaused: true };
   };
   if (acumulacion) servicio.acumular = acumulacion;
+  if (recepcion) servicio.recepcionar = async (entrada): Promise<ResultadoRecepcion> => {
+    const { apiClient } = await import("./client");
+    const payload = typeof recepcion === "object" && recepcion.construirPayload
+      ? recepcion.construirPayload(entrada)
+      : { observaciones: entrada.observaciones };
+    const { data } = await apiClient.post<unknown>(urlMovimiento(entrada.expediente.id, "recepcionar", apiClient.defaults.baseURL), payload);
+    if (!esObjeto(data) || data.nuevoEstado !== "EN_REVISION") respuestaNoConfirmada();
+    return data as unknown as ResultadoRecepcion;
+  };
   return servicio;
 }

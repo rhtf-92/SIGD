@@ -4,7 +4,8 @@ interface CvdVerificationResultProps {
   resultado: ValidacionCVDResult;
 }
 
-function formatoFecha(valor: string): string {
+function formatoFecha(valor: string | null): string {
+  if (!valor) return "No disponible";
   return new Date(valor).toLocaleString("es-PE", {
     day: "2-digit",
     month: "long",

@@ -1,0 +1,116 @@
+name: sigd
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${SIGD_POSTGRES_PASSWORD:?Set SIGD_POSTGRES_PASSWORD in the local environment}
+      POSTGRES_DB: sigd_jacobo_demo
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sigd_jacobo_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres_test:
+    image: postgres:18-alpine
+    profiles: ["validacion"]
+    environment:
+      POSTGRES_USER: sigd_test_user
+      POSTGRES_PASSWORD: ${SIGD_TEST_POSTGRES_PASSWORD:?Set SIGD_TEST_POSTGRES_PASSWORD in the local environment}
+      POSTGRES_DB: sigd_migraciones_test
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - pgdata_test:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sigd_test_user -d sigd_migraciones_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.4.8-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${SIGD_MINIO_ROOT_USER:?Set SIGD_MINIO_ROOT_USER in the local environment}
+      MINIO_ROOT_PASSWORD: ${SIGD_MINIO_ROOT_PASSWORD:?Set SIGD_MINIO_ROOT_PASSWORD in the local environment}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.sigd
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      SIGD_SAFE_BOOT: "true"
+      MIGRATE_ON_BOOT: "false"
+      DATABASE_URL: ${SIGD_DATABASE_URL:?Set SIGD_DATABASE_URL locally to the authorized postgres service target}
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${SIGD_MINIO_ROOT_USER:?Set SIGD_MINIO_ROOT_USER in the local environment}
+      S3_SECRET_KEY: ${SIGD_MINIO_ROOT_PASSWORD:?Set SIGD_MINIO_ROOT_PASSWORD in the local environment}
+      S3_BUCKET: sigd-expedientes
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Defina AUTH_JWT_SECRET en el archivo local externo}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.sigd
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000
+      VITE_ENABLE_MOCKS: "false"
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+    external: true
+    name: sigd-integrado_pgdata
+  redisdata:
+    external: true
+    name: sigd-integrado_redisdata
+  miniodata:
+    external: true
+    name: sigd-integrado_miniodata
+  pgdata_test:
+    external: true
+    name: sigd-validacion_pgdata_test

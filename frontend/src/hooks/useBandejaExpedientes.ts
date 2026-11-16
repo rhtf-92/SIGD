@@ -1,74 +1,65 @@
-import { useQuery } from "@tanstack/react-query";
-
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { apiClient } from "../api/client";
-import { EXPEDIENTES_FIXTURE } from "../data/expedientesFixtures";
-import type { EstadoFlujoExpediente, ExpedienteSGD } from "../types/expediente";
-
-/** Retardo de red simulado en modo mock, conforme al estándar de la arquitectura (300 ms). */
-const RETARDO_MOCK_MS = 300;
-
-const usarMocks = import.meta.env.VITE_ENABLE_MOCKS === "true";
+import { ApiHttpError } from "../types/api";
+import type { ExpedienteDetalleRutaDoc, PestanaRutaDoc, ResultadoBandejaRutaDoc } from "../types/expediente";
 
 export interface FiltrosBandejaExpedientes {
-  /** Pestaña activa. `undefined` trae todos los expedientes (usado para calcular contadores). */
-  estado?: EstadoFlujoExpediente;
-  /** Búsqueda libre por CUT, solicitante o asunto. */
+  pestana: PestanaRutaDoc;
   busqueda?: string;
+  areaId?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  limite?: number;
 }
 
-async function obtenerExpedientesMock(): Promise<ExpedienteSGD[]> {
-  await new Promise((resolve) => setTimeout(resolve, RETARDO_MOCK_MS));
-  return EXPEDIENTES_FIXTURE;
+export function mensajeErrorExpediente(error: unknown): string {
+  const status = error instanceof ApiHttpError ? error.status : undefined;
+  if (status === 401) return "Inicia sesión para consultar los expedientes.";
+  if (status === 403) return "No tienes permiso para consultar este recurso.";
+  if (status === 404) return "No se encontró el expediente solicitado.";
+  return "No se pudo completar la consulta. Intenta nuevamente.";
 }
 
-async function obtenerExpedientesApi(): Promise<ExpedienteSGD[]> {
-  const { data } = await apiClient.get<ExpedienteSGD[]>("/api/v1/expedientes");
-  return data;
-}
-
-function aplicarFiltros(
-  expedientes: ExpedienteSGD[],
-  filtros: FiltrosBandejaExpedientes,
-): ExpedienteSGD[] {
-  let resultado = expedientes;
-
-  if (filtros.estado) {
-    resultado = resultado.filter((exp) => exp.estadoFlujo === filtros.estado);
-  }
-
-  if (filtros.busqueda && filtros.busqueda.trim().length > 0) {
-    const termino = filtros.busqueda.trim().toLowerCase();
-    resultado = resultado.filter(
-      (exp) =>
-        exp.codigoExpediente.toLowerCase().includes(termino) ||
-        exp.asunto.toLowerCase().includes(termino) ||
-        exp.solicitante.nombreOrazonSocial.toLowerCase().includes(termino),
-    );
-  }
-
-  return resultado;
-}
-
-/**
- * Trae la lista completa de expedientes (sin filtrar) para poder calcular los
- * contadores de las 6 pestañas de la Bandeja Operativa en un único fetch.
- */
-export function useExpedientesBase() {
-  return useQuery({
-    queryKey: ["expedientes", "base"],
-    queryFn: usarMocks ? obtenerExpedientesMock : obtenerExpedientesApi,
-    staleTime: 30_000,
-  });
-}
-
-/**
- * Hook principal de la Bandeja Operativa (ENT-M03-01).
- * Aplica los filtros de pestaña y búsqueda sobre los datos ya cacheados por TanStack Query.
- */
+/** Cada pestaña y combinación de filtros tiene su propia secuencia de cursores. */
 export function useBandejaExpedientes(filtros: FiltrosBandejaExpedientes) {
-  const { data, ...resto } = useExpedientesBase();
+  const { pestana, areaId, fechaDesde, fechaHasta, limite = 20 } = filtros;
+  const terminoBusqueda = filtros.busqueda?.trim() || undefined;
+  const query = useInfiniteQuery({
+    queryKey: ["expedientes", "bandeja", { pestana, terminoBusqueda, areaId, fechaDesde, fechaHasta, limite }],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) => {
+      const { data } = await apiClient.get<ResultadoBandejaRutaDoc>("/api/v1/expedientes", {
+        params: { pestana, terminoBusqueda, areaId, fechaDesde, fechaHasta, limite, cursor: pageParam },
+        signal,
+      });
+      return data;
+    },
+    getNextPageParam: (pagina) => pagina.tieneMas && pagina.siguienteCursor ? pagina.siguienteCursor : undefined,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const paginas = query.data?.pages;
+  const ultimo = paginas?.at(-1);
+  // Un movimiento concurrente puede repetir un UUID entre páginas.
+  const elementos = paginas
+    ? [...new Map(paginas.flatMap(p => p.elementos).map(e => [e.idExpediente, e])).values()]
+    : undefined;
+  return { ...query, data: elementos, contadores: ultimo?.contadores,
+    siguienteCursor: ultimo?.siguienteCursor, tieneMas: ultimo?.tieneMas ?? false };
+}
 
-  const expedientesFiltrados = data ? aplicarFiltros(data, filtros) : undefined;
-
-  return { data: expedientesFiltrados, ...resto };
+/** Consulta independiente: no depende de filtros, caché o paginación de la bandeja. */
+export function useExpedienteDetalle(id: string | undefined) {
+  return useQuery({
+    queryKey: ["expedientes", "detalle", id],
+    queryFn: async ({ signal }) => {
+      const { data } = await apiClient.get<ExpedienteDetalleRutaDoc>(
+        `/api/v1/expedientes/${encodeURIComponent(id!)}`, { signal },
+      );
+      return data;
+    },
+    enabled: Boolean(id),
+    staleTime: 0,
+    retry: false,
+  });
 }

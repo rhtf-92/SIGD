@@ -9,8 +9,6 @@ import { Link } from "react-router-dom";
 
 import CvdIntegrityReport from "../../components/cvd/CvdIntegrityReport";
 import {
-  CVD_ALTERADO,
-  CVD_VALIDO,
   useCvdPublicVerification,
 } from "../../hooks/useCvdPublicVerification";
 import {
@@ -19,8 +17,6 @@ import {
   extraerCvdDeTexto,
   validarCvd,
 } from "../../utils/cvdValidator";
-
-const PATRON_CVD = /CVD-\d{2,4}-[A-Z]{2,6}-\d{4,6}-[A-F0-9]{4}/;
 
 export default function ValidadorPublicoCvdPage() {
   const [codigo, setCodigo] = useState("");
@@ -64,8 +60,7 @@ export default function ValidadorPublicoCvdPage() {
     const lector = new FileReader();
     lector.onload = () => {
       const texto = String(lector.result ?? "").toUpperCase();
-      const coincidencias = texto.match(PATRON_CVD) ?? extraerCvdDeTexto(texto);
-      const encontrado = Array.isArray(coincidencias) ? coincidencias[0] : coincidencias;
+      const encontrado = extraerCvdDeTexto(texto);
       if (encontrado) {
         setCodigo(encontrado);
         setMensaje(null);
@@ -127,7 +122,7 @@ export default function ValidadorPublicoCvdPage() {
       try {
         if (video.readyState >= 2) {
           const texto = (await detector.detect(video))?.[0]?.rawValue ?? "";
-          const cvd = texto ? (extraerCvdDeTexto(texto) ?? texto.match(PATRON_CVD)?.[0]) : null;
+          const cvd = texto ? extraerCvdDeTexto(texto) : null;
           if (cvd) {
             detenerCamara();
             setCodigo(cvd);
@@ -161,8 +156,7 @@ export default function ValidadorPublicoCvdPage() {
             Verificador público de Códigos de Verificación Digital (CVD)
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Empleadores y entidades externas pueden contrastar la autenticidad de resoluciones
-            impresas sin apersonarse a Pucallpa · D.S. N° 070-2013-PCM.
+            Consulte el registro institucional del CVD y coteje la integridad del documento almacenado.
           </p>
         </div>
       </header>
@@ -190,7 +184,7 @@ export default function ValidadorPublicoCvdPage() {
               placeholder="CVD-2026-RD-000412-892F"
               spellCheck={false}
               autoComplete="off"
-              maxLength={26}
+              maxLength={40}
               aria-describedby="ayuda-cvd"
               aria-invalid={mensaje ? true : undefined}
               className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-2.5 font-mono text-sm uppercase placeholder:font-sans placeholder:normal-case focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
@@ -209,22 +203,6 @@ export default function ValidadorPublicoCvdPage() {
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
-              Ejemplos:
-            </span>
-            {[CVD_VALIDO, CVD_ALTERADO].map((ejemplo) => (
-              <button
-                key={ejemplo}
-                type="button"
-                onClick={() => {
-                  setCodigo(ejemplo);
-                  verificarCodigo(ejemplo);
-                }}
-                className="rounded-full border border-slate-300 px-3 py-1 font-mono text-xs text-slate-600 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
-              >
-                {ejemplo}
-              </button>
-            ))}
             <button
               type="button"
               onClick={camaraActiva ? detenerCamara : iniciarCamara}
@@ -270,7 +248,7 @@ export default function ValidadorPublicoCvdPage() {
               <span aria-hidden="true" className="text-2xl">⬆</span>
               <span>
                 Seleccionar o soltar el documento <b>.PDF</b> — el sistema extraerá automáticamente
-                el CVD de su firma PAdES y lo validará.
+                el CVD si aparece como texto legible y lo consultará en el registro institucional.
               </span>
               <input
                 ref={entradaArchivoRef}
@@ -319,9 +297,9 @@ export default function ValidadorPublicoCvdPage() {
             <h2 className="text-sm font-bold text-slate-800">¿Qué es el CVD?</h2>
             <p className="mt-2 text-sm leading-5 text-slate-600">
               El Código de Verificación Digital es el identificador único que el IESTP Suiza estampa
-              sobre todo documento electrónico suscrito. Resuelto contra el repositorio
-              institucional, permite comprobar autenticidad, integridad y vigencia, identidad de
-              firmantes y sello de tiempo TSA.
+              sobre documentos electrónicos suscritos. Esta consulta muestra la evidencia registrada
+              y coteja el PDF con su SHA-256. No determina la vigencia del certificado ni sustituye
+              una validación criptográfica de la firma.
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-5">

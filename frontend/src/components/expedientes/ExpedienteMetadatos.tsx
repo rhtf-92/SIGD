@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ETIQUETAS_ESTADO_FLUJO, type ExpedienteSGD } from "../../types/expediente";
+import { ETIQUETAS_ESTADO_FLUJO, type ExpedienteSGD, type ExpedienteDetalleRutaDoc } from "../../types/expediente";
 import { etiquetaExpediente, fechaExpediente, plazoExpediente } from "../../utils/expedientePresentacion";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
@@ -11,7 +11,28 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
   );
 }
 
-export default function ExpedienteMetadatos({ expediente }: { expediente: ExpedienteSGD }) {
+export default function ExpedienteMetadatos({ expediente }: { expediente: ExpedienteSGD | ExpedienteDetalleRutaDoc }) {
+  if ("idExpediente" in expediente) return (
+    <section aria-labelledby="metadatos-titulo" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <h2 id="metadatos-titulo" className="text-lg font-bold text-slate-900">Metadatos del Expediente</h2>
+      <dl className="mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+        <Dato etiqueta="CUT">{expediente.cut}</Dato>
+        <Dato etiqueta="Asunto">{expediente.asunto}</Dato>
+        <Dato etiqueta="Solicitante (UUID)">{expediente.solicitanteId ?? "No disponible"}</Dato>
+        <Dato etiqueta="Estado actual">{expediente.estadoActual}</Dato>
+        <Dato etiqueta="Área actual (ID)">{expediente.areaActualId ?? "No disponible"}</Dato>
+        <Dato etiqueta="Fecha de radicación"><time dateTime={expediente.fechaRadicacion}>{fechaExpediente(expediente.fechaRadicacion, true)}</time></Dato>
+        <Dato etiqueta="Documentos">{expediente.resumenDocumentos?.cantidadDocumentos ?? "No disponible"}</Dato>
+        <Dato etiqueta="Número de folios">{expediente.resumenDocumentos?.totalFolios ?? "No disponible"}</Dato>
+        <Dato etiqueta="Plazo de atención">No disponible</Dato>
+        {expediente.ultimoMovimiento && <>
+          <Dato etiqueta="Último evento">{expediente.ultimoMovimiento.evento}</Dato>
+          <Dato etiqueta="Fecha del último movimiento">{fechaExpediente(expediente.ultimoMovimiento.fechaHora, true)}</Dato>
+          <Dato etiqueta="ID del último operador">{expediente.ultimoMovimiento.usuarioOperadorId}</Dato>
+        </>}
+      </dl>
+    </section>
+  );
   const { solicitante, metadatos, clasificacionCCD } = expediente;
   return (
     <section aria-labelledby="metadatos-titulo" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">

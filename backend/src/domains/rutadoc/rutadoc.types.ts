@@ -33,6 +33,8 @@ export interface ExpedienteResumen {
   cut: string;
   asunto: string;
   fechaRadicacion: string;
+  /** Real reception from the first valid receipt or the canonical document record. */
+  fechaIngreso?: string | null;
   estadoActual: EstadoRutaDoc;
   /** Procede de datos.areaId del último movimiento, si el escritor lo aporta. */
   areaActualId: string | null;
@@ -47,9 +49,11 @@ export interface UltimoMovimiento {
 }
 
 export interface ExpedienteDetalle extends ExpedienteResumen {
-  /** TramiCore sólo publica fk_remitente; el nombre requiere IdentiCore. */
+  /** UUID de sigd_tra.expediente.solicitante_id; el nombre requiere IdentiCore. */
   solicitanteId: string | null;
   resumenDocumentos: { cantidadDocumentos: number; totalFolios: number } | null;
+  /** Documentos foliados consultables mediante Storage; nunca incluye claves S3. */
+  documentos?: { idDocumento: string; nombre: string; mimeType: string; folioInicio: number; folioFin: number; tieneFirmaDigital?: boolean }[];
   ultimoMovimiento: UltimoMovimiento | null;
   /** El cálculo SLA corresponde a otro entregable. */
   sla: null;
@@ -62,11 +66,20 @@ export interface ResultadoBandeja {
   contadores: ContadoresRutaDoc;
 }
 
+export interface AlcanceBandejaRutaDoc {
+  solicitanteId: string | null;
+  accesoGlobal: boolean;
+  esOperadorArea?: boolean;
+}
+
 export interface ActorRutaDoc {
   id: string;
   roles: readonly string[];
+  /** Facultades del RBAC persistido, cuando el proveedor institucional las publica. */
+  permisos?: readonly import('../../core/auth/auth.guard.js').PermisoInstitucional[];
   /** Unidad derivada por el proveedor de identidad verificado, si está disponible. */
   unidadOrganicaId?: string | null;
   /** La visibilidad fina queda a cargo del proveedor de autenticación. */
   puedeVerExpediente?: (idExpediente: string) => boolean | Promise<boolean>;
+  obtenerAlcanceBandeja?: () => Promise<AlcanceBandejaRutaDoc | null>;
 }

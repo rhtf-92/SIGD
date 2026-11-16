@@ -1,73 +1,51 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
-import { PostgreSqlContainer } from '@testcontainers/postgresql';
+import dotenv from 'dotenv';
+import path from 'node:path';
+import fs from 'node:fs';
 
-const ON_ERROR_STOP = 'ON_ERROR_STOP=1';
-
+/**
+ * Global Setup institucional para B_JACOBO.
+ * Conexión segura y exclusiva a sigd_jacobo_demo con rol técnico de solo lectura.
+ * Queda terminantemente prohibida la creación de contenedores adicionales
+ * o la ejecución de DDL destructivo/truncate sobre la base oficial.
+ */
 export default async function globalSetup(): Promise<void> {
-  const imagen = process.env.TESTCONTAINERS_IMAGE ?? 'postgres:18-alpine';
-  const container = await new PostgreSqlContainer(imagen)
-    .withDatabase('sigd_prueba')
-    .withUsername('postgres')
-    .withPassword('postgres')
-    .start();
+  const posiblesRutasEnv = [
+    path.resolve(__dirname, '../../.env.test'),
+    path.resolve(process.cwd(), '.env.test'),
+    path.resolve(process.cwd(), 'backend/.env.test'),
+  ];
+  for (const ruta of posiblesRutasEnv) {
+    if (fs.existsSync(ruta)) {
+      dotenv.config({ path: ruta, override: true });
+      break;
+    }
+  }
 
-  const databaseUrl = `postgres://postgres:postgres@${container.getHost()}:${container.getPort()}/sigd_prueba`;
+  const databaseUrl =
+    process.env.TEST_DATABASE_URL ||
+    process.env.DATABASE_URL ||
+    'postgres://sigd_test_ro@127.0.0.1:5433/sigd_jacobo_demo';
+
   process.env.TEST_DATABASE_URL = databaseUrl;
-  (globalThis as Record<string, unknown>).__SIGD_CONTAINER__ = container;
-
-  await ejecutarMigraciones(databaseUrl);
-}
-
-function directorioSetup(): string {
-  return path.dirname(fileURLToPath(import.meta.url));
-}
-
-async function ejecutarMigraciones(databaseUrl: string): Promise<void> {
-  const raizProyecto = path.resolve(directorioSetup(), '../..');
-  const rutaDdlDocs = existsSync(path.resolve(raizProyecto, 'docs/00_corelink/06_sigd_audit_esquema_ddl.sql'))
-    ? path.resolve(raizProyecto, 'docs/00_corelink/06_sigd_audit_esquema_ddl.sql')
-    : path.resolve(raizProyecto, 'docs/corelink/06_sigd_audit_esquema_ddl.sql');
-  const archivoDdlAudit = existsSync(rutaDdlDocs)
-    ? rutaDdlDocs
-    : path.resolve(raizProyecto, '../06_sigd_audit_esquema_ddl.sql');
-  const dirMigraciones = process.env.MIGRATIONS_DIR
-    ? path.resolve(raizProyecto, process.env.MIGRATIONS_DIR)
-    : path.join(raizProyecto, 'migraciones');
-  const fixture = path.join(raizProyecto, 'tests', 'fixtures', '01_schema_fixtures_test.sql');
 
   const cliente = new Client({ connectionString: databaseUrl });
   await cliente.connect();
   try {
-    await cliente.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+    const res = await cliente.query<{ db: string; usr: string }>('SELECT current_database() AS db, current_user AS usr');
+    const db = res.rows[0]?.db;
+    const usr = res.rows[0]?.usr;
 
-    await aplicarSql(cliente, fixture);
-    if (existsSync(archivoDdlAudit)) {
-      await aplicarSql(cliente, archivoDdlAudit);
+    if (db !== 'sigd_jacobo_demo') {
+      throw new Error(
+        `[GLOBAL-SETUP] Violación de Exclusividad: conectado a "${db}". Se requiere estrictamente "sigd_jacobo_demo".`
+      );
     }
 
-    if (existsSync(dirMigraciones)) {
-      const archivos = readdirSync(dirMigraciones)
-        .filter((f) => f.endsWith('.sql'))
-        .sort();
-      for (const archivo of archivos) {
-        await aplicarSql(cliente, path.join(dirMigraciones, archivo));
-      }
-    }
+    console.log(
+      `[GLOBAL-SETUP] Verificación de entorno exitosa en "${db}" (usuario: "${usr}"). Modo seguro sin contenedores adicionales.`
+    );
   } finally {
     await cliente.end();
-  }
-}
-
-async function aplicarSql(cliente: Client, ruta: string): Promise<void> {
-  const sql = readFileSync(ruta, 'utf8').trim();
-  if (!sql) return;
-  try {
-    await cliente.query(sql);
-  } catch (error) {
-    console.error(`[MIGRACION] Falló al aplicar ${ruta} (${ON_ERROR_STOP}):`, error);
-    throw error;
   }
 }

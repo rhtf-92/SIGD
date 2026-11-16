@@ -1,3 +1,4 @@
+import type { IdentificacionData } from '../../../types/tramiteWizardState';
 /**
  * ==============================================================================
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
@@ -26,10 +27,19 @@ import type {
 } from '../../../types/tramiteWizardState';
 import { apiClient } from '../../../api/client';
 import { usePresignedUpload } from '../../../hooks/usePresignedUpload';
+import { useAuthStore } from '../../../stores/authStore';
+import { publicAvailability, resetPublicSubmission, type DisponibilidadPublica } from '../../../services/radicacionPublicaService';
+import { DocumentacionRequisitos, type DestinoCarga } from '../DocumentacionRequisitos';
+import { ResumenDocumental } from '../ResumenDocumental';
+import { calcularFoliacionFront } from '../../../utils/foliacion';
+import type { DocumentacionTramite, ClasificacionAdjunto } from '../../../types/documentacionTramite';
+import { consultarDocumentacion, validarAdjuntosRequisitos } from '../../../services/documentacionTramiteService';
+import { CATALOGO_TUPA_MESA_PARTES } from '../../../data/catalogoTupaMesaPartes';
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
   data: DocumentosData;
+  identidadPublica?:IdentificacionData;
   /** Despachador de acciones atómicas hacia el reducer del wizard */
   dispatch: React.Dispatch<WizardAction>;
   /** Callback para avanzar al siguiente paso del asistente */
@@ -77,13 +87,24 @@ const CATALOGO_TUPA_INSTITUCIONAL = [
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // Límite del contrato de radicación.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export interface TipoDocumentalFormal {
+  codigo: string;
+  nombre: string;
+  obligatorio?: boolean;
+}
+
 interface TipoTramiteFormal {
   id: string;
   codigo: string;
+  codigoVisible?: string;
+  numeroVisible?: string;
+  codigoInterno?: string;
   denominacion: string;
   unidad_organica: string | null;
   descripcion?: string | null;
   vigente: true;
+  costoFuente?: string;
+  tipos_documentales?: TipoDocumentalFormal[] | null;
 }
 
 function validarTiposFormales(data: unknown): TipoTramiteFormal[] | null {
@@ -109,6 +130,19 @@ function validarTiposFormales(data: unknown): TipoTramiteFormal[] | null {
     if (ids.has(id) || codigos.has(codigo)) return null;
     ids.add(id);
     codigos.add(codigo);
+    let tiposDocumentales: TipoDocumentalFormal[] | undefined;
+    if ('tipos_documentales' in item && Array.isArray((item as Record<string, unknown>).tipos_documentales)) {
+      tiposDocumentales = ((item as Record<string, unknown>).tipos_documentales as unknown[])
+        .filter((td): td is { codigo: string; nombre: string; obligatorio?: boolean } =>
+          typeof td === 'object' && td !== null && 'codigo' in td && 'nombre' in td
+        )
+        .map(td => ({
+          codigo: String(td.codigo),
+          nombre: String(td.nombre),
+          obligatorio: Boolean(td.obligatorio),
+        }));
+    }
+
     tipos.push({
       id: item.id,
       codigo,
@@ -116,6 +150,7 @@ function validarTiposFormales(data: unknown): TipoTramiteFormal[] | null {
       unidad_organica: item.unidad_organica,
       descripcion: 'descripcion' in item ? item.descripcion as string | null : undefined,
       vigente: true,
+      tipos_documentales: tiposDocumentales,
     });
   }
   return tipos;
@@ -130,20 +165,140 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
 }) => {
   const formId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cargaEnCurso = useRef(false);
+  const vistasPdf = useRef<Record<string, string>>({});
+  const [vistas, setVistas] = useState<Record<string, string>>({});
+  useEffect(() => () => { Object.values(vistasPdf.current).forEach(url => URL.revokeObjectURL(url)); }, []);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [fileError, setFileError] = useState<string | null>(null);
-  const subida = usePresignedUpload({ diferirRegistroAdjunto: true });
+  const [documentacion, setDocumentacion] = useState<DocumentacionTramite | null>(null);
+  const [falloDocumentacion, setErrorDocumentacion] = useState<{ id: string; mensaje: string } | null>(null);
+  const errorDocumentacion = falloDocumentacion?.id === data.tipoTramiteId ? falloDocumentacion.mensaje : null;
+  const [clasificacionNueva, setClasificacionNueva] = useState<ClasificacionAdjunto>('EXPEDIENTE');
+  const esPublico = !useAuthStore(auth => auth.isAuthenticated);
+  const [disponibilidad, setDisponibilidad] = useState<DisponibilidadPublica[]>([]);
+  const [errorDisponibilidad, setErrorDisponibilidad] = useState<string | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    publicAvailability().then(result => { if (vigente) setDisponibilidad(result); })
+      .catch(() => { if (vigente) setErrorDisponibilidad('No se pudo comprobar la admisibilidad pública. Inténtelo más tarde.'); });
+    return () => { vigente = false; };
+  }, [esPublico]);
+  const bloqueoPublico = esPublico ? errorDisponibilidad ??
+    (disponibilidad.find(t => t.id === data.tipoTramiteId)?.habilitado ? null :
+      disponibilidad.find(t => t.id === data.tipoTramiteId)?.motivo ?? 'Seleccione un procedimiento y espere la comprobación de sus condiciones de radicación pública.') : null;
+  const subida = usePresignedUpload({ diferirRegistroAdjunto: true, publicMode: esPublico, publicProcedureId: data.tipoTramiteId });
+  const cancelarSubida = subida.cancel;
+  const procedimientoActualRef = useRef(data.tipoTramiteId);
   const cargandoArchivo = !['idle', 'success', 'cancelled', 'error'].includes(subida.status);
-  useEffect(() => () => subida.cancel(), [subida.cancel]);
-  const [tiposFormales, setTiposFormales] = useState<TipoTramiteFormal[]>([]);
+  useEffect(() => () => cancelarSubida(), [cancelarSubida]);
+  useEffect(() => {
+    if (procedimientoActualRef.current === data.tipoTramiteId) return;
+    procedimientoActualRef.current = data.tipoTramiteId;
+    cancelarSubida();
+    setFileError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    Object.values(vistasPdf.current).forEach(url => URL.revokeObjectURL(url));
+    vistasPdf.current = {}; setVistas({});
+  }, [data.tipoTramiteId, cancelarSubida]);
+  const [tiposFormalesBase, setTiposFormales] = useState<TipoTramiteFormal[]>([]);
+  const tiposFormales = useMemo(() => tiposFormalesBase.map(tipo => {
+    const conOrden = tipo.id === data.tipoTramiteId && Boolean(data.ordenPagoId);
+    const gratis=disponibilidad.find(d=>d.id===tipo.id)?.condicionFinanciera==='GRATUITO';
+    const originales = tipo.tipos_documentales ?? [];
+    const tipos = originales.filter(t => t.codigo !== 'COMPROBANTE_PAGO');
+    if (!tipos.length && originales.some(t => t.codigo === 'COMPROBANTE_PAGO')) {
+      tipos.push({ codigo: 'FUT', nombre: gratis ? 'Solicitud (FUT); procedimiento gratuito' : conOrden ? 'Solicitud (FUT); pago gestionado en Tesorería' : 'Solicitud demostrativa (FUT), sin comprobante de pago', obligatorio: true });
+    }
+    return { ...tipo, tipos_documentales: tipos };
+  }), [tiposFormalesBase, disponibilidad, data.tipoTramiteId, data.ordenPagoId]);
+  const [busquedaProcedimiento,setBusquedaProcedimiento]=useState('');
+  const tiposVisibles=useMemo(()=>tiposFormales.filter(t=>`${t.codigo} ${t.numeroVisible ?? ''} ${t.codigoInterno ?? ''} ${t.denominacion}`.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(busquedaProcedimiento.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase())),[tiposFormales,busquedaProcedimiento]);
   const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
   const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null);
   const [intentoCatalogo, setIntentoCatalogo] = useState(0);
+  const reintentarConsulta = () => {
+    setCargandoCatalogo(true); setErrorCatalogo(null); setIntentoCatalogo(i => i+1);
+  };
+  useEffect(() => {
+    const controller = new AbortController();
+    if (UUID_RE.test(data.tipoTramiteId)) {
+      consultarDocumentacion(data.tipoTramiteId, controller.signal)
+        .then(detalle => { if (!controller.signal.aborted) { setDocumentacion(detalle); setErrorDocumentacion(null); } })
+        .catch(() => { if (!controller.signal.aborted) setErrorDocumentacion({ id: data.tipoTramiteId, mensaje: 'No se pudieron verificar los requisitos y la tarifa. Reintente antes de continuar.' }); });
+    }
+    return () => controller.abort();
+  }, [data.tipoTramiteId, intentoCatalogo]);
+  const [desplegableAbierto, setDesplegableAbierto] = useState(false);
+  const [indiceResaltado, setIndiceResaltado] = useState<number>(-1);
+  const selectorRef = useRef<HTMLDivElement>(null);
+  const botonTriggerRef = useRef<HTMLButtonElement>(null);
+  const listboxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const manejarClickFuera = (e: MouseEvent) => {
+      if (selectorRef.current && !selectorRef.current.contains(e.target as Node)) {
+        setDesplegableAbierto(false);
+      }
+    };
+    if (desplegableAbierto) {
+      document.addEventListener('mousedown', manejarClickFuera);
+      return () => document.removeEventListener('mousedown', manejarClickFuera);
+    }
+  }, [desplegableAbierto]);
+
+  useEffect(() => {
+    if (desplegableAbierto && listboxRef.current && indiceResaltado >= 0) {
+      const itemEl = listboxRef.current.querySelector(`[data-index="${indiceResaltado}"]`) as HTMLElement;
+      if (itemEl && typeof itemEl.scrollIntoView === 'function') {
+        itemEl.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [indiceResaltado, desplegableAbierto]);
+
+  const seleccionarOpcion = (id: string) => {
+    if (id !== data.tipoTramiteId) {
+      if (esPublico) resetPublicSubmission();
+      procedimientoActualRef.current = id;
+      subida.cancel();
+      setFileError(null);
+      setClasificacionNueva('EXPEDIENTE');
+      Object.values(vistasPdf.current).forEach(url => URL.revokeObjectURL(url));
+      vistasPdf.current = {}; setVistas({});
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+    handleFieldChange('tipoTramiteId', id);
+    markTouched('tipoTramiteId');
+    setDesplegableAbierto(false);
+    setBusquedaProcedimiento('');
+    botonTriggerRef.current?.focus();
+  };
+
+
+  const manejarKeyDownTrigger = (e: React.KeyboardEvent) => {
+    if (isSubmitting || cargandoCatalogo) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (!desplegableAbierto) {
+        setDesplegableAbierto(true);
+        const idxActual = tiposVisibles.findIndex((t) => t.id === data.tipoTramiteId);
+        setIndiceResaltado(idxActual >= 0 ? idxActual : 0);
+      } else if (e.key === 'ArrowDown') {
+        setIndiceResaltado((prev) => (prev < tiposVisibles.length - 1 ? prev + 1 : 0));
+      } else if (e.key === 'ArrowUp') {
+        setIndiceResaltado((prev) => (prev > 0 ? prev - 1 : tiposVisibles.length - 1));
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        if (indiceResaltado >= 0 && indiceResaltado < tiposVisibles.length) {
+          seleccionarOpcion(tiposVisibles[indiceResaltado].id);
+        }
+      }
+    } else if (e.key === 'Escape' || e.key === 'Tab') {
+      setDesplegableAbierto(false);
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
-    setCargandoCatalogo(true);
-    setErrorCatalogo(null);
 
     apiClient.get<unknown>('/api/v1/tramites/tipos', { signal: controller.signal })
       .then((respuesta) => {
@@ -154,7 +309,21 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           setErrorCatalogo('El catálogo formal devolvió datos incompletos o ambiguos. No se puede seleccionar un procedimiento para radicar.');
           return;
         }
-        setTiposFormales(tipos);
+        const porCodigo = new Map(tipos.map(tipo => [tipo.codigo, tipo]));
+        const usarCodigoVisible = porCodigo.size >= 72;
+        const ordenados = CATALOGO_TUPA_MESA_PARTES.flatMap(concepto => {
+          const persistido = porCodigo.get(concepto.codigoInterno);
+          return persistido ? [{
+            ...persistido,
+            codigo: usarCodigoVisible ? concepto.codigoVisible : persistido.codigo,
+            codigoVisible: concepto.codigoVisible,
+            numeroVisible: concepto.numeroVisible,
+            codigoInterno: concepto.codigoInterno,
+            denominacion: concepto.nombre,
+            costoFuente: concepto.costoFuente,
+          }] : [];
+        });
+        setTiposFormales(ordenados);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -212,10 +381,17 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       errs.archivos = 'Hay archivos sin una referencia de almacenamiento válida. Retire los archivos locales o de demostración y cargue el documento antes de continuar.';
     }
 
-    return errs;
-  }, [data, cargandoCatalogo, errorCatalogo, tiposFormales]);
+    if (data.tipoTramiteId && (!documentacion || documentacion.id !== data.tipoTramiteId || errorDocumentacion)) {
+      errs.tipoTramiteId = errorDocumentacion ?? 'Consultando requisitos y tarifa del procedimiento…';
+    } else if (!errs.archivos && documentacion) {
+      const documental = validarAdjuntosRequisitos(documentacion, data.archivos);
+      if (documental) errs.archivos = documental;
+    }
 
-  const isValid = Object.keys(errors).length === 0;
+    return errs;
+  }, [data, cargandoCatalogo, errorCatalogo, tiposFormales, documentacion, errorDocumentacion]);
+
+  const isValid = Object.keys(errors).length === 0 && !bloqueoPublico;
   const tipoSeleccionado = tiposFormales.find((tipo) => tipo.id === data.tipoTramiteId);
 
   const markTouched = (field: string) => {
@@ -230,76 +406,73 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   };
 
   // Carga y validación binaria de archivos PDF con SHA-256
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (cargandoArchivo) return;
-    setFileError(null);
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const { documentosFoliados, totalFolios } = useMemo(() => {
+    return calcularFoliacionFront(data.archivos);
+  }, [data.archivos]);
 
-    // Validación de tipo de archivo
-    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      setFileError('Solo se permiten archivos en formato PDF (Estándar PDF/A).');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    // Validación de tamaño máximo del endpoint de radicación (20 MiB).
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      setFileError(
-        `El archivo excede el tamaño máximo permitido de 20 MB (tamaño actual: ${(
-          file.size /
-          (1024 * 1024)
-        ).toFixed(2)} MB).`
-      );
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    try {
-      const archivoSubido = await subida.upload(file);
-      if (!archivoSubido) return;
-
-      const nuevoArchivo: ArchivoTramite = {
-        nombre: file.name,
-        peso: file.size,
-        hashSha256: archivoSubido.sha256,
-        storageUrl: archivoSubido.s3Key,
-      };
-
+  useEffect(() => {
+    if (data.archivos.length > 0 && totalFolios > 0 && data.numeroFolios !== totalFolios) {
       dispatch({
         type: 'UPDATE_DOCUMENTOS',
-        payload: {
-          archivos: [...data.archivos, nuevoArchivo],
-        },
+        payload: { numeroFolios: totalFolios },
       });
-    } catch (error) {
-      setFileError(error instanceof Error ? error.message : 'No se pudo completar la carga del archivo seleccionado. Reintente antes de continuar.');
-    } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+    }
+  }, [data.archivos.length, totalFolios, data.numeroFolios, dispatch]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, destino: DestinoCarga = { clasificacion: clasificacionNueva }) => {
+    if (bloqueoPublico) { setFileError(bloqueoPublico); return; }
+    if (cargandoArchivo || cargaEnCurso.current) return;
+    setFileError(null);
+    const input = e.currentTarget;
+    const files = Array.from(input.files ?? []);
+    if (!files.length) return;
+    const procedimientoDeCarga = data.tipoTramiteId;
+    let archivosActuales = data.archivos.filter(a => !destino.sustituir || a.storageUrl !== destino.sustituir);
+    cargaEnCurso.current = true;
+    try {
+      if (archivosActuales.length + files.length > (esPublico ? 5 : 30)) throw new Error(esPublico ? 'Se admiten hasta 5 PDF por solicitud pública.' : 'Se admiten hasta 30 PDF por solicitud.');
+      if (esPublico && archivosActuales.reduce((s,a) => s+a.peso,0) + files.reduce((s,f) => s+f.size,0) > 50*1024*1024) throw new Error('Los PDF no pueden superar 50 MB en total.');
+      for (const file of files) {
+        if (!file.name.toLowerCase().endsWith('.pdf') || (file.type && file.type !== 'application/pdf')) throw new Error('Solo se permiten archivos PDF.');
+        if (file.size <= 0 || file.size > MAX_FILE_SIZE_BYTES) throw new Error('El archivo debe tener contenido y no superar 20 MB.');
+        if (archivosActuales.some(a => a.nombre.toLowerCase() === file.name.toLowerCase())) throw new Error(`Ya adjuntó un archivo llamado ${file.name}. Utilice Sustituir.`);
+        const archivoSubido = await subida.upload(file);
+        if (!archivoSubido || procedimientoActualRef.current !== procedimientoDeCarga) return;
+        if (archivosActuales.some(a => a.hashSha256 === archivoSubido.sha256)) throw new Error('Este PDF ya está adjuntado; no lo duplique.');
+        const nuevoArchivo: ArchivoTramite = {
+          nombre: file.name, peso: file.size, hashSha256: archivoSubido.sha256, storageUrl: archivoSubido.s3Key,
+          clasificacion: destino.clasificacion, requisitoId: destino.requisitoId,
+          paginas: (archivoSubido as any).paginas ?? 1,
+        };
+        if (typeof URL.createObjectURL === 'function') {
+          if (destino.sustituir && vistasPdf.current[destino.sustituir]) URL.revokeObjectURL(vistasPdf.current[destino.sustituir]);
+          vistasPdf.current[archivoSubido.s3Key] = URL.createObjectURL(file);
+          setVistas({ ...vistasPdf.current });
+        }
+        archivosActuales = [...archivosActuales, nuevoArchivo];
+        const foliacionActual = calcularFoliacionFront(archivosActuales);
+        dispatch({ type: 'UPDATE_DOCUMENTOS', payload: { archivos: foliacionActual.documentosFoliados, numeroFolios: foliacionActual.totalFolios } });
       }
+    } catch (error) {
+      if (procedimientoActualRef.current === procedimientoDeCarga) {
+        setFileError(error instanceof Error ? error.message : 'No se pudo completar la carga del archivo seleccionado. Reintente antes de continuar.');
+      }
+    } finally {
+      cargaEnCurso.current = false;
+      input.value = '';
     }
   };
 
   const handleRemoveArchivo = (indexToRemove: number) => {
+    const key = data.archivos[indexToRemove].storageUrl;
+    if (key && vistasPdf.current[key]) {
+      URL.revokeObjectURL(vistasPdf.current[key]); delete vistasPdf.current[key]; setVistas({ ...vistasPdf.current });
+    }
     const filtrados = data.archivos.filter((_, idx) => idx !== indexToRemove);
     dispatch({
       type: 'UPDATE_DOCUMENTOS',
       payload: { archivos: filtrados },
     });
-  };
-
-  const handleSimularArchivoPrueba = () => {
-    const dummy: ArchivoTramite = {
-      nombre: 'solicitud_firmada_estudios_2026.pdf',
-      peso: 154230,
-      hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    };
-    dispatch({
-      type: 'UPDATE_DOCUMENTOS',
-      payload: { archivos: [...data.archivos, dummy] },
-    });
-    setFileError(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -335,6 +508,18 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
         </p>
       </header>
 
+      {bloqueoPublico && <p role="status" className="rounded-xl bg-blue-50 p-4 text-sm text-blue-900">{bloqueoPublico}</p>}
+      {!data.ordenPagoId && disponibilidad.find(d => d.id === data.tipoTramiteId)?.omisionPagoDemo && (
+        <div role="status" className="rounded-xl border border-blue-200 bg-blue-50/80 p-3.5 text-xs sm:text-sm text-blue-900 flex items-start gap-2.5">
+          <svg className="w-4 h-4 text-[#006EC7] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="flex-1 leading-relaxed">
+            <span className="font-semibold text-[#005bb5]">Información de trámite:</span>{' '}
+            {disponibilidad.find(d => d.id === data.tipoTramiteId)?.motivo}
+          </div>
+        </div>
+      )}
       <div className="space-y-5">
         {/* 1. Selección de Procedimiento TUPA */}
         <div>
@@ -343,6 +528,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
           >
             Procedimiento Institucional o Trámite TUPA <span className="text-red-600">*</span>
+            <span className="ml-2 font-semibold text-xs text-[#006EC7]">(72 procedimientos vigentes)</span>
           </label>
           <select
             id={`${formId}-tipoTramiteId`}
@@ -359,13 +545,9 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             onChange={(e) => handleFieldChange('tipoTramiteId', e.target.value)}
             onBlur={() => markTouched('tipoTramiteId')}
             disabled={isSubmitting}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer ${
-              touched.tipoTramiteId && errors.tipoTramiteId
-                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
-            } disabled:bg-slate-100`}
+            className="sr-only"
           >
-            <option value="">{cargandoCatalogo ? 'Cargando tipos formales…' : '-- Seleccione un tipo disponible --'}</option>
+            <option value="" disabled>{cargandoCatalogo ? 'Cargando tipos formales…' : '-- Seleccione un tipo disponible (72 vigentes) --'}</option>
             {data.tipoTramiteId && !tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId) && (
               <option value={data.tipoTramiteId} disabled>
                 Selección guardada pendiente de revalidación: {CATALOGO_TUPA_INSTITUCIONAL.find((tipo) => tipo.id === data.tipoTramiteId)?.nombre ?? data.tipoTramiteId}
@@ -373,27 +555,163 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             )}
             {tiposFormales.map((tipo) => (
               <option key={tipo.id} value={tipo.id}>
-                {tipo.codigo} — {tipo.denominacion}{tipo.unidad_organica ? ` (${tipo.unidad_organica})` : ''}
+                {tipo.codigo} — {tipo.denominacion}{tipo.costoFuente ? ` — ${tipo.costoFuente}` : ''}
               </option>
             ))}
           </select>
-          <p className="mt-1.5 text-xs text-slate-600">
-            Se muestran los procedimientos vigentes del catálogo formal del backend. Los 75 conceptos informativos de Ventanilla no constituyen automáticamente trámites radicables ni acreditan aprobación institucional.
-          </p>
+
+          <input type="search" aria-label="Buscar procedimiento" placeholder="Buscar por código o nombre" value={busquedaProcedimiento}
+            onChange={e=>{setBusquedaProcedimiento(e.target.value);setIndiceResaltado(0);setDesplegableAbierto(true);}}
+            className="mb-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          {/* Selector visual personalizado: compacto, con scrollbar y ~5 opciones visibles */}
+          <div ref={selectorRef} className="relative w-full">
+            <button
+              ref={botonTriggerRef}
+              type="button"
+              id={`${formId}-tipoTramiteId-trigger`}
+              aria-haspopup="listbox"
+              aria-expanded={desplegableAbierto}
+              aria-controls={`${formId}-tipoTramiteId-dropdown`}
+              onClick={() => {
+                if (!isSubmitting && !cargandoCatalogo) {
+                  const nuevoEstado = !desplegableAbierto;
+                  setDesplegableAbierto(nuevoEstado);
+                  if (nuevoEstado) {
+                    const idx = tiposVisibles.findIndex((t) => t.id === data.tipoTramiteId);
+                    setIndiceResaltado(idx >= 0 ? idx : 0);
+                  }
+                }
+              }}
+              onKeyDown={manejarKeyDownTrigger}
+              onBlur={() => {
+                if (!desplegableAbierto) markTouched('tipoTramiteId');
+              }}
+              disabled={isSubmitting || cargandoCatalogo}
+              className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs transition cursor-pointer flex items-center justify-between text-left gap-2 ${
+                touched.tipoTramiteId && errors.tipoTramiteId
+                  ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                  : desplegableAbierto
+                  ? 'border-[#006EC7] ring-2 ring-[#006EC7]/20 bg-white text-slate-900'
+                  : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 focus:outline-none focus:border-[#006EC7] focus:ring-2 focus:ring-[#006EC7]/20'
+              } disabled:bg-slate-100 disabled:cursor-not-allowed`}
+            >
+              <div className="min-w-0 flex-1 truncate">
+                {tipoSeleccionado ? (
+                  <span className="font-medium text-slate-900 truncate block">
+                    <span>{tipoSeleccionado.codigo} — {tipoSeleccionado.denominacion}{tipoSeleccionado.costoFuente ? ` — ${tipoSeleccionado.costoFuente}` : ''}</span>
+                  </span>
+                ) : cargandoCatalogo ? (
+                  <span className="text-slate-400 italic">Cargando tipos formales…</span>
+                ) : (
+                  <span className="text-slate-500">-- Seleccione un tipo disponible (72 vigentes) --</span>
+                )}
+              </div>
+              <svg
+                className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
+                  desplegableAbierto ? 'rotate-180 text-[#006EC7]' : 'text-slate-400'
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {/* Menú desplegable con scrollbar vertical y límite a ~5 opciones visibles */}
+            {desplegableAbierto && (
+              <div
+                id={`${formId}-tipoTramiteId-dropdown`}
+                className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden animate-in fade-in duration-100"
+              >
+                <div
+                  ref={listboxRef}
+                  role="listbox"
+                  aria-label="Procedimientos TUPA disponibles"
+                  className="max-h-[235px] overflow-y-auto divide-y divide-slate-100 focus:outline-none"
+                  style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#94a3b8 #f1f5f9',
+                  }}
+                >
+                  {/* Deseleccionar si hay selección */}
+                  {data.tipoTramiteId && (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => seleccionarOpcion('')}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') seleccionarOpcion(''); }}
+                      className="px-3.5 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 cursor-pointer flex items-center justify-between border-b border-slate-100 transition"
+                    >
+                      <span>✕ Deseleccionar procedimiento</span>
+                    </div>
+                  )}
+
+                  {/* Lista de trámites formales vigentes */}
+                  {tiposVisibles.map((tipo, idx) => {
+                    const isSelected = data.tipoTramiteId === tipo.id;
+                    const isHighlighted = idx === indiceResaltado;
+                    return (
+                      <div
+                        key={tipo.id}
+                        data-index={idx}
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={() => seleccionarOpcion(tipo.id)}
+                        onMouseEnter={() => setIndiceResaltado(idx)}
+                        className={`px-3.5 py-2.5 text-left text-sm cursor-pointer transition flex items-start justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-blue-50 text-[#006EC7] font-medium'
+                            : isHighlighted
+                            ? 'bg-slate-50 text-slate-900'
+                            : 'text-slate-800 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs sm:text-sm leading-snug">
+                            <span className={isSelected ? 'text-[#005bb5] font-semibold' : 'text-slate-900'}>
+                              {tipo.codigo} — {tipo.denominacion}
+                            </span>
+                            {tipo.costoFuente && <span className="block text-xs text-slate-600">{tipo.costoFuente}</span>}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <svg
+                            className="w-4 h-4 text-[#006EC7] shrink-0 mt-0.5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
           {tipoSeleccionado && (
             <div className="mt-2 space-y-1 text-xs text-slate-600">
               {tipoSeleccionado.descripcion && <p>{tipoSeleccionado.descripcion}</p>}
               <p>La API disponible no informa los requisitos documentales ni su obligatoriedad para este procedimiento. La descripción no constituye una lista de adjuntos exigibles.</p>
+              {documentacion?.id === data.tipoTramiteId && <DocumentacionRequisitos detalle={documentacion} archivos={data.archivos}
+                disabled={isSubmitting || cargandoArchivo || Boolean(bloqueoPublico)} adjuntar={handleFileChange} />}
+              {!documentacion && !errorDocumentacion && <p role="status">Consultando requisitos y tarifa…</p>}
+              {errorDocumentacion && <div role="alert"><p>{errorDocumentacion}</p><button type="button" className="underline" onClick={reintentarConsulta}>Reintentar requisitos</button></div>}
             </div>
           )}
-          {cargandoCatalogo && <p role="status" className="mt-1 text-xs text-slate-500">Consultando tipos formales…</p>}
+          {cargandoCatalogo && <p role="status" className="mt-1 text-xs text-slate-500">Consultando procedimientos…</p>}
           {!cargandoCatalogo && !errorCatalogo && tiposFormales.length === 0 && (
             <p role="status" className="mt-1 text-xs text-slate-600">El backend no informa tipos formales vigentes disponibles.</p>
           )}
           {errorCatalogo && (
             <div role="alert" className="mt-1.5 text-xs text-red-700">
               <p>{errorCatalogo}</p>
-              <button type="button" className="mt-1 font-bold underline" onClick={() => setIntentoCatalogo((valor) => valor + 1)} disabled={cargandoCatalogo}>
+              <button type="button" className="mt-1 font-bold underline" onClick={reintentarConsulta} disabled={cargandoCatalogo}>
                 Reintentar consulta
               </button>
             </div>
@@ -461,14 +779,19 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           )}
         </div>
 
-        {/* 3. Cantidad de Folios */}
-        <div className="max-w-xs">
-          <label
-            htmlFor={`${formId}-numeroFolios`}
-            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
-          >
-            Cantidad Estimada de Folios <span className="text-red-600">*</span>
-          </label>
+                {/* 3. Cantidad de Folios */}
+        <div>
+          <div className="flex justify-between items-center mb-1.5">
+            <label
+              htmlFor={`${formId}-numeroFolios`}
+              className="block text-xs font-bold uppercase tracking-wider text-slate-700"
+            >
+              Cantidad de Folios <span className="text-red-600">*</span>
+            </label>
+            <span className="text-[11px] text-slate-400">
+              {data.archivos.length > 0 ? "Sincronizado con foliación de adjuntos" : "Mínimo 1, máximo 5000 folios"}
+            </span>
+          </div>
           <input
             id={`${formId}-numeroFolios`}
             name="numeroFolios"
@@ -483,19 +806,19 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 ? `${formId}-numeroFolios-error`
                 : undefined
             }
-            value={data.numeroFolios}
+            value={data.numeroFolios || ""}
             onChange={(e) =>
-              handleFieldChange('numeroFolios', Number(e.target.value))
+              handleFieldChange("numeroFolios", parseInt(e.target.value, 10) || 0)
             }
-            onBlur={() => markTouched('numeroFolios')}
+            onBlur={() => markTouched("numeroFolios")}
             disabled={isSubmitting}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm font-mono shadow-xs focus:outline-none focus:ring-2 transition ${
+            className={`w-full sm:w-48 rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition ${
               touched.numeroFolios && errors.numeroFolios
-                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
+                ? "border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200"
+                : "border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20"
             } disabled:bg-slate-100`}
           />
-          {touched.numeroFolios && errors.numeroFolios ? (
+          {touched.numeroFolios && errors.numeroFolios && (
             <p
               id={`${formId}-numeroFolios-error`}
               role="alert"
@@ -503,12 +826,24 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             >
               {errors.numeroFolios}
             </p>
-          ) : (
-            <p className="mt-1 text-[11px] text-slate-500">
-              Número de caras numeradas o páginas útiles que componen el expediente.
-            </p>
           )}
         </div>
+
+        {/* 3. Resumen Documental Oficial y Foliación Correlativa Automática */}
+        <ResumenDocumental
+          documentos={documentosFoliados.map((doc) => ({
+            nombre: doc.nombre,
+            paginas: doc.paginas,
+            folioInicio: doc.folioInicio,
+            folioFin: doc.folioFin,
+            clasificacion: doc.clasificacion,
+            requisitoNombre: [...(documentacion?.requisitos ?? []), ...(documentacion?.anexos ?? [])].find(
+              (r) => r.id === doc.requisitoId
+            )?.nombre,
+            peso: doc.peso,
+          }))}
+          totalFolios={data.archivos.length > 0 ? totalFolios : 0}
+        />
 
         {/* 4. Carga Documentaria con cálculo de SHA-256 */}
         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 space-y-3">
@@ -521,17 +856,15 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 El envío requiere al menos un archivo PDF (máximo 20 MB por archivo). Esta exigencia técnica no determina qué documentos son requisitos institucionales del procedimiento.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleSimularArchivoPrueba}
-              disabled={isSubmitting || cargandoArchivo}
-              className="text-xs font-bold text-[#006EC7] hover:underline self-start sm:self-auto cursor-pointer"
-            >
-              + Cargar PDF de prueba
-            </button>
           </div>
 
           {/* Zona de Drop / Carga de Archivo */}
+          {documentacion?.id === data.tipoTramiteId && <label className="block text-xs font-semibold">Clasificación del nuevo archivo
+            <select aria-label="Clasificación del nuevo archivo" value={clasificacionNueva} disabled={isSubmitting || cargandoArchivo}
+              onChange={e => setClasificacionNueva(e.target.value as ClasificacionAdjunto)} className="ml-2 rounded border border-slate-300 p-2">
+              <option value="EXPEDIENTE">EXPEDIENTE</option><option value="ANEXO">ANEXO</option>
+            </select>
+          </label>}
           <label
             htmlFor={`${formId}-file-upload`}
             className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white p-5 text-center cursor-pointer hover:border-[#006EC7] hover:bg-blue-50/20 transition"
@@ -560,10 +893,11 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               id={`${formId}-file-upload`}
               ref={fileInputRef}
               type="file"
+              multiple
               accept=".pdf,application/pdf"
               className="sr-only"
-              onChange={handleFileChange}
-              disabled={isSubmitting || cargandoArchivo}
+              onChange={e => handleFileChange(e)}
+              disabled={isSubmitting || cargandoArchivo || Boolean(bloqueoPublico)}
             />
           </label>
 
@@ -591,7 +925,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               {data.archivos.map((archivo, index) => (
                 <div
                   key={`${archivo.nombre}-${index}`}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xs"
+                  className="flex flex-wrap gap-2 items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xs"
                 >
                   <div className="flex items-center gap-3 overflow-hidden">
                     <span className="shrink-0 rounded bg-red-100 px-2 py-0.5 font-bold text-red-700">
@@ -607,10 +941,36 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                       </p>
                     </div>
                   </div>
+                    <label className="ml-3 text-xs break-all">
+                      Clasificación de {archivo.nombre}
+                      <select
+                        aria-label={`Clasificación de ${archivo.nombre}`}
+                        value={archivo.clasificacion ?? 'EXPEDIENTE'}
+                        disabled={isSubmitting || cargandoArchivo}
+                        onChange={e => handleFieldChange('archivos', data.archivos.map((actual, i) => i === index
+                          ? { ...actual, clasificacion: e.target.value as ClasificacionAdjunto, requisitoId: undefined, tipoDocumentalCodigo: undefined, tipoDocumentalId: undefined }
+                          : actual))}
+                        className="block rounded border border-slate-300 p-2"
+                      >
+                        <option value="EXPEDIENTE">EXPEDIENTE</option>
+                        <option value="ANEXO">ANEXO</option>
+                      </select>
+                    </label>
+                  {!archivo.clasificacion && <button type="button" className="text-xs text-blue-800 underline" disabled={isSubmitting || cargandoArchivo}
+                    onClick={() => handleFieldChange('archivos', data.archivos.map((actual, i) => i === index
+                      ? { ...actual, clasificacion: 'EXPEDIENTE', tipoDocumentalCodigo: undefined, tipoDocumentalId: undefined } : actual))}>
+                    Confirmar clasificación EXPEDIENTE del borrador
+                  </button>}
+                  {archivo.requisitoId && <span className="text-xs text-slate-600">{[...(documentacion?.requisitos ?? []),...(documentacion?.anexos ?? [])].find(r => r.id === archivo.requisitoId)?.nombre}</span>}
+                  {archivo.storageUrl && vistas[archivo.storageUrl] && <a href={vistas[archivo.storageUrl]} target="_blank" rel="noreferrer" className="text-blue-800 underline">Ver PDF: {archivo.nombre}</a>}
+                  <label className="ml-2 text-xs text-blue-800">Sustituir
+                    <input type="file" accept="application/pdf,.pdf" aria-label={`Sustituir ${archivo.nombre}`} disabled={isSubmitting || cargandoArchivo}
+                      className="block w-32 text-xs" onChange={e => handleFileChange(e, { clasificacion: archivo.clasificacion ?? 'EXPEDIENTE', requisitoId: archivo.requisitoId, sustituir: archivo.storageUrl })} />
+                  </label>
                   <button
                     type="button"
                     onClick={() => handleRemoveArchivo(index)}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || cargandoArchivo}
                     className="ml-3 shrink-0 rounded px-2 py-1 font-bold text-red-600 hover:bg-red-50 cursor-pointer"
                   >
                     Eliminar

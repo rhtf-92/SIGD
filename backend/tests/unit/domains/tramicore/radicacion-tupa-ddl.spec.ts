@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { createHash } from 'node:crypto';
+import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it, vi } from 'vitest';
 import { crearProveedorFeriados, RadicacionVirtualService } from '../../../../src/domains/tramicore/radicacionVirtual.service.js';
 import { radicacionVirtualSchema } from '../../../../src/domains/tramicore/tramites.schemas.js';
@@ -10,6 +11,9 @@ const UUID_TUPA = '11111111-1111-4111-8111-111111111111';
 const UUID_USUARIO = '22222222-2222-4222-8222-222222222222';
 const UUID_PERSONA = '33333333-3333-4333-8333-333333333333';
 const UUID_DOCUMENTAL = '44444444-4444-4444-8444-444444444444';
+const pdfStorage = await PDFDocument.create();
+pdfStorage.addPage();
+const pdfStorageBytes = Buffer.from(await pdfStorage.save());
 
 function datosRadicacion() {
   return radicacionVirtualSchema.parse({
@@ -36,17 +40,34 @@ function crearServicioConTipo(
   idPersona: string | null = UUID_PERSONA,
   errorIdentidad?: Error,
   datosIdentidad: { id_documento?: string; tipo_persona?: string; nombre_identidad?: string; activo?: boolean } = {},
-  tiposDocumentales: Array<{ tipo_documental_id: string; requiere_condicion: boolean }> = [{ tipo_documental_id: UUID_DOCUMENTAL, requiere_condicion: false }],
+  tiposDocumentales: Array<{ tipo_documental_id: string; tipo_doc_codigo?: string; requiere_condicion: boolean; obligatorio?: boolean }> = [{ tipo_documental_id: UUID_DOCUMENTAL, requiere_condicion: false }],
   errorClasificacion?: Error,
   falloPersistencia: string | null = 'INSERT INTO sigd_tra.expediente',
   obtenerFeriados: () => Promise<string[]> = async () => [],
+  cuts: string[] = ['EXP-2026-000001'],
 ) {
   const consultas: string[] = [];
   const parametros: unknown[][] = [];
+  let cutIndex = 0;
+  let expedienteIndex = 0;
+  let expedienteActual = '55555555-5555-4555-8555-555555555555';
+  const auditadas = new Map<string, unknown>();
+  const expedienteIds = [
+    '55555555-5555-4555-8555-555555555555',
+    '55555555-5555-4555-8555-555555555556',
+  ];
   const cliente = {
     query: vi.fn(async (sql: string, values: unknown[] = []) => {
       consultas.push(sql);
       parametros.push(values);
+      // Explicit synthetic financial fixture; never implies institutional gratuity.
+      if (sql.includes("to_regclass('sigd_tes.orden_pago')")) return { rows: [{ tabla: 'sigd_tes.orden_pago' }], rowCount: 1 };
+      if (sql.includes('FROM sigd_tes.tarifa')) return { rows: [{ importe: '0.00' }], rowCount: 1 };
+      if (sql === 'SELECT current_database() AS db') return { rows: [{ db: 'sigd_jacobo_demo' }], rowCount: 1 };
+      if (sql.includes("datos_despues->'resultado' AS resultado")) {
+        const resultado = auditadas.get(String(values[0]) + ':' + String(values[1]));
+        return { rows: resultado ? [{ resultado }] : [], rowCount: resultado ? 1 : 0 };
+      }
       if (sql.includes('FROM sigd_doc.requisito r')) {
         if (errorClasificacion) throw errorClasificacion;
         return { rows: tiposDocumentales, rowCount: tiposDocumentales.length };
@@ -68,16 +89,25 @@ function crearServicioConTipo(
         };
       }
       if (sql.includes('fn_generar_cut')) {
-        return { rows: [{ cut: 'EXP-2026-000001' }], rowCount: 1 };
+        const cut = cuts[Math.min(cutIndex, cuts.length - 1)];
+        cutIndex += 1;
+        return { rows: [{ cut }], rowCount: 1 };
       }
       if (falloPersistencia && sql.includes(falloPersistencia)) {
         throw new Error('PARADA_DE_PRUEBA_ANTES_DE_PERSISTENCIA');
       }
+      if (sql.includes('INSERT INTO sigd_audit.bitacora_auditoria')) {
+        const datos = JSON.parse(String(values[8]));
+        auditadas.set(datos.usuario_id + ':' + datos.huella_solicitud, datos.resultado);
+        return { rows: [{ id_auditoria: '77777777-7777-4777-8777-777777777777' }], rowCount: 1 };
+      }
       if (sql.includes('INSERT INTO sigd_doc.expediente')) {
-        return { rows: [{ expediente_id: '55555555-5555-4555-8555-555555555555', fecha_registro: values[4] }], rowCount: 1 };
+        expedienteActual = expedienteIds[Math.min(expedienteIndex, expedienteIds.length - 1)];
+        expedienteIndex += 1;
+        return { rows: [{ expediente_id: expedienteActual, fecha_registro: values[4] }], rowCount: 1 };
       }
       if (sql.includes('FROM sigd_tra.expediente') && sql.includes('FOR UPDATE')) {
-        return { rows: [{ expediente_id: '55555555-5555-4555-8555-555555555555' }], rowCount: 1 };
+        return { rows: [{ expediente_id: expedienteActual }], rowCount: 1 };
       }
       if (sql.includes('MAX(f.folio_fin)')) {
         return { rows: [{ folio_inicio: 1 }], rowCount: 1 };
@@ -93,8 +123,8 @@ function crearServicioConTipo(
   const service = new RadicacionVirtualService(pool, obtenerFeriados);
   // Estas pruebas aíslan la transacción; la lectura S3 se prueba por separado.
   const verificarArchivo = vi.spyOn(service as unknown as {
-    verificarArchivo: (documento: unknown) => Promise<{ bucket: string; key: string }>;
-  }, 'verificarArchivo').mockResolvedValue({ bucket: 'bucket-unitario', key: 'expedientes/2026/77777777-7777-4777-8777-777777777777.pdf' });
+    verificarArchivo: (documento: unknown) => Promise<{ bucket: string; key: string; paginas: number }>;
+  }, 'verificarArchivo').mockResolvedValue({ bucket: 'bucket-unitario', key: 'expedientes/2026/77777777-7777-4777-8777-777777777777.pdf', paginas: 1 });
   return { service, consultas, parametros, cliente, verificarArchivo };
 }
 
@@ -191,6 +221,23 @@ describe('TramiCore · consulta del catálogo TUPA según DocuCore SQL 04', () =
     expect(datosRadicacion()).not.toHaveProperty('idPersona');
   });
 
+  it.each([
+    { tipoDocumentalId: '55555555-5555-4555-8555-555555555555' },
+    { tipoDocumentalCodigo: 'FUT' },
+    { tipoDocumentalId: UUID_DOCUMENTAL, tipoDocumentalCodigo: 'FUT' },
+  ])('rechaza clasificación explícita incorrecta incluso con un solo tipo: %j', async clasificacion => {
+    const { service, consultas, cliente } = crearServicioConTipo(true, UUID_PERSONA, undefined, {}, [
+      { tipo_documental_id: UUID_DOCUMENTAL, tipo_doc_codigo: 'ANEXO', requiere_condicion: false },
+    ]);
+    const datos = datosRadicacion();
+    Object.assign(datos.documentos[0], clasificacion);
+    await expect(service.radicar(datos, UUID_USUARIO)).rejects.toMatchObject({
+      invalidParams: [{ reason: expect.stringContaining('TIPO_DOCUMENTAL_NO_AUTORIZADO') }],
+    });
+    expect(consultas.some(sql => sql.includes('fn_generar_cut') || sql.includes('INSERT INTO'))).toBe(false);
+    expect(cliente.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+
   it('resuelve el único UUID documental por las relaciones, sin clasificar por metadatos', async () => {
     const { service, consultas, parametros } = crearServicioConTipo(true);
     await expect(service.radicar(datosRadicacion(), UUID_USUARIO)).rejects.toThrow('PARADA_DE_PRUEBA_ANTES_DE_PERSISTENCIA');
@@ -264,8 +311,63 @@ describe('TramiCore · consulta del catálogo TUPA según DocuCore SQL 04', () =
     expect(cliente.release).toHaveBeenCalledOnce();
   });
 
+  it('admite dos radicaciones independientes del mismo ciudadano y SUZ26-035 en el entorno aislado', async () => {
+    const { service, consultas, cliente } = crearServicioConTipo(
+      true,
+      UUID_PERSONA,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      null,
+      async () => [],
+      ['EXP-2026-000101', 'EXP-2026-000102'],
+    );
+    const primera = await service.radicar(datosRadicacion(), UUID_USUARIO);
+    const segunda = await service.radicar({
+      ...datosRadicacion(),
+      asunto: 'Segunda solicitud independiente de certificado',
+      documentos: [{ ...datosRadicacion().documentos[0], nombreArchivo: 'segundo.pdf' }],
+    }, UUID_USUARIO);
+
+    expect(primera.cut).toBe('EXP-2026-000101');
+    expect(segunda.cut).toBe('EXP-2026-000102');
+    expect(segunda.expedienteId).not.toBe(primera.expedienteId);
+    expect(consultas.filter((sql) => sql === 'COMMIT')).toHaveLength(2);
+    expect(consultas.some((sql) => /SELECT.*solicitante_id.*tipo_tramite_id/is.test(sql))).toBe(false);
+    expect(cliente.release).toHaveBeenCalledTimes(2);
+  });
+
+  it('recupera un reintento idéntico sin consumir otro CUT ni insertar otro expediente', async () => {
+    const { service, consultas } = crearServicioConTipo(true, UUID_PERSONA, undefined, {}, undefined, undefined, null);
+    const primera = await service.radicar(datosRadicacion(), UUID_USUARIO);
+    const repetida = await service.radicar(datosRadicacion(), UUID_USUARIO);
+    expect(repetida).toEqual(primera);
+    expect(consultas.filter(sql => sql.includes('pg_advisory_xact_lock'))).toHaveLength(2);
+    expect(consultas.filter(sql => sql.includes('fn_generar_cut'))).toHaveLength(1);
+    expect(consultas.filter(sql => sql.includes('INSERT INTO sigd_doc.expediente'))).toHaveLength(1);
+    expect(consultas.filter(sql => sql.includes('INSERT INTO sigd_audit.bitacora_auditoria'))).toHaveLength(1);
+  });
+
+  it('aplica la excepción demo autenticada y deja evidencia económica sin pago ficticio', async () => {
+    vi.stubEnv('SIGD_DEMO_OMITIR_PAGO', 'true'); vi.stubEnv('NODE_ENV', 'test');
+    try {
+      const tipos = [
+        { tipo_documental_id: UUID_DOCUMENTAL, tipo_doc_codigo: 'FUT', requiere_condicion: false, obligatorio: true },
+        { tipo_documental_id: '88888888-8888-4888-8888-888888888888', tipo_doc_codigo: 'COMPROBANTE_PAGO', requiere_condicion: false, obligatorio: true },
+      ];
+      const { service, consultas, parametros } = crearServicioConTipo(true, UUID_PERSONA, undefined, {}, tipos, undefined, null);
+      const datos = datosRadicacion(); datos.documentos[0].tipoDocumentalCodigo = 'FUT';
+      const resultado = await service.radicar(datos, UUID_USUARIO);
+      expect(resultado.mensajeLegal).toContain('Estado económico: NO VERIFICADO');
+      const indice = consultas.findIndex(sql => sql.includes('INSERT INTO sigd_audit.bitacora_auditoria'));
+      expect(JSON.parse(String(parametros[indice][8]))).toMatchObject({ usuario_id: UUID_USUARIO, estado_economico: 'NO_VERIFICADO', identidad: 'SESION_AUTENTICADA' });
+      expect(consultas.some(sql => /INSERT INTO.*(?:pago|transaccion_pago)/i.test(sql))).toBe(false);
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it.each(['INSERT INTO sigd_doc.expediente', 'INSERT INTO sigd_tra.expediente', 'INSERT INTO sigd_tra.tramite',
-    'INSERT INTO sigd_doc.documento_adjunto', 'INSERT INTO sigd_tra.expediente_documento_folio', 'INSERT INTO sigd_tra.asiento_registro'])
+    'INSERT INTO sigd_doc.documento_adjunto', 'INSERT INTO sigd_tra.expediente_documento_folio', 'INSERT INTO sigd_tra.asiento_registro', 'INSERT INTO sigd_audit.bitacora_auditoria'])
   ('revierte sin COMMIT cuando falla %s', async fallo => {
     const { service, consultas, cliente } = crearServicioConTipo(true, UUID_PERSONA, undefined, {}, undefined, undefined, fallo);
     await expect(service.radicar(datosRadicacion(), UUID_USUARIO)).rejects.toThrow('PARADA_DE_PRUEBA_ANTES_DE_PERSISTENCIA');
@@ -321,7 +423,7 @@ describe('Radicación · lectura del calendario antes del CUT', () => {
 });
 
 describe('Radicación · verificación de referencia existente en storage, sin subida real', () => {
-  const contenido = Buffer.from('%PDF-1.7\narchivo unitario');
+  const contenido = pdfStorageBytes;
   const key = 'expedientes/2026/77777777-7777-4777-8777-777777777777.pdf';
   const documento = { ...datosRadicacion().documentos[0], storagePath: key,
     tamanoBytes: contenido.length, hashSha256: createHash('sha256').update(contenido).digest('hex') };
@@ -343,7 +445,7 @@ describe('Radicación · verificación de referencia existente en storage, sin s
 
   it('usa el firmador existente y comprueba bytes, hash, tamaño y MIME antes de persistir', async () => {
     const { resultado, leer } = await verificar();
-    expect(resultado).toEqual({ bucket: 'bucket-unitario', key });
+    expect(resultado).toEqual({ bucket: 'bucket-unitario', key, paginas: 1 });
     const [url, opciones] = leer.mock.calls[0];
     expect(new URL(url).pathname).toBe(`/bucket-unitario/${key}`);
     expect(new URL(url).searchParams.get('X-Amz-SignedHeaders')).toBe('host');
@@ -383,6 +485,177 @@ describe('Radicación · verificación de referencia existente en storage, sin s
       controller.close();
     } });
     const { resultado } = await verificar({}, new Response(stream, { headers: { 'content-type': 'application/pdf' } }));
-    expect(resultado).toEqual({ bucket: 'bucket-unitario', key });
+    expect(resultado).toEqual({ bucket: 'bucket-unitario', key, paginas: 1 });
   });
+
+describe('clasificación documental multi-archivo TUPA Suiza 2026 (SUZ26-066)', () => {
+  const UUID_FUT = 'dc156983-a824-418a-835e-5a7e104c9ca5';
+  const UUID_ANEXO = 'b7f37bde-ec45-49d0-b28e-fc2ad4341b60';
+
+  const tiposMultiples = [
+    { tipo_documental_id: UUID_FUT, tipo_doc_codigo: 'FUT', requiere_condicion: false },
+    { tipo_documental_id: UUID_ANEXO, tipo_doc_codigo: 'ANEXO', requiere_condicion: false },
+  ];
+
+  it.each(['FUT', 'ANEXO'])('acepta un único adjunto explícito %s si los demás tipos son opcionales', async codigo => {
+    const tipos = tiposMultiples.map(t => ({ ...t, obligatorio: false }));
+    const { service, parametros, consultas } = crearServicioConTipo(true, UUID_PERSONA, undefined, {}, tipos, undefined, null);
+    const datos = datosRadicacion();
+    datos.documentos[0].tipoDocumentalCodigo = codigo;
+    await expect(service.radicar(datos, UUID_USUARIO)).resolves.toHaveProperty('cut');
+    const indice = consultas.findIndex(sql => sql.includes('INSERT INTO sigd_tra.expediente'));
+    expect(parametros[indice][3]).toBe(tipos.find(t => t.tipo_doc_codigo === codigo)!.tipo_documental_id);
+    expect(consultas.find(sql => sql.includes('FROM sigd_doc.requisito r'))).toContain('bool_or(r.obligatorio) AS obligatorio');
+  });
+
+  it('rechaza la falta de un tipo realmente obligatorio antes del CUT', async () => {
+    const tipos = tiposMultiples.map(t => ({ ...t, obligatorio: t.tipo_doc_codigo === 'FUT' }));
+    const { service, consultas, cliente } = crearServicioConTipo(true, UUID_PERSONA, undefined, {}, tipos);
+    const datos = datosRadicacion(); datos.documentos[0].tipoDocumentalCodigo = 'ANEXO';
+    await expect(service.radicar(datos, UUID_USUARIO)).rejects.toMatchObject({
+      invalidParams: [{ reason: expect.stringContaining('DOCUMENTOS_FALTANTES') }],
+    });
+    expect(consultas.some(sql => sql.includes('fn_generar_cut') || sql.includes('INSERT INTO'))).toBe(false);
+    expect(cliente.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+
+  it('rechaza ID y código contradictorios entre tipos válidos sin consumir CUT', async () => {
+    const { service, consultas } = crearServicioConTipo(true, UUID_PERSONA, undefined, {}, tiposMultiples);
+    const datos = datosRadicacion();
+    datos.documentos = [
+      { ...datos.documentos[0], tipoDocumentalId: UUID_FUT, tipoDocumentalCodigo: 'ANEXO' },
+      { ...datos.documentos[0], nombreArchivo: 'anexo.pdf', tipoDocumentalCodigo: 'ANEXO' },
+    ];
+    await expect(service.radicar(datos, UUID_USUARIO)).rejects.toMatchObject({
+      invalidParams: [{ reason: expect.stringContaining('TIPO_DOCUMENTAL_NO_AUTORIZADO') }],
+    });
+    expect(consultas.some(sql => sql.includes('fn_generar_cut') || sql.includes('INSERT INTO'))).toBe(false);
+  });
+
+  it('radica exitosamente un procedimiento multi-documental cuando se proporcionan todos los tipos clasificados', async () => {
+    const { service, consultas, cliente } = crearServicioConTipo(
+      true,
+      UUID_PERSONA,
+      undefined,
+      {},
+      tiposMultiples as any,
+      undefined,
+      null, // No simular fallo en persistencia
+    );
+
+    const datos = datosRadicacion();
+    datos.totalFolios = 2;
+    datos.documentos = [
+      {
+        nombreArchivo: 'solicitud-fut.pdf',
+        contentType: 'application/pdf',
+        tamanoBytes: 1024,
+        hashSha256: 'a'.repeat(64),
+        tipoDocumentalCodigo: 'FUT',
+      },
+      {
+        nombreArchivo: 'voucher-anexo.pdf',
+        contentType: 'application/pdf',
+        tamanoBytes: 2048,
+        hashSha256: 'b'.repeat(64),
+        tipoDocumentalCodigo: 'ANEXO',
+      },
+    ];
+
+    const resultado = await service.radicar(datos, UUID_USUARIO, new Date('2026-10-16T15:00:00Z'));
+    expect(resultado.cut).toBe('EXP-2026-000001');
+    expect(resultado.totalFolios).toBe(2);
+
+    // Debe insertar en expediente tramitológico con FUT como tipo principal
+    const insExp = consultas.find(sql => sql.includes('INSERT INTO sigd_tra.expediente'));
+    expect(insExp).toBeDefined();
+
+    // Debe insertar ambos adjuntos en sigd_doc.documento_adjunto
+    const insAdjuntos = consultas.filter(sql => sql.includes('INSERT INTO sigd_doc.documento_adjunto'));
+    expect(insAdjuntos.length).toBe(2);
+
+    // Debe foliar ambos adjuntos
+    const insFolios = consultas.filter(sql => sql.includes('INSERT INTO sigd_tra.expediente_documento_folio'));
+    expect(insFolios.length).toBe(2);
+
+    expect(cliente.query).toHaveBeenCalledWith('COMMIT');
+  });
+
+  it('rechaza con error descriptivo si se proporcionan tipos duplicados en la radicación', async () => {
+    const { service } = crearServicioConTipo(true, UUID_PERSONA, undefined, {}, tiposMultiples as any);
+    const datos = datosRadicacion();
+    datos.documentos = [
+      {
+        nombreArchivo: 'fut-1.pdf',
+        contentType: 'application/pdf',
+        tamanoBytes: 1024,
+        hashSha256: 'a'.repeat(64),
+        tipoDocumentalCodigo: 'FUT',
+      },
+      {
+        nombreArchivo: 'fut-2.pdf',
+        contentType: 'application/pdf',
+        tamanoBytes: 2048,
+        hashSha256: 'b'.repeat(64),
+        tipoDocumentalCodigo: 'FUT',
+      },
+    ];
+
+    await expect(service.radicar(datos, UUID_USUARIO)).rejects.toMatchObject({
+      invalidParams: [{ reason: expect.stringContaining('TIPO_DOCUMENTAL_DUPLICADO') }],
+    });
+  });
+
+  it('rechaza con error descriptivo si se proporciona un tipo documental no autorizado para el trámite', async () => {
+    const { service } = crearServicioConTipo(true, UUID_PERSONA, undefined, {}, tiposMultiples as any);
+    const datos = datosRadicacion();
+    datos.documentos = [
+      {
+        nombreArchivo: 'fut.pdf',
+        contentType: 'application/pdf',
+        tamanoBytes: 1024,
+        hashSha256: 'a'.repeat(64),
+        tipoDocumentalCodigo: 'FUT',
+      },
+      {
+        nombreArchivo: 'otro.pdf',
+        contentType: 'application/pdf',
+        tamanoBytes: 2048,
+        hashSha256: 'b'.repeat(64),
+        tipoDocumentalCodigo: 'TIPO_NO_EXISTE',
+      },
+    ];
+
+    await expect(service.radicar(datos, UUID_USUARIO)).rejects.toMatchObject({
+      invalidParams: [{ reason: expect.stringContaining('TIPO_DOCUMENTAL_NO_AUTORIZADO') }],
+    });
+  });
+
+  it('rechaza si faltan documentos obligatorios requeridos por el procedimiento TUPA', async () => {
+    const { service } = crearServicioConTipo(true, UUID_PERSONA, undefined, {}, tiposMultiples as any);
+    const datos = datosRadicacion();
+    datos.documentos = [
+      {
+        nombreArchivo: 'fut.pdf',
+        contentType: 'application/pdf',
+        tamanoBytes: 1024,
+        hashSha256: 'a'.repeat(64),
+        tipoDocumentalCodigo: 'FUT',
+      },
+      {
+        nombreArchivo: 'fut-extra.pdf',
+        contentType: 'application/pdf',
+        tamanoBytes: 2048,
+        hashSha256: 'b'.repeat(64),
+        tipoDocumentalId: UUID_FUT,
+      },
+    ];
+
+    // Este caso tiene duplicado FUT y le falta ANEXO
+    await expect(service.radicar(datos, UUID_USUARIO)).rejects.toMatchObject({
+      invalidParams: [{ reason: expect.stringContaining('TIPO_DOCUMENTAL_DUPLICADO') }],
+    });
+  });
+});
+
 });

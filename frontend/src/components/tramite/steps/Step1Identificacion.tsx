@@ -14,11 +14,12 @@
  * - Nombres y apellidos completos (o Razón Social).
  * - Correo electrónico institucional y teléfono celular.
  * - Programa de Estudios oficial: SearchableSelect con las 11 carreras oficiales
- *   del IESTP "Suiza", con placeholder gris tenue que cambia a texto oscuro al seleccionar.
+ *   del IESTP "Suiza".
+ * - Catálogo UBIGEO dinámico respaldado por PostgreSQL y ubigeoService (0 datos estáticos).
  * ==============================================================================
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   type DatosSolicitante,
   type TipoPersona,
@@ -27,7 +28,12 @@ import {
 } from "../../../types/tramiteWizard";
 import TextInput from "../../common/TextInput";
 import SearchableSelect, { type SelectOption } from "../../common/SearchableSelect";
-import { UCAYALI_PROVINCIAS, type Provincia } from "../../../data/ucayali";
+import {
+  fetchDepartamentos,
+  fetchProvincias,
+  fetchDistritos,
+} from "../../../services/ubigeoService";
+import type { UbigeoItem } from "../../../types/ubigeo";
 
 export interface Step1IdentificacionProps {
   /** Datos actuales del solicitante extraídos de formData.solicitante */
@@ -45,44 +51,118 @@ const OPCIONES_TIPO_DOCUMENTO: readonly SelectOption[] = [
   { value: "PASAPORTE", label: "Pasaporte Oficial", description: "Para ciudadanos no domiciliados" },
 ];
 
-const OPCIONES_DEPARTAMENTO: readonly SelectOption[] = [
-  { value: "Ucayali", label: "Ucayali (Sede Institucional Pucallpa)" },
-  { value: "Loreto", label: "Loreto" },
-  { value: "Huánuco", label: "Huánuco" },
-  { value: "San Martín", label: "San Martín" },
-  { value: "Lima", label: "Lima Metropolitana" },
-];
-
 export const Step1Identificacion: React.FC<Step1IdentificacionProps> = ({
   data,
   errors,
   onChange,
 }) => {
-  // Opciones de provincias según el catálogo de Ucayali
-  const opcionesProvincias: readonly SelectOption[] = useMemo(() => {
-    return UCAYALI_PROVINCIAS.map((prov: Provincia) => ({
-      value: prov.nombre,
-      label: `Provincia de ${prov.nombre}`,
-    }));
+  const [departamentosItems, setDepartamentosItems] = useState<UbigeoItem[]>([]);
+  const [provinciasItems, setProvinciasItems] = useState<UbigeoItem[]>([]);
+  const [distritosItems, setDistritosItems] = useState<UbigeoItem[]>([]);
+
+  // 1. Carga dinámica de departamentos desde PostgreSQL
+  useEffect(() => {
+    let activo = true;
+    fetchDepartamentos()
+      .then((items) => {
+        if (activo && items && items.length > 0) {
+          setDepartamentosItems(items);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      activo = false;
+    };
   }, []);
 
-  // Opciones de distritos dinámicamente filtradas por la provincia seleccionada
-  const opcionesDistritos: readonly SelectOption[] = useMemo(() => {
-    const provEncontrada = UCAYALI_PROVINCIAS.find(
-      (p: Provincia) => p.nombre.toLowerCase() === (data.provincia || "").toLowerCase()
+  // 2. Carga dinámica de provincias cuando cambia el departamento
+  useEffect(() => {
+    let activo = true;
+    const depNombre = data.departamento || "Ucayali";
+    const depEncontrado = departamentosItems.find(
+      (d) => d.nombre.toLowerCase() === depNombre.toLowerCase()
     );
-    if (!provEncontrada) {
-      return [
-        { value: data.distrito || "Callería", label: data.distrito || "Callería" },
-        { value: "Yarinacocha", label: "Yarinacocha" },
-        { value: "Manantay", label: "Manantay" },
-      ];
+    const depId = depEncontrado ? depEncontrado.id : (depNombre.toLowerCase().includes("ucayali") ? "25" : "");
+
+    if (depId) {
+      fetchProvincias(depId)
+        .then((items) => {
+          if (activo) {
+            setProvinciasItems(items);
+          }
+        })
+        .catch(() => {
+          if (activo) setProvinciasItems([]);
+        });
+    } else {
+      setProvinciasItems([]);
     }
-    return provEncontrada.distritos.map((dist: string) => ({
-      value: dist,
-      label: dist,
-    }));
-  }, [data.provincia, data.distrito]);
+    return () => {
+      activo = false;
+    };
+  }, [data.departamento, departamentosItems]);
+
+  // 3. Carga dinámica de distritos cuando cambia la provincia
+  useEffect(() => {
+    let activo = true;
+    const provNombre = data.provincia || "";
+    const provEncontrada = provinciasItems.find(
+      (p) => p.nombre.toLowerCase() === provNombre.toLowerCase()
+    );
+
+    if (provEncontrada) {
+      fetchDistritos(provEncontrada.id)
+        .then((items) => {
+          if (activo) {
+            setDistritosItems(items);
+          }
+        })
+        .catch(() => {
+          if (activo) setDistritosItems([]);
+        });
+    } else {
+      setDistritosItems([]);
+    }
+    return () => {
+      activo = false;
+    };
+  }, [data.provincia, provinciasItems]);
+
+  // Mapeo a SelectOptions de departamentos (PostgreSQL como única fuente de verdad)
+  const opcionesDepartamentos: readonly SelectOption[] = useMemo(() => {
+    if (departamentosItems.length > 0) {
+      return departamentosItems.map((d) => ({
+        value: d.nombre,
+        label: d.id === "25" ? "Ucayali (Sede Institucional Pucallpa)" : d.nombre,
+      }));
+    }
+    return [];
+  }, [departamentosItems]);
+
+  // Mapeo a SelectOptions de provincias (PostgreSQL como única fuente de verdad)
+  const opcionesProvincias: readonly SelectOption[] = useMemo(() => {
+    if (provinciasItems.length > 0) {
+      return provinciasItems.map((prov) => ({
+        value: prov.nombre,
+        label: `Provincia de ${prov.nombre}`,
+      }));
+    }
+    return [];
+  }, [provinciasItems]);
+
+  // Mapeo a SelectOptions de distritos (PostgreSQL como única fuente de verdad)
+  const opcionesDistritos: readonly SelectOption[] = useMemo(() => {
+    if (distritosItems.length > 0) {
+      return distritosItems.map((dist) => ({
+        value: dist.nombre,
+        label: dist.nombre,
+      }));
+    }
+    if (data.distrito) {
+      return [{ value: data.distrito, label: data.distrito }];
+    }
+    return [];
+  }, [distritosItems, data.distrito]);
 
   const handleTipoPersonaChange = (tipo: TipoPersona) => {
     onChange({
@@ -159,7 +239,6 @@ export const Step1Identificacion: React.FC<Step1IdentificacionProps> = ({
             required
             value={data.numeroDocumento}
             onChange={(e) => {
-              // Solo permitir dígitos si es DNI o RUC
               const soloDigitos = e.target.value.replace(/[^0-9]/g, "");
               if (data.tipoDocumento === "DNI" || data.tipoDocumento === "RUC") {
                 onChange({ numeroDocumento: soloDigitos });
@@ -263,7 +342,7 @@ export const Step1Identificacion: React.FC<Step1IdentificacionProps> = ({
         />
       </div>
 
-      {/* 6. Domicilio y Ubigeo Ucayali */}
+      {/* 6. Domicilio y Ubigeo Dinámico */}
       <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-4">
         <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
           Ubicación Geográfica y Domicilio
@@ -273,9 +352,15 @@ export const Step1Identificacion: React.FC<Step1IdentificacionProps> = ({
           <SearchableSelect
             label="Departamento"
             required
-            options={OPCIONES_DEPARTAMENTO}
+            options={opcionesDepartamentos}
             value={data.departamento}
-            onChange={(val) => onChange({ departamento: val })}
+            onChange={(val) => {
+              onChange({
+                departamento: val,
+                provincia: "",
+                distrito: "",
+              });
+            }}
             placeholder="Seleccione departamento..."
           />
 
@@ -285,10 +370,9 @@ export const Step1Identificacion: React.FC<Step1IdentificacionProps> = ({
             options={opcionesProvincias}
             value={data.provincia}
             onChange={(val) => {
-              const nuevaProv = UCAYALI_PROVINCIAS.find((p: Provincia) => p.nombre === val);
               onChange({
                 provincia: val,
-                distrito: nuevaProv?.distritos[0] || "",
+                distrito: "",
               });
             }}
             placeholder="Seleccione provincia..."

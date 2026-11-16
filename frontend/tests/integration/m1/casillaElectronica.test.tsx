@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import CasillaElectronicaPage from "../../../src/pages/casilla/CasillaElectronicaPage";
+import { ApiHttpError } from "../../../src/types/api";
 import { casillaService } from "../../../src/services/casillaService";
 import type {
   AcuseNotificacion,
@@ -242,6 +243,16 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(casillaService.getEstadisticas).mockResolvedValue(mockEstadisticasBase);
+    vi.mocked(casillaService.getNotificacionById).mockImplementation(async (id) => {
+      const notificacion = listaNotificacionesCompleta.find((item) => item.id === id);
+      if (!notificacion) throw new Error("Notificación de prueba no encontrada");
+      return notificacion;
+    });
+    vi.mocked(casillaService.marcarComoLeido).mockImplementation(async (id) => {
+      const notificacion = listaNotificacionesCompleta.find((item) => item.id === id);
+      if (!notificacion) throw new Error("Notificación de prueba no encontrada");
+      return { ...notificacion, estado: "LEIDO", fechaLecturaIso: "2026-09-16T20:00:00.000Z" };
+    });
     vi.mocked(casillaService.getNotificaciones).mockImplementation(
       async (filtros?: FiltrosCasilla) => {
         let resultado = [...listaNotificacionesCompleta];
@@ -450,6 +461,9 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     await user.click(tarjetaNoLeida);
 
     await waitFor(() => {
+      expect(casillaService.getNotificacionById).toHaveBeenCalledWith(
+        mockNotificacionNoLeida.id,
+      );
       expect(casillaService.marcarComoLeido).toHaveBeenCalledWith(
         mockNotificacionNoLeida.id,
       );
@@ -473,7 +487,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     // 1. Número de documento del acto administrativo dentro del modal
     expect(
       within(modal).getByRole("heading", {
-        name: mockNotificacionNoLeida.actoAdministrativo.numeroDocumento,
+        name: mockNotificacionNoLeida.actoAdministrativo.numeroDocumento!,
       }),
     ).toBeInTheDocument();
 
@@ -496,7 +510,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
 
     // 4. Código de Verificación Digital (CVD) dentro del modal
     expect(
-      within(modal).getByText(mockNotificacionNoLeida.actoAdministrativo.cvd),
+      within(modal).getByText(mockNotificacionNoLeida.actoAdministrativo.cvd!),
     ).toBeInTheDocument();
   });
 
@@ -536,7 +550,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
 
     // Botón para generar acuse digital
     const botonGenerarAcuse = await screen.findByRole("button", {
-      name: /Generar y Confirmar Acuse Digital Legal/i,
+      name: /Confirmar recepci/i,
     });
     await user.click(botonGenerarAcuse);
 
@@ -550,9 +564,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     expect(acuseGenerado.timestampGeneracionIso).toMatch(regexIso8601);
 
     // Despliegue en modal del acuse confirmado
-    expect(
-      await screen.findByText("CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(acuseGenerado.idAcuse)).toBeInTheDocument();
     expect(screen.getByText(isoFechaGenerada)).toBeInTheDocument();
   });
 
@@ -591,25 +603,10 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     expect(screen.getByText(hashValidoSha256)).toBeInTheDocument();
   });
 
-  it("j) La dirección de casilla respeta el formato {documento}@casilla.iestpsuiza.edu.pe", async () => {
+  it("j) La cabecera no atribuye una identidad fija a la cuenta autenticada", async () => {
     renderConQueryClient(<CasillaElectronicaPage />);
-
-    // Comprobación en la cabecera institucional del administrado
-    const regexFormatoCasilla = /^[a-zA-Z0-9._%+-]+@casilla\.iestpsuiza\.edu\.pe$/;
-    const direccionEsperada = "74561238@casilla.iestpsuiza.edu.pe";
-
-    expect(direccionEsperada).toMatch(regexFormatoCasilla);
-
-    const elementoCasilla = await screen.findByText(direccionEsperada);
-    expect(elementoCasilla).toBeInTheDocument();
-
-    // Comprobación de que coincide con el DNI del titular
-    expect(mockAcuseNotificado.destinatario.direccionCasilla).toBe(
-      `${mockAcuseNotificado.destinatario.numeroDocumento}@casilla.iestpsuiza.edu.pe`,
-    );
-    expect(mockAcuseNotificado.destinatario.direccionCasilla).toMatch(
-      regexFormatoCasilla,
-    );
+    expect(screen.getByText("Casilla de la cuenta autenticada")).toBeInTheDocument();
+    expect(screen.queryByText("74561238@casilla.iestpsuiza.edu.pe")).not.toBeInTheDocument();
   });
 
   it("k) Permite buscar por texto libre, cambiar el límite por página y limpiar los filtros", async () => {
@@ -689,7 +686,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
 
     // Clic en la tarjeta de Notificados con Acuse
     const tarjetaMetricaNotificados = screen.getByRole("button", {
-      name: /^Con Acuse Legal/i,
+      name: /^Con confirmación/i,
     });
     await user.click(tarjetaMetricaNotificados);
 
@@ -700,7 +697,7 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     });
   });
 
-  it("m) Permite descargar el acto administrativo en PDF y la cédula de acuse oficial", async () => {
+  it("m) No anuncia ni inicia descargas de documentos sin referencias persistidas", async () => {
     const user = userEvent.setup();
 
     vi.mocked(casillaService.getNotificaciones).mockResolvedValue(
@@ -719,21 +716,16 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
 
     // Descargar PDF
     const botonDescargarPdf = within(modal).getByRole("button", {
-      name: /Descargar Acto Administrativo \(\.PDF\)/i,
+      name: /Documento no disponible/i,
     });
-    await user.click(botonDescargarPdf);
-    expect(casillaService.descargarDocumento).toHaveBeenCalledWith(
-      mockNotificacionNotificada,
-    );
+    expect(botonDescargarPdf).toBeDisabled();
 
-    // Descargar Acuse oficial
     const botonDescargarAcuse = within(modal).getByRole("button", {
-      name: /Descargar Cédula de Acuse/i,
+      name: /PDF de acuse no disponible/i,
     });
-    await user.click(botonDescargarAcuse);
-    expect(casillaService.descargarAcuse).toHaveBeenCalledWith(
-      mockAcuseNotificado,
-    );
+    expect(botonDescargarAcuse).toBeDisabled();
+    expect(casillaService.descargarDocumento).not.toHaveBeenCalled();
+    expect(casillaService.descargarAcuse).not.toHaveBeenCalled();
 
     // Cerrar modal con botón Cerrar
     const botonCerrar = within(modal).getByRole("button", {
@@ -741,6 +733,205 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
     });
     await user.click(botonCerrar);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it('muestra el fallo de descarga y permite reintentar sin presentar un archivo ficticio', async () => {
+    const user = userEvent.setup();
+    const notificacionConDocumento = {
+      ...mockNotificacionNotificada,
+      documentoUrl: '/api/v1/storage/download/pruebas/documento.pdf',
+    };
+    vi.mocked(casillaService.getNotificaciones).mockResolvedValue(crearRespuestaPaginada([notificacionConDocumento]));
+    vi.mocked(casillaService.getNotificacionById).mockResolvedValue(notificacionConDocumento);
+    vi.mocked(casillaService.descargarDocumento).mockRejectedValueOnce(new Error('Acceso denegado'))
+      .mockResolvedValueOnce(undefined);
+    renderConQueryClient(<CasillaElectronicaPage />);
+    await user.click(await screen.findByRole('button', { name: new RegExp(mockNotificacionNotificada.numeroNotificacion, 'i') }));
+    const modal = await screen.findByRole('dialog');
+    const descargar = within(modal).getByRole('button', { name: /Descargar Acto Administrativo/i });
+    await user.click(descargar);
+    expect(await within(modal).findByRole('alert')).toHaveTextContent('No se pudo descargar el archivo');
+    expect(descargar).not.toBeDisabled();
+    await user.click(descargar);
+    await waitFor(() => expect(within(modal).queryByRole('alert')).not.toBeInTheDocument());
+    expect(casillaService.descargarDocumento).toHaveBeenCalledTimes(2);
+  });
+
+  it("muestra el mensaje de STORAGE_REFERENCE_UNAVAILABLE al fallar la descarga de documento", async () => {
+    const user = userEvent.setup();
+    const notificacionConDocumento = {
+      ...mockNotificacionNotificada,
+      documentoUrl: '/api/v1/storage/download/pruebas/documento.pdf',
+    };
+    vi.mocked(casillaService.getNotificaciones).mockResolvedValue(crearRespuestaPaginada([notificacionConDocumento]));
+    vi.mocked(casillaService.getNotificacionById).mockResolvedValue(notificacionConDocumento);
+    const errMock = new ApiHttpError({
+      type: "https://httpstatuses.com/503",
+      title: "Service Unavailable",
+      status: 503,
+      detail: "La notificación no tiene una referencia de documento disponible.",
+      instance: "/api/v1/casilla/notificaciones/123/documento/descargar",
+      code: "STORAGE_REFERENCE_UNAVAILABLE",
+      category: "System",
+      correlationId: "corr-123",
+      retryable: false,
+    });
+    vi.mocked(casillaService.descargarDocumento).mockRejectedValueOnce(errMock);
+
+    renderConQueryClient(<CasillaElectronicaPage />);
+    await user.click(await screen.findByRole('button', { name: new RegExp(mockNotificacionNotificada.numeroNotificacion, 'i') }));
+    const modal = await screen.findByRole('dialog');
+    const descargar = within(modal).getByRole('button', { name: /Descargar Acto Administrativo/i });
+    await user.click(descargar);
+    expect(await within(modal).findByRole('alert')).toHaveTextContent('La notificación no tiene una referencia de documento disponible.');
+  });
+
+  it("muestra el mensaje específico de ACK_DOCUMENT_REFERENCE_UNAVAILABLE indicando que el acuse no está disponible y que se intente más tarde", async () => {
+    const user = userEvent.setup();
+    const notificacionConDocumento = {
+      ...mockNotificacionNotificada,
+      documentoUrl: '/api/v1/storage/download/pruebas/documento.pdf',
+    };
+    vi.mocked(casillaService.getNotificaciones).mockResolvedValue(crearRespuestaPaginada([notificacionConDocumento]));
+    vi.mocked(casillaService.getNotificacionById).mockResolvedValue(notificacionConDocumento);
+    const errMock = new ApiHttpError({
+      type: "https://httpstatuses.com/503",
+      title: "Service Unavailable",
+      status: 503,
+      detail: "El registro de recepción existe, pero no tiene un documento asociado para descargar.",
+      instance: "/api/v1/casilla/notificaciones/123/acuse/descargar",
+      code: "ACK_DOCUMENT_REFERENCE_UNAVAILABLE",
+      category: "System",
+      correlationId: "corr-ack-503",
+      retryable: false,
+    });
+    vi.mocked(casillaService.descargarDocumento).mockRejectedValueOnce(errMock);
+
+    renderConQueryClient(<CasillaElectronicaPage />);
+    await user.click(await screen.findByRole('button', { name: new RegExp(mockNotificacionNotificada.numeroNotificacion, 'i') }));
+    const modal = await screen.findByRole('dialog');
+    const descargar = within(modal).getByRole('button', { name: /Descargar Acto Administrativo/i });
+    await user.click(descargar);
+    expect(await within(modal).findByRole('alert')).toHaveTextContent('El acuse todavía no está disponible. Intente más tarde.');
+  });
+
+  it("muestra el mensaje detallado ante otros errores HTTP 503 al fallar la descarga", async () => {
+    const user = userEvent.setup();
+    const notificacionConDocumento = {
+      ...mockNotificacionNotificada,
+      documentoUrl: '/api/v1/storage/download/pruebas/documento.pdf',
+    };
+    vi.mocked(casillaService.getNotificaciones).mockResolvedValue(crearRespuestaPaginada([notificacionConDocumento]));
+    vi.mocked(casillaService.getNotificacionById).mockResolvedValue(notificacionConDocumento);
+    const errMock = new ApiHttpError({
+      type: "https://httpstatuses.com/503",
+      title: "Service Unavailable",
+      status: 503,
+      detail: "Servicio de almacenamiento temporalmente saturado.",
+      instance: "/api/v1/casilla/notificaciones/123/documento/descargar",
+      code: "STORAGE_UNAVAILABLE",
+      category: "System",
+      correlationId: "corr-503",
+      retryable: true,
+    });
+    vi.mocked(casillaService.descargarDocumento).mockRejectedValueOnce(errMock);
+
+    renderConQueryClient(<CasillaElectronicaPage />);
+    await user.click(await screen.findByRole('button', { name: new RegExp(mockNotificacionNotificada.numeroNotificacion, 'i') }));
+    const modal = await screen.findByRole('dialog');
+    const descargar = within(modal).getByRole('button', { name: /Descargar Acto Administrativo/i });
+    await user.click(descargar);
+    expect(await within(modal).findByRole('alert')).toHaveTextContent('Servicio de almacenamiento temporalmente saturado.');
+  });
+
+  it("muestra el mensaje correspondiente ante error HTTP 401 de sesión expirada al descargar", async () => {
+    const user = userEvent.setup();
+    const notificacionConDocumento = {
+      ...mockNotificacionNotificada,
+      documentoUrl: '/api/v1/storage/download/pruebas/documento.pdf',
+    };
+    vi.mocked(casillaService.getNotificaciones).mockResolvedValue(crearRespuestaPaginada([notificacionConDocumento]));
+    vi.mocked(casillaService.getNotificacionById).mockResolvedValue(notificacionConDocumento);
+    const errMock = new ApiHttpError({
+      type: "https://httpstatuses.com/401",
+      title: "Unauthorized",
+      status: 401,
+      detail: "Sesión ciudadana expirada. Inicie sesión nuevamente.",
+      instance: "/api/v1/casilla/notificaciones/123/documento/descargar",
+      code: "AUTH_EXPIRED",
+      category: "Security",
+      correlationId: "corr-401",
+      retryable: false,
+    });
+    vi.mocked(casillaService.descargarDocumento).mockRejectedValueOnce(errMock);
+
+    renderConQueryClient(<CasillaElectronicaPage />);
+    await user.click(await screen.findByRole('button', { name: new RegExp(mockNotificacionNotificada.numeroNotificacion, 'i') }));
+    const modal = await screen.findByRole('dialog');
+    const descargar = within(modal).getByRole('button', { name: /Descargar Acto Administrativo/i });
+    await user.click(descargar);
+    expect(await within(modal).findByRole('alert')).toHaveTextContent('Sesión ciudadana expirada. Inicie sesión nuevamente.');
+  });
+
+  it("muestra el mensaje correspondiente ante error HTTP 403 de acceso denegado al descargar", async () => {
+    const user = userEvent.setup();
+    const notificacionConDocumento = {
+      ...mockNotificacionNotificada,
+      documentoUrl: '/api/v1/storage/download/pruebas/documento.pdf',
+    };
+    vi.mocked(casillaService.getNotificaciones).mockResolvedValue(crearRespuestaPaginada([notificacionConDocumento]));
+    vi.mocked(casillaService.getNotificacionById).mockResolvedValue(notificacionConDocumento);
+    const errMock = new ApiHttpError({
+      type: "https://httpstatuses.com/403",
+      title: "Forbidden",
+      status: 403,
+      detail: "No tiene permiso para descargar este documento de otra casilla.",
+      instance: "/api/v1/casilla/notificaciones/123/documento/descargar",
+      code: "FORBIDDEN_ACCESS",
+      category: "Security",
+      correlationId: "corr-403",
+      retryable: false,
+    });
+    vi.mocked(casillaService.descargarDocumento).mockRejectedValueOnce(errMock);
+
+    renderConQueryClient(<CasillaElectronicaPage />);
+    await user.click(await screen.findByRole('button', { name: new RegExp(mockNotificacionNotificada.numeroNotificacion, 'i') }));
+    const modal = await screen.findByRole('dialog');
+    const descargar = within(modal).getByRole('button', { name: /Descargar Acto Administrativo/i });
+    await user.click(descargar);
+    expect(await within(modal).findByRole('alert')).toHaveTextContent('No tiene permiso para descargar este documento de otra casilla.');
+  });
+
+  it("muestra mensaje generico seguro ante fallos de red al intentar descargar", async () => {
+    const user = userEvent.setup();
+    const notificacionConDocumento = {
+      ...mockNotificacionNotificada,
+      documentoUrl: '/api/v1/storage/download/pruebas/documento.pdf',
+    };
+    vi.mocked(casillaService.getNotificaciones).mockResolvedValue(crearRespuestaPaginada([notificacionConDocumento]));
+    vi.mocked(casillaService.getNotificacionById).mockResolvedValue(notificacionConDocumento);
+    vi.mocked(casillaService.descargarDocumento).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    renderConQueryClient(<CasillaElectronicaPage />);
+    await user.click(await screen.findByRole('button', { name: new RegExp(mockNotificacionNotificada.numeroNotificacion, 'i') }));
+    const modal = await screen.findByRole('dialog');
+    const descargar = within(modal).getByRole('button', { name: /Descargar Acto Administrativo/i });
+    await user.click(descargar);
+    expect(await within(modal).findByRole('alert')).toHaveTextContent('No se pudo descargar el archivo. Comprueba tu acceso y vuelve a intentarlo.');
+  });
+
+  it("no presenta ceros como contadores reales cuando falla la consulta de estadísticas", async () => {
+    vi.mocked(casillaService.getEstadisticas).mockRejectedValue(new Error("Servicio no disponible"));
+
+    renderConQueryClient(<CasillaElectronicaPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "No se pudieron consultar los contadores de la Casilla Electrónica.",
+    );
+    expect(screen.getAllByText("No disponible")).toHaveLength(4);
+    expect(screen.getByText(mockNotificacionNoLeida.asunto)).toBeInTheDocument();
+    expect(casillaService.marcarComoLeido).not.toHaveBeenCalled();
+    expect(casillaService.generarAcuseLegal).not.toHaveBeenCalled();
   });
 
   it("n) Muestra estado de error con botón de reintento y estado de bandeja vacía", async () => {

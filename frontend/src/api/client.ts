@@ -121,7 +121,8 @@ apiClient.interceptors.response.use(
         } else {
           try {
             const { data } = await apiClient.post("/api/v1/auth/refresh", { refreshToken });
-            useAuthStore.getState().setToken(data.accessToken, data.refreshToken);
+            useAuthStore.getState().setToken(data.accessToken, data.refreshToken,
+              { roles: data.roles ?? [], permisos: data.permisos ?? [] });
             procesarCola(null, data.accessToken);
             originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
             isRefreshing = false;

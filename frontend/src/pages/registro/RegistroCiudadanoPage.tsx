@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import PersonaNaturalForm from "../../components/registro/PersonaNaturalForm";
 import PersonaJuridicaForm from "../../components/registro/PersonaJuridicaForm";
@@ -11,11 +11,29 @@ export default function RegistroCiudadanoPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [password, setPassword] = useState("");
+  const [capacidades, setCapacidades] = useState({ domicilio: false, verificacionContacto: false });
+  const [enviando, setEnviando] = useState(false);
+  const [tokenActivacion, setTokenActivacion] = useState<string | null>(null);
+  const [correoRegistrado, setCorreoRegistrado] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vigente = true;
+    apiClient.get<{ domicilio: boolean; verificacionContacto: boolean }>("/api/v1/auth/registro-capacidades")
+      .then(({ data }) => { if (vigente) setCapacidades({ domicilio: data.domicilio === true, verificacionContacto: data.verificacionContacto === true }); })
+      .catch(() => { /* Keep the minimal account form; never guess storage support. */ });
+    return () => { vigente = false; };
+  }, []);
 
   const mostrarErrorRegistro = (error: unknown) => {
     setErrorMessage(
-      error instanceof ApiHttpError && error.status === 409
+      error instanceof ApiHttpError && error.problemDetails.code === "CITIZEN_IDENTITY_CONFLICT"
+        ? "No fue posible comprobar la correspondencia de su identidad. Revise los datos o solicite validación institucional presencial."
+        : error instanceof ApiHttpError && error.problemDetails.code === "REPRESENTANTE_NO_REGISTRADO"
+        ? "El representante legal debe tener su identidad registrada antes de solicitar la cuenta jurídica."
+        : error instanceof ApiHttpError && error.status === 409
         ? "Ya existe un registro con ese documento o correo. Revise sus datos o inicie sesión."
+        : error instanceof ApiHttpError && error.problemDetails.code === "REGISTRO_MODELO_NO_COMPATIBLE"
+          ? "No se pudo confirmar el registro: el modelo de datos vigente no permite guardar todos los datos requeridos. No se creó ninguna cuenta."
         : error instanceof ApiHttpError && (error.status === 400 || error.status === 422)
           ? "No se pudo completar el registro. Revise los datos ingresados e inténtelo nuevamente."
           : "No se pudo confirmar el registro. Sus datos se conservan; inténtelo nuevamente cuando el servicio esté disponible.",
@@ -23,8 +41,11 @@ export default function RegistroCiudadanoPage() {
   };
 
   const handleNaturalSubmit = async (data: Natural) => {
+    if (enviando) return;
     setSuccessMessage(null);
     setErrorMessage(null);
+    setTokenActivacion(null);
+    setCorreoRegistrado(null);
     if (password.length < 8 || password.length > 128) {
       setErrorMessage("Ingrese una contraseña de entre 8 y 128 caracteres para su cuenta.");
       return;
@@ -36,34 +57,49 @@ export default function RegistroCiudadanoPage() {
 
     const payload = {
       tipoPersona: "NATURAL" as const,
-      dni: data.numeroDocumento,
+      dni: data.tipoDocumento === "DNI" ? data.numeroDocumento : undefined,
+      tipoDocumento: data.tipoDocumento,
+      numeroDocumento: data.numeroDocumento,
       nombres: data.nombres.trim(),
       apellidoPaterno,
       apellidoMaterno,
+      fechaNacimiento: data.fechaNacimiento,
       correo: data.correo.trim().toLowerCase(),
       celular: data.celular.trim(),
-      ubigeoDistrito: data.domicilio.distritoCodigo,
-      direccion: data.domicilio.direccionExacta.trim(),
+      ...(capacidades.domicilio ? { ubigeoDistrito: data.domicilio.distritoCodigo,
+        direccion: data.domicilio.direccionExacta.trim(), referencia: data.domicilio.referencia?.trim() } : {}),
       password,
       consentimientoDatos: data.consentimientoLey29733,
-      aceptaNotificaciones: data.consentimientoLey29733,
+      declaracionJuradaAceptada: data.declaracionJuradaAceptada,
+      aceptaNotificaciones: false,
+      versionPolitica: data.version,
     };
 
+    setEnviando(true);
     try {
-      const respuesta = await apiClient.post<{ idPersona: string; mensaje: string }>("/api/v1/auth/registro-ciudadano", payload);
+      const respuesta = await apiClient.post<{ idPersona: string; idUsuario?: string; tokenVerificacion?: string; mensaje: string }>("/api/v1/auth/registro-ciudadano", payload);
       if (respuesta.status !== 201 || typeof respuesta.data?.idPersona !== "string" || !respuesta.data.idPersona.trim()) {
         mostrarErrorRegistro(null);
         return;
       }
-      setSuccessMessage("Registro completado. Ya puede iniciar sesión con su cuenta.");
+      if (respuesta.data?.tokenVerificacion) {
+        setTokenActivacion(respuesta.data.tokenVerificacion);
+      }
+      setCorreoRegistrado(payload.correo);
+      setSuccessMessage("Registro completado. Ya puede iniciar sesión con su cuenta. Hemos enviado un enlace de activación a tu correo electrónico (" + payload.correo + "). Revisa tu bandeja de entrada para activar tu cuenta y acceder a tu Casilla Electrónica.");
     } catch (err) {
       mostrarErrorRegistro(err);
+    } finally {
+      setEnviando(false);
     }
   };
 
   const handleJuridicaSubmit = async (data: Juridical) => {
+    if (enviando) return;
     setSuccessMessage(null);
     setErrorMessage(null);
+    setTokenActivacion(null);
+    setCorreoRegistrado(null);
     if (password.length < 8 || password.length > 128) {
       setErrorMessage("Ingrese una contraseña de entre 8 y 128 caracteres para su cuenta.");
       return;
@@ -74,26 +110,40 @@ export default function RegistroCiudadanoPage() {
       ruc: data.ruc,
       razonSocial: data.razonSocial.trim(),
       partidaRegistral: data.partidaSunarp || undefined,
-      dniRepresentante: data.representanteLegal.numeroDocumento,
+      tipoDocumentoRepresentante: data.representanteLegal.tipoDocumento,
+      numeroDocumentoRepresentante: data.representanteLegal.numeroDocumento,
+      dniRepresentante: data.representanteLegal.tipoDocumento === "DNI"
+        ? data.representanteLegal.numeroDocumento
+        : undefined,
       nombreRepresentante: `${data.representanteLegal.nombres} ${data.representanteLegal.apellidos}`.trim(),
+      cargoRepresentante: data.representanteLegal.cargo.trim(),
       correo: data.correoCorporativo.trim().toLowerCase(),
       celular: data.celularContacto.trim(),
-      ubigeoDistrito: data.domicilio.distritoCodigo,
-      direccion: data.domicilio.direccionExacta.trim(),
+      ...(capacidades.domicilio ? { ubigeoDistrito: data.domicilio.distritoCodigo,
+        direccion: data.domicilio.direccionExacta.trim(), referencia: data.domicilio.referencia?.trim() } : {}),
       password,
       consentimientoDatos: data.consentimientoLey29733,
-      aceptaNotificaciones: data.consentimientoLey29733,
+      declaracionJuradaAceptada: data.declaracionJuradaAceptada,
+      aceptaNotificaciones: false,
+      versionPolitica: data.version,
     };
 
+    setEnviando(true);
     try {
-      const respuesta = await apiClient.post<{ idPersona: string; mensaje: string }>("/api/v1/auth/registro-persona-juridica", payload);
+      const respuesta = await apiClient.post<{ idPersona: string; idUsuario?: string; tokenVerificacion?: string; mensaje: string }>("/api/v1/auth/registro-persona-juridica", payload);
       if (respuesta.status !== 201 || typeof respuesta.data?.idPersona !== "string" || !respuesta.data.idPersona.trim()) {
         mostrarErrorRegistro(null);
         return;
       }
-      setSuccessMessage("Registro completado. Ya puede iniciar sesión con su cuenta.");
+      if (respuesta.data?.tokenVerificacion) {
+        setTokenActivacion(respuesta.data.tokenVerificacion);
+      }
+      setCorreoRegistrado(payload.correo);
+      setSuccessMessage("Registro completado. Ya puede iniciar sesión con su cuenta. Hemos enviado un enlace de activación a tu correo corporativo (" + payload.correo + "). Revisa tu bandeja de entrada para activar tu cuenta y acceder a tu Casilla Electrónica.");
     } catch (err) {
       mostrarErrorRegistro(err);
+    } finally {
+      setEnviando(false);
     }
   };
 
@@ -160,44 +210,45 @@ export default function RegistroCiudadanoPage() {
         </div>
 
         <div className="mb-6">
-          <label htmlFor="registro-password" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="cuenta-password"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             Contraseña para su cuenta *
           </label>
           <input
-            id="registro-password"
+            id="cuenta-password"
             type="password"
             autoComplete="new-password"
-            minLength={8}
-            maxLength={128}
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            aria-describedby="registro-password-ayuda"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Entre 8 y 128 caracteres"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#006EC7] focus:border-transparent text-sm"
           />
-          <p id="registro-password-ayuda" className="text-sm text-gray-600 mt-1">
-            Use entre 8 y 128 caracteres. Esta contraseña se utilizará para iniciar sesión.
+          <p className="mt-1 text-xs text-gray-500">
+            Esta contraseña le permitirá ingresar al SIGD una vez activada su cuenta.
           </p>
         </div>
 
         <div
-          role="tabpanel"
           id="panel-natural"
+          role="tabpanel"
           aria-labelledby="tab-natural"
           hidden={activeTab !== "NATURAL"}
         >
           {activeTab === "NATURAL" && (
-            <PersonaNaturalForm onSubmit={handleNaturalSubmit} />
+            <PersonaNaturalForm onSubmit={handleNaturalSubmit} solicitarDomicilio={capacidades.domicilio} />
           )}
         </div>
 
         <div
-          role="tabpanel"
           id="panel-juridica"
+          role="tabpanel"
           aria-labelledby="tab-juridica"
           hidden={activeTab !== "JURIDICA"}
         >
           {activeTab === "JURIDICA" && (
-            <PersonaJuridicaForm onSubmit={handleJuridicaSubmit} />
+            <PersonaJuridicaForm onSubmit={handleJuridicaSubmit} solicitarDomicilio={capacidades.domicilio} />
           )}
         </div>
 
@@ -209,18 +260,49 @@ export default function RegistroCiudadanoPage() {
 
         {successMessage && (
           <div
-            className="mt-6 p-4 bg-green-50 border border-green-200 rounded-md text-green-800 text-sm flex items-center justify-between"
+            className="mt-6 p-5 bg-green-50 border border-green-200 rounded-lg text-green-900 text-sm space-y-3"
             role="status"
             aria-live="polite"
           >
-            <span>{successMessage}</span>
-            <button
-              onClick={handleClearSuccess}
-              className="text-green-600 hover:text-green-800 underline text-xs focus:outline-none focus:ring-2 focus:ring-green-500 rounded"
-              aria-label="Cerrar mensaje de éxito"
-            >
-              Cerrar
-            </button>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2 font-bold text-green-800 text-base">
+                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span>¡Registro Recibido con Éxito!</span>
+              </div>
+              <button
+                onClick={handleClearSuccess}
+                className="text-green-600 hover:text-green-800 underline text-xs focus:outline-none focus:ring-2 focus:ring-green-500 rounded"
+                aria-label="Cerrar mensaje de éxito"
+              >
+                Cerrar
+              </button>
+            </div>
+            <p className="text-sm">{successMessage}</p>
+            {correoRegistrado && (
+              <p className="text-xs text-green-800 bg-green-100 p-2 rounded">
+                Verificación enviada al buzón: <span className="font-semibold">{correoRegistrado}</span>
+              </p>
+            )}
+            <div className="pt-2 flex flex-wrap gap-3">
+              <Link
+                to={tokenActivacion ? `/activar-cuenta?token=${tokenActivacion}` : "/activar-cuenta"}
+                className="inline-flex items-center px-4 py-2 bg-[#006EC7] hover:bg-[#005bb5] text-white text-xs font-semibold rounded-md shadow transition"
+              >
+                Activar Mi Cuenta y Habilitar Casilla →
+              </Link>
+              <Link
+                to="/login"
+                className="inline-flex items-center px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-md transition"
+              >
+                Ir a Iniciar Sesión
+              </Link>
+            </div>
           </div>
         )}
       </div>

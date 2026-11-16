@@ -18,7 +18,8 @@
  * ==============================================================================
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type {
   TramiteWizardState,
   WizardAction,
@@ -29,9 +30,13 @@ import QrCodeView from '../../common/QrCodeView';
 import { apiClient } from '../../../api/client';
 import { useAuthStore } from '../../../stores/authStore';
 import { ApiHttpError } from '../../../types/api';
+import { TRAMITE_WIZARD_STORAGE_KEY } from '../../../hooks/useTramiteWizardReducer';
+import { submitPublicRequest, completePublicSubmission, publicTrackingUrl, publicAvailability } from '../../../services/radicacionPublicaService';
 import { Link, useLocation } from 'react-router-dom';
+import { OrdenPosteriorRadicacion, type EstadoOrdenPosterior } from '../OrdenPosteriorRadicacion';
 
 interface RadicacionVirtualResponse {
+  tesoreria?: EstadoOrdenPosterior;
   expedienteId: string;
   cut: string;
   anioFiscal: number;
@@ -97,7 +102,19 @@ export interface StepConfirmacionProps {
 }
 
 function EnlaceInicioSesionParaRetomar(): React.ReactElement {
-  const location = useLocation();
+  let location: { pathname: string; search: string; hash: string } | null = null;
+  try {
+    location = useLocation();
+  } catch {
+    location = null;
+  }
+  if (!location) {
+    return (
+      <a href="/login" className="font-bold underline">
+        Iniciar sesion y volver a la solicitud
+      </a>
+    );
+  }
   return (
     <Link
       to="/login"
@@ -116,8 +133,13 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   onGoToStep,
   onSuccess,
 }) => {
+  const queryClient = useQueryClient();
+  const esPublico = !useAuthStore(auth => auth.isAuthenticated);
+  const esCiudadano = useAuthStore(auth => auth.usuario?.rol === 'CIUDADANO' || Boolean(auth.usuario?.roles?.includes('CIUDADANO')));
+  const envioEnCurso = useRef(false);
   const [copiado, setCopiado] = useState(false);
   const [tiposFormales, setTiposFormales] = useState<TipoTramiteFormal[]>([]);
+  const [ordenPosterior,setOrdenPosterior]=useState<{expedienteId:string;inicial?:EstadoOrdenPosterior}|null>(null);
   const [estadoCatalogo, setEstadoCatalogo] = useState<'cargando' | 'disponible' | 'error'>('cargando');
   const [intentoCatalogo, setIntentoCatalogo] = useState(0);
   const {
@@ -154,6 +176,15 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   }, [intentoCatalogo]);
 
   const tipoSeleccionado = tiposFormales.find((tipo) => tipo.id === documentos.tipoTramiteId);
+  const [avisoDemo, setAvisoDemo] = useState<string | null>(null);
+  useEffect(() => {
+    let activo = true;
+    publicAvailability().then(tipos => {
+      const tipo = tipos.find(t => t.id === documentos.tipoTramiteId);
+      if (activo) setAvisoDemo(tipo?.omisionPagoDemo && !documentos.ordenPagoId ? tipo.motivo : null);
+    }).catch(() => { if (activo) setAvisoDemo(null); });
+    return () => { activo = false; };
+  }, [esPublico, documentos.tipoTramiteId, documentos.ordenPagoId]);
 
   const navigateToStep = useCallback(
     (step: WizardStep) => {
@@ -183,7 +214,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   };
 
   const handleRadicar = async () => {
-    if (isSubmitting) return;
+    if (isSubmitting || envioEnCurso.current) return;
     if (!useAuthStore.getState().accessToken) {
       dispatch({
         type: 'SET_ERROR',
@@ -228,6 +259,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       dispatch({ type: 'SET_ERROR', payload: 'Revise la identificación, el correo, el asunto y los folios en los pasos anteriores. No se sustituirán datos faltantes para enviar la solicitud.' });
       return;
     }
+    envioEnCurso.current = true;
     dispatch({ type: 'SET_SUBMITTING', payload: true });
     try {
 
@@ -239,6 +271,10 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
               tamanoBytes: a.peso,
               hashSha256: a.hashSha256.toLowerCase(),
               storagePath: a.storageUrl,
+              ...(a.clasificacion ? { clasificacion: a.clasificacion, requisitoId: a.requisitoId } : {
+                tipoDocumentalCodigo: a.tipoDocumentalCodigo,
+                tipoDocumentalId: a.tipoDocumentalId,
+              }),
             }));
 
       const payload = {
@@ -249,48 +285,133 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         nombreSolicitante: nombreCompleto,
         correo,
         totalFolios: documentos.numeroFolios,
+        ...(documentos.ordenPagoId ? { ordenPagoId: documentos.ordenPagoId } : {}),
         documentos: archivosPayload,
       };
 
-      const res = await apiClient.post<RadicacionVirtualResponse>(
+      const res = esPublico ? await submitPublicRequest<RadicacionVirtualResponse>({ ...payload,
+        nombres: identificacion.nombres.trim(), apellidos: identificacion.apellidos.trim(), telefono: identificacion.telefono.trim(),
+        declaracionVeracidad: state.declaracionJurada.declaracionVeracidad, aceptaTerminos: state.declaracionJurada.aceptaTerminos,
+      }) : await apiClient.post<RadicacionVirtualResponse>(
         '/api/v1/tramites/radicacion-virtual',
         payload,
       );
 
       const serverData = res.data;
+      if (res.status !== 201 || !serverData ||
+          !UUID_RE.test(serverData.expedienteId) || !/^EXP-\d{4}-\d{6}$/.test(serverData.cut) ||
+          serverData.anioFiscal !== Number(serverData.cut.slice(4, 8)) ||
+          typeof serverData.fechaEnvioReal !== 'string' || !serverData.fechaEnvioReal.trim() ||
+          typeof serverData.fechaRadicacionLegal !== 'string' || !serverData.fechaRadicacionLegal.trim() ||
+          !Number.isSafeInteger(serverData.totalFolios) || serverData.totalFolios<1 || serverData.totalFolios>5000 || typeof serverData.diferidoPorCorte !== 'boolean' ||
+          typeof serverData.qrSeguimientoUrl !== 'string' || !serverData.qrSeguimientoUrl.trim() ||
+          serverData.cargoDigital?.codigo !== serverData.cut ||
+          serverData.cargoDigital?.qrContenido !== serverData.qrSeguimientoUrl) {
+        throw new Error('La respuesta no confirma la radicación del expediente.');
+      }
       if (typeof serverData.cargoDigital?.hashSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(serverData.cargoDigital.hashSha256)) {
         throw new Error('La respuesta no contiene la huella del cargo digital.');
       }
       const cargoEmitido: CargoDigitalResponse = {
+        mensajeLegal: serverData.mensajeLegal,
         cut: serverData.cut,
         fechaRadicacion: serverData.fechaRadicacionLegal,
         fechaRecepcionOficial: serverData.fechaEnvioReal,
         asunto: documentos.asunto,
         remitente: nombreCompleto,
         hashTransaccion: serverData.cargoDigital.hashSha256,
-        qrValidationUrl: serverData.qrSeguimientoUrl,
+        qrValidationUrl: esPublico ? publicTrackingUrl(serverData.cut) : serverData.qrSeguimientoUrl,
       };
 
+      setOrdenPosterior({expedienteId:serverData.expedienteId,inicial:serverData.tesoreria});
+      dispatch({type:'UPDATE_DOCUMENTOS',payload:{numeroFolios:serverData.totalFolios}});
+      void queryClient.invalidateQueries({ queryKey: ['expedientes'] });
+      if (esPublico) completePublicSubmission(serverData.cut);
+      try {
+        window.sessionStorage.removeItem(TRAMITE_WIZARD_STORAGE_KEY);
+      } catch {
+        // El cargo sigue siendo válido aunque el navegador restrinja el almacenamiento.
+      }
       dispatch({ type: 'SET_CARGO', payload: cargoEmitido });
 
       if (onSuccess) {
         onSuccess(cargoEmitido, serverData.cut);
       }
     } catch (err: unknown) {
-      console.error('[StepConfirmacion] Error en la radicación formal:', err);
       const status = err instanceof ApiHttpError
         ? err.status
         : (err as { status?: number; response?: { status?: number } })?.status ??
           (err as { response?: { status?: number } })?.response?.status;
+      console.error('[StepConfirmacion] No se pudo confirmar la radicación.', { status });
+
+      const detail = err instanceof ApiHttpError
+        ? (err.problemDetails?.detail || err.message || '')
+        : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+          (err as { message?: string })?.message ??
+          '';
+
+      const detailNorm = detail.toLowerCase();
+      const invalidParams = err instanceof ApiHttpError
+        ? err.problemDetails.invalidParams ?? []
+        : [];
+      const validationReasons = invalidParams.map((param) => param.reason.toUpperCase());
+
+      let mensajeError: string;
+      if (esPublico && [403, 410, 413, 415, 422, 429, 503].includes(status ?? 0)) {
+        mensajeError = detail || 'No se pudo completar la radicación pública. Revise los datos del formulario.';
+      } else if (status === 401) {
+        if (detailNorm.includes('expirado') || detailNorm.includes('vigente') || detailNorm.includes('caducada')) {
+          mensajeError = 'Su sesión ha caducado o no corresponde a una cuenta activa. Inicie sesión nuevamente para radicar la solicitud.';
+        } else {
+          mensajeError = 'Inicie sesion con una cuenta vinculada a una persona para radicar la solicitud.';
+        }
+      } else if (status === 403) {
+        if (detailNorm.includes('no coinciden con la identidad')) {
+          mensajeError = 'Discrepancia de identidad: los datos declarados no coinciden con la identidad vinculada a su sesión. Vuelva al Paso 1 y compruebe el tipo y número de documento y los nombres del titular autenticado.';
+        } else if (detailNorm.includes('no está habilitada') || detailNorm.includes('no tiene una identidad')) {
+          mensajeError = 'Cuenta no habilitada para radicar: Su cuenta no tiene una identidad (persona natural o jurídica) registrada y habilitada en el sistema institucional. Comuníquese con la administración institucional del IESTP «Suiza» para validar su identidad.';
+        } else if (detailNorm.includes('mesa_partes')) {
+          mensajeError = 'Operación no autorizada: Esta acción requiere el rol de operador de Mesa de Partes vigente. Para registrar solicitudes presenciales de terceros, utilice la Ventanilla Presencial.';
+        } else if (detailNorm.includes('no cuenta con permisos')) {
+          mensajeError = 'Acceso denegado: su cuenta no tiene autorización para esta operación. La radicación virtual solo permite presentar solicitudes a nombre del titular autenticado.';
+        } else if (detail && !detailNorm.includes('no cuenta con permisos')) {
+          mensajeError = `Acceso denegado: ${detail}`;
+        } else {
+          mensajeError = 'La cuenta no esta habilitada para radicar o los datos declarados no coinciden con su identidad.';
+        }
+      } else if (status === 503) {
+        mensajeError = 'La Mesa de Partes Virtual no está disponible temporalmente. Para evitar trámites duplicados, verifique el estado con Mesa de Partes antes de volver a enviar o acuda a la Mesa de Partes presencial de la institución. Los datos de su solicitud se conservan en pantalla.';
+      } else if (status === 409) {
+        mensajeError = 'El servidor detectó un conflicto al registrar la solicitud. No la vuelva a enviar hasta comprobar si ya se generó un expediente; sus datos permanecen en pantalla.';
+      } else if (status === 400 || status === 422) {
+        if (validationReasons.some((reason) => reason.includes('DOCUMENTOS_FALTANTES'))) {
+          mensajeError = 'Faltan documentos requeridos para este procedimiento. Revise los documentos indicados en el paso 2.';
+        } else if (validationReasons.some((reason) => reason.includes('TIPO_DOCUMENTAL_NO_AUTORIZADO'))) {
+          mensajeError = 'Uno o más archivos tienen una clasificación que no corresponde al procedimiento seleccionado. Vuelva al paso 2 y revise los documentos.';
+        } else if (validationReasons.some((reason) => reason.includes('TIPO_DOCUMENTAL_DUPLICADO'))) {
+          mensajeError = 'Hay más de un archivo con la misma clasificación. Revise los documentos del paso 2.';
+        } else if (validationReasons.some((reason) => reason.includes('CLASIFICACION_DOCUMENTAL'))) {
+          mensajeError = 'No se pudo validar la clasificación documental de este procedimiento. Consulte con Mesa de Partes antes de volver a enviar.';
+        } else if (validationReasons.some((reason) => reason.includes('TIPO_TRAMITE_INACTIVO') || reason.includes('TIPO_TRAMITE_DESCONOCIDO'))) {
+          mensajeError = 'El procedimiento seleccionado ya no está disponible para nuevas radicaciones. Vuelva al paso 2 y elija uno vigente.';
+        } else {
+          const campos = [...new Set(invalidParams.map((param) => param.name))].filter(Boolean);
+          mensajeError = campos.length
+            ? `Revise los campos indicados (${campos.join(', ')}) y vuelva a intentarlo. Sus datos se conservaron.`
+            : 'La solicitud no superó una validación. Revise los pasos anteriores; sus datos se conservaron.';
+        }
+      } else if (typeof status !== 'number') {
+        mensajeError = 'No se recibió confirmación del servidor. Para evitar solicitudes duplicadas, verifique el estado con Mesa de Partes antes de volver a enviar. Los datos de su solicitud permanecen en pantalla.';
+      } else {
+        mensajeError = 'El servidor institucional reportó un error al procesar la solicitud. No es posible confirmar si la radicación llegó a completarse. Para evitar trámites duplicados, verifique el estado con Mesa de Partes antes de volver a enviar. Los datos de su solicitud permanecen en pantalla.';
+      }
+
       dispatch({
         type: 'SET_ERROR',
-        payload:
-          status === 401
-            ? 'Inicie sesion con una cuenta vinculada a una persona para radicar la solicitud.'
-            : status === 403
-              ? 'La cuenta no esta habilitada para radicar o los datos declarados no coinciden con su identidad.'
-              : 'No se pudo radicar formalmente el expediente en la sede digital. Verifique su conexión y requisitos.',
+        payload: mensajeError,
       });
+    } finally {
+      envioEnCurso.current = false;
     }
   };
 
@@ -304,6 +425,12 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   if (cargoEmitido) {
     return (
       <div className="space-y-6">
+        {ordenPosterior&&<OrdenPosteriorRadicacion expedienteId={ordenPosterior.expedienteId} cut={cargoEmitido.cut} publico={esPublico} inicial={ordenPosterior.inicial}/>}
+        {cargoEmitido.mensajeLegal?.includes('RADICACIÓN DEMOSTRATIVA') && (
+          <p role="status" className="rounded-xl border border-blue-200 bg-blue-50/80 p-3.5 text-xs sm:text-sm text-blue-900">
+            {cargoEmitido.mensajeLegal}
+          </p>
+        )}
         <div className="rounded-2xl border border-emerald-200 bg-white p-6 sm:p-8 shadow-sm text-center">
           {/* Icono de Confirmación Oficial */}
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-3 shadow-xs">
@@ -395,6 +522,12 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
           {/* Botonera Posterior */}
           <div className="mt-7 flex flex-wrap justify-center gap-3">
+            <a
+              href={esPublico ? `/consulta/${cargoEmitido.cut}` : esCiudadano ? '/consulta' : '/expedientes'}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+            >
+              {esPublico ? 'Consultar esta solicitud' : 'Ver mis expedientes'}
+            </a>
             <button
               type="button"
               onClick={handleImprimir}
@@ -432,6 +565,17 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         </p>
       </header>
 
+      {avisoDemo && (
+        <div role="status" className="rounded-xl border border-blue-200 bg-blue-50/80 p-3.5 text-xs sm:text-sm text-blue-900 flex items-start gap-2.5">
+          <svg className="w-4 h-4 text-[#006EC7] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="flex-1 leading-relaxed">
+            <span className="font-semibold text-[#005bb5]">Información de pago:</span>{' '}
+            {avisoDemo}
+          </div>
+        </div>
+      )}
       {error && (
         <div
           role="alert"
@@ -440,8 +584,29 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         >
           <span className="space-y-2">
             <span className="block">⚠️ {error}</span>
-            {error.toLocaleLowerCase('es-PE').includes('inicie sesion') && (
+            {(error.toLocaleLowerCase('es-PE').includes('inicie sesion') || error.toLocaleLowerCase('es-PE').includes('inicie sesión')) && (
               <span className="block"><EnlaceInicioSesionParaRetomar /></span>
+            )}
+            {error.toLocaleLowerCase('es-PE').includes('paso 1') && onGoToStep && (
+              <span className="block">
+                <button
+                  type="button"
+                  onClick={() => onGoToStep(1)}
+                  className="font-bold underline text-red-900 hover:text-red-700 cursor-pointer"
+                >
+                  Volver al Paso 1 para corregir la identidad
+                </button>
+              </span>
+            )}
+            {error.toLocaleLowerCase('es-PE').includes('ventanilla presencial') && (
+              <span className="block">
+                <a
+                  href="/tramite/ventanilla-presencial"
+                  className="font-bold underline text-red-900 hover:text-red-700"
+                >
+                  Ir al módulo de Ventanilla Presencial
+                </a>
+              </span>
             )}
           </span>
         </div>

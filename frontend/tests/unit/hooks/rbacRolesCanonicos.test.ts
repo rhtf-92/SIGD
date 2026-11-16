@@ -1,74 +1,59 @@
-import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { apiClient } from "../../../src/api/client";
 import { useRbacConfig } from "../../../src/hooks/useRbacConfig";
-
-describe("Suite de Pruebas de Gobernanza RBAC y 5 Roles Canónicos Institucionales (BR-08 / ENT-M05-03)", () => {
-  beforeEach(() => {
-    localStorage.clear();
-  });
-
-  it("incluye exactamente los 5 roles canónicos institucionales del IESTP Suiza", () => {
+vi.mock("../../../src/api/client", () => ({ apiClient: { get: vi.fn(), put: vi.fn() } }));
+const roleId = "11111111-1111-4111-8111-111111111111";
+const permissionId = "22222222-2222-4222-8222-222222222222";
+const config = {
+  roles: [{ id: roleId, codigo: "ADMINISTRADOR", nombre: "Administrador", descripcion: null, vigente: true, usuarios: 0, permisos: [] }],
+  catalogoPermisos: [{ id: permissionId, codigo: "ADMIN_USUARIOS", nombre: "Administrar usuarios y roles", ambito: "GLOBAL" }],
+};
+beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); });
+describe("RBAC institucional persistido", () => {
+  it("consulta los roles reales sin inventar cuentas o asignaciones", async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: config });
     const { result } = renderHook(() => useRbacConfig());
-    const ids = result.current.roles.map((r) => r.id);
-
-    expect(ids).toContain("SUPER_ADMIN");
-    expect(ids).toContain("DIRECTOR");
-    expect(ids).toContain("DOCENTE");
-    expect(ids).toContain("MESA_PARTES");
-    expect(ids).toContain("ESTUDIANTE");
-    expect(result.current.roles).toHaveLength(5);
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+    expect(result.current.roles).toEqual(config.roles);
+    expect(result.current.rolActual?.codigo).toBe("ADMINISTRADOR");
+    expect(result.current.permisosSeleccionados).toEqual([]);
+    expect(apiClient.get).toHaveBeenCalledWith("/api/v1/admin/roles-permisos");
   });
-
-  it("SUPER_ADMIN inicia como rol seleccionado por defecto con permisos completos", () => {
+  it("una denegación no se reemplaza por roles o permisos locales", async () => {
+    localStorage.setItem("sigd_permisos", JSON.stringify({ SUPER_ADMIN: [{ ver: true }] }));
+    vi.mocked(apiClient.get).mockRejectedValue(new Error("Acceso denegado"));
     const { result } = renderHook(() => useRbacConfig());
-
-    expect(result.current.rolSeleccionado).toBe("SUPER_ADMIN");
-    expect(result.current.rolActual.nombre).toBe("Super Administrador");
-
-    const permisoExpedientes = result.current.permisosRolActual.find(
-      (p) => p.modulo === "Expedientes",
-    );
-    expect(permisoExpedientes?.ver).toBe(true);
-    expect(permisoExpedientes?.crear).toBe(true);
-    expect(permisoExpedientes?.editar).toBe(true);
-    expect(permisoExpedientes?.eliminar).toBe(true);
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+    expect(result.current.roles).toEqual([]);
+    expect(result.current.error).toBe("Acceso denegado");
   });
-
-  it("Invariante WORM: el módulo Auditoría jamás admite mutaciones (crear, editar, eliminar, archivar)", () => {
+  it("guarda IDs institucionales en el endpoint original y confirma mediante una nueva lectura", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({ data: config })
+      .mockResolvedValueOnce({ data: { ...config, roles: [{ ...config.roles[0], permisos: ["ADMIN_USUARIOS"] }] } });
+    vi.mocked(apiClient.put).mockResolvedValue({ status: 200 });
     const { result } = renderHook(() => useRbacConfig());
-
-    for (const rol of result.current.roles) {
-      act(() => {
-        result.current.setRolSeleccionado(rol.id);
-      });
-
-      const permisoAuditoria = result.current.permisosRolActual.find(
-        (p) => p.modulo === "Auditoría",
-      );
-
-      expect(permisoAuditoria?.crear).toBe(false);
-      expect(permisoAuditoria?.editar).toBe(false);
-      expect(permisoAuditoria?.eliminar).toBe(false);
-      expect(permisoAuditoria?.archivar).toBe(false);
-      expect(permisoAuditoria?.derivar).toBe(false);
-    }
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+    act(() => result.current.alternarPermiso(permissionId));
+    await act(async () => { await result.current.guardarPermisos(); });
+    expect(apiClient.put).toHaveBeenCalledWith("/api/v1/roles/" + roleId + "/permisos", { permisos: [permissionId] });
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+    expect(result.current.mensaje).toContain("confirmados");
+    expect(localStorage.getItem("sigd_permisos")).toBeNull();
   });
-
-  it("permite conmutar roles y alternar permisos autorizados", () => {
+  it("evita dos envíos simultáneos y conserva el borrador cuando falla el servidor", async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: config });
+    let rechazar!: (e: Error) => void;
+    vi.mocked(apiClient.put).mockReturnValue(new Promise((_resolve, reject) => { rechazar = reject; }));
     const { result } = renderHook(() => useRbacConfig());
-
-    act(() => {
-      result.current.setRolSeleccionado("DOCENTE");
-    });
-
-    expect(result.current.rolActual.nombre).toBe("Docente / Coordinador");
-
-    // Alternar permiso 'exportar' en índice 0 (Expedientes)
-    act(() => {
-      result.current.alternarPermiso(0, "exportar");
-    });
-
-    const permisoActualizado = result.current.permisosRolActual[0];
-    expect(permisoActualizado?.exportar).toBe(false);
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+    act(() => result.current.alternarPermiso(permissionId));
+    let envio!: Promise<void>;
+    act(() => { envio = result.current.guardarPermisos(); void result.current.guardarPermisos(); });
+    expect(apiClient.put).toHaveBeenCalledTimes(1);
+    await act(async () => { rechazar(new Error("Servicio no disponible")); await envio; });
+    expect(result.current.permisosSeleccionados).toEqual([permissionId]);
+    expect(result.current.mensaje).toBe("");
+    expect(result.current.error).toBe("Servicio no disponible");
   });
 });

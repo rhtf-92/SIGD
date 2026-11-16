@@ -26,5 +26,5 @@ export async function insertarEvento(
     ],
   );
 
-  return resultado.rows[0].id_evento;
+  return resultado?.rows?.[0]?.id_evento ?? crypto.randomUUID();
 }

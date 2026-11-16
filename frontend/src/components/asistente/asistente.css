@@ -1,0 +1,74 @@
+/* Estilos propios del asistente: no modifican body, encabezado ni portada. */
+.sigd-assistant {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 60;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #163653;
+}
+.sigd-assistant *, .sigd-assistant *::before, .sigd-assistant *::after { box-sizing: border-box; }
+.sigd-assistant [hidden] { display: none !important; }
+.sigd-assistant button, .sigd-assistant a, .sigd-assistant input, .sigd-assistant select, .sigd-assistant textarea { font: inherit; }
+.sigd-assistant button, .sigd-assistant a { cursor: pointer; touch-action: manipulation; }
+.sigd-assistant :focus-visible { outline: 3px solid #0073e6; outline-offset: 3px; }
+.sigd-assistant:has(> .sigd-assistant-launcher:not([hidden])) {
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+}
+.sigd-assistant-launcher { display: block; width: clamp(65.975px, 6.09vw, 85.26px); margin-bottom: 0; padding: 0; background: transparent; border: 0; border-radius: 24px; }
+.sigd-assistant-launcher img { display: block; width: 100%; height: auto; object-fit: contain; }
+.sigd-assistant-panel {
+  display: flex; flex-direction: column;
+  width: min(410px, calc(100vw - 32px));
+  height: min(720px, calc(100dvh - 32px));
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #b9d7f0; border-radius: 20px;
+  background: #fff; box-shadow: 0 12px 48px #082f7c30;
+  animation: sigd-assistant-appear 160ms ease-out;
+}
+.sigd-assistant-header { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 12px; background: #004d9e; color: #fff; }
+.sigd-assistant-header img { width: 44px; height: 51px; object-fit: contain; flex-shrink: 0; }
+.sigd-assistant-heading { flex: 1; min-width: 0; }
+.sigd-assistant-heading h2 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3; }
+.sigd-assistant-heading p { margin: 3px 0 0; color: #e8f4fe; font-size: 12px; }
+.sigd-assistant-header button { display: grid; place-items: center; width: 32px; height: 36px; flex-shrink: 0; border: 0; border-radius: 8px; color: #fff; background: transparent; }
+.sigd-assistant-header button:hover { background: #ffffff25; }
+.sigd-assistant-header :focus-visible { outline-color: #fff; }
+.sigd-assistant-notice { margin: 0; padding: 9px 14px; background: #e8f4fe; font-size: 11px; line-height: 1.45; }
+.sigd-assistant-messages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; background: #f7fbff; scrollbar-gutter: stable; }
+.sigd-assistant-message { margin-bottom: 14px; padding: 12px; border: 1px solid #d7e8f8; border-radius: 14px 14px 14px 4px; background: #fff; overflow-wrap: anywhere; }
+.sigd-assistant-message:last-child { margin-bottom: 0; }
+.sigd-assistant-message-ciudadano { margin-left: 24px; background: #e8f4fe; border-radius: 14px 14px 4px 14px; }
+.sigd-assistant-author { display: block; margin-bottom: 6px; color: #004d9e; font-size: 11px; font-weight: 700; }
+.sigd-assistant-message p { margin: 0 0 10px; white-space: pre-line; }
+.sigd-assistant-message p:last-child { margin-bottom: 0; }
+.sigd-assistant-options { display: grid; gap: 8px; margin-top: 14px; }
+.sigd-assistant-options button { display: flex; justify-content: space-between; gap: 6px; padding: 10px 12px; min-height: 44px; text-align: left; color: #004d9e; background: #f3f8fe; border: 1px solid #bdd8f1; border-radius: 9px; font-weight: 600; }
+.sigd-assistant-options button:hover { background: #e0effc; }
+.sigd-assistant-link { display: inline-block; margin-top: 8px; color: #004d9e; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; background: transparent; border: 0; text-align: left; }
+.sigd-assistant-tools { display: flex; flex: 0 0 auto; justify-content: space-between; gap: 8px; border-top: 1px solid #d7e8f8; padding: 8px 14px; }
+.sigd-assistant-tools button { padding: 4px 0; color: #004d9e; font-size: 12px; text-decoration: underline; background: none; border: 0; }
+.sigd-assistant-composer { display: flex; flex: 0 0 auto; align-items: flex-end; gap: 8px; padding: 4px 12px 8px; }
+.sigd-assistant-composer textarea { flex: 1; min-width: 0; resize: none; max-height: 100px; padding: 10px; border: 1px solid #abcce7; border-radius: 10px; background: #fff; }
+.sigd-assistant-composer button { display: grid; place-items: center; width: 42px; height: 44px; flex-shrink: 0; border: 0; border-radius: 10px; color: #fff; background: #004d9e; }
+.sigd-assistant-composer button:disabled { opacity: .45; cursor: default; }
+.sigd-assistant-footer { flex: 0 0 auto; margin: 0; padding: 0 12px 10px; color: #465c70; font-size: 10px; }
+.sigd-assistant-catalogo { margin-top: 12px; }
+.sigd-assistant-catalogo label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 12px; }
+.sigd-assistant-catalogo input, .sigd-assistant-catalogo select { width: 100%; min-width: 0; padding: 9px; border: 1px solid #abcce7; border-radius: 8px; background: #fff; text-overflow: ellipsis; }
+.sigd-assistant-procedimiento { margin-top: 14px; font-size: 13px; }
+.sigd-assistant-procedimiento strong { display: block; margin-bottom: 8px; }
+.sigd-assistant-procedimiento dl { margin: 12px 0; }
+.sigd-assistant-procedimiento dt { font-weight: 700; margin-top: 8px; }
+.sigd-assistant-procedimiento dd { margin: 0; }
+.sigd-assistant-procedimiento ul { margin: 8px 0 12px; padding-left: 18px; list-style: disc; }
+.sigd-assistant-fuente { font-size: 11px; color: #465c70; }
+.sigd-assistant-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@keyframes sigd-assistant-appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .sigd-assistant-panel { animation: none; } }
+@media (max-height: 480px) { .sigd-assistant-notice, .sigd-assistant-footer { display: none; } .sigd-assistant-header { padding: 6px 10px; } }
+@media print { .sigd-assistant { display: none; } }

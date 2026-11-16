@@ -68,6 +68,20 @@ describe("401 de login y conservación de la renovación existente", () => {
     expect(localStorage.getItem("sigd_token")).toBe("access-renovado-del-doble");
     expect(logout).not.toHaveBeenCalled();
   });
+  it('actualiza los permisos de interfaz con las facultades vigentes devueltas al renovar', async () => {
+    localStorage.setItem('sigd_facultades', JSON.stringify([{ codigo: 'ADMIN_USUARIOS', ambito: 'GLOBAL', areaId: null }]));
+    let intento = 0;
+    apiClient.defaults.adapter = async config => {
+      if (config.url === '/api/v1/auth/refresh') return response(config, {
+        accessToken: 'nuevo-del-doble', refreshToken: 'nuevo-refresh-del-doble', roles: ['CIUDADANO'], permisos: [],
+      });
+      if (intento++ === 0) unauthorized(config);
+      return response(config, { ok: true });
+    };
+    await apiClient.get('/api/v1/recurso-protegido-del-doble');
+    expect(JSON.parse(localStorage.getItem('sigd_facultades')!)).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('sigd_roles')!)).toEqual(['CIUDADANO']);
+  });
 
   it("no intenta refrescar una solicitud anÃ³nima rechazada", async () => {
     const requests: string[] = [];

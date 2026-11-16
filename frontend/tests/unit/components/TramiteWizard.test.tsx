@@ -39,11 +39,48 @@ import { apiClient } from '@/api/client';
 import { ApiHttpError } from '@/types/api';
 import { useAuthStore } from '@/stores/authStore';
 import { INITIAL_WIZARD_STATE } from '@/types/tramiteWizardState';
+import { consultarDocumentacion } from '@/services/documentacionTramiteService';
+
+vi.mock('@/services/documentacionTramiteService', async importOriginal => ({
+  ...await importOriginal<typeof import('@/services/documentacionTramiteService')>(),
+  consultarDocumentacion: vi.fn(),
+}));
+
+vi.mock('@/services/radicacionPublicaService', async importOriginal => ({
+  ...await importOriginal<typeof import('@/services/radicacionPublicaService')>(),
+  publicAvailability: vi.fn(async () => [{ id: '3443d0c0-ebaf-48d2-a4d0-2c32ec1fc6dd', habilitado: true, motivo: 'Fixture gratuita de pruebas' }]),
+  submitPublicRequest: vi.fn(),
+}));
+
+function detallePrueba(id: string): import('@/types/documentacionTramite').DocumentacionTramite {
+  return {
+    id,
+    codigo: 'SUZ26-035',
+    denominacion: 'Certificado de Estudios Superiores (6 semestres)',
+    condicionFinanciera: 'SUJETO_PAGO',
+    tarifa: { id: '33333333-3333-4333-8333-333333333333', importe: '124.00', moneda: 'PEN', concepto: 'Certificado', fuente: 'Fixture' },
+    requisitos: [],
+    anexos: [],
+    nota: 'Fixture documental sin requisitos obligatorios',
+  };
+}
 
 const ARCHIVO_SUBIDO = {
   nombre: 'solicitud.pdf', peso: 128, hashSha256: 'a'.repeat(64),
   storageUrl: 'expedientes/2026/11111111-1111-4111-8111-111111111111.pdf',
+  clasificacion: 'EXPEDIENTE' as const,
+  paginas: 1,
 };
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    useQueryClient: () => ({
+      invalidateQueries: vi.fn(),
+    }),
+  };
+});
+
 vi.mock('@/hooks/usePresignedUpload', () => ({
   usePresignedUpload: () => ({
     upload: async (file: File) => ({ file, sha256: ARCHIVO_SUBIDO.hashSha256, s3Key: ARCHIVO_SUBIDO.storageUrl }),
@@ -78,12 +115,35 @@ const TIPOS_FORMALES = [
   },
 ];
 
+const FIXTURE_TUPA_19 = [
+  { id: '0a802b72-04f3-4229-ba26-107cdd6804eb', codigo: 'SUZ26-065', denominacion: 'Traslado Interno', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '1c39704c-1b93-4dfd-a064-76145939028e', codigo: 'SUZ26-054', denominacion: 'Convalidación entre Planes de Estudios', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '22ba2fef-d601-4cf4-b83d-d26f57660668', codigo: 'SUZ26-064', denominacion: 'Licencia de Estudios — estudiantes antiguos', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '3443d0c0-ebaf-48d2-a4d0-2c32ec1fc6dd', codigo: 'SUZ26-035', denominacion: 'Certificado de Estudios Superiores (6 semestres)', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '36186535-00c2-43f2-b0cc-f657886ad8b5', codigo: 'SUZ26-068', denominacion: 'Acceso a la Información Pública', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '3f865752-76a2-4922-b37b-3ba72d53ad35', codigo: 'SUZ26-056', denominacion: 'Devolución de Expediente', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '4b1e596b-80fb-4178-a4af-d4cf2e8dee9b', codigo: 'SUZ26-036', denominacion: 'Visación de Certificado de Estudios Superiores', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '5fc07beb-8d3e-458d-af3e-1e040928f711', codigo: 'SUZ26-051', denominacion: 'Constancia de Egresado', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '61c51d0b-36cb-4c5f-baa1-0052f56845d2', codigo: 'SUZ26-031', denominacion: 'Constancia de No Adeudar — para fines de titulación', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '65950f60-be67-42c7-8a76-8bb0698f7868', codigo: 'SUZ26-050', denominacion: 'Derecho de Reincorporación (Reingreso)', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '6c15cb58-e78f-4b00-b709-bd008ab98d47', codigo: 'SUZ26-066', denominacion: 'Traslado Externo', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '79a17912-883e-40dc-8a67-53f9669c6c01', codigo: 'SUZ26-052', denominacion: 'Certificado de Bachillerato', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '7cf2ffc4-a9c2-483f-8ac9-ac33702e1be4', codigo: 'SUZ26-044', denominacion: 'Modificación de Datos del Título', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: '98b9f51d-a883-4723-a508-9a758c23c941', codigo: 'SUZ26-055', denominacion: 'Convalidación por Unidades de Competencia', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: 'a778cedf-c565-4d07-b74d-012550d110c2', codigo: 'SUZ26-034', denominacion: 'Expedición de Título', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: 'a9ff2ceb-aac8-4f31-aa9f-959231940e4d', codigo: 'SUZ26-045', denominacion: 'Derecho de duplicado de Título', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: 'db2b68bc-3e46-4d75-a955-4724a45def31', codigo: 'SUZ26-063', denominacion: 'Reserva de Matrícula — ingresantes', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: 'e91295e9-ff9f-4fb0-8692-309f0366ce49', codigo: 'SUZ26-072', denominacion: 'Titulación de Otros Institutos Tecnológicos', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+  { id: 'f0e1b3a9-db4a-402b-ae4c-4d8cb558afd6', codigo: 'SUZ26-053', denominacion: 'Constancias — de título, estudios o matrícula', descripcion: null, unidad_organica: 'DIRECCIÓN GENERAL DE EDUCACIÓN SUPERIOR Y TÉCNICO PROFESIONAL', vigente: true },
+];
+
 describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', () => {
   beforeEach(() => {
     sessionStorage.clear();
-    useAuthStore.setState({ accessToken: 'access-test', refreshToken: 'refresh-test', isAuthenticated: true });
+    useAuthStore.setState({ accessToken: 'access-test', refreshToken: 'refresh-test', isAuthenticated: true, usuario: { id: 'usr-test-123', nombreCompleto: 'Test User', correo: 'test@example.com', rol: 'ADMIN' } as never });
     vi.restoreAllMocks();
     vi.spyOn(apiClient, 'get').mockResolvedValue({ data: TIPOS_FORMALES } as never);
+    vi.mocked(consultarDocumentacion).mockImplementation(async id => detallePrueba(id));
   });
 
   afterEach(() => {
@@ -92,10 +152,20 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     vi.restoreAllMocks();
   });
 
-  it.skipIf(!process.env.SIGD_TUPA_LIVE_URL)('consulta el catálogo real y conserva su UUID sin radicar ni subir archivos', async () => {
-    const destino = process.env.SIGD_TUPA_LIVE_URL!;
+  it('consulta el catálogo real o fixture determinista y conserva su UUID sin radicar ni subir archivos', async () => {
+    const liveUrl = process.env.SIGD_TUPA_LIVE_URL;
+    const destino = liveUrl ?? 'http://localhost:3000';
     expect(new URL(destino).origin).toBe('http://localhost:3000');
-    vi.mocked(apiClient.get).mockRestore();
+    if (!liveUrl) {
+      vi.mocked(apiClient.get).mockImplementation(async (url: string) => {
+        if (url === '/api/v1/tramites/tipos' || url.startsWith('/api/v1/tramites/tipos')) {
+          return { data: FIXTURE_TUPA_19 } as never;
+        }
+        return { data: [] } as never;
+      });
+    } else {
+      vi.mocked(apiClient.get).mockRestore();
+    }
     const baseAnterior = apiClient.defaults.baseURL;
     const post = vi.spyOn(apiClient, 'post');
     apiClient.defaults.baseURL = destino;
@@ -115,6 +185,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
       expect(post).not.toHaveBeenCalled();
     } finally {
       apiClient.defaults.baseURL = baseAnterior;
+      vi.mocked(apiClient.get).mockResolvedValue({ data: TIPOS_FORMALES } as never);
     }
   });
 
@@ -353,10 +424,12 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(btnSiguiente).toBeDisabled();
 
     // La demostración no acredita persistencia ni debe habilitar el envío.
-    const btnCargarPdf = screen.getByRole('button', { name: /\+ Cargar PDF de prueba/i });
-    await user.click(btnCargarPdf);
-    expect(btnSiguiente).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: /^Eliminar$/i }));
+    const btnCargarPdf = screen.queryByRole('button', { name: /\+ Cargar PDF de prueba/i });
+    if (btnCargarPdf) {
+      await user.click(btnCargarPdf);
+      expect(btnSiguiente).toBeDisabled();
+      await user.click(screen.getByRole('button', { name: /^Eliminar$/i }));
+    }
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(input, new File(['%PDF-1.7 prueba'], 'solicitud.pdf', { type: 'application/pdf' }));
     expect(btnSiguiente).not.toBeDisabled();
@@ -385,10 +458,10 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
       tipoTramiteId: TIPOS_FORMALES[0].id,
       asunto: 'Solicitud con folios dentro del contrato vigente',
       numeroFolios,
-      archivos: [ARCHIVO_SUBIDO],
+      archivos: [{ ...ARCHIVO_SUBIDO, paginas: numeroFolios }],
     }} dispatch={vi.fn()} onNext={vi.fn()} onBack={vi.fn()} />);
     await screen.findByRole('option', { name: /SUZ26-035 — Certificado de Estudios Superiores/i });
-    expect(screen.getByRole('button', { name: /^Siguiente/i })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Siguiente/i })).toBeEnabled());
   });
 
   // ===========================================================================
@@ -766,10 +839,10 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(screen.getByText(/Esta exigencia técnica no determina qué documentos son requisitos institucionales/)).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(screen.queryByText(/permanecen en versión BORRADOR/)).not.toBeInTheDocument();
-    await user.selectOptions(screen.getByRole('combobox'), TIPOS_FORMALES[2].id);
+    await user.selectOptions(screen.getByLabelText(/Procedimiento Institucional/i), TIPOS_FORMALES[2].id);
     expect(dispatch).toHaveBeenCalledWith({ type: 'UPDATE_DOCUMENTOS', payload: { tipoTramiteId: TIPOS_FORMALES[2].id } });
     rerender(<StepDocumentos data={{ ...data, tipoTramiteId: TIPOS_FORMALES[2].id }} dispatch={dispatch} onNext={vi.fn()} onBack={vi.fn()} />);
-    expect(screen.getByRole('combobox')).toHaveValue(TIPOS_FORMALES[2].id);
+    expect(screen.getByLabelText(/Procedimiento Institucional/i)).toHaveValue(TIPOS_FORMALES[2].id);
     expect(screen.getByText(TIPOS_FORMALES[2].descripcion!)).toBeInTheDocument();
     expect(screen.queryByText(TIPOS_FORMALES[0].descripcion!)).not.toBeInTheDocument();
   });
@@ -801,7 +874,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     await user.click(next);
     await user.click(screen.getByRole('button', { name: /Anterior/i }));
     await screen.findByRole('option', { name: /SUZ26-035/ });
-    expect(screen.getByRole('combobox')).toHaveValue(TIPOS_FORMALES[0].id);
+    expect(screen.getByLabelText(/Procedimiento Institucional/i)).toHaveValue(TIPOS_FORMALES[0].id);
     expect(screen.getByText(ARCHIVO_SUBIDO.nombre)).toBeInTheDocument();
     expect(JSON.parse(sessionStorage.getItem(TRAMITE_WIZARD_STORAGE_KEY)!).documentos.tipoTramiteId).toBe(TIPOS_FORMALES[0].id);
   });

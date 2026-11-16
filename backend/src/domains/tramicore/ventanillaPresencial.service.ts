@@ -13,8 +13,11 @@ import crypto from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 import { TicketTermicoUtil } from './ticketTermico.util.js';
+import { calcularFoliacionCorrelativa } from './pdfFoliacion.js';
 import { AppError, ValidationError } from '../../shared/domain/errors/index.js';
 import { validarDni } from '../identicore/modulo11.validator.js';
+import { radicacionVirtualSchema } from './tramites.schemas.js';
+import { CATALOGO_DOCUMENTAL_POR_CODIGO } from './catalogoDocumentalTupa2026.js';
 
 export const identidadNaturalVentanillaSchema = z.object({
   tipoPersona: z.literal('NATURAL'),
@@ -34,6 +37,18 @@ export interface DatosRecepcionFisica extends z.infer<typeof identidadNaturalVen
   // El transporte aún lo declara opcional; el registro exige un UUID vigente
   // de sigd_doc.tipo_documento. No se deduce del DNI ni de un código de React.
   tipoDocumentalId?: string;
+  idTipoTramiteTupa?: string;
+  documentos?: Array<{
+    nombreArchivo: string;
+    tamanoBytes: number;
+    hashSha256: string;
+    storagePath?: string;
+    contentType?: string;
+    tipoDocumentalId?: string;
+    clasificacion?: 'EXPEDIENTE' | 'ANEXO';
+    requisitoId?: string;
+    paginas?: number;
+  }>;
 }
 
 export interface ResultadoVentanilla {
@@ -94,6 +109,17 @@ export class VentanillaPresencialService {
     }
     const tipoDocumentalId = validacionTipoDocumental.data;
 
+    const tupaValidado = radicacionVirtualSchema.innerType().shape.idTipoTramiteTupa.optional().safeParse(datos.idTipoTramiteTupa);
+    if (!tupaValidado.success) {
+      throw new ValidationError({ invalidParams: [{ name: 'idTipoTramiteTupa', reason: 'Indique un UUID TUPA válido.' }] });
+    }
+    // Reconocer el marcador del cliente anterior sólo para rechazar una omisión;
+    // nunca derivar el vínculo desde texto libre ni elegir un TUPA por defecto.
+    const codigoEnAsunto = datos.asunto.trim().match(/^(SUZ26-\d{3})\s+—(?:\s|$)/i)?.[1].toUpperCase();
+    if (codigoEnAsunto && !tupaValidado.data) {
+      throw new ValidationError({ invalidParams: [{ name: 'idTipoTramiteTupa', reason: 'El trámite TUPA debe enviarse como identificador estructurado; el asunto no establece la relación.' }] });
+    }
+
     const cliente = clienteTransaccional ?? (await this.pool.connect());
     const debeManejarTx = !clienteTransaccional;
 
@@ -101,13 +127,14 @@ export class VentanillaPresencialService {
       if (debeManejarTx) await cliente.query('BEGIN');
 
       // Validar antes de generar el CUT (su función escribe en la secuencia)
-      // o registrar identidades. El bloqueo conserva la vigencia hasta el cierre
-      // de la transacción; no reemplaza la FK que debe garantizar PostgreSQL.
+      // o registrar identidades. Nota de concurrencia: se retira el bloqueo de fila
+      // FOR SHARE en el entorno aislado (evita requerir UPDATE a la cuenta de ventanilla).
+      // Pendiente de revisión para producción si se requiere garantizar vigencia inmutable
+      // concurrente durante toda la transacción.
       const tipoDocumental = await cliente.query<{ tipo_documental_id: string }>(
         `SELECT tipo_documental_id
            FROM sigd_doc.tipo_documento
-          WHERE tipo_documental_id = $1::uuid AND vigente = TRUE
-          FOR SHARE;`,
+          WHERE tipo_documental_id = $1::uuid AND vigente = TRUE;`,
         [tipoDocumentalId],
       );
       if (!tipoDocumental.rows[0]) {
@@ -117,6 +144,25 @@ export class VentanillaPresencialService {
             reason: 'El tipo documental no existe o no está vigente en sigd_doc.tipo_documento. Seleccione un tipo válido del catálogo institucional.',
           }],
         });
+      }
+
+      let procedimiento: { tipo_tramite_id: string; codigo: string; vigente: boolean; tipo_documental_permitido: boolean } | undefined;
+      if (tupaValidado.data) {
+        const tupa = await cliente.query<{ tipo_tramite_id: string; codigo: string; vigente: boolean; tipo_documental_permitido: boolean }>(
+          `SELECT t.tipo_tramite_id, t.codigo, t.vigente,
+                  EXISTS (SELECT 1 FROM sigd_doc.requisito r
+                    JOIN sigd_doc.tipo_documento_requisito dr USING (requisito_id)
+                    WHERE r.tipo_tramite_id = t.tipo_tramite_id
+                      AND dr.tipo_documental_id = $2::uuid) AS tipo_documental_permitido
+             FROM sigd_doc.tipo_tramite_tupa t
+            WHERE t.tipo_tramite_id = $1::uuid`, [tupaValidado.data, tipoDocumentalId],
+        );
+        procedimiento = tupa.rows[0];
+        if (tupa.rows.length !== 1 || !procedimiento?.vigente || !procedimiento.tipo_documental_permitido ||
+            procedimiento.tipo_tramite_id !== tupaValidado.data.toLowerCase() || !procedimiento.codigo ||
+            (codigoEnAsunto && codigoEnAsunto !== procedimiento.codigo)) {
+          throw new ValidationError({ invalidParams: [{ name: 'idTipoTramiteTupa', reason: 'El procedimiento no existe, no está vigente o contradice la solicitud.' }] });
+        }
       }
 
       const anioActual = new Date().getFullYear();
@@ -191,6 +237,36 @@ export class VentanillaPresencialService {
       const solicitanteId = persona.id_persona;
       const nombreRemitente = persona.nombre_completo;
 
+      let areaDestinoId = datos.areaDestinoId ?? null;
+      if (!areaDestinoId && procedimiento) {
+        const configDoc = CATALOGO_DOCUMENTAL_POR_CODIGO.get(procedimiento.codigo);
+        let codigoArea = 'MP'; // Flujo seguro por defecto: Mesa de Partes (MP)
+        // Solo derivar automáticamente si la competencia institucional está verificada documentalmente
+        if (configDoc?.unidadResponsableVerificada === true) {
+          const unidadResp = (configDoc.unidadResponsable ?? '').toLowerCase();
+          if (unidadResp.includes('secretar') || unidadResp.includes('académic')) {
+            codigoArea = 'SEC';
+          } else if (unidadResp.includes('dirección') || unidadResp.includes('general')) {
+            codigoArea = 'DG';
+          }
+        }
+        const areaFila = await cliente.query<{ area_id: string }>(
+          'SELECT area_id FROM sigd_org.area WHERE codigo = $1 AND vigente = TRUE LIMIT 1',
+          [codigoArea],
+        );
+        if (areaFila.rows[0]) {
+          areaDestinoId = areaFila.rows[0].area_id;
+        } else {
+          // Si el área específica no existe en sigd_org.area, asegurar recepción en MP
+          const mpFila = await cliente.query<{ area_id: string }>(
+            "SELECT area_id FROM sigd_org.area WHERE codigo = 'MP' AND vigente = TRUE LIMIT 1",
+          );
+          if (mpFila.rows[0]) {
+            areaDestinoId = mpFila.rows[0].area_id;
+          }
+        }
+      }
+
       // 3. Insertar expediente formal en sigd_tra.expediente
       const ahora = new Date();
       const expRes = await cliente.query<{ expediente_id: string }>(
@@ -210,7 +286,7 @@ export class VentanillaPresencialService {
            $3::uuid,
            $4,
            $5::uuid,
-           'RECEPCIONADO',
+           'REGISTRADO',
            $6
          ) RETURNING expediente_id;`,
         [
@@ -218,11 +294,84 @@ export class VentanillaPresencialService {
           datos.dniSolicitante,
           tipoDocumentalId,
           solicitanteId,
-          datos.areaDestinoId ?? null,
+          areaDestinoId,
           ahora,
         ],
       );
       const expedienteId = expRes.rows[0].expediente_id;
+
+      if (procedimiento) {
+        // Mismo UUID, CUT y solicitante en ambos dominios, como en MPV.
+        // Las colisiones se propagan; no se reasignan identidades ni relaciones.
+        const documental = await cliente.query<{ expediente_id: string; tipo_tramite_id: string; codigo_expediente: string; solicitante_id: string }>(
+          `INSERT INTO sigd_doc.expediente
+             (expediente_id, tipo_tramite_id, codigo_expediente, asunto, solicitante_id, fecha_registro)
+           VALUES ($1::uuid, $2::uuid, $3, $4, $5::uuid, $6)
+           RETURNING expediente_id, tipo_tramite_id, codigo_expediente, solicitante_id`,
+          [expedienteId, procedimiento.tipo_tramite_id, cut, datos.asunto, solicitanteId, ahora],
+        );
+        const fila = documental.rows[0];
+        if (documental.rowCount !== 1 || fila?.expediente_id !== expedienteId ||
+            fila.tipo_tramite_id !== procedimiento.tipo_tramite_id ||
+            fila.codigo_expediente !== cut || fila.solicitante_id !== solicitanteId) {
+          throw new AppError({ status: 409, code: 'TUPA_LINK_CONFLICT', message: 'No se confirmó una vinculación TUPA coherente con el expediente.' });
+        }
+        const tramite = await cliente.query<{ expediente_id: string; codigo_tramite: string }>(
+          `INSERT INTO sigd_tra.tramite (expediente_id, codigo_tramite, asunto)
+           VALUES ($1::uuid, $2, $3)
+           RETURNING expediente_id, codigo_tramite`,
+          [expedienteId, procedimiento.codigo, datos.asunto],
+        );
+        if (tramite.rowCount !== 1 || tramite.rows[0]?.expediente_id !== expedienteId ||
+            tramite.rows[0]?.codigo_tramite !== procedimiento.codigo) {
+          throw new AppError({ status: 409, code: 'TUPA_LINK_CONFLICT', message: 'No se confirmó el código del trámite asociado al expediente.' });
+        }
+      }
+
+      // 3.5. Foliación correlativa y registro de documentos adjuntos
+      let totalFoliosCalculados = datos.foliosTotales;
+      if (datos.documentos && datos.documentos.length > 0) {
+        const { documentosFoliados, totalFolios } = calcularFoliacionCorrelativa(
+          datos.documentos.map(d => ({ ...d, paginas: d.paginas ?? 1 }))
+        );
+        totalFoliosCalculados = totalFolios;
+        datos.foliosTotales = totalFolios;
+
+        for (const doc of documentosFoliados) {
+          const docRes = await cliente.query<{ documento_adjunto_id: string }>(`
+            INSERT INTO sigd_doc.documento_adjunto
+              (expediente_id, nombre_archivo, mime_type, tamano_bytes, sha256, s3_bucket, s3_key, tipo_documental_id)
+            VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8::uuid)
+            RETURNING documento_adjunto_id
+          `, [
+            expedienteId,
+            doc.nombreArchivo,
+            doc.contentType ?? 'application/pdf',
+            doc.tamanoBytes,
+            doc.hashSha256.toLowerCase(),
+            'sigd-expedientes',
+            doc.storagePath ?? `expedientes/${anioActual}/${cut}-${doc.nombreArchivo}`,
+            doc.tipoDocumentalId ?? tipoDocumentalId,
+          ]);
+          const idAdjunto = docRes.rows[0]?.documento_adjunto_id;
+          if (idAdjunto) {
+            await cliente.query(`
+              INSERT INTO sigd_tra.expediente_documento_folio
+                (expediente_id, id_documento, folio_inicio, folio_fin)
+              VALUES ($1::uuid, $2::uuid, $3::integer, $4::integer)
+            `, [expedienteId, idAdjunto, doc.folioInicio, doc.folioFin]);
+
+            if (doc.requisitoId) {
+              await cliente.query(`
+                INSERT INTO sigd_doc.expediente_requisito
+                  (expediente_id, requisito_id, documento_adjunto_id, cumplido)
+                VALUES ($1::uuid, $2::uuid, $3::uuid, TRUE)
+                ON CONFLICT (expediente_id, requisito_id) DO NOTHING
+              `, [expedienteId, doc.requisitoId, idAdjunto]);
+            }
+          }
+        }
+      }
 
       // 4. Asentar en libro de registro institucional inmutable
       await cliente.query(

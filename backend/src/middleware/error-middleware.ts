@@ -11,10 +11,11 @@ export function errorMiddleware(error: unknown, req: Request, res: Response, _ne
   const serializado = serializeError(error);
   const contexto = getRequestContext();
   const correlation_id = contexto?.correlation_id ?? '';
+  const rutaLimpia = (req.originalUrl ?? req.url ?? '').split('?')[0] || (req.path ?? '');
 
   if (serializado.status >= 500) {
     console.error(
-      `[ERROR 5xx] correlation_id=${correlation_id} method=${req.method} path=${req.originalUrl}`,
+      `[ERROR 5xx] correlation_id=${correlation_id} method=${req.method} path=${rutaLimpia}`,
       error,
     );
   }
@@ -28,7 +29,7 @@ export function errorMiddleware(error: unknown, req: Request, res: Response, _ne
     title: titleForStatus(serializado.status, serializado.code),
     status: serializado.status,
     detail: serializado.detail,
-    instance: req.originalUrl,
+    instance: rutaLimpia,
     code: serializado.code,
     codigo: serializado.code,
     correlation_id,

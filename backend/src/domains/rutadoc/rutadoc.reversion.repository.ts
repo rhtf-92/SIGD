@@ -59,7 +59,7 @@ export class RepositorioReversionRutaDoc {
 
   async existeExpediente(cliente: PoolClient, expedienteId: string): Promise<boolean> {
     const consulta = await cliente.query<{ existe: boolean }>(
-      'SELECT EXISTS(SELECT 1 FROM sigd_tra.expediente WHERE id_expediente = $1::bigint) AS existe',
+      'SELECT EXISTS(SELECT 1 FROM sigd_tra.expediente WHERE expediente_id = $1::uuid) AS existe',
       [expedienteId]);
     return consulta.rows[0].existe;
   }
@@ -70,7 +70,7 @@ export class RepositorioReversionRutaDoc {
              estado_anterior, estado_nuevo, fecha_hora, motivo, correlation_id,
              movimiento_objetivo_secuencia::text, huella_comando, compensacion_folios
         FROM sigd_rut.movimiento_compensatorio
-       WHERE expediente_id = $1::bigint AND clave_idempotencia = $2`, [expedienteId, clave]);
+       WHERE expediente_id = $1::uuid AND clave_idempotencia = $2`, [expedienteId, clave]);
     return consulta.rows[0] ?? null;
   }
 
@@ -80,13 +80,13 @@ export class RepositorioReversionRutaDoc {
              m.fecha_hora, m.estado_anterior, m.estado_nuevo, m.evento,
              (SELECT previo.datos->>'areaId' FROM (
                 SELECT secuencia, datos FROM sigd_rut.movimiento_tramite
-                 WHERE expediente_id = $1::bigint AND secuencia < $2::bigint
+                 WHERE expediente_id = $1::uuid AND secuencia < $2::bigint
                 UNION ALL
                 SELECT secuencia, datos FROM sigd_rut.movimiento_compensatorio
-                 WHERE expediente_id = $1::bigint AND secuencia < $2::bigint
+                 WHERE expediente_id = $1::uuid AND secuencia < $2::bigint
               ) previo ORDER BY previo.secuencia DESC LIMIT 1) AS area_anterior_id
         FROM sigd_rut.movimiento_tramite m
-       WHERE m.expediente_id = $1::bigint AND m.secuencia = $2::bigint`, [expedienteId, secuencia]);
+       WHERE m.expediente_id = $1::uuid AND m.secuencia = $2::bigint`, [expedienteId, secuencia]);
     const fila = consulta.rows[0];
     return fila ? {
       idMovimiento: fila.id_movimiento, expedienteId: fila.expediente_id,
@@ -100,10 +100,10 @@ export class RepositorioReversionRutaDoc {
     const consulta = await cliente.query<{ tipo: string; secuencia: string }>(`
       SELECT tipo, secuencia::text FROM (
         SELECT 'NORMAL'::text AS tipo, secuencia
-          FROM sigd_rut.movimiento_tramite WHERE expediente_id = $1::bigint
+          FROM sigd_rut.movimiento_tramite WHERE expediente_id = $1::uuid
         UNION ALL
         SELECT 'COMPENSATORIA'::text AS tipo, secuencia
-          FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = $1::bigint
+          FROM sigd_rut.movimiento_compensatorio WHERE expediente_id = $1::uuid
       ) actuaciones ORDER BY secuencia DESC LIMIT 1`, [expedienteId]);
     return consulta.rows[0] ?? null;
   }
@@ -140,7 +140,7 @@ export class RepositorioReversionRutaDoc {
          correlation_id, clave_idempotencia, movimiento_objetivo_fecha_hora,
          movimiento_objetivo_id, movimiento_objetivo_secuencia, huella_comando,
          motivo, compensacion_folios, datos)
-      VALUES ($1::bigint, $2, $3, $4::bigint, $5, $6, $7, $8::uuid,
+      VALUES ($1::uuid, $2, $3, $4::bigint, $5, $6, $7, $8::uuid,
               $9::bigint, $10, $11, $12::jsonb, $13::jsonb)
       RETURNING id_movimiento::text, expediente_id::text, secuencia::text,
                 estado_anterior, estado_nuevo, fecha_hora, motivo, correlation_id,

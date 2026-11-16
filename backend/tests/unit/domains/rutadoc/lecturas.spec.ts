@@ -32,6 +32,28 @@ describe('ServicioTrazabilidadRutaDoc', () => {
     await expect(new ServicioTrazabilidadRutaDoc(repositorio).obtener('5', actor)).rejects.toMatchObject({ status: 404 });
     expect(repositorio.listar).not.toHaveBeenCalled();
   });
+  it('deniega antes de consultar existencia para ocultar expedientes ajenos e inexistentes', async () => {
+    const repositorio: RepositorioTrazabilidadRutaDoc = {
+      existeExpediente: vi.fn(async () => true), listar: vi.fn(async () => []),
+    };
+    const servicio = new ServicioTrazabilidadRutaDoc(repositorio);
+    const sinAcceso = { ...actor, puedeVerExpediente: vi.fn(async () => false) };
+
+    await expect(servicio.obtener('expediente-ajeno', sinAcceso)).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+    await expect(servicio.obtener('uuid-inexistente', sinAcceso)).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+    expect(sinAcceso.puedeVerExpediente).toHaveBeenCalledTimes(2);
+    expect(repositorio.existeExpediente).not.toHaveBeenCalled();
+    expect(repositorio.listar).not.toHaveBeenCalled();
+  });
+  it('propaga los errores de PostgreSQL durante la autorización', async () => {
+    const errorSql = Object.assign(new Error('db unavailable'), { code: '08006' });
+    const servicio = new ServicioTrazabilidadRutaDoc({
+      existeExpediente: vi.fn(), listar: vi.fn(),
+    } as unknown as RepositorioTrazabilidadRutaDoc);
+    const actorConFallo = { ...actor, puedeVerExpediente: async () => { throw errorSql; } };
+
+    await expect(servicio.obtener('expediente', actorConFallo)).rejects.toBe(errorSql);
+  });
   it('devuelve timeline vacío para expediente existente sin movimientos', async () => {
     const repositorio: RepositorioTrazabilidadRutaDoc = { existeExpediente: async () => true, listar: async () => [] };
     await expect(new ServicioTrazabilidadRutaDoc(repositorio).obtener('5', actor)).resolves.toEqual({ expedienteId: '5', actuaciones: [] });

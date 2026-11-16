@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
+import { publicTrackingHeaders } from '../../services/radicacionPublicaService';
+import { useAuthStore } from '../../stores/authStore';
 
 export interface DtoDocumentoPublico {
   nombreArchivo: string;
@@ -32,47 +34,80 @@ export interface DtoConsultaPublica {
   documentos: DtoDocumentoPublico[];
   proveidos: DtoProveidoPublico[];
   mensajeLegal: string;
+  condicionEconomica?: 'PENDIENTE DE PAGO' | 'PAGO VERIFICADO' | 'GRATUITO' | null;
+  ordenPago?: {
+    codigo: string;
+    importe: string;
+    moneda: string;
+    fechaEmision: string;
+    indicaciones: string;
+    estado: string;
+  } | null;
+}
+
+interface DtoExpedientePropio {
+  cut: string;
+  fecha_radicacion: string;
+  estado: string;
+  codigo_procedimiento: string | null;
+  procedimiento: string | null;
+  asunto: string;
 }
 
 export default function ConsultaPublicaPage() {
+  const cuenta = useAuthStore(state => state.isAuthenticated ? state.usuario?.id ?? 'sin-identidad' : 'publico');
+  const { cut } = useParams<{ cut: string }>();
+  // Account and CUT changes create an independent state scope, including in-flight requests.
+  return <ConsultaPublicaContenido key={cuenta + ':' + (cut ?? '')} />;
+}
+
+function ConsultaPublicaContenido() {
   const { cut } = useParams<{ cut: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated, usuario } = useAuthStore();
+  const esCiudadano = Boolean(usuario && (usuario.rol === 'CIUDADANO' || usuario.roles?.includes('CIUDADANO')));
+  const contexto = isAuthenticated ? usuario?.id ?? 'sin-identidad' : 'publico';
   const [cutInput, setCutInput] = useState(cut ?? '');
   const [resultado, setResultado] = useState<DtoConsultaPublica | null>(null);
-  const [cargando, setCargando] = useState(false);
+  const [propietarioResultado, setPropietarioResultado] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(Boolean(cut));
   const [error, setError] = useState<string | null>(null);
+  const [misExpedientes, setMisExpedientes] = useState<DtoExpedientePropio[]>([]);
+  const [misExpedientesOwner, setMisExpedientesOwner] = useState<string | null>(null);
+  const [cargandoMisExpedientes, setCargandoMisExpedientes] = useState(isAuthenticated && esCiudadano);
+  const [errorMisExpedientes, setErrorMisExpedientes] = useState(false);
+  const [paginaHistorial, setPaginaHistorial] = useState(1);
+  const [hayMasHistorial, setHayMasHistorial] = useState(false);
 
   useEffect(() => {
-    if (cut) {
-      setCutInput(cut);
-      consultar(cut);
-    }
-  }, [cut]);
+    if (!cut) return;
+    let activo = true;
+    const codigo = cut.trim().toUpperCase();
+    apiClient.get<DtoConsultaPublica>(
+      '/api/v1/tramites/consulta-publica/' + encodeURIComponent(codigo), { headers: publicTrackingHeaders(codigo) },
+    ).then(({ data }) => {
+      if (activo) { setResultado(data); setPropietarioResultado(contexto); }
+    }).catch(() => {
+      if (activo) setError('No se encontr\u00f3 ning\u00fan expediente con el c\u00f3digo CUT ingresado o ocurri\u00f3 un error en la consulta.');
+    }).finally(() => { if (activo) setCargando(false); });
+    return () => { activo = false; };
+  }, [cut, contexto]);
 
-  const consultar = async (codigoCut: string) => {
-    const trimmed = codigoCut.trim().toUpperCase();
-    if (!trimmed) {
-      setError('Por favor, ingrese un código CUT válido.');
-      return;
-    }
-
-    setCargando(true);
-    setError(null);
-
-    try {
-      const res = await apiClient.get<DtoConsultaPublica>(
-        `/api/v1/tramites/consulta-publica/${encodeURIComponent(trimmed)}`
-      );
-      setResultado(res.data);
-    } catch (err: unknown) {
-      setResultado(null);
-      setError(
-        'No se encontró ningún expediente con el código CUT ingresado o ocurrió un error en la consulta.'
-      );
-    } finally {
-      setCargando(false);
-    }
-  };
+  useEffect(() => {
+    if (!isAuthenticated || !esCiudadano) return;
+    let active = true;
+    apiClient.get<{ items: DtoExpedientePropio[]; hayMas?: boolean }>(
+      '/api/v1/tramites/mis-expedientes' + (paginaHistorial > 1 ? '?pagina=' + paginaHistorial : ''),
+    ).then(({ data }) => {
+      if (active) {
+        setMisExpedientes(prev => paginaHistorial === 1 ? (Array.isArray(data.items) ? data.items : []) : [...prev, ...(Array.isArray(data.items) ? data.items : [])]);
+        setMisExpedientesOwner(usuario?.id ?? null);
+        setHayMasHistorial(data.hayMas === true);
+      }
+    }).catch(() => { if (active) setErrorMisExpedientes(true); })
+      .finally(() => { if (active) setCargandoMisExpedientes(false); });
+    return () => { active = false; };
+  }, [isAuthenticated, esCiudadano, usuario?.id, paginaHistorial]);
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,6 +139,7 @@ export default function ConsultaPublicaPage() {
           </div>
 
           {/* Formulario de Búsqueda */}
+          {isAuthenticated && esCiudadano && <Link to="/tesoreria" className="mb-4 inline-block text-sm font-semibold text-[#006EC7] underline">Mis pagos y devoluciones</Link>}
           <form onSubmit={handleBuscar} className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
               <label htmlFor="cut-input" className="sr-only">
@@ -134,8 +170,43 @@ export default function ConsultaPublicaPage() {
           )}
         </div>
 
+        {isAuthenticated && esCiudadano && (
+          <section aria-labelledby="mis-expedientes-title" className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="mis-expedientes-title" className="text-lg font-bold text-slate-900">Mis expedientes</h2>
+                <p className="text-sm text-slate-500 mt-1">Registros asociados al titular de su sesión autenticada.</p>
+              </div>
+              {cargandoMisExpedientes && <span role="status" className="text-xs text-slate-500">Cargando...</span>}
+            </div>
+            {errorMisExpedientes && <p role="alert" className="mt-4 rounded-lg bg-rose-50 border border-rose-200 p-3 text-sm text-rose-700">No fue posible cargar sus expedientes. Vuelva a intentarlo más tarde.</p>}
+            {!cargandoMisExpedientes && !errorMisExpedientes && misExpedientesOwner === usuario?.id && misExpedientes.length === 0 && <p className="mt-4 text-sm text-slate-500">No se encontraron expedientes asociados a su cuenta.</p>}
+            {misExpedientesOwner === usuario?.id && misExpedientes.length > 0 && (
+              <ul className="mt-4 divide-y divide-slate-100">
+                {misExpedientes.map((item) => (
+                  <li key={item.cut} className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-mono font-semibold text-slate-900">{item.cut}</p>
+                      <p className="text-sm text-slate-700">{item.procedimiento ?? item.codigo_procedimiento ?? 'Trámite institucional'}</p>
+                      {item.asunto && <p className="text-xs text-slate-500 truncate">{item.asunto}</p>}
+                      <p className="text-xs text-slate-500">Ingresó: {new Date(item.fecha_radicacion).toLocaleString('es-PE', { timeZone: 'America/Lima' })}</p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="rounded-full bg-blue-50 text-blue-800 border border-blue-100 px-3 py-1 text-xs font-semibold">{item.estado}</span>
+                      <Link to={`/consulta/${encodeURIComponent(item.cut)}`} className="text-sm font-semibold text-[#006EC7] hover:underline">Ver seguimiento</Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {misExpedientesOwner === usuario?.id && hayMasHistorial && <button type="button"
+              disabled={cargandoMisExpedientes} onClick={() => { setCargandoMisExpedientes(true); setErrorMisExpedientes(false); setPaginaHistorial(p => p + 1); }}
+              className="mt-4 text-sm font-semibold text-[#006EC7] disabled:opacity-50">Cargar más expedientes</button>}
+          </section>
+        )}
+
         {/* Detalle del Expediente */}
-        {resultado && (
+        {resultado && propietarioResultado === contexto && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="bg-slate-900 px-6 py-5 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <div>
@@ -185,6 +256,52 @@ export default function ConsultaPublicaPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Condición Económica y Orden de Pago */}
+              {resultado.condicionEconomica === 'PENDIENTE DE PAGO' && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold uppercase tracking-wider text-amber-800 flex items-center gap-2">
+                      <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      PENDIENTE DE PAGO EN TESORERÍA
+                    </span>
+                    {resultado.ordenPago?.codigo && (
+                      <span className="font-mono text-xs font-semibold bg-amber-200/80 text-amber-900 px-2 py-1 rounded">
+                        Orden: {resultado.ordenPago.codigo}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-sm text-slate-800">
+                    Este trámite se encuentra registrado con derechos de tramitación pendientes de abono en caja por un importe de <strong>S/ {resultado.ordenPago?.importe ?? '0.00'} {resultado.ordenPago?.moneda ?? 'PEN'}</strong> ({resultado.tipoTramite}).
+                  </p>
+                  <div className="mt-3 rounded border border-amber-200 bg-white/80 p-3 text-xs text-amber-900">
+                    <p className="font-semibold">Indicaciones para el pago presencial en Tesorería:</p>
+                    <p className="mt-1">{resultado.ordenPago?.indicaciones ?? 'Acérquese a la caja de Tesorería del IESTP Público «Suiza» y abone en efectivo indicando su CUT o número de orden. Su expediente mantendrá los documentos ingresados y este mismo código CUT.'}</p>
+                  </div>
+                </div>
+              )}
+              {resultado.condicionEconomica === 'PAGO VERIFICADO' && (
+                <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold uppercase tracking-wider text-emerald-800">
+                      PAGO VERIFICADO EN CAJA
+                    </span>
+                    {resultado.ordenPago?.codigo && (
+                      <span className="font-mono text-xs font-semibold bg-emerald-200 text-emerald-900 px-2 py-1 rounded">
+                        Orden: {resultado.ordenPago.codigo}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-sm text-slate-800">
+                    El pago por <strong>S/ {resultado.ordenPago?.importe ?? '0.00'}</strong> fue recibido y verificado por Tesorería. El expediente se encuentra plenamente habilitado para calificación y derivación institucional.
+                  </p>
+                </div>
+              )}
+              {resultado.condicionEconomica === 'GRATUITO' && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900 text-sm">
+                  <span className="font-semibold">Trámite Gratuito:</span> Procedimiento sin derecho de tramitación conforme al TUPA 2026.
+                </div>
+              )}
 
               {/* Documentos */}
               {resultado.documentos.length > 0 && (

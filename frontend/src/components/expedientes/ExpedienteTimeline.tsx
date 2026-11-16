@@ -1,8 +1,8 @@
-import type { BitacoraEventoExpediente } from "../../types/trazabilidadExpediente";
+import type { ActuacionRutaDoc, BitacoraEventoExpediente } from "../../types/trazabilidadExpediente";
 import TimelineItemCard from "./TimelineItemCard";
 
 interface ExpedienteTimelineProps {
-  eventos: BitacoraEventoExpediente[];
+  eventos: (BitacoraEventoExpediente | ActuacionRutaDoc)[];
   cargando?: boolean;
 }
 
@@ -25,7 +25,10 @@ export default function ExpedienteTimeline({
   if (eventos.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-        Este expediente todavía no registra movimientos en su bitácora.
+        <p className="font-semibold text-slate-700">Este expediente todavía no registra movimientos en su bitácora.</p>
+        <p className="mt-1 text-xs text-slate-500">
+          Expediente registrado en Mesa de Partes. Pendiente de primera derivación o actuación administrativa.
+        </p>
       </div>
     );
   }
@@ -38,7 +41,7 @@ export default function ExpedienteTimeline({
       <ol className="relative space-y-4 border-l-2 border-slate-200 pl-0">
         {eventos.map((evento, indice) => (
           <TimelineItemCard
-            key={evento.eventoId}
+            key={"movimientoId" in evento ? evento.movimientoId : evento.eventoId}
             evento={evento}
             esMasReciente={indice === eventos.length - 1}
           />

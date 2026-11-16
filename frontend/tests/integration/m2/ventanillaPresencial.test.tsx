@@ -18,6 +18,11 @@ vi.mock("../../../src/hooks/useHorarioCorte", () => ({
 // Catálogo exclusivamente simulado: no se crean registros en PostgreSQL.
 const tipoDocumentalDoble = { tipo_documental_id: randomUUID(), codigo: "TIPO_UNITARIO", nombre: "Documento del doble", vigente: true };
 const segundoTipoDocumentalDoble = { tipo_documental_id: randomUUID(), codigo: "OTRO_UNITARIO", nombre: "Segundo documento del doble", vigente: true };
+const procedimientoFormalDoble = {
+  id: randomUUID(), codigo: "SUZ26-054", denominacion: "Convalidación entre Planes de Estudios",
+  descripcion: "Rubro: Otros Servicios Académicos. Derecho de pago: S/ 46.50. Plazo no especificado en la fuente.",
+  unidad_organica: "Unidad del doble", vigente: true,
+};
 
 const mockRespuestaVentanilla = {
   status: 201,
@@ -66,7 +71,9 @@ const cargoMuestra: CargoOficialTramite = {
 
 describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-05)", () => {
   beforeEach(() => {
-    vi.spyOn(apiClient, "get").mockResolvedValue({ status: 200, data: [tipoDocumentalDoble, segundoTipoDocumentalDoble] });
+    vi.spyOn(apiClient, "get").mockImplementation(async (url) => ({ status: 200,
+      data: url === "/api/v1/tramites/tipos" ? [procedimientoFormalDoble] : [tipoDocumentalDoble, segundoTipoDocumentalDoble],
+    }));
     vi.spyOn(apiClient, "post").mockResolvedValue(mockRespuestaVentanilla as any);
   });
 
@@ -86,7 +93,8 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     expect(screen.getByLabelText(/Persona Jurídica/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Número de Documento \*/i)).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /Trámite no TUPA \/ documentación general/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /Prácticas Iniciales/i })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /SUZ26-054/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Prácticas Iniciales/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Cantidad de Folios Físicos \*/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /✓ Registrar y Emitir Cargo CUT/i })).toBeInTheDocument();
   });
@@ -100,11 +108,49 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
       </MemoryRouter>,
     );
 
+    await screen.findByRole("option", { name: /SUZ26-054/ });
     await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "SUZ26-054");
 
     expect(screen.getByRole("option", { name: /Convalidaci.n entre Planes de Estudios/ })).toBeInTheDocument();
     expect(screen.getByText(/46\.50/)).toBeInTheDocument();
     expect(screen.getByText(/Rubro: Otros Servicios Acad/)).toBeInTheDocument();
+  });
+
+  it("busca en el catálogo formal y distingue una búsqueda sin coincidencias", async () => {
+    render(<MemoryRouter><VentanillaPresencialPage /></MemoryRouter>);
+    await screen.findByRole("option", { name: /SUZ26-054/ });
+    const search = screen.getByLabelText(/Buscar por código o denominación/);
+    fireEvent.change(search, { target: { value: "inexistente" } });
+    expect(screen.queryByRole("option", { name: /SUZ26-054/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/No hay procedimientos que coincidan/)).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "SUZ26-054" } });
+    expect(screen.getByRole("option", { name: /SUZ26-054/ })).toBeInTheDocument();
+  });
+
+  it("no ofrece procedimientos inactivos ni inventa opciones cuando el catálogo está vacío", async () => {
+    vi.mocked(apiClient.get).mockImplementation(async (url) => ({ status: 200,
+      data: url === "/api/v1/tramites/tipos" ? [{ ...procedimientoFormalDoble, vigente: false }] : [tipoDocumentalDoble],
+    }));
+    render(<MemoryRouter><VentanillaPresencialPage /></MemoryRouter>);
+    expect(await screen.findByText(/No hay procedimientos formales vigentes/)).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /SUZ26-054/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /TUPA-01/ })).not.toBeInTheDocument();
+  });
+
+  it("bloquea y permite reintentar un error de catálogo formal sin reemplazos estáticos", async () => {
+    let fail = true;
+    vi.mocked(apiClient.get).mockImplementation(async (url) => {
+      if (url === "/api/v1/tramites/tipos" && fail) throw new Error("servicio no disponible");
+      return { status: 200, data: url === "/api/v1/tramites/tipos" ? [procedimientoFormalDoble] : [tipoDocumentalDoble] };
+    });
+    render(<MemoryRouter><VentanillaPresencialPage /></MemoryRouter>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo consultar el catálogo formal");
+    expect(screen.getByLabelText(/Procedimiento TUPA 2026/)).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Registrar y Emitir Cargo/ })).toBeDisabled();
+    fail = false;
+    fireEvent.click(screen.getByRole("button", { name: /Reintentar catálogo/ }));
+    expect(await screen.findByRole("option", { name: /SUZ26-054/ })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Procedimiento TUPA 2026/)).toBeEnabled();
   });
 
   it("CargoDigitalModal: renderiza el ticket térmico con CUT, QR y datos del solicitante", () => {
@@ -176,8 +222,19 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     });
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText(/Persona Jurídica/i)).toBeDisabled();
-    expect(screen.getByRole("option", { name: /CE.*pendiente/i })).toBeDisabled();
-    expect(screen.getByRole("option", { name: /RUC.*pendiente/i })).toBeDisabled();
+    expect(screen.getByRole("option", { name: /^CE\b/i })).toBeDisabled();
+    expect(screen.getByRole("option", { name: /^RUC\b/i })).toBeDisabled();
+  });
+
+  it("transmite el UUID TUPA seleccionado como campo propio, independiente del asunto", async () => {
+    const user = await llenarFormulario();
+    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), procedimientoFormalDoble.codigo);
+    await user.click(screen.getByRole("button", { name: /Registrar y Emitir Cargo/i }));
+    expect(apiClient.post).toHaveBeenCalledWith("/api/v1/tramites/ventanilla-presencial", expect.objectContaining({
+      idTipoTramiteTupa: procedimientoFormalDoble.id,
+      tipoDocumentalId: tipoDocumentalDoble.tipo_documental_id,
+    }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
   it("envía el UUID del tipo elegido y muestra su nombre del catálogo en el cargo", async () => {
@@ -210,7 +267,7 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     render(<MemoryRouter><VentanillaPresencialPage /></MemoryRouter>);
     const select = screen.getByLabelText(/Tipo de Documento Presentado/i);
     const registrar = screen.getByRole("button", { name: /Registrar y Emitir Cargo/i });
-    expect(screen.getByRole("status")).toHaveTextContent("Cargando tipos documentales");
+    expect(screen.getByText("Cargando tipos documentales…")).toHaveAttribute("role", "status");
     expect(select).toBeDisabled();
     expect(registrar).toBeDisabled();
     fireEvent.submit(select.closest("form")!);
@@ -304,5 +361,182 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
     expect(screen.getByRole("button", { name: "Registrando…" })).toBeDisabled();
     await act(async () => { resolver(mockRespuestaVentanilla); });
     await waitFor(() => expect(screen.getByRole("button", { name: /Registrar y Emitir Cargo/i })).toBeEnabled());
+  });
+  it("muestra Persona Jurídica deshabilitada sin la palabra pendiente", async () => {
+    render(
+      <MemoryRouter>
+        <VentanillaPresencialPage />
+      </MemoryRouter>,
+    );
+
+    const radioJuridica = screen.getByLabelText(/Persona Jurídica/i);
+    expect(radioJuridica).toBeInTheDocument();
+    expect(radioJuridica).toBeDisabled();
+    expect(radioJuridica).toHaveAttribute("aria-disabled", "true");
+    expect(radioJuridica.closest("label")).toHaveTextContent("Persona Jurídica");
+    expect(radioJuridica.closest("label")).toHaveTextContent("No disponible en ventanilla física");
+    expect(screen.queryByText(/pendiente/i)).not.toBeInTheDocument();
+  });
+
+  it("opera el selector personalizado de tipo de documento con teclado, scrollbar y sin pendiente", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <VentanillaPresencialPage />
+      </MemoryRouter>,
+    );
+
+    const trigger = screen.getByRole("button", { name: /Tipo Documento Identidad/i });
+    expect(trigger).toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-haspopup", "listbox");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    // Abrir con click
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    const listbox = screen.getByRole("listbox", { name: /Tipos de documento de identidad/i });
+    expect(listbox).toBeInTheDocument();
+    expect(listbox.className).toContain("max-h-[235px]");
+    expect(listbox.className).toContain("overflow-y-auto");
+
+    // Verificar dentro del listbox personalizado que las opciones disabled tienen aria-disabled="true"
+    const itemsListbox = within(listbox).getAllByRole("option");
+    expect(itemsListbox.length).toBeGreaterThanOrEqual(5);
+
+    const opcionDni = itemsListbox.find((o) => o.textContent?.includes("DNI"));
+    const opcionCe = itemsListbox.find((o) => o.textContent?.includes("CE"));
+    expect(opcionDni).toBeInTheDocument();
+    expect(opcionCe).toHaveAttribute("aria-disabled", "true");
+
+    // Cerrar con Escape
+    fireEvent.keyDown(trigger, { key: "Escape" });
+    expect(screen.queryByRole("listbox", { name: /Tipos de documento de identidad/i })).not.toBeInTheDocument();
+  });
+  it("opera el selector personalizado de procedimiento TUPA 2026 con apertura, scrollbar y actualización de ficha", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <VentanillaPresencialPage />
+      </MemoryRouter>,
+    );
+
+    // Esperar a que cargue el procedimiento
+    await screen.findByRole("option", { name: /SUZ26-054/ });
+
+    const trigger = screen.getByRole("button", { name: /-- Seleccione un procedimiento o servicio --/i });
+    expect(trigger).toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-haspopup", "listbox");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    // Abrir menú con clic
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    const listbox = screen.getByRole("listbox", { name: /Procedimientos TUPA disponibles/i });
+    expect(listbox).toBeInTheDocument();
+    expect(listbox.className).toContain("max-h-[235px]");
+    expect(listbox.className).toContain("overflow-y-auto");
+
+    // Seleccionar el procedimiento del catálogo
+    const opcionProc = within(listbox).getByRole("option", { name: /SUZ26-054/i });
+    await user.click(opcionProc);
+
+    // El dropdown se cierra tras la selección
+    expect(screen.queryByRole("listbox", { name: /Procedimientos TUPA disponibles/i })).not.toBeInTheDocument();
+
+    // El trigger se actualiza con el procedimiento seleccionado
+    expect(trigger).toHaveTextContent("SUZ26-054");
+    expect(trigger).toHaveTextContent("Convalidación entre Planes de Estudios");
+
+    // La ficha informativa inferior se actualiza
+    expect(screen.getByRole("heading", { name: /TUPA 2026 — IESTP Suiza/i })).toBeInTheDocument();
+    expect(screen.getByText(/46\.50/)).toBeInTheDocument();
+  });
+
+  it("CargoDigitalModal (modoVentanilla): renderiza confirmación exitosa con botones institucionales de ventanilla y sin casilla", () => {
+    const handleBandeja = vi.fn();
+    const handleSeguimiento = vi.fn();
+    const handleNuevo = vi.fn();
+
+    render(
+      <CargoDigitalModal
+        isOpen={true}
+        onClose={() => {}}
+        cargo={cargoMuestra}
+        modoVentanilla={true}
+        onIrBandeja={handleBandeja}
+        onConsultarSeguimiento={handleSeguimiento}
+        onNuevoRegistro={handleNuevo}
+      />,
+    );
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("¡Trámite registrado exitosamente!")).toBeInTheDocument();
+    expect(screen.getByText(/ESTADO INICIAL: REGISTRADO/i)).toBeInTheDocument();
+    expect(screen.getByText("EXP-2026-000155")).toBeInTheDocument();
+
+    // Botones de acción institucional
+    const btnBandeja = screen.getByRole("button", { name: /Ir a Bandeja de Expedientes/i });
+    const btnSeguimiento = screen.getByRole("button", { name: /Consultar Seguimiento/i });
+    const btnNuevo = screen.getByRole("button", { name: /Registrar Nuevo Trámite/i });
+    expect(btnBandeja).toBeInTheDocument();
+    expect(btnSeguimiento).toBeInTheDocument();
+    expect(btnNuevo).toBeInTheDocument();
+
+    // NO debe existir acceso a casilla en ventanilla física
+    expect(screen.queryByRole("button", { name: /Acceder a Casilla Electrónica/i })).not.toBeInTheDocument();
+
+    fireEvent.click(btnBandeja);
+    expect(handleBandeja).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(btnSeguimiento);
+    expect(handleSeguimiento).toHaveBeenCalledWith("EXP-2026-000155");
+
+    fireEvent.click(btnNuevo);
+    expect(handleNuevo).toHaveBeenCalledTimes(1);
+  });
+
+  it("al cerrar el modal de cargo, muestra la barra institucional persistente con opciones de acceso y reapertura", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <VentanillaPresencialPage />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
+    await user.type(screen.getByLabelText(/^Nombres \*/i), "Sergio");
+    await user.type(screen.getByLabelText(/^Apellidos \*/i), "Serruche");
+    await user.type(screen.getByLabelText(/Correo Electrónico para Notificación \*/i), "sergio@correo.pe");
+    await user.type(screen.getByLabelText(/Teléfono \/ Celular de Contacto \*/i), "961234567");
+    await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "NO_TUPA");
+    await user.type(screen.getByLabelText(/Asunto \/ Petitorio Concreto \*/i), "Solicitud de convalidación académica");
+    await user.selectOptions(screen.getByLabelText(/Tipo de Documento Presentado/i), tipoDocumentalDoble.tipo_documental_id);
+
+    await user.click(screen.getByRole("button", { name: /✓ Registrar y Emitir Cargo CUT/i }));
+
+    // Modal abierto
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+
+    // Cerrar modal usando botón "✕"
+    const botonCerrarModal = within(dialog).getByRole("button", { name: /Cerrar ventana de cargo/i });
+    await user.click(botonCerrarModal);
+
+    // Modal cerrado
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    // La barra persistente superior debe mostrarse
+    const banner = screen.getByRole("status", { name: /Confirmación de último trámite registrado/i });
+    expect(banner).toBeInTheDocument();
+    expect(within(banner).getByText("¡Trámite registrado exitosamente!")).toBeInTheDocument();
+    expect(within(banner).getByText("EXP-2026-000155")).toBeInTheDocument();
+    expect(within(banner).getByText("REGISTRADO")).toBeInTheDocument();
+
+    // Reabrir modal con botón "Ver Cargo Digital"
+    const btnReabrir = within(banner).getByRole("button", { name: /📄 Ver Cargo Digital/i });
+    await user.click(btnReabrir);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 });

@@ -46,7 +46,7 @@ export default function DashboardEjecutivoPage() {
     ...(periodMode === "month" ? { mes: month } : {}),
     ...(unitId ? { unidadOrganicaId: unitId } : {}),
   };
-  const { summary, trend, estados, cuellosBotella, executive, units, isLoading, isError, errorMessage } = useDashboardMetrics(filters);
+  const { summary, trend, estados, cuellosBotella, executive, executiveAvailable, units, isLoading, isFetching, isError, errorMessage, reintentar } = useDashboardMetrics(filters);
 
   const state: DashboardPageState = isLoading ? "loading" : isError ? "error" : "ready";
   const summaryMetrics = summary?.metrics ?? [];
@@ -113,6 +113,8 @@ export default function DashboardEjecutivoPage() {
         >
           <h1 className="text-2xl font-bold text-slate-900">No se pudo cargar el tablero ejecutivo</h1>
           <p className="mt-3 text-slate-600">{errorMessage ?? "La consulta a la API de reportes no respondió correctamente."}</p>
+          <button type="button" disabled={isFetching} onClick={() => void reintentar()}
+            className="mt-4 rounded-lg border border-slate-300 px-4 py-2 disabled:opacity-50">Volver a consultar</button>
             {filterControls}
         </section>
       </main>
@@ -141,48 +143,57 @@ export default function DashboardEjecutivoPage() {
             filters={filters}
             records={summaryMetrics.map((metric) => ({
               indicador: metric.title,
-              valor: metric.value,
+              valor: metric.available === false ? null : metric.value,
               unidad: metric.unit,
-              delta: metric.delta,
+              delta: metric.deltaAvailable === false ? null : metric.delta,
+              disponible: metric.available !== false,
             }))}
           />
         </header>
 
         {filterControls}
-        <ExecutiveKpiSummary metrics={executive} />
+        {executiveAvailable !== false && <ExecutiveKpiSummary metrics={executive} />}
         <KpiMetricGrid metrics={summaryMetrics} />
 
         <div className="grid min-w-0 grid-cols-1 gap-6 min-[1025px]:grid-cols-[1.7fr_1fr]">
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="trend-title">
             <div className="mb-4 flex items-center justify-between">
               <h2 id="trend-title" className="text-lg font-semibold text-slate-900">
-                Tendencia de radicados y resueltos
+                Tendencia de radicados y atendidos
               </h2>
               <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
                 {trend.length} periodos
               </span>
             </div>
 
-            <svg viewBox="0 0 100 100" className="h-56 w-full" role="img" aria-label="Gráfico de tendencia de radicados y resueltos">
-              <path d={trendChart.map((point) => `${point.x === 0 ? "M" : "L"}${point.x},${point.yRadicados}`).join(" ")} fill="none" stroke="#1E40AF" strokeWidth="2.3" strokeLinecap="round" />
-              <path d={trendChart.map((point) => `${point.x === 0 ? "M" : "L"}${point.x},${point.yResueltos}`).join(" ")} fill="none" stroke="#10B981" strokeWidth="2.3" strokeLinecap="round" />
-              {trendChart.map((point, index) => (
-                <g key={`${point.label}-${index}`}>
-                  <circle cx={point.x} cy={point.yRadicados} r="1.5" fill="#1E40AF" />
-                  <circle cx={point.x} cy={point.yResueltos} r="1.5" fill="#10B981" />
-                </g>
-              ))}
-            </svg>
+            {trend.length === 0 ? (
+              <p className="py-12 text-center text-sm text-slate-500">
+                No hay datos de tendencia registrados para el periodo seleccionado.
+              </p>
+            ) : (
+              <>
+                <svg viewBox="0 0 100 100" className="h-56 w-full" role="img" aria-label="Gráfico de tendencia de radicados y atendidos">
+                  <path d={trendChart.map((point) => `${point.x === 0 ? "M" : "L"}${point.x},${point.yRadicados}`).join(" ")} fill="none" stroke="#1E40AF" strokeWidth="2.3" strokeLinecap="round" />
+                  <path d={trendChart.map((point) => `${point.x === 0 ? "M" : "L"}${point.x},${point.yResueltos}`).join(" ")} fill="none" stroke="#10B981" strokeWidth="2.3" strokeLinecap="round" />
+                  {trendChart.map((point, index) => (
+                    <g key={`${point.label}-${index}`}>
+                      <circle cx={point.x} cy={point.yRadicados} r="1.5" fill="#1E40AF" />
+                      <circle cx={point.x} cy={point.yResueltos} r="1.5" fill="#10B981" />
+                    </g>
+                  ))}
+                </svg>
 
-            <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
-              <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-700" />Radicados</span>
-              <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Resueltos</span>
-            </div>
+                <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
+                  <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-700" />Radicados</span>
+                  <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Atendidos</span>
+                </div>
+              </>
+            )}
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="estado-title">
             <h2 id="estado-title" className="mb-4 text-lg font-semibold text-slate-900">Distribución por estado</h2>
-            <div className="flex flex-col gap-4">
+            {estados.length === 0 ? <p className="text-sm text-slate-600">Distribución por estado no disponible en esta fuente.</p> : <div className="flex flex-col gap-4">
               <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full border-[14px] border-slate-200 bg-white"
                 style={{
                   background: `conic-gradient(${estados
@@ -207,44 +218,50 @@ export default function DashboardEjecutivoPage() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </div>}
           </section>
         </div>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="bottleneck-title">
           <h2 id="bottleneck-title" className="mb-4 text-lg font-semibold text-slate-900">Cuellos de botella</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
-                  <th className="px-3 py-2 font-medium">Área</th>
-                  <th className="px-3 py-2 font-medium">Expedientes</th>
-                  <th className="px-3 py-2 font-medium">Días promedio</th>
-                  <th className="px-3 py-2 font-medium">Riesgo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cuellosBotella.map((item) => (
-                  <tr key={item.area} className="border-b border-slate-100 last:border-none">
-                    <td className="px-3 py-3 font-medium text-slate-800">{item.area}</td>
-                    <td className="px-3 py-3 text-slate-600">{item.expedienteCount}</td>
-                    <td className="px-3 py-3 text-slate-600">{item.diasPromedio.toFixed(1)} días</td>
-                    <td className="px-3 py-3">
-                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                        item.severity === "high"
-                          ? "bg-red-100 text-red-700"
-                          : item.severity === "medium"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-emerald-100 text-emerald-700"
-                      }`}>
-                        {item.severity === "high" ? "Alto" : item.severity === "medium" ? "Medio" : "Bajo"}
-                      </span>
-                    </td>
+          {cuellosBotella.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-500">
+              No se registran cuellos de botella para el periodo seleccionado.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500">
+                    <th className="px-3 py-2 font-medium">Área</th>
+                    <th className="px-3 py-2 font-medium">Expedientes</th>
+                    <th className="px-3 py-2 font-medium">Días promedio</th>
+                    <th className="px-3 py-2 font-medium">Riesgo</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {cuellosBotella.map((item) => (
+                    <tr key={item.area} className="border-b border-slate-100 last:border-none">
+                      <td className="px-3 py-3 font-medium text-slate-800">{item.area}</td>
+                      <td className="px-3 py-3 text-slate-600">{item.expedienteCount}</td>
+                      <td className="px-3 py-3 text-slate-600">{item.diasPromedio.toFixed(1)} días</td>
+                      <td className="px-3 py-3">
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                          item.severity === "high"
+                            ? "bg-red-100 text-red-700"
+                            : item.severity === "medium"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-emerald-100 text-emerald-700"
+                        }`}>
+                          {item.severity === "high" ? "Alto" : item.severity === "medium" ? "Medio" : "Bajo"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </div>
     </main>

@@ -37,6 +37,7 @@ interface RefirmaConnectorModalProps {
   abierto: boolean;
   documento: DocumentoOficial | null;
   firmanteDni?: string;
+  soloConsulta?: boolean;
   onCerrar: () => void;
   onFirmado: (resultado: RefirmaRespuestaDTO) => void;
 }
@@ -78,11 +79,13 @@ function EstadoCasilla({ fase, indice }: { fase: number; indice: number }) {
 export default function RefirmaConnectorModal({
   abierto,
   documento,
-  firmanteDni = "00000000",
+  firmanteDni = "",
+  soloConsulta = false,
   onCerrar,
   onFirmado,
 }: RefirmaConnectorModalProps) {
   const [mecanismo, setMecanismo] = useState<MecanismoFirma>("DNIE");
+  const esModoConsulta = soloConsulta || documento?.estadoFirma === "FIRMADO";
   const {
     estado,
     pasoActual,
@@ -91,9 +94,17 @@ export default function RefirmaConnectorModal({
     segundosRestantes,
     timeoutMs,
     iniciarFirma,
+    consultarEstado,
     reintentar,
     cancelar,
   } = useRefirmaGateway(onFirmado);
+
+  useEffect(() => {
+    if (abierto && documento) consultarEstado(documento);
+    return cancelar;
+    // La identidad del documento determina la consulta; no se reinicia por un render del padre.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abierto, documento?.idDocumento, consultarEstado, cancelar]);
 
   const fase = pasoActual ? PASOS.findIndex((paso) => paso.clave === pasoActual) : -1;
   const totalSegundos = Math.floor(timeoutMs / 1000);
@@ -152,13 +163,12 @@ export default function RefirmaConnectorModal({
               id="refirma-modal-titulo"
               className="text-lg font-bold text-slate-900"
             >
-              Firma Digital con Refirma RENIEC
+              {esModoConsulta ? "Consulta de Firma Digital" : "Firma Digital con Refirma RENIEC"}
             </h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              La suscripción digital ostenta plena validez conforme a la Ley N°
-              27269 (Firmas y Certificados Digitales) y su Reglamento D.S. N°
-              052-2008-PCM. Las claves privadas nunca abandonan el dispositivo
-              seguro.
+              La operación de firma se realiza en el agente externo. Esta pantalla
+              consulta la evidencia registrada por DocuCore y la integridad del PDF;
+              no acredita por sí sola la vigencia del certificado.
             </p>
           </div>
         </header>
@@ -174,7 +184,7 @@ export default function RefirmaConnectorModal({
             <p className="text-xs text-slate-500">{documento.asunto}</p>
           </div>
 
-          {estado === "INACTIVO" && (
+          {estado === "INACTIVO" && !esModoConsulta && (
             <fieldset>
               <legend className="mb-2 text-sm font-bold text-slate-700">
                 Mecanismo de firma
@@ -202,6 +212,12 @@ export default function RefirmaConnectorModal({
             </fieldset>
           )}
 
+          {estado === "INACTIVO" && esModoConsulta && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
+              Documento con firma registrada. Puede consultar la evidencia persistida y verificar el PDF registrado.
+            </div>
+          )}
+
           {(estado === "CONECTANDO" ||
             estado === "ESPERANDO_PIN" ||
             estado === "SOLICITANDO_TSA" ||
@@ -225,7 +241,7 @@ export default function RefirmaConnectorModal({
                 </div>
               ))}
               <p className="pt-1 text-xs text-slate-400" role="status">
-                Firma PAdES-BES · Sellado de tiempo criptográfico TSA (RFC 3161)
+                Esperando confirmación del registro de firma en DocuCore.
               </p>
               {/* T-FE-DOC-11: barra de espera de 5 minutos con cuenta regresiva */}
               {segundosRestantes !== null && (
@@ -263,7 +279,7 @@ export default function RefirmaConnectorModal({
               role="alert"
               className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
             >
-              <p className="font-bold">No fue posible firmar el documento</p>
+              <p className="font-bold">No se pudo confirmar el resultado de firma</p>
               <p className="mt-1">{mensajeError}</p>
             </div>
           )}
@@ -273,19 +289,21 @@ export default function RefirmaConnectorModal({
               role="status"
               className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
             >
-              <p className="font-bold">Documento firmado exitosamente</p>
+              <p className="font-bold">Registro de firma confirmado</p>
               <p className="mt-1">
                 CVD: <code className="font-bold">{resultado.cvd}</code>
               </p>
               <p className="text-xs">
-                Sello de tiempo: {new Date(resultado.timestamp).toLocaleString("es-PE")}
+                Fecha registrada: {new Date(resultado.timestamp).toLocaleString("es-PE")}
               </p>
+              <p className="mt-2 text-xs">PDF cotejado por SHA-256. No incluye validación criptográfica independiente ni vigencia del certificado.</p>
+              <a href={resultado.urlFirmado} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block underline">Abrir PDF registrado</a>
             </div>
           )}
         </div>
 
         <footer className="flex flex-wrap justify-end gap-3 border-t border-slate-100 p-5">
-          {estado === "INACTIVO" && (
+          {estado === "INACTIVO" && !esModoConsulta && (
             <>
               <button
                 type="button"
@@ -300,6 +318,25 @@ export default function RefirmaConnectorModal({
                 className="rounded-lg bg-blue-700 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
               >
                 Conectar con Refirma
+              </button>
+            </>
+          )}
+
+          {estado === "INACTIVO" && esModoConsulta && (
+            <>
+              <button
+                type="button"
+                onClick={cerrarConLimpieza}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => consultarEstado(documento)}
+                className="rounded-lg bg-blue-700 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+              >
+                Consultar estado
               </button>
             </>
           )}
@@ -328,7 +365,7 @@ export default function RefirmaConnectorModal({
                 onClick={reintentar}
                 className="rounded-lg bg-blue-700 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
               >
-                Reintentar conexión
+                Consultar estado
               </button>
             </>
           )}

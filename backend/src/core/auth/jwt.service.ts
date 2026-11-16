@@ -4,6 +4,8 @@ import { UnauthorizedError } from '../../shared/domain/errors/index.js';
 export interface ClaimsJwt {
   sub: string;
   roles: string[];
+  ctx?: string;
+  rol?: string;
   iat: number;
   exp: number;
   typ: 'access';
@@ -12,6 +14,8 @@ export interface ClaimsJwt {
 export interface OpcionesFirma {
   sub: string;
   roles?: string[];
+  ctx?: string;
+  rol?: string;
   expiraSegundos?: number;
   ahora?: number;
   secreto?: string;
@@ -46,9 +50,11 @@ export function firmarTokenAcceso(opciones: OpcionesFirma): string {
     sub: opciones.sub,
     roles: opciones.roles ?? [],
     iat: ahora,
-    exp: ahora + (opciones.expiraSegundos ?? 900),
+    exp: ahora + (opciones.expiraSegundos ?? 1140), // 19 minutos normativos B_JACOBO
     typ: 'access',
   };
+  if (opciones.ctx) claims.ctx = opciones.ctx;
+  if (opciones.rol) claims.rol = opciones.rol;
 
   const encabezado = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const cuerpo = base64url(JSON.stringify(claims));

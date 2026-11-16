@@ -9,13 +9,18 @@ import { useEffect, useRef, useState } from "react";
 
 import { casillaService } from "../../services/casillaService";
 import type { Notificacion } from "../../types/casilla";
+import { ApiHttpError } from "../../types/api";
 
 interface NotificacionDetailModalProps {
   isOpen: boolean;
   notificacion: Notificacion | null;
   isGenerandoAcuse: boolean;
+  isLoadingDetail: boolean;
+  detailError: boolean;
+  acuseError: boolean;
   onClose: () => void;
   onGenerarAcuse: (notificacionId: string) => void;
+  onRetryDetail: () => void;
 }
 
 function formatIsoFecha(isoString?: string | null): string {
@@ -39,12 +44,46 @@ export default function NotificacionDetailModal({
   isOpen,
   notificacion,
   isGenerandoAcuse,
+  isLoadingDetail,
+  detailError,
+  acuseError,
   onClose,
   onGenerarAcuse,
+  onRetryDetail,
 }: NotificacionDetailModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [descargando, setDescargando] = useState(false);
+  const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
+  const descargaEnCurso = useRef(false);
+
+  useEffect(() => { setErrorDescarga(null); }, [isOpen, notificacion?.id]);
+
+  async function descargar(operacion: () => Promise<void>) {
+    if (descargaEnCurso.current) return;
+    descargaEnCurso.current = true;
+    setDescargando(true);
+    setErrorDescarga(null);
+    try {
+      await operacion();
+    } catch (err: unknown) {
+      if (err instanceof ApiHttpError) {
+        if (err.problemDetails?.code === "ACK_DOCUMENT_REFERENCE_UNAVAILABLE") {
+          setErrorDescarga("El acuse todavía no está disponible. Intente más tarde.");
+        } else if (err.problemDetails?.code === "STORAGE_REFERENCE_UNAVAILABLE") {
+          setErrorDescarga("La notificación no tiene una referencia de documento disponible.");
+        } else {
+          setErrorDescarga(err.problemDetails?.detail || err.message);
+        }
+      } else {
+        setErrorDescarga("No se pudo descargar el archivo. Comprueba tu acceso y vuelve a intentarlo.");
+      }
+    } finally {
+      descargaEnCurso.current = false;
+      setDescargando(false);
+    }
+  }
 
   // Manejo de teclado (Escape para cerrar) y foco accesible
   useEffect(() => {
@@ -113,17 +152,17 @@ export default function NotificacionDetailModal({
               </span>
               <span className="text-slate-400">•</span>
               <span className="text-xs font-bold text-amber-300">
-                {notificacion.numeroExpediente}
+                {notificacion.numeroExpediente ?? "Expediente sin CUT registrado"}
               </span>
             </div>
             <h2
               id="modal-act-title"
               className="text-lg font-bold text-white sm:text-xl tracking-tight"
             >
-              {acto.numeroDocumento}
+              {acto.numeroDocumento ?? "Documento sin número registrado"}
             </h2>
             <p className="text-xs text-slate-300">
-              Emitido por: {notificacion.unidadEmisora}
+              {notificacion.unidadEmisora ? `Emitido por: ${notificacion.unidadEmisora}` : "Unidad emisora no registrada"}
             </p>
           </div>
 
@@ -154,6 +193,15 @@ export default function NotificacionDetailModal({
         {/* CUERPO DEL MODAL (SCROLLABLE)                                      */}
         {/* ================================================================== */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 text-slate-800">
+          {errorDescarga && <p role="alert" className="text-sm text-red-700">{errorDescarga}</p>}
+          {isLoadingDetail && <p role="status" className="text-sm text-slate-600">Consultando el detalle de la notificación…</p>}
+          {detailError && (
+            <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <span>No se pudo consultar el detalle o registrar la lectura.</span>
+              <button type="button" onClick={onRetryDetail} className="font-semibold underline">Reintentar</button>
+            </div>
+          )}
+          {acuseError && <p role="alert" className="text-sm text-red-700">No se pudo registrar la confirmación. Vuelve a intentarlo.</p>}
           {/* Metadatos institucionales de la notificación */}
           <section className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-3 text-xs">
             <div>
@@ -169,7 +217,7 @@ export default function NotificacionDetailModal({
               <p className="mt-0.5 font-medium text-slate-900">
                 {notificacion.fechaLecturaIso
                   ? formatIsoFecha(notificacion.fechaLecturaIso)
-                  : "Lectura en este momento"}
+                  : "Lectura pendiente"}
               </p>
             </div>
             <div>
@@ -192,11 +240,11 @@ export default function NotificacionDetailModal({
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    Notificado válidamente
+                    Confirmación registrada
                   </span>
                 ) : (
                   <span className="text-amber-700">
-                    Pendiente de confirmación de acuse
+                    Sin confirmación de recepción registrada
                   </span>
                 )}
               </p>
@@ -229,7 +277,7 @@ export default function NotificacionDetailModal({
                   id="modal-act-desc"
                   className="mt-0.5 text-sm font-bold text-slate-900"
                 >
-                  {acto.asunto}
+              {acto.asunto || notificacion.asunto}
                 </p>
               </div>
 
@@ -238,7 +286,7 @@ export default function NotificacionDetailModal({
                   Fundamentación y Resumen Legal:
                 </p>
                 <p className="mt-1 text-xs sm:text-sm text-slate-700 leading-relaxed text-justify bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                  {acto.resumenLegal}
+                  {acto.resumenLegal ?? "No hay resumen registrado para esta notificación."}
                 </p>
               </div>
 
@@ -284,10 +332,10 @@ export default function NotificacionDetailModal({
                     </span>
                     <div>
                       <p className="text-xs font-bold text-slate-900 truncate">
-                        {acto.nombreArchivoPdf}
+                        {acto.nombreArchivoPdf ?? "Nombre de archivo no registrado"}
                       </p>
                       <p className="text-[11px] text-slate-500">
-                        Tamaño: {acto.tamanoArchivo}
+                        {acto.tamanoArchivo ? `Tamaño: ${acto.tamanoArchivo}` : "Tamaño no disponible"}
                       </p>
                     </div>
                   </div>
@@ -296,13 +344,13 @@ export default function NotificacionDetailModal({
                     <p className="text-[11px] font-semibold text-slate-500">
                       Hash SHA-256 (Integridad):
                     </p>
-                    <div className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-700 truncate">
+                    {acto.hashIntegridadSha256 ? <div className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-700 truncate">
                       <span className="truncate">{acto.hashIntegridadSha256}</span>
                       <button
                         type="button"
                         onClick={() =>
                           copyToClipboard(
-                            acto.hashIntegridadSha256,
+                            acto.hashIntegridadSha256!,
                             "hash-doc",
                           )
                         }
@@ -311,20 +359,19 @@ export default function NotificacionDetailModal({
                       >
                         {copiedHash === "hash-doc" ? "✓" : "Copiar"}
                       </button>
-                    </div>
+                    </div> : <p className="text-xs text-slate-500">Hash no registrado.</p>}
 
                     <p className="mt-2 text-[11px] font-semibold text-slate-500">
                       Código de Verificación Digital (CVD):
                     </p>
-                    <p className="font-mono text-xs font-bold text-blue-800">
-                      {acto.cvd}
-                    </p>
+                    <p className="font-mono text-xs font-bold text-blue-800">{acto.cvd ?? "CVD no registrado."}</p>
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => casillaService.descargarDocumento(notificacion)}
+                  disabled={descargando || !notificacion.documentoUrl}
+                  onClick={() => void descargar(() => casillaService.descargarDocumento(notificacion))}
                   className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-2.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
                 >
                   <svg
@@ -340,14 +387,14 @@ export default function NotificacionDetailModal({
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                     />
                   </svg>
-                  Descargar Acto Administrativo (.PDF)
+                  {notificacion.documentoUrl ? "Descargar Acto Administrativo (.PDF)" : "Documento no disponible"}
                 </button>
               </div>
 
               {/* Tarjeta de Firmantes Digitales */}
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
                 <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
-                  Firmantes Digitales Validados
+                  Firmantes registrados
                 </p>
                 <div className="space-y-2.5">
                   {acto.firmantes.map((firmante) => (
@@ -381,6 +428,7 @@ export default function NotificacionDetailModal({
                       </p>
                     </div>
                   ))}
+                  {acto.firmantes.length === 0 && <p className="text-xs text-slate-500">No hay datos de firma asociados a esta notificación.</p>}
                 </div>
               </div>
             </div>
@@ -390,222 +438,44 @@ export default function NotificacionDetailModal({
           {/* SECCIÓN CRÍTICA: ACUSE DIGITAL LEGAL (LPAG LEY N° 27444)          */}
           {/* ================================================================ */}
           <section className="space-y-3">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 flex items-center gap-2">
-              <svg
-                className="h-4 w-4 text-emerald-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                />
-              </svg>
-              Acuse de Notificación Electrónica y Cómputo Legal
+            <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900">
+              Confirmación de recepción
             </h3>
-
-            {/* CASO A: YA SE HA GENERADO EL ACUSE LEGAL */}
             {acuse ? (
-              <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50/50 via-white to-teal-50/30 p-5 shadow-sm space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-xs">
-                      ✓
-                    </span>
-                    <div>
-                      <h4 className="text-sm font-bold text-emerald-950">
-                        CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA
-                      </h4>
-                      <p className="text-xs text-emerald-800">
-                        Identificador Oficial: <strong>{acuse.idAcuse}</strong>
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className="rounded-full bg-emerald-100 border border-emerald-300 px-3 py-1 text-xs font-black uppercase tracking-wider text-emerald-800">
-                    Validez Jurídica Plena
-                  </span>
-                </div>
-
-                {/* Datos del Acuse Oficial generados por el servidor */}
-                <div className="grid gap-3 sm:grid-cols-2 text-xs">
-                  <div>
-                    <p className="font-semibold text-slate-500">
-                      Timestamp Oficial Servidor (ISO-8601):
-                    </p>
-                    <div className="mt-1 flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2 font-mono text-emerald-400">
-                      <span>{acuse.timestampGeneracionIso}</span>
-                    </div>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Hora local certificada:{" "}
-                      {formatIsoFecha(acuse.timestampGeneracionIso)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="font-semibold text-slate-500">
-                      Hash SHA-256 del Acuse (Inmutable):
-                    </p>
-                    <div className="mt-1 flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2 font-mono text-xs text-emerald-400">
-                      <span className="truncate">{acuse.hashSha256Acuse}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyToClipboard(acuse.hashSha256Acuse, "hash-acuse")
-                        }
-                        className="ml-2 text-xs font-sans font-bold text-emerald-300 hover:text-white shrink-0 underline"
-                      >
-                        {copiedHash === "hash-acuse" ? "Copiado!" : "Copiar"}
-                      </button>
-                    </div>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      CVD de Verificación:{" "}
-                      <strong className="text-slate-800">{acuse.cvdAcuse}</strong>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Surtimiento de Efecto y Cómputo de Plazos */}
-                <div className="rounded-xl border border-emerald-200 bg-white p-3.5 text-xs text-slate-700 space-y-1.5">
-                  <p className="font-bold text-emerald-900">
-                    Efecto Jurídico y Cómputo de Plazos (Art. 20 TUO Ley N° 27444):
-                  </p>
-                  <p className="text-slate-600 leading-relaxed">
-                    {acuse.fechaEfectoLegal}
-                  </p>
-                  <p className="text-slate-600">
-                    • Plazo de atención / impugnación:{" "}
-                    <strong>{acuse.plazoImpugnacionDiasHabiles} días hábiles</strong>.
-                    {acuse.fechaLimiteImpugnacion && (
-                      <span>
-                        {" "}
-                        (Vencimiento proyectado:{" "}
-                        <strong>{acuse.fechaLimiteImpugnacion}</strong>)
-                      </span>
-                    )}
-                  </p>
-                </div>
-
-                {/* Botón para descargar Cédula de Acuse Oficial */}
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="button"
-                    onClick={() => casillaService.descargarAcuse(acuse)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    Descargar Cédula de Acuse (.TXT / .PDF)
-                  </button>
-                </div>
+              <div className="rounded-2xl border border-emerald-300 bg-emerald-50/50 p-5 space-y-3">
+                <h4 className="text-sm font-bold text-emerald-950">Registro persistido</h4>
+                <dl className="grid gap-3 text-xs sm:grid-cols-2">
+                  <div><dt className="font-semibold text-slate-500">Identificador</dt><dd>{acuse.idAcuse}</dd></div>
+                  <div><dt className="font-semibold text-slate-500">Fecha y hora</dt><dd>{acuse.timestampGeneracionIso ?? "No registrada"}</dd></div>
+                  <div><dt className="font-semibold text-slate-500">Hash del registro</dt><dd className="break-all font-mono">{acuse.hashSha256Acuse ?? "No registrado"}</dd></div>
+                  <div><dt className="font-semibold text-slate-500">Destinatario</dt><dd>{acuse.destinatario.direccionCasilla ?? "No registrado"}</dd></div>
+                </dl>
+                <p className="text-xs text-slate-600">CVD, efectos legales y plazos no están registrados en el modelo de Casilla.</p>
+                <p className="text-xs text-slate-600">No hay una referencia de documento PDF asociada a este registro.</p>
+                <button
+                  type="button"
+                  disabled={descargando || !acuse.documentoUrl}
+                  onClick={() => void descargar(() => casillaService.descargarAcuse(acuse))}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  PDF de acuse no disponible
+                </button>
               </div>
             ) : (
-              /* CASO B: AÚN NO SE HA GENERADO EL ACUSE DIGITAL */
-              <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-5 space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white font-bold text-sm">
-                    !
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-amber-950">
-                      Requisito de Acuse Digital Legal (TUO Ley N° 27444)
-                    </h4>
-                    <p className="mt-1 text-xs text-amber-900 leading-relaxed">
-                      Conforme al Artículo 20 del TUO de la Ley N° 27444, para
-                      que la notificación surta plenos efectos jurídicos y se
-                      inicie el cómputo legal de plazos, debe generar el acuse de
-                      recibo formal.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-xl bg-white p-3.5 text-xs text-slate-600 border border-amber-200">
-                  <p className="font-semibold text-slate-800">
-                    Al confirmar el acuse:
-                  </p>
-                  <ul className="mt-1 list-disc list-inside space-y-0.5 text-slate-600">
-                    <li>
-                      El servidor del SIGD registrará la marca de tiempo cierta
-                      (formato ISO-8601).
-                    </li>
-                    <li>
-                      Se generará y sellará el código criptográfico SHA-256
-                      inmutable.
-                    </li>
-                    <li>
-                      Podrá descargar la cédula de acuse como constancia oficial.
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                  <span className="text-[11px] text-amber-800">
-                    * Acción certificada y registrada en los logs de auditoría.
-                  </span>
-
-                  <button
-                    type="button"
-                    disabled={isGenerandoAcuse}
-                    onClick={() => onGenerarAcuse(notificacion.id)}
-                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-xs font-bold text-white shadow-md transition hover:bg-blue-800 disabled:cursor-wait disabled:opacity-60"
-                  >
-                    {isGenerandoAcuse ? (
-                      <>
-                        <svg
-                          className="h-4 w-4 animate-spin text-white"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
-                        Generando acuse legal con timestamp en servidor...
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                        Generar y Confirmar Acuse Digital Legal
-                      </>
-                    )}
-                  </button>
-                </div>
+              <div className="rounded-2xl border border-amber-300 bg-amber-50/60 p-5 space-y-3">
+                <h4 className="text-sm font-bold text-amber-950">Confirmación de recepción</h4>
+                <p className="text-xs text-amber-900">
+                  Al confirmar, el sistema registra la confirmación en los campos existentes de la notificación.
+                  La descarga de un PDF requiere que exista una referencia documental persistida.
+                </p>
+                <button
+                  type="button"
+                  disabled={isGenerandoAcuse}
+                  onClick={() => onGenerarAcuse(notificacion.id)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-xs font-bold text-white disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isGenerandoAcuse ? "Registrando confirmación..." : "Confirmar recepción"}
+                </button>
               </div>
             )}
           </section>

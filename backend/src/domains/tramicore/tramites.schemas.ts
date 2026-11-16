@@ -67,6 +67,13 @@ export const adjuntoRadicacionSchema = z
     }),
     hashSha256,
     storagePath: z.string().trim().max(512).optional(),
+    tipoDocumentalId: z.string().uuid().optional(),
+    tipoDocumentalCodigo: z.string().trim().optional(),
+    clasificacion: z.enum(['EXPEDIENTE', 'ANEXO']).optional(),
+    requisitoId: z.string().trim().min(1).max(128).optional(),
+    paginas: z.number().int().positive().optional(),
+    folioInicio: z.number().int().positive().optional(),
+    folioFin: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -109,6 +116,7 @@ export const radicacionVirtualSchema = z
       .email('El correo electronico no tiene un formato valido.')
       .max(150, 'El correo electronico no puede superar los 150 caracteres.'),
     totalFolios: z.number().int().min(1).max(5000),
+    ordenPagoId: z.string().uuid().optional(),
     documentos: z
       .array(adjuntoRadicacionSchema)
       .min(1, 'La radicacion exige al menos un archivo cargado.')

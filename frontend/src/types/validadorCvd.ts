@@ -2,16 +2,16 @@ import type { TipoActoAdministrativo } from "./firmaDigital";
 
 export interface FirmanteValidacion {
   nombre: string;
-  cargo: string;
+  cargo: string | null;
   fechaFirma: string;
-  entidadCertificadora: string;
+  entidadCertificadora: string | null;
 }
 
 export interface DocumentoValidacionCvd {
-  numeroDocumento: string;
-  tipo: TipoActoAdministrativo;
-  asunto: string;
-  fechaEmision: string;
+  numeroDocumento: string | null;
+  tipo: TipoActoAdministrativo | null;
+  asunto: string | null;
+  fechaEmision: string | null;
   firmantes: FirmanteValidacion[];
   hashIntegridadSha256: string;
   urlDescargaAutentica: string;

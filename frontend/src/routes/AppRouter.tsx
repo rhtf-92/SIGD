@@ -3,7 +3,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
 
-import SeguridadPage from "../pages/administracion/SeguridadPage";
 import DashboardEjecutivoPage from "../pages/DashboardEjecutivoPage";
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
 import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
@@ -13,15 +12,19 @@ import ValidadorPublicoCvdPage from "../pages/validador/ValidadorPublicoCvdPage"
 import LoginPage from "../pages/LoginPage";
 import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
+import ActivarCuentaPage from "../pages/registro/ActivarCuentaPage";
 import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
+import BandejaDocentePage from "../pages/expedientes/BandejaDocentePage";
+import SupervisionAreaPage from "../pages/expedientes/SupervisionAreaPage";
 import ExpedienteDetallePage from "../pages/expedientes/ExpedienteDetallePage";
-import MesaPartesVirtualPage from "../pages/tramite/MesaPartesVirtualPage";
 import VentanillaPresencialPage from "../pages/tramite/VentanillaPresencialPage";
 import TramitePage from "../pages/tramite/TramitePage";
 import ConsultaPublicaPage from "../pages/tramite/ConsultaPublicaPage";
 import ProyectorResolucionesPage from "../pages/flujos/ProyectorResolucionesPage";
 import AdminRoutes from "./AdminRoutes";
 import ProtectedRoute from "./ProtectedRoute";
+import TesoreriaPage from '../pages/tesoreria/TesoreriaPage';
+import MisExpedientesPage from '../pages/tramite/MisExpedientesPage';
 
 export default function AppRouter() {
   return (
@@ -30,20 +33,28 @@ export default function AppRouter() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
 
+      {/* Consulta pública ciudadana (acceso libre) */}
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
 
+      {/* Casilla electrónica ciudadana (portal administrado, API backend protegida) */}
       <Route path="/casilla" element={<CasillaElectronicaPage />} />
       <Route
         path="/casilla-electronica"
         element={<CasillaElectronicaPage />}
       />
-      <Route path="/registro" element={<RegistroCiudadanoPage />} />
 
+      {/* Registro ciudadano público y activación */}
+      <Route path="/registro" element={<RegistroCiudadanoPage />} />
+      <Route path="/activar-cuenta" element={<ActivarCuentaPage />} />
+      <Route path="/mis-expedientes" element={<ProtectedRoute><MisExpedientesPage /></ProtectedRoute>} />
+      <Route path="/tesoreria" element={<ProtectedRoute requiredRoles={["ADMINISTRADOR", "SUPER_ADMIN", "TESORERO", "CIUDADANO"]}><TesoreriaPage /></ProtectedRoute>} />
+
+      {/* Mesa de partes virtual pública */}
       <Route path="/tramite" element={<TramitePage />} />
       <Route
         path="/tramite/mesa-partes-virtual"
-        element={<MesaPartesVirtualPage />}
+        element={<TramitePage />}
       />
       <Route
         path="/tramite/mesa-partes"
@@ -51,12 +62,14 @@ export default function AppRouter() {
       />
       <Route
         path="/mesa-partes"
-        element={<MesaPartesVirtualPage />}
+        element={<TramitePage />}
       />
+
+      {/* Ventanilla presencial (restringido a MESA_PARTES) */}
       <Route
         path="/tramite/ventanilla-presencial"
         element={
-          <ProtectedRoute requiredRoles={["MESA_PARTES"]}>
+          <ProtectedRoute requiredRoles={["MESA_PARTES", "ADMINISTRADOR"]}>
             <VentanillaPresencialPage />
           </ProtectedRoute>
         }
@@ -64,29 +77,58 @@ export default function AppRouter() {
       <Route
         path="/ventanilla"
         element={
-          <ProtectedRoute requiredRoles={["MESA_PARTES"]}>
+          <ProtectedRoute requiredRoles={["MESA_PARTES", "ADMINISTRADOR"]}>
             <VentanillaPresencialPage />
           </ProtectedRoute>
         }
       />
-      <Route path="/administracion/seguridad" element={<SeguridadPage />} />
-      <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
-      <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
+
+      {/* Flujos documentales y de validez legal protegidos */}
+      <Route
+        path="/flujo-validez-legal"
+        element={
+          <ProtectedRoute>
+            <FlujoValidezLegalPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/flujos/titulacion"
+        element={
+          <ProtectedRoute>
+            <WorkflowAcademicoPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/flujos/proyector-resoluciones"
-        element={<ProyectorResolucionesPage />}
+        element={
+          <ProtectedRoute requiredRoles={["SECRETARIO", "COORDINADOR_AREA", "JEFE_UNIDAD_ACADEMICA", "DIRECTOR", "ADMINISTRADOR", "SUPER_ADMIN"]}>
+            <ProyectorResolucionesPage />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/flujo-validez-legal/firma"
-        element={<PasarelaFirmaPage />}
+        element={
+          <ProtectedRoute requiredRoles={["DIRECTOR", "ADMINISTRADOR", "SUPER_ADMIN"]}>
+            <PasarelaFirmaPage />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/flujo-validez-legal/visor-cvd"
-        element={<VisorCvdPage />}
+        element={
+          <ProtectedRoute>
+            <VisorCvdPage />
+          </ProtectedRoute>
+        }
       />
+
+      {/* Validador CVD público (acceso libre conforme a normativa) */}
       <Route path="/validador-cvd" element={<ValidadorPublicoCvdPage />} />
 
-
+      {/* Hub de Administración (protegido por módulo Administración) */}
       <Route
         path="/administracion"
         element={
@@ -103,14 +145,83 @@ export default function AppRouter() {
         element={<Navigate to="/administracion" replace />}
       />
 
-      <Route path="/expedientes" element={<BandejaExpedientesPage />} />
-      <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
+      {/* Bandeja y detalle de expedientes (RutaDoc — restringido a personal institucional operativo) */}
+      <Route
+        path="/expedientes/mis-evaluaciones"
+        element={
+          <ProtectedRoute requiredRoles={["DOCENTE"]}>
+            <BandejaDocentePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/expedientes/supervision"
+        element={
+          <ProtectedRoute requiredRoles={[
+            "COORDINADOR_AREA",
+            "JEFE_UNIDAD_ACADEMICA",
+            "DIRECTOR"
+          ]}>
+            <SupervisionAreaPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/expedientes"
+        element={
+          <ProtectedRoute requiredRoles={[
+            "ADMINISTRADOR",
+            "SUPER_ADMIN",
+            "DIRECTOR",
+            "JEFE_UNIDAD_ACADEMICA",
+            "COORDINADOR_AREA",
+            "SECRETARIO",
+            "DOCENTE",
+            "GESTOR_APOYO_AREA",
+            "MESA_PARTES"
+          ]}>
+            <BandejaExpedientesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/expedientes/:id"
+        element={
+          <ProtectedRoute requiredRoles={[
+            "ADMINISTRADOR",
+            "SUPER_ADMIN",
+            "DIRECTOR",
+            "JEFE_UNIDAD_ACADEMICA",
+            "COORDINADOR_AREA",
+            "SECRETARIO",
+            "DOCENTE",
+            "GESTOR_APOYO_AREA",
+            "MESA_PARTES"
+          ]}>
+            <ExpedienteDetallePage />
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/reportes" element={<DashboardEjecutivoPage />} />
-      <Route path="/reportes/dashboard" element={<DashboardEjecutivoPage />} />
+      {/* Reportes gerenciales (protegido por módulo Reportes) */}
+      <Route
+        path="/reportes"
+        element={
+          <ProtectedRoute requiredModule="Reportes" requiredAction="ver">
+            <DashboardEjecutivoPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reportes/dashboard"
+        element={
+          <ProtectedRoute requiredModule="Reportes" requiredAction="ver">
+            <DashboardEjecutivoPage />
+          </ProtectedRoute>
+        }
+      />
 
       <Route path="*" element={<Navigate to="/" replace />} />
-
     </Routes>
   );
 }
