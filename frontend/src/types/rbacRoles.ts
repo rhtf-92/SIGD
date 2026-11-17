@@ -14,9 +14,7 @@ export type RolCanonicoId =
   | "ESTUDIANTE"
   | "CIUDADANO"
   // Rol transversal de plataforma SaaS (Migración 25)
-  | "SUPER_ADMIN"
-  // Rol histórico preservado para trazabilidad / compatibilidad (no activo)
-  | "ESPECIALISTA";
+  | "SUPER_ADMIN";
 
 export interface Rol {
   id: string;
