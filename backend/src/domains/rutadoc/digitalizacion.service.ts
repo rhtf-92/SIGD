@@ -7,6 +7,7 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  UnauthorizedError,
   ValidationError,
 } from '../../shared/domain/errors/index.js';
 import type { ActorRutaDoc } from './rutadoc.types.js';
@@ -80,20 +81,88 @@ export class DigitalizacionService {
     return { bucket: config.bucket, key };
   }
 
+  private async verificarAutorizacionAdjuntar(
+    expedienteId: string,
+    actor: ActorRutaDoc,
+  ): Promise<void> {
+    if (!actor) {
+      throw new UnauthorizedError({ detail: 'Actor no autenticado.' });
+    }
+
+    // Ciudadano externo no puede digitalizar ni foliar trámites institucionales
+    if (actor.roles?.includes('CIUDADANO') && !actor.roles.some((r) => r !== 'CIUDADANO')) {
+      throw new ForbiddenError({ detail: 'No cuenta con facultades para digitalizar o foliar expedientes.' });
+    }
+
+    if (!actor.permisos || actor.permisos.length === 0) {
+      throw new ForbiddenError({ detail: 'No cuenta con facultades para digitalizar o foliar expedientes.' });
+    }
+
+    const permisosAdjuntar = actor.permisos.filter((p) => p.codigo === 'EXPEDIENTE_ADJUNTAR');
+    if (permisosAdjuntar.length === 0) {
+      throw new ForbiddenError({ detail: 'No cuenta con facultades para digitalizar o foliar expedientes (requiere EXPEDIENTE_ADJUNTAR).' });
+    }
+
+    const tieneGlobal = permisosAdjuntar.some((p) => p.ambito === 'GLOBAL' && p.areaId === null);
+    if (!tieneGlobal) {
+      const areasAutorizadas = permisosAdjuntar
+        .filter((p) => p.ambito === 'AREA' && p.areaId !== null)
+        .map((p) => p.areaId as string);
+
+      if (areasAutorizadas.length === 0) {
+        throw new ForbiddenError({ detail: 'El permiso de digitalización no tiene un ámbito organizacional válido.' });
+      }
+
+      const areaRes = await this.pool.query<{ area_actual_id: string | null }>(
+        `SELECT
+           COALESCE(
+             NULLIF(a.area_actual_id, ''),
+             CASE WHEN ar.canal_ingreso IN ('MESA_PRESENCIAL', 'MESA_VIRTUAL')
+                  THEN (SELECT area_id::text FROM sigd_org.area WHERE codigo = 'MP')
+                  ELSE e.area_destino_id::text
+             END,
+             (SELECT area_id::text FROM sigd_org.area WHERE codigo = 'MP')
+           ) AS area_actual_id
+         FROM sigd_tra.expediente e
+         LEFT JOIN sigd_rut.estado_actual_expediente a USING (expediente_id)
+         LEFT JOIN (
+           SELECT DISTINCT ON (expediente_id)
+                  expediente_id, canal_ingreso, anulado
+             FROM sigd_tra.asiento_registro
+            WHERE anulado = FALSE
+            ORDER BY expediente_id, numero_registro ASC
+         ) ar ON ar.expediente_id = e.expediente_id
+         WHERE e.expediente_id = $1::uuid`,
+        [expedienteId],
+      );
+
+      if (areaRes.rowCount === 0) {
+        throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
+      }
+
+      const areaActual = areaRes.rows[0]?.area_actual_id;
+      if (!areaActual) {
+        throw new ForbiddenError({ detail: 'No se pudo determinar el área actual del expediente para verificar la autorización.' });
+      }
+
+      if (!areasAutorizadas.includes(areaActual)) {
+        throw new ForbiddenError({ detail: 'El expediente no se encuentra en el área asignada al usuario.' });
+      }
+    }
+
+    if (actor.puedeVerExpediente && !(await actor.puedeVerExpediente(expedienteId))) {
+      throw new ForbiddenError({ detail: 'No cuenta con autorización para intervenir este expediente.' });
+    }
+  }
+
   public async adjuntarDocumento(
     expedienteId: string,
     input: AdjuntarDocumentoInput,
     usuarioId: string,
     actor: ActorRutaDoc,
   ): Promise<ResultadoDigitalizacion> {
-    // 1. Autorización: Ciudadano externo no puede digitalizar ni foliar trámites
-    if (actor.roles?.includes('CIUDADANO') && !actor.roles.some((r) => r !== 'CIUDADANO')) {
-      throw new ForbiddenError({ detail: 'No cuenta con facultades para digitalizar o foliar expedientes.' });
-    }
-
-    if (actor.puedeVerExpediente && !(await actor.puedeVerExpediente(expedienteId))) {
-      throw new ForbiddenError({ detail: 'No cuenta con autorización para intervenir este expediente.' });
-    }
+    // 1. Autorización explícita previa a cualquier acceso a almacenamiento o BD
+    await this.verificarAutorizacionAdjuntar(expedienteId, actor);
 
     // 2. Verificar archivo en MinIO S3
     const archivoS3 = await this.verificarArchivoEnStorage(input);

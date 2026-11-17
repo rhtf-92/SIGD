@@ -98,6 +98,44 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
       }
       const actor = await proveedorActor.obtenerActor(req);
       if (!actor) throw new UnauthorizedError();
+      if (actor.permisos !== undefined) {
+        const permisosAdjuntar = actor.permisos.filter(p => p.codigo === 'EXPEDIENTE_ADJUNTAR');
+        let autorizado = permisosAdjuntar.some(p => p.ambito === 'GLOBAL' && p.areaId === null);
+        if (!autorizado && permisosAdjuntar.some(p => p.ambito === 'AREA' && p.areaId !== null)) {
+          const areas = permisosAdjuntar.filter(p => p.ambito === 'AREA' && p.areaId !== null).map(p => p.areaId);
+          const acceso = await pool.query<{ autorizado: boolean }>(`SELECT EXISTS (
+            SELECT 1 FROM sigd_tra.expediente e
+            LEFT JOIN sigd_rut.estado_actual_expediente a USING (expediente_id)
+            LEFT JOIN (
+              SELECT DISTINCT ON (expediente_id)
+                     expediente_id, canal_ingreso, anulado
+                FROM sigd_tra.asiento_registro
+               WHERE anulado = FALSE
+               ORDER BY expediente_id, numero_registro ASC
+            ) ar ON ar.expediente_id = e.expediente_id
+            WHERE e.expediente_id::text=$1
+              AND (
+                CASE
+                  WHEN a.expediente_id IS NOT NULL AND NULLIF(a.area_actual_id, '') IS NOT NULL
+                       THEN NULLIF(a.area_actual_id, '')
+                  WHEN a.expediente_id IS NOT NULL AND a.estado_nuevo = 'RESUELTO'
+                       THEN COALESCE(
+                         (SELECT m.datos->>'areaId' FROM sigd_rut.movimiento_tramite m
+                           WHERE m.expediente_id = e.expediente_id AND m.datos->>'areaId' IS NOT NULL
+                           ORDER BY m.secuencia DESC LIMIT 1),
+                         e.area_destino_id::text
+                       )
+                  WHEN ar.canal_ingreso IN ('MESA_PRESENCIAL', 'MESA_VIRTUAL') AND (ar.anulado IS FALSE OR ar.anulado IS NULL)
+                       THEN (SELECT area_id::text FROM sigd_org.area WHERE codigo = 'MP')
+                  ELSE NULL
+                END
+              ) = ANY($2::text[])) AS autorizado`, [id, areas]);
+          autorizado = acceso.rows[0]?.autorizado === true;
+        }
+        if (!autorizado) {
+          throw new ForbiddenError({ detail: 'No cuenta con facultades para digitalizar o foliar este expediente.' });
+        }
+      }
       const datos = adjuntarDocumentoSchema.parse(req.body);
       const resultado = await digitalizacionService.adjuntarDocumento(id, datos, actor.id, actor);
       res.status(201).json(resultado);
