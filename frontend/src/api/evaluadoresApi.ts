@@ -4,6 +4,7 @@ import type {
   HistorialEvaluadorItem,
   DocenteElegible,
   ReasignacionMasivaResultado,
+  EvaluacionSupervisionItem,
 } from '../types/expediente';
 
 export interface AsignarEvaluadorPayload {
@@ -110,19 +111,7 @@ export interface EmitirDictamenPayload {
   requisitosAprobados?: string[];
 }
 
-export interface EvaluacionSupervisionItem {
-  idAsignacion: string;
-  expedienteId: string;
-  codigoExpediente: string;
-  asunto: string;
-  docenteNombre: string;
-  docenteEmail: string;
-  estadoEvaluacion: string;
-  estadoExpediente: string;
-  asignadoEn: string;
-  diasTranscurridos: number;
-  resultadoEvaluacion: string | null;
-}
+export type { EvaluacionSupervisionItem };
 
 /**
  * Consulta el evaluador activo actualmente asignado a un expediente.
