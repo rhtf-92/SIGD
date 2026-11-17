@@ -502,18 +502,22 @@ $datos_suiza$::jsonb;
   fila jsonb;
   existente jsonb;
 BEGIN
-  IF current_database() NOT IN ('sigd_prueba', 'sigd_migraciones_test')
-     AND current_database() !~ '^sigd_suiza_repro_[0-9]+$' THEN
-    RAISE EXCEPTION 'Destino no autorizado para esta carga de desarrollo: %', current_database();
+  IF current_database() NOT IN ('sigd_jacobo_demo') THEN
+    RAISE EXCEPTION 'Destino no autorizado para esta carga institucional: %. Exclusivo para sigd_jacobo_demo.', current_database();
   END IF;
-  IF (SELECT count(*) FROM sigd_doc.tipo_tramite_tupa
-       WHERE (codigo, tipo_tramite_id) IN (
+  -- Esta carga conserva las 19 fichas iniciales. No reducir ni reescribir el catálogo completo.
+  IF current_database() = 'sigd_jacobo_demo' AND
+     (SELECT count(*) FROM sigd_doc.tipo_tramite_tupa WHERE vigente AND codigo LIKE 'SUZ26-%') = 72 THEN
+    RAISE NOTICE 'Catálogo de 72 conceptos ya instalado; carga inicial omitida sin modificar registros.';
+    RETURN;
+  END IF;
+  IF EXISTS (SELECT 1 FROM sigd_doc.tipo_tramite_tupa
+       WHERE codigo IN ('TUPA-01','TUPA-02','TUPA-03') AND (codigo, tipo_tramite_id) NOT IN (
          ('TUPA-01', '00000000-0000-0000-0000-000000000001'::uuid),
          ('TUPA-02', '00000000-0000-0000-0000-000000000002'::uuid),
-         ('TUPA-03', '00000000-0000-0000-0000-000000000003'::uuid))) <> 3 THEN
-    RAISE EXCEPTION 'Falta la semilla original o sus identificadores difieren. No se sobrescribe.';
+         ('TUPA-03', '00000000-0000-0000-0000-000000000003'::uuid))) THEN
+    RAISE EXCEPTION 'Identificadores históricos incompatibles. No se sobrescribe ni se crea la semilla retirada.';
   END IF;
-
   -- Prevalidar TODAS las filas antes de cualquier INSERT/UPDATE.
 
   FOR fila IN SELECT value FROM jsonb_array_elements(datos->'tipo_tramite_tupa') LOOP

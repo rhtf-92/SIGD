@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { apiClient } from '../../api/client';
-import type { ConceptoTupaMesaPartes } from '../../data/catalogoTupaMesaPartes';
+import { useMemo, useState } from 'react';
+import { useCatalogoTupa2026 } from '../../hooks/useCatalogoTupa';
 
 /** Catálogo de consulta. No habilita por sí mismo un servicio para radicación formal. */
 export function CatalogoTupaCompleto({
@@ -10,30 +9,10 @@ export function CatalogoTupaCompleto({
   codigosRadicables: ReadonlySet<string>;
   onSeleccionarRadicable: (codigoInterno: string) => void;
 }) {
-  const [catalogo, setCatalogo] = useState<ConceptoTupaMesaPartes[]>([]);
-  const [errorCatalogo, setErrorCatalogo] = useState(false);
-  const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
+  const { data: catalogo = [], isLoading: cargandoCatalogo, isError: errorCatalogo, refetch } = useCatalogoTupa2026();
   const [busqueda, setBusqueda] = useState('');
   const [categoria, setCategoria] = useState('Todos');
   const [seleccion, setSeleccion] = useState<string | null>(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    apiClient.get<unknown>('/api/v1/tramites/catalogo-tupa-2026', { signal: controller.signal })
-      .then(({ data }) => {
-        if (!Array.isArray(data) || data.length !== 72 || data.some((item) => !item || typeof item !== 'object' ||
-          !('codigoInterno' in item) || typeof item.codigoInterno !== 'string' ||
-          !('nombre' in item) || typeof item.nombre !== 'string' ||
-          !('rubro' in item) || typeof item.rubro !== 'string' ||
-          !('paginaFuente' in item) || typeof item.paginaFuente !== 'number' ||
-          !('costoFuente' in item) || typeof item.costoFuente !== 'string')) {
-          throw new Error('Catálogo TUPA inválido');
-        }
-        setCatalogo(data as ConceptoTupaMesaPartes[]);
-      })
-      .catch(() => { if (!controller.signal.aborted) setErrorCatalogo(true); })
-      .finally(() => { if (!controller.signal.aborted) setCargandoCatalogo(false); });
-    return () => controller.abort();
-  }, []);
   const categorias = useMemo(() => ['Todos', ...new Set(catalogo.map((item) => item.rubro))], [catalogo]);
   const items = useMemo(() => {
     const normalizar = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-PE');
@@ -49,7 +28,7 @@ export function CatalogoTupaCompleto({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 id="catalogo-tupa-title" className="text-base font-bold text-slate-900">Catálogo TUPA 2026</h3>
-          <p className="mt-1 text-xs text-slate-600">72 filas del tarifario institucional, organizadas por rubro. Los códigos mostrados son referencias internas.</p>
+          <p className="mt-1 text-xs text-slate-600">Tarifario institucional organizado por rubro. Los códigos mostrados son referencias internas.</p>
         </div>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">{items.length} conceptos</span>
       </div>
@@ -66,7 +45,12 @@ export function CatalogoTupaCompleto({
         </label>
       </div>
       {cargandoCatalogo && <p role="status" className="mt-3 text-sm text-slate-600">Cargando catálogo TUPA…</p>}
-      {errorCatalogo && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">No se pudo consultar el catálogo TUPA. Reintente más tarde.</p>}
+      {errorCatalogo && (
+        <div role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800 flex items-center justify-between">
+          <span>No se pudo consultar el catálogo TUPA. Reintente más tarde.</span>
+          <button type="button" onClick={() => void refetch()} className="font-semibold underline hover:text-red-900 ml-2">Reintentar</button>
+        </div>
+      )}
       {!cargandoCatalogo && !errorCatalogo && <div className="mt-3 max-h-64 overflow-auto rounded-lg border border-slate-200 bg-white" role="listbox" aria-label="72 conceptos del TUPA Suiza 2026">
         {items.map((item) => (
           <button key={item.codigoInterno} type="button" role="option" aria-selected={seleccion === item.codigoInterno}

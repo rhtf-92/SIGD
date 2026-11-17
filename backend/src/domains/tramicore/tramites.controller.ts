@@ -177,6 +177,10 @@ export function crearRouterTramites(
       SELECT t.tipo_tramite_id AS id,
              t.tipo_tramite_id AS id_tipo_tramite,
              t.codigo,
+             t.codigo AS "codigoInterno",
+             'SUZ26-' || LPAD(ROW_NUMBER() OVER (ORDER BY t.codigo ASC)::text, 3, '0') AS "codigoVisible",
+             LPAD(ROW_NUMBER() OVER (ORDER BY t.codigo ASC)::text, 3, '0') AS "numeroVisible",
+             COALESCE(NULLIF(t.tupa_fuente->>'costoFuente', ''), 'Gratuito') AS "costoFuente",
              t.denominacion,
              t.descripcion,
              t.unidad_organica,
@@ -211,9 +215,34 @@ export function crearRouterTramites(
   // Catálogo de consulta completo: incluye servicios/bienes que no son
   // automáticamente expedientes radicables. Las tarifas se muestran como
   // transcripción fuente y no habilitan órdenes M10 por sí solas.
-  router.get('/tramites/catalogo-tupa-2026', (_req: Request, res: Response) => {
-    res.setHeader('Cache-Control', 'public, max-age=300');
-    res.status(200).json(CATALOGO_TUPA_2026);
+  // Fuente única de verdad: PostgreSQL (sigd_doc.tipo_tramite_tupa)
+  router.get('/tramites/catalogo-tupa-2026', async (_req: Request, res: Response, next) => {
+    try {
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      if (!pool || typeof pool.query !== 'function') {
+        res.status(200).json(CATALOGO_TUPA_2026);
+        return;
+      }
+      const query = `
+        SELECT 
+          t.codigo AS "codigoInterno",
+          'SUZ26-' || LPAD(ROW_NUMBER() OVER (ORDER BY t.codigo ASC)::text, 3, '0') AS "codigoVisible",
+          LPAD(ROW_NUMBER() OVER (ORDER BY t.codigo ASC)::text, 3, '0') AS "numeroVisible",
+          COALESCE(t.tupa_fuente->'referenciasInternas', jsonb_build_array(t.codigo)) AS "referenciasInternas",
+          COALESCE(NULLIF(t.tupa_fuente->>'nombre', ''), t.denominacion) AS "nombre",
+          COALESCE(NULLIF(t.tupa_fuente->>'rubro', ''), 'Trámites y Servicios Institucionales') AS "rubro",
+          COALESCE((t.tupa_fuente->>'paginaFuente')::int, 1) AS "paginaFuente",
+          COALESCE(NULLIF(t.tupa_fuente->>'costoFuente', ''), 'Gratuito') AS "costoFuente",
+          COALESCE(t.tupa_fuente->'detallesTarifa', '[]'::jsonb) AS "detallesTarifa"
+        FROM sigd_doc.tipo_tramite_tupa t
+        WHERE t.vigente = TRUE
+        ORDER BY t.codigo ASC;
+      `;
+      const resultado = await pool.query(query);
+      res.status(200).json(resultado.rows);
+    } catch (error) {
+      next(error);
+    }
   });
   router.get(['/tramites/tipos/:id/documentacion', '/tramites/procedimientos/:id/documentacion'], async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');

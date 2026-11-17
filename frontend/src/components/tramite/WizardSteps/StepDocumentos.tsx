@@ -34,7 +34,6 @@ import { ResumenDocumental } from '../ResumenDocumental';
 import { calcularFoliacionFront } from '../../../utils/foliacion';
 import type { DocumentacionTramite, ClasificacionAdjunto } from '../../../types/documentacionTramite';
 import { consultarDocumentacion, validarAdjuntosRequisitos } from '../../../services/documentacionTramiteService';
-import { CATALOGO_TUPA_MESA_PARTES } from '../../../data/catalogoTupaMesaPartes';
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
@@ -143,17 +142,27 @@ function validarTiposFormales(data: unknown): TipoTramiteFormal[] | null {
         }));
     }
 
+    const itemObj = item as Record<string, unknown>;
+    const codigoVisible = typeof itemObj.codigoVisible === 'string' ? itemObj.codigoVisible : codigo;
+    const numeroVisible = typeof itemObj.numeroVisible === 'string' ? itemObj.numeroVisible : undefined;
+    const codigoInterno = typeof itemObj.codigoInterno === 'string' ? itemObj.codigoInterno : codigo;
+    const costoFuente = typeof itemObj.costoFuente === 'string' ? itemObj.costoFuente : undefined;
+
     tipos.push({
       id: item.id,
-      codigo,
+      codigo: codigoVisible,
+      codigoVisible,
+      numeroVisible,
+      codigoInterno,
       denominacion: item.denominacion.trim(),
       unidad_organica: item.unidad_organica,
       descripcion: 'descripcion' in item ? item.descripcion as string | null : undefined,
       vigente: true,
+      costoFuente,
       tipos_documentales: tiposDocumentales,
     });
   }
-  return tipos;
+  return [...tipos].sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }));
 }
 
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
@@ -309,21 +318,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           setErrorCatalogo('El catálogo formal devolvió datos incompletos o ambiguos. No se puede seleccionar un procedimiento para radicar.');
           return;
         }
-        const porCodigo = new Map(tipos.map(tipo => [tipo.codigo, tipo]));
-        const usarCodigoVisible = porCodigo.size >= 72;
-        const ordenados = CATALOGO_TUPA_MESA_PARTES.flatMap(concepto => {
-          const persistido = porCodigo.get(concepto.codigoInterno);
-          return persistido ? [{
-            ...persistido,
-            codigo: usarCodigoVisible ? concepto.codigoVisible : persistido.codigo,
-            codigoVisible: concepto.codigoVisible,
-            numeroVisible: concepto.numeroVisible,
-            codigoInterno: concepto.codigoInterno,
-            denominacion: concepto.nombre,
-            costoFuente: concepto.costoFuente,
-          }] : [];
-        });
-        setTiposFormales(ordenados);
+        setTiposFormales(tipos);
       })
       .catch(() => {
         if (!controller.signal.aborted) {

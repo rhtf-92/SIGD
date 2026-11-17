@@ -100,6 +100,18 @@ $RECYCLE.BIN/
 .antigravity/
 .gemini/
 scripts/
+!scripts/
+scripts/*
+!scripts/iniciar-sigd-local.ps1
+!scripts/detener-demo.ps1
+!scripts/estado-demo.ps1
+!scripts/reiniciar-demo.ps1
+!scripts/procesos-sigd.ps1
+
+scratch/
+!scratch/
+scratch/*
+!scratch/serve_demo.ts
 
 # --- Artefactos de Seguimiento de Agentes ---
 ORIGINAL_REQUEST.md

@@ -40,7 +40,17 @@ beforeEach(()=>{
 afterEach(()=>{vi.restoreAllMocks();useAuthStore.setState({isAuthenticated:false});});
 describe('Carga, sustitución y aislamiento de adjuntos',()=>{
   it('ofrece exactamente los 72 registros persistidos, en orden original y sin la tarjeta de catálogo',async()=>{
-    const tipos=CATALOGO_TUPA_MESA_PARTES.map((p,i)=>({id:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,codigo:p.codigoInterno,denominacion:p.nombre,vigente:true,unidad_organica:null}));
+    const tipos = CATALOGO_TUPA_MESA_PARTES.map((p, i) => ({
+      id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
+      codigo: p.codigoVisible,
+      codigoVisible: p.codigoVisible,
+      numeroVisible: p.numeroVisible,
+      codigoInterno: p.codigoInterno,
+      denominacion: p.nombre,
+      costoFuente: p.costoFuente,
+      vigente: true,
+      unidad_organica: null,
+    }));
     vi.mocked(apiClient.get).mockResolvedValue({data:[...tipos].reverse()});
     render(<Harness/>);
     await waitFor(()=>expect(document.querySelectorAll('select[name="tipoTramiteId"] option:not([disabled])')).toHaveLength(72));

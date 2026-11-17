@@ -5,7 +5,6 @@ import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
 import { ApiHttpError } from "../../types/api";
-import { CATALOGO_TUPA_MESA_PARTES } from '../../data/catalogoTupaMesaPartes';
 import { useAuthStore } from '../../stores/authStore';
 import DevolucionesMesaPartes from '../../components/tesoreria/DevolucionesMesaPartes';
 import { consultarDocumentacion } from '../../services/documentacionTramiteService';
@@ -20,7 +19,13 @@ interface TipoDocumental {
   vigente: boolean;
 }
 
-interface ProcedimientoFormal {  id: string;  codigo: string;  codigoVisible?: string;  numeroVisible?: string;  codigoInterno?: string;
+interface ProcedimientoFormal {
+  id: string;
+  codigo: string;
+  codigoVisible?: string;
+  numeroVisible?: string;
+  codigoInterno?: string;
+  costoFuente?: string;
   denominacion: string;
   descripcion: string | null;
   unidad_organica: string | null;
@@ -335,18 +340,18 @@ export default function VentanillaPresencialPage() {
             new Set(data.map(p => p.codigo)).size !== data.length) {
           throw new Error("Catálogo formal inválido.");
         }
-        const porCodigo = new Map(data.filter(p => p.vigente).map(p => [p.codigo, p]));
-        setProcedimientos(CATALOGO_TUPA_MESA_PARTES.flatMap(concepto => {
-          const persistido = porCodigo.get(concepto.codigoInterno);
-          return persistido ? [{
-            ...persistido,
-            codigo: persistido.codigo,
-            codigoVisible: concepto.codigoVisible,
-            numeroVisible: concepto.numeroVisible,
-            codigoInterno: concepto.codigoInterno,
-            denominacion: concepto.nombre,
-            descripcion: `${persistido.descripcion ?? ''}\nCosto según TUPA: ${concepto.costoFuente}${concepto.detallesTarifa.length ? '\n' + concepto.detallesTarifa.join('\n') : ''}` }] : [];
-        }));
+        const validos = data.filter(p => p.vigente);
+        setProcedimientos(validos.map(p => ({
+          ...p,
+          codigo: p.codigo,
+          codigoVisible: p.codigoVisible ?? p.codigo,
+          numeroVisible: p.numeroVisible,
+          codigoInterno: p.codigoInterno ?? p.codigo,
+          denominacion: p.denominacion,
+          descripcion: p.costoFuente && p.costoFuente !== 'Gratuito'
+            ? `${p.descripcion ?? ''}\nCosto según TUPA: ${p.costoFuente}`.trim()
+            : (p.descripcion ?? null),
+        })));
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -1079,7 +1084,7 @@ export default function VentanillaPresencialPage() {
 
                 tabIndex={-1}
               >
-                <option value="" disabled hidden>Seleccione un procedimiento o servicio (72 vigentes)</option>
+                <option value="" disabled hidden>Seleccione un procedimiento o servicio</option>
                 <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
                 {procedimientosFiltrados.map((procedimiento) => (
                   <option key={procedimiento.codigo} value={procedimiento.codigo}>
