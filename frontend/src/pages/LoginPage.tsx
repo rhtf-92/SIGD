@@ -32,11 +32,11 @@ export default function LoginPage() {
 
   function redirigirSegunContexto() {
     const usuario = useAuthStore.getState().usuario;
-    const rol = usuario?.rol ?? usuario?.contextoActivo?.codigo;
+    const codigoContexto = usuario?.rol || usuario?.capacidadActiva || usuario?.contextoActivo?.codigo || "";
     const esAdministrador = Boolean(
       usuario?.roles?.some((r) => r === "ADMINISTRADOR" || r === "SUPER_ADMIN") ||
-      rol === "ADMINISTRADOR" ||
-      rol === "SUPER_ADMIN" ||
+      codigoContexto === "ADMINISTRADOR" ||
+      codigoContexto === "SUPER_ADMIN" ||
       usuario?.permisos?.some(
         (p) => p.codigo === "ADMIN_USUARIOS" && p.ambito === "GLOBAL" && p.areaId === null,
       ),
@@ -63,7 +63,7 @@ export default function LoginPage() {
     navigate(
       esAdministrador
         ? "/administracion"
-        : safeReturnTo ?? (rol ? DESTINOS_POR_ROL[rol] ?? "/" : "/"),
+        : safeReturnTo ?? (codigoContexto ? DESTINOS_POR_ROL[codigoContexto] ?? "/" : "/"),
       { replace: true },
     );
   }

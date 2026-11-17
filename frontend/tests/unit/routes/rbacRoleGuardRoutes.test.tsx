@@ -34,6 +34,7 @@ function sesion(rol: string, permisos: Array<{ codigo: string; ambito: string; a
   localStorage.setItem("sigd_token", "jwt-de-prueba");
   localStorage.setItem("sigd_rol", rol);
   localStorage.setItem("sigd_roles", JSON.stringify([rol]));
+  localStorage.removeItem("sigd_capacidad");
   localStorage.setItem("sigd_facultades", JSON.stringify(permisos));
   useAuthStore.setState({
     accessToken: "jwt-de-prueba",
@@ -46,6 +47,49 @@ function sesion(rol: string, permisos: Array<{ codigo: string; ambito: string; a
       rol,
       roles: [rol],
       permisos: permisos as any,
+    },
+  });
+}
+
+function sesionCapacidad(
+  capacidad: string,
+  permisos: Array<{ codigo: string; ambito: string; areaId: string | null }> = [
+    { codigo: "EXPEDIENTE_LEER", ambito: "GLOBAL", areaId: null },
+    { codigo: "EXPEDIENTE_RECEPCIONAR", ambito: "AREA", areaId: "area-test-uuid" },
+    { codigo: "EXPEDIENTE_DERIVAR", ambito: "AREA", areaId: "area-test-uuid" },
+    { codigo: "EXPEDIENTE_ADJUNTAR", ambito: "AREA", areaId: "area-test-uuid" },
+  ]
+) {
+  localStorage.setItem("sigd_token", "jwt-de-prueba");
+  localStorage.setItem("sigd_capacidad", capacidad);
+  localStorage.setItem("sigd_roles", "[]");
+  localStorage.removeItem("sigd_rol");
+  localStorage.setItem("sigd_facultades", JSON.stringify(permisos));
+  useAuthStore.setState({
+    accessToken: "jwt-de-prueba",
+    refreshToken: "ref-de-prueba",
+    isAuthenticated: true,
+    usuario: {
+      id: "usr-unit-test-capacidad",
+      nombreCompleto: `Personal de Apoyo (${capacidad})`,
+      correo: "apoyo@iestp.edu.pe",
+      rol: "",
+      roles: [],
+      capacidadActiva: capacidad,
+      capacidades: [capacidad],
+      permisos: permisos as any,
+      contextoActivo: {
+        idAsignacion: "asig-cap-test",
+        tipo: "CAPACIDAD",
+        codigo: capacidad,
+        nombre: "Apoyo de Área",
+        areaId: "area-test-uuid",
+        areaNombre: "Desarrollo de Sistemas",
+        permisos: permisos as any,
+        vigenteDesde: "2026-01-01T00:00:00Z",
+        vigenteHasta: null,
+        activo: true,
+      },
     },
   });
 }
@@ -225,6 +269,35 @@ describe("Matriz de Guardias de Rutas y Autorización por Rol (ENT-M05-01 / AppR
 
       montar("/expedientes");
       expect(screen.getByText("Bandeja expedientes")).toBeInTheDocument();
+    });
+  });
+
+  describe("Capacidad Operativa Delegada GESTOR_APOYO_AREA (Secretaría de Apoyo)", () => {
+    it("accede a bandeja de expedientes (/expedientes) mediante requiredCapacidades", () => {
+      sesionCapacidad("GESTOR_APOYO_AREA");
+      montar("/expedientes");
+      expect(screen.getByText("Bandeja expedientes")).toBeInTheDocument();
+      expect(screen.getByTestId("ruta-actual")).toHaveTextContent(/^\/expedientes$/);
+    });
+
+    it("accede al detalle de expediente (/expedientes/:id) mediante requiredCapacidades", () => {
+      sesionCapacidad("GESTOR_APOYO_AREA");
+      montar("/expedientes/exp-123-uuid");
+      expect(screen.getByText("Detalle expediente")).toBeInTheDocument();
+    });
+
+    it.each([
+      "/administracion",
+      "/flujos/proyector-resoluciones",
+      "/flujo-validez-legal/firma",
+      "/tramite/ventanilla-presencial",
+      "/expedientes/supervision",
+      "/expedientes/mis-evaluaciones",
+    ])("deniega acceso a ruta exclusiva institucional %s y redirige a /acceso-denegado", (ruta) => {
+      sesionCapacidad("GESTOR_APOYO_AREA");
+      montar(ruta);
+      expect(screen.getByText("Acceso denegado")).toBeInTheDocument();
+      expect(screen.getByTestId("ruta-actual")).toHaveTextContent(/^\/acceso-denegado$/);
     });
   });
 });

@@ -239,6 +239,20 @@ export interface DocenteElegible {
   areaNombre?: string | null;
 }
 
+export interface EvaluacionSupervisionItem {
+  idAsignacion: string;
+  expedienteId: string;
+  codigoExpediente: string;
+  asunto: string;
+  docenteNombre: string;
+  docenteEmail: string;
+  estadoEvaluacion: string;
+  estadoExpediente: string;
+  asignadoEn: string;
+  diasTranscurridos: number;
+  resultadoEvaluacion: string | null;
+}
+
 export interface ReasignacionMasivaResultado {
   ok: boolean;
   mensaje: string;

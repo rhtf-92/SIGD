@@ -146,9 +146,11 @@ export default function HomePage() {
         "DOCENTE",
         "COORDINADOR_AREA",
         "JEFE_UNIDAD_ACADEMICA",
-        "GESTOR_APOYO_AREA",
       ].includes(r)
-    );
+    ) ||
+    usuario?.capacidadActiva === "GESTOR_APOYO_AREA" ||
+    usuario?.contextoActivo?.codigo === "GESTOR_APOYO_AREA" ||
+    (Array.isArray(usuario?.capacidades) && usuario.capacidades.includes("GESTOR_APOYO_AREA"));
 
   const esCiudadano = roles.includes("CIUDADANO") || (!esPersonal && isAuthenticated);
 

@@ -169,17 +169,21 @@ export default function AppRouter() {
       <Route
         path="/expedientes"
         element={
-          <ProtectedRoute requiredRoles={[
-            "ADMINISTRADOR",
-            "SUPER_ADMIN",
-            "DIRECTOR",
-            "JEFE_UNIDAD_ACADEMICA",
-            "COORDINADOR_AREA",
-            "SECRETARIO",
-            "DOCENTE",
-            "GESTOR_APOYO_AREA",
-            "MESA_PARTES"
-          ]}>
+          <ProtectedRoute
+            requiredRoles={[
+              "ADMINISTRADOR",
+              "SUPER_ADMIN",
+              "DIRECTOR",
+              "JEFE_UNIDAD_ACADEMICA",
+              "COORDINADOR_AREA",
+              "SECRETARIO",
+              "DOCENTE",
+              "MESA_PARTES"
+            ]}
+            requiredCapacidades={[
+              "GESTOR_APOYO_AREA"
+            ]}
+          >
             <BandejaExpedientesPage />
           </ProtectedRoute>
         }
@@ -187,17 +191,21 @@ export default function AppRouter() {
       <Route
         path="/expedientes/:id"
         element={
-          <ProtectedRoute requiredRoles={[
-            "ADMINISTRADOR",
-            "SUPER_ADMIN",
-            "DIRECTOR",
-            "JEFE_UNIDAD_ACADEMICA",
-            "COORDINADOR_AREA",
-            "SECRETARIO",
-            "DOCENTE",
-            "GESTOR_APOYO_AREA",
-            "MESA_PARTES"
-          ]}>
+          <ProtectedRoute
+            requiredRoles={[
+              "ADMINISTRADOR",
+              "SUPER_ADMIN",
+              "DIRECTOR",
+              "JEFE_UNIDAD_ACADEMICA",
+              "COORDINADOR_AREA",
+              "SECRETARIO",
+              "DOCENTE",
+              "MESA_PARTES"
+            ]}
+            requiredCapacidades={[
+              "GESTOR_APOYO_AREA"
+            ]}
+          >
             <ExpedienteDetallePage />
           </ProtectedRoute>
         }

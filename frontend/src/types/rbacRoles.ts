@@ -16,6 +16,15 @@ export type RolCanonicoId =
   // Rol transversal de plataforma SaaS (Migración 25)
   | "SUPER_ADMIN";
 
+// Capacidad operativa delegada institucional (Secretaría de Apoyo de Área)
+export type CapacidadOperativaId =
+  | "GESTOR_APOYO_AREA";
+
+// Distinción formal de contexto de autorización
+export type TipoContextoInstitucional =
+  | "ROL"
+  | "CAPACIDAD";
+
 export interface Rol {
   id: string;
   nombre: string;
