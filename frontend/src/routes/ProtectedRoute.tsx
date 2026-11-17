@@ -14,8 +14,8 @@ const CLAVE_PERMISOS = "sigd_facultades";
 
 interface ProtectedRouteProps {
   children?: ReactNode;
-  requiredRoles?: (RolCanonicoId | string)[];
-  requiredCapacidades?: (CapacidadOperativaId | string)[];
+  requiredRoles?: readonly RolCanonicoId[];
+  requiredCapacidades?: readonly CapacidadOperativaId[];
   requiredModule?: string;
   requiredAction?: ClavePermiso;
 }
