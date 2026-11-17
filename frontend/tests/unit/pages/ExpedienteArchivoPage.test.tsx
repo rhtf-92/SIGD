@@ -6,7 +6,7 @@ import ExpedienteDetallePage from '@/pages/expedientes/ExpedienteDetallePage';
 import { apiClient } from '@/api/client';
 const fixture = vi.hoisted(() => ({ permiso: true, estado: 'RESUELTO', area: 'area-1', traza: true }));
 vi.mock('@/api/client', () => ({ apiClient: { get: vi.fn(), post: vi.fn() } }));
-vi.mock('@/stores/authStore', () => ({ useAuthStore: (selector: (state: unknown) => unknown) => selector({ usuario: { permisos: fixture.permiso ? [{ codigo: 'EXPEDIENTE_RESOLVER', ambito: 'AREA', areaId: 'area-1' }] : [] } }) }));
+vi.mock('@/stores/authStore', () => ({ useAuthStore: (selector: (state: unknown) => unknown) => selector({ usuario: { permisos: fixture.permiso ? [{ codigo: 'EXPEDIENTE_RESOLVER', ambito: 'AREA', areaId: 'area-1' }, { codigo: 'EXPEDIENTE_RECEPCIONAR', ambito: 'AREA', areaId: 'area-1' }] : [] } }) }));
 vi.mock('@/hooks/useBandejaExpedientes', () => ({ mensajeErrorExpediente: () => 'Error', useExpedienteDetalle: () => ({ data: { idExpediente: 'exp-prueba', cut: 'EXP-PRUEBA', estadoActual: fixture.estado, areaActualId: fixture.area, documentos: [], ultimoMovimiento: fixture.traza && fixture.estado !== 'REGISTRADO' ? { idMovimiento: 'mov-prueba', evento: 'CIERRE', estadoNuevo: fixture.estado, fechaHora: '2026-10-27T12:00:00Z', usuarioOperadorId: '990000001' } : null } }) }));
 vi.mock('@/hooks/useExpedienteTimeline', () => ({ useExpedienteTimeline: () => ({ data: [] }) }));
 vi.mock('@/hooks/useTablasMaestras', () => ({ useTablasMaestras: () => ({ areasReales: [] }) }));

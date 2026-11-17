@@ -822,19 +822,38 @@ export default function ExpedienteDetallePage() {
   const { data, isLoading: cargandoExpediente, isError: errorExpediente, error } = useExpedienteDetalle(id);
   const expediente = errorExpediente ? undefined : data;
   const estadoSinActuacion = Boolean(expediente && expediente.estadoActual !== "REGISTRADO" && !expediente.ultimoMovimiento);
-  const puedeRecepcionar = usuarioArchivo?.permisos?.some((p) =>
-    ["EXPEDIENTE_DERIVAR", "EXPEDIENTE_RESOLVER"].includes(p.codigo) &&
-    ((p.ambito === "GLOBAL" && p.areaId === null) ||
-      (p.ambito === "AREA" && p.areaId != null && p.areaId === expediente?.areaActualId))) === true;
 
-  const puedeDigitalizar = Boolean(
-    usuarioArchivo &&
-    (
-      ["MESA_PARTES", "ADMINISTRADOR", "DIRECTOR", "SECRETARIO"].includes(usuarioArchivo.rol) ||
-      usuarioArchivo.roles?.some((r) => ["MESA_PARTES", "ADMINISTRADOR", "DIRECTOR", "SECRETARIO"].includes(r)) ||
-      usuarioArchivo.permisos?.some((p) => ["EXPEDIENTE_DERIVAR", "EXPEDIENTE_LEER", "EXPEDIENTE_RESOLVER"].includes(p.codigo))
-    )
-  );
+  const permisosEfectivos = useMemo(() => {
+    if (!usuarioArchivo) return [];
+    if (usuarioArchivo.contextoActivo) {
+      return Array.isArray(usuarioArchivo.contextoActivo.permisos)
+        ? usuarioArchivo.contextoActivo.permisos
+        : [];
+    }
+    return Array.isArray(usuarioArchivo.permisos)
+      ? usuarioArchivo.permisos
+      : [];
+  }, [usuarioArchivo]);
+
+  const tieneFacultad = useMemo(() => {
+    return (codigo: string): boolean => {
+      if (!expediente || permisosEfectivos.length === 0) return false;
+      return permisosEfectivos.some((p) => {
+        if (!p || p.codigo !== codigo) return false;
+        if (p.ambito === "GLOBAL" && (p.areaId === null || p.areaId === undefined)) {
+          return true;
+        }
+        if (p.ambito === "AREA" && p.areaId != null && expediente.areaActualId != null) {
+          return p.areaId === expediente.areaActualId;
+        }
+        return false;
+      });
+    };
+  }, [expediente, permisosEfectivos]);
+
+  const puedeRecepcionar = tieneFacultad("EXPEDIENTE_RECEPCIONAR");
+  const puedeDigitalizar = tieneFacultad("EXPEDIENTE_ADJUNTAR");
+  const puedeDerivar = tieneFacultad("EXPEDIENTE_DERIVAR");
 
   const [modalAsignarEvaluador, setModalAsignarEvaluador] = useState(false);
   const [mostrarHistorialEvaluadores, setMostrarHistorialEvaluadores] = useState(false);
@@ -882,12 +901,19 @@ export default function ExpedienteDetallePage() {
   }, [cargandoAreas, errorAreas, unidadesDestino]);
 
   const ultimaUnidadDestinoRef = useRef<string | null>(null);
+  const puedeDerivarRef = useRef(puedeDerivar);
+  useEffect(() => {
+    puedeDerivarRef.current = puedeDerivar;
+  }, [puedeDerivar]);
 
   const servicioExpediente = useMemo(
     () =>
       crearServicioExpedienteActions({
         derivacion: {
           construirPayload: (entrada) => {
+            if (!puedeDerivarRef.current) {
+              throw new Error("No cuenta con autorización para derivar este expediente.");
+            }
             ultimaUnidadDestinoRef.current = entrada.unidadDestinoId;
             return {
               destinos: [{ area_destino_id: entrada.unidadDestinoId, es_copia: false }],
@@ -993,7 +1019,7 @@ export default function ExpedienteDetallePage() {
   };
 
   const ejecutarRecepcion = async () => {
-    if (!expediente || recepcionando) return;
+    if (!expediente || recepcionando || !puedeRecepcionar) return;
     setRecepcionando(true);
     setMensajeAlerta(null);
     try {
@@ -1090,9 +1116,7 @@ export default function ExpedienteDetallePage() {
                     Proyectar Resolución
                   </button>
                 )}
-                {!estadoSinActuacion && expediente.estadoActual === "RESUELTO" && usuarioArchivo?.permisos?.some((p) =>
-                  p.codigo === "EXPEDIENTE_RESOLVER" && (p.ambito === "GLOBAL" ||
-                    (p.ambito === "AREA" && p.areaId != null && p.areaId === expediente.areaActualId))) && (
+                {!estadoSinActuacion && expediente.estadoActual === "RESUELTO" && tieneFacultad("EXPEDIENTE_RESOLVER") && (
                   <button
                     type="button"
                     title="Archivar el expediente en el archivo físico institucional (CIERRE → ARCHIVADO)"
@@ -1102,21 +1126,26 @@ export default function ExpedienteDetallePage() {
                     📁 Archivar Expediente
                   </button>
                 )}
-                <button
-                  type="button"
-                  disabled={unidadesDestino.length === 0 || estadoSinActuacion}
-                  title={
-                    unidadesDestino.length === 0
-                      ? "No hay unidades de destino disponibles en el catálogo institucional"
-                      : "Derivar expediente a otra unidad orgánica"
-                  }
-                  onClick={() => setModalActivo("derivacion")}
-                  className={`rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800 ${
-                    unidadesDestino.length === 0 ? "opacity-60 cursor-not-allowed" : ""
-                  }`}
-                >
-                  Derivar Expediente
-                </button>
+                {puedeDerivar && (
+                  <button
+                    type="button"
+                    disabled={unidadesDestino.length === 0 || estadoSinActuacion}
+                    title={
+                      unidadesDestino.length === 0
+                        ? "No hay unidades de destino disponibles en el catálogo institucional"
+                        : "Derivar expediente a otra unidad orgánica"
+                    }
+                    onClick={() => {
+                      if (!puedeDerivar) return;
+                      setModalActivo("derivacion");
+                    }}
+                    className={`rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800 ${
+                      unidadesDestino.length === 0 ? "opacity-60 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    Derivar Expediente
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setModalActivo("observacion")}
@@ -1376,7 +1405,7 @@ export default function ExpedienteDetallePage() {
 
             {/* Modales de Acciones Procesales */}
             <DerivacionModal
-              open={modalActivo === "derivacion"}
+              open={modalActivo === "derivacion" && puedeDerivar}
               onClose={() => setModalActivo(null)}
               expediente={expedienteParaAccion}
               unidades={estadoUnidades}
