@@ -222,11 +222,11 @@ describe('migrador con selección segura de archivo',()=>{
   `;
   expect(() => validarEstructuraTransaccional(sqlHistorico, '20_migracion_historica.sql')).not.toThrow();
  });
- it('las migraciones 22 a 27 en disco cumplen estrictamente la validación estructural transaccional',()=>{
+ it('las migraciones 22 a 28 en disco cumplen estrictamente la validación estructural transaccional',()=>{
   const directorio = path.resolve(process.cwd(), 'migraciones');
-  const migracionesNuevas = ['22', '23', '24', '25', '26', '27'];
+  const migracionesNuevas = ['22', '23', '24', '25', '26', '27', '28'];
   const archivos = fs.readdirSync(directorio).filter(f => migracionesNuevas.some(num => f.startsWith(`${num}_`)));
-  expect(archivos.length).toBe(6);
+  expect(archivos.length).toBe(7);
 
   for (const archivo of archivos) {
     const contenido = fs.readFileSync(path.join(directorio, archivo), 'utf8');
@@ -235,10 +235,11 @@ describe('migrador con selección segura de archivo',()=>{
     expect(detectados, `Migración ${archivo} no debe contener comandos transaccionales de nivel superior`).toEqual([]);
   }
  });
- it('las 25 migraciones activas en raíz y 2 archivadas en pendientes (total 27) se validan correctamente',()=>{
+ it('las 26 migraciones activas en raíz y 2 archivadas en pendientes (total 28) se validan correctamente',()=>{
   const directorio = path.resolve(process.cwd(), 'migraciones');
   const archivosRaiz = fs.readdirSync(directorio).filter(f => /^\d{2}_.*\.sql$/.test(f));
-  expect(archivosRaiz.length).toBe(25);
+  expect(archivosRaiz.length).toBe(26);
+  expect(archivosRaiz).toContain('28_sigd_org_eliminacion_definitiva_rol_especialista.sql');
 
   const dirPendientes = path.join(directorio, 'pendientes');
   const archivosPendientes = fs.existsSync(dirPendientes)
@@ -247,7 +248,7 @@ describe('migrador con selección segura de archivo',()=>{
   expect(archivosPendientes.length).toBe(2);
 
   const totalArchivos = [...archivosRaiz.map(f => path.join(directorio, f)), ...archivosPendientes.map(f => path.join(dirPendientes, f))];
-  expect(totalArchivos.length).toBe(27);
+  expect(totalArchivos.length).toBe(28);
 
   for (const rutaCompleta of totalArchivos) {
     const nombreArchivo = path.basename(rutaCompleta);
