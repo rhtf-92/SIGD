@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import request from 'supertest';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { construirApp } from '../../../../src/app.js';
 import type { ActorRutaDoc } from '../../../../src/domains/rutadoc/rutadoc.types.js';
 
@@ -63,14 +63,14 @@ function crearAppRecepcion(actor: ActorRutaDoc | null, poolQueryMock?: any, clie
   });
 }
 
-describe('T-BE-RD-12 / FASE 7B: Endpoint HTTP de Recepción Formal', () => {
-  it('1. POST /api/v1/expedientes/:id/recepcionar retorna 200 OK con payload institucional cuando está autorizado', async () => {
+describe('T-BE-RD-12 / FASE 7B: Endpoint HTTP de Recepción Formal [HAL-B03-07 / OBS-13-01]', () => {
+  it('1. POST /api/v1/expedientes/:id/recepcionar retorna 200 OK con payload institucional cuando está autorizado con EXPEDIENTE_RECEPCIONAR en ámbito AREA', async () => {
     const actorSec: ActorRutaDoc = {
       id: mockOperadorId,
-      roles: ['SECRETARIO', 'ESPECIALISTA'],
+      roles: ['SECRETARIO'],
       unidadOrganicaId: mockAreaSecId,
       permisos: [
-        { codigo: 'EXPEDIENTE_RESOLVER', ambito: 'AREA', areaId: mockAreaSecId },
+        { codigo: 'EXPEDIENTE_RECEPCIONAR', ambito: 'AREA', areaId: mockAreaSecId },
       ],
     };
 
@@ -88,13 +88,13 @@ describe('T-BE-RD-12 / FASE 7B: Endpoint HTTP de Recepción Formal', () => {
     });
   });
 
-  it('2. POST /api/v1/expedientes/:id/movimientos/recepcionar ruta alias funciona idénticamente', async () => {
+  it('2. POST /api/v1/expedientes/:id/movimientos/recepcionar ruta alias funciona idénticamente con EXPEDIENTE_RECEPCIONAR', async () => {
     const actorSec: ActorRutaDoc = {
       id: mockOperadorId,
       roles: ['SECRETARIO'],
       unidadOrganicaId: mockAreaSecId,
       permisos: [
-        { codigo: 'EXPEDIENTE_DERIVAR', ambito: 'AREA', areaId: mockAreaSecId },
+        { codigo: 'EXPEDIENTE_RECEPCIONAR', ambito: 'AREA', areaId: mockAreaSecId },
       ],
     };
 
@@ -106,7 +106,25 @@ describe('T-BE-RD-12 / FASE 7B: Endpoint HTTP de Recepción Formal', () => {
     expect(res.body.nuevoEstado).toBe('EN_REVISION');
   });
 
-  it('3. Rechaza con 401 Unauthorized cuando el usuario no envía token', async () => {
+  it('3. autoriza la recepción cuando el actor posee EXPEDIENTE_RECEPCIONAR con ámbito GLOBAL', async () => {
+    const actorGlobal: ActorRutaDoc = {
+      id: mockOperadorId,
+      roles: [],
+      unidadOrganicaId: null,
+      permisos: [
+        { codigo: 'EXPEDIENTE_RECEPCIONAR', ambito: 'GLOBAL', areaId: null },
+      ],
+    };
+
+    const res = await request(crearAppRecepcion(actorGlobal))
+      .post(`/api/v1/expedientes/${mockExpedienteId}/recepcionar`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.nuevoEstado).toBe('EN_REVISION');
+  });
+
+  it('4. rechaza con 401 Unauthorized cuando el usuario no envía token o actor es nulo', async () => {
     const res = await request(crearAppRecepcion(null))
       .post(`/api/v1/expedientes/${mockExpedienteId}/recepcionar`)
       .send({});
@@ -114,13 +132,77 @@ describe('T-BE-RD-12 / FASE 7B: Endpoint HTTP de Recepción Formal', () => {
     expect(res.status).toBe(401);
   });
 
-  it('4. Rechaza con 403 Forbidden cuando el operador no tiene permisos para el área del expediente', async () => {
+  it('5. [HARDENING OBS-13-01] rechaza con 403 Forbidden cuando el actor autenticado tiene permisos undefined', async () => {
+    const actorPermisosUndefined: ActorRutaDoc = {
+      id: mockOperadorId,
+      roles: ['SECRETARIO'],
+      unidadOrganicaId: mockAreaSecId,
+      permisos: undefined,
+    };
+
+    const res = await request(crearAppRecepcion(actorPermisosUndefined))
+      .post(`/api/v1/expedientes/${mockExpedienteId}/recepcionar`)
+      .send({});
+
+    expect(res.status).toBe(403);
+  });
+
+  it('6. [HARDENING OBS-13-01] rechaza con 403 Forbidden cuando el operador no tiene permisos configurados (array vacío)', async () => {
+    const actorSinPermisos: ActorRutaDoc = {
+      id: mockOperadorId,
+      roles: ['DOCENTE'],
+      unidadOrganicaId: mockAreaSecId,
+      permisos: [],
+    };
+
+    const res = await request(crearAppRecepcion(actorSinPermisos))
+      .post(`/api/v1/expedientes/${mockExpedienteId}/recepcionar`)
+      .send({});
+
+    expect(res.status).toBe(403);
+  });
+
+  it('7. rechaza con 403 Forbidden cuando el operador solo posee EXPEDIENTE_DERIVAR pero no EXPEDIENTE_RECEPCIONAR', async () => {
+    const actorDerivar: ActorRutaDoc = {
+      id: mockOperadorId,
+      roles: ['SECRETARIO'],
+      unidadOrganicaId: mockAreaSecId,
+      permisos: [
+        { codigo: 'EXPEDIENTE_DERIVAR', ambito: 'AREA', areaId: mockAreaSecId },
+      ],
+    };
+
+    const res = await request(crearAppRecepcion(actorDerivar))
+      .post(`/api/v1/expedientes/${mockExpedienteId}/recepcionar`)
+      .send({});
+
+    expect(res.status).toBe(403);
+  });
+
+  it('8. rechaza con 403 Forbidden cuando el operador solo posee EXPEDIENTE_RESOLVER pero no EXPEDIENTE_RECEPCIONAR', async () => {
+    const actorResolver: ActorRutaDoc = {
+      id: mockOperadorId,
+      roles: ['SECRETARIO'],
+      unidadOrganicaId: mockAreaSecId,
+      permisos: [
+        { codigo: 'EXPEDIENTE_RESOLVER', ambito: 'AREA', areaId: mockAreaSecId },
+      ],
+    };
+
+    const res = await request(crearAppRecepcion(actorResolver))
+      .post(`/api/v1/expedientes/${mockExpedienteId}/recepcionar`)
+      .send({});
+
+    expect(res.status).toBe(403);
+  });
+
+  it('9. rechaza con 403 Forbidden cuando el operador tiene EXPEDIENTE_RECEPCIONAR para otra área distinta', async () => {
     const actorOtraArea: ActorRutaDoc = {
       id: '00000000-0000-0000-0000-000000000099',
       roles: ['OPERADOR_MP'],
       unidadOrganicaId: '11111111-1111-4111-8111-111111111111',
       permisos: [
-        { codigo: 'EXPEDIENTE_DERIVAR', ambito: 'AREA', areaId: '11111111-1111-4111-8111-111111111111' },
+        { codigo: 'EXPEDIENTE_RECEPCIONAR', ambito: 'AREA', areaId: '11111111-1111-4111-8111-111111111111' },
       ],
     };
 
@@ -131,13 +213,13 @@ describe('T-BE-RD-12 / FASE 7B: Endpoint HTTP de Recepción Formal', () => {
     expect(res.status).toBe(403);
   });
 
-  it('5. Rechaza con 409 Conflict cuando el expediente ya se encuentra en EN_REVISION', async () => {
+  it('10. rechaza con 409 Conflict cuando el expediente ya se encuentra en EN_REVISION', async () => {
     const actorSec: ActorRutaDoc = {
       id: mockOperadorId,
       roles: ['SECRETARIO'],
       unidadOrganicaId: mockAreaSecId,
       permisos: [
-        { codigo: 'EXPEDIENTE_RESOLVER', ambito: 'AREA', areaId: mockAreaSecId },
+        { codigo: 'EXPEDIENTE_RECEPCIONAR', ambito: 'AREA', areaId: mockAreaSecId },
       ],
     };
 
@@ -165,13 +247,13 @@ describe('T-BE-RD-12 / FASE 7B: Endpoint HTTP de Recepción Formal', () => {
     expect(res.body.code).toBe('EXPEDIENTE_YA_RECEPCIONADO');
   });
 
-  it('6. Rechaza con 404 Not Found cuando el expediente no existe', async () => {
+  it('11. rechaza con 404 Not Found cuando el expediente no existe', async () => {
     const actorSec: ActorRutaDoc = {
       id: mockOperadorId,
       roles: ['SECRETARIO'],
       unidadOrganicaId: mockAreaSecId,
       permisos: [
-        { codigo: 'EXPEDIENTE_RESOLVER', ambito: 'AREA', areaId: mockAreaSecId },
+        { codigo: 'EXPEDIENTE_RECEPCIONAR', ambito: 'AREA', areaId: mockAreaSecId },
       ],
     };
 
@@ -187,5 +269,35 @@ describe('T-BE-RD-12 / FASE 7B: Endpoint HTTP de Recepción Formal', () => {
       .send({});
 
     expect(res.status).toBe(404);
+  });
+
+  it('12. [HARDENING OBS-13-01] la operacion de derivacion mantiene fail-closed estricto: rechaza con 403 si tiene permisos undefined o solo EXPEDIENTE_RECEPCIONAR', async () => {
+    const actorPermisosUndefined: ActorRutaDoc = {
+      id: mockOperadorId,
+      roles: ['SECRETARIO'],
+      unidadOrganicaId: mockAreaSecId,
+      permisos: undefined,
+    };
+
+    const resUndefined = await request(crearAppRecepcion(actorPermisosUndefined))
+      .post(`/api/v1/expedientes/${mockExpedienteId}/derivar`)
+      .send({ areaDestinoId: mockAreaSecId });
+
+    expect(resUndefined.status).toBe(403);
+
+    const actorSoloRecepcion: ActorRutaDoc = {
+      id: mockOperadorId,
+      roles: ['SECRETARIO'],
+      unidadOrganicaId: mockAreaSecId,
+      permisos: [
+        { codigo: 'EXPEDIENTE_RECEPCIONAR', ambito: 'AREA', areaId: mockAreaSecId },
+      ],
+    };
+
+    const resSoloRecep = await request(crearAppRecepcion(actorSoloRecepcion))
+      .post(`/api/v1/expedientes/${mockExpedienteId}/derivar`)
+      .send({ areaDestinoId: mockAreaSecId });
+
+    expect(resSoloRecep.status).toBe(403);
   });
 });

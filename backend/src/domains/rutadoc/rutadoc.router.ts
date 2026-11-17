@@ -147,88 +147,90 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
   derivaciones.use(async (req, _res, next) => {
     const actor = await proveedorActor.obtenerActor(req);
     if (!actor) throw new UnauthorizedError();
-    if (actor.permisos !== undefined) {
-      const isLote = req.path.endsWith('/derivar-lote') || req.path.endsWith('/derivar-masivo') || req.path === '/derivar-lote' || req.path === '/derivar-masivo';
-      const isDerivar = req.path.endsWith('/derivar') || isLote;
-      const codigos = req.path.endsWith('/recepcionar')
-        ? ['EXPEDIENTE_DERIVAR', 'EXPEDIENTE_RESOLVER']
-        : isDerivar
-        ? ['EXPEDIENTE_DERIVAR']
-        : ['EXPEDIENTE_RESOLVER'];
-      const permisos = actor.permisos.filter(p => codigos.includes(p.codigo));
-      let autorizado = permisos.some(p => p.ambito === 'GLOBAL' && p.areaId === null);
-      if (!autorizado && permisos.some(p => p.ambito === 'AREA' && p.areaId !== null)) {
-        const areas = permisos.filter(p => p.ambito === 'AREA' && p.areaId !== null).map(p => p.areaId);
-        if (isLote) {
-          const rawIds = req.body?.expedienteIds;
-          const expIds = Array.isArray(rawIds) ? rawIds.filter((id: unknown) => typeof id === 'string' && z.string().uuid().safeParse(id).success) : [];
-          if (expIds.length > 0) {
-            const acceso = await pool.query<{ total: number }>(`SELECT COUNT(DISTINCT e.expediente_id)::int AS total FROM sigd_tra.expediente e
-              LEFT JOIN sigd_rut.estado_actual_expediente a USING (expediente_id)
-              LEFT JOIN (
-                SELECT DISTINCT ON (expediente_id)
-                       expediente_id, canal_ingreso, anulado
-                  FROM sigd_tra.asiento_registro
-                 WHERE anulado = FALSE
-                 ORDER BY expediente_id, numero_registro ASC
-              ) ar ON ar.expediente_id = e.expediente_id
-              WHERE e.expediente_id = ANY($1::uuid[])
-                AND (
-                  CASE
-                    WHEN a.expediente_id IS NOT NULL AND NULLIF(a.area_actual_id, '') IS NOT NULL
-                         THEN NULLIF(a.area_actual_id, '')
-                    WHEN a.expediente_id IS NOT NULL AND a.estado_nuevo = 'RESUELTO'
-                         THEN COALESCE(
-                           (SELECT m.datos->>'areaId' FROM sigd_rut.movimiento_tramite m
-                             WHERE m.expediente_id = e.expediente_id AND m.datos->>'areaId' IS NOT NULL
-                             ORDER BY m.secuencia DESC LIMIT 1),
-                           e.area_destino_id::text
-                         )
-                    WHEN ar.canal_ingreso IN ('MESA_PRESENCIAL', 'MESA_VIRTUAL') AND (ar.anulado IS FALSE OR ar.anulado IS NULL)
-                         THEN (SELECT area_id::text FROM sigd_org.area WHERE codigo = 'MP')
-                    ELSE NULL
-                  END
-                ) = ANY($2::text[])`, [expIds, areas]);
-            autorizado = (acceso.rows[0]?.total ?? 0) === expIds.length;
-          } else {
-            autorizado = true;
-          }
+    if (!Array.isArray(actor.permisos) || actor.permisos.length === 0) {
+      throw new ForbiddenError();
+    }
+    const isLote = req.path.endsWith('/derivar-lote') || req.path.endsWith('/derivar-masivo') || req.path === '/derivar-lote' || req.path === '/derivar-masivo';
+    const isDerivar = req.path.endsWith('/derivar') || isLote;
+    const isRecepcionar = req.path.endsWith('/recepcionar');
+    const codigos = isRecepcionar
+      ? ['EXPEDIENTE_RECEPCIONAR']
+      : isDerivar
+      ? ['EXPEDIENTE_DERIVAR']
+      : ['EXPEDIENTE_RESOLVER'];
+    const permisos = actor.permisos.filter(p => codigos.includes(p.codigo));
+    let autorizado = permisos.some(p => p.ambito === 'GLOBAL' && p.areaId === null);
+    if (!autorizado && permisos.some(p => p.ambito === 'AREA' && p.areaId !== null)) {
+      const areas = permisos.filter(p => p.ambito === 'AREA' && p.areaId !== null).map(p => p.areaId);
+      if (isLote) {
+        const rawIds = req.body?.expedienteIds;
+        const expIds = Array.isArray(rawIds) ? rawIds.filter((id: unknown) => typeof id === 'string' && z.string().uuid().safeParse(id).success) : [];
+        if (expIds.length > 0) {
+          const acceso = await pool.query<{ total: number }>(`SELECT COUNT(DISTINCT e.expediente_id)::int AS total FROM sigd_tra.expediente e
+            LEFT JOIN sigd_rut.estado_actual_expediente a USING (expediente_id)
+            LEFT JOIN (
+              SELECT DISTINCT ON (expediente_id)
+                     expediente_id, canal_ingreso, anulado
+                FROM sigd_tra.asiento_registro
+               WHERE anulado = FALSE
+               ORDER BY expediente_id, numero_registro ASC
+            ) ar ON ar.expediente_id = e.expediente_id
+            WHERE e.expediente_id = ANY($1::uuid[])
+              AND (
+                CASE
+                  WHEN a.expediente_id IS NOT NULL AND NULLIF(a.area_actual_id, '') IS NOT NULL
+                       THEN NULLIF(a.area_actual_id, '')
+                  WHEN a.expediente_id IS NOT NULL AND a.estado_nuevo = 'RESUELTO'
+                       THEN COALESCE(
+                         (SELECT m.datos->>'areaId' FROM sigd_rut.movimiento_tramite m
+                           WHERE m.expediente_id = e.expediente_id AND m.datos->>'areaId' IS NOT NULL
+                           ORDER BY m.secuencia DESC LIMIT 1),
+                         e.area_destino_id::text
+                       )
+                  WHEN ar.canal_ingreso IN ('MESA_PRESENCIAL', 'MESA_VIRTUAL') AND (ar.anulado IS FALSE OR ar.anulado IS NULL)
+                       THEN (SELECT area_id::text FROM sigd_org.area WHERE codigo = 'MP')
+                  ELSE NULL
+                END
+              ) = ANY($2::text[])`, [expIds, areas]);
+          autorizado = (acceso.rows[0]?.total ?? 0) === expIds.length;
         } else {
-          const expId = req.path.split('/')[1];
-          if (expId && z.string().uuid().safeParse(expId).success) {
-            const acceso = await pool.query<{ autorizado: boolean }>(`SELECT EXISTS (
-              SELECT 1 FROM sigd_tra.expediente e
-              LEFT JOIN sigd_rut.estado_actual_expediente a USING (expediente_id)
-              LEFT JOIN (
-                SELECT DISTINCT ON (expediente_id)
-                       expediente_id, canal_ingreso, anulado
-                  FROM sigd_tra.asiento_registro
-                 WHERE anulado = FALSE
-                 ORDER BY expediente_id, numero_registro ASC
-              ) ar ON ar.expediente_id = e.expediente_id
-              WHERE e.expediente_id::text=$1
-                AND (
-                  CASE
-                    WHEN a.expediente_id IS NOT NULL AND NULLIF(a.area_actual_id, '') IS NOT NULL
-                         THEN NULLIF(a.area_actual_id, '')
-                    WHEN a.expediente_id IS NOT NULL AND a.estado_nuevo = 'RESUELTO'
-                         THEN COALESCE(
-                           (SELECT m.datos->>'areaId' FROM sigd_rut.movimiento_tramite m
-                             WHERE m.expediente_id = e.expediente_id AND m.datos->>'areaId' IS NOT NULL
-                             ORDER BY m.secuencia DESC LIMIT 1),
-                           e.area_destino_id::text
-                         )
-                    WHEN ar.canal_ingreso IN ('MESA_PRESENCIAL', 'MESA_VIRTUAL') AND (ar.anulado IS FALSE OR ar.anulado IS NULL)
-                         THEN (SELECT area_id::text FROM sigd_org.area WHERE codigo = 'MP')
-                    ELSE NULL
-                  END
-                ) = ANY($2::text[])) AS autorizado`, [expId, areas]);
-            autorizado = acceso.rows[0]?.autorizado === true;
-          }
+          autorizado = true;
+        }
+      } else {
+        const expId = req.path.split('/')[1];
+        if (expId && z.string().uuid().safeParse(expId).success) {
+          const acceso = await pool.query<{ autorizado: boolean }>(`SELECT EXISTS (
+            SELECT 1 FROM sigd_tra.expediente e
+            LEFT JOIN sigd_rut.estado_actual_expediente a USING (expediente_id)
+            LEFT JOIN (
+              SELECT DISTINCT ON (expediente_id)
+                     expediente_id, canal_ingreso, anulado
+                FROM sigd_tra.asiento_registro
+               WHERE anulado = FALSE
+               ORDER BY expediente_id, numero_registro ASC
+            ) ar ON ar.expediente_id = e.expediente_id
+            WHERE e.expediente_id::text=$1
+              AND (
+                CASE
+                  WHEN a.expediente_id IS NOT NULL AND NULLIF(a.area_actual_id, '') IS NOT NULL
+                       THEN NULLIF(a.area_actual_id, '')
+                  WHEN a.expediente_id IS NOT NULL AND a.estado_nuevo = 'RESUELTO'
+                       THEN COALESCE(
+                         (SELECT m.datos->>'areaId' FROM sigd_rut.movimiento_tramite m
+                           WHERE m.expediente_id = e.expediente_id AND m.datos->>'areaId' IS NOT NULL
+                           ORDER BY m.secuencia DESC LIMIT 1),
+                         e.area_destino_id::text
+                       )
+                  WHEN ar.canal_ingreso IN ('MESA_PRESENCIAL', 'MESA_VIRTUAL') AND (ar.anulado IS FALSE OR ar.anulado IS NULL)
+                       THEN (SELECT area_id::text FROM sigd_org.area WHERE codigo = 'MP')
+                  ELSE NULL
+                END
+              ) = ANY($2::text[])) AS autorizado`, [expId, areas]);
+          autorizado = acceso.rows[0]?.autorizado === true;
         }
       }
-      if (!autorizado) throw new ForbiddenError();
     }
+    if (!autorizado) throw new ForbiddenError();
     if (req.method === 'POST') {
       const isLote = req.path.endsWith('/derivar-lote') || req.path.endsWith('/derivar-masivo') || req.path === '/derivar-lote' || req.path === '/derivar-masivo';
       if (!isLote) {
