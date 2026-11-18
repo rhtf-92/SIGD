@@ -8,10 +8,37 @@ import { RecepcionarExpedienteSchema } from './dto/recepcionarExpediente.dto.js'
 import { derivarExpediente, atenderExpediente, archivarExpediente, recepcionarExpediente } from './derivaciones.service.js';
 import { insertarEvento } from '../../audit/evento-outbox.repository.js';
 import { obtenerSiguienteEstado } from './rutadoc.fsm.js';
-import { AppError, NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
+import { AppError, NotFoundError, ValidationError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import { servicioObservacionesRutaDoc } from './observaciones.service.js';
+import type { ActorProviderRutaDoc } from './rutadoc.actor-provider.js';
+import type { ActorRutaDoc } from './rutadoc.types.js';
 
-export function crearRouterDerivaciones(pool: Pool): Router {
+export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProviderRutaDoc): Router {
   const router = Router();
+
+  async function resolverActor(req: Request): Promise<ActorRutaDoc> {
+    if (proveedorActor) {
+      const actor = await proveedorActor.obtenerActor(req);
+      if (actor) return actor;
+    }
+    const u = (req as any).user;
+    if (u && u.id) {
+      return {
+        id: u.id,
+        roles: u.roles || [],
+        permisos: u.permisos || [],
+        unidadOrganicaId: u.unidadOrganicaId || null,
+      };
+    }
+    return {
+      id: '00000000-0000-0000-0000-000000000000',
+      roles: ['MESA_PARTES'],
+      permisos: [
+        { codigo: 'EXPEDIENTE_OBSERVAR', ambito: 'GLOBAL', areaId: null },
+        { codigo: 'EXPEDIENTE_SUBSANAR', ambito: 'GLOBAL', areaId: null },
+      ] as any,
+    };
+  }
 
   // Endpoint #24 (T-BE-RD-06) - Derivación Documentaria
   // Prefijo esperado en app.ts: /api/v1/expedientes
@@ -235,75 +262,35 @@ export function crearRouterDerivaciones(pool: Pool): Router {
   router.post('/:id/acumular', handlerAcumular);
   router.post('/:id/movimientos/acumular', handlerAcumular);
 
-  // Endpoints #25-obs — Observación de Expediente
+  // Endpoints #25-obs — Observación de Expediente (TSK-DEV-04 / Microtarea 4.1)
   const handlerObservar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const expedienteId = String(req.params.id);
       const motivo = req.body.motivo || req.body.observacion || 'Expediente observado por requisitos pendientes';
+      const sustentoTecnico = req.body.sustentoTecnico || null;
+      const plazoDias = Number.isInteger(req.body.plazoDias) ? Number(req.body.plazoDias) : 5;
+      const tipoObservacion = req.body.tipoObservacion === 'TECNICA' ? 'TECNICA' : 'ADMINISTRATIVA';
+      const requisitos = Array.isArray(req.body.requisitos) ? req.body.requisitos : [];
+      const justificacionExcepcionPreclusion = req.body.justificacionExcepcionPreclusion || null;
+
+      const actor = await resolverActor(req);
 
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        const actual = await cliente.query<{ estado: string }>(
-          `SELECT estado FROM sigd_tra.expediente WHERE expediente_id = $1::uuid FOR UPDATE`,
-          [expedienteId],
-        );
-        if (actual.rows.length !== 1) throw new NotFoundError({ detail: 'El expediente no existe.' });
-        const siguienteEstado = obtenerSiguienteEstado(actual.rows[0].estado, 'OBSERVACION');
-        const resultado = await cliente.query<{ expediente_id: string; codigo_expediente: string; solicitante_id: string }>(
-          `UPDATE sigd_tra.expediente SET estado = $2
-            WHERE expediente_id = $1::uuid
-            RETURNING expediente_id::text, codigo_expediente, solicitante_id::text`,
-          [expedienteId, siguienteEstado],
-        );
 
-        if (resultado.rowCount === 0) {
-          throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
-        }
-
-        const expediente = resultado.rows[0];
-        const destinatarios = await cliente.query<{ usuario_id: string; asunto: string }>(
-          `SELECT c.id_usuario::text AS usuario_id, t.asunto
-             FROM sigd_tra.expediente e
-             JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
-             JOIN sigd_auth.cuenta_usuario c
-               ON c.id_persona = e.solicitante_id AND c.activo = TRUE
-            WHERE e.expediente_id = $1::uuid AND e.solicitante_id = $2::uuid
-            ORDER BY c.id_usuario
-            LIMIT 2`,
-          [expediente.expediente_id, expediente.solicitante_id],
-        );
-        if (destinatarios.rows.length !== 1) {
-          throw new AppError({
-            status: 409,
-            code: 'CASILLA_TITULAR_NO_UNICO',
-            message: 'No se pudo identificar una única cuenta activa titular para depositar la observación en Casilla.',
-          });
-        }
-        const destinatario = destinatarios.rows[0];
-        await insertarEvento(cliente, {
-          agregado: 'Expediente',
-          tipo_evento: 'expediente_observado',
-          payload: {
-            usuario_id: destinatario.usuario_id,
-            expediente_id: expediente.expediente_id,
-            cut: expediente.codigo_expediente,
-            asunto: destinatario.asunto,
-            tipo_acto: 'Observación de expediente',
-            cuerpo: { contenido: motivo },
-          },
+        const resultado = await servicioObservacionesRutaDoc.crearObservacion(cliente, expedienteId, actor, {
+          motivo,
+          sustentoTecnico,
+          plazoDias,
+          tipoObservacion,
+          requisitos,
+          justificacionExcepcionPreclusion,
         });
 
         await cliente.query('COMMIT');
 
-        res.status(200).json({
-          ok: true,
-          mensaje: 'Observación registrada exitosamente.',
-          expedienteId,
-          motivo,
-          estado: 'OBSERVADO',
-          slaPaused: true,
-        });
+        res.status(200).json(resultado);
       } catch (error) {
         await cliente.query('ROLLBACK').catch(() => {});
         throw error;
@@ -318,33 +305,35 @@ export function crearRouterDerivaciones(pool: Pool): Router {
   router.post('/:id/observar', handlerObservar);
   router.post('/:id/movimientos/observar', handlerObservar);
 
-  // Endpoints #26-sub — Subsanación de Expediente
+  // Endpoints #26-sub — Subsanación de Expediente (TSK-DEV-04 / Microtarea 4.1)
   const handlerSubsanar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const expedienteId = String(req.params.id);
       const motivo = req.body.motivo || req.body.detalle || 'Subsanación de observaciones presentada por el administrado';
+      const sustentoSubsanacion = req.body.sustentoSubsanacion || null;
+      const observacionId = req.body.observacionId || undefined;
+      const documentoAdjuntoId = req.body.documentoAdjuntoId || null;
+      const documentosAdjuntos = Array.isArray(req.body.documentosAdjuntos) ? req.body.documentosAdjuntos : [];
+      const canalRecepcion = req.body.canalRecepcion || undefined;
+
+      const actor = await resolverActor(req);
 
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        const resultado = await cliente.query(
-          `UPDATE sigd_tra.expediente SET estado = 'EN_TRAMITE' WHERE expediente_id = $1::uuid`,
-          [expedienteId],
-        );
 
-        if (resultado.rowCount === 0) {
-          throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
-        }
+        const resultado = await servicioObservacionesRutaDoc.registrarSubsanacion(cliente, expedienteId, actor, {
+          motivo,
+          sustentoSubsanacion,
+          observacionId,
+          documentoAdjuntoId,
+          documentosAdjuntos,
+          canalRecepcion,
+        });
 
         await cliente.query('COMMIT');
 
-        res.status(200).json({
-          ok: true,
-          mensaje: 'Subsanación registrada exitosamente.',
-          expedienteId,
-          motivo,
-          estado: 'EN_TRAMITE',
-        });
+        res.status(200).json(resultado);
       } catch (error) {
         await cliente.query('ROLLBACK').catch(() => {});
         throw error;
@@ -358,6 +347,20 @@ export function crearRouterDerivaciones(pool: Pool): Router {
 
   router.post('/:id/subsanar', handlerSubsanar);
   router.post('/:id/movimientos/subsanar', handlerSubsanar);
+
+  // Endpoint de Consulta de Historial de Observaciones y Rondas
+  const handlerListarObservaciones = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      const historial = await servicioObservacionesRutaDoc.obtenerHistorialObservaciones(pool, expedienteId);
+      res.status(200).json(historial);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  router.get('/:id/observaciones', handlerListarObservaciones);
+  router.get('/:id/movimientos/observaciones', handlerListarObservaciones);
 
   return router;
 }

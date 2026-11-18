@@ -153,13 +153,26 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
     const isLote = req.path.endsWith('/derivar-lote') || req.path.endsWith('/derivar-masivo') || req.path === '/derivar-lote' || req.path === '/derivar-masivo';
     const isDerivar = req.path.endsWith('/derivar') || isLote;
     const isRecepcionar = req.path.endsWith('/recepcionar');
+    const isObservar = req.path.endsWith('/observar');
+    const isSubsanar = req.path.endsWith('/subsanar');
+    const isObservacionesList = req.path.endsWith('/observaciones');
+
     const codigos = isRecepcionar
       ? ['EXPEDIENTE_RECEPCIONAR']
       : isDerivar
       ? ['EXPEDIENTE_DERIVAR']
+      : isObservar
+      ? ['EXPEDIENTE_OBSERVAR']
+      : isSubsanar
+      ? ['EXPEDIENTE_SUBSANAR']
+      : isObservacionesList
+      ? ['EXPEDIENTE_LEER', 'EXPEDIENTE_OBSERVAR', 'EXPEDIENTE_SUBSANAR', 'EXPEDIENTE_EVALUAR']
       : ['EXPEDIENTE_RESOLVER'];
     const permisos = actor.permisos.filter(p => codigos.includes(p.codigo));
     let autorizado = permisos.some(p => p.ambito === 'GLOBAL' && p.areaId === null);
+    if (!autorizado && (isSubsanar || isObservacionesList) && (actor.roles?.includes('MESA_PARTES') || actor.roles?.includes('ESTUDIANTE') || actor.roles?.includes('CIUDADANO') || actor.roles?.includes('DOCENTE'))) {
+      autorizado = true;
+    }
     if (!autorizado && permisos.some(p => p.ambito === 'AREA' && p.areaId !== null)) {
       const areas = permisos.filter(p => p.ambito === 'AREA' && p.areaId !== null).map(p => p.areaId);
       if (isLote) {
@@ -258,7 +271,7 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
     setUnidadOrganicaId(actor.unidadOrganicaId ?? null);
     next();
   });
-  derivaciones.use(crearRouterDerivaciones(pool));
+  derivaciones.use(crearRouterDerivaciones(pool, proveedorActor));
   router.use('/expedientes', derivaciones);
   return router;
 }

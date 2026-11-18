@@ -1280,6 +1280,56 @@ export async function registrarObservacionEvaluacion(
     [expedienteId],
   );
 
+  // Sincronización Relacional TSK-DEV-04: sigd_rut.expediente_observacion y observacion_requisito
+  try {
+    const obsPreviasRes = await cliente.query<{ max_ronda: number | null }>(
+      `SELECT MAX(ronda) AS max_ronda FROM sigd_rut.expediente_observacion WHERE expediente_id = $1::uuid`,
+      [expedienteId],
+    );
+    const ronda = (obsPreviasRes.rows[0]?.max_ronda ?? 0) + 1;
+    const fechaLimite = new Date(Date.now() + (datos.plazoDias || 5) * 24 * 60 * 60 * 1000);
+
+    const obsInsert = await cliente.query<{ id_observacion: string }>(
+      `INSERT INTO sigd_rut.expediente_observacion (
+         expediente_id, ronda, tipo_observacion, motivo, sustento_tecnico,
+         plazo_dias, fecha_limite, estado, usuario_observador_id,
+         usuario_cuenta_id, area_origen_id, fecha_observacion
+       ) VALUES (
+         $1::uuid, $2, 'TECNICA', $3, $4,
+         $5, $6, 'PENDIENTE', $7,
+         $8::uuid, $9::uuid, CURRENT_TIMESTAMP
+       ) RETURNING id_observacion::text`,
+      [
+        expedienteId,
+        ronda,
+        datos.motivo,
+        datos.sustentoTecnico || null,
+        datos.plazoDias || 5,
+        fechaLimite,
+        operadorId,
+        actor.id,
+        areaId !== '00000000-0000-0000-0000-000000000000' ? areaId : null,
+      ],
+    );
+    const idObservacion = obsInsert.rows[0]?.id_observacion;
+
+    if (datos.requisitosObservados && datos.requisitosObservados.length > 0 && idObservacion) {
+      for (const reqId of datos.requisitosObservados) {
+        if (/^[0-9a-fA-F-]{36}$/.test(reqId)) {
+          await cliente.query(
+            `INSERT INTO sigd_rut.observacion_requisito (
+               id_observacion, requisito_id, descripcion_incumplimiento
+             ) VALUES ($1::uuid, $2::uuid, $3)
+             ON CONFLICT (id_observacion, requisito_id) DO NOTHING`,
+            [idObservacion, reqId, datos.motivo],
+          );
+        }
+      }
+    }
+  } catch {
+    // Preservar flujo principal si la sincronización falla
+  }
+
   if (asigRes.rowCount && asigRes.rows[0]) {
     const obsHistorica = {
       tipo: 'OBSERVACION',
@@ -1450,6 +1500,50 @@ export async function registrarSubsanacionEstudiante(
     `UPDATE sigd_tra.expediente SET estado = 'SUBSANADO' WHERE expediente_id = $1::uuid`,
     [expedienteId],
   );
+
+  // Sincronización Relacional TSK-DEV-04: sigd_rut.expediente_subsanacion
+  try {
+    const obsActivaRes = await cliente.query<{ id_observacion: string; ronda: number }>(
+      `SELECT id_observacion::text, ronda FROM sigd_rut.expediente_observacion
+        WHERE expediente_id = $1::uuid AND estado = 'PENDIENTE'
+        ORDER BY ronda DESC LIMIT 1`,
+      [expedienteId],
+    );
+    if (obsActivaRes.rowCount && obsActivaRes.rows[0]) {
+      const obsActiva = obsActivaRes.rows[0];
+      await cliente.query(
+        `INSERT INTO sigd_rut.expediente_subsanacion (
+           id_observacion, expediente_id, ronda, descripcion_respuesta,
+           canal_recepcion, usuario_subsanador_id, usuario_cuenta_id,
+           es_titular, fecha_subsanacion
+         ) VALUES (
+           $1::uuid, $2::uuid, $3, $4,
+           $5, $6, $7::uuid,
+           $8, CURRENT_TIMESTAMP
+         )`,
+        [
+          obsActiva.id_observacion,
+          expedienteId,
+          obsActiva.ronda,
+          datos.motivo,
+          canalRecepcion,
+          operadorId,
+          actor.id,
+          esTitular,
+        ],
+      );
+      await cliente.query(
+        `UPDATE sigd_rut.expediente_observacion SET estado = 'SUBSANADA', fecha_subsanacion = CURRENT_TIMESTAMP WHERE id_observacion = $1::uuid`,
+        [obsActiva.id_observacion],
+      );
+      await cliente.query(
+        `UPDATE sigd_rut.observacion_requisito SET subsanado = TRUE, fecha_subsanacion = CURRENT_TIMESTAMP WHERE id_observacion = $1::uuid`,
+        [obsActiva.id_observacion],
+      );
+    }
+  } catch {
+    // Preservar flujo principal si la sincronización falla
+  }
 
   const subsanacionHistorica = {
     tipo: 'SUBSANACION',

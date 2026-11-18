@@ -1,6 +1,6 @@
 import { NotFoundError } from '../../shared/domain/errors/not-found-error.js';
 import type { Pool } from 'pg';
-import type { CalendarioLaboralPort, EntradaSla, ResultadoSla } from './sla.types.js';
+import type { CalendarioLaboralPort, EntradaSla, IntervaloSuspensionSla, ResultadoSla } from './sla.types.js';
 import { calendarioLaboralPredeterminadoRutaDoc } from './sla.calendario.js';
 
 const ISO_DIA = /^\d{4}-\d{2}-\d{2}$/;
@@ -40,25 +40,42 @@ export function calcularSla(entrada: EntradaSla): ResultadoSla {
   }
 
   const noLaborables = entrada.diasNoLaborables ?? new Set<string>();
+  const intervalos = entrada.intervalosSuspension ?? [];
+
   let transcurridos = 0;
+  let suspendidos = 0;
+
   for (let fechaMs = inicioMs + MS_DIA; fechaMs <= actualMs; fechaMs += MS_DIA) {
     const fecha = new Date(fechaMs);
     const iso = fecha.toISOString().slice(0, 10);
     const semana = fecha.getUTCDay();
-    if (semana !== 0 && semana !== 6 && !noLaborables.has(iso)) transcurridos++;
+    if (semana !== 0 && semana !== 6 && !noLaborables.has(iso)) {
+      transcurridos++;
+      const estaSuspendido = intervalos.some((i) => iso >= i.desde && iso <= i.hasta);
+      if (estaSuspendido) {
+        suspendidos++;
+      }
+    }
   }
 
-  const porcentaje = Math.round((transcurridos / limite) * 10000) / 100;
-  const estado = transcurridos > limite ? 'ROJO' : porcentaje >= umbralAmarillo ? 'AMARILLO' : 'VERDE';
+  const consumidos = Math.max(0, transcurridos - suspendidos);
+  const porcentaje = Math.round((consumidos / limite) * 10000) / 100;
+  const estado = consumidos > limite ? 'ROJO' : porcentaje >= umbralAmarillo ? 'AMARILLO' : 'VERDE';
+  const fechaActualIso = entrada.fechaActual;
+  const suspendidoActualmente = intervalos.some((i) => fechaActualIso >= i.desde && fechaActualIso <= i.hasta);
+
   return {
     fechaInicio: entrada.fechaInicio,
     fechaCalculo: entrada.fechaActual,
-    fechaLimite: sumarDiasHabiles(entrada.fechaInicio, limite, noLaborables),
+    fechaLimite: sumarDiasHabiles(entrada.fechaInicio, limite + suspendidos, noLaborables),
     diasHabilesLimite: limite,
     diasHabilesTranscurridos: transcurridos,
-    diasHabilesRestantes: Math.max(0, limite - transcurridos),
+    diasHabilesSuspendidos: suspendidos,
+    diasHabilesConsumidos: consumidos,
+    diasHabilesRestantes: Math.max(0, limite - consumidos),
     porcentaje,
     estado,
+    suspendidoActualmente,
   };
 }
 
@@ -81,6 +98,33 @@ export class RepositorioSlaRutaDoc {
        WHERE expediente_id = $1::uuid`, [idExpediente]);
     return resultado.rows[0]?.fecha_inicio ?? null;
   }
+
+  async obtenerIntervalosSuspension(idExpediente: string): Promise<IntervaloSuspensionSla[]> {
+    const resultado = await this.pool.query<{
+      fecha_obs: string;
+      fecha_sub: string | null;
+      ronda: number;
+      motivo: string;
+      estado: string;
+    }>(
+      `SELECT (fecha_observacion AT TIME ZONE 'America/Lima')::date::text AS fecha_obs,
+              (fecha_subsanacion AT TIME ZONE 'America/Lima')::date::text AS fecha_sub,
+              ronda,
+              motivo,
+              estado
+         FROM sigd_rut.expediente_observacion
+        WHERE expediente_id = $1::uuid
+        ORDER BY ronda ASC`,
+      [idExpediente],
+    );
+
+    return resultado.rows.map((r) => ({
+      desde: r.fecha_obs,
+      hasta: r.fecha_sub ?? fechaHoyLima(),
+      ronda: r.ronda,
+      motivo: r.motivo,
+    }));
+  }
 }
 
 export class ServicioSlaRutaDoc {
@@ -98,10 +142,16 @@ export class ServicioSlaRutaDoc {
     if (!fechaInicio) throw new NotFoundError({ detail: 'El expediente no existe.' });
     const fechaActual = this.hoy();
     const hasta = new Date(validarFecha(fechaInicio) + 150 * MS_DIA).toISOString().slice(0, 10);
-    const diasNoLaborables = await this.calendario.obtenerDiasNoLaborables(fechaInicio,
-      fechaActual > hasta ? fechaActual : hasta);
-    return calcularSla({ fechaInicio, fechaActual, diasNoLaborables: new Set(diasNoLaborables),
-      diasHabilesLimite: 30,
-      porcentajeAmarilloDesde: this.politica.porcentajeAmarilloDesde });
+    const noLaborablesArray = await this.calendario.obtenerDiasNoLaborables(fechaInicio, hasta);
+    const noLaborables = new Set(noLaborablesArray);
+    const intervalosSuspension = await this.repositorio.obtenerIntervalosSuspension(idExpediente);
+
+    return calcularSla({
+      fechaInicio,
+      fechaActual,
+      diasNoLaborables: noLaborables,
+      porcentajeAmarilloDesde: this.politica.porcentajeAmarilloDesde,
+      intervalosSuspension,
+    });
   }
 }

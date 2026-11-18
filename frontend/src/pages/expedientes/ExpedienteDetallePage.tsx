@@ -9,6 +9,7 @@ import ExpedienteVersiones from "../../components/expedientes/ExpedienteVersione
 import ExpedienteMetadatos from "../../components/expedientes/ExpedienteMetadatos";
 import DerivacionModal from "../../components/expedientes/DerivacionModal";
 import ObservacionModal from "../../components/expedientes/ObservacionModal";
+import SubsanarVentanillaModal from "../../components/expedientes/SubsanarVentanillaModal";
 import AcumulacionModal from "../../components/expedientes/AcumulacionModal";
 import DigitalizacionModal from "../../components/expedientes/DigitalizacionModal";
 import ExpedienteActionToast from "../../components/expedientes/ExpedienteActionToast";
@@ -811,7 +812,7 @@ export default function ExpedienteDetallePage() {
   const [recepcionando, setRecepcionando] = useState(false);
   const [mensajeAlerta, setMensajeAlerta] = useState<{ tipo: "exito" | "error"; texto: string } | null>(null);
 
-  const [modalActivo, setModalActivo] = useState<"derivacion" | "observacion" | "acumulacion" | null>(null);
+  const [modalActivo, setModalActivo] = useState<"derivacion" | "observacion" | "subsanacion" | "acumulacion" | null>(null);
   const usuarioArchivo = useAuthStore((state) => state.usuario);
   const [modalArchivar, setModalArchivar] = useState(false);
   const [modalDigitalizar, setModalDigitalizar] = useState(false);
@@ -1146,13 +1147,23 @@ export default function ExpedienteDetallePage() {
                     Derivar Expediente
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setModalActivo("observacion")}
-                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition"
-                >
-                  Observar / Suspender
-                </button>
+                {expediente.estadoActual === "OBSERVADO" ? (
+                  <button
+                    type="button"
+                    onClick={() => setModalActivo("subsanacion")}
+                    className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800"
+                  >
+                    Subsanar por Ventanilla
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setModalActivo("observacion")}
+                    className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition"
+                  >
+                    Observar / Suspender
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setModalActivo("acumulacion")}
@@ -1417,6 +1428,19 @@ export default function ExpedienteDetallePage() {
               onClose={() => setModalActivo(null)}
               expediente={expedienteParaAccion}
               accion={acciones.observacion}
+            />
+
+            <SubsanarVentanillaModal
+              open={modalActivo === "subsanacion"}
+              onClose={() => setModalActivo(null)}
+              expediente={expedienteParaAccion}
+              onExito={() => {
+                setMensajeAlerta({
+                  tipo: "exito",
+                  texto: "Subsanación registrada exitosamente. El expediente pasa a estado SUBSANADO.",
+                });
+                void queryClient.invalidateQueries();
+              }}
             />
 
             <AcumulacionModal
