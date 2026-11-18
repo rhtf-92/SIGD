@@ -90,6 +90,7 @@ REVOKE EXECUTE ON FUNCTION sigd_tra.fn_generar_cut(INT) FROM PUBLIC;
 CREATE TABLE IF NOT EXISTS sigd_tra.expediente (
     expediente_id      UUID         NOT NULL DEFAULT gen_random_uuid()
                                    CONSTRAINT pk_tra_expediente PRIMARY KEY,
+    id_expediente      BIGINT       GENERATED ALWAYS AS IDENTITY UNIQUE,
     codigo_expediente  VARCHAR(20)  NOT NULL UNIQUE,
     numero            VARCHAR(30)  NOT NULL,
     dni_solicitante    CHAR(8)      NULL,
@@ -100,6 +101,7 @@ CREATE TABLE IF NOT EXISTS sigd_tra.expediente (
                                    REFERENCES sigd_org.area (area_id) ON DELETE RESTRICT,
     estado             VARCHAR(30)  NOT NULL DEFAULT 'REGISTRADO',
     fecha_radicacion   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    creado_en          TIMESTAMPTZ  NOT NULL DEFAULT now(),
     fecha_limite       TIMESTAMPTZ  NULL,
     CONSTRAINT uq_tra_expediente_numero UNIQUE (numero),
     CONSTRAINT chk_tra_expediente_dni CHECK (dni_solicitante IS NULL OR dni_solicitante ~ '^[0-9]{8}$'),

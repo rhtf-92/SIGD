@@ -202,6 +202,24 @@ CREATE INDEX IF NOT EXISTS idx_notif_casilla_fecha
     ON sigd_auth.notificacion_casilla (fecha_deposito DESC);
 
 -- Semilla inicial determinista para pruebas y desarrollo
+INSERT INTO sigd_auth.persona (id_persona, tipo, id_documento)
+VALUES ('00000000-0000-0000-0000-000000000001', 'NATURAL', '00000001')
+ON CONFLICT (id_persona) DO NOTHING;
+
+INSERT INTO sigd_auth.persona_natural (id_persona, nombres, apellidos, nombre_completo, correo)
+VALUES ('00000000-0000-0000-0000-000000000001', 'Administrador', 'General', 'Administrador General', 'admin@iestp-suiza.edu.pe')
+ON CONFLICT (id_persona) DO NOTHING;
+
+INSERT INTO sigd_auth.cuenta_usuario (id_usuario, id_persona, usuario, correo, password_hash, activo)
+VALUES (
+    '00000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000001',
+    'admin',
+    'admin@iestp-suiza.edu.pe',
+    '$argon2id$v=19$m=65536,t=3,p=4$61646d696e5f73616c745f3230323621$b86d779eda5f9d3e43e6c4c5a54642cc1f54738ab694f737539fa5efff0993e0c9a0a268a73169dd90cd66b4dcecdbf52f63ab51628c416fba573884d6a6999e',
+    TRUE
+) ON CONFLICT (id_usuario) DO NOTHING;
+
 INSERT INTO sigd_auth.notificacion_casilla (
     id, usuario_id, cut, asunto, tipo_acto, numero_documento,
     estado, fecha_deposito, hash_sha256, cvd

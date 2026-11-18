@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
     port: Number(localEnv.VITE_PORT || 5173),
     proxy: {
       "/api": {
-        target: (localEnv.VITE_API_BASE_URL || "http://localhost:3000")
+        target: (localEnv.VITE_API_URL || localEnv.VITE_API_BASE_URL || "http://localhost:3000")
           .replace(/\/api(\/v\d+)?\/?$/i, "")
           .replace(/\/+$/, ""),
         changeOrigin: true,

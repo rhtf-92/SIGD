@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS sigd_org.rol_sistema (
     descripcion  TEXT         NULL,
     vigente      BOOLEAN      NOT NULL DEFAULT TRUE,
     CONSTRAINT chk_rol_codigo CHECK (codigo IN (
-        'ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES', 'CIUDADANO'
+        'ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES', 'CIUDADANO', 'SUPER_ADMIN', 'DOCENTE', 'ESTUDIANTE'
     ))
 );
 
@@ -225,12 +225,21 @@ CREATE INDEX IF NOT EXISTS idx_rol_permiso_rol ON sigd_org.rol_permiso (rol_id);
 INSERT INTO sigd_org.rol_sistema (codigo, nombre, descripcion)
 VALUES
     ('ADMINISTRADOR', 'Administrador del Sistema', 'Administración técnica total de la plataforma SIGD'),
+    ('SUPER_ADMIN', 'Super Administrador', 'Supervisión y gobierno global del sistema'),
     ('DIRECTOR', 'Director', 'Emisión de resoluciones directorales y firma digital'),
     ('SECRETARIO', 'Secretario Académico', 'Proyección y preparación de resoluciones y expedientes de titulación'),
     ('ESPECIALISTA', 'Especialista', 'Análisis técnico y emisión de dictámenes'),
+    ('DOCENTE', 'Docente Institucional', 'Gestión de actas y titulación'),
     ('MESA_PARTES', 'Mesa de Partes', 'Recepción, radicación y registro de documentos'),
+    ('ESTUDIANTE', 'Estudiante Institucional', 'Acceso a trámites académicos y casilla'),
     ('CIUDADANO', 'Ciudadano', 'Acceso restringido a la Casilla Electrónica del administrado')
 ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO sigd_org.usuario_rol (id_usuario, rol_id)
+SELECT '00000000-0000-0000-0000-000000000001'::uuid, rol_id
+FROM sigd_org.rol_sistema
+WHERE codigo = 'ADMINISTRADOR'
+ON CONFLICT DO NOTHING;
 
 INSERT INTO sigd_org.permiso_sistema (codigo, nombre, ambito)
 VALUES

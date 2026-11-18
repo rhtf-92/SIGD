@@ -182,7 +182,10 @@ export function construirApp(
 
   app.use('/api', crearRouterReferencia(pool));
   app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
-  app.use('/api/v1', crearRouterAuth(pool));
+  const routerAuth = crearRouterAuth(pool);
+  app.use('/api/v1', routerAuth);
+  app.use('/api', routerAuth);
+  app.use(routerAuth);
   app.use('/api/v1', crearRouterCasilla(pool));
   app.use('/api/v1', crearRouterStorage(pool));
   app.use('/api/v1', crearRouterTramites(pool));

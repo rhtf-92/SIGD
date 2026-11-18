@@ -5,6 +5,7 @@ import { ApiHttpError } from "../types/api";
 
 const DESTINOS_POR_ROL: Record<string, string> = {
   SUPER_ADMIN: "/administracion",
+  ADMINISTRADOR: "/administracion",
   DIRECTOR: "/administracion",
   DOCENTE: "/flujos/titulacion",
   MESA_PARTES: "/tramite/ventanilla-presencial",
@@ -52,9 +53,30 @@ export default function LoginPage() {
       }
       navigate(safeReturnTo ?? (rol ? DESTINOS_POR_ROL[rol] ?? "/" : "/"), { replace: true });
     } catch (errorLogin: unknown) {
-      if (errorLogin instanceof ApiHttpError && errorLogin.status === 401) {
-        setError("Credenciales incorrectas. Verifique su usuario y contraseña.");
-      } else if (errorLogin instanceof ApiHttpError && errorLogin.status < 500) {
+      if (errorLogin instanceof ApiHttpError) {
+        const mensajeServidor =
+          errorLogin.problemDetails?.detail ||
+          errorLogin.problemDetails?.title ||
+          errorLogin.message;
+
+        if (errorLogin.status === 401) {
+          if (mensajeServidor && mensajeServidor.toLowerCase().includes("inválid")) {
+            setError("Credenciales incorrectas. Verifique su usuario o contraseña institucional.");
+          } else {
+            setError(mensajeServidor || "Credenciales incorrectas. Verifique su usuario y contraseña.");
+          }
+        } else if (errorLogin.status === 403) {
+          setError(mensajeServidor || "Su cuenta se encuentra suspendida o deshabilitada.");
+        } else if (errorLogin.status < 500) {
+          setError(mensajeServidor);
+        } else {
+          setError(
+            mensajeServidor && !mensajeServidor.toLowerCase().includes("interno") && !mensajeServidor.toLowerCase().includes("network")
+              ? mensajeServidor
+              : "No se pudo iniciar sesión. Compruebe la conexión e inténtelo nuevamente."
+          );
+        }
+      } else if (errorLogin instanceof Error && errorLogin.message && !errorLogin.message.toLowerCase().includes("network")) {
         setError(errorLogin.message);
       } else {
         setError("No se pudo iniciar sesión. Compruebe la conexión e inténtelo nuevamente.");

@@ -7,7 +7,7 @@ const ORIGENES_DEFAULT = [
 
 const METODOS_PERMITIDOS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD';
 const CABECERAS_PERMITIDAS =
-  'Authorization, Content-Type, X-Correlation-ID, x-correlation-id, X-Usuario-ID, x-usuario-id, Accept';
+  'Authorization, Content-Type, X-Correlation-ID, x-correlation-id, X-Usuario-ID, x-usuario-id, Accept, Origin, X-Requested-With, Access-Control-Request-Method, Access-Control-Request-Headers';
 const CABECERAS_EXPUESTAS = 'X-Correlation-ID, x-correlation-id, Date';
 
 function parsearOrigenesPermitidos(): string[] {
@@ -50,6 +50,7 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction):
   res.setHeader('Access-Control-Expose-Headers', CABECERAS_EXPUESTAS);
 
   if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Max-Age', '86400');
     res.status(204).end();
     return;
   }

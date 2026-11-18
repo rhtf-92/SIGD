@@ -25,10 +25,35 @@ import { firmarTokenAcceso, extraerTokenBearer, verificarTokenAcceso } from '../
 import { AppError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 import { Argon2Service } from './argon2.service.js';
 
-const loginSchema = z.object({
-  identificador: z.string().min(3).max(100),
-  password: z.string().min(6).max(128),
-});
+const loginSchema = z.preprocess(
+  (val: unknown) => {
+    if (typeof val === 'object' && val !== null) {
+      const obj = val as Record<string, unknown>;
+      const identificador =
+        obj.identificador ??
+        obj.usuario ??
+        obj.email ??
+        obj.correo ??
+        obj.username ??
+        obj.login;
+      const password =
+        obj.password ??
+        obj.contrasena ??
+        obj.contraseña ??
+        obj.clave;
+      return {
+        ...obj,
+        identificador,
+        password,
+      };
+    }
+    return val;
+  },
+  z.object({
+    identificador: z.string().min(3).max(100),
+    password: z.string().min(6).max(128),
+  }),
+);
 
 const refreshSchema = z.object({
   refreshToken: z.string().min(20),

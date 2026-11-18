@@ -29,8 +29,13 @@ function fromBase64url(texto: string): Buffer {
   return Buffer.from(normalizado + relleno, 'base64');
 }
 
+const DEFAULT_DEV_JWT_SECRET = 'sigd_institucional_jwt_secret_super_seguro_2026_iestp_suiza_32b';
+
 export function secretoJwt(env: NodeJS.ProcessEnv = process.env): string {
-  const secreto = env.AUTH_JWT_SECRET ?? env.JWT_SECRET;
+  const secreto =
+    env.AUTH_JWT_SECRET ??
+    env.JWT_SECRET ??
+    (process.env.NODE_ENV !== 'production' ? DEFAULT_DEV_JWT_SECRET : undefined);
   if (!secreto || secreto.trim().length < 32) {
     throw new Error(
       'AUTH_JWT_SECRET no configurado o demasiado corto (mínimo 32 caracteres). ' +
