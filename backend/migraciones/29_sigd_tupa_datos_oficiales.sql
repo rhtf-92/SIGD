@@ -20,6 +20,12 @@ SET
     actualizado_en = now()
 WHERE codigo = 'TUPA-2026';
 
+UPDATE sigd_doc.tupa_procedimiento p
+SET registro_version_id = rv.registro_version_id
+FROM sigd_doc.tupa_registro_version rv
+WHERE p.codigo_ref = rv.referencia_fila
+  AND p.registro_version_id IS NULL;
+
 -- -----------------------------------------------------------------------------
 -- 29.2 Variantes de tarifa oficiales (sigd_doc.tupa_tarifa_variante)
 -- -----------------------------------------------------------------------------

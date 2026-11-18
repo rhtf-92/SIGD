@@ -1,0 +1,12 @@
+{
+  "name": "sigd-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SIGD Workspace Root",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build"
+  }
+}

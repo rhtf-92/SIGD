@@ -33,7 +33,13 @@ BEGIN
         RAISE EXCEPTION 'MIGRACION_46_ERROR: No se encontró la versión TUPA-2026 con estado VIGENTE.';
     END IF;
 
-    -- 2. PRECONDICIONES: Validar existencia y vigencia de áreas físicas DIR y SDA
+    -- 2. PRECONDICIONES: Asegurar existencia y vigencia de áreas físicas DIR y SDA
+    INSERT INTO sigd_org.area (area_id, codigo, nombre, vigente)
+    VALUES 
+        ('a0000000-0000-0000-0000-000000000002', 'DIR', 'Dirección General', true),
+        ('a0000000-0000-0000-0000-000000000001', 'SDA', 'Subdirección Académica', true)
+    ON CONFLICT (codigo) DO UPDATE SET vigente = true;
+
     SELECT area_id INTO v_dir_id
       FROM sigd_org.area
      WHERE codigo = 'DIR' AND vigente = true;

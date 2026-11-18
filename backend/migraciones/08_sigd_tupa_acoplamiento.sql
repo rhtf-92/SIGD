@@ -133,3 +133,824 @@ DROP TRIGGER IF EXISTS tr_tupa_vinculo_no_truncar ON sigd_doc.expediente_tupa_vi
 CREATE TRIGGER tr_tupa_vinculo_no_truncar
     BEFORE TRUNCATE ON sigd_doc.expediente_tupa_vinculo
     FOR EACH STATEMENT EXECUTE FUNCTION sigd_doc.fn_tupa_vinculo_inmutable();
+
+
+-- Inserción canónica de las 72 entradas oficiales TUPA 2026 (18 APROBADO, 54 PENDIENTE)
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 1, 'p1-fila-01', 1,
+    null, 'Prácticas Iniciales', 'S/ 35.00', '["Pago del Derecho en Tesorería","Control en el Área Académica","Comprobante de Pago 0.64 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 1, 'p1-fila-02', 1,
+    null, 'Prácticas Intermedias', 'S/ 45.00', '["Pago del Derecho en Tesorería","Control en el Área Académica","Comprobante de Pago 0.82 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 1, 'p1-fila-03', 1,
+    null, 'Prácticas Finales', 'S/ 60.00', '["Pago del Derecho en Tesorería","Control en el Área Académica","Comprobante de Pago 1.09 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 1, 'p1-fila-04', 1,
+    null, 'Experiencias Formativas en Situaciones Reales de Trabajo (I, II, III y IV)
+Por cada Módulo', 'S/ 46.50', '["Informe del Área Académica designando los Docentes responsables para las Supervisiones de Experiencias Formativas en Situaciones Reales de Trabajo","Pago del Derecho en Tesorería","Comprobante de Pago 0.84 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 1, 'p1-fila-05', 1,
+    null, 'Certificado Modular (I, II, III y IV)
+Por cada Módulo', 'S/ 100.00', '["Pago en el Área de Tesorería","Emisión de la B/V"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 1, 'p1-fila-06', 1,
+    null, 'Certificado de Inglés', 'S/ 100.00', '["Pago en el Área de Tesorería","Emisión de la B/V"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 1, 'p1-fila-07', 1,
+    null, 'Centro de Idiomas:
+Inglés, Portugués, Japonés
+Nivel Básico Paquete: 04 meses para Alumnos del IESTP "SUIZA"', 'S/ 300.00', '["Pago en el Área de Tesorería","Emisión de la B/V"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 1, 'p1-fila-08', 1,
+    null, 'Centro de Idiomas:
+Inglés, Portugués, Japonés
+Nivel Básico Paquete: 04 meses para Alumnos Externos del IESTP "SUIZA"', 'S/ 350.00', '["Pago en el Área de Tesorería","Emisión de la B/V"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 1, 'p1-fila-09', 1,
+    null, 'Examen de Suficiencia de Inglés y/o Portugués', 'S/ 300.00', '["Pago en el Área de Tesorería","Emisión de la B/V"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 1, 'p1-fila-10', 1,
+    null, 'CEPRETEC 2026', 'S/ 400.00
+S/ 200.00
+S/ 60.00
+S/ 50.00
+S/ 40.00
+S/ 10.00', '["Pago en el Área de Tesorería","Emisión de la B/V"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 2, 'p2-fila-01', 1,
+    null, 'Alquiler del Galpón Agrícola Para la Crianza de Pollos
+(Por Campaña)', 'S/ 500.00', '["Solicitud dirigida al Director del IESTP SUIZA.","Suscripción del Contrato.","Pago en tesorería de acuerdo al Contrato","Precio por Campaña"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 2, 'p2-fila-02', 1,
+    null, 'Alquiler de Retroproyector', 'S/ 100.00', '["Pago en tesorería."]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 2, 'p2-fila-03', 1,
+    null, 'Alquiler de Aulas - Diario', 'S/ 150.00', '["Solicitud dirigida al Director del IESTP SUIZA","Proveído a la Unidad Administrativa para su Autorización","Pago en tesorería.","Emisión de B/V."]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 2, 'p2-fila-04', 1,
+    null, 'Alquiler de la Cancha de Fútbol - Diario', 'S/ 100.00', '["Solicitud dirigida al Director del IESTP SUIZA","Proveído a la Unidad Administrativa para su Autorización","Pago en tesorería.","Emisión de B/V."]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 2, 'p2-fila-05', 1,
+    null, 'Alquiler de Ambientes para servicio de alimentación.', 'S/ 1,000.00', '["Solicitud dirigida al Director del IESTP SUIZA.","Suscripción del Contrato.","Pago en tesorería de acuerdo al Contrato","Precios de acuerdo al Contrato S/. 50.00 a S/. 350.00"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 2, 'p2-fila-06', 1,
+    null, 'Alquiler del Auditorio.', 'S/ 300.00', '["Solicitud dirigida al Director del IESTP SUIZA.","Proveído a la Unidad Administrativa para su Autorización","Pago en tesorería.","Emisión de B/V."]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 2, 'p2-fila-07', 1,
+    null, 'Alquiler de Laboratorio de Cómputo a Terceros', 'S/ 20.00', '["Por hora y por cada equipo"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 2, 'p2-fila-08', 1,
+    null, 'Venta Ambulatoria Diaria', 'S/ 20.00', '["Solicitud dirigida al Director.","Proveído a la Unidad Administrativa para su Autorización.","Pago en Tesorería.","Emisión de la B/V"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 2, 'p2-fila-09', 1,
+    null, 'Venta de Mangos (Ciento)', 'S/ 15.00', '["Pago en Tesorería","Entrega del bien en proyectos","Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.","Supervisión de salida del bien-vigilancia","Emisión de Boleta de Venta"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 2, 'p2-fila-10', 1,
+    null, 'Venta de Patos BB', 'S/ 15.00', '["Pago en Tesorería","Entrega del bien en Proyectos","Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.","Supervisión de salida del bien-vigilancia","Emisión de Boleta de Venta"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 3, 'p3-fila-01', 1,
+    null, 'Venta de Patos Pichones, de acuerdo al Tamaño.', 'S/ 30.00
+S/ 40.00', '["Pago en Tesorería","Entrega del bien en Proyectos","Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.","Supervisión de salida del bien-vigilancia","Emisión de Boleta de Venta","PICHONES HEMBRAS: S/ 30.00","PICHONES MACHOS: S/ 40.00"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 3, 'p3-fila-02', 1,
+    null, 'Venta de Pati Pollos', 'S/ 15.00', '["Pago en Tesorería","Entrega del bien en Proyectos","Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.","Supervisión de salida del bien-vigilancia","Emisión de Boleta de Venta"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 3, 'p3-fila-03', 1,
+    null, 'Venta de Patos adultos hembras', 'S/ 40.00', '["Pago en Tesorería","Entrega del bien en Proyectos","Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.","Supervisión de salida del bien-vigilancia","Emisión de Boleta de Venta"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 3, 'p3-fila-04', 1,
+    null, 'Venta de Patos adultos machos', 'S/ 50.00
+S/ 55.00', '["Pago en Tesorería","Entrega del bien en Proyectos","Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.","Supervisión de salida del bien-vigilancia","Emisión de Boleta de Venta"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 3, 'p3-fila-05', 1,
+    null, 'Venta de Porcino para consumo Kg', 'S/ 20.00', '["Pago en Tesorería","Entrega del bien en Proyectos","Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.","Supervisión de salida del bien-vigilancia","Emisión de Boleta de Venta"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 3, 'p3-fila-06', 1,
+    null, 'Venta de Porcino en Pie Kg', 'S/ 25.00
+S/ 15.00', '["Emisión de B/V.","REPRODUCTOR: S/ 25.00","CARNE: S/ 15.00"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 3, 'p3-fila-07', 1,
+    null, 'Venta de Ganado Vacuno en pie Kg; EN', 'S/ 20.00
+S/ 15.00', '["Pago en Tesorería","Entrega del bien en Proyectos","Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.","Supervisión de salida del bien-vigilancia","Emisión de B/V.","CARCASA (SIN PATA, SIN CABEZA) KG: S/ 20.00","EN PIE: S/ 15.00"]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 3, 'p3-fila-08', 1,
+    null, 'Servicio de Empadre', 'S/ 50.00', '["Ejecución del Servicio","Pago en Tesorería","Emisión de B/V."]'::jsonb,
+    'D.S. Nº 028-2007-ED', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-01', 1,
+    null, 'FUT', 'S/ 4.00', '["Pago del Derecho en Tesorería 3 FUT","Comprobante de Pago 0.07 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-02', 1,
+    null, 'Constancia de No Adeudar
+(Para fines de Titulación)', 'S/ 16.50', '["Pago del Derecho en Tesorería","Comprobante de Pago 0.30 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-03', 1,
+    null, 'Trabajo de Aplicación Profesional
+(Examen Teórico Práctico)', 'S/ 57.00', '["Pago del Derecho en Tesorería, 1.03 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-04', 1,
+    null, 'Examen de Suficiencia Profesional
+(Examen Teórico Práctico)', 'S/ 57.00', '["Pago del Derecho en Tesorería, 1.03 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-05', 1,
+    null, 'Expedición de Título', 'S/ 105.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 1.90 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-06', 1,
+    null, 'Certificado de Estudios Superiores
+(6 Semestres)', 'S/ 124.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 2.24 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-07', 1,
+    null, 'Visación de Certificado de Estudios Superiores', 'S/ 16.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 0.29 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-08', 1,
+    null, 'Caligrafiado de Título', 'S/ 26.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 0.47 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-09', 1,
+    null, 'Derecho de Formato de Título', 'S/ 42.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 0.75 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-10', 1,
+    null, 'Inscripción de Título', 'S/ 120.00', '["Pago del Derecho en Tesorería","Comprobante de Pago"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-11', 1,
+    null, 'Medallas', 'S/ 100.00', '["Pago del Derecho en Tesorería","Comprobante de Pago"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-12', 1,
+    null, 'Protector de Título', 'S/ 100.00', '["Pago del Derecho en Tesorería"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-13', 1,
+    null, 'Colación', 'S/ 100.00', '["Pago del Derecho en Tesorería"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-14', 1,
+    null, 'Protector de Certificado Modular', 'S/ 50.00', '["Pago del Derecho en Tesorería"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-15', 1,
+    null, 'Modificación de Datos del Título', 'S/ 269.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 4.88 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 4, 'p4-fila-16', 1,
+    null, 'Derecho de duplicado de Título.', 'S/ 309.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 5.61 % UIT Vigente"]'::jsonb,
+    'Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.', 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-01', 1,
+    null, 'Matrículas', 'S/ 200.00', '["Ficha de matrícula","Pago de adeudos en Tesorería","Pago de derecho de matrícula en tesorería"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-02', 1,
+    null, 'ADMISIÓN 2026', 'S/ 250.00', '["Pago en el Área de Tesorería"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-03', 1,
+    null, 'Guías del postulante', 'S/ 50.00', '["Pago en el Área de Tesorería"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-04', 1,
+    null, 'Ingreso ADMISIÓN 2026 - Titulados', 'S/ 500.00', '["Pago en el Área de Tesorería"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-05', 1,
+    null, 'Derecho de Reincorporación
+(Reingreso)', 'S/ 300.00', '["Pago en el Área de Tesorería"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-06', 1,
+    null, 'Constancia de Egresado', 'S/ 31.00', '["Pago del Derecho en Tesorería"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-07', 1,
+    null, 'Certificado de Bachillerato', 'S/ 42.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 0.75 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-08', 1,
+    null, 'Constancias
+(Otros: de Título, estudios, de Matrícula)', 'S/ 23.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 0.41 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-09', 1,
+    null, 'Convalidación entre Planes de Estudios', 'S/ 46.50', '["Pago del Derecho en Tesorería, 0.84% UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-10', 1,
+    null, 'Convalidación por Unidades de Competencia', 'S/ 46.50', '["Pago del Derecho en Tesorería","Comprobante de Pago 0.84 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-11', 1,
+    null, 'Devolución de Expediente', 'S/ 21.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 0.37 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-12', 1,
+    null, 'Evaluación Extraordinaria (A)', 'S/ 93.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 1.68 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-13', 1,
+    null, 'Evaluación Extraordinaria
+(RM 069)', 'S/ 70.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 1.27 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-14', 1,
+    null, 'Examen de Recuperación', 'S/ 70.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 1.27 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-15', 1,
+    null, 'Examen de Cargo', 'S/ 70.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 1.27 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-16', 1,
+    null, 'Repitencia de Unidad Didáctica', 'S/ 86.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 1.56 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-17', 1,
+    null, 'Repitencia de Semestre', 'S/ 80.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 1.45 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-18', 1,
+    null, 'Reserva de Matrícula - Ingresantes', 'S/ 66.00', '["Pago del Derecho en Tesorería","Resolución Directoral-Secretaría Académica","Comprobante de Pago 1.20 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-19', 1,
+    null, 'Licencia de Estudios - Estudiantes Antiguos', 'S/ 66.00', '["Pago del Derecho en Tesorería","Resolución Directoral-Secretaría - Académica","Comprobante de Pago 1.20 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-20', 1,
+    null, 'Traslado Interno', 'S/ 309.00', '["Vacante en la Carrera","Resolución Directoral-Secretaría Académica","Pago del Derecho en Tesorería","Comprobante de Pago 5.61 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 5, 'p5-fila-21', 1,
+    null, 'Traslado Externo', 'S/ 412.00', '["Solicitud en FUT dirigida al Director.","Vacante en la Carrera","Resolución Directoral-Secretaría - Académica","Pago del Derecho en Tesorería","Comprobante de Pago 7.48 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 6, 'p6-fila-01', 1,
+    null, 'Demora Devolución Libro Biblioteca', 'S/ 10.00', '["Informe a la Unidad Administrativa de deudores de Libros","Unidad Administrativa deriva a Tesorería","Pago del Derecho en Tesorería","Comprobante de Pago 0.19 % UIT Vigente (Costo por día)"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 6, 'p6-fila-02', 1,
+    null, 'Acceso a la Información Pública.
+S/. 10.00 por C/Hoja', 'S/ 10.50', '["Solicitud dirigida a Dirección en FUT","Pago del Derecho en Tesorería 0.19 % de la UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 6, 'p6-fila-03', 1,
+    null, 'Búsqueda y Duplicados de Boletas (C/U)
+Síllabus (C/U)
+Otros Trámites', 'S/ 10.50', '["Pago del Derecho en Tesorería","Otros Trámites Administrativos","Comprobante de Pago 0.19% UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 6, 'p6-fila-04', 1,
+    null, 'Titulación de Otros Institutos Tecnológicos', 'S/ 515.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 9.35 % UIT Vigente","Resolución Directoral-Secretaría Académica"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'APROBADO', 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1'
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 6, 'p6-fila-05', 1,
+    null, 'Examen de Subsanación con Jurado', 'S/ 33.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 0.60 % UIT Vigente","Resolución Directoral-Secretaría Académica"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 6, 'p6-fila-06', 1,
+    null, 'Prueba de Suficiencia Académica', 'S/ 105.00', '["Pago del Derecho en Tesorería","Comprobante de Pago 1.90 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
+INSERT INTO sigd_doc.tupa_registro_version (
+    documento_sha256, fuente_nombre, pagina, referencia_fila, revision,
+    codigo_externo, denominacion_original, monto_original, requisitos_original,
+    referencia_normativa_original, version_fuente, vigencia_desde, vigencia_hasta,
+    estado_validacion, referencia_aprobacion
+  ) VALUES (
+    '377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622', 'TUPA_2026_IESTP_Suiza.pdf', 6, 'p6-fila-07', 1,
+    null, 'Carnets, Insignia y Distintivos', 'S/ 50.00', '["Pago en el Área de Tesorería","Emisión de la B/V","0.93 % UIT Vigente"]'::jsonb,
+    null, 'TUPA 2026', null, null,
+    'PENDIENTE_VALIDACION', null
+  ) ON CONFLICT ON CONSTRAINT uq_tupa_registro_procedencia DO NOTHING;
