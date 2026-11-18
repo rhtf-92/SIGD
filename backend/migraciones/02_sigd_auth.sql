@@ -201,30 +201,9 @@ CREATE INDEX IF NOT EXISTS idx_notif_casilla_cut
 CREATE INDEX IF NOT EXISTS idx_notif_casilla_fecha
     ON sigd_auth.notificacion_casilla (fecha_deposito DESC);
 
-<<<<<<< HEAD
--- -----------------------------------------------------------------------------
--- 2.5 Usuario sistema (casilla electrónica, automatización y seed de pruebas)
--- -----------------------------------------------------------------------------
-INSERT INTO sigd_auth.persona (id_persona, tipo, id_documento)
-VALUES ('00000000-0000-0000-0000-000000000000', 'NATURAL', 'SISTEMA')
-ON CONFLICT (tipo, id_documento) DO NOTHING;
-
-INSERT INTO sigd_auth.cuenta_usuario (id_usuario, id_persona, usuario, correo, password_hash)
-VALUES (
-    '00000000-0000-0000-0000-000000000001',
-    '00000000-0000-0000-0000-000000000000',
-    'sistema',
-    'sistema@sigd.iestp-suiza.edu.pe',
-    '$argon2id$demo$seed'
-)
-ON CONFLICT (id_usuario) DO NOTHING;
-
--- Semilla inicial determinista para pruebas y desarrollo
-=======
 -- Seed de demostración desactivado: usuario_id 00000000-0000-0000-0000-000000000001
 -- no existe en cuenta_usuario y viola la FK de notificacion_casilla.
 /*
->>>>>>> origin/B_GERIC
 INSERT INTO sigd_auth.notificacion_casilla (
     id, usuario_id, cut, asunto, tipo_acto, numero_documento,
     estado, fecha_deposito, hash_sha256, cvd

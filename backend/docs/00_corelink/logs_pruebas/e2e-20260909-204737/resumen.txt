@@ -1,0 +1,14 @@
+EVIDENCIA E2E (Vitest + Supertest)
+==================================
+Fecha de ejecución : 2026-09-09 20:47-20:48 (UTC-05:00)  [E2E-07 ampliado: 3 casos de atomicidad]
+Base de datos      : PostgreSQL 16 local  sigd_prueba (TEST_DATABASE_URL)
+Migraciones        : DDL real de sigd_audit (integracion/06_sigd_audit_esquema_ddl.sql) + FIXTURES
+                     PROVISIONALES de los 5 módulos del prototipo (tests/fixtures/01_schema_fixtures_test.sql).
+Alcance            : SOLO prototipo CoreLink (sigd_audit real + stubs provisionales). No se ejecutan
+                     las migraciones reales de los 6 módulos; la conformidad intermodular queda
+                     PARCIAL/PENDIENTE y se espera la ejecución en PostgreSQL 18 vía Testcontainers.
+Resultado          : 12/12 archivos · 23/23 casos · EXIT_CODE = 0
+                     (sin ANSI, sin rutas personales, sin stack traces internos en el log)
+Novedad            : E2E-07 ahora cubre 3 casos: persistencia conjunta (PENDIENTE), rollback de
+                     radicación (expediente + outbox + bitácora) y rollback de DERIVACIÓN
+                     (movimiento_tramite + su bitácora) ante falla inducida por trigger temporal.

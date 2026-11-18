@@ -432,7 +432,7 @@ BEGIN
                 count(*) AS cantidad
               FROM sigd_tra.expediente e
               LEFT JOIN sigd_rut.estado_actual_expediente p
-                ON p.expediente_id::text = e.expediente_id::text
+                ON p.expediente_id = e.id_expediente
              GROUP BY 1
         )
         UPDATE sigd_rut.contador_pestana_local c
@@ -470,7 +470,7 @@ BEGIN
     PERFORM pg_advisory_xact_lock(hashtext('exp_' || v_expediente::text));
     IF to_regclass('sigd_tra.expediente') IS NOT NULL THEN
         SELECT EXISTS(SELECT 1 FROM sigd_tra.expediente
-            WHERE expediente_id::text = v_expediente::text) INTO v_visible;
+            WHERE id_expediente = v_expediente) INTO v_visible;
         IF NOT v_visible THEN
             RETURN NULL;
         END IF;
@@ -523,22 +523,22 @@ DECLARE
     v_vieja TEXT;
     v_nueva TEXT;
 BEGIN
-    IF TG_OP = 'UPDATE' AND OLD.expediente_id = NEW.expediente_id THEN
+    IF TG_OP = 'UPDATE' AND OLD.id_expediente = NEW.id_expediente THEN
         RETURN NULL;
     END IF;
     IF TG_OP <> 'INSERT' THEN
-        PERFORM pg_advisory_xact_lock(hashtext('exp_' || OLD.expediente_id::text));
+        PERFORM pg_advisory_xact_lock(hashtext('exp_' || OLD.id_expediente::text));
         SELECT sigd_rut.pestana_de_estado(COALESCE(p.estado_nuevo, 'REGISTRADO'))
           INTO v_vieja FROM (SELECT 1) base
           LEFT JOIN sigd_rut.estado_actual_expediente p
-            ON p.expediente_id::text = OLD.expediente_id::text;
+            ON p.expediente_id = OLD.id_expediente;
     END IF;
     IF TG_OP <> 'DELETE' THEN
-        PERFORM pg_advisory_xact_lock(hashtext('exp_' || NEW.expediente_id::text));
+        PERFORM pg_advisory_xact_lock(hashtext('exp_' || NEW.id_expediente::text));
         SELECT sigd_rut.pestana_de_estado(COALESCE(p.estado_nuevo, 'REGISTRADO'))
           INTO v_nueva FROM (SELECT 1) base
           LEFT JOIN sigd_rut.estado_actual_expediente p
-            ON p.expediente_id::text = NEW.expediente_id::text;
+            ON p.expediente_id = NEW.id_expediente;
     END IF;
     PERFORM 1 FROM sigd_rut.contador_pestana_local
      WHERE pestana IN (v_vieja, v_nueva) ORDER BY pestana FOR UPDATE;
@@ -573,7 +573,7 @@ DO $indice_expediente$
 BEGIN
     IF to_regclass('sigd_tra.expediente') IS NOT NULL THEN
         CREATE INDEX IF NOT EXISTS ix_rutadoc_expediente_fecha_id
-            ON sigd_tra.expediente (fecha_radicacion DESC, expediente_id DESC);
+            ON sigd_tra.expediente (creado_en DESC, id_expediente DESC);
     END IF;
 END;
 $indice_expediente$;
