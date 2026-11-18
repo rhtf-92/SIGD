@@ -88,11 +88,16 @@ export default function HomePage() {
         {/* Contenido / Textos y Acciones en Glass Card */}
         <div className="sigd-hero-copy">
           <span className="sr-only">Sistema Integral de Gestión Documentaria</span>
+          <div className="inline-flex flex-wrap items-center gap-2 rounded-full bg-amber-300/95 text-blue-950 px-3.5 py-1 text-[11px] sm:text-xs font-black uppercase tracking-wider shadow-sm mb-2">
+            <span>IESTP &quot;SUIZA&quot; · Pucallpa, Ucayali</span>
+            <span className="opacity-60">•</span>
+            <span>R.D. N° 0778-2006-ED</span>
+          </div>
           <h1 id="hero-title">
             Trámites Documentarios <br />del IESTP SUIZA
           </h1>
           <p>
-            Presenta solicitudes, consulta el estado de tus trámites y valida documentos de forma digital, segura y confiable.
+            Plataforma oficial del Instituto de Educación Superior Tecnológico Público &quot;Suiza&quot; de Pucallpa. Presenta solicitudes, consulta tu CUT y valida documentos con valor legal.
           </p>
           <div className="sigd-hero-actions">
             <Link to="/mesa-partes" className="sigd-cta sigd-cta-light">
@@ -197,8 +202,11 @@ export default function HomePage() {
         <div className="sigd-services-grid">
           {/* Tarjeta 1: Mesa de Partes Digital */}
           <Link to="/mesa-partes" className="sigd-service-card group">
-            <div className="sigd-service-icon">
-              <Laptop className="sigd-icon-svg" />
+            <div className="sigd-service-top">
+              <div className="sigd-service-icon">
+                <Laptop className="sigd-icon-svg" />
+              </div>
+              <span className="sigd-service-badge">Atención 24/7</span>
             </div>
             <div className="sigd-service-content">
               <h2 className="sigd-service-title">Mesa de Partes Digital</h2>
@@ -208,6 +216,7 @@ export default function HomePage() {
               <span className="sigd-service-arrow" aria-hidden="true">
                 <ArrowRight className="sigd-arrow-svg" />
               </span>
+              <span className="sigd-service-cta-label">Iniciar solicitud</span>
             </div>
             <svg className="sigd-card-corner" viewBox="0 0 100 70" preserveAspectRatio="none" aria-hidden="true">
               <defs>
@@ -235,8 +244,11 @@ export default function HomePage() {
 
           {/* Tarjeta 2: Consulta por CUT */}
           <Link to="/consulta" className="sigd-service-card group">
-            <div className="sigd-service-icon">
-              <Search className="sigd-icon-svg" />
+            <div className="sigd-service-top">
+              <div className="sigd-service-icon">
+                <Search className="sigd-icon-svg" />
+              </div>
+              <span className="sigd-service-badge">En tiempo real</span>
             </div>
             <div className="sigd-service-content">
               <h2 className="sigd-service-title">Consulta por CUT</h2>
@@ -246,6 +258,7 @@ export default function HomePage() {
               <span className="sigd-service-arrow" aria-hidden="true">
                 <ArrowRight className="sigd-arrow-svg" />
               </span>
+              <span className="sigd-service-cta-label">Rastrear trámite</span>
             </div>
             <svg className="sigd-card-corner" viewBox="0 0 100 70" preserveAspectRatio="none" aria-hidden="true">
               <defs>
@@ -273,8 +286,11 @@ export default function HomePage() {
 
           {/* Tarjeta 3: Catálogo TUPA */}
           <Link to="/tupa" className="sigd-service-card group">
-            <div className="sigd-service-icon">
-              <Layers className="sigd-icon-svg" />
+            <div className="sigd-service-top">
+              <div className="sigd-service-icon">
+                <Layers className="sigd-icon-svg" />
+              </div>
+              <span className="sigd-service-badge">72 Procedimientos</span>
             </div>
             <div className="sigd-service-content">
               <h2 className="sigd-service-title">Catálogo TUPA</h2>
@@ -284,6 +300,7 @@ export default function HomePage() {
               <span className="sigd-service-arrow" aria-hidden="true">
                 <ArrowRight className="sigd-arrow-svg" />
               </span>
+              <span className="sigd-service-cta-label">Ver catálogo</span>
             </div>
             <svg className="sigd-card-corner" viewBox="0 0 100 70" preserveAspectRatio="none" aria-hidden="true">
               <defs>
@@ -311,8 +328,11 @@ export default function HomePage() {
 
           {/* Tarjeta 4: Validador CVD */}
           <Link to="/validador-cvd" className="sigd-service-card group">
-            <div className="sigd-service-icon">
-              <ShieldCheck className="sigd-icon-svg" />
+            <div className="sigd-service-top">
+              <div className="sigd-service-icon">
+                <ShieldCheck className="sigd-icon-svg" />
+              </div>
+              <span className="sigd-service-badge">Verificación QR</span>
             </div>
             <div className="sigd-service-content">
               <h2 className="sigd-service-title">Validador CVD</h2>
@@ -322,6 +342,7 @@ export default function HomePage() {
               <span className="sigd-service-arrow" aria-hidden="true">
                 <ArrowRight className="sigd-arrow-svg" />
               </span>
+              <span className="sigd-service-cta-label">Validar código</span>
             </div>
             <svg className="sigd-card-corner" viewBox="0 0 100 70" preserveAspectRatio="none" aria-hidden="true">
               <defs>
@@ -346,6 +367,24 @@ export default function HomePage() {
               />
             </svg>
           </Link>
+        </div>
+
+        {/* Barra Institucional IESTP "Suiza" de Pucallpa */}
+        <div className="mx-auto mt-3 w-full max-w-[1580px] rounded-2xl border border-sky-200/80 bg-white/85 px-4 py-2.5 shadow-2xs backdrop-blur-xs">
+          <div className="flex flex-wrap items-center justify-center lg:justify-between gap-2.5 text-xs font-semibold text-[#062144]">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200 px-3 py-1">
+              <span>📍</span>
+              <span>Sede Central: Av. Túpac Amaru s/n, Pucallpa – Ucayali</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-950 px-3 py-1">
+              <span>🎓</span>
+              <span>11 Carreras Profesionales Técnicas · Instituto de Excelencia</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-950 px-3 py-1">
+              <span>🕘</span>
+              <span>Ventanilla Presencial: Lun a Vie 8:00 a.m. – 4:30 p.m. · Tel. (061) 280665</span>
+            </span>
+          </div>
         </div>
       </section>
     </main>

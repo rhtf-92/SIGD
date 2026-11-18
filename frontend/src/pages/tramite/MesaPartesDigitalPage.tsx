@@ -19,7 +19,7 @@ import {
   obtenerPlaceholderDocumento,
 } from '../../utils/documentValidation';
 import { useAuthStore } from '../../stores/authStore';
-import processingImg from '../../assets/sigd/processing-documents.webp';
+import { ModuleHero, MesaPartesIllustration } from '../../components/tramite/ModuleHero';
 
 interface ArchivoAdjuntoState {
   idRequisito?: string;
@@ -522,52 +522,81 @@ export default function MesaPartesDigitalPage() {
 
   return (
     <main className="w-full bg-surface-page py-4 sm:py-6 px-4 sm:px-6 lg:px-8 text-slate-900">
-      <div className="max-w-4xl mx-auto space-y-4">
-        {/* Cabecera Oficial */}
-        <section className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs space-y-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Mesa de Partes Digital
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Presenta tus solicitudes y documentos al IESTP SUIZA de forma sencilla y segura.
+      <div className="max-w-5xl mx-auto space-y-5">
+        {/* Cabecera Oficial Institucional */}
+        <ModuleHero
+          eyebrow='Sede Digital Oficial · IESTP "Suiza" — Pucallpa, Ucayali'
+          title={<>Mesa de Partes <span className="text-amber-300">Digital</span></>}
+          subtitle='Presenta tus solicitudes y expedientes al IESTP "Suiza" de Pucallpa con foliación digital automática, asignación inmediata de CUT y cargo oficial con código QR.'
+          illustration={<MesaPartesIllustration className="h-40 w-auto" />}
+          actions={
+            <>
+              <Link
+                to="/tupa"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white bg-white px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-blue-50"
+              >
+                Ver Catálogo TUPA 2026
+              </Link>
+              <Link
+                to="/consulta"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-300 px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-amber-200"
+              >
+                Consultar Estado CUT
+              </Link>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-3 py-1 text-[11px] font-bold text-white backdrop-blur">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                Recepción Digital 24/7 · Ley N° 27444
+              </span>
+            </>
+          }
+          footer={
+            <p className="text-[11px] sm:text-xs text-blue-100 font-medium">
+              IESTP &quot;Suiza&quot; de Pucallpa (R.D. N° 0778-2006-ED) · Av. Túpac Amaru s/n, Coronel Portillo – Ucayali · Horario hábil LPAG: Lun–Vie 08:00 a 16:30 hrs
             </p>
-          </div>
+          }
+        />
 
-          {/* Stepper Oficial */}
-          {!resultado && (
-            <div className="pt-1 border-t border-slate-100">
-              <ProcessStepper
-                steps={[
-                  {
-                    id: '1',
-                    title: 'Tus datos',
-                    description: 'Identificación',
-                    status: paso === 1 ? 'current' : paso > 1 ? 'completed' : 'pending',
-                  },
-                  {
-                    id: '2',
-                    title: 'Tu trámite',
-                    description: 'Procedimiento',
-                    status: paso === 2 ? 'current' : paso > 2 ? 'completed' : 'pending',
-                  },
-                  {
-                    id: '3',
-                    title: 'Documentos',
-                    description: 'Requisitos PDF',
-                    status: paso === 3 ? 'current' : paso > 3 ? 'completed' : 'pending',
-                  },
-                  {
-                    id: '4',
-                    title: 'Confirmación',
-                    description: 'Revisión final',
-                    status: paso === 4 ? 'current' : 'pending',
-                  },
-                ]}
-              />
+        {/* Stepper Oficial */}
+        {!resultado && (
+          <section className="rounded-2xl border border-blue-100 bg-white p-4 sm:p-5 shadow-xs space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-blue-950">
+                Progreso de tu Solicitud Documentaria
+              </span>
+              <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-0.5 text-xs font-bold text-blue-900 border border-blue-200">
+                Paso {paso} de 4
+              </span>
             </div>
-          )}
-        </section>
+            <ProcessStepper
+              steps={[
+                {
+                  id: '1',
+                  title: 'Tus datos',
+                  description: 'Identificación',
+                  status: paso === 1 ? 'current' : paso > 1 ? 'completed' : 'pending',
+                },
+                {
+                  id: '2',
+                  title: 'Tu trámite',
+                  description: 'Procedimiento',
+                  status: paso === 2 ? 'current' : paso > 2 ? 'completed' : 'pending',
+                },
+                {
+                  id: '3',
+                  title: 'Documentos',
+                  description: 'Requisitos PDF',
+                  status: paso === 3 ? 'current' : paso > 3 ? 'completed' : 'pending',
+                },
+                {
+                  id: '4',
+                  title: 'Confirmación',
+                  description: 'Revisión final',
+                  status: paso === 4 ? 'current' : 'pending',
+                },
+              ]}
+            />
+          </section>
+        )}
 
         {/* Formulario o Resultado */}
         {resultado ? (
@@ -711,20 +740,68 @@ export default function MesaPartesDigitalPage() {
 
             {/* PASO 1: Tus datos personales / Datos de la entidad */}
             {paso === 1 && (
-              <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-6 space-y-4 shadow-2xs">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                    {identidadBloqueada
-                      ? 'Verifica tus datos'
-                      : tipoPersona === 'NATURAL'
-                      ? 'Tus datos personales'
-                      : 'Datos de la entidad o empresa'}
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {identidadBloqueada
-                      ? 'Sus datos oficiales han sido precargados desde su sesión verificada.'
-                      : 'Comienza indicando quién presenta la solicitud.'}
-                  </p>
+              <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 space-y-5 shadow-xs">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-900 text-sm font-black text-white shadow-2xs">
+                      1
+                    </span>
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                        {identidadBloqueada
+                          ? 'Verifica tus datos'
+                          : tipoPersona === 'NATURAL'
+                          ? 'Tus datos personales'
+                          : 'Datos de la entidad o empresa'}
+                      </h2>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {identidadBloqueada
+                          ? 'Sus datos oficiales han sido precargados desde su sesión verificada.'
+                          : 'Comienza indicando quién presenta la solicitud ante el IESTP "Suiza" de Pucallpa.'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-900">
+                    🔒 Protección de Datos · Ley N° 29733
+                  </span>
+                </div>
+
+                {/* Selector visual segmentado de Tipo de Persona */}
+                <div className="inline-flex flex-wrap rounded-xl bg-slate-100 p-1 border border-slate-200">
+                  <button
+                    type="button"
+                    disabled={identidadBloqueada}
+                    onClick={() => {
+                      setTipoPersona('NATURAL');
+                      setTipoDocumento('DNI');
+                      setNumeroDocumento('');
+                      setErrorDocumento(null);
+                    }}
+                    className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
+                      tipoPersona === 'NATURAL'
+                        ? 'bg-white text-blue-950 shadow-2xs border border-slate-200/80'
+                        : 'text-slate-600 hover:text-slate-900'
+                    } ${identidadBloqueada ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
+                  >
+                    👤 Persona Natural (Estudiante / Egresado / Ciudadano)
+                  </button>
+                  <button
+                    type="button"
+                    disabled={identidadBloqueada}
+                    onClick={() => {
+                      setTipoPersona('JURIDICA');
+                      setTipoDocumento('RUC');
+                      setNumeroDocumento('');
+                      setErrorDocumento(null);
+                    }}
+                    className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
+                      tipoPersona === 'JURIDICA'
+                        ? 'bg-white text-blue-950 shadow-2xs border border-slate-200/80'
+                        : 'text-slate-600 hover:text-slate-900'
+                    } ${identidadBloqueada ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
+                  >
+                    🏢 Persona Jurídica (Empresa / Entidad)
+                  </button>
                 </div>
 
                 {esContextoInstitucional && (
@@ -1702,15 +1779,9 @@ export default function MesaPartesDigitalPage() {
             className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4"
           >
             <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl border border-slate-200 text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
-              <img
-                src={processingImg}
-                alt="Procesando trámite"
-                width={112}
-                height={112}
-                loading="lazy"
-                decoding="async"
-                className="mx-auto h-28 w-28 object-contain aspect-square"
-              />
+              <div className="mx-auto flex justify-center">
+                <MesaPartesIllustration className="h-28 w-auto" />
+              </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">Procesando radicación digital</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Sistema de Gestión Documentaria — IESTP Suiza</p>

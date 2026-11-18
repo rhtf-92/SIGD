@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { ModuleHero, TesoreriaIllustration } from "../../components/tramite/ModuleHero";
 import {
   tesoreriaService,
   type DtoConfiguracionDemoQr,
@@ -419,57 +420,85 @@ export default function TesoreriaPage() {
   return (
     <main className="min-h-screen bg-slate-50 py-6 px-3.5 sm:px-6 sm:py-8 lg:px-8 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* Cabecera */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-950 mb-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Caja y Tesorería Institucional
-            </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-              Módulo de Tesorería — IESTP &quot;Suiza&quot;
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-slate-500">
-              Control de órdenes de pago, recaudación presencial/digital y emisión de recibos oficiales.
+        {/* Cabecera Institucional */}
+        <ModuleHero
+          eyebrow='Unidad de Caja y Tesorería · IESTP "Suiza" — Pucallpa, Ucayali'
+          title={<>Módulo de Tesorería <span className="text-amber-300">Institucional</span></>}
+          subtitle='Control de órdenes de pago TUPA y centros de producción, recaudación presencial/digital (Efectivo y Yape/QR) y emisión de recibos oficiales del IESTP "Suiza" de Pucallpa.'
+          illustration={<TesoreriaIllustration className="h-40 w-auto" />}
+          actions={
+            <>
+              <Link
+                to="/expedientes"
+                className="inline-flex items-center rounded-xl border border-white/30 bg-white/15 px-3.5 py-1.5 text-xs font-bold text-white backdrop-blur transition hover:bg-white/25"
+              >
+                ← Bandeja de Expedientes
+              </Link>
+              <Link
+                to="/tupa"
+                className="inline-flex items-center rounded-xl border border-white bg-white px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-blue-50"
+              >
+                Catálogo TUPA 2026
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  void cargarDashboard();
+                  void cargarOrdenes();
+                }}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-300 px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-amber-200"
+              >
+                🔄 Actualizar Datos
+              </button>
+            </>
+          }
+          footer={
+            <p className="text-[11px] sm:text-xs text-blue-100 font-medium">
+              Sede Central: Av. Túpac Amaru s/n, Pucallpa – Ucayali · Recaudación TUPA 2026 y Bienes Productivos · Vigencia de orden de pago: 7 días hábiles
             </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              to="/expedientes"
-              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition"
-            >
-              ← Bandeja de Expedientes
-            </Link>
-          </div>
-        </header>
+          }
+        />
 
         {/* Tarjetas Métricas Dashboard */}
-        <section aria-label="Métricas de recaudación" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/40 p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Órdenes Pendientes</span>
-              <span className="rounded-full bg-amber-100 p-2 text-amber-800 text-sm">⏳</span>
+        <section aria-label="Métricas de recaudación" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="relative overflow-hidden rounded-2xl border border-amber-200 bg-white p-5 shadow-xs">
+            <div className="absolute inset-x-0 top-0 h-1 bg-amber-500" />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-800">Órdenes Pendientes</span>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-200">⏳ Por cobrar</span>
             </div>
-            <p className="mt-2 text-3xl font-extrabold text-amber-900">{metricas.pendientes}</p>
-            <p className="text-xs text-amber-700/80 mt-1">Por cobrar en ventanilla o confirmar</p>
+            <p className="mt-2.5 text-3xl font-black text-amber-950 font-mono">{metricas.pendientes}</p>
+            <p className="text-xs text-slate-600 mt-1">Por cobrar en caja Pucallpa o confirmar</p>
           </div>
 
-          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-white to-emerald-50/40 p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Confirmados Hoy</span>
-              <span className="rounded-full bg-emerald-100 p-2 text-emerald-800 text-sm">✓</span>
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-white p-5 shadow-xs">
+            <div className="absolute inset-x-0 top-0 h-1 bg-emerald-600" />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">Confirmados Hoy</span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-900 border border-emerald-200">✓ Recaudado</span>
             </div>
-            <p className="mt-2 text-3xl font-extrabold text-emerald-900">{metricas.confirmadosHoy}</p>
-            <p className="text-xs text-emerald-700/80 mt-1">Pagos recaudados durante la jornada</p>
+            <p className="mt-2.5 text-3xl font-black text-emerald-950 font-mono">{metricas.confirmadosHoy}</p>
+            <p className="text-xs text-slate-600 mt-1">Pagos recaudados durante la jornada</p>
           </div>
 
-          <div className="rounded-2xl border border-rose-200 bg-gradient-to-br from-white to-rose-50/40 p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Órdenes Vencidas</span>
-              <span className="rounded-full bg-rose-100 p-2 text-rose-800 text-sm">⚠️</span>
+          <div className="relative overflow-hidden rounded-2xl border border-rose-200 bg-white p-5 shadow-xs">
+            <div className="absolute inset-x-0 top-0 h-1 bg-rose-600" />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-rose-800">Órdenes Vencidas</span>
+              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-900 border border-rose-200">⚠ Expirado</span>
             </div>
-            <p className="mt-2 text-3xl font-extrabold text-rose-900">{metricas.vencidos}</p>
-            <p className="text-xs text-rose-700/80 mt-1">Plazo de 7 días hábiles expirado</p>
+            <p className="mt-2.5 text-3xl font-black text-rose-950 font-mono">{metricas.vencidos}</p>
+            <p className="text-xs text-slate-600 mt-1">Plazo de 7 días hábiles expirado</p>
+          </div>
+
+          <div className="relative overflow-hidden rounded-2xl border border-blue-200 bg-white p-5 shadow-xs">
+            <div className="absolute inset-x-0 top-0 h-1 bg-blue-800" />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-900">Caja Institucional Pucallpa</span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">Activo</span>
+            </div>
+            <p className="mt-2.5 text-xl sm:text-2xl font-black text-blue-950 tracking-tight">Efectivo · QR</p>
+            <p className="text-xs text-slate-600 mt-1">Av. Túpac Amaru s/n · Lun–Vie 08:00–16:30</p>
           </div>
         </section>
 
@@ -572,13 +601,31 @@ export default function TesoreriaPage() {
                   </button>
                 </div>
               ) : (!ordenes || ordenes.length === 0) ? (
-                <div className="p-12 text-center text-slate-500">
-                  <p className="text-base font-semibold text-slate-700">No se encontraron órdenes de pago</p>
-                  <p className="text-xs text-slate-400 mt-1">
+                <div className="p-10 sm:p-12 text-center bg-slate-50/50 space-y-3">
+                  <TesoreriaIllustration className="h-28 w-auto mx-auto mb-2" />
+                  <h3 className="text-base font-bold text-slate-800">
+                    No se encontraron órdenes de pago
+                  </h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
                     {filtroEstado !== "TODOS"
-                      ? `No existen órdenes en estado ${filtroEstado}.`
-                      : "No hay registros disponibles con el criterio de búsqueda."}
+                      ? `No existen órdenes de pago registradas en estado ${filtroEstado} para el IESTP "Suiza" de Pucallpa.`
+                      : "No hay órdenes de pago disponibles con el criterio de búsqueda aplicado."}
                   </p>
+                  <div className="pt-1 flex justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFiltroEstado("TODOS");
+                        setBusqueda("");
+                        setPagina(1);
+                        void cargarDashboard();
+                        void cargarOrdenes();
+                      }}
+                      className="rounded-xl border border-blue-900/20 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-950 hover:bg-blue-100 transition cursor-pointer"
+                    >
+                      Restablecer Filtros y Recargar
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">

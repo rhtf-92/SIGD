@@ -109,7 +109,7 @@
 
 /* HERO */
 .sigd-hero {
-  height: clamp(308px, 42vh, 465px);
+  height: clamp(332px, 44vh, 475px);
   position: relative;
   isolation: isolate;
   background: linear-gradient(90deg, #063974 0%, #0752a1 35%, #0861b8 70%, #0a6bc7 100%);
@@ -219,9 +219,9 @@
   position: absolute;
   z-index: 4;
   left: clamp(345px, 28vw, 495px);
-  top: clamp(44px, 6.8vh, 72px);
-  max-width: clamp(450px, 35vw, 530px);
-  width: 33%;
+  top: clamp(28px, 4.5vh, 56px);
+  max-width: clamp(460px, 36vw, 540px);
+  width: 34%;
   color: #fff;
   background: transparent;
   border: none;
@@ -378,6 +378,30 @@
   border-color: #9cd4fb;
 }
 
+/* Top row of service card: icon + status badge */
+.sigd-service-top {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: clamp(8px, 1.0vh, 11px);
+  z-index: 1;
+}
+
+.sigd-service-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #e8f3ff;
+  color: #05498f;
+  border: 1px solid #c6e0fc;
+  white-space: nowrap;
+}
+
 /* Icon box top-left */
 .sigd-service-icon {
   height: clamp(42px, 4.8vh, 48px);
@@ -390,7 +414,6 @@
   flex: none;
   color: #004b93;
   box-shadow: 0 2px 5px rgba(0, 75, 147, 0.05);
-  margin-bottom: clamp(8px, 1.0vh, 11px);
 }
 
 .sigd-icon-svg {
@@ -434,7 +457,19 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 9px;
   z-index: 1;
+}
+
+.sigd-service-cta-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #004b93;
+  transition: color 0.2s ease;
+}
+
+.sigd-service-card:hover .sigd-service-cta-label {
+  color: #0259b8;
 }
 
 .sigd-service-arrow {
@@ -649,7 +684,7 @@
   }
 
   .sigd-hero {
-    height: clamp(252px, 35.5vh, 328px);
+    height: clamp(290px, 39vh, 360px);
   }
   .sigd-hero-building {
     width: clamp(56%, 60vw, 65%);
@@ -669,9 +704,9 @@
   }
   .sigd-hero-copy {
     left: clamp(315px, 26.5vw, 440px);
-    top: clamp(26px, 4.2vh, 42px);
-    width: 34%;
-    max-width: 450px;
+    top: clamp(18px, 3.0vh, 34px);
+    width: 35%;
+    max-width: 470px;
     background: transparent;
     border: none;
     box-shadow: none;
@@ -734,7 +769,7 @@
     height: clamp(38px, 4.6vh, 44px);
     width: clamp(38px, 4.6vh, 44px);
     border-radius: 12px;
-    margin-bottom: clamp(6px, 0.8vh, 9px);
+    margin-bottom: 0;
   }
   .sigd-icon-svg {
     width: clamp(20px, 2.4vh, 23px);
@@ -1254,7 +1289,7 @@
     height: 42px;
     width: 42px;
     border-radius: 12px;
-    margin-bottom: 9px;
+    margin-bottom: 0;
   }
   .sigd-icon-svg {
     width: 21px;

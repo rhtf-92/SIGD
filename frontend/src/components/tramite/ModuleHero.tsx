@@ -193,3 +193,119 @@ export function CatalogoIllustration({ className = 'h-40 w-auto' }: { className?
     </svg>
   );
 }
+
+/* Mesa de Partes Digital: documento PDF, foliación automática, carga y sello CUT */
+export function MesaPartesIllustration({ className = 'h-40 w-auto' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 240 190" className={className} role="img" aria-label="Mesa de Partes Digital con documento PDF, foliación y código CUT">
+      <Defs id="mp" />
+      <ellipse cx="120" cy="174" rx="102" ry="9" fill="#04204d" opacity="0.35" />
+
+      {/* Carpeta trasera */}
+      <rect x="38" y="34" width="128" height="118" rx="12" fill="#1e64be" opacity="0.55" />
+      <rect x="46" y="42" width="128" height="118" rx="12" fill="#93c5fd" opacity="0.45" />
+
+      {/* Hoja principal del expediente */}
+      <rect x="54" y="24" width="124" height="138" rx="12" fill="url(#mp-w)" stroke="#c7d9f5" />
+      <rect x="54" y="24" width="124" height="24" rx="12" fill="url(#mp-b)" />
+      <rect x="54" y="36" width="124" height="12" fill="url(#mp-b)" />
+
+      {/* Etiqueta PDF */}
+      <rect x="66" y="30" width="32" height="13" rx="4" fill="#ef4444" />
+      <text x="82" y="39.5" textAnchor="middle" fontSize="8.5" fontWeight="900" fill="#fff" fontFamily="system-ui">PDF</text>
+
+      {/* Etiqueta FOLIO 001 */}
+      <rect x="104" y="30" width="62" height="13" rx="4" fill="#ffffff" opacity="0.92" />
+      <text x="135" y="39.5" textAnchor="middle" fontSize="7.5" fontWeight="800" fill="#0a2f6b" fontFamily="ui-monospace, monospace">FOLIO 001</text>
+
+      {/* Líneas del documento */}
+      <rect x="68" y="60" width="76" height="6" rx="3" fill="#0b4f9e" />
+      <rect x="68" y="73" width="94" height="5" rx="2.5" fill="#94a3b8" />
+      <rect x="68" y="84" width="82" height="5" rx="2.5" fill="#cbd5e1" />
+      <rect x="68" y="95" width="90" height="5" rx="2.5" fill="#cbd5e1" />
+
+      {/* Caja CUT */}
+      <rect x="68" y="110" width="96" height="24" rx="6" fill="#eaf2ff" stroke="#93c5fd" />
+      <text x="116" y="125" textAnchor="middle" fontSize="10" fontWeight="800" fill="#0a2f6b" fontFamily="ui-monospace, monospace">CUT EXP-2026</text>
+
+      {/* Sello dorado institucional */}
+      <g transform="rotate(-12 184 128)">
+        <circle cx="184" cy="128" r="22" fill="url(#mp-g)" />
+        <circle cx="184" cy="128" r="17" fill="none" stroke="#fffbeb" strokeWidth="1.5" strokeDasharray="2 2.5" />
+        <path d="M176 128l5.5 5.5 11-11.5" stroke="#fff" strokeWidth="3.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+
+      {/* Flecha de carga digital */}
+      <g>
+        <circle cx="192" cy="54" r="22" fill="url(#mp-g)" />
+        <path d="M192 64V44m0 0l-7 7m7-7l7 7" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
+
+      <circle cx="30" cy="48" r="4" fill="#fbbf24" className="animate-pulse" />
+      <circle cx="222" cy="86" r="3" fill="#93c5fd" className="animate-pulse" />
+    </svg>
+  );
+}
+
+/* Tesorería Institucional: comprobante oficial REC-2026, símbolo S/, QR y monedas */
+export function TesoreriaIllustration({ className = 'h-40 w-auto' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 240 190" className={className} role="img" aria-label="Tesorería institucional con comprobante de pago, código QR y moneda Soles">
+      <Defs id="ts" />
+      <ellipse cx="120" cy="174" rx="102" ry="9" fill="#04204d" opacity="0.35" />
+
+      {/* Comprobante oficial */}
+      <path d="M52 24h114a10 10 0 0 1 10 10v126l-11-7-11 7-11-7-11 7-11-7-11 7-11-7-11 7-11-7-11 7-11-7V34a10 10 0 0 1 10-10z" fill="url(#ts-w)" stroke="#c7d9f5" />
+      <rect x="52" y="24" width="124" height="28" rx="10" fill="url(#ts-b)" />
+      <rect x="52" y="38" width="124" height="14" fill="url(#ts-b)" />
+      <text x="114" y="42" textAnchor="middle" fontSize="10.5" fontWeight="800" fill="#ffffff" fontFamily="ui-monospace, monospace">REC-2026 · PAG</text>
+
+      {/* Emblema S/ */}
+      <circle cx="84" cy="82" r="18" fill="url(#ts-g)" />
+      <circle cx="84" cy="82" r="14" fill="none" stroke="#fffbeb" strokeWidth="1.2" strokeDasharray="2 2" />
+      <text x="84" y="88" textAnchor="middle" fontSize="15" fontWeight="900" fill="#7c2d12" fontFamily="system-ui">S/</text>
+
+      {/* Matriz QR */}
+      <rect x="114" y="64" width="44" height="44" rx="6" fill="#ffffff" stroke="#bfd6fb" />
+      <g fill="#0a2f6b">
+        <rect x="120" y="70" width="11" height="11" rx="1.5" />
+        <rect x="141" y="70" width="11" height="11" rx="1.5" />
+        <rect x="120" y="91" width="11" height="11" rx="1.5" />
+        <rect x="135" y="85" width="5" height="5" />
+        <rect x="142" y="91" width="10" height="5" />
+        <rect x="135" y="97" width="6" height="5" />
+        <rect x="147" y="97" width="5" height="5" />
+      </g>
+      <g fill="#ffffff">
+        <rect x="122.5" y="72.5" width="6" height="6" rx="0.8" />
+        <rect x="143.5" y="72.5" width="6" height="6" rx="0.8" />
+        <rect x="122.5" y="93.5" width="6" height="6" rx="0.8" />
+      </g>
+
+      {/* Líneas de detalle y sello confirmado */}
+      <rect x="66" y="118" width="96" height="5" rx="2.5" fill="#cbd5e1" />
+      <rect x="66" y="130" width="68" height="20" rx="6" fill="#dcfce7" stroke="#86efac" />
+      <circle cx="80" cy="140" r="6" fill="#16a34a" />
+      <path d="M77 140l2 2 4-4.5" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <text x="108" y="143.5" textAnchor="middle" fontSize="8.5" fontWeight="800" fill="#166534" fontFamily="system-ui">CONFIRMADO</text>
+
+      {/* Monedas doradas apiladas */}
+      <g>
+        <ellipse cx="192" cy="150" rx="22" ry="7" fill="#d97706" />
+        <rect x="170" y="141" width="44" height="9" fill="#f59e0b" />
+        <ellipse cx="192" cy="141" rx="22" ry="7" fill="url(#ts-g)" />
+
+        <ellipse cx="192" cy="136" rx="22" ry="7" fill="#d97706" />
+        <rect x="170" y="127" width="44" height="9" fill="#f59e0b" />
+        <ellipse cx="192" cy="127" rx="22" ry="7" fill="url(#ts-g)" />
+
+        <ellipse cx="192" cy="122" rx="22" ry="7" fill="#d97706" />
+        <rect x="170" y="113" width="44" height="9" fill="#f59e0b" />
+        <ellipse cx="192" cy="113" rx="22" ry="7" fill="url(#ts-g)" />
+      </g>
+
+      <circle cx="30" cy="54" r="4" fill="#fbbf24" className="animate-pulse" />
+      <circle cx="218" cy="48" r="3" fill="#93c5fd" className="animate-pulse" />
+    </svg>
+  );
+}
