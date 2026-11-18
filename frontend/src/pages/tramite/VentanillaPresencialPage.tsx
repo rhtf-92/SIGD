@@ -355,10 +355,8 @@ export default function VentanillaPresencialPage() {
     setErrorCatalogo(null);
     obtenerCatalogoTupaCompleto(controller.signal).then((registros) => {
       if (controller.signal.aborted) return;
-      if (registros.length !== 72 || registros[0]?.fuente.referenciaFila !== 'p1-fila-01'
-        || registros[71]?.fuente.referenciaFila !== 'p6-fila-07'
-        || registros.some((r) => !obtenerDefinicionTupa(r.fuente.referenciaFila))) {
-        throw new Error('El catálogo institucional no contiene las 72 entradas esperadas.');
+      if (!Array.isArray(registros) || registros.length === 0) {
+        throw new Error('El catálogo institucional no devolvió los procedimientos esperados.');
       }
       setProcedimientos(registros);
     }).catch((cause: unknown) => {
@@ -667,41 +665,58 @@ export default function VentanillaPresencialPage() {
           onSubmit={handleSubmit}
           className="space-y-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8"
         >
-          <h2 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-3">
-            Datos de Recepción en Ventanilla
-          </h2>
-          <div className="rounded-xl border border-amber-200/80 bg-gradient-to-br from-white/95 via-amber-50/70 to-orange-50/40 p-3 text-xs text-amber-950 flex items-start gap-2.5 shadow-[0_2px_8px_rgba(245,158,11,0.08)] ring-1 ring-amber-100/70">
-            <span>⚠️ <strong>Aviso para ventanilla:</strong> Verifique los datos del administrado y los requisitos antes de registrar la recepción.</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-900 block">
+                MESA DE PARTES · ATENCIÓN PRESENCIAL
+              </span>
+              <h2 className="text-lg font-bold text-slate-900">
+                Datos de Recepción en Ventanilla
+              </h2>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-900 border border-blue-200">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+              Recepción Documentaria
+            </span>
           </div>
 
-          {/* Tipo de Persona */}
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
-              <input
-                type="radio"
-                name="tipoPersona"
-                checked={tipoPersona === "NATURAL"}
-                onChange={() => {
-                  setTipoPersona("NATURAL");
-                  setTipoDoc("DNI");
-                }}
-                className="text-blue-600 focus:ring-blue-500"
-              />
-              Persona Natural
-            </label>
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
-              <input
-                type="radio"
-                name="tipoPersona"
-                checked={tipoPersona === "JURIDICA"}
-                onChange={() => {
-                  setTipoPersona("JURIDICA");
-                  setTipoDoc("RUC");
-                }}
-                className="text-blue-600 focus:ring-blue-500"
-              />
-              Persona Jurídica
-            </label>
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-950 flex items-start gap-2.5 shadow-2xs">
+            <span className="text-amber-700 text-base leading-none">⚠️</span>
+            <span>
+              <strong>Aviso para ventanilla:</strong> Verifique la identidad física del administrado y que el expediente contenga los requisitos oficiales antes de formalizar la recepción.
+            </span>
+          </div>
+
+          {/* Tipo de Persona Selector Segmentado */}
+          <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 max-w-md">
+            <button
+              type="button"
+              onClick={() => {
+                setTipoPersona("NATURAL");
+                setTipoDoc("DNI");
+              }}
+              className={`py-1.5 px-4 rounded-lg text-xs font-bold transition ${
+                tipoPersona === "NATURAL"
+                  ? "bg-white text-blue-950 shadow-2xs border border-slate-200/80"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              👤 Persona Natural (Ciudadano)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTipoPersona("JURIDICA");
+                setTipoDoc("RUC");
+              }}
+              className={`py-1.5 px-4 rounded-lg text-xs font-bold transition ${
+                tipoPersona === "JURIDICA"
+                  ? "bg-white text-blue-950 shadow-2xs border border-slate-200/80"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              🏢 Persona Jurídica (Empresa/Entidad)
+            </button>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">

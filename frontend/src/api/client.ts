@@ -44,12 +44,19 @@ apiClient.interceptors.request.use(
       config.headers["X-Correlation-ID"] = correlationId;
     }
 
-    // Inyección de token JWT si existe en almacenamiento local o de sesión
-    const token =
-      (typeof localStorage !== "undefined" &&
-        (localStorage.getItem("sigd_token") || localStorage.getItem("token"))) ||
-      (typeof sessionStorage !== "undefined" &&
-        (sessionStorage.getItem("sigd_token") || sessionStorage.getItem("token")));
+    // Inyección de token JWT desde authStore o almacenamiento local/sesión
+    let token: string | null = null;
+    try {
+      token = useAuthStore.getState().accessToken;
+    } catch {}
+    if (!token) {
+      token =
+        (typeof localStorage !== "undefined" &&
+          (localStorage.getItem("sigd_token") || localStorage.getItem("token"))) ||
+        (typeof sessionStorage !== "undefined" &&
+          (sessionStorage.getItem("sigd_token") || sessionStorage.getItem("token"))) ||
+        null;
+    }
 
     if (token && !config.headers["Authorization"]) {
       config.headers["Authorization"] = `Bearer ${token}`;

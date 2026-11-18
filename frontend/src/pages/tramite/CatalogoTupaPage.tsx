@@ -54,7 +54,7 @@ export default function CatalogoTupaPage() {
   const token = useAuthStore((s) => s.accessToken);
   const esInstitucional =
     usuario?.rol &&
-    ['MESA_PARTES', 'ADMINISTRADOR', 'DIRECTOR', 'ESPECIALISTA', 'SECRETARIO'].includes(usuario.rol);
+    ['MESA_PARTES', 'ADMINISTRADOR', 'DIRECTOR', 'ESPECIALISTA', 'SECRETARIO', 'TESORERIA', 'SUPERADMINISTRADOR'].includes(usuario.rol);
 
   const [cargando, setCargando] = useState(true);
   const [tieneAccesoPdfOficial, setTieneAccesoPdfOficial] = useState(false);
@@ -292,19 +292,19 @@ export default function CatalogoTupaPage() {
   const getCategoriaBadge = (cat: CategoriaTupa) => {
     switch (cat) {
       case 'PROCEDIMIENTO_APROBADO':
-        return <Badge variant="success">Trámite Oficial</Badge>;
+        return <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200">✓ Trámite Oficial</span>;
       case 'PROCEDIMIENTO_PENDIENTE':
-        return <Badge variant="warning">En Homologación</Badge>;
+        return <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-bold text-orange-800 border border-orange-200">⏳ En Homologación</span>;
       case 'SERVICIO_ACADEMICO':
-        return <Badge variant="info">Servicio Académico</Badge>;
+        return <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-800 border border-indigo-200">🎓 Servicio Académico</span>;
       case 'SERVICIO_COMERCIAL':
-        return <Badge variant="neutral">Alquiler y Servicios</Badge>;
+        return <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-bold text-sky-800 border border-sky-200">🏢 Alquiler y Servicios</span>;
       case 'BIEN_PRODUCTIVO':
-        return <Badge variant="warning">Venta de Productos</Badge>;
+        return <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-800 border border-amber-200">📦 Bien Productivo</span>;
       case 'ACTUACION_INTERNA':
-        return <Badge variant="neutral">Gestión Interna</Badge>;
+        return <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700 border border-slate-200">🔒 Gestión Interna</span>;
       default:
-        return <Badge variant="neutral">Trámites y Constancias</Badge>;
+        return <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700 border border-slate-200">Trámites y Constancias</span>;
     }
   };
 

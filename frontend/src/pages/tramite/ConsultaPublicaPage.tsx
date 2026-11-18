@@ -219,28 +219,28 @@ export default function ConsultaPublicaPage() {
     <main className="min-h-screen bg-surface-page py-8 px-4 sm:px-6 lg:px-8 text-slate-900">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Cabecera Institucional */}
-        <header className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xs space-y-5">
+        <header className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
             <div>
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 mb-2">
-                <ShieldCheck className="h-3.5 w-3.5 text-suiza-primary" />
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900 border border-blue-200 mb-2.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-blue-800" />
                 Consulta Pública de Trámites y Expedientes
               </div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                Consulta tu trámite
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Consulta tu trámite en línea
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              <p className="text-xs sm:text-sm text-slate-600 mt-1">
                 IESTP &quot;Suiza&quot; — Sede Digital y Transparencia Documentaria (Ley N° 27444 / Ley N° 29733)
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Link to="/mesa-partes">
-                <Button variant="secondary" size="sm">
+                <Button variant="secondary" size="sm" className="border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold">
                   Mesa de Partes
                 </Button>
               </Link>
               <Link to="/">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
                   <ArrowLeft className="h-3.5 w-3.5 mr-1" />
                   Inicio
                 </Button>
@@ -248,7 +248,7 @@ export default function ConsultaPublicaPage() {
             </div>
           </div>
 
-          {/* Formulario de Búsqueda Seguro (CUT + Documento) con Ilustración Secundaria */}
+          {/* Formulario de Búsqueda Seguro (CUT + Documento) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
             <form onSubmit={handleBuscar} className="space-y-4 lg:col-span-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -287,16 +287,17 @@ export default function ConsultaPublicaPage() {
               </div>
 
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-                <p className="text-xs text-slate-500">
-                  🔒 Por seguridad y confidencialidad (Ley N° 29733), se valida que el número de documento corresponda al titular del expediente.
-                </p>
+                <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-sm">🔒</span>
+                  <span>Por seguridad y confidencialidad (Ley N° 29733), se valida que el número de documento corresponda al titular del expediente.</span>
+                </div>
                 <Button
                   type="submit"
                   variant="primary"
                   size="md"
                   isLoading={cargando}
                   loadingText="Consultando..."
-                  className="w-full sm:w-auto shrink-0"
+                  className="w-full sm:w-auto shrink-0 bg-blue-900 hover:bg-blue-800 text-white font-bold shadow-sm"
                 >
                   <Search className="h-4 w-4 mr-1.5" />
                   Consultar Estado
@@ -304,7 +305,7 @@ export default function ConsultaPublicaPage() {
               </div>
             </form>
 
-            <div className="hidden lg:flex lg:col-span-4 justify-center items-center p-2">
+            <div className="hidden lg:flex lg:col-span-4 justify-center items-center p-3 rounded-2xl bg-gradient-to-br from-blue-50/50 to-slate-50 border border-blue-100">
               <img
                 src={consultaCutImg}
                 alt="Consulta CUT SIGD"

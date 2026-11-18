@@ -715,28 +715,25 @@ export function crearRouterTramites(
     }
 
     const token = extraerTokenBearer(req.get('authorization'));
-    if (!token) {
-      return res.status(403).json({
-        error: 'ACCESO_RESTRINGIDO',
-        codigo: 'SOLICITUD_ACCESO_REQUERIDA',
-        mensaje: 'Para consultar el documento TUPA institucional completo se requiere una solicitud de acceso.',
-      });
-    }
+    let esInstitucional = false;
 
-    let claims: ClaimsJwt;
-    try {
-      claims = verificarTokenAcceso(token);
-    } catch {
-      return res.status(403).json({
-        error: 'ACCESO_RESTRINGIDO',
-        codigo: 'SOLICITUD_ACCESO_REQUERIDA',
-        mensaje: 'Token inválido o expirado. Para consultar el documento TUPA completo se requiere autenticación válida.',
-      });
+    if (token) {
+      try {
+        const claims = verificarTokenAcceso(token);
+        const ROLES_INSTITUCIONALES = [
+          'ADMINISTRADOR',
+          'MESA_PARTES',
+          'DIRECTOR',
+          'SECRETARIO',
+          'ESPECIALISTA',
+          'TESORERIA',
+          'SUPERADMINISTRADOR',
+        ];
+        esInstitucional = claims.roles?.some((r) => ROLES_INSTITUCIONALES.includes(r)) ?? false;
+      } catch {
+        // Token inválido: se tratará como consulta pública
+      }
     }
-
-    const esInstitucional = claims.roles?.some((r) =>
-      ['MESA_PARTES', 'ADMINISTRADOR', 'DIRECTOR', 'ESPECIALISTA', 'SECRETARIO'].includes(r),
-    );
 
     if (esInstitucional) {
       const enCacheCompleto = await getCached<unknown[]>(cacheKeyCompleto);
@@ -759,44 +756,52 @@ export function crearRouterTramites(
       return res.status(200).json(resultadoCompleto);
     }
 
-    // Para CIUDADANO: verificar si tiene solicitud de acceso APROBADA
+    // Para CIUDADANO o consultas públicas autorizadas:
+    // Si tiene acceso aprobado, entrega catálogo completo; si no, entrega catálogo público
     const identidad = await resolverIdentidadPersona(req);
-    if (!identidad) {
-      return res.status(403).json({
-        error: 'ACCESO_RESTRINGIDO',
-        codigo: 'SOLICITUD_ACCESO_REQUERIDA',
-        mensaje: 'Cuenta de usuario no activa o no asociada a una persona válida.',
-      });
+    const tieneAcceso = identidad ? await tupaAccesoRepo.tieneAccesoAprobado(identidad.idPersona) : false;
+
+    if (tieneAcceso) {
+      const enCacheCiudadano = await getCached<unknown[]>(cacheKeyCompleto);
+      if (enCacheCiudadano && Array.isArray(enCacheCiudadano) && enCacheCiudadano.length > 0) {
+        return res.status(200).json(enCacheCiudadano);
+      }
+      let resultadoCiudadano: unknown[] = [];
+      try {
+        const procs = await tupaVersionRepo.listarProcedimientosVigentes(false);
+        if (procs.length > 0) {
+          resultadoCiudadano = procs.map(mapearProcedimientoADto);
+        }
+      } catch {}
+      if (resultadoCiudadano.length === 0) {
+        resultadoCiudadano = await tupaService.listarCompletoAutorizado();
+      }
+      if (resultadoCiudadano.length > 0) {
+        await setCached(cacheKeyCompleto, resultadoCiudadano, 3600);
+      }
+      return res.status(200).json(resultadoCiudadano);
     }
 
-    const tieneAcceso = await tupaAccesoRepo.tieneAccesoAprobado(identidad.idPersona);
-    if (!tieneAcceso) {
-      return res.status(403).json({
-        error: 'ACCESO_RESTRINGIDO',
-        codigo: 'SOLICITUD_ACCESO_REQUERIDA',
-        mensaje: 'Para consultar el documento TUPA institucional completo se requiere una solicitud de acceso aprobada.',
-      });
+    // Catálogo público fallback para usuarios sin rol institucional (sin exponer actuaciones internas)
+    const enCachePub = await getCached<unknown[]>(cacheKeyPublico);
+    if (enCachePub && Array.isArray(enCachePub) && enCachePub.length > 0) {
+      return res.status(200).json(enCachePub);
     }
-
-    const enCacheCiudadano = await getCached<unknown[]>(cacheKeyCompleto);
-    if (enCacheCiudadano && Array.isArray(enCacheCiudadano) && enCacheCiudadano.length > 0) {
-      return res.status(200).json(enCacheCiudadano);
-    }
-
-    let resultadoCiudadano: unknown[] = [];
+    let resPub: unknown[] = [];
     try {
       const procs = await tupaVersionRepo.listarProcedimientosVigentes(false);
       if (procs.length > 0) {
-        resultadoCiudadano = procs.map(mapearProcedimientoADto);
+        resPub = procs.filter((p) => p.categoria !== 'ACTUACION_INTERNA').map(mapearProcedimientoADto);
       }
     } catch {}
-    if (resultadoCiudadano.length === 0) {
-      resultadoCiudadano = await tupaService.listarCompletoAutorizado();
+    if (resPub.length === 0) {
+      const todos = await tupaService.listarCompletoAutorizado();
+      resPub = (todos as any[]).filter((p) => p.categoria !== 'ACTUACION_INTERNA');
     }
-    if (resultadoCiudadano.length > 0) {
-      await setCached(cacheKeyCompleto, resultadoCiudadano, 3600);
+    if (resPub.length > 0) {
+      await setCached(cacheKeyPublico, resPub, 3600);
     }
-    return res.status(200).json(resultadoCiudadano);
+    return res.status(200).json(resPub);
   });
 
   // Estado de acceso TUPA del usuario autenticado

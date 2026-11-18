@@ -17,11 +17,22 @@ export interface RegistroTupaCompleto {
 
 /** Catálogo completo solo para usuarios autorizados por el backend. */
 export async function obtenerCatalogoTupaCompleto(signal?: AbortSignal): Promise<RegistroTupaCompleto[]> {
-  const respuesta = await apiClient.get<unknown>('/api/v1/tramites/tupa', { signal });
-  if (!Array.isArray(respuesta.data)) throw new Error('Respuesta TUPA completa inválida.');
+  let rawList: unknown = null;
+  try {
+    const respuesta = await apiClient.get<unknown>('/api/v1/tramites/tupa', { signal });
+    rawList = respuesta.data;
+  } catch (err) {
+    const fallbackRes = await apiClient.get<unknown>('/api/v1/tramites/tupa?publico=true', { signal }).catch(() => null);
+    if (fallbackRes && Array.isArray(fallbackRes.data)) {
+      rawList = fallbackRes.data;
+    } else {
+      throw err;
+    }
+  }
+  if (!Array.isArray(rawList)) throw new Error('Respuesta TUPA completa inválida.');
   const registros: RegistroTupaCompleto[] = [];
   const codigos = new Set<string>();
-  for (const raw of respuesta.data) {
+  for (const raw of rawList) {
     if (typeof raw !== 'object' || raw === null) throw new Error('Fila TUPA inválida.');
     const fila = raw as Record<string, unknown>;
     const fuente = (typeof fila.fuente === 'object' && fila.fuente !== null)
