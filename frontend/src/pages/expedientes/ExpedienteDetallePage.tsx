@@ -21,6 +21,7 @@ import ResolverModal from "../../components/expedientes/ResolverModal";
 import ArchivadoModal from "../../components/expedientes/ArchivadoModal";
 import AsignacionModal from "../../components/expedientes/AsignacionModal";
 import ExpedienteActionToast from "../../components/expedientes/ExpedienteActionToast";
+import { ReciboPagoPrintable } from "../../components/tesoreria/ReciboPagoPrintable";
 import { useExpedienteActions } from "../../hooks/useExpedienteActions";
 import { servicioExpedienteActionsReal } from "../../api/expedienteActions";
 import { useAuthStore } from "../../stores/authStore";
@@ -2649,7 +2650,20 @@ export default function ExpedienteDetallePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => setModalReciboDetalle(ordenPago)}
+                            onClick={() =>
+                              setModalReciboDetalle({
+                                ...ordenPago,
+                                codigoExpediente: ordenPago.codigoExpediente || detalleData.cut,
+                                solicitanteNombre:
+                                  ordenPago.solicitanteNombre ||
+                                  solicitanteResumen?.nombreCompleto ||
+                                  "Administrado",
+                                documentoEnmascarado:
+                                  ordenPago.documentoEnmascarado ||
+                                  solicitanteResumen?.documentoEnmascarado ||
+                                  "---",
+                              })
+                            }
                             className="shrink-0 rounded-xl border border-emerald-700 bg-white px-3.5 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-50 transition shadow-xs"
                           >
                             Ver Recibo Oficial
@@ -3300,112 +3314,20 @@ export default function ExpedienteDetallePage() {
         <dialog
           open
           data-print-target="recibo-voucher"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 w-full h-full backdrop-blur-xs print:static print:inset-auto print:w-full print:h-auto print:bg-transparent print:p-0 print:block"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 w-full h-full backdrop-blur-xs print:static print:inset-auto print:w-full print:h-auto print:bg-transparent print:p-0 print:block print:overflow-visible"
           aria-labelledby="recibo-modal-titulo"
           aria-modal="true"
         >
           <div
             data-print-target="recibo-card"
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 border border-slate-200 print:max-w-md print:mx-auto print:border print:border-dashed print:border-slate-400 print:shadow-none print:p-4 break-inside-avoid"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-auto max-h-[92vh] overflow-y-auto p-6 space-y-4 border border-slate-200 print:max-h-none print:overflow-visible print:max-w-md print:mx-auto print:border print:border-dashed print:border-slate-400 print:shadow-none print:p-4 break-inside-avoid"
           >
-            <div className="text-center border-b border-dashed border-slate-300 pb-3 space-y-1">
-              <div className="inline-block text-[11px] font-bold text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-full mb-1">
-                IESTP &quot;SUIZA&quot; — PUCALLPA
-              </div>
-              <h3 id="recibo-modal-titulo" className="text-base font-extrabold text-slate-900 tracking-tight">
-                CONSTANCIA DE PAGO
-              </h3>
-              <p className="text-xs font-semibold text-slate-600">
-                RECIBO INTERNO DE TESORERÍA
-              </p>
-              <p className="text-[11px] font-mono text-slate-500">RUC: 20496155601</p>
-              <p className="text-xs font-mono font-bold text-emerald-800">
-                N° COMPROBANTE: {modalReciboDetalle.codigoRecibo || "REC-2026-OFICIAL"}
-              </p>
-            </div>
-
-            <div className="space-y-2 text-xs text-slate-700 border-b border-dashed border-slate-300 pb-3">
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Fecha y Hora:</span>
-                <span className="font-semibold text-slate-800 text-right">
-                  {formatearFechaLarga(modalReciboDetalle.fechaPago || modalReciboDetalle.fechaCreacion)}
-                </span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Código Orden:</span>
-                <span className="font-mono font-bold text-slate-900 text-right">{modalReciboDetalle.codigoPago}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Expediente CUT:</span>
-                <span className="font-mono font-semibold text-blue-800 text-right">{modalReciboDetalle.codigoExpediente}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Administrado:</span>
-                <span className="font-semibold text-slate-900 text-right break-words">{modalReciboDetalle.solicitanteNombre}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Documento:</span>
-                <span className="font-mono text-slate-700 text-right">{modalReciboDetalle.documentoEnmascarado}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Concepto:</span>
-                <span className="font-medium text-slate-800 text-right break-words">{modalReciboDetalle.concepto}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Medio de Pago:</span>
-                <span className="font-semibold text-slate-900 text-right">
-                  {modalReciboDetalle.metodoPago === "EFECTIVO"
-                    ? "Efectivo en Ventanilla"
-                    : modalReciboDetalle.metodoPago === "YAPE"
-                      ? "Yape / Digital Asistido"
-                      : "QR Automático — TAYPI Sandbox"}
-                </span>
-              </div>
-              {modalReciboDetalle.metodoPago === "YAPE" && modalReciboDetalle.referenciaOperacion && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 shrink-0">N° Operación Yape:</span>
-                  <span className="font-mono font-bold text-purple-900 text-right">{modalReciboDetalle.referenciaOperacion}</span>
-                </div>
-              )}
-              {modalReciboDetalle.metodoPago === "QR_AUTOMATICO_SANDBOX" && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 shrink-0">Origen confirmación:</span>
-                  <span className="font-mono font-bold text-amber-900 text-right">Webhook TAYPI</span>
-                </div>
-              )}
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Operador:</span>
-                <span className="font-semibold text-slate-800 text-right">{modalReciboDetalle.tesoreroNombre || "Tesorería — IESTP Suiza"}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
-              <span className="font-bold text-slate-900 text-sm">TOTAL CANCELADO:</span>
-              <span className="font-mono text-lg font-extrabold text-blue-900">
-                {modalReciboDetalle.moneda} {modalReciboDetalle.monto.toFixed(2)}
-              </span>
-            </div>
-
-            <div className="text-center text-[10px] text-slate-400">
-              ✓ Pago validado por Tesorería. El expediente se encuentra desbloqueado para continuar su trámite.
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 print:hidden">
-              <button
-                type="button"
-                onClick={() => setModalReciboDetalle(null)}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cerrar
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded-xl bg-blue-800 px-4 py-2 text-xs font-bold text-white hover:bg-blue-900 shadow-xs"
-              >
-                🖨️ Imprimir Recibo
-              </button>
-            </div>
+            <ReciboPagoPrintable
+              orden={modalReciboDetalle}
+              formatearFecha={(val) => (val ? formatearFechaLarga(val) : "-")}
+              onClose={() => setModalReciboDetalle(null)}
+              headingId="recibo-modal-titulo"
+            />
           </div>
         </dialog>
       )}

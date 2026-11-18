@@ -511,6 +511,8 @@ export function crearRouterCasilla(pool: Pool): Router {
         tipoActo: notif.tipo_acto,
         asunto: notif.asunto,
         fechaDeposito: notif.fecha_deposito,
+        fechaLectura: notif.fecha_lectura,
+        estadoNotificacion: notif.estado,
         documentoUrlNotificado: notif.documento_url,
         cvdActoNotificado: notif.cvd,
         hashActoNotificado: notif.hash_sha256,

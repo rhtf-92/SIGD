@@ -71,12 +71,13 @@ function makeCoverPage(request: ReportExportRequest): string {
   const commands = [
     `0.08 0.25 0.39 rg 0 ${(PAGE_HEIGHT - 140).toFixed(2)} ${PAGE_WIDTH} 140 re f`,
     "1 1 1 rg",
-    textCommand("IESTP SUIZA | SISTEMA INTEGRAL DE GESTION DOCUMENTARIA", 42, 48, 10, "F2"),
-    textCommand(request.reportName.toUpperCase(), 42, 91, 19, "F2"),
+    textCommand("IESTP SUIZA | SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA", 42, 48, 10, "F2"),
+    textCommand(request.reportName.toUpperCase().slice(0, 48), 42, 91, 18, "F2"),
+    textCommand("Av. Túpac Amaru s/n, Pucallpa – Ucayali", 42, 118, 8.5, "F1"),
     "0 0 0 rg",
     textCommand("REPORTE INSTITUCIONAL", 42, 178, 11, "F2"),
     textCommand(`Generado: ${request.generatedAt}`, 42, 201, 9),
-    textCommand(`Periodo: ${request.filters.periodo || "General"}`, 42, 218, 9),
+    textCommand(`Período: ${request.filters.periodo || "General"}`, 42, 218, 9),
     textCommand(`Desde: ${request.filters.fechaInicio || "-"}    Hasta: ${request.filters.fechaFin || "-"}`, 42, 235, 9),
     textCommand(`Registros: ${request.records.length}`, 42, 252, 9),
   ];
@@ -97,7 +98,7 @@ function makeCoverPage(request: ReportExportRequest): string {
       const y = 466 - barHeight;
       commands.push(`${x} ${PAGE_HEIGHT - 466} ${38} ${barHeight.toFixed(2)} re f`);
       commands.push("0 0 0 rg");
-      commands.push(textCommand(Object.values(record)[0], x - 7, 484, 7));
+      commands.push(textCommand(String(Object.values(record)[0] ?? "").slice(0, 12), x - 4, 484, 7));
       commands.push(textCommand(record[numericKey], x, y - 7, 7));
       commands.push("0.12 0.43 0.48 rg");
     });
@@ -107,50 +108,64 @@ function makeCoverPage(request: ReportExportRequest): string {
   commands.push("0.08 0.25 0.39 RG 0.8 w");
   commands.push(lineCommand(42, 780, 553, 780));
   commands.push("0 0 0 rg");
-  commands.push(textCommand("Documento generado por el Sistema Integral de Gestion Documentaria", 42, 798, 8));
+  commands.push(textCommand('IESTP "Suiza" · Sistema Integral de Gestión Documentaria (SIGD)', 42, 798, 8));
   return commands.join("\n");
 }
 
 function makeTablePage(
   request: ReportExportRequest,
   pageNumber: number,
+  totalPages: number,
   records: ExportableReportRecord[],
 ): string {
   const headers = Object.keys(records[0] ?? request.records[0] ?? {});
   const columnCount = Math.max(1, headers.length);
   const columnWidth = 511 / columnCount;
+  const maxCharsPerCell = Math.max(8, Math.floor((columnWidth - 10) / 4.3));
   const commands = [
-    textCommand(request.reportName, 42, 48, 14, "F2"),
-    textCommand(`Detalle | Pagina ${pageNumber}`, 42, 68, 8),
+    textCommand(`IESTP "SUIZA" — ${request.reportName}`, 42, 48, 12, "F2"),
+    textCommand(`Detalle de registros · Página ${pageNumber} de ${totalPages}`, 42, 68, 8.5),
     "0.08 0.25 0.39 rg 42 700 511 28 re f",
   ];
   headers.forEach((header, index) => {
     commands.push("1 1 1 rg");
-    commands.push(textCommand(header.slice(0, 28), 47 + index * columnWidth, 718, 8, "F2"));
+    commands.push(
+      textCommand(header.slice(0, maxCharsPerCell), 47 + index * columnWidth, 130, 8, "F2"),
+    );
   });
-  commands.push("0 0 0 rg 0.75 w");
+  commands.push("0 0 0 rg 0.6 w 0.72 0.77 0.84 RG");
   records.forEach((record, rowIndex) => {
-    const y = 132 + rowIndex * 22;
+    const y = 148 + rowIndex * 22;
     commands.push(lineCommand(42, y, 553, y));
     headers.forEach((header, columnIndex) => {
-      commands.push(textCommand(record[header], 47 + columnIndex * columnWidth, y + 15, 7));
+      const val = String(record[header] ?? "-");
+      commands.push(
+        textCommand(val.slice(0, maxCharsPerCell), 47 + columnIndex * columnWidth, y + 14, 7.2),
+      );
     });
   });
-  commands.push(lineCommand(42, 132 + records.length * 22, 553, 132 + records.length * 22));
+  commands.push(lineCommand(42, 148 + records.length * 22, 553, 148 + records.length * 22));
+  commands.push(lineCommand(42, 780, 553, 780));
   commands.push(textCommand(`Total de registros: ${request.records.length}`, 42, 795, 8));
+  commands.push(textCommand(`Página ${pageNumber} de ${totalPages}`, 500, 795, 8, "F2"));
   return commands.join("\n");
 }
 
 export function buildGenuinePdfBlob(request: ReportExportRequest): Blob {
   const pageSize = 24;
-  const pages = [makeCoverPage(request)];
+  const tableChunks: ExportableReportRecord[][] = [];
   if (request.records.length === 0) {
-    pages.push(makeTablePage(request, 2, []));
+    tableChunks.push([]);
   } else {
     for (let start = 0; start < request.records.length; start += pageSize) {
-      pages.push(makeTablePage(request, pages.length + 1, request.records.slice(start, start + pageSize)));
+      tableChunks.push(request.records.slice(start, start + pageSize));
     }
   }
+  const totalPages = 1 + tableChunks.length;
+  const pages = [
+    makeCoverPage(request),
+    ...tableChunks.map((chunk, idx) => makeTablePage(request, idx + 2, totalPages, chunk)),
+  ];
   const objects: string[] = [""];
   objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
   const pageObjectIds = pages.map((_, index) => 5 + index * 2);

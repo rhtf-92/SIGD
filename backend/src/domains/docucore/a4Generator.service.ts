@@ -620,18 +620,21 @@ export class A4GeneratorService {
     const anchoLinea = ANCHO_UTIL - sangriaIzquierda;
     const particion = ajustarLineas(aPalabras(tramos), medir, cuerpo, anchoLinea - sangria);
 
-    return particion.map((palabras, indice) => ({
-      palabras,
-      anchoPalabras: anchoDeLinea(palabras, medir, cuerpo),
-      cuerpo,
-      interlineado,
-      alto: cuerpo * interlineado,
-      alineacion,
-      justificada: alineacion === "justificado" && indice < particion.length - 1,
-      sangriaX: sangriaIzquierda + (indice === 0 ? sangria : 0),
-      anchoLinea,
-      color,
-    }));
+    return particion.map((palabras, indice) => {
+      const sangriaPrimeraLinea = indice === 0 ? sangria : 0;
+      return {
+        palabras,
+        anchoPalabras: anchoDeLinea(palabras, medir, cuerpo),
+        cuerpo,
+        interlineado,
+        alto: cuerpo * interlineado,
+        alineacion,
+        justificada: alineacion === "justificado" && indice < particion.length - 1,
+        sangriaX: sangriaIzquierda + sangriaPrimeraLinea,
+        anchoLinea: Math.max(cuerpo, anchoLinea - sangriaPrimeraLinea),
+        color,
+      };
+    });
   }
 
   private compilar(
@@ -1344,7 +1347,7 @@ export class A4GeneratorService {
     const x = MARGEN_PUNTOS + linea.sangriaX;
 
     if (linea.justificada && linea.palabras.length > 1 && holgura >= 0) {
-      const hueco = holgura / (linea.palabras.length - 1);
+      const huecoExtra = holgura / (linea.palabras.length - 1);
       let cursor = x;
       for (const palabra of linea.palabras) {
         const fuente = fuentes[palabra.estilo];
@@ -1355,7 +1358,10 @@ export class A4GeneratorService {
           font: fuente,
           color: linea.color,
         });
-        cursor += fuente.widthOfTextAtSize(palabra.texto, linea.cuerpo) + hueco;
+        cursor +=
+          fuente.widthOfTextAtSize(palabra.texto, linea.cuerpo) +
+          fuente.widthOfTextAtSize(" ", linea.cuerpo) +
+          huecoExtra;
       }
       return;
     }

@@ -6,9 +6,19 @@ import {
   DeleteObjectCommand,
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
 import { obtenerConfiguracionS3, type ConfiguracionS3 } from '../../config/s3.config.js';
 import { ValidationError, NotFoundError } from '../../shared/domain/errors/index.js';
+import {
+  A4InstitutionalDocBuilder,
+  INSTITUCION_SISTEMA,
+} from '../../domains/docucore/institucionalPdf.helper.js';
+
+export interface DocumentoPresentadoCargo {
+  nombre: string;
+  folios?: number;
+  tipo?: string;
+}
 
 export interface DatosCargoPdf {
   cut: string;
@@ -18,6 +28,11 @@ export interface DatosCargoPdf {
   asunto: string;
   folios: number;
   operadorMesa: string;
+  canalRecepcion?: string | null;
+  estadoInicial?: string | null;
+  documentosPresentados?: readonly DocumentoPresentadoCargo[];
+  observacionHorario?: string | null;
+  hashRecepcion?: string | null;
   codigoTupa?: string | null;
   denominacionTupa?: string | null;
   costoTupa?: number | null;
@@ -32,6 +47,8 @@ export interface DatosResolucionPdf {
   observacionInterna?: string | null;
   operador: string;
   area: string;
+  numeroResolucion?: string | null;
+  tramiteNombre?: string | null;
 }
 
 export interface ObjetoS3Verificado {
@@ -160,48 +177,30 @@ export class DocumentoStorageService {
   }
 
   /**
-   * Genera el PDF físico oficial de Cargo de Recepción para Ventanilla Presencial.
+   * Resuelve una etiqueta legible del canal real de ingreso sin asumir ventanilla física.
+   */
+  private resolverCanalLegible(datos: DatosCargoPdf): string {
+    const raw = (datos.canalRecepcion ?? '').trim().toUpperCase();
+    if (raw === 'MESA_PARTES_DIGITAL' || raw === 'VIRTUAL') {
+      return 'Mesa de Partes Digital (Virtual)';
+    }
+    if (raw === 'VENTANILLA_PRESENCIAL' || raw === 'PRESENCIAL') {
+      return 'Ventanilla Presencial — Mesa de Partes';
+    }
+    if (raw) {
+      return datos.canalRecepcion!.trim();
+    }
+    if ((datos.operadorMesa ?? '').toLowerCase().includes('digital')) {
+      return 'Mesa de Partes Digital (Virtual)';
+    }
+    return 'Ventanilla Presencial — Mesa de Partes';
+  }
+
+  /**
+   * Genera el PDF oficial en hoja A4 de Cargo de Recepción Documentaria
+   * (Mesa de Partes Digital o Ventanilla Presencial).
    */
   public async generarCargoPdf(datos: DatosCargoPdf): Promise<Buffer> {
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595.28, 841.89]); // A4 estándar
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-    const { width, height } = page.getSize();
-
-    // Encabezado institucional
-    page.drawText('INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"', {
-      x: 50,
-      y: height - 50,
-      size: 11,
-      font: fontBold,
-      color: rgb(0.1, 0.2, 0.4),
-    });
-    page.drawText('SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA (SIGD 2026) — MESA DE PARTES', {
-      x: 50,
-      y: height - 66,
-      size: 8.5,
-      font,
-      color: rgb(0.3, 0.3, 0.3),
-    });
-
-    page.drawLine({
-      start: { x: 50, y: height - 76 },
-      end: { x: width - 50, y: height - 76 },
-      thickness: 1,
-      color: rgb(0.7, 0.7, 0.7),
-    });
-
-    // Título del documento
-    page.drawText('CARGO OFICIAL DE RECEPCIÓN DOCUMENTARIA', {
-      x: 50,
-      y: height - 105,
-      size: 13,
-      font: fontBold,
-      color: rgb(0.05, 0.15, 0.35),
-    });
-
     const fechaFormateada = datos.fechaHora.toLocaleString('es-PE', {
       timeZone: 'America/Lima',
       year: 'numeric',
@@ -212,114 +211,88 @@ export class DocumentoStorageService {
       second: '2-digit',
     });
 
-    const campos: Array<[string, string]> = [
-      ['CÓDIGO ÚNICO DE TRÁMITE (CUT):', datos.cut],
-      ['FECHA Y HORA DE INGRESO:', fechaFormateada],
-      ['CANAL DE RECEPCIÓN:', 'Ventanilla Presencial — Mesa de Partes'],
-      ['ADMINISTRADO / SOLICITANTE:', datos.nombreSolicitante],
-      ['DOCUMENTO DE IDENTIDAD:', datos.documentoEnmascarado],
-      ['ASUNTO DEL TRÁMITE:', datos.asunto.slice(0, 120)],
-      ['TOTAL DE FOLIOS PRESENTADOS:', `${datos.folios} folio(s)`],
-      ['OPERADOR DE RECEPCIÓN:', datos.operadorMesa || 'Mesa de Partes Presencial'],
-    ];
-
-    if (datos.codigoTupa) {
-      const costoStr = datos.costoTupa !== undefined && datos.costoTupa !== null
-        ? ` · S/ ${Number(datos.costoTupa).toFixed(2)}`
-        : '';
-      campos.push([
-        'PROCEDIMIENTO TUPA:',
-        `${datos.codigoTupa}${datos.denominacionTupa ? ` - ${datos.denominacionTupa}` : ''}${costoStr}`,
-      ]);
-    }
-
-    if (datos.urlConsulta) {
-      campos.push(['CONSULTA DE ESTADO:', datos.urlConsulta]);
-    }
-
-    let y = height - 135;
-    for (const [etiqueta, valor] of campos) {
-      page.drawText(etiqueta, {
-        x: 50,
-        y,
-        size: 8.5,
-        font: fontBold,
-        color: rgb(0.2, 0.2, 0.2),
-      });
-      page.drawText(valor, {
-        x: 230,
-        y,
-        size: 8.5,
-        font,
-        color: rgb(0, 0, 0),
-      });
-      y -= 22;
-    }
-
-    // Pie de página legal
-    page.drawLine({
-      start: { x: 50, y: 75 },
-      end: { x: width - 50, y: 75 },
-      thickness: 0.5,
-      color: rgb(0.8, 0.8, 0.8),
+    const canalLegible = this.resolverCanalLegible(datos);
+    const builder = await A4InstitutionalDocBuilder.create({
+      tituloDocumento: 'CARGO OFICIAL DE RECEPCIÓN DOCUMENTARIA',
+      subtituloDocumento: canalLegible,
+      unidadEmisora: 'MESA DE PARTES Y TRÁMITE DOCUMENTARIO',
+      codigoReferencia: `CUT: ${datos.cut}`,
+      fechaEmisionTexto: `Fecha y hora (Lima): ${fechaFormateada}`,
+      metadataTitle: `Cargo de Recepción - ${datos.cut}`,
     });
 
-    page.drawText(
-      'Constancia formal de recepción documentaria expedida conforme al Art. 136 del TUO de la Ley N° 27444 (LPAG).',
-      {
-        x: 50,
-        y: 60,
-        size: 7.5,
-        font,
-        color: rgb(0.4, 0.4, 0.4),
-      },
-    );
+    builder.drawSectionTitle('1. IDENTIFICACIÓN DEL EXPEDIENTE Y RECEPCIÓN');
+    const filasExpediente = [
+      { label: 'Código Único de Trámite (CUT)', value: datos.cut, mono: true, highlight: true },
+      { label: 'Canal de recepción', value: canalLegible },
+      { label: 'Fecha y hora de radicación', value: fechaFormateada },
+      { label: 'Estado inicial registrado', value: datos.estadoInicial || 'REGISTRADO' },
+      { label: 'Operador / canal registrante', value: datos.operadorMesa || canalLegible },
+    ];
+    builder.drawKeyValueTable(filasExpediente);
 
-    const pdfBytes = await pdfDoc.save();
-    return Buffer.from(pdfBytes);
+    builder.drawSectionTitle('2. DATOS DEL ADMINISTRADO Y PROCEDIMIENTO');
+    const filasSolicitante = [
+      { label: 'Solicitante / administrado', value: datos.nombreSolicitante },
+      { label: 'Documento (enmascarado)', value: datos.documentoEnmascarado, mono: true },
+    ];
+    if (datos.codigoTupa || datos.denominacionTupa) {
+      const costoStr =
+        datos.costoTupa !== undefined && datos.costoTupa !== null
+          ? ` | Tasa TUPA: S/ ${Number(datos.costoTupa).toFixed(2)}`
+          : '';
+      const tupaTexto = [datos.codigoTupa, datos.denominacionTupa].filter(Boolean).join(' — ');
+      filasSolicitante.push({ label: 'Procedimiento TUPA', value: `${tupaTexto}${costoStr}` });
+    }
+    filasSolicitante.push(
+      { label: 'Asunto del expediente', value: datos.asunto },
+      { label: 'Total de folios recibidos', value: `${datos.folios} folio(s)` },
+    );
+    builder.drawKeyValueTable(filasSolicitante);
+
+    if (datos.documentosPresentados && datos.documentosPresentados.length > 0) {
+      builder.drawSectionTitle('3. DOCUMENTACIÓN PRESENTADA');
+      const filasDocs = datos.documentosPresentados.map((d, idx) => ({
+        label: `Documento ${idx + 1}`,
+        value: `${d.nombre}${d.tipo ? ` (${d.tipo})` : ''}${d.folios ? ` · ${d.folios} folio(s)` : ''}`,
+      }));
+      builder.drawKeyValueTable(filasDocs);
+    }
+
+    if (datos.observacionHorario) {
+      builder.drawNoticeBox('REGISTRO FUERA DE HORARIO HÁBIL (TUO LEY N° 27444)', [
+        datos.observacionHorario,
+      ], 'warn');
+    }
+
+    const urlTracking =
+      datos.urlConsulta || `https://sigd.iestp-suiza.edu.pe/consulta/${encodeURIComponent(datos.cut)}`;
+
+    await builder.drawVerificationCard({
+      qrContent: urlTracking,
+      qrCaption: 'SEGUIMIENTO EN LÍNEA',
+      titulo: 'SEGUIMIENTO Y AUTENTICIDAD DEL CARGO',
+      filas: [
+        { label: 'Portal de consulta pública', value: urlTracking, mono: true },
+        {
+          label: 'Base legal de recepción',
+          value: 'Expediente registrado conforme al Art. 136 del TUO de la Ley N° 27444 (LPAG).',
+        },
+        ...(datos.hashRecepcion
+          ? [{ label: 'Huella SHA-256 del documento principal', value: datos.hashRecepcion, mono: true }]
+          : []),
+      ],
+    });
+
+    return builder.finalize(
+      `${INSTITUCION_SISTEMA} · Cargo oficial ${datos.cut}`,
+    );
   }
 
   /**
-   * Genera el PDF físico oficial de Resolución / Atención Administrativa.
+   * Genera el PDF oficial en hoja A4 de Constancia / Resolución de Atención Administrativa.
    */
   public async generarResolucionPdf(datos: DatosResolucionPdf): Promise<Buffer> {
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595.28, 841.89]);
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-    const { width, height } = page.getSize();
-
-    page.drawText('INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"', {
-      x: 50,
-      y: height - 50,
-      size: 11,
-      font: fontBold,
-      color: rgb(0.1, 0.2, 0.4),
-    });
-    page.drawText(`SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA — ${datos.area.toUpperCase()}`, {
-      x: 50,
-      y: height - 66,
-      size: 8.5,
-      font,
-      color: rgb(0.3, 0.3, 0.3),
-    });
-
-    page.drawLine({
-      start: { x: 50, y: height - 76 },
-      end: { x: width - 50, y: height - 76 },
-      thickness: 1,
-      color: rgb(0.7, 0.7, 0.7),
-    });
-
-    page.drawText(`RESOLUCIÓN DE ATENCIÓN DE EXPEDIENTE: ${datos.cut}`, {
-      x: 50,
-      y: height - 105,
-      size: 13,
-      font: fontBold,
-      color: rgb(0.05, 0.15, 0.35),
-    });
-
     const fechaFormateada = datos.fechaHora.toLocaleString('es-PE', {
       timeZone: 'America/Lima',
       year: 'numeric',
@@ -329,58 +302,45 @@ export class DocumentoStorageService {
       minute: '2-digit',
     });
 
-    const campos: Array<[string, string]> = [
-      ['EXPEDIENTE ADMINISTRATIVO:', datos.cut],
-      ['FECHA DE EMISIÓN:', fechaFormateada],
-      ['ÓRGANO RESOLUTOR:', datos.area],
-      ['ADMINISTRADO:', datos.administrado],
-      ['DICTAMEN / RESOLUCIÓN:', datos.resultadoResumen.slice(0, 180)],
-      ['RESPONSABLE DE EMISIÓN:', datos.operador || 'Especialista Académico'],
-    ];
-
-    if (datos.observacionInterna) {
-      campos.push(['OBSERVACIONES TÉCNICAS:', datos.observacionInterna.slice(0, 180)]);
-    }
-
-    let y = height - 135;
-    for (const [etiqueta, valor] of campos) {
-      page.drawText(etiqueta, {
-        x: 50,
-        y,
-        size: 8.5,
-        font: fontBold,
-        color: rgb(0.2, 0.2, 0.2),
-      });
-      page.drawText(valor, {
-        x: 230,
-        y,
-        size: 8.5,
-        font,
-        color: rgb(0, 0, 0),
-      });
-      y -= 24;
-    }
-
-    page.drawLine({
-      start: { x: 50, y: 75 },
-      end: { x: width - 50, y: 75 },
-      thickness: 0.5,
-      color: rgb(0.8, 0.8, 0.8),
+    const refDoc = datos.numeroResolucion ? datos.numeroResolucion : datos.cut;
+    const builder = await A4InstitutionalDocBuilder.create({
+      tituloDocumento: 'CONSTANCIA DE ATENCIÓN ADMINISTRATIVA',
+      subtituloDocumento: `Órgano emisor: ${datos.area}`,
+      unidadEmisora: datos.area.toUpperCase(),
+      codigoReferencia: refDoc,
+      fechaEmisionTexto: `Fecha de emisión (Lima): ${fechaFormateada}`,
+      metadataTitle: `Atención Administrativa - ${datos.cut}`,
     });
 
-    page.drawText(
-      'Acto resolutivo formal emitido por la autoridad competente de conformidad con el TUO de la Ley N° 27444.',
-      {
-        x: 50,
-        y: 60,
-        size: 7.5,
-        font,
-        color: rgb(0.4, 0.4, 0.4),
-      },
+    builder.drawSectionTitle('1. REFERENCIA DEL EXPEDIENTE');
+    builder.drawKeyValueTable([
+      { label: 'Expediente Administrativo (CUT)', value: datos.cut, mono: true, highlight: true },
+      ...(datos.numeroResolucion
+        ? [{ label: 'N° de documento / resolución', value: datos.numeroResolucion, mono: true }]
+        : []),
+      ...(datos.tramiteNombre ? [{ label: 'Procedimiento', value: datos.tramiteNombre }] : []),
+      { label: 'Administrado / solicitante', value: datos.administrado },
+      { label: 'Área responsable', value: datos.area },
+      { label: 'Fecha de emisión', value: fechaFormateada },
+      { label: 'Responsable de atención', value: datos.operador || 'Especialista Académico' },
+    ]);
+
+    builder.drawSectionTitle('2. DESARROLLO Y PRONUNCIAMIENTO');
+    builder.drawParagraph(datos.resultadoResumen, { size: 9.6 });
+
+    if (datos.observacionInterna) {
+      builder.drawNoticeBox('OBSERVACIONES / SUSTENTO TÉCNICO', [datos.observacionInterna], 'info');
+    }
+
+    builder.drawSignatureBlock(
+      datos.area.toUpperCase(),
+      datos.operador || 'Especialista Responsable',
+      'Instituto de Educación Superior Tecnológico Público "Suiza"',
     );
 
-    const pdfBytes = await pdfDoc.save();
-    return Buffer.from(pdfBytes);
+    return builder.finalize(
+      `${INSTITUCION_SISTEMA} · TUO Ley N° 27444 · ${datos.cut}`,
+    );
   }
 
   /**

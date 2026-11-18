@@ -471,6 +471,14 @@ export class MesaPartesDigitalService {
         asunto: datos.asunto,
         folios: totalPaginasFoliadas,
         operadorMesa: 'Mesa de Partes Digital',
+        canalRecepcion: 'MESA_PARTES_DIGITAL',
+        estadoInicial: ordenPagoInfo ? 'PENDIENTE_PAGO' : 'REGISTRADO',
+        documentosPresentados: datos.documentos.map((d, idx) => ({
+          nombre: d.nombreArchivo,
+          tipo: idx === 0 ? 'Principal' : 'Anexo',
+          folios: d.totalPaginas,
+        })),
+        observacionHorario: horario.requiereProyeccion ? redactarMensajeLegal(horario) : null,
         codigoTupa: contextoPago?.codigoTupa || undefined,
         denominacionTupa: contextoPago?.concepto || undefined,
         costoTupa: contextoPago?.costoOficial !== undefined ? Number(contextoPago.costoOficial) : undefined,
@@ -570,14 +578,22 @@ export class MesaPartesDigitalService {
   }
 
   private async generarPdfFallback(nombreArchivo: string, cut: string): Promise<Buffer> {
-    const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
-    const doc = await PDFDocument.create();
-    const page = doc.addPage([595.28, 841.89]);
-    const font = await doc.embedFont(StandardFonts.Helvetica);
-    page.drawText(`Documento Oficial Digital: ${nombreArchivo}`, { x: 50, y: 780, size: 14, font, color: rgb(0, 0, 0) });
-    page.drawText(`Expediente CUT: ${cut}`, { x: 50, y: 750, size: 12, font, color: rgb(0.2, 0.2, 0.2) });
-    page.drawText(`Presentado a través de Mesa de Partes Digital — IESTP "Suiza"`, { x: 50, y: 720, size: 10, font, color: rgb(0.4, 0.4, 0.4) });
-    const bytes = await doc.save();
-    return Buffer.from(bytes);
+    const { A4InstitutionalDocBuilder, INSTITUCION_SISTEMA } = await import(
+      '../docucore/institucionalPdf.helper.js'
+    );
+    const builder = await A4InstitutionalDocBuilder.create({
+      tituloDocumento: 'CONSTANCIA DE ANEXO DIGITAL',
+      subtituloDocumento: 'Mesa de Partes Digital — Respaldo Documental',
+      unidadEmisora: 'MESA DE PARTES DIGITAL',
+      codigoReferencia: `CUT: ${cut}`,
+      metadataTitle: `${nombreArchivo} - ${cut}`,
+    });
+    builder.drawSectionTitle('REFERENCIA DEL DOCUMENTO ADJUNTO');
+    builder.drawKeyValueTable([
+      { label: 'Expediente Administrativo (CUT)', value: cut, mono: true, highlight: true },
+      { label: 'Archivo declarado', value: nombreArchivo },
+      { label: 'Canal de presentación', value: 'Mesa de Partes Digital (Virtual)' },
+    ]);
+    return builder.finalize(`${INSTITUCION_SISTEMA} · ${cut}`);
   }
 }

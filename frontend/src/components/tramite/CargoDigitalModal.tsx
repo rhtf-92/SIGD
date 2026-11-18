@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import QrCodeView from "../common/QrCodeView";
+import logoSuiza from "../../assets/sigd/logo-suiza.png";
 import { formatearFechaHoraLegible } from "../../utils/expedientePresentacion";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import type { CargoDigitalResponse } from "../../types/tramiteWizardState";
@@ -115,19 +116,23 @@ export default function CargoDigitalModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="titulo-cargo-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm"
+      data-print-target="cargo-voucher"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm print:static print:inset-auto print:bg-transparent print:p-0 print:block print:overflow-visible"
     >
       <div
         ref={dialogRef}
-        className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden print:m-0 print:p-0 print:shadow-none print:w-full print:max-w-none"
+        data-print-target="cargo-card"
+        className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden break-inside-avoid print:m-0 print:mx-auto print:p-4 print:shadow-none print:w-full print:max-w-md print:border print:border-dashed print:border-slate-400"
       >
         {/* Cabecera del Modal (Oculta en Impresión) */}
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4 print:hidden">
           <div>
             <h3 id="titulo-cargo-modal" className="text-sm font-bold text-slate-900">
-              Cargo de Recepción Digital (CUT)
+              {isDigitalResponse ? "Cargo de Recepción Digital (CUT)" : "Cargo de Recepción Documentaria (CUT)"}
             </h3>
-            <p className="text-xs text-slate-500">Mesa de Partes / Ventanilla Presencial</p>
+            <p className="text-xs text-slate-500">
+              {isDigitalResponse ? "Mesa de Partes Digital (Virtual)" : "Mesa de Partes — Ventanilla Presencial"}
+            </p>
           </div>
           <button
             type="button"
@@ -143,10 +148,18 @@ export default function CargoDigitalModal({
         <div className="p-6 font-mono text-xs text-slate-900 space-y-4 print:p-2 print:text-black">
           {/* Encabezado del Ticket */}
           <div className="text-center border-b border-dashed border-slate-400 pb-3">
-            <p className="font-bold text-sm tracking-wide">IESTP &ldquo;SUIZA&rdquo;</p>
-            <p className="text-[10px] text-slate-600">PUCALLPA — UCAYALI</p>
-            <p className="text-[9px] text-slate-500 mt-0.5">Mesa de Partes y Trámite Documentario</p>
-            <p className="text-[9px] text-slate-500">RUC: 20131312955</p>
+            <img
+              src={logoSuiza}
+              alt='Escudo IESTP "Suiza"'
+              className="h-10 w-10 shrink-0 aspect-square mx-auto mb-1 object-contain"
+            />
+            <p className="font-bold text-xs tracking-wide uppercase">
+              IESTP &ldquo;SUIZA&rdquo; — PUCALLPA, UCAYALI
+            </p>
+            <p className="text-[10px] text-slate-700 font-semibold">
+              {isDigitalResponse ? "Mesa de Partes Digital (Virtual)" : "Mesa de Partes — Ventanilla Presencial"}
+            </p>
+            <p className="text-[9px] text-slate-500 mt-0.5">Av. Túpac Amaru s/n · SIGD</p>
           </div>
 
           {/* Código CUT Destacado */}

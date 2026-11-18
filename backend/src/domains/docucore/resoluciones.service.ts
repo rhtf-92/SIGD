@@ -1,47 +1,17 @@
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { Pool, PoolClient } from 'pg';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { headObject, validarMagicBytes } from '../../core/storage/s3-storage.service.js';
 import { a4GeneratorService, type OpcionesGeneracion } from './a4Generator.service.js';
 import { CvdStampService } from './cvdStamp.service.js';
+import { cargarLogoInstitucionalPng } from './institucionalPdf.helper.js';
 import type { ContenidoResolucion } from './types.js';
 import { AppError, NotFoundError } from '../../shared/domain/errors/index.js';
 
 const SHA256_CONTENIDO_VACIO =
   'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 const pendingCvdPorDocId = new Map<string, string>();
-let logoSuizaCache: Uint8Array | null | undefined;
-
-function cargarLogoInstitucionalPng(): Uint8Array | undefined {
-  if (logoSuizaCache !== undefined) {
-    return logoSuizaCache ?? undefined;
-  }
-  const actualDir = path.dirname(fileURLToPath(import.meta.url));
-  const candidatos = [
-    path.resolve(actualDir, '../../../assets/logo-suiza.png'),
-    path.resolve(actualDir, '../../../../assets/logo-suiza.png'),
-    path.resolve(process.cwd(), 'assets/logo-suiza.png'),
-    path.resolve(process.cwd(), 'backend/assets/logo-suiza.png'),
-    path.resolve(process.cwd(), '../frontend/src/assets/sigd/logo-suiza.png'),
-    path.resolve(process.cwd(), 'frontend/src/assets/sigd/logo-suiza.png'),
-  ];
-  for (const ruta of candidatos) {
-    try {
-      if (fs.existsSync(ruta)) {
-        logoSuizaCache = new Uint8Array(fs.readFileSync(ruta));
-        return logoSuizaCache;
-      }
-    } catch {
-      // Continuar con el siguiente candidato
-    }
-  }
-  logoSuizaCache = null;
-  return undefined;
-}
 
 // =============================================================================
 // DocuCore · Servicio de proyección de Resoluciones Directorales (A4)

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { ReciboPagoPrintable } from "../../components/tesoreria/ReciboPagoPrintable";
 import {
   tesoreriaService,
   type DtoConfiguracionDemoQr,
@@ -653,6 +654,13 @@ export default function TesoreriaPage() {
                               <>
                                 <button
                                   type="button"
+                                  onClick={() => handleAbrirRecibo(ord)}
+                                  className="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                >
+                                  Ver Orden
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => handleAbrirConfirmar(ord)}
                                   className="rounded-xl border border-emerald-700 bg-emerald-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-800 transition shadow-xs"
                                 >
@@ -676,10 +684,21 @@ export default function TesoreriaPage() {
                                 Ver Recibo
                               </button>
                             )}
-                            {ord.estado === "RECHAZADO" && ord.motivoRechazo && (
-                              <span className="text-[11px] text-rose-600 italic truncate max-w-xs inline-block" title={ord.motivoRechazo}>
-                                {ord.motivoRechazo}
-                              </span>
+                            {(ord.estado === "RECHAZADO" || ord.estado === "ANULADO" || ord.estado === "VENCIDO") && (
+                              <div className="inline-flex items-center gap-2">
+                                {ord.motivoRechazo && (
+                                  <span className="text-[11px] text-rose-600 italic truncate max-w-xs inline-block" title={ord.motivoRechazo}>
+                                    {ord.motivoRechazo}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleAbrirRecibo(ord)}
+                                  className="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                >
+                                  Ver Orden
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -1344,134 +1363,18 @@ export default function TesoreriaPage() {
       {modalReciboAbierto && reciboData && (
         <div
           data-print-target="recibo-voucher"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 print:static print:inset-auto print:bg-transparent print:p-0 print:block"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 backdrop-blur-xs p-4 print:static print:inset-auto print:bg-transparent print:p-0 print:block print:overflow-visible"
         >
           <div
             data-print-target="recibo-card"
-            className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4 print:max-w-md print:mx-auto print:border print:border-dashed print:border-slate-400 print:shadow-none print:p-4 break-inside-avoid"
+            className="w-full max-w-lg my-auto max-h-[92vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4 print:max-h-none print:overflow-visible print:max-w-md print:mx-auto print:border print:border-dashed print:border-slate-400 print:shadow-none print:p-4 break-inside-avoid"
           >
-            {/* Cabecera del comprobante */}
-            <div className="text-center border-b border-dashed border-slate-300 pb-3 space-y-1">
-              <div className="inline-block text-[11px] font-bold text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-full mb-1">
-                IESTP &quot;SUIZA&quot; — PUCALLPA
-              </div>
-              <h2 className="text-base font-extrabold text-slate-900 tracking-tight">
-                CONSTANCIA DE PAGO
-              </h2>
-              <p className="text-xs font-semibold text-slate-600">
-                RECIBO INTERNO DE TESORERÍA
-              </p>
-              <p className="text-[11px] font-mono text-slate-500">RUC: 20496155601</p>
-              <p className="text-xs font-mono font-bold text-emerald-800">
-                N° COMPROBANTE: {reciboData.codigoRecibo || "REC-2026-PENDIENTE"}
-              </p>
-            </div>
-
-            {/* Datos del pago */}
-            <div className="space-y-2 text-xs text-slate-700 border-b border-dashed border-slate-300 pb-3">
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Fecha y Hora:</span>
-                <span className="font-semibold text-slate-800 text-right">{formatearFecha(reciboData.fechaPago || reciboData.fechaCreacion)}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Código Orden:</span>
-                <span className="font-mono font-bold text-slate-900 text-right">{reciboData.codigoPago}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Expediente CUT:</span>
-                <span className="font-mono font-semibold text-blue-800 text-right">{reciboData.codigoExpediente}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Administrado:</span>
-                <span className="font-semibold text-slate-900 text-right break-words">{reciboData.solicitanteNombre}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Documento:</span>
-                <span className="font-mono text-slate-700 text-right">{reciboData.documentoEnmascarado}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Concepto:</span>
-                <span className="font-medium text-slate-800 text-right break-words">{reciboData.concepto}</span>
-              </div>
-              {reciboData.codigoTupa && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 shrink-0">Procedimiento TUPA:</span>
-                  <span className="font-mono text-slate-800 text-right">{reciboData.codigoTupa}</span>
-                </div>
-              )}
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Medio de Pago:</span>
-                <span className="font-semibold text-slate-900 text-right">
-                  {reciboData.metodoPago === "EFECTIVO"
-                    ? "Efectivo en Ventanilla"
-                    : reciboData.metodoPago === "YAPE"
-                      ? "Yape / Digital Asistido"
-                      : reciboData.paymentProvider === "DEMO_QR"
-                        ? "QR Automático — Simulador (sin dinero real)"
-                        : "QR Automático — TAYPI Sandbox"}
-                </span>
-              </div>
-              {reciboData.metodoPago === "YAPE" && reciboData.referenciaOperacion && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 shrink-0">N° Operación Yape:</span>
-                  <span className="font-mono font-bold text-purple-900 text-right">{reciboData.referenciaOperacion}</span>
-                </div>
-              )}
-              {reciboData.metodoPago === "QR_AUTOMATICO_SANDBOX" && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 shrink-0">Origen confirmación:</span>
-                  <span className="font-mono font-bold text-amber-900 text-right">
-                    {reciboData.paymentProvider === "DEMO_QR" ? "Webhook del simulador" : "Webhook TAYPI"}
-                  </span>
-                </div>
-              )}
-              {reciboData.metodoPago === "EFECTIVO" && reciboData.montoRecibido && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 shrink-0">Efectivo Entregado:</span>
-                  <span className="font-mono text-right">S/ {Number(reciboData.montoRecibido).toFixed(2)}</span>
-                </div>
-              )}
-              {reciboData.metodoPago === "EFECTIVO" && reciboData.vuelto !== null && Number(reciboData.vuelto) > 0 && (
-                <div className="flex justify-between gap-4 text-emerald-800 font-semibold">
-                  <span className="shrink-0">Vuelto:</span>
-                  <span className="font-mono text-right">S/ {Number(reciboData.vuelto).toFixed(2)}</span>
-                </div>
-              )}
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Operador:</span>
-                <span className="font-semibold text-slate-800 text-right">{reciboData.tesoreroNombre || "Tesorería — IESTP Suiza"}</span>
-              </div>
-            </div>
-
-            {/* Total */}
-            <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
-              <span className="font-bold text-slate-900 text-sm">TOTAL CANCELADO:</span>
-              <span className="font-mono text-lg font-extrabold text-blue-900">
-                {reciboData.moneda} {reciboData.monto.toFixed(2)}
-              </span>
-            </div>
-
-            <div className="text-center text-[10px] text-slate-400">
-              ✓ Pago validado por Tesorería. El expediente se encuentra desbloqueado para continuar su trámite.
-            </div>
-
-            {/* Botones de acción */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 print:hidden">
-              <button
-                type="button"
-                onClick={() => setModalReciboAbierto(false)}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cerrar
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded-xl bg-blue-800 px-4 py-2 text-xs font-bold text-white hover:bg-blue-900 shadow-xs"
-              >
-                🖨️ Imprimir Recibo
-              </button>
-            </div>
+            <ReciboPagoPrintable
+              orden={reciboData}
+              formatearFecha={(val) => formatearFecha(val || "")}
+              onClose={() => setModalReciboAbierto(false)}
+              headingId="tesoreria-recibo-modal-titulo"
+            />
           </div>
         </div>
       )}

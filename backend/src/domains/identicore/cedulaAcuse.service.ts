@@ -1,10 +1,13 @@
 import crypto from 'node:crypto';
 import type { Pool } from 'pg';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { generarUrlPresigned } from '../../core/storage/s3-storage.service.js';
 import { NotFoundError } from '../../shared/domain/errors/index.js';
+import {
+  A4InstitutionalDocBuilder,
+  INSTITUCION_SISTEMA,
+} from '../docucore/institucionalPdf.helper.js';
 
 export interface DestinatarioCedula {
   nombresCompletos: string;
@@ -19,6 +22,9 @@ export interface DatosCedulaAcuse {
   tipoActo: string;
   asunto: string;
   fechaDeposito: Date | string;
+  fechaLectura?: Date | string | null;
+  estadoNotificacion?: string | null;
+  canalNotificacion?: string | null;
   documentoUrlNotificado?: string | null;
   cvdActoNotificado?: string | null;
   hashActoNotificado?: string | null;
@@ -54,222 +60,93 @@ export function formatearFechaIso(fecha: Date | string): string {
  * Conforme al Art. 20 del TUO de la Ley N° 27444 (LPAG) y Ley N° 29733.
  */
 export async function generarCedulaAcusePdf(datos: DatosCedulaAcuse): Promise<Buffer> {
-  const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([595.28, 841.89]); // A4 estándar
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const fontMono = await pdfDoc.embedFont(StandardFonts.Courier);
-  const fontMonoBold = await pdfDoc.embedFont(StandardFonts.CourierBold);
+  const canal = datos.canalNotificacion || 'Casilla Electrónica Institucional SIGD';
+  const fechaAcuseLocal = formatearFechaLocal(datos.acuseSelladoTiempo);
+  const fechaAcuseIso = formatearFechaIso(datos.acuseSelladoTiempo);
+  const fechaDepositoLocal = formatearFechaLocal(datos.fechaDeposito);
+  const fechaLecturaLocal = datos.fechaLectura
+    ? formatearFechaLocal(datos.fechaLectura)
+    : 'Lectura simultánea o previa al registro del acuse';
 
-  const { width, height } = page.getSize();
-  const margenX = 45;
-  const anchoUtil = width - 2 * margenX;
+  const tieneAcuseConfirmado = Boolean(datos.idAcuse && datos.acuseSelladoTiempo);
+  const estadoTrazabilidad = tieneAcuseConfirmado
+    ? 'ACUSE DE RECIBO SELLADO (NOTIFICACIÓN DILIGENCIADA)'
+    : datos.fechaLectura
+      ? 'PUESTA A DISPOSICIÓN Y LEÍDA (ACUSE PENDIENTE)'
+      : 'PUESTA A DISPOSICIÓN EN CASILLA (PENDIENTE DE LECTURA/ACUSE)';
 
-  // 1. Encabezado institucional con franja decorativa
-  page.drawRectangle({
-    x: margenX,
-    y: height - 42,
-    width: anchoUtil,
-    height: 4,
-    color: rgb(0.08, 0.22, 0.44), // Azul institucional
+  const builder = await A4InstitutionalDocBuilder.create({
+    tituloDocumento: 'CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA',
+    subtituloDocumento: 'Casilla Electrónica Ciudadana — Constancia Oficial LPAG (Art. 20 Ley N° 27444)',
+    unidadEmisora: 'SECRETARÍA GENERAL / CASILLA ELECTRÓNICA',
+    codigoReferencia: datos.idAcuse,
+    fechaEmisionTexto: `Sellado (Lima): ${fechaAcuseLocal}`,
+    metadataTitle: `Cédula de Acuse - ${datos.idAcuse}`,
   });
 
-  page.drawText('INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"', {
-    x: margenX,
-    y: height - 60,
-    size: 11,
-    font: fontBold,
-    color: rgb(0.06, 0.16, 0.36),
+  builder.drawSectionTitle('1. TRAZABILIDAD DEL DILIGENCIAMIENTO Y ESTADO DE NOTIFICACIÓN');
+  builder.drawKeyValueTable([
+    { label: 'Estado de notificación', value: estadoTrazabilidad, highlight: true },
+    { label: 'Canal de diligenciamiento', value: canal },
+    { label: '1) Generación y depósito (casilla)', value: fechaDepositoLocal },
+    { label: '2) Acceso / lectura registrada', value: fechaLecturaLocal },
+    { label: '3) Emisión y sellado de acuse formal', value: `${fechaAcuseLocal} (${fechaAcuseIso})` },
+    { label: 'Identificador oficial de acuse', value: datos.idAcuse, mono: true },
+  ]);
+
+  builder.drawSectionTitle('2. EXPEDIENTE Y ACTO ADMINISTRATIVO NOTIFICADO');
+  builder.drawKeyValueTable([
+    { label: 'Código Único de Trámite (CUT)', value: datos.cut || 'No asignado', mono: true, highlight: true },
+    { label: 'Identificador de notificación', value: datos.idNotificacion, mono: true },
+    { label: 'Tipo de acto administrativo', value: datos.tipoActo },
+    { label: 'Asunto del acto notificado', value: datos.asunto },
+    ...(datos.cvdActoNotificado
+      ? [{ label: 'CVD del acto notificado', value: datos.cvdActoNotificado, mono: true }]
+      : []),
+    ...(datos.hashActoNotificado
+      ? [{ label: 'Hash SHA-256 del acto notificado', value: datos.hashActoNotificado, mono: true }]
+      : []),
+  ]);
+
+  builder.drawSectionTitle('3. DATOS DEL DESTINATARIO (ADMINISTRADO)');
+  builder.drawKeyValueTable([
+    { label: 'Nombre completo / razón social', value: datos.destinatario.nombresCompletos },
+    {
+      label: 'Documento de identidad',
+      value: `${datos.destinatario.tipoDocumento} ${datos.destinatario.numeroDocumento}`,
+      mono: true,
+    },
+    ...(datos.destinatario.correoPersonal
+      ? [{ label: 'Correo electrónico de aviso', value: datos.destinatario.correoPersonal }]
+      : []),
+  ]);
+
+  builder.drawNoticeBox(
+    '4. EFECTOS JURÍDICOS Y CÓMPUTO DE PLAZOS (TUO LEY N° 27444)',
+    [
+      '• SURTIMIENTO DE EFECTOS (Art. 20, num. 20.4 LPAG): La notificación electrónica surte efectos legales desde el día en que conste el acuse de recibo formal en la Casilla Electrónica del administrado; no basta la sola generación en base de datos.',
+      '• CÓMPUTO DE PLAZOS ADMINISTRATIVOS (Art. 144 y 218 LPAG): Los plazos para subsanación o interposición de recursos (15 días hábiles) se computan a partir del día hábil siguiente de recibida efectivamente la notificación.',
+      '• INTEGRIDAD Y FECHA CIERTA: El sello de tiempo del servidor institucional y la huella SHA-256 garantizan la inmutabilidad del acuse emitido.',
+    ],
+    'legal',
+  );
+
+  const portalBase = (process.env.APP_URL || process.env.HOST_PUBLICO || 'http://localhost:5173').replace(/\/$/, '');
+  const urlVerificacionCvd = `${portalBase}/api/v1/validador-cvd/verificar/${encodeURIComponent(datos.cvdAcuse)}`;
+
+  await builder.drawVerificationCard({
+    qrContent: urlVerificacionCvd,
+    qrCaption: 'VERIFICAR CVD ACUSE',
+    titulo: 'INTEGRIDAD CRIPTOGRÁFICA Y VALIDACIÓN CVD',
+    filas: [
+      { label: 'Código de Verificación Digital (CVD) del Acuse', value: datos.cvdAcuse, mono: true },
+      { label: 'Huella SHA-256 inmutable del Acuse', value: datos.acuseHashSha256, mono: true },
+    ],
   });
 
-  page.drawText('SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA (SIGD 2026) — CASILLA ELECTRÓNICA CIUDADANA', {
-    x: margenX,
-    y: height - 74,
-    size: 8,
-    font,
-    color: rgb(0.3, 0.35, 0.4),
-  });
-
-  page.drawText('CONSTANCIA OFICIAL DE DILIGENCIAMIENTO Y RECEPCIÓN DE NOTIFICACIÓN ELECTRÓNICA', {
-    x: margenX,
-    y: height - 86,
-    size: 7.5,
-    font: fontBold,
-    color: rgb(0.2, 0.5, 0.3),
-  });
-
-  page.drawLine({
-    start: { x: margenX, y: height - 95 },
-    end: { x: width - margenX, y: height - 95 },
-    thickness: 1,
-    color: rgb(0.8, 0.85, 0.9),
-  });
-
-  // 2. Título de la Cédula
-  page.drawText('CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA', {
-    x: margenX,
-    y: height - 120,
-    size: 13,
-    font: fontBold,
-    color: rgb(0.05, 0.18, 0.4),
-  });
-
-  // Distintivo de Validez Legal
-  page.drawRectangle({
-    x: margenX,
-    y: height - 146,
-    width: anchoUtil,
-    height: 20,
-    color: rgb(0.92, 0.98, 0.94),
-    borderColor: rgb(0.4, 0.75, 0.5),
-    borderWidth: 0.8,
-  });
-
-  page.drawText('VALIDEZ JURÍDICA PLENA — ART. 20 DEL TUO DE LA LEY N° 27444 (LPAG) Y LEY N° 29733', {
-    x: margenX + 10,
-    y: height - 141,
-    size: 7.5,
-    font: fontBold,
-    color: rgb(0.08, 0.45, 0.22),
-  });
-
-  let curY = height - 170;
-
-  // Función auxiliar para renderizar títulos de sección
-  const dibujarTituloSeccion = (titulo: string) => {
-    page.drawRectangle({
-      x: margenX,
-      y: curY - 2,
-      width: anchoUtil,
-      height: 16,
-      color: rgb(0.94, 0.96, 0.98),
-      borderColor: rgb(0.8, 0.85, 0.9),
-      borderWidth: 0.5,
-    });
-    page.drawText(titulo, {
-      x: margenX + 8,
-      y: curY + 2,
-      size: 8.5,
-      font: fontBold,
-      color: rgb(0.1, 0.2, 0.38),
-    });
-    curY -= 20;
-  };
-
-  // Función auxiliar para filas de datos clave/valor
-  const dibujarFilaDato = (etiqueta: string, valor: string, esMono: boolean = false) => {
-    page.drawText(etiqueta, {
-      x: margenX + 8,
-      y: curY,
-      size: 8,
-      font: fontBold,
-      color: rgb(0.25, 0.3, 0.35),
-    });
-    page.drawText(valor, {
-      x: margenX + 190,
-      y: curY,
-      size: esMono ? 7.5 : 8,
-      font: esMono ? fontMono : font,
-      color: rgb(0.1, 0.1, 0.1),
-    });
-    curY -= 14;
-  };
-
-  // SECCIÓN 1: DATOS DEL ACUSE OFICIAL
-  dibujarTituloSeccion('1. DATOS DEL ACUSE DE NOTIFICACIÓN ELECTRÓNICA');
-  dibujarFilaDato('Identificador Oficial de Acuse:', datos.idAcuse, true);
-  dibujarFilaDato('CVD de Verificación del Acuse:', datos.cvdAcuse, true);
-  dibujarFilaDato('Timestamp Oficial Servidor (ISO-8601):', formatearFechaIso(datos.acuseSelladoTiempo), true);
-  dibujarFilaDato('Fecha y Hora Local Certificada (Perú):', formatearFechaLocal(datos.acuseSelladoTiempo));
-  dibujarFilaDato('Hash SHA-256 del Acuse (Inmutable):', datos.acuseHashSha256, true);
-  curY -= 6;
-
-  // SECCIÓN 2: EXPEDIENTE Y ACTO ADMINISTRATIVO DILIGENCIADO
-  dibujarTituloSeccion('2. EXPEDIENTE Y ACTO ADMINISTRATIVO NOTIFICADO');
-  dibujarFilaDato('Código Único de Trámite (CUT):', datos.cut, true);
-  dibujarFilaDato('Identificador de Notificación:', datos.idNotificacion, true);
-  dibujarFilaDato('Tipo de Acto Notificado:', datos.tipoActo);
-  dibujarFilaDato('Asunto del Acto:', datos.asunto.slice(0, 95));
-  dibujarFilaDato('Fecha de Depósito en Casilla:', formatearFechaLocal(datos.fechaDeposito));
-  if (datos.cvdActoNotificado) {
-    dibujarFilaDato('CVD del Acto Notificado:', datos.cvdActoNotificado, true);
-  }
-  if (datos.hashActoNotificado) {
-    dibujarFilaDato('Hash SHA-256 del Acto Notificado:', datos.hashActoNotificado, true);
-  }
-  curY -= 6;
-
-  // SECCIÓN 3: DATOS DEL ADMINISTRADO (DESTINATARIO)
-  dibujarTituloSeccion('3. DATOS DEL DESTINATARIO (ADMINISTRADO)');
-  dibujarFilaDato('Nombre / Razón Social:', datos.destinatario.nombresCompletos);
-  dibujarFilaDato('Documento de Identidad:', `${datos.destinatario.tipoDocumento} ${datos.destinatario.numeroDocumento}`, true);
-  if (datos.destinatario.correoPersonal) {
-    dibujarFilaDato('Correo Registrado:', datos.destinatario.correoPersonal);
-  }
-  dibujarFilaDato('Canal Oficial de Entrega:', 'Casilla Electrónica Ciudadana (IESTP Suiza)');
-  curY -= 8;
-
-  // SECCIÓN 4: EFECTOS JURÍDICOS Y CÓMPUTO DE PLAZOS (MARCO LEGAL LPAG)
-  dibujarTituloSeccion('4. EFECTOS JURÍDICOS Y CÓMPUTO DE PLAZOS (TUO LEY N° 27444)');
-
-  page.drawRectangle({
-    x: margenX,
-    y: curY - 78,
-    width: anchoUtil,
-    height: 82,
-    color: rgb(0.97, 0.99, 0.97),
-    borderColor: rgb(0.7, 0.85, 0.75),
-    borderWidth: 0.8,
-  });
-
-  const textosLegales = [
-    '• SURTIMIENTO DE EFECTOS (Art. 20, num. 20.4 LPAG): La notificación electrónica surte plenos efectos legales',
-    '  el mismo día en que se genera y sella el presente acuse de recibo en la Casilla Electrónica del administrado.',
-    '• CÓMPUTO DE PLAZOS ADMINISTRATIVOS: El cómputo de los plazos para la interposición de recursos',
-    '  administrativos (15 días hábiles conforme al Art. 218) o subsanación de observaciones se inicia a partir del',
-    '  primer día hábil siguiente a la fecha consignada en este acuse de recepción.',
-    '• INMUTABILIDAD Y FECHA CIERTA: Este acuse digital constituye plena prueba fehaciente de la fecha y hora de',
-    '  recepción, certificado mediante hash criptográfico SHA-256 y Código de Verificación Digital (CVD).',
-  ];
-
-  let legalY = curY - 8;
-  for (const linea of textosLegales) {
-    page.drawText(linea, {
-      x: margenX + 8,
-      y: legalY,
-      size: 7,
-      font: linea.startsWith('•') ? fontBold : font,
-      color: rgb(0.12, 0.35, 0.18),
-    });
-    legalY -= 10.5;
-  }
-
-  // 5. Pie de página institucional
-  page.drawLine({
-    start: { x: margenX, y: 55 },
-    end: { x: width - margenX, y: 55 },
-    thickness: 0.6,
-    color: rgb(0.75, 0.8, 0.85),
-  });
-
-  page.drawText('Documento emitido electrónicamente por el IESTP "Suiza" (Pucallpa, Ucayali) conforme a la Ley N° 27444 y Ley N° 29733.', {
-    x: margenX,
-    y: 42,
-    size: 7,
-    font,
-    color: rgb(0.4, 0.45, 0.5),
-  });
-
-  page.drawText(`Verificación oficial en portal institucional mediante CVD: ${datos.cvdAcuse}`, {
-    x: margenX,
-    y: 31,
-    size: 7,
-    font: fontBold,
-    color: rgb(0.1, 0.25, 0.45),
-  });
-
-  const pdfBytes = await pdfDoc.save();
-  return Buffer.from(pdfBytes);
+  return builder.finalize(
+    `${INSTITUCION_SISTEMA} · Ley N° 27444 y Ley N° 29733 · CVD ${datos.cvdAcuse}`,
+  );
 }
 
 /**
@@ -441,7 +318,9 @@ export async function asegurarCedulaAcusePersistida(
     cut: string | null;
     asunto: string;
     tipo_acto: string;
+    estado: string | null;
     fecha_deposito: Date | string;
+    fecha_lectura: Date | string | null;
     hash_sha256: string | null;
     cvd: string | null;
     id_acuse: string | null;
@@ -451,7 +330,7 @@ export async function asegurarCedulaAcusePersistida(
     cuerpo: any;
   }>(
     `SELECT id, usuario_id, persona_id, correo_destinatario, cut, asunto, tipo_acto,
-            fecha_deposito, hash_sha256, cvd, id_acuse, acuse_hash_sha256,
+            estado, fecha_deposito, fecha_lectura, hash_sha256, cvd, id_acuse, acuse_hash_sha256,
             acuse_sellado_tiempo, documento_url, cuerpo
        FROM sigd_auth.notificacion_casilla
       WHERE id = $1::uuid
@@ -505,6 +384,8 @@ export async function asegurarCedulaAcusePersistida(
     tipoActo: notif.tipo_acto,
     asunto: notif.asunto,
     fechaDeposito: notif.fecha_deposito,
+    fechaLectura: notif.fecha_lectura,
+    estadoNotificacion: notif.estado,
     documentoUrlNotificado: notif.documento_url,
     cvdActoNotificado: notif.cvd,
     hashActoNotificado: notif.hash_sha256,

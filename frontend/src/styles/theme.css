@@ -132,22 +132,28 @@
   }
 
   /* Ocultar elementos de navegación y fondos globales */
-  header, footer, nav, .header-sigd, .sigd-footer, .header-bar, .print\:hidden {
+  header, footer, nav, aside, .header-sigd, .sigd-footer, .header-bar, .print\:hidden {
     display: none !important;
   }
 
-  /* Cuando un comprobante/voucher esté presente, aislar únicamente el comprobante */
-  body:has([data-print-target="recibo-voucher"]) {
+  /* Cuando un comprobante, cargo o ticket esté presente, aislar únicamente su contenedor */
+  body:has([data-print-target="recibo-voucher"]),
+  body:has([data-print-target="cargo-voucher"]),
+  body:has([data-print-target="thermal-ticket"]) {
     background: #ffffff !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  body:has([data-print-target="recibo-voucher"]) *:not([data-print-target="recibo-voucher"]):not(:has([data-print-target="recibo-voucher"])):not([data-print-target="recibo-voucher"] *) {
+  body:has([data-print-target="recibo-voucher"]) *:not([data-print-target="recibo-voucher"]):not(:has([data-print-target="recibo-voucher"])):not([data-print-target="recibo-voucher"] *),
+  body:has([data-print-target="cargo-voucher"]) *:not([data-print-target="cargo-voucher"]):not(:has([data-print-target="cargo-voucher"])):not([data-print-target="cargo-voucher"] *),
+  body:has([data-print-target="thermal-ticket"]) *:not([data-print-target="thermal-ticket"]):not(:has([data-print-target="thermal-ticket"])):not([data-print-target="thermal-ticket"] *) {
     display: none !important;
   }
 
-  body:has([data-print-target="recibo-voucher"]) :has([data-print-target="recibo-voucher"]) {
+  body:has([data-print-target="recibo-voucher"]) :has([data-print-target="recibo-voucher"]),
+  body:has([data-print-target="cargo-voucher"]) :has([data-print-target="cargo-voucher"]),
+  body:has([data-print-target="thermal-ticket"]) :has([data-print-target="thermal-ticket"]) {
     min-height: 0 !important;
     height: auto !important;
     padding: 0 !important;
@@ -157,7 +163,8 @@
     box-shadow: none !important;
   }
 
-  [data-print-target="recibo-voucher"] {
+  [data-print-target="recibo-voucher"],
+  [data-print-target="cargo-voucher"] {
     position: static !important;
     inset: auto !important;
     width: 100% !important;
@@ -175,11 +182,14 @@
     break-inside: avoid !important;
   }
 
-  [data-print-target="recibo-voucher"] .print\:hidden {
+  [data-print-target="recibo-voucher"] .print\:hidden,
+  [data-print-target="cargo-voucher"] .print\:hidden,
+  [data-print-target="thermal-ticket"] .print\:hidden {
     display: none !important;
   }
 
-  [data-print-target="recibo-card"] {
+  [data-print-target="recibo-card"],
+  [data-print-target="cargo-card"] {
     width: 100% !important;
     max-width: 135mm !important;
     margin: 0 auto !important;
@@ -189,6 +199,21 @@
     border: 1px dashed #64748b !important;
     border-radius: 8px !important;
     box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  [data-print-target="recibo-card"] img,
+  [data-print-target="cargo-card"] img,
+  [data-print-target="thermal-ticket"] img {
+    object-fit: contain !important;
+    max-width: 100% !important;
+  }
+
+  [data-print-target="thermal-ticket"] {
+    margin: 0 auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }

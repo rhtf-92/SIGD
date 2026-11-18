@@ -137,24 +137,24 @@ export function crearRouterReportes(pool: Pool): Router {
       : null;
 
     const binario = generarPdfInforme((doc) => {
-      doc.agregarTitulo('Reporte analitico institucional SIGD');
-      doc.agregarSubtitulo(`Periodo ${parametros.periodoInicio} a ${parametros.periodoFin}`);
+      doc.agregarTitulo('Reporte analítico institucional SIGD');
+      doc.agregarSubtitulo(`Período ${parametros.periodoInicio} a ${parametros.periodoFin}`);
       doc.agregarSeccion('Consolidado de indicadores MGD');
       doc.agregarFila(['Indicador', 'Valor', 'Meta', 'Cumple'], { negrita: true, separador: true });
-      doc.agregarFila(['VTEP', String(resumen.vtep.valor ?? 'n/d'), `${resumen.vtep.meta} %`, resumen.vtep.cumple === null ? 'n/d' : resumen.vtep.cumple ? 'SI' : 'NO']);
-      doc.agregarFila(['TPR (horas habiles)', String(resumen.tprHorasHabiles.valor ?? 'n/d'), `<= ${resumen.tprHorasHabiles.meta} h`, resumen.tprHorasHabiles.cumple === null ? 'n/d' : resumen.tprHorasHabiles.cumple ? 'SI' : 'NO']);
-      doc.agregarFila(['TRO', String(resumen.tro.valor ?? 'n/d'), `>= ${resumen.tro.meta} %`, resumen.tro.cumple === null ? 'n/d' : resumen.tro.cumple ? 'SI' : 'NO']);
-      doc.agregarFila(['TEO', String(resumen.teo.valor ?? 'n/d'), `<= ${resumen.teo.meta} %`, resumen.teo.cumple === null ? 'n/d' : resumen.teo.cumple ? 'SI' : 'NO']);
+      doc.agregarFila(['VTEP', String(resumen.vtep.valor ?? 'n/d'), `${resumen.vtep.meta} %`, resumen.vtep.cumple === null ? 'n/d' : resumen.vtep.cumple ? 'SÍ' : 'NO']);
+      doc.agregarFila(['TPR (horas hábiles)', String(resumen.tprHorasHabiles.valor ?? 'n/d'), `<= ${resumen.tprHorasHabiles.meta} h`, resumen.tprHorasHabiles.cumple === null ? 'n/d' : resumen.tprHorasHabiles.cumple ? 'SÍ' : 'NO']);
+      doc.agregarFila(['TRO', String(resumen.tro.valor ?? 'n/d'), `>= ${resumen.tro.meta} %`, resumen.tro.cumple === null ? 'n/d' : resumen.tro.cumple ? 'SÍ' : 'NO']);
+      doc.agregarFila(['TEO', String(resumen.teo.valor ?? 'n/d'), `<= ${resumen.teo.meta} %`, resumen.teo.cumple === null ? 'n/d' : resumen.teo.cumple ? 'SÍ' : 'NO']);
       doc.agregarSeccion('Volumen de expedientes');
       doc.agregarFila(['Radicados', String(resumen.totalRadicados)]);
-      doc.agregarFila(['En tramite', String(resumen.totalExpedientesEnTramite)]);
+      doc.agregarFila(['En trámite', String(resumen.totalExpedientesEnTramite)]);
       doc.agregarFila(['Atendidos', String(resumen.totalExpedientesAtendidos)]);
       doc.agregarFila(['Archivados', String(resumen.totalArchivados)]);
-      doc.agregarFila(['Atrasados criticos', String(resumen.atrasadosCriticos)]);
+      doc.agregarFila(['Atrasados críticos', String(resumen.atrasadosCriticos)]);
 
       if (cuelloBotella?.cuelloBotella.length) {
-        doc.agregarSeccion('Cuellos de botella por area');
-        doc.agregarFila(['Area', 'Estado', 'Expedientes', 'Dias promedio', 'Nivel'], {
+        doc.agregarSeccion('Cuellos de botella por área');
+        doc.agregarFila(['Área', 'Estado', 'Expedientes', 'Días promedio', 'Nivel'], {
           negrita: true,
           separador: true,
         });
@@ -162,7 +162,7 @@ export function crearRouterReportes(pool: Pool): Router {
           doc.agregarFila([fila.area, fila.estado, String(fila.expedientes), String(fila.diasPromedio), fila.nivelAlerta]);
         }
       }
-    }, 'Reporte analitico institucional SIGD');
+    }, 'Reporte analítico institucional SIGD');
 
     res.status(200)
       .set({

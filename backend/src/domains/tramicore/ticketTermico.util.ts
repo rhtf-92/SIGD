@@ -11,8 +11,9 @@ export class TicketTermicoUtil {
     const separador = "-".repeat(40);
     
     const ticketStr = [
-      "      SISTEMA DE GESTION DOCUMENTARIA     ",
-      "           MESA DE PARTES FISICA          ",
+      '             IESTP "SUIZA"              ',
+      '   SISTEMA INTEGRAL SIGD — PUCALLPA     ',
+      '       MESA DE PARTES PRESENCIAL        ',
       separador,
       `CUT: ${datos.cut}`,
       `FECHA/HORA: ${datos.timestamp.toLocaleString('es-PE')}`,

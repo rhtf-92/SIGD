@@ -551,6 +551,12 @@ export class VentanillaPresencialService {
         asunto: datos.asunto,
         folios: datos.foliosTotales,
         operadorMesa: datos.idOperadorVentanilla || 'Mesa de Partes Presencial',
+        canalRecepcion: 'VENTANILLA_PRESENCIAL',
+        estadoInicial: ordenPagoGenerada ? 'PENDIENTE_PAGO' : 'REGISTRADO',
+        documentosPresentados: datos.documentosAdjuntos?.map((d) => ({
+          nombre: d.nombreArchivo,
+          tipo: 'Adjunto físico digitalizado',
+        })),
         codigoTupa: contextoPagoInfo?.codigoTupa || undefined,
         denominacionTupa: contextoPagoInfo?.concepto || undefined,
         costoTupa: contextoPagoInfo?.costoOficial !== undefined ? Number(contextoPagoInfo.costoOficial) : undefined,
