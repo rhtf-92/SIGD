@@ -231,6 +231,7 @@ export interface ItemDesglose {
   observaciones?: string | null;
 }
 
+/** Información canónica de resolución directoral asociada al expediente. Consulta de PDF mediante Storage API (documentoAdjuntoId); nunca expone claves físicas S3. */
 export interface ResolucionInfoRutaDoc {
   resolucionId: string;
   expedienteId: string;
@@ -246,7 +247,6 @@ export interface ResolucionInfoRutaDoc {
   cvd?: string | null;
   hashPades?: string | null;
   documentoAdjuntoId?: string | null;
-  s3Key?: string | null;
 }
 
 export interface ExpedienteDetalleRutaDoc extends ExpedienteResumenRutaDoc {

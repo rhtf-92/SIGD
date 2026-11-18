@@ -352,6 +352,7 @@ describe('TSK-DEV-05.1 — Despacho Resolutivo, Ciclo de Vida y Reconciliación 
     expect(res.body.resolucionInfo.hashPades).toBe('a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0');
     expect(res.body.resolucionInfo.firmanteNombre).toBe('Director General M51');
     expect(res.body.resolucionInfo.documentoAdjuntoId).toBe(ID_DOC_PDF_FIRMADO);
+    expect(res.body.resolucionInfo.s3Key).toBeUndefined();
   });
 
   it('2. GET /api/v1/expedientes/:id expone resolucionInfo: null para expediente sin resolución', async () => {
@@ -376,7 +377,7 @@ describe('TSK-DEV-05.1 — Despacho Resolutivo, Ciclo de Vida y Reconciliación 
     expect(res.body.resolucion.numeroBorrador).toBe('RD-2026-000501');
     expect(res.body.resolucion.tipoResolucion).toBe('DIRECTORAL_ADMINISTRATIVA');
     expect(res.body.resolucion.documentoAdjuntoId).toBe(ID_DOC_PDF_BORRADOR);
-    expect(res.body.resolucion.s3Key).toBe('resoluciones/RD-2026-000501.pdf');
+    expect(res.body.resolucion.s3Key).toBeUndefined();
   });
 
   it('4. GET /api/v1/resoluciones/expediente/:expedienteId retorna resolucion: null si no existe', async () => {

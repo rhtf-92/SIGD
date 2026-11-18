@@ -399,7 +399,6 @@ export function crearRouterResoluciones(pool: Pool): Router {
       cvd: string | null;
       hash_pades: string | null;
       documento_adjunto_id: string | null;
-      s3_key: string | null;
     }>(
       `SELECT r.resolucion_id::text,
               r.expediente_id::text,
@@ -414,8 +413,7 @@ export function crearRouterResoluciones(pool: Pool): Router {
               r.firmado_en,
               fd.cvd,
               COALESCE(r.hash_pades, fd.sha256_firmado) AS hash_pades,
-              adj.documento_adjunto_id::text,
-              adj.s3_key
+              adj.documento_adjunto_id::text
          FROM sigd_doc.resolucion r
          LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = r.firmado_por
          LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = cu.id_persona
@@ -460,7 +458,6 @@ export function crearRouterResoluciones(pool: Pool): Router {
         cvd: row.cvd,
         hashPades: row.hash_pades,
         documentoAdjuntoId: row.documento_adjunto_id,
-        s3Key: row.s3_key,
       },
       correlation_id: contexto?.correlation_id,
     });
