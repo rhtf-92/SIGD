@@ -153,7 +153,7 @@ export function crearRouterTesoreria(pool: Pool): Router {
   router.get('/tesoreria/dashboard', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { claims } = await autenticar(req);
-      exigirRoles(claims, ['TESORERIA', 'ADMINISTRADOR']);
+      exigirRoles(claims, ['TESORERIA']);
 
       const metricas = await service.obtenerMetricasDashboard();
       res.status(200).json(metricas);
@@ -166,7 +166,7 @@ export function crearRouterTesoreria(pool: Pool): Router {
   router.get('/tesoreria/ordenes', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { claims } = await autenticar(req);
-      exigirRoles(claims, ['TESORERIA', 'ADMINISTRADOR']);
+      exigirRoles(claims, ['TESORERIA']);
 
       const params = buscarOrdenesQuerySchema.parse(req.query);
       const resultado = await service.listarOrdenes(params);
@@ -204,7 +204,7 @@ export function crearRouterTesoreria(pool: Pool): Router {
   router.post('/tesoreria/ordenes/:id/confirmar', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { claims } = await autenticar(req);
-      exigirRoles(claims, ['TESORERIA', 'ADMINISTRADOR']);
+      exigirRoles(claims, ['TESORERIA']);
 
       const ordenPagoId = String(req.params.id);
       const datos = confirmarPagoSchema.parse(req.body);
@@ -226,7 +226,7 @@ export function crearRouterTesoreria(pool: Pool): Router {
   router.post('/tesoreria/ordenes/:id/rechazar', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { claims } = await autenticar(req);
-      exigirRoles(claims, ['TESORERIA', 'ADMINISTRADOR']);
+      exigirRoles(claims, ['TESORERIA']);
 
       const ordenPagoId = String(req.params.id);
       const datos = rechazarPagoSchema.parse(req.body);
@@ -504,7 +504,7 @@ export function crearRouterTesoreria(pool: Pool): Router {
   router.post('/devoluciones/:id/ejecutar', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { claims } = await autenticar(req);
-      exigirRoles(claims, ['TESORERIA', 'ADMINISTRADOR']);
+      exigirRoles(claims, ['TESORERIA']);
 
       const id = String(req.params.id);
       const body = ejecutarDevolucionSchema.parse(req.body);

@@ -350,8 +350,8 @@ describe('SEC-01 / BOLA & FSM: Control de Acceso, Roles Reales y FSM Canónica e
 
       expect(res.status).toBe(200);
       expect(res.body.ok).toBe(true);
-      expect(res.body.estado).toBe('EN_REVISION');
-      expect(res.body.estadoRutaDoc).toBe('EN_REVISION');
+      expect(res.body.estado).toBe('SUBSANADO');
+      expect(res.body.estadoRutaDoc).toBe('SUBSANADO');
       expect(res.body.pestana).toBe('EN_TRAMITE');
       expect(tracker.beginCount).toBe(1);
       expect(tracker.mutaciones).toBe(1);
@@ -400,7 +400,7 @@ describe('SEC-01 / BOLA & FSM: Control de Acceso, Roles Reales y FSM Canónica e
 
       expect(res.status).toBe(200);
       expect(res.body.ok).toBe(true);
-      expect(res.body.estado).toBe('EN_REVISION');
+      expect(res.body.estado).toBe('SUBSANADO');
     });
 
     it('permite con 200 OK a MESA_PARTES para ventanilla presencial', async () => {
@@ -412,7 +412,7 @@ describe('SEC-01 / BOLA & FSM: Control de Acceso, Roles Reales y FSM Canónica e
 
       expect(res.status).toBe(200);
       expect(res.body.ok).toBe(true);
-      expect(res.body.estado).toBe('EN_REVISION');
+      expect(res.body.estado).toBe('SUBSANADO');
     });
 
     it('rechaza con 422 (ESTADO_INVALIDO) si el expediente no está en estado OBSERVADO', async () => {

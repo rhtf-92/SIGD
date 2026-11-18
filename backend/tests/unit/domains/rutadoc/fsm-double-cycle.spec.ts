@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PoolClient } from 'pg';
 import { DomainError } from '../../../../src/shared/domain/errors/index.js';
-import { observarExpediente, subsanarExpediente } from '../../../../src/domains/rutadoc/derivaciones.service.js';
+import { observarExpediente, subsanarExpediente, iniciarRevisionExpediente } from '../../../../src/domains/rutadoc/derivaciones.service.js';
 vi.mock('../../../../src/shared/request-context/request-context.js', () => ({
   getRequestContext: vi.fn(),
 }));
@@ -65,18 +65,35 @@ describe('FSM Doble Ciclo: Observación y Subsanación Canónica (F-06)', () => 
       rowCount: 1,
       rows: [{ estado_actual_id: 'OBSERVADO', area_contexto_id: 'area-sistemas' }],
     });
-    mockQuery.mockResolvedValueOnce({}); // INSERT CORRECCION -> SUBSANADO
     mockQuery.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{ movimiento_id: 'mov-sub-1' }],
-    }); // INSERT INICIAR_REVISION -> EN_REVISION
-    mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE sigd_tra.expediente SET estado = 'EN_REVISION'
+    }); // INSERT CORRECCION -> SUBSANADO
+    mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE sigd_tra.expediente SET estado = 'SUBSANADO'
 
     await subsanarExpediente(mockCliente, mockExpedienteId, 'Subsanación ciclo 1: adjunto requisitos');
 
-    // Verificar que subsanar actualiza a EN_REVISION (NO EN_TRAMITE)
     expect(mockQuery).toHaveBeenNthCalledWith(
-      7,
+      6,
+      expect.stringContaining("SET estado = 'SUBSANADO'"),
+      [mockExpedienteId]
+    );
+
+    // 1.3 Inicio formal de revisión institucional: SUBSANADO -> EN_REVISION
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ estado_actual_id: 'SUBSANADO', area_contexto_id: 'area-sistemas' }],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ movimiento_id: 'mov-rev-1' }],
+    }); // INSERT INICIAR_REVISION -> EN_REVISION
+    mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE sigd_tra.expediente SET estado = 'EN_REVISION'
+
+    await iniciarRevisionExpediente(mockCliente, mockExpedienteId, 'Revisión formal ciclo 1');
+
+    expect(mockQuery).toHaveBeenNthCalledWith(
+      9,
       expect.stringContaining("SET estado = 'EN_REVISION'"),
       [mockExpedienteId]
     );
@@ -96,7 +113,7 @@ describe('FSM Doble Ciclo: Observación y Subsanación Canónica (F-06)', () => 
     await observarExpediente(mockCliente, mockExpedienteId, 'Observación ciclo 2: firma ilegible');
 
     expect(mockQuery).toHaveBeenNthCalledWith(
-      10,
+      12,
       expect.stringContaining("SET estado = 'OBSERVADO'"),
       [mockExpedienteId]
     );
@@ -106,22 +123,40 @@ describe('FSM Doble Ciclo: Observación y Subsanación Canónica (F-06)', () => 
       rowCount: 1,
       rows: [{ estado_actual_id: 'OBSERVADO', area_contexto_id: 'area-sistemas' }],
     });
-    mockQuery.mockResolvedValueOnce({}); // INSERT CORRECCION -> SUBSANADO
     mockQuery.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{ movimiento_id: 'mov-sub-2' }],
-    }); // INSERT INICIAR_REVISION -> EN_REVISION
-    mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE sigd_tra.expediente SET estado = 'EN_REVISION'
+    }); // INSERT CORRECCION -> SUBSANADO
+    mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE sigd_tra.expediente SET estado = 'SUBSANADO'
 
     await subsanarExpediente(mockCliente, mockExpedienteId, 'Subsanación ciclo 2: reenvío firma legible');
 
     expect(mockQuery).toHaveBeenNthCalledWith(
-      14,
+      15,
+      expect.stringContaining("SET estado = 'SUBSANADO'"),
+      [mockExpedienteId]
+    );
+
+    // 2.3 Inicio formal de revisión institucional: SUBSANADO -> EN_REVISION
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ estado_actual_id: 'SUBSANADO', area_contexto_id: 'area-sistemas' }],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ movimiento_id: 'mov-rev-2' }],
+    }); // INSERT INICIAR_REVISION -> EN_REVISION
+    mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE sigd_tra.expediente SET estado = 'EN_REVISION'
+
+    await iniciarRevisionExpediente(mockCliente, mockExpedienteId, 'Revisión formal ciclo 2');
+
+    expect(mockQuery).toHaveBeenNthCalledWith(
+      18,
       expect.stringContaining("SET estado = 'EN_REVISION'"),
       [mockExpedienteId]
     );
 
-    // Ambos ciclos se completaron exitosamente sin errores de estado o concurrencia
-    expect(mockQuery).toHaveBeenCalledTimes(14);
+    // Ambos ciclos se completaron exitosamente con segregación formal institucional
+    expect(mockQuery).toHaveBeenCalledTimes(18);
   });
 });

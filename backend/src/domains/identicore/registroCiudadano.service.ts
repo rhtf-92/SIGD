@@ -47,11 +47,16 @@ export class RegistroCiudadanoService {
   async registrarCiudadano(datos: RegistroCiudadanoInput, ipAddress: string | null): Promise<RegistroResult> {
     const numeroDocumento = datos.tipoDocumento === 'CE' ? datos.ce : datos.dni;
     const validacion = datos.tipoDocumento === 'CE'
-      ? { valido: /^[A-Z0-9]{9,12}$/.test(numeroDocumento ?? '') }
+      ? { valido: /^[A-Za-z0-9]{8,12}$/.test(numeroDocumento ?? '') }
       : validarDni(numeroDocumento ?? '');
     if (!validacion.valido || !numeroDocumento) {
       throw new ValidationError({
-        invalidParams: [{ name: 'dni', reason: 'DNI_FORMATO_INVALIDO: debe contener 8 dígitos.' }],
+        invalidParams: [{
+          name: datos.tipoDocumento === 'CE' ? 'ce' : 'dni',
+          reason: datos.tipoDocumento === 'CE'
+            ? 'CE_FORMATO_INVALIDO: debe contener entre 8 y 12 caracteres alfanuméricos.'
+            : 'DNI_FORMATO_INVALIDO: debe contener 8 dígitos.',
+        }],
       });
     }
     return this.registrarPersona({
@@ -196,40 +201,48 @@ export class RegistroCiudadanoService {
       if (personaExistente.rows[0]?.id_persona) {
         // Reutilizar persona existente
         personaId = personaExistente.rows[0].id_persona;
-        await cliente.query(
-          `UPDATE sigd_auth.persona
-              SET direccion = COALESCE($2, direccion),
-                  ubigeo_distrito = COALESCE($3, ubigeo_distrito),
-                  actualizado_en = now()
-            WHERE id_persona = $1::uuid`,
-          [personaId, datos.direccion || null, datos.ubigeoDistrito || null],
-        );
 
+        // Principio de Inmutabilidad Civil: NO alterar ni completar datos del padrón civil
+        // (persona, persona_natural, persona_juridica) desde un registro público no verificado.
+        // Los datos declarados por el solicitante se conservan en su cuenta de usuario (cuenta_usuario / perfil_usuario).
         if (datos.tipoPersona === 'NATURAL') {
           const apellidos = [datos.apellidoPaterno, datos.apellidoMaterno].filter(Boolean).join(' ');
           const nombreCompleto = [datos.nombres, apellidos].filter(Boolean).join(' ');
 
-          const existeNatural = await cliente.query<{ id_persona: string }>(
-            `SELECT id_persona::text FROM sigd_auth.persona_natural WHERE id_persona = $1::uuid LIMIT 1`,
+          const existeNatural = await cliente.query<{
+            id_persona: string;
+            nombres: string;
+            apellidos: string;
+            nombre_completo: string;
+          }>(
+            `SELECT id_persona::text, nombres, apellidos, nombre_completo
+               FROM sigd_auth.persona_natural
+              WHERE id_persona = $1::uuid
+              LIMIT 1`,
             [personaId],
           );
           if (existeNatural.rows[0]) {
-            await cliente.query(
-              `UPDATE sigd_auth.persona_natural
-                  SET nombres = COALESCE(NULLIF($2, ''), nombres),
-                      apellidos = COALESCE(NULLIF($3, ''), apellidos),
-                      nombre_completo = COALESCE(NULLIF($4, ''), nombre_completo),
-                      correo = COALESCE(NULLIF($5, ''), correo),
-                      telefono = COALESCE(NULLIF($6, ''), telefono)
-                WHERE id_persona = $1::uuid`,
-              [personaId, datos.nombres, apellidos, nombreCompleto, datos.correo, datos.celular],
+            const natural = existeNatural.rows[0];
+            const nombreRegistrado = normalizarNombre(
+              natural.nombre_completo || [natural.nombres, natural.apellidos].filter(Boolean).join(' '),
             );
+            const nombreDeclarado = normalizarNombre(nombreCompleto);
+
+            // Salvaguarda contra suplantación de identidad (Anti-Impersonation):
+            // Si la persona ya cuenta con identidad civil registrada en el padrón,
+            // los nombres declarados deben coincidir sustancialmente con el registro previo.
+            if (nombreRegistrado && nombreDeclarado && nombreRegistrado !== nombreDeclarado) {
+              throw new ConflictError({
+                code: 'IDENTITY_MISMATCH',
+                message: 'Los nombres y apellidos declarados no coinciden con los registros institucionales de este documento de identidad.',
+              });
+            }
           } else {
             await cliente.query(
               `INSERT INTO sigd_auth.persona_natural
                  (id_persona, nombres, apellidos, nombre_completo, correo, telefono)
-               VALUES ($1::uuid, $2, $3, $4, $5, $6)`,
-              [personaId, datos.nombres, apellidos, nombreCompleto, datos.correo, datos.celular],
+               VALUES ($1::uuid, $2, $3, $4, NULL, NULL)`,
+              [personaId, datos.nombres, apellidos, nombreCompleto],
             );
           }
         } else {
@@ -264,27 +277,26 @@ export class RegistroCiudadanoService {
             });
           }
 
-          const existeJuridica = await cliente.query<{ id_persona: string }>(
-            `SELECT id_persona::text FROM sigd_auth.persona_juridica WHERE id_persona = $1::uuid LIMIT 1`,
+          const existeJuridica = await cliente.query<{ id_persona: string; razon_social: string }>(
+            `SELECT id_persona::text, razon_social FROM sigd_auth.persona_juridica WHERE id_persona = $1::uuid LIMIT 1`,
             [personaId],
           );
           if (existeJuridica.rows[0]) {
-            await cliente.query(
-              `UPDATE sigd_auth.persona_juridica
-                  SET razon_social = COALESCE(NULLIF($2, ''), razon_social),
-                      nombre_comercial = COALESCE(NULLIF($3, ''), nombre_comercial),
-                      representante_legal = COALESCE(NULLIF($4, ''), representante_legal),
-                      direccion = COALESCE(NULLIF($5, ''), direccion),
-                      partida_registral_sunarp = COALESCE(NULLIF($6, ''), partida_registral_sunarp)
-                WHERE id_persona = $1::uuid`,
-              [personaId, datos.razonSocial, datos.nombreComercial, nombreRepresentante, datos.direccion, datos.partidaRegistral],
-            );
+            const jur = existeJuridica.rows[0];
+            const razonRegistrada = normalizarNombre(jur.razon_social);
+            const razonDeclarada = normalizarNombre(datos.razonSocial || '');
+            if (razonRegistrada && razonDeclarada && razonRegistrada !== razonDeclarada) {
+              throw new ConflictError({
+                code: 'IDENTITY_MISMATCH',
+                message: 'La razón social declarada no coincide con los registros institucionales de este RUC.',
+              });
+            }
           } else {
             await cliente.query(
               `INSERT INTO sigd_auth.persona_juridica
                  (id_persona, razon_social, nombre_comercial, representante_legal, direccion, partida_registral_sunarp)
-               VALUES ($1::uuid, $2, $3, $4, $5, $6)`,
-              [personaId, datos.razonSocial, datos.nombreComercial, nombreRepresentante, datos.direccion, datos.partidaRegistral],
+               VALUES ($1::uuid, $2, $3, $4, NULL, NULL)`,
+              [personaId, datos.razonSocial, datos.nombreComercial, nombreRepresentante],
             );
           }
 
@@ -386,6 +398,15 @@ export class RegistroCiudadanoService {
       );
       const usuarioId = cuenta.rows[0]?.id;
       if (!usuarioId) throw new Error('La inserción de cuenta no devolvió su identificador.');
+
+      if (datos.celular) {
+        await cliente.query(
+          `INSERT INTO sigd_auth.perfil_usuario (id_usuario, telefono)
+           VALUES ($1::uuid, $2)
+           ON CONFLICT (id_usuario) DO UPDATE SET telefono = EXCLUDED.telefono, actualizado_en = now()`,
+          [usuarioId, datos.celular],
+        );
+      }
 
       const rolCiudadano = await cliente.query<IdResult>(
         `INSERT INTO sigd_org.usuario_rol (id_usuario, rol_id)

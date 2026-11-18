@@ -11,12 +11,15 @@ export interface UnidadDestino {
   readonly id: string;
   readonly nombre: string;
   readonly habilitada: boolean;
+  readonly enrutable?: boolean;
+  readonly motivo_no_enrutable?: string | null;
 }
 
 export interface SolicitudDerivacion {
   readonly expediente: ExpedienteAccionReferencia;
   readonly unidadDestinoId: string;
   readonly proveido: string;
+  readonly justificacion_desviacion?: string;
 }
 
 export interface SolicitudRecepcion {
@@ -73,7 +76,7 @@ export interface ResultadoRecepcion { ok: boolean; expedienteId: string; nuevoEs
 export interface ResultadoAtencion { ok: boolean; expedienteId: string; nuevoEstado: string }
 export interface ResultadoArchivado { ok: boolean; expedienteId: string; nuevoEstado: string }
 export interface ResultadoObservacion { estado: "OBSERVADO"; slaPaused: true }
-export interface ResultadoSubsanacion { estado: "EN_REVISION" | "EN_TRAMITE"; expedienteId: string; motivo: string; estadoRutaDoc?: string; pestana?: string }
+export interface ResultadoSubsanacion { estado: "EN_REVISION" | "EN_TRAMITE" | "SUBSANADO"; expedienteId: string; motivo: string; estadoRutaDoc?: string; pestana?: string }
 export interface ResultadoEnviarAFirma { ok: boolean; expedienteId: string; nuevoEstado: string }
 export interface ResultadoResolver { ok: boolean; expedienteId: string; nuevoEstado: string }
 

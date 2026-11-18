@@ -94,6 +94,7 @@ export interface FilaTupaProcedimiento {
   unidad_resolutiva_id: string | null;
   unidad_financiera_id: string | null;
   intervencion_financiera: string | null;
+  perfil_responsable_id?: number | null;
   registro_version_id: string | null;
   activo: boolean;
   orden: number;
@@ -130,6 +131,7 @@ export interface ActualizarProcedimientoDTO {
   unidadResolutivaId?: string | null;
   unidadFinancieraId?: string | null;
   intervencionFinanciera?: string | null;
+  activo?: boolean;
 }
 
 export type FuenteProcedenciaCampo =
@@ -209,6 +211,7 @@ export interface FilaVinculoConSnapshot {
   unidad_responsable_id: string | null;
   unidad_responsable_codigo: string | null;
   unidad_responsable_nombre: string | null;
+  perfil_responsable_id?: number | null;
   unidad_resolutiva_id: string | null;
   unidad_resolutiva_codigo: string | null;
   unidad_resolutiva_nombre: string | null;
@@ -478,15 +481,15 @@ export class TupaVersionRepository {
                 monto, unidad_cobro, plazo_dias, plazo_fuente, requisitos, genera_expediente,
                 calificacion, calificacion_fuente, canal_presentacion,
                 unidad_receptora_id, unidad_responsable_id, unidad_resolutiva_id,
-                unidad_financiera_id, intervencion_financiera,
+                unidad_financiera_id, intervencion_financiera, perfil_responsable_id,
                 registro_version_id, activo, orden
              ) VALUES (
                 $1, $2, $3, $4, $5, $6,
                 $7, $8, $9, $10, $11, $12,
                 $13, $14, $15,
                 $16, $17, $18,
-                $19, $20,
-                $21, $22, $23
+                $19, $20, $21,
+                $22, $23, $24
              ) RETURNING id_procedimiento`,
             [
               nuevaVersion.id_version,
@@ -509,6 +512,7 @@ export class TupaVersionRepository {
               p.unidad_resolutiva_id,
               p.unidad_financiera_id,
               p.intervencion_financiera,
+              p.perfil_responsable_id ?? null,
               p.registro_version_id,
               p.activo,
               p.orden,
@@ -673,6 +677,10 @@ export class TupaVersionRepository {
       params.push(datos.intervencionFinanciera);
       updates.push(`intervencion_financiera = $${params.length}`);
     }
+    if (datos.activo !== undefined) {
+      params.push(datos.activo);
+      updates.push(`activo = $${params.length}`);
+    }
 
     if (updates.length === 0) {
       return proc.rows[0];
@@ -690,10 +698,102 @@ export class TupaVersionRepository {
     return res.rows[0];
   }
 
+  async enviarAValidacion(idVersion: string, _usuarioId?: string): Promise<FilaTupaVersion> {
+    const version = await this.obtenerVersionPorId(idVersion);
+    if (!version) {
+      throw new NotFoundError({ message: 'Versión TUPA no encontrada.' });
+    }
+    if (version.estado !== 'BORRADOR') {
+      throw new ConflictError({
+        message: `Solo se pueden enviar a validación versiones en estado BORRADOR (estado actual: ${version.estado}).`,
+      });
+    }
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+      const res = await cliente.query<FilaTupaVersion>(
+        `UPDATE sigd_doc.tupa_version
+            SET estado = 'PENDIENTE_VALIDACION',
+                actualizado_en = now()
+          WHERE id_version = $1::uuid
+          RETURNING *`,
+        [idVersion],
+      );
+
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_doc',
+        tabla: 'tupa_version',
+        operacion: 'UPDATE',
+        datos_antes: { id_version: idVersion, estado: 'BORRADOR' },
+        datos_despues: { id_version: idVersion, estado: 'PENDIENTE_VALIDACION' },
+      });
+
+      await cliente.query('COMMIT');
+      return res.rows[0];
+    } catch (e) {
+      await cliente.query('ROLLBACK');
+      throw e;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  async aprobarVersion(
+    idVersion: string,
+    resolucionAprobacion: string,
+    fechaAprobacion?: string | Date,
+    _usuarioId?: string,
+  ): Promise<FilaTupaVersion> {
+    const version = await this.obtenerVersionPorId(idVersion);
+    if (!version) {
+      throw new NotFoundError({ message: 'Versión TUPA no encontrada.' });
+    }
+    if (version.estado !== 'PENDIENTE_VALIDACION' && version.estado !== 'BORRADOR') {
+      throw new ConflictError({
+        message: `Solo se pueden aprobar institucionalmente versiones en BORRADOR o PENDIENTE_VALIDACION (estado actual: ${version.estado}).`,
+      });
+    }
+
+    const fechaNorm = fechaAprobacion ? new Date(fechaAprobacion) : new Date();
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+      const res = await cliente.query<FilaTupaVersion>(
+        `UPDATE sigd_doc.tupa_version
+            SET resolucion_aprobacion = $1,
+                fecha_aprobacion = $2,
+                estado = 'PENDIENTE_VALIDACION',
+                actualizado_en = now()
+          WHERE id_version = $3::uuid
+          RETURNING *`,
+        [resolucionAprobacion, fechaNorm, idVersion],
+      );
+
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_doc',
+        tabla: 'tupa_version',
+        operacion: 'UPDATE',
+        datos_antes: { id_version: idVersion, resolucion_aprobacion: version.resolucion_aprobacion, fecha_aprobacion: version.fecha_aprobacion },
+        datos_despues: { id_version: idVersion, resolucion_aprobacion: resolucionAprobacion, fecha_aprobacion: fechaNorm },
+      });
+
+      await cliente.query('COMMIT');
+      return res.rows[0];
+    } catch (e) {
+      await cliente.query('ROLLBACK');
+      throw e;
+    } finally {
+      cliente.release();
+    }
+  }
+
   async publicarVersion(
     idVersion: string,
     fechaVigenciaDesde?: string | Date,
     usuarioId?: string,
+    opciones?: { exigirValidacionPrevia?: boolean },
   ): Promise<FilaTupaVersion> {
     const version = await this.obtenerVersionPorId(idVersion);
     if (!version) {
@@ -701,6 +801,29 @@ export class TupaVersionRepository {
     }
     if (version.estado === 'VIGENTE') {
       return version;
+    }
+    if (opciones?.exigirValidacionPrevia) {
+      if (version.estado === 'BORRADOR') {
+        throw new ConflictError({
+          message:
+            'No se permite la publicación directa de una versión en BORRADOR. Debe enviarse a validación y contar con aprobación institucional previa (PENDIENTE_VALIDACION).',
+        });
+      }
+      if (
+        !version.resolucion_aprobacion ||
+        !version.resolucion_aprobacion.trim() ||
+        !version.fecha_aprobacion
+      ) {
+        throw new ConflictError({
+          message:
+            'No se permite la publicación técnica sin aprobación institucional formal previa. Se requiere acto resolutivo (resolución de aprobación) y fecha de aprobación registradas.',
+        });
+      }
+      if (version.estado !== 'PENDIENTE_VALIDACION') {
+        throw new ConflictError({
+          message: `Para publicación técnica controlada, la versión debe estar en estado PENDIENTE_VALIDACION (estado actual: ${version.estado}).`,
+        });
+      }
     }
     if (version.estado === 'HISTORICO' || version.estado === 'ANULADO') {
       throw new ConflictError({
@@ -761,6 +884,14 @@ export class TupaVersionRepository {
     } finally {
       cliente.release();
     }
+  }
+
+  async publicarVersionConGobierno(
+    idVersion: string,
+    fechaVigenciaDesde?: string | Date,
+    usuarioId?: string,
+  ): Promise<FilaTupaVersion> {
+    return this.publicarVersion(idVersion, fechaVigenciaDesde, usuarioId, { exigirValidacionPrevia: true });
   }
 
   async obtenerDiffVersiones(idVersionA: string, idVersionB: string): Promise<DiffVersionesResultado> {
@@ -1204,6 +1335,7 @@ export class TupaVersionRepository {
             plazo_dias_snapshot, calificacion_snapshot, canal_presentacion,
             unidad_receptora_id, unidad_receptora_codigo, unidad_receptora_nombre,
             unidad_responsable_id, unidad_responsable_codigo, unidad_responsable_nombre,
+            perfil_responsable_id,
             unidad_resolutiva_id, unidad_resolutiva_codigo, unidad_resolutiva_nombre,
             fuente_datos
          )
@@ -1215,6 +1347,7 @@ export class TupaVersionRepository {
             COALESCE($11, p.plazo_dias), COALESCE($12, p.calificacion), COALESCE($13, p.canal_presentacion),
             COALESCE($14::uuid, p.unidad_receptora_id), COALESCE($15, receptor.codigo), COALESCE($16, receptor.nombre),
             COALESCE($17::uuid, p.unidad_responsable_id), COALESCE($18, responsable.codigo), COALESCE($19, responsable.nombre),
+            p.perfil_responsable_id,
             COALESCE($20::uuid, p.unidad_resolutiva_id), COALESCE($21, resolutiva.codigo), COALESCE($22, resolutiva.nombre),
             COALESCE(
               $23::jsonb,
@@ -1310,5 +1443,160 @@ export class TupaVersionRepository {
       [idProcedimiento],
     );
     return res.rows;
+  }
+
+  /**
+   * Valida la elegibilidad estricta de un procedimiento TUPA para la apertura y radicación
+   * de expediente administrativo en SIGD.
+   *
+   * Reglas de Dominio (Fase C3.5):
+   * 1. Existencia del registro de versión (NotFoundError).
+   * 2. estado_validacion === 'APROBADO' (ConflictError: VERSION_TUPA_NO_APROBADA).
+   * 3. Ventana de vigencia temporal (ConflictError: VERSION_TUPA_FUERA_DE_VIGENCIA).
+   * 4. Procedimiento activo !== false (ConflictError: PROCEDIMIENTO_TUPA_INACTIVO).
+   * 5. Coherencia de genera_expediente con catálogo:
+   *    - genera_expediente === true  -> ALLOW.
+   *    - genera_expediente === false -> ConflictError: PROCEDIMIENTO_NO_GENERA_EXPEDIENTE.
+   *    - genera_expediente === null/undefined -> ConflictError: RADICACION_TUPA_NO_DETERMINADA (fail-closed).
+   */
+  async validarElegibilidadRadicacion(
+    registroVersionId: string,
+    now: Date = new Date(),
+    executor: Pool | PoolClient = this.pool,
+  ): Promise<{
+    registroVersionId: string;
+    idProcedimiento: string | null;
+    codigoRef: string | null;
+    denominacion: string | null;
+    generaExpediente: boolean;
+    activo: boolean;
+    unidadReceptoraId?: string | null;
+    categoria?: string | null;
+  }> {
+    const REGEX_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    if (!registroVersionId || !REGEX_UUID.test(registroVersionId)) {
+      throw new ValidationError({
+        invalidParams: [
+          { name: 'registroVersionId', reason: 'registroVersionId debe ser un UUID válido de sigd_doc.tupa_registro_version.' },
+        ],
+      });
+    }
+
+    const res = await executor.query<{
+      registro_version_id: string;
+      estado_validacion: string;
+      vigencia_desde: Date | null;
+      vigencia_hasta: Date | null;
+      id_procedimiento: string | null;
+      codigo_ref: string | null;
+      denominacion: string | null;
+      genera_expediente: boolean | null;
+      activo: boolean | null;
+      unidad_receptora_id: string | null;
+      categoria: string | null;
+    }>(
+      `SELECT rv.registro_version_id,
+              rv.estado_validacion,
+              rv.vigencia_desde,
+              rv.vigencia_hasta,
+              p.id_procedimiento,
+              p.codigo_ref,
+              p.denominacion,
+              p.genera_expediente,
+              p.activo,
+              p.unidad_receptora_id,
+              p.categoria
+         FROM sigd_doc.tupa_registro_version rv
+         LEFT JOIN LATERAL (
+           SELECT procedimiento.*
+             FROM sigd_doc.tupa_procedimiento procedimiento
+            WHERE procedimiento.registro_version_id = rv.registro_version_id
+            ORDER BY procedimiento.activo DESC, procedimiento.orden, procedimiento.id_procedimiento
+            LIMIT 1
+         ) p ON TRUE
+        WHERE rv.registro_version_id = $1::uuid`,
+      [registroVersionId],
+    );
+
+    const fila = res.rows[0];
+    if (!fila) {
+      throw new NotFoundError({
+        message: 'La versión TUPA indicada no existe.',
+        detail: `No existe sigd_doc.tupa_registro_version con registroVersionId ${registroVersionId}.`,
+      });
+    }
+
+    if (fila.estado_validacion !== 'APROBADO') {
+      throw new ConflictError({
+        code: 'VERSION_TUPA_NO_APROBADA',
+        message: 'La versión TUPA indicada no está aprobada.',
+        detail: `La versión ${registroVersionId} está en estado ${fila.estado_validacion}; solo se vinculan versiones APROBADO.`,
+      });
+    }
+
+    const hoyStr = now.toISOString().slice(0, 10);
+    if (fila.vigencia_desde) {
+      const desdeStr = fila.vigencia_desde instanceof Date ? fila.vigencia_desde.toISOString().slice(0, 10) : String(fila.vigencia_desde).slice(0, 10);
+      if (desdeStr > hoyStr) {
+        throw new ConflictError({
+          code: 'VERSION_TUPA_FUERA_DE_VIGENCIA',
+          message: 'La versión TUPA indicada aún no entra en vigencia.',
+          detail: `La versión ${registroVersionId} entra en vigencia el ${desdeStr}.`,
+        });
+      }
+    }
+    if (fila.vigencia_hasta) {
+      const hastaStr = fila.vigencia_hasta instanceof Date ? fila.vigencia_hasta.toISOString().slice(0, 10) : String(fila.vigencia_hasta).slice(0, 10);
+      if (hastaStr < hoyStr) {
+        throw new ConflictError({
+          code: 'VERSION_TUPA_FUERA_DE_VIGENCIA',
+          message: 'La versión TUPA indicada ya no está vigente.',
+          detail: `La versión ${registroVersionId} venció el ${hastaStr}.`,
+        });
+      }
+    }
+
+    if (fila.activo === false) {
+      throw new ConflictError({
+        code: 'PROCEDIMIENTO_TUPA_INACTIVO',
+        message: 'El procedimiento TUPA se encuentra inactivo y no admite nuevas radicaciones.',
+        detail: `El procedimiento ${fila.codigo_ref ?? registroVersionId} está inactivo (activo = false).`,
+      });
+    }
+
+    if (fila.genera_expediente === false) {
+      throw new ConflictError({
+        code: 'PROCEDIMIENTO_NO_GENERA_EXPEDIENTE',
+        message: 'El procedimiento TUPA seleccionado no genera expediente administrativo.',
+        detail: `El procedimiento ${fila.codigo_ref ?? ''} (${fila.denominacion ?? ''}) tiene genera_expediente = false y no admite apertura de expediente en SIGD.`,
+      });
+    }
+
+    if (fila.genera_expediente === null || fila.genera_expediente === undefined) {
+      throw new ConflictError({
+        code: 'RADICACION_TUPA_NO_DETERMINADA',
+        message: 'La condición de radicación del procedimiento TUPA no está determinada.',
+        detail: `El procedimiento ${fila.codigo_ref ?? ''} (${fila.denominacion ?? ''}) tiene genera_expediente = NULL; radicación bloqueada fail-closed.`,
+      });
+    }
+
+    if (fila.categoria === 'ACTUACION_INTERNA') {
+      throw new ConflictError({
+        code: 'ACTUACION_INTERNA_NO_RADICABLE',
+        message: 'El procedimiento seleccionado es una actuación interna no radicable por ventanilla externa.',
+        detail: `El procedimiento ${fila.codigo_ref ?? ''} (${fila.denominacion ?? ''}) es una actuación interna y no admite radicación documentaria externa.`,
+      });
+    }
+
+    return {
+      registroVersionId: fila.registro_version_id,
+      idProcedimiento: fila.id_procedimiento,
+      codigoRef: fila.codigo_ref,
+      denominacion: fila.denominacion,
+      generaExpediente: true,
+      activo: fila.activo ?? true,
+      unidadReceptoraId: fila.unidad_receptora_id ?? null,
+      categoria: fila.categoria ?? null,
+    };
   }
 }

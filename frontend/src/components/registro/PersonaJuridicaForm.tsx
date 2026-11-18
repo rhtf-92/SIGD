@@ -7,6 +7,11 @@ import { UbigeoSelector } from "../common/UbigeoSelector";
 import type { UbigeoDTO } from "../../data/ucayali";
 import { DeclaracionJuradaCheckbox } from "./DeclaracionJuradaCheckbox";
 import { ConsentimientoLey29733Modal } from "./ConsentimientoLey29733Modal";
+import {
+  sanitizarNumeroDocumento,
+  obtenerTextoAyudaDocumento,
+  obtenerPlaceholderDocumento,
+} from "../../utils/documentValidation";
 
 interface PersonaJuridicaFormProps {
   onSubmit: (data: Juridical) => void | Promise<void>;
@@ -60,6 +65,8 @@ export default function PersonaJuridicaForm({
   const domicilioValue = watch("domicilio");
   const declaracionJuradaAceptada = watch("declaracionJuradaAceptada");
   const consentimientoLey29733 = watch("consentimientoLey29733");
+  const ruc = watch("ruc") || "";
+  const repDoc = watch("representanteLegal.numeroDocumento") || "";
 
   const handleUbigeoChange = (_ubigeoCod: string, dto: UbigeoDTO) => {
     const updatedDomicilio = {
@@ -92,25 +99,40 @@ export default function PersonaJuridicaForm({
       {/* RUC y Razón Social */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="ruc"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            RUC *
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label
+              htmlFor="ruc"
+              className="block text-sm font-medium text-gray-700"
+            >
+              RUC *
+            </label>
+            <span className="text-[11px] text-slate-400 font-mono">
+              {ruc.length} / 11 dígitos
+            </span>
+          </div>
           <input
             id="ruc"
             type="text"
-            {...register("ruc")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
+            inputMode="numeric"
+            maxLength={11}
+            {...register("ruc", {
+              onChange: (e) => {
+                const s = sanitizarNumeroDocumento(e.target.value, "RUC");
+                setValue("ruc", s, { shouldValidate: true });
+              },
+            })}
+            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none font-mono ${
               errors.ruc ? "border-red-500" : "border-gray-300"
             }`}
-            placeholder="10XXXXXXXXX o 20XXXXXXXXX"
-            maxLength={11}
+            placeholder={obtenerPlaceholderDocumento("RUC")}
           />
-          {errors.ruc && (
+          {errors.ruc ? (
             <p className="mt-1 text-xs text-red-600 font-medium">
               {errors.ruc.message}
+            </p>
+          ) : (
+            <p className="mt-1 text-[11px] text-slate-500">
+              {obtenerTextoAyudaDocumento("RUC")}
             </p>
           )}
         </div>
@@ -162,24 +184,40 @@ export default function PersonaJuridicaForm({
         </div>
 
         <div>
-          <label
-            htmlFor="representanteNumeroDocumento"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Número de Documento *
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label
+              htmlFor="representanteNumeroDocumento"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Número de Documento *
+            </label>
+            <span className="text-[11px] text-slate-400 font-mono">
+              {repDoc.length} / 8 dígitos
+            </span>
+          </div>
           <input
             id="representanteNumeroDocumento"
             type="text"
-            {...register("representanteLegal.numeroDocumento")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
+            inputMode="numeric"
+            maxLength={8}
+            {...register("representanteLegal.numeroDocumento", {
+              onChange: (e) => {
+                const s = sanitizarNumeroDocumento(e.target.value, "DNI");
+                setValue("representanteLegal.numeroDocumento", s, { shouldValidate: true });
+              },
+            })}
+            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none font-mono ${
               errors.representanteLegal?.numeroDocumento ? "border-red-500" : "border-gray-300"
             }`}
-            placeholder="DNI: 8 dígitos o CE: 9-12 caracteres"
+            placeholder={obtenerPlaceholderDocumento("DNI")}
           />
-          {errors.representanteLegal?.numeroDocumento && (
+          {errors.representanteLegal?.numeroDocumento ? (
             <p className="mt-1 text-xs text-red-600 font-medium">
               {errors.representanteLegal.numeroDocumento.message}
+            </p>
+          ) : (
+            <p className="mt-1 text-[11px] text-slate-500">
+              {obtenerTextoAyudaDocumento("DNI")}
             </p>
           )}
         </div>

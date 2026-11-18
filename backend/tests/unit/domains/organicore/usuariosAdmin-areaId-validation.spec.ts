@@ -85,7 +85,7 @@ describe('P2 — Validación de areaId en creación de usuario (Codex Audit)', (
         return { rows: [{ id_usuario: 'u-1' }] };
       }
       if (sql.includes('FROM sigd_org.rol_sistema')) {
-        return { rows: [{ rol_id: 'r-1' }] };
+        return { rows: [{ rol_id: 'r-1', codigo: 'ESPECIALISTA' }] };
       }
       if (sql.includes('FROM sigd_org.area')) {
         // Área NO existe
@@ -124,7 +124,7 @@ describe('P2 — Validación de areaId en creación de usuario (Codex Audit)', (
         return { rows: [{ id_usuario: 'u-1' }] };
       }
       if (sql.includes('FROM sigd_org.rol_sistema')) {
-        return { rows: [{ rol_id: 'r-1' }] };
+        return { rows: [{ rol_id: 'r-1', codigo: 'ESPECIALISTA' }] };
       }
       if (sql.includes('FROM sigd_org.area')) {
         // Área existe pero NO está vigente
@@ -163,7 +163,7 @@ describe('P2 — Validación de areaId en creación de usuario (Codex Audit)', (
         return { rows: [{ id_usuario: 'u-1' }] };
       }
       if (sql.includes('FROM sigd_org.rol_sistema')) {
-        return { rows: [{ rol_id: 'r-1' }] };
+        return { rows: [{ rol_id: 'r-1', codigo: 'ESPECIALISTA' }] };
       }
       if (sql.includes('FROM sigd_org.area')) {
         // Área existe y está vigente

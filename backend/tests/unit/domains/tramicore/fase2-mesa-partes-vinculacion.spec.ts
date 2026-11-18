@@ -41,13 +41,18 @@ describe('SIGD 2026 — FASE 2: Mesa Digital Pública, Persona sin Cuenta y Vinc
         mockQueries.push(sql);
         mockParams.push(params);
 
-        if (sql.includes('SELECT registro_version_id, estado_validacion')) {
+        if (sql.includes('sigd_doc.tupa_registro_version') || sql.includes('estado_validacion')) {
           return {
             rows: [{
               registro_version_id: 'a0000000-0000-0000-0000-000000000001',
               estado_validacion: 'APROBADO',
               vigencia_desde: null,
               vigencia_hasta: null,
+              id_procedimiento: 'p0000000-0000-0000-0000-000000000001',
+              codigo_ref: 'P01',
+              denominacion: 'Procedimiento Prueba',
+              genera_expediente: true,
+              activo: true,
             }],
           };
         }
@@ -79,7 +84,7 @@ describe('SIGD 2026 — FASE 2: Mesa Digital Pública, Persona sin Cuenta y Vinc
         if (sql.includes('SELECT MAX(folio_fin)')) {
           return { rows: [{ max_folio: 0 }] };
         }
-        if (sql.includes('costoOficial') || sql.includes('tupa_registro_version')) {
+        if (sql.includes('costoOficial')) {
           return { rows: [] };
         }
         return { rows: [] };
@@ -118,10 +123,10 @@ describe('SIGD 2026 — FASE 2: Mesa Digital Pública, Persona sin Cuenta y Vinc
       expect(insertExpQuery).toContain('id_usuario_creador');
       expect(insertExpQuery).toContain('NULL');
 
-      // Verificar que el asiento tiene canal MESA_PARTES_DIGITAL
+      // Verificar que el asiento tiene canal MESA_VIRTUAL (permitido por chk_asiento_canal)
       const insertAsientoQuery = mockQueries.find((q) => q.includes('INSERT INTO sigd_tra.asiento_registro'));
       expect(insertAsientoQuery).toBeDefined();
-      expect(insertAsientoQuery).toContain('MESA_PARTES_DIGITAL');
+      expect(insertAsientoQuery).toContain('MESA_VIRTUAL');
 
       // Verificar que NUNCA se intentó insertar en cuenta_usuario
       const insertCuenta = mockQueries.find((q) => q.includes('sigd_auth.cuenta_usuario'));

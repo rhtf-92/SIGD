@@ -1,7 +1,7 @@
 import React from 'react';
-import { MessageSquare } from 'lucide-react';
 import { useGuidedAssistant } from '../hooks/useGuidedAssistant';
 import { ChatbotPanel } from './ChatbotPanel';
+import chatbotImg from '../../../assets/sigd/chatbot-sm.webp';
 
 export const ChatbotWidget: React.FC = () => {
   const {
@@ -17,22 +17,32 @@ export const ChatbotWidget: React.FC = () => {
 
   return (
     <>
-      {/* Botón flotante accesible con identidad corporativa SIGD */}
+      {/* Botón flotante accesible con identidad gráfica oficial Chatbot.png */}
       {!isOpen && (
         <button
           type="button"
           onClick={toggleOpen}
           aria-expanded={isOpen}
           aria-label="¿Necesitas ayuda? Abrir asistente institucional"
-          className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 group flex items-center gap-2.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-full shadow-lg shadow-slate-900/25 border border-slate-700 transition-all duration-200 transform hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-300 min-h-[44px] min-w-[44px]"
+          title="Asistente SIGD"
+          className="fixed bottom-3 right-3 sm:bottom-3 sm:right-4 z-40 group flex items-center justify-center gap-2 bg-[#00478f] hover:bg-[#003875] text-white p-2 2xl:px-4 2xl:py-2.5 rounded-full shadow-lg shadow-blue-950/30 border border-sky-400/30 transition-all duration-200 transform hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-300 min-h-[44px] min-w-[44px]"
         >
-          <div className="relative">
-            <MessageSquare className="w-5 h-5 text-white" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 border-2 border-slate-900 rounded-full" />
+          <div className="relative shrink-0">
+            <img
+              src={chatbotImg}
+              alt=""
+              width={30}
+              height={30}
+              loading="lazy"
+              decoding="async"
+              className="w-7 h-7 rounded-full object-contain bg-white/10 p-0.5 aspect-square"
+            />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 border-2 border-[#00478f] rounded-full" />
           </div>
-          <span className="text-xs sm:text-sm font-semibold tracking-wide">
-            ¿Necesitas ayuda?
+          <span className="hidden 2xl:inline text-xs font-bold tracking-wide">
+            Asistente SIGD
           </span>
+          <span className="sr-only">¿Necesitas ayuda?</span>
         </button>
       )}
 

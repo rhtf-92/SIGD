@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { Pool } from 'pg';
 import { Argon2Service } from '../domains/identicore/argon2.service.js';
 
@@ -7,9 +8,11 @@ interface DemoAccountConfig {
   dni: string;
   nombres: string;
   apellidos: string;
-  rol: 'CIUDADANO' | 'MESA_PARTES' | 'ESPECIALISTA' | 'SECRETARIO' | 'DIRECTOR' | 'ADMINISTRADOR' | 'TESORERIA';
+  rol: 'CIUDADANO' | 'MESA_PARTES' | 'ESPECIALISTA' | 'SECRETARIO' | 'DIRECTOR' | 'ADMINISTRADOR' | 'TESORERIA' | 'SUPERADMINISTRADOR';
   areaCodigo: 'DIR' | 'SDA' | null;
   passwordEnvVar: string;
+  perfilOperativoCodigo?: 'GESTOR_AREA_ACADEMICA';
+  funcion?: string;
 }
 
 const CUENTAS_DEMO: DemoAccountConfig[] = [
@@ -83,6 +86,28 @@ const CUENTAS_DEMO: DemoAccountConfig[] = [
     areaCodigo: 'DIR',
     passwordEnvVar: 'LAB_TESORERIA_PASSWORD',
   },
+  {
+    usuario: 'superadmin_demo',
+    correo: 'superadmin.demo@iestp-suiza.edu.pe',
+    dni: '99000008',
+    nombres: 'Superadministrador',
+    apellidos: 'Gobierno Demo',
+    rol: 'SUPERADMINISTRADOR',
+    areaCodigo: 'DIR',
+    passwordEnvVar: 'LAB_SUPERADMINISTRADOR_PASSWORD',
+  },
+  {
+    usuario: 'responsable_ingles_demo',
+    correo: 'ingles.demo@iestp-suiza.edu.pe',
+    dni: '99000009',
+    nombres: 'Responsable',
+    apellidos: 'Inglés Demo',
+    rol: 'ESPECIALISTA',
+    areaCodigo: 'SDA',
+    passwordEnvVar: 'LAB_RESPONSABLE_INGLES_PASSWORD',
+    perfilOperativoCodigo: 'GESTOR_AREA_ACADEMICA',
+    funcion: 'RESPONSABLE_IDIOMAS',
+  },
 ];
 
 export async function ejecutarSeedLab(poolParam?: Pool): Promise<void> {
@@ -90,10 +115,14 @@ export async function ejecutarSeedLab(poolParam?: Pool): Promise<void> {
     throw new Error('FATAL: seed-lab cannot run in production environment.');
   }
 
-  // Validar presencia obligatoria de todas las contraseñas de las cuentas demo antes de proceder
+  // Validar presencia obligatoria de contraseñas de las cuentas demo antes de proceder
   for (const cuenta of CUENTAS_DEMO) {
     const password = process.env[cuenta.passwordEnvVar];
     if (!password || password.trim() === '') {
+      if (cuenta.usuario === 'superadmin_demo' || cuenta.usuario === 'responsable_ingles_demo') {
+        // Omisión controlada si no se define la variable (sin fallback a otras contraseñas)
+        continue;
+      }
       throw new Error(
         `Falta definir la variable de entorno obligatoria para la cuenta demo: ${cuenta.passwordEnvVar}`,
       );
@@ -119,7 +148,16 @@ export async function ejecutarSeedLab(poolParam?: Pool): Promise<void> {
 
   try {
     for (const cuenta of CUENTAS_DEMO) {
-      const password = process.env[cuenta.passwordEnvVar]!;
+      const password = process.env[cuenta.passwordEnvVar];
+      if (!password || password.trim() === '') {
+        if (cuenta.usuario === 'superadmin_demo' || cuenta.usuario === 'responsable_ingles_demo') {
+          console.log(`[SKIP] Cuenta ${cuenta.usuario} omitida: ${cuenta.passwordEnvVar} no configurada.`);
+          continue;
+        }
+        throw new Error(
+          `Falta definir la variable de entorno obligatoria para la cuenta demo: ${cuenta.passwordEnvVar}`,
+        );
+      }
 
       const passwordHash = await Argon2Service.hash(password, {
         type: 2,
@@ -210,6 +248,74 @@ export async function ejecutarSeedLab(poolParam?: Pool): Promise<void> {
            VALUES ($1::uuid, $2::uuid, $3::uuid, now())`,
           [idUsuario, rolId, areaId],
         );
+      }
+
+      // 7. Upsert vinculo_institucional para cuentas institucionales
+      if (cuenta.rol !== 'CIUDADANO') {
+        const tipoVinculoCodigo =
+          cuenta.rol === 'DIRECTOR'
+            ? 'DIRECTIVO'
+            : cuenta.rol === 'ESPECIALISTA' || cuenta.rol === 'SECRETARIO'
+              ? 'DOCENTE'
+              : 'ADMINISTRATIVO';
+        const tipoVincRes = await pool.query<{ id_tipo_vinculo: number }>(
+          `SELECT id_tipo_vinculo FROM sigd_auth.tipo_vinculo_institucional WHERE codigo = $1`,
+          [tipoVinculoCodigo],
+        );
+        if (tipoVincRes.rows[0]) {
+          const idTipoVinculo = tipoVincRes.rows[0].id_tipo_vinculo;
+          const vincExist = await pool.query<{ id_vinculo: string }>(
+            `SELECT id_vinculo FROM sigd_auth.vinculo_institucional
+              WHERE id_persona = $1::uuid AND id_tipo_vinculo = $2`,
+            [idPersona, idTipoVinculo],
+          );
+          if (!vincExist.rows[0]) {
+            await pool.query(
+              `INSERT INTO sigd_auth.vinculo_institucional (id_persona, id_tipo_vinculo, estado, vigente_desde)
+               VALUES ($1::uuid, $2, 'ACTIVO', now())`,
+              [idPersona, idTipoVinculo],
+            );
+          } else {
+            await pool.query(
+              `UPDATE sigd_auth.vinculo_institucional
+                  SET estado = 'ACTIVO', vigente_hasta = NULL
+                WHERE id_vinculo = $1::uuid`,
+              [vincExist.rows[0].id_vinculo],
+            );
+          }
+        }
+      }
+
+      // 8. Upsert perfil operativo institucional si está especificado
+      if (cuenta.perfilOperativoCodigo) {
+        const perfilRes = await pool.query<{ perfil_id: number }>(
+          `SELECT perfil_id FROM sigd_org.perfil_operativo WHERE codigo = $1`,
+          [cuenta.perfilOperativoCodigo],
+        );
+        if (perfilRes.rows[0]) {
+          const perfilId = perfilRes.rows[0].perfil_id;
+          const apoExist = await pool.query<{ id_asignacion_perfil: string }>(
+            `SELECT id_asignacion_perfil FROM sigd_org.asignacion_perfil_operativo
+              WHERE id_usuario = $1::uuid AND perfil_id = $2`,
+            [idUsuario, perfilId],
+          );
+          const alcanceJson = cuenta.funcion ? JSON.stringify({ funcion: cuenta.funcion }) : null;
+          if (!apoExist.rows[0]) {
+            await pool.query(
+              `INSERT INTO sigd_org.asignacion_perfil_operativo
+                 (id_usuario, perfil_id, area_id, scope, estado, alcance, vigente_desde)
+               VALUES ($1::uuid, $2, $3::uuid, 'AREA', 'ACTIVO', $4::jsonb, now())`,
+              [idUsuario, perfilId, areaId, alcanceJson],
+            );
+          } else {
+            await pool.query(
+              `UPDATE sigd_org.asignacion_perfil_operativo
+                  SET area_id = $1::uuid, estado = 'ACTIVO', vigente_hasta = NULL, alcance = $3::jsonb
+                WHERE id_asignacion_perfil = $2::uuid`,
+              [areaId, apoExist.rows[0].id_asignacion_perfil, alcanceJson],
+            );
+          }
+        }
       }
 
       console.log(

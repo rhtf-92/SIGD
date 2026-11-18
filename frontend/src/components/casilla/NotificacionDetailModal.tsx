@@ -83,8 +83,12 @@ export default function NotificacionDetailModal({
     try {
       if (tipo === 'documento') await casillaService.descargarDocumento(notificacion);
       else if (acuse) await casillaService.descargarAcuse(acuse);
-    } catch {
-      setErrorDescarga('El archivo todavía no está disponible para descarga.');
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error && err.message && !err.message.includes('status code')
+          ? err.message
+          : 'El archivo todavía no está disponible para descarga.';
+      setErrorDescarga(msg);
     }
   };
 

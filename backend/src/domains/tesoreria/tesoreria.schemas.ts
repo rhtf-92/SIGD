@@ -52,7 +52,7 @@ export const registrarPersonaPresencialSchema = z.object({
   if (data.tipoPersona === 'NATURAL') {
     if (data.tipoDocumento === 'RUC') return false;
     if (data.tipoDocumento === 'DNI' && !/^[0-9]{8}$/.test(data.numeroDocumento)) return false;
-    if (data.tipoDocumento === 'CE' && !/^[A-Za-z0-9]{9,12}$/.test(data.numeroDocumento)) return false;
+    if (data.tipoDocumento === 'CE' && !/^[A-Za-z0-9]{8,12}$/.test(data.numeroDocumento)) return false;
     return Boolean(data.nombres && data.apellidos);
   }
   if (data.tipoPersona === 'JURIDICA') {
@@ -62,7 +62,7 @@ export const registrarPersonaPresencialSchema = z.object({
   }
   return false;
 }, {
-  message: 'Inconsistencia en tipo de persona y documento: NATURAL solo acepta DNI (8 dígitos) o CE (9-12 caracteres); JURIDICA solo acepta RUC (11 dígitos) y requiere razón social.',
+  message: 'Inconsistencia en tipo de persona y documento: NATURAL solo acepta DNI (8 dígitos) o CE (8-12 caracteres); JURIDICA solo acepta RUC (11 dígitos) y requiere razón social.',
 });
 
 // ---------------------------------------------------------------------------

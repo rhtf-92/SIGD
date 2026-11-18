@@ -17,11 +17,11 @@ afterEach(() => {
 
 describe('primer login y redirect por rol', () => {
   it.each([
-    ['CIUDADANO', '/administracion', '/tramite'],
+    ['CIUDADANO', '/administracion', '/mesa-partes'],
     ['ADMINISTRADOR', '/administracion', '/administracion'],
     ['DIRECTOR', '/administracion', '/reportes/dashboard'],
     ['MESA_PARTES', '/tramite', '/tramite/ventanilla-presencial'],
-    ['CIUDADANO', null, '/tramite'],
+    ['CIUDADANO', null, '/mesa-partes'],
   ] as const)('%s desde %s termina en %s al primer intento', async (rol, origen, destino) => {
     const usuario: UsuarioPerfil = { id: '11111111-1111-4111-8111-111111111111', nombreCompleto: 'Persona Lab', correo: 'lab@example.test', rol };
     vi.spyOn(apiClient, 'post').mockResolvedValue({ data: { accessToken: 'jwt-lab', refreshToken: 'refresh-lab', usuario } });
@@ -29,6 +29,7 @@ describe('primer login y redirect por rol', () => {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/administracion" element={<ProtectedRoute requiredRoles={ROLES_ADMIN}><p>Destino administración</p></ProtectedRoute>} />
+        <Route path="/mesa-partes" element={<p>Destino mesa de partes</p>} />
         <Route path="/tramite" element={<ProtectedRoute requiredRoles={ROLES_CIUDADANO}><p>Destino trámite</p></ProtectedRoute>} />
         <Route path="/tramite/ventanilla-presencial" element={<ProtectedRoute requiredRoles={ROLES_VENTANILLA}><p>Destino ventanilla</p></ProtectedRoute>} />
         <Route path="/reportes/dashboard" element={<ProtectedRoute requiredRoles={ROLES_REPORTES}><p>Destino reportes</p></ProtectedRoute>} />
@@ -39,7 +40,7 @@ describe('primer login y redirect por rol', () => {
     await actor.type(screen.getByLabelText(/Usuario o correo/i), 'lab@example.test');
     await actor.type(screen.getByLabelText(/Contraseña/i), 'clave-lab');
     await actor.click(screen.getByRole('button', { name: /Ingresar al sistema/i }));
-    await waitFor(() => expect(screen.getByText(`Destino ${destino === '/administracion' ? 'administración' : destino === '/tramite' ? 'trámite' : destino === '/reportes/dashboard' ? 'reportes' : 'ventanilla'}`)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(`Destino ${destino === '/administracion' ? 'administración' : destino === '/mesa-partes' ? 'mesa de partes' : destino === '/reportes/dashboard' ? 'reportes' : 'ventanilla'}`)).toBeInTheDocument());
     expect(screen.queryByText('Acceso denegado')).not.toBeInTheDocument();
     expect(useAuthStore.getState().usuario?.rol).toBe(rol);
   });

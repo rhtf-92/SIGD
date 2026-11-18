@@ -88,10 +88,23 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
 
     // Verificación de mensaje de error inline emitido por el schema Zod
     const mensajeError = await screen.findByText(
-      /DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos/i,
+      /Documento inválido: DNI requiere 8 dígitos; Carné de Extranjería requiere entre 8 y 12 caracteres alfanuméricos/i,
     );
     expect(mensajeError).toBeInTheDocument();
     expect(handleSubmit).not.toHaveBeenCalled();
+
+    // Verificación de comportamiento con Carné de Extranjería (CE): formato válido 8-12 caracteres
+    const selectTipoDoc = screen.getByLabelText(/Tipo de Documento/i);
+    await user.selectOptions(selectTipoDoc, "CE");
+    await user.clear(inputDni);
+    await user.type(inputDni, "001234567"); // 9 caracteres oficiales de CE
+    await user.tab();
+
+    expect(
+      screen.queryByText(
+        /Documento inválido: DNI requiere 8 dígitos; Carné de Extranjería requiere entre 8 y 12 caracteres alfanuméricos/i,
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it("c) PersonaNaturalForm: un celular que no inicia en 9 muestra error inline", async () => {

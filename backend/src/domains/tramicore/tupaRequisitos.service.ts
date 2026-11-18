@@ -911,6 +911,18 @@ export class TupaRequisitosService {
       evidenciasPorReq.set(r.id_requisito, arr);
     }
 
+    // Consulta autoritativa de pagos confirmados para requisitos financieros del expediente
+    let pagoInstitucionalValido = false;
+    try {
+      const resPagos = await db.query<{ estado: string }>(
+        `SELECT estado FROM sigd_tra.orden_pago WHERE expediente_id = $1::uuid AND estado IN ('CONFIRMADO', 'PAGADO') LIMIT 1`,
+        [expedienteId],
+      );
+      pagoInstitucionalValido = resPagos.rows.length > 0;
+    } catch {
+      pagoInstitucionalValido = false;
+    }
+
     let satisfechos = 0;
     let pendientes = 0;
     let observados = 0;
@@ -942,11 +954,19 @@ export class TupaRequisitosService {
 
       requisitosAplicables += 1;
 
-      // Determinar estado a partir de la última evidencia
+      // Determinar estado a partir de pago institucional válido para FINANCIERO o de la última evidencia
       let estado: EstadoValidacionRequisito = 'PENDIENTE';
       let cumplido = false;
 
-      if (evids.length > 0) {
+      // Requisito FINANCIERO: derivar autoritativamente si existe pago institucional confirmado/pagado
+      const tienePagoEnEvidencias = evids.some(
+        (e) => e.ordenPago && (e.ordenPago.estado === 'CONFIRMADO' || e.ordenPago.estado === 'PAGADO'),
+      );
+      if (req.tipoRequisito === 'FINANCIERO' && (pagoInstitucionalValido || tienePagoEnEvidencias)) {
+        estado = 'VALIDADO';
+        cumplido = true;
+        satisfechos += 1;
+      } else if (evids.length > 0) {
         const ultimaEvid = evids[evids.length - 1];
         estado = ultimaEvid.estadoValidacion;
         if (estado === 'VALIDADO' || estado === 'PRESENTADO' || estado === 'SUBSANADO') {

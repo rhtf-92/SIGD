@@ -1,1 +1,43 @@
 @import "tailwindcss";
+@import "./styles/theme.css";
+@import "./styles/homeMockup.css";
+
+:root {
+  --suiza-primary: #006EC7;
+  --suiza-secondary: #E6007E;
+  --suiza-accent: #F9E000;
+
+  --surface-page: #F8FAFC;
+  --surface-card: #FFFFFF;
+  --border-default: #E2E8F0;
+
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+
+  --success: #047857;
+  --warning: #B45309;
+  --danger: #D62828;
+
+  --font-sans: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+@theme {
+  --color-suiza-primary: #006EC7;
+  --color-suiza-secondary: #E6007E;
+  --color-suiza-accent: #F9E000;
+
+  --color-surface-page: #F8FAFC;
+  --color-surface-card: #FFFFFF;
+  --color-border-default: #E2E8F0;
+
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748B;
+
+  --color-success: #047857;
+  --color-warning: #B45309;
+  --color-danger: #D62828;
+
+  --font-sans: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}

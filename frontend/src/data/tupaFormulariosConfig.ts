@@ -175,8 +175,9 @@ function generarCamposPorTipo(tipo: TipoFormularioTupa, item: ItemTupaOficial): 
           nombre: 'numeroComprobante',
           etiqueta: 'N° Comprobante de Pago (Tesorería / Banco)',
           tipo: 'text',
-          obligatorio: item.monto !== 'Gratuito' && item.monto !== '0',
-          placeholder: 'Ej. OP-98765432',
+          obligatorio: false,
+          placeholder: 'Opcional (Ej. OP-98765432)',
+          ayuda: 'Opcional. Si ya realizó el pago en Tesorería ingrese el número; de lo contrario, se liquidará en caja.',
         },
         {
           nombre: 'observacionesAcademicas',
@@ -216,8 +217,9 @@ function generarCamposPorTipo(tipo: TipoFormularioTupa, item: ItemTupaOficial): 
           nombre: 'numeroComprobante',
           etiqueta: 'Número de Comprobante de Pago',
           tipo: 'text',
-          obligatorio: item.monto !== 'Gratuito' && item.monto !== '0',
-          placeholder: 'Ej. REC-2026-00452',
+          obligatorio: false,
+          placeholder: 'Opcional (Ej. REC-2026-00452)',
+          ayuda: 'Opcional. Se validará con Tesorería tras el registro de la solicitud.',
         },
         {
           nombre: 'asuntoPetitorio',

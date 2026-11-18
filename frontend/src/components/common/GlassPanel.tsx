@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { ArrowRight, ExternalLink } from "lucide-react";
 
 /* ========================================================================= */
-/* 1. GlassPanel — Contenedor Principal de Liquid Glass                      */
+/* @deprecated LEGACY VISUAL — Mantener temporalmente sin romper páginas      */
+/* antiguas. La norma institucional oficial para nuevas vistas es Card.tsx   */
 /* ========================================================================= */
 
 export interface GlassPanelProps extends HTMLAttributes<HTMLDivElement> {

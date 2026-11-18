@@ -38,6 +38,12 @@ export type AccionPermiso =
   | 'PAGO_REGISTRAR'
   | 'TUPA_GESTIONAR'
   | 'TUPA_ACTIVAR'
+  | 'TUPA_PUBLICAR'
+  | 'ROLES_GESTIONAR'
+  | 'PERMISOS_GESTIONAR'
+  | 'PERFILES_GESTIONAR'
+  | 'CONFIGURACION_GLOBAL_GESTIONAR'
+  | 'AUDITORIA_GLOBAL_VER'
   | 'FIRMA_FIRMAR'
   | 'ADMIN_USUARIOS'
   | 'REPORTE_LEER'
@@ -216,3 +222,40 @@ export const revocarAsignacionPerfilSchema = z.object({
 export const anularAsignacionPerfilSchema = z.object({
   motivoAnulacion: z.string().min(1, 'El motivo de anulación es obligatorio').max(255),
 });
+
+/**
+ * Permisos canónicos de solo consulta documental que NO otorgan capacidad de recepción operativa.
+ */
+export const PERMISOS_CONSULTA_RUTADOC: readonly AccionPermiso[] = [
+  'EXPEDIENTE_VER',
+] as const;
+
+/**
+ * Permisos canónicos mínimos que facultan operativamente a un funcionario para recibir y/o atender
+ * expedientes en una unidad orgánica (capacidad real de receptor operativo en RutaDoc).
+ */
+export const PERMISOS_OPERATIVOS_RECEPTOR_RUTADOC: readonly AccionPermiso[] = [
+  'EXPEDIENTE_RECIBIR',
+  'EXPEDIENTE_ATENDER',
+] as const;
+
+/**
+ * Roles funcionales canónicos que facultan operativamente la gestión de recepción y despacho
+ * de expedientes en una unidad orgánica (o a nivel directivo/institucional).
+ *
+ * NOTA DE SEGURIDAD Y GOBIERNO (Fase C0.1B):
+ * Ni SUPERADMINISTRADOR ni ADMINISTRADOR pertenecen a esta lista.
+ * Los roles de gobierno técnico o administración no convierten por sí solos un área en enrutable.
+ */
+export const ROLES_OPERATIVOS_RECEPTOR_RUTADOC = [
+  'DIRECTOR',
+  'SECRETARIO',
+  'ESPECIALISTA',
+  'MESA_PARTES',
+] as const;
+export type RolOperativoReceptorRutaDoc = (typeof ROLES_OPERATIVOS_RECEPTOR_RUTADOC)[number];
+
+// Alias canónicos para compatibilidad hacia atrás
+export const PERMISOS_OPERATIVOS_RUTADOC = PERMISOS_OPERATIVOS_RECEPTOR_RUTADOC;
+export const ROLES_OPERATIVOS_RUTADOC = ROLES_OPERATIVOS_RECEPTOR_RUTADOC;
+export type RolOperativoRutaDoc = RolOperativoReceptorRutaDoc;

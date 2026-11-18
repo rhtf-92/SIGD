@@ -220,9 +220,9 @@ export class AuthorizationService {
     }
 
     // 4. REGLA: PODER TÉCNICO ≠ AUTORIDAD SUSTANTIVA DE NEGOCIO
-    // ADMINISTRADOR_SIGD no puede por defecto resolver expedientes ni autorizar devoluciones
+    // ADMINISTRADOR y SUPERADMINISTRADOR poseen control técnico y no confieren facultades de resolución sustantiva ni aprobación de negocio
     const esSoloAdminTecnico =
-      contexto.rolesCanonicos.includes('ADMINISTRADOR') &&
+      (contexto.rolesCanonicos.includes('ADMINISTRADOR') || contexto.rolesCanonicos.includes('SUPERADMINISTRADOR')) &&
       !contexto.rolesCanonicos.some((r) => ['DIRECTOR', 'MESA_PARTES', 'TESORERIA'].includes(r)) &&
       !contexto.perfilesOperativos.some((p) =>
         ['APROBADOR_DIRECCION', 'GESTOR_RECEPCION_DOCUMENTAL', 'GESTOR_TESORERIA', 'AUTORIZADOR_DEVOLUCION'].includes(
@@ -242,7 +242,7 @@ export class AuthorizationService {
         autorizado: false,
         codigoDenegacion: 'PODER_TECNICO_SIN_AUTORIDAD_NEGOCIO',
         motivoInterno:
-          'El perfil ADMINISTRADOR_SIGD posee control técnico y no confiere facultades de resolución sustantiva ni aprobación de negocio.',
+          'Los roles de administración técnica (ADMINISTRADOR / SUPERADMINISTRADOR) poseen control técnico y no confieren facultades de resolución sustantiva ni aprobación de negocio.',
       };
     }
 
@@ -394,6 +394,28 @@ export class AuthorizationService {
     recurso: SolicitudAutorizacion['recurso'],
     contexto: ContextoAutorizacion,
   ): Promise<ResultadoAutorizacion> {
+    // SUPERADMINISTRADOR: gobierno técnico global, seguridad, roles, permisos y publicación controlada TUPA
+    if (roles.includes('SUPERADMINISTRADOR')) {
+      const accionesSuperAdminPermitidas: AccionPermiso[] = [
+        'ROLES_GESTIONAR',
+        'PERMISOS_GESTIONAR',
+        'PERFILES_GESTIONAR',
+        'CONFIGURACION_GLOBAL_GESTIONAR',
+        'AUDITORIA_GLOBAL_VER',
+        'TUPA_PUBLICAR',
+        'TUPA_GESTIONAR',
+        'CUENTA_GESTIONAR',
+        'ADMIN_USUARIOS',
+        'ORGANIZACION_GESTIONAR',
+        'EXPEDIENTE_VER',
+        'REPORTE_LEER',
+        'PAGO_VER',
+      ];
+      if (accionesSuperAdminPermitidas.includes(accion)) {
+        return { autorizado: true, perfilAplicado: 'RBAC_BRIDGE:SUPERADMINISTRADOR', scopeAplicado: 'GLOBAL_TECNICO' };
+      }
+    }
+
     // ADMINISTRADOR: gestión técnica y administrativa (ORGANIZACION_GESTIONAR requiere perfil ADMINISTRADOR_SIGD)
     if (roles.includes('ADMINISTRADOR')) {
       const accionesAdminPermitidas: AccionPermiso[] = [
@@ -402,6 +424,7 @@ export class AuthorizationService {
         'EXPEDIENTE_VER',
         'REPORTE_LEER',
         'PAGO_VER',
+        'TUPA_GESTIONAR',
       ];
       if (accionesAdminPermitidas.includes(accion)) {
         return { autorizado: true, perfilAplicado: 'RBAC_BRIDGE:ADMINISTRADOR', scopeAplicado: 'GLOBAL_TECNICO' };

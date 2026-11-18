@@ -1,1 +1,0 @@
-export { default as VentanillaPresencialPage, default } from './tramite/VentanillaPresencialPage';

@@ -329,6 +329,15 @@ export class VinculacionHistoricaService {
               AND id_usuario_creador IS NULL`,
           [solicitud.expediente_id, solicitud.id_usuario],
         );
+
+        // Asociar usuario en notificaciones históricas de este expediente que carecían de usuario_id
+        await cliente.query(
+          `UPDATE sigd_auth.notificacion_casilla
+              SET usuario_id = $2::uuid
+            WHERE cut = (SELECT codigo_expediente FROM sigd_tra.expediente WHERE expediente_id = $1::uuid)
+              AND usuario_id IS NULL`,
+          [solicitud.expediente_id, solicitud.id_usuario],
+        );
       } else {
         if (!input.motivoRechazo || input.motivoRechazo.trim().length === 0) {
           throw new ValidationError({

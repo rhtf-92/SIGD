@@ -3,21 +3,27 @@ import type { ModalAccionProps, ResultadoAtencion, SolicitudAtencion } from "../
 import { useFormularioExpediente } from "../../hooks/useFormularioExpediente";
 import AccionModal from "./AccionModal";
 
-export type AtencionModalProps = ModalAccionProps<SolicitudAtencion, ResultadoAtencion>;
+export interface AtencionModalProps extends ModalAccionProps<SolicitudAtencion, ResultadoAtencion> {
+  esIntermediaTecnica?: boolean;
+}
 
 export default function AtencionModal(props: AtencionModalProps) {
   return props.open ? <FormularioAtencion key={props.expediente.id} {...props} /> : null;
 }
 
-function FormularioAtencion({ expediente, accion, onClose }: AtencionModalProps) {
+function FormularioAtencion({ expediente, accion, onClose, esIntermediaTecnica }: AtencionModalProps) {
   const id = useId();
   const [resumen, setResumen] = useState(
-    "Se declara PROCEDENTE la atención de la solicitud y se emite la certificación correspondiente conforme al cumplimiento cabal de los requisitos académicos normados por el IESTP Suiza."
+    esIntermediaTecnica
+      ? "Se declara PROCEDENTE la atención técnica de la solicitud tras verificación curricular conforme en actas institucionales."
+      : "Se declara PROCEDENTE la atención de la solicitud y se emite la certificación correspondiente conforme al cumplimiento cabal de los requisitos académicos normados por el IESTP Suiza."
   );
   const [observacionInterna, setObservacionInterna] = useState(
-    "Verificación curricular conforme en actas institucionales. Certificado emitido y suscrito digitalmente."
+    esIntermediaTecnica
+      ? "Evaluación técnica conforme. Cumple requisitos del TUPA."
+      : "Verificación curricular conforme en actas institucionales. Certificado emitido y suscrito digitalmente."
   );
-  const [adjuntarPdf, setAdjuntarPdf] = useState(true);
+  const [adjuntarPdf, setAdjuntarPdf] = useState(!esIntermediaTecnica);
   const [confirmado, setConfirmado] = useState(false);
   const [intento, setIntento] = useState(false);
 
@@ -73,22 +79,30 @@ function FormularioAtencion({ expediente, accion, onClose }: AtencionModalProps)
 
   return (
     <AccionModal
-      titulo="Atender y Resolver Expediente"
-      descripcion={`Expediente ${expediente.codigo}. Emisión del acto administrativo resolutivo y notificación a Casilla Electrónica.`}
+      titulo={esIntermediaTecnica ? "Registrar Atención y Dictamen Técnico" : "Atender y Resolver Expediente"}
+      descripcion={
+        esIntermediaTecnica
+          ? `Expediente ${expediente.codigo}. Registro del dictamen técnico para posterior elevación a Despacho de Dirección.`
+          : `Expediente ${expediente.codigo}. Emisión del acto administrativo resolutivo y notificación a Casilla Electrónica.`
+      }
       pending={formulario.pending}
       onClose={cerrar}
     >
       <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-900 mb-4">
         <p className="font-semibold mb-1">Efecto Procesal e Institucional:</p>
         <p>
-          Al confirmar la atención, el expediente transicionará a <strong>RESUELTO</strong>. Se notificará fehacientemente al administrado en su <strong>Casilla Electrónica</strong> y se pondrá a su disposición el documento resolutivo emitido.
+          {esIntermediaTecnica
+            ? "Al confirmar la atención técnica, se registrará formalmente el dictamen técnico en el workflow del expediente. El expediente permanecerá en su área para su elevación a Despacho de Dirección con la acción 'Enviar a Firma'."
+            : "Al confirmar la atención, el expediente transicionará a RESUELTO. Se notificará fehacientemente al administrado en su Casilla Electrónica y se pondrá a su disposición el documento resolutivo emitido."}
         </p>
       </div>
 
       <form noValidate onSubmit={enviar} className="space-y-4">
         <div className="m03-field">
           <label htmlFor={`${id}-resumen`} className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-            Resumen del Acto Resolutivo / Dictamen de Atención (obligatorio)
+            {esIntermediaTecnica
+              ? "Dictamen / Informe de Atención Técnica (obligatorio)"
+              : "Resumen del Acto Resolutivo / Dictamen de Atención (obligatorio)"}
           </label>
           <textarea
             id={`${id}-resumen`}
@@ -123,23 +137,25 @@ function FormularioAtencion({ expediente, accion, onClose }: AtencionModalProps)
           />
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
-          <label className="flex items-start gap-2.5 cursor-pointer text-xs font-semibold text-slate-800">
-            <input
-              type="checkbox"
-              checked={adjuntarPdf}
-              onChange={(e) => setAdjuntarPdf(e.target.checked)}
-              disabled={formulario.pending}
-              className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-            />
-            <span>Adjuntar y emitir Documento Resolutivo Oficial (PDF firmado digitalmente)</span>
-          </label>
-          {adjuntarPdf && (
-            <p className="text-[11px] text-slate-600 pl-6">
-              Archivo: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-800">Resolucion_{expediente.codigo || "SDA"}.pdf</code> · Formato PDF/A-1b con metadatos de integridad.
-            </p>
-          )}
-        </div>
+        {!esIntermediaTecnica && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+            <label className="flex items-start gap-2.5 cursor-pointer text-xs font-semibold text-slate-800">
+              <input
+                type="checkbox"
+                checked={adjuntarPdf}
+                onChange={(e) => setAdjuntarPdf(e.target.checked)}
+                disabled={formulario.pending}
+                className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>Adjuntar y emitir Documento Resolutivo Oficial (PDF firmado digitalmente)</span>
+            </label>
+            {adjuntarPdf && (
+              <p className="text-[11px] text-slate-600 pl-6">
+                Archivo: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-800">Resolucion_{expediente.codigo || "SDA"}.pdf</code> · Formato PDF/A-1b con metadatos de integridad.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="pt-2">
           <label className="flex items-start gap-2.5 cursor-pointer text-xs font-medium text-slate-900" htmlFor={`${id}-confirmacion`}>
@@ -153,7 +169,9 @@ function FormularioAtencion({ expediente, accion, onClose }: AtencionModalProps)
               className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
             />
             <span>
-              Confirmo la emisión formal del acto administrativo y su remisión inmediata a la Casilla Electrónica del administrado.
+              {esIntermediaTecnica
+                ? "Confirmo que he evaluado técnicamente la solicitud y el cumplimiento de requisitos académicos, emitiendo dictamen procedente para posterior elevación a Dirección."
+                : "Confirmo la emisión formal del acto administrativo y su remisión inmediata a la Casilla Electrónica del administrado."}
             </span>
           </label>
           {intento && !confirmado && (
@@ -183,7 +201,11 @@ function FormularioAtencion({ expediente, accion, onClose }: AtencionModalProps)
             className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800 transition shadow-sm disabled:opacity-50"
             disabled={formulario.pending || !accion.disponible}
           >
-            {formulario.pending ? "Emitiendo atención..." : "Emitir Resolución y Notificar"}
+            {formulario.pending
+              ? "Registrando..."
+              : esIntermediaTecnica
+                ? "Confirmar Dictamen Técnico"
+                : "Emitir Resolución y Notificar"}
           </button>
         </div>
       </form>

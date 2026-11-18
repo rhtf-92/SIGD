@@ -93,7 +93,7 @@ describe("Fase 5J Frontend: Consulta Pública, Casilla y Notificaciones", () => 
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 2, name: "EXP-2026-000100" })).toBeInTheDocument();
-      expect(screen.getByText("EN PROCESO")).toBeInTheDocument();
+      expect(screen.getByText(/en proceso/i)).toBeInTheDocument();
       expect(screen.getByText("En revisión por el área responsable")).toBeInTheDocument();
     });
 

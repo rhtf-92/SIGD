@@ -27,6 +27,17 @@ export interface AsignarExpedienteInput {
   asignadoPorUsuarioId: string;
 }
 
+export interface CandidatoAsignacionDTO {
+  idUsuario: string;
+  idPersona: string;
+  usuario: string;
+  nombreCompleto: string;
+  rolCodigo: string;
+  perfilCodigo: string | null;
+  alcance: any;
+  esPrioritario: boolean;
+}
+
 export class ExpedienteAsignacionService {
   constructor(private readonly pool: Pool) {}
 
@@ -65,8 +76,8 @@ export class ExpedienteAsignacionService {
     }
 
     // 2. Validar que la persona existe
-    const resPersona = await db.query<{ id_persona: string; estado: string }>(
-      `SELECT id_persona, estado FROM sigd_auth.persona WHERE id_persona = $1::uuid`,
+    const resPersona = await db.query<{ id_persona: string }>(
+      `SELECT id_persona FROM sigd_auth.persona WHERE id_persona = $1::uuid`,
       [input.idPersona],
     );
     if (resPersona.rows.length === 0) {
@@ -82,7 +93,10 @@ export class ExpedienteAsignacionService {
       throw new NotFoundError({ message: 'La cuenta de usuario indicada no existe.' });
     }
     if (!resCuenta.rows[0].activo) {
-      throw new ForbiddenError({ detail: 'La cuenta del funcionario se encuentra deshabilitada (FAIL-CLOSED).' });
+      throw new ForbiddenError({
+        message: 'La cuenta del funcionario se encuentra deshabilitada (FAIL-CLOSED).',
+        detail: 'La cuenta del funcionario se encuentra deshabilitada (FAIL-CLOSED).',
+      });
     }
     if (resCuenta.rows[0].id_persona !== input.idPersona) {
       throw new ValidationError({ message: 'La cuenta de usuario no corresponde a la persona indicada.' });
@@ -100,7 +114,10 @@ export class ExpedienteAsignacionService {
       [input.idPersona],
     );
     if (resVinculo.rows.length === 0) {
-      throw new ForbiddenError({ detail: 'El funcionario no cuenta con un vínculo institucional vigente.' });
+      throw new ForbiddenError({
+        message: 'El funcionario no cuenta con un vínculo institucional vigente.',
+        detail: 'El funcionario no cuenta con un vínculo institucional vigente.',
+      });
     }
 
     // 5. Validar que el funcionario pertenezca o tenga perfil/responsabilidad en el área actual del expediente
@@ -109,10 +126,10 @@ export class ExpedienteAsignacionService {
         EXISTS (
           SELECT 1 FROM sigd_org.asignacion_personal ap
            WHERE ap.id_persona = $1::uuid
-             AND ap.id_area = $2::uuid
+             AND ap.area_id = $2::uuid
              AND ap.estado = 'ACTIVO'
-             AND ap.fecha_inicio <= CURRENT_DATE
-             AND (ap.fecha_fin IS NULL OR ap.fecha_fin >= CURRENT_DATE)
+             AND ap.vigente_desde <= now()
+             AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
         ) OR EXISTS (
           SELECT 1 FROM sigd_org.asignacion_perfil_operativo apo
            WHERE apo.id_usuario = $3::uuid
@@ -122,11 +139,17 @@ export class ExpedienteAsignacionService {
              AND (apo.vigente_hasta IS NULL OR apo.vigente_hasta > now())
         ) OR EXISTS (
           SELECT 1 FROM sigd_org.responsabilidad_temporal rt
-           WHERE rt.id_persona = $1::uuid
-             AND rt.id_area = $2::uuid
+           WHERE (rt.id_persona = $1::uuid OR rt.id_usuario = $3::uuid)
+             AND rt.area_id = $2::uuid
              AND rt.estado = 'ACTIVO'
-             AND rt.fecha_inicio <= CURRENT_DATE
-             AND (rt.fecha_fin IS NULL OR rt.fecha_fin >= CURRENT_DATE)
+             AND rt.vigente_desde <= now()
+             AND (rt.vigente_hasta IS NULL OR rt.vigente_hasta > now())
+        ) OR EXISTS (
+          SELECT 1 FROM sigd_org.usuario_rol ur
+           WHERE ur.id_usuario = $3::uuid
+             AND ur.area_id = $2::uuid
+             AND ur.vigente_desde <= now()
+             AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         )
       ) AS valida`,
       [input.idPersona, areaActualId, input.idUsuario],
@@ -134,6 +157,7 @@ export class ExpedienteAsignacionService {
 
     if (!resPertenenciaArea.rows[0]?.valida) {
       throw new ForbiddenError({
+        message: `ASIGNACION_NO_VIGENTE: El funcionario no cuenta con asignación laboral, perfil operativo ni responsabilidad activa en el área ${areaActualId}.`,
         detail: `ASIGNACION_NO_VIGENTE: El funcionario no cuenta con asignación laboral, perfil operativo ni responsabilidad activa en el área ${areaActualId}.`,
       });
     }
@@ -356,5 +380,103 @@ export class ExpedienteAsignacionService {
       motivoDesasignacion: r.motivo_desasignacion,
       areaNombre: r.area_nombre,
     }));
+  }
+
+  /**
+   * Lista funcionarios activos del área actual del expediente elegibles para asignación,
+   * ordenando y priorizando según el perfil operativo requerido por el procedimiento TUPA.
+   */
+  async listarCandidatosAsignacion(
+    expedienteId: string,
+    clienteParam?: PoolClient | Pool,
+  ): Promise<CandidatoAsignacionDTO[]> {
+    const db = clienteParam ?? this.pool;
+
+    const resExp = await db.query<{
+      area_actual_id: string | null;
+      perfil_requerido_codigo: string | null;
+    }>(
+      `SELECT
+         COALESCE(u.area_actual_id, e.area_destino_id::text) AS area_actual_id,
+         po.codigo AS perfil_requerido_codigo
+       FROM sigd_tra.expediente e
+       LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
+       LEFT JOIN sigd_doc.expediente_tupa_vinculo v ON v.expediente_id = e.expediente_id AND v.reemplaza_vinculo_id IS NULL
+       LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = v.registro_version_id
+       LEFT JOIN sigd_org.perfil_operativo po ON po.perfil_id = tp.perfil_responsable_id
+       WHERE e.expediente_id = $1::uuid
+       ORDER BY v.vinculado_en DESC NULLS LAST
+       LIMIT 1`,
+      [expedienteId],
+    );
+
+    if (resExp.rows.length === 0 || !resExp.rows[0].area_actual_id) {
+      return [];
+    }
+
+    const { area_actual_id: areaId, perfil_requerido_codigo: perfilRequeridoCodigo } = resExp.rows[0];
+
+    const { rows } = await db.query<{
+      id_usuario: string;
+      id_persona: string;
+      usuario: string;
+      nombre_completo: string;
+      rol_codigo: string;
+      perfil_codigo: string | null;
+      alcance: any;
+    }>(
+      `SELECT DISTINCT
+         cu.id_usuario,
+         cu.id_persona,
+         cu.usuario,
+         pn.nombre_completo,
+         rs.codigo AS rol_codigo,
+         po.codigo AS perfil_codigo,
+         apo.alcance
+       FROM sigd_auth.cuenta_usuario cu
+       JOIN sigd_auth.persona p ON p.id_persona = cu.id_persona
+       JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+       JOIN sigd_auth.vinculo_institucional vi ON vi.id_persona = p.id_persona AND vi.estado = 'ACTIVO'
+       LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = cu.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+       LEFT JOIN sigd_org.rol_sistema rs ON rs.rol_id = ur.rol_id
+       LEFT JOIN sigd_org.asignacion_perfil_operativo apo ON apo.id_usuario = cu.id_usuario AND apo.estado = 'ACTIVO'
+       LEFT JOIN sigd_org.perfil_operativo po ON po.perfil_id = apo.perfil_id
+       WHERE cu.activo = true
+         AND (
+           ur.area_id = $1::uuid
+           OR apo.area_id = $1::uuid
+           OR EXISTS (
+             SELECT 1 FROM sigd_org.asignacion_personal ap
+              WHERE ap.id_persona = cu.id_persona
+                AND ap.area_id = $1::uuid
+                AND ap.estado = 'ACTIVO'
+                AND ap.vigente_desde <= now()
+                AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
+           )
+         )
+         AND rs.codigo IN ('ESPECIALISTA', 'SECRETARIO')
+       ORDER BY cu.usuario ASC`,
+      [areaId],
+    );
+
+    return rows.map((r) => {
+      const coincidePerfil = Boolean(perfilRequeridoCodigo && r.perfil_codigo === perfilRequeridoCodigo);
+      return {
+        idUsuario: r.id_usuario,
+        idPersona: r.id_persona,
+        usuario: r.usuario,
+        nombreCompleto: r.nombre_completo,
+        rolCodigo: r.rol_codigo,
+        perfilCodigo: r.perfil_codigo,
+        alcance: r.alcance,
+        esPrioritario: coincidePerfil,
+      };
+    }).sort((a, b) => {
+      if (a.esPrioritario && !b.esPrioritario) return -1;
+      if (!a.esPrioritario && b.esPrioritario) return 1;
+      if (a.rolCodigo === 'ESPECIALISTA' && b.rolCodigo !== 'ESPECIALISTA') return -1;
+      if (a.rolCodigo !== 'ESPECIALISTA' && b.rolCodigo === 'ESPECIALISTA') return 1;
+      return a.nombreCompleto.localeCompare(b.nombreCompleto);
+    });
   }
 }

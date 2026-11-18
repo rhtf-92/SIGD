@@ -41,5 +41,19 @@ export function serializeError(error: unknown): ErrorSerializado {
     return { ...mapeo, invalidParams: [] };
   }
 
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    (('type' in error && (error as any).type === 'entity.too.large') ||
+      ('status' in error && (error as any).status === 413))
+  ) {
+    return {
+      status: 413,
+      code: 'PAYLOAD_TOO_LARGE',
+      detail: 'El archivo o solicitud excede el tamaño máximo permitido por el servidor (50 MB).',
+      invalidParams: [],
+    };
+  }
+
   return INTERNO;
 }

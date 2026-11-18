@@ -95,6 +95,9 @@ export class DestinoCasilla implements DestinoNotificacion {
       ?? (typeof datosEsp.codigo_expediente === 'string' ? datosEsp.codigo_expediente : null)
       ?? (typeof identidad.codigo_expediente === 'string' ? identidad.codigo_expediente : null);
 
+    const expedienteId = (typeof payload.expediente_id === 'string' ? payload.expediente_id : null)
+      ?? (typeof identidad.expediente_id === 'string' ? identidad.expediente_id : null);
+
     let personaId = (typeof payload.persona_id === 'string' ? payload.persona_id : null)
       ?? (typeof payload.solicitante_id === 'string' ? payload.solicitante_id : null)
       ?? (typeof datosEsp.persona_id === 'string' ? datosEsp.persona_id : null)
@@ -103,18 +106,76 @@ export class DestinoCasilla implements DestinoNotificacion {
     let usuarioId = (typeof payload.usuario_id === 'string' ? payload.usuario_id : null)
       ?? (typeof identidad.usuario_id === 'string' ? identidad.usuario_id : null);
 
-    const correo = typeof payload.correo_destinatario === 'string' ? payload.correo_destinatario : null;
+    let correo = typeof payload.correo_destinatario === 'string' ? payload.correo_destinatario : null;
 
     // Validación fail-closed de evento notificable (Sección 13 y 14 / TC-5K-14)
     // Para un evento que ES notificable pero carece de destinatario resoluble: lanzar error para dead-letter/retry
-    if (!correo && !usuarioId && !personaId && !cut) {
+    if (!correo && !usuarioId && !personaId && !cut && !expedienteId) {
       throw new Error(
         `[DestinoCasilla] Evento notificable '${evento.tipo_evento}' (${evento.id_evento}) carece de destinatario resoluble (cut, persona_id, usuario_id o correo).`,
       );
     }
 
-    // Resolución de usuario_id activo si la persona tiene cuenta (Sección 8, 9, 10 / TC-5K-06, TC-5K-07)
-    if (personaId && !usuarioId) {
+    // Resolución de usuario_id para Casilla Electrónica:
+    // Para expedientes sin cuenta verificada, NO vincular automáticamente una casilla por coincidencia de DNI.
+    // Solo asignar usuario_id si:
+    // a) El expediente fue creado formalmente por esa cuenta autenticada (id_usuario_creador), O
+    // b) Existe una solicitud de vinculación formal APROBADA en sigd_tra.solicitud_vinculacion_expediente.
+    if (!usuarioId && (expedienteId || cut)) {
+      try {
+        const resExp = await this.pool.query<{
+          expediente_id: string;
+          id_usuario_creador: string | null;
+          solicitante_id: string;
+        }>(
+          `SELECT expediente_id, id_usuario_creador, solicitante_id
+             FROM sigd_tra.expediente
+            WHERE ($1::text IS NOT NULL AND codigo_expediente = $1)
+               OR ($2::uuid IS NOT NULL AND expediente_id = $2::uuid)
+            LIMIT 1`,
+          [cut, expedienteId],
+        );
+
+        if (resExp.rows.length > 0) {
+          const exp = resExp.rows[0];
+          if (!personaId) {
+            personaId = exp.solicitante_id;
+          }
+
+          if (exp.id_usuario_creador) {
+            const resCuenta = await this.pool.query<{ id_usuario: string }>(
+              `SELECT id_usuario FROM sigd_auth.cuenta_usuario
+                WHERE id_usuario = $1::uuid
+                  AND ($2::uuid IS NULL OR id_persona = $2::uuid)
+                  AND activo = true
+                LIMIT 1`,
+              [exp.id_usuario_creador, personaId],
+            );
+            if (resCuenta.rows.length > 0) {
+              usuarioId = resCuenta.rows[0].id_usuario;
+            }
+          } else {
+            // Expediente sin cuenta creadora verificada (ventanilla presencial o registro no autenticado)
+            // Verificar si cuenta con vinculación formal aprobada
+            const resVinc = await this.pool.query<{ id_usuario: string }>(
+              `SELECT sv.id_usuario
+                 FROM sigd_tra.solicitud_vinculacion_expediente sv
+                WHERE sv.expediente_id = $1::uuid
+                  AND sv.estado = 'APROBADA'
+                ORDER BY sv.resuelto_en DESC NULLS LAST
+                LIMIT 1`,
+              [exp.expediente_id],
+            );
+            if (resVinc.rows.length > 0) {
+              usuarioId = resVinc.rows[0].id_usuario;
+            }
+          }
+        }
+      } catch {
+        // En caso de fallo en consulta auxiliar, no forzar usuarioId
+      }
+    } else if (personaId && !usuarioId && !cut && !expedienteId) {
+      // Para eventos no asociados a expedientes donde solo se indica la persona
       try {
         const resCuenta = await this.pool.query<{ id_usuario: string }>(
           `SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_persona = $1::uuid AND activo = true ORDER BY creado_en DESC LIMIT 1`,
@@ -126,6 +187,23 @@ export class DestinoCasilla implements DestinoNotificacion {
       } catch {
         // En caso de error de consulta auxiliar, continuar con usuarioId = null
       }
+    }
+
+    if (!correo && personaId) {
+      try {
+        const resCorreo = await this.pool.query<{ correo: string | null }>(
+          `SELECT COALESCE(cu.correo, pn.correo) AS correo
+             FROM sigd_auth.persona p
+             LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_persona = p.id_persona AND cu.activo = true
+             LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+            WHERE p.id_persona = $1::uuid
+            LIMIT 1`,
+          [personaId],
+        );
+        if (resCorreo.rows[0]?.correo) {
+          correo = resCorreo.rows[0].correo;
+        }
+      } catch {}
     }
 
     // Clave de idempotencia canónica e inequívoca basada directamente en el evento inmutable (Sección 6 / 5K.2)

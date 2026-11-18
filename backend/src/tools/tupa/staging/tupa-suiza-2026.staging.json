@@ -1,0 +1,516 @@
+{
+  "schemaVersion": 1,
+  "fuente": {
+    "archivoNombre": "TUPA_2026_IESTP_Suiza.pdf",
+    "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622",
+    "tamanoBytes": 321617,
+    "numeroPaginas": 6,
+    "hashVerificado": true
+  },
+  "entradas": [
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 1, "referenciaFila": "p1-fila-01", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Prácticas Iniciales\nPago del Derecho en Tesorería\nControl en el Área Académica\nComprobante de Pago 0.64 % UIT Vigente\nS/ 35.00", "denominacionOriginal": "Prácticas Iniciales", "montoOriginal": "S/ 35.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Control en el Área Académica", "Comprobante de Pago 0.64 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "La fila describe pago y control académico, pero no confirma un procedimiento radicable en SIGD."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 1, "referenciaFila": "p1-fila-02", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Prácticas Intermedias\nPago del Derecho en Tesorería\nControl en el Área Académica\nComprobante de Pago 0.82 % UIT Vigente\nS/ 45.00", "denominacionOriginal": "Prácticas Intermedias", "montoOriginal": "S/ 45.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Control en el Área Académica", "Comprobante de Pago 0.82 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "La fila describe pago y control académico, pero no confirma un procedimiento radicable en SIGD."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 1, "referenciaFila": "p1-fila-03", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Prácticas Finales\nPago del Derecho en Tesorería\nControl en el Área Académica\nComprobante de Pago 1.09 % UIT Vigente\nS/ 60.00", "denominacionOriginal": "Prácticas Finales", "montoOriginal": "S/ 60.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Control en el Área Académica", "Comprobante de Pago 1.09 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "La fila describe pago y control académico, pero no confirma un procedimiento radicable en SIGD."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 1, "referenciaFila": "p1-fila-04", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Experiencias Formativas en Situaciones Reales de Trabajo (I, II, III y IV)\nPor cada Módulo\nInforme del Área Académica designando los Docentes responsables para las Supervisiones de Experiencias Formativas en Situaciones Reales de Trabajo\nPago del Derecho en Tesorería\nComprobante de Pago 0.84 % UIT Vigente\nS/ 46.50", "denominacionOriginal": "Experiencias Formativas en Situaciones Reales de Trabajo (I, II, III y IV)\nPor cada Módulo", "montoOriginal": "S/ 46.50",
+      "requisitosOriginal": ["Informe del Área Académica designando los Docentes responsables para las Supervisiones de Experiencias Formativas en Situaciones Reales de Trabajo", "Pago del Derecho en Tesorería", "Comprobante de Pago 0.84 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "La intervención del Área Académica está descrita, pero el documento no define radicación SIGD."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 1, "referenciaFila": "p1-fila-05", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Certificado Modular (I, II, III y IV)\nPor cada Módulo\nPago en el Área de Tesorería\nEmisión de la B/V\nS/ 100.00", "denominacionOriginal": "Certificado Modular (I, II, III y IV)\nPor cada Módulo", "montoOriginal": "S/ 100.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería", "Emisión de la B/V"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "La denominación solicita la emisión de un certificado; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 1, "referenciaFila": "p1-fila-06", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Certificado de Inglés\nPago en el Área de Tesorería\nEmisión de la B/V\nS/ 100.00", "denominacionOriginal": "Certificado de Inglés", "montoOriginal": "S/ 100.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería", "Emisión de la B/V"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "La denominación solicita un certificado; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 1, "referenciaFila": "p1-fila-07", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Centro de Idiomas:\nInglés, Portugués, Japonés\nNivel Básico Paquete: 04 meses para Alumnos del IESTP \"SUIZA\"\nPago en el Área de Tesorería\nEmisión de la B/V\nS/ 300.00", "denominacionOriginal": "Centro de Idiomas:\nInglés, Portugués, Japonés\nNivel Básico Paquete: 04 meses para Alumnos del IESTP \"SUIZA\"", "montoOriginal": "S/ 300.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería", "Emisión de la B/V"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Paquete formativo de cuatro meses, sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 1, "referenciaFila": "p1-fila-08", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Centro de Idiomas:\nInglés, Portugués, Japonés\nNivel Básico Paquete: 04 meses para Alumnos Externos del IESTP \"SUIZA\"\nPago en el Área de Tesorería\nEmisión de la B/V\nS/ 350.00", "denominacionOriginal": "Centro de Idiomas:\nInglés, Portugués, Japonés\nNivel Básico Paquete: 04 meses para Alumnos Externos del IESTP \"SUIZA\"", "montoOriginal": "S/ 350.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería", "Emisión de la B/V"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Paquete formativo de cuatro meses, sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 1, "referenciaFila": "p1-fila-09", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Examen de Suficiencia de Inglés y/o Portugués\nPago en el Área de Tesorería\nEmisión de la B/V\nS/ 300.00", "denominacionOriginal": "Examen de Suficiencia de Inglés y/o Portugués", "montoOriginal": "S/ 300.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería", "Emisión de la B/V"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Es una evaluación académica; el PDF no define si requiere expediente SIGD."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 1, "referenciaFila": "p1-fila-10", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "CEPRETEC 2026\n• Matrícula\nS/ 400.00\n• Matrícula Último mes\nS/ 200.00\n• Matrícula Última Semana\nS/ 60.00\n• Solo Simulacro (C/U)\nS/ 50.00\n• Venta de Guías\nS/ 40.00\n• Cambio de Carrera (Antes del I Simulacro)\nS/ 10.00\nPago en el Área de Tesorería\nEmisión de la B/V", "denominacionOriginal": "CEPRETEC 2026", "montoOriginal": "S/ 400.00\nS/ 200.00\nS/ 60.00\nS/ 50.00\nS/ 40.00\nS/ 10.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería", "Emisión de la B/V"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "La fila agrupa seis conceptos y montos de CEPRETEC; se conserva como una sola fila física del PDF."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 2, "referenciaFila": "p2-fila-01", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Alquiler del Galpón Agrícola Para la Crianza de Pollos\n(Por Campaña)\nSolicitud dirigida al Director del IESTP SUIZA.\nSuscripción del Contrato.\nPago en tesorería de acuerdo al Contrato\nPrecio por Campaña\nS/ 500.00", "denominacionOriginal": "Alquiler del Galpón Agrícola Para la Crianza de Pollos\n(Por Campaña)", "montoOriginal": "S/ 500.00",
+      "requisitosOriginal": ["Solicitud dirigida al Director del IESTP SUIZA.", "Suscripción del Contrato.", "Pago en tesorería de acuerdo al Contrato", "Precio por Campaña"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Exige solicitud y contrato, pero corresponde a un alquiler; Geric/profesor debe decidir si entra en SIGD."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 2, "referenciaFila": "p2-fila-02", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Alquiler de Retroproyector\nPago en tesorería.\nS/ 100.00", "denominacionOriginal": "Alquiler de Retroproyector", "montoOriginal": "S/ 100.00",
+      "requisitosOriginal": ["Pago en tesorería."], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Alquiler de equipo sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 2, "referenciaFila": "p2-fila-03", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Alquiler de Aulas - Diario\nSolicitud dirigida al Director del IESTP SUIZA\nProveído a la Unidad Administrativa para su Autorización\nPago en tesorería.\nEmisión de B/V.\nS/ 150.00", "denominacionOriginal": "Alquiler de Aulas - Diario", "montoOriginal": "S/ 150.00",
+      "requisitosOriginal": ["Solicitud dirigida al Director del IESTP SUIZA", "Proveído a la Unidad Administrativa para su Autorización", "Pago en tesorería.", "Emisión de B/V."], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Exige solicitud y autorización, pero corresponde a un alquiler."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 2, "referenciaFila": "p2-fila-04", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Alquiler de la Cancha de Fútbol - Diario\nSolicitud dirigida al Director del IESTP SUIZA\nProveído a la Unidad Administrativa para su Autorización\nPago en tesorería.\nEmisión de B/V.\nS/ 100.00", "denominacionOriginal": "Alquiler de la Cancha de Fútbol - Diario", "montoOriginal": "S/ 100.00",
+      "requisitosOriginal": ["Solicitud dirigida al Director del IESTP SUIZA", "Proveído a la Unidad Administrativa para su Autorización", "Pago en tesorería.", "Emisión de B/V."], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Exige solicitud y autorización, pero corresponde a un alquiler."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 2, "referenciaFila": "p2-fila-05", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Alquiler de Ambientes para servicio de alimentación.\nSolicitud dirigida al Director del IESTP SUIZA.\nSuscripción del Contrato.\nPago en tesorería de acuerdo al Contrato\nPrecios de acuerdo al Contrato S/. 50.00 a S/. 350.00\nS/ 1,000.00", "denominacionOriginal": "Alquiler de Ambientes para servicio de alimentación.", "montoOriginal": "S/ 1,000.00",
+      "requisitosOriginal": ["Solicitud dirigida al Director del IESTP SUIZA.", "Suscripción del Contrato.", "Pago en tesorería de acuerdo al Contrato", "Precios de acuerdo al Contrato S/. 50.00 a S/. 350.00"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "La descripción incluye rango contractual y la columna monto muestra S/ 1,000.00; requiere aclaración institucional."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 2, "referenciaFila": "p2-fila-06", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Alquiler del Auditorio.\nSolicitud dirigida al Director del IESTP SUIZA.\nProveído a la Unidad Administrativa para su Autorización\nPago en tesorería.\nEmisión de B/V.\nS/ 300.00", "denominacionOriginal": "Alquiler del Auditorio.", "montoOriginal": "S/ 300.00",
+      "requisitosOriginal": ["Solicitud dirigida al Director del IESTP SUIZA.", "Proveído a la Unidad Administrativa para su Autorización", "Pago en tesorería.", "Emisión de B/V."], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Exige solicitud y autorización, pero corresponde a un alquiler."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 2, "referenciaFila": "p2-fila-07", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Alquiler de Laboratorio de Cómputo a Terceros\nPor hora y por cada equipo\nS/ 20.00", "denominacionOriginal": "Alquiler de Laboratorio de Cómputo a Terceros", "montoOriginal": "S/ 20.00",
+      "requisitosOriginal": ["Por hora y por cada equipo"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Alquiler por hora/equipo sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 2, "referenciaFila": "p2-fila-08", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Venta Ambulatoria Diaria\nSolicitud dirigida al Director.\nProveído a la Unidad Administrativa para su Autorización.\nPago en Tesorería.\nEmisión de la B/V\nS/ 20.00", "denominacionOriginal": "Venta Ambulatoria Diaria", "montoOriginal": "S/ 20.00",
+      "requisitosOriginal": ["Solicitud dirigida al Director.", "Proveído a la Unidad Administrativa para su Autorización.", "Pago en Tesorería.", "Emisión de la B/V"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Exige solicitud y autorización; debe decidirse si la gestión corresponde al SIGD."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 2, "referenciaFila": "p2-fila-09", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Venta de Mangos (Ciento)\nPago en Tesorería\nEntrega del bien en proyectos\nPapeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.\nSupervisión de salida del bien-vigilancia\nEmisión de Boleta de Venta\nS/ 15.00", "denominacionOriginal": "Venta de Mangos (Ciento)", "montoOriginal": "S/ 15.00",
+      "requisitosOriginal": ["Pago en Tesorería", "Entrega del bien en proyectos", "Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.", "Supervisión de salida del bien-vigilancia", "Emisión de Boleta de Venta"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Venta de un bien físico; no se presenta como procedimiento documentario."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 2, "referenciaFila": "p2-fila-10", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Venta de Patos BB\nPago en Tesorería\nEntrega del bien en Proyectos\nPapeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.\nSupervisión de salida del bien-vigilancia\nEmisión de Boleta de Venta\nS/ 15.00", "denominacionOriginal": "Venta de Patos BB", "montoOriginal": "S/ 15.00",
+      "requisitosOriginal": ["Pago en Tesorería", "Entrega del bien en Proyectos", "Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.", "Supervisión de salida del bien-vigilancia", "Emisión de Boleta de Venta"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Venta de un bien físico; no se presenta como procedimiento documentario."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 3, "referenciaFila": "p3-fila-01", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Venta de Patos Pichones, de acuerdo al Tamaño.\nPago en Tesorería\nEntrega del bien en Proyectos\nPapeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.\nSupervisión de salida del bien-vigilancia\nEmisión de Boleta de Venta\nPICHONES HEMBRAS: S/ 30.00\nPICHONES MACHOS: S/ 40.00\nS/ 30.00\nS/ 40.00", "denominacionOriginal": "Venta de Patos Pichones, de acuerdo al Tamaño.", "montoOriginal": "S/ 30.00\nS/ 40.00",
+      "requisitosOriginal": ["Pago en Tesorería", "Entrega del bien en Proyectos", "Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.", "Supervisión de salida del bien-vigilancia", "Emisión de Boleta de Venta", "PICHONES HEMBRAS: S/ 30.00", "PICHONES MACHOS: S/ 40.00"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Venta de bienes físicos con precios diferenciados por sexo."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 3, "referenciaFila": "p3-fila-02", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Venta de Pati Pollos\nPago en Tesorería\nEntrega del bien en Proyectos\nPapeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.\nSupervisión de salida del bien-vigilancia\nEmisión de Boleta de Venta\nS/ 15.00", "denominacionOriginal": "Venta de Pati Pollos", "montoOriginal": "S/ 15.00",
+      "requisitosOriginal": ["Pago en Tesorería", "Entrega del bien en Proyectos", "Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.", "Supervisión de salida del bien-vigilancia", "Emisión de Boleta de Venta"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Venta de un bien físico; no se presenta como procedimiento documentario."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 3, "referenciaFila": "p3-fila-03", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Venta de Patos adultos hembras\nPago en Tesorería\nEntrega del bien en Proyectos\nPapeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.\nSupervisión de salida del bien-vigilancia\nEmisión de Boleta de Venta\nS/ 40.00", "denominacionOriginal": "Venta de Patos adultos hembras", "montoOriginal": "S/ 40.00",
+      "requisitosOriginal": ["Pago en Tesorería", "Entrega del bien en Proyectos", "Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.", "Supervisión de salida del bien-vigilancia", "Emisión de Boleta de Venta"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Venta de un bien físico; no se presenta como procedimiento documentario."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 3, "referenciaFila": "p3-fila-04", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Venta de Patos adultos machos\nPago en Tesorería\nEntrega del bien en Proyectos\nPapeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.\nSupervisión de salida del bien-vigilancia\nEmisión de Boleta de Venta\nS/ 50.00\nS/ 55.00", "denominacionOriginal": "Venta de Patos adultos machos", "montoOriginal": "S/ 50.00\nS/ 55.00",
+      "requisitosOriginal": ["Pago en Tesorería", "Entrega del bien en Proyectos", "Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.", "Supervisión de salida del bien-vigilancia", "Emisión de Boleta de Venta"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "La columna monto presenta S/ 50.00 y S/ 55.00 sin etiquetas que expliquen la diferencia."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 3, "referenciaFila": "p3-fila-05", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Venta de Porcino para consumo Kg\nPago en Tesorería\nEntrega del bien en Proyectos\nPapeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.\nSupervisión de salida del bien-vigilancia\nEmisión de Boleta de Venta\nS/ 20.00", "denominacionOriginal": "Venta de Porcino para consumo Kg", "montoOriginal": "S/ 20.00",
+      "requisitosOriginal": ["Pago en Tesorería", "Entrega del bien en Proyectos", "Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.", "Supervisión de salida del bien-vigilancia", "Emisión de Boleta de Venta"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Venta de un bien físico por kilogramo."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 3, "referenciaFila": "p3-fila-06", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Venta de Porcino en Pie Kg\nEmisión de B/V.\nREPRODUCTOR: S/ 25.00\nCARNE: S/ 15.00\nS/ 25.00\nS/ 15.00", "denominacionOriginal": "Venta de Porcino en Pie Kg", "montoOriginal": "S/ 25.00\nS/ 15.00",
+      "requisitosOriginal": ["Emisión de B/V.", "REPRODUCTOR: S/ 25.00", "CARNE: S/ 15.00"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Venta de un bien físico con dos categorías literales de precio."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 3, "referenciaFila": "p3-fila-07", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Venta de Ganado Vacuno en pie Kg; EN\nPago en Tesorería\nEntrega del bien en Proyectos\nPapeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.\nSupervisión de salida del bien-vigilancia\nEmisión de B/V.\nCARCASA (SIN PATA, SIN CABEZA) KG: S/ 20.00\nEN PIE: S/ 15.00\nS/ 20.00\nS/ 15.00", "denominacionOriginal": "Venta de Ganado Vacuno en pie Kg; EN", "montoOriginal": "S/ 20.00\nS/ 15.00",
+      "requisitosOriginal": ["Pago en Tesorería", "Entrega del bien en Proyectos", "Papeleta de Autorización de salida Firmada por la Unidad Administrativa, Jefe (e) del Área de Proyectos Productivos y Jefe (e) de Abastecimiento y Patrimonio del IESTP SUIZA.", "Supervisión de salida del bien-vigilancia", "Emisión de B/V.", "CARCASA (SIN PATA, SIN CABEZA) KG: S/ 20.00", "EN PIE: S/ 15.00"], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "La denominación termina literalmente en «; EN»; debe validarse si el texto quedó truncado en la fuente."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 3, "referenciaFila": "p3-fila-08", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Servicio de Empadre\nEjecución del Servicio\nPago en Tesorería\nEmisión de B/V.\nS/ 50.00", "denominacionOriginal": "Servicio de Empadre", "montoOriginal": "S/ 50.00",
+      "requisitosOriginal": ["Ejecución del Servicio", "Pago en Tesorería", "Emisión de B/V."], "referenciaNormativaOriginal": "D.S. Nº 028-2007-ED", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Servicio productivo sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-01", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "FUT\nPago del Derecho en Tesorería 3 FUT\nComprobante de Pago 0.07 % UIT Vigente\nS/ 4.00", "denominacionOriginal": "FUT", "montoOriginal": "S/ 4.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería 3 FUT", "Comprobante de Pago 0.07 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "PAGO_DERECHO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Corresponde al derecho por tres formatos FUT, no al trámite presentado mediante ellos."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-02", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Constancia de No Adeudar\n(Para fines de Titulación)\nPago del Derecho en Tesorería\nComprobante de Pago 0.30 % UIT Vigente\nS/ 16.50", "denominacionOriginal": "Constancia de No Adeudar\n(Para fines de Titulación)", "montoOriginal": "S/ 16.50",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 0.30 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Solicitud de una constancia; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-03", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Trabajo de Aplicación Profesional\n(Examen Teórico Práctico)\nPago del Derecho en Tesorería, 1.03 % UIT Vigente\nS/ 57.00", "denominacionOriginal": "Trabajo de Aplicación Profesional\n(Examen Teórico Práctico)", "montoOriginal": "S/ 57.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería, 1.03 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Forma parte de titulación, pero la fila solo describe examen y pago."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-04", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Examen de Suficiencia Profesional\n(Examen Teórico Práctico)\nPago del Derecho en Tesorería, 1.03 % UIT Vigente\nS/ 57.00", "denominacionOriginal": "Examen de Suficiencia Profesional\n(Examen Teórico Práctico)", "montoOriginal": "S/ 57.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería, 1.03 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Forma parte de titulación, pero la fila solo describe examen y pago."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-05", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Expedición de Título\nPago del Derecho en Tesorería\nComprobante de Pago 1.90 % UIT Vigente\nS/ 105.00", "denominacionOriginal": "Expedición de Título", "montoOriginal": "S/ 105.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 1.90 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Expedición de documento oficial; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-06", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Certificado de Estudios Superiores\n(6 Semestres)\nPago del Derecho en Tesorería\nComprobante de Pago 2.24 % UIT Vigente\nS/ 124.00", "denominacionOriginal": "Certificado de Estudios Superiores\n(6 Semestres)", "montoOriginal": "S/ 124.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 2.24 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Emisión de certificado; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-07", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Visación de Certificado de Estudios Superiores\nPago del Derecho en Tesorería\nComprobante de Pago 0.29 % UIT Vigente\nS/ 16.00", "denominacionOriginal": "Visación de Certificado de Estudios Superiores", "montoOriginal": "S/ 16.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 0.29 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Visación de documento; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-08", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Caligrafiado de Título\nPago del Derecho en Tesorería\nComprobante de Pago 0.47 % UIT Vigente\nS/ 26.00", "denominacionOriginal": "Caligrafiado de Título", "montoOriginal": "S/ 26.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 0.47 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Servicio material asociado al título, sin trámite independiente descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-09", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Derecho de Formato de Título\nPago del Derecho en Tesorería\nComprobante de Pago 0.75 % UIT Vigente\nS/ 42.00", "denominacionOriginal": "Derecho de Formato de Título", "montoOriginal": "S/ 42.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 0.75 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "PAGO_DERECHO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Derecho por formato asociado al título, no trámite independiente descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-10", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Inscripción de Título\nPago del Derecho en Tesorería\nComprobante de Pago\nS/ 120.00", "denominacionOriginal": "Inscripción de Título", "montoOriginal": "S/ 120.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Inscripción de documento; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-11", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Medallas\nPago del Derecho en Tesorería\nComprobante de Pago\nS/ 100.00", "denominacionOriginal": "Medallas", "montoOriginal": "S/ 100.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Entrega de bien físico, no procedimiento documentario."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-12", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Protector de Título\nPago del Derecho en Tesorería\nS/ 100.00", "denominacionOriginal": "Protector de Título", "montoOriginal": "S/ 100.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Entrega de bien físico, no procedimiento documentario."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-13", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Colación\nPago del Derecho en Tesorería\nS/ 100.00", "denominacionOriginal": "Colación", "montoOriginal": "S/ 100.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Actividad académica asociada a titulación, sin trámite independiente descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-14", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Protector de Certificado Modular\nPago del Derecho en Tesorería\nS/ 50.00", "denominacionOriginal": "Protector de Certificado Modular", "montoOriginal": "S/ 50.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Entrega de bien físico, no procedimiento documentario."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-15", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Modificación de Datos del Título\nPago del Derecho en Tesorería\nComprobante de Pago 4.88 % UIT Vigente\nS/ 269.00", "denominacionOriginal": "Modificación de Datos del Título", "montoOriginal": "S/ 269.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 4.88 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Modificación de documento oficial; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 4, "referenciaFila": "p4-fila-16", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Derecho de duplicado de Título.\nPago del Derecho en Tesorería\nComprobante de Pago 5.61 % UIT Vigente\nS/ 309.00", "denominacionOriginal": "Derecho de duplicado de Título.", "montoOriginal": "S/ 309.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 5.61 % UIT Vigente"], "referenciaNormativaOriginal": "Ley 28693: Ley General del Sistema Nacional de Tesorería. • Principio de Unidad de Caja. • Directiva de Tesorería.", "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Duplicado de documento oficial; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-01", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Matrículas\nFicha de matrícula\nPago de adeudos en Tesorería\nPago de derecho de matrícula en tesorería\nS/ 200.00", "denominacionOriginal": "Matrículas", "montoOriginal": "S/ 200.00",
+      "requisitosOriginal": ["Ficha de matrícula", "Pago de adeudos en Tesorería", "Pago de derecho de matrícula en tesorería"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Proceso académico de matrícula, no trámite documentario externo descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-02", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "ADMISIÓN 2026\nPago en el Área de Tesorería\nS/ 250.00", "denominacionOriginal": "ADMISIÓN 2026", "montoOriginal": "S/ 250.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Proceso académico de admisión, no trámite documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-03", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Guías del postulante\nPago en el Área de Tesorería\nS/ 50.00", "denominacionOriginal": "Guías del postulante", "montoOriginal": "S/ 50.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Entrega de guía, no procedimiento documentario."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-04", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Ingreso ADMISIÓN 2026 - Titulados\nPago en el Área de Tesorería\nS/ 500.00", "denominacionOriginal": "Ingreso ADMISIÓN 2026 - Titulados", "montoOriginal": "S/ 500.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Proceso académico de admisión para titulados."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-05", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Derecho de Reincorporación\n(Reingreso)\nPago en el Área de Tesorería\nS/ 300.00", "denominacionOriginal": "Derecho de Reincorporación\n(Reingreso)", "montoOriginal": "S/ 300.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Solicitud de reincorporación; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-06", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Constancia de Egresado\nPago del Derecho en Tesorería\nS/ 31.00", "denominacionOriginal": "Constancia de Egresado", "montoOriginal": "S/ 31.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Emisión de constancia; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-07", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Certificado de Bachillerato\nPago del Derecho en Tesorería\nComprobante de Pago 0.75 % UIT Vigente\nS/ 42.00", "denominacionOriginal": "Certificado de Bachillerato", "montoOriginal": "S/ 42.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 0.75 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Emisión de certificado; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-08", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Constancias\n(Otros: de Título, estudios, de Matrícula)\nPago del Derecho en Tesorería\nComprobante de Pago 0.41 % UIT Vigente\nS/ 23.00", "denominacionOriginal": "Constancias\n(Otros: de Título, estudios, de Matrícula)", "montoOriginal": "S/ 23.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 0.41 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Emisión de constancias; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-09", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Convalidación entre Planes de Estudios\nPago del Derecho en Tesorería, 0.84% UIT Vigente\nS/ 46.50", "denominacionOriginal": "Convalidación entre Planes de Estudios", "montoOriginal": "S/ 46.50",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería, 0.84% UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Convalidación académica que requiere decisión institucional; candidatura para revisión."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-10", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Convalidación por Unidades de Competencia\nPago del Derecho en Tesorería\nComprobante de Pago 0.84 % UIT Vigente\nS/ 46.50", "denominacionOriginal": "Convalidación por Unidades de Competencia", "montoOriginal": "S/ 46.50",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 0.84 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Convalidación académica que requiere decisión institucional; candidatura para revisión."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-11", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Devolución de Expediente\nPago del Derecho en Tesorería\nComprobante de Pago 0.37 % UIT Vigente\nS/ 21.00", "denominacionOriginal": "Devolución de Expediente", "montoOriginal": "S/ 21.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 0.37 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Actuación sobre expediente; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-12", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Evaluación Extraordinaria (A)\nPago del Derecho en Tesorería\nComprobante de Pago 1.68 % UIT Vigente\nS/ 93.00", "denominacionOriginal": "Evaluación Extraordinaria (A)", "montoOriginal": "S/ 93.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 1.68 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Evaluación académica, sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-13", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Evaluación Extraordinaria\n(RM 069)\nPago del Derecho en Tesorería\nComprobante de Pago 1.27 % UIT Vigente\nS/ 70.00", "denominacionOriginal": "Evaluación Extraordinaria\n(RM 069)", "montoOriginal": "S/ 70.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 1.27 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Evaluación académica, sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-14", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Examen de Recuperación\nPago del Derecho en Tesorería\nComprobante de Pago 1.27 % UIT Vigente\nS/ 70.00", "denominacionOriginal": "Examen de Recuperación", "montoOriginal": "S/ 70.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 1.27 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Evaluación académica, sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-15", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Examen de Cargo\nPago del Derecho en Tesorería\nComprobante de Pago 1.27 % UIT Vigente\nS/ 70.00", "denominacionOriginal": "Examen de Cargo", "montoOriginal": "S/ 70.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 1.27 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Evaluación académica, sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-16", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Repitencia de Unidad Didáctica\nPago del Derecho en Tesorería\nComprobante de Pago 1.56 % UIT Vigente\nS/ 86.00", "denominacionOriginal": "Repitencia de Unidad Didáctica", "montoOriginal": "S/ 86.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 1.56 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Condición académica, sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-17", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Repitencia de Semestre\nPago del Derecho en Tesorería\nComprobante de Pago 1.45 % UIT Vigente\nS/ 80.00", "denominacionOriginal": "Repitencia de Semestre", "montoOriginal": "S/ 80.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 1.45 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Condición académica, sin procedimiento documentario descrito."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-18", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Reserva de Matrícula - Ingresantes\nPago del Derecho en Tesorería\nResolución Directoral-Secretaría Académica\nComprobante de Pago 1.20 % UIT Vigente\nS/ 66.00", "denominacionOriginal": "Reserva de Matrícula - Ingresantes", "montoOriginal": "S/ 66.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Resolución Directoral-Secretaría Académica", "Comprobante de Pago 1.20 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Produce resolución y requiere gestión académica; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-19", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Licencia de Estudios - Estudiantes Antiguos\nPago del Derecho en Tesorería\nResolución Directoral-Secretaría - Académica\nComprobante de Pago 1.20 % UIT Vigente\nS/ 66.00", "denominacionOriginal": "Licencia de Estudios - Estudiantes Antiguos", "montoOriginal": "S/ 66.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Resolución Directoral-Secretaría - Académica", "Comprobante de Pago 1.20 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Produce resolución y requiere gestión académica; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-20", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Traslado Interno\nVacante en la Carrera\nResolución Directoral-Secretaría Académica\nPago del Derecho en Tesorería\nComprobante de Pago 5.61 % UIT Vigente\nS/ 309.00", "denominacionOriginal": "Traslado Interno", "montoOriginal": "S/ 309.00",
+      "requisitosOriginal": ["Vacante en la Carrera", "Resolución Directoral-Secretaría Académica", "Pago del Derecho en Tesorería", "Comprobante de Pago 5.61 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Traslado con resolución y condición de vacante; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 5, "referenciaFila": "p5-fila-21", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Traslado Externo\nSolicitud en FUT dirigida al Director.\nVacante en la Carrera\nResolución Directoral-Secretaría - Académica\nPago del Derecho en Tesorería\nComprobante de Pago 7.48 % UIT Vigente\nS/ 412.00", "denominacionOriginal": "Traslado Externo", "montoOriginal": "S/ 412.00",
+      "requisitosOriginal": ["Solicitud en FUT dirigida al Director.", "Vacante en la Carrera", "Resolución Directoral-Secretaría - Académica", "Pago del Derecho en Tesorería", "Comprobante de Pago 7.48 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Incluye solicitud en FUT y resolución; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 6, "referenciaFila": "p6-fila-01", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Demora Devolución Libro Biblioteca\nInforme a la Unidad Administrativa de deudores de Libros\nUnidad Administrativa deriva a Tesorería\nPago del Derecho en Tesorería\nComprobante de Pago 0.19 % UIT Vigente (Costo por día)\nS/ 10.00", "denominacionOriginal": "Demora Devolución Libro Biblioteca", "montoOriginal": "S/ 10.00",
+      "requisitosOriginal": ["Informe a la Unidad Administrativa de deudores de Libros", "Unidad Administrativa deriva a Tesorería", "Pago del Derecho en Tesorería", "Comprobante de Pago 0.19 % UIT Vigente (Costo por día)"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "PAGO_DERECHO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Cobro diario por demora, no solicitud documentaria."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 6, "referenciaFila": "p6-fila-02", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Acceso a la Información Pública.\nS/. 10.00 por C/Hoja\nSolicitud dirigida a Dirección en FUT\nPago del Derecho en Tesorería 0.19 % de la UIT Vigente\nS/ 10.50", "denominacionOriginal": "Acceso a la Información Pública.\nS/. 10.00 por C/Hoja", "montoOriginal": "S/ 10.50",
+      "requisitosOriginal": ["Solicitud dirigida a Dirección en FUT", "Pago del Derecho en Tesorería 0.19 % de la UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Incluye solicitud en FUT, pero muestra «S/. 10.00 por C/Hoja» y S/ 10.50 en la columna monto; requiere conciliación institucional."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 6, "referenciaFila": "p6-fila-03", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Búsqueda y Duplicados de Boletas (C/U)\nSíllabus (C/U)\nOtros Trámites\nPago del Derecho en Tesorería\nOtros Trámites Administrativos\nComprobante de Pago 0.19% UIT Vigente\nS/ 10.50", "denominacionOriginal": "Búsqueda y Duplicados de Boletas (C/U)\nSíllabus (C/U)\nOtros Trámites", "montoOriginal": "S/ 10.50",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Otros Trámites Administrativos", "Comprobante de Pago 0.19% UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "REQUIERE_DECISION", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Una sola fila agrupa tres conceptos distintos; debe decidirse si se separan antes de homologar."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 6, "referenciaFila": "p6-fila-04", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Titulación de Otros Institutos Tecnológicos\nPago del Derecho en Tesorería\nComprobante de Pago 9.35 % UIT Vigente\nResolución Directoral-Secretaría Académica\nS/ 515.00", "denominacionOriginal": "Titulación de Otros Institutos Tecnológicos", "montoOriginal": "S/ 515.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 9.35 % UIT Vigente", "Resolución Directoral-Secretaría Académica"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "APROBADO", "referenciaAprobacion": "VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1",
+      "clasificacion": "PROCEDIMIENTO_DOCUMENTARIO", "candidatoRadicacion": "CANDIDATO", "estadoHomologacion": "LISTO_PARA_REVISION", "observacionClasificacion": "Procedimiento de titulación con resolución; candidatura sujeta a homologación."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 6, "referenciaFila": "p6-fila-05", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Examen de Subsanación con Jurado\nPago del Derecho en Tesorería\nComprobante de Pago 0.60 % UIT Vigente\nResolución Directoral-Secretaría Académica\nS/ 33.00", "denominacionOriginal": "Examen de Subsanación con Jurado", "montoOriginal": "S/ 33.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 0.60 % UIT Vigente", "Resolución Directoral-Secretaría Académica"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Es una evaluación académica con resolución; debe definirse si requiere expediente SIGD."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 6, "referenciaFila": "p6-fila-06", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Prueba de Suficiencia Académica\nPago del Derecho en Tesorería\nComprobante de Pago 1.90 % UIT Vigente\nS/ 105.00", "denominacionOriginal": "Prueba de Suficiencia Académica", "montoOriginal": "S/ 105.00",
+      "requisitosOriginal": ["Pago del Derecho en Tesorería", "Comprobante de Pago 1.90 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "SERVICIO_ACADEMICO", "candidatoRadicacion": "REQUIERE_DECISION", "estadoHomologacion": "REQUIERE_DECISION", "observacionClasificacion": "Es una evaluación académica; debe definirse si requiere expediente SIGD."
+    },
+    {
+      "documentoSha256": "377dd8e14b8806f2030b5374120ab9b4fe17640bb98086e10c1a9a4431a33622", "fuenteNombre": "TUPA_2026_IESTP_Suiza.pdf", "pagina": 6, "referenciaFila": "p6-fila-07", "revision": 1,
+      "codigoExterno": null, "textoOriginal": "Carnets, Insignia y Distintivos\nPago en el Área de Tesorería\nEmisión de la B/V\n0.93 % UIT Vigente\nS/ 50.00", "denominacionOriginal": "Carnets, Insignia y Distintivos", "montoOriginal": "S/ 50.00",
+      "requisitosOriginal": ["Pago en el Área de Tesorería", "Emisión de la B/V", "0.93 % UIT Vigente"], "referenciaNormativaOriginal": null, "versionFuente": "TUPA 2026",
+      "vigenciaDesde": null, "vigenciaHasta": null, "estadoValidacion": "PENDIENTE_VALIDACION", "referenciaAprobacion": null,
+      "clasificacion": "BIEN_SERVICIO", "candidatoRadicacion": "NO_CANDIDATO", "estadoHomologacion": "NO_APLICA_SIGD", "observacionClasificacion": "Entrega de bienes físicos, no procedimiento documentario descrito."
+    }
+  ]
+}

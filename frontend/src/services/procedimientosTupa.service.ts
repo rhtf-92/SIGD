@@ -243,6 +243,19 @@ function normalizarTextoParaBusqueda(txt: string): string {
 
 export type TipoRequisitoTupa = 'DOCUMENTAL' | 'FINANCIERO' | 'DECLARATIVO' | 'INTERNO' | 'AMBIGUO';
 
+export interface DtoAnexoTupa {
+  idAnexo: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+  version?: string;
+  nombreArchivo?: string;
+  mimeType?: string;
+  tamanoBytes?: number;
+  esDescargable?: boolean;
+  activo?: boolean;
+}
+
 export interface DtoRequisitoTupa {
   idRequisito: string;
   idProcedimiento: string;
@@ -256,6 +269,8 @@ export interface DtoRequisitoTupa {
   formatosPermitidos: string;
   activo: boolean;
   fuenteOriginal: string;
+  idAnexo?: string | null;
+  anexo?: DtoAnexoTupa | null;
 }
 
 export interface DtoRequisitosProcedimiento {

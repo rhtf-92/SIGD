@@ -277,7 +277,10 @@ export class WorkflowRepository {
               v.proveniencia, v.fuente_original, v.estado_homologacion, v.pasos, v.creado_en
          FROM sigd_rut.workflow_procedimiento_config c
          JOIN sigd_rut.workflow_version v ON v.id_version = c.id_version_workflow
-        WHERE c.id_procedimiento = $1::uuid
+        WHERE (
+          c.id_procedimiento = $1::uuid
+          OR c.id_procedimiento IN (SELECT p.id_procedimiento FROM sigd_doc.tupa_procedimiento p WHERE p.registro_version_id = $1::uuid)
+        )
           AND c.activo = true
           AND v.activo = true
         LIMIT 1`,

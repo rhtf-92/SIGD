@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { UnauthorizedError, ForbiddenError, NotFoundError } from '../../shared/domain/errors/index.js';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { headObject, generarUrlPresigned } from '../../core/storage/s3-storage.service.js';
+import { DocumentoStorageService } from '../../core/storage/documento-storage.service.js';
 import { ValidationError } from '../../shared/domain/errors/validation-error.js';
 import { z } from 'zod';
 import { filtrosSchema, idSchema } from './rutadoc.schemas.js';
@@ -13,6 +14,10 @@ import type { ActorRutaDoc, SolicitanteResumen } from './rutadoc.types.js';
 import type { ActorProviderRutaDoc } from './rutadoc.actor-provider.js';
 import type { ServicioRutaDoc } from './rutadoc.service.js';
 import type { ServicioSlaRutaDoc } from './sla.service.js';
+import {
+  evaluarElegibilidadDerivacion,
+  consultarEstadoEtapaTecnicaTupa,
+} from './derivaciones.service.js';
 
 /** El proveedor debe derivar el actor de una sesión/token verificado, nunca de headers libres. */
 export type ObtenerActorRutaDoc = (req: Request) => ActorRutaDoc | null | Promise<ActorRutaDoc | null>;
@@ -65,10 +70,23 @@ export function crearControladorRutaDoc(
                   COALESCE(tp.denominacion, rv.denominacion_original) AS "denominacion",
                   COALESCE(tp.categoria, 'PROCEDIMIENTO_APROBADO') AS "clasificacion",
                   COALESCE(tp.plazo_dias, 30)::int AS "plazoDias",
-                  COALESCE(tp.monto, 0.00)::float AS "costo"
+                  COALESCE(tp.monto, 0.00)::float AS "costo",
+                  COALESCE(v.unidad_responsable_id, tp.unidad_responsable_id)::text AS "unidadResponsableId",
+                  resp.nombre AS "unidadResponsableNombre"
              FROM sigd_doc.expediente_tupa_vinculo v
              JOIN sigd_doc.tupa_registro_version rv ON rv.registro_version_id = v.registro_version_id
-        LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = rv.registro_version_id
+        LEFT JOIN LATERAL (
+          SELECT p.*, tv2.codigo AS version_codigo
+            FROM sigd_doc.tupa_procedimiento p
+            JOIN sigd_doc.tupa_version tv2 ON tv2.id_version = p.id_version
+           WHERE (
+             (v.tupa_codigo IS NOT NULL AND tv2.codigo = v.tupa_codigo AND (p.codigo_ref = v.codigo_ref OR p.registro_version_id = v.registro_version_id))
+             OR (v.tupa_codigo IS NULL AND p.registro_version_id = v.registro_version_id)
+           )
+           ORDER BY p.activo DESC, p.orden ASC
+           LIMIT 1
+        ) tp ON TRUE
+        LEFT JOIN sigd_org.area resp ON resp.area_id = COALESCE(v.unidad_responsable_id, tp.unidad_responsable_id)
             WHERE v.expediente_id = $1::uuid
               AND v.reemplaza_vinculo_id IS NULL
             ORDER BY v.vinculado_en DESC, v.vinculo_id DESC
@@ -81,6 +99,54 @@ export function crearControladorRutaDoc(
       let documentos: any[] = [];
       if (opciones.pool) {
         try {
+          // Sincronizar documentos no foliados en sigd_tra.expediente_documento_folio
+          const docsSinFoliar = await opciones.pool.query<{
+            documento_adjunto_id: string;
+            s3_bucket: string | null;
+            s3_key: string | null;
+            subido_por: string | null;
+          }>(
+            `SELECT da.documento_adjunto_id, da.s3_bucket, da.s3_key, da.subido_por
+               FROM sigd_doc.documento_adjunto da
+          LEFT JOIN sigd_tra.expediente_documento_folio f ON f.id_documento = da.documento_adjunto_id AND f.expediente_id = $1::uuid
+              WHERE (da.expediente_tra_id = $1::uuid OR da.expediente_id = $1::uuid)
+                AND f.id_folio IS NULL
+              ORDER BY da.creado_en ASC`,
+            [id],
+          );
+
+          if (docsSinFoliar.rows.length > 0) {
+            const storageService = new DocumentoStorageService();
+            for (const docSin of docsSinFoliar.rows) {
+              let numPaginas = 1;
+              if (docSin.s3_key) {
+                try {
+                  const buffer = await storageService.obtenerObjetoS3(docSin.s3_key, docSin.s3_bucket ?? undefined);
+                  numPaginas = await storageService.obtenerCantidadPaginasPdf(buffer);
+                } catch {
+                  numPaginas = 1;
+                }
+              }
+              const maxFolioRes = await opciones.pool.query<{ max_folio: number | null }>(
+                `SELECT MAX(folio_fin) AS max_folio FROM sigd_tra.expediente_documento_folio WHERE expediente_id = $1::uuid;`,
+                [id],
+              );
+              const maxFolio = maxFolioRes.rows[0]?.max_folio ?? 0;
+              const folioInicio = maxFolio + 1;
+              const folioFin = folioInicio + numPaginas - 1;
+              const asignadoPor = docSin.subido_por ?? expediente.solicitanteId ?? '00000000-0000-0000-0000-000000000001';
+
+              await opciones.pool.query(
+                `INSERT INTO sigd_tra.expediente_documento_folio (
+                   id_folio, expediente_id, id_documento, folio_inicio, folio_fin, asignado_por, creado_en
+                 ) VALUES (
+                   gen_random_uuid(), $1::uuid, $2::uuid, $3, $4, $5::uuid, NOW()
+                 );`,
+                [id, docSin.documento_adjunto_id, folioInicio, folioFin, asignadoPor],
+              );
+            }
+          }
+
           const resDocs = await opciones.pool.query<{
             id_documento: string;
             nombre_archivo: string;
@@ -223,6 +289,56 @@ export function crearControladorRutaDoc(
         }
       }
 
+      let elegibilidadDerivacion = null;
+      if (opciones.pool) {
+        try {
+          elegibilidadDerivacion = await evaluarElegibilidadDerivacion(opciones.pool, id);
+        } catch {
+          elegibilidadDerivacion = null;
+        }
+      }
+
+      let flujoAtencion = null;
+      if (opciones.pool) {
+        try {
+          const etapa = await consultarEstadoEtapaTecnicaTupa(opciones.pool, id);
+          if (etapa.areaResponsableId || etapa.areaResolutivaId) {
+            flujoAtencion = {
+              requiereAtencionTecnica: etapa.requiereEvaluacionTecnica,
+              atencionTecnicaCompletada: etapa.requiereEvaluacionTecnica ? etapa.completada : false,
+              tieneAsignacion: etapa.tieneAsignacion,
+              tieneDictamenTecnico: etapa.tieneDictamenTecnico,
+              areaResponsableId: etapa.areaResponsableId,
+              areaResolutivaId: etapa.areaResolutivaId,
+            };
+          }
+        } catch {
+          flujoAtencion = null;
+        }
+      }
+
+      const foliosDesdeDocs = documentos.reduce((acc, d) => {
+        if (d.foliado && d.folios) {
+          const match = d.folios.match(/F\.\s*(\d+)\s*-\s*F\.\s*(\d+)/);
+          if (match) {
+            const ini = parseInt(match[1], 10);
+            const fin = parseInt(match[2], 10);
+            return acc + (fin - ini + 1);
+          }
+        }
+        return acc;
+      }, 0);
+      const docsFoliadosCount = documentos.filter((d) => d.foliado).length;
+      const totalFoliosEfectivo = foliosDesdeDocs > 0 ? foliosDesdeDocs : (expediente.resumenDocumentos?.totalFolios ?? 0);
+      const cantFoliadosEfectiva = docsFoliadosCount > 0 ? docsFoliadosCount : (expediente.resumenDocumentos?.cantidadFoliados ?? 0);
+      const cantDocsEfectiva = Math.max(documentos.length, expediente.resumenDocumentos?.cantidadDocumentos ?? 0);
+
+      if (expediente.resumenDocumentos) {
+        expediente.resumenDocumentos.totalFolios = totalFoliosEfectivo;
+        expediente.resumenDocumentos.cantidadFoliados = cantFoliadosEfectiva;
+        expediente.resumenDocumentos.cantidadDocumentos = cantDocsEfectiva;
+      }
+
       res.json({
         expediente,
         estado: expediente.estadoActual,
@@ -230,19 +346,23 @@ export function crearControladorRutaDoc(
           ? {
               estado: slaData.estado,
               diasHabilesRestantes: slaData.diasHabilesRestantes,
+              diasHabilesLimite: slaData.diasHabilesLimite,
+              diasHabilesTranscurridos: slaData.diasHabilesTranscurridos,
               porcentaje: slaData.porcentaje,
               fechaLimite: slaData.fechaLimite,
             }
           : null,
         foliacionResumen: {
-          cantidadDocumentos: expediente.resumenDocumentos?.cantidadDocumentos ?? 0,
-          totalFolios: expediente.resumenDocumentos?.totalFolios ?? 0,
-          cantidadFoliados: expediente.resumenDocumentos?.cantidadFoliados ?? 0,
+          cantidadDocumentos: cantDocsEfectiva,
+          totalFolios: totalFoliosEfectivo,
+          cantidadFoliados: cantFoliadosEfectiva,
         },
         tupaResumen: tupaData,
         documentos,
         solicitanteResumen,
         pago: pagoResumen,
+        elegibilidadDerivacion,
+        flujoAtencion,
       });
     },
     revertir: async (req, res) => {

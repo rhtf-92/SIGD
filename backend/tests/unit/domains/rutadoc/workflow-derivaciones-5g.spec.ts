@@ -437,14 +437,12 @@ describe('SIGD — FASE 5G: Core Operativo, Workflow, Custodia, Asignación y Ob
         rows: [{ estado_actual_id: 'OBSERVADO', area_contexto_id: ID_AREA_A }],
       })
       // 2. INSERT SUBSANADO
-      .mockResolvedValueOnce({ rowCount: 1 })
-      // 3. INSERT EN_REVISION
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ movimiento_id: 'mov-sub-1' }] })
-      // 4. UPDATE sigd_tra.expediente
+      // 3. UPDATE sigd_tra.expediente
       .mockResolvedValueOnce({ rowCount: 1 })
-      // 5. SELECT última observacion
+      // 4. SELECT última observacion
       .mockResolvedValueOnce({ rows: [{ id_observacion: 'obs-struct-1' }] })
-      // 6. UPDATE expediente_observacion
+      // 5. UPDATE expediente_observacion
       .mockResolvedValueOnce({
         rows: [{
           id_observacion: 'obs-struct-1',
@@ -859,16 +857,28 @@ describe('SIGD — FASE 5G: Core Operativo, Workflow, Custodia, Asignación y Ob
     mockQuery
       .mockResolvedValueOnce({ rowCount: 1 }) // BEGIN
       .mockResolvedValueOnce({ rowCount: 1 }) // pg_advisory_xact_lock
-      // 1. Requisito financiero NO homologado (PENDIENTE_HOMOLOGACION)
+      // 1. evaluarElegibilidadDerivacion -> vinculo
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [{
-          id_requisito: 'req-fin-1',
-          nombre: 'Tasa Trámite Documentario',
-          estado_homologacion: 'PENDIENTE_HOMOLOGACION',
+          registro_version_id: 'reg-ver-1',
+          id_procedimiento: 'proc-1',
+          monto_efectivo: '0.00',
+          monto_proc: '0.00',
+          intervencion_financiera: 'NO_APLICA',
         }],
       })
-      // 2. Contexto expediente (área actual ID_AREA_A, estado EN_REVISION)
+      // 2. evaluarElegibilidadDerivacion -> reqDocObligatorios (documental)
+      .mockResolvedValueOnce({
+        rowCount: 0,
+        rows: [],
+      })
+      // 3. evaluarElegibilidadDerivacion -> reqFinancieros (solo HOMOLOGADO)
+      .mockResolvedValueOnce({
+        rowCount: 0,
+        rows: [],
+      })
+      // 4. Contexto expediente (área actual ID_AREA_A, estado EN_REVISION)
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [{
@@ -878,24 +888,34 @@ describe('SIGD — FASE 5G: Core Operativo, Workflow, Custodia, Asignación y Ob
           area_contexto_id: ID_AREA_A,
         }],
       })
-      // 3. Destino ID_AREA_B vigente
+      // 5. Destino ID_AREA_B vigente
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [{ id_area: ID_AREA_B, nombre: 'Área Destino B', vigente: true }],
       })
-      // 4. derivarExpediente -> SELECT estado_actual_id
+      // resolverDestinoTupa -> 1. validar expediente_id
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ estado_actual_id: 'EN_REVISION', area_contexto_id: ID_AREA_A }],
+        rows: [{ expediente_id: ID_EXPEDIENTE }],
       })
-      // 5. derivarExpediente -> INSERT movimiento
+      // resolverDestinoTupa -> 2. consultar vinculoRes
+      .mockResolvedValueOnce({
+        rowCount: 0,
+        rows: [],
+      })
+      // 6. derivarExpediente -> SELECT estado_actual_id
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ estado_actual_id: 'EN_REVISION', area_contexto_id: ID_AREA_A, codigo_expediente: 'EXP-001', solicitante_id: 'sol-1' }],
+      })
+      // 7. derivarExpediente -> INSERT movimiento
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [{ movimiento_id: 'mov-pm-21' }],
       })
-      // 6. UPDATE sigd_tra.expediente
+      // 8. UPDATE sigd_tra.expediente
       .mockResolvedValueOnce({ rowCount: 1 })
-      // 7. COMMIT
+      // 9. COMMIT
       .mockResolvedValueOnce({ rowCount: 1 });
 
     const res = await request(app)
@@ -931,19 +951,33 @@ describe('SIGD — FASE 5G: Core Operativo, Workflow, Custodia, Asignación y Ob
     mockQuery
       .mockResolvedValueOnce({ rowCount: 1 }) // BEGIN
       .mockResolvedValueOnce({ rowCount: 1 }) // pg_advisory_xact_lock
-      // Requisito financiero formalmente HOMOLOGADO
+      // evaluarElegibilidadDerivacion -> vinculo
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          registro_version_id: 'reg-ver-1',
+          id_procedimiento: 'proc-1',
+          monto_efectivo: '45.00',
+          monto_proc: '45.00',
+          intervencion_financiera: 'REQUIERE_PAGO',
+        }],
+      })
+      // reqDocObligatorios (documental)
+      .mockResolvedValueOnce({
+        rowCount: 0,
+        rows: [],
+      })
+      // reqFinancieros HOMOLOGADO
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [{
           id_requisito: 'req-fin-homologado',
-          nombre: 'Tasa Certificado Oficial',
-          estado_homologacion: 'HOMOLOGADO',
         }],
       })
-      // Orden de pago en estado PENDIENTE
+      // orden de pago CONFIRMADO (ninguna confirmada)
       .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ estado: 'PENDIENTE', monto: 45.00 }],
+        rowCount: 0,
+        rows: [],
       })
       .mockResolvedValueOnce({ rowCount: 1 }); // ROLLBACK
 
@@ -961,18 +995,33 @@ describe('SIGD — FASE 5G: Core Operativo, Workflow, Custodia, Asignación y Ob
     mockQuery
       .mockResolvedValueOnce({ rowCount: 1 }) // BEGIN
       .mockResolvedValueOnce({ rowCount: 1 }) // pg_advisory_xact_lock
+      // evaluarElegibilidadDerivacion -> vinculo
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          registro_version_id: 'reg-ver-1',
+          id_procedimiento: 'proc-1',
+          monto_efectivo: '45.00',
+          monto_proc: '45.00',
+          intervencion_financiera: 'REQUIERE_PAGO',
+        }],
+      })
+      // reqDocObligatorios (documental)
+      .mockResolvedValueOnce({
+        rowCount: 0,
+        rows: [],
+      })
+      // reqFinancieros HOMOLOGADO
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [{
           id_requisito: 'req-fin-homologado',
-          nombre: 'Tasa Certificado Oficial',
-          estado_homologacion: 'HOMOLOGADO',
         }],
       })
-      // Pago confirmado satisface la obligación
+      // orden de pago CONFIRMADO
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ estado: 'CONFIRMADO', monto: 45.00 }],
+        rows: [{ orden_pago_id: 'orden-conf-1' }],
       })
       .mockResolvedValueOnce({
         rowCount: 1,
@@ -987,9 +1036,19 @@ describe('SIGD — FASE 5G: Core Operativo, Workflow, Custodia, Asignación y Ob
         rowCount: 1,
         rows: [{ id_area: ID_AREA_B, nombre: 'Área Destino B', vigente: true }],
       })
+      // resolverDestinoTupa -> 1. validar expediente_id
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ estado_actual_id: 'EN_REVISION', area_contexto_id: ID_AREA_A }],
+        rows: [{ expediente_id: ID_EXPEDIENTE }],
+      })
+      // resolverDestinoTupa -> 2. consultar vinculoRes
+      .mockResolvedValueOnce({
+        rowCount: 0,
+        rows: [],
+      })
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ estado_actual_id: 'EN_REVISION', area_contexto_id: ID_AREA_A, codigo_expediente: 'EXP-001', solicitante_id: 'sol-1' }],
       })
       .mockResolvedValueOnce({
         rowCount: 1,
@@ -1125,5 +1184,116 @@ describe('SIGD — FASE 5G: Core Operativo, Workflow, Custodia, Asignación y Ob
       mockClient,
       expect.objectContaining({ tipo_evento: 'ExpedienteAtendido' }),
     );
+  });
+
+  // ===========================================================================
+  // PM-5G-26: Actor con rol ESPECIALISTA no puede enviar a firma (DENY 403)
+  // ===========================================================================
+  it('PM-5G-26: Actor con rol ESPECIALISTA no puede elevar directamente a firma (DENY 403 ESPECIALISTA_NO_PUEDE_ELEVAR_A_FIRMA)', async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(
+      '/api/v1/expedientes',
+      crearRouterDerivaciones(mockPool, {
+        obtenerActor: vi.fn().mockResolvedValue({
+          id: ID_USUARIO_ACTOR,
+          idPersona: ID_PERSONA_ACTOR,
+          roles: ['ESPECIALISTA'],
+          unidadOrganicaId: ID_AREA_A,
+          contextoOperacion: 'INSTITUCIONAL',
+        }),
+      } as any),
+    );
+    app.use(errorMiddleware);
+
+    const res = await request(app)
+      .post(`/api/v1/expedientes/${ID_EXPEDIENTE}/enviar-a-firma`)
+      .send({
+        resultado_resumen: 'Intento de elevación por especialista',
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('ESPECIALISTA_NO_PUEDE_ELEVAR_A_FIRMA');
+  });
+
+  // ===========================================================================
+  // PM-5G-27: Actor con rol SECRETARIO sí puede enviar a firma tras atención técnica (ALLOW 200)
+  // ===========================================================================
+  it('PM-5G-27: Actor con rol SECRETARIO sí posee facultad de despacho para elevar a firma (ALLOW 200)', async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(
+      '/api/v1/expedientes',
+      crearRouterDerivaciones(mockPool, {
+        obtenerActor: vi.fn().mockResolvedValue({
+          id: ID_USUARIO_ACTOR,
+          idPersona: ID_PERSONA_ACTOR,
+          roles: ['SECRETARIO'],
+          unidadOrganicaId: ID_AREA_A,
+          contextoOperacion: 'INSTITUCIONAL',
+        }),
+      } as any),
+    );
+    app.use(errorMiddleware);
+
+    mockQuery
+      .mockResolvedValueOnce({ rowCount: 1 }) // BEGIN
+      .mockResolvedValueOnce({ rowCount: 1 }) // pg_advisory_xact_lock
+      // SELECT estado_actual_id
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          estado_actual_id: 'EN_REVISION',
+          area_contexto_id: ID_AREA_A,
+          codigo_expediente: 'EXP-2026-0001',
+          solicitante_id: 'sol-1',
+          unidad_responsable_id: ID_AREA_A,
+          unidad_resolutiva_id: ID_AREA_B,
+        }],
+      })
+      // SELECT evidencia etapa técnica (atención técnica y asignación completadas)
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          paso_actual: 2,
+          tiene_asignacion: true,
+          historial_pasos: [{ evento: 'ATENCION_TECNICA' }],
+        }],
+      })
+      // INSERT movimiento_tramite EN_FIRMA
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ movimiento_id: 'mov-firma-1' }] })
+      // SELECT contextoExpediente (WorkflowSvc)
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          expediente_id: ID_EXPEDIENTE,
+          codigo_expediente: 'EXP-2026-0001',
+          estado_actual: 'EN_REVISION',
+          area_actual_id: ID_AREA_A,
+        }],
+      })
+      // workflowSvc queries: SELECT workflow_instancia
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          instancia_id: 'inst-1',
+          estado_workflow: 'EN_CURSO',
+          paso_actual: 2,
+          historial_pasos: [],
+        }],
+      })
+      // UPDATE workflow_instancia
+      .mockResolvedValueOnce({ rowCount: 1 })
+      .mockResolvedValueOnce({ rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post(`/api/v1/expedientes/${ID_EXPEDIENTE}/enviar-a-firma`)
+      .send({
+        resultado_resumen: 'Pase a Despacho de Dirección General',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.mensaje).toContain('EN_FIRMA exitosamente');
   });
 });

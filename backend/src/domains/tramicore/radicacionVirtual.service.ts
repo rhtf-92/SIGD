@@ -10,6 +10,7 @@ import { calcularVencimientoOrdenPago } from '../tesoreria/tesoreria.service.js'
 import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
 import { TupaRequisitosService } from './tupaRequisitos.service.js';
 import { TupaVersionRepository } from './tupaVersion.repository.js';
+import { WorkflowService } from '../rutadoc/workflow.service.js';
 
 /**
  * T-BE-TC-02 y T-BE-TC-03 — Logica de negocio de la radicacion virtual
@@ -102,6 +103,7 @@ export class RadicacionVirtualService {
   private readonly tesoreriaRepository = new TesoreriaRepository();
   private readonly tupaRequisitosService: TupaRequisitosService;
   private readonly tupaVersionRepository: TupaVersionRepository;
+  private readonly workflowService: WorkflowService;
   private readonly obtenerFeriados: ProveedorFeriados;
 
   constructor(private readonly pool: Pool, obtenerFeriados?: ProveedorFeriados) {
@@ -109,6 +111,7 @@ export class RadicacionVirtualService {
     this.obtenerFeriados = obtenerFeriados ?? crearProveedorFeriados(pool);
     this.tupaRequisitosService = new TupaRequisitosService(pool);
     this.tupaVersionRepository = new TupaVersionRepository(pool);
+    this.workflowService = new WorkflowService(pool);
   }
 
   async radicar(datos: RadicacionVirtualInput, now: Date = new Date()): Promise<ResultadoRadicacion> {
@@ -168,6 +171,7 @@ export class RadicacionVirtualService {
       let ordenPagoCreadaId: string | undefined;
       if (datos.registroVersionId) {
         await this.insertarVinculoTupa(cliente, expediente.expediente_id, datos.registroVersionId);
+        await this.workflowService.vincularInstanciaExpediente(expediente.expediente_id, datos.registroVersionId, cliente);
         const contextoPago = await this.tesoreriaRepository.obtenerContextoExpedienteParaPago(cliente, expediente.expediente_id);
         if (!contextoPago) throw new Error('No se pudo resolver el costo TUPA del expediente radicado.');
         if (contextoPago.costoOficial > 0) {
@@ -198,6 +202,7 @@ export class RadicacionVirtualService {
 
         // Registrar evidencias documentales asociadas a requisitos (Fase 5F)
         if (datos.documentos && datos.documentos.length > 0) {
+          let maxFolioAcc = 0;
           for (const doc of datos.documentos) {
             if (doc.idRequisito) {
               const resAdj = await cliente.query<{ documento_adjunto_id: string }>(
@@ -223,6 +228,22 @@ export class RadicacionVirtualService {
                 ],
               );
               const idDocAdjunto = resAdj.rows[0]?.documento_adjunto_id;
+
+              if (idDocAdjunto) {
+                const numPaginasDoc = Math.max(1, datos.totalFolios && datos.documentos.length === 1 ? datos.totalFolios : 1);
+                const folioInicio = maxFolioAcc + 1;
+                const folioFin = folioInicio + numPaginasDoc - 1;
+                maxFolioAcc = folioFin;
+
+                await cliente.query(
+                  `INSERT INTO sigd_tra.expediente_documento_folio (
+                     id_folio, expediente_id, id_documento, folio_inicio, folio_fin, asignado_por, creado_en
+                   ) VALUES (
+                     gen_random_uuid(), $1::uuid, $2::uuid, $3, $4, $5::uuid, $6
+                   );`,
+                  [expediente.expediente_id, idDocAdjunto, folioInicio, folioFin, persona.id_persona, horario.radicacionLegal],
+                );
+              }
 
               await this.tupaRequisitosService.registrarEvidencia(
                 {
@@ -465,56 +486,7 @@ export class RadicacionVirtualService {
   }
 
   private async verificarVersionTupa(cliente: PoolClient, registroVersionId: string, now: Date): Promise<void> {
-    if (!registroVersionId || !REGEX_UUID.test(registroVersionId)) {
-      throw new ValidationError({
-        invalidParams: [
-          { name: 'registroVersionId', reason: 'registroVersionId debe ser un UUID valido de sigd_doc.tupa_registro_version.' },
-        ],
-      });
-    }
-
-    const resultado = await cliente.query<FilaVersionTupa>(
-      `SELECT registro_version_id, estado_validacion, vigencia_desde, vigencia_hasta
-         FROM sigd_doc.tupa_registro_version
-        WHERE registro_version_id = $1::uuid`,
-      [registroVersionId],
-    );
-    const version = resultado.rows[0];
-    if (!version) {
-      throw new NotFoundError({
-        message: 'La version TUPA indicada no existe.',
-        detail: `No existe sigd_doc.tupa_registro_version con registroVersionId ${registroVersionId}.`,
-      });
-    }
-    if (version.estado_validacion !== 'APROBADO') {
-      throw new ConflictError({
-        code: 'VERSION_TUPA_NO_APROBADA',
-        message: 'La version TUPA indicada no esta aprobada.',
-        detail: `La version ${registroVersionId} esta en estado ${version.estado_validacion}; solo se vinculan versiones APROBADO.`,
-      });
-    }
-
-    const hoyStr = now.toISOString().slice(0, 10);
-    if (version.vigencia_desde) {
-      const desdeStr = version.vigencia_desde instanceof Date ? version.vigencia_desde.toISOString().slice(0, 10) : String(version.vigencia_desde).slice(0, 10);
-      if (desdeStr > hoyStr) {
-        throw new ConflictError({
-          code: 'VERSION_TUPA_FUERA_DE_VIGENCIA',
-          message: 'La version TUPA indicada aun no entra en vigencia.',
-          detail: `La version ${registroVersionId} entra en vigencia el ${desdeStr}.`,
-        });
-      }
-    }
-    if (version.vigencia_hasta) {
-      const hastaStr = version.vigencia_hasta instanceof Date ? version.vigencia_hasta.toISOString().slice(0, 10) : String(version.vigencia_hasta).slice(0, 10);
-      if (hastaStr < hoyStr) {
-        throw new ConflictError({
-          code: 'VERSION_TUPA_FUERA_DE_VIGENCIA',
-          message: 'La version TUPA indicada ya no esta vigente.',
-          detail: `La version ${registroVersionId} vencio el ${hastaStr}.`,
-        });
-      }
-    }
+    await this.tupaVersionRepository.validarElegibilidadRadicacion(registroVersionId, now, cliente);
   }
 
   private async insertarExpediente(

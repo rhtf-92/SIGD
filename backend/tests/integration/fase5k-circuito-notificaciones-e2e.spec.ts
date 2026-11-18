@@ -133,15 +133,27 @@ describe('Fase 5K.1 — Suite E2E Real: Circuito RutaDoc → Outbox → Casilla 
     return usuarioId;
   }
 
-  async function crearExpedienteTest(solicitanteId: string, estadoInicial: string, cutPersonalizado?: string): Promise<{ expedienteId: string; cut: string }> {
+  async function crearExpedienteTest(solicitanteId: string, estadoInicial: string, cutPersonalizado?: string, idUsuarioCreador?: string): Promise<{ expedienteId: string; cut: string }> {
     const expedienteId = randomUUID();
     const cut = cutPersonalizado || `EXP-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    let creador = idUsuarioCreador || null;
+    if (!creador) {
+      const uRes = await pool.query<{ id_usuario: string }>(
+        'SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_persona = $1::uuid AND activo = true LIMIT 1',
+        [solicitanteId],
+      );
+      if (uRes.rows.length > 0) {
+        creador = uRes.rows[0].id_usuario;
+      }
+    }
+
     await pool.query(
       `INSERT INTO sigd_tra.expediente (
          expediente_id, codigo_expediente, numero, tipo_documental_id, solicitante_id,
-         area_destino_id, estado, fecha_radicacion
-       ) VALUES ($1, $2, $2, $3, $4, $5, $6, now())`,
-      [expedienteId, cut, tipoDocId, solicitanteId, areaId, estadoInicial],
+         area_destino_id, estado, fecha_radicacion, id_usuario_creador
+       ) VALUES ($1, $2, $2, $3, $4, $5, $6, now(), $7)`,
+      [expedienteId, cut, tipoDocId, solicitanteId, areaId, estadoInicial, creador],
     );
     idsCreados.expedientes.add(expedienteId);
     return { expedienteId, cut };
@@ -157,7 +169,7 @@ describe('Fase 5K.1 — Suite E2E Real: Circuito RutaDoc → Outbox → Casilla 
          documento_adjunto_id, expediente_id, expediente_tra_id, tipo_documental_id,
          nombre_archivo, s3_bucket, s3_key, sha256, tamano_bytes, mime_type, subido_por, creado_en
        ) VALUES ($1, NULL, $2, $3, 'resolucion_firmada.pdf', 'sigd-expedientes', $4, $5, 2048, 'application/pdf', $6, now())`,
-      [documentoId, expedienteId, tipoDocId, `expedientes/test/${documentoId}.pdf`, shaFirmado, solicitanteId],
+      [documentoId, expedienteId, tipoDocId, `resoluciones/test/${documentoId}.pdf`, shaFirmado, solicitanteId],
     );
 
     await pool.query(
@@ -165,7 +177,7 @@ describe('Fase 5K.1 — Suite E2E Real: Circuito RutaDoc → Outbox → Casilla 
          documento_id, cvd, sha256_firmado, firmante, estado, fecha_registro,
          fecha_sello_tsa, s3_bucket, s3_key, algoritmo_firma, proveedor_firma, documento_version
        ) VALUES ($1, $2, $3, 'Director General IESTP Suiza', 'FIRMADO_DIGITALMENTE', now(), now(), 'sigd-expedientes', $4, 'SHA256withRSA', 'DNIE_TEST', 1)`,
-      [documentoId, cvd, shaFirmado, `expedientes/test/${documentoId}.pdf`],
+      [documentoId, cvd, shaFirmado, `resoluciones/test/${documentoId}.pdf`],
     );
 
     idsCreados.documentos.add(documentoId);

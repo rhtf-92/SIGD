@@ -106,7 +106,7 @@ export class DocumentoStorageService {
       });
     }
 
-    const prefijosPermitidos = ['expedientes/', 'tupa/', 'cargos/', 'resoluciones/'];
+    const prefijosPermitidos = ['expedientes/', 'tupa/', 'cargos/', 'resoluciones/', 'acuses/', 'presentados/'];
     const esPrefijoValido = prefijosPermitidos.some((p) => key.startsWith(p));
     if (!esPrefijoValido) {
       throw new ValidationError({

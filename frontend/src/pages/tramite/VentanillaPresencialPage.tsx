@@ -374,6 +374,7 @@ export default function VentanillaPresencialPage() {
   );
   const definicionSeleccionada = procedimientoSeleccionado
     ? obtenerDefinicionTupa(procedimientoSeleccionado.fuente.referenciaFila) : undefined;
+  const esActuacionInterna = definicionSeleccionada?.categoria === 'ACTUACION_INTERNA';
 
   const terminosBusqueda = useMemo(() => {
     return normalizarParaBusqueda(busquedaTupa).split(/\s+/).filter(Boolean);
@@ -461,6 +462,10 @@ export default function VentanillaPresencialPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (esActuacionInterna) {
+      alert('Las actuaciones internas no están autorizadas para radicación documentaria externa en ventanilla.');
+      return;
+    }
     if (definicionSeleccionada && !definicionSeleccionada.generaExpediente) {
       setModalDinamicoAbierto(true);
       return;
@@ -1143,6 +1148,14 @@ export default function VentanillaPresencialPage() {
                         'Recepción de documentación libre, petitorio general o documentos no tabulados en TUPA.'
                       )}
                     </p>
+                    {esActuacionInterna && (
+                      <div className="mt-2.5 rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs text-red-900" role="alert">
+                        <strong className="font-bold text-red-800">⚠ Actuación interna no radicable en ventanilla externa</strong>
+                        <p className="mt-0.5 text-red-700 leading-relaxed">
+                          Este trámite es de gestión académica interna y no admite radicación documentaria externa por Ventanilla Presencial.
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -1520,8 +1533,11 @@ export default function VentanillaPresencialPage() {
           )}
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-            {!puedeRadicarCut && (!definicionSeleccionada || definicionSeleccionada.generaExpediente) &&
-              <p className="text-xs text-amber-800">La emisión de CUT presencial requiere Mesa de Partes o Administración.</p>}
+            {esActuacionInterna ? (
+              <p className="text-xs font-semibold text-red-700">Procedimiento interno: no admite radicación documentaria presencial.</p>
+            ) : !puedeRadicarCut && (!definicionSeleccionada || definicionSeleccionada.generaExpediente) && (
+              <p className="text-xs text-amber-800">La emisión de CUT presencial requiere Mesa de Partes o Administración.</p>
+            )}
             <button
               type="button"
               onClick={handleNuevoRegistro}
@@ -1530,13 +1546,19 @@ export default function VentanillaPresencialPage() {
               Limpiar Campos
             </button>
             <button
-              type={definicionSeleccionada && !definicionSeleccionada.generaExpediente ? 'button' : 'submit'}
-              onClick={definicionSeleccionada && !definicionSeleccionada.generaExpediente
+              type={esActuacionInterna ? 'button' : (definicionSeleccionada && !definicionSeleccionada.generaExpediente ? 'button' : 'submit')}
+              onClick={!esActuacionInterna && definicionSeleccionada && !definicionSeleccionada.generaExpediente
                 ? () => setModalDinamicoAbierto(true) : undefined}
-              disabled={((!definicionSeleccionada || definicionSeleccionada.generaExpediente) && !puedeRadicarCut) || enviando}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-800 transition"
+              disabled={esActuacionInterna || ((!definicionSeleccionada || definicionSeleccionada.generaExpediente) && !puedeRadicarCut) || enviando}
+              className={`inline-flex min-h-[44px] items-center gap-2 rounded-lg px-5 py-2.5 text-xs font-bold text-white shadow-sm transition ${
+                esActuacionInterna ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-700 hover:bg-blue-800'
+              }`}
             >
-              {definicionSeleccionada && !definicionSeleccionada.generaExpediente ? 'Abrir formulario específico' : '✓ Registrar y Emitir Cargo CUT'}
+              {esActuacionInterna
+                ? 'Actuación interna no radicable'
+                : definicionSeleccionada && !definicionSeleccionada.generaExpediente
+                ? 'Abrir formulario específico'
+                : '✓ Registrar y Emitir Cargo CUT'}
             </button>
           </div>
         </form>

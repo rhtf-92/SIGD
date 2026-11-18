@@ -30,6 +30,7 @@ import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js'
 import { documentoStorageService } from '../../core/storage/documento-storage.service.js';
 import { TupaRequisitosService } from './tupaRequisitos.service.js';
 import { TupaVersionRepository } from './tupaVersion.repository.js';
+import { WorkflowService } from '../rutadoc/workflow.service.js';
 
 export interface DocumentoAdjuntoPresencialInput {
   nombreArchivo: string;
@@ -121,6 +122,7 @@ export function enmascararNumeroDocumento(tipoDoc: string, numDoc: string): stri
 export class VentanillaPresencialService {
   private readonly tupaRequisitosService: TupaRequisitosService;
   private readonly tupaVersionRepository: TupaVersionRepository;
+  private readonly workflowService: WorkflowService;
 
   constructor(
     private readonly pool: Pool,
@@ -129,6 +131,7 @@ export class VentanillaPresencialService {
   ) {
     this.tupaRequisitosService = tupaRequisitosService ?? new TupaRequisitosService(pool);
     this.tupaVersionRepository = new TupaVersionRepository(pool);
+    this.workflowService = new WorkflowService(pool);
   }
 
   public async registrarExpedienteVentanilla(
@@ -148,9 +151,9 @@ export class VentanillaPresencialService {
         invalidParams: [{ name: 'numeroDocumento', reason: 'El RUC debe contener exactamente 11 dígitos.' }],
       });
     }
-    if (tipoDoc === 'CE' && !/^[0-9a-zA-Z]{9,12}$/.test(numDoc)) {
+    if (tipoDoc === 'CE' && !/^[0-9a-zA-Z]{8,12}$/.test(numDoc)) {
       throw new ValidationError({
-        invalidParams: [{ name: 'numeroDocumento', reason: 'El Carné de Extranjería debe contener entre 9 y 12 caracteres.' }],
+        invalidParams: [{ name: 'numeroDocumento', reason: 'El Carné de Extranjería debe contener entre 8 y 12 caracteres.' }],
       });
     }
 
@@ -436,6 +439,11 @@ export class VentanillaPresencialService {
           expedienteId,
           datos.registroVersionId,
           {},
+          cliente,
+        );
+        await this.workflowService.vincularInstanciaExpediente(
+          expedienteId,
+          datos.registroVersionId,
           cliente,
         );
 
@@ -825,53 +833,13 @@ export class VentanillaPresencialService {
   }
 
   private async verificarVersionTupa(cliente: PoolClient, registroVersionId: string): Promise<void> {
-    if (!registroVersionId || !REGEX_UUID.test(registroVersionId)) {
-      throw new ValidationError({
-        invalidParams: [{ name: 'registroVersionId', reason: 'registroVersionId debe ser un UUID válido.' }],
-      });
-    }
-
-    const resultado = await cliente.query<FilaVersionTupa>(
-      `SELECT registro_version_id, estado_validacion, vigencia_desde, vigencia_hasta
-         FROM sigd_doc.tupa_registro_version
-        WHERE registro_version_id = $1::uuid`,
-      [registroVersionId],
-    );
-    const version = resultado.rows[0];
-    if (!version) {
-      throw new NotFoundError({
-        message: 'La version TUPA indicada no existe.',
-        detail: `No existe sigd_doc.tupa_registro_version con registroVersionId ${registroVersionId}.`,
-      });
-    }
-    if (version.estado_validacion !== 'APROBADO') {
+    const elegibilidad = await this.tupaVersionRepository.validarElegibilidadRadicacion(registroVersionId, new Date(), cliente);
+    if (elegibilidad.categoria === 'ACTUACION_INTERNA') {
       throw new ConflictError({
-        code: 'VERSION_TUPA_NO_APROBADA',
-        message: 'La version TUPA indicada no esta aprobada.',
-        detail: `La version ${registroVersionId} esta en estado ${version.estado_validacion}; solo se vinculan versiones APROBADO.`,
+        code: 'ACTUACION_INTERNA_NO_RADICABLE',
+        message: 'El procedimiento seleccionado es una actuación interna no radicable por ventanilla externa.',
+        detail: `La actuación interna "${elegibilidad.denominacion}" (${elegibilidad.codigoRef}) no admite radicación documentaria externa en ventanilla.`,
       });
-    }
-
-    const hoyStr = new Date().toISOString().slice(0, 10);
-    if (version.vigencia_desde) {
-      const desdeStr = version.vigencia_desde instanceof Date ? version.vigencia_desde.toISOString().slice(0, 10) : String(version.vigencia_desde).slice(0, 10);
-      if (desdeStr > hoyStr) {
-        throw new ConflictError({
-          code: 'VERSION_TUPA_FUERA_DE_VIGENCIA',
-          message: 'La version TUPA indicada aun no entra en vigencia.',
-          detail: `La version ${registroVersionId} entra en vigencia el ${desdeStr}.`,
-        });
-      }
-    }
-    if (version.vigencia_hasta) {
-      const hastaStr = version.vigencia_hasta instanceof Date ? version.vigencia_hasta.toISOString().slice(0, 10) : String(version.vigencia_hasta).slice(0, 10);
-      if (hastaStr < hoyStr) {
-        throw new ConflictError({
-          code: 'VERSION_TUPA_FUERA_DE_VIGENCIA',
-          message: 'La version TUPA indicada ya no esta vigente.',
-          detail: `La version ${registroVersionId} vencio el ${hastaStr}.`,
-        });
-      }
     }
   }
 

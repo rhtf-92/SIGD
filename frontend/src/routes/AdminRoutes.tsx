@@ -29,7 +29,7 @@ export default function AdminRoutes() {
       <Route
         path="usuarios"
         element={
-          <ProtectedRoute requiredRoles={["ADMINISTRADOR"]}>
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR", "SUPERADMINISTRADOR"]}>
             {withSuspense(UsuariosPage)}
           </ProtectedRoute>
         }
@@ -42,7 +42,7 @@ export default function AdminRoutes() {
       <Route
         path="tupa"
         element={
-          <ProtectedRoute requiredRoles={["ADMINISTRADOR"]}>
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR", "SUPERADMINISTRADOR"]}>
             {withSuspense(TupaAdminPage)}
           </ProtectedRoute>
         }

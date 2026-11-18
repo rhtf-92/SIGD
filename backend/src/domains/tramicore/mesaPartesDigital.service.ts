@@ -27,6 +27,7 @@ import { calcularVencimientoOrdenPago } from '../tesoreria/tesoreria.service.js'
 import { ValidationError, NotFoundError, ConflictError } from '../../shared/domain/errors/index.js';
 import type { MesaPartesDigitalInput } from './tramites.schemas.js';
 import { TupaVersionRepository } from './tupaVersion.repository.js';
+import { WorkflowService } from '../rutadoc/workflow.service.js';
 
 export interface ResultadoMesaPartesDigital {
   expedienteId: string;
@@ -59,6 +60,7 @@ export class MesaPartesDigitalService {
   private readonly tupaVersionRepository: TupaVersionRepository;
   private readonly tupaRequisitosService: TupaRequisitosService;
   private readonly documentoStorageService: DocumentoStorageService;
+  private readonly workflowService: WorkflowService;
   private readonly obtenerFeriados: () => Promise<string[]>;
 
   constructor(private readonly pool: Pool, obtenerFeriados?: () => Promise<string[]>) {
@@ -66,46 +68,31 @@ export class MesaPartesDigitalService {
     this.tupaVersionRepository = new TupaVersionRepository(pool);
     this.tupaRequisitosService = new TupaRequisitosService(pool);
     this.documentoStorageService = new DocumentoStorageService();
+    this.workflowService = new WorkflowService(pool);
     this.obtenerFeriados = obtenerFeriados ?? crearProveedorFeriados(pool);
   }
 
   async radicarDigital(
     datos: MesaPartesDigitalInput,
     now: Date = new Date(),
+    clienteParam?: PoolClient,
+    idUsuarioCreador?: string | null,
+    personaAutenticadaId?: string | null,
   ): Promise<ResultadoMesaPartesDigital> {
-    const cliente = await this.pool.connect();
+    const cliente = clienteParam ?? await this.pool.connect();
+    const esTransaccionPropia = !clienteParam;
     let transaccionAbierta = false;
     const objetosSubidosMinIO: string[] = [];
 
     try {
-      await cliente.query('BEGIN');
-      transaccionAbierta = true;
+      if (esTransaccionPropia) {
+        await cliente.query('BEGIN');
+        transaccionAbierta = true;
+      }
 
-      // 1. Validar versión TUPA
-      const versionRes = await cliente.query<{
-        registro_version_id: string;
-        estado_validacion: string;
-        vigencia_desde: Date | null;
-        vigencia_hasta: Date | null;
-      }>(
-        `SELECT registro_version_id, estado_validacion, vigencia_desde, vigencia_hasta
-           FROM sigd_doc.tupa_registro_version
-          WHERE registro_version_id = $1::uuid`,
-        [datos.registroVersionId],
-      );
-      const version = versionRes.rows[0];
-      if (!version) {
-        throw new NotFoundError({
-          message: 'La versión del procedimiento TUPA no existe.',
-          detail: `No se encontró tupa_registro_version con ID ${datos.registroVersionId}.`,
-        });
-      }
-      if (version.estado_validacion !== 'APROBADO') {
-        throw new ConflictError({
-          code: 'VERSION_TUPA_NO_APROBADA',
-          message: 'El procedimiento TUPA seleccionado no se encuentra aprobado.',
-        });
-      }
+      // 1. Validar versión TUPA, vigencia, estado y que genera expediente
+      const elegibilidad = await this.tupaVersionRepository.validarElegibilidadRadicacion(datos.registroVersionId, now, cliente);
+      const areaDestinoId = elegibilidad.unidadReceptoraId || 'a0000000-0000-0000-0000-000000000002';
 
       // Validar requisitos documentales obligatorios
       await this.tupaRequisitosService.validarRequisitosObligatorios(
@@ -129,15 +116,39 @@ export class MesaPartesDigitalService {
       let personaId: string;
       let nombreRemitente: string;
 
-      if (personaExistente.rows[0]) {
+      if (personaAutenticadaId) {
+        personaId = personaAutenticadaId;
+        if (datos.tipoPersona === 'NATURAL') {
+          const apellidos = [datos.apellidoPaterno, datos.apellidoMaterno].filter(Boolean).join(' ');
+          const nombreCompleto = [datos.nombres, apellidos].filter(Boolean).join(' ');
+          nombreRemitente = nombreCompleto || datos.numeroDocumento;
+          await cliente.query(
+            `UPDATE sigd_auth.persona_natural
+                SET correo = COALESCE($2, correo),
+                    telefono = COALESCE($3, telefono)
+              WHERE id_persona = $1::uuid`,
+            [personaId, datos.correo, datos.celular || null],
+          );
+        } else {
+          nombreRemitente = datos.razonSocial || datos.numeroDocumento;
+        }
+        if (datos.direccion || datos.ubigeoDistrito) {
+          await cliente.query(
+            `UPDATE sigd_auth.persona
+                SET direccion = COALESCE($2, direccion),
+                    ubigeo_distrito = COALESCE($3, ubigeo_distrito)
+              WHERE id_persona = $1::uuid`,
+            [personaId, datos.direccion || null, datos.ubigeoDistrito || null],
+          );
+        }
+      } else if (personaExistente.rows[0]) {
         personaId = personaExistente.rows[0].id_persona;
         // Actualizar dirección si se provee
         if (datos.direccion || datos.ubigeoDistrito) {
           await cliente.query(
             `UPDATE sigd_auth.persona
                 SET direccion = COALESCE($2, direccion),
-                    ubigeo_distrito = COALESCE($3, ubigeo_distrito),
-                    actualizado_en = now()
+                    ubigeo_distrito = COALESCE($3, ubigeo_distrito)
               WHERE id_persona = $1::uuid`,
             [personaId, datos.direccion || null, datos.ubigeoDistrito || null],
           );
@@ -237,21 +248,28 @@ export class MesaPartesDigitalService {
       const anio = anioDeRecepcion(now);
       const { cut } = await this.cutService.generar(anio, cliente);
 
-      // 5. Insertar Expediente formal (id_usuario_creador = NULL por radicar sin cuenta)
+      // 5. Insertar Expediente formal (id_usuario_creador vinculado si hay sesión autenticada, NULL si es público)
+      const creadorSql = idUsuarioCreador ? `$7::uuid` : `NULL`;
+      const paramsExp: any[] = [
+        cut,
+        /^[0-9]{8}$/.test(datos.numeroDocumento) ? datos.numeroDocumento : null,
+        tipoDocumentalId,
+        personaId,
+        areaDestinoId,
+        horario.radicacionLegal,
+      ];
+      if (idUsuarioCreador) {
+        paramsExp.push(idUsuarioCreador);
+      }
+
       const expInsert = await cliente.query<{ expediente_id: string }>(
         `INSERT INTO sigd_tra.expediente (
            codigo_expediente, numero, dni_solicitante, tipo_documental_id,
            solicitante_id, area_destino_id, estado, fecha_radicacion, id_usuario_creador
          ) VALUES (
-           $1, $1, $2, $3::uuid, $4::uuid, NULL, 'REGISTRADO', $5, NULL
+           $1, $1, $2, $3::uuid, $4::uuid, $5::uuid, 'REGISTRADO', $6, ${creadorSql}
          ) RETURNING expediente_id`,
-        [
-          cut,
-          /^[0-9]{8}$/.test(datos.numeroDocumento) ? datos.numeroDocumento : null,
-          tipoDocumentalId,
-          personaId,
-          horario.radicacionLegal,
-        ],
+        paramsExp,
       );
       const expedienteId = expInsert.rows[0].expediente_id;
 
@@ -263,7 +281,7 @@ export class MesaPartesDigitalService {
 
       await cliente.query(
         `INSERT INTO sigd_tra.asiento_registro (expediente_id, fecha_ingreso, canal_ingreso, asunto, remitente_id)
-         VALUES ($1::uuid, $2, 'MESA_PARTES_DIGITAL', $3, $4::uuid)`,
+         VALUES ($1::uuid, $2, 'MESA_VIRTUAL', $3, $4::uuid)`,
         [expedienteId, horario.envioReal, datos.asunto, personaId],
       );
 
@@ -271,6 +289,12 @@ export class MesaPartesDigitalService {
         expedienteId,
         datos.registroVersionId,
         {},
+        cliente,
+      );
+
+      await this.workflowService.vincularInstanciaExpediente(
+        expedienteId,
+        datos.registroVersionId,
         cliente,
       );
 
@@ -486,16 +510,28 @@ export class MesaPartesDigitalService {
         `INSERT INTO sigd_rut.estado_actual_expediente (
            expediente_id, secuencia, estado_nuevo, evento, area_actual_id, id_movimiento, fecha_hora, usuario_operador_id
          ) VALUES (
-           $1::uuid, 1, $2, 'RADICACION_DIGITAL_PUBLICA', 'MESA_PARTES', gen_random_uuid(), $3, 0
+           $1::uuid, 1, $2, 'RADICACION_DIGITAL_PUBLICA', $3, gen_random_uuid(), $4, 0
          ) ON CONFLICT (expediente_id) DO UPDATE
-         SET estado_nuevo = EXCLUDED.estado_nuevo, fecha_hora = EXCLUDED.fecha_hora;`,
-        [expedienteId, ordenPagoInfo ? 'PENDIENTE_PAGO' : 'REGISTRADO', horario.radicacionLegal],
+         SET estado_nuevo = EXCLUDED.estado_nuevo,
+             fecha_hora = EXCLUDED.fecha_hora,
+             area_actual_id = EXCLUDED.area_actual_id;`,
+        [expedienteId, 'REGISTRADO', areaDestinoId, horario.radicacionLegal],
+      );
+
+      await cliente.query(
+        `INSERT INTO sigd_rut.movimiento_secuencia (expediente_id, ultima_secuencia)
+         VALUES ($1::uuid, 1)
+         ON CONFLICT (expediente_id) DO UPDATE
+         SET ultima_secuencia = GREATEST(sigd_rut.movimiento_secuencia.ultima_secuencia, 1);`,
+        [expedienteId],
       );
 
       const codigoCargo = `CARGO-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
-      await cliente.query('COMMIT');
-      transaccionAbierta = false;
+      if (esTransaccionPropia) {
+        await cliente.query('COMMIT');
+        transaccionAbierta = false;
+      }
 
       return {
         expedienteId,
@@ -527,7 +563,9 @@ export class MesaPartesDigitalService {
       }
       throw error;
     } finally {
-      cliente.release();
+      if (esTransaccionPropia) {
+        cliente.release();
+      }
     }
   }
 

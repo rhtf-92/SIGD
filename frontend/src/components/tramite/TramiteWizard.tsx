@@ -218,16 +218,16 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
   );
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`space-y-4 ${className}`}>
       {perfilEstado === 'cargando' && (
-        <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xs">
+        <div role="status" className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xs">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#006EC7] border-r-transparent mb-3" />
           <p className="text-sm font-semibold text-slate-700">Cargando datos de tu cuenta...</p>
           <p className="text-xs text-slate-500 mt-1">Recuperando tu identidad oficial para el trámite...</p>
         </div>
       )}
       {perfilEstado === 'error' && (
-        <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-800">
+        <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-800">
           <h3 className="text-sm font-bold">No se pudo consultar el perfil de la cuenta</h3>
           <p className="text-xs mt-1 text-rose-700">{perfilError}. Vuelve a iniciar sesión si el problema continúa.</p>
         </div>
@@ -235,7 +235,7 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
       {perfilEstado === 'listo' && (
         <>
           {/* 1. RENDERIZADO MODULAR SEGÚN EL PASO ACTIVO */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-xs">
             {state.currentStep === 1 && (
               <StepIdentificacion
                 data={state.identificacion}

@@ -150,22 +150,64 @@ export const casillaService = {
   },
 
   async descargarDocumento(notificacion: Notificacion): Promise<void> {
-    const { data } = await apiClient.get<{ downloadUrl: string }>(
-      CASILLA_ENDPOINTS.DESCARGAR_DOCUMENTO(notificacion.id),
-    );
+    const response = await apiClient.get<{
+      downloadUrl?: string;
+      url?: string;
+      data?: { downloadUrl?: string; url?: string };
+    }>(CASILLA_ENDPOINTS.DESCARGAR_DOCUMENTO(notificacion.id));
+
+    const raw = response.data;
+    const downloadUrl =
+      raw?.downloadUrl ||
+      raw?.url ||
+      raw?.data?.downloadUrl ||
+      raw?.data?.url;
+
+    if (!downloadUrl) {
+      throw new Error("El enlace de descarga del documento no se encuentra disponible.");
+    }
+
+    const nombreArchivo =
+      notificacion.actoAdministrativo?.nombreArchivoPdf ||
+      (notificacion.numeroExpediente
+        ? `Resolucion_${notificacion.numeroExpediente}.pdf`
+        : "acto_administrativo.pdf");
+
     const link = document.createElement("a");
-    link.href = data.downloadUrl;
+    link.href = downloadUrl;
+    link.download = nombreArchivo;
+    link.target = "_blank";
     link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   },
 
   async descargarAcuse(acuse: AcuseNotificacion): Promise<void> {
-    const { data } = await apiClient.get<{ downloadUrl: string }>(
-      CASILLA_ENDPOINTS.DESCARGAR_ACUSE(acuse.idNotificacion),
-    );
+    const response = await apiClient.get<{
+      downloadUrl?: string;
+      url?: string;
+      data?: { downloadUrl?: string; url?: string };
+    }>(CASILLA_ENDPOINTS.DESCARGAR_ACUSE(acuse.idNotificacion));
+
+    const raw = response.data;
+    const downloadUrl =
+      raw?.downloadUrl ||
+      raw?.url ||
+      raw?.data?.downloadUrl ||
+      raw?.data?.url;
+
+    if (!downloadUrl) {
+      throw new Error("El archivo de acuse todavía no está disponible para descarga.");
+    }
+
     const link = document.createElement("a");
-    link.href = data.downloadUrl;
+    link.href = downloadUrl;
+    link.download = `Acuse_${acuse.idAcuse || acuse.idNotificacion}.pdf`;
+    link.target = "_blank";
     link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   },
 };

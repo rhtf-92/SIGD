@@ -2,9 +2,11 @@ import { Request, Response, Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { getRequestContext } from '../../shared/request-context/request-context.js';
+import { UnauthorizedError } from '../../shared/domain/errors/index.js';
 import {
   crearServicioResoluciones,
   TIPOS_RESOLUCION,
+  generarActoResolutivoInstitucional,
   type ServicioResoluciones,
 } from './resoluciones.service.js';
 
@@ -77,7 +79,39 @@ export function crearRouterResoluciones(pool: Pool): Router {
     });
   }
 
+  const esquemaGenerarActo = z.object({
+    expedienteId: z.string().uuid(),
+    resultadoResumen: z.string().optional(),
+    observacionInterna: z.string().optional(),
+  });
+
+  async function generarActo(req: Request, res: Response): Promise<void> {
+    const datos = esquemaGenerarActo.parse(req.body);
+    const contexto = getRequestContext();
+    const usuarioId = contexto?.usuario_id;
+    if (!usuarioId) {
+      throw new UnauthorizedError({ detail: 'Autenticación requerida para generar acto resolutivo.' });
+    }
+    const resultado = await generarActoResolutivoInstitucional(
+      pool,
+      datos.expedienteId,
+      usuarioId,
+      {
+        resultadoResumen: datos.resultadoResumen,
+        observacionInterna: datos.observacionInterna,
+      },
+    );
+    res.status(201).json({
+      ok: true,
+      ...resultado,
+      correlation_id: contexto?.correlation_id,
+    });
+  }
+
   // Se registran primero las rutas específicas para no colisionar con /:id.
+  router.post('/generar-acto', (req, res, next) => {
+    generarActo(req, res).catch(next);
+  });
   router.post('/proyectar', (req, res, next) => {
     proyectar(req, res).catch(next);
   });

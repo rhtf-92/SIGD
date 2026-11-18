@@ -76,10 +76,13 @@ export const naturalSchema = z
     }),
   }).refine((data) => data.password === data.confirmarPassword, {
     path: ['confirmarPassword'], message: 'Las contraseñas no coinciden',
-  }).refine((data) => data.tipoDocumento === 'DNI'
-    ? /^[0-9]{8}$/.test(data.numeroDocumento)
-    : /^[A-Z0-9]{9,12}$/.test(data.numeroDocumento), {
-    path: ['numeroDocumento'], message: 'DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos',
+  }).refine((data) => {
+    if (data.tipoDocumento === 'DNI') return /^[0-9]{8}$/.test(data.numeroDocumento);
+    if (data.tipoDocumento === 'CE') return /^[A-Z0-9]{8,12}$/.test(data.numeroDocumento);
+    return false;
+  }, {
+    path: ['numeroDocumento'],
+    message: 'Documento inválido: DNI requiere 8 dígitos; Carné de Extranjería requiere entre 8 y 12 caracteres alfanuméricos',
   });
 
 /* --- Persona Jurídica --- */
@@ -122,10 +125,13 @@ const juridicalDocumentSchema = z
       .string()
       .min(2, "Cargo debe tener mínimo 2 caracteres")
       .max(100, "Cargo debe tener máximo 100 caracteres"),
-  }).refine((data) => data.tipoDocumento === 'DNI'
-    ? /^[0-9]{8}$/.test(data.numeroDocumento)
-    : /^[A-Z0-9]{9,12}$/.test(data.numeroDocumento), {
-    path: ['numeroDocumento'], message: 'DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos',
+  }).refine((data) => {
+    if (data.tipoDocumento === 'DNI') return /^[0-9]{8}$/.test(data.numeroDocumento);
+    if (data.tipoDocumento === 'CE') return /^[A-Z0-9]{8,12}$/.test(data.numeroDocumento);
+    return false;
+  }, {
+    path: ['numeroDocumento'],
+    message: 'Documento inválido: DNI requiere 8 dígitos; Carné de Extranjería requiere entre 8 y 12 caracteres alfanuméricos',
   });
 
 /* Schema persona jurídica */

@@ -56,7 +56,7 @@ const ciudadanoSchema = z.object({
   const campo = datos.tipoDocumento === 'CE' ? 'ce' : 'dni';
   const valor = datos[campo];
   const valido = datos.tipoDocumento === 'CE'
-    ? /^[A-Z0-9]{9,12}$/.test(valor ?? '')
+    ? /^[A-Za-z0-9]{8,12}$/.test(valor ?? '')
     : /^[0-9]{8}$/.test(valor ?? '');
   if (!valido || datos[datos.tipoDocumento === 'CE' ? 'dni' : 'ce']) {
     ctx.addIssue({ code: 'custom', path: [campo], message: 'Documento de identidad inválido.' });

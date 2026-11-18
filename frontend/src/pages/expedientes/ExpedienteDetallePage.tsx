@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { useExpedienteTimeline } from "../../hooks/useExpedienteTimeline";
 import { useRutaDocDetalle } from "./rutadoc/useRutaDocDetalle";
@@ -19,6 +19,7 @@ import AtencionModal from "../../components/expedientes/AtencionModal";
 import EnviarAFirmaModal from "../../components/expedientes/EnviarAFirmaModal";
 import ResolverModal from "../../components/expedientes/ResolverModal";
 import ArchivadoModal from "../../components/expedientes/ArchivadoModal";
+import AsignacionModal from "../../components/expedientes/AsignacionModal";
 import ExpedienteActionToast from "../../components/expedientes/ExpedienteActionToast";
 import { useExpedienteActions } from "../../hooks/useExpedienteActions";
 import { servicioExpedienteActionsReal } from "../../api/expedienteActions";
@@ -55,7 +56,7 @@ function formatearBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${unidades[i]}`;
 }
 
-function humanizarEstado(estado?: string): { texto: string; badgeClass: string; dotClass: string } {
+function humanizarEstado(estado?: string, esTitular?: boolean): { texto: string; badgeClass: string; dotClass: string } {
   switch (estado) {
     case "REGISTRADO":
       return { texto: "Registrado", badgeClass: "bg-blue-50 text-blue-800 border-blue-200", dotClass: "bg-blue-600" };
@@ -68,7 +69,11 @@ function humanizarEstado(estado?: string): { texto: string; badgeClass: string; 
     case "OBSERVADO":
       return { texto: "Observado", badgeClass: "bg-rose-50 text-rose-800 border-rose-200", dotClass: "bg-rose-600" };
     case "SUBSANADO":
-      return { texto: "Subsanado", badgeClass: "bg-teal-50 text-teal-800 border-teal-200", dotClass: "bg-teal-600" };
+      return {
+        texto: esTitular ? "Subsanado (Pendiente de nueva revisión por la institución)" : "Subsanado",
+        badgeClass: "bg-teal-50 text-teal-800 border-teal-200",
+        dotClass: "bg-teal-600",
+      };
     case "DERIVADO":
       return { texto: "Derivado", badgeClass: "bg-cyan-50 text-cyan-800 border-cyan-200", dotClass: "bg-cyan-600" };
     case "EN_FIRMA":
@@ -214,6 +219,7 @@ export default function ExpedienteDetallePage() {
   };
 
   // 1. Endpoint consolidado: 1 solo request HTTP (/resumen) alimenta la vista inicial
+  const queryClient = useQueryClient();
   const resumen = useQuery({
     queryKey: ["rutadoc", id, "resumen"],
     queryFn: ({ signal }) => rutaDoc.resumen(id!, signal),
@@ -285,6 +291,21 @@ export default function ExpedienteDetallePage() {
   );
   const puedeResolver = puedeOperar && tieneFacultadFirmaResolucion;
 
+  // Separación de funciones: Facultad de despacho y elevación a firma reservada a Secretaría/Dirección
+  const tieneFacultadDespacho = Boolean(
+    usuario &&
+    ["SECRETARIO", "DIRECTOR"].includes(usuario.rol)
+  );
+  const tieneRolAtencion = Boolean(
+    usuario &&
+    ["DIRECTOR", "SECRETARIO", "ESPECIALISTA"].includes(usuario.rol)
+  );
+  const tieneRolArchivo = Boolean(
+    usuario &&
+    ["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "MESA_PARTES", "SUPER_ADMIN"].includes(usuario.rol)
+  );
+  const esEspecialista = usuario?.rol === "ESPECIALISTA";
+
   // Regla PM-5H-21: Módulo y acciones financieras requieren perfil operativo explícito
   const tieneCapacidadTesoreria = Boolean(
     usuario &&
@@ -297,7 +318,7 @@ export default function ExpedienteDetallePage() {
      usuario.perfiles?.includes("GESTOR_RECEPCION_DOCUMENTAL"))
   );
 
-  const [modal, setModal] = useState<"derivacion" | "observacion" | "subsanacion" | "acumulacion" | "atender" | "enviar-a-firma" | "resolver" | "archivar" | null>(null);
+  const [modal, setModal] = useState<"derivacion" | "observacion" | "subsanacion" | "acumulacion" | "atender" | "enviar-a-firma" | "resolver" | "archivar" | "asignacion" | null>(null);
   const [verRequisitos, setVerRequisitos] = useState(false);
 
   const requisitosQuery = useQuery({
@@ -355,6 +376,28 @@ export default function ExpedienteDetallePage() {
     },
     enabled: puedeOperar && modal === "derivacion",
     staleTime: 60_000,
+  });
+
+  const asignacionQuery = useQuery({
+    queryKey: ["rutadoc", id, "asignacion"],
+    queryFn: async ({ signal }) => {
+      const { data } = await apiClient.get<{
+        ok: boolean;
+        activa: {
+          idAsignacion: string;
+          idPersona: string;
+          idUsuario: string;
+          usuario: string;
+          nombreCompleto: string;
+          motivo: string;
+          asignadoEn: string;
+        } | null;
+      }>(`/api/v1/expedientes/${encodeURIComponent(id!)}/asignacion`, { signal });
+      return data;
+    },
+    enabled: Boolean(id) && usaResumen && detalleData?.estadoActual === "EN_REVISION",
+    staleTime: 10_000,
+    retry: false,
   });
 
   const acciones = useExpedienteActions({
@@ -756,33 +799,230 @@ export default function ExpedienteDetallePage() {
     Boolean(saldosQuery.data && saldosQuery.data.totalPagado > 0);
   const bloqueadoPorPago = tieneCostoTupa && !pagoConfirmado;
 
+  const elegibilidadEnResumen = (resumen.data as any)?.elegibilidadDerivacion;
+  const bloqueadoPorRequisitos = elegibilidadEnResumen ? !elegibilidadEnResumen.requisitosConformes : false;
+  const bloqueadoPorSubsanacion = detalleData?.estadoActual === "SUBSANADO";
+
+  // 1. Ubicación Actual y Nombres Institucionales (Sin UUIDs crudos)
+  const resolverNombreArea = (areaId: string | null | undefined): string => {
+    if (!areaId) return "Mesa de Partes";
+    if (areaId === "a0000000-0000-0000-0000-000000000001" || areaId === "SDA") {
+      return "Subdirección Académica";
+    }
+    if (areaId === "a0000000-0000-0000-0000-000000000002" || areaId === "DIR") {
+      return "Dirección General";
+    }
+    if (detalleData?.areaActualId === areaId && detalleData?.areaActualNombre) {
+      return detalleData.areaActualNombre;
+    }
+    const encontrada = unidadesQuery.data?.find((u) => u.id === areaId);
+    if (encontrada) return encontrada.nombre;
+    return "Mesa de Partes";
+  };
+
+  // Coherencia estricta con backend: custodia orgánica, asignación activa y estado FSM
+  const AREA_DIR_ID = "a0000000-0000-0000-0000-000000000002";
+  const areaExpedienteId = detalleData?.areaActualId ?? null;
+  const nombreAreaCustodia = resolverNombreArea(areaExpedienteId);
+  const esAreaMesaODir =
+    !areaExpedienteId ||
+    areaExpedienteId === "Mesa de Partes" ||
+    areaExpedienteId === "DIR" ||
+    areaExpedienteId === AREA_DIR_ID;
+  const esMismaArea = Boolean(
+    usuario?.areaId && areaExpedienteId
+      ? usuario.areaId === areaExpedienteId ||
+          (usuario.areaId === AREA_DIR_ID && areaExpedienteId === "DIR")
+      : !usuario?.areaId && (!areaExpedienteId || areaExpedienteId === "Mesa de Partes")
+  );
+
+  const asignacionActiva = asignacionQuery.data?.activa ?? null;
+  const usuarioAsignadoIdEfectivo =
+    asignacionActiva?.idUsuario ?? detalleData?.usuarioAsignadoId ?? null;
+  const personaAsignadoIdEfectivo =
+    asignacionActiva?.idPersona ?? detalleData?.personaAsignadaId ?? null;
+  const hayAsignacionActiva = Boolean(
+    usuarioAsignadoIdEfectivo || personaAsignadoIdEfectivo
+  );
+  const esUsuarioAsignado = Boolean(
+    usuario &&
+      hayAsignacionActiva &&
+      ((usuarioAsignadoIdEfectivo && usuarioAsignadoIdEfectivo === usuario.id) ||
+        (usuario.idPersona &&
+          personaAsignadoIdEfectivo &&
+          personaAsignadoIdEfectivo === usuario.idPersona))
+  );
+
+  const motivoBaseOperacion = (permisoFallback: string): string => {
+    if (esTitular) {
+      return "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente.";
+    }
+    if (!esContextoInstitucional && tieneMultiplesContextos) {
+      return "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto.";
+    }
+    return permisoFallback;
+  };
+
+  const tieneCustodiaDerivar = Boolean(
+    esMismaArea ||
+    (usuario?.rol === "MESA_PARTES" && detalleData?.estadoActual === "REGISTRADO")
+  );
+  const estadoPermiteDerivar = Boolean(
+    detalleData?.estadoActual &&
+    !["RESUELTO", "ARCHIVADO", "OBSERVADO", "SUBSANADO", "EN_FIRMA"].includes(detalleData.estadoActual)
+  );
+  const puedeDerivar =
+    puedeOperar &&
+    tieneCustodiaDerivar &&
+    estadoPermiteDerivar &&
+    !bloqueadoPorPago &&
+    !bloqueadoPorRequisitos &&
+    !bloqueadoPorSubsanacion;
+
+  const tieneCustodiaObservar = Boolean(
+    usuario &&
+    (["ADMINISTRADOR", "DIRECTOR"].includes(usuario.rol) ||
+      esMismaArea ||
+      (usuario.rol === "MESA_PARTES" && detalleData?.estadoActual === "EN_CALIFICACION"))
+  );
+  const estadoPermiteObservar = debeUsarFallback
+    ? Boolean(detalleData?.estadoActual !== "RESUELTO" && detalleData?.estadoActual !== "ARCHIVADO")
+    : Boolean(detalleData?.estadoActual === "EN_CALIFICACION" || detalleData?.estadoActual === "EN_REVISION");
+  const puedeObservar = puedeOperar && tieneCustodiaObservar && estadoPermiteObservar;
+
+  const tieneFacultadAsignacion = Boolean(usuario && usuario.rol === "SECRETARIO");
+  const puedeAsignar =
+    puedeOperar &&
+    tieneFacultadAsignacion &&
+    esMismaArea &&
+    detalleData?.estadoActual === "EN_REVISION";
+
+  const flujoAtencion = resumen.data?.flujoAtencion ?? null;
+  const requiereAtencionTecnica = Boolean(flujoAtencion?.requiereAtencionTecnica);
+  const atencionTecnicaYaCompletada = Boolean(
+    requiereAtencionTecnica && flujoAtencion?.atencionTecnicaCompletada
+  );
+  const areaResponsableTecnicaId =
+    flujoAtencion?.areaResponsableId ?? tupaResumen?.unidadResponsableId ?? null;
+  const estaEnAreaTecnica = Boolean(
+    requiereAtencionTecnica &&
+    areaExpedienteId &&
+    areaResponsableTecnicaId &&
+    areaExpedienteId === areaResponsableTecnicaId
+  );
+  const evaluacionAcademicaPendiente = Boolean(
+    requiereAtencionTecnica && !atencionTecnicaYaCompletada
+  );
+  const hayAsignacionEfectiva = Boolean(
+    hayAsignacionActiva || flujoAtencion?.tieneAsignacion
+  );
+
+  const requiereDictamenConAsignacion = Boolean(
+    usuario && ["ESPECIALISTA", "DIRECTOR"].includes(usuario.rol) && usuario.rol !== "SECRETARIO"
+  );
+  const cumpleAsignacionAtender = !requiereDictamenConAsignacion || esUsuarioAsignado;
+  const bloqueadoPorAreaTecnicaParaAtender = Boolean(
+    requiereAtencionTecnica && !estaEnAreaTecnica
+  );
+  const puedeAtender =
+    puedeOperar &&
+    tieneRolAtencion &&
+    esMismaArea &&
+    detalleData?.estadoActual === "EN_REVISION" &&
+    !atencionTecnicaYaCompletada &&
+    !bloqueadoPorAreaTecnicaParaAtender &&
+    cumpleAsignacionAtender;
+
+  const requiereAtencionPendienteFirma = evaluacionAcademicaPendiente;
+  const puedeEnviarAFirma =
+    puedeOperar &&
+    tieneFacultadDespacho &&
+    !esEspecialista &&
+    esMismaArea &&
+    detalleData?.estadoActual === "EN_REVISION" &&
+    !requiereAtencionPendienteFirma;
+
+  const puedeResolverEfectivo =
+    puedeResolver &&
+    esMismaArea &&
+    detalleData?.estadoActual === "EN_FIRMA" &&
+    !evaluacionAcademicaPendiente;
+
+  const puedeArchivar =
+    puedeOperar &&
+    tieneRolArchivo &&
+    detalleData?.estadoActual === "RESUELTO";
+
+  const tieneCustodiaAcumular = Boolean(
+    usuario && (["ADMINISTRADOR", "DIRECTOR"].includes(usuario.rol) || esMismaArea)
+  );
+  const puedeAcumular =
+    puedeOperar &&
+    tieneCustodiaAcumular &&
+    detalleData?.estadoActual !== "ARCHIVADO";
+
+  const puedeRecepcionar =
+    puedeOperar &&
+    esMismaArea &&
+    detalleData?.estadoActual === "DERIVADO";
+
+  const puedeIniciarRevision =
+    puedeOperar &&
+    detalleData?.estadoActual === "SUBSANADO" &&
+    Boolean(
+      usuario &&
+      (["ADMINISTRADOR", "DIRECTOR"].includes(usuario.rol) ||
+        esMismaArea ||
+        (usuario.rol === "MESA_PARTES" && esAreaMesaODir))
+    );
+
+  const [iniciandoRevision, setIniciandoRevision] = useState(false);
+  const handleIniciarRevision = async () => {
+    if (!id || iniciandoRevision || !puedeIniciarRevision) return;
+    setIniciandoRevision(true);
+    try {
+      await apiClient.post(`/api/v1/expedientes/${id}/iniciar-revision`, {
+        motivo: "Inicio formal de revisión tras subsanación",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["rutadoc", id] });
+    } catch (err: unknown) {
+      console.error("Error al iniciar revisión:", err);
+    } finally {
+      setIniciandoRevision(false);
+    }
+  };
+
   const accionesDisponibles = [
     {
       nombre: "Derivar",
       tipo: "derivacion" as const,
       ayuda: !puedeOperar
-        ? esTitular
-          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
-          : !esContextoInstitucional && tieneMultiplesContextos
-            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
-            : "No cuenta con permisos para derivar este expediente."
-        : bloqueadoPorPago
-          ? "El expediente requiere pago confirmado en Tesorería antes de continuar."
-          : "Derivar el expediente hacia otra unidad orgánica para su atención.",
-      habilitado: puedeOperar && !bloqueadoPorPago && detalleData?.estadoActual !== "RESUELTO" && detalleData?.estadoActual !== "ARCHIVADO" && detalleData?.estadoActual !== "OBSERVADO",
+        ? motivoBaseOperacion("No cuenta con permisos para derivar este expediente.")
+        : !tieneCustodiaDerivar
+          ? `No pertenece al área de custodia actual (${nombreAreaCustodia}) para derivar este expediente.`
+          : bloqueadoPorSubsanacion
+            ? "El expediente se encuentra subsanado. Debe iniciar formalmente la revisión antes de poder derivarlo."
+            : !estadoPermiteDerivar
+              ? `No es posible derivar un expediente en estado ${detalleData?.estadoActual ?? "actual"}.`
+              : bloqueadoPorRequisitos
+                ? "Faltan requisitos documentales obligatorios por validar o conformar."
+                : bloqueadoPorPago
+                  ? "El expediente requiere pago confirmado en Tesorería antes de continuar."
+                  : "Derivar el expediente hacia otra unidad orgánica para su atención.",
+      habilitado: puedeDerivar,
       clase: "border-blue-800 bg-blue-800 text-white hover:bg-blue-900 focus-visible:outline-blue-700 shadow-xs",
     },
     {
       nombre: "Observar",
       tipo: "observacion" as const,
-      ayuda: puedeOperar
-        ? "Registrar pliego de observaciones formales para el administrado."
-        : esTitular
-          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
-          : !esContextoInstitucional && tieneMultiplesContextos
-            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
-            : "No cuenta con permisos para observar este expediente.",
-      habilitado: puedeOperar && detalleData?.estadoActual !== "RESUELTO" && detalleData?.estadoActual !== "ARCHIVADO",
+      ayuda: !puedeOperar
+        ? motivoBaseOperacion("No cuenta con permisos para observar este expediente.")
+        : !tieneCustodiaObservar
+          ? `No tiene custodia activa en ${nombreAreaCustodia} para registrar observaciones.`
+          : !estadoPermiteObservar
+            ? "Solo se pueden observar expedientes en estado EN_CALIFICACION o EN_REVISION."
+            : "Registrar pliego de observaciones formales para el administrado.",
+      habilitado: puedeObservar,
       clase: "border-amber-700 bg-amber-700 text-white hover:bg-amber-800 focus-visible:outline-amber-700 shadow-xs",
     },
     {
@@ -797,80 +1037,106 @@ export default function ExpedienteDetallePage() {
       clase: "border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 focus-visible:outline-emerald-700 shadow-xs",
     },
     {
+      nombre: "Asignar",
+      tipo: "asignacion" as const,
+      ayuda: !puedeOperar
+        ? motivoBaseOperacion("No cuenta con permisos para operar este expediente.")
+        : !tieneFacultadAsignacion
+          ? "Solo el Secretario del área con custodia posee facultades para asignar especialistas."
+          : !esMismaArea
+            ? `El expediente está en custodia de ${nombreAreaCustodia}; no pertenece al área para asignar.`
+            : detalleData?.estadoActual !== "EN_REVISION"
+              ? "Solo se pueden asignar especialistas en estado EN_REVISION."
+              : "Asignar expediente a un especialista o responsable técnico del área.",
+      habilitado: puedeAsignar,
+      clase: "border-indigo-700 bg-indigo-700 text-white hover:bg-indigo-800 focus-visible:outline-indigo-700 shadow-xs",
+    },
+    {
+      nombre: "Atender",
+      tipo: "atender" as const,
+      ayuda: !puedeOperar
+        ? motivoBaseOperacion("No cuenta con permisos para atender este expediente.")
+        : !tieneRolAtencion
+          ? "El rol activo no dispone de facultades para registrar atención técnica ni dictámenes."
+          : !esMismaArea
+            ? `No cuenta con custodia en el área actual (${nombreAreaCustodia}) para atender el expediente.`
+            : detalleData?.estadoActual !== "EN_REVISION"
+              ? "Solo se puede registrar atención cuando el expediente se encuentra EN_REVISION."
+              : atencionTecnicaYaCompletada
+                ? "El dictamen de atención técnica ya fue registrado; proceda con Enviar a Firma."
+                : bloqueadoPorAreaTecnicaParaAtender
+                  ? `La evaluación académica corresponde a ${resolverNombreArea(areaResponsableTecnicaId)}. Derive el expediente a dicha unidad.`
+                  : !cumpleAsignacionAtender
+                    ? !hayAsignacionActiva
+                      ? "El expediente aún no ha sido asignado formalmente para su atención técnica."
+                      : `El expediente se encuentra asignado a ${asignacionActiva?.nombreCompleto || "otro especialista"}.`
+                    : requiereAtencionTecnica
+                      ? "Registrar dictamen e informe de atención técnica del expediente."
+                      : "Registrar evaluación interna en revisión.",
+      habilitado: puedeAtender,
+      clase: "border-teal-800 bg-teal-800 text-white hover:bg-teal-900 focus-visible:outline-teal-700 shadow-xs",
+    },
+    {
       nombre: "Enviar a Firma",
       tipo: "enviar-a-firma" as const,
       ayuda: !puedeOperar
-        ? esTitular
-          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
-          : !esContextoInstitucional && tieneMultiplesContextos
-            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
-            : "No cuenta con permisos para enviar a firma."
-        : detalleData?.estadoActual !== "EN_REVISION"
-          ? "Solo se puede enviar a firma cuando el expediente se encuentra EN_REVISION."
-          : "Elevar expediente evaluado a Despacho de Dirección para suscripción formal.",
-      habilitado: puedeOperar && detalleData?.estadoActual === "EN_REVISION",
+        ? motivoBaseOperacion("No cuenta con permisos para enviar a firma.")
+        : esEspecialista && !tieneFacultadDespacho
+          ? "El especialista emite dictamen técnico. La elevación a firma corresponde a la Secretaría o Despacho del área."
+          : !tieneFacultadDespacho
+            ? "No cuenta con facultades de despacho para elevar expedientes a firma resolutiva."
+            : !esMismaArea
+              ? `No pertenece al área de custodia (${nombreAreaCustodia}) para elevar este expediente a firma.`
+              : detalleData?.estadoActual !== "EN_REVISION"
+                ? "Solo se puede enviar a firma cuando el expediente se encuentra EN_REVISION."
+                : requiereAtencionPendienteFirma
+                  ? `Requiere asignación y dictamen técnico previo en ${resolverNombreArea(areaResponsableTecnicaId)} antes de elevar a Dirección.`
+                  : "Elevar expediente evaluado a Despacho de Dirección para suscripción formal.",
+      habilitado: puedeEnviarAFirma,
       clase: "border-violet-700 bg-violet-700 text-white hover:bg-violet-800 focus-visible:outline-violet-700 shadow-xs",
     },
     {
       nombre: "Resolver con Firma",
       tipo: "resolver" as const,
       ayuda: !puedeResolver
-        ? esTitular
-          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
-          : !esContextoInstitucional && tieneMultiplesContextos
-            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
-            : !tieneFacultadFirmaResolucion
-              ? "No cuenta con facultades resolutivas institucionales."
-              : "No cuenta con facultades resolutivas institucionales."
-        : detalleData?.estadoActual !== "EN_FIRMA"
-          ? "Solo se pueden resolver expedientes en estado EN_FIRMA."
-          : "Emitir acto resolutivo formal suscrito y notificar a Casilla Electrónica.",
-      habilitado: puedeResolver && detalleData?.estadoActual === "EN_FIRMA",
+        ? motivoBaseOperacion("No cuenta con facultades resolutivas institucionales.")
+        : !esMismaArea
+          ? `El expediente está en custodia de ${nombreAreaCustodia}; la resolución requiere despacho directivo con custodia.`
+          : evaluacionAcademicaPendiente
+            ? `Falta asignación formal y dictamen técnico de ${resolverNombreArea(areaResponsableTecnicaId)} antes de resolver.`
+            : detalleData?.estadoActual !== "EN_FIRMA"
+              ? "Solo se pueden resolver expedientes en estado EN_FIRMA."
+              : "Emitir acto resolutivo formal suscrito y notificar a Casilla Electrónica.",
+      habilitado: puedeResolverEfectivo,
       clase: "border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900 focus-visible:outline-emerald-700 shadow-xs",
     },
     {
       nombre: "Archivar",
       tipo: "archivar" as const,
       ayuda: !puedeOperar
-        ? esTitular
-          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
-          : !esContextoInstitucional && tieneMultiplesContextos
-            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
-            : "No cuenta con facultades para archivar formalmente el expediente."
-        : detalleData?.estadoActual !== "RESUELTO"
-          ? "Solo se pueden archivar expedientes en estado RESUELTO."
-          : "Registrar ubicación de inventario físico y archivar expediente.",
-      habilitado: puedeOperar && detalleData?.estadoActual === "RESUELTO",
+        ? motivoBaseOperacion("No cuenta con facultades para archivar formalmente el expediente.")
+        : !tieneRolArchivo
+          ? "El rol activo no posee facultades para el archivado formal del expediente."
+          : detalleData?.estadoActual !== "RESUELTO"
+            ? "Solo se pueden archivar expedientes en estado RESUELTO."
+            : "Registrar ubicación de inventario físico y archivar expediente.",
+      habilitado: puedeArchivar,
       clase: "border-amber-800 bg-amber-800 text-white hover:bg-amber-900 focus-visible:outline-amber-700 shadow-xs",
     },
     {
       nombre: "Acumular",
       tipo: "acumulacion" as const,
-      ayuda: puedeOperar
-        ? "Acumular expedientes conexos bajo este expediente principal (Art. 160 LPAG)."
-        : esTitular
-          ? "Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente."
-          : !esContextoInstitucional && tieneMultiplesContextos
-            ? "Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto."
-            : "No cuenta con permisos para acumular este expediente.",
-      habilitado: puedeOperar && detalleData?.estadoActual !== "ARCHIVADO",
+      ayuda: !puedeOperar
+        ? motivoBaseOperacion("No cuenta con permisos para acumular este expediente.")
+        : !tieneCustodiaAcumular
+          ? `No pertenece al área de custodia (${nombreAreaCustodia}) para acumular este expediente.`
+          : detalleData?.estadoActual === "ARCHIVADO"
+            ? "No se pueden acumular expedientes en estado ARCHIVADO."
+            : "Acumular expedientes conexos bajo este expediente principal (Art. 160 LPAG).",
+      habilitado: puedeAcumular,
       clase: "border-slate-700 bg-slate-700 text-white hover:bg-slate-800 focus-visible:outline-slate-700 shadow-xs",
     },
   ];
-
-  // 1. Ubicación Actual y Nombres Institucionales (Sin UUIDs crudos)
-  const resolverNombreArea = (areaId: string | null | undefined): string => {
-    if (!areaId) return "Mesa de Partes";
-    if (areaId === "a0000000-0000-0000-0000-000000000001" || areaId === "SDA") {
-      return "Subdirección Académica";
-    }
-    if (areaId === "a0000000-0000-0000-0000-000000000002" || areaId === "DIR") {
-      return "Dirección General";
-    }
-    const encontrada = unidadesQuery.data?.find((u) => u.id === areaId);
-    if (encontrada) return encontrada.nombre;
-    return "Mesa de Partes";
-  };
 
   const ubicacionActual = useMemo(() => {
     if (detalleData?.estadoActual === "ARCHIVADO") {
@@ -878,6 +1144,9 @@ export default function ExpedienteDetallePage() {
     }
     if (detalleData?.estadoActual === "RESUELTO") {
       return "Subdirección Académica / Casilla Ciudadana";
+    }
+    if (detalleData?.estadoActual === "EN_FIRMA") {
+      return "Dirección General (Despacho de Firma)";
     }
     if (detalleData?.estadoActual === "DERIVADO" || detalleData?.estadoActual === "EN_REVISION") {
       return resolverNombreArea(detalleData.areaActualId);
@@ -889,6 +1158,9 @@ export default function ExpedienteDetallePage() {
   const areaResponsable = useMemo(() => {
     if (detalleData?.estadoActual === "ARCHIVADO") {
       return "Archivo Central";
+    }
+    if (detalleData?.estadoActual === "EN_FIRMA") {
+      return resolverNombreArea(detalleData.areaActualId) || "Dirección General";
     }
     if (detalleData?.estadoActual === "DERIVADO" || detalleData?.estadoActual === "EN_REVISION" || detalleData?.estadoActual === "RESUELTO") {
       return resolverNombreArea(detalleData.areaActualId);
@@ -903,14 +1175,20 @@ export default function ExpedienteDetallePage() {
     if (detalleData?.estadoActual === "RESUELTO") {
       return "Secretario Académico / Director";
     }
+    if (detalleData?.estadoActual === "EN_FIRMA") {
+      return "Director General (Titular con DNIe)";
+    }
     if (detalleData?.estadoActual === "EN_REVISION") {
-      return "Especialista asignado";
+      if (asignacionActiva?.nombreCompleto) {
+        return `${asignacionActiva.nombreCompleto} (Asignado)`;
+      }
+      return hayAsignacionActiva ? "Especialista asignado" : "Pendiente de asignación en área";
     }
     if (detalleData?.estadoActual === "DERIVADO") {
       return "Mesa de entrada / Despacho de área receptora";
     }
     return "Operador de Mesa de Partes";
-  }, [detalleData]);
+  }, [detalleData, asignacionActiva, hayAsignacionActiva]);
 
   const ultimaActuacion = useMemo(() => {
     if (detalleData?.estadoActual === "ARCHIVADO") {
@@ -918,6 +1196,9 @@ export default function ExpedienteDetallePage() {
     }
     if (detalleData?.estadoActual === "RESUELTO") {
       return "Acto administrativo emitido y depositado en Casilla";
+    }
+    if (detalleData?.estadoActual === "EN_FIRMA") {
+      return "Remitido formalmente a Despacho de Dirección para emisión de resolución y firma digital DNIe";
     }
     if (detalleData?.estadoActual === "EN_REVISION") {
       return "Expediente recepcionado y en calificación técnica";
@@ -943,13 +1224,44 @@ export default function ExpedienteDetallePage() {
     if (detalleData?.estadoActual === "RESUELTO") {
       return "Inventariar y archivar legajo en custodia física";
     }
+    if (detalleData?.estadoActual === "EN_FIRMA") {
+      if (evaluacionAcademicaPendiente) {
+        return `Completar evaluación académica en ${resolverNombreArea(areaResponsableTecnicaId)} antes de firmar`;
+      }
+      return "Firmar y resolver (Suscripción digital de acto resolutivo por Dirección General)";
+    }
     if (detalleData?.estadoActual === "EN_REVISION") {
-      return "Evaluar expediente y emitir documento de resolución";
+      if (requiereAtencionTecnica) {
+        if (!atencionTecnicaYaCompletada) {
+          if (!estaEnAreaTecnica) {
+            return `Derivar a ${resolverNombreArea(areaResponsableTecnicaId)} (SDA) para evaluación académica`;
+          }
+          if (!hayAsignacionEfectiva) {
+            return "Asignar especialista en Subdirección Académica";
+          }
+          return "Registrar dictamen técnico (Especialista asignado)";
+        }
+        return estaEnAreaTecnica
+          ? "Elevar a Dirección (Enviar a Firma)"
+          : "Elevar a etapa de firma en Dirección General";
+      }
+      return "Elevar expediente a Dirección General para firma y resolución";
+    }
+    if (detalleData?.estadoActual === "SUBSANADO") {
+      return esTitular
+        ? "Pendiente de nueva revisión por la institución"
+        : "Iniciar revisión formal tras subsanación";
+    }
+    if (detalleData?.estadoActual === "OBSERVADO") {
+      return "Esperar subsanación del administrado";
     }
     if (detalleData?.estadoActual === "DERIVADO") {
       return detalleData?.areaActualId
         ? `Confirmar recepción formal en ${resolverNombreArea(detalleData.areaActualId)}`
         : "Confirmar recepción formal en la unidad correspondiente";
+    }
+    if (bloqueadoPorRequisitos) {
+      return "Revisar y validar requisitos documentales obligatorios";
     }
     if (pagoConfirmado) {
       return "Derivar expediente a área técnica competente";
@@ -958,7 +1270,19 @@ export default function ExpedienteDetallePage() {
       return "Esperar confirmación de pago en Tesorería";
     }
     return "Derivar expediente a área técnica competente";
-  }, [detalleData, pagoConfirmado, bloqueadoPorPago]);
+  }, [
+    detalleData,
+    pagoConfirmado,
+    bloqueadoPorPago,
+    bloqueadoPorRequisitos,
+    esTitular,
+    evaluacionAcademicaPendiente,
+    requiereAtencionTecnica,
+    atencionTecnicaYaCompletada,
+    estaEnAreaTecnica,
+    hayAsignacionEfectiva,
+    areaResponsableTecnicaId,
+  ]);
 
   // Regla PM-5H-23 / PM-5H-24: Solo sugerir destino si proviene de configuración explícita verificable
   const destinoSugeridoId = tupaResumen?.unidadResponsableId ?? undefined;
@@ -966,7 +1290,7 @@ export default function ExpedienteDetallePage() {
     tupaResumen?.unidadResponsableNombre ??
     (destinoSugeridoId ? resolverNombreArea(destinoSugeridoId) : undefined);
 
-  const estadoInfo = humanizarEstado(detalleData?.estadoActual);
+  const estadoInfo = humanizarEstado(detalleData?.estadoActual, esTitular);
   const cantidadDocs = foliacionResumen?.cantidadDocumentos ?? detalleData?.resumenDocumentos?.cantidadDocumentos ?? documentosAdjuntos.length ?? 0;
   const foliosAsignados = foliacionResumen?.totalFolios ?? detalleData?.resumenDocumentos?.totalFolios ?? 0;
   const esFoliadoCompleto = foliacionResumen?.cantidadFoliados ? foliacionResumen.cantidadFoliados >= cantidadDocs : foliosAsignados > 0;
@@ -1176,8 +1500,69 @@ export default function ExpedienteDetallePage() {
                   </div>
                 </section>
 
+                {/* BANNER SUBSANADO (PENDIENTE DE INICIAR REVISIÓN FORMAL) */}
+                {detalleData.estadoActual === "SUBSANADO" && (
+                  <div className="rounded-2xl border border-teal-300 bg-teal-50/90 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-xs">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse" aria-hidden="true" />
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800 border border-teal-300">
+                          {esTitular ? "✓ Subsanación Registrada" : "✓ Subsanado por Administrado"}
+                        </span>
+                        <h3 className="text-sm font-bold text-teal-950 uppercase tracking-wide">
+                          {esTitular ? "Pendiente de nueva revisión por la institución" : "Pendiente de Inicio de Revisión"}
+                        </h3>
+                      </div>
+                      <p className="text-xs text-teal-900">
+                        {esTitular
+                          ? "Su subsanación ha sido ingresada formalmente. El personal institucional procederá con la revisión correspondiente."
+                          : "El administrado completó el levantamiento de observaciones. Inicie la revisión formal para reanudar la calificación sustantiva del expediente."}
+                      </p>
+                    </div>
+                    {puedeOperar && !esTitular && (
+                      <div className="shrink-0 flex flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          onClick={puedeIniciarRevision ? handleIniciarRevision : undefined}
+                          disabled={iniciandoRevision || !puedeIniciarRevision}
+                          title={!puedeIniciarRevision ? `El expediente está en custodia de ${nombreAreaCustodia}` : undefined}
+                          className="shrink-0 rounded-xl bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed px-4 py-2.5 text-xs font-bold text-white transition shadow-xs flex items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-teal-600 cursor-pointer"
+                        >
+                          <span>🔍</span>
+                          <span>{iniciandoRevision ? "Iniciando..." : "Iniciar Revisión Formal"}</span>
+                        </button>
+                        {!puedeIniciarRevision && (
+                          <span className="text-[11px] text-teal-800">
+                            Custodia actual: {nombreAreaCustodia}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* BANNER REQUISITOS DOCUMENTALES PENDIENTES */}
+                {detalleData.estadoActual !== "ARCHIVADO" && detalleData.estadoActual !== "RESUELTO" && detalleData.estadoActual !== "OBSERVADO" && detalleData.estadoActual !== "SUBSANADO" && bloqueadoPorRequisitos && (
+                  <div className="rounded-2xl border border-rose-300 bg-rose-50/90 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" aria-hidden="true" />
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                          ⚠ Requisitos Pendientes
+                        </span>
+                        <h3 className="text-sm font-bold text-rose-950 uppercase tracking-wide">
+                          Gate Documental Pendiente de Conformidad
+                        </h3>
+                      </div>
+                      <p className="text-xs text-rose-900">
+                        El expediente cuenta con requisitos documentales obligatorios pendientes de validación o no conformes. La derivación hacia otra unidad orgánica está bloqueada hasta que todos los requisitos documentales obligatorios sean validados formalmente.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* BANNER LISTO PARA DERIVAR POST-PAGO (ESTADO REGISTRADO CON PAGO CONFIRMADO) */}
-                {detalleData.estadoActual === "REGISTRADO" && pagoConfirmado && (
+                {detalleData.estadoActual === "REGISTRADO" && pagoConfirmado && !bloqueadoPorRequisitos && (
                   <div className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-xs">
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -1198,7 +1583,7 @@ export default function ExpedienteDetallePage() {
                         </p>
                       )}
                     </div>
-                    {puedeOperar && (
+                    {puedeDerivar && (
                       <button
                         type="button"
                         onClick={() => setModal("derivacion")}
@@ -1246,14 +1631,21 @@ export default function ExpedienteDetallePage() {
                       </p>
                     </div>
                     {puedeOperar && (
-                      <button
-                        type="button"
-                        disabled={acciones.recepcion.pending}
-                        onClick={() => void acciones.recepcion.ejecutar({ expediente: refExpediente })}
-                        className="shrink-0 rounded-xl bg-indigo-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-900 transition shadow-xs disabled:opacity-50"
-                      >
-                        {acciones.recepcion.pending ? "Recepcionando..." : "📥 Recepcionar Expediente"}
-                      </button>
+                      <div className="shrink-0 flex flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          disabled={acciones.recepcion.pending || !puedeRecepcionar}
+                          onClick={puedeRecepcionar ? () => void acciones.recepcion.ejecutar({ expediente: refExpediente }) : undefined}
+                          className="shrink-0 rounded-xl bg-indigo-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                        >
+                          {acciones.recepcion.pending ? "Recepcionando..." : "📥 Recepcionar Expediente"}
+                        </button>
+                        {!puedeRecepcionar && (
+                          <span className="text-[11px] text-indigo-900">
+                            Solo personal de {nombreAreaCustodia} puede recepcionar
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1264,21 +1656,96 @@ export default function ExpedienteDetallePage() {
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-600 animate-pulse"></span>
                         <h3 className="text-sm font-bold text-amber-950 uppercase tracking-wide">
-                          Expediente en Calificación y Revisión Académica
+                          {requiereAtencionTecnica
+                            ? atencionTecnicaYaCompletada
+                              ? "Revisión Académica: Dictamen Técnico Registrado"
+                              : !estaEnAreaTecnica
+                                ? "Evaluación Académica Pendiente — Remitir a SDA"
+                                : !hayAsignacionEfectiva
+                                  ? "Calificación Académica (SDA) — Pendiente de Asignación"
+                                  : "Calificación Académica (SDA) — Evaluación por Especialista"
+                            : "Expediente en Calificación y Revisión"}
                         </h3>
                       </div>
                       <p className="text-xs text-amber-900">
-                        El expediente se encuentra en revisión. Una vez evaluados los requisitos, emita el acto resolutivo para notificar a la Casilla Electrónica.
+                        {requiereAtencionTecnica
+                          ? atencionTecnicaYaCompletada
+                            ? esEspecialista
+                              ? "✓ El dictamen de atención técnica fue registrado. El expediente se encuentra a disposición de la Secretaría del área para elevar a Despacho de Dirección."
+                              : "✓ El dictamen de atención técnica fue registrado por el especialista. Proceda a elevar el expediente a Despacho de Dirección mediante 'Enviar a Firma'."
+                            : !estaEnAreaTecnica
+                              ? `El procedimiento requiere asignación y dictamen técnico obligatorio en ${resolverNombreArea(areaResponsableTecnicaId)} antes de poder elevarse a firma o resolverse. Derive el expediente a dicha unidad.`
+                              : !hayAsignacionEfectiva
+                                ? "La Secretaría del área debe asignar formalmente un especialista antes de registrar el dictamen técnico."
+                                : `Especialista asignado (${asignacionActiva?.nombreCompleto || "asignado"}). Registre el dictamen técnico para habilitar el envío a firma.`
+                          : "El expediente se encuentra en revisión. Una vez evaluado, remítalo a despacho mediante 'Enviar a Firma' para su resolución."}
                       </p>
                     </div>
                     {puedeOperar && (
-                      <button
-                        type="button"
-                        onClick={() => setModal("atender")}
-                        className="shrink-0 rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-900 transition shadow-xs"
-                      >
-                        📝 Atender y Emitir Resolución
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {evaluacionAcademicaPendiente && !estaEnAreaTecnica && (
+                          <button
+                            type="button"
+                            disabled={!puedeDerivar}
+                            onClick={puedeDerivar ? () => setModal("derivacion") : undefined}
+                            className="shrink-0 rounded-xl bg-blue-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                          >
+                            🚀 Derivar a SDA
+                          </button>
+                        )}
+                        {Boolean(usuario && usuario.rol === "SECRETARIO") && (!requiereAtencionTecnica || estaEnAreaTecnica) && (
+                          <button
+                            type="button"
+                            disabled={!puedeAsignar}
+                            onClick={puedeAsignar ? () => setModal("asignacion") : undefined}
+                            title={!puedeAsignar ? `Custodia actual en ${nombreAreaCustodia}` : undefined}
+                            className="shrink-0 rounded-xl bg-indigo-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-800 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                          >
+                            👤 Asignar Especialista
+                          </button>
+                        )}
+                        {!atencionTecnicaYaCompletada && !evaluacionAcademicaPendiente && tieneRolAtencion && !bloqueadoPorAreaTecnicaParaAtender && (
+                          <button
+                            type="button"
+                            disabled={!puedeAtender}
+                            onClick={puedeAtender ? () => setModal("atender") : undefined}
+                            className="shrink-0 rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                          >
+                            📝 Registrar Evaluación Interna
+                          </button>
+                        )}
+                        {requiereAtencionTecnica && !atencionTecnicaYaCompletada && estaEnAreaTecnica && tieneRolAtencion && (
+                          <button
+                            type="button"
+                            disabled={!puedeAtender}
+                            onClick={puedeAtender ? () => setModal("atender") : undefined}
+                            title={
+                              !puedeAtender
+                                ? !cumpleAsignacionAtender
+                                  ? hayAsignacionActiva
+                                    ? `Asignado a ${asignacionActiva?.nombreCompleto || "otro especialista"}`
+                                    : "Requiere asignación formal previa"
+                                  : "Sin permiso para atender en este estado"
+                                : undefined
+                            }
+                            className="shrink-0 rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                          >
+                            📝 Registrar Dictamen Técnico
+                          </button>
+                        )}
+                        {(!requiereAtencionTecnica || atencionTecnicaYaCompletada) &&
+                          tieneFacultadDespacho &&
+                          !esEspecialista && (
+                          <button
+                            type="button"
+                            disabled={!puedeEnviarAFirma}
+                            onClick={puedeEnviarAFirma ? () => setModal("enviar-a-firma") : undefined}
+                            className="shrink-0 rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-violet-800 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                          >
+                            🚀 Enviar a Firma (Dirección)
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1296,7 +1763,7 @@ export default function ExpedienteDetallePage() {
                         El acto administrativo fue emitido y depositado en la Casilla Electrónica del administrado. El legajo está listo para su inventario y archivo formal en custodia física.
                       </p>
                     </div>
-                    {Boolean(usuario && ["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "MESA_PARTES"].includes(usuario.rol)) && (
+                    {puedeArchivar && (
                       <button
                         type="button"
                         onClick={() => setModal("archivar")}
@@ -1446,7 +1913,7 @@ export default function ExpedienteDetallePage() {
                         type="button"
                         disabled={!accion.habilitado}
                         aria-describedby={`${disponibilidadId}-${indice}`}
-                        onClick={() => setModal(accion.tipo)}
+                        onClick={accion.habilitado ? () => setModal(accion.tipo) : undefined}
                         className={`rounded-lg border px-4 py-2 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 ${
                           accion.habilitado
                             ? "border-blue-800 bg-blue-800 text-white hover:bg-blue-900 focus-visible:outline-blue-700"
@@ -1968,10 +2435,41 @@ export default function ExpedienteDetallePage() {
                                 )}
                               </div>
                               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                {ord.estado === "CONFIRMADO" && ordenPago && ordenPago.ordenPagoId === ord.ordenPagoId && (
+                                {ord.estado === "CONFIRMADO" && (
                                   <button
                                     type="button"
-                                    onClick={() => setModalReciboDetalle(ordenPago)}
+                                    onClick={() => {
+                                      if (ordenPago && ordenPago.ordenPagoId === ord.ordenPagoId) {
+                                        setModalReciboDetalle(ordenPago);
+                                      } else {
+                                        setModalReciboDetalle({
+                                          ordenPagoId: ord.ordenPagoId,
+                                          codigoPago: ord.codigoPago,
+                                          expedienteId: detalleData.idExpediente,
+                                          codigoExpediente: detalleData.cut,
+                                          solicitanteId: detalleData.solicitanteId || "",
+                                          solicitanteNombre: solicitanteResumen?.nombreCompleto || ordenPago?.solicitanteNombre || "Administrado",
+                                          documentoEnmascarado: solicitanteResumen?.documentoEnmascarado || ordenPago?.documentoEnmascarado || "---",
+                                          concepto: tupaResumen?.denominacion || ordenPago?.concepto || "Derecho de tramitación TUPA",
+                                          codigoTupa: tupaResumen?.codigo || ordenPago?.codigoTupa || null,
+                                          monto: ord.monto,
+                                          moneda: "PEN",
+                                          estado: ord.estado,
+                                          tipoOrden: ord.tipoOrden,
+                                          metodoPago: ordenPago?.metodoPago ?? "EFECTIVO",
+                                          referenciaOperacion: null,
+                                          montoRecibido: null,
+                                          vuelto: null,
+                                          codigoRecibo: ord.codigoRecibo,
+                                          fechaCreacion: ord.fechaPago || detalleData.fechaRadicacion,
+                                          fechaVencimiento: ord.fechaPago || detalleData.fechaRadicacion,
+                                          fechaPago: ord.fechaPago,
+                                          tesoreroId: null,
+                                          tesoreroNombre: ordenPago?.tesoreroNombre || "Tesorería — IESTP Suiza",
+                                          motivoRechazo: null,
+                                        });
+                                      }
+                                    }}
                                     className="rounded-xl border border-emerald-700 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-50 transition shadow-xs"
                                   >
                                     Ver Recibo
@@ -2242,7 +2740,7 @@ export default function ExpedienteDetallePage() {
                           type="button"
                           disabled={!accion.habilitado}
                           aria-describedby={`${disponibilidadId}-${indice}`}
-                          onClick={() => setModal(accion.tipo)}
+                          onClick={accion.habilitado ? () => setModal(accion.tipo) : undefined}
                           className={`w-full rounded-xl border px-4 py-2.5 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 ${
                             accion.habilitado
                               ? accion.clase
@@ -2544,6 +3042,16 @@ export default function ExpedienteDetallePage() {
             onClose={() => setModal(null)}
             expediente={refExpediente}
             accion={acciones.atencion}
+            esIntermediaTecnica={Boolean(resumen.data?.flujoAtencion?.requiereAtencionTecnica)}
+          />
+          <AsignacionModal
+            open={modal === "asignacion"}
+            onClose={() => setModal(null)}
+            expediente={refExpediente}
+            onAsignado={async () => {
+              await queryClient.invalidateQueries({ queryKey: ["rutadoc", id] });
+              await queryClient.invalidateQueries({ queryKey: ["rutadoc", "bandeja"] });
+            }}
           />
           <EnviarAFirmaModal
             open={modal === "enviar-a-firma"}
@@ -2692,11 +3200,15 @@ export default function ExpedienteDetallePage() {
       {modalReciboDetalle && (
         <dialog
           open
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 w-full h-full backdrop-blur-xs"
+          data-print-target="recibo-voucher"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 w-full h-full backdrop-blur-xs print:static print:inset-auto print:w-full print:h-auto print:bg-transparent print:p-0 print:block"
           aria-labelledby="recibo-modal-titulo"
           aria-modal="true"
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 border border-slate-200">
+          <div
+            data-print-target="recibo-card"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 border border-slate-200 print:max-w-md print:mx-auto print:border print:border-dashed print:border-slate-400 print:shadow-none print:p-4 break-inside-avoid"
+          >
             <div className="text-center border-b border-dashed border-slate-300 pb-3 space-y-1">
               <div className="inline-block text-[11px] font-bold text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-full mb-1">
                 IESTP &quot;SUIZA&quot; — PUCALLPA
@@ -2714,35 +3226,35 @@ export default function ExpedienteDetallePage() {
             </div>
 
             <div className="space-y-2 text-xs text-slate-700 border-b border-dashed border-slate-300 pb-3">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Fecha y Hora:</span>
-                <span className="font-semibold text-slate-800">
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Fecha y Hora:</span>
+                <span className="font-semibold text-slate-800 text-right">
                   {formatearFechaLarga(modalReciboDetalle.fechaPago || modalReciboDetalle.fechaCreacion)}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Código Orden:</span>
-                <span className="font-mono font-bold text-slate-900">{modalReciboDetalle.codigoPago}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Código Orden:</span>
+                <span className="font-mono font-bold text-slate-900 text-right">{modalReciboDetalle.codigoPago}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Expediente CUT:</span>
-                <span className="font-mono font-semibold text-blue-800">{modalReciboDetalle.codigoExpediente}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Expediente CUT:</span>
+                <span className="font-mono font-semibold text-blue-800 text-right">{modalReciboDetalle.codigoExpediente}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Administrado:</span>
-                <span className="font-semibold text-slate-900">{modalReciboDetalle.solicitanteNombre}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Administrado:</span>
+                <span className="font-semibold text-slate-900 text-right break-words">{modalReciboDetalle.solicitanteNombre}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Documento:</span>
-                <span className="font-mono text-slate-700">{modalReciboDetalle.documentoEnmascarado}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Documento:</span>
+                <span className="font-mono text-slate-700 text-right">{modalReciboDetalle.documentoEnmascarado}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Concepto:</span>
-                <span className="font-medium text-slate-800 text-right">{modalReciboDetalle.concepto}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Concepto:</span>
+                <span className="font-medium text-slate-800 text-right break-words">{modalReciboDetalle.concepto}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Medio de Pago:</span>
-                <span className="font-semibold text-slate-900">
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Medio de Pago:</span>
+                <span className="font-semibold text-slate-900 text-right">
                   {modalReciboDetalle.metodoPago === "EFECTIVO"
                     ? "Efectivo en Ventanilla"
                     : modalReciboDetalle.metodoPago === "YAPE"
@@ -2751,20 +3263,20 @@ export default function ExpedienteDetallePage() {
                 </span>
               </div>
               {modalReciboDetalle.metodoPago === "YAPE" && modalReciboDetalle.referenciaOperacion && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">N° Operación Yape:</span>
-                  <span className="font-mono font-bold text-purple-900">{modalReciboDetalle.referenciaOperacion}</span>
+                <div className="flex justify-between gap-4">
+                  <span className="text-slate-500 shrink-0">N° Operación Yape:</span>
+                  <span className="font-mono font-bold text-purple-900 text-right">{modalReciboDetalle.referenciaOperacion}</span>
                 </div>
               )}
               {modalReciboDetalle.metodoPago === "QR_AUTOMATICO_SANDBOX" && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Origen confirmación:</span>
-                  <span className="font-mono font-bold text-amber-900">Webhook TAYPI</span>
+                <div className="flex justify-between gap-4">
+                  <span className="text-slate-500 shrink-0">Origen confirmación:</span>
+                  <span className="font-mono font-bold text-amber-900 text-right">Webhook TAYPI</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-slate-500">Operador:</span>
-                <span className="font-semibold text-slate-800">{modalReciboDetalle.tesoreroNombre || "Tesorería — IESTP Suiza"}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Operador:</span>
+                <span className="font-semibold text-slate-800 text-right">{modalReciboDetalle.tesoreroNombre || "Tesorería — IESTP Suiza"}</span>
               </div>
             </div>
 
@@ -2779,7 +3291,7 @@ export default function ExpedienteDetallePage() {
               ✓ Pago validado por Tesorería. El expediente se encuentra desbloqueado para continuar su trámite.
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 print:hidden">
               <button
                 type="button"
                 onClick={() => setModalReciboDetalle(null)}

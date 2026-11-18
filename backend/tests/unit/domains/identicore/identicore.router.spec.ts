@@ -31,6 +31,52 @@ describe('rutas HTTP de validación IdentiCore', () => {
     });
   });
 
+  it('valida Carné de Extranjería (CE) en formatos de 8 a 12 caracteres alfanuméricos', async () => {
+    const app = crearAppPrueba();
+
+    // 1. Número oficial de 9 dígitos (SBS / Migraciones)
+    const res9 = await request(app)
+      .get('/api/v1/auth/validar-documento')
+      .query({ tipoDocumento: 'CE', numeroDocumento: '001234567' });
+    expect(res9.status).toBe(200);
+    expect(res9.body).toEqual({ valido: true, codigo: 'CE_FORMATO' });
+
+    // 2. Serie alfanumérica Migraciones (prefijo N)
+    const resN = await request(app)
+      .get('/api/v1/auth/validar-documento')
+      .query({ tipoDocumento: 'CE', numeroDocumento: 'N00123456' });
+    expect(resN.status).toBe(200);
+    expect(resN.body).toEqual({ valido: true, codigo: 'CE_FORMATO' });
+
+    // 3. Formato histórico de 8 dígitos
+    const res8 = await request(app)
+      .get('/api/v1/auth/validar-documento')
+      .query({ tipoDocumento: 'CE', numeroDocumento: '00123456' });
+    expect(res8.status).toBe(200);
+    expect(res8.body).toEqual({ valido: true, codigo: 'CE_FORMATO' });
+
+    // 4. Formato extendido SUNAT de 12 caracteres
+    const res12 = await request(app)
+      .get('/api/v1/auth/validar-documento')
+      .query({ tipoDocumento: 'CE', numeroDocumento: 'N01234567890' });
+    expect(res12.status).toBe(200);
+    expect(res12.body).toEqual({ valido: true, codigo: 'CE_FORMATO' });
+
+    // 5. Rechazo de longitud insuficiente (< 8)
+    const resCorto = await request(app)
+      .get('/api/v1/auth/validar-documento')
+      .query({ tipoDocumento: 'CE', numeroDocumento: '1234567' });
+    expect(resCorto.status).toBe(200);
+    expect(resCorto.body).toEqual({ valido: false, codigo: 'CE_FORMATO' });
+
+    // 6. Rechazo de símbolos especiales
+    const resSimbolo = await request(app)
+      .get('/api/v1/auth/validar-documento')
+      .query({ tipoDocumento: 'CE', numeroDocumento: '0012-3456' });
+    expect(resSimbolo.status).toBe(200);
+    expect(resSimbolo.body).toEqual({ valido: false, codigo: 'CE_FORMATO' });
+  });
+
   it('devuelve errores Zod con application/problem+json', async () => {
     const respuesta = await request(crearAppPrueba())
       .get('/api/v1/auth/validar-documento')

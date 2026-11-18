@@ -124,9 +124,9 @@ export function crearServicioExpedienteActions(contratos: ContratosExpedienteAct
   if (subsanacion) servicio.subsanar = async (entrada: SolicitudSubsanacion): Promise<ResultadoSubsanacion> => {
     const { apiClient } = await import("./client");
     const { data } = await apiClient.post<unknown>(urlMovimiento(entrada.expediente.id, "subsanar", apiClient.defaults.baseURL), subsanacion.construirPayload(entrada));
-    if (!esObjeto(data) || data.ok !== true || (data.estado !== "EN_REVISION" && data.estado !== "EN_TRAMITE") || data.expedienteId !== entrada.expediente.id || typeof data.motivo !== "string") respuestaNoConfirmada();
+    if (!esObjeto(data) || data.ok !== true || (data.estado !== "EN_REVISION" && data.estado !== "EN_TRAMITE" && data.estado !== "SUBSANADO") || data.expedienteId !== entrada.expediente.id || typeof data.motivo !== "string") respuestaNoConfirmada();
     return {
-      estado: data.estado as "EN_REVISION" | "EN_TRAMITE",
+      estado: data.estado as "EN_REVISION" | "EN_TRAMITE" | "SUBSANADO",
       expedienteId: data.expedienteId,
       motivo: data.motivo,
       estadoRutaDoc: typeof data.estadoRutaDoc === "string" ? data.estadoRutaDoc : undefined,

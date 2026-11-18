@@ -71,6 +71,12 @@ export const MANIFIESTO_BASELINE = [
   '43_sigd_workflow_custodia_asignacion_observaciones.sql',
   '44_sigd_evidencia_firma_digital_dnie.sql',
   '45_sigd_casillero_notificaciones_trazabilidad.sql',
+  '46_sigd_tupa_destinos_funcionales.sql',
+  '47_sigd_superadministrador_gobierno.sql',
+  '48_sigd_pre_enrutamiento_responsables.sql',
+  '49_sigd_tupa_homologacion_tecnica_72.sql',
+  '50_sigd_workflow_tupa_circuitos.sql',
+  '51_sigd_limpieza_textos_tupa_requisitos.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }

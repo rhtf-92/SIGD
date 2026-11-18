@@ -169,18 +169,26 @@ describe("naturalSchema", () => {
     }
   });
 
-  it("debe RECHAZAR un CE con menos de 9 caracteres", () => {
+  it("debe RECHAZAR un CE con menos de 8 caracteres o con símbolos no permitidos", () => {
     const resultado = naturalSchema.safeParse(
-      crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "AB12345" })
+      crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "12345" })
     );
     expect(resultado.success).toBe(false);
+
+    const conSimbolos = naturalSchema.safeParse(
+      crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "AB-123456" })
+    );
+    expect(conSimbolos.success).toBe(false);
   });
 
-  it("debe ACEPTAR un CE válido de 9 a 12 caracteres alfanuméricos", () => {
+  it("debe ACEPTAR un CE válido de exactamente 8 dígitos numéricos", () => {
     const resultado = naturalSchema.safeParse(
-      crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "AB1234567X" })
+      crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "00123456" })
     );
     expect(resultado.success).toBe(true);
+    if (resultado.success) {
+      expect(resultado.data.numeroDocumento).toBe("00123456");
+    }
   });
 
   it("debe RECHAZAR una persona menor de 16 años", () => {
@@ -243,6 +251,53 @@ describe("naturalSchema", () => {
         apellidos: "Pérez",
       });
     }
+  });
+
+  describe("validación de Carné de Extranjería en registro ciudadano", () => {
+    it("debe ACEPTAR Carné de Extranjería oficial de 9 dígitos con ceros iniciales", () => {
+      const resultado = naturalSchema.safeParse(
+        crearPersonaNatural({
+          tipoDocumento: "CE",
+          numeroDocumento: "001234567",
+        })
+      );
+      expect(resultado.success).toBe(true);
+    });
+
+    it("debe ACEPTAR Carné de Extranjería con serie alfanumérica (prefijo N)", () => {
+      const resultado = naturalSchema.safeParse(
+        crearPersonaNatural({
+          tipoDocumento: "CE",
+          numeroDocumento: "N00123456",
+        })
+      );
+      expect(resultado.success).toBe(true);
+    });
+
+    it("debe ACEPTAR Carné de Extranjería en formato histórico de 8 dígitos", () => {
+      const resultado = naturalSchema.safeParse(
+        crearPersonaNatural({
+          tipoDocumento: "CE",
+          numeroDocumento: "00123456",
+        })
+      );
+      expect(resultado.success).toBe(true);
+    });
+
+    it("debe ACEPTAR Carné de Extranjería extendido SUNAT de 12 caracteres alfanuméricos", () => {
+      const resultado = naturalSchema.safeParse(
+        crearPersonaNatural({
+          tipoDocumento: "CE",
+          numeroDocumento: "N01234567890",
+        })
+      );
+      expect(resultado.success).toBe(true);
+    });
+
+    it("debe RECHAZAR Carné de Extranjería con menos de 8 caracteres o más de 12", () => {
+      expect(naturalSchema.safeParse(crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "1234567" })).success).toBe(false);
+      expect(naturalSchema.safeParse(crearPersonaNatural({ tipoDocumento: "CE", numeroDocumento: "1234567890123" })).success).toBe(false);
+    });
   });
 });
 

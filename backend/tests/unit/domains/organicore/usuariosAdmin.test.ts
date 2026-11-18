@@ -869,37 +869,172 @@ describe('crearUsuariosAdminService', () => {
     });
   });
 
-  it('documenta el bloqueo intermodular al crear con puesto activo', async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [
-        {
-          activo: true,
-        },
-      ],
-      rowCount: 1,
+  it('registra exitosamente un usuario institucional con puesto activo', async () => {
+    mockQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM sigd_org.puesto_laboral')) {
+        return { rows: [{ activo: true }], rowCount: 1 };
+      }
+      if (sql.includes('FROM sigd_auth.cuenta_usuario') && sql.includes('WHERE usuario =')) {
+        return { rows: [], rowCount: 0 };
+      }
+      if (sql.includes('INSERT INTO sigd_auth.persona (tipo')) {
+        return { rows: [{ id_persona: 'p-uuid-1' }], rowCount: 1 };
+      }
+      if (sql.includes('INSERT INTO sigd_auth.persona_natural')) {
+        return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes('INSERT INTO sigd_auth.cuenta_usuario')) {
+        return { rows: [{ id_usuario: 'u-uuid-1' }], rowCount: 1 };
+      }
+      if (sql.includes('FROM sigd_org.rol_sistema')) {
+        return { rows: [{ rol_id: ROL_ID, codigo: 'ESPECIALISTA' }], rowCount: 1 };
+      }
+      if (sql.includes('INSERT INTO sigd_org.usuario_rol')) {
+        return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes('INSERT INTO sigd_auth.perfil_usuario')) {
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
     });
 
-    const service =
-      crearUsuariosAdminService(mockPool);
+    const service = crearUsuariosAdminService(mockPool);
+
+    const resultado = await service.crearUsuario({
+      tipoDocumentoId: 1,
+      numeroDocumento: '74851201',
+      nombres: 'Leonardo',
+      apellidoPaterno: 'Rodriguez',
+      apellidoMaterno: null,
+      telefono: null,
+      correo: 'leonardo@iestpsuiza.edu.pe',
+      username: 'leonardo.rodriguez',
+      passwordInicial: 'ClaveSegura2026!',
+      puestoLaboralId: PUESTO_ID,
+      rolId: ROL_ID,
+    });
+
+    expect(resultado.idUsuario).toBe('u-uuid-1');
+    expect(resultado.usuario).toBe('leonardo.rodriguez');
+    expect(resultado.nombreCompleto).toBe('Leonardo Rodriguez');
+    expect(resultado.activo).toBe(true);
+  });
+
+  /* =========================================================
+   * SERVICE - ACTUALIZACIÓN DE USUARIOS
+   * ========================================================= */
+
+  it('actualiza estado operativo y revoca sesiones al desactivar usuario', async () => {
+    mockQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM sigd_auth.cuenta_usuario cu')) {
+        return {
+          rows: [
+            {
+              id_usuario: '11111111-2222-3333-4444-555555555555',
+              id_persona: 'p-target-1',
+              usuario: 'trabajador_demo',
+              correo: 'trabajador@iestpsuiza.edu.pe',
+              activo: true,
+              nombres: 'Juan',
+              apellidos: 'Perez',
+              nombre_completo: 'Juan Perez',
+              id_documento: '12345678',
+              area_id: AREA_ID,
+              cargo_id: null,
+              rol_id: ROL_ID,
+              rol_codigo: 'ESPECIALISTA',
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes('UPDATE sigd_auth.cuenta_usuario SET activo =')) {
+        return { rowCount: 1, rows: [] };
+      }
+      if (sql.includes('UPDATE sigd_auth.sesion_usuario')) {
+        return { rowCount: 2, rows: [] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = crearUsuariosAdminService(mockPool);
+
+    const resultado = await service.actualizarUsuario(
+      '11111111-2222-3333-4444-555555555555',
+      { estado: 'INACTIVO' },
+      { sub: 'admin-caller-uuid', roles: ['ADMINISTRADOR'] },
+    );
+
+    expect(resultado.estado).toBe('INACTIVO');
+  });
+
+  it('bloquea auto-escalamiento si el solicitante intenta modificarse a sí mismo', async () => {
+    mockQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM sigd_auth.cuenta_usuario cu')) {
+        return {
+          rows: [
+            {
+              id_usuario: 'admin-caller-uuid',
+              id_persona: 'persona-caller-uuid',
+              usuario: 'administrador_demo',
+              correo: 'admin@iestpsuiza.edu.pe',
+              activo: true,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = crearUsuariosAdminService(mockPool);
 
     await expect(
-      service.crearUsuario({
-        tipoDocumentoId: 1,
-        numeroDocumento: '74851201',
-        nombres: 'Leonardo',
-        apellidoPaterno: 'Rodriguez',
-        apellidoMaterno: null,
-        telefono: null,
-        correo: 'leonardo@iestpsuiza.edu.pe',
-        username: 'leonardo.rodriguez',
-        passwordInicial: 'ClaveSegura2026!',
-        puestoLaboralId: PUESTO_ID,
-        rolId: ROL_ID,
-      }),
+      service.actualizarUsuario(
+        'admin-caller-uuid',
+        { estado: 'INACTIVO' },
+        { sub: 'admin-caller-uuid', roles: ['ADMINISTRADOR'] },
+      ),
     ).rejects.toMatchObject({
-      status: 503,
-      code:
-        'CONTRATO_INTERMODULAR_PENDIENTE',
+      code: 'AUTO_ESCALACION_PROHIBIDA',
+    });
+  });
+
+  it('bloquea asignación de DIRECTOR si el solicitante no es SUPERADMINISTRADOR', async () => {
+    mockQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM sigd_auth.cuenta_usuario cu')) {
+        return {
+          rows: [
+            {
+              id_usuario: 'target-worker-uuid',
+              id_persona: 'target-persona-uuid',
+              usuario: 'trabajador',
+              correo: 'trabajador@iestpsuiza.edu.pe',
+              activo: true,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes('FROM sigd_org.rol_sistema')) {
+        return {
+          rows: [{ rol_id: 'director-rol-uuid', codigo: 'DIRECTOR' }],
+          rowCount: 1,
+        };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = crearUsuariosAdminService(mockPool);
+
+    await expect(
+      service.actualizarUsuario(
+        'target-worker-uuid',
+        { rol: 'DIRECTOR' },
+        { sub: 'admin-caller-uuid', roles: ['ADMINISTRADOR'] },
+      ),
+    ).rejects.toMatchObject({
+      code: 'PRIVILEGIO_INSUFICIENTE_ASIGNACION_ROL',
     });
   });
 });

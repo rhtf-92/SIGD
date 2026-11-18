@@ -17,6 +17,8 @@ export const resumenSchema = z.object({
   estadoActual: estado, areaActualId: z.string().nullable(),
   areaActualNombre: z.string().nullable().optional(),
   areaActualCodigo: z.string().nullable().optional(),
+  personaAsignadaId: z.string().nullable().optional(),
+  usuarioAsignadoId: z.string().nullable().optional(),
 });
 export const detalleSchema = resumenSchema.extend({
   solicitanteId: uuid.nullable(),

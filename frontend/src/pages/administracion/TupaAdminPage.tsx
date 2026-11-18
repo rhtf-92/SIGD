@@ -29,7 +29,7 @@ export interface TupaVersionItem {
   codigo: string;
   anio: number;
   descripcion: string;
-  estado: "VIGENTE" | "BORRADOR" | "HISTORICO";
+  estado: "VIGENTE" | "BORRADOR" | "HISTORICO" | "PENDIENTE_VALIDACION" | "ANULADO";
   fechaAprobacion?: string;
   numeroResolucion?: string;
   totalProcedimientos?: number;
@@ -97,7 +97,8 @@ function formatBytes(bytes: number | null | undefined): string {
 export default function TupaAdminPage() {
   const token = useAuthStore((s) => s.accessToken);
   const usuario = useAuthStore((s) => s.usuario);
-  const esAdmin = usuario?.rol === "ADMINISTRADOR";
+  const esAdmin = usuario?.rol === "ADMINISTRADOR" || usuario?.rol === "SUPERADMINISTRADOR";
+  const esSuperAdmin = usuario?.rol === "SUPERADMINISTRADOR";
 
   // Pestaña activa: "resumen" | "copia_oficial" | "catalogo" | "versiones"
   const [tabActiva, setTabActiva] = useState<"resumen" | "copia_oficial" | "catalogo" | "versiones">("resumen");
@@ -773,7 +774,7 @@ export default function TupaAdminPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              {esBorrador && (
+              {(esSuperAdmin || esAdmin) && (versionSeleccionada?.estado === 'PENDIENTE_VALIDACION' || esBorrador) && (
                 <button
                   type="button"
                   disabled={publicandoVersion}

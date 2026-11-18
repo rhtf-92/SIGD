@@ -8,6 +8,7 @@ import {
   archivarExpediente,
   observarExpediente,
   subsanarExpediente,
+  iniciarRevisionExpediente,
 } from '../../../../src/domains/rutadoc/derivaciones.service.js';
 import { UnauthorizedError, ForbiddenError, NotFoundError } from '../../../../src/shared/domain/errors/index.js';
 import { DomainError } from '../../../../src/shared/domain/errors/index.js';
@@ -92,7 +93,6 @@ describe('T-BE-RD-06: derivaciones.service.ts', () => {
         datos_especificos: {
           motivo: 'Para atencion requerida',
           es_copia: false,
-          usuario_asignado_id: undefined
         }
       })
     }));
@@ -106,7 +106,7 @@ describe('T-BE-RD-06: derivaciones.service.ts', () => {
       destinos: [
         { area_destino_id: 'area-dest-1', es_copia: false },
         { area_destino_id: 'area-dest-2', es_copia: true },
-        { area_destino_id: 'area-dest-3', es_copia: true, usuario_asignado_id: 'usr-dest' }
+        { area_destino_id: 'area-dest-3', es_copia: true }
       ],
       proveido: 'Pase a multiples areas'
     };
@@ -143,7 +143,7 @@ describe('T-BE-RD-06: derivaciones.service.ts', () => {
   });
 
   it('5. FSM-01: debe permitir derivación desde cada uno de los estados permitidos por la FSM', async () => {
-    const estadosPermitidos = ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'SUBSANADO'];
+    const estadosPermitidos = ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION'];
     const dto: DerivarExpedienteDTO = {
       destinos: [{ area_destino_id: 'area-dest-1', es_copia: false }],
       proveido: 'Pase reglamentario'
@@ -165,8 +165,6 @@ describe('T-BE-RD-06: derivaciones.service.ts', () => {
         mockQuery.mockResolvedValueOnce({}); // INICIAR_CALIFICACION
       } else if (estado === 'DERIVADO') {
         mockQuery.mockResolvedValueOnce({}); // RECEPCION
-      } else if (estado === 'SUBSANADO') {
-        mockQuery.mockResolvedValueOnce({}); // INICIAR_REVISION
       }
       // 3. INSERT movimiento de derivación
       mockQuery.mockResolvedValueOnce({ rows: [{ movimiento_id: 'mov-1' }] });
@@ -176,7 +174,7 @@ describe('T-BE-RD-06: derivaciones.service.ts', () => {
   });
 
   it('6. FSM-01: debe rechazar derivación desde cada uno de los estados prohibidos por la FSM', async () => {
-    const estadosProhibidos = ['ARCHIVADO', 'RESUELTO', 'EN_FIRMA', 'OBSERVADO'];
+    const estadosProhibidos = ['ARCHIVADO', 'RESUELTO', 'EN_FIRMA', 'OBSERVADO', 'SUBSANADO'];
     const dto: DerivarExpedienteDTO = {
       destinos: [{ area_destino_id: 'area-dest-1', es_copia: false }],
       proveido: 'Pase indebido'
@@ -605,22 +603,21 @@ describe('RutaDoc FSM: Observación y Subsanación Formal', () => {
         .rejects.toThrow(DomainError);
     });
 
-    it('debe procesar subsanación correctamente y transicionar a EN_REVISION', async () => {
+    it('debe procesar subsanación correctamente y transicionar a SUBSANADO', async () => {
       vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
       mockQuery.mockReset();
       mockQuery.mockResolvedValueOnce({
         rowCount: 1,
         rows: [{ estado_actual_id: 'OBSERVADO', area_contexto_id: 'area-1' }]
       });
-      mockQuery.mockResolvedValueOnce({}); // INSERT CORRECCION -> SUBSANADO
       mockQuery.mockResolvedValueOnce({
         rows: [{ movimiento_id: 'mov-sub-1' }]
-      }); // INSERT INICIAR_REVISION -> EN_REVISION
+      }); // INSERT CORRECCION -> SUBSANADO
       mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE sigd_tra.expediente
 
       await subsanarExpediente(mockCliente, mockExpedienteId, 'Documentos adjuntados');
 
-      expect(mockQuery).toHaveBeenCalledTimes(4);
+      expect(mockQuery).toHaveBeenCalledTimes(3);
       expect(insertarEvento).toHaveBeenCalledWith(mockCliente, expect.objectContaining({
         tipo_evento: 'ExpedienteSubsanado',
         payload: expect.objectContaining({
@@ -636,12 +633,30 @@ describe('RutaDoc FSM: Observación y Subsanación Formal', () => {
         rowCount: 1,
         rows: [{ estado_actual_id: 'OBSERVADO', area_contexto_id: 'area-1' }]
       });
-      mockQuery.mockResolvedValueOnce({});
       mockQuery.mockResolvedValueOnce({ rows: [{ movimiento_id: 'mov-sub-1' }] });
       mockQuery.mockResolvedValueOnce({ rowCount: 0 }); // Concurrency conflict: 0 rows affected
 
       await expect(subsanarExpediente(mockCliente, mockExpedienteId, 'Documentos adjuntados'))
-        .rejects.toThrow('No se pudo actualizar el estado a EN_REVISION para el expediente');
+        .rejects.toThrow('No se pudo actualizar el estado a SUBSANADO para el expediente');
+    });
+
+    describe('iniciarRevisionExpediente', () => {
+      it('debe iniciar revisión formal desde SUBSANADO a EN_REVISION', async () => {
+        vi.mocked(getRequestContext).mockReturnValueOnce({ usuario_id: 'usr-123', correlation_id: 'c1', ip_origen: 'ip', user_agent: 'ua' });
+        mockQuery.mockReset();
+        mockQuery.mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ estado_actual_id: 'SUBSANADO', area_contexto_id: 'area-1' }]
+        });
+        mockQuery.mockResolvedValueOnce({
+          rows: [{ movimiento_id: 'mov-rev-1' }]
+        }); // INSERT INICIAR_REVISION -> EN_REVISION
+        mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE sigd_tra.expediente SET estado = 'EN_REVISION'
+
+        const resultado = await iniciarRevisionExpediente(mockCliente, mockExpedienteId, 'Inicio formal');
+        expect(resultado.movimientoId).toBe('mov-rev-1');
+        expect(mockQuery).toHaveBeenCalledTimes(3);
+      });
     });
   });
 });

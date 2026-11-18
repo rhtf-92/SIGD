@@ -1523,9 +1523,9 @@ export class TesoreriaService {
         invalidParams: [{ name: 'numeroDocumento', reason: 'El RUC debe tener exactamente 11 dígitos.' }],
       });
     }
-    if (datos.tipoDocumento === 'CE' && !/^[0-9a-zA-Z]{9,12}$/.test(datos.numeroDocumento.trim())) {
+    if (datos.tipoDocumento === 'CE' && !/^[0-9a-zA-Z]{8,12}$/.test(datos.numeroDocumento.trim())) {
       throw new ValidationError({
-        invalidParams: [{ name: 'numeroDocumento', reason: 'El Carné de Extranjería debe tener entre 9 y 12 caracteres alfanuméricos.' }],
+        invalidParams: [{ name: 'numeroDocumento', reason: 'El Carné de Extranjería debe tener entre 8 y 12 caracteres alfanuméricos.' }],
       });
     }
 

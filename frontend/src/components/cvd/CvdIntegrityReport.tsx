@@ -5,6 +5,8 @@
  * fecha/hora de sellado TSA (RFC 3161) y descarga del documento cotejado.
  */
 import type { ValidacionCVDResult } from "../../types/validadorCvd";
+import logoSuiza from "../../assets/sigd/logo-suiza.webp";
+import { TechnicalDetails } from "../ui/TechnicalDetails";
 
 interface CvdIntegrityReportProps {
   resultado: ValidacionCVDResult;
@@ -65,13 +67,15 @@ function descargarDocumentoOriginal(resultado: ValidacionCVDResult) {
 
 function EscudoSuiza() {
   return (
-    <span
-      className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 border-blue-800 bg-white text-xl font-black text-blue-800"
-      aria-hidden="true"
-      title="Escudo institucional IESTP Suiza"
-    >
-      S
-    </span>
+    <img
+      src={logoSuiza}
+      alt="IESTP Suiza"
+      width={48}
+      height={48}
+      loading="lazy"
+      decoding="async"
+      className="h-12 w-12 object-contain bg-white rounded-xl p-1 shrink-0 shadow-2xs aspect-square"
+    />
   );
 }
 
@@ -154,13 +158,17 @@ export default function CvdIntegrityReport({ resultado }: CvdIntegrityReportProp
               {formatoFechaHora(resultado.selloTiempoTsa)}
             </dd>
           </div>
-          <div>
-            <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">
-              Hash SHA-256 (integridad)
-            </dt>
-            <dd className="mt-1 break-all font-mono text-xs text-slate-600">
-              {documento.hashIntegridadSha256}
-            </dd>
+          <div className="pt-2">
+            <TechnicalDetails title="Detalles criptográficos de integridad">
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Hash SHA-256 (integridad)
+                </dt>
+                <dd className="mt-1 break-all font-mono text-xs text-slate-600">
+                  {documento.hashIntegridadSha256}
+                </dd>
+              </div>
+            </TechnicalDetails>
           </div>
         </dl>
 

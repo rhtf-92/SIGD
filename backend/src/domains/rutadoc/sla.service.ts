@@ -72,15 +72,47 @@ function fechaHoyLima(): string {
   return `${parte('year')}-${parte('month')}-${parte('day')}`;
 }
 
+export interface DatosSlaExpediente {
+  fechaInicio: string | null;
+  plazoDias: number;
+}
+
 export class RepositorioSlaRutaDoc {
   constructor(private readonly pool: Pool) {}
 
+  async obtenerDatosExpediente(idExpediente: string): Promise<DatosSlaExpediente | null> {
+    const resultado = await this.pool.query<{
+      fecha_inicio: string | null;
+      plazo_dias: number | null;
+    }>(`
+      SELECT (e.fecha_radicacion AT TIME ZONE 'America/Lima')::date::text AS fecha_inicio,
+             COALESCE(tp.plazo_dias, 30)::int AS plazo_dias
+        FROM sigd_tra.expediente e
+   LEFT JOIN sigd_doc.expediente_tupa_vinculo v ON v.expediente_id = e.expediente_id AND v.reemplaza_vinculo_id IS NULL
+   LEFT JOIN LATERAL (
+     SELECT p.plazo_dias
+       FROM sigd_doc.tupa_procedimiento p
+       JOIN sigd_doc.tupa_version tv2 ON tv2.id_version = p.id_version
+      WHERE (
+        (v.tupa_codigo IS NOT NULL AND tv2.codigo = v.tupa_codigo AND (p.codigo_ref = v.codigo_ref OR p.registro_version_id = v.registro_version_id))
+        OR (v.tupa_codigo IS NULL AND p.registro_version_id = v.registro_version_id)
+      )
+      ORDER BY p.activo DESC, p.orden ASC
+      LIMIT 1
+   ) tp ON TRUE
+       WHERE e.expediente_id = $1::uuid
+       ORDER BY v.vinculado_en DESC NULLS LAST
+       LIMIT 1`, [idExpediente]);
+    if (resultado.rows.length === 0) return null;
+    return {
+      fechaInicio: resultado.rows[0].fecha_inicio,
+      plazoDias: resultado.rows[0].plazo_dias ?? 30,
+    };
+  }
+
   async obtenerFechaInicio(idExpediente: string): Promise<string | null> {
-    const resultado = await this.pool.query<FilaFechaExpediente>(`
-      SELECT (fecha_radicacion AT TIME ZONE 'America/Lima')::date::text AS fecha_inicio
-        FROM sigd_tra.expediente
-       WHERE expediente_id = $1::uuid`, [idExpediente]);
-    return resultado.rows[0]?.fecha_inicio ?? null;
+    const datos = await this.obtenerDatosExpediente(idExpediente);
+    return datos?.fechaInicio ?? null;
   }
 }
 
@@ -95,14 +127,22 @@ export class ServicioSlaRutaDoc {
   }
 
   async obtener(idExpediente: string): Promise<ResultadoSla> {
-    const fechaInicio = await this.fechaInicio(idExpediente);
+    const repoAny = this.repositorio as {
+      obtenerDatosExpediente?: (id: string) => Promise<DatosSlaExpediente | null>;
+      obtenerFechaInicio: (id: string) => Promise<string | null>;
+    };
+    const datos = typeof repoAny.obtenerDatosExpediente === 'function'
+      ? await repoAny.obtenerDatosExpediente(idExpediente)
+      : null;
+    const fechaInicio = datos ? datos.fechaInicio : await this.fechaInicio(idExpediente);
     if (!fechaInicio) throw new NotFoundError({ detail: 'El expediente no existe.' });
+    const limitePlazo = datos?.plazoDias && datos.plazoDias > 0 ? datos.plazoDias : 30;
     const fechaActual = this.hoy();
     const hasta = new Date(validarFecha(fechaInicio) + 150 * MS_DIA).toISOString().slice(0, 10);
     const diasNoLaborables = await this.calendario.obtenerDiasNoLaborables(fechaInicio,
       fechaActual > hasta ? fechaActual : hasta);
     return calcularSla({ fechaInicio, fechaActual, diasNoLaborables: new Set(diasNoLaborables),
-      diasHabilesLimite: 30,
+      diasHabilesLimite: limitePlazo,
       porcentajeAmarilloDesde: this.politica.porcentajeAmarilloDesde });
   }
 }

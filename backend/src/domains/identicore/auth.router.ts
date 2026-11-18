@@ -149,13 +149,7 @@ export function crearRouterAuth(pool: Pool): Router {
       rol?: string;
       areaId?: string;
       perfiles?: string[];
-    }> = [
-      {
-        tipo: 'PERSONAL',
-        descripcion: 'Trámites personales, consulta ciudadana y casilla electrónica',
-        rol: 'CIUDADANO',
-      },
-    ];
+    }> = [];
 
     let rolInstitucional =
       rolesRows.find((r) => r.codigo !== 'CIUDADANO')?.codigo ??
@@ -176,13 +170,24 @@ export function crearRouterAuth(pool: Pool): Router {
       });
     }
 
-    // Selección de contexto seguro (Opción B: PERSONAL por defecto)
-    const contextoSolicitado = datos.contexto;
-    let contextoEfectivo: 'PERSONAL' | 'INSTITUCIONAL' = 'PERSONAL';
-    let rolEfectivo = 'CIUDADANO';
-    let areaIdEfectivo: string | undefined = undefined;
+    // Contexto PERSONAL: habilitado para trámites personales y casilla ciudadana
+    contextosDisponibles.push({
+      tipo: 'PERSONAL',
+      descripcion: 'Trámites personales, consulta ciudadana y casilla electrónica',
+      rol: 'CIUDADANO',
+    });
 
-    if (contextoSolicitado === 'INSTITUCIONAL') {
+    // Selección de contexto legítimo y seguro
+    const contextoSolicitado = datos.contexto;
+    let contextoEfectivo: 'PERSONAL' | 'INSTITUCIONAL';
+    let rolEfectivo: string;
+    let areaIdEfectivo: string | undefined;
+
+    if (contextoSolicitado === 'PERSONAL') {
+      contextoEfectivo = 'PERSONAL';
+      rolEfectivo = 'CIUDADANO';
+      areaIdEfectivo = undefined;
+    } else if (contextoSolicitado === 'INSTITUCIONAL') {
       if (!tieneCapacidadInstitucional) {
         throw new AppError({
           status: 403,
@@ -195,10 +200,18 @@ export function crearRouterAuth(pool: Pool): Router {
       rolEfectivo = rolInstitucional ?? 'ESPECIALISTA';
       areaIdEfectivo = areaIdInstitucional ?? undefined;
     } else {
-      // Por defecto y para contexto PERSONAL: siempre contexto seguro PERSONAL
-      contextoEfectivo = 'PERSONAL';
-      rolEfectivo = 'CIUDADANO';
-      areaIdEfectivo = undefined;
+      // Sin solicitud explícita de contexto:
+      // Si el usuario posee facultades institucionales, entra por defecto en INSTITUCIONAL;
+      // si es una cuenta puramente ciudadana, entra en PERSONAL.
+      if (tieneCapacidadInstitucional) {
+        contextoEfectivo = 'INSTITUCIONAL';
+        rolEfectivo = rolInstitucional ?? 'ESPECIALISTA';
+        areaIdEfectivo = areaIdInstitucional ?? undefined;
+      } else {
+        contextoEfectivo = 'PERSONAL';
+        rolEfectivo = 'CIUDADANO';
+        areaIdEfectivo = undefined;
+      }
     }
 
     const accessToken = firmarTokenAcceso({

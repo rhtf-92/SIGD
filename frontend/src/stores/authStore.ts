@@ -216,13 +216,11 @@ function createStore() {
         contexto: nuevoContexto,
       });
 
-      // Regla 15 (Fase 5H): Al pasar INSTITUCIONAL -> PERSONAL, purgar datos sensibles en memoria
-      if (nuevoContexto === "PERSONAL") {
-        try {
-          queryClient.clear();
-        } catch {
-          // Ignore
-        }
+      // Invalidar cachés frontend sensibles al contexto en cualquier transición
+      try {
+        queryClient.clear();
+      } catch {
+        // Ignore
       }
 
       const rolActualizado: RolCanonica =

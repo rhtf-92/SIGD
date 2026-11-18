@@ -243,7 +243,7 @@ describe("F-04: RegistroCiudadanoPage — Fail-Closed Error Handling & Network R
     await user.click(await screen.findByRole("button", { name: "Confirmar y crear cuenta" }));
 
     const alertBanner = await screen.findByRole("alert", {}, { timeout: 4000 });
-    expect(alertBanner).toHaveTextContent(/idPersona canónico \(UUID\)/i);
+    expect(alertBanner).toHaveTextContent(/El servidor no devolvió una confirmación válida con idPersona para el registro ciudadano/i);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   }, 15000);
 });

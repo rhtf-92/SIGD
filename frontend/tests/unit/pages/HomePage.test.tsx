@@ -12,7 +12,7 @@ function renderHomePage() {
   );
 }
 
-describe("HomePage — Segmentación visual de módulos públicos, ciudadanos e institucionales", () => {
+describe("HomePage — Diseño Público Definitivo Aprobado SIGD", () => {
   beforeEach(() => {
     useAuthStore.setState({
       accessToken: null,
@@ -33,201 +33,111 @@ describe("HomePage — Segmentación visual de módulos públicos, ciudadanos e 
     localStorage.clear();
   });
 
-  describe("1. Estructura de los tres bloques visuales", () => {
-    it("renderiza el hero institucional con el título y descripción canónica", () => {
+  describe("1. Hero Panorámico Institucional", () => {
+    it("renderiza el título oficial del instituto y la descripción canónica", () => {
       renderHomePage();
-      expect(screen.getByText("SIGD")).toBeInTheDocument();
-      expect(
-        screen.getByText("Sistema Integral de Gestión Documentaria")
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/IESTP "Suiza" — Pucallpa/i)
-      ).toBeInTheDocument();
-    });
-
-    it("renderiza los tres encabezados de bloque diferenciados", () => {
-      renderHomePage();
-
-      // Bloque A: Públicos
       expect(
         screen.getByRole("heading", {
-          name: /Servicios Públicos y Consulta Ciudadana/i,
+          name: /Trámites Documentarios del IESTP SUIZA/i,
         })
       ).toBeInTheDocument();
-
-      // Bloque B: Ciudadano
       expect(
-        screen.getByRole("heading", {
-          name: /Portal y Servicios del Administrado/i,
-        })
+        screen.getByText(
+          /Presenta solicitudes, consulta el estado de tus trámites y valida documentos de forma digital, segura y confiable\./i
+        )
       ).toBeInTheDocument();
+    });
 
-      // Bloque C: Institucional
+    it("renderiza los botones de acción del hero con las rutas correctas", () => {
+      renderHomePage();
+      const botonIniciar = screen.getByRole("link", { name: /Iniciar trámite/i });
+      expect(botonIniciar).toBeInTheDocument();
+      expect(botonIniciar).toHaveAttribute("href", "/mesa-partes");
+
+      const botonConsultar = screen.getByRole("link", { name: /Consultar CUT/i });
+      expect(botonConsultar).toBeInTheDocument();
+      expect(botonConsultar).toHaveAttribute("href", "/consulta");
+    });
+
+    it("renderiza las imágenes gráficas oficiales del hero con texto alternativo", () => {
+      renderHomePage();
       expect(
-        screen.getByRole("heading", {
-          name: /Operación, Despacho y Gestión Interna/i,
-        })
+        screen.getByAltText(/Entrada del Instituto Superior Tecnológico Suiza/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByAltText(/Estudiantes del IESTP Suiza/i)
       ).toBeInTheDocument();
     });
   });
 
-  describe("2. Reubicación y presencia de los 12 módulos", () => {
-    it("muestra los 5 módulos públicos en el bloque público", () => {
+  describe("2. Cuatro Tarjetas de Servicios Públicos", () => {
+    it("renderiza exactamente las 4 tarjetas de servicios públicos aprobadas", () => {
       renderHomePage();
 
-      expect(screen.getByText("Consulta Pública por CUT")).toBeInTheDocument();
-      expect(screen.getByText("Registro Ciudadano")).toBeInTheDocument();
-      expect(screen.getByText("Validador CVD")).toBeInTheDocument();
-      expect(screen.getByText("Flujo y Validez Legal")).toBeInTheDocument();
-      expect(screen.getByText("Iniciar Sesión")).toBeInTheDocument();
-    });
+      // 1. Mesa de Partes Digital
+      expect(
+        screen.getByRole("heading", { name: /^Mesa de Partes Digital$/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Presenta tus trámites y adjunta documentos\./i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /Mesa de Partes Digital/i })
+      ).toHaveAttribute("href", "/mesa-partes");
 
-    it("muestra los 3 módulos de cuenta ciudadana", () => {
-      renderHomePage();
+      // 2. Consulta por CUT
+      expect(
+        screen.getByRole("heading", { name: /^Consulta por CUT$/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Revisa el estado de tu trámite en línea\./i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /Consulta por CUT/i })
+      ).toHaveAttribute("href", "/consulta");
 
-      expect(screen.getByText("Mesa de Partes Virtual")).toBeInTheDocument();
-      expect(screen.getByText("Mis Expedientes")).toBeInTheDocument();
-      expect(screen.getByText("Casilla Electrónica")).toBeInTheDocument();
-    });
+      // 3. Catálogo TUPA
+      expect(
+        screen.getByRole("heading", { name: /^Catálogo TUPA$/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Consulta requisitos, costos y plazos oficiales\./i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /Catálogo TUPA/i })
+      ).toHaveAttribute("href", "/tupa");
 
-    it("muestra los 4 módulos institucionales por rol", () => {
-      renderHomePage();
-
-      expect(screen.getByText("Bandeja de Expedientes")).toBeInTheDocument();
-      expect(screen.getByText("Ventanilla Presencial")).toBeInTheDocument();
-      expect(screen.getByText("Panel de Administración")).toBeInTheDocument();
-      expect(screen.getByText("Reportes y Tableros")).toBeInTheDocument();
+      // 4. Validador CVD
+      expect(
+        screen.getByRole("heading", { name: /^Validador CVD$/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Verifica la autenticidad de documentos emitidos\./i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /Validador CVD/i })
+      ).toHaveAttribute("href", "/validador-cvd");
     });
   });
 
-  describe("3. Badges visibles por categoría", () => {
-    it("muestra exactamente 5 badges 'Público'", () => {
-      renderHomePage();
-      const badgesPublicos = screen.getAllByText(/^Público$/);
-      expect(badgesPublicos).toHaveLength(5);
-    });
-
-    it("muestra exactamente 3 badges 'Requiere login'", () => {
-      renderHomePage();
-      const badgesCiudadano = screen.getAllByText(/^Requiere login$/);
-      expect(badgesCiudadano).toHaveLength(3);
-    });
-
-    it("muestra exactamente 4 badges 'Requiere rol institucional'", () => {
-      renderHomePage();
-      const badgesInstitucionales = screen.getAllByText(/^Requiere rol institucional$/);
-      expect(badgesInstitucionales).toHaveLength(4);
-    });
-  });
-
-  describe("4. CTAs para usuario no autenticado (fail-closed)", () => {
-    it("muestra 'Iniciar sesión para acceder' en los 3 módulos de cuenta ciudadana", () => {
-      renderHomePage();
-      const ctasLogin = screen.getAllByText("Iniciar sesión para acceder");
-      expect(ctasLogin).toHaveLength(3);
-    });
-
-    it("muestra 'Acceso con rol asignado' en los 4 módulos institucionales", () => {
-      renderHomePage();
-      const ctasRol = screen.getAllByText("Acceso con rol asignado");
-      expect(ctasRol).toHaveLength(4);
-    });
-
-    it("muestra CTAs de acceso directo en los servicios públicos", () => {
-      renderHomePage();
-      expect(screen.getByText("Consultar trámite")).toBeInTheDocument();
-      expect(screen.getByText("Registrar cuenta")).toBeInTheDocument();
-      expect(screen.getByText("Verificar documento")).toBeInTheDocument();
-      expect(screen.getByText("Ver flujo y validez")).toBeInTheDocument();
-    });
-  });
-
-  describe("5. CTAs para usuario autenticado como CIUDADANO", () => {
-    beforeEach(() => {
-      useAuthStore.setState({
-        accessToken: "fake-jwt-ciudadano",
-        refreshToken: "fake-refresh",
-        usuario: {
-          id: "usr-01",
-          correo: "ciudadano_demo@example.test",
-          nombreCompleto: "Juan Pérez García",
-          rol: "CIUDADANO",
-          idPersona: "per-01",
-        },
-        isAuthenticated: true,
-      });
-    });
-
-    it("muestra banner con sesión activa del ciudadano", () => {
-      renderHomePage();
-      expect(screen.getByText(/Sesión activa:/i)).toBeInTheDocument();
-      expect(screen.getByText("Mi cuenta")).toBeInTheDocument();
-      expect(screen.queryByText("Juan Pérez García")).not.toBeInTheDocument();
-      expect(screen.queryByText("CIUDADANO")).not.toBeInTheDocument();
-    });
-
-    it("habilita CTAs de acceso a los servicios de ciudadano", () => {
-      renderHomePage();
-      expect(screen.getByText("Acceder a Mesa de Partes")).toBeInTheDocument();
-      expect(screen.getByText("Ver mis expedientes")).toBeInTheDocument();
-      expect(screen.getByText("Abrir casilla electrónica")).toBeInTheDocument();
-    });
-
-    it("mantiene 'Acceso con rol asignado' en los módulos institucionales para un ciudadano", () => {
-      renderHomePage();
-      const ctasRol = screen.getAllByText("Acceso con rol asignado");
-      expect(ctasRol).toHaveLength(4);
-    });
-  });
-
-  describe("6. CTAs para usuario autenticado como ADMINISTRADOR", () => {
-    beforeEach(() => {
-      useAuthStore.setState({
-        accessToken: "fake-jwt-admin",
-        refreshToken: "fake-refresh",
-        usuario: {
-          id: "usr-admin",
-          correo: "administrador_demo@example.test",
-          nombreCompleto: "Admin General",
-          rol: "ADMINISTRADOR",
-          idPersona: "per-admin",
-        },
-        isAuthenticated: true,
-      });
-    });
-
-    it("muestra CTAs de ingreso activo en los módulos institucionales permitidos para ADMINISTRADOR", () => {
-      renderHomePage();
-      expect(screen.getByText("Ir a bandeja institucional")).toBeInTheDocument();
-      expect(screen.getByText("Abrir ventanilla presencial")).toBeInTheDocument();
-      expect(screen.getByText("Ingresar a administración")).toBeInTheDocument();
-      expect(screen.getByText("Ver tablero directivo")).toBeInTheDocument();
-    });
-  });
-
-  describe("7. Enlaces y rutas canónicas en cada tarjeta", () => {
-    it("asigna las rutas correctas a cada enlace de navegación", () => {
+  describe("3. Aislamiento estricto de módulos institucionales restringidos", () => {
+    it("NO expone módulos internos ni tarjetas reservadas al personal en la Home pública", () => {
       renderHomePage();
 
-      // Públicos
-      expect(screen.getByRole("link", { name: /Consulta Pública por CUT/i })).toHaveAttribute("href", "/consulta");
-      expect(screen.getByRole("link", { name: /Registro Ciudadano/i })).toHaveAttribute("href", "/registro");
-      expect(screen.getByRole("link", { name: /Validador CVD/i })).toHaveAttribute("href", "/validador-cvd");
-      expect(screen.getByRole("link", { name: /Flujo y Validez Legal/i })).toHaveAttribute("href", "/flujo-validez-legal");
-      const enlacesLogin = screen.getAllByRole("link", { name: /Iniciar Sesión/i });
-      expect(enlacesLogin.length).toBeGreaterThanOrEqual(1);
-      expect(enlacesLogin[0]).toHaveAttribute("href", "/login");
+      expect(screen.queryByText("Bandeja de Expedientes")).not.toBeInTheDocument();
+      expect(screen.queryByText("Panel de Administración")).not.toBeInTheDocument();
+      expect(screen.queryByText("Ventanilla Presencial")).not.toBeInTheDocument();
+      expect(screen.queryByText("Reportes y Tableros")).not.toBeInTheDocument();
+      expect(screen.queryByText("Mis Expedientes")).not.toBeInTheDocument();
+      expect(screen.queryByText("Casilla Electrónica")).not.toBeInTheDocument();
+    });
 
-      // Ciudadano
-      expect(screen.getByRole("link", { name: /Mesa de Partes Virtual/i })).toHaveAttribute("href", "/tramite");
-      expect(screen.getByRole("link", { name: /Mis Expedientes/i })).toHaveAttribute("href", "/mis-expedientes");
-      expect(screen.getByRole("link", { name: /Casilla Electrónica/i })).toHaveAttribute("href", "/casilla");
+    it("NO muestra badges técnicos de módulos bloqueados", () => {
+      renderHomePage();
 
-      // Institucional
-      expect(screen.getByRole("link", { name: /Bandeja de Expedientes/i })).toHaveAttribute("href", "/expedientes");
-      expect(screen.getByRole("link", { name: /Ventanilla Presencial/i })).toHaveAttribute("href", "/tramite/ventanilla-presencial");
-      expect(screen.getByRole("link", { name: /Panel de Administración/i })).toHaveAttribute("href", "/administracion");
-      expect(screen.getByRole("link", { name: /Reportes y Tableros/i })).toHaveAttribute("href", "/reportes/dashboard");
+      expect(screen.queryByText("Requiere rol institucional")).not.toBeInTheDocument();
+      expect(screen.queryByText("Requiere login")).not.toBeInTheDocument();
+      expect(screen.queryByText("Acceso con rol asignado")).not.toBeInTheDocument();
     });
   });
 });

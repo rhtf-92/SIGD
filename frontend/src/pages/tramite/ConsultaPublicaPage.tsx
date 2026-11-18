@@ -1,6 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import {
+  FileText,
+  Image as ImageIcon,
+  File,
+  Search,
+  ShieldCheck,
+  ArrowLeft,
+  type LucideIcon,
+} from 'lucide-react';
 import { apiClient } from '../../api/client';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/Badge';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { ProcessStepper, type ProcessStep } from '../../components/ui/ProcessStepper';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { TechnicalDetails } from '../../components/ui/TechnicalDetails';
+import { SkeletonCard } from '../../components/ui/Skeleton';
+import { ContextualHelp } from '../../components/ui/ContextualHelp';
+import consultaCutImg from '../../assets/sigd/consulta-cut.webp';
 
 export interface DtoDocumentoPublico {
   nombreArchivo: string;
@@ -35,6 +54,18 @@ export interface DtoConsultaPublica {
   documentos: DtoDocumentoPublico[];
   proveidos: DtoProveidoPublico[];
   mensajeLegal: string;
+}
+
+function obtenerTipoDocumentalVisual(contentType: string, nombreArchivo: string): { label: string; icon: LucideIcon } {
+  const ct = (contentType || '').toLowerCase();
+  const name = (nombreArchivo || '').toLowerCase();
+  if (ct.includes('pdf') || name.endsWith('.pdf')) {
+    return { label: 'PDF', icon: FileText };
+  }
+  if (ct.includes('image') || name.match(/\.(jpg|jpeg|png|webp|gif)$/)) {
+    return { label: 'Imagen', icon: ImageIcon };
+  }
+  return { label: 'Documento', icon: File };
 }
 
 export default function ConsultaPublicaPage() {
@@ -84,7 +115,7 @@ export default function ConsultaPublicaPage() {
         }
       );
       setResultado(res.data);
-    } catch (err: unknown) {
+    } catch {
       setResultado(null);
       setError(
         'No se encontró ningún expediente con los datos provistos o los datos de identidad no coinciden.'
@@ -116,269 +147,370 @@ export default function ConsultaPublicaPage() {
     switch (estado) {
       case 'PAGADO':
       case 'CONFIRMADO':
-        return { label: 'Tasa Pagada', badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+        return { label: 'Tasa Pagada', variant: 'success' as const };
       case 'PENDIENTE':
       case 'PENDIENTE_PAGO':
-        return { label: 'Pago Pendiente', badgeClass: 'bg-amber-100 text-amber-800 border-amber-300' };
+        return { label: 'Pago Pendiente', variant: 'warning' as const };
       case 'EXONERADO':
       case 'NO_APLICA':
       default:
-        return { label: 'Gratuito / No Aplica', badgeClass: 'bg-slate-100 text-slate-700 border-slate-300' };
+        return { label: 'Gratuito / No Aplica', variant: 'neutral' as const };
     }
   };
 
-  const infoPago = resultado ? formatearEstadoPago(resultado.estadoPago) : null;
+  // Construir etapas de progreso psicológico real
+  const calcularEtapas = (r: DtoConsultaPublica): ProcessStep[] => {
+    const estado = (r.estadoTramite || '').toUpperCase();
+    const pago = (r.estadoPago || '').toUpperCase();
+    const pagoCompletado = pago === 'CONFIRMADO' || pago === 'PAGADO' || pago === 'EXONERADO' || pago === 'NO_APLICA';
+
+    return [
+      {
+        id: '1',
+        title: 'Trámite registrado',
+        description: 'Ingreso oficial a Mesa de Partes',
+        status: 'completed',
+      },
+      {
+        id: '2',
+        title: 'Pago institucional',
+        description: pagoCompletado ? 'Arancel confirmado' : 'Pendiente de pago',
+        status: pagoCompletado ? 'completed' : 'current',
+      },
+      {
+        id: '3',
+        title: 'En evaluación',
+        description: 'Revisión técnica de requisitos',
+        status:
+          estado === 'RESUELTO' || estado === 'ARCHIVADO' || estado === 'ATENDIDO'
+            ? 'completed'
+            : estado === 'OBSERVADO'
+            ? 'error'
+            : estado === 'EN_TRAMITE' || estado === 'ASIGNADO' || estado === 'EN_REVISION'
+            ? 'current'
+            : 'pending',
+      },
+      {
+        id: '4',
+        title: 'Pendiente de resolución',
+        description: 'Acto resolutivo formal',
+        status:
+          estado === 'RESUELTO' || estado === 'ARCHIVADO'
+            ? 'completed'
+            : estado === 'POR_FIRMAR'
+            ? 'current'
+            : 'pending',
+      },
+      {
+        id: '5',
+        title: 'Resultado disponible',
+        description: 'Notificación oficial emitida',
+        status:
+          estado === 'RESUELTO' || estado === 'ATENDIDO'
+            ? 'completed'
+            : estado === 'RECHAZADO'
+            ? 'error'
+            : 'pending',
+      },
+    ];
+  };
 
   return (
-    <main className="min-h-screen min-h-dvh bg-gradient-to-br from-slate-50 via-cyan-50/25 to-teal-50/15 py-10 px-4 sm:px-6 lg:px-8 text-slate-900">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <main className="min-h-screen bg-surface-page py-8 px-4 sm:px-6 lg:px-8 text-slate-900">
+      <div className="max-w-4xl mx-auto space-y-6">
         {/* Cabecera Institucional */}
-        <section className="relative overflow-hidden rounded-3xl border border-white/80 bg-gradient-to-br from-white/90 via-cyan-50/40 to-teal-50/25 p-6 sm:p-8 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),inset_0_-1px_2px_0_rgba(6,182,212,0.06),0_16px_48px_-8px_rgba(6,182,212,0.14),0_2px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-cyan-200/50 backdrop-blur-md space-y-6 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent after:pointer-events-none after:absolute after:-top-24 after:-right-24 after:h-48 after:w-48 after:rounded-full after:bg-cyan-300/15 after:blur-2xl">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 pb-6 mb-6">
+        <header className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xs space-y-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 mb-2">
+                <ShieldCheck className="h-3.5 w-3.5 text-suiza-primary" />
                 Consulta Pública de Trámites y Expedientes
+              </div>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                Consulta tu trámite
               </h1>
-              <p className="text-sm text-slate-500 mt-1">
-                IESTP "Suiza" — Sede Digital y Transparencia Documentaria (Ley N° 27444 / Ley N° 29733)
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                IESTP &quot;Suiza&quot; — Sede Digital y Transparencia Documentaria (Ley N° 27444 / Ley N° 29733)
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Link
-                to="/mesa-partes"
-                className="text-xs font-semibold text-cyan-900 bg-white/90 border border-cyan-200/80 px-4 py-2 rounded-xl shadow-2xs hover:bg-cyan-50/80 hover:border-cyan-300 transition shrink-0"
-              >
-                Mesa de Partes Digital
+              <Link to="/mesa-partes">
+                <Button variant="secondary" size="sm">
+                  Mesa de Partes
+                </Button>
               </Link>
-              <Link
-                to="/"
-                className="text-xs font-semibold text-slate-700 bg-white/90 border border-slate-200 px-4 py-2 rounded-xl shadow-2xs hover:bg-slate-50 transition shrink-0"
-              >
-                ← Volver al Portal
+              <Link to="/">
+                <Button variant="ghost" size="sm">
+                  <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+                  Inicio
+                </Button>
               </Link>
             </div>
           </div>
 
-          {/* Formulario de Búsqueda Seguro (CUT + Documento) */}
-          <form onSubmit={handleBuscar} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="cut-input" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Código Único de Trámite (CUT) <span className="text-rose-500">*</span>
-                </label>
-                <input
+          {/* Formulario de Búsqueda Seguro (CUT + Documento) con Ilustración Secundaria */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            <form onSubmit={handleBuscar} className="space-y-4 lg:col-span-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
                   id="cut-input"
-                  type="text"
+                  label="Código Único de Trámite (CUT)"
+                  labelSuffix={
+                    <ContextualHelp
+                      title="¿Qué es el código CUT?"
+                      content="Es el identificador oficial (ej. EXP-2026-000001) asignado a su expediente al momento de ingresar por la Mesa de Partes Digital. Lo encuentra en su cargo de recepción."
+                    />
+                  }
+                  required
                   placeholder="Ejemplo: EXP-2026-000001"
                   value={cutInput}
                   onChange={(e) => setCutInput(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border border-cyan-200/90 bg-white/95 text-slate-800 placeholder-slate-400 font-mono text-sm uppercase shadow-xs focus:border-cyan-500 focus:ring-4 focus:ring-cyan-200/50 focus:outline-none transition"
-                  required
+                  helperText="Identificador oficial entregado en su cargo digital"
                 />
-              </div>
-              <div>
-                <label htmlFor="doc-input" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Documento del Solicitante (DNI / CE / RUC) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  id="doc-input"
-                  type="text"
-                  placeholder="Ejemplo: 45678901"
-                  value={documentoInput}
-                  onChange={(e) => setDocumentoInput(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border border-cyan-200/90 bg-white/95 text-slate-800 placeholder-slate-400 font-mono text-sm shadow-xs focus:border-cyan-500 focus:ring-4 focus:ring-cyan-200/50 focus:outline-none transition"
-                  required
-                />
-              </div>
-            </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-              <p className="text-xs text-slate-500">
-                🔒 Por seguridad y confidencialidad (Ley N° 29733), se valida que el número de documento corresponda al titular del expediente.
-              </p>
-              <button
-                type="submit"
-                disabled={cargando}
-                className="w-full sm:w-auto px-7 py-3 rounded-2xl bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 hover:from-teal-700 hover:via-cyan-700 hover:to-sky-700 text-white font-bold shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] shrink-0"
-              >
-                {cargando ? 'Consultando...' : 'Consultar Estado'}
-              </button>
+                <Input
+                  id="doc-input"
+                  label="Documento del Solicitante"
+                  labelSuffix={
+                    <ContextualHelp
+                      title="Validación de titularidad"
+                      content="Por protección de datos personales (Ley N° 29733), solo el titular de la solicitud o su representante legal pueden consultar el detalle del expediente con su DNI, CE o RUC."
+                    />
+                  }
+                  required
+                  placeholder="Ejemplo: 45678901"
+                  maxLength={15}
+                  value={documentoInput}
+                  onChange={(e) => setDocumentoInput(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase())}
+                  helperText="Ingresa el DNI (8 dígitos), RUC (11 dígitos) o CE del solicitante"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                <p className="text-xs text-slate-500">
+                  🔒 Por seguridad y confidencialidad (Ley N° 29733), se valida que el número de documento corresponda al titular del expediente.
+                </p>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  isLoading={cargando}
+                  loadingText="Consultando..."
+                  className="w-full sm:w-auto shrink-0"
+                >
+                  <Search className="h-4 w-4 mr-1.5" />
+                  Consultar Estado
+                </Button>
+              </div>
+            </form>
+
+            <div className="hidden lg:flex lg:col-span-4 justify-center items-center p-2">
+              <img
+                src={consultaCutImg}
+                alt="Consulta CUT SIGD"
+                width={176}
+                height={176}
+                loading="lazy"
+                decoding="async"
+                className="h-44 w-auto object-contain drop-shadow-xs aspect-square"
+              />
             </div>
-          </form>
+          </div>
 
           {error && (
-            <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-start gap-3">
-              <span className="text-lg">⚠️</span>
-              <div>
-                <p className="font-semibold">Información de consulta</p>
-                <p>{error}</p>
-              </div>
+            <div className="mt-4">
+              <EmptyState
+                imageSrc={consultaCutImg}
+                title="No encontramos un trámite con esos datos"
+                description={error}
+              />
             </div>
           )}
-        </section>
+        </header>
+
+        {/* Loading skeleton */}
+        {cargando && !resultado && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-4">
+            <SkeletonCard />
+          </div>
+        )}
 
         {/* Detalle del Expediente */}
         {resultado && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            {/* Header del Expediente */}
+          <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs space-y-0">
+            {/* 1. Header con Información Principal */}
             <div className="bg-slate-900 px-6 py-5 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
-                <span className="text-xs uppercase tracking-wider text-cyan-400 font-semibold">
+                <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold block">
                   Expediente Encontrado
                 </span>
-                <h2 className="text-2xl font-mono font-bold text-white tracking-wide">{resultado.cut}</h2>
+                <h2 className="text-2xl font-mono font-extrabold text-white tracking-wide mt-0.5">
+                  {resultado.cut}
+                </h2>
+                <p className="text-sm text-slate-300 font-medium mt-1">
+                  {resultado.tipoTramite ?? resultado.asunto}
+                </p>
               </div>
+
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/20 text-cyan-200 border border-cyan-400/30">
-                  {resultado.estadoTramite}
+                <StatusBadge status={resultado.estadoTramite} />
+                {resultado.estadoPago && (
+                  <Badge variant={formatearEstadoPago(resultado.estadoPago).variant}>
+                    {formatearEstadoPago(resultado.estadoPago).label}
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Resumen Inmediato y Orientación */}
+            <div className="bg-slate-50/80 px-6 py-4 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div>
+                <span className="font-bold uppercase tracking-wider text-slate-400 block text-[10px]">
+                  Área Responsable
                 </span>
-                {infoPago && (
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${infoPago.badgeClass}`}>
-                    {infoPago.label}
-                  </span>
-                )}
+                <p className="font-bold text-slate-900 mt-0.5 text-sm">
+                  {resultado.areaActual ?? 'Área de Trámite General'}
+                </p>
+              </div>
+
+              <div>
+                <span className="font-bold uppercase tracking-wider text-slate-400 block text-[10px]">
+                  Foliación Oficial
+                </span>
+                <p className="font-semibold text-slate-800 mt-0.5 text-sm">
+                  {resultado.totalFolios} {resultado.totalFolios === 1 ? 'folio certificado' : 'folios certificados'}
+                </p>
+              </div>
+
+              <div>
+                <span className="font-bold uppercase tracking-wider text-slate-400 block text-[10px]">
+                  Fecha Radicación Legal
+                </span>
+                <p className="font-medium text-slate-800 mt-0.5 text-sm">
+                  {resultado.fechaRadicacionLegal
+                    ? new Date(resultado.fechaRadicacionLegal).toLocaleDateString('es-PE')
+                    : 'En trámite'}
+                </p>
               </div>
             </div>
 
-            {/* Banner de Orientación y Próximo Paso */}
-            <div className="bg-gradient-to-r from-cyan-50 via-teal-50/50 to-white p-6 border-b border-cyan-100">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {resultado.areaActual && (
-                  <div className="bg-white p-4 rounded-xl border border-cyan-200/60 shadow-2xs">
-                    <span className="text-xs font-bold uppercase tracking-wider text-cyan-800">Ubicación Actual</span>
-                    <p className="text-base font-semibold text-slate-900 mt-1">{resultado.areaActual}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Área institucional a cargo</p>
-                  </div>
-                )}
-
-                <div className={`bg-white p-4 rounded-xl border border-cyan-200/60 shadow-2xs ${resultado.areaActual ? 'md:col-span-2' : 'md:col-span-3'}`}>
-                  <span className="text-xs font-bold uppercase tracking-wider text-teal-800">Próximo Paso / Orientación</span>
-                  <p className="text-sm font-medium text-slate-800 mt-1">{resultado.pasoSiguiente}</p>
-                </div>
-              </div>
+            {/* 3. Progreso por Etapas Reales (ProcessStepper) */}
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">
+                Progreso del Procedimiento
+              </h3>
+              <ProcessStepper steps={calcularEtapas(resultado)} />
             </div>
 
-            {/* Datos Técnicos del Expediente */}
-            <div className="p-6 sm:p-8 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {/* 4. Próximo Paso y Datos del Solicitante */}
+            <div className="p-6 border-b border-slate-200 space-y-4">
+              <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-suiza-primary block">
+                  Próximo Paso / Orientación al Administrado
+                </span>
+                <p className="text-sm font-semibold text-slate-900 mt-1">
+                  {resultado.pasoSiguiente}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <span className="font-bold text-slate-400 uppercase tracking-wider block text-[10px]">
                     Asunto / Petitorio
-                  </h3>
-                  <p className="mt-1 text-slate-800 font-medium">{resultado.asunto}</p>
-                </div>
-
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Tipo de Procedimiento
-                  </h3>
-                  <p className="mt-1 text-slate-800 font-medium">
-                    {resultado.tipoTramite ?? 'Trámite General'}
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Foliación Oficial
-                  </h3>
-                  <p className="mt-1 text-slate-800 font-semibold">
-                    {resultado.totalFolios} {resultado.totalFolios === 1 ? 'folio certificado' : 'folios certificados'}
-                  </p>
+                  </span>
+                  <p className="font-medium text-slate-800 mt-0.5">{resultado.asunto}</p>
                 </div>
 
                 {resultado.administrado && (resultado.administrado.nombreEnmascarado || resultado.administrado.documentoEnmascarado) && (
                   <div>
-                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      Solicitante (Ley 29733)
-                    </h3>
-                    <p className="mt-1 text-slate-700 font-mono">
+                    <span className="font-bold text-slate-400 uppercase tracking-wider block text-[10px]">
+                      Solicitante Titular (Ley 29733)
+                    </span>
+                    <p className="font-medium text-slate-800 mt-0.5">
                       {resultado.administrado.nombreEnmascarado ?? 'Ciudadano Administrado'}
                     </p>
-                    <p className="text-xs text-slate-400 font-mono">
-                      Doc: {resultado.administrado.documentoEnmascarado ?? 'Reservado'}
+                    <p className="text-slate-500 font-mono text-[11px]">
+                      Doc: {resultado.administrado.documentoEnmascarado ?? 'Protegido'}
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
 
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Canal de Ingreso
-                  </h3>
-                  <p className="mt-1 text-slate-700 font-medium capitalize">
-                    {resultado.canalRecepcion ? resultado.canalRecepcion.toLowerCase().replace(/_/g, ' ') : 'Mesa virtual'}
-                  </p>
-                  {resultado.fueraDeHorario && (
-                    <span className="inline-block mt-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                      Corte Horario (Siguiente día hábil)
-                    </span>
-                  )}
-                </div>
+            {/* 5. Documentos Oficiales Registrados (Sin MIME types técnicos) */}
+            {resultado.documentos.length > 0 && (
+              <div className="p-6 border-b border-slate-200 space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                  <span>Documentos Oficiales Registrados</span>
+                  <span className="font-normal text-slate-400">{resultado.documentos.length} archivo(s)</span>
+                </h3>
 
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Fecha Radicación Legal
-                  </h3>
-                  <p className="mt-1 text-slate-700">
-                    {resultado.fechaRadicacionLegal
-                      ? new Date(resultado.fechaRadicacionLegal).toLocaleString('es-PE')
-                      : 'En trámite'}
-                  </p>
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
+                  {resultado.documentos.map((doc, idx) => {
+                    const tipoVisual = obtenerTipoDocumentalVisual(doc.contentType, doc.nombreArchivo);
+                    const TipoIcono = tipoVisual.icon;
+
+                    return (
+                      <div key={idx} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm hover:bg-slate-50/80 transition">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-lg bg-slate-100 text-suiza-primary flex items-center justify-center shrink-0">
+                            <TipoIcono className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-900 truncate">{doc.nombreArchivo}</p>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 mt-0.5">
+                              {tipoVisual.label}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Huella Criptográfica en TechnicalDetails */}
+                        <div className="sm:max-w-xs w-full">
+                          <TechnicalDetails
+                            title="Huella Digital (SHA-256)"
+                            items={[
+                              {
+                                label: 'SHA-256',
+                                value: doc.hashSha256,
+                                copyable: true,
+                              },
+                            ]}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+            )}
 
-              {/* Documentos Oficiales */}
-              {resultado.documentos.length > 0 && (
-                <div className="border-t border-slate-100 pt-6">
-                  <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center justify-between">
-                    <span>Documentos Oficiales Registrados</span>
-                    <span className="text-xs text-slate-500 font-normal">{resultado.documentos.length} documento(s)</span>
-                  </h3>
-                  <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                    {resultado.documentos.map((doc, idx) => (
-                      <div key={idx} className="p-4 flex items-center justify-between text-sm bg-slate-50/50 hover:bg-slate-50 transition">
-                        <div>
-                          <p className="font-medium text-slate-800">{doc.nombreArchivo}</p>
-                          <p className="text-xs text-slate-400 font-mono mt-0.5">
-                            SHA-256: {doc.hashSha256.slice(0, 16)}...
-                          </p>
-                        </div>
-                        <span className="text-xs bg-slate-200/70 text-slate-700 px-2.5 py-1 rounded-md font-mono">
-                          {doc.contentType}
-                        </span>
+            {/* 6. Proveídos y Actuaciones Oficiales */}
+            {resultado.proveidos.length > 0 && (
+              <div className="p-6 border-b border-slate-200 space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Actuaciones y Proveídos Institucionales
+                </h3>
+                <div className="space-y-2">
+                  {resultado.proveidos.map((prov, idx) => (
+                    <div key={idx} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                      <div className="flex justify-between items-center font-bold text-slate-800">
+                        <span>{prov.numero}</span>
+                        <span className="text-slate-500 font-normal">{new Date(prov.fechaEmision).toLocaleDateString('es-PE')}</span>
                       </div>
-                    ))}
-                  </div>
+                      <p className="text-slate-700 leading-relaxed">{prov.resumen}</p>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Proveídos Públicos */}
-              {resultado.proveidos.length > 0 && (
-                <div className="border-t border-slate-100 pt-6">
-                  <h3 className="text-sm font-semibold text-slate-900 mb-3">
-                    Actuaciones y Proveídos Institucionales
-                  </h3>
-                  <div className="space-y-3">
-                    {resultado.proveidos.map((prov, idx) => (
-                      <div key={idx} className="p-4 rounded-xl bg-teal-50/50 border border-teal-100">
-                        <div className="flex justify-between items-center text-xs text-teal-800 font-semibold mb-1">
-                          <span>{prov.numero}</span>
-                          <span>{new Date(prov.fechaEmision).toLocaleDateString('es-PE')}</span>
-                        </div>
-                        <p className="text-sm text-slate-700">{prov.resumen}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Mensaje Legal */}
-              {resultado.mensajeLegal && (
-                <div className="border-t border-slate-100 pt-4 text-xs text-slate-500 italic">
-                  {resultado.mensajeLegal}
-                </div>
-              )}
-            </div>
-          </div>
+            {/* 7. Mensaje Legal al pie */}
+            {resultado.mensajeLegal && (
+              <div className="p-4 bg-slate-50 text-[11px] text-slate-500 italic text-center">
+                {resultado.mensajeLegal}
+              </div>
+            )}
+          </section>
         )}
       </div>
     </main>

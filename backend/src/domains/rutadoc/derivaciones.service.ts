@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg';
+import type { PoolClient, Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { getRequestContext } from '../../shared/request-context/request-context.js';
 import { insertarEvento } from '../../audit/evento-outbox.repository.js';
@@ -7,6 +7,7 @@ import type { DerivarExpedienteDTO } from './dto/derivarExpediente.dto.js';
 import type { ArchivarExpedienteDTO } from './dto/archivarExpediente.dto.js';
 import type { AtenderExpedienteDTO } from './dto/atenderExpediente.dto.js';
 import { documentoStorageService } from '../../core/storage/documento-storage.service.js';
+import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { ExpedienteAsignacionService } from './expedienteAsignacion.service.js';
 import { ExpedienteObservacionService } from './expedienteObservacion.service.js';
 
@@ -25,6 +26,119 @@ export function resolverOperadorBigInt(id: string | number | undefined | null): 
     // fallback
   }
   return '1';
+}
+
+export interface EstadoEtapaTecnicaExpediente {
+  requiereEvaluacionTecnica: boolean;
+  tieneAsignacion: boolean;
+  tieneDictamenTecnico: boolean;
+  completada: boolean;
+  areaResponsableId: string | null;
+  areaResolutivaId: string | null;
+  areaActualId: string | null;
+}
+
+/**
+ * Evalúa si un expediente con procedimiento TUPA de etapa técnica intermedia
+ * (unidad responsable != unidad resolutiva, ej. SDA != DIR) cuenta con
+ * asignación formal y dictamen técnico completado en workflow_instancia.
+ */
+export async function verificarEvidenciaEtapaTecnica(
+  db: Pool | PoolClient,
+  expedienteId: string,
+): Promise<{ tieneAsignacion: boolean; tieneDictamenTecnico: boolean; completada: boolean }> {
+  const res = await db.query<{
+    tiene_asignacion: boolean;
+    historial_pasos: any;
+  }>(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM sigd_rut.expediente_asignacion ea
+          WHERE ea.expediente_id = $1::uuid
+       ) AS tiene_asignacion,
+       (
+         SELECT wi.historial_pasos
+           FROM sigd_rut.workflow_instancia wi
+          WHERE wi.expediente_id = $1::uuid
+          LIMIT 1
+       ) AS historial_pasos`,
+    [expedienteId],
+  );
+  const row = res.rows[0];
+  const tieneAsignacion = Boolean(row?.tiene_asignacion);
+  const historial = row?.historial_pasos ?? [];
+  const tieneDictamenTecnico =
+    Array.isArray(historial) &&
+    historial.some((h: any) => h?.evento === 'ATENCION_TECNICA' || h?.evento === 'ATENCION');
+
+  return {
+    tieneAsignacion,
+    tieneDictamenTecnico,
+    completada: tieneAsignacion && tieneDictamenTecnico,
+  };
+}
+
+export async function consultarEstadoEtapaTecnicaTupa(
+  db: Pool | PoolClient,
+  expedienteId: string,
+): Promise<EstadoEtapaTecnicaExpediente> {
+  const resWf = await db.query<{
+    unidad_responsable_id: string | null;
+    unidad_resolutiva_id: string | null;
+    area_actual_id: string | null;
+  }>(
+    `SELECT
+       COALESCE(tp.unidad_responsable_id, v.unidad_responsable_id)::text AS unidad_responsable_id,
+       COALESCE(tp.unidad_resolutiva_id, v.unidad_resolutiva_id, (SELECT area_id FROM sigd_org.area WHERE codigo = 'DIR'))::text AS unidad_resolutiva_id,
+       COALESCE(u.area_actual_id, e.area_destino_id::text) AS area_actual_id
+     FROM sigd_tra.expediente e
+     LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
+     LEFT JOIN sigd_doc.expediente_tupa_vinculo v ON v.expediente_id = e.expediente_id AND v.reemplaza_vinculo_id IS NULL
+     LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = v.registro_version_id
+     WHERE e.expediente_id = $1::uuid
+     ORDER BY v.vinculado_en DESC NULLS LAST
+     LIMIT 1`,
+    [expedienteId],
+  );
+  if (resWf.rows.length === 0) {
+    return {
+      requiereEvaluacionTecnica: false,
+      tieneAsignacion: false,
+      tieneDictamenTecnico: false,
+      completada: true,
+      areaResponsableId: null,
+      areaResolutivaId: null,
+      areaActualId: null,
+    };
+  }
+  const w = resWf.rows[0];
+  const requiereEvaluacionTecnica = Boolean(
+    w.unidad_responsable_id &&
+    w.unidad_resolutiva_id &&
+    w.unidad_responsable_id !== w.unidad_resolutiva_id,
+  );
+  if (!requiereEvaluacionTecnica) {
+    return {
+      requiereEvaluacionTecnica: false,
+      tieneAsignacion: false,
+      tieneDictamenTecnico: false,
+      completada: true,
+      areaResponsableId: w.unidad_responsable_id,
+      areaResolutivaId: w.unidad_resolutiva_id,
+      areaActualId: w.area_actual_id,
+    };
+  }
+  const evidencia = await verificarEvidenciaEtapaTecnica(db, expedienteId);
+  return {
+    requiereEvaluacionTecnica: true,
+    tieneAsignacion: evidencia.tieneAsignacion,
+    tieneDictamenTecnico: evidencia.tieneDictamenTecnico,
+    completada: evidencia.completada,
+    areaResponsableId: w.unidad_responsable_id,
+    areaResolutivaId: w.unidad_resolutiva_id,
+    areaActualId: w.area_actual_id,
+  };
 }
 
 /**
@@ -75,7 +189,7 @@ export async function derivarExpediente(
     solicitante_id: string;
   }>(`
     SELECT
-      COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
+      CASE WHEN e.estado = 'PENDIENTE_PAGO' THEN 'PENDIENTE_PAGO' ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id
@@ -95,11 +209,13 @@ export async function derivarExpediente(
     solicitante_id: solicitanteId,
   } = resEstadoActual.rows[0];
 
-  const estadosPermitidosDerivacion = ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'SUBSANADO'];
+  const estadosPermitidosDerivacion = ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION'];
   if (!estadosPermitidosDerivacion.includes(estadoActual)) {
     throw new DomainError({
       code: 'ESTADO_INVALIDO',
-      message: `El expediente en estado ${estadoActual} no puede ser derivado.`,
+      message: `El expediente en estado ${estadoActual} no puede ser derivado.${
+        estadoActual === 'SUBSANADO' ? ' Debe iniciar formalmente la revisión institucional antes de derivarlo.' : ''
+      }`,
     });
   }
 
@@ -137,20 +253,14 @@ export async function derivarExpediente(
     `, [expedienteId, operadorId, JSON.stringify({ detalle: 'Recepción previa a re-derivación' })]);
 
     estadoPrevioDerivacion = 'EN_REVISION';
-  } else if (estadoActual === 'SUBSANADO') {
-    await cliente.query(`
-      INSERT INTO sigd_rut.movimiento_tramite (
-        expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, datos
-      ) VALUES ($1::uuid, 'SUBSANADO', 'INICIAR_REVISION', 'EN_REVISION', $2::bigint, $3::jsonb)
-    `, [expedienteId, operadorId, JSON.stringify({ detalle: 'Pase a revisión tras subsanación' })]);
-
-    estadoPrevioDerivacion = 'EN_REVISION';
   }
 
   // 4. Procesar cada destino e insertar movimiento append-only
   for (const destino of datos.destinos) {
     const esCorreccion = Boolean(datos.es_correccion || datos.motivo === 'CORRECCION_DERIVACION');
-    const eventoMov = esCorreccion ? 'CORRECCION_DERIVACION' : 'DERIVACION';
+    // La FK sigd_rut.fk_movimiento_transicion exige el evento canónico 'DERIVACION';
+    // el carácter correctivo queda auditado en datos.es_correccion, workflow y outbox.
+    const eventoMov = 'DERIVACION';
     const claveMov = datos.clave_idempotencia || randomUUID();
 
     const datosMovimiento = {
@@ -160,8 +270,7 @@ export async function derivarExpediente(
       motivo: datos.proveido,
       es_copia: destino.es_copia,
       es_correccion: esCorreccion,
-      usuario_asignado_id: destino.usuario_asignado_id || null,
-      persona_asignada_id: destino.persona_asignada_id || null,
+      justificacion_desviacion: datos.justificacion_desviacion ?? null,
     };
 
     const resMovimiento = await cliente.query<{ movimiento_id: string }>(`
@@ -210,7 +319,6 @@ export async function derivarExpediente(
         datos_especificos: {
           motivo: datos.proveido,
           es_copia: destino.es_copia,
-          usuario_asignado_id: destino.usuario_asignado_id
         }
       }
     });
@@ -335,6 +443,8 @@ export async function enviarAFirmaExpediente(
   datos: {
     resultado_resumen: string;
     observacion_interna?: string | null;
+    actor_unidad_organica_id?: string | null;
+    actor_roles?: readonly string[] | string[];
   },
 ): Promise<{ movimiento_id: string; estado: 'EN_FIRMA' }> {
   const contexto = getRequestContext();
@@ -349,14 +459,20 @@ export async function enviarAFirmaExpediente(
     area_contexto_id: string;
     codigo_expediente: string;
     solicitante_id: string;
+    unidad_responsable_id?: string | null;
+    unidad_resolutiva_id?: string | null;
   }>(
     `SELECT
       COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
-      e.solicitante_id::text AS solicitante_id
+      e.solicitante_id::text AS solicitante_id,
+      COALESCE(tp.unidad_responsable_id, v.unidad_responsable_id) AS unidad_responsable_id,
+      COALESCE(tp.unidad_resolutiva_id, v.unidad_resolutiva_id, (SELECT area_id FROM sigd_org.area WHERE codigo = 'DIR')) AS unidad_resolutiva_id
     FROM sigd_tra.expediente e
     LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
+    LEFT JOIN sigd_doc.expediente_tupa_vinculo v ON v.expediente_id = e.expediente_id AND v.reemplaza_vinculo_id IS NULL
+    LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = v.registro_version_id
     WHERE e.expediente_id = $1::uuid`,
     [expedienteId],
   );
@@ -365,8 +481,23 @@ export async function enviarAFirmaExpediente(
     throw new NotFoundError({ detail: 'El expediente no existe o no tiene estado actual.' });
   }
 
-  const { estado_actual_id: estadoActual, area_contexto_id: areaActual } = resEstadoActual.rows[0];
+  const {
+    estado_actual_id: estadoActual,
+    area_contexto_id: areaActual,
+    unidad_responsable_id: areaResponsable,
+    unidad_resolutiva_id: areaResolutivaRaw,
+  } = resEstadoActual.rows[0];
   const operadorId = resolverOperadorBigInt(usuarioActorId);
+  const areaResolutiva = areaResolutivaRaw || 'a0000000-0000-0000-0000-000000000002';
+
+  if (datos.actor_unidad_organica_id) {
+    if (areaActual && datos.actor_unidad_organica_id !== areaActual) {
+      throw new ForbiddenError({
+        code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+        detail: 'No pertenece al área de custodia del expediente para remitirlo a despacho de firma.',
+      });
+    }
+  }
 
   if (estadoActual === 'DERIVADO') {
     await cliente.query(
@@ -380,6 +511,20 @@ export async function enviarAFirmaExpediente(
       code: 'ESTADO_INVALIDO',
       message: `El expediente en estado ${estadoActual} no puede ser enviado a firma. Se requiere estado EN_REVISION o DERIVADO.`,
     });
+  }
+
+  // Si el procedimiento tiene un área intermedia responsable técnica diferente de la resolutiva,
+  // exigir asignación formal y dictamen técnico completado sin importar en qué área se encuentre actualmente.
+  if (areaResponsable && areaResolutiva && areaResponsable !== areaResolutiva) {
+    const evidencia = await verificarEvidenciaEtapaTecnica(cliente, expedienteId);
+    if (!evidencia.completada) {
+      throw new DomainError({
+        code: 'ATENCION_TECNICA_REQUERIDA',
+        message: !evidencia.tieneAsignacion
+          ? 'ATENCION_TECNICA_REQUERIDA: El expediente requiere asignación formal a especialista y dictamen técnico válido en la unidad responsable (SDA) antes de ser elevado a firma.'
+          : 'ATENCION_TECNICA_REQUERIDA: El expediente requiere dictamen y evaluación técnica completada en la unidad responsable (SDA) antes de ser enviado a firma de Dirección.',
+      });
+    }
   }
 
   const resMov = await cliente.query<{ movimiento_id: string }>(
@@ -408,7 +553,8 @@ export async function enviarAFirmaExpediente(
         detalle: 'Pase formal para emisión y firma de resolución',
         resultado_resumen: datos.resultado_resumen,
         observacion_interna: datos.observacion_interna || null,
-        areaId: areaActual || null,
+        areaId: areaResolutiva,
+        areaOrigenId: areaActual,
       }),
     ],
   );
@@ -417,10 +563,11 @@ export async function enviarAFirmaExpediente(
 
   const updateRes = await cliente.query(
     `UPDATE sigd_tra.expediente
-        SET estado = 'EN_FIRMA'
+        SET estado = 'EN_FIRMA',
+            area_destino_id = $2::uuid
       WHERE expediente_id = $1::uuid
         AND estado IN ('EN_REVISION', 'DERIVADO')`,
-    [expedienteId],
+    [expedienteId, areaResolutiva],
   );
 
   if ((updateRes?.rowCount ?? 0) !== 1) {
@@ -467,15 +614,23 @@ export async function resolverExpedienteConFirma(
     area_contexto_id: string;
     codigo_expediente: string;
     solicitante_id: string;
+    unidad_responsable_id?: string | null;
+    unidad_resolutiva_id?: string | null;
   }>(
     `SELECT
       COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
-      e.solicitante_id::text AS solicitante_id
+      e.solicitante_id::text AS solicitante_id,
+      COALESCE(tp.unidad_responsable_id, v.unidad_responsable_id)::text AS unidad_responsable_id,
+      COALESCE(tp.unidad_resolutiva_id, v.unidad_resolutiva_id)::text AS unidad_resolutiva_id
     FROM sigd_tra.expediente e
     LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
-    WHERE e.expediente_id = $1::uuid`,
+    LEFT JOIN sigd_doc.expediente_tupa_vinculo v ON v.expediente_id = e.expediente_id AND v.reemplaza_vinculo_id IS NULL
+    LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = v.registro_version_id
+    WHERE e.expediente_id = $1::uuid
+    ORDER BY v.vinculado_en DESC NULLS LAST
+    LIMIT 1`,
     [expedienteId],
   );
 
@@ -488,6 +643,8 @@ export async function resolverExpedienteConFirma(
     area_contexto_id: areaActual,
     codigo_expediente: codigoExpediente,
     solicitante_id: solicitanteId,
+    unidad_responsable_id: areaResponsableTupa,
+    unidad_resolutiva_id: areaResolutivaTupa,
   } = resEstadoActual.rows[0];
 
   if (estadoActual !== 'EN_FIRMA') {
@@ -497,34 +654,91 @@ export async function resolverExpedienteConFirma(
     });
   }
 
+  if (areaResponsableTupa && areaResolutivaTupa && areaResponsableTupa !== areaResolutivaTupa) {
+    const evidencia = await verificarEvidenciaEtapaTecnica(cliente, expedienteId);
+    if (!evidencia.completada) {
+      throw new DomainError({
+        code: 'ATENCION_TECNICA_REQUERIDA',
+        message: 'ATENCION_TECNICA_REQUERIDA: No se puede resolver el expediente sin asignación formal y dictamen técnico válido de la unidad responsable.',
+      });
+    }
+  }
+
   // Comprobar evidencia canónica de firma digital/criptográfica
   let tieneEvidenciaFirma = false;
   let documentoFirmadoId: string | null = null;
   let cvdFirmado: string | null = null;
+  let s3KeyFirmado: string | null = null;
+  let sha256Firmado: string | null = null;
 
-  // Evidencia 1: Registro formal en sigd_doc.firma_digital_documento
-  const resFirmaDoc = await cliente.query<{ documento_id: string; cvd: string | null }>(
-    `SELECT f.documento_id, f.cvd
-       FROM sigd_doc.firma_digital_documento f
-       JOIN sigd_doc.documento_adjunto a ON a.documento_adjunto_id = f.documento_id
-      WHERE (a.expediente_id = $1::uuid OR a.expediente_tra_id = $1::uuid)
-        AND f.estado = 'FIRMADO_DIGITALMENTE'
-      ORDER BY f.fecha_registro DESC
-      LIMIT 1`,
-    [expedienteId],
-  );
-  if (resFirmaDoc.rowCount && resFirmaDoc.rowCount > 0) {
-    tieneEvidenciaFirma = true;
-    documentoFirmadoId = resFirmaDoc.rows[0].documento_id;
-    cvdFirmado = resFirmaDoc.rows[0].cvd;
+  // Evidencia 1: Si se especificó documento_respuesta_id, verificar que sea un acto institucional válido
+  if (datos.documento_respuesta_id) {
+    const resDocResp = await cliente.query<{
+      documento_id: string;
+      cvd: string | null;
+      s3_key?: string | null;
+      sha256_firmado?: string | null;
+      id_requisito: string | null;
+      s3_key_adjunto: string;
+    }>(
+      `SELECT f.documento_id, f.cvd, f.s3_key, f.sha256_firmado, a.id_requisito, a.s3_key AS s3_key_adjunto
+         FROM sigd_doc.firma_digital_documento f
+         JOIN sigd_doc.documento_adjunto a ON a.documento_adjunto_id = f.documento_id
+        WHERE f.documento_id = $1::uuid
+          AND f.estado = 'FIRMADO_DIGITALMENTE'
+        LIMIT 1`,
+      [datos.documento_respuesta_id],
+    );
+    if (resDocResp.rowCount && resDocResp.rowCount > 0) {
+      const resp = resDocResp.rows[0];
+      if (resp.id_requisito !== null || resp.s3_key_adjunto.startsWith('expedientes/')) {
+        throw new DomainError({
+          code: 'DOCUMENTO_NO_ES_ACTO_RESOLUTIVO',
+          message: 'El documento especificado como respuesta corresponde a un recaudo de entrada y no a un acto resolutivo institucional válido.',
+        });
+      }
+      tieneEvidenciaFirma = true;
+      documentoFirmadoId = resp.documento_id;
+      cvdFirmado = resp.cvd;
+      s3KeyFirmado = resp.s3_key ?? resp.s3_key_adjunto ?? null;
+      sha256Firmado = resp.sha256_firmado ?? null;
+    }
   }
 
-  // Evidencia 2: Resolución oficial firmada en sigd_doc.resolucion
+  // Evidencia 2: Registro formal institucional en sigd_doc.firma_digital_documento (excluye recaudos del ciudadano)
+  if (!tieneEvidenciaFirma) {
+    const resFirmaDoc = await cliente.query<{
+      documento_id: string;
+      cvd: string | null;
+      s3_key?: string | null;
+      sha256_firmado?: string | null;
+    }>(
+      `SELECT f.documento_id, f.cvd, f.s3_key, f.sha256_firmado
+         FROM sigd_doc.firma_digital_documento f
+         JOIN sigd_doc.documento_adjunto a ON a.documento_adjunto_id = f.documento_id
+        WHERE (a.expediente_id = $1::uuid OR a.expediente_tra_id = $1::uuid)
+          AND f.estado = 'FIRMADO_DIGITALMENTE'
+          AND a.id_requisito IS NULL
+          AND NOT (a.s3_key LIKE 'expedientes/%')
+        ORDER BY f.fecha_registro DESC
+        LIMIT 1`,
+      [expedienteId],
+    );
+    if (resFirmaDoc.rowCount && resFirmaDoc.rowCount > 0) {
+      tieneEvidenciaFirma = true;
+      documentoFirmadoId = resFirmaDoc.rows[0].documento_id;
+      cvdFirmado = resFirmaDoc.rows[0].cvd;
+      s3KeyFirmado = resFirmaDoc.rows[0].s3_key ?? null;
+      sha256Firmado = resFirmaDoc.rows[0].sha256_firmado ?? null;
+    }
+  }
+
+  // Evidencia 3: Resolución oficial firmada en sigd_doc.resolucion
   if (!tieneEvidenciaFirma) {
     const resResolucion = await cliente.query<{ resolucion_id: string }>(
       `SELECT resolucion_id
          FROM sigd_doc.resolucion
-        WHERE expediente_id = $1::uuid
+        WHERE (expediente_id = $1::uuid OR expediente_tra_id = $1::uuid)
           AND estado IN ('FIRMADA', 'NOTIFICADA')
           AND firmado_en IS NOT NULL
         ORDER BY creado_en DESC
@@ -534,23 +748,6 @@ export async function resolverExpedienteConFirma(
     if (resResolucion.rowCount && resResolucion.rowCount > 0) {
       tieneEvidenciaFirma = true;
       documentoFirmadoId = resResolucion.rows[0].resolucion_id;
-    }
-  }
-
-  // Evidencia 3: Si se especificó documento_respuesta_id, verificar firma del adjunto
-  if (!tieneEvidenciaFirma && datos.documento_respuesta_id) {
-    const resDocResp = await cliente.query<{ documento_id: string; cvd: string | null }>(
-      `SELECT documento_id, cvd
-         FROM sigd_doc.firma_digital_documento
-        WHERE documento_id = $1::uuid
-          AND estado = 'FIRMADO_DIGITALMENTE'
-        LIMIT 1`,
-      [datos.documento_respuesta_id],
-    );
-    if (resDocResp.rowCount && resDocResp.rowCount > 0) {
-      tieneEvidenciaFirma = true;
-      documentoFirmadoId = resDocResp.rows[0].documento_id;
-      cvdFirmado = resDocResp.rows[0].cvd;
     }
   }
 
@@ -613,6 +810,15 @@ export async function resolverExpedienteConFirma(
     });
   }
 
+  // Actualizar resolución institucional a NOTIFICADA si existía en estado FIRMADA
+  await cliente.query(
+    `UPDATE sigd_doc.resolucion
+        SET estado = 'NOTIFICADA'
+      WHERE (expediente_tra_id = $1::uuid OR expediente_id = $1::uuid)
+        AND estado = 'FIRMADA'`,
+    [expedienteId],
+  );
+
   // FASE 5K.1 / REGLA: RutaDoc NO escribe directamente en Casilla.
   // El evento canónico transaccional ExpedienteAtendido alimenta al Transactional Outbox.
   // Privacidad estricta: NO incluir observacion_interna ni notas privadas en el payload ciudadano.
@@ -626,11 +832,12 @@ export async function resolverExpedienteConFirma(
       movimiento_id: movimientoId,
       documento_id: documentoFirmadoId || datos.documento_respuesta_id || null,
       cvd: cvdFirmado || null,
+      sha256: sha256Firmado || null,
       asunto: `Resolución de Trámite: ${codigoExpediente}`,
       tipo_acto: 'RESOLUCION',
       subtipo: 'RESOLUCION_FIRMADA',
       resultado_resumen: datos.resultado_resumen,
-      documento_url: documentoFirmadoId ? `/expedientes/${expedienteId}` : null,
+      documento_url: s3KeyFirmado || (documentoFirmadoId ? `firmados/${documentoFirmadoId}.pdf` : null),
       identidad: {
         expediente_id: expedienteId,
         movimiento_id: movimientoId,
@@ -672,15 +879,23 @@ export async function atenderExpediente(
     codigo_expediente: string;
     solicitante_id: string;
     tipo_documental_id: string;
+    unidad_responsable_id?: string | null;
+    unidad_resolutiva_id?: string | null;
+    registro_version_id?: string | null;
   }>(
     `SELECT
       COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id,
-      e.tipo_documental_id::text AS tipo_documental_id
+      e.tipo_documental_id::text AS tipo_documental_id,
+      COALESCE(tp.unidad_responsable_id, v.unidad_responsable_id) AS unidad_responsable_id,
+      COALESCE(tp.unidad_resolutiva_id, v.unidad_resolutiva_id, (SELECT area_id FROM sigd_org.area WHERE codigo = 'DIR')) AS unidad_resolutiva_id,
+      v.registro_version_id
     FROM sigd_tra.expediente e
     LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
+    LEFT JOIN sigd_doc.expediente_tupa_vinculo v ON v.expediente_id = e.expediente_id AND v.reemplaza_vinculo_id IS NULL
+    LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = v.registro_version_id
     WHERE e.expediente_id = $1::uuid`,
     [expedienteId],
   );
@@ -689,7 +904,162 @@ export async function atenderExpediente(
     throw new NotFoundError({ detail: 'El expediente no existe o no tiene estado actual.' });
   }
 
-  const { estado_actual_id: estadoActual } = resEstadoActual.rows[0];
+  const {
+    estado_actual_id: estadoActual,
+    area_contexto_id: areaActual,
+    unidad_responsable_id: areaResponsable,
+    unidad_resolutiva_id: areaResolutivaRaw,
+    registro_version_id: registroVersionId,
+  } = resEstadoActual.rows[0];
+
+  const areaResolutiva = areaResolutivaRaw || 'a0000000-0000-0000-0000-000000000002';
+  const esIntermediaTecnica = Boolean(areaResponsable && areaResolutiva && areaResponsable !== areaResolutiva);
+
+  if (estadoActual === 'EN_REVISION' && esIntermediaTecnica) {
+    if (areaActual !== areaResponsable) {
+      throw new DomainError({
+        code: 'AREA_TECNICA_REQUERIDA',
+        message: 'El dictamen técnico de este procedimiento debe registrarse en la unidad responsable asignada (SDA), no en Dirección General.',
+      });
+    }
+
+    const resAsignacion = await cliente.query<{ id_usuario: string }>(
+      `SELECT id_usuario::text AS id_usuario
+         FROM sigd_rut.expediente_asignacion
+        WHERE expediente_id = $1::uuid AND activo = true
+        ORDER BY asignado_en DESC
+        LIMIT 1`,
+      [expedienteId],
+    );
+    const asignacionActiva = resAsignacion.rows[0];
+    if (!asignacionActiva) {
+      throw new ForbiddenError({
+        code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
+        message: 'El expediente no cuenta con asignación formal vigente para registrar dictamen técnico.',
+      });
+    }
+    if (asignacionActiva.id_usuario !== usuarioActorId) {
+      throw new ForbiddenError({
+        code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
+        message: 'Solo el especialista formalmente asignado al expediente puede emitir el dictamen técnico.',
+      });
+    }
+
+    // 1. Asegurar que existe instancia de workflow inicializada
+    const resInstancia = await cliente.query<{ id_instancia: string }>(
+      `SELECT id_instancia FROM sigd_rut.workflow_instancia WHERE expediente_id = $1::uuid`,
+      [expedienteId],
+    );
+
+    if (resInstancia.rows.length === 0 && registroVersionId) {
+      const versionWf = await cliente.query<{ id_version: string; total_pasos: number }>(
+        `SELECT v.id_version, jsonb_array_length(v.pasos) AS total_pasos
+           FROM sigd_rut.workflow_procedimiento_config c
+           JOIN sigd_rut.workflow_version v ON v.id_version = c.id_version_workflow
+          WHERE (c.id_procedimiento = $1::uuid OR c.id_procedimiento IN (
+            SELECT p.id_procedimiento FROM sigd_doc.tupa_procedimiento p WHERE p.registro_version_id = $1::uuid
+          )) AND c.activo = true AND v.activo = true LIMIT 1`,
+        [registroVersionId],
+      );
+      if (versionWf.rows.length > 0) {
+        await cliente.query(
+          `INSERT INTO sigd_rut.workflow_instancia (
+            expediente_id, id_version_workflow, paso_actual, total_pasos, estado_instancia
+          ) VALUES ($1::uuid, $2::uuid, 4, $3, 'EN_CURSO')
+          ON CONFLICT (expediente_id) DO NOTHING`,
+          [expedienteId, versionWf.rows[0].id_version, versionWf.rows[0].total_pasos],
+        );
+      }
+    }
+
+    // 2. Registrar atención técnica en historial de workflow
+    await cliente.query(
+      `UPDATE sigd_rut.workflow_instancia
+          SET paso_actual = GREATEST(paso_actual, 4),
+              historial_pasos = COALESCE(historial_pasos, '[]'::jsonb) || jsonb_build_array(
+                jsonb_build_object(
+                  'paso', 4,
+                  'evento', 'ATENCION_TECNICA',
+                  'usuarioId', $2::text,
+                  'areaId', $3::text,
+                  'detalle', $4::text,
+                  'completadoEn', now()
+                )
+              )
+        WHERE expediente_id = $1::uuid`,
+      [expedienteId, usuarioActorId, areaActual, datos.resultado_resumen],
+    );
+
+    // 2.1 Si se adjuntó un documento de dictamen técnico / informe, persistirlo en sigd_doc.documento_adjunto
+    if (datos.s3_key && datos.sha256 && datos.nombre_archivo) {
+      const configS3 = obtenerConfiguracionS3();
+      const resTipo = await cliente.query<{ tipo_documental_id: string }>(
+        `SELECT tipo_documental_id FROM sigd_doc.tipo_documento
+          WHERE vigente = true
+          ORDER BY CASE WHEN codigo IN ('INF', 'INFORME', 'DICTAMEN') THEN 0 ELSE 1 END, nombre ASC
+          LIMIT 1`,
+      );
+      const tipoDocId = resTipo.rows[0]?.tipo_documental_id;
+      if (tipoDocId) {
+        const docId = datos.documento_respuesta_id || randomUUID();
+        await cliente.query(
+          `INSERT INTO sigd_doc.documento_adjunto (
+             documento_adjunto_id,
+             expediente_tra_id,
+             tipo_documental_id,
+             nombre_archivo,
+             s3_bucket,
+             s3_key,
+             sha256,
+             tamano_bytes,
+             mime_type,
+             subido_por,
+             id_requisito
+           ) VALUES (
+             $1::uuid,
+             $2::uuid,
+             $3::uuid,
+             $4,
+             $5,
+             $6,
+             $7,
+             $8,
+             $9,
+             $10::uuid,
+             NULL
+           ) ON CONFLICT (documento_adjunto_id) DO NOTHING`,
+          [
+            docId,
+            expedienteId,
+            tipoDocId,
+            datos.nombre_archivo,
+            configS3.bucket,
+            datos.s3_key,
+            datos.sha256,
+            datos.tamano_bytes || 0,
+            datos.mime_type || 'application/pdf',
+            usuarioActorId,
+          ],
+        );
+      }
+    }
+
+    // 3. Emitir evento outbox
+    await insertarEvento(cliente, {
+      agregado: 'Expediente',
+      tipo_evento: 'ExpedienteAtendidoTecnicamente',
+      payload: {
+        identidad: { expediente_id: expedienteId },
+        contexto: { usuario_actor_id: usuarioActorId, area_contexto_id: areaActual },
+        datos_especificos: {
+          resultado_resumen: datos.resultado_resumen,
+          observacion_interna: datos.observacion_interna,
+        },
+      },
+    });
+
+    return;
+  }
 
   if (estadoActual !== 'EN_FIRMA') {
     throw new DomainError({
@@ -752,6 +1122,7 @@ export async function archivarExpediente(
   const operadorId = resolverOperadorBigInt(usuarioActorId);
 
   const datosMovimiento = {
+    areaId: areaActualExpediente || null,
     estante: datos.estante,
     balda: datos.balda,
     caja: datos.caja,
@@ -846,7 +1217,7 @@ export async function observarExpediente(
     solicitante_id: string;
   }>(`
     SELECT
-      COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
+      CASE WHEN e.estado = 'PENDIENTE_PAGO' THEN 'PENDIENTE_PAGO' ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id
@@ -966,6 +1337,14 @@ export async function observarExpediente(
       const obsSvc = new ExpedienteObservacionService(cliente as any);
       const personaId = opciones.personaId ?? usuarioActorId;
 
+      let areaIdValida = areaOrigenId || opciones.areaId;
+      if (!areaIdValida || areaIdValida === '00000000-0000-0000-0000-000000000000') {
+        const areaRes = await cliente.query<{ area_id: string }>(
+          `SELECT area_id FROM sigd_org.area WHERE codigo = 'DIR' LIMIT 1`,
+        );
+        areaIdValida = areaRes.rows[0]?.area_id || 'a0000000-0000-0000-0000-000000000002';
+      }
+
       await obsSvc.registrarObservacion(
         {
           expedienteId,
@@ -973,7 +1352,7 @@ export async function observarExpediente(
           requisitosAfectados: opciones.requisitosAfectados,
           usuarioId: usuarioActorId,
           personaId,
-          areaId: areaOrigenId || opciones.areaId || '00000000-0000-0000-0000-000000000000',
+          areaId: areaIdValida,
           estadoAnterior: estadoActual,
           idMovimientoObservacion: movimientoId,
         },
@@ -1042,7 +1421,7 @@ export async function subsanarExpediente(
     solicitante_id: string;
   }>(`
     SELECT
-      COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
+      CASE WHEN e.estado = 'PENDIENTE_PAGO' THEN 'PENDIENTE_PAGO' ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id
@@ -1071,13 +1450,7 @@ export async function subsanarExpediente(
 
   const operadorId = resolverOperadorBigInt(usuarioActorId);
 
-  // FSM formal: OBSERVADO -> CORRECCION -> SUBSANADO -> INICIAR_REVISION -> EN_REVISION
-  await cliente.query(`
-    INSERT INTO sigd_rut.movimiento_tramite (
-      expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, datos
-    ) VALUES ($1::uuid, 'OBSERVADO', 'CORRECCION', 'SUBSANADO', $2::bigint, $3::jsonb)
-  `, [expedienteId, operadorId, JSON.stringify({ motivo, detalle: motivo, areaId: areaOrigenId || null })]);
-
+  // FSM formal: OBSERVADO -> CORRECCION -> SUBSANADO
   const resMov = await cliente.query<{ movimiento_id: string }>(`
     INSERT INTO sigd_rut.movimiento_tramite (
       expediente_id,
@@ -1089,9 +1462,9 @@ export async function subsanarExpediente(
       datos
     ) VALUES (
       $1::uuid,
+      'OBSERVADO',
+      'CORRECCION',
       'SUBSANADO',
-      'INICIAR_REVISION',
-      'EN_REVISION',
       $2::bigint,
       $3,
       $4::jsonb
@@ -1100,14 +1473,14 @@ export async function subsanarExpediente(
     expedienteId,
     operadorId,
     randomUUID(),
-    JSON.stringify({ detalle: 'Pase a revisión tras subsanación', areaId: areaOrigenId || null }),
+    JSON.stringify({ motivo, detalle: motivo, areaId: areaOrigenId || null }),
   ]);
 
   const movimientoId = resMov.rows[0].movimiento_id;
 
   const updateRes = await cliente.query(
     `UPDATE sigd_tra.expediente
-        SET estado = 'EN_REVISION'
+        SET estado = 'SUBSANADO'
       WHERE expediente_id = $1::uuid
         AND estado = 'OBSERVADO'`,
     [expedienteId],
@@ -1115,7 +1488,7 @@ export async function subsanarExpediente(
   if ((updateRes?.rowCount ?? 0) !== 1) {
     throw new ConflictError({
       code: 'CONCURRENCY_CONFLICT_EXPEDIENTE_MUTATION',
-      message: `No se pudo actualizar el estado a EN_REVISION para el expediente ${expedienteId}.`,
+      message: `No se pudo actualizar el estado a SUBSANADO para el expediente ${expedienteId}.`,
     });
   }
 
@@ -1147,4 +1520,273 @@ export async function subsanarExpediente(
       datos_especificos: { motivo },
     },
   });
+}
+
+/**
+ * Servicio de Inicio Formal de Revisión (RutaDoc FSM y LPAG).
+ * Mapea la acción formal institucional desde 'SUBSANADO' hacia 'EN_REVISION'.
+ */
+export async function iniciarRevisionExpediente(
+  cliente: PoolClient,
+  expedienteId: string,
+  motivo?: string,
+): Promise<{ movimientoId: string }> {
+  const contexto = getRequestContext();
+  const usuarioActorId = contexto?.usuario_id;
+
+  if (!usuarioActorId) {
+    throw new UnauthorizedError({ detail: 'No se encontró usuario en el contexto para iniciar la revisión.' });
+  }
+
+  const resEstadoActual = await cliente.query<{
+    estado_actual_id: string;
+    area_contexto_id: string;
+    codigo_expediente: string;
+    solicitante_id: string;
+  }>(`
+    SELECT
+      CASE WHEN e.estado = 'PENDIENTE_PAGO' THEN 'PENDIENTE_PAGO' ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
+      COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
+      e.codigo_expediente,
+      e.solicitante_id::text AS solicitante_id
+    FROM sigd_tra.expediente e
+    LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
+    WHERE e.expediente_id = $1::uuid
+  `, [expedienteId]);
+
+  if (resEstadoActual.rowCount === 0) {
+    throw new NotFoundError({ detail: 'El expediente no existe o no tiene estado actual.' });
+  }
+
+  const {
+    estado_actual_id: estadoActual,
+    area_contexto_id: areaOrigenId,
+  } = resEstadoActual.rows[0];
+
+  if (estadoActual !== 'SUBSANADO') {
+    throw new DomainError({
+      code: 'ESTADO_INVALIDO',
+      message: `Solo se puede iniciar revisión de expedientes en estado SUBSANADO (actual: ${estadoActual}).`,
+    });
+  }
+
+  const operadorId = resolverOperadorBigInt(usuarioActorId);
+
+  const resMov = await cliente.query<{ movimiento_id: string }>(`
+    INSERT INTO sigd_rut.movimiento_tramite (
+      expediente_id,
+      estado_anterior,
+      evento,
+      estado_nuevo,
+      usuario_operador_id,
+      clave_idempotencia,
+      datos
+    ) VALUES (
+      $1::uuid,
+      'SUBSANADO',
+      'INICIAR_REVISION',
+      'EN_REVISION',
+      $2::bigint,
+      $3,
+      $4::jsonb
+    ) RETURNING id_movimiento AS movimiento_id
+  `, [
+    expedienteId,
+    operadorId,
+    randomUUID(),
+    JSON.stringify({
+      detalle: motivo ?? 'Inicio formal de revisión tras subsanación',
+      areaId: areaOrigenId || null,
+    }),
+  ]);
+
+  const movimientoId = resMov.rows[0].movimiento_id;
+
+  const updateRes = await cliente.query(
+    `UPDATE sigd_tra.expediente
+        SET estado = 'EN_REVISION'
+      WHERE expediente_id = $1::uuid
+        AND estado = 'SUBSANADO'`,
+    [expedienteId],
+  );
+  if ((updateRes?.rowCount ?? 0) !== 1) {
+    throw new ConflictError({
+      code: 'CONCURRENCY_CONFLICT_EXPEDIENTE_MUTATION',
+      message: `No se pudo actualizar el estado a EN_REVISION para el expediente ${expedienteId}.`,
+    });
+  }
+
+  await insertarEvento(cliente, {
+    agregado: 'Expediente',
+    tipo_evento: 'ExpedienteRevisionIniciada',
+    payload: {
+      identidad: { expediente_id: expedienteId, movimiento_id: movimientoId },
+      contexto: { usuario_actor_id: usuarioActorId, area_contexto_id: areaOrigenId },
+      datos_especificos: { motivo: motivo ?? 'Inicio formal de revisión' },
+    },
+  });
+
+  return { movimientoId };
+}
+
+export interface ElegibilidadDerivacion {
+  puedeDerivar: boolean;
+  requisitosConformes: boolean;
+  pagoConforme: boolean;
+  bloqueos: string[];
+  totalRequisitosDocumentalesObligatorios: number;
+  totalRequisitosDocumentalesConformes: number;
+  montoRequerido: number;
+  pagoRegistrado: boolean;
+}
+
+/**
+ * Evalúa centralizadamente la elegibilidad formal para la derivación institucional de un expediente.
+ * Regla de Negocio C3.6.2:
+ * 1. Todos los requisitos DOCUMENTALES obligatorios y activos de la versión snapshot vinculada al expediente
+ *    deben contar con evidencia en estado VALIDADO (o CONFORME).
+ * 2. Si el procedimiento arancelado requiere pago, debe contar con al menos una orden de pago en estado CONFIRMADO.
+ * 3. Si 0 requisitos documentales obligatorios aplican, el gate documental se considera plenamente satisfecho.
+ */
+export async function evaluarElegibilidadDerivacion(
+  cliente: PoolClient | Pool,
+  expedienteId: string,
+): Promise<ElegibilidadDerivacion> {
+  const bloqueos: string[] = [];
+
+  // 1. Obtener vínculo TUPA del expediente (o snapshot asociado)
+  const { rows: vincRows } = await cliente.query<{
+    registro_version_id: string;
+    id_procedimiento: string | null;
+    monto_efectivo: string | null;
+    monto_proc: string | null;
+    intervencion_financiera: string | null;
+  }>(`
+    SELECT
+      v.registro_version_id,
+      p.id_procedimiento,
+      v.monto_efectivo,
+      p.monto AS monto_proc,
+      p.intervencion_financiera
+    FROM sigd_doc.expediente_tupa_vinculo v
+    LEFT JOIN sigd_doc.tupa_procedimiento p ON p.registro_version_id = v.registro_version_id
+    WHERE v.expediente_id = $1::uuid
+    ORDER BY v.vinculado_en DESC
+    LIMIT 1
+  `, [expedienteId]);
+
+  if (vincRows.length === 0) {
+    return {
+      puedeDerivar: true,
+      requisitosConformes: true,
+      pagoConforme: true,
+      bloqueos: [],
+      totalRequisitosDocumentalesObligatorios: 0,
+      totalRequisitosDocumentalesConformes: 0,
+      montoRequerido: 0,
+      pagoRegistrado: true,
+    };
+  }
+
+  const vinculo = vincRows[0];
+  const registroVersionId = vinculo.registro_version_id;
+  const idProcedimiento = vinculo.id_procedimiento;
+
+  // 2. Requisitos documentales obligatorios y activos de la versión snapshot exacta
+  const { rows: reqDocObligatorios } = await cliente.query<{
+    id_requisito: string;
+    nombre: string;
+    regla_condicional: unknown;
+  }>(`
+    SELECT r.id_requisito, r.nombre, r.regla_condicional
+      FROM sigd_doc.tupa_requisito_documental r
+     WHERE (r.registro_version_id = $1::uuid OR (r.registro_version_id IS NULL AND r.id_procedimiento = $2::uuid))
+       AND r.tipo_requisito = 'DOCUMENTAL'
+       AND r.obligatorio = true
+       AND r.activo = true
+     ORDER BY r.orden ASC
+  `, [registroVersionId, idProcedimiento]);
+
+  const totalObligatorios = reqDocObligatorios.length;
+  let totalConformes = 0;
+  let requisitosConformes = true;
+
+  if (totalObligatorios > 0) {
+    const reqIds = reqDocObligatorios.map((r: { id_requisito: string }) => r.id_requisito);
+    const { rows: evidencias } = await cliente.query<{
+      id_requisito: string;
+      estado_validacion: string;
+      creado_en: Date;
+    }>(`
+      SELECT e.id_requisito, e.estado_validacion, e.creado_en
+        FROM sigd_doc.expediente_evidencia_requisito e
+       WHERE e.expediente_id = $1::uuid
+         AND e.id_requisito = ANY($2::uuid[])
+       ORDER BY e.creado_en ASC
+    `, [expedienteId, reqIds]);
+
+    const ultimasEvidencias = new Map<string, string>();
+    for (const ev of evidencias) {
+      ultimasEvidencias.set(ev.id_requisito, ev.estado_validacion);
+    }
+
+    for (const req of reqDocObligatorios) {
+      const estado = ultimasEvidencias.get(req.id_requisito);
+      if (estado === 'VALIDADO' || estado === 'CONFORME') {
+        totalConformes++;
+      } else {
+        requisitosConformes = false;
+      }
+    }
+
+    if (!requisitosConformes) {
+      bloqueos.push('REQUISITOS_DOCUMENTALES_PENDIENTES');
+    }
+  }
+
+  // 3. Validación financiera (Pago)
+  const { rows: reqFinancieros } = await cliente.query<{ id_requisito: string }>(`
+    SELECT r.id_requisito
+      FROM sigd_doc.tupa_requisito_documental r
+     WHERE (r.registro_version_id = $1::uuid OR (r.registro_version_id IS NULL AND r.id_procedimiento = $2::uuid))
+       AND r.tipo_requisito = 'FINANCIERO'
+       AND r.obligatorio = true
+       AND r.activo = true
+       AND (r.estado_homologacion = 'HOMOLOGADO' OR r.estado_homologacion IS NULL)
+  `, [registroVersionId, idProcedimiento]);
+
+  const montoEfectivo = Number(vinculo.monto_efectivo ?? vinculo.monto_proc ?? 0);
+  const exigePago = reqFinancieros.length > 0 || (montoEfectivo > 0 && vinculo.intervencion_financiera === 'REQUIERE_PAGO');
+
+  let pagoConforme = true;
+  let pagoRegistrado = false;
+
+  if (exigePago) {
+    const { rows: pagosConfirmados } = await cliente.query<{ orden_pago_id: string }>(`
+      SELECT orden_pago_id
+        FROM sigd_tra.orden_pago
+       WHERE expediente_id = $1::uuid
+         AND estado = 'CONFIRMADO'
+       LIMIT 1
+    `, [expedienteId]);
+
+    pagoRegistrado = pagosConfirmados.length > 0;
+    if (!pagoRegistrado) {
+      pagoConforme = false;
+      bloqueos.push('PAGO_PENDIENTE');
+    }
+  }
+
+  const puedeDerivar = requisitosConformes && pagoConforme;
+
+  return {
+    puedeDerivar,
+    requisitosConformes,
+    pagoConforme,
+    bloqueos,
+    totalRequisitosDocumentalesObligatorios: totalObligatorios,
+    totalRequisitosDocumentalesConformes: totalConformes,
+    montoRequerido: montoEfectivo,
+    pagoRegistrado,
+  };
 }

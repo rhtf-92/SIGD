@@ -1,10 +1,13 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft, User, Building2, ShieldCheck, CheckCircle2 } from "lucide-react";
 import PersonaNaturalForm from "../../components/registro/PersonaNaturalForm";
 import PersonaJuridicaForm from "../../components/registro/PersonaJuridicaForm";
 import type { Natural, Juridical } from "../../types/registroCiudadano";
 import { apiClient } from "../../api/client";
 import { TRAMITE_WIZARD_STORAGE_KEY } from "../../hooks/useTramiteWizardReducer";
+import { Button } from "../../components/ui/Button";
+import logoSuiza from "../../assets/sigd/logo-suiza.webp";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -81,7 +84,7 @@ export default function RegistroCiudadanoPage() {
         throw new Error(
           res.data?.detail ||
           res.data?.message ||
-          "El servidor no devolvió una confirmación válida con idPersona canónico (UUID) para el registro ciudadano."
+          "El servidor no devolvió una confirmación válida con idPersona para el registro ciudadano."
         );
       }
 
@@ -98,7 +101,7 @@ export default function RegistroCiudadanoPage() {
   const registrarJuridica = async (data: Juridical) => {
     if (data.representanteLegal.tipoDocumento !== 'DNI') {
       setSuccessMessage(null);
-      setErrorMessage('El representante legal debe identificarse con DNI según el contrato actual.');
+      setErrorMessage('El representante legal debe identificarse con DNI.');
       return;
     }
     const errorCampos = validarCamposObligatorios(data.celularContacto, data.domicilio?.distritoCodigo ?? '', data.domicilio?.direccionExacta ?? '', data.password, data.confirmarPassword);
@@ -121,8 +124,6 @@ export default function RegistroCiudadanoPage() {
       ubigeoDistrito: data.domicilio.distritoCodigo,
       direccion: data.domicilio.direccionExacta.trim(),
       password: data.password,
-      consentimientoDatos: true as const,
-      aceptaNotificaciones: false,
     };
 
     try {
@@ -138,7 +139,7 @@ export default function RegistroCiudadanoPage() {
         throw new Error(
           res.data?.detail ||
           res.data?.message ||
-          "El servidor no devolvió una confirmación válida con idPersona canónico (UUID) para el registro de persona jurídica."
+          "El servidor no devolvió una confirmación válida con idPersona para el registro ciudadano."
         );
       }
 
@@ -193,42 +194,48 @@ export default function RegistroCiudadanoPage() {
   const handleClearSuccess = () => setSuccessMessage(null);
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50/30 to-teal-50/20 flex items-center justify-center p-3.5 sm:p-6 lg:p-8">
-      {/* Halo ambiental suave estilo Aqua / Glass */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-      >
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 h-96 w-96 rounded-full bg-cyan-200/25 blur-3xl" />
-      </div>
-
-      <div className="relative overflow-hidden bg-gradient-to-br from-white/92 via-cyan-50/40 to-sky-50/25 rounded-3xl border border-white/85 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),inset_0_-1px_2px_0_rgba(6,182,212,0.06),0_16px_48px_-8px_rgba(6,182,212,0.14),0_2px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-cyan-200/50 backdrop-blur-md max-w-2xl w-full p-5 sm:p-8 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent after:pointer-events-none after:absolute after:-top-24 after:-right-24 after:h-48 after:w-48 after:rounded-full after:bg-cyan-300/15 after:blur-2xl">
-        <Link
-          to="/"
-          className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-cyan-200/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-cyan-50/80 hover:border-cyan-300 transition"
-        >
-          ← Volver al inicio
-        </Link>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-          <span className="text-xs font-bold uppercase tracking-wider text-cyan-800">IESTP &quot;Suiza&quot;</span>
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Registro de Usuario Externo
-        </h1>
-        <p className="text-sm text-gray-600 mb-4">
-          Complete sus datos para crear su cuenta y Casilla Electrónica
-          Institucional
-        </p>
-
-        <div className="mb-6 rounded-xl border border-cyan-300/80 bg-gradient-to-r from-cyan-50/70 to-teal-50/50 p-3.5 text-xs text-cyan-950 flex items-start gap-2 shadow-2xs backdrop-blur-xs">
-          <span>ℹ️ <strong>Tratamiento de Datos Personales:</strong> Los datos proporcionados serán tratados por el IESTP Suiza para fines de identificación, gestión documentaria y comunicaciones institucionales, en ejercicio de sus funciones públicas y conforme a la Ley N.° 29733 y su Reglamento (D.S. N.° 016-2024-JUS).</span>
+    <main className="min-h-screen bg-surface-page flex items-center justify-center p-4 sm:p-6 lg:p-8 text-slate-900">
+      <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs space-y-6">
+        <div>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-suiza-primary transition mb-3"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Volver al inicio
+          </Link>
+          <div className="flex items-center gap-2 mb-1">
+            <img
+              src={logoSuiza}
+              alt="IESTP Suiza"
+              width={40}
+              height={41}
+              loading="eager"
+              decoding="async"
+              className="h-10 w-auto object-contain mr-1 aspect-[256/261]"
+            />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">IESTP &quot;Suiza&quot;</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Registro de Usuario Externo
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
+            Esta cuenta permite presentar y consultar trámites públicos del IESTP &quot;Suiza&quot;.
+          </p>
         </div>
 
+        {/* Nota legal y tratamiento de datos */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-700 flex items-start gap-2.5">
+          <ShieldCheck className="h-4 w-4 text-suiza-primary shrink-0 mt-0.5" />
+          <span>
+            <strong>Tratamiento de Datos Personales:</strong> Los datos proporcionados serán tratados por el IESTP Suiza exclusivamente para fines de identificación y gestión documentaria de sus solicitudes, conforme a la Ley N.° 29733.
+          </span>
+        </div>
+
+        {/* Pestañas de Tipo de Persona */}
         <div
           role="tablist"
           aria-label="Tipo de persona"
-          className="flex gap-1 mb-8 border-b border-cyan-100"
+          className="flex gap-2 border-b border-slate-200 pb-px"
         >
           <button
             role="tab"
@@ -239,12 +246,13 @@ export default function RegistroCiudadanoPage() {
               setActiveTab("NATURAL");
               setSuccessMessage(null);
             }}
-            className={`px-5 py-2.5 text-sm font-semibold rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-t-lg transition-colors cursor-pointer focus:outline-none ${
               activeTab === "NATURAL"
-                ? "text-cyan-900 border-b-2 border-cyan-600 bg-cyan-50/50"
-                : "text-slate-500 hover:text-slate-700 border-b-2 border-transparent"
+                ? "text-suiza-primary border-b-2 border-suiza-primary bg-sky-50/50"
+                : "text-slate-500 hover:text-slate-800 border-b-2 border-transparent"
             }`}
           >
+            <User className="h-3.5 w-3.5" />
             Persona Natural
           </button>
           <button
@@ -256,12 +264,13 @@ export default function RegistroCiudadanoPage() {
               setActiveTab("JURIDICA");
               setSuccessMessage(null);
             }}
-            className={`px-5 py-2.5 text-sm font-semibold rounded-t-md transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-t-lg transition-colors cursor-pointer focus:outline-none ${
               activeTab === "JURIDICA"
-                ? "text-cyan-900 border-b-2 border-cyan-600 bg-cyan-50/50"
-                : "text-slate-500 hover:text-slate-700 border-b-2 border-transparent"
+                ? "text-suiza-primary border-b-2 border-suiza-primary bg-sky-50/50"
+                : "text-slate-500 hover:text-slate-800 border-b-2 border-transparent"
             }`}
           >
+            <Building2 className="h-3.5 w-3.5" />
             Persona Jurídica
           </button>
         </div>
@@ -273,12 +282,12 @@ export default function RegistroCiudadanoPage() {
           hidden={activeTab !== "NATURAL"}
         >
           {activeTab === "NATURAL" && (
-            <>
-              <p className="mb-4 rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-950">
+            <div className="space-y-4">
+              <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
                 Verifica cuidadosamente tu número de documento. Este dato se utilizará para identificar tu cuenta y no podrá modificarse directamente después del registro.
               </p>
               <PersonaNaturalForm onSubmit={prepararNatural} />
-            </>
+            </div>
           )}
         </div>
 
@@ -289,24 +298,24 @@ export default function RegistroCiudadanoPage() {
           hidden={activeTab !== "JURIDICA"}
         >
           {activeTab === "JURIDICA" && (
-            <>
-              <p className="mb-4 rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-950">
+            <div className="space-y-4">
+              <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
                 Verifica cuidadosamente el RUC de la entidad. No podrá modificarse directamente después del registro.
               </p>
               <PersonaJuridicaForm onSubmit={prepararJuridica} />
-            </>
+            </div>
           )}
         </div>
 
         {errorMessage && (
           <div
-            className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm flex items-center justify-between"
+            className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-center justify-between"
             role="alert"
           >
-            <span>{errorMessage}</span>
+            <span className="font-medium">{errorMessage}</span>
             <button
               onClick={() => setErrorMessage(null)}
-              className="text-red-600 hover:text-red-800 underline text-xs focus:outline-none focus:ring-2 focus:ring-red-500 rounded"
+              className="text-red-700 hover:text-red-900 underline text-xs font-semibold cursor-pointer ml-2"
               aria-label="Cerrar mensaje de error"
             >
               Cerrar
@@ -316,37 +325,59 @@ export default function RegistroCiudadanoPage() {
 
         {successMessage && (
           <div
-            className="mt-6 p-4 bg-green-50 border border-green-200 rounded-md text-green-800 text-sm flex items-center justify-between"
+            className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center justify-between"
             role="status"
             aria-live="polite"
           >
-            <span>{successMessage}</span>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span className="font-medium">{successMessage}</span>
+            </div>
             <button
               onClick={handleClearSuccess}
-              className="text-green-600 hover:text-green-800 underline text-xs focus:outline-none focus:ring-2 focus:ring-green-500 rounded"
+              className="text-emerald-700 hover:text-emerald-900 underline text-xs font-semibold cursor-pointer ml-2"
               aria-label="Cerrar mensaje de éxito"
             >
               Cerrar
             </button>
           </div>
         )}
+
         {pendiente && (
-          <div role="dialog" aria-modal="true" aria-labelledby="confirmar-documento" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-              <h2 id="confirmar-documento" className="text-lg font-bold text-slate-900">Verifica tu documento antes de continuar</h2>
-              <p className="mt-3 text-sm text-slate-700">
+          <div role="dialog" aria-modal="true" aria-labelledby="confirmar-documento" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-200 space-y-4">
+              <h2 id="confirmar-documento" className="text-base font-bold text-slate-900">
+                Verifica tu documento antes de continuar
+              </h2>
+              <p className="text-xs text-slate-700 leading-relaxed">
                 ¿Confirmas que el {pendiente.tipo === 'JURIDICA' ? 'RUC' : pendiente.datos.tipoDocumento} <strong>{pendiente.tipo === 'JURIDICA' ? pendiente.datos.ruc : pendiente.datos.numeroDocumento}</strong> es correcto?
               </p>
-              <div className="mt-6 flex justify-end gap-3">
-                <button type="button" onClick={() => setPendiente(null)} disabled={confirmando} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50">Revisar</button>
-                <button type="button" onClick={() => void confirmarRegistro()} disabled={confirmando} className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                  {confirmando ? 'Creando cuenta...' : 'Confirmar y crear cuenta'}
-                </button>
+              <div className="flex justify-end gap-2.5 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPendiente(null)}
+                  disabled={confirmando}
+                >
+                  Revisar
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void confirmarRegistro()}
+                  disabled={confirmando}
+                  isLoading={confirmando}
+                  loadingText="Creando cuenta..."
+                >
+                  Confirmar y crear cuenta
+                </Button>
               </div>
             </div>
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

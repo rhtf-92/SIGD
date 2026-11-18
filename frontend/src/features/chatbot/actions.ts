@@ -9,7 +9,7 @@ export const SIGD_ROUTES = {
   CONSULTA_PUBLICA: '/consulta',
   TUPA_CATALOGO: '/tupa',
   SOLICITUD_ACCESO_TUPA: '/solicitud-acceso-tupa',
-  TRAMITE_MESA_PARTES: '/tramite',
+  TRAMITE_MESA_PARTES: '/mesa-partes',
   MIS_EXPEDIENTES: '/mis-expedientes',
   CASILLA_ELECTRONICA: '/casilla',
   VALIDADOR_CVD: '/validador-cvd',

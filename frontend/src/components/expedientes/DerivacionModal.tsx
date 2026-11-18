@@ -21,20 +21,34 @@ function FormularioDerivacion({ expediente, unidades, accion, onClose, destinoSu
   const id = useId();
   const [destino, setDestino] = useState(destinoSugeridoId || "");
   const [proveido, setProveido] = useState("");
-  const [errores, setErrores] = useState({ unidadDestinoId: "", proveido: "" });
+  const [justificacionDesviacion, setJustificacionDesviacion] = useState("");
+  const [errores, setErrores] = useState({ unidadDestinoId: "", proveido: "", justificacionDesviacion: "" });
   const destinoRef = useRef<HTMLSelectElement>(null);
   const proveidoRef = useRef<HTMLTextAreaElement>(null);
+  const justificacionRef = useRef<HTMLTextAreaElement>(null);
   const formulario = useFormularioExpediente(accion);
   const opciones = unidades.estado === "listo" ? unidades.datos : [];
+  const esDesviacion = Boolean(destinoSugeridoId && destino && destino !== destinoSugeridoId);
+
   function cerrar() { if (!formulario.pending) { accion.restablecer(); onClose(); } }
   function enviar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (formulario.pending) return;
-    const validacion = validarDerivacion(destino, proveido, expediente, opciones);
-    setErrores(validacion);
+    const validacion = validarDerivacion(destino, proveido, expediente, opciones, destinoSugeridoId, justificacionDesviacion);
+    setErrores({
+      unidadDestinoId: validacion.unidadDestinoId,
+      proveido: validacion.proveido,
+      justificacionDesviacion: validacion.justificacionDesviacion ?? "",
+    });
     if (validacion.unidadDestinoId) { destinoRef.current?.focus(); return; }
     if (validacion.proveido) { proveidoRef.current?.focus(); return; }
-    void formulario.enviar({ expediente, unidadDestinoId: destino, proveido: normalizarMotivo(proveido) }, () => { setDestino(""); setProveido(""); onClose(); });
+    if (validacion.justificacionDesviacion) { justificacionRef.current?.focus(); return; }
+    void formulario.enviar({
+      expediente,
+      unidadDestinoId: destino,
+      proveido: normalizarMotivo(proveido),
+      justificacion_desviacion: esDesviacion ? normalizarMotivo(justificacionDesviacion) : undefined,
+    }, () => { setDestino(""); setProveido(""); setJustificacionDesviacion(""); onClose(); });
   }
   return <AccionModal titulo="Derivar expediente" descripcion={`Expediente ${expediente.codigo}. El proveído motivará el pase a otra unidad orgánica.`} pending={formulario.pending} onClose={cerrar}>
     <form noValidate onSubmit={enviar}>
@@ -53,11 +67,43 @@ function FormularioDerivacion({ expediente, unidades, accion, onClose, destinoSu
       <div className="m03-field"><label htmlFor={`${id}-destino`}>Unidad de destino (obligatoria)</label>
         <select id={`${id}-destino`} ref={destinoRef} data-foco-inicial className="input-sigd" value={destino} onChange={(event) => setDestino(event.target.value)} required disabled={formulario.pending || unidades.estado !== "listo"} aria-invalid={Boolean(errores.unidadDestinoId)} aria-describedby={errores.unidadDestinoId ? `${id}-destino-error` : undefined}>
           <option value="">Seleccione una unidad</option>
-          {opciones.map((unidad) => <option key={unidad.id} value={unidad.id} disabled={!unidad.habilitada || unidad.id === expediente.unidadOrigenId}>{unidad.nombre}{unidad.id === expediente.unidadOrigenId ? " (unidad de origen)" : ""}</option>)}
+          {opciones.map((unidad) => {
+            const noHabilitada = !unidad.habilitada;
+            const esOrigen = unidad.id === expediente.unidadOrigenId;
+            const noEnrutable = unidad.enrutable === false;
+            const disabled = noHabilitada || esOrigen || noEnrutable;
+            let sufijo = "";
+            if (esOrigen) sufijo = " (unidad de origen)";
+            else if (noEnrutable) sufijo = " (no enrutable: sin personal habilitado)";
+
+            return (
+              <option key={unidad.id} value={unidad.id} disabled={disabled}>
+                {unidad.nombre}{sufijo}
+              </option>
+            );
+          })}
         </select>
         {errores.unidadDestinoId ? <p id={`${id}-destino-error`} className="m03-error">{errores.unidadDestinoId}</p> : null}
       </div>
       {unidades.estado === "cargando" ? <p role="status">Cargando unidades…</p> : unidades.estado === "error" ? <p role="alert" className="m03-alert">{unidades.mensaje}</p> : opciones.length === 0 ? <p role="status">No hay unidades de destino disponibles.</p> : null}
+      {esDesviacion && (
+        <div className="m03-field">
+          <label htmlFor={`${id}-justificacion`}>Justificación de desviación TUPA (obligatoria al cambiar de unidad sugerida)</label>
+          <textarea
+            id={`${id}-justificacion`}
+            ref={justificacionRef}
+            className="input-sigd"
+            value={justificacionDesviacion}
+            onChange={(event) => setJustificacionDesviacion(event.target.value)}
+            required
+            disabled={formulario.pending}
+            placeholder="Indique el motivo técnico o administrativo para derivar a un área distinta a la sugerida por TUPA..."
+            aria-invalid={Boolean(errores.justificacionDesviacion)}
+            aria-describedby={errores.justificacionDesviacion ? `${id}-justificacion-error` : undefined}
+          />
+          {errores.justificacionDesviacion ? <p id={`${id}-justificacion-error`} className="m03-error">{errores.justificacionDesviacion}</p> : null}
+        </div>
+      )}
       <div className="m03-field"><label htmlFor={`${id}-proveido`}>Proveído motivado (obligatorio)</label>
         <textarea id={`${id}-proveido`} ref={proveidoRef} className="input-sigd" value={proveido} onChange={(event) => setProveido(event.target.value)} required disabled={formulario.pending} aria-invalid={Boolean(errores.proveido)} aria-describedby={errores.proveido ? `${id}-proveido-error` : undefined} />
         {errores.proveido ? <p id={`${id}-proveido-error`} className="m03-error">{errores.proveido}</p> : null}

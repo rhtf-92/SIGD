@@ -1342,8 +1342,14 @@ export default function TesoreriaPage() {
 
       {/* MODAL 3: RECIBO OFICIAL DE TESORERÍA (PRINTABLE VOUCHER) */}
       {modalReciboAbierto && reciboData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4">
+        <div
+          data-print-target="recibo-voucher"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 print:static print:inset-auto print:bg-transparent print:p-0 print:block"
+        >
+          <div
+            data-print-target="recibo-card"
+            className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4 print:max-w-md print:mx-auto print:border print:border-dashed print:border-slate-400 print:shadow-none print:p-4 break-inside-avoid"
+          >
             {/* Cabecera del comprobante */}
             <div className="text-center border-b border-dashed border-slate-300 pb-3 space-y-1">
               <div className="inline-block text-[11px] font-bold text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-full mb-1">
@@ -1363,39 +1369,39 @@ export default function TesoreriaPage() {
 
             {/* Datos del pago */}
             <div className="space-y-2 text-xs text-slate-700 border-b border-dashed border-slate-300 pb-3">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Fecha y Hora:</span>
-                <span className="font-semibold text-slate-800">{formatearFecha(reciboData.fechaPago || reciboData.fechaCreacion)}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Fecha y Hora:</span>
+                <span className="font-semibold text-slate-800 text-right">{formatearFecha(reciboData.fechaPago || reciboData.fechaCreacion)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Código Orden:</span>
-                <span className="font-mono font-bold text-slate-900">{reciboData.codigoPago}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Código Orden:</span>
+                <span className="font-mono font-bold text-slate-900 text-right">{reciboData.codigoPago}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Expediente CUT:</span>
-                <span className="font-mono font-semibold text-blue-800">{reciboData.codigoExpediente}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Expediente CUT:</span>
+                <span className="font-mono font-semibold text-blue-800 text-right">{reciboData.codigoExpediente}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Administrado:</span>
-                <span className="font-semibold text-slate-900">{reciboData.solicitanteNombre}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Administrado:</span>
+                <span className="font-semibold text-slate-900 text-right break-words">{reciboData.solicitanteNombre}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Documento:</span>
-                <span className="font-mono text-slate-700">{reciboData.documentoEnmascarado}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Documento:</span>
+                <span className="font-mono text-slate-700 text-right">{reciboData.documentoEnmascarado}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Concepto:</span>
-                <span className="font-medium text-slate-800 text-right">{reciboData.concepto}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Concepto:</span>
+                <span className="font-medium text-slate-800 text-right break-words">{reciboData.concepto}</span>
               </div>
               {reciboData.codigoTupa && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Procedimiento TUPA:</span>
-                  <span className="font-mono text-slate-800">{reciboData.codigoTupa}</span>
+                <div className="flex justify-between gap-4">
+                  <span className="text-slate-500 shrink-0">Procedimiento TUPA:</span>
+                  <span className="font-mono text-slate-800 text-right">{reciboData.codigoTupa}</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-slate-500">Medio de Pago:</span>
-                <span className="font-semibold text-slate-900">
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Medio de Pago:</span>
+                <span className="font-semibold text-slate-900 text-right">
                   {reciboData.metodoPago === "EFECTIVO"
                     ? "Efectivo en Ventanilla"
                     : reciboData.metodoPago === "YAPE"
@@ -1406,34 +1412,34 @@ export default function TesoreriaPage() {
                 </span>
               </div>
               {reciboData.metodoPago === "YAPE" && reciboData.referenciaOperacion && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">N° Operación Yape:</span>
-                  <span className="font-mono font-bold text-purple-900">{reciboData.referenciaOperacion}</span>
+                <div className="flex justify-between gap-4">
+                  <span className="text-slate-500 shrink-0">N° Operación Yape:</span>
+                  <span className="font-mono font-bold text-purple-900 text-right">{reciboData.referenciaOperacion}</span>
                 </div>
               )}
               {reciboData.metodoPago === "QR_AUTOMATICO_SANDBOX" && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Origen confirmación:</span>
-                  <span className="font-mono font-bold text-amber-900">
+                <div className="flex justify-between gap-4">
+                  <span className="text-slate-500 shrink-0">Origen confirmación:</span>
+                  <span className="font-mono font-bold text-amber-900 text-right">
                     {reciboData.paymentProvider === "DEMO_QR" ? "Webhook del simulador" : "Webhook TAYPI"}
                   </span>
                 </div>
               )}
               {reciboData.metodoPago === "EFECTIVO" && reciboData.montoRecibido && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Efectivo Entregado:</span>
-                  <span className="font-mono">S/ {Number(reciboData.montoRecibido).toFixed(2)}</span>
+                <div className="flex justify-between gap-4">
+                  <span className="text-slate-500 shrink-0">Efectivo Entregado:</span>
+                  <span className="font-mono text-right">S/ {Number(reciboData.montoRecibido).toFixed(2)}</span>
                 </div>
               )}
               {reciboData.metodoPago === "EFECTIVO" && reciboData.vuelto !== null && Number(reciboData.vuelto) > 0 && (
-                <div className="flex justify-between text-emerald-800 font-semibold">
-                  <span>Vuelto:</span>
-                  <span className="font-mono">S/ {Number(reciboData.vuelto).toFixed(2)}</span>
+                <div className="flex justify-between gap-4 text-emerald-800 font-semibold">
+                  <span className="shrink-0">Vuelto:</span>
+                  <span className="font-mono text-right">S/ {Number(reciboData.vuelto).toFixed(2)}</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-slate-500">Operador:</span>
-                <span className="font-semibold text-slate-800">{reciboData.tesoreroNombre || "Tesorería — IESTP Suiza"}</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500 shrink-0">Operador:</span>
+                <span className="font-semibold text-slate-800 text-right">{reciboData.tesoreroNombre || "Tesorería — IESTP Suiza"}</span>
               </div>
             </div>
 
@@ -1450,7 +1456,7 @@ export default function TesoreriaPage() {
             </div>
 
             {/* Botones de acción */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 print:hidden">
               <button
                 type="button"
                 onClick={() => setModalReciboAbierto(false)}

@@ -34,7 +34,7 @@ export function crearRouterIdenticore(pool: Pool, cache?: CacheDistribuida): Rou
     const resultado = query.tipoDocumento === 'DNI'
       ? validarDni(query.numeroDocumento)
       : query.tipoDocumento === 'CE'
-        ? { valido: /^[A-Z0-9]{9,12}$/.test(query.numeroDocumento), codigo: 'CE_FORMATO' }
+        ? { valido: /^[A-Za-z0-9]{8,12}$/.test(query.numeroDocumento), codigo: 'CE_FORMATO' }
         : validarRuc(query.numeroDocumento);
     res.status(200).json(resultado);
   });

@@ -36,6 +36,17 @@ describe("DerivacionModal", () => {
     expect(cerrar).toHaveBeenCalledOnce();
   });
 
+  it("deshabilita áreas no enrutables con aviso explícito de falta de personal", () => {
+    const unidadesConNoEnrutable = [
+      ...unidades,
+      { id: "area-vacia", nombre: "Área Sin Personal", habilitada: true, enrutable: false, motivo_no_enrutable: "Sin personal activo" },
+    ];
+    render(<DerivacionModal open onClose={vi.fn()} expediente={expediente} unidades={{ estado: "listo", datos: unidadesConNoEnrutable }} accion={crearAccionPrueba<SolicitudDerivacion, ResultadoDerivacion>({ ejecutar: vi.fn() })} />);
+    const opcionNoEnrutable = screen.getByRole("option", { name: /no enrutable: sin personal habilitado/ });
+    expect(opcionNoEnrutable).toBeInTheDocument();
+    expect(opcionNoEnrutable).toBeDisabled();
+  });
+
   it("bloquea doble envío, edición y Escape mientras procesa", async () => {
     const user = userEvent.setup();
     const pendiente = diferida<boolean>();

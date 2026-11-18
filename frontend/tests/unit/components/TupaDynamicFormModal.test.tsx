@@ -2,8 +2,13 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import TupaDynamicFormModal from '../../../src/components/tramite/TupaDynamicFormModal';
 import { useAuthStore } from '../../../src/stores/authStore';
+
+function renderModal(ui: React.ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
 
 describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', () => {
   const originalFetch = globalThis.fetch;
@@ -28,7 +33,7 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
   });
 
   it('no renderiza nada cuando isOpen es false', () => {
-    const { container } = render(
+    const { container } = renderModal(
       <TupaDynamicFormModal
         isOpen={false}
         codigoInicial="p1-fila-05"
@@ -40,7 +45,7 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
 
   it('renderiza campos y cálculo de importe para ALQUILER (Galpón Agrícola)', async () => {
     const user = userEvent.setup();
-    render(
+    renderModal(
       <TupaDynamicFormModal
         isOpen={true}
         codigoInicial="p2-fila-01" // Alquiler del Galpón Agrícola
@@ -48,8 +53,12 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
       />
     );
 
-    expect(screen.getByText('Motor de Formularios Dinámicos TUPA 2026')).toBeInTheDocument();
-    expect(screen.getByText(/Disponibilidad sujeta a confirmación institucional previa/i)).toBeInTheDocument();
+    expect(screen.getByText(/Solicitud de Servicio Institucional/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Alquiler del Galpón Agrícola/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Aviso de disponibilidad/i)).toBeInTheDocument();
+
+    // Avanzar a Paso 2: Datos
+    await user.click(screen.getByRole('button', { name: /Completar Solicitud/i }));
 
     // Ver cálculo de cantidad con S/ 500.00 base usando selector de label flexible
     const inputCantidad = screen.getByLabelText(/Cantidad/i);
@@ -62,7 +71,7 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
 
   it('renderiza aviso de disponibilidad y cálculo para VENTA_BIEN (Venta de Mangos)', async () => {
     const user = userEvent.setup();
-    render(
+    renderModal(
       <TupaDynamicFormModal
         isOpen={true}
         codigoInicial="p2-fila-09" // Venta de Mangos
@@ -70,7 +79,11 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
       />
     );
 
-    expect(screen.getByText(/Disponibilidad sujeta a confirmación institucional previa/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Venta de Mangos/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Aviso de disponibilidad/i)).toBeInTheDocument();
+
+    // Avanzar a Paso 2: Datos
+    await user.click(screen.getByRole('button', { name: /Completar Solicitud/i }));
 
     // S/ 15.00 base x 5 = S/ 75.00
     const inputCantidad = screen.getByLabelText(/Cantidad/i);
@@ -81,7 +94,7 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
   });
 
   it('bloquea la radicación para CIUDADANO cuando el tipo es ACTUACION_INTERNA', () => {
-    render(
+    renderModal(
       <TupaDynamicFormModal
         isOpen={true}
         codigoInicial="p1-fila-01" // Prácticas Iniciales (ACTUACION_INTERNA)
@@ -90,13 +103,12 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
     );
 
     expect(screen.getByText(/Gestión interna institucional/i)).toBeInTheDocument();
-    const botonEnviar = screen.getByRole('button', { name: /Registrar Solicitud|Radicar Expediente/i });
-    expect(botonEnviar).toBeDisabled();
+    const botonCompletar = screen.getByRole('button', { name: /Completar Solicitud/i });
+    expect(botonCompletar).toBeDisabled();
   });
 
-  it('permite cambiar de procedimiento desde el selector sin recargar la página', async () => {
-    const user = userEvent.setup();
-    render(
+  it('permite cambiar de procedimiento cuando se actualiza el código inicial', () => {
+    const { rerender } = renderModal(
       <TupaDynamicFormModal
         isOpen={true}
         codigoInicial="p1-fila-05"
@@ -104,11 +116,20 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
       />
     );
 
-    // Selector
-    const selector = screen.getByLabelText(/Seleccione el Procedimiento o Concepto TUPA/i);
-    await user.selectOptions(selector, 'p1-fila-06'); // Certificado de Inglés
+    expect(screen.getByText(/p1-fila-05/i)).toBeInTheDocument();
 
-    expect(screen.getByText(/Datos del Formulario \(DOCUMENTARIO\)/i)).toBeInTheDocument();
+    rerender(
+      <MemoryRouter>
+        <TupaDynamicFormModal
+          isOpen={true}
+          codigoInicial="p1-fila-06"
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText(/p1-fila-06/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/DOCUMENTARIO/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it('envía solicitud no documentaria y muestra código canónico SOL-2026-XXXXXX', async () => {
@@ -127,7 +148,7 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
       }),
     });
 
-    render(
+    renderModal(
       <TupaDynamicFormModal
         isOpen={true}
         codigoInicial="p2-fila-09" // Venta de Mangos (VENTA_BIEN)
@@ -136,11 +157,22 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
       />
     );
 
-    // Llenar teléfono de contacto obligatorio
+    // Paso 1: Orientación -> Avanzar
+    await user.click(screen.getByRole('button', { name: /Completar Solicitud/i }));
+
+    // Paso 2: Llenar campos obligatorios (cantidad y teléfono)
+    const inputCantidad = screen.getByLabelText(/Cantidad/i);
+    await user.clear(inputCantidad);
+    await user.type(inputCantidad, '5');
+
     const inputTelefono = screen.getByLabelText(/Teléfono \/ WhatsApp/i);
     await user.type(inputTelefono, '961123456');
 
-    const botonEnviar = screen.getByRole('button', { name: /Registrar Solicitud/i });
+    // Avanzar a Paso 3: Revisión
+    await user.click(screen.getByRole('button', { name: /Revisar Resumen/i }));
+
+    // Paso 3: Confirmar y Enviar
+    const botonEnviar = screen.getByRole('button', { name: /Confirmar y Enviar Solicitud/i });
     await user.click(botonEnviar);
 
     await waitFor(() => {
@@ -154,20 +186,34 @@ describe('TupaDynamicFormModal — Motor de Formularios Dinámicos TUPA 2026', (
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, json: () => Promise.resolve({ detail: 'Servicio no disponible' }) });
     const onExito = vi.fn();
     const actor = userEvent.setup();
-    render(<TupaDynamicFormModal isOpen codigoInicial="p2-fila-09" onClose={vi.fn()} onExito={onExito} />);
+    renderModal(<TupaDynamicFormModal isOpen codigoInicial="p2-fila-09" onClose={vi.fn()} onExito={onExito} />);
+
+    // Paso 1 -> Paso 2
+    await actor.click(screen.getByRole('button', { name: /Completar Solicitud/i }));
+
+    // Paso 2: Llenar campos obligatorios y avanzar
+    const inputCantidad = screen.getByLabelText(/Cantidad/i);
+    await actor.clear(inputCantidad);
+    await actor.type(inputCantidad, '5');
+
     await actor.type(screen.getByLabelText(/Teléfono \/ WhatsApp/i), '961123456');
-    await actor.click(screen.getByRole('button', { name: /Registrar Solicitud/i }));
+    await actor.click(screen.getByRole('button', { name: /Revisar Resumen/i }));
+
+    // Paso 3: Enviar
+    await actor.click(screen.getByRole('button', { name: /Confirmar y Enviar Solicitud/i }));
+
     expect(await screen.findByText('Servicio no disponible')).toBeInTheDocument();
-    expect(screen.queryByText(/Solicitud Registrada con Éxito/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/¡Solicitud Registrada con Éxito!/i)).not.toBeInTheDocument();
     expect(onExito).not.toHaveBeenCalled();
   });
 
   it('redirige el documentario aprobado al flujo CUT sin crear SOL', () => {
     globalThis.fetch = vi.fn();
-    render(<TupaDynamicFormModal isOpen codigoInicial="p1-fila-06" onClose={vi.fn()} />);
-    expect(screen.getByText(/Datos del Formulario \(DOCUMENTARIO\)/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Ir a radicación CUT/i })).toHaveAttribute('href', '/tramite');
-    expect(screen.queryByRole('button', { name: /Registrar Solicitud/i })).not.toBeInTheDocument();
+    renderModal(<TupaDynamicFormModal isOpen codigoInicial="p1-fila-06" onClose={vi.fn()} />);
+    expect(screen.getAllByText(/DOCUMENTARIO/i).length).toBeGreaterThanOrEqual(1);
+    const linkCut = screen.getByRole('link', { name: /Ir a Mesa de Partes Digital \(CUT\)/i });
+    expect(linkCut).toHaveAttribute('href', expect.stringContaining('/mesa-partes?procedimiento=p1-fila-06'));
+    expect(screen.queryByRole('button', { name: /Completar Solicitud/i })).not.toBeInTheDocument();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 

@@ -22,6 +22,7 @@ import { ServicioFirmaService } from './domains/docucore/firma.service.js';
 import { crearRouterIdenticore } from './domains/identicore/identicore.router.js';
 import type { CacheDistribuida } from './domains/identicore/ubigeo.service.js';
 import { crearRouterRutaDoc } from './domains/rutadoc/rutadoc.router.js';
+import { EnrutabilidadService } from './domains/rutadoc/enrutabilidad.service.js';
 import type { ObtenerActorRutaDoc } from './domains/rutadoc/rutadoc.controller.js';
 import type {
   FolioCompensationPort,
@@ -72,8 +73,9 @@ import { obtenerMetricasPool } from './database.js';
 import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.service.js';
 import { UnauthorizedError, ForbiddenError } from './shared/domain/errors/index.js';
 
-export const ROLES_ADMIN_PERMITIDOS = ['ADMINISTRADOR'] as const;
-const ROLES_INSTITUCIONALES = ['ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES', 'TESORERIA'] as const;
+export const ROLES_ADMIN_PERMITIDOS = ['ADMINISTRADOR', 'SUPERADMINISTRADOR'] as const;
+export const ROLES_SUPERADMIN_PERMITIDOS = ['SUPERADMINISTRADOR'] as const;
+const ROLES_INSTITUCIONALES = ['ADMINISTRADOR', 'SUPERADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES', 'TESORERIA'] as const;
 
 export function requireInstitutionalRole(req: express.Request, _res: express.Response, next: express.NextFunction): void {
   const token = extraerTokenBearer(req.get('authorization'));
@@ -86,8 +88,8 @@ export function requireInstitutionalRole(req: express.Request, _res: express.Res
 }
 
 /**
- * Middleware de guarda de administración institucional (H-08 / N-01).
- * Exige Bearer Token válido con rol canónico ADMINISTRADOR.
+ * Middleware de guarda de administración institucional (H-08 / N-01 / Fase C2).
+ * Exige Bearer Token válido con rol canónico ADMINISTRADOR o SUPERADMINISTRADOR.
  */
 export function requireAdminRole(req: express.Request, _res: express.Response, next: express.NextFunction): void {
   const token = extraerTokenBearer(req.get('authorization'));
@@ -106,7 +108,35 @@ export function requireAdminRole(req: express.Request, _res: express.Response, n
   if (!tieneRol) {
     throw new ForbiddenError({
       message: 'Acceso denegado.',
-      detail: 'Se requiere rol administrativo (ADMINISTRADOR) para esta operación.',
+      detail: 'Se requiere rol administrativo (ADMINISTRADOR o SUPERADMINISTRADOR) para esta operación.',
+    });
+  }
+
+  next();
+}
+
+/**
+ * Middleware de guarda de superadministración técnica de gobierno (Fase C2).
+ * Exige Bearer Token válido exclusivamente con rol canónico SUPERADMINISTRADOR.
+ */
+export function requireSuperAdminRole(req: express.Request, _res: express.Response, next: express.NextFunction): void {
+  const token = extraerTokenBearer(req.get('authorization'));
+  if (!token) {
+    throw new UnauthorizedError({
+      detail: 'Debe autenticarse con Authorization: Bearer <jwt> para acceder a recursos de superadministración.',
+    });
+  }
+
+  const claims = verificarTokenAcceso(token);
+
+  const tieneRol = claims.roles?.some((r) =>
+    (ROLES_SUPERADMIN_PERMITIDOS as readonly string[]).includes(r.toUpperCase()),
+  );
+
+  if (!tieneRol) {
+    throw new ForbiddenError({
+      message: 'Acceso denegado.',
+      detail: 'Se requiere rol SUPERADMINISTRADOR para esta operación técnica.',
     });
   }
 
@@ -159,13 +189,30 @@ export function construirApp(
   app.use(securityHeadersMiddleware);
 
   app.use(corsMiddleware);
+
+  // Parser con límite de 50 MB segmentado exclusivamente para rutas con ingesta de documentos / base64
+  const RUTAS_INGESTA_DOCUMENTAL = ['/api/v1/tramites', '/api/v1/storage', '/api/v1/firma'];
   app.use(
+    RUTAS_INGESTA_DOCUMENTAL,
     express.json({
+      limit: '50mb',
       verify: (req, _res, buf) => {
         (req as unknown as { rawBody?: Buffer }).rawBody = buf;
       },
     }),
   );
+  app.use(RUTAS_INGESTA_DOCUMENTAL, express.urlencoded({ extended: true, limit: '50mb' }));
+
+  // Parser estándar con límite de 2 MB para el resto de rutas (mitigación de DoS por memoria)
+  app.use(
+    express.json({
+      limit: '2mb',
+      verify: (req, _res, buf) => {
+        (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
   app.use(contextMiddleware);
 
   app.get('/health', (_req, res) => {
@@ -291,15 +338,31 @@ export function construirApp(
    * OrganiCore - Organigrama y Áreas Jerárquicas ltree (#44, #45)
    */
   const organigramaCtrl = crearControladorOrganigrama(new OrganigramaService(pool));
+  const enrutabilidadSvc = new EnrutabilidadService(pool);
   app.get('/api/v1/admin/organigrama', requireAdminRole, organigramaCtrl.getOrganigrama);
   app.get('/api/v1/admin/organigrama/arbol', requireAdminRole, organigramaCtrl.getOrganigrama);
   app.get('/api/v1/organigrama/areas-activas', requireInstitutionalRole, async (_req, res, next) => {
     try {
-      const { rows } = await pool.query(
-        `SELECT area_id::text AS id, nombre, vigente AS habilitada
-           FROM sigd_org.area WHERE vigente = TRUE ORDER BY nombre, area_id`,
+      const areas = await enrutabilidadSvc.listarAreasEnrutables(pool);
+      // Mantiene compatibilidad total con consumidores existentes ({ id, nombre, habilitada })
+      // y enriquece con el estado operativo de enrutabilidad
+      res.json(
+        areas.map((a) => ({
+          id: a.id,
+          nombre: a.nombre,
+          habilitada: a.habilitada,
+          enrutable: a.enrutable,
+          motivo_no_enrutable: a.motivo_no_enrutable,
+        })),
       );
-      res.json(rows);
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.get('/api/v1/organigrama/areas-enrutables', requireInstitutionalRole, async (_req, res, next) => {
+    try {
+      const areas = await enrutabilidadSvc.listarAreasEnrutables(pool);
+      res.json(areas.filter((a) => a.enrutable));
     } catch (error) {
       next(error);
     }

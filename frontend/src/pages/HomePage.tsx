@@ -1,386 +1,353 @@
 import { Link } from "react-router-dom";
 import {
-  Globe,
-  User,
-  Building2,
-  ArrowRight,
-  Lock,
-  Shield,
+  Laptop,
   Search,
-  FileCheck,
   Layers,
-  LogIn,
+  ShieldCheck,
+  ArrowRight,
   FileText,
-  Mail,
-  Inbox,
-  Sliders,
-  BarChart3,
-  type LucideIcon,
 } from "lucide-react";
-import { useAuthStore } from "../stores/authStore";
-import {
-  MODULOS_HOME_PUBLICOS,
-  MODULOS_HOME_CIUDADANO,
-  MODULOS_HOME_INSTITUCIONAL,
-  type ModuloHomeItem,
-  type RolCanonica,
-} from "../config/navigation.config";
-
-const ICONOS_POR_ID: Record<string, LucideIcon> = {
-  "consulta-cut": Search,
-  "registro-ciudadano": User,
-  "validador-cvd": FileCheck,
-  "flujo-validez-legal": Layers,
-  "iniciar-sesion": LogIn,
-  "mesa-partes-virtual": FileText,
-  "mis-expedientes": Layers,
-  "casilla-electronica": Mail,
-  "bandeja-expedientes": Inbox,
-  "ventanilla-presencial": Building2,
-  "panel-administracion": Sliders,
-  "reportes-tableros": BarChart3,
-};
+import estudiantesImg from "../assets/sigd/estudiantes-sigd.webp";
+import entradaInstitutoImg from "../assets/sigd/entrada-instituto.webp";
 
 export default function HomePage() {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const usuario = useAuthStore((state) => state.usuario);
-
-  const tieneRolPermitido = (rolesPermitidos?: readonly RolCanonica[]) => {
-    if (!isAuthenticated || !usuario?.rol || !rolesPermitidos) return false;
-    return rolesPermitidos.includes(usuario.rol as RolCanonica);
-  };
-
   return (
-    <main className="flex min-h-screen flex-col items-center bg-gradient-to-br from-slate-50 via-sky-50/20 to-teal-50/15 px-3.5 py-8 text-slate-900 sm:px-6 sm:py-10 lg:px-8">
-      {/* 1. Encabezado Institucional Principal */}
-      <header className="max-w-3xl text-center space-y-3">
-        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200/80 bg-gradient-to-b from-white/95 via-cyan-50/85 to-sky-50/70 px-4 py-1.5 text-xs font-bold text-cyan-950 shadow-[0_2px_10px_rgba(6,182,212,0.15),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-xs">
-          <span className="h-2 w-2 rounded-full bg-cyan-600 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-          IESTP &quot;Suiza&quot; — Pucallpa, Ucayali
+    <main className="w-full flex-1 flex flex-col justify-start" id="inicio">
+      {/* 1. Hero Panorámico Institucional Oficial (Traslado de Maqueta index.html) */}
+      <section className="sigd-hero" aria-labelledby="hero-title">
+        {/* Fachada panorámica auténtica del IESTP SUIZA */}
+        <div className="sigd-hero-building" role="img" aria-label="Entrada del Instituto Superior Tecnológico Suiza">
+          <img
+            src={entradaInstitutoImg}
+            alt="Entrada del Instituto Superior Tecnológico Suiza"
+            className="w-full h-full object-cover"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+          />
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
-          SIGD
-        </h1>
-        <p className="text-lg font-semibold text-slate-700 sm:text-xl">
-          Sistema Integral de Gestión Documentaria
-        </p>
-        <p className="text-sm text-slate-500 max-w-xl mx-auto leading-relaxed">
-          Plataforma Institucional y Notificación Electrónica con Validez Legal.
-          Accede a servicios de consulta abierta, trámites de administrados o gestión interna.
-        </p>
 
-        {isAuthenticated && usuario && (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-cyan-200/80 bg-gradient-to-b from-white/95 via-cyan-50/80 to-white px-4 py-1.5 text-xs text-slate-900 shadow-[0_2px_8px_rgba(6,182,212,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-xs ring-1 ring-cyan-400/20">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>
-              Sesión activa: <strong className="font-semibold">{usuario.rol === 'CIUDADANO' ? 'Mi cuenta' : usuario.nombreCompleto}</strong>
-              {usuario.rol !== 'CIUDADANO' && <> (<span className="font-mono font-bold text-cyan-800">{usuario.rol}</span>)</>}
-            </span>
-          </div>
-        )}
-      </header>
+        {/* Degradado luminoso institucional: Cerúleo y azul regio en texto con desvanecimiento suave */}
+        <div className="sigd-hero-shade" aria-hidden="true" />
 
-      {/* 2. Tres Bloques Segmentados de Navegación con lenguaje visual Liquid Glass */}
-      <div className="mt-12 w-full max-w-6xl space-y-10">
-        {/* BLOQUE A: Servicios Públicos (Aqua / Cyan / Emerald Liquid Glass) */}
-        <section
-          aria-labelledby="bloque-publico-titulo"
-          className="relative overflow-hidden rounded-3xl border border-white/80 bg-gradient-to-br from-white/90 via-cyan-50/40 to-emerald-50/25 p-5 sm:p-7 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),inset_0_-1px_2px_0_rgba(6,182,212,0.06),0_16px_48px_-8px_rgba(6,182,212,0.14),0_2px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-cyan-200/50 backdrop-blur-md space-y-5 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent after:pointer-events-none after:absolute after:-top-24 after:-right-24 after:h-48 after:w-48 after:rounded-full after:bg-cyan-300/15 after:blur-2xl"
+        {/* Curvas fluidas decorativas con degradados celestes/azules (Ribbons Glass) */}
+        <svg
+          className="sigd-hero-ribbons"
+          viewBox="0 0 600 450"
+          preserveAspectRatio="none"
+          aria-hidden="true"
         >
-          <div className="relative z-10 flex flex-col gap-2 border-b border-cyan-200/60 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-cyan-200/80 bg-gradient-to-b from-white/95 via-cyan-50/80 to-sky-50/60 px-3 py-1 text-xs font-bold text-cyan-950 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),0_2px_6px_rgba(6,182,212,0.12)] backdrop-blur-xs">
-                <Globe className="h-3.5 w-3.5 text-cyan-700" />
-                Servicios Públicos
-              </div>
-              <h2
-                id="bloque-publico-titulo"
-                className="mt-2 text-xl font-extrabold text-slate-900 sm:text-2xl tracking-tight"
-              >
-                Servicios Públicos y Consulta Ciudadana
-              </h2>
-              <p className="text-xs text-slate-600 sm:text-sm">
-                Acceso libre y abierto sin requerir autenticación ni credenciales previas.
-              </p>
-            </div>
-            <span className="self-start rounded-full border border-cyan-200/70 bg-gradient-to-b from-white/95 via-cyan-50/60 to-white px-3.5 py-1 text-xs font-semibold text-cyan-950 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),0_2px_6px_rgba(6,182,212,0.08)] sm:self-auto">
-              5 servicios disponibles
-            </span>
-          </div>
+          <defs>
+            <linearGradient id="ribbonCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.85" />
+              <stop offset="60%" stopColor="#0284c7" stopOpacity="0.45" />
+              <stop offset="100%" stopColor="#0369a1" stopOpacity="0.05" />
+            </linearGradient>
+            <linearGradient id="ribbonDeep" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.5" />
+              <stop offset="50%" stopColor="#0369a1" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="#075985" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="ribbonGlow" x1="20%" y1="0%" x2="80%" y2="100%">
+              <stop offset="0%" stopColor="#7dd3fc" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#0284c7" stopOpacity="0.2" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M -50 0 C 150 80, 260 220, 220 450 L 160 450 C 200 240, 100 120, -50 40 Z"
+            fill="url(#ribbonCyan)"
+          />
+          <path
+            d="M 50 0 C 230 110, 320 280, 260 450 L 220 450 C 280 300, 190 140, 0 30 Z"
+            fill="url(#ribbonDeep)"
+          />
+          <path
+            d="M -30 20 C 140 90, 235 210, 205 450"
+            stroke="url(#ribbonGlow)"
+            strokeWidth="3.5"
+            fill="none"
+            opacity="0.85"
+          />
+        </svg>
 
-          <div className="relative z-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {MODULOS_HOME_PUBLICOS.map((modulo) => (
-              <CardModuloPublico key={modulo.id} modulo={modulo} />
-            ))}
-          </div>
-        </section>
+        {/* Reflejo geométrico diagonal institucional */}
+        <div className="sigd-hero-diagonal" aria-hidden="true" />
 
-        {/* BLOQUE B: Acceso con Cuenta Ciudadana (Sky / Blue Liquid Glass) */}
-        <section
-          aria-labelledby="bloque-ciudadano-titulo"
-          className="relative overflow-hidden rounded-3xl border border-white/80 bg-gradient-to-br from-white/90 via-sky-50/40 to-blue-50/20 p-5 sm:p-7 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),inset_0_-1px_2px_0_rgba(14,165,233,0.06),0_16px_48px_-8px_rgba(14,165,233,0.12),0_2px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-sky-200/50 backdrop-blur-md space-y-5 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent after:pointer-events-none after:absolute after:-top-24 after:-right-24 after:h-48 after:w-48 after:rounded-full after:bg-sky-300/15 after:blur-2xl"
+        {/* Tres Estudiantes Institucionales */}
+        <img
+          className="sigd-hero-students"
+          src={estudiantesImg}
+          alt="Estudiantes del IESTP Suiza"
+          fetchPriority="high"
+          width={1448}
+          height={1086}
+          loading="eager"
+          decoding="async"
+        />
+
+        {/* Contenido / Textos y Acciones en Glass Card */}
+        <div className="sigd-hero-copy">
+          <span className="sr-only">Sistema Integral de Gestión Documentaria</span>
+          <h1 id="hero-title">
+            Trámites Documentarios <br />del IESTP SUIZA
+          </h1>
+          <p>
+            Presenta solicitudes, consulta el estado de tus trámites y valida documentos de forma digital, segura y confiable.
+          </p>
+          <div className="sigd-hero-actions">
+            <Link to="/mesa-partes" className="sigd-cta sigd-cta-light">
+              <FileText className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+              <span>Iniciar trámite</span>
+            </Link>
+            <Link to="/consulta" className="sigd-cta sigd-cta-outline">
+              <Search className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+              <span>Consultar CUT</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Ondas decorativas fluidas (Juego enriquecido de 5 capas armónicas con relieve y transparencias) */}
+        <svg
+          className="sigd-hero-waves"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 1672 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
         >
-          <div className="relative z-10 flex flex-col gap-2 border-b border-sky-200/60 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-200/80 bg-gradient-to-b from-white/95 via-sky-50/80 to-blue-50/60 px-3 py-1 text-xs font-bold text-sky-950 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),0_2px_6px_rgba(14,165,233,0.12)] backdrop-blur-xs">
-                <User className="h-3.5 w-3.5 text-sky-700" />
-                Acceso con Cuenta Ciudadana
-              </div>
-              <h2
-                id="bloque-ciudadano-titulo"
-                className="mt-2 text-xl font-extrabold text-slate-900 sm:text-2xl tracking-tight"
-              >
-                Portal y Servicios del Administrado
-              </h2>
-              <p className="text-xs text-slate-600 sm:text-sm">
-                Radicación virtual de trámites 24/7, expedientes de autoría propia y casilla electrónica.
-              </p>
-            </div>
-            <span className="self-start rounded-full border border-sky-200/70 bg-gradient-to-b from-white/95 via-sky-50/60 to-white px-3.5 py-1 text-xs font-semibold text-sky-950 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),0_2px_6px_rgba(14,165,233,0.08)] sm:self-auto">
-              3 servicios de administrado
-            </span>
-          </div>
+          <defs>
+            {/* Gradiente 1: Celeste cielo luminoso para capa trasera */}
+            <linearGradient id="sigdWaveSky" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.55" />
+              <stop offset="30%" stopColor="#7dd3fc" stopOpacity="0.45" />
+              <stop offset="70%" stopColor="#38bdf8" stopOpacity="0.60" />
+              <stop offset="100%" stopColor="#0284c7" stopOpacity="0.70" />
+            </linearGradient>
 
-          <div className="relative z-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {MODULOS_HOME_CIUDADANO.map((modulo) => (
-              <CardModuloCiudadano
-                key={modulo.id}
-                modulo={modulo}
-                isAuthenticated={isAuthenticated}
-                esCiudadano={usuario?.rol === "CIUDADANO"}
+            {/* Gradiente 2: Cinta azul institucional vibrante con volumen */}
+            <linearGradient id="sigdWaveVibrant" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#0284c7" stopOpacity="0.96" />
+              <stop offset="25%" stopColor="#039ae8" stopOpacity="0.94" />
+              <stop offset="65%" stopColor="#0284c7" stopOpacity="0.96" />
+              <stop offset="100%" stopColor="#005ea6" stopOpacity="0.98" />
+            </linearGradient>
+
+            {/* Gradiente 3: Turquesa/celeste translúcido con reflejo */}
+            <linearGradient id="sigdWaveCyanIce" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#a5f3fc" stopOpacity="0.65" />
+              <stop offset="45%" stopColor="#bae6fd" stopOpacity="0.50" />
+              <stop offset="80%" stopColor="#7dd3fc" stopOpacity="0.60" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.65" />
+            </linearGradient>
+
+            {/* Gradiente 4: Velo de luz blanco-hielo suave */}
+            <linearGradient id="sigdWaveIce" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#e0f2fe" stopOpacity="0.80" />
+              <stop offset="50%" stopColor="#f0f9ff" stopOpacity="0.88" />
+              <stop offset="100%" stopColor="#bae6fd" stopOpacity="0.80" />
+            </linearGradient>
+
+            {/* Gradiente 5: Base blanca luminosa que fluye hacia servicios */}
+            <linearGradient id="sigdWaveBase" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.98" />
+              <stop offset="45%" stopColor="#edf8ff" stopOpacity="1" />
+              <stop offset="100%" stopColor="#e1f2fd" stopOpacity="1" />
+            </linearGradient>
+
+            {/* Sombra de relieve volumétrica para la cinta azul */}
+            <filter id="sigdWaveShadow" x="-2%" y="-10%" width="104%" height="130%">
+              <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#002855" floodOpacity="0.18" />
+            </filter>
+          </defs>
+
+          {/* 1. Capa trasera celeste cielo translúcida (asoma en las crestas superiores) */}
+          <path
+            d="M0 20 C 140 6, 360 62, 580 60 C 780 58, 1040 32, 1280 20 C 1420 12, 1540 6, 1672 16 V 100 H 0 Z"
+            fill="url(#sigdWaveSky)"
+          />
+
+          {/* 2. Cinta azul vibrante institucional continua con relieve */}
+          <path
+            d="M0 26 C 120 10, 340 70, 640 70 C 880 70, 1140 44, 1380 24 C 1500 14, 1600 6, 1672 14 V 36 C 1600 28, 1500 36, 1380 48 C 1140 68, 880 88, 640 88 C 340 86, 120 26, 0 42 Z"
+            fill="url(#sigdWaveVibrant)"
+            filter="url(#sigdWaveShadow)"
+          />
+
+          {/* 3. Onda intermedia cian/hielo translúcida con fase desplazada (segundo oleaje visible) */}
+          <path
+            d="M0 36 C 220 18, 420 80, 720 78 C 960 76, 1200 48, 1420 30 C 1520 22, 1610 16, 1672 24 V 100 H 0 Z"
+            fill="url(#sigdWaveCyanIce)"
+          />
+
+          {/* 4. Velo suave blanco-hielo superpuesto */}
+          <path
+            d="M0 46 C 200 28, 400 84, 680 84 C 920 84, 1160 56, 1380 38 C 1500 28, 1600 22, 1672 32 V 100 H 0 Z"
+            fill="url(#sigdWaveIce)"
+          />
+
+          {/* 5. Onda base blanca luminosa que conecta a 0px con servicios */}
+          <path
+            d="M0 54 C 180 36, 380 90, 640 90 C 880 90, 1120 64, 1340 48 C 1480 38, 1590 28, 1672 38 V 100 H 0 Z"
+            fill="url(#sigdWaveBase)"
+          />
+        </svg>
+      </section>
+
+      {/* 2. Cuatro Tarjetas de Servicios Públicos (Composición vertical según boceto) */}
+      <section className="sigd-services" id="servicios" aria-label="Servicios públicos del SIGD">
+        <div className="sigd-services-grid">
+          {/* Tarjeta 1: Mesa de Partes Digital */}
+          <Link to="/mesa-partes" className="sigd-service-card group">
+            <div className="sigd-service-icon">
+              <Laptop className="sigd-icon-svg" />
+            </div>
+            <div className="sigd-service-content">
+              <h2 className="sigd-service-title">Mesa de Partes Digital</h2>
+              <p className="sigd-service-desc">Presenta tus trámites y adjunta documentos.</p>
+            </div>
+            <div className="sigd-service-action">
+              <span className="sigd-service-arrow" aria-hidden="true">
+                <ArrowRight className="sigd-arrow-svg" />
+              </span>
+            </div>
+            <svg className="sigd-card-corner" viewBox="0 0 100 70" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="cardCornerWaveBack1" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#bae6fd" stopOpacity="0.8" />
+                  <stop offset="60%" stopColor="#7dd3fc" stopOpacity="0.75" />
+                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.85" />
+                </linearGradient>
+                <linearGradient id="cardCornerWaveFront1" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.95" />
+                  <stop offset="70%" stopColor="#0284c7" stopOpacity="0.95" />
+                  <stop offset="100%" stopColor="#0066b2" stopOpacity="0.98" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M 0 70 C 26 69, 54 55, 74 38 C 86 26, 94 14, 100 0 L 100 70 Z"
+                fill="url(#cardCornerWaveBack1)"
               />
-            ))}
-          </div>
-        </section>
-
-        {/* BLOQUE C: Acceso Institucional por Rol (Slate / Indigo Liquid Glass) */}
-        <section
-          aria-labelledby="bloque-institucional-titulo"
-          className="relative overflow-hidden rounded-3xl border border-white/80 bg-gradient-to-br from-white/90 via-slate-50/60 to-indigo-50/25 p-5 sm:p-7 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),inset_0_-1px_2px_0_rgba(99,102,241,0.05),0_16px_48px_-8px_rgba(99,102,241,0.10),0_2px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-indigo-200/40 backdrop-blur-md space-y-5 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent after:pointer-events-none after:absolute after:-top-24 after:-right-24 after:h-48 after:w-48 after:rounded-full after:bg-indigo-300/10 after:blur-2xl"
-        >
-          <div className="relative z-10 flex flex-col gap-2 border-b border-indigo-200/60 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200/80 bg-gradient-to-b from-white/95 via-indigo-50/70 to-slate-50/60 px-3 py-1 text-xs font-bold text-indigo-950 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),0_2px_6px_rgba(99,102,241,0.10)] backdrop-blur-xs">
-                <Building2 className="h-3.5 w-3.5 text-indigo-700" />
-                Acceso Institucional por Rol
-              </div>
-              <h2
-                id="bloque-institucional-titulo"
-                className="mt-2 text-xl font-extrabold text-slate-900 sm:text-2xl tracking-tight"
-              >
-                Operación, Despacho y Gestión Interna
-              </h2>
-              <p className="text-xs text-slate-600 sm:text-sm">
-                Módulos de gestión documental restringidos para personal y directivos del IESTP Suiza.
-              </p>
-            </div>
-            <span className="self-start rounded-full border border-indigo-200/70 bg-gradient-to-b from-white/95 via-indigo-50/50 to-white px-3.5 py-1 text-xs font-semibold text-indigo-950 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),0_2px_6px_rgba(99,102,241,0.08)] sm:self-auto">
-              4 módulos institucionales
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
-            {MODULOS_HOME_INSTITUCIONAL.map((modulo) => (
-              <CardModuloInstitucional
-                key={modulo.id}
-                modulo={modulo}
-                isAuthenticated={isAuthenticated}
-                tienePermiso={tieneRolPermitido(modulo.rolesPermitidos)}
+              <path
+                d="M 32 70 C 52 69, 72 57, 84 43 C 92 33, 97 22, 100 12 L 100 70 Z"
+                fill="url(#cardCornerWaveFront1)"
               />
-            ))}
-          </div>
-        </section>
-      </div>
+            </svg>
+          </Link>
+
+          {/* Tarjeta 2: Consulta por CUT */}
+          <Link to="/consulta" className="sigd-service-card group">
+            <div className="sigd-service-icon">
+              <Search className="sigd-icon-svg" />
+            </div>
+            <div className="sigd-service-content">
+              <h2 className="sigd-service-title">Consulta por CUT</h2>
+              <p className="sigd-service-desc">Revisa el estado de tu trámite en línea.</p>
+            </div>
+            <div className="sigd-service-action">
+              <span className="sigd-service-arrow" aria-hidden="true">
+                <ArrowRight className="sigd-arrow-svg" />
+              </span>
+            </div>
+            <svg className="sigd-card-corner" viewBox="0 0 100 70" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="cardCornerWaveBack2" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#bae6fd" stopOpacity="0.8" />
+                  <stop offset="60%" stopColor="#7dd3fc" stopOpacity="0.75" />
+                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.85" />
+                </linearGradient>
+                <linearGradient id="cardCornerWaveFront2" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.95" />
+                  <stop offset="70%" stopColor="#0284c7" stopOpacity="0.95" />
+                  <stop offset="100%" stopColor="#0066b2" stopOpacity="0.98" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M 0 70 C 26 69, 54 55, 74 38 C 86 26, 94 14, 100 0 L 100 70 Z"
+                fill="url(#cardCornerWaveBack2)"
+              />
+              <path
+                d="M 32 70 C 52 69, 72 57, 84 43 C 92 33, 97 22, 100 12 L 100 70 Z"
+                fill="url(#cardCornerWaveFront2)"
+              />
+            </svg>
+          </Link>
+
+          {/* Tarjeta 3: Catálogo TUPA */}
+          <Link to="/tupa" className="sigd-service-card group">
+            <div className="sigd-service-icon">
+              <Layers className="sigd-icon-svg" />
+            </div>
+            <div className="sigd-service-content">
+              <h2 className="sigd-service-title">Catálogo TUPA</h2>
+              <p className="sigd-service-desc">Consulta requisitos, costos y plazos oficiales.</p>
+            </div>
+            <div className="sigd-service-action">
+              <span className="sigd-service-arrow" aria-hidden="true">
+                <ArrowRight className="sigd-arrow-svg" />
+              </span>
+            </div>
+            <svg className="sigd-card-corner" viewBox="0 0 100 70" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="cardCornerWaveBack3" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#bae6fd" stopOpacity="0.8" />
+                  <stop offset="60%" stopColor="#7dd3fc" stopOpacity="0.75" />
+                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.85" />
+                </linearGradient>
+                <linearGradient id="cardCornerWaveFront3" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.95" />
+                  <stop offset="70%" stopColor="#0284c7" stopOpacity="0.95" />
+                  <stop offset="100%" stopColor="#0066b2" stopOpacity="0.98" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M 0 70 C 26 69, 54 55, 74 38 C 86 26, 94 14, 100 0 L 100 70 Z"
+                fill="url(#cardCornerWaveBack3)"
+              />
+              <path
+                d="M 32 70 C 52 69, 72 57, 84 43 C 92 33, 97 22, 100 12 L 100 70 Z"
+                fill="url(#cardCornerWaveFront3)"
+              />
+            </svg>
+          </Link>
+
+          {/* Tarjeta 4: Validador CVD */}
+          <Link to="/validador-cvd" className="sigd-service-card group">
+            <div className="sigd-service-icon">
+              <ShieldCheck className="sigd-icon-svg" />
+            </div>
+            <div className="sigd-service-content">
+              <h2 className="sigd-service-title">Validador CVD</h2>
+              <p className="sigd-service-desc">Verifica la autenticidad de documentos emitidos.</p>
+            </div>
+            <div className="sigd-service-action">
+              <span className="sigd-service-arrow" aria-hidden="true">
+                <ArrowRight className="sigd-arrow-svg" />
+              </span>
+            </div>
+            <svg className="sigd-card-corner" viewBox="0 0 100 70" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="cardCornerWaveBack4" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#bae6fd" stopOpacity="0.8" />
+                  <stop offset="60%" stopColor="#7dd3fc" stopOpacity="0.75" />
+                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.85" />
+                </linearGradient>
+                <linearGradient id="cardCornerWaveFront4" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.95" />
+                  <stop offset="70%" stopColor="#0284c7" stopOpacity="0.95" />
+                  <stop offset="100%" stopColor="#0066b2" stopOpacity="0.98" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M 0 70 C 26 69, 54 55, 74 38 C 86 26, 94 14, 100 0 L 100 70 Z"
+                fill="url(#cardCornerWaveBack4)"
+              />
+              <path
+                d="M 32 70 C 52 69, 72 57, 84 43 C 92 33, 97 22, 100 12 L 100 70 Z"
+                fill="url(#cardCornerWaveFront4)"
+              />
+            </svg>
+          </Link>
+        </div>
+      </section>
     </main>
-  );
-}
-
-/**
- * Tarjeta de Servicio Público: estilo aqua / glass translúcido con microinteracción elegante.
- */
-function CardModuloPublico({ modulo }: { modulo: ModuloHomeItem }) {
-  const Icono = ICONOS_POR_ID[modulo.id] || Globe;
-
-  return (
-    <Link
-      to={modulo.ruta}
-      className="group relative overflow-hidden flex flex-col justify-between rounded-2xl border border-white/90 bg-white/80 p-4 sm:p-5 shadow-[0_4px_20px_-4px_rgba(6,182,212,0.08)] backdrop-blur-sm transition-all duration-300 ease-out ring-1 ring-cyan-100/60 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent hover:-translate-y-1 hover:border-cyan-300/80 hover:bg-white/95 hover:shadow-[0_14px_30px_-6px_rgba(6,182,212,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
-    >
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-b from-white to-cyan-50 text-cyan-700 border border-cyan-200/80 shadow-[0_2px_5px_rgba(6,182,212,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)] group-hover:bg-cyan-100 group-hover:text-cyan-800 transition">
-            <Icono className="h-4 w-4" />
-          </div>
-          {/* Badge visible obligatorio estilo cápsula */}
-          <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200/70 bg-gradient-to-b from-white via-cyan-50/80 to-sky-50/60 px-2.5 py-0.5 text-xs font-semibold text-cyan-950 shadow-[0_1px_4px_rgba(6,182,212,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)]">
-            {modulo.badge}
-          </span>
-        </div>
-
-        <div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-700">
-            {modulo.subtitulo}
-          </span>
-          <h3 className="mt-0.5 text-base font-bold text-slate-900 group-hover:text-cyan-900 transition">
-            {modulo.titulo}
-          </h3>
-        </div>
-
-        <p className="text-xs leading-relaxed text-slate-600">
-          {modulo.descripcion}
-        </p>
-      </div>
-
-      <div className="mt-4 pt-3 border-t border-cyan-100/60">
-        <span className="inline-flex w-full items-center justify-between rounded-xl border border-cyan-600/30 bg-gradient-to-b from-white to-cyan-50/90 px-3.5 py-2 text-xs font-bold text-cyan-800 transition shadow-2xs group-hover:border-cyan-600 group-hover:bg-gradient-to-r group-hover:from-teal-600 group-hover:to-cyan-600 group-hover:text-white group-hover:shadow-[0_4px_12px_rgba(6,182,212,0.3)]">
-          <span>{modulo.ctaPublico}</span>
-          <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-        </span>
-      </div>
-    </Link>
-  );
-}
-
-/**
- * Tarjeta de Cuenta Ciudadana: estilo azul institucional translúcido orientado al administrado.
- */
-function CardModuloCiudadano({
-  modulo,
-  isAuthenticated,
-  esCiudadano,
-}: {
-  modulo: ModuloHomeItem;
-  isAuthenticated: boolean;
-  esCiudadano: boolean;
-}) {
-  const Icono = ICONOS_POR_ID[modulo.id] || User;
-
-  const ctaTexto = !isAuthenticated
-    ? "Iniciar sesión para acceder"
-    : esCiudadano
-    ? (modulo.ctaAutenticado ?? "Acceder al servicio")
-    : "Iniciar sesión para acceder";
-
-  return (
-    <Link
-      to={modulo.ruta}
-      className="group relative overflow-hidden flex flex-col justify-between rounded-2xl border border-white/90 bg-white/80 p-4 sm:p-5 shadow-[0_4px_20px_-4px_rgba(14,165,233,0.08)] backdrop-blur-sm transition-all duration-300 ease-out ring-1 ring-sky-100/60 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent hover:-translate-y-1 hover:border-sky-300/80 hover:bg-white/95 hover:shadow-[0_14px_30px_-6px_rgba(14,165,233,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-    >
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-b from-white to-sky-50 text-sky-700 border border-sky-200/80 shadow-[0_2px_5px_rgba(14,165,233,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)] group-hover:bg-sky-100 transition">
-            <Icono className="h-4 w-4" />
-          </div>
-          {/* Badge visible obligatorio estilo cápsula */}
-          <span className="inline-flex items-center gap-1 rounded-full border border-sky-200/70 bg-gradient-to-b from-white via-sky-50/80 to-blue-50/60 px-2.5 py-0.5 text-xs font-semibold text-sky-950 shadow-[0_1px_4px_rgba(14,165,233,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)]">
-            {modulo.badge}
-          </span>
-        </div>
-
-        <div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-sky-600">
-            {modulo.subtitulo}
-          </span>
-          <h3 className="mt-0.5 text-base font-bold text-slate-900 group-hover:text-sky-800 transition">
-            {modulo.titulo}
-          </h3>
-        </div>
-
-        <p className="text-xs leading-relaxed text-slate-600">
-          {modulo.descripcion}
-        </p>
-      </div>
-
-      <div className="mt-4 pt-3 border-t border-sky-100/60">
-        <span
-          className={`inline-flex w-full items-center justify-between rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-2xs ${
-            !isAuthenticated
-              ? "bg-blue-600 text-white shadow-xs group-hover:bg-blue-700"
-              : esCiudadano
-              ? "border border-blue-600 bg-gradient-to-b from-white to-blue-50 text-blue-800 group-hover:bg-blue-600 group-hover:text-white"
-              : "bg-slate-100 text-slate-700 border border-slate-200"
-          }`}
-        >
-          <span>{ctaTexto}</span>
-          {!isAuthenticated ? (
-            <Lock className="h-3.5 w-3.5 opacity-90" />
-          ) : (
-            <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-          )}
-        </span>
-      </div>
-    </Link>
-  );
-}
-
-/**
- * Tarjeta de Módulo Institucional: estilo sobrio índigo/slate translúcido y profesional.
- */
-function CardModuloInstitucional({
-  modulo,
-  isAuthenticated,
-  tienePermiso,
-}: {
-  modulo: ModuloHomeItem;
-  isAuthenticated: boolean;
-  tienePermiso: boolean;
-}) {
-  const Icono = ICONOS_POR_ID[modulo.id] || Building2;
-
-  const ctaTexto = !isAuthenticated
-    ? "Acceso con rol asignado"
-    : tienePermiso
-    ? (modulo.ctaAutenticado ?? "Ingresar al módulo")
-    : "Acceso con rol asignado";
-
-  return (
-    <Link
-      to={modulo.ruta}
-      className="group relative overflow-hidden flex flex-col justify-between rounded-2xl border border-white/90 bg-white/80 p-4 sm:p-5 shadow-[0_4px_20px_-4px_rgba(99,102,241,0.06)] backdrop-blur-sm transition-all duration-300 ease-out ring-1 ring-indigo-100/50 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent hover:-translate-y-1 hover:border-indigo-300/80 hover:bg-white/95 hover:shadow-[0_14px_30px_-6px_rgba(99,102,241,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-    >
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-b from-white to-indigo-50/70 text-indigo-700 border border-indigo-200/70 shadow-[0_2px_5px_rgba(99,102,241,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)] group-hover:bg-indigo-100 transition">
-            <Icono className="h-4 w-4" />
-          </div>
-          {/* Badge visible obligatorio estilo cápsula */}
-          <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200/70 bg-gradient-to-b from-white via-indigo-50/70 to-slate-50/60 px-2.5 py-0.5 text-xs font-semibold text-indigo-950 shadow-[0_1px_4px_rgba(99,102,241,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)]">
-            {modulo.badge}
-          </span>
-        </div>
-
-        <div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">
-            {modulo.subtitulo}
-          </span>
-          <h3 className="mt-0.5 text-base font-bold text-slate-900 group-hover:text-indigo-900 transition">
-            {modulo.titulo}
-          </h3>
-        </div>
-
-        <p className="text-xs leading-relaxed text-slate-600">
-          {modulo.descripcion}
-        </p>
-      </div>
-
-      <div className="mt-4 pt-3 border-t border-indigo-100/60">
-        <span
-          className={`inline-flex w-full items-center justify-between rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-2xs ${
-            !isAuthenticated
-              ? "bg-slate-800 text-white shadow-xs group-hover:bg-slate-900"
-              : tienePermiso
-              ? "border border-indigo-600 bg-gradient-to-b from-white to-indigo-50 text-indigo-900 group-hover:bg-indigo-700 group-hover:text-white"
-              : "bg-slate-100 text-slate-700 border border-slate-200"
-          }`}
-        >
-          <span>{ctaTexto}</span>
-          {!isAuthenticated ? (
-            <Shield className="h-3.5 w-3.5 opacity-90" />
-          ) : (
-            <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-          )}
-        </span>
-      </div>
-    </Link>
   );
 }

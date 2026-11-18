@@ -14,6 +14,7 @@ export const filtrosSchema = z.object({
   limite: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(1).max(100)).default(20),
   terminoBusqueda: z.string().trim().min(1).max(100).optional(),
   areaId: z.guid().optional(),
+  bandeja: z.enum(['AREA', 'PERSONAL', 'GENERAL']).optional(),
   fechaDesde: fecha.optional(),
   fechaHasta: fecha.optional(),
 }).strict().superRefine((valor, ctx) => {

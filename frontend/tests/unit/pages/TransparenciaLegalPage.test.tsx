@@ -16,9 +16,16 @@ function renderTransparencia(initialEntry = '/transparencia') {
 }
 
 describe('TransparenciaLegalPage — Transparencia, Legalidad y Catálogo TUPA', () => {
-  it('renderiza la cabecera institucional y la pestaña por defecto de Privacidad', () => {
+  it('renderiza la cabecera institucional y la pestaña por defecto de Normativa y permite consultar Privacidad', async () => {
+    const user = userEvent.setup();
     renderTransparencia();
     expect(screen.getByText('Transparencia, Legalidad y Protección de Datos')).toBeInTheDocument();
+    expect(screen.getByText('TUO de la Ley N.° 27444')).toBeInTheDocument();
+    expect(screen.getByText(/Ley del Procedimiento Administrativo General/i)).toBeInTheDocument();
+
+    const tabPrivacidad = screen.getByRole('button', { name: /Política de Privacidad/i });
+    await user.click(tabPrivacidad);
+
     expect(screen.getByText('Política de Privacidad y Confidencialidad')).toBeInTheDocument();
     expect(screen.getAllByText(/Ley N.° 29733/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/D.S. N.° 016-2024-JUS/i).length).toBeGreaterThanOrEqual(1);
@@ -57,20 +64,76 @@ describe('TransparenciaLegalPage — Transparencia, Legalidad y Catálogo TUPA',
 
     expect(screen.getAllByText(/Transparencia y Acceso a la Información Pública/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Ley N.° 27806/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('link', { name: /Presentar solicitud por Mesa de Partes/i })).toHaveAttribute('href', '/mesa-partes');
   });
 
-  it('en la pestaña de TUPA muestra el panel de acceso restringido y no expone el catálogo completo de forma anónima', async () => {
+  it('permite cambiar a la pestaña de Datos Personales y Derechos ARCO y muestra el D.S. 016-2024-JUS', async () => {
+    const user = userEvent.setup();
+    renderTransparencia();
+
+    const tabDatos = screen.getByRole('button', { name: /Datos Personales y Derechos ARCO/i });
+    await user.click(tabDatos);
+
+    expect(screen.getByText('Tratamiento de Datos y Ejercicio de Derechos ARCO')).toBeInTheDocument();
+    expect(screen.getByText('Derecho de Acceso')).toBeInTheDocument();
+    expect(screen.getByText('Derecho de Rectificación')).toBeInTheDocument();
+    expect(screen.getByText('Derecho de Cancelación')).toBeInTheDocument();
+    expect(screen.getByText('Derecho de Oposición')).toBeInTheDocument();
+    expect(screen.getByText('D.S. 016-2024-JUS Art. 60')).toBeInTheDocument();
+  });
+
+  it('permite cambiar a la pestaña de Seguridad de la Cuenta y muestra controles criptográficos y BOLA', async () => {
+    const user = userEvent.setup();
+    renderTransparencia();
+
+    const tabSeguridad = screen.getByRole('button', { name: /Seguridad de la Cuenta/i });
+    await user.click(tabSeguridad);
+
+    expect(screen.getByText('Seguridad de la Cuenta y Control de Acceso')).toBeInTheDocument();
+    expect(screen.getByText('Criptografía Argon2id')).toBeInTheDocument();
+    expect(screen.getByText('Tokens JWT Efímeros')).toBeInTheDocument();
+    expect(screen.getByText('Protección BOLA / RBAC')).toBeInTheDocument();
+  });
+
+  it('soporta carga directa vía URL en /transparencia/privacidad, /transparencia/datos-personales y /transparencia/acceso-informacion', () => {
+    const { unmount: unmount1 } = renderTransparencia('/transparencia/privacidad');
+    expect(screen.getByText('Política de Privacidad y Confidencialidad')).toBeInTheDocument();
+    unmount1();
+
+    const { unmount: unmount2 } = renderTransparencia('/transparencia/datos-personales');
+    expect(screen.getByText('Tratamiento de Datos y Ejercicio de Derechos ARCO')).toBeInTheDocument();
+    unmount2();
+
+    const { unmount: unmount3 } = renderTransparencia('/transparencia/acceso-informacion');
+    expect(screen.getByText('Transparencia y Acceso a la Información Pública')).toBeInTheDocument();
+    unmount3();
+  });
+
+  it('identifica con honestidad que las directivas internas están en proceso de formulación y no inventa números oficiales', () => {
+    renderTransparencia('/transparencia/normativa');
+    expect(
+      screen.getByText(/en proceso de formulación y aprobación institucional mediante resolución directoral/i)
+    ).toBeInTheDocument();
+  });
+
+  it('en la pestaña de TUPA muestra el panel institucional y enlaces de consulta y solicitud oficial', async () => {
     renderTransparencia('/transparencia/tupa');
 
-    expect(screen.getByText(/Acceso Restringido al Documento TUPA Institucional/i)).toBeInTheDocument();
-    expect(screen.getByText(/Para consultar el documento TUPA institucional completo se requiere una solicitud de acceso/i)).toBeInTheDocument();
+    expect(screen.getByText('Catálogo TUPA Institucional 2026')).toBeInTheDocument();
+    expect(screen.getByText('Copia Oficial del Documento TUPA y Catálogo de Servicios')).toBeInTheDocument();
+    expect(
+      screen.getByText(/La descarga de la copia oficial escaneada en formato PDF requiere una solicitud de acceso/i)
+    ).toBeInTheDocument();
 
-    // Botón de solicitar acceso
-    const linkSolicitud = screen.getByRole('link', { name: /Solicitar Acceso al Catálogo TUPA/i });
+    // Enlace de consulta abierta al catálogo público
+    const linkConsulta = screen.getByRole('link', { name: /Consultar Catálogo Público TUPA/i });
+    expect(linkConsulta).toHaveAttribute('href', '/tupa');
+
+    // Enlace de solicitud de copia escaneada oficial en PDF
+    const linkSolicitud = screen.getByRole('link', { name: /Solicitar Copia Escaneada Oficial \(PDF\)/i });
     expect(linkSolicitud).toHaveAttribute('href', '/solicitud-acceso-tupa');
 
-    // Confirmar que el catálogo de 72 entradas NO está expuesto públicamente aquí
-    expect(screen.queryByText(/Catálogo Integral TUPA 2026 \(72 Entradas Oficiales\)/i)).not.toBeInTheDocument();
+    // Confirmar que el detalle de procedimientos individuales no está expuesto aquí
     expect(screen.queryByText(/Alquiler del Galpón Agrícola/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Venta de Mangos/i)).not.toBeInTheDocument();
   });

@@ -184,6 +184,8 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
              COALESCE(ultimo.area_actual_id, e.area_destino_id::text) AS area_actual_id,
              a.nombre AS area_actual_nombre,
              a.codigo AS area_actual_codigo,
+             ultimo.persona_asignada_id::text AS persona_asignada_id,
+             ultimo.usuario_asignado_id::text AS usuario_asignado_id,
              e.solicitante_id::text,
              ultimo.id_movimiento::text, ultimo.evento, ultimo.fecha_hora,
              ultimo.usuario_operador_id::text

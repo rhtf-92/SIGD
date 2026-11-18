@@ -7,6 +7,8 @@ function resolverPasoSiguiente(estado: string): string {
       return 'Expediente registrado en Mesa de Partes, pendiente de revisión y derivación al área competente.';
     case 'EN_REVISION':
       return 'Expediente en revisión técnica por el área asignada.';
+    case 'EN_FIRMA':
+      return 'Expediente remitido a Despacho de Dirección General para suscripción y firma digital de la resolución.';
     case 'EN_TRAMITE':
     case 'DERIVADO':
       return 'Expediente en curso de atención formal por el área competente.';

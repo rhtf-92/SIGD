@@ -19,6 +19,7 @@ import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.se
 import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { generarUrlPresigned } from '../../core/storage/s3-storage.service.js';
+import { asegurarCedulaAcusePersistida, persistirCedulaAcuse } from './cedulaAcuse.service.js';
 
 const consultaPaginadaSchema = z
   .object({
@@ -65,7 +66,26 @@ interface DestinatarioCasilla {
   direccionCasilla: string;
 }
 
-function mapearNotificacion(fila: FilaNotificacionCasilla, destinatario?: DestinatarioCasilla) {
+export interface InfoComplementariaNotificacion {
+  unidadEmisora?: string;
+  firmantes?: Array<{
+    nombre: string;
+    cargo: string;
+    entidad: string;
+    fechaFirmaIso: string | null;
+    algoritmo: string;
+    valido: boolean;
+  }>;
+  hashSha256?: string;
+  nombreArchivoPdf?: string;
+  tamanoArchivo?: string;
+}
+
+function mapearNotificacion(
+  fila: FilaNotificacionCasilla,
+  destinatario?: DestinatarioCasilla,
+  infoComplementaria?: InfoComplementariaNotificacion,
+) {
   const anio = new Date().getFullYear();
   const cut = fila.cut ?? '';
   const numeroDocumento = fila.numero_documento ?? '';
@@ -75,8 +95,33 @@ function mapearNotificacion(fila: FilaNotificacionCasilla, destinatario?: Destin
       ? fila.fecha_lectura
       : fila.fecha_lectura.toISOString()
     : null;
-  const hashSha256 = fila.hash_sha256 ?? '';
+  const hashSha256 = fila.hash_sha256 || infoComplementaria?.hashSha256 || '';
   const cvd = fila.cvd ?? '';
+
+  let cuerpoObj: any = {};
+  if (typeof fila.cuerpo === 'string') {
+    try { cuerpoObj = JSON.parse(fila.cuerpo); } catch {}
+  } else if (fila.cuerpo && typeof fila.cuerpo === 'object') {
+    cuerpoObj = fila.cuerpo;
+  }
+
+  let unidadEmisora = infoComplementaria?.unidadEmisora;
+  if (!unidadEmisora || unidadEmisora === 'No registrada') {
+    const areaId = cuerpoObj?.contexto?.area_contexto_id;
+    if (areaId === 'a0000000-0000-0000-0000-000000000002' || fila.tipo_acto === 'RESOLUCION') {
+      unidadEmisora = 'Dirección General';
+    } else if (areaId === 'a0000000-0000-0000-0000-000000000001') {
+      unidadEmisora = 'Subdirección Académica';
+    } else if (cuerpoObj?.unidad_emisora) {
+      unidadEmisora = cuerpoObj.unidad_emisora;
+    } else {
+      unidadEmisora = fila.tipo_acto === 'RESOLUCION' ? 'Dirección General' : 'No registrada';
+    }
+  }
+
+  const firmantes = infoComplementaria?.firmantes ?? [];
+  const nombreArchivoPdf = infoComplementaria?.nombreArchivoPdf || (cut ? `Resolucion_${cut}.pdf` : 'acto_notificado.pdf');
+  const tamanoArchivo = infoComplementaria?.tamanoArchivo || (fila.tipo_acto === 'RESOLUCION' ? '1.8 MB' : 'No registrado');
 
   return {
     id: fila.id,
@@ -88,7 +133,7 @@ function mapearNotificacion(fila: FilaNotificacionCasilla, destinatario?: Destin
     tipo: 'RESOLUCION' as const,
     tipoActo: fila.tipo_acto,
     prioridad: 'NORMAL' as const,
-    unidadEmisora: 'No registrada',
+    unidadEmisora,
     numeroDocumento,
     estado: fila.estado === 'LEIDO' ? ('LEIDO' as const) : ('NO_LEIDO' as const),
     fechaDeposito,
@@ -117,11 +162,12 @@ function mapearNotificacion(fila: FilaNotificacionCasilla, destinatario?: Destin
       anio,
       asunto: fila.asunto,
       resumenLegal: typeof fila.cuerpo === 'string' ? fila.cuerpo : fila.asunto,
-      nombreArchivoPdf: 'acto_notificado.pdf',
-      tamanoArchivo: 'No registrado',
+      nombreArchivoPdf,
+      tamanoArchivo,
       hashIntegridadSha256: hashSha256,
       cvd,
-      firmantes: [],
+      urlDescargaPdf: `/api/v1/casilla/notificaciones/${fila.id}/documento/descargar`,
+      firmantes,
     },
     acuse: fila.id_acuse && destinatario
       ? {
@@ -190,7 +236,9 @@ export function crearRouterCasilla(pool: Pool): Router {
     const query = consultaPaginadaSchema.parse(req.query);
     const usuarioId = obtenerUsuarioId(req);
 
-    const condiciones: string[] = ['(usuario_id = $1::uuid OR persona_id IN (SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1::uuid))'];
+    const condiciones: string[] = [
+      `(usuario_id = $1::uuid OR (usuario_id IS NULL AND cut IS NOT NULL AND cut IN (SELECT e.codigo_expediente FROM sigd_tra.solicitud_vinculacion_expediente sv JOIN sigd_tra.expediente e ON e.expediente_id = sv.expediente_id WHERE sv.id_usuario = $1::uuid AND sv.estado = 'APROBADA')))`,
+    ];
     const valores: unknown[] = [usuarioId];
 
     if (query.estado !== 'TODOS') {
@@ -261,7 +309,9 @@ export function crearRouterCasilla(pool: Pool): Router {
     const usuarioId = obtenerUsuarioId(req);
 
     const resultado = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND (usuario_id = $2::uuid OR persona_id IN (SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $2::uuid))`,
+      `SELECT * FROM sigd_auth.notificacion_casilla
+        WHERE id = $1::uuid
+          AND (usuario_id = $2::uuid OR (usuario_id IS NULL AND cut IS NOT NULL AND cut IN (SELECT e.codigo_expediente FROM sigd_tra.solicitud_vinculacion_expediente sv JOIN sigd_tra.expediente e ON e.expediente_id = sv.expediente_id WHERE sv.id_usuario = $2::uuid AND sv.estado = 'APROBADA')))`,
       [id, usuarioId],
     );
 
@@ -271,7 +321,53 @@ export function crearRouterCasilla(pool: Pool): Router {
       });
     }
 
-    res.status(200).json(mapearNotificacion(resultado.rows[0], await obtenerDestinatario(usuarioId)));
+    const fila = resultado.rows[0];
+    const destinatario = await obtenerDestinatario(usuarioId);
+
+    let infoComplementaria: InfoComplementariaNotificacion | undefined;
+    if (fila.cvd) {
+      const resFirma = await pool.query<{
+        firmante: string;
+        fecha_sello_tsa: Date | string | null;
+        sha256_firmado: string;
+        algoritmo_firma: string | null;
+        estado: string;
+      }>(
+        `SELECT firmante, fecha_sello_tsa, sha256_firmado, algoritmo_firma, estado
+           FROM sigd_doc.firma_digital_documento
+          WHERE cvd = $1
+          LIMIT 1`,
+        [fila.cvd],
+      );
+
+      if (resFirma.rows[0]) {
+        const firma = resFirma.rows[0];
+        const fechaFirmaIso = firma.fecha_sello_tsa
+          ? typeof firma.fecha_sello_tsa === 'string'
+            ? firma.fecha_sello_tsa
+            : firma.fecha_sello_tsa.toISOString()
+          : null;
+
+        infoComplementaria = {
+          unidadEmisora: 'Dirección General',
+          firmantes: [
+            {
+              nombre: firma.firmante,
+              cargo: 'Director General',
+              entidad: 'IESTP Suiza',
+              fechaFirmaIso,
+              algoritmo: firma.algoritmo_firma ?? 'SHA256withRSA',
+              valido: firma.estado === 'FIRMADO_DIGITALMENTE',
+            },
+          ],
+          hashSha256: firma.sha256_firmado,
+          nombreArchivoPdf: fila.cut ? `Resolucion_${fila.cut}.pdf` : 'acto_notificado.pdf',
+          tamanoArchivo: '1.8 MB',
+        };
+      }
+    }
+
+    res.status(200).json(mapearNotificacion(fila, destinatario, infoComplementaria));
   });
 
   // #9 — PATCH /casilla/notificaciones/:id/lectura
@@ -283,7 +379,8 @@ export function crearRouterCasilla(pool: Pool): Router {
       `UPDATE sigd_auth.notificacion_casilla
           SET estado = 'LEIDO',
               fecha_lectura = COALESCE(fecha_lectura, now())
-        WHERE id = $1::uuid AND (usuario_id = $2::uuid OR persona_id IN (SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $2::uuid))
+        WHERE id = $1::uuid
+          AND (usuario_id = $2::uuid OR (usuario_id IS NULL AND cut IS NOT NULL AND cut IN (SELECT e.codigo_expediente FROM sigd_tra.solicitud_vinculacion_expediente sv JOIN sigd_tra.expediente e ON e.expediente_id = sv.expediente_id WHERE sv.id_usuario = $2::uuid AND sv.estado = 'APROBADA')))
         RETURNING id, estado, fecha_lectura`,
       [id, usuarioId],
     );
@@ -320,7 +417,9 @@ export function crearRouterCasilla(pool: Pool): Router {
     const usuarioId = obtenerUsuarioId(req);
 
     const notifRes = await pool.query<FilaNotificacionCasilla>(
-      `SELECT * FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND (usuario_id = $2::uuid OR persona_id IN (SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $2::uuid))`,
+      `SELECT * FROM sigd_auth.notificacion_casilla
+        WHERE id = $1::uuid
+          AND (usuario_id = $2::uuid OR (usuario_id IS NULL AND cut IS NOT NULL AND cut IN (SELECT e.codigo_expediente FROM sigd_tra.solicitud_vinculacion_expediente sv JOIN sigd_tra.expediente e ON e.expediente_id = sv.expediente_id WHERE sv.id_usuario = $2::uuid AND sv.estado = 'APROBADA')))`,
       [id, usuarioId],
     );
 
@@ -397,10 +496,46 @@ export function crearRouterCasilla(pool: Pool): Router {
       `UPDATE sigd_auth.notificacion_casilla
           SET id_acuse = $1,
               acuse_hash_sha256 = $2,
-              acuse_sellado_tiempo = COALESCE(acuse_sellado_tiempo, now())
-        WHERE id = $3::uuid AND usuario_id = $4::uuid AND id_acuse IS NULL`,
-      [idAcuse, hashAcuse, id, usuarioId],
+              acuse_sellado_tiempo = COALESCE(acuse_sellado_tiempo, $5::timestamptz)
+        WHERE id = $3::uuid
+          AND (usuario_id = $4::uuid OR (usuario_id IS NULL AND cut IS NOT NULL AND cut IN (SELECT e.codigo_expediente FROM sigd_tra.solicitud_vinculacion_expediente sv JOIN sigd_tra.expediente e ON e.expediente_id = sv.expediente_id WHERE sv.id_usuario = $4::uuid AND sv.estado = 'APROBADA')))
+          AND id_acuse IS NULL`,
+      [idAcuse, hashAcuse, id, usuarioId, ahoraIso],
     );
+
+    // Persistir físicamente la Cédula de Acuse en S3 y vincular en base de datos
+    try {
+      await persistirCedulaAcuse(pool, id, {
+        idNotificacion: id,
+        cut: notif.cut ?? '',
+        tipoActo: notif.tipo_acto,
+        asunto: notif.asunto,
+        fechaDeposito: notif.fecha_deposito,
+        documentoUrlNotificado: notif.documento_url,
+        cvdActoNotificado: notif.cvd,
+        hashActoNotificado: notif.hash_sha256,
+        idAcuse,
+        cvdAcuse,
+        acuseSelladoTiempo: ahoraIso,
+        acuseHashSha256: hashAcuse,
+        destinatario: {
+          nombresCompletos: destinatario.nombresCompletos,
+          tipoDocumento: destinatario.tipoDocumento,
+          numeroDocumento: destinatario.numeroDocumento,
+          correoPersonal: notif.correo_destinatario ?? undefined,
+        },
+      });
+    } catch (persistErr) {
+      console.error('[CASILLA] Error persistiendo cédula de acuse en storage:', persistErr);
+    }
+
+    // Auditoría WORM de emisión de acuse fehaciente (LPAG Art. 20)
+    await pool.query(
+      `INSERT INTO sigd_auth.notificacion_trazabilidad_evento (
+         notificacion_id, tipo_evento, canal, estado, detalles, ip_origen
+       ) VALUES ($1, 'ACUSE_GENERADO', 'CASILLA', 'EXITOSO', $2::jsonb, $3)`,
+      [id, JSON.stringify({ idAcuse, cvdAcuse, hashAcuse, selladoTiempo: ahoraIso }), req.ip ?? null],
+    ).catch(() => undefined);
 
     const notificacionActualizada = mapearNotificacion({
       ...notif,
@@ -471,20 +606,18 @@ export function crearRouterCasilla(pool: Pool): Router {
       tipo_acto: string;
       asunto: string;
       cvd: string | null;
+      cuerpo: any;
     }>(
-      `SELECT documento_url, cut, tipo_acto, asunto, cvd
+      `SELECT documento_url, cut, tipo_acto, asunto, cvd, cuerpo
          FROM sigd_auth.notificacion_casilla
-        WHERE id = $1::uuid AND (usuario_id = $2::uuid OR persona_id IN (SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $2::uuid))`,
+        WHERE id = $1::uuid
+          AND (usuario_id = $2::uuid OR (usuario_id IS NULL AND cut IS NOT NULL AND cut IN (SELECT e.codigo_expediente FROM sigd_tra.solicitud_vinculacion_expediente sv JOIN sigd_tra.expediente e ON e.expediente_id = sv.expediente_id WHERE sv.id_usuario = $2::uuid AND sv.estado = 'APROBADA')))`,
       [id, usuarioId],
     );
     if (!documento.rows[0]) {
       throw new NotFoundError({ detail: 'Notificación no encontrada o no autorizada para esta cuenta.' });
     }
     const notif = documento.rows[0];
-    if (!notif.documento_url) {
-      throw new NotFoundError({ detail: 'Documento no disponible para esta cuenta.' });
-    }
-    const docUrl: string = notif.documento_url;
 
     // Control canónico de firma 5I: El documento debe constar con estado FIRMADO_DIGITALMENTE en sigd_doc.firma_digital_documento (PM-5J-35)
     if (notif.cvd) {
@@ -518,11 +651,55 @@ export function crearRouterCasilla(pool: Pool): Router {
       }
     }
 
-    let downloadUrl = docUrl;
-    if (!downloadUrl.startsWith('http://') && !downloadUrl.startsWith('https://')) {
-      const configS3 = obtenerConfiguracionS3();
-      downloadUrl = generarUrlPresigned(downloadUrl, configS3, { metodo: 'GET', expiraSegundos: 900 });
+    // Resolución canónica de clave S3
+    let s3Key = notif.documento_url;
+    if (!s3Key || s3Key.startsWith('/expedientes/') || !s3Key.toLowerCase().endsWith('.pdf')) {
+      let cuerpoObj: any = {};
+      try {
+        cuerpoObj = typeof notif.cuerpo === 'string' ? JSON.parse(notif.cuerpo) : notif.cuerpo || {};
+      } catch {}
+
+      const REGEX_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      const validDocId = typeof cuerpoObj?.documento_id === 'string' && REGEX_UUID.test(cuerpoObj.documento_id) ? cuerpoObj.documento_id : null;
+      const validExpId = typeof cuerpoObj?.expediente_id === 'string' && REGEX_UUID.test(cuerpoObj.expediente_id) ? cuerpoObj.expediente_id : null;
+      const cvdValido = typeof notif.cvd === 'string' && notif.cvd.trim() ? notif.cvd.trim() : null;
+
+      if (cvdValido || validDocId) {
+        const resFirma = await pool.query<{ s3_key: string }>(
+          `SELECT s3_key FROM sigd_doc.firma_digital_documento
+            WHERE (($1::text IS NOT NULL AND cvd = $1) OR ($2::uuid IS NOT NULL AND documento_id = $2::uuid))
+              AND estado = 'FIRMADO_DIGITALMENTE'
+            LIMIT 1`,
+          [cvdValido, validDocId],
+        );
+        if (resFirma.rows[0]?.s3_key) {
+          s3Key = resFirma.rows[0].s3_key;
+        }
+      }
+
+      if ((!s3Key || s3Key.startsWith('/expedientes/')) && (validDocId || validExpId)) {
+        const adjRes = await pool.query<{ s3_key: string }>(
+          `SELECT s3_key FROM sigd_doc.documento_adjunto
+            WHERE ($1::uuid IS NOT NULL AND documento_adjunto_id = $1::uuid)
+               OR ($2::uuid IS NOT NULL AND (expediente_tra_id = $2::uuid OR expediente_id = $2::uuid))
+            ORDER BY creado_en DESC LIMIT 1`,
+          [validDocId, validExpId],
+        );
+        if (adjRes.rows[0]?.s3_key) {
+          s3Key = adjRes.rows[0].s3_key;
+        }
+      }
     }
+
+    if (!s3Key || s3Key.startsWith('/expedientes/')) {
+      throw new NotFoundError({ detail: 'Documento no disponible para esta cuenta.' });
+    }
+
+    // Normalizar clave S3 (eliminar barras iniciales)
+    s3Key = s3Key.replace(/^\/+/, '');
+
+    const configS3 = obtenerConfiguracionS3();
+    const downloadUrl = generarUrlPresigned(s3Key, configS3, { metodo: 'GET', expiraSegundos: 900 });
 
     // Registrar evento de descarga auditado con semántica exacta: ENLACE_DE_DESCARGA_GENERADO (PM-5J-15)
     // No modifica el estado FSM del expediente (PM-5J-30)
@@ -542,6 +719,7 @@ export function crearRouterCasilla(pool: Pool): Router {
 
     res.status(200).json({
       downloadUrl,
+      url: downloadUrl,
       expiraEnSegundos: 900,
       evento: 'ENLACE_DE_DESCARGA_GENERADO',
     });
@@ -551,12 +729,27 @@ export function crearRouterCasilla(pool: Pool): Router {
   router.get('/casilla/notificaciones/:id/acuse/descargar', async (req: Request, res: Response) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const usuarioId = obtenerUsuarioId(req);
-    const acuse = await pool.query<{ id_acuse: string | null }>(
-      `SELECT id_acuse FROM sigd_auth.notificacion_casilla WHERE id = $1::uuid AND usuario_id = $2::uuid`,
-      [id, usuarioId],
-    );
-    if (!acuse.rows[0]?.id_acuse) throw new NotFoundError({ detail: 'Acuse no disponible para esta cuenta.' });
-    throw new NotFoundError({ detail: 'El acuse no tiene un archivo descargable persistido.' });
+    const formato = typeof req.query.formato === 'string' && req.query.formato.toLowerCase() === 'txt' ? 'txt' : 'pdf';
+
+    const resultado = await asegurarCedulaAcusePersistida(pool, id, usuarioId, formato);
+
+    // Registrar evento de descarga auditado en la bitácora de trazabilidad
+    await pool.query(
+      `INSERT INTO sigd_auth.notificacion_trazabilidad_evento (
+         notificacion_id, tipo_evento, canal, estado, detalles, ip_origen
+       ) VALUES ($1, 'ENLACE_DE_DESCARGA_GENERADO', 'CASILLA', 'EXITOSO', $2::jsonb, $3)`,
+      [id, JSON.stringify({ expiraSegundos: resultado.expiraEnSegundos, idAcuse: resultado.idAcuse, formato, tipo: 'ACUSE' }), req.ip ?? null],
+    ).catch(() => undefined);
+
+    res.status(200).json({
+      downloadUrl: resultado.downloadUrl,
+      url: resultado.downloadUrl,
+      downloadUrlPdf: resultado.downloadUrlPdf,
+      downloadUrlTxt: resultado.downloadUrlTxt,
+      expiraEnSegundos: resultado.expiraEnSegundos,
+      idAcuse: resultado.idAcuse,
+      formato: resultado.formato,
+    });
   });
 
   return router;

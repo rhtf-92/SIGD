@@ -6,6 +6,13 @@ import {
   Lock,
   ArrowRight,
   Database,
+  Clock,
+  Coins,
+  Building,
+  FileText,
+  ChevronDown,
+  Info,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import {
@@ -14,8 +21,33 @@ import {
 } from '../../data/tupaFormulariosConfig';
 import type { CategoriaTupa } from '../../data/tupaSuiza2026CatalogoCompleto';
 import type { TupaFormDefinition } from '../../types/tupaFormulario.types';
-import { CapsuleBadge } from '../../components/common/GlassPanel';
 import TupaDynamicFormModal from '../../components/tramite/TupaDynamicFormModal';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SkeletonCard } from '../../components/ui/Skeleton';
+import { TechnicalDetails } from '../../components/ui/TechnicalDetails';
+import { ContextualHelp } from '../../components/ui/ContextualHelp';
+
+interface RawTupaItem {
+  id?: string;
+  id_procedimiento?: string;
+  codigo?: string;
+  codigoRef?: string;
+  denominacion?: string;
+  categoria?: string;
+  clasificacion?: string;
+  requisitos?: string[];
+  monto?: number | string;
+  costoSoles?: number;
+  plazoDiasHabiles?: number;
+  plazo_dias_habiles?: number;
+  autoridadCompetente?: string;
+  autoridad_competente?: string;
+  admiteRadicacionSigd?: boolean;
+  admite_radicacion_sigd?: boolean;
+  generaExpediente?: boolean;
+}
 
 export default function CatalogoTupaPage() {
   const usuario = useAuthStore((s) => s.usuario);
@@ -25,9 +57,10 @@ export default function CatalogoTupaPage() {
     ['MESA_PARTES', 'ADMINISTRADOR', 'DIRECTOR', 'ESPECIALISTA', 'SECRETARIO'].includes(usuario.rol);
 
   const [cargando, setCargando] = useState(true);
-  const [autorizado, setAutorizado] = useState(false);
+  const [tieneAccesoPdfOficial, setTieneAccesoPdfOficial] = useState(false);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [codigoModal, setCodigoModal] = useState<string>('p1-fila-05');
+  const [requisitosExpandidos, setRequisitosExpandidos] = useState<Record<string, boolean>>({});
 
   // Datos vivos desde la API PostgreSQL
   const [procedimientosDb, setProcedimientosDb] = useState<TupaFormDefinition[] | null>(null);
@@ -43,7 +76,7 @@ export default function CatalogoTupaPage() {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<CategoriaTupa | 'TODAS'>('TODAS');
   const [filtroRadicacion, setFiltroRadicacion] = useState<'TODOS' | 'SI' | 'NO'>('TODOS');
 
-  // Sincronizar con cambios en la URL (ej. navegación desde el Asistente Público)
+  // Sincronizar con cambios en la URL
   useEffect(() => {
     if (paramProcedimiento) {
       setBusqueda(paramProcedimiento);
@@ -59,156 +92,166 @@ export default function CatalogoTupaPage() {
     return () => clearTimeout(handler);
   }, [busqueda]);
 
-  // 1. Verificar autorización de acceso
+  // 1. Cargar catálogo de procedimientos TUPA (público sin requerir autenticación)
   useEffect(() => {
     let activo = true;
-    async function verificar() {
-      if (!token) {
-        setCargando(false);
-        setAutorizado(false);
-        return;
-      }
 
-      if (esInstitucional) {
-        if (activo) {
-          setAutorizado(true);
-          setCargando(false);
+    async function cargarCatalogo() {
+      setCargando(true);
+      try {
+        const url = token && esInstitucional
+          ? '/api/v1/tramites/tupa'
+          : '/api/v1/tramites/tupa?publico=true';
+
+        const res = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (!activo) return;
+
+          const rawList: RawTupaItem[] = Array.isArray(data) ? data : data.procedimientos || [];
+          if (rawList.length > 0) {
+            const mapeados: TupaFormDefinition[] = rawList
+              .filter((raw) => esInstitucional || raw.categoria !== 'ACTUACION_INTERNA')
+              .map((raw) => {
+                const codRef = raw.codigoRef || raw.codigo || raw.id || '';
+                const defBase = obtenerDefinicionTupa(codRef);
+
+                const montoNum = Number(raw.costoSoles ?? (typeof raw.monto === 'number' ? raw.monto : 0));
+                const montoTexto =
+                  typeof raw.monto === 'string' && raw.monto.length > 0
+                    ? raw.monto
+                    : montoNum > 0
+                    ? `S/ ${montoNum.toFixed(2)}`
+                    : 'Gratuito';
+
+                const plazoNum = raw.plazoDiasHabiles ?? raw.plazo_dias_habiles;
+                const plazoTexto = plazoNum ? `${plazoNum} días hábiles` : defBase?.plazo || '30 días hábiles';
+                const reqs = Array.isArray(raw.requisitos) ? raw.requisitos : defBase?.requisitos || [];
+                const generaExp = Boolean(
+                  raw.generaExpediente ??
+                  raw.admiteRadicacionSigd ??
+                  raw.admite_radicacion_sigd ??
+                  defBase?.generaExpediente ??
+                  false
+                );
+                const unidad =
+                  raw.autoridadCompetente ||
+                  raw.autoridad_competente ||
+                  defBase?.unidadResponsable ||
+                  'IESTP Suiza';
+                const cat = (raw.categoria || raw.clasificacion || defBase?.categoria || 'PROCEDIMIENTO_APROBADO') as CategoriaTupa;
+
+                if (defBase) {
+                  return {
+                    ...defBase,
+                    denominacion: raw.denominacion || defBase.denominacion,
+                    categoria: cat,
+                    requisitos: reqs,
+                    monto: montoNum,
+                    montoTexto,
+                    plazo: plazoTexto,
+                    unidadResponsable: unidad,
+                    generaExpediente: generaExp,
+                  };
+                }
+
+                return {
+                  codigoRef: codRef,
+                  denominacion: raw.denominacion || 'Procedimiento sin denominación',
+                  categoria: cat,
+                  tipoFormulario: 'DOCUMENTARIO',
+                  campos: [],
+                  requisitos: reqs,
+                  monto: montoNum,
+                  montoTexto,
+                  unidadCobro: 'Trámite',
+                  generaExpediente: generaExp,
+                  flujoDestino: '/mesa-partes',
+                  plazo: plazoTexto,
+                  unidadResponsable: unidad,
+                  baseLegal: '',
+                  bloqueadoParaCiudadano: false,
+                  observacion: '',
+                };
+              });
+
+            setProcedimientosDb(mapeados);
+            setOrigenDatos('BASE_DE_DATOS');
+            if (data.version) {
+              setVersionActiva({
+                codigo: data.version.codigo,
+                anio: Number(data.version.anio),
+              });
+            }
+          }
+        } else {
+          // Fallback a catálogo canónico local si la API no está disponible
+          if (activo) {
+            setProcedimientosDb(
+              TUPA_FORMULARIOS_CONFIG.filter((p) => esInstitucional || p.categoria !== 'ACTUACION_INTERNA')
+            );
+            setOrigenDatos('CATALOGO_CANONICO');
+          }
         }
+      } catch {
+        if (activo) {
+          setProcedimientosDb(
+            TUPA_FORMULARIOS_CONFIG.filter((p) => esInstitucional || p.categoria !== 'ACTUACION_INTERNA')
+          );
+          setOrigenDatos('CATALOGO_CANONICO');
+        }
+      } finally {
+        if (activo) setCargando(false);
+      }
+    }
+
+    void cargarCatalogo();
+    return () => {
+      activo = false;
+    };
+  }, [token, esInstitucional]);
+
+  // 2. Verificar si el usuario tiene acceso formal para descargar el PDF oficial escaneado
+  useEffect(() => {
+    let activo = true;
+
+    async function verificarAccesoPdf() {
+      if (esInstitucional) {
+        if (activo) setTieneAccesoPdfOficial(true);
         return;
       }
-
+      if (!token) {
+        if (activo) setTieneAccesoPdfOficial(false);
+        return;
+      }
       try {
         const res = await fetch('/api/v1/tramites/tupa/acceso/estado', {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
           const data = await res.json();
-          if (activo) setAutorizado(Boolean(data.autorizado));
+          if (activo) setTieneAccesoPdfOficial(Boolean(data.autorizado));
         } else {
-          if (activo) setAutorizado(false);
+          if (activo) setTieneAccesoPdfOficial(false);
         }
       } catch {
-        if (activo) setAutorizado(false);
-      } finally {
-        if (activo) setCargando(false);
+        if (activo) setTieneAccesoPdfOficial(false);
       }
     }
-    verificar();
+
+    void verificarAccesoPdf();
     return () => {
       activo = false;
     };
   }, [token, esInstitucional]);
 
-  // 2. Cargar catálogo Data-Driven desde backend si está autorizado
-  useEffect(() => {
-    if (!autorizado) return;
-    let activo = true;
-
-    async function cargarTupaApi() {
-      try {
-        const res = await fetch('/api/v1/tramites/tupa', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!activo) return;
-
-        interface RawTupaItem {
-          id?: string;
-          id_procedimiento?: string;
-          codigo?: string;
-          codigoRef?: string;
-          denominacion?: string;
-          categoria?: string;
-          clasificacion?: string;
-          requisitos?: string[];
-          monto?: number | string;
-          costoSoles?: number;
-          plazoDiasHabiles?: number;
-          plazo_dias_habiles?: number;
-          autoridadCompetente?: string;
-          autoridad_competente?: string;
-          admiteRadicacionSigd?: boolean;
-          admite_radicacion_sigd?: boolean;
-          generaExpediente?: boolean;
-        }
-
-        const rawList: RawTupaItem[] = Array.isArray(data) ? data : data.procedimientos || [];
-        if (rawList.length > 0) {
-          const mapeados: TupaFormDefinition[] = rawList.map((raw) => {
-            const codRef = raw.codigoRef || raw.codigo || raw.id || '';
-            const defBase = obtenerDefinicionTupa(codRef);
-
-            const montoNum = Number(raw.costoSoles ?? (typeof raw.monto === 'number' ? raw.monto : 0));
-            const montoTexto =
-              typeof raw.monto === 'string' && raw.monto.length > 0
-                ? raw.monto
-                : montoNum > 0
-                ? `S/ ${montoNum.toFixed(2)}`
-                : 'Gratuito';
-
-            const plazoNum = raw.plazoDiasHabiles ?? raw.plazo_dias_habiles;
-            const plazoTexto = plazoNum ? `${plazoNum} días hábiles` : defBase?.plazo || '30 días hábiles';
-            const reqs = Array.isArray(raw.requisitos) ? raw.requisitos : defBase?.requisitos || [];
-            const generaExp = Boolean(raw.generaExpediente ?? raw.admiteRadicacionSigd ?? raw.admite_radicacion_sigd ?? defBase?.generaExpediente ?? false);
-            const unidad = raw.autoridadCompetente || raw.autoridad_competente || defBase?.unidadResponsable || 'IESTP Suiza';
-            const cat = (raw.categoria || raw.clasificacion || defBase?.categoria || 'PROCEDIMIENTO_APROBADO') as CategoriaTupa;
-
-            if (defBase) {
-              return {
-                ...defBase,
-                denominacion: raw.denominacion || defBase.denominacion,
-                categoria: cat,
-                requisitos: reqs,
-                monto: montoNum,
-                montoTexto,
-                plazo: plazoTexto,
-                unidadResponsable: unidad,
-                generaExpediente: generaExp,
-              };
-            }
-
-            return {
-              codigoRef: codRef,
-              denominacion: raw.denominacion || 'Procedimiento sin denominación',
-              categoria: cat,
-              tipoFormulario: 'DOCUMENTARIO',
-              campos: [],
-              requisitos: reqs,
-              monto: montoNum,
-              montoTexto,
-              unidadCobro: 'Trámite',
-              generaExpediente: generaExp,
-              flujoDestino: '/tramite',
-              plazo: plazoTexto,
-              unidadResponsable: unidad,
-              baseLegal: '',
-              bloqueadoParaCiudadano: false,
-              observacion: '',
-            };
-          });
-
-          setProcedimientosDb(mapeados);
-          setOrigenDatos('BASE_DE_DATOS');
-          if (data.version) {
-            setVersionActiva({
-              codigo: data.version.codigo,
-              anio: Number(data.version.anio),
-            });
-          }
-        }
-      } catch {
-        // Fallback a catálogo canónico local
-      }
-    }
-
-    void cargarTupaApi();
-    return () => {
-      activo = false;
-    };
-  }, [autorizado, token]);
-
-  const catalogoBase = procedimientosDb || TUPA_FORMULARIOS_CONFIG;
+  const catalogoBase = useMemo(() => {
+    const lista = procedimientosDb || TUPA_FORMULARIOS_CONFIG;
+    return esInstitucional ? lista : lista.filter((p) => p.categoria !== 'ACTUACION_INTERNA');
+  }, [procedimientosDb, esInstitucional]);
 
   const tupaFiltrado = useMemo(() => {
     return catalogoBase.filter((item) => {
@@ -239,279 +282,367 @@ export default function CatalogoTupaPage() {
     setModalAbierto(true);
   };
 
+  const toggleRequisitos = (codigoRef: string) => {
+    setRequisitosExpandidos((prev) => ({
+      ...prev,
+      [codigoRef]: !prev[codigoRef],
+    }));
+  };
+
   const getCategoriaBadge = (cat: CategoriaTupa) => {
     switch (cat) {
       case 'PROCEDIMIENTO_APROBADO':
-        return <CapsuleBadge variant="approved">Procedimiento Aprobado</CapsuleBadge>;
+        return <Badge variant="success">Trámite Oficial</Badge>;
       case 'PROCEDIMIENTO_PENDIENTE':
-        return <CapsuleBadge variant="pending">Procedimiento Pendiente</CapsuleBadge>;
+        return <Badge variant="warning">En Homologación</Badge>;
       case 'SERVICIO_ACADEMICO':
-        return <CapsuleBadge variant="sky">Servicio Académico</CapsuleBadge>;
+        return <Badge variant="info">Servicio Académico</Badge>;
       case 'SERVICIO_COMERCIAL':
-        return <CapsuleBadge variant="legal">Servicio Comercial</CapsuleBadge>;
+        return <Badge variant="neutral">Alquiler y Servicios</Badge>;
       case 'BIEN_PRODUCTIVO':
-        return <CapsuleBadge variant="amber">Venta de Bien</CapsuleBadge>;
+        return <Badge variant="warning">Venta de Productos</Badge>;
       case 'ACTUACION_INTERNA':
-        return <CapsuleBadge variant="slate">Gestión Interna</CapsuleBadge>;
+        return <Badge variant="neutral">Gestión Interna</Badge>;
       default:
-        return <CapsuleBadge variant="slate">Otro No Radicable</CapsuleBadge>;
+        return <Badge variant="neutral">Trámites y Constancias</Badge>;
     }
   };
 
-  if (cargando) {
-    return (
-      <main className="min-h-screen min-h-dvh flex items-center justify-center p-4 bg-slate-50">
-        <div className="text-center space-y-3">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-cyan-600 border-r-transparent" />
-          <p className="text-xs font-semibold text-slate-500">Verificando autorización de acceso al TUPA...</p>
-        </div>
-      </main>
-    );
-  }
+  const categoriasDisponibles = useMemo(() => {
+    const todas = [
+      { key: 'PROCEDIMIENTO_APROBADO', label: 'Trámites Oficiales' },
+      { key: 'SERVICIO_ACADEMICO', label: 'Servicios Académicos' },
+      { key: 'BIEN_PRODUCTIVO', label: 'Venta de Productos' },
+      { key: 'SERVICIO_COMERCIAL', label: 'Alquiler y Servicios' },
+      { key: 'PROCEDIMIENTO_PENDIENTE', label: 'Trámites en Homologación' },
+      { key: 'OTRO_NO_RADICABLE', label: 'Trámites y Orientaciones' },
+    ];
+    if (esInstitucional) {
+      todas.push({ key: 'ACTUACION_INTERNA', label: 'Gestión Interna' });
+    }
+    return todas;
+  }, [esInstitucional]);
 
-  // Si no está autorizado -> Bloqueo con enlace a solicitar acceso
-  if (!autorizado) {
-    return (
-      <main className="min-h-screen min-h-dvh flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 via-cyan-50/20 to-teal-50/15">
-        <div className="max-w-lg w-full text-center p-8 rounded-3xl border border-white/80 bg-white/95 shadow-xl space-y-5">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600 border border-rose-200">
-            <Lock className="h-8 w-8" />
-          </div>
-          <div className="space-y-1">
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Acceso Denegado / Solicitud Requerida</h1>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              El Catálogo Integral TUPA 2026 no es público y requiere una solicitud de acceso previa debidamente
-              autorizada por Mesa de Partes.
-            </p>
-          </div>
-          <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 text-left space-y-1">
-            <strong>¿Cómo acceder al documento completo?</strong>
-            <p>
-              Inicie sesión como Ciudadano y formule su solicitud en el portal. Una vez aprobada, podrá consultar las 72
-              entradas y completar los formularios dinámicos.
-            </p>
-          </div>
-          <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
-            <Link
-              to="/solicitud-acceso-tupa"
-              className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 text-white font-bold text-xs shadow-xs hover:shadow-cyan-600/30"
-            >
-              Solicitar Acceso al TUPA <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-            <Link
-              to="/tramite"
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              ← Volver
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  // Usuario Autorizado -> Visualización completa de las 72 entradas
   return (
-    <main className="min-h-screen min-h-dvh bg-gradient-to-br from-slate-50 via-cyan-50/25 to-teal-50/15 py-10 px-4 sm:px-6 lg:px-8 text-slate-900">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Cabecera del Catálogo Autorizado */}
-        <section className="relative overflow-hidden rounded-3xl border border-white/80 bg-gradient-to-br from-white/90 via-cyan-50/40 to-teal-50/25 p-6 sm:p-8 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.95),0_16px_48px_-8px_rgba(6,182,212,0.14)] ring-1 ring-cyan-200/50 backdrop-blur-md space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <main className="w-full bg-surface-page py-4 sm:py-6 px-4 sm:px-6 lg:px-8 text-slate-900">
+      <div className="max-w-7xl mx-auto space-y-4">
+        {/* Cabecera del Catálogo TUPA Oficial */}
+        <header className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xs space-y-3">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <CapsuleBadge variant="approved">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Acceso Autorizado ({catalogoBase.length} Entradas Completas)
-                </CapsuleBadge>
-                {esInstitucional && <CapsuleBadge variant="role">Rol: {usuario?.rol}</CapsuleBadge>}
+                <Badge variant="success">
+                  <CheckCircle2 className="h-3 w-3 mr-1" /> Catálogo Público ({catalogoBase.length} Entradas)
+                </Badge>
+                {esInstitucional && <Badge variant="info">Rol: {usuario?.rol}</Badge>}
                 {origenDatos === 'BASE_DE_DATOS' && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100/80 px-2.5 py-0.5 text-[10px] font-bold text-cyan-800 border border-cyan-300/60">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
                     <Database className="h-3 w-3" /> Datos en vivo (DB)
                   </span>
                 )}
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Catálogo Integral {versionActiva ? versionActiva.codigo : 'TUPA 2026'} — IESTP &quot;Suiza&quot;
+                Catálogo de Procedimientos y Servicios {versionActiva ? versionActiva.codigo : 'TUPA 2026'} — IESTP &quot;Suiza&quot;
               </h1>
-              <p className="text-xs sm:text-sm text-slate-600 max-w-3xl mt-1">
-                Catálogo institucional con las {catalogoBase.length} entradas físicas oficiales debidamente clasificadas y habilitadas con
-                el motor de formularios dinámicos especializados.
+              <p className="text-xs sm:text-sm text-slate-600 max-w-3xl mt-1 leading-relaxed">
+                Consulte requisitos, costos oficiales, plazos de atención y radicación documentaria para todos los procedimientos del instituto.
               </p>
             </div>
-            <Link
-              to="/tramite"
-              className="text-xs font-semibold text-cyan-900 bg-white/90 border border-cyan-200/80 px-4 py-2 rounded-xl shadow-2xs hover:bg-cyan-50 transition shrink-0"
-            >
-              ← Volver
-            </Link>
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full sm:w-auto">
+              {tieneAccesoPdfOficial ? (
+                <a
+                  href="/api/v1/tramites/tupa/documento-oficial/descargar"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full sm:w-auto"
+                >
+                  <Button variant="secondary" size="sm" className="w-full">
+                    <FileText className="h-3.5 w-3.5 mr-1" /> Descargar PDF Oficial
+                  </Button>
+                </a>
+              ) : (
+                <Link to="/solicitud-acceso-tupa" className="w-full sm:w-auto">
+                  <Button variant="secondary" size="sm" className="w-full">
+                    <Lock className="h-3.5 w-3.5 mr-1" /> Solicitar Copia Escaneada (PDF)
+                  </Button>
+                </Link>
+              )}
+              <Link to="/mesa-partes" className="w-full sm:w-auto">
+                <Button variant="primary" size="sm" className="w-full">
+                  Mesa de Partes Digital <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </Link>
+              <Link to="/" className="w-full sm:w-auto">
+                <Button variant="ghost" size="sm" className="w-full">
+                  ← Volver al inicio
+                </Button>
+              </Link>
+            </div>
           </div>
 
-          {/* Filtros dinámicos */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 border-t border-cyan-100">
+          {/* Filtros dinámicos estructurados */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
             <div>
-              <label htmlFor="busqueda-tupa" className="text-[11px] font-bold text-slate-700 block mb-1">
+              <label htmlFor="busqueda-tupa" className="text-xs font-semibold text-slate-700 block mb-1">
                 Buscar por denominación o código:
               </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <div className="relative flex items-center">
+                <Search className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" />
                 <input
                   id="busqueda-tupa"
                   type="text"
-                  placeholder="Ej. Certificado, Mango, Auditorio, Examen..."
+                  placeholder="Ej. Certificado, Inglés, Galpón, Matrícula..."
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
-                  className="w-full text-xs rounded-xl border border-cyan-200/90 pl-9 pr-3 py-2 bg-white shadow-2xs focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200/50"
+                  className="w-full h-11 min-h-[44px] rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-suiza-primary focus:ring-2 focus:ring-suiza-primary/20 focus:outline-none transition"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="filtro-categoria-tupa" className="text-[11px] font-bold text-slate-700 block mb-1">
+              <label htmlFor="filtro-categoria-tupa" className="text-xs font-semibold text-slate-700 block mb-1">
                 Filtrar por Categoría:
               </label>
               <select
                 id="filtro-categoria-tupa"
                 value={categoriaSeleccionada}
                 onChange={(e) => setCategoriaSeleccionada(e.target.value as CategoriaTupa | 'TODAS')}
-                className="w-full text-xs rounded-xl border border-cyan-200/90 px-3 py-2 bg-white shadow-2xs focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200/50"
+                className="w-full h-11 min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-suiza-primary focus:ring-2 focus:ring-suiza-primary/20 focus:outline-none transition"
               >
                 <option value="TODAS">Todas las categorías ({catalogoBase.length})</option>
-                {(['PROCEDIMIENTO_APROBADO', 'PROCEDIMIENTO_PENDIENTE', 'SERVICIO_ACADEMICO', 'SERVICIO_COMERCIAL', 'BIEN_PRODUCTIVO', 'ACTUACION_INTERNA', 'OTRO_NO_RADICABLE'] as const).map((categoria) => (
-                  <option key={categoria} value={categoria}>
-                    {categoria} ({catalogoBase.filter((item) => item.categoria === categoria).length})
+                {categoriasDisponibles.map((cat) => (
+                  <option key={cat.key} value={cat.key}>
+                    {cat.label} ({catalogoBase.filter((item) => item.categoria === cat.key).length})
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label htmlFor="filtro-radicacion-tupa" className="text-[11px] font-bold text-slate-700 block mb-1">
-                ¿Genera Expediente SIGD?:
-              </label>
+              <div className="flex items-center gap-1 mb-1">
+                <label htmlFor="filtro-radicacion-tupa" className="text-xs font-semibold text-slate-700">
+                  Modalidad de atención:
+                </label>
+                <ContextualHelp
+                  title="Modalidad de atención"
+                  content="Los trámites con expediente digital generan un código CUT para seguimiento en línea; los servicios y venta de bienes se gestionan de forma presencial o directa según directiva."
+                />
+              </div>
               <select
                 id="filtro-radicacion-tupa"
                 value={filtroRadicacion}
                 onChange={(e) => setFiltroRadicacion(e.target.value as 'TODOS' | 'SI' | 'NO')}
-                className="w-full text-xs rounded-xl border border-cyan-200/90 px-3 py-2 bg-white shadow-2xs focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200/50"
+                className="w-full h-11 min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-suiza-primary focus:ring-2 focus:ring-suiza-primary/20 focus:outline-none transition"
               >
-                <option value="TODOS">Todos los tipos ({catalogoBase.length})</option>
+                <option value="TODOS">Todas las modalidades ({catalogoBase.length})</option>
                 <option value="SI">
-                  Sí — Genera Expediente / CUT ({catalogoBase.filter((item) => item.generaExpediente).length})
+                  Con expediente digital / CUT ({catalogoBase.filter((item) => item.generaExpediente).length})
                 </option>
                 <option value="NO">
-                  No — Servicios, bienes y trámites no radicables ({catalogoBase.filter((item) => !item.generaExpediente).length})
+                  Atención directa o presencial ({catalogoBase.filter((item) => !item.generaExpediente).length})
                 </option>
               </select>
             </div>
           </div>
-        </section>
+        </header>
 
-        {/* Tabla de 72 entradas en contenedor Liquid Glass */}
-        <div className="overflow-x-auto rounded-3xl border border-cyan-300/80 shadow-md bg-white/95 ring-1 ring-cyan-400/20 backdrop-blur-xs">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-gradient-to-r from-cyan-100/70 via-teal-50/50 to-sky-100/60 text-cyan-950 font-bold border-b border-cyan-200/80">
-              <tr>
-                <th className="py-3 px-3 w-20">Código</th>
-                <th className="py-3 px-3 min-w-[240px]">Denominación y Requisitos</th>
-                <th className="py-3 px-3 w-36">Categoría</th>
-                <th className="py-3 px-3 w-28">Tipo Formulario</th>
-                <th className="py-3 px-3 w-24">Precio Real</th>
-                <th className="py-3 px-3 w-24">Unidad</th>
-                <th className="py-3 px-3 w-28">Expediente</th>
-                <th className="py-3 px-3 w-36 text-center">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-cyan-100/60 text-slate-700">
-              {tupaFiltrado.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-10 text-center text-slate-500">
-                    No se encontraron procedimientos o conceptos con los filtros seleccionados.
-                  </td>
-                </tr>
-              ) : (
-                tupaFiltrado.map((def) => (
-                  <tr key={def.codigoRef} className="hover:bg-cyan-50/40 transition-colors">
-                    {/* Código */}
-                    <td className="py-3 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap font-bold">
-                      {def.codigoRef}
-                    </td>
+        {/* Estado de Carga con Skeletons */}
+        {cargando ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : tupaFiltrado.length === 0 ? (
+          <EmptyState
+            title="No encontramos procedimientos"
+            description="Prueba con otra palabra o restablece los filtros de búsqueda aplicados."
+            action={
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setBusqueda('');
+                  setCategoriaSeleccionada('TODAS');
+                  setFiltroRadicacion('TODOS');
+                }}
+              >
+                Restablecer filtros
+              </Button>
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {tupaFiltrado.map((def) => {
+              const expandido = Boolean(requisitosExpandidos[def.codigoRef]);
 
-                    {/* Denominación */}
-                    <td className="py-3 px-3">
-                      <span className="font-semibold text-slate-900 block leading-snug">{def.denominacion}</span>
-                      {def.requisitos.length > 0 ? (
-                        <ul className="mt-1 text-[10px] text-slate-500 space-y-0.5 list-disc pl-3">
-                          {def.requisitos.map((req, rIdx) => (
-                            <li key={rIdx}>{req}</li>
-                          ))}
-                        </ul>
-                      ) : def.bloqueadoParaCiudadano ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 text-rose-800 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold">
-                          Interno
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 italic block mt-0.5">
-                          Sin requisitos documentarios
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Categoría */}
-                    <td className="py-3 px-3 whitespace-nowrap">{getCategoriaBadge(def.categoria)}</td>
-
-                    {/* Tipo Formulario */}
-                    <td className="py-3 px-3 whitespace-nowrap">
-                      <CapsuleBadge variant="public" className="text-[10px]">
-                        {def.tipoFormulario}
-                      </CapsuleBadge>
-                    </td>
-
-                    {/* Precio Real */}
-                    <td className="py-3 px-3 font-semibold text-slate-900 whitespace-nowrap">
-                      {def.montoTexto}
-                    </td>
-
-                    {/* Unidad */}
-                    <td className="py-3 px-3 text-[11px] text-slate-600 whitespace-nowrap">
-                      {def.unidadCobro}
-                    </td>
-
-                    {/* Genera Expediente */}
-                    <td className="py-3 px-3 whitespace-nowrap">
+              return (
+                <div
+                  key={def.codigoRef}
+                  className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs hover:border-suiza-primary/40 hover:shadow-xs transition duration-150 flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    {/* Encabezado de la tarjeta: Badges */}
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                      {getCategoriaBadge(def.categoria)}
                       {def.generaExpediente ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-bold">
-                          Sí (CUT)
+                        <span className="inline-flex items-center rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold">
+                          Genera CUT
+                        </span>
+                      ) : def.categoria === 'PROCEDIMIENTO_PENDIENTE' ? (
+                        <span className="inline-flex items-center rounded-md bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 text-[10px] font-bold">
+                          Pendiente
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 text-slate-600 border border-slate-300 px-2 py-0.5 text-[10px] font-semibold">
-                          No (SOL)
+                        <span className="inline-flex items-center rounded-md bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 text-[10px] font-medium">
+                          Ficha Informativa
                         </span>
                       )}
-                    </td>
+                    </div>
 
-                    {/* Acción / Abrir formulario dinámico */}
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
-                      <button
-                        onClick={() => handleAbrirFormulario(def.codigoRef)}
-                        disabled={def.bloqueadoParaCiudadano && !esInstitucional}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 hover:from-teal-700 hover:via-cyan-700 hover:to-sky-700 text-white font-bold text-[11px] shadow-xs disabled:opacity-40 transition"
-                      >
-                        {def.bloqueadoParaCiudadano && !esInstitucional ? (
-                          <>
-                            <Lock className="h-3 w-3" /> Bloqueado
-                          </>
-                        ) : (
-                          <>
-                            Iniciar Trámite <ArrowRight className="h-3 w-3" />
-                          </>
+                    {/* Denominación Principal */}
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 leading-snug">
+                        {def.denominacion}
+                      </h3>
+                    </div>
+
+                    {/* Ficha Resumen de Parámetros: Costo, Plazo, Área */}
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+                      <div className="flex items-center gap-1.5 text-slate-700">
+                        <Coins className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-slate-400">Costo</p>
+                          <p className="font-bold text-slate-900">{def.montoTexto}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-slate-700">
+                        <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-slate-400">Plazo</p>
+                          <p className="font-semibold text-slate-800">{def.plazo}</p>
+                        </div>
+                      </div>
+
+                      <div className="col-span-2 flex items-center gap-1.5 text-slate-700 pt-1">
+                        <Building className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[10px] uppercase font-bold text-slate-400">Área Responsable</p>
+                          <p className="font-medium text-slate-800 truncate">{def.unidadResponsable}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Requisitos / Desplegable Ciudadano */}
+                    {def.requisitos.length > 0 ? (
+                      <div className="pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => toggleRequisitos(def.codigoRef)}
+                          className="w-full flex items-center justify-between text-xs font-semibold text-suiza-primary hover:text-suiza-primary/80 transition cursor-pointer py-1"
+                        >
+                          <span className="flex items-center gap-1">
+                            <FileText className="h-3.5 w-3.5" />
+                            {expandido ? 'Ocultar requisitos' : `Ver requisitos (${def.requisitos.length})`}
+                          </span>
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform duration-150 ${expandido ? 'rotate-180' : ''}`}
+                          />
+                        </button>
+
+                        {expandido && (
+                          <ul className="mt-2 text-xs text-slate-600 space-y-1 list-disc pl-4 bg-slate-50 p-2.5 rounded-lg border border-slate-200/80 animate-in fade-in duration-100">
+                            {def.requisitos.map((req, rIdx) => (
+                              <li key={rIdx} className="leading-snug">{req}</li>
+                            ))}
+                          </ul>
                         )}
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 italic pt-1">
+                        Sin requisitos documentarios adicionales
+                      </p>
+                    )}
+
+                    {/* Detalle Técnico: reservado para operadores institucionales */}
+                    {esInstitucional && (
+                      <div className="pt-2">
+                        <TechnicalDetails title="Detalle técnico">
+                          <p className="text-xs font-mono text-slate-500">
+                            Código de catálogo: {def.codigoRef}
+                          </p>
+                        </TechnicalDetails>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Acciones de la Tarjeta */}
+                  <div className="mt-5 pt-3 border-t border-slate-100">
+                    {def.categoria === 'ACTUACION_INTERNA' ? (
+                      <div className="rounded-lg bg-slate-50 border border-slate-200 p-2.5 text-center">
+                        <p className="text-xs font-semibold text-slate-700 flex items-center justify-center gap-1.5">
+                          <Lock className="h-3.5 w-3.5 text-slate-500" />
+                          Gestión Interna Institucional
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                          Actuación administrativa interna del personal del IESTP Suiza. No sujeta a trámite externo.
+                        </p>
+                      </div>
+                    ) : def.categoria === 'PROCEDIMIENTO_PENDIENTE' ? (
+                      <div className="rounded-lg bg-amber-50 border border-amber-200/80 p-2.5 text-center">
+                        <p className="text-xs font-semibold text-amber-800 flex items-center justify-center gap-1.5">
+                          <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                          Radicación Digital No Habilitada
+                        </p>
+                        <p className="text-[11px] text-amber-700 mt-0.5 leading-snug">
+                          Procedimiento en proceso de homologación técnica reglamentaria para radicación en SIGD.
+                        </p>
+                      </div>
+                    ) : def.generaExpediente ? (
+                      <Link
+                        to={`/mesa-partes?procedimiento=${encodeURIComponent(def.codigoRef)}`}
+                        className="w-full block"
+                      >
+                        <Button variant="primary" size="md" className="w-full">
+                          Iniciar Trámite con CUT <ArrowRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </Link>
+                    ) : esInstitucional ? (
+                      <Button
+                        variant="secondary"
+                        size="md"
+                        onClick={() => handleAbrirFormulario(def.codigoRef)}
+                        className="w-full"
+                      >
+                        Registrar en Ventanilla <ArrowRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    ) : (
+                      <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5 space-y-1">
+                        <div className="flex items-center gap-1.5 text-slate-700">
+                          <Info className="h-3.5 w-3.5 text-suiza-primary shrink-0" />
+                          <span className="text-xs font-semibold text-slate-800">
+                            Ficha Informativa de Atención
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-snug">
+                          Área responsable: <span className="font-medium text-slate-800">{def.unidadResponsable}</span>.
+                        </p>
+                        {def.plazo && (
+                          <p className="text-[11px] text-slate-500 leading-snug">
+                            Modalidad / Plazo: {def.plazo}.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Modal Dinámico TUPA */}

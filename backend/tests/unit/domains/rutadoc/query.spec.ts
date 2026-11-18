@@ -73,6 +73,13 @@ describe('Consulta RutaDoc', () => {
     expect(() => filtrosSchema.parse({ pestana: 'DERIVADOS', areaId: 'SDA' })).toThrow(z.ZodError);
   });
 
+  it('acepta parametro bandeja AREA, PERSONAL y GENERAL rechazando valores invalidos', () => {
+    expect(filtrosSchema.parse({ pestana: 'PENDIENTES', bandeja: 'AREA' }).bandeja).toBe('AREA');
+    expect(filtrosSchema.parse({ pestana: 'PENDIENTES', bandeja: 'PERSONAL' }).bandeja).toBe('PERSONAL');
+    expect(filtrosSchema.parse({ pestana: 'PENDIENTES', bandeja: 'GENERAL' }).bandeja).toBe('GENERAL');
+    expect(() => filtrosSchema.parse({ pestana: 'PENDIENTES', bandeja: 'OTRO' })).toThrow(z.ZodError);
+  });
+
   it('valida fechas reales y un rango ordenado', () => {
     expect(filtrosSchema.parse({ pestana: 'PENDIENTES', fechaDesde: '2026-09-01', fechaHasta: '2026-09-30' }).fechaDesde)
       .toBe('2026-09-01');

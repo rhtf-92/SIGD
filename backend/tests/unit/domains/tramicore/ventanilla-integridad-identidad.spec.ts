@@ -561,7 +561,7 @@ describe('Ventanilla Presencial: Integridad Documental, Identidad y Cronología'
 
       mockQuery.mockResolvedValueOnce({}); // BEGIN
       mockQuery.mockResolvedValueOnce({ rows: [{ tipo_documental_id: 'doc-type-uuid' }] });
-      mockQuery.mockResolvedValueOnce({ rows: [{ registro_version_id: 'version-uuid', estado_validacion: 'APROBADO', vigencia_desde: null, vigencia_hasta: null }] }); // verificarVersionTupa
+      mockQuery.mockResolvedValueOnce({ rows: [{ registro_version_id: 'version-uuid', estado_validacion: 'APROBADO', vigencia_desde: null, vigencia_hasta: null, genera_expediente: true, activo: true }] }); // verificarVersionTupa
       mockQuery.mockResolvedValueOnce({ rows: [{ cut: 'EXP-2026-000104' }] });
       mockQuery.mockResolvedValueOnce({ rows: [{ id_persona: 'persona-1', tipo: 'NATURAL', id_documento: '45678901', nombre_completo: 'Persona Test' }] });
       mockQuery.mockResolvedValueOnce({ rows: [{ expediente_id: 'exp-uuid-1' }] });

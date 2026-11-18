@@ -11,6 +11,7 @@ import type {
   PaginationMeta,
   TipoNotificacion,
 } from "../../types/casilla";
+import casillaImg from "../../assets/sigd/casilla-electronica.webp";
 
 interface NotificationListProps {
   notificaciones: Notificacion[];
@@ -459,21 +460,17 @@ export default function NotificationList({
       {/* BANDEJA VACÍA                                                        */}
       {/* ==================================================================== */}
       {!isLoading && !isError && notificaciones.length === 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-            <svg
-              className="h-8 w-8"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-              />
-            </svg>
+        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+          <div className="mx-auto mb-3 flex justify-center">
+            <img
+              src={casillaImg}
+              alt="Casilla Electrónica"
+              width={112}
+              height={112}
+              loading="lazy"
+              decoding="async"
+              className="h-28 w-auto object-contain aspect-square"
+            />
           </div>
           <h3 className="mt-4 text-lg font-bold text-slate-900">
             No se encontraron notificaciones oficiales

@@ -18,6 +18,14 @@ describe("validaciones de acciones", () => {
     expect(validarDerivacion("origen-prueba", "Motivo", expediente, unidades).unidadDestinoId).toContain("distinto");
     expect(validarDerivacion("inactiva-prueba", "Motivo", expediente, unidades).unidadDestinoId).toContain("válida");
     expect(validarDerivacion("destino-prueba", "Motivo", expediente, unidades)).toEqual({ unidadDestinoId: "", proveido: "" });
+    const unidadNoEnrutable = { id: "no-enrutable", nombre: "Área sin personal", habilitada: true, enrutable: false };
+    expect(validarDerivacion("no-enrutable", "Motivo", expediente, [...unidades, unidadNoEnrutable]).unidadDestinoId).toContain("personal habilitado");
+
+    // Desviación de destino TUPA
+    const desviacionInvalida = validarDerivacion("destino-prueba", "Motivo", expediente, unidades, "otro-destino-sugerido", "");
+    expect(desviacionInvalida.justificacionDesviacion).toContain("al menos 10 caracteres");
+    const desviacionValida = validarDerivacion("destino-prueba", "Motivo", expediente, unidades, "otro-destino-sugerido", "Justificación válida y motivada de desviación");
+    expect(desviacionValida.justificacionDesviacion).toBe("");
   });
   it("rechaza autoacumulación, duplicados y justificación vacía", () => {
     expect(validarAcumulacion(expediente, [], " ")).toEqual({ conexos: "Seleccione al menos un expediente conexo.", motivo: "La justificación de acumulación es obligatoria." });
@@ -28,6 +36,15 @@ describe("validaciones de acciones", () => {
 });
 
 describe("RFC 7807", () => {
+  it("adapta errores de enrutabilidad y asignación embebida con mensajes canónicos", () => {
+    const errEnrutable = adaptarErrorAccion(errorProblema(400, { code: "AREA_NO_ENRUTABLE" }));
+    expect(errEnrutable.message).toContain("personal habilitado");
+    const errAsig = adaptarErrorAccion(errorProblema(400, { code: "ASIGNACION_EMBEBIDA_NO_PERMITIDA" }));
+    expect(errAsig.message).toContain("POST /api/v1/expedientes/:id/asignar");
+    const errInactivo = adaptarErrorAccion(errorProblema(400, { code: "DESTINO_INACTIVO" }));
+    expect(errInactivo.message).toContain("inactiva");
+  });
+
   it.each([400, 401, 403, 404, 409, 422, 500])("presenta mensaje seguro para HTTP %i", (status) => {
     const error = adaptarErrorAccion(errorProblema(status));
     expect(error).toMatchObject({ tipo: "http", status });

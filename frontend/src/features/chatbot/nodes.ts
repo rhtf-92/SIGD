@@ -29,7 +29,7 @@ export const GUIDED_NODES: Record<string, GuidedNode> = {
       'Puedes iniciar trámites de manera virtual las 24 horas del día o consultar los aranceles y requisitos vigentes en el Catálogo TUPA.',
     options: [
       { id: 'opt_rt_ver_tupa', label: 'Ver trámites disponibles', nextNode: 'BUSCAR_TUPA' },
-      { id: 'opt_rt_iniciar', label: 'Iniciar trámite', route: '/tramite', requiresAuth: true },
+      { id: 'opt_rt_iniciar', label: 'Iniciar trámite', route: '/mesa-partes', requiresAuth: false },
       { id: 'opt_rt_reqs', label: 'Consultar requisitos', nextNode: 'BUSCAR_TUPA' },
       { id: 'opt_rt_sol_tupa', label: 'Solicitar acceso TUPA', route: '/solicitud-acceso-tupa' },
       { id: 'opt_rt_back', label: '← Volver', isBack: true },

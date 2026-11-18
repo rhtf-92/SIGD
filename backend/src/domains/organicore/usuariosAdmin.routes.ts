@@ -17,11 +17,11 @@ import { UnauthorizedError, ForbiddenError } from "../../shared/domain/errors/in
  * PUT  /api/v1/admin/usuarios/:id
  */
 
-export const ROLES_ADMIN_USUARIOS_PERMITIDOS = ['ADMINISTRADOR'] as const;
+export const ROLES_ADMIN_USUARIOS_PERMITIDOS = ['ADMINISTRADOR', 'SUPERADMINISTRADOR'] as const;
 
 /**
  * Middleware de guarda: autenticación y autorización para administración de usuarios (N-01).
- * Exige Bearer Token válido con rol institucional canónico ADMINISTRADOR.
+ * Exige Bearer Token válido con rol institucional canónico ADMINISTRADOR o SUPERADMINISTRADOR.
  */
 export function requireAdminUsuarios(req: Request, _res: Response, next: NextFunction): void {
   const token = extraerTokenBearer(req.get("authorization"));
@@ -40,10 +40,11 @@ export function requireAdminUsuarios(req: Request, _res: Response, next: NextFun
   if (!tieneRol) {
     throw new ForbiddenError({
       message: "Acceso denegado.",
-      detail: "Se requiere rol institucional ADMINISTRADOR para gestionar usuarios.",
+      detail: "Se requiere rol institucional ADMINISTRADOR o SUPERADMINISTRADOR para gestionar usuarios.",
     });
   }
 
+  (req as any).user = claims;
   next();
 }
 

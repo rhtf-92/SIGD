@@ -28,6 +28,7 @@ function preparar(costoOficial: number) {
       if (sql.includes('FROM sigd_auth.persona')) return { rows: [{ id_persona: personaId, id_documento: '99000123' }] };
       if (sql.includes('FROM sigd_doc.tupa_registro_version')) return { rows: [{
         registro_version_id: versionId, estado_validacion: 'APROBADO', vigencia_desde: null, vigencia_hasta: null,
+        genera_expediente: true, activo: true,
       }] };
       if (sql.includes('fn_generar_cut')) return { rows: [{ cut: 'EXP-2026-000123' }] };
       if (sql.includes('INSERT INTO sigd_tra.expediente')) return { rows: [{ expediente_id: expedienteId }] };

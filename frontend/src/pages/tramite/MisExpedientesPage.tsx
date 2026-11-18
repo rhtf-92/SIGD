@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { formatearFechaHoraLegible } from "../../utils/expedientePresentacion";
 import { tesoreriaService, type DtoOrdenPago, type DtoSaldosExpediente, type CausalDevolucion } from "../../services/tesoreria.service";
+import emptyExpedientesImg from "../../assets/sigd/empty-expedientes.webp";
 
 export interface SolicitudVinculacionDto {
   solicitudId: string;
@@ -442,21 +443,29 @@ export default function MisExpedientesPage() {
         {!cargando && !error && (
           <>
             {expedientes.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 text-2xl font-bold">
-                  📄
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 sm:p-12 text-center shadow-xs">
+                <div className="mx-auto mb-3 flex justify-center">
+                  <img
+                    src={emptyExpedientesImg}
+                    alt="Sin expedientes"
+                    width={144}
+                    height={144}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-28 sm:h-36 w-auto object-contain aspect-square"
+                  />
                 </div>
-                <h3 className="mt-4 text-base font-semibold text-slate-900">
+                <h3 className="mt-3 text-base font-bold text-slate-900">
                   Aún no tienes expedientes radicados
                 </h3>
-                <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
-                  Todos los trámites que presentes a través de la Mesa de Partes Virtual aparecerán aquí con su estado y seguimiento en vivo.
+                <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
+                  No tienes expedientes pendientes. Todos los trámites que presentes a través de la Mesa de Partes Virtual aparecerán aquí con su estado y seguimiento en vivo.
                 </p>
                 <div className="mt-6">
                   <Link
                     to="/tramite"
                     state={{ nuevoTramite: true }}
-                    className="inline-flex items-center rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 transition"
+                    className="inline-flex items-center rounded-lg bg-suiza-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-suiza-hover transition"
                   >
                     Presentar Primer Trámite
                   </Link>

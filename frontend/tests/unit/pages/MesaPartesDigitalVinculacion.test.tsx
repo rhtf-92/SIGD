@@ -59,10 +59,16 @@ describe('SIGD 2026 — FASE 2: Mesa de Partes Digital Pública, Consulta Segura
       );
 
       expect(screen.getByRole('heading', { name: /Mesa de Partes Digital/i })).toBeInTheDocument();
-      expect(screen.getByText(/Sin Necesidad de Cuenta Previa/i)).toBeInTheDocument();
-      expect(screen.getByText('Paso 1: Identificación y Contacto del Solicitante')).toBeInTheDocument();
+      expect(screen.getByText(/Presenta tus solicitudes y documentos al IESTP SUIZA de forma sencilla y segura/i)).toBeInTheDocument();
+      expect(screen.getByText('Tus datos personales')).toBeInTheDocument();
+      expect(screen.getByText('Comienza indicando quién presenta la solicitud.')).toBeInTheDocument();
       expect(screen.getByText(/Tipo de Solicitante/i)).toBeInTheDocument();
       expect(screen.getByText(/Número de Documento/i)).toBeInTheDocument();
+
+      // Elementos redundantes eliminados para una presentación limpia
+      expect(screen.queryByText(/Sin Necesidad de Cuenta Previa/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Trámite Oficial 24x7/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Consultar Expediente/i })).not.toBeInTheDocument();
     });
   });
 

@@ -7,6 +7,11 @@ import { UbigeoSelector } from "../common/UbigeoSelector";
 import type { UbigeoDTO } from "../../data/ucayali";
 import { DeclaracionJuradaCheckbox } from "./DeclaracionJuradaCheckbox";
 import { ConsentimientoLey29733Modal } from "./ConsentimientoLey29733Modal";
+import {
+  sanitizarNumeroDocumento,
+  obtenerTextoAyudaDocumento,
+  obtenerPlaceholderDocumento,
+} from "../../utils/documentValidation";
 
 interface PersonaNaturalFormProps {
   onSubmit: (data: Natural) => void | Promise<void>;
@@ -55,6 +60,8 @@ export default function PersonaNaturalForm({
   const domicilioValue = watch("domicilio");
   const declaracionJuradaAceptada = watch("declaracionJuradaAceptada");
   const consentimientoLey29733 = watch("consentimientoLey29733");
+  const tipoDocumento = watch("tipoDocumento");
+  const numeroDocumento = watch("numeroDocumento") || "";
 
   const handleUbigeoChange = (_ubigeoCod: string, dto: UbigeoDTO) => {
     const updatedDomicilio = {
@@ -109,24 +116,40 @@ export default function PersonaNaturalForm({
         </div>
 
         <div>
-          <label
-            htmlFor="numeroDocumento"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Número de Documento *
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label
+              htmlFor="numeroDocumento"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Número de Documento *
+            </label>
+            <span className="text-[11px] text-slate-400 font-mono">
+              {numeroDocumento.length} / {tipoDocumento === 'CE' ? '8-12 car.' : '8 dígitos'}
+            </span>
+          </div>
           <input
             id="numeroDocumento"
             type="text"
-            {...register("numeroDocumento")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
+            inputMode={tipoDocumento === 'CE' ? 'text' : 'numeric'}
+            maxLength={tipoDocumento === 'CE' ? 12 : 8}
+            {...register("numeroDocumento", {
+              onChange: (e) => {
+                const s = sanitizarNumeroDocumento(e.target.value, tipoDocumento);
+                setValue("numeroDocumento", s, { shouldValidate: true });
+              },
+            })}
+            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none font-mono ${
               errors.numeroDocumento ? "border-red-500" : "border-gray-300"
             }`}
-            placeholder="DNI: 8 dígitos o CE: 9-12 caracteres"
+            placeholder={obtenerPlaceholderDocumento(tipoDocumento)}
           />
-          {errors.numeroDocumento && (
+          {errors.numeroDocumento ? (
             <p className="mt-1 text-xs text-red-600 font-medium">
               {errors.numeroDocumento.message}
+            </p>
+          ) : (
+            <p className="mt-1 text-[11px] text-slate-500">
+              {obtenerTextoAyudaDocumento(tipoDocumento)}
             </p>
           )}
         </div>

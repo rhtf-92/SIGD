@@ -170,6 +170,7 @@ function FormularioResolver({ expediente, accion, onClose }: ResolverModalProps)
       expediente,
       resultado_resumen: resumen.trim(),
       observacion_interna: observacionInterna.trim() || undefined,
+      documento_respuesta_id: registroFirma?.documentoId || preparacion?.documentoId,
     };
 
     void formulario.enviar(payload, () => {
@@ -268,7 +269,7 @@ function FormularioResolver({ expediente, accion, onClose }: ResolverModalProps)
           <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 text-xs space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-bold text-indigo-950 uppercase tracking-wider">
-                Documento Oficial a Firmar
+                Acto Resolutivo Institucional a Firmar
               </span>
               <span className="text-indigo-700 font-mono text-[11px] font-semibold">
                 {preparacion.cut}

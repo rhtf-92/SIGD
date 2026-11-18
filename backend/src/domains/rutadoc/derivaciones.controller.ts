@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { DerivarExpedienteSchema } from './dto/derivarExpediente.dto.js';
 import { AtenderExpedienteSchema } from './dto/atenderExpediente.dto.js';
 import { ArchivarExpedienteSchema } from './dto/archivarExpediente.dto.js';
@@ -12,6 +12,9 @@ import {
   archivarExpediente,
   observarExpediente,
   subsanarExpediente,
+  iniciarRevisionExpediente,
+  evaluarElegibilidadDerivacion,
+  verificarEvidenciaEtapaTecnica,
 } from './derivaciones.service.js';
 import {
   ConflictError,
@@ -29,6 +32,9 @@ import { AuthorizationService } from '../../core/auth/authorization.service.js';
 import { ExpedienteAsignacionService } from './expedienteAsignacion.service.js';
 import { ExpedienteObservacionService } from './expedienteObservacion.service.js';
 import { WorkflowService } from './workflow.service.js';
+import { EnrutabilidadService } from './enrutabilidad.service.js';
+import { TupaDestinoService } from './tupaDestino.service.js';
+import { verificarFacultadFirma } from '../../core/auth/auth.guard.js';
 
 interface ContextoExpedienteRutaDoc {
   expedienteId: string;
@@ -48,6 +54,8 @@ export function crearRouterDerivaciones(
   const asignacionSvc = new ExpedienteAsignacionService(pool);
   const observacionSvc = new ExpedienteObservacionService(pool);
   const workflowSvc = new WorkflowService(pool);
+  const enrutabilidadSvc = new EnrutabilidadService(pool);
+  const tupaDestinoSvc = new TupaDestinoService(pool, enrutabilidadSvc);
 
   async function resolverActor(req: Request): Promise<ActorRutaDoc | null> {
     if ((req as any).actor) {
@@ -121,6 +129,30 @@ export function crearRouterDerivaciones(
     return null;
   }
 
+  async function verificarEncargaturaDespacho(
+    poolOrClient: Pool | PoolClient,
+    idUsuario: string,
+    areaId: string,
+  ): Promise<boolean> {
+    try {
+      const res = await poolOrClient.query(
+        `SELECT 1
+           FROM sigd_org.responsabilidad_temporal rt
+          WHERE rt.id_usuario = $1::uuid
+            AND rt.area_id = $2::uuid
+            AND rt.estado = 'ACTIVO'
+            AND rt.tipo IN ('ENCARGATURA', 'DELEGACION', 'SUPLENCIA', 'DESIGNACION_ESPECIFICA')
+            AND rt.vigente_desde <= now()
+            AND (rt.vigente_hasta IS NULL OR rt.vigente_hasta > now())
+          LIMIT 1`,
+        [idUsuario, areaId],
+      );
+      return (res.rowCount ?? 0) > 0;
+    } catch {
+      return false;
+    }
+  }
+
   function resolverContextoOperacion(req: Request, actor: ActorRutaDoc): 'INSTITUCIONAL' | 'PERSONAL' {
     const rawHeader = req.headers['x-contexto-operacion'];
     if (typeof rawHeader === 'string' && rawHeader.trim().toUpperCase() === 'PERSONAL') {
@@ -137,6 +169,25 @@ export function crearRouterDerivaciones(
   // ===========================================================================
   const handlerDerivar = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // REGLA DE SEGURIDAD (POST-CIERRE): Rechazo canónico e inmediato de asignación embebida
+      const rawBody = req.body;
+      const tieneAsignacionEmbebida =
+        rawBody?.usuario_asignado_id !== undefined ||
+        rawBody?.persona_asignada_id !== undefined ||
+        (Array.isArray(rawBody?.destinos) &&
+          rawBody.destinos.some(
+            (d: any) =>
+              d && (d.usuario_asignado_id !== undefined || d.persona_asignada_id !== undefined),
+          ));
+
+      if (tieneAsignacionEmbebida) {
+        throw new ValidationError({
+          code: 'ASIGNACION_EMBEBIDA_NO_PERMITIDA',
+          message:
+            'ASIGNACION_EMBEBIDA_NO_PERMITIDA: La asignación individual de un expediente debe realizarse a través del servicio formal POST /api/v1/expedientes/:id/asignar.',
+        });
+      }
+
       const expedienteId = String(req.params.id);
       const datos = DerivarExpedienteSchema.parse(req.body);
 
@@ -150,48 +201,7 @@ export function crearRouterDerivaciones(
         await cliente.query('BEGIN');
         await bloquearExpedienteRutaDoc(cliente, expedienteId);
 
-        // 1. Verificación de Obligación Financiera Homologada (Principio 5F/5G: solo requisitos HOMOLOGADOS bloquean)
-        const reqFinancieroRes = await cliente.query<{
-          id_requisito: string;
-          nombre: string;
-          estado_homologacion: string;
-        }>(`
-          SELECT r.id_requisito, r.nombre, r.estado_homologacion
-            FROM sigd_doc.expediente_tupa_vinculo v
-            JOIN sigd_doc.tupa_requisito_documental r
-              ON r.registro_version_id = v.registro_version_id
-           WHERE v.expediente_id = $1::uuid
-             AND v.reemplaza_vinculo_id IS NULL
-             AND r.activo = true
-             AND r.obligatorio = true
-             AND r.tipo_requisito = 'FINANCIERO'
-           ORDER BY (r.estado_homologacion = 'HOMOLOGADO') DESC
-           LIMIT 1
-        `, [expedienteId]);
-
-        const reqFinanciero = reqFinancieroRes.rows[0];
-
-        // REGLA CANÓNICA: Solo si el requisito financiero está formalmente HOMOLOGADO puede bloquear institucionalmente
-        if (reqFinanciero && reqFinanciero.estado_homologacion === 'HOMOLOGADO') {
-          const pagoRes = await cliente.query<{ estado: string; monto: number }>(`
-            SELECT estado, monto
-              FROM sigd_tra.orden_pago
-             WHERE expediente_id = $1::uuid
-             ORDER BY fecha_creacion DESC
-             LIMIT 1
-          `, [expedienteId]);
-
-          const orden = pagoRes.rows[0];
-          if (!orden || orden.estado !== 'CONFIRMADO') {
-            throw new ConflictError({
-              code: 'PAGO_PENDIENTE',
-              message: 'El expediente requiere pago confirmado antes de continuar.',
-              detail: `Existe un requisito financiero homologado obligatorio ('${reqFinanciero.nombre}') sin pago confirmado (estado actual: ${orden?.estado ?? 'SIN_ORDEN'}).`,
-            });
-          }
-        }
-
-        // 2. Validación de Actor y Contexto de Operación
+        // 1. Validación de Actor y Contexto de Operación
         const actor = await resolverActor(req);
         if (!actor) {
           throw new UnauthorizedError({ detail: 'Autenticación requerida para derivar el expediente.' });
@@ -210,6 +220,32 @@ export function crearRouterDerivaciones(
           throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para derivar expedientes.' });
         }
 
+        const esTesoreria = actor.roles.includes('TESORERIA') &&
+          !actor.roles.some((r) => ['DIRECTOR', 'SECRETARIO', 'MESA_PARTES'].includes(r));
+        if (esTesoreria) {
+          throw new ForbiddenError({
+            code: 'ROL_FINANCIERO_SIN_FACULTAD_DERIVAR',
+            detail: 'El rol TESORERIA no posee facultades para derivar expedientes documentarios.',
+          });
+        }
+
+        // 2. Validación de Gates de Dominio: Requisitos Documentales y Financieros (C3.6.2)
+        const elegibilidad = await evaluarElegibilidadDerivacion(cliente, expedienteId);
+        if (!elegibilidad.requisitosConformes) {
+          throw new ConflictError({
+            code: 'REQUISITOS_DOCUMENTALES_PENDIENTES',
+            message: 'El expediente cuenta con requisitos documentales obligatorios pendientes de validación o no conformes.',
+            detail: `Requisitos documentales obligatorios conformes: ${elegibilidad.totalRequisitosDocumentalesConformes}/${elegibilidad.totalRequisitosDocumentalesObligatorios}.`,
+          });
+        }
+        if (!elegibilidad.pagoConforme) {
+          throw new ConflictError({
+            code: 'PAGO_PENDIENTE',
+            message: 'El expediente requiere pago confirmado antes de continuar.',
+            detail: `El trámite exige tasa arancelada de S/ ${elegibilidad.montoRequerido.toFixed(2)} con pago PENDIENTE de confirmación en Tesorería.`,
+          });
+        }
+
         const contextoExp = await consultarContextoExpediente(expedienteId);
         const idPersonaActor = await resolverIdPersonaActor(actor);
 
@@ -225,43 +261,155 @@ export function crearRouterDerivaciones(
         }
 
         // Verificación de tenencia de custodia en el área
-        const esAdminGlobal = actor.roles.some((r) => ['ADMINISTRADOR', 'DIRECTOR'].includes(r));
-        if (!esAdminGlobal) {
-          let tieneCustodia = false;
-          if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
-            tieneCustodia = true;
-          } else if (actor.roles.some((r) => ['ESPECIALISTA', 'SECRETARIO', 'MESA_PARTES'].includes(r))) {
-            if (['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION'].includes(contextoExp.estadoActual)) {
-              tieneCustodia = true;
-            } else if (actor.unidadOrganicaId === contextoExp.areaActualId) {
-              tieneCustodia = true;
-            }
-          }
-          if (!tieneCustodia) {
-            throw new ForbiddenError({
-              code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
-              detail: 'No pertenece al área de custodia actual para derivar el expediente.',
-            });
-          }
+        let tieneCustodia = false;
+
+        if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
+          tieneCustodia = true;
+        } else if (
+          actor.roles.includes('MESA_PARTES') &&
+          ['REGISTRADO'].includes(contextoExp.estadoActual)
+        ) {
+          tieneCustodia = true;
         }
 
-        // 3. Validación de áreas de destino
+        if (!tieneCustodia) {
+          throw new ForbiddenError({
+            code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+            detail: 'No pertenece al área de custodia actual para derivar el expediente.',
+          });
+        }
+
+        // 3. Validación de áreas de destino y enrutabilidad operativa
+        const idsDestino = datos.destinos.map((d) => d.area_destino_id);
+        const mapaEnrutabilidad = await enrutabilidadSvc.evaluarEnrutabilidadAreas(idsDestino, cliente);
+
         for (const destino of datos.destinos) {
-          const resArea = await cliente.query<{ id_area: string; nombre: string; vigente: boolean }>(
-            `SELECT area_id AS id_area, nombre, vigente FROM sigd_org.area WHERE area_id = $1::uuid`,
-            [destino.area_destino_id],
-          );
-          if (resArea.rowCount === 0) {
+          const evalArea = mapaEnrutabilidad.get(destino.area_destino_id);
+          if (!evalArea || !evalArea.existe) {
             throw new NotFoundError({
               detail: `DESTINO_INVALIDO: El área de destino ${destino.area_destino_id} no existe en la estructura orgánica.`,
             });
           }
-          if (!resArea.rows[0].vigente) {
+          if (!evalArea.vigente) {
             throw new DomainError({
               code: 'DESTINO_INACTIVO',
-              message: `DESTINO_INACTIVO: El área de destino ${destino.area_destino_id} (${resArea.rows[0].nombre}) se encuentra inactiva o dada de baja.`,
+              message: `DESTINO_INACTIVO: El área de destino ${destino.area_destino_id} (${evalArea.nombre ?? ''}) se encuentra inactiva o dada de baja.`,
             });
           }
+          if (!evalArea.enrutable) {
+            throw new DomainError({
+              code: 'AREA_NO_ENRUTABLE',
+              message: 'El área seleccionada no cuenta actualmente con personal habilitado para recibir y gestionar expedientes.',
+            });
+          }
+        }
+
+        // 3.1 Verificación de destino TUPA y auditoría de desviaciones manuales
+        const destinoTupa = await tupaDestinoSvc.resolverDestinoTupa(expedienteId, cliente);
+        const primerDestinoId = datos.destinos[0]?.area_destino_id;
+        if (
+          destinoTupa.vinculadoTupa &&
+          destinoTupa.unidadResponsableId &&
+          primerDestinoId &&
+          primerDestinoId !== destinoTupa.unidadResponsableId &&
+          primerDestinoId !== destinoTupa.unidadResolutivaId
+        ) {
+          const justificacion = datos.justificacion_desviacion?.trim();
+          if (!justificacion || justificacion.length < 10) {
+            throw new ValidationError({
+              code: 'JUSTIFICACION_DESVIACION_REQUERIDA',
+              message: `JUSTIFICACION_DESVIACION_REQUERIDA: El área seleccionada (${primerDestinoId}) difiere de la unidad responsable configurada según TUPA (${destinoTupa.unidadResponsableNombre ?? destinoTupa.unidadResponsableId}). Se requiere una justificación motivada de al menos 10 caracteres.`,
+            });
+          }
+
+          await insertarEvento(cliente, {
+            agregado: 'Expediente',
+            tipo_evento: 'DesviacionDestinoTupaRegistrada',
+            payload: {
+              identidad: { expediente_id: expedienteId },
+              contexto: {
+                usuario_actor_id: actor.id,
+                area_origen_id: contextoExp.areaActualId,
+                area_destino_id: primerDestinoId,
+              },
+              datos_especificos: {
+                destino_configurado_id: destinoTupa.unidadResponsableId,
+                destino_configurado_nombre: destinoTupa.unidadResponsableNombre,
+                destino_seleccionado_id: primerDestinoId,
+                codigo_procedimiento: destinoTupa.codigoProcedimiento,
+                version_tupa: destinoTupa.versionTupa,
+                justificacion,
+              },
+            },
+          });
+        }
+
+        // 3.2 Bloqueo estricto contra derivación prematura SDA -> DIR que omita la evaluación técnica
+        const requiereEvaluacionIntermedia = Boolean(
+          destinoTupa.vinculadoTupa &&
+          destinoTupa.unidadResponsableId &&
+          destinoTupa.unidadResolutivaId &&
+          destinoTupa.unidadResponsableId !== destinoTupa.unidadResolutivaId,
+        );
+        const esRetornoTecnicoADireccion = Boolean(
+          requiereEvaluacionIntermedia &&
+          contextoExp.areaActualId === destinoTupa.unidadResponsableId &&
+          primerDestinoId === destinoTupa.unidadResolutivaId,
+        );
+        if (esRetornoTecnicoADireccion) {
+          const evidenciaTecnica = await verificarEvidenciaEtapaTecnica(cliente, expedienteId);
+          if (!datos.es_correccion) {
+            if (!evidenciaTecnica.completada) {
+              throw new DomainError({
+                code: 'DERIVACION_PREMATURA_EVALUACION_PENDIENTE',
+                message: !evidenciaTecnica.tieneAsignacion
+                  ? 'No se permite derivar el expediente hacia Dirección sin asignación formal y dictamen técnico obligatorio de la unidad responsable (SDA).'
+                  : 'No se permite derivar el expediente hacia Dirección sin dictamen técnico válido registrado en la unidad responsable (SDA).',
+              });
+            }
+            throw new DomainError({
+              code: 'USAR_ENVIO_A_FIRMA',
+              message: 'El expediente ya cuenta con evaluación técnica completada. Debe elevarse a Dirección mediante la acción formal "Enviar a Firma".',
+            });
+          }
+
+          // Derivación correctiva o excepcional legítima: requiere jefatura/secretaría + justificación + auditoría
+          const tieneAutoridadCorrectiva = actor.roles.some((r) =>
+            ['SECRETARIO', 'DIRECTOR', 'ADMINISTRADOR', 'SUPERADMINISTRADOR'].includes(r),
+          );
+          if (!tieneAutoridadCorrectiva) {
+            throw new ForbiddenError({
+              code: 'SIN_FACULTAD_CORRECCION_DERIVACION',
+              detail: 'Solo la Secretaría del área o jefatura autorizada puede ejecutar una derivación correctiva o excepcional hacia Dirección.',
+            });
+          }
+          const justificacionCorrectiva = (datos.justificacion_desviacion ?? '').trim();
+          if (justificacionCorrectiva.length < 10) {
+            throw new ValidationError({
+              code: 'JUSTIFICACION_DESVIACION_REQUERIDA',
+              message: 'JUSTIFICACION_DESVIACION_REQUERIDA: Toda derivación correctiva o excepcional desde SDA hacia Dirección requiere una justificación motivada de al menos 10 caracteres.',
+            });
+          }
+
+          await insertarEvento(cliente, {
+            agregado: 'Expediente',
+            tipo_evento: 'DerivacionCorrectivaExcepcionalRegistrada',
+            payload: {
+              identidad: { expediente_id: expedienteId },
+              contexto: {
+                usuario_actor_id: actor.id,
+                area_origen_id: contextoExp.areaActualId,
+                area_destino_id: primerDestinoId,
+              },
+              datos_especificos: {
+                codigo_procedimiento: destinoTupa.codigoProcedimiento,
+                justificacion: justificacionCorrectiva,
+                evaluacion_tecnica_completada: evidenciaTecnica.completada,
+                tiene_asignacion: evidenciaTecnica.tieneAsignacion,
+                tiene_dictamen: evidenciaTecnica.tieneDictamenTecnico,
+              },
+            },
+          });
         }
 
         await derivarExpediente(cliente, expedienteId, datos);
@@ -273,7 +421,7 @@ export function crearRouterDerivaciones(
             `UPDATE sigd_tra.expediente
                 SET estado = 'DERIVADO', area_destino_id = $2::uuid
               WHERE expediente_id = $1::uuid
-                AND estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'SUBSANADO')`,
+                AND estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION')`,
             [expedienteId, areaDestinoId],
           );
         } else {
@@ -281,7 +429,7 @@ export function crearRouterDerivaciones(
             `UPDATE sigd_tra.expediente
                 SET estado = 'DERIVADO'
               WHERE expediente_id = $1::uuid
-                AND estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'SUBSANADO')`,
+                AND estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION')`,
             [expedienteId],
           );
         }
@@ -317,7 +465,11 @@ export function crearRouterDerivaciones(
           nuevoEstado: 'DERIVADO',
         });
       } catch (error) {
-        await cliente.query('ROLLBACK').catch(() => {});
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {
+          // Ignorar fallo de rollback
+        }
         throw error;
       } finally {
         cliente.release();
@@ -329,6 +481,53 @@ export function crearRouterDerivaciones(
 
   router.post('/:id/derivar', handlerDerivar);
   router.post('/:id/movimientos/derivar', handlerDerivar);
+
+  // ===========================================================================
+  // Endpoint: Pre-enrutamiento y Resolución de Destino TUPA (Fase C3)
+  // GET /api/v1/expedientes/:id/destino-tupa
+  // ===========================================================================
+  router.get('/:id/destino-tupa', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para consultar destino TUPA.' });
+      }
+
+      const destino = await tupaDestinoSvc.resolverDestinoTupa(expedienteId);
+      res.status(200).json({
+        success: true,
+        ok: true,
+        datos: {
+          expedienteId: destino.expedienteId,
+          vinculadoTupa: destino.vinculadoTupa,
+          destinoConfigurado: Boolean(destino.unidadResponsableId),
+          destinoEnrutable: destino.destinoEnrutable,
+          unidadResponsableId: destino.unidadResponsableId,
+          unidadResponsableCodigo: destino.unidadResponsableCodigo,
+          unidadResponsableNombre: destino.unidadResponsableNombre,
+          perfilResponsableId: destino.perfilResponsableId,
+          perfilResponsableCodigo: destino.perfilResponsableCodigo,
+          perfilResponsableNombre: destino.perfilResponsableNombre,
+          unidadReceptoraId: destino.unidadReceptoraId,
+          unidadReceptoraCodigo: destino.unidadReceptoraCodigo,
+          unidadReceptoraNombre: destino.unidadReceptoraNombre,
+          unidadResolutivaId: destino.unidadResolutivaId,
+          unidadResolutivaCodigo: destino.unidadResolutivaCodigo,
+          unidadResolutivaNombre: destino.unidadResolutivaNombre,
+          unidadFinancieraId: destino.unidadFinancieraId,
+          unidadFinancieraCodigo: destino.unidadFinancieraCodigo,
+          unidadFinancieraNombre: destino.unidadFinancieraNombre,
+          procedimientoCodigoRef: destino.codigoProcedimiento,
+          versionTupaCodigo: destino.versionTupa,
+          motivo: destino.motivoNoEnrutable,
+        },
+        ...destino,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
 
   // ===========================================================================
   // Endpoint: Recepción en Área de Destino (T-BE-RD-06 / 5G)
@@ -369,22 +568,15 @@ export function crearRouterDerivaciones(
       }
 
       // BOLA: Verificar pertenencia al área de destino
-      const esAdminGlobal = actor.roles.some((r) => ['ADMINISTRADOR', 'DIRECTOR'].includes(r));
-      if (!esAdminGlobal) {
-        let tieneCustodia = false;
-        if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
-          tieneCustodia = true;
-        } else if (actor.roles.some((r) => ['ESPECIALISTA', 'SECRETARIO', 'MESA_PARTES'].includes(r))) {
-          if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
-            tieneCustodia = true;
-          }
-        }
-        if (!tieneCustodia) {
-          throw new ForbiddenError({
-            code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
-            detail: 'No pertenece al área de destino para recepcionar el expediente.',
-          });
-        }
+      let tieneCustodia = false;
+      if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
+        tieneCustodia = true;
+      }
+      if (!tieneCustodia) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No pertenece al área de destino para recepcionar el expediente.',
+        });
       }
 
       const cliente = await pool.connect();
@@ -401,7 +593,11 @@ export function crearRouterDerivaciones(
           nuevoEstado: 'EN_REVISION',
         });
       } catch (error) {
-        await cliente.query('ROLLBACK').catch(() => {});
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {
+          // Ignorar fallo de rollback
+        }
         throw error;
       } finally {
         cliente.release();
@@ -456,29 +652,66 @@ export function crearRouterDerivaciones(
 
       // Poder técnico ≠ Autoridad de negocio
       const esSoloAdminTecnico =
-        actor.roles.includes('ADMINISTRADOR') &&
+        actor.roles.some((r) => ['ADMINISTRADOR', 'SUPERADMINISTRADOR'].includes(r)) &&
         !actor.roles.some((r) => ['DIRECTOR', 'SECRETARIO', 'ESPECIALISTA'].includes(r));
 
       if (esSoloAdminTecnico) {
         throw new ForbiddenError({
           code: 'PODER_TECNICO_SIN_AUTORIDAD_NEGOCIO',
-          detail: 'El perfil ADMINISTRADOR posee control técnico y no confiere facultades de resolución sustantiva ni emisión de resoluciones.',
+          detail: 'El perfil técnico posee control del sistema y no confiere facultades de resolución sustantiva ni emisión de dictámenes.',
         });
       }
 
-      // Verificar custodia o director
-      const esDirector = actor.roles.includes('DIRECTOR');
-      if (!esDirector) {
-        let tieneCustodia = false;
-        if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
-          tieneCustodia = true;
-        } else if (actor.roles.some((r) => ['ESPECIALISTA', 'SECRETARIO'].includes(r))) {
-          if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
-            tieneCustodia = true;
-          }
+      const esRolNoAtencion = actor.roles.some((r) => ['TESORERIA', 'MESA_PARTES'].includes(r)) &&
+        !actor.roles.some((r) => ['DIRECTOR', 'SECRETARIO', 'ESPECIALISTA'].includes(r));
+      if (esRolNoAtencion) {
+        throw new ForbiddenError({
+          code: 'ROL_SIN_FACULTAD_ATENCION',
+          detail: 'El rol no dispone de facultades para registrar atención técnica o dictamen.',
+        });
+      }
+
+      // BOLA: Verificar pertenencia al área de custodia
+      if (!actor.unidadOrganicaId || actor.unidadOrganicaId !== contextoExp.areaActualId) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No cuenta con facultades en el área para atender el expediente.',
+        });
+      }
+
+      // El rol DIRECTOR no emite dictámenes técnicos ordinarios sin asignación formal o perfil técnico
+      if (actor.roles.includes('DIRECTOR') && !actor.roles.includes('SECRETARIO')) {
+        const asignacionActiva = await asignacionSvc.obtenerAsignacionActiva(expedienteId);
+        const esAsignado =
+          asignacionActiva &&
+          (asignacionActiva.idUsuario === actor.id ||
+            (idPersonaActor && asignacionActiva.idPersona === idPersonaActor));
+        if (!esAsignado) {
+          throw new ForbiddenError({
+            code: 'DIRECTOR_SIN_FACULTAD_DICTAMEN',
+            detail: 'El rol DIRECTOR no emite dictámenes técnicos ordinarios sin asignación formal o perfil técnico en el expediente.',
+          });
         }
-        if (!tieneCustodia) {
-          throw new ForbiddenError({ detail: 'No cuenta con facultades en el área para atender el expediente.' });
+      }
+
+      // Regla de Asignación individual:
+      // Si el actor opera como ESPECIALISTA, debe ser el especialista asignado formalmente al expediente
+      if (actor.roles.includes('ESPECIALISTA') && !actor.roles.includes('SECRETARIO')) {
+        const asignacionActiva = await asignacionSvc.obtenerAsignacionActiva(expedienteId);
+        if (!asignacionActiva) {
+          throw new ForbiddenError({
+            code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
+            message: 'El expediente no ha sido asignado formalmente a un especialista para su atención técnica.',
+          });
+        }
+        const esAsignado =
+          asignacionActiva.idUsuario === actor.id ||
+          (idPersonaActor && asignacionActiva.idPersona === idPersonaActor);
+        if (!esAsignado) {
+          throw new ForbiddenError({
+            code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
+            message: 'El expediente no se encuentra asignado a este especialista para su atención técnica.',
+          });
         }
       }
 
@@ -502,16 +735,30 @@ export function crearRouterDerivaciones(
           // Sin workflow
         }
 
+        const resEstado = await cliente.query<{ estado: string }>(
+          `SELECT COALESCE(u.estado_nuevo, e.estado) AS estado
+             FROM sigd_tra.expediente e
+             LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
+            WHERE e.expediente_id = $1::uuid`,
+          [expedienteId],
+        );
+        const estadoFinal = resEstado.rows[0]?.estado || 'EN_REVISION';
         await cliente.query('COMMIT');
         res.status(200).json({
           ok: true,
-          mensaje: 'Atención resolutiva registrada exitosamente.',
+          mensaje: estadoFinal === 'RESUELTO'
+            ? 'Atención resolutiva registrada exitosamente.'
+            : 'Atención técnica registrada exitosamente.',
           expediente_id: expedienteId,
           expedienteId,
-          nuevoEstado: 'RESUELTO',
+          nuevoEstado: estadoFinal,
         });
       } catch (error) {
-        await cliente.query('ROLLBACK').catch(() => {});
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {
+          // Ignorar fallo de rollback
+        }
         throw error;
       } finally {
         cliente.release();
@@ -548,6 +795,23 @@ export function crearRouterDerivaciones(
         throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para remitir a firma.' });
       }
 
+      const tieneFacultadDespacho = actor.roles.some((r) =>
+        ['SECRETARIO', 'DIRECTOR'].includes(r),
+      );
+      const esEspecialista = actor.roles.includes('ESPECIALISTA');
+      if (esEspecialista && !tieneFacultadDespacho) {
+        throw new ForbiddenError({
+          code: 'ESPECIALISTA_NO_PUEDE_ELEVAR_A_FIRMA',
+          detail: 'El especialista técnico emite dictamen o informe, pero no posee facultad de despacho para elevar directamente a firma. La elevación corresponde a la Secretaría o Jefatura de Despacho.',
+        });
+      }
+      if (!tieneFacultadDespacho) {
+        throw new ForbiddenError({
+          code: 'SIN_FACULTAD_DESPACHO_FIRMA',
+          detail: 'El usuario no posee facultades de secretaría o despacho para remitir expedientes a firma resolutiva.',
+        });
+      }
+
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
@@ -556,7 +820,24 @@ export function crearRouterDerivaciones(
         const resultado = await enviarAFirmaExpediente(cliente, expedienteId, {
           resultado_resumen: req.body.resultado_resumen || 'Pase formal para emisión y firma de resolución',
           observacion_interna: req.body.observacion_interna,
+          actor_unidad_organica_id: actor.unidadOrganicaId,
+          actor_roles: actor.roles,
         });
+
+        // Avanzar workflow a paso firma si existe
+        try {
+          const contextoExp = await consultarContextoExpediente(expedienteId);
+          await workflowSvc.avanzarPasoExpediente(
+            expedienteId,
+            actor.id,
+            contextoExp.areaActualId,
+            'ENVIAR_A_FIRMA',
+            req.body.resultado_resumen || 'Pase a despacho de firma',
+            cliente,
+          );
+        } catch {
+          // Sin workflow
+        }
 
         await cliente.query('COMMIT');
         res.status(200).json({
@@ -567,7 +848,11 @@ export function crearRouterDerivaciones(
           ...resultado,
         });
       } catch (error) {
-        await cliente.query('ROLLBACK').catch(() => {});
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {
+          // Ignorar fallo de rollback
+        }
         throw error;
       } finally {
         cliente.release();
@@ -604,12 +889,38 @@ export function crearRouterDerivaciones(
         throw new ForbiddenError({ detail: 'Los administrados no tienen facultades resolutivas.' });
       }
 
+      // REGLA CANÓNICA: Autoridad resolutiva reservada a DIRECTOR con facultad de firma
+      const rolesNoFirmantes = actor.roles.filter((r) => r !== 'ADMINISTRADOR' && r !== 'SUPERADMINISTRADOR');
+      const facultad = await verificarFacultadFirma(pool, actor.id, rolesNoFirmantes);
+      if (!facultad.puedeFirmar) {
+        throw new ForbiddenError({
+          code: 'SIN_FACULTAD_RESOLUTIVA',
+          message: 'Acceso denegado: Se requiere cargo o facultad directiva (DIRECTOR) para emitir la resolución del expediente.',
+          detail: facultad.motivo ?? 'El rol administrativo o técnico no confiere facultades de resolución institucional.',
+        });
+      }
+
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
         await bloquearExpedienteRutaDoc(cliente, expedienteId);
 
         const resultado = await resolverExpedienteConFirma(cliente, expedienteId, datos);
+
+        // Avanzar workflow a resolución si existe
+        try {
+          const contextoExp = await consultarContextoExpediente(expedienteId);
+          await workflowSvc.avanzarPasoExpediente(
+            expedienteId,
+            actor.id,
+            contextoExp.areaActualId,
+            'FIRMA',
+            datos.resultado_resumen,
+            cliente,
+          );
+        } catch {
+          // Sin workflow
+        }
 
         await cliente.query('COMMIT');
         res.status(200).json({
@@ -620,7 +931,11 @@ export function crearRouterDerivaciones(
           ...resultado,
         });
       } catch (error) {
-        await cliente.query('ROLLBACK').catch(() => {});
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {
+          // Ignorar fallo de rollback
+        }
         throw error;
       } finally {
         cliente.release();
@@ -673,6 +988,21 @@ export function crearRouterDerivaciones(
         await cliente.query('BEGIN');
         await bloquearExpedienteRutaDoc(cliente, expedienteId);
         await archivarExpediente(cliente, expedienteId, datos);
+
+        // Avanzar workflow a paso final cierre si existe
+        try {
+          await workflowSvc.avanzarPasoExpediente(
+            expedienteId,
+            actor.id,
+            contextoExp.areaActualId,
+            'CIERRE',
+            'Archivado formal del expediente',
+            cliente,
+          );
+        } catch {
+          // Sin workflow
+        }
+
         await cliente.query('COMMIT');
         res.status(200).json({
           ok: true,
@@ -682,7 +1012,11 @@ export function crearRouterDerivaciones(
           nuevoEstado: 'ARCHIVADO',
         });
       } catch (error) {
-        await cliente.query('ROLLBACK').catch(() => {});
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {
+          // Ignorar fallo de rollback
+        }
         throw error;
       } finally {
         cliente.release();
@@ -853,6 +1187,7 @@ export function crearRouterDerivaciones(
         await observarExpediente(cliente, expedienteId, motivo, {
           personaId: idPersonaActor ?? undefined,
           requisitosAfectados: req.body.requisitosAfectados,
+          areaId: (contextoExp.areaActualId || actor.unidadOrganicaId) ?? undefined,
         });
         await cliente.query('COMMIT');
 
@@ -865,7 +1200,11 @@ export function crearRouterDerivaciones(
           slaPaused: true,
         });
       } catch (error) {
-        await cliente.query('ROLLBACK').catch(() => {});
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {
+          // Ignorar fallo de rollback
+        }
         throw error;
       } finally {
         cliente.release();
@@ -933,15 +1272,19 @@ export function crearRouterDerivaciones(
 
         res.status(200).json({
           ok: true,
-          mensaje: 'Subsanación registrada exitosamente.',
+          mensaje: 'Subsanación registrada exitosamente. Pendiente de inicio de revisión institucional.',
           expedienteId,
           motivo,
-          estado: 'EN_REVISION',
-          estadoRutaDoc: 'EN_REVISION',
+          estado: 'SUBSANADO',
+          estadoRutaDoc: 'SUBSANADO',
           pestana: 'EN_TRAMITE',
         });
       } catch (error) {
-        await cliente.query('ROLLBACK').catch(() => {});
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {
+          // Ignorar fallo de rollback
+        }
         throw error;
       } finally {
         cliente.release();
@@ -953,6 +1296,219 @@ export function crearRouterDerivaciones(
 
   router.post('/:id/subsanar', handlerSubsanar);
   router.post('/:id/movimientos/subsanar', handlerSubsanar);
+
+  // ===========================================================================
+  // Endpoint: Iniciar Revisión Formal tras Subsanación (C3.6.2 / RutaDoc FSM)
+  // ===========================================================================
+  const handlerIniciarRevision = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      const motivo = req.body?.motivo ? String(req.body.motivo).trim() : undefined;
+
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para iniciar revisión.' });
+      }
+
+      const contextoOperacion = resolverContextoOperacion(req, actor);
+      if (contextoOperacion === 'PERSONAL') {
+        throw new ForbiddenError({
+          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
+          detail: 'En contexto personal el usuario no dispone de facultades para iniciar revisión de expedientes.',
+        });
+      }
+
+      const esAdministrado = actor.roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r));
+      if (esAdministrado) {
+        throw new ForbiddenError({
+          code: 'ADMINISTRADO_NO_AUTORIZADO',
+          detail: 'Los administrados no tienen autorización para iniciar revisión de expedientes.',
+        });
+      }
+
+      const contextoExp = await consultarContextoExpediente(expedienteId);
+      const idPersonaActor = await resolverIdPersonaActor(actor);
+
+      // Autoatención prohibida
+      if (
+        (idPersonaActor && idPersonaActor === contextoExp.solicitanteId) ||
+        actor.id === contextoExp.solicitanteId
+      ) {
+        throw new ForbiddenError({
+          code: 'CONFLICTO_INTERES_EXPEDIENTE_PROPIO',
+          detail: 'AUTOATENCION_PROHIBIDA: El solicitante no puede iniciar revisión de su propio expediente personal.',
+        });
+      }
+
+      // Validar estado actual FSM
+      if (contextoExp.estadoActual !== 'SUBSANADO') {
+        throw new DomainError({
+          code: 'ESTADO_INVALIDO',
+          message: `Solo se puede iniciar revisión de expedientes en estado SUBSANADO (actual: ${contextoExp.estadoActual}).`,
+        });
+      }
+
+      // BOLA / Custodia: Mesa de Partes, especialista/secretario del área, o admin/director
+      const esDirectorOAdmin = actor.roles.some((r) => ['DIRECTOR', 'ADMINISTRADOR'].includes(r));
+      if (!esDirectorOAdmin) {
+        let tieneCustodia = false;
+        if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
+          tieneCustodia = true;
+        } else if (actor.roles.includes('MESA_PARTES') && (contextoExp.areaActualId === 'DIR' || !contextoExp.areaActualId)) {
+          tieneCustodia = true;
+        }
+        if (!tieneCustodia) {
+          throw new ForbiddenError({
+            code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+            detail: 'No pertenece al área responsable ni cuenta con custodia del expediente para iniciar la revisión.',
+          });
+        }
+      }
+
+      const cliente = await pool.connect();
+      try {
+        await cliente.query('BEGIN');
+        await bloquearExpedienteRutaDoc(cliente, expedienteId);
+        const { movimientoId } = await iniciarRevisionExpediente(cliente, expedienteId, motivo);
+        await cliente.query('COMMIT');
+
+        res.status(200).json({
+          ok: true,
+          mensaje: 'Revisión formal del expediente iniciada exitosamente.',
+          expediente_id: expedienteId,
+          expedienteId,
+          movimientoId,
+          estado: 'EN_REVISION',
+          estadoRutaDoc: 'EN_REVISION',
+          nuevoEstado: 'EN_REVISION',
+        });
+      } catch (error) {
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {
+          // Ignorar fallo de rollback
+        }
+        throw error;
+      } finally {
+        cliente.release();
+      }
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  router.post('/:id/iniciar-revision', handlerIniciarRevision);
+  router.post('/:id/movimientos/iniciar-revision', handlerIniciarRevision);
+
+  // Endpoint de Calificación / Validación de Evidencia de Requisito
+  router.post('/:id/requisitos/:idRequisito/calificar', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      const idRequisito = String(req.params.idRequisito);
+      const { estadoValidacion, observacion } = req.body ?? {};
+
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para calificar requisitos.' });
+      }
+
+      const contextoOperacion = resolverContextoOperacion(req, actor);
+      if (contextoOperacion === 'PERSONAL') {
+        throw new ForbiddenError({
+          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
+          detail: 'En contexto personal el usuario no dispone de facultades para calificar requisitos.',
+        });
+      }
+
+      const esAdministrado = actor.roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r));
+      if (esAdministrado) {
+        throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para calificar requisitos.' });
+      }
+
+      if (!['VALIDADO', 'OBSERVADO'].includes(estadoValidacion)) {
+        throw new ValidationError({
+          invalidParams: [{ name: 'estadoValidacion', reason: 'Debe ser VALIDADO u OBSERVADO.' }],
+        });
+      }
+
+      const cliente = await pool.connect();
+      try {
+        await cliente.query('BEGIN');
+        const { rows: evRows } = await cliente.query<{ id_evidencia: string }>(`
+          SELECT id_evidencia
+            FROM sigd_doc.expediente_evidencia_requisito
+           WHERE expediente_id = $1::uuid AND id_requisito = $2::uuid
+           ORDER BY creado_en DESC
+           LIMIT 1
+        `, [expedienteId, idRequisito]);
+
+        if (evRows.length > 0) {
+          await cliente.query(`
+            UPDATE sigd_doc.expediente_evidencia_requisito
+               SET estado_validacion = $1,
+                   observacion = COALESCE($2, observacion),
+                   validado_por = $3::uuid,
+                   validado_en = now()
+             WHERE id_evidencia = $4::uuid
+          `, [estadoValidacion, observacion ?? null, actor.id, evRows[0].id_evidencia]);
+        } else {
+          const { rows: expRows } = await cliente.query<{ solicitante_id: string }>(`
+            SELECT solicitante_id FROM sigd_tra.expediente WHERE expediente_id = $1::uuid
+          `, [expedienteId]);
+
+          if (expRows.length > 0) {
+            await cliente.query(`
+              INSERT INTO sigd_doc.expediente_evidencia_requisito (
+                expediente_id, id_requisito, tipo_evidencia, id_persona, id_usuario,
+                canal, estado_validacion, observacion, validado_por, validado_en
+              ) VALUES (
+                $1::uuid, $2::uuid, 'DOCUMENTO', $3::uuid, $4::uuid,
+                'PRESENCIAL', $5, $6, $4::uuid, now()
+              )
+            `, [
+              expedienteId,
+              idRequisito,
+              expRows[0].solicitante_id,
+              actor.id,
+              estadoValidacion,
+              observacion ?? null,
+            ]);
+          }
+        }
+        await cliente.query('COMMIT');
+
+        res.status(200).json({
+          ok: true,
+          mensaje: `Requisito ${estadoValidacion === 'VALIDADO' ? 'conformado' : 'observado'} exitosamente.`,
+          expedienteId,
+          idRequisito,
+          estadoValidacion,
+        });
+      } catch (err) {
+        await cliente.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        cliente.release();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Endpoint de Consulta Centralizada de Elegibilidad de Derivación
+  router.get('/:id/elegibilidad-derivacion', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para consultar elegibilidad.' });
+      }
+      const elegibilidad = await evaluarElegibilidadDerivacion(pool, expedienteId);
+      res.status(200).json(elegibilidad);
+    } catch (error) {
+      next(error);
+    }
+  });
 
   // ===========================================================================
   // Endpoints: Asignación Operativa Individual (5G)
@@ -970,6 +1526,30 @@ export function crearRouterDerivaciones(
         throw new ForbiddenError({
           code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
           detail: 'En contexto personal no se pueden asignar expedientes a funcionarios.',
+        });
+      }
+
+      const contextoExp = await consultarContextoExpediente(expedienteId);
+      const esSecretario = actor.roles.includes('SECRETARIO');
+      const esDirector = actor.roles.includes('DIRECTOR');
+      let tieneEncargatura = false;
+      if (esDirector) {
+        tieneEncargatura = await verificarEncargaturaDespacho(pool, actor.id, contextoExp.areaActualId);
+      }
+
+      if (!esSecretario && !tieneEncargatura) {
+        throw new ForbiddenError({
+          code: 'SIN_FACULTAD_ASIGNACION',
+          message: esDirector
+            ? 'El rol DIRECTOR no posee facultad de asignación ordinaria de especialistas sin una encargatura o delegación vigente en el área de custodia.'
+            : 'Solo el Secretario del área con custodia o funcionario con encargatura/delegación vigente posee facultades para asignar expedientes.',
+        });
+      }
+
+      if (!tieneEncargatura && (!actor.unidadOrganicaId || actor.unidadOrganicaId !== contextoExp.areaActualId)) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No pertenece al área de custodia del expediente para gestionar asignaciones.',
         });
       }
 
@@ -995,6 +1575,21 @@ export function crearRouterDerivaciones(
           },
           cliente,
         );
+
+        // Avanzar workflow a paso de asignación si existe
+        try {
+          const contextoExp = await consultarContextoExpediente(expedienteId);
+          await workflowSvc.avanzarPasoExpediente(
+            expedienteId,
+            actor.id,
+            contextoExp.areaActualId,
+            'ASIGNACION',
+            motivo,
+            cliente,
+          );
+        } catch {
+          // Sin workflow
+        }
 
         await cliente.query('COMMIT');
         res.status(200).json({
@@ -1029,6 +1624,30 @@ export function crearRouterDerivaciones(
         });
       }
 
+      const contextoExp = await consultarContextoExpediente(expedienteId);
+      const esSecretario = actor.roles.includes('SECRETARIO');
+      const esDirector = actor.roles.includes('DIRECTOR');
+      let tieneEncargatura = false;
+      if (esDirector) {
+        tieneEncargatura = await verificarEncargaturaDespacho(pool, actor.id, contextoExp.areaActualId);
+      }
+
+      if (!esSecretario && !tieneEncargatura) {
+        throw new ForbiddenError({
+          code: 'SIN_FACULTAD_ASIGNACION',
+          message: esDirector
+            ? 'El rol DIRECTOR no posee facultad de asignación ordinaria de especialistas sin una encargatura o delegación vigente en el área de custodia.'
+            : 'Solo el Secretario del área con custodia o funcionario con encargatura/delegación vigente posee facultades para desasignar expedientes.',
+        });
+      }
+
+      if (!tieneEncargatura && (!actor.unidadOrganicaId || actor.unidadOrganicaId !== contextoExp.areaActualId)) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No pertenece al área de custodia del expediente para gestionar asignaciones.',
+        });
+      }
+
       const motivo = req.body?.motivo || 'Desasignación operativa por reubicación o cese';
 
       const cliente = await pool.connect();
@@ -1057,10 +1676,12 @@ export function crearRouterDerivaciones(
       const expedienteId = String(req.params.id);
       const activa = await asignacionSvc.obtenerAsignacionActiva(expedienteId);
       const historial = await asignacionSvc.listarHistorialAsignaciones(expedienteId);
+      const candidatos = await asignacionSvc.listarCandidatosAsignacion(expedienteId);
       res.status(200).json({
         ok: true,
         activa,
         historial,
+        candidatos,
       });
     } catch (error) {
       next(error);

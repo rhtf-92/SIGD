@@ -74,11 +74,15 @@ describe('AppRouter — Fail-Closed Route Guards y Segmentación Modular RBAC', 
       renderWithProviders('/acceso-denegado');
       expect(screen.getByText(/Acceso denegado/i)).toBeInTheDocument();
     });
+
+    it('ruta compatible /tramite redirige a /mesa-partes y se renderiza para visitantes públicos', async () => {
+      renderWithProviders('/tramite');
+      expect(await screen.findByText(/Mesa de Partes Digital/i)).toBeInTheDocument();
+    });
   });
 
   describe('2. Fail-Closed: Redirección inmediata a /login para anónimos en rutas privadas', () => {
     it.each([
-      '/tramite',
       '/mis-expedientes',
       '/casilla',
       '/tramite/ventanilla-presencial',

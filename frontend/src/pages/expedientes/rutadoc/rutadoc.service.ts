@@ -47,6 +47,24 @@ export const rutaDoc = {
       } | null;
       documentos?: DocumentoAdjuntoDto[];
       solicitanteResumen?: SolicitanteResumenDto | null;
+      elegibilidadDerivacion?: {
+        puedeDerivar: boolean;
+        requisitosConformes: boolean;
+        pagoConforme: boolean;
+        bloqueos: string[];
+        totalRequisitosDocumentalesObligatorios: number;
+        totalRequisitosDocumentalesConformes: number;
+        montoRequerido: number;
+        pagoRegistrado: boolean;
+      } | null;
+      flujoAtencion?: {
+        requiereAtencionTecnica: boolean;
+        atencionTecnicaCompletada: boolean;
+        tieneAsignacion?: boolean;
+        tieneDictamenTecnico?: boolean;
+        areaResponsableId: string | null;
+        areaResolutivaId: string | null;
+      } | null;
     };
   },
   obtenerUrlArchivo: async (idExpediente: string, idDocumento: string, signal?: AbortSignal) => {

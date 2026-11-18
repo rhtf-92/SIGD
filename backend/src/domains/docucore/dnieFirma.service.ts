@@ -7,6 +7,7 @@ import {
   type DniePreparationStore,
   TTL_PREPARACION_DNIE_SEGUNDOS,
 } from './dniePreparation.store.js';
+import { generarActoResolutivoInstitucional } from './resoluciones.service.js';
 
 export interface SolicitudPrepararFirmaDnie {
   expedienteId: string;
@@ -32,6 +33,7 @@ export interface ContextoPreparacionFirma {
   fechaCreacion: string;
   fechaExpiracion: string;
   consumido: boolean;
+  cvd?: string;
 }
 
 export interface SolicitudRegistrarFirmaDnie {
@@ -165,6 +167,29 @@ export class CertificateIdentityExtractor {
  * Impide que un certificado autofirmado o desconocido sea aceptado como válido.
  * Requiere que la cadena provenga de una entidad de certificación de confianza.
  */
+export const SIGD_ROOT_CA_DEV_PEM = `-----BEGIN CERTIFICATE-----
+MIIDjzCCAnegAwIBAgIUGVJzXf3/9ETUdVqKSpc285qjdBYwDQYJKoZIhvcNAQEL
+BQAwVzELMAkGA1UEBhMCUEUxGDAWBgNVBAoMD0lFU1RQIFNVSVpBIExBQjESMBAG
+A1UECwwJVEVTVF9PTkxZMRowGAYDVQQDDBFTSUdEIFRFU1QgUk9PVCBDQTAeFw0y
+NjExMDkyMTAyNDdaFw0zNjExMDYyMTAyNDdaMFcxCzAJBgNVBAYTAlBFMRgwFgYD
+VQQKDA9JRVNUUCBTVUlaQSBMQUIxEjAQBgNVBAsMCVRFU1RfT05MWTEaMBgGA1UE
+AwwRU0lHRCBURVNUIFJPT1QgQ0EwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDByH0+BF5NK6v64+j++dJgWR3UgH1bQFXa8BybsYggMYZZWvcl35dPjbns
+UePx75gSJGft08gdekwe1MEYn8q82sL4E8eZAZA1hN1Dn9HGNCeMP+IjZ58a5Vif
+AMaRu7aLZq+ViOezxziUeztboNhvzUZHjuIfhG0ilxUGyXWaX1W579CHnkVUFjsB
+h8ZsWtNm8gE1Y3CramGonjk4wyMUO7RE2jIJ74jJ7wn+g7yqZHrfm/P41wUrn75d
+iy037e7z3h5v0LY2gO/MZ5zUcqQzVp8HfpvoH/4RblRxp84f9j7/mktog0ktqclf
+NV5my/ac6yD3/z38jCzxWzKv5b9pAgMBAAGjUzBRMB0GA1UdDgQWBBTCkDFewYfo
+dcxMQq58Fwko6eVTQjAfBgNVHSMEGDAWgBTCkDFewYfodcxMQq58Fwko6eVTQjAP
+BgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCLWHpiGbEwqyOaUzaG
+pDMHhZoiBBX+cK3WHeS4QhNqseetCkBFh2X6/LfNZrZFoL0F7Y2D5ZldlTcMb8wc
+nrPdiGnUwHHfeYPfeVd2dpXcQPIbuNMncflvBTeTF1brbR1hTB1EOIhsuBJ6pIkS
+D5fy7uprasNBV5RSwYpt1z0mdq4/aIeFJYANYfj3cW1BK2wpNpIHcfpCNUsJ8Oe8
+l6NMhrx/I5LlSSl9JoP08xbjmrgXs/M9/0CE+B0mXtx3pE8ooMXA8NpPuQu7OuTR
+dcnJ/ZkbZweRcEih6ZgPBlJuWzJKa/yruOfEThMv3ajXNaY73hYsnAEUNw4EGAdd
+WyKZ
+-----END CERTIFICATE-----`;
+
 export class DnieTrustStore {
   private static roots: crypto.X509Certificate[] = [];
 
@@ -190,7 +215,15 @@ export class DnieTrustStore {
       };
     }
 
-    // 2. Si no hay CAs de confianza registradas (por ejemplo producción sin IOFE instalada)
+    // 2. Si no hay CAs de confianza registradas (por ejemplo desarrollo/test o fallback de entorno)
+    if (this.roots.length === 0) {
+      if (process.env.DNIE_ROOT_CA_PEM) {
+        this.registrarRootCA(process.env.DNIE_ROOT_CA_PEM);
+      } else if (entorno !== 'production' && process.env.APP_ENV !== 'production') {
+        this.registrarRootCA(SIGD_ROOT_CA_DEV_PEM);
+      }
+    }
+
     if (this.roots.length === 0) {
       return {
         esConfiable: false,
@@ -357,7 +390,10 @@ export async function prepararFirmaDnie(
   contextoActor?: string,
   rolesActor: string[] = [],
   store: DniePreparationStore = obtenerDniePreparationStore(),
+  clienteParam?: PoolClient,
 ): Promise<ContextoPreparacionFirma> {
+  const db = clienteParam ?? pool;
+
   // 1. Validar contexto institucional
   if (contextoActor !== 'INSTITUCIONAL') {
     throw new AppError({
@@ -369,15 +405,18 @@ export async function prepararFirmaDnie(
   }
 
   // 2. Resolver persona asociada a la cuenta del usuario
-  const resPersona = await pool.query<{
+  const resPersona = await db.query<{
     id_persona: string;
     numero_documento: string;
     nombre_completo: string;
   }>(
-    `SELECT p.id_persona, p.numero_documento,
-            COALESCE(p.nombre_completo, p.nombres || ' ' || p.primer_apellido) AS nombre_completo
+    `SELECT p.id_persona,
+            p.id_documento AS numero_documento,
+            COALESCE(pn.nombre_completo, pn.nombres || ' ' || pn.apellidos, pj.razon_social, '') AS nombre_completo
        FROM sigd_auth.cuenta_usuario cu
        JOIN sigd_auth.persona p ON p.id_persona = cu.id_persona
+  LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+  LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = p.id_persona
       WHERE cu.id_usuario = $1`,
     [usuarioId],
   );
@@ -406,13 +445,14 @@ export async function prepararFirmaDnie(
   }
 
   // 4. Validar estado y titularidad del expediente en sigd_tra.expediente
-  const resExp = await pool.query<{
+  const resExp = await db.query<{
     expediente_id: string;
     codigo_expediente: string;
     estado: string;
     solicitante_id: string;
+    id_usuario_creador: string | null;
   }>(
-    `SELECT expediente_id, codigo_expediente, estado, solicitante_id
+    `SELECT expediente_id, codigo_expediente, estado, solicitante_id, id_usuario_creador
        FROM sigd_tra.expediente
       WHERE expediente_id = $1::uuid`,
     [solicitud.expedienteId],
@@ -450,57 +490,66 @@ export async function prepararFirmaDnie(
   let documentoId = solicitud.documentoId;
   let documentoNombre = 'Resolucion_Directoral.pdf';
   let hashSha256 = '';
+  let cvdAsociado: string | undefined = undefined;
 
   if (documentoId) {
-    const resDoc = await pool.query<{
+    const resDoc = await db.query<{
       documento_adjunto_id: string;
       nombre_archivo: string;
       sha256: string;
+      id_requisito: string | null;
+      subido_por: string | null;
+      s3_key: string;
     }>(
-      `SELECT documento_adjunto_id, nombre_archivo, sha256
-         FROM sigd_doc.documento_adjunto
-        WHERE documento_adjunto_id = $1::uuid
-          AND (expediente_tra_id = $2::uuid OR expediente_id = $2::uuid)`,
+      `SELECT d.documento_adjunto_id, d.nombre_archivo, d.sha256, d.id_requisito, d.subido_por, d.s3_key
+         FROM sigd_doc.documento_adjunto d
+        WHERE d.documento_adjunto_id = $1::uuid
+          AND (d.expediente_tra_id = $2::uuid OR d.expediente_id = $2::uuid)`,
       [documentoId, solicitud.expedienteId],
     );
-    if (resDoc.rowCount && resDoc.rowCount > 0) {
-      documentoNombre = resDoc.rows[0].nombre_archivo;
-      hashSha256 = resDoc.rows[0].sha256;
-    }
-  }
 
-  if (!hashSha256) {
-    const resUltimo = await pool.query<{
-      documento_adjunto_id: string;
-      nombre_archivo: string;
-      sha256: string;
-    }>(
-      `SELECT documento_adjunto_id, nombre_archivo, sha256
-         FROM sigd_doc.documento_adjunto
-        WHERE (expediente_tra_id = $1::uuid OR expediente_id = $1::uuid)
-        ORDER BY creado_en DESC
-        LIMIT 1`,
-      [solicitud.expedienteId],
+    if (resDoc.rowCount === 0) {
+      throw new AppError({
+        status: 404,
+        code: 'DOCUMENTO_NO_ENCONTRADO',
+        message: 'No se encontró el documento especificado en el expediente.',
+      });
+    }
+
+    const doc = resDoc.rows[0];
+
+    // Control Fail-Closed: Un documento presentado por el administrado o recaudo de entrada
+    // jamás puede ser firmado como acto resolutivo institucional.
+    const esRecaudoCiudadano =
+      doc.id_requisito !== null ||
+      doc.s3_key.startsWith('expedientes/') ||
+      Boolean(exp.id_usuario_creador && doc.subido_por === exp.id_usuario_creador);
+
+    if (esRecaudoCiudadano) {
+      throw new AppError({
+        status: 422,
+        code: 'DOCUMENTO_NO_ES_ACTO_RESOLUTIVO',
+        message: 'El documento especificado no es un acto resolutivo institucional: corresponde a un recaudo o documento de entrada presentado por el administrado.',
+      });
+    }
+
+    documentoNombre = doc.nombre_archivo;
+    hashSha256 = doc.sha256;
+  } else {
+    // Si no se proporcionó documentoId:
+    // ELIMINADO EL FALLBACK QUE SELECCIONABA EL ÚLTIMO DOCUMENTO DEL CIUDADANO.
+    // En su lugar, obtener o generar el acto resolutivo institucional oficial:
+    const acto = await generarActoResolutivoInstitucional(
+      pool,
+      solicitud.expedienteId,
+      usuarioId,
+      undefined,
+      clienteParam,
     );
-
-    if (resUltimo.rowCount && resUltimo.rowCount > 0) {
-      documentoId = resUltimo.rows[0].documento_adjunto_id;
-      documentoNombre = resUltimo.rows[0].nombre_archivo;
-      hashSha256 = resUltimo.rows[0].sha256;
-    } else {
-      documentoId = crypto.randomUUID();
-      const canonicalContent = `SIGD-ACTO-RESOLUTIVO|EXP:${exp.codigo_expediente}|FECHA:${new Date().toISOString().slice(0, 10)}`;
-      hashSha256 = crypto.createHash('sha256').update(canonicalContent).digest('hex');
-
-      await pool.query(
-        `INSERT INTO sigd_doc.documento_adjunto
-          (documento_adjunto_id, expediente_tra_id, tipo_documental_id, nombre_archivo, s3_bucket, s3_key, sha256, tamano_bytes, mime_type, subido_por)
-         VALUES
-          ($1::uuid, $2::uuid, '00000000-0000-0000-0000-000000000001'::uuid, $3, 'sigd-expedientes', 'resoluciones/' || $1 || '.pdf', $4, 1024, 'application/pdf', $5::uuid)
-         ON CONFLICT (documento_adjunto_id) DO NOTHING`,
-        [documentoId, exp.expediente_id, documentoNombre, hashSha256, usuarioId],
-      );
-    }
+    documentoId = acto.documentoId;
+    documentoNombre = acto.documentoNombre;
+    hashSha256 = acto.hashSha256;
+    cvdAsociado = acto.cvd;
   }
 
   const preparacionId = crypto.randomUUID();
@@ -526,6 +575,7 @@ export async function prepararFirmaDnie(
     fechaCreacion,
     fechaExpiracion,
     consumido: false,
+    cvd: cvdAsociado,
   };
 
   await store.guardar(contexto, TTL_PREPARACION_DNIE_SEGUNDOS);
@@ -541,6 +591,7 @@ export async function verificarYRegistrarFirmaDnie(
   usuarioId: string,
   contextoActor?: string,
   store: DniePreparationStore = obtenerDniePreparationStore(),
+  clienteParam?: PoolClient,
 ): Promise<RespuestaRegistrarFirmaDnie> {
   // 1. Prohibición estricta del proveedor MOCK en entorno de producción (PM-5I-16)
   const esProduccion = process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production';
@@ -625,9 +676,12 @@ export async function verificarYRegistrarFirmaDnie(
   }
 
   // 9. Persistencia transaccional segura con advisory lock e idempotencia WORM
-  const cliente: PoolClient = await pool.connect();
+  const esTransaccionPropia = !clienteParam;
+  const cliente: PoolClient = clienteParam ?? (await pool.connect());
   try {
-    await cliente.query('BEGIN');
+    if (esTransaccionPropia) {
+      await cliente.query('BEGIN');
+    }
 
     // Advisory lock transaccional por expediente
     await cliente.query(
@@ -667,7 +721,9 @@ export async function verificarYRegistrarFirmaDnie(
         reg.firma_b64 === solicitud.firmaB64
       ) {
         // Misma firma y misma operación: devolver registro existente sin mutar (WORM)
-        await cliente.query('COMMIT');
+        if (esTransaccionPropia) {
+          await cliente.query('COMMIT');
+        }
         await store.consumir(solicitud.preparacionId);
         return {
           ok: true,
@@ -706,8 +762,8 @@ export async function verificarYRegistrarFirmaDnie(
       });
     }
 
-    // 11. Generar CVD formal
-    const cvd = `CVD-${new Date().getFullYear()}-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+    // 11. Generar o reutilizar CVD formal ya estampado
+    const cvd = prep.cvd || `CVD-${new Date().getFullYear()}-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
 
     // 12. Insertar evidencia canónica WORM en sigd_doc.firma_digital_documento
     await cliente.query(
@@ -789,7 +845,9 @@ export async function verificarYRegistrarFirmaDnie(
       [usuarioId, solicitud.hashSha256, prep.expedienteId],
     );
 
-    await cliente.query('COMMIT');
+    if (esTransaccionPropia) {
+      await cliente.query('COMMIT');
+    }
     await store.consumir(solicitud.preparacionId);
 
     return {
@@ -810,9 +868,13 @@ export async function verificarYRegistrarFirmaDnie(
       },
     };
   } catch (error) {
-    await cliente.query('ROLLBACK');
+    if (esTransaccionPropia) {
+      await cliente.query('ROLLBACK');
+    }
     throw error;
   } finally {
-    cliente.release();
+    if (esTransaccionPropia) {
+      cliente.release();
+    }
   }
 }

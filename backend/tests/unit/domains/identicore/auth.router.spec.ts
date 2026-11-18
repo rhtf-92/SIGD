@@ -258,4 +258,127 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
     expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
     expect(capturedQuery).toContain('COALESCE(ur.area_id, p.area_id) AS area_id');
   });
+
+  it('POST /api/v1/auth/login entrega contextos legítimos y selecciona INSTITUCIONAL por defecto para trabajadores', async () => {
+    const fakePool = {
+      query: vi.fn(async (queryText: string) => {
+        if (queryText.includes('FROM sigd_auth.cuenta_usuario')) {
+          return {
+            rows: [
+              {
+                id_usuario: '11111111-1111-1111-1111-111111111111',
+                id_persona: '22222222-2222-2222-2222-222222222222',
+                usuario: 'director.general',
+                correo: 'director@iestp-suiza.edu.pe',
+                password_hash: hashValido,
+                activo: true,
+                nombre_completo: 'Director General',
+                rol_codigo: 'DIRECTOR',
+                area_id: 'a0000000-0000-0000-0000-000000000002',
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+        if (queryText.includes('FROM sigd_org.usuario_rol ur')) {
+          return {
+            rows: [
+              { codigo: 'DIRECTOR', area_id: 'a0000000-0000-0000-0000-000000000002' },
+            ],
+            rowCount: 1,
+          };
+        }
+        if (queryText.includes('FROM sigd_org.asignacion_perfil_operativo ap')) {
+          return { rows: [], rowCount: 0 };
+        }
+        if (queryText.includes('FROM sigd_org.asignacion_personal a')) {
+          return { rows: [], rowCount: 0 };
+        }
+        if (queryText.includes('INSERT INTO sigd_auth.sesion_usuario')) {
+          return { rows: [], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 0 };
+      }),
+    } as unknown as Pool;
+
+    const app = construirApp(fakePool);
+
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({
+        identificador: 'director.general',
+        password: 'PasswordValida123!',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.contextoActivo).toBe('INSTITUCIONAL');
+    expect(res.body.usuario.rol).toBe('DIRECTOR');
+    expect(res.body.contextos).toHaveLength(2);
+    expect(res.body.contextos[0].tipo).toBe('INSTITUCIONAL');
+    expect(res.body.contextos[1].tipo).toBe('PERSONAL');
+  });
+
+  it('POST /api/v1/auth/contexto conmuta entre PERSONAL e INSTITUCIONAL revalidando permisos', async () => {
+    const token = firmarTokenAcceso({
+      sub: '11111111-1111-1111-1111-111111111111',
+      roles: ['DIRECTOR'],
+      expiraSegundos: 300,
+    });
+
+    const fakePool = {
+      query: vi.fn(async (queryText: string) => {
+        if (queryText.includes('FROM sigd_auth.cuenta_usuario c')) {
+          return {
+            rows: [
+              {
+                id_usuario: '11111111-1111-1111-1111-111111111111',
+                id_persona: '22222222-2222-2222-2222-222222222222',
+                usuario: 'director.general',
+                correo: 'director@iestp-suiza.edu.pe',
+                activo: true,
+                nombre_completo: 'Director General',
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+        if (queryText.includes('FROM sigd_org.usuario_rol ur')) {
+          return {
+            rows: [
+              { codigo: 'DIRECTOR', area_id: 'a0000000-0000-0000-0000-000000000002' },
+            ],
+            rowCount: 1,
+          };
+        }
+        if (queryText.includes('FROM sigd_org.asignacion_perfil_operativo ap')) {
+          return { rows: [], rowCount: 0 };
+        }
+        return { rows: [], rowCount: 0 };
+      }),
+    } as unknown as Pool;
+
+    const app = construirApp(fakePool);
+
+    // 1. Conmutar a PERSONAL
+    const resPersonal = await request(app)
+      .post('/api/v1/auth/contexto')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ contexto: 'PERSONAL' });
+
+    expect(resPersonal.status).toBe(200);
+    expect(resPersonal.body.ok).toBe(true);
+    expect(resPersonal.body.contextoActivo).toBe('PERSONAL');
+    expect(resPersonal.body.usuario.rol).toBe('CIUDADANO');
+
+    // 2. Conmutar de vuelta a INSTITUCIONAL
+    const resInst = await request(app)
+      .post('/api/v1/auth/contexto')
+      .set('Authorization', `Bearer ${resPersonal.body.accessToken}`)
+      .send({ contexto: 'INSTITUCIONAL' });
+
+    expect(resInst.status).toBe(200);
+    expect(resInst.body.ok).toBe(true);
+    expect(resInst.body.contextoActivo).toBe('INSTITUCIONAL');
+    expect(resInst.body.usuario.rol).toBe('DIRECTOR');
+  });
 });
