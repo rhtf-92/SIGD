@@ -8,7 +8,7 @@ import { TablasMaestrasService } from '../../../../src/domains/organicore/tablas
 import { crearRouterTramites } from '../../../../src/domains/tramicore/tramites.controller.js';
 
 const cargaSuiza = readFileSync(new URL('../../../../carga_tupa_suiza_2026.sql', import.meta.url), 'utf8');
-const datosSuiza = JSON.parse(cargaSuiza.match(/\$datos_suiza\$\n([\s\S]*?)\n\$datos_suiza\$/)![1]) as Record<string, Array<Record<string, unknown>>>;
+const datosSuiza = JSON.parse(cargaSuiza.match(/\$datos_suiza\$\r?\n([\s\S]*?)\r?\n\$datos_suiza\$/)![1]) as Record<string, Array<Record<string, unknown>>>;
 
 describe('Carga reproducible Suiza sin DDL', () => {
   it('conserva las identidades, menciones documentales y limitaciones verificadas', () => {

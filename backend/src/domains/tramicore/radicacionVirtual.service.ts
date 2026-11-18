@@ -92,7 +92,10 @@ export class RadicacionVirtualService {
       transaccionAbierta = true;
 
       const tipoTramite = await this.verificarTipoTramite(cliente, datos.idTipoTramiteTupa);
-      const persona = await this.verificarAdministrado(cliente, datos.idPersona);
+      const persona = await this.verificarAdministrado(
+        cliente,
+        datos.idPersona ?? (typeof idUsuarioOFecha === 'string' ? idUsuarioOFecha : ''),
+      );
       const tipoDocumentalId = await this.resolverTipoDocumentalPorDefecto(cliente);
 
       const [{ cut, anio }, horario] = await Promise.all([

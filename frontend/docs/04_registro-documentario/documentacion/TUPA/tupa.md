@@ -1,601 +1,234 @@
-# TUPA 2026
-
-> **Referencia histórica de Pasco; no es el catálogo vigente del SIGD Suiza.**
-> Se conserva el contenido para trazabilidad, sin establecer equivalencias con procedimientos Suiza.
-> El catálogo informativo Suiza se encuentra en `src/data/tupaSuiza2026.ts` (75 conceptos).
-> Los procedimientos radicables se consultan en los endpoints existentes `/api/v1/tramites/tipos`
-> y `/api/v1/tramites/tupa`, cuya fuente es `sigd_doc.tipo_tramite_tupa` con `vigente = TRUE`.
-> Esta documentación no debe utilizarse para cargar requisitos, tarifas ni plazos de Suiza.
-
-## Instituto de Educación Superior Tecnológico Público Pasco
-
-**Institución:** IESTP PASCO  
-**Documento:** Texto Único de Procedimientos Administrativos (TUPA) 2026  
-**Fecha:** Cerro de Pasco, febrero de 2026
-
-> Documento convertido desde el PDF `TUPA 2026.pdf`. La información se mantiene basada en el contenido del documento fuente.
-
-## Procedimientos administrativos
-
-### 1. Certificado de estudios
-**Requisitos**
-1. Solicitud FUT
-2. Constancia de No Adeudar
-3. Una fotografía tamaño pasaporte
-4. Derecho de trámite (recibo)
-
-**Derecho de pago:** S/. 11.00 por semestre; S/. 2.00  
-**Dependencia que inicia:** Mesa de Partes / Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 05 días hábiles
-
-### 2. Convalidación de estudios interna y externa
-**Requisitos**
-1. Solicitud FUT
-2. Certificados de Estudios Original
-3. Recibo por Derecho de convalidación
-4. Sílabo
-
-**Derecho de pago:** S/. 25.00 por asignatura interna; S/. 30.00 externa  
-**Dependencia que inicia:** Mesa de Partes / Unidad Académica  
-**Autoridad:** Unidad Académica  
-**Tiempo máximo:** Cronograma
-
-### 3. Constancia de aprobación de prácticas
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de pago por formato
-
-**Derecho de pago:** S/. 3.00  
-**Dependencia que inicia:** Mesa de Partes / Secretaría Académica  
-**Autoridad:** Secretaría General  
-**Tiempo máximo:** 01 día hábil
-
-### 4. Carta de presentación
-**Requisitos**
-1. Solicitud FUT
-2. Constancia de Aprobación de Prácticas
-3. Pago por Formato (03 ejemplares)
-
-**Derecho de pago:** S/. 3.00  
-**Dependencia que inicia:** Mesa de Partes  
-**Autoridad:** Unidad Académica  
-**Tiempo máximo:** 01 día
-
-### 5. Aprobación de borrador de informe de práctica profesional
-Incluye: Inicial, Intermedia y Final.
-
-**Requisitos**
-1. Solicitud FUT
-2. Un ejemplar - borrador
-3. Recibo de pago por derecho
-4. Revisión de informe y/o Monografía
-
-**Derecho de pago:** S/. 20.00  
-**Dependencia que inicia:** Mesa de Partes / Jefe de Área Académica / Docentes  
-**Autoridad:** Jefe de Área Académica / Unidad Académica  
-**Tiempo máximo:** 07 días
-
-### 6. Calificación de informe de práctica
-Incluye: Inicial, Intermedia y Final.
-
-**Requisitos**
-1. Solicitud FUT
-2. Ficha de Evaluación del Informe
-   - 01 ejemplar: P. Inicial
-   - 02 ejemplares: P. Intermedia
-   - 03 ejemplares: P. Final
-
-**Derecho de pago:** Gratuito  
-**Dependencia que inicia:** Área Académica / Docente  
-**Autoridad:** Jefe de Área Académica / Unidad Académica  
-**Tiempo máximo:** 02 días
-
-### 7. Convalidación de informes de prácticas empresariales
-
-#### Nivel inicial
-**Requisitos**
-1. Carpeta de práctica debidamente rellenada
-2. Solicitud FUT
-3. Ficha de Evaluación de Prácticas Profesionales (Consolidado)
-4. Ficha de Evaluación Individual
-5. Ficha de Supervisión
-6. Resolución Directoral
-
-**Derecho de pago:** S/. 150.00  
-**Dependencia:** Área Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 03 días
-
-#### Nivel intermedio
-**Requisito adicional indicado en el documento:** Recibo de Pago  
-**Derecho de pago:** S/. 150.00  
-**Tiempo máximo:** 03 días
-
-#### Nivel terminal
-**Requisitos**
-1. Solicitud FUT
-2. Ficha de Evaluación de Prácticas Profesionales (Consolidado)
-3. Ficha de Evaluación Empresarial y/o Institucional
-4. Ficha de Supervisión
-5. Constancia de Prácticas Profesionales
-6. Resolución Directoral
-7. Recibo de Pago
-
-**Derecho de pago:** S/. 150.00  
-**Tiempo máximo:** 03 días
-
-### 8. Módulo I-A al VI-A / Módulo I-B al VI-B
-
-**Módulo I-A al VI-A:** Semestral — Mecánica Automotriz  
-**Derecho de pago:** S/. 75.00
-
-**Módulo I-B al VI-B:** Anual  
-**Derecho de pago:** S/. 150.00
-
-**Requisitos**
-1. Solicitud FUT
-2. Ficha de Evaluación de Prácticas Profesionales (Consolidado)
-3. Ficha de Evaluación Individual
-4. Ficha de Supervisión
-5. Resolución Directoral
-6. Recibo de Pago
-
-### 9. Derecho de titulación
-**Requisitos**
-1. Solicitud FUT
-2. Certificado de Estudios Secundaria - Original
-3. Partida de Nacimiento Original
-4. Certificado de Estudios Superiores – Original
-5. Certificado de Estudios Inglés
-6. Constancias de Aprobación de Prácticas Profesionales
-7. Constancia de Egresado
-8. Acta de Examen Teórico/Práctico
-9. Oficio para Nombrar Jurado
-10. Resolución de Expedido
-11. Trámite de Titulación
-12. Derecho de Titulación
-13. Derecho de Examen Teórico Práctico (Jurados)
-14. Formato de Título
-15. Derecho de Colación
-16. Constancia de No Adeudar
-17. Asesoría para Titulación
-18. 02 Fotografías Pasaporte - Fondo Blanco
-19. Proyecto de Examen Teórico Sistema Modular
-20. Proyecto Examen Teórico Práctico Tradicional
-21. Revisión de trabajos de Investigación
-22. Recibo de Pago por derecho de Inscripción del Título DREP
-23. 03 Formatos de Registro de Título Expedido por la DREP
-24. Fotocopia de DNI autenticados por el Fedatario de la DREP
-25. Sobre Manila tamaño oficio
-26. 20 hojas de papel bond de 80 gramos
-
-**Derechos de pago indicados en el documento:** S/. 0.50, S/. 68.00, S/. 75.00, S/. 3.00, S/. 5.00, S/. 10.00, S/. 35.00, S/. 20.00, S/. 250.00, S/. 100.00, S/. 50.00, S/. 2.00, S/. 200.00, S/. 600.00, S/. 900.00 y S/. 300.00.
-
-**Dependencia:** Mesa de Partes / Secretaría General  
-**Tiempo máximo:** 15 días
-
-### 10. Constancia de no adeudar
-**Requisito:** Recibo de Pago  
-**Derecho de pago:** S/. 2.00  
-**Dependencia:** Administración / Biblioteca  
-**Autoridad:** Administración  
-**Tiempo máximo:** 01 día
-
-### 11. Constancia de egresado
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 5.00  
-**Dependencia:** Mesa de Partes / Secretaría Académica  
-**Autoridad:** Secretaría General  
-**Tiempo máximo:** 02 días
-
-### 12. Carné de estudiante
-**Requisito:** Recibo de Pago  
-**Derecho de pago:** S/. 10.00  
-**Dependencia:** Biblioteca
-
-### 13. Evaluación extraordinaria / subsanación de asignatura
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 35.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría General  
-**Tiempo máximo:** 02 días
-
-### 14. Pago al momento de matricularse
-Incluye:
-- Repitencia de asignaturas/unidad didáctica
-- Repitencia de semestre
-- Examen de cargo por asignatura/unidad didáctica
-- Examen de recuperación por asignatura/unidad didáctica
-
-**Requisitos y pagos indicados:** Recibo de Pago / Solicitud FUT / Pago de Recibo. El documento presenta tasas de S/. 35.00, S/. 35.00 y S/. 20.00 según el concepto.
-
-**Dependencia:** Secretaría Académica / Secretaría General  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 02 días
-
-### 15. Examen extraordinario de asignaturas y/o unidad didáctica
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 35.00 por asignatura / S/. 35.00 por unidad didáctica  
-**Dependencia:** Mesa de Partes / Unidad Académica  
-**Autoridad:** Unidad Académica
-
-### 16. Traslado interno
-**Requisitos**
-1. Solicitud FUT
-2. Derecho de Pago
-3. Certificado de Estudios Originales
-
-**Derecho de pago:** S/. 100.00  
-**Dependencia:** Mesa de Partes
-
-### 17. Traslado externo
-**Requisitos**
-1. Solicitud FUT
-2. Constancia de Vacante
-3. Recibo de Derecho de Pago
-
-**Derecho de pago:** S/. 150.00  
-**Dependencia:** Mesa de Partes
-
-### 18. Record de notas
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago por Semestre
-
-**Derecho de pago:** S/. 3.00 c/s  
-**Dependencia:** Mesa de Partes / Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 19. Constancia de haber sustentado examen T/práctico
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 20.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 20. Constancia de aprobación de examen teórico práctico antes del 2016
-**Requisitos**
-1. Solicitud
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 30.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 21. Aprobación del plan de proyecto, reparación, mantenimiento, implementación, producción, servicio e investigación
-**Requisitos**
-1. Solicitud FUT
-2. Plan de Proyecto
-3. Formato de Resolución
-4. Recibo de Pago
-
-**Derecho de pago:** Tasas vigentes según R.D. N.º 048  
-**Dependencia:** Área Académica  
-**Autoridad:** Dirección General / Unidad Académica  
-**Tiempo máximo:** 05 días
-
-### 22. Examen teórico práctico
-**Requisitos**
-1. Solicitud FUT
-2. Derecho de Examen Teórico Práctico - Jurados
-3. Certificado de Estudios Superiores (Original)
-4. Oficio Nombramiento de Jurados (03)
-5. Acta de Evaluación
-6. Constancia de Prácticas Profesionales
-7. Constancia de Aprobación de Módulos
-8. Resolución de Expedito
-9. Constancia de no adeudar
-10. Constancia de Expedito
-11. Asesoría para Titulación
-
-**Derechos de pago indicados:** S/. 250.00, S/. 10.00, S/. 10.00, S/. 10.00, S/. 3.00, S/. 5.00 y S/. 200.00.  
-**Dependencia:** Mesa de Partes  
-**Autoridad:** Unidad Académica
-
-### 23. Constancia de expedito
-**Requisitos**
-1. Formato de Expedito - Abastecimientos
-2. Solicitud FUT
-
-**Derecho de pago:** S/. 5.00  
-**Dependencia:** Abastecimientos / Áreas Académicas  
-**Tiempo máximo:** 01 día
-
-### 24. Certificación por módulo semestral y anual
-**Requisitos**
-1. Solicitud FUT
-2. Constancia de Aprobación de Módulo
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 20.00  
-**Dependencia:** Secretaría Académica / Dirección General
-
-### 25. Certificados de estudios urgentes
-**Modalidades:** Sistema Tradicional / Sistema Modular.
-
-**Requisitos**
-1. Solicitud FUT
-2. Constancia de No Adeudar
-3. 01 fotografía tamaño pasaporte
-4. Derecho de trámite
-
-**Derechos de pago indicados:** S/. 0.50 y S/. 15.00  
-**Dependencia:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 26. Actualización de matrícula - reentrante
-**Requisitos**
-1. Solicitud FUT
-2. Record de Notas
-
-**Derecho de pago:** S/. 50.00  
-**Dependencia:** Mesa de Partes  
-**Autoridad:** Dirección General
-
-### 27. Certificado de egresado
-**Requisitos**
-1. Solicitud FUT
-2. Recibo de Pago
-
-**Derecho de pago:** S/. 15.00  
-**Dependencia:** Dirección General  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 01 día
-
-### 28. Constancia de ingreso
-**Requisito:** Recibo de Pago  
-**Derecho de pago:** S/. 10.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 29. Devolución de expediente - estudiantes semestre I
-**Requisitos**
-1. Recibo de Pago
-2. Solicitud
-
-**Derecho de pago:** S/. 10.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** 01 día
-
-### 30. Autorización de titulación de otras instituciones
-**Requisitos**
-1. Solicitud
-2. Constancia de Prácticas
-3. Certificado de Estudios
-4. Constancia de autorización
-5. Recibo de Pago
-
-**Derecho de pago:** S/. 50.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 07 días
-
-### 31. Reserva de matrícula, ingreso y/o vacante
-**Requisitos**
-1. Solicitud
-2. Constancia de Matrícula
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 30.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 15 días
-
-### 32. Traslado de matrícula externa a otras instituciones
-**Requisitos**
-1. Solicitud
-2. Certificado de Estudios Superiores
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 150.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** 07 días
-
-### 33. Traslado externo de otras instituciones
-**Requisitos**
-1. Solicitud
-2. Certificado de Estudios Superiores
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 150.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** Cronograma
-
-### 34. Traslado interno
-**Requisitos**
-1. Solicitud
-2. Certificado de Estudios
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 100.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Dirección General  
-**Tiempo máximo:** Cronograma
-
-### 35. Matrícula regular - invicto
-**Requisitos**
-1. Boleta de Notas
-2. 02 Fotografías
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 80.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 36. Matrícula repitente - reentrante
-**Requisitos**
-1. Resolución de Autorización
-2. Recibo de Pago
-3. 02 fotografías
-
-**Derecho de pago:** S/. 130.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 37. Matrícula con unidad a cargo
-**Requisitos**
-1. Boleta de Notas
-2. Recibo de Pago
-3. 02 fotografías
-
-**Derecho de pago:** S/. 100.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 38. Matrícula becada IESTP Pasco - primer puesto
-**Requisitos**
-1. Resolución Directoral
-2. Recibo de Pago
-3. 02 fotografías
-
-**Derecho de pago:** S/. 20.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 39. Matrícula semi beca IESTP - segundo puesto
-**Requisitos**
-1. Resolución Directoral
-2. Recibo de Pago
-3. 02 fotografías
-
-**Derecho de pago:** S/. 40.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 40. Matrícula becado externo
-**Requisitos**
-1. Boleta de Notas
-2. 02 fotografías
-3. Recibo de Pago
-
-**Derecho de pago:** S/. 100.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 41. Examen de admisión ordinario
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 200.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 42. Examen de admisión - modalidad primeros puestos
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 220.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 43. Examen de admisión - modalidad titulados / segunda carrera
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 230.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 44. Examen de admisión - modalidad convenios institucionales
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 200.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 45. Examen de admisión - modalidad servicio militar, víctimas de violencia y personas con discapacidad
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 150.00  
-**Dependencia:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 46. Examen de admisión - modalidad deportistas destacados
-**Requisito:** Inscripción  
-**Derecho de pago:** S/. 200.00  
-**Dependencia:** Secretaría Académica  
-**Autoridad:** Secretaría Académica  
-**Tiempo máximo:** Cronograma
-
-### 47. Examen médico odontológico / tratamiento consultorio odontológico
-
-El documento incluye tarifas diferenciadas para estudiantes, docentes/administrativos y público en general, además de servicios como curación, visitas, extracción dental, profilaxis, fluorización, destartraje y rayos X.
-
-**Servicios y tarifas indicadas en el documento:**
-- Curación pequeña: S/. 10.00
-- Curación mediana: S/. 15.00
-- Curación grande: S/. 20.00
-- Curación extra grande: S/. 30.00
-- Extracción dental simple: S/. 15.00
-- Extracción dental complicada: S/. 50.00
-- Profilaxis: S/. 15.00
-- Fluorización: S/. 5.00
-- Destartraje: S/. 20.00
-- Rayos X peri apical: S/. 10.00
-- Rayos X oclusales: S/. 23.00
-
-**Dependencia:** Tópico  
-**Tiempo máximo:** Cronograma
-
-### 48. Otros
-
-Servicios de alquiler indicados en el documento:
-
-| Servicio | Tarifa |
-|---|---:|
-| Alquiler de Proyector Multimedia | S/. 10.00 / hora |
-| Alquiler de Power + parlante | S/. 20.00 / hora |
-| Alquiler de Auditorio - externo | S/. 50.00 / hora |
-| Alquiler de Auditorio interno | S/. 700.00 / día |
-| Alquiler de Ecram | S/. 20.00 / día |
-| Alquiler de Power | S/. 5.00 / hora |
-| Alquiler de mezclador | S/. 10.00 / hora |
-| Alquiler de Micrófono | S/. 10.00 / día |
-| Alquiler de Aula | S/. 80.00 / día |
-| Alquiler de Campo deportivo | S/. 50.00 / día |
-| Alquiler de Parrilla | S/. 20.00 / día |
-| Alquiler de Cochera - trabajador instituto | S/. 30.00 / mes |
-| Alquiler de Cochera - trabajador particular | S/. 30.00 / mes |
-| Alquiler de Laptop | S/. 3.00 / día |
-| Alquiler de PC por máquina | S/. 2.00 / hora |
-| Alquiler de equipo de soldar | S/. 10.00 / hora |
-| Alquiler de Silla blanca | S/. 2.00 / día |
-| Alquiler de Silla tapizada dúo | S/. 5.00 / día |
-| Alquiler de mesa | S/. 5.00 / día |
-| Alquiler Sala de Licenciamiento | S/. 300.00 / día |
+# Texto Único de Procedimientos Administrativos (TUPA) 2026
+## Instituto de Educación Superior Tecnológico Público "Suiza" (IESTP "Suiza") — Pucallpa
+
+> **Catálogo Oficial y Vigente del SIGD Suiza**  
+> Documento transcrito, verificado y estructurado a partir del documento oficial **`TUPA_SUIZA_2026_CORREGIDO_V2.pdf`** (6 páginas).  
+> Reemplaza de forma definitiva cualquier referencia histórica anterior.
 
 ---
 
-## Uso dentro del proyecto SIGD
+### Datos Generales e Institucionales
 
-Este documento puede almacenarse como documentación del sistema, por ejemplo:
+* **Institución:** Instituto de Educación Superior Tecnológico Público "Suiza" (Pucallpa, Provincia de Coronel Portillo, Región Ucayali)
+* **Distinción:** Instituto de Excelencia
+* **Entidad Matriz:** Dirección Regional de Educación de Ucayali (DREU)
+* **Unidad Orgánica:** Dirección General de Educación Superior y Técnico Profesional
+* **Unidad Impositiva Tributaria (UIT Vigente 2026):** **S/. 5,500.00**
+* **Fecha de Emisión Institucional:** Pucallpa, Enero de 2026
+* **Marco Legal Rector:**
+  * **Ley N° 28693:** Ley General del Sistema Nacional de Tesorería (Principio de Unidad de Caja y Directiva de Tesorería).
+  * **D.S. N° 028-2007-ED:** Reglamento de Gestión de Recursos Propios y Actividades Productivas y Empresariales en las Instituciones Educativas Públicas.
+  * **TUO de la Ley N° 27444:** Ley del Procedimiento Administrativo General (D.S. N° 006-2026-JUS).
 
-```text
-frontend/
-└── docs/
-    └── registro-documentario/
-        └── TUPA_2026.md
-```
+---
 
-**Fuente:** TUPA 2026 del Instituto de Educación Superior Tecnológico Público Pasco.
+## Estructura de Cuentas Corrientes Institucionales
+
+| Rubro Presupuestal / Finalidad | Entidad Bancaria | Número de Cuenta Corriente | Procedimientos Asignados |
+| :--- | :--- | :--- | :--- |
+| **Proyectos Productivos y Venta de Servicios** | Banco de la Nación | **`0512-039170`** | Prácticas, Certificados modulares, Idiomas y CEPRETEC |
+| **Ingresos Propios — Servicios Académicos** | Banco de la Nación | **`0512-015263`** | Titulación, Certificados oficiales, Traslados y Evaluaciones |
+| **Venta de Bienes y Alquileres (D.S. 028-2007-ED)** | Tesorería Institucional | Pago directo en Tesorería / Contrato | Alquileres de galpón, aulas, cancha, agropecuarios |
+
+---
+
+## SECCIÓN I: Proyectos Productivos — Venta de Servicios
+**Cuenta Corriente Banco de la Nación:** `0512-039170`  
+**Gestión de Recursos Propios y Actividades Productivas y Empresariales del IESTP "Suiza"**
+
+### 1.1 Prácticas y Experiencias Formativas
+* **Prácticas Iniciales (`SUZ26-001`)**
+  * **Descripción / Requisitos:** Pago del derecho en Tesorería; control en el Área Académica; comprobante de pago.
+  * **Porcentaje UIT:** 0.64 % UIT Vigente
+  * **Derecho de Pago:** **S/ 35.00**
+
+* **Prácticas Intermedias (`SUZ26-002`)**
+  * **Descripción / Requisitos:** Pago del derecho en Tesorería; control en el Área Académica; comprobante de pago.
+  * **Porcentaje UIT:** 0.82 % UIT Vigente
+  * **Derecho de Pago:** **S/ 45.00**
+
+* **Prácticas Finales (`SUZ26-003`)**
+  * **Descripción / Requisitos:** Pago del derecho en Tesorería; control en el Área Académica; comprobante de pago.
+  * **Porcentaje UIT:** 1.09 % UIT Vigente
+  * **Derecho de Pago:** **S/ 60.00**
+
+* **Experiencias Formativas en Situaciones Reales de Trabajo (EFSRT I, II, III y IV) — Por cada Módulo (`SUZ26-004`)**
+  * **Descripción / Requisitos:** Informe del Área Académica designando los docentes responsables para las supervisiones de Experiencias Formativas en Situaciones Reales de Trabajo; pago del derecho en Tesorería; comprobante de pago.
+  * **Porcentaje UIT:** 0.84 % UIT Vigente
+  * **Derecho de Pago:** **S/ 46.50**
+
+### 1.2 Certificaciones y Módulos
+* **Certificado Modular (I, II, III y IV) — Por cada Módulo (`SUZ26-005`)**
+  * **Descripción / Requisitos:** Pago en el Área de Tesorería; emisión de Boleta de Venta (B/V).
+  * **Derecho de Pago:** **S/ 100.00**
+
+* **Certificado de Inglés (`SUZ26-006`)**
+  * **Descripción / Requisitos:** Pago en el Área de Tesorería; emisión de Boleta de Venta (B/V).
+  * **Derecho de Pago:** **S/ 100.00**
+
+### 1.3 Centro de Idiomas (Inglés, Portugués, Japonés)
+* **Centro de Idiomas — Alumnos del IESTP "Suiza" (`SUZ26-007`)**
+  * **Alcance:** Nivel Básico, paquete de 04 meses para estudiantes regulares.
+  * **Descripción / Requisitos:** Pago en el Área de Tesorería; emisión de B/V.
+  * **Derecho de Pago:** **S/ 300.00**
+
+* **Centro de Idiomas — Alumnos Externos (`SUZ26-008`)**
+  * **Alcance:** Nivel Básico, paquete de 04 meses para estudiantes y público externo.
+  * **Descripción / Requisitos:** Pago en el Área de Tesorería; emisión de B/V.
+  * **Derecho de Pago:** **S/ 350.00**
+
+* **Examen de Suficiencia de Inglés y/o Portugués (`SUZ26-009`)**
+  * **Descripción / Requisitos:** Pago en el Área de Tesorería; emisión de B/V.
+  * **Derecho de Pago:** **S/ 300.00**
+
+### 1.4 Centro Pretecnológico CEPRETEC 2026 (`SUZ26-010`)
+* **Descripción General:** Preparación preuniversitaria / pretecnológica institucional; pago en el Área de Tesorería y emisión de Boleta de Venta (B/V).
+* **Detalle y Desglose Oficial de Tarifas:**
+  1. **Matrícula Regular:** **S/ 400.00**
+  2. **Matrícula Último Mes:** **S/ 200.00**
+  3. **Matrícula Última Semana:** **S/ 60.00**
+  4. **Solo Simulacro (c/u):** **S/ 50.00**
+  5. **Venta de Guías:** **S/ 40.00**
+  6. **Cambio de Carrera (antes del I Simulacro):** **S/ 10.00**
+
+---
+
+## SECCIÓN II: Venta de Bienes y Otros Servicios (D.S. N° 028-2007-ED)
+
+### 2.1 Alquileres e Infraestructura (Venta de Servicios)
+* **Servicios de Maquicentro:** De acuerdo al mercado (Caterpillar y Petroleros).
+* **Alquiler del Galpón Agrícola para Crianza de Pollos — Por Campaña (`SUZ26-011`)**
+  * **Requisitos:** Solicitud dirigida al Director del IESTP "Suiza"; suscripción de contrato; pago en Tesorería según contrato.
+  * **Tarifa Referencial:** **S/ 500.00** por campaña.
+* **Alquiler de Retroproyector (`SUZ26-012`)**
+  * **Requisitos:** Pago en Tesorería.
+  * **Tarifa:** **S/ 100.00**
+* **Alquiler de Aulas — Diario (`SUZ26-013`)**
+  * **Requisitos:** Solicitud dirigida al Director; proveído a Unidad Administrativa para autorización; pago en Tesorería; emisión de B/V.
+  * **Tarifa:** **S/ 150.00** por día.
+* **Alquiler de Cancha de Fútbol — Diario (`SUZ26-014`)**
+  * **Requisitos:** Solicitud dirigida al Director; proveído a Unidad Administrativa; pago en Tesorería; emisión de B/V.
+  * **Tarifa:** **S/ 100.00** por día.
+* **Alquiler de Ambientes para Servicio de Alimentación (`SUZ26-015`)**
+  * **Requisitos:** Solicitud al Director; suscripción de contrato; pago en Tesorería según contrato (rangos de S/ 50.00 a S/ 350.00).
+  * **Tarifa en Cuadro:** **S/ 1,000.00**
+* **Alquiler del Auditorio (`SUZ26-016`)**
+  * **Requisitos:** Solicitud al Director; autorización de Unidad Administrativa; pago en Tesorería; emisión de B/V.
+  * **Tarifa:** **S/ 300.00**
+* **Alquiler de Laboratorio de Cómputo a Terceros (`SUZ26-017`)**
+  * **Tarifa:** **S/ 20.00** (por hora y por cada equipo de cómputo).
+* **Venta Ambulatoria Diaria (`SUZ26-018`)**
+  * **Requisitos:** Solicitud al Director; autorización administrativa; pago en Tesorería; emisión de B/V.
+  * **Tarifa:** **S/ 20.00** por día.
+
+### 2.2 Venta de Bienes Agropecuarios
+> *Precios de mercado aprobados institucionalmente. Requiere pago en Tesorería, entrega en proyectos, papeleta de salida suscrita por Unidad Administrativa, Área de Proyectos Productivos y Abastecimiento/Patrimonio, y supervisión de vigilancia.*
+
+* **Venta de Mangos (Ciento) (`SUZ26-019`):** **S/ 15.00**
+* **Venta de Patos BB (`SUZ26-020`):** **S/ 15.00**
+* **Venta de Patos Pichones — Hembras (`SUZ26-021`):** **S/ 30.00**
+* **Venta de Patos Pichones — Machos (`SUZ26-022`):** **S/ 40.00**
+* **Venta de Pati Pollos (`SUZ26-023`):** **S/ 15.00**
+* **Venta de Patos Adultos Hembras (`SUZ26-024`):** **S/ 40.00**
+* **Venta de Patos Adultos Machos (`SUZ26-025`):** **S/ 50.00** y **S/ 55.00** (según peso/tamaño)
+* **Venta de Porcino para Consumo (Kg) (`SUZ26-026`):** **S/ 20.00** por kg.
+* **Venta de Porcino en Pie (Kg) (`SUZ26-027`):**
+  * Reproductor: **S/ 25.00** por kg.
+  * Carne: **S/ 15.00** por kg.
+* **Venta de Ganado Vacuno (`SUZ26-028`):**
+  * En Pie: **S/ 15.00** por kg.
+  * Carcasa (sin patas, sin cabeza): **S/ 20.00** por kg.
+  * General: **S/ 20.00** por kg.
+* **Servicio de Empadre (`SUZ26-029`):** **S/ 50.00**
+
+---
+
+## SECCIÓN III: Ingresos Propios — Servicios Académicos
+**Cuenta Corriente Banco de la Nación:** `0512-015263`
+
+### 3.1 Proceso Integral de Titulación Profesional Técnica
+Los conceptos y derechos que componen la titulación profesional técnica suman un total institucional de **S/ 917.50**:
+
+| Código SIGD | Concepto Documental | % UIT | Tarifa (S/.) | Requisitos y Descripción Oficial |
+| :--- | :--- | :---: | :---: | :--- |
+| `SUZ26-030` | **Formulario Único de Trámite (FUT)** | 0.07 % | **S/ 4.00** | Pago del derecho en Tesorería (3 FUT); comprobante de pago. |
+| `SUZ26-031` | **Constancia de No Adeudar (Titulación)** | 0.30 % | **S/ 16.50** | Pago en Tesorería; comprobante para expediente de titulación. |
+| `SUZ26-032` | **Trabajo de Aplicación Profesional** | 1.03 % | **S/ 57.00** | Examen teórico-práctico de sustentación de trabajo aplicativo. |
+| `SUZ26-033` | **Examen de Suficiencia Profesional** | 1.03 % | **S/ 57.00** | Examen teórico-práctico por modalidad de suficiencia. |
+| `SUZ26-034` | **Expedición de Título Profesional Técnico** | 1.90 % | **S/ 105.00** | Pago del derecho en Tesorería; comprobante de pago oficial. |
+| `SUZ26-035` | **Certificado de Estudios Superiores (6 semestres)** | 2.24 % | **S/ 124.00** | Emisión completa de actas y notas de los 6 semestres lectivos. |
+| `SUZ26-036` | **Visación de Certificado de Estudios** | 0.29 % | **S/ 16.00** | Cotejo y visación por Secretaría Académica / DREU. |
+| `SUZ26-037` | **Caligrafiado de Título** | 0.47 % | **S/ 26.00** | Inscripción caligráfica reglamentaria en cartulina oficial. |
+| `SUZ26-038` | **Derecho de Formato de Título** | 0.75 % | **S/ 42.00** | Cartulina y formato oficial con elementos de seguridad. |
+| `SUZ26-039` | **Inscripción de Título** | Tarifa fija | **S/ 120.00** | Registro en libro institucional y padrón oficial MINEDU. |
+| `SUZ26-040` | **Medallas de Graduación** | Tarifa fija | **S/ 100.00** | Medalla institucional para colación protocolar. |
+| `SUZ26-041` | **Protector de Título** | Tarifa fija | **S/ 100.00** | Porta-diploma institucional con forro y distintivo. |
+| `SUZ26-042` | **Derecho de Colación** | Tarifa fija | **S/ 100.00** | Ceremonia oficial protocolar de graduación y entrega. |
+| `SUZ26-043` | **Protector de Certificado Modular** | Tarifa fija | **S/ 50.00** | Porta-certificado modular oficial. |
+| — | **TOTAL PROCESO DE TITULACIÓN** | — | **S/ 917.50** | Sumatoria total de conceptos del proceso. |
+
+---
+
+### 3.2 Otros Servicios Académicos y Administrativos
+
+| Código SIGD | Procedimiento / Servicio | % UIT | Tarifa (S/.) | Requisitos y Descripción Oficial |
+| :--- | :--- | :---: | :---: | :--- |
+| `SUZ26-044` | **Modificación de Datos del Título** | 4.88 % | **S/ 269.00** | Pago en Tesorería; rectificación registral y comprobante. |
+| `SUZ26-045` | **Derecho de Duplicado de Título** | 5.61 % | **S/ 309.00** | Pérdida, deterioro o destrucción; publicación y denuncia previa. |
+| `SUZ26-046` | **Matrícula Regular** | Tarifa fija | **S/ 200.00** | Ficha de matrícula; pago de adeudos; pago en Tesorería. |
+| `SUZ26-047` | **Admisión Ordinaria 2026** | Tarifa fija | **S/ 250.00** | Inscripción al concurso de admisión general y derecho de prueba. |
+| `SUZ26-048` | **Guías del Postulante** | Tarifa fija | **S/ 50.00** | Prospecto y carpeta informativa de admisión. |
+| `SUZ26-049` | **Admisión Titulados / Graduados** | Tarifa fija | **S/ 500.00** | Modalidad especial de admisión para egresados de superior. |
+| `SUZ26-050` | **Derecho de Reincorporación (Reingreso)** | Tarifa fija | **S/ 300.00** | Retorno a estudios tras licencia o interrupción; pago Tesorería. |
+| `SUZ26-051` | **Constancia de Egresado** | Tarifa fija | **S/ 31.00** | Culminación del plan de estudios; constancia de egreso formal. |
+| `SUZ26-052` | **Certificado de Bachillerato** | 0.75 % | **S/ 42.00** | Certificación académica de bachillerato técnico. |
+| `SUZ26-053` | **Constancias (Título, Estudios, Matrícula)** | 0.41 % | **S/ 23.00** | Solicitud y emisión de constancias académicas generales. |
+| `SUZ26-054` | **Convalidación entre Planes de Estudios** | 0.84 % | **S/ 46.50** | Adecuación curricular por actualización de plan institucional. |
+| `SUZ26-055` | **Convalidación por Unidades de Competencia** | 0.84 % | **S/ 46.50** | Validación de competencias laborales o formativas previas. |
+| `SUZ26-056` | **Devolución de Expediente** | 0.37 % | **S/ 21.00** | Desistimiento o retiro de documentos originales archivados. |
+| `SUZ26-057` | **Evaluación Extraordinaria (A)** | 1.68 % | **S/ 93.00** | Evaluación especial por modalidad directiva extraordinaria. |
+| `SUZ26-058` | **Evaluación Extraordinaria (RM 069)** | 1.27 % | **S/ 70.00** | Evaluación bajo marco normativo de la RM N° 069. |
+| `SUZ26-059` | **Examen de Recuperación** | 1.27 % | **S/ 70.00** | Derecho a evaluación de subsanación de unidad desaprobada. |
+| `SUZ26-060` | **Examen de Cargo** | 1.27 % | **S/ 70.00** | Examen de unidad didáctica pendiente de regularización. |
+| `SUZ26-061` | **Repitencia de Unidad Didáctica** | 1.56 % | **S/ 86.00** | Cursado reiterado de unidad no aprobada en ciclo previo. |
+| `SUZ26-062` | **Repitencia de Semestre** | 1.45 % | **S/ 80.00** | Matrícula de repitencia del periodo académico semestral. |
+| `SUZ26-063` | **Reserva de Matrícula (Ingresantes)** | 1.20 % | **S/ 66.00** | Resolución Directoral - Secretaría Académica; pago en Tesorería. |
+| `SUZ26-064` | **Licencia de Estudios (Estudiantes Antiguos)**| 1.20 % | **S/ 66.00** | Resolución Directoral - Secretaría Académica; pago en Tesorería. |
+| `SUZ26-065` | **Traslado Interno** | 5.61 % | **S/ 309.00** | Vacante en carrera destino; Resolución Directoral; Tesorería. |
+| `SUZ26-066` | **Traslado Externo** | 7.48 % | **S/ 412.00** | FUT al Director; vacante; Resolución Directoral; Tesorería. |
+| `SUZ26-067` | **Demora Devolución Libro Biblioteca** | 0.19 % | **S/ 10.00** | Informe administrativo; pago por día de demora en entrega. |
+| `SUZ26-068` | **Acceso a la Información Pública** | 0.19 % | **S/ 10.50** | FUT a Dirección; S/ 10.50 trámite base (S/ 10.00 por hoja según texto). |
+| `SUZ26-069` | **Búsqueda y Duplicados de Boletas (c/u)** | 0.19 % | **S/ 10.50** | Pago en Tesorería; búsqueda y copia certificada de boleta. |
+| `SUZ26-070` | **Síllabus de Cursos (c/u)** | 0.19 % | **S/ 10.50** | Búsqueda y visación de plan curricular de unidad por asignatura. |
+| `SUZ26-071` | **Otros Trámites Administrativos** | 0.19 % | **S/ 10.50** | Gestiones documentarias no tipificadas de Secretaría General. |
+| `SUZ26-072` | **Titulación de Otros Institutos** | 9.35 % | **S/ 515.00** | Trámite de egresados de otras instituciones tecnológicas públicas. |
+| `SUZ26-073` | **Examen de Subsanación con Jurado** | 0.60 % | **S/ 33.00** | Resolución Directoral - Secretaría Académica; jurado examinador. |
+| `SUZ26-074` | **Prueba de Suficiencia Académica** | 1.90 % | **S/ 105.00** | Resolución Directoral - Secretaría Académica; evaluación formal. |
+| `SUZ26-075` | **Carnets, Insignia y Distintivos** | 0.93 % | **S/ 50.00** | Emisión de carnet estudiantil, insignia y distintivos del IESTP. |
+
+---
+
+## SECCIÓN IV: Anexo de Verificación Institucional (Página 6 del Documento Fuente)
+
+Este anexo refleja las notas técnicas y límites de verificación del documento oficial original:
+
+1. **CEPRETEC:** Desglose validado de conceptos: Matrícula S/ 400.00, Último mes S/ 200.00, Última semana S/ 60.00, Simulacro S/ 50.00, Guías S/ 40.00, Cambio de carrera antes del I simulacro S/ 10.00.
+2. **Ambientes para Alimentación:** El cuadro exhibe S/ 1,000.00 de monto referencial y una descripción de precios contractuales de S/ 50.00 a S/ 350.00 según licitación/contrato.
+3. **Venta de Bienes:** El documento fuente menciona precios vigentes calculados con base de mercado y conserva la leyenda de actualización patrimonial.
+4. **Patos Adultos Machos:** Se consignan dos importes (S/ 50.00 y S/ 55.00) en función del peso y tamaño del animal.
+5. **Ganado Vacuno:** Se mantiene el desglose: En Pie (S/ 15.00/kg) y Carcasa sin pata ni cabeza (S/ 20.00/kg), con tarifa base de S/ 20.00.
+6. **FUT Titulación:** El original consigna "3 FUT" asociado al monto de S/ 4.00 (0.07 % UIT).
+7. **Constancia de Egresado:** Transcrito íntegramente con monto de S/ 31.00.
+8. **Acceso a la Información Pública:** Consigna tarifa porcentual del 0.19 % UIT (S/ 10.50) y costo por hoja referencial de S/ 10.00.
+9. **Boletas, Síllabus y Otros:** Tarifa individual de S/ 10.50 para cada concepto documental solicitado.
+
+---
+
+## SECCIÓN V: Resumen de Procedimientos Radicables en el SIGD
+
+Los procedimientos que cuentan con soporte de radicación digital a través de la Mesa de Partes Virtual (`/tramite/asistente`) y endpoints de backend `/api/v1/tramites/radicacion-virtual` están sincronizados con la tabla `sigd_doc.tipo_tramite_tupa` del backend y el catálogo `PROCEDIMIENTOS_TUPA_2026` del frontend:
+
+* Identificador técnico estandarizado: formato unívoco **`SUZ26-XXX`** (`SUZ26-001` al `SUZ26-075`).
+* Identificador compuesto en asistente virtual: **`TUPA-SUZ26-XXX`** y opción general **`LIBRE`** para trámites no tarifados.
+* Plazo legal supletorio: 30 días hábiles (salvo indicación específica en convocatoria o cronograma).
+* Silencio Administrativo: Positivo / Negativo según calificación del TUO Ley 27444.

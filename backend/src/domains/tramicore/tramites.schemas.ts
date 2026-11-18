@@ -107,7 +107,10 @@ export const radicacionVirtualSchema = z
       .refine(
         (valor) => valor !== '00000000-0000-0000-0000-000000000000',
         'El identificador del administrado no puede ser el UUID nulo.',
-      ),
+      )
+      .optional(),
+    tipoDocumento: z.enum(['DNI', 'CE', 'RUC', 'PASAPORTE', 'OTRO']).optional(),
+    numeroDocumento: z.string().trim().min(1).max(20).optional(),
     nombreSolicitante: z
       .string()
       .trim()
