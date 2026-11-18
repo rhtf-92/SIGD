@@ -13,21 +13,23 @@ export default function MainLayout({ children }: MainLayoutProps): React.JSX.Ele
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const isLoginPage = location.pathname === "/login";
+  const isAcademicCatalogPage = location.pathname === "/oferta-academica";
+  const isRegistrationPage = location.pathname === "/registro";
   const isPublicHome =
     location.pathname === "/" &&
     (typeof window === "undefined" || !window.localStorage.getItem("sigd_token"));
   const isExpedientesInbox = location.pathname === "/expedientes";
 
-  if (isLoginPage || isPublicHome) {
+  if (isLoginPage || isAcademicCatalogPage || isPublicHome) {
     return <>{children}</>;
   }
 
   if (isExpedientesInbox) {
     return (
-      <div className="min-h-screen bg-[#06131b] text-slate-100">
+      <div className="min-h-screen bg-slate-50 text-slate-800">
         <HeaderInstitucional darkTheme />
         {children}
-        <footer className="border-t border-amber-400/35 bg-slate-950/90 text-amber-100/75 print:hidden before:block before:h-px before:w-full before:bg-gradient-to-r before:from-transparent before:via-amber-300/80 before:to-transparent">
+        <footer className="border-t border-slate-200 bg-white text-slate-500 print:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4 text-center text-xs font-medium sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
             <span>Instituto Suiza • Sistema Integral de Gestión Documentaria</span>
             <span>© 2026</span>
@@ -45,8 +47,16 @@ export default function MainLayout({ children }: MainLayoutProps): React.JSX.Ele
       />
       <div className="flex flex-1 flex-col min-w-0">
         <TopHeaderBar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
-        <main className="flex-1 bg-[#f8fafc] p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-7xl">{children}</div>
+        <main
+          className={`flex-1 ${
+            isRegistrationPage
+              ? "bg-transparent p-0"
+              : "bg-[#f8fafc] p-4 sm:p-6 lg:p-8"
+          }`}
+        >
+          <div className={isRegistrationPage ? "h-full w-full" : "mx-auto max-w-7xl"}>
+            {children}
+          </div>
         </main>
         <footer className="border-t border-slate-200/90 bg-white px-4 py-3.5 text-center text-xs text-slate-500 sm:px-6 lg:px-8 print:hidden">
           <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 sm:flex-row">

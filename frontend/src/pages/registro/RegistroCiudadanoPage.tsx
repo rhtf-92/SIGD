@@ -112,13 +112,24 @@ export default function RegistroCiudadanoPage() {
 
   return (
     <main className="registration-page relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-8 sm:px-6 sm:py-12">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -right-32 -top-36 h-96 w-96 rounded-full bg-blue-200/50 blur-3xl" />
-        <div className="absolute -bottom-40 -left-32 h-[30rem] w-[30rem] rounded-full bg-cyan-100/70 blur-3xl" />
-        <div className="absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-indigo-100/40 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/graduacion-registro.jpg')" }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(135deg, rgba(226, 239, 255, 0.44) 0%, rgba(236, 244, 255, 0.38) 48%, rgba(220, 244, 240, 0.46) 100%)",
+          }}
+        />
+        <div className="absolute -right-32 -top-36 h-96 w-96 rounded-full bg-blue-200/35 blur-3xl" />
+        <div className="absolute -bottom-40 -left-32 h-[30rem] w-[30rem] rounded-full bg-cyan-100/45 blur-3xl" />
+        <div className="absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-indigo-100/25 blur-3xl" />
       </div>
 
-      <div className="registration-card w-full max-w-4xl overflow-hidden rounded-3xl border border-white/80 bg-white shadow-2xl shadow-slate-900/10">
+      <div className="registration-card relative z-10 w-full max-w-4xl overflow-hidden rounded-3xl border border-white/90 bg-white shadow-2xl shadow-slate-900/15">
         <div className="h-1.5 bg-gradient-to-r from-blue-700 via-cyan-500 to-teal-400" />
         <div className="p-5 sm:p-8 lg:p-10">
         <Link
@@ -138,10 +149,10 @@ export default function RegistroCiudadanoPage() {
               <p className="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
                 IESTP “Suiza” · Pucallpa
               </p>
-              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+              <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
                 Registro de Usuario Externo
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+              <p className="mt-2 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
                 Complete sus datos para crear su cuenta y Casilla Electrónica
                 Institucional.
               </p>
@@ -167,7 +178,7 @@ export default function RegistroCiudadanoPage() {
               setActiveTab("NATURAL");
               handleClearMessages();
             }}
-            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:flex-none sm:px-6 ${
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-base font-semibold transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:flex-none sm:px-6 ${
               activeTab === "NATURAL"
                 ? "bg-white text-blue-800 shadow-sm"
                 : "text-slate-500 hover:bg-white/70 hover:text-slate-800"
@@ -185,7 +196,7 @@ export default function RegistroCiudadanoPage() {
               setActiveTab("JURIDICA");
               handleClearMessages();
             }}
-            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:flex-none sm:px-6 ${
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-base font-semibold transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:flex-none sm:px-6 ${
               activeTab === "JURIDICA"
                 ? "bg-white text-blue-800 shadow-sm"
                 : "text-slate-500 hover:bg-white/70 hover:text-slate-800"
@@ -196,7 +207,7 @@ export default function RegistroCiudadanoPage() {
           </button>
         </div>
 
-        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900">
+        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-base text-blue-900">
           <ShieldCheck aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" />
           <p className="leading-6">
             Complete los datos tal como aparecen en sus documentos. Al finalizar,

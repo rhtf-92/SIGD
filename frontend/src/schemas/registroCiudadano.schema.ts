@@ -3,9 +3,6 @@ import { z } from "zod";
 const direccionExactaSchema = z
   .string()
   .trim()
-  .min(5, {
-    message: "La dirección exacta debe tener al menos 5 caracteres",
-  })
   .max(200, {
     message: "La dirección exacta debe tener máximo 200 caracteres",
   });

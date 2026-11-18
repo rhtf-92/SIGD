@@ -12,6 +12,41 @@ export interface RegistroMigracion {
   ejecutado_en: Date;
 }
 
+interface CompatibilidadChecksumMigracion {
+  checksumRegistrado: string;
+  checksumFuente: string;
+  migracionCorrectiva?: string;
+  checksumCorrectivo?: string;
+}
+
+const CHECKSUMS_MIGRACIONES_COMPATIBLES: Readonly<
+  Record<string, CompatibilidadChecksumMigracion>
+> = {
+  '02_sigd_auth.sql': {
+    checksumRegistrado: '8e04a8582283f135f50903c1778613d63802ac1d678ebbb41e94d266b34a2dba',
+    checksumFuente: 'd8a04fa7b2c2958f9a1bb2a1e150fc4abd4a33479d89069154410517284cee64',
+  },
+  '12_sigd_radicacion_registro_ciudadano.sql': {
+    checksumRegistrado: '3907262f6e80a5122ecbd07285056360c93782360bc535e57fd33aefeb5987ae',
+    checksumFuente: 'b640b41e96e834fae752a1de79252559696e7eb4966db0c3e6a0236b28fdd513',
+    migracionCorrectiva: '13_sigd_radicacion_registro_ciudadano.sql',
+    checksumCorrectivo: 'b640b41e96e834fae752a1de79252559696e7eb4966db0c3e6a0236b28fdd513',
+  },
+};
+
+export function checksumMigracionCompatible(
+  nombreScript: string,
+  checksumRegistrado: string,
+  checksumActual: string,
+): boolean {
+  const compatibilidad = CHECKSUMS_MIGRACIONES_COMPATIBLES[nombreScript];
+  if (!compatibilidad) return false;
+  return (
+    compatibilidad.checksumRegistrado === checksumRegistrado &&
+    compatibilidad.checksumFuente === checksumActual
+  );
+}
+
 /**
  * Identificador del Advisory Lock de sesión para el pipeline DDL.
  *
@@ -118,6 +153,32 @@ export async function ejecutarMigraciones(pool: Pool, opciones: { timeoutLockMs?
 
       if (existentes.rowCount && existentes.rowCount > 0) {
         if (existentes.rows[0].checksum_sha256 !== checksum) {
+          const compatibilidad = CHECKSUMS_MIGRACIONES_COMPATIBLES[archivo];
+          const esCompatible = checksumMigracionCompatible(
+            archivo,
+            existentes.rows[0].checksum_sha256,
+            checksum,
+          );
+          const reemplazo = compatibilidad?.migracionCorrectiva;
+          const rutaCorrectiva = reemplazo
+            ? path.join(directorio, reemplazo)
+            : '';
+          const checksumCorrectivo =
+            reemplazo && archivos.includes(reemplazo)
+              ? crypto.createHash('sha256').update(fs.readFileSync(rutaCorrectiva, 'utf-8')).digest('hex')
+              : null;
+
+          if (
+            esCompatible &&
+            (!reemplazo || checksumCorrectivo === compatibilidad.checksumCorrectivo)
+          ) {
+            console.warn(`[MIGRATE] Se reconoce el checksum histórico de ${archivo}; no se modifica el registro.`);
+            if (reemplazo) {
+              console.warn(`[MIGRATE] Se aplicará la migración correctiva ${reemplazo}.`);
+            }
+            continue;
+          }
+
           throw new Error(
             `Error de Integridad DDL: ${archivo} fue alterado tras su ejecución. ` +
               `Checksum registrado: ${existentes.rows[0].checksum_sha256}, actual: ${checksum}`,

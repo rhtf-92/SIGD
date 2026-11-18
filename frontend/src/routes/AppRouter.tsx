@@ -13,6 +13,7 @@ import ValidadorPublicoCvdPage from "../pages/validador/ValidadorPublicoCvdPage"
 import LoginPage from "../pages/LoginPage";
 import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
+import OfertaAcademicaRegistroPage from "../pages/registro/OfertaAcademicaRegistroPage";
 import BandejaExpedientesPage from "../pages/expedientes/BandejaExpedientesPage";
 import ExpedienteDetallePage from "../pages/expedientes/ExpedienteDetallePage";
 import MesaPartesVirtualPage from "../pages/tramite/MesaPartesVirtualPage";
@@ -39,6 +40,7 @@ export default function AppRouter() {
         element={<CasillaElectronicaPage />}
       />
       <Route path="/registro" element={<RegistroCiudadanoPage />} />
+      <Route path="/oferta-academica" element={<OfertaAcademicaRegistroPage />} />
 
       <Route path="/tramite" element={<TramitePage />} />
       <Route

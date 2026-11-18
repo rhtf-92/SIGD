@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderOpen, Gem, Search } from "lucide-react";
+import { FolderOpen, Search } from "lucide-react";
 
 import BandejaTabFilter from "../../components/expedientes/BandejaTabFilter";
 import ExpedienteTable from "../../components/expedientes/ExpedienteTable";
@@ -126,56 +126,45 @@ export default function BandejaExpedientesPage() {
     }).length ?? 0;
 
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[#06131b] text-slate-100">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-[-1] bg-[radial-gradient(rgba(34,211,238,0.08)_1px,transparent_1px),repeating-linear-gradient(135deg,rgba(255,255,255,0.012)_0_1px,transparent_1px_4px)] [background-size:24px_24px,auto]"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-[-1] bg-[radial-gradient(ellipse_at_8%_14%,rgba(8,145,178,0.18),transparent_32%),radial-gradient(ellipse_at_90%_20%,rgba(217,70,239,0.12),transparent_30%),radial-gradient(ellipse_at_50%_100%,rgba(245,158,11,0.11),transparent_38%)]"
-      />
-      <header className="border-b border-cyan-300/15 bg-[#07131e]/85 shadow-[0_8px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+    <main className="min-h-screen bg-slate-50 text-slate-800">
+      <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-5">
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-cyan-300/30 bg-slate-900/70 px-4 py-2 text-sm font-semibold text-cyan-100 shadow-sm transition hover:border-amber-300/70 hover:bg-amber-400/10 hover:text-amber-100"
+            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
           >
             ← Volver al inicio
           </button>
 
-          <p className="text-sm font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">SIGD · IESTP "Suiza"</p>
-          <h1 className="text-2xl font-bold text-fuchsia-300 drop-shadow-[0_0_14px_rgba(232,121,249,0.38)]">Bandeja de Trabajo Diario</h1>
-          <p className="mt-1 text-sm text-slate-300">
+          <p className="text-sm font-bold text-blue-800">SIGD · IESTP "Suiza"</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Bandeja de Trabajo Diario</h1>
+          <p className="mt-1 text-sm text-slate-600">
             Gestión operativa de expedientes, semáforo SLA de 30 días LPAG y taxonomía archivística CCD.
           </p>
         </div>
       </header>
 
       <section
-        className="bandeja-neon-shell relative mx-auto my-8 max-w-7xl rounded-3xl px-6 py-8 shadow-[0_24px_70px_rgba(0,0,0,0.48)] backdrop-blur-2xl sm:px-8"
+        className="relative mx-auto my-8 max-w-7xl rounded-2xl border border-slate-200 bg-white px-4 py-6 shadow-sm sm:px-8 sm:py-8"
       >
         {/* Panel de KPIs */}
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-cyan-300/55 bg-gradient-to-br from-cyan-950/75 via-slate-950/75 to-blue-950/70 p-5 text-center shadow-[0_0_28px_rgba(6,182,212,0.18),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md">
-            <p className="text-3xl font-bold text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.75)]">{volumenActivo}</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-cyan-100/80">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
+            <p className="text-3xl font-bold tabular-nums text-blue-800">{volumenActivo}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
               Volumen Activo
             </p>
           </div>
-          <div className="rounded-2xl border border-amber-300/65 bg-gradient-to-br from-amber-950/80 via-orange-950/60 to-slate-950/75 p-5 text-center shadow-[0_0_30px_rgba(245,158,11,0.2),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md">
-            <p className="text-3xl font-bold text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.75)]">{urgentes}</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-100/85">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
+            <p className="text-3xl font-bold tabular-nums text-slate-900">{urgentes}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
               Trámites Urgentes
             </p>
           </div>
-          <div className="rounded-2xl border border-rose-400/50 bg-gradient-to-br from-rose-950/75 via-red-950/55 to-slate-950/75 p-5 text-center shadow-[0_0_28px_rgba(244,63,94,0.16),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md">
-            <div className="flex items-center justify-center gap-2">
-              <Gem aria-hidden="true" className="h-4 w-4 animate-pulse text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.85)]" />
-              <p className="text-3xl font-bold text-red-500 drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]">{proximosAVencer}</p>
-            </div>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-rose-100/80">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
+            <p className="text-3xl font-bold tabular-nums text-slate-900">{proximosAVencer}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
               Próximos a Vencer (LPAG)
             </p>
           </div>
@@ -184,13 +173,13 @@ export default function BandejaExpedientesPage() {
         {/* Barra de Búsqueda y Filtro CCD */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div className="relative max-w-md flex-1">
-            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-300 drop-shadow-[0_0_7px_rgba(251,191,36,0.6)]" />
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar por CUT, solicitante o asunto…"
-              className="w-full rounded-xl border border-cyan-400/35 bg-slate-950/65 py-2 pl-10 pr-4 text-sm text-amber-100 shadow-[0_0_18px_rgba(6,182,212,0.08)] backdrop-blur-md placeholder:text-slate-500 focus:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400/25"
+              className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
             />
           </div>
 
@@ -198,20 +187,20 @@ export default function BandejaExpedientesPage() {
             <button
               type="button"
               onClick={() => setMostrarFiltroCcd(!mostrarFiltroCcd)}
-              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur-md transition hover:shadow-[0_0_16px_rgba(245,158,11,0.18)] ${
+              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${
                 filtroCcd
-                  ? "border-amber-300 bg-amber-950/75 text-amber-200 shadow-[0_0_18px_rgba(245,158,11,0.2)]"
-                    : "border-amber-300/45 bg-slate-950/65 text-amber-100 hover:border-amber-300 hover:bg-amber-400/10"
+                  ? "border-blue-700 bg-blue-50 text-blue-800"
+                  : "border-slate-300 bg-white text-slate-700 hover:border-blue-400 hover:bg-blue-50"
               }`}
             >
-              <FolderOpen className="h-3.5 w-3.5 text-amber-600 drop-shadow-[0_0_5px_rgba(245,158,11,0.65)]" />
+              <FolderOpen className="h-3.5 w-3.5 text-blue-700" />
               Taxonomía CCD {filtroCcd ? `(${filtroCcd.serie.codigo})` : ""}
             </button>
             {filtroCcd && (
               <button
                 type="button"
                 onClick={() => setFiltroCcd(null)}
-                className="text-xs text-rose-300 hover:text-rose-200 hover:underline"
+                className="text-xs font-medium text-blue-700 hover:text-blue-900 hover:underline"
               >
                 Limpiar filtro CCD
               </button>
@@ -221,15 +210,15 @@ export default function BandejaExpedientesPage() {
 
         {/* Panel Desplegable de Árbol CCD (ENT-M03-04) */}
         {mostrarFiltroCcd && (
-          <div className="mb-6 rounded-2xl border border-amber-300/30 bg-slate-950/60 p-5 shadow-[0_12px_32px_rgba(0,0,0,0.3)] backdrop-blur-xl">
-            <div className="mb-3 flex items-center justify-between border-b border-amber-300/20 pb-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-100">
+          <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                 Seleccionar Serie Documental Archivística (Cuadro CCD)
               </h3>
               <button
                 type="button"
                 onClick={() => setMostrarFiltroCcd(false)}
-                className="text-xs text-slate-400 hover:text-amber-200"
+                className="text-xs font-medium text-slate-500 hover:text-slate-800"
               >
                 ✕ Cerrar
               </button>
@@ -256,10 +245,10 @@ export default function BandejaExpedientesPage() {
 
         {/* Tabla Operativa con Semáforo SLA integrado */}
         {isLoading && (
-          <p className="rounded-2xl border border-cyan-400/20 bg-slate-950/65 p-6 text-sm text-cyan-100">Cargando expedientes…</p>
+          <p className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600" role="status">Cargando expedientes…</p>
         )}
         {isError && (
-          <p className="rounded-2xl border border-rose-400/35 bg-rose-950/50 p-6 text-sm text-rose-200">
+          <p className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800" role="alert">
             Ocurrió un error al cargar los expedientes. Intenta nuevamente.
           </p>
         )}

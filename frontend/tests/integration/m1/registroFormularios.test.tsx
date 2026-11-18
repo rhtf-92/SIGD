@@ -133,7 +133,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     expect(handleSubmit).not.toHaveBeenCalled();
   });
 
-  it("PersonaNaturalForm: quita el error de dirección al corregirla", async () => {
+  it("PersonaNaturalForm: no muestra error por una dirección menor a 5 caracteres", async () => {
     const user = userEvent.setup();
     render(<PersonaNaturalForm onSubmit={vi.fn()} />);
 
@@ -143,13 +143,10 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     const direccion = screen.getByLabelText(/Dirección Exacta \*/i);
     await user.type(direccion, "Jr.");
     await user.click(screen.getByRole("button", { name: /Registrar y Crear Casilla/i }));
-    expect(await screen.findByText(/La dirección exacta debe tener al menos 5 caracteres/i)).toBeInTheDocument();
-
-    await user.type(direccion, " Masisea 460 San Fernando");
     expect(screen.queryByText(/La dirección exacta debe tener al menos 5 caracteres/i)).not.toBeInTheDocument();
   });
 
-  it("PersonaJuridicaForm: quita el error de dirección al corregirla", async () => {
+  it("PersonaJuridicaForm: no muestra error por una dirección menor a 5 caracteres", async () => {
     const user = userEvent.setup();
     render(<PersonaJuridicaForm onSubmit={vi.fn()} />);
 
@@ -159,9 +156,6 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     const direccion = screen.getByLabelText(/Dirección Exacta \*/i);
     await user.type(direccion, "Jr.");
     await user.click(screen.getByRole("button", { name: /Registrar Empresa y Crear Casilla/i }));
-    expect(await screen.findByText(/La dirección exacta debe tener al menos 5 caracteres/i)).toBeInTheDocument();
-
-    await user.type(direccion, " Masisea 460 San Fernando");
     expect(screen.queryByText(/La dirección exacta debe tener al menos 5 caracteres/i)).not.toBeInTheDocument();
   });
 

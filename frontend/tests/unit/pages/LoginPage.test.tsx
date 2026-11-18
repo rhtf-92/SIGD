@@ -76,6 +76,14 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
   });
 
   describe("2. Columna Derecha — Formulario de Login", () => {
+    test("Ofrece acceso al portal de carreras y registro de usuario", () => {
+      renderLoginPage();
+
+      expect(
+        screen.getByRole("link", { name: /Registro de usuario/i }),
+      ).toHaveAttribute("href", "/oferta-academica");
+    });
+
     test("Renderiza encabezado del formulario y campos requeridos con iconos", () => {
       renderLoginPage();
 

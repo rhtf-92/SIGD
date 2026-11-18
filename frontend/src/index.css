@@ -99,6 +99,31 @@
   animation-delay: 135ms;
 }
 
+.registration-form label {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.registration-form label span,
+.registration-form button[type="button"] {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.registration-form input:not([type="checkbox"]),
+.registration-form select,
+.registration-form textarea {
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.registration-form p.text-xs {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
 .registration-form > :nth-child(5) {
   animation-delay: 180ms;
 }
