@@ -8,6 +8,8 @@
  */
 
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
@@ -16,6 +18,7 @@ import {
   generarUrlPresigned,
   verificarMagicBytesPdfEnS3,
 } from './s3-storage.service.js';
+import { middlewareSubidaPdf, EXPEDIENTES_DIR, UPLOADS_ROOT_DIR } from './upload.middleware.js';
 import { ValidationError } from '../../shared/domain/errors/index.js';
 
 const MAX_FILE_BYTES_25MB = 25 * 1024 * 1024; // 26,214,400 bytes
@@ -100,6 +103,9 @@ export function crearRouterStorage(pool?: Pool): Router {
   const router = Router();
   const config = obtenerConfiguracionS3();
 
+  // Endpoint de subida real directa en Express con Multer (Mesa de Partes Virtual y módulos SIGD)
+  router.post('/storage/upload', middlewareSubidaPdf);
+
   // #18 — POST /storage/presigned-url
   router.post('/storage/presigned-url', (req: Request, res: Response) => {
     const datos = presignedInputSchema.parse(req.body);
@@ -107,7 +113,23 @@ export function crearRouterStorage(pool?: Pool): Router {
     const extension = datos.nombreArchivo.split('.').pop()?.toLowerCase() ?? 'pdf';
     const s3Key = `expedientes/${new Date().getFullYear()}/${uuid}.${extension}`;
 
-    const uploadUrl = generarUrlPresigned(s3Key, config, {
+    const endpointParaCliente = new URL(config.endpoint);
+    const origen = req.get('origin');
+    if (endpointParaCliente.hostname === 'minio' && origen) {
+      try {
+        const urlOrigen = new URL(origen);
+        if (urlOrigen.hostname === 'localhost' || urlOrigen.hostname === '127.0.0.1') {
+          endpointParaCliente.hostname = urlOrigen.hostname;
+        }
+      } catch {
+        // Un Origin inválido no altera el endpoint S3 configurado.
+      }
+    }
+
+    const uploadUrl = generarUrlPresigned(s3Key, {
+      ...config,
+      endpoint: endpointParaCliente.origin,
+    }, {
       metodo: 'PUT',
       contentType: datos.mimeType,
       expiraSegundos: config.presignExpirationSegundos,
@@ -118,6 +140,30 @@ export function crearRouterStorage(pool?: Pool): Router {
       s3Key,
       expiraEnSegundos: config.presignExpirationSegundos,
       expiresIn: config.presignExpirationSegundos,
+    });
+  });
+
+  // Manejador PUT para subidas directas tipo streaming/raw hacia almacenamiento local
+  router.put('/storage/upload-raw', (req: Request, res: Response) => {
+    const rawKey = (req.query.key as string) || `expedientes/${new Date().getFullYear()}/${crypto.randomUUID()}.pdf`;
+    const cleanKey = rawKey.replace(/^uploads\//, '').replace(/^\/+/, '');
+    const anio = String(new Date().getFullYear());
+    const folder = path.join(EXPEDIENTES_DIR, anio);
+    if (!fs.existsSync(folder)) {
+      fs.mkdirSync(folder, { recursive: true });
+    }
+    const destPath = path.join(UPLOADS_ROOT_DIR, cleanKey.startsWith('expedientes/') ? cleanKey : `expedientes/${cleanKey}`);
+    const destDir = path.dirname(destPath);
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
+    }
+    const writeStream = fs.createWriteStream(destPath);
+    req.pipe(writeStream);
+    writeStream.on('finish', () => {
+      res.status(200).json({ ok: true, s3Key: cleanKey });
+    });
+    writeStream.on('error', (err) => {
+      res.status(500).json({ error: err.message });
     });
   });
 
@@ -188,7 +234,19 @@ export function crearRouterStorage(pool?: Pool): Router {
       });
     }
 
-    const configBucket = { ...config, bucket };
+    const endpointParaCliente = new URL(config.endpoint);
+    const origen = req.get('origin');
+    if (endpointParaCliente.hostname === 'minio' && origen) {
+      try {
+        const urlOrigen = new URL(origen);
+        if (urlOrigen.hostname === 'localhost' || urlOrigen.hostname === '127.0.0.1') {
+          endpointParaCliente.hostname = urlOrigen.hostname;
+        }
+      } catch {
+        // Un Origin inválido no altera el endpoint S3 configurado.
+      }
+    }
+    const configBucket = { ...config, bucket, endpoint: endpointParaCliente.origin };
     const downloadUrl = generarUrlPresigned(key, configBucket, {
       metodo: 'GET',
       expiraSegundos: 900,

@@ -61,6 +61,10 @@ desktop.ini
 *.sql.bak
 .testcontainers/
 
+# --- Archivos Subidos Localmente (Multer / Expedientes) ---
+uploads/
+!uploads/.gitkeep
+
 # --- Informes de Auditoría, Diagnósticos y Planes Excluidos ---
 docs/DIAGNOSTICO_IDENTICORE.md
 DIAGNOSTICO_IDENTICORE.md

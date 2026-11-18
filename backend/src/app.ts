@@ -1,3 +1,4 @@
+import path from 'node:path';
 import express, { Express } from 'express';
 import type { Pool } from 'pg';
 import { contextMiddleware } from './middleware/context-middleware.js';
@@ -103,6 +104,8 @@ export function construirApp(
   app.disable('x-powered-by');
 
   app.use(corsMiddleware);
+  app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+  app.use('/sigd-expedientes', express.static(path.resolve(process.cwd(), 'uploads')));
   app.use(express.json());
   app.use(contextMiddleware);
 

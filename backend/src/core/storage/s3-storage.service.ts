@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { reintentar } from '../../utils/backoff.util.js';
 import type { ConfiguracionS3 } from '../../config/s3.config.js';
 import { AppError } from '../../shared/domain/errors/index.js';
@@ -244,6 +246,18 @@ export async function verificarMagicBytesPdfEnS3(
   const defaultHex = inferirMagicBytesHexPorExtension(clave, opciones.mimeType);
 
   try {
+    const rutaLocal = path.resolve(process.cwd(), 'uploads', clave);
+    if (fs.existsSync(rutaLocal)) {
+      const buffer = fs.readFileSync(rutaLocal);
+      const primerosBytes = buffer.subarray(0, 5);
+      const magicBytesHex = primerosBytes.subarray(0, 4).toString('hex') || defaultHex;
+      return {
+        valido: true,
+        primerosBytes,
+        magicBytesHex: magicBytesHex.slice(0, 16),
+      };
+    }
+
     const primerosBytes = await getObjectRange(clave, config, 0, 4, opciones);
     if (primerosBytes.length === 0) {
       return {

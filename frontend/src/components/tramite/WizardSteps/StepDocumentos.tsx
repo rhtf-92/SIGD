@@ -269,7 +269,14 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
 
     try {
       const archivoSubido = await subida.upload(file);
-      if (!archivoSubido) return;
+      if (!archivoSubido) {
+        const err = subida.getLastError() ?? subida.error;
+        console.error('[StepDocumentos] Error al subir archivo adjunto:', err);
+        setFileError(
+          err?.message ?? 'No pudimos guardar tu archivo debido a un problema temporal de comunicación.'
+        );
+        return;
+      }
 
       const nuevoArchivo: ArchivoTramite = {
         nombre: file.name,
@@ -284,7 +291,9 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           archivos: [...data.archivos, nuevoArchivo],
         },
       });
+      setFileError(null);
     } catch (error) {
+      console.error('[StepDocumentos] Excepción en subida de archivo:', error);
       setFileError(error instanceof Error ? error.message : 'No se pudo completar la carga del archivo seleccionado. Reintente antes de continuar.');
     } finally {
       if (fileInputRef.current) {

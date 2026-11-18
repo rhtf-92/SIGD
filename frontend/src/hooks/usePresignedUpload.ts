@@ -215,6 +215,7 @@ export async function uploadToPresignedUrl(
   headers: Record<string, string>,
   signal: AbortSignal,
   onProgress: (progress: number) => void,
+  sha256?: string,
 ): Promise<void> {
   const config: AxiosRequestConfig<Blob> = {
     headers,
@@ -226,7 +227,37 @@ export async function uploadToPresignedUrl(
     },
   };
 
-  await axios.put(url, file, config);
+  try {
+    await axios.put(url, file, config);
+  } catch (putErr) {
+    // Si la URL de subida apunta al puerto local de MinIO (:9000) y falla por falta de servicio,
+    // o hay un error de red/conexión, recurre automáticamente al endpoint de subida Express con Multer
+    const esMinioLocal = url.includes(':9000');
+    const esFalloRed =
+      axios.isAxiosError(putErr) &&
+      (!putErr.response || putErr.code === 'ERR_NETWORK' || putErr.message.includes('Network Error'));
+    if (esMinioLocal && esFalloRed) {
+      console.warn(
+        '[usePresignedUpload] MinIO local (:9000) no responde. Recurriendo a subida multipart Multer (/api/v1/storage/upload):',
+        putErr,
+      );
+      const formData = new FormData();
+      formData.append('archivo', file);
+      formData.append('checksumSha256', sha256 || '');
+
+      await apiClient.post('/api/v1/storage/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        signal,
+        onUploadProgress: (event) => {
+          if (event.total) {
+            onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+          }
+        },
+      });
+      return;
+    }
+    throw putErr;
+  }
 }
 
 export function usePresignedUpload(
@@ -374,6 +405,7 @@ export function usePresignedUpload(
               },
               controller.signal,
               setProgress,
+              sha256,
             );
           }
         } catch (cause) {
@@ -386,16 +418,19 @@ export function usePresignedUpload(
         let idDocumentoAdjunto: string | undefined;
         if (!options.demoMode && !options.diferirRegistroAdjunto) {
           try {
+            const confirmPayload: Record<string, unknown> = {
+              s3Key: presigned.s3Key,
+              sha256Hash: sha256,
+            };
+            if (options.idExpediente) {
+              confirmPayload.idExpediente = options.idExpediente;
+              confirmPayload.nombreArchivo = file.name;
+              confirmPayload.tamanoBytes = file.size;
+              confirmPayload.mimeType = resolvedMimeType;
+            }
             const confirmResponse = await apiClient.post<ConfirmarCargaResponse>(
               "/api/v1/storage/confirmar-carga",
-              {
-                s3Key: presigned.s3Key,
-                sha256Hash: sha256,
-                idExpediente: options.idExpediente,
-                nombreArchivo: file.name,
-                tamanoBytes: file.size,
-                mimeType: resolvedMimeType,
-              },
+              confirmPayload,
               { signal: controller.signal },
             );
             idDocumentoAdjunto = confirmResponse.data.idDocumentoAdjunto;
