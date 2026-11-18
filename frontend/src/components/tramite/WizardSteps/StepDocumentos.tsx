@@ -196,18 +196,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     });
   };
 
-  const handleSimularArchivoPrueba = () => {
-    const dummy: ArchivoTramite = {
-      nombre: 'solicitud_firmada_estudios_2026.pdf',
-      peso: 154230,
-      hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    };
-    dispatch({
-      type: 'UPDATE_DOCUMENTOS',
-      payload: { archivos: [...data.archivos, dummy] },
-    });
-    setFileError(null);
-  };
+  
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -424,15 +413,11 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               <p className="text-xs text-slate-500">
                 Suba su solicitud o formulario formal en formato PDF (máximo 25 MB por archivo).
               </p>
+              <p className="text-xs text-amber-800">
+                El archivo se verifica con su huella SHA-256. El almacenamiento definitivo es la siguiente etapa.
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={handleSimularArchivoPrueba}
-              disabled={isSubmitting}
-              className="text-xs font-bold text-[#006EC7] hover:underline self-start sm:self-auto cursor-pointer"
-            >
-              + Cargar PDF de prueba
-            </button>
+            
           </div>
 
           {/* Zona de Drop / Carga de Archivo */}

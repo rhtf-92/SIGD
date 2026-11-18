@@ -100,6 +100,8 @@ $RECYCLE.BIN/
 .antigravity/
 .gemini/
 scripts/
+!backend/scripts/
+!backend/scripts/generarConocimientoTupa.ts
 
 # --- Artefactos de Seguimiento de Agentes ---
 ORIGINAL_REQUEST.md

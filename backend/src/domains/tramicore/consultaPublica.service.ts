@@ -138,9 +138,9 @@ export class ConsultaPublicaService {
   private async leerExpediente(cliente: PoolClient, cut: string): Promise<FilaConsulta | undefined> {
     const resultado = await cliente.query<FilaConsulta>(
       `SELECT e.codigo_expediente AS cut,
-              e.estado AS estado_tramite,
-              t.denominacion   AS tipo_tramite,
-              t.unidad_organica AS unidad_organica,
+              COALESCE(ea.estado_nuevo, e.estado) AS estado_tramite,
+              COALESCE(tv.denominacion, t.denominacion) AS tipo_tramite,
+              COALESCE(tv.unidad_recibe, t.unidad_organica) AS unidad_organica,
               a.asunto,
               a.fecha_ingreso,
               e.fecha_radicacion,
@@ -151,6 +151,8 @@ export class ConsultaPublicaService {
               pn.apellidos,
               pj.razon_social
          FROM sigd_tra.expediente e
+                  LEFT JOIN sigd_tupa.tramite_version tv
+                ON tv.tramite_version_id = e.tramite_version_id
          LEFT JOIN sigd_doc.tipo_documento td
                 ON td.tipo_documental_id = e.tipo_documental_id
          LEFT JOIN sigd_doc.tipo_tramite_tupa t
@@ -164,6 +166,8 @@ export class ConsultaPublicaService {
          LEFT JOIN sigd_tra.asiento_registro a
                 ON a.expediente_id = e.expediente_id
                AND a.anulado = FALSE
+                        LEFT JOIN sigd_rut.estado_actual_expediente ea
+                ON ea.expediente_id = e.expediente_id
         WHERE e.codigo_expediente = $1
         LIMIT 1`,
       [cut],
@@ -178,8 +182,19 @@ export class ConsultaPublicaService {
   }
 
   private async leerProveidosPublicos(cliente: PoolClient, cut: string): Promise<DtoProveidoPublico[]> {
-    // sigd_tra.proveido no existe en el esquema real.
-    return [];
+        const r = await cliente.query<{ secuencia: string; fecha_hora: Date; evento: string; estado_nuevo: string }>(
+      `SELECT m.secuencia, m.fecha_hora, m.evento, m.estado_nuevo
+         FROM sigd_rut.movimiento_tramite m
+         JOIN sigd_tra.expediente e ON e.expediente_id = m.expediente_id
+        WHERE e.codigo_expediente = $1
+        ORDER BY m.secuencia`,
+      [cut],
+    );
+    return r.rows.map((fila) => ({
+      numero: 'MOV-' + String(fila.secuencia),
+      fechaEmision: fila.fecha_hora.toISOString(),
+      resumen: fila.evento.replace(/_/g, ' ') + ' - estado: ' + fila.estado_nuevo.replace(/_/g, ' '),
+    }));
   }
 }
 

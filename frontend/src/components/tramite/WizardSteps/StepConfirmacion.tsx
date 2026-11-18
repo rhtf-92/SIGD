@@ -161,35 +161,39 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         return;
       }
 
-      const archivosPayload =
-        documentos.archivos.length > 0
-          ? documentos.archivos.map((a) => ({
-              nombreArchivo: a.nombre,
-              contentType: 'application/pdf',
-              tamanoBytes: Number(a.peso) || 1024,
-              hashSha256:
-                a.hashSha256 && /^[0-9a-f]{64}$/i.test(a.hashSha256)
-                  ? a.hashSha256.toLowerCase()
-                  : 'a'.repeat(64),
-            }))
-          : [
-              {
-                nombreArchivo: 'documento_principal.pdf',
-                contentType: 'application/pdf',
-                tamanoBytes: 2048,
-                hashSha256: 'a'.repeat(64),
-              },
-            ];
+            if (documentos.archivos.length === 0) {
+        dispatch({ type: 'SET_SUBMITTING', payload: false });
+        dispatch({ type: 'SET_ERROR', payload: 'Debe adjuntar al menos un archivo PDF antes de radicar.' });
+        return;
+      }
+      const archivoInvalido = documentos.archivos.some(
+        (a) => !a.hashSha256 || !/^[0-9a-f]{64}$/i.test(a.hashSha256) || !(Number(a.peso) > 0),
+      );
+      if (archivoInvalido) {
+        dispatch({ type: 'SET_SUBMITTING', payload: false });
+        dispatch({ type: 'SET_ERROR', payload: 'Un archivo no tiene huella o tamano valido. Vuelva a adjuntarlo.' });
+        return;
+      }
+      const correoReal = identificacion.correo.trim().toLowerCase();
+      if (nombreCompleto.length < 2 || !correoReal) {
+        dispatch({ type: 'SET_SUBMITTING', payload: false });
+        dispatch({ type: 'SET_ERROR', payload: 'Faltan el nombre o el correo del solicitante. Vuelva al paso 1.' });
+        return;
+      }
+
+      const archivosPayload = documentos.archivos.map((a) => ({
+        nombreArchivo: a.nombre,
+        contentType: 'application/pdf',
+        tamanoBytes: Number(a.peso),
+        hashSha256: a.hashSha256.toLowerCase(),
+      }));
 
       const payload = {
         asunto: asuntoFinal,
         idTipoTramiteTupa: idTipoTramite,
-        nombreSolicitante:
-          nombreCompleto.length >= 2 ? nombreCompleto : 'Ciudadano Administrado',
-        correo:
-          identificacion.correo.trim().toLowerCase() ||
-          'contacto@iestpsuiza.edu.pe',
-        totalFolios: Number(documentos.numeroFolios) || 1,
+        nombreSolicitante: nombreCompleto,
+        correo: correoReal,
+        totalFolios: Number(documentos.numeroFolios),
         documentos: archivosPayload,
       };
 
@@ -206,7 +210,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         asunto: documentos.asunto,
         remitente: nombreCompleto,
         hashTransaccion:
-          serverData.cargoDigital?.hashSha256 || 'a'.repeat(64),
+          serverData.cargoDigital?.hashSha256 ?? '',
         qrValidationUrl: serverData.qrSeguimientoUrl,
       };
 

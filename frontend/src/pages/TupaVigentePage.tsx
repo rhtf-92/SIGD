@@ -133,14 +133,13 @@ export default function TupaVigentePage() {
           <div className="mt-5 overflow-x-auto">
             <table className="sigd-table w-full min-w-[42rem] border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
-                <tr><th className="p-3">Código</th><th className="p-3">Trámite</th><th className="p-3">Derecho</th><th className="p-3">Plazo</th></tr>
+                <tr><th className="p-3">Código</th><th className="p-3">Trámite</th><th className="p-3">Plazo</th></tr>
               </thead>
               <tbody>
                 {tramites.map((tramite) => (
                   <tr className="border-t border-slate-100 hover:bg-blue-50/50" key={tramite.tramite_version_id}>
                     <td className="p-3 font-mono text-xs">{tramite.codigo}</td>
                     <td className="p-3"><button className="text-left font-semibold text-blue-800 hover:underline" onClick={() => void mostrarDetalle(tramite.codigo)}>{tramite.denominacion}</button></td>
-                    <td className="p-3">{formatoMonto(tramite)}</td>
                     <td className="p-3">{tramite.plazo_texto || "No especificado"}</td>
                   </tr>
                 ))}

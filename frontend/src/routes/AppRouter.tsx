@@ -4,7 +4,7 @@ import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
 import NotFoundPage from "../pages/NotFoundPage";
 
-import SeguridadPage from "../pages/administracion/SeguridadPage";
+import AtencionPage from "../pages/administracion/AtencionPage";
 import DashboardEjecutivoPage from "../pages/DashboardEjecutivoPage";
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
 import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
@@ -33,7 +33,14 @@ export default function AppRouter() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/acceso-denegado" element={<AccesoDenegadoPage />} />
       <Route path="/tupa" element={<TupaVigentePage />} />
-      <Route path="/tupa/gestion" element={<TupaGestionPage />} />
+            <Route
+        path="/tupa/gestion"
+        element={
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR"]}>
+            <TupaGestionPage />
+          </ProtectedRoute>
+        }
+      />
 
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
@@ -71,13 +78,34 @@ export default function AppRouter() {
       />
       <Route
         path="/tramite/ventanilla-presencial"
-        element={<VentanillaPresencialPage />}
+                element={
+          <ProtectedRoute
+            requiredRoles={["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "ESPECIALISTA", "MESA_PARTES"]}
+          >
+            <VentanillaPresencialPage />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/ventanilla"
-        element={<VentanillaPresencialPage />}
+                element={
+          <ProtectedRoute
+            requiredRoles={["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "ESPECIALISTA", "MESA_PARTES"]}
+          >
+            <VentanillaPresencialPage />
+          </ProtectedRoute>
+        }
       />
-      <Route path="/administracion/seguridad" element={<SeguridadPage />} />
+            <Route
+        path="/administracion/atencion"
+        element={
+          <ProtectedRoute
+            requiredRoles={["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "ESPECIALISTA", "MESA_PARTES"]}
+          >
+            <AtencionPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
       <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
       <Route
@@ -98,10 +126,7 @@ export default function AppRouter() {
       <Route
         path="/administracion"
         element={
-          <ProtectedRoute
-            requiredModule="Administración"
-            requiredAction="ver"
-          />
+          <ProtectedRoute requiredRoles={["ADMINISTRADOR", "DIRECTOR"]} />
         }
       >
         {AdminRoutes()}

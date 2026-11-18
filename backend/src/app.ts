@@ -5,6 +5,8 @@ import { errorMiddleware } from './middleware/error-middleware.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
 import { crearRouterResoluciones } from './domains/docucore/resoluciones.controller.js';
 import { crearUsuariosAdminRouter } from './domains/organicore/usuariosAdmin.routes.js';
+import { crearAdminDirectorioRouter } from './domains/organicore/adminDirectorio.routes.js';
+import { crearAtencionRouter } from './domains/rutadoc/atencion.routes.js';
 
 // Módulos de DocuCore / Firma Digital (B_VALENTIN)
 import { crearFirmaRouter } from './domains/docucore/firma.controller.js';
@@ -32,6 +34,8 @@ import type { CalendarioLaboralPort } from './domains/rutadoc/sla.types.js';
 import type { ClasificadorCcdPort } from './domains/rutadoc/ccd.types.js';
 import type { DocumentoMetadataPort } from './domains/rutadoc/foliacion.types.js';
 import { crearRouterTramites } from './domains/tramicore/tramites.controller.js';
+import { crearRouterTiposTupaReal } from './domains/tramicore/tiposTupaReal.routes.js';
+import { crearRouterVentanillaReal } from './domains/tramicore/ventanillaReal.routes.js';
 import { crearRouterReportes } from './domains/corelink/reportes.router.js';
 
 // Módulos OrganiCore Maestras, Calendario y Organigrama
@@ -184,6 +188,8 @@ export function construirApp(
   app.use('/api/v1', crearRouterCasilla(pool));
   app.use('/api/v1', crearRouterTupa(pool));
   app.use('/api/v1', crearRouterStorage(pool));
+  app.use('/api/v1', crearRouterTiposTupaReal(pool));
+  app.use('/api/v1', crearRouterVentanillaReal(pool));
   app.use('/api/v1', crearRouterTramites(pool));
   app.use(
     '/api/v1',
@@ -257,6 +263,8 @@ export function construirApp(
   const routerFirmaPendientes = crearRouterFirmaPendientes(pool);
   app.use('/api/v1/firma', routerFirmaPendientes);
   app.use('/api/v1/firmas', routerFirmaPendientes);
+    app.use('/api/v1/administracion', crearAdminDirectorioRouter(pool));
+    app.use('/api/v1/atencion', crearAtencionRouter(pool));
   app.get('/api/v1/firmas/cola-firmantes', (req, res, next) => {
     req.url = '/pendientes';
     routerFirmaPendientes(req, res, next);
@@ -285,53 +293,37 @@ export function construirApp(
   app.get('/api/v1/admin/roles-permisos', async (_req, res, next) => {
     try {
       const { rows: roles } = await pool.query(
-        `SELECT r.id, r.codigo, r.nombre, r.descripcion,
-                COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
-         FROM sigd_org.rol_sistema r
-         LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.id
-         LEFT JOIN sigd_org.permiso_sistema p ON p.id = rp.permiso_id
-         GROUP BY r.id, r.codigo, r.nombre, r.descripcion`,
+        `SELECT r.rol_id AS id, r.codigo, r.nombre, r.descripcion,
+                COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') AS permisos
+           FROM sigd_org.rol_sistema r
+           LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
+           LEFT JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+          GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion
+          ORDER BY r.codigo`,
       );
       res.json({ roles });
-    } catch {
-      res.json({
-        roles: [
-          { codigo: 'SUPER_ADMIN', nombre: 'Super Administrador' },
-          { codigo: 'DIRECTOR', nombre: 'Director General' },
-          { codigo: 'DOCENTE', nombre: 'Docente Titular' },
-          { codigo: 'MESA_PARTES', nombre: 'Operador de Mesa de Partes' },
-          { codigo: 'ESTUDIANTE', nombre: 'Estudiante / Administrado' },
-        ],
-      });
+    } catch (error) {
+      next(error);
     }
   });
 
+  /* Sedes: el esquema no tiene tabla de sedes. Se devuelve lista vacia (sin datos inventados). */
   app.get('/api/v1/admin/maestras/sede', (_req, res) => {
-    res.json({
-      sedes: [
-        { id: '1', codigo: 'SEDE_CENTRAL', nombre: 'Sede Central Pucallpa - Av. Túpac Amaru Km. 4.5' },
-        { id: '2', codigo: 'SEDE_FILIAL', nombre: 'Filial Yarinacocha' },
-      ],
-    });
+    res.json({ sedes: [] });
   });
 
-  app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
+    app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
     try {
       const { rows } = await pool.query(
-        `SELECT id, codigo, nombre, descripcion, dias_atencion_legal, vigente
-         FROM sigd_doc.tipo_documento
-         WHERE vigente = TRUE
-         ORDER BY nombre ASC`,
+        `SELECT tipo_documental_id AS id, codigo, nombre, extension, mime_type,
+                tamano_maximo_mb, exige_firma, vigente
+           FROM sigd_doc.tipo_documento
+          WHERE vigente = TRUE
+          ORDER BY nombre ASC`,
       );
       res.json(rows);
-    } catch {
-      res.json([
-        { codigo: 'SOLICITUD', nombre: 'Solicitud' },
-        { codigo: 'OFICIO', nombre: 'Oficio' },
-        { codigo: 'MEMORANDO', nombre: 'Memorando' },
-        { codigo: 'INFORME', nombre: 'Informe Técnico' },
-        { codigo: 'RESOLUCION', nombre: 'Resolución Directoral' },
-      ]);
+    } catch (error) {
+      next(error);
     }
   });
 
