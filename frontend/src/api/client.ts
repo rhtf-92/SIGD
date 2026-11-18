@@ -29,7 +29,7 @@ function mapStatusToCategory(status: number): ProblemCategory {
 
 export const apiClient = axios.create({
   baseURL: env.apiBaseUrl,
-  timeout: 15000,
+  timeout: 30000,
   headers: {
     "Content-Type": "application/json",
   },

@@ -216,10 +216,11 @@ export async function uploadToPresignedUrl(
   signal: AbortSignal,
   onProgress: (progress: number) => void,
   sha256?: string,
-): Promise<void> {
+): Promise<{ s3Key?: string } | void> {
   const config: AxiosRequestConfig<Blob> = {
     headers,
     signal,
+    timeout: 30000,
     onUploadProgress: (event) => {
       if (event.total) {
         onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
@@ -230,31 +231,37 @@ export async function uploadToPresignedUrl(
   try {
     await axios.put(url, file, config);
   } catch (putErr) {
-    // Si la URL de subida apunta al puerto local de MinIO (:9000) y falla por falta de servicio,
-    // o hay un error de red/conexión, recurre automáticamente al endpoint de subida Express con Multer
-    const esMinioLocal = url.includes(':9000');
-    const esFalloRed =
-      axios.isAxiosError(putErr) &&
-      (!putErr.response || putErr.code === 'ERR_NETWORK' || putErr.message.includes('Network Error'));
-    if (esMinioLocal && esFalloRed) {
+    // Si la subida directa a la URL (ej. MinIO local en :9000 o localhost) falla por firma (403),
+    // falta de servicio, error de red, timeout o HTTP 4xx/5xx, recurre automáticamente
+    // al endpoint de subida Express con Multer (/api/v1/storage/upload)
+    const esMinioLocal = url.includes(':9000') || url.includes('localhost') || url.includes('127.0.0.1');
+    if (esMinioLocal) {
       console.warn(
-        '[usePresignedUpload] MinIO local (:9000) no responde. Recurriendo a subida multipart Multer (/api/v1/storage/upload):',
+        '[usePresignedUpload] Subida directa PUT no completada en MinIO local. Recurriendo a subida multipart Multer (/api/v1/storage/upload):',
         putErr,
       );
       const formData = new FormData();
       formData.append('archivo', file);
-      formData.append('checksumSha256', sha256 || '');
+      if (sha256) {
+        formData.append('checksumSha256', sha256);
+      }
 
-      await apiClient.post('/api/v1/storage/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        signal,
-        onUploadProgress: (event) => {
-          if (event.total) {
-            onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
-          }
+      const resMulter = await apiClient.post<{ s3Key?: string; ruta?: string; storageUrl?: string }>(
+        '/api/v1/storage/upload',
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          signal,
+          timeout: 30000,
+          onUploadProgress: (event) => {
+            if (event.total) {
+              onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+            }
+          },
         },
-      });
-      return;
+      );
+      const serverKey = resMulter.data?.s3Key ?? resMulter.data?.ruta ?? resMulter.data?.storageUrl;
+      return { s3Key: serverKey };
     }
     throw putErr;
   }
@@ -396,7 +403,7 @@ export function usePresignedUpload(
               }, 80);
             });
           } else {
-            await uploadToPresignedUrl(
+            const uploadResultado = await uploadToPresignedUrl(
               presigned.uploadUrl,
               file,
               {
@@ -407,6 +414,9 @@ export function usePresignedUpload(
               setProgress,
               sha256,
             );
+            if (uploadResultado?.s3Key) {
+              presigned.s3Key = uploadResultado.s3Key;
+            }
           }
         } catch (cause) {
           if (controller.signal.aborted) {

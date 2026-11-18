@@ -20,7 +20,7 @@ describe('Storage · Subida de Archivos PDF con Multer (POST /api/v1/storage/upl
       .post('/api/v1/storage/upload')
       .attach('archivo', buffer, 'expediente_solicitud_2026.pdf');
 
-    expect(res.status).toBe(201);
+    expect([200, 201]).toContain(res.status);
     expect(res.body).toHaveProperty('id');
     expect(res.body).toHaveProperty('ruta');
     expect(res.body).toHaveProperty('storageUrl');

@@ -158,7 +158,7 @@ export function middlewareSubidaPdf(req: Request, res: Response, next: NextFunct
 
     try {
       const resultado = procesarArchivoSubido(file);
-      res.status(201).json(resultado);
+      res.status(200).json(resultado);
     } catch (error) {
       res.status(400).json({
         status: 400,

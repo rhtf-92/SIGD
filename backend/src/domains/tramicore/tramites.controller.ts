@@ -87,6 +87,7 @@ export function crearRouterTramites(
 
   // #15 en catálogo — Catálogo de tipos de trámite TUPA y trámites internos
   const handlerTiposTupa = async (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     try {
       const query = `
         SELECT tipo_tramite_id AS id,

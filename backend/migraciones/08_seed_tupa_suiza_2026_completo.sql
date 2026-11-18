@@ -5,6 +5,9 @@
 -- UIT Vigente 2026: S/. 5,500.00
 -- ============================================================================
 
+-- Depurar registros obsoletos o parciales con códigos previos
+DELETE FROM sigd_doc.tipo_tramite_tupa WHERE codigo LIKE 'TUPA-%';
+
 INSERT INTO sigd_doc.tipo_tramite_tupa (
     tipo_tramite_id,
     codigo,
