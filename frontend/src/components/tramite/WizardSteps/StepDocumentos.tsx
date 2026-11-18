@@ -45,40 +45,7 @@ export interface StepDocumentosProps {
   isSubmitting?: boolean;
 }
 
-// Referencias heredadas solo para rotular borradores antiguos; no se ofrecen para nuevas selecciones.
-const CATALOGO_TUPA_INSTITUCIONAL = [
-  {
-    id: 'TUPA-01',
-    nombre: 'Certificado Oficial de Estudios (Por Semestre o Ciclo Completo)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-02',
-    nombre: 'Constancia de Matrícula, Egresado y No Adeudo',
-    unidad: 'Dirección de Asuntos Académicos',
-  },
-  {
-    id: 'TUPA-03',
-    nombre: 'Expedición de Título Profesional Técnico a Nombre de la Nación',
-    unidad: 'Área de Titulación y Grados',
-  },
-  {
-    id: 'TUPA-04',
-    nombre: 'Rectificación de Matrícula o Reserva de Vacante Temporal',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-05',
-    nombre: 'Convalidación y Homologación de Unidades Didácticas (Módulos)',
-    unidad: 'Coordinación de Programas de Estudio',
-  },
-  {
-    id: 'LIBRE-01',
-    nombre: 'Solicitud Formal General / Trámite Libre Institucional',
-    unidad: 'Mesa de Partes General',
-  },
-] as const;
-
+// Referencias heredadas removidas. El catálogo se sincroniza dinámicamente con el backend institucional.
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // Límite del contrato de radicación.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -126,6 +93,34 @@ function validarTiposFormales(data: unknown): TipoTramiteFormal[] | null {
   return tipos;
 }
 
+function limpiarStorageTipoTramite(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (window.sessionStorage) {
+      const rawSession = window.sessionStorage.getItem('SIGD_TRAMITE_WIZARD_DRAFT');
+      if (rawSession) {
+        const parsed = JSON.parse(rawSession);
+        if (parsed?.documentos && parsed.documentos.tipoTramiteId) {
+          parsed.documentos.tipoTramiteId = '';
+          window.sessionStorage.setItem('SIGD_TRAMITE_WIZARD_DRAFT', JSON.stringify(parsed));
+        }
+      }
+    }
+    if (window.localStorage) {
+      const rawLocal = window.localStorage.getItem('SIGD_TRAMITE_WIZARD_DRAFT');
+      if (rawLocal) {
+        const parsed = JSON.parse(rawLocal);
+        if (parsed?.documentos && parsed.documentos.tipoTramiteId) {
+          parsed.documentos.tipoTramiteId = '';
+          window.localStorage.setItem('SIGD_TRAMITE_WIZARD_DRAFT', JSON.stringify(parsed));
+        }
+      }
+    }
+  } catch {
+    // Limpieza silenciosa
+  }
+}
+
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   data,
   dispatch,
@@ -161,6 +156,12 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
         }
         setTiposFormales(tipos);
         setErrorCatalogo(null);
+        // Si el valor guardado no existe en el catálogo formal cargado, límpialo silenciosamente
+        if (data.tipoTramiteId && !tipos.some((t) => t.id === data.tipoTramiteId)) {
+          dispatch({ type: 'UPDATE_DOCUMENTOS', payload: { tipoTramiteId: '' } });
+          setTouched((prev) => ({ ...prev, tipoTramiteId: false }));
+          limpiarStorageTipoTramite();
+        }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -169,6 +170,11 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           const respaldo = obtenerCatalogoFormalRespaldo();
           setTiposFormales(respaldo);
           setErrorCatalogo(null);
+          if (data.tipoTramiteId && !respaldo.some((t) => t.id === data.tipoTramiteId)) {
+            dispatch({ type: 'UPDATE_DOCUMENTOS', payload: { tipoTramiteId: '' } });
+            setTouched((prev) => ({ ...prev, tipoTramiteId: false }));
+            limpiarStorageTipoTramite();
+          }
         }
       })
       .finally(() => {
@@ -176,7 +182,21 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       });
 
     return () => controller.abort();
-  }, [intentoCatalogo]);
+  }, [intentoCatalogo, data.tipoTramiteId, dispatch]);
+
+  // Limpieza automática y silenciosa de selecciones inválidas o huérfanas de sesiones anteriores
+  useEffect(() => {
+    if (cargandoCatalogo || tiposFormales.length === 0) return;
+
+    if (data.tipoTramiteId && !tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId)) {
+      dispatch({
+        type: 'UPDATE_DOCUMENTOS',
+        payload: { tipoTramiteId: '' },
+      });
+      setTouched((prev) => ({ ...prev, tipoTramiteId: false }));
+      limpiarStorageTipoTramite();
+    }
+  }, [cargandoCatalogo, tiposFormales, data.tipoTramiteId, dispatch]);
 
   // ===========================================================================
   // VALIDACIÓN REACTIVA EN TIEMPO REAL
@@ -187,10 +207,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     // 1. Procedimiento Institucional
     if (cargandoCatalogo || errorCatalogo) {
       errs.tipoTramiteId = 'Debe verificarse el catálogo formal antes de continuar.';
-    } else if (!data.tipoTramiteId.trim()) {
+    } else if (!data.tipoTramiteId.trim() || !tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId)) {
       errs.tipoTramiteId = 'Debe seleccionar un procedimiento institucional o trámite TUPA.';
-    } else if (!tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId)) {
-      errs.tipoTramiteId = 'La selección guardada no pertenece al catálogo formal vigente. Seleccione nuevamente un tipo disponible.';
     }
 
     // 2. Asunto / Petitorio sucinto
@@ -376,7 +394,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 ? `${formId}-tipoTramiteId-error`
                 : undefined
             }
-            value={data.tipoTramiteId}
+            value={tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId) ? data.tipoTramiteId : ''}
             onChange={(e) => handleFieldChange('tipoTramiteId', e.target.value)}
             onBlur={() => markTouched('tipoTramiteId')}
             disabled={isSubmitting}
@@ -387,11 +405,6 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             } disabled:bg-slate-100`}
           >
             <option value="">{cargandoCatalogo ? 'Cargando tipos formales…' : '-- Seleccione un tipo disponible --'}</option>
-            {data.tipoTramiteId && !tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId) && (
-              <option value={data.tipoTramiteId} disabled>
-                Selección guardada pendiente de revalidación: {CATALOGO_TUPA_INSTITUCIONAL.find((tipo) => tipo.id === data.tipoTramiteId)?.nombre ?? data.tipoTramiteId}
-              </option>
-            )}
             {tiposFormales.map((tipo) => (
               <option key={tipo.id} value={tipo.id}>
                 {tipo.codigo} — {tipo.denominacion}{tipo.unidad_organica ? ` (${tipo.unidad_organica})` : ''}
@@ -717,17 +730,32 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           ← Anterior
         </button>
 
-        <button
-          type="submit"
-          disabled={!isValid || isSubmitting || cargandoArchivo}
-          className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-7 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs transition ${
-            isValid && !isSubmitting
-              ? 'bg-[#1877f2] hover:bg-[#166fe5] cursor-pointer'
-              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-          }`}
+        <div
+          className="w-full sm:w-auto"
+          onClick={() => {
+            if (!isValid) {
+              setTouched((prev) => ({
+                ...prev,
+                tipoTramiteId: true,
+                asunto: true,
+                numeroFolios: true,
+                archivos: true,
+              }));
+            }
+          }}
         >
-          Siguiente →
-        </button>
+          <button
+            type="submit"
+            disabled={!isValid || isSubmitting || cargandoArchivo}
+            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-7 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs transition ${
+              isValid && !isSubmitting
+                ? 'bg-[#1877f2] hover:bg-[#166fe5] cursor-pointer'
+                : 'bg-slate-300 text-slate-500 cursor-not-allowed pointer-events-none'
+            }`}
+          >
+            Siguiente →
+          </button>
+        </div>
       </footer>
     </form>
   );
