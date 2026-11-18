@@ -274,7 +274,7 @@ export function construirApp(
   /*
    * OrganiCore / CoreLink - Auditoría Bitácora WORM (#46), Roles RBAC (#45) y Maestras
    */
-  app.get('/api/v1/admin/auditoria/bitacora', async (req, res, next) => {
+  app.get('/api/v1/admin/auditoria/bitacora', exigirRoles('ADMINISTRADOR', 'DIRECTOR'), async (req, res, next) => {
     try {
       const limite = Math.min(Number(req.query.limite ?? 50), 100);
       const offset = Number(req.query.offset ?? 0);
