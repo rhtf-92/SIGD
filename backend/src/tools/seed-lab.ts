@@ -318,6 +318,16 @@ export async function ejecutarSeedLab(poolParam?: Pool): Promise<void> {
         }
       }
 
+      // 9. Si es ciudadano, asegurar que tenga acceso TUPA aprobado para trámites
+      if (cuenta.rol === 'CIUDADANO') {
+        await pool.query(
+          `INSERT INTO sigd_doc.tupa_solicitud_acceso (id_persona, correo, motivo, estado, fecha_resolucion, vigencia_hasta)
+           VALUES ($1::uuid, $2, 'Acceso TUPA autorizado para consultas y requerimientos', 'APROBADA', now(), now() + interval '365 days')
+           ON CONFLICT DO NOTHING;`,
+          [idPersona, cuenta.correo],
+        );
+      }
+
       console.log(
         `✓ [${cuenta.rol}] Usuario: ${cuenta.usuario} | DNI: ${cuenta.dni} | Área: ${cuenta.areaCodigo ?? 'N/A'}`,
       );

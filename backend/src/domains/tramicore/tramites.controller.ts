@@ -1988,15 +1988,23 @@ export function crearRouterTramites(
       observacion: z.string().max(1000).optional(),
       telefono: z.string().max(30).optional(),
       solicitante: z.object({
-        tipoPersona: z.enum(['NATURAL', 'JURIDICA']),
-        numeroDocumento: z.string().regex(/^[A-Za-z0-9]{8,12}$/),
-        correo: z.email(),
-      }).optional(),
+        tipoPersona: z.enum(['NATURAL', 'JURIDICA']).default('NATURAL'),
+        numeroDocumento: z.string().optional().default(''),
+        correo: z.string().optional().default(''),
+        nombres: z.string().optional(),
+        apellidos: z.string().optional(),
+        nombreCompleto: z.string().optional(),
+        celular: z.string().optional(),
+      }).optional().nullable(),
     });
 
     const parsed = esquema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: 'DATOS_INVALIDOS', detalles: parsed.error.issues });
+      return res.status(400).json({
+        error: 'DATOS_INVALIDOS',
+        message: 'Los datos de la solicitud contienen campos inválidos.',
+        detalles: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      });
     }
 
     // 1. Resolver código TUPA contra catálogo oficial sigd_doc.tupa_registro_version
@@ -2046,43 +2054,92 @@ export function crearRouterTramites(
     }
 
     // Regla de actuación interna: ciudadano no puede iniciar actuaciones internas
-    const esInstitucional = identidad.roles.some((r) =>
-      ['MESA_PARTES', 'ADMINISTRADOR', 'DIRECTOR', 'ESPECIALISTA', 'SECRETARIO'].includes(r),
-    );
+    const ROLES_INSTITUCIONALES = [
+      'ADMINISTRADOR',
+      'MESA_PARTES',
+      'DIRECTOR',
+      'SECRETARIO',
+      'ESPECIALISTA',
+      'TESORERIA',
+    ];
+    const esInstitucional = identidad.roles.some((r) => ROLES_INSTITUCIONALES.includes(r));
     if (tipoEfectivo === 'ACTUACION_INTERNA') {
       if (!esInstitucional) {
         throw new ForbiddenError({
           detail: 'Gestión interna institucional. Los ciudadanos externos no pueden iniciar este trámite.',
         });
       }
-    } else if (!esInstitucional && !(await tupaAccesoRepo.tieneAccesoAprobado(identidad.idPersona))) {
-      throw new ForbiddenError({ detail: 'Se requiere una solicitud de acceso TUPA aprobada y vigente.' });
     }
 
-    if (!esInstitucional && parsed.data.solicitante) {
-      throw new ForbiddenError({ detail: 'El ciudadano no puede registrar solicitudes a nombre de otra persona.' });
-    }
-    let solicitante = { idPersona: identidad.idPersona, nombre: identidad.nombre, correo: identidad.correo };
-    if (esInstitucional && tipoEfectivo !== 'ACTUACION_INTERNA') {
-      if (!parsed.data.solicitante) {
-        throw new ValidationError({ invalidParams: [{ name: 'solicitante', reason: 'La ventanilla requiere identificar al solicitante real.' }] });
-      }
-      const persona = await pool.query<{ id_persona: string; nombre: string | null }>(
+    // Identidad del solicitante: por defecto la persona autenticada
+    let solicitante = {
+      idPersona: identidad.idPersona,
+      nombre: identidad.nombre,
+      correo: identidad.correo || (parsed.data.solicitante?.correo ? parsed.data.solicitante.correo.trim() : ''),
+    };
+
+    // Si un operador institucional registra en ventanilla para un administrado (tercero)
+    const docTercero = parsed.data.solicitante?.numeroDocumento?.trim();
+    if (esInstitucional && docTercero && docTercero.length >= 8) {
+      const tipoPersona = parsed.data.solicitante?.tipoPersona ?? 'NATURAL';
+      const numDoc = docTercero.toUpperCase();
+
+      const personaExistente = await pool.query<{ id_persona: string; nombre: string | null }>(
         `SELECT p.id_persona, COALESCE(pn.nombre_completo, pj.razon_social) AS nombre
            FROM sigd_auth.persona p
            LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
            LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = p.id_persona
-          WHERE p.tipo = $1 AND p.id_documento = $2`,
-        [parsed.data.solicitante.tipoPersona, parsed.data.solicitante.numeroDocumento.trim().toUpperCase()],
+          WHERE p.tipo = $1 AND p.id_documento = $2
+          LIMIT 1`,
+        [tipoPersona, numDoc],
       );
-      if (!persona.rows[0]?.nombre) {
-        throw new ValidationError({ invalidParams: [{ name: 'solicitante.numeroDocumento', reason: 'La persona no existe en el registro; regístrela antes de iniciar la solicitud.' }] });
+
+      if (personaExistente.rows[0]) {
+        solicitante = {
+          idPersona: personaExistente.rows[0].id_persona,
+          nombre: personaExistente.rows[0].nombre || parsed.data.solicitante?.nombreCompleto || `Ciudadano ${numDoc}`,
+          correo: parsed.data.solicitante?.correo?.trim() || solicitante.correo,
+        };
+      } else {
+        const insPersona = await pool.query<{ id_persona: string }>(
+          `INSERT INTO sigd_auth.persona (tipo, id_documento)
+           VALUES ($1, $2)
+           ON CONFLICT (tipo, id_documento) DO UPDATE SET id_documento = EXCLUDED.id_documento
+           RETURNING id_persona`,
+          [tipoPersona, numDoc],
+        );
+        const nuevoId = insPersona.rows[0].id_persona;
+        const nombreIngresado =
+          parsed.data.solicitante?.nombreCompleto?.trim() ||
+          [parsed.data.solicitante?.nombres, parsed.data.solicitante?.apellidos].filter(Boolean).join(' ').trim() ||
+          `Ciudadano ${numDoc}`;
+        const correoIngresado =
+          parsed.data.solicitante?.correo?.trim() || `tramite_${numDoc.toLowerCase()}@iestp-suiza.edu.pe`;
+
+        if (tipoPersona === 'NATURAL') {
+          await pool.query(
+            `INSERT INTO sigd_auth.persona_natural (id_persona, nombres, apellidos, nombre_completo, correo)
+             VALUES ($1::uuid, $2, $3, $4, $5)
+             ON CONFLICT (id_persona) DO UPDATE
+               SET nombre_completo = EXCLUDED.nombre_completo,
+                   correo = EXCLUDED.correo`,
+            [nuevoId, parsed.data.solicitante?.nombres || nombreIngresado, parsed.data.solicitante?.apellidos || '', nombreIngresado, correoIngresado],
+          );
+        } else {
+          await pool.query(
+            `INSERT INTO sigd_auth.persona_juridica (id_persona, razon_social)
+             VALUES ($1::uuid, $2)
+             ON CONFLICT (id_persona) DO UPDATE SET razon_social = EXCLUDED.razon_social`,
+            [nuevoId, nombreIngresado],
+          );
+        }
+
+        solicitante = {
+          idPersona: nuevoId,
+          nombre: nombreIngresado,
+          correo: correoIngresado,
+        };
       }
-      solicitante = {
-        idPersona: persona.rows[0].id_persona,
-        nombre: persona.rows[0].nombre,
-        correo: parsed.data.solicitante.correo,
-      };
     }
 
     // Helper para extraer precio base oficial
