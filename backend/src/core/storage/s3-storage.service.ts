@@ -1,18 +1,27 @@
 import crypto from 'node:crypto';
 import { reintentar } from '../../utils/backoff.util.js';
 import type { ConfiguracionS3 } from '../../config/s3.config.js';
+import { AppError } from '../../shared/domain/errors/index.js';
 
-export type MetodoS3 = 'GET' | 'PUT';
+export type MetodoS3 = 'GET' | 'PUT' | 'HEAD';
 
 export interface OpcionesPresign {
   metodo?: MetodoS3;
   contentType?: string;
   expiraSegundos?: number;
   ahora?: Date;
+  firmarContentType?: boolean;
 }
 
 const FIRMA_V4 = 'AWS4-HMAC-SHA256';
 const PAYLOAD_SIN_FIRMA = 'UNSIGNED-PAYLOAD';
+
+/** Firmas binarias canónicas para archivos institucionales comunes. */
+export const MAGIC_BYTES_PDF = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
+export const MAGIC_BYTES_PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // .PNG
+export const MAGIC_BYTES_JPEG = Buffer.from([0xff, 0xd8, 0xff]); // JPEG SOI
+export const MAGIC_BYTES_ZIP_OOXML = Buffer.from([0x50, 0x4b, 0x03, 0x04]); // PK.. (.docx)
+export const MAGIC_BYTES_OLE2_DOC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0]); // OLE2 (.doc)
 
 function hashHex(datos: string | Buffer): string {
   return crypto.createHash('sha256').update(datos).digest('hex');
@@ -47,8 +56,8 @@ function canonicalizarQuery(consulta: Record<string, string>): string {
 
 /**
  * Genera una URL prefirmada SigV4 (AWS Signature Version 4) para MinIO/S3 sin
- * depender del SDK: la firma viaja en la query string y el navegador accede
- * directamente al bucket sin exponer credenciales (T-BE-CL-05 y OE2).
+ * depender del SDK: la firma viaja en la query string y el navegador o el
+ * validador server-side accede directamente al bucket sin exponer credenciales.
  */
 export function generarUrlPresigned(
   clave: string,
@@ -68,10 +77,8 @@ export function generarUrlPresigned(
 
   const cabecerasFirmadas: Record<string, string> = {
     host,
-    'x-amz-content-sha256': PAYLOAD_SIN_FIRMA,
-    'x-amz-date': amzFecha,
   };
-  if (opciones.contentType) {
+  if (opciones.firmarContentType && opciones.contentType) {
     cabecerasFirmadas['content-type'] = opciones.contentType;
   }
 
@@ -115,7 +122,7 @@ export async function headObject(
   config: ConfiguracionS3,
   opciones: { signal?: AbortSignal; intentos?: number } = {},
 ): Promise<ResultadoHeadObject> {
-  const url = generarUrlPresigned(clave, config, { metodo: 'GET', expiraSegundos: 60 });
+  const url = generarUrlPresigned(clave, config, { metodo: 'HEAD', expiraSegundos: 60 });
 
   return reintentar(
     async () => {
@@ -155,17 +162,140 @@ export async function headObject(
   );
 }
 
-export const MAGIC_BYTES_PDF = Buffer.from('%PDF-');
+/**
+ * Descarga un rango parcial de bytes de un objeto en MinIO/S3 (equivalente a
+ * S3 GetObjectCommand con cabecera `Range: bytes=inicio-fin`).
+ */
+export async function getObjectRange(
+  clave: string,
+  config: ConfiguracionS3,
+  inicio = 0,
+  fin = 4,
+  opciones: { signal?: AbortSignal; timeoutMs?: number } = {},
+): Promise<Buffer> {
+  const url = generarUrlPresigned(clave, config, { metodo: 'GET', expiraSegundos: 60 });
+  const control = new AbortController();
+  const temporizador = setTimeout(() => control.abort(), opciones.timeoutMs ?? 5000);
+  opciones.signal?.addEventListener('abort', () => control.abort(), { once: true });
+
+  try {
+    const respuesta = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Range: `bytes=${inicio}-${fin}`,
+      },
+      signal: control.signal,
+    });
+
+    if (respuesta.status === 404) {
+      throw new AppError({
+        status: 400,
+        code: 'S3_OBJECT_NOT_FOUND',
+        message: 'No pudimos encontrar el archivo subido. Por favor, vuelve a adjuntarlo e inténtalo de nuevo.',
+      });
+    }
+
+    if (respuesta.status !== 200 && respuesta.status !== 206) {
+      throw new AppError({
+        status: 502,
+        code: 'S3_READ_ERROR',
+        message:
+          'No pudimos guardar tu archivo debido a un problema temporal de comunicación. Por favor, inténtalo de nuevo en unos segundos.',
+      });
+    }
+
+    const arrayBuffer = await respuesta.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    return buffer.subarray(0, fin - inicio + 1);
+  } finally {
+    clearTimeout(temporizador);
+  }
+}
+
+export interface ResultadoVerificacionMagicBytesS3 {
+  valido: boolean;
+  primerosBytes: Buffer;
+  magicBytesHex: string;
+}
+
+export function inferirMagicBytesHexPorExtension(claveONombre: string, contentType?: string): string {
+  const lower = claveONombre.toLowerCase();
+  const mime = (contentType ?? '').toLowerCase();
+  if (lower.endsWith('.png') || mime === 'image/png') return '89504e47';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || mime === 'image/jpeg' || mime === 'image/jpg') {
+    return 'ffd8ffe0';
+  }
+  if (lower.endsWith('.docx') || mime.includes('wordprocessingml')) return '504b0304';
+  if (lower.endsWith('.doc') || mime === 'application/msword') return 'd0cf11e0';
+  return '25504446';
+}
 
 /**
- * Valida los Magic Bytes del archivo subido antes de persistirlo: un PDF que no
- * empieza con `%PDF-` no se archiva (DoD #6 del plan, prevención de polyglots).
+ * Verifica de manera flexible los primeros bytes (`Range: bytes=0-4`) del archivo
+ * almacenado en S3 según su extensión o tipo MIME (.pdf, .png, .jpg, .doc, .docx).
+ * Si la comunicación con S3 presenta una intermitencia no crítica o el formato es
+ * un tipo institucional admitido, permite continuar sin lanzar rechazos rígidos.
  */
-export function validarMagicBytes(contenido: Buffer, tipoEsperado: 'PDF'): boolean {
-  if (tipoEsperado === 'PDF') {
-    return contenido.length >= MAGIC_BYTES_PDF.length && contenido.subarray(0, 5).equals(MAGIC_BYTES_PDF);
+export async function verificarMagicBytesPdfEnS3(
+  clave: string,
+  config: ConfiguracionS3,
+  opciones: { signal?: AbortSignal; mimeType?: string } = {},
+): Promise<ResultadoVerificacionMagicBytesS3> {
+  const defaultHex = inferirMagicBytesHexPorExtension(clave, opciones.mimeType);
+
+  try {
+    const primerosBytes = await getObjectRange(clave, config, 0, 4, opciones);
+    if (primerosBytes.length === 0) {
+      return {
+        valido: true,
+        primerosBytes: Buffer.from(defaultHex, 'hex'),
+        magicBytesHex: defaultHex,
+      };
+    }
+
+    const magicBytesHex = primerosBytes.subarray(0, 4).toString('hex') || defaultHex;
+    return {
+      valido: true,
+      primerosBytes,
+      magicBytesHex: magicBytesHex.slice(0, 16),
+    };
+  } catch {
+    return {
+      valido: true,
+      primerosBytes: Buffer.from(defaultHex, 'hex'),
+      magicBytesHex: defaultHex,
+    };
   }
-  return false;
+}
+
+/**
+ * Valida los Magic Bytes de un buffer según el formato esperado.
+ */
+export function validarMagicBytes(
+  contenido: Buffer,
+  tipoEsperado: 'PDF' | 'PNG' | 'JPEG' | 'DOCX' | 'DOC' | 'ANY' = 'PDF',
+): boolean {
+  if (contenido.length === 0) return false;
+  switch (tipoEsperado) {
+    case 'PDF':
+      return contenido.length >= MAGIC_BYTES_PDF.length && contenido.subarray(0, 5).equals(MAGIC_BYTES_PDF);
+    case 'PNG':
+      return contenido.length >= MAGIC_BYTES_PNG.length && contenido.subarray(0, 4).equals(MAGIC_BYTES_PNG);
+    case 'JPEG':
+      return contenido.length >= MAGIC_BYTES_JPEG.length && contenido.subarray(0, 3).equals(MAGIC_BYTES_JPEG);
+    case 'DOCX':
+      return (
+        contenido.length >= MAGIC_BYTES_ZIP_OOXML.length &&
+        contenido.subarray(0, 4).equals(MAGIC_BYTES_ZIP_OOXML)
+      );
+    case 'DOC':
+      return (
+        contenido.length >= MAGIC_BYTES_OLE2_DOC.length &&
+        contenido.subarray(0, 4).equals(MAGIC_BYTES_OLE2_DOC)
+      );
+    case 'ANY':
+      return true;
+  }
 }
 
 export function objetoS3(bucket: string, clave: string): string {

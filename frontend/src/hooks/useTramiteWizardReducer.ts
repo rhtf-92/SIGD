@@ -178,7 +178,8 @@ export function wizardReducer(
         isSubmitting: false,
       };
 
-    case 'RESET': {
+    case 'RESET':
+    case 'RESET_WIZARD': {
       if (typeof window !== 'undefined' && window.sessionStorage) {
         try {
           window.sessionStorage.removeItem(TRAMITE_WIZARD_STORAGE_KEY);

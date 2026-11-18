@@ -5,16 +5,15 @@ import type { Pool, PoolClient } from 'pg';
  *
  * Mascara institucional: `EXP-YYYY-XXXXXX` (MGD-PCM, R.S. N° 001-2017-PCM/SEGDI).
  *
- * El correlativo se resuelve en PostgreSQL mediante la funcion
- * `sigd_tra.fn_generar_cut(p_anio)`, que consume la secuencia anual
- * `sigd_tra.seq_cut_<anio>` con `nextval()`. De este modo la asignacion es
- * O(1) y no depende de un `SELECT MAX() + 1` ni de una tabla de control con
- * `FOR UPDATE` por llamada, precisamente los dos patrones que bajo concurrencia
- * producían colisiones SQLSTATE 23505 y dejaban la Mesa de Partes bloqueada.
+ * El correlativo se resuelve en PostgreSQL mediante la funcion nativa
+ * `sigd_tra.fn_generar_cut(p_anio)` (alias canonico de
+ * `sigd_tra.generar_cut_expediente(p_anio)` definida en `05_sigd_tra.sql`),
+ * la cual incrementa atomicamente `sigd_tra.secuencia_anual_cut (anio_fiscal, ultimo_correlativo)`
+ * bajo bloqueo pesimista de fila (`SELECT ... FOR UPDATE`).
  *
- * Este servicio no reimplementa el correlativo: delega en la base de datos para
- * que exista una unica fuente de verdad del CUT y la garantia de unicidad quede
- * respaldada por la restriccion `UNIQUE` sobre `sigd_tra.expediente.cut`.
+ * Este servicio delega en la base de datos para que exista una unica fuente de
+ * verdad del CUT y la garantia de unicidad quede respaldada por las restricciones
+ * `UNIQUE` sobre `sigd_tra.expediente.codigo_expediente` y `sigd_doc.expediente.codigo_expediente`.
  */
 
 /** Expresion regular normativa del formato CUT. Criterio de aceptacion DoD. */
@@ -67,7 +66,7 @@ export function esCutValido(cut: string): boolean {
 export class CutService {
   constructor(private readonly pool: Pool) {}
 
-  /** Ejercicio fiscal corriente segun la zona horaria del institute (America/Lima). */
+  /** Ejercicio fiscal corriente segun la zona horaria del instituto (America/Lima). */
   static anioFiscalCorriente(fecha: Date = new Date()): number {
     const partes = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Lima',
@@ -81,8 +80,9 @@ export class CutService {
   }
 
   /**
-   * Reserva el siguiente CUT del ejercicio fiscal. Acepta la conexion del
-   * llamador para que la asignacion viaje en la misma transaccion que la
+   * Reserva el siguiente CUT del ejercicio fiscal invocando la funcion nativa
+   * `sigd_tra.fn_generar_cut($1::INT)` (`05_sigd_tra.sql`). Acepta la conexion
+   * del llamador para que la asignacion viaje en la misma transaccion que la
    * radicacion: si la radicacion falla, el correlativo se libera con el
    * ROLLBACK y no se quema.
    */
@@ -97,8 +97,6 @@ export class CutService {
       throw new Error('sigd_tra.fn_generar_cut no devolvio ningun CUT.');
     }
     if (!esCutValido(cut)) {
-      // Invariante del motor: si la base devolvio una mascara invalida, el
-      // defecto es del DDL y no del payload, asi que se corta la radicacion.
       throw new Error(`CUT_CON_MASCARA_INVALIDA: la base de datos devolvio "${cut}"`);
     }
     return { cut, anio };

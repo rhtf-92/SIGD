@@ -2,36 +2,32 @@ import { z } from 'zod';
 import { REGEX_CUT } from './cut.service.js';
 
 /**
- * T-BE-TC-02 · Contratos de entrada de Tramites.
+ * T-BE-TC-02 · Contratos de entrada de Tramites (Alineado con 02_sigd_auth, 04_sigd_doc, 05_sigd_tra).
  *
- * El esquema es deliberadamente estricto (`.strict()`): el problema que se
- * corrige son las insertions parciales que dejaban expedientes "zombie" sin
- * administrado asociado ni documento adjunto. Un campo obligatorio ausente, un
- * correo invalido o un adjunto sin hash deben fallar ANTES de abrir la
- * transaccion, no después de haber escrito la cabecera.
+ * El esquema permite formatos documentales institucionales comunes:
+ * PDF (.pdf), imágenes (.png, .jpg, .jpeg, .tiff) y documentos de Office (.doc, .docx, .odt).
  */
 
-/** Tipos MIME aceptados para la radicacion virtual. */
+/** Tipos MIME institucionales comunes aceptados para la radicacion virtual. */
 export const TIPOS_ARCHIVO_ACEPTADOS = [
   'application/pdf',
   'image/jpeg',
+  'image/jpg',
   'image/png',
   'image/tiff',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.oasis.opendocument.text',
+  'application/octet-stream',
 ] as const;
 
-/** Tope por archivo: 20 MiB. El limite lo aplica el gateway S3 (B_RIQUELMER). */
-export const TAMANO_MAXIMO_BYTES = 20 * 1024 * 1024;
-
-/** Longitudes de la mascara de un hash SHA-256 en hexadecimal. */
-const LONGITUD_HASH = 64;
+/** Tope normativo por archivo: 25 MB (26,214,400 bytes, alineado con sigd_doc.tipo_documento.tamano_maximo_mb = 25). */
+export const TAMANO_MAXIMO_BYTES = 25 * 1024 * 1024;
 
 const hashSha256 = z
   .string()
   .trim()
-  .regex(/^[0-9a-f]{64}$/i, 'El hash debe ser SHA-256 en 64 digitos hexadecimales.');
+  .regex(/^[0-9a-f]{64}$/i, 'El código de seguridad SHA-256 del archivo no es válido.');
 
 /**
  * Evita homoglifos y rutas: solo se admiten extension y nombre de archivo sin
@@ -45,7 +41,20 @@ const nombreArchivo = z
   .max(255)
   .refine((valor) => !/[\\/]/.test(valor), 'El nombre del archivo no puede contener rutas.')
   .refine((valor) => !valor.includes('..'), 'El nombre del archivo no puede contener "..".')
-  .refine((valor) => /\.[A-Za-z0-9]{1,10}$/.test(valor), 'El archivo debe tener extension.');
+  .refine((valor) => /\.[A-Za-z0-9]{1,10}$/.test(valor), 'El archivo debe tener extensión.');
+
+/**
+ * Clave de objeto en MinIO S3 (`s3_key` en `sigd_doc.documento_adjunto`, max 500 chars).
+ * Previene path traversal (`..`), barras invertidas y claves vacías.
+ */
+const s3KeyMetadataSchema = z
+  .string()
+  .trim()
+  .min(3, 'La ruta de almacenamiento debe tener al menos 3 caracteres.')
+  .max(500, 'La ruta de almacenamiento no puede superar los 500 caracteres.')
+  .refine((valor) => !valor.includes('..') && !valor.includes('\\'), {
+    message: 'La ruta de almacenamiento contiene caracteres no permitidos.',
+  });
 
 export const adjuntoRadicacionSchema = z
   .object({
@@ -57,16 +66,20 @@ export const adjuntoRadicacionSchema = z
       .max(120)
       .refine(
         (valor): valor is (typeof TIPOS_ARCHIVO_ACEPTADOS)[number] =>
-          (TIPOS_ARCHIVO_ACEPTADOS as readonly string[]).includes(valor),
+          (TIPOS_ARCHIVO_ACEPTADOS as readonly string[]).includes(valor.toLowerCase()),
         {
-          message: `Tipo de archivo no admitido. Se aceptan: ${TIPOS_ARCHIVO_ACEPTADOS.join(', ')}.`,
+          message:
+            'Formato de archivo no compatible. Se admiten documentos PDF, Word (.doc, .docx) e imágenes (.png, .jpg).',
         },
       ),
     tamanoBytes: z.number().int().positive().max(TAMANO_MAXIMO_BYTES, {
-      message: 'El archivo supera el maximo permitido de 20 MiB.',
+      message: 'Tu archivo supera el tamaño máximo permitido de 25 MB.',
     }),
     hashSha256,
-    storagePath: z.string().trim().max(512).optional(),
+    storagePath: s3KeyMetadataSchema.optional(),
+    s3Key: s3KeyMetadataSchema.optional(),
+    s3Bucket: z.string().trim().min(3).max(120).optional(),
+    idDocumentoAdjunto: z.string().trim().uuid().optional(),
   })
   .strict();
 
@@ -81,24 +94,20 @@ export const radicacionVirtualSchema = z
     idTipoTramiteTupa: z
       .string()
       .trim()
-      .uuid('El tipo de tramite TUPA debe ser un UUID valido.')
+      .uuid('El tipo de tramite TUPA debe ser un UUID valido (sigd_doc.tipo_tramite_tupa.tipo_tramite_id).')
       .refine(
         (valor) => valor !== '00000000-0000-0000-0000-000000000000',
         'El tipo de tramite no puede ser el UUID nulo.',
       ),
-    // `sigd_auth.persona.id` es BIGSERIAL en el DDL canonico de IdentiCore, de
-    // modo que el identificador del solicitante llega como entero. Se acepta
-    // tambien string porque las variables de ruta y los formularios del
-    // frontend serializan todo como texto.
-    idPersona: z.coerce
-      .number()
-      .int('El administrado debe ser un identificador entero.')
-      .positive('El administrado debe ser un identificador entero positivo.'),
-    // T-BE-TC-02 exige certificar los datos completos del solicitante y
-    // rechazar los correos invalidos. Se capturan en el acto de la radicacion
-    // porque el cargo digital y las notificaciones de seguimiento se dirigen a
-    // esta direccion; no se toma del padron porque el ciudadano puede radicar
-    // con un correo de contacto distinto al registrado.
+    // `sigd_auth.persona.id_persona` es UUID en el DDL canonico desplegado (02_sigd_auth.sql).
+    idPersona: z
+      .string()
+      .trim()
+      .uuid('El administrado debe ser un UUID valido (sigd_auth.persona.id_persona).')
+      .refine(
+        (valor) => valor !== '00000000-0000-0000-0000-000000000000',
+        'El identificador del administrado no puede ser el UUID nulo.',
+      ),
     nombreSolicitante: z
       .string()
       .trim()

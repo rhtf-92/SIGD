@@ -107,6 +107,8 @@ export interface ArchivoTramite {
   peso: number;
   hashSha256: string;
   storageUrl?: string;
+  s3Key?: string;
+  idDocumentoAdjunto?: string;
 }
 
 /**
@@ -167,7 +169,8 @@ export type WizardAction =
   | { type: 'SET_CARGO'; payload: CargoDigitalResponse }
   | { type: 'SET_SUBMITTING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  | { type: 'RESET_WIZARD' };
 
 /**
  * Valores iniciales por defecto para el estado de Identificación.

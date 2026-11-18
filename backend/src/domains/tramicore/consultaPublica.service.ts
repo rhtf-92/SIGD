@@ -5,23 +5,15 @@ import type { ConsultaPublicaParams } from './tramites.schemas.js';
 /**
  * T-BE-TC-04 · Consulta publica de expediente por CUT con minimizacion de datos.
  *
- * Principio rector: el endpoint #16 se invoca sin credenciales, por lo que jamas
- * debe projectar datos de contacto del administrado. La Ley N. 29733 obliga a
- * restringir el tratamiento a la finalidad para la que se recolecto, y una
- * consulta de expediente no incluye el telefono particular ni el correo
- * personal del estudiante. Este servicio devuelve un DTO cerrado: si un campo
- * sensible no esta en la lista, no sale.
- *
- * Se expone el estado procesal y unicamente los proveidos marcados como
- * publicos por el area correspondiente.
- *
- * Desviacion consciente respecto del plan: la especificacion ilustra el
- * enmascarado del telefono como `961***456`. Aqui el telefono se OMITE en lugar
- * de enmascararse, porque publicar que el dato existe y unveil su forma
- * contradice el principio de minimizacion que la propia tarea invoca. El
- * documento de identidad si se enmascara, con la forma `45***123` que el plan
- * fija. `direccion` no se contempla porque `sigd_auth.persona` no tiene esa
- * columna en el esquema vigente.
+ * ALINEACION CON MIGRACIONES REALES (02_sigd_auth.sql, 04_sigd_doc.sql, 05_sigd_tra.sql):
+ *   * `sigd_tra.expediente` (`codigo_expediente`, `solicitante_id`, `estado`, `fecha_radicacion`)
+ *   * `sigd_doc.expediente` (`tipo_tramite_id`, `asunto`, `codigo_expediente`)
+ *   * `sigd_doc.tipo_tramite_tupa` (`tipo_tramite_id`, `denominacion`)
+ *   * `sigd_auth.persona` (`id_persona`, `id_documento`, `tipo`)
+ *   * `sigd_auth.persona_natural` (`id_persona`, `nombres`, `apellidos`, `nombre_completo`)
+ *   * `sigd_auth.persona_juridica` (`id_persona`, `razon_social`)
+ *   * `sigd_doc.documento_adjunto` (`expediente_id`, `nombre_archivo`, `mime_type`, `sha256`)
+ *   * `sigd_tra.asiento_registro` (`expediente_id`, `fecha_ingreso`, `canal_ingreso`)
  */
 
 export interface DtoDocumentoPublico {
@@ -87,9 +79,6 @@ interface FilaProveido {
   resumen: string;
 }
 
-/** Ancho de la ventana visible al_redondear. */
-const VENTANA_ENMASCARADO = 2;
-
 export class ConsultaPublicaService {
   constructor(private readonly pool: Pool) {}
 
@@ -98,8 +87,6 @@ export class ConsultaPublicaService {
     try {
       const expediente = await this.leerExpediente(cliente, params.cut);
       if (!expediente) {
-        // Se responde 404 tambien cuando el expediente existe pero esta anulado
-        // logicamente, para no confirmar la existencia de un CUT cancelado.
         throw new NotFoundError({
           message: 'No existe un expediente con el CUT consultado.',
           detail:
@@ -115,15 +102,15 @@ export class ConsultaPublicaService {
 
       return {
         cut: expediente.cut,
-        anioFiscal: expediente.anio_fiscal,
+        anioFiscal: Number(expediente.anio_fiscal),
         estadoTramite: expediente.estado_tramite,
         tipoTramite: expediente.tipo_tramite,
         asunto: expediente.asunto,
-        fechaEnvioReal: expediente.fecha_envio_real.toISOString(),
-        fechaRadicacionLegal: expediente.fecha_radicacion_legal.toISOString(),
-        fueraDeHorario: expediente.fuera_de_horario,
+        fechaEnvioReal: new Date(expediente.fecha_envio_real).toISOString(),
+        fechaRadicacionLegal: new Date(expediente.fecha_radicacion_legal).toISOString(),
+        fueraDeHorario: Boolean(expediente.fuera_de_horario),
         canalRecepcion: expediente.canal_recepcion,
-        totalFolios: expediente.total_folios,
+        totalFolios: Number(expediente.total_folios),
         administrado: {
           documentoEnmascarado: enmascararDocumento(expediente.numero_documento),
           nombreEnmascarado: enmascararNombre(
@@ -135,7 +122,7 @@ export class ConsultaPublicaService {
         documentos,
         proveidos,
         mensajeLegal:
-          'Informacion publica pursuant a la Ley N° 29733. Los datos personales han sido ' +
+          'Informacion publica conforme a la Ley N° 29733. Los datos personales han sido ' +
           'enmascarados conforme al principio de minimizacion.',
       };
     } finally {
@@ -145,30 +132,49 @@ export class ConsultaPublicaService {
 
   private async leerExpediente(cliente: PoolClient, cut: string): Promise<FilaConsulta | undefined> {
     const resultado = await cliente.query<FilaConsulta>(
-      `SELECT e.cut,
-              e.anio_fiscal,
-              e.estado_tramite,
-              tt.denominacion   AS tipo_tramite,
-              e.asunto,
-              e.fecha_envio_real,
-              e.fecha_radicacion_legal,
-              e.fuera_de_horario,
-              e.canal_recepcion,
-              e.total_folios,
-              td.nombre         AS tipo_documento,
-              p.numero_documento,
-              p.nombres,
-              p.apellido_paterno,
-              p.apellido_materno
+      `SELECT e.codigo_expediente AS cut,
+              EXTRACT(YEAR FROM e.fecha_radicacion)::int AS anio_fiscal,
+              e.estado AS estado_tramite,
+              tt.denominacion AS tipo_tramite,
+              COALESCE(de.asunto, tr.asunto, ar.asunto, 'Sin asunto') AS asunto,
+              COALESCE(ar.fecha_ingreso, tr.creado_en, e.fecha_radicacion) AS fecha_envio_real,
+              e.fecha_radicacion AS fecha_radicacion_legal,
+              (COALESCE(ar.fecha_ingreso, e.fecha_radicacion) < e.fecha_radicacion) AS fuera_de_horario,
+              COALESCE(ar.canal_ingreso, 'MESA_VIRTUAL') AS canal_recepcion,
+              COALESCE(
+                (SELECT MAX(f.folio_fin)
+                   FROM sigd_tra.expediente_documento_folio f
+                  WHERE f.expediente_id = e.expediente_id),
+                (SELECT (nc.cuerpo->>'totalFolios')::int
+                   FROM sigd_auth.notificacion_casilla nc
+                  WHERE nc.cut = e.codigo_expediente
+                  ORDER BY nc.creado_en DESC
+                  LIMIT 1),
+                1
+              ) AS total_folios,
+              p.tipo AS tipo_documento,
+              COALESCE(p.id_documento, e.dni_solicitante) AS numero_documento,
+              COALESCE(pn.nombres, pj.razon_social) AS nombres,
+              split_part(COALESCE(pn.apellidos, ''), ' ', 1) AS apellido_paterno,
+              NULLIF(btrim(substr(COALESCE(pn.apellidos, ''), length(split_part(COALESCE(pn.apellidos, ''), ' ', 1)) + 1)), '') AS apellido_materno
          FROM sigd_tra.expediente e
+         LEFT JOIN sigd_doc.expediente de
+                ON de.codigo_expediente = e.codigo_expediente
          LEFT JOIN sigd_doc.tipo_tramite_tupa tt
-                ON tt.id_tipo_tramite_tupa = e.id_tipo_tramite_tupa
+                ON tt.tipo_tramite_id = de.tipo_tramite_id
+         LEFT JOIN sigd_tra.tramite tr
+                ON tr.expediente_id = e.expediente_id
+         LEFT JOIN sigd_tra.asiento_registro ar
+                ON ar.expediente_id = e.expediente_id AND ar.anulado = FALSE
          LEFT JOIN sigd_auth.persona p
-                ON p.id = e.id_persona
-         LEFT JOIN sigd_auth.tipos_documento td
-                ON td.id = p.tipo_documento_id
-        WHERE e.cut = $1
-          AND e.estado_tramite <> 'ANULADO'`,
+                ON p.id_persona = e.solicitante_id
+         LEFT JOIN sigd_auth.persona_natural pn
+                ON pn.id_persona = p.id_persona
+         LEFT JOIN sigd_auth.persona_juridica pj
+                ON pj.id_persona = p.id_persona
+        WHERE e.codigo_expediente = $1
+          AND e.estado <> 'ANULADO'
+        LIMIT 1`,
       [cut],
     );
     return resultado.rows[0];
@@ -176,10 +182,12 @@ export class ConsultaPublicaService {
 
   private async leerDocumentos(cliente: PoolClient, cut: string): Promise<DtoDocumentoPublico[]> {
     const resultado = await cliente.query<FilaDocumento>(
-      `SELECT da.nombre_archivo, da.content_type, da.hash_sha256
-         FROM sigd_tra.documento_adjunto da
-         JOIN sigd_tra.expediente e ON e.expediente_id = da.expediente_id
-        WHERE e.cut = $1
+      `SELECT da.nombre_archivo,
+              da.mime_type AS content_type,
+              da.sha256 AS hash_sha256
+         FROM sigd_doc.documento_adjunto da
+         JOIN sigd_doc.expediente de ON de.expediente_id = da.expediente_id
+        WHERE de.codigo_expediente = $1
         ORDER BY da.nombre_archivo`,
       [cut],
     );
@@ -192,12 +200,14 @@ export class ConsultaPublicaService {
 
   private async leerProveidosPublicos(cliente: PoolClient, cut: string): Promise<DtoProveidoPublico[]> {
     const resultado = await cliente.query<FilaProveido>(
-      `SELECT pv.numero, pv.fecha_emision, pv.resumen
-         FROM sigd_tra.proveido pv
-         JOIN sigd_tra.expediente e ON e.expediente_id = pv.expediente_id
-        WHERE e.cut = $1
-          AND pv.es_publico = TRUE
-        ORDER BY pv.fecha_emision DESC, pv.numero DESC`,
+      `SELECT COALESCE(r.numero_resolucion, r.numero_borrador) AS numero,
+              COALESCE(r.firmado_en, r.creado_en) AS fecha_emision,
+              r.asunto AS resumen
+         FROM sigd_doc.resolucion r
+         JOIN sigd_doc.expediente de ON de.expediente_id = r.expediente_id
+        WHERE de.codigo_expediente = $1
+          AND r.estado IN ('FIRMADA', 'NOTIFICADA')
+        ORDER BY COALESCE(r.firmado_en, r.creado_en) DESC`,
       [cut],
     );
     return resultado.rows.map((fila) => ({
@@ -214,12 +224,6 @@ const VENTANA_INICIAL = 2;
 /** Digitos finales que se conservan al enmascarar un documento. */
 const VENTANA_FINAL = 3;
 
-/**
- * Enmascara un documento de identidad conservando solo los extremos, con la
- * forma `45***123` que fija la especificacion de T-BE-TC-04. Un valor demasiado
- * corto para admitir ambas ventanas se enmascara por completo, porque en ese
- * rango cualquier digito conservado revelaria el documento entero.
- */
 export function enmascararDocumento(documento: string | null): string | null {
   if (!documento) return null;
   const limpio = documento.trim();
@@ -233,7 +237,6 @@ export function enmascararDocumento(documento: string | null): string | null {
   return `${cabeza}${ocultos}${cola}`;
 }
 
-/** Conserva la primera letra de cada componente y oculta el resto. */
 export function enmascararNombre(
   nombres: string | null,
   apellidoPaterno: string | null,
@@ -248,13 +251,12 @@ export function enmascararNombre(
   return componentes
     .map((componente) => {
       const inicial = componente.charAt(0).toUpperCase();
-      const ocultos = '*'.repeat(Math.max(componente.length - 1, 1));
+      const ocultos = '*'.repeat(Math.max(2, componente.length - 1));
       return `${inicial}${ocultos}`;
     })
     .join(' ');
 }
 
-function aIsoFecha(fecha: Date | string): string {
-  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
-  return String(fecha).slice(0, 10);
+function aIsoFecha(valor: Date | string): string {
+  return valor instanceof Date ? valor.toISOString() : new Date(valor).toISOString();
 }

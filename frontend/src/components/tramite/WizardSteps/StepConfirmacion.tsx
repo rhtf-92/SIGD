@@ -196,16 +196,27 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         // Fallback defensivo
       }
 
+      const inferMimeByFileName = (name: string): string => {
+        const lower = name.toLowerCase();
+        if (lower.endsWith('.png')) return 'image/png';
+        if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+        if (lower.endsWith('.doc')) return 'application/msword';
+        if (lower.endsWith('.docx'))
+          return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        return 'application/pdf';
+      };
+
       const archivosPayload =
         documentos.archivos.length > 0
           ? documentos.archivos.map((a) => ({
               nombreArchivo: a.nombre,
-              contentType: 'application/pdf',
+              contentType: inferMimeByFileName(a.nombre),
               tamanoBytes: Number(a.peso) || 1024,
               hashSha256:
                 a.hashSha256 && /^[0-9a-f]{64}$/i.test(a.hashSha256)
                   ? a.hashSha256.toLowerCase()
                   : 'a'.repeat(64),
+              ...(a.s3Key || a.storageUrl ? { storagePath: a.s3Key ?? a.storageUrl } : {}),
             }))
           : [
               {
@@ -263,6 +274,10 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
   const handleIniciarNuevoTramite = () => {
     dispatch({ type: 'RESET' });
+  };
+
+  const handleLimpiarTodo = () => {
+    dispatch({ type: 'RESET_WIZARD' });
   };
 
   // ===========================================================================
@@ -569,16 +584,49 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         </div>
       </div>
 
-      {/* BOTONERA INFERIOR */}
-      <footer className="mt-8 flex items-center justify-between border-t border-slate-200 pt-5">
+      {/* BOTONERA DE NAVEGACIÓN ACCESIBLE */}
+      <footer className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200/80 pt-6">
+        {/* Botón Izquierdo: Anterior */}
         <button
           type="button"
           onClick={onBack}
           disabled={isSubmitting}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 cursor-pointer"
+          className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition-all duration-200 hover:bg-slate-50 hover:border-slate-400 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
         >
-          ← Anterior
+          <span className="transition-transform duration-200 group-hover:-translate-x-1 group-active:-translate-x-1.5">
+            ←
+          </span>
+          <span>Anterior</span>
         </button>
+
+        {/* Grupo Derecho: Limpiar datos + Radicar Trámite */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={handleLimpiarTodo}
+            disabled={isSubmitting}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-xs transition-all duration-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 active:scale-[0.98] cursor-pointer"
+          >
+            <span aria-hidden="true">🗑️</span>
+            <span>Limpiar datos</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleRadicar}
+            disabled={isSubmitting}
+            className={`group w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-xl px-7 py-2.5 text-xs font-bold text-white transition-all duration-200 ${
+              !isSubmitting
+                ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 active:scale-[0.98] cursor-pointer'
+                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+            }`}
+          >
+            <span>{isSubmitting ? 'Radicando...' : 'Radicar Trámite'}</span>
+            <span className="transition-transform duration-200 group-hover:translate-x-1 group-active:translate-x-1.5">
+              →
+            </span>
+          </button>
+        </div>
       </footer>
     </div>
   );

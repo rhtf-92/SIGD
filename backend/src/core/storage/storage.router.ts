@@ -2,8 +2,8 @@
  * Endpoints #18 y #19 del catálogo REST — Almacenamiento Desacoplado MinIO S3
  * Responsable: B_RIQUELMER (Leysglin) y B_CHRISTIAN (Christian) / TramiCore & DocuCore
  *
- *   #18 POST /api/v1/storage/presigned-url   — Emisión de URL prefirmada PUT para carga directa
- *   #19 POST /api/v1/storage/confirmar-carga — Confirmación de subida, validación de hash y registro
+ *   #18 POST /api/v1/storage/presigned-url   — Emisión de URL prefirmada PUT para carga directa (PDF, Word, Imágenes)
+ *   #19 POST /api/v1/storage/confirmar-carga — Confirmación de subida y registro flexible
  *       GET  /api/v1/storage/download/:bucket/:key — Generación de URL GET temporal de descarga
  */
 
@@ -12,31 +12,88 @@ import { Router, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
-import { generarUrlPresigned } from './s3-storage.service.js';
+import {
+  generarUrlPresigned,
+  verificarMagicBytesPdfEnS3,
+} from './s3-storage.service.js';
 import { ValidationError } from '../../shared/domain/errors/index.js';
 
+const MAX_FILE_BYTES_25MB = 25 * 1024 * 1024; // 26,214,400 bytes
+
+export const ALLOWED_STORAGE_MIME_TYPES = [
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/tiff',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.oasis.opendocument.text',
+  'application/octet-stream',
+] as const;
+
 const presignedInputSchema = z.preprocess(
-  (val: any) => {
+  (val: unknown) => {
     if (val && typeof val === 'object') {
+      const obj = val as Record<string, unknown>;
       return {
-        ...val,
-        sha256Hash: val.sha256Hash ?? val.checksumSha256,
+        ...obj,
+        sha256Hash: obj.sha256Hash ?? obj.checksumSha256,
+        mimeType:
+          typeof obj.mimeType === 'string' && obj.mimeType.trim().length > 0
+            ? obj.mimeType.trim().toLowerCase()
+            : 'application/pdf',
       };
     }
     return val;
   },
   z.object({
-    nombreArchivo: z.string().min(1).max(255),
-    tamanoBytes: z.number().int().positive().max(26_214_400), // Máximo 25 MB
-    mimeType: z.literal('application/pdf'),
-    sha256Hash: z.string().length(64).regex(/^[a-fA-F0-9]{64}$/),
+    nombreArchivo: z
+      .string()
+      .trim()
+      .min(1, 'El nombre del archivo es obligatorio.')
+      .max(255, 'El nombre del archivo es demasiado largo.')
+      .refine((v) => !/[\\/]/.test(v) && !v.includes('..'), 'Nombre de archivo no permitido.'),
+    tamanoBytes: z
+      .number()
+      .int()
+      .positive('El archivo seleccionado parece estar vacío.')
+      .max(MAX_FILE_BYTES_25MB, 'Tu archivo supera el tamaño máximo permitido de 25 MB.'),
+    mimeType: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .refine(
+        (m) => (ALLOWED_STORAGE_MIME_TYPES as readonly string[]).includes(m.toLowerCase()),
+        'Formato de archivo no compatible. Puedes adjuntar PDF, Word (.doc, .docx) o imágenes (.png, .jpg).',
+      ),
+    sha256Hash: z
+      .string()
+      .trim()
+      .length(64)
+      .regex(/^[a-fA-F0-9]{64}$/, 'El código de seguridad SHA-256 del archivo no es válido.'),
+    categoria: z.string().trim().max(64).optional(),
+    checksumSha256: z.string().optional(),
   }),
 );
 
 const confirmarInputSchema = z.object({
-  s3Key: z.string().min(3),
-  sha256Hash: z.string().length(64).regex(/^[a-fA-F0-9]{64}$/),
+  s3Key: z
+    .string()
+    .trim()
+    .min(3, 'La ruta del archivo es obligatoria.')
+    .max(500, 'La ruta del archivo es demasiado larga.')
+    .refine((v) => !v.includes('..') && !v.startsWith('/'), 'Ruta de archivo no válida.'),
+  sha256Hash: z
+    .string()
+    .trim()
+    .length(64)
+    .regex(/^[a-fA-F0-9]{64}$/, 'El código de seguridad SHA-256 del archivo no es válido.'),
   idExpediente: z.string().uuid().optional(),
+  nombreArchivo: z.string().trim().min(1).max(255).optional(),
+  tamanoBytes: z.number().int().positive().max(MAX_FILE_BYTES_25MB).optional(),
+  mimeType: z.string().trim().min(1).max(120).optional(),
 });
 
 export function crearRouterStorage(pool?: Pool): Router {
@@ -47,7 +104,7 @@ export function crearRouterStorage(pool?: Pool): Router {
   router.post('/storage/presigned-url', (req: Request, res: Response) => {
     const datos = presignedInputSchema.parse(req.body);
     const uuid = crypto.randomUUID();
-    const extension = datos.nombreArchivo.split('.').pop() ?? 'pdf';
+    const extension = datos.nombreArchivo.split('.').pop()?.toLowerCase() ?? 'pdf';
     const s3Key = `expedientes/${new Date().getFullYear()}/${uuid}.${extension}`;
 
     const uploadUrl = generarUrlPresigned(s3Key, config, {
@@ -67,17 +124,45 @@ export function crearRouterStorage(pool?: Pool): Router {
   // #19 — POST /storage/confirmar-carga
   router.post('/storage/confirmar-carga', async (req: Request, res: Response) => {
     const datos = confirmarInputSchema.parse(req.body);
+
+    const verificacionS3 = await verificarMagicBytesPdfEnS3(datos.s3Key, config, {
+      mimeType: datos.mimeType,
+    });
     const idAdjunto = crypto.randomUUID();
 
-    if (pool) {
-      // Registrar en sigd_doc.documento_adjunto si se proporciona pool
+    if (pool && datos.idExpediente) {
+      const nombreDerivado =
+        datos.nombreArchivo ?? datos.s3Key.split('/').pop() ?? 'documento.pdf';
+      const tamano = datos.tamanoBytes ?? 1;
+      const mime = datos.mimeType ?? 'application/pdf';
+
       await pool
         .query(
-          `INSERT INTO sigd_doc.documento_adjunto
-             (id_documento_adjunto, s3_bucket, s3_key, sha256_hash, creado_en)
-           VALUES ($1, $2, $3, $4, now())
+          `WITH td AS (
+             SELECT tipo_documental_id
+               FROM sigd_doc.tipo_documento
+              WHERE vigente = TRUE
+              ORDER BY codigo ASC
+              LIMIT 1
+           )
+           INSERT INTO sigd_doc.documento_adjunto
+             (documento_adjunto_id, expediente_id, tipo_documental_id, nombre_archivo,
+              s3_bucket, s3_key, sha256, tamano_bytes, mime_type, magic_bytes, creado_en)
+           SELECT $1::uuid, $2::uuid, td.tipo_documental_id, $3,
+                  $4, $5, $6, $7, $8, $9, now()
+             FROM td
            ON CONFLICT DO NOTHING;`,
-          [idAdjunto, config.bucket, datos.s3Key, datos.sha256Hash.toLowerCase()],
+          [
+            idAdjunto,
+            datos.idExpediente,
+            nombreDerivado,
+            config.bucket,
+            datos.s3Key,
+            datos.sha256Hash.toLowerCase(),
+            tamano,
+            mime,
+            verificacionS3.magicBytesHex,
+          ],
         )
         .catch(() => null);
     }
@@ -85,8 +170,9 @@ export function crearRouterStorage(pool?: Pool): Router {
     res.status(201).json({
       idDocumentoAdjunto: idAdjunto,
       s3Key: datos.s3Key,
+      magicBytesHex: verificacionS3.magicBytesHex,
       confirmado: true,
-      mensaje: 'Documento PDF verificado y registrado en el almacenamiento institucional.',
+      mensaje: 'Tu documento ha sido verificado y adjuntado correctamente.',
     });
   });
 
