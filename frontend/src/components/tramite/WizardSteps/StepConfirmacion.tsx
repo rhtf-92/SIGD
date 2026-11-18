@@ -405,7 +405,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
             <button
               type="button"
               onClick={handleIniciarNuevoTramite}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#006EC7] px-6 py-2.5 text-xs font-bold text-white hover:bg-[#005ba3] transition cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1877f2] px-6 py-2.5 text-xs font-bold text-white hover:bg-[#166fe5] transition cursor-pointer shadow-xs"
             >
               Iniciar Nuevo Trámite
             </button>
@@ -420,14 +420,14 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   // ===========================================================================
   return (
     <div className="space-y-6">
-      <header className="border-b border-slate-200 pb-4">
-        <span className="text-xs font-bold uppercase tracking-wider text-[#006EC7]">
-          Paso 4 de 4
-        </span>
-        <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
-          Confirmación y Emisión de Cargo
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
+      <header className="border-b border-slate-200/80 pb-5 mb-8">
+        <div className="flex items-center gap-2.5">
+          <div className="w-1.5 h-6 bg-[#1877f2] rounded-full shrink-0" />
+          <h2 className="text-xl sm:text-2xl font-black text-[#062856]">
+            Confirmación y Emisión de Cargo
+          </h2>
+        </div>
+        <p className="mt-1.5 text-sm text-slate-500 pl-4">
           Revise minuciosamente el consolidado de datos antes de asentar legalmente su expediente institucional.
         </p>
       </header>
@@ -613,12 +613,12 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       </div>
 
       {/* BOTONERA INFERIOR */}
-      <footer className="mt-8 flex items-center justify-between border-t border-slate-200 pt-5">
+      <footer className="mt-10 flex items-center justify-between border-t border-slate-200/80 pt-6">
         <button
           type="button"
           onClick={onBack}
           disabled={isSubmitting}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 cursor-pointer"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-2xs transition hover:bg-slate-50 cursor-pointer"
         >
           ← Anterior
         </button>

@@ -101,14 +101,14 @@ export const StepDeclaracionJurada: React.FC<StepDeclaracionJuradaProps> = ({
       noValidate
       className="space-y-6"
     >
-      <header className="border-b border-slate-200 pb-4">
-        <span className="text-xs font-bold uppercase tracking-wider text-[#006EC7]">
-          Paso 3 de 4
-        </span>
-        <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
-          Declaración Jurada y Condiciones Legales
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
+      <header className="border-b border-slate-200/80 pb-5 mb-8">
+        <div className="flex items-center gap-2.5">
+          <div className="w-1.5 h-6 bg-[#1877f2] rounded-full shrink-0" />
+          <h2 className="text-xl sm:text-2xl font-black text-[#062856]">
+            Declaración Jurada y Condiciones Legales
+          </h2>
+        </div>
+        <p className="mt-1.5 text-sm text-slate-500 pl-4">
           Revise las declaraciones de veracidad y condiciones de notificación conforme al Texto Único Ordenado de la Ley N° 27444.
         </p>
       </header>
@@ -273,12 +273,12 @@ export const StepDeclaracionJurada: React.FC<StepDeclaracionJuradaProps> = ({
       </div>
 
       {/* BOTONERA DE NAVEGACIÓN ACCESIBLE */}
-      <footer className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-5">
+      <footer className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200/80 pt-6">
         <button
           type="button"
           onClick={onBack}
           disabled={isSubmitting}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 cursor-pointer"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-2xs transition hover:bg-slate-50 cursor-pointer"
         >
           ← Anterior
         </button>
@@ -286,9 +286,9 @@ export const StepDeclaracionJurada: React.FC<StepDeclaracionJuradaProps> = ({
         <button
           type="submit"
           disabled={!isValid || isSubmitting}
-          className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold text-white shadow-xs transition ${
+          className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-7 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs transition ${
             isValid && !isSubmitting
-              ? 'bg-[#006EC7] hover:bg-[#005ba3] cursor-pointer'
+              ? 'bg-[#1877f2] hover:bg-[#166fe5] cursor-pointer'
               : 'bg-slate-300 text-slate-500 cursor-not-allowed'
           }`}
         >
