@@ -53,18 +53,17 @@ const MODULOS: TarjetaModulo[] = [
 
 export default function FlujoValidezLegalPage() {
   return (
-    <div className="mx-auto max-w-7xl space-y-8 text-slate-900">
-      <header className="bg-white/95 backdrop-blur-xl rounded-2xl p-6 sm:p-8 shadow-xl shadow-slate-950/20 border border-white/80">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <main className="min-h-screen bg-slate-100 text-slate-900">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-start justify-between gap-4 px-6 py-8">
           <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/60 px-3 py-1 text-xs font-bold tracking-wider text-blue-700 uppercase mb-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+            <p className="text-sm font-bold tracking-[0.16em] text-slate-900 uppercase">
               Módulo 04 · Flujo y Validez Legal de Documentos Digitales
-            </span>
-            <h1 className="mt-1 text-3xl font-black text-slate-900 tracking-tight">
+            </p>
+            <h1 className="mt-1 text-3xl font-black text-slate-900">
               Centro de Coordinación
             </h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600 leading-relaxed">
+            <p className="mt-2 max-w-3xl text-sm text-slate-700">
               Hub de navegación de la entrega 04 liderada por Adriano David
               Espinoza Ramírez (ADERRTX). Cada tarjeta corresponde a un artefacto
               evaluable del plan de trabajo.
@@ -72,32 +71,32 @@ export default function FlujoValidezLegalPage() {
           </div>
           <Link
             to="/"
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-100 self-start"
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
           >
             ← Volver al inicio
           </Link>
         </div>
       </header>
 
-      <section>
+      <div className="header-bar" aria-hidden="true" />
+
+      <section className="mx-auto max-w-7xl px-6 py-10">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {MODULOS.map((modulo) => {
             const disponible = modulo.ruta !== null;
             return (
               <article
                 key={modulo.codigo}
-                className={`flex flex-col bg-white/95 backdrop-blur-xl rounded-2xl p-6 border border-white/80 shadow-lg hover:shadow-2xl hover:border-cyan-400/40 transition-all duration-200 ${
+                className={`flex flex-col rounded-2xl border bg-white p-6 shadow-sm ${
                   disponible
-                    ? "hover:-translate-y-1"
-                    : "opacity-85"
+                    ? "border-slate-200 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+                    : "border-dashed border-slate-300 opacity-70"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/60 px-3 py-1 font-mono text-[11px] font-bold text-blue-700 uppercase tracking-wider">
-                    {modulo.codigo}
-                  </span>
+                  <span className="badge-sigd">{modulo.codigo}</span>
                   <span
-                    className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wider ${
+                    className={`rounded-full border px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-wider ${
                       disponible
                         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                         : "border-amber-200 bg-amber-50 text-amber-700"
@@ -107,14 +106,14 @@ export default function FlujoValidezLegalPage() {
                   </span>
                 </div>
 
-                <h2 className="mt-4 text-lg font-extrabold text-slate-900 tracking-tight">
+                <h2 className="mt-4 text-base font-bold text-slate-900">
                   {modulo.titulo}
                 </h2>
-                <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-600">
+                <p className="mt-2 flex-1 text-sm leading-5 text-slate-600">
                   {modulo.descripcion}
                 </p>
 
-                <p className="mt-4 text-xs font-bold text-slate-500">
+                <p className="mt-4 text-xs font-bold text-slate-400">
                   {modulo.responsables}
                 </p>
 
@@ -122,12 +121,12 @@ export default function FlujoValidezLegalPage() {
                   {disponible && modulo.ruta ? (
                     <Link
                       to={modulo.ruta}
-                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:from-blue-700 hover:to-indigo-700"
+                      className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
                     >
                       Ir al artefacto →
                     </Link>
                   ) : (
-                    <span className="text-xs font-medium text-slate-500">
+                    <span className="text-xs text-slate-500">
                       🔒 Pendiente del integrante responsable
                     </span>
                   )}
@@ -137,6 +136,6 @@ export default function FlujoValidezLegalPage() {
           })}
         </div>
       </section>
-    </div>
+    </main>
   );
 }
