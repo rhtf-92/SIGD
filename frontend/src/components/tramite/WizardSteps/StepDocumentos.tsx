@@ -18,12 +18,13 @@
  * ==============================================================================
  */
 
-import React, { useId, useMemo, useRef, useState } from 'react';
+import React, { useId, useMemo, useRef, useState, useEffect } from 'react';
 import type {
   DocumentosData,
   ArchivoTramite,
   WizardAction,
 } from '../../../types/tramiteWizardState';
+import { apiClient } from '../../../api/client';
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
@@ -38,38 +39,12 @@ export interface StepDocumentosProps {
   isSubmitting?: boolean;
 }
 
-const CATALOGO_TUPA_INSTITUCIONAL = [
-  {
-    id: 'TUPA-01',
-    nombre: 'Certificado Oficial de Estudios (Por Semestre o Ciclo Completo)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-02',
-    nombre: 'Constancia de Matrícula, Egresado y No Adeudo',
-    unidad: 'Dirección de Asuntos Académicos',
-  },
-  {
-    id: 'TUPA-03',
-    nombre: 'Expedición de Título Profesional Técnico a Nombre de la Nación',
-    unidad: 'Área de Titulación y Grados',
-  },
-  {
-    id: 'TUPA-04',
-    nombre: 'Rectificación de Matrícula o Reserva de Vacante Temporal',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-05',
-    nombre: 'Convalidación y Homologación de Unidades Didácticas (Módulos)',
-    unidad: 'Coordinación de Programas de Estudio',
-  },
-  {
-    id: 'LIBRE-01',
-    nombre: 'Solicitud Formal General / Trámite Libre Institucional',
-    unidad: 'Mesa de Partes General',
-  },
-] as const;
+interface TipoTramiteCatalogo {
+  id: string;
+  codigo: string;
+  denominacion: string;
+  unidad_organica?: string | null;
+}
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
@@ -84,6 +59,34 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [fileError, setFileError] = useState<string | null>(null);
+  const [tiposTramite, setTiposTramite] = useState<TipoTramiteCatalogo[]>([]);
+  const [cargandoTipos, setCargandoTipos] = useState(true);
+  const [errorTipos, setErrorTipos] = useState<string | null>(null);
+
+  useEffect(() => {
+    let ignorar = false;
+    const cargarTipos = async () => {
+      setCargandoTipos(true);
+      setErrorTipos(null);
+      try {
+        const resp = await apiClient.get<TipoTramiteCatalogo[]>(
+          '/api/v1/tramites/tipos',
+        );
+        if (!ignorar) setTiposTramite(resp.data ?? []);
+      } catch {
+        if (!ignorar)
+          setErrorTipos(
+            'No se pudo cargar el catálogo de trámites. Intente nuevamente.',
+          );
+      } finally {
+        if (!ignorar) setCargandoTipos(false);
+      }
+    };
+    cargarTipos();
+    return () => {
+      ignorar = true;
+    };
+  }, []);
 
   // ===========================================================================
   // VALIDACIÓN REACTIVA EN TIEMPO REAL
@@ -193,18 +196,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     });
   };
 
-  const handleSimularArchivoPrueba = () => {
-    const dummy: ArchivoTramite = {
-      nombre: 'solicitud_firmada_estudios_2026.pdf',
-      peso: 154230,
-      hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    };
-    dispatch({
-      type: 'UPDATE_DOCUMENTOS',
-      payload: { archivos: [...data.archivos, dummy] },
-    });
-    setFileError(null);
-  };
+  
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,17 +262,40 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             } disabled:bg-slate-100`}
           >
             <option value="">-- Seleccione un procedimiento oficial --</option>
-            {CATALOGO_TUPA_INSTITUCIONAL.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id} — {t.nombre} ({t.unidad})
+            {cargandoTipos ? (
+              <option disabled>
+                Cargando trámites...
               </option>
-            ))}
+            ) : errorTipos ? (
+              <option disabled>{errorTipos}</option>
+            ) : (
+              tiposTramite.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.codigo} — {t.denominacion}
+                  {t.unidad_organica ? ` (${t.unidad_organica})` : ''}
+                </option>
+              ))
+            )}
           </select>
-          {touched.tipoTramiteId && errors.tipoTramiteId && (
+          {cargandoTipos && (
+            <p id={`${formId}-tipoTramiteId-carga`} className="mt-1 text-xs text-slate-500">
+              Cargando catálogo de trámites…
+            </p>
+          )}
+          {errorTipos && !cargandoTipos && (
             <p
               id={`${formId}-tipoTramiteId-error`}
               role="alert"
-              className="mt-1.5 text-xs text-red-600 font-medium"
+              className="mt-1 text-xs text-red-600 font-medium"
+            >
+              {errorTipos}
+            </p>
+          )}
+          {touched.tipoTramiteId && errors.tipoTramiteId && !cargandoTipos && !errorTipos && (
+            <p
+              id={`${formId}-tipoTramiteId-error`}
+              role="alert"
+              className="mt-1 text-xs text-red-600 font-medium"
             >
               {errors.tipoTramiteId}
             </p>
@@ -398,15 +413,11 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               <p className="text-xs text-slate-500">
                 Suba su solicitud o formulario formal en formato PDF (máximo 25 MB por archivo).
               </p>
+              <p className="text-xs text-amber-800">
+                El archivo se verifica con su huella SHA-256. El almacenamiento definitivo es la siguiente etapa.
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={handleSimularArchivoPrueba}
-              disabled={isSubmitting}
-              className="text-xs font-bold text-[#006EC7] hover:underline self-start sm:self-auto cursor-pointer"
-            >
-              + Cargar PDF de prueba
-            </button>
+            
           </div>
 
           {/* Zona de Drop / Carga de Archivo */}

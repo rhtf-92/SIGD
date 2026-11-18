@@ -20,8 +20,8 @@ export const CLAVE_STORAGE_PERMISOS = "sigd_permisos";
 
 const roles: Rol[] = [
   {
-    id: "SUPER_ADMIN",
-    nombre: "Super Administrador",
+    id: "ADMINISTRADOR",
+    nombre: "Administrador",
     descripcion: "Gobernanza global, auditoría forense WORM y configuración institucional.",
     alcance: "Institución y Servidores",
     usuarios: 2,
@@ -34,13 +34,6 @@ const roles: Rol[] = [
     usuarios: 1,
   },
   {
-    id: "DOCENTE",
-    nombre: "Docente / Coordinador",
-    descripcion: "Evaluación académica de proyectos de titulación y derivación de actuados.",
-    alcance: "Programas de Estudio",
-    usuarios: 12,
-  },
-  {
     id: "MESA_PARTES",
     nombre: "Mesa de Partes / Ventanilla",
     descripcion: "Recepción ciudadana virtual y presencial, foliado y asignación de CUT.",
@@ -48,8 +41,8 @@ const roles: Rol[] = [
     usuarios: 4,
   },
   {
-    id: "ESTUDIANTE",
-    nombre: "Estudiante / Administrado",
+    id: "CIUDADANO",
+    nombre: "Ciudadano / Administrado",
     descripcion: "Presentación de solicitudes académicas y consulta de Casilla Electrónica.",
     alcance: "Trámites propios",
     usuarios: 450,
@@ -57,7 +50,7 @@ const roles: Rol[] = [
 ];
 
 export const permisosIniciales: MatrizPermisos = {
-  SUPER_ADMIN: [
+  ADMINISTRADOR: [
     { modulo: "Expedientes", ver: true, crear: true, editar: true, derivar: true, archivar: true, eliminar: true, exportar: true },
     { modulo: "Documentos", ver: true, crear: true, editar: true, derivar: true, archivar: true, eliminar: true, exportar: true },
     { modulo: "Administración", ver: true, crear: true, editar: true, derivar: false, archivar: false, eliminar: true, exportar: true },
@@ -69,19 +62,13 @@ export const permisosIniciales: MatrizPermisos = {
     { modulo: "Administración", ver: true, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: true },
     { modulo: "Auditoría", ver: true, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: true },
   ],
-  DOCENTE: [
-    { modulo: "Expedientes", ver: true, crear: true, editar: true, derivar: true, archivar: false, eliminar: false, exportar: true },
-    { modulo: "Documentos", ver: true, crear: true, editar: true, derivar: true, archivar: false, eliminar: false, exportar: true },
-    { modulo: "Administración", ver: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false },
-    { modulo: "Auditoría", ver: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false },
-  ],
   MESA_PARTES: [
     { modulo: "Expedientes", ver: true, crear: true, editar: true, derivar: true, archivar: false, eliminar: false, exportar: true },
     { modulo: "Documentos", ver: true, crear: true, editar: false, derivar: true, archivar: false, eliminar: false, exportar: false },
     { modulo: "Administración", ver: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false },
     { modulo: "Auditoría", ver: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false },
   ],
-  ESTUDIANTE: [
+  CIUDADANO: [
     { modulo: "Expedientes", ver: true, crear: true, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false },
     { modulo: "Documentos", ver: true, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false },
     { modulo: "Administración", ver: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false },
@@ -123,7 +110,7 @@ export const ACCIONES_INMUTABLES_AUDITORIA: ClavePermiso[] = [
 ];
 
 export function useRbacConfig() {
-  const [rolSeleccionado, setRolSeleccionado] = useState("SUPER_ADMIN");
+  const [rolSeleccionado, setRolSeleccionado] = useState("ADMINISTRADOR");
   const [permisos, setPermisos] = useState<MatrizPermisos>(permisosIniciales);
   const [mensaje, setMensaje] = useState("");
 

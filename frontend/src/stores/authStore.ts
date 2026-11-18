@@ -1,12 +1,21 @@
 import { useSyncExternalStore } from "react";
 import { apiClient } from "../api/client";
+import { env } from "../config/env";
 import { permisosIniciales } from "../hooks/useRbacConfig";
+
+export type RolSistema =
+  | 'ADMINISTRADOR'
+  | 'DIRECTOR'
+  | 'SECRETARIO'
+  | 'ESPECIALISTA'
+  | 'MESA_PARTES'
+  | 'CIUDADANO';
 
 export interface UsuarioPerfil {
   id: string;
   nombreCompleto: string;
   correo: string;
-  rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE';
+  rol: RolSistema;
   areaId?: string;
 }
 
@@ -40,10 +49,30 @@ function createStore() {
   } => {
     try {
       if (typeof window !== "undefined" && window.localStorage) {
+        const tokenExistente = window.localStorage.getItem("sigd_token");
+        if (!env.enableMocks && tokenExistente?.startsWith("demo-jwt-")) {
+          window.localStorage.removeItem("sigd_token");
+          window.localStorage.removeItem("token");
+          window.localStorage.removeItem("sigd_rol");
+          window.localStorage.removeItem("sigd_permisos");
+        }
         const item = window.localStorage.getItem(STORAGE_KEY);
         if (item) {
           const parsed = JSON.parse(item);
           const state = parsed.state ?? parsed;
+          if (!env.enableMocks && state.accessToken?.startsWith("demo-jwt-")) {
+            window.localStorage.removeItem(STORAGE_KEY);
+            window.localStorage.removeItem("sigd_token");
+            window.localStorage.removeItem("token");
+            window.localStorage.removeItem("sigd_rol");
+            window.localStorage.removeItem("sigd_permisos");
+            return {
+              accessToken: null,
+              refreshToken: null,
+              usuario: null,
+              isAuthenticated: false,
+            };
+          }
           return {
             accessToken: state.accessToken ?? null,
             refreshToken: state.refreshToken ?? null,
@@ -120,6 +149,14 @@ function createStore() {
           window.localStorage.removeItem("sigd_rol");
           window.localStorage.removeItem("sigd_permisos");
           window.localStorage.removeItem(STORAGE_KEY);
+        }
+      } catch {
+        // Ignore storage errors
+      }
+      try {
+        if (typeof window !== "undefined" && window.sessionStorage) {
+          window.sessionStorage.removeItem("sigd_token");
+          window.sessionStorage.removeItem("token");
         }
       } catch {
         // Ignore storage errors

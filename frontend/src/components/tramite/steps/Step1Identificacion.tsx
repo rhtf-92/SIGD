@@ -39,7 +39,7 @@ export interface Step1IdentificacionProps {
 }
 
 const OPCIONES_TIPO_DOCUMENTO: readonly SelectOption[] = [
-  { value: "DNI", label: "DNI — Documento Nacional de Identidad (8 dígitos)", description: "Para ciudadanos peruanos" },
+  { value: "DNI", label: "DNI", description: "Para ciudadanos peruanos" },
   { value: "RUC", label: "RUC — Registro Único de Contribuyentes (11 dígitos)", description: "Para personas jurídicas y empresas" },
   { value: "CE", label: "Carné de Extranjería (CE)", description: "Para residentes extranjeros" },
   { value: "PASAPORTE", label: "Pasaporte Oficial", description: "Para ciudadanos no domiciliados" },

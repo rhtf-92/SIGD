@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const roles = ['SUPER_ADMIN', 'DIRECTOR', 'DOCENTE', 'MESA_PARTES', 'ESTUDIANTE'];
+const roles = ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES', 'CIUDADANO'];
 const permisos = [
   'EXPEDIENTE_CREAR',
   'EXPEDIENTE_DERIVAR',
@@ -11,11 +11,10 @@ const permisos = [
 
 export default function RbacPermissionMatrix() {
   const [matriz, setMatriz] = useState<Record<string, Record<string, boolean>>>({
-    SUPER_ADMIN: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: true, EXPEDIENTE_FIRMAR: true, CONFIG_CALENDARIO: true, GESTION_ROLES: true },
+    ADMINISTRADOR: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: true, EXPEDIENTE_FIRMAR: true, CONFIG_CALENDARIO: true, GESTION_ROLES: true },
     DIRECTOR: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: true, EXPEDIENTE_FIRMAR: true, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
-    DOCENTE: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: false, EXPEDIENTE_FIRMAR: false, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
     MESA_PARTES: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: true, EXPEDIENTE_FIRMAR: false, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
-    ESTUDIANTE: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: false, EXPEDIENTE_FIRMAR: false, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
+    CIUDADANO: { EXPEDIENTE_CREAR: true, EXPEDIENTE_DERIVAR: false, EXPEDIENTE_FIRMAR: false, CONFIG_CALENDARIO: false, GESTION_ROLES: false },
   });
 
   const handleCheckboxChange = (rol: string, permiso: string) => {

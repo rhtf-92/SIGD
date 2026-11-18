@@ -69,6 +69,7 @@ const frontendDir = path.resolve(__dirname, '../../frontend');
 const viteBin = path.resolve(frontendDir, 'node_modules/vite/bin/vite.js');
 
 let viteProc: ReturnType<typeof spawn> | null = null;
+if (process.env.SIGD_DISABLE_VITE !== "true") {
 try {
   viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
     cwd: frontendDir,
@@ -97,6 +98,7 @@ try {
   });
 } catch (e) {
   console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
+}
 }
 
 process.on('SIGINT', () => {

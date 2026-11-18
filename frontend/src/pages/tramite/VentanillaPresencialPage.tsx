@@ -1,10 +1,23 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
-import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
+import { useAuthStore } from "../../stores/authStore";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
+
+interface TramiteTupa {
+  id: string;
+  codigo: string;
+  denominacion: string;
+  unidad_organica: string | null;
+  plazo_dias_habiles: number | null;
+}
+
+interface RequisitoTupa {
+  orden: number;
+  texto: string;
+}
 
 interface VentanillaPresencialResultado {
   expedienteId: string;
@@ -33,89 +46,177 @@ export default function VentanillaPresencialPage() {
   const [tipoPersona, setTipoPersona] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [tipoDoc, setTipoDoc] = useState<"DNI" | "RUC" | "CE">("DNI");
   const [numeroDoc, setNumeroDoc] = useState("");
-  const [nombre, setNombre] = useState("");
+  const [nombres, setNombres] = useState("");
+  const [apellidos, setApellidos] = useState("");
   const [correo, setCorreo] = useState("");
   const [telefono, setTelefono] = useState("");
   const [procedimientoTupa, setProcedimientoTupa] = useState("");
-  const [requisitosRecibidos, setRequisitosRecibidos] = useState<Set<number>>(new Set());
   const [tipoDocumento, setTipoDocumento] = useState("SOLICITUD");
   const [asunto, setAsunto] = useState("");
   const [cantidadFolios, setCantidadFolios] = useState(1);
   const [cargoGenerado, setCargoGenerado] = useState<CargoOficialTramite | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
-  const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_2026.find(
-    (procedimiento) => procedimiento.codigo === procedimientoTupa,
-  );
+  const [tramites, setTramites] = useState<TramiteTupa[]>([]);
+  const [errorCatalogo, setErrorCatalogo] = useState("");
+  const [requisitos, setRequisitos] = useState<RequisitoTupa[]>([]);
+  const [requisitosRecibidos, setRequisitosRecibidos] = useState<Set<number>>(new Set());
+  const [cargandoRequisitos, setCargandoRequisitos] = useState(false);
+  const [errorRequisitos, setErrorRequisitos] = useState("");
+  const [errorEnvio, setErrorEnvio] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    let ignorar = false;
+    apiClient
+      .get<TramiteTupa[]>("/api/v1/tramites/tipos")
+      .then((respuesta) => {
+        if (!ignorar) setTramites(respuesta.data ?? []);
+      })
+      .catch(() => {
+        if (!ignorar) setErrorCatalogo("No se pudo cargar el catálogo de trámites del TUPA.");
+      });
+    return () => {
+      ignorar = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignorar = false;
+    if (!procedimientoTupa) {
+      setRequisitos([]);
+      setRequisitosRecibidos(new Set());
+      setCargandoRequisitos(false);
+      setErrorRequisitos("");
+      return () => {
+        ignorar = true;
+      };
+    }
+
+    setRequisitos([]);
+    setRequisitosRecibidos(new Set());
+    setErrorRequisitos("");
+    setCargandoRequisitos(true);
+    apiClient
+      .get<RequisitoTupa[]>(
+        `/api/v1/tramites/tipos/${encodeURIComponent(procedimientoTupa)}/requisitos`,
+      )
+      .then((respuesta) => {
+        if (!ignorar) {
+          setRequisitos(Array.isArray(respuesta.data) ? respuesta.data : []);
+          setRequisitosRecibidos(new Set());
+        }
+      })
+      .catch(() => {
+        if (!ignorar) {
+          setRequisitos([]);
+          setErrorRequisitos("No se pudieron cargar los requisitos del procedimiento.");
+        }
+      })
+      .finally(() => {
+        if (!ignorar) setCargandoRequisitos(false);
+      });
+    return () => {
+      ignorar = true;
+    };
+  }, [procedimientoTupa]);
+
+  const procedimientoSeleccionado = tramites.find((tramite) => tramite.id === procedimientoTupa);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setErrorEnvio("");
 
-    const asuntoFinal = procedimientoSeleccionado
-      ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
-      : asunto;
+    if (tipoPersona !== "NATURAL" || tipoDoc !== "DNI") {
+      setErrorEnvio("Por ahora la ventanilla registra solo personas naturales con DNI.");
+      return;
+    }
+    if (!/^[0-9]{8}$/.test(numeroDoc.trim())) {
+      setErrorEnvio("El DNI debe tener exactamente 8 dígitos.");
+      return;
+    }
+    if (nombres.trim().length < 2 || apellidos.trim().length < 2) {
+      setErrorEnvio("Ingrese los nombres y los apellidos del solicitante.");
+      return;
+    }
+    if (!procedimientoSeleccionado) {
+      setErrorEnvio("Seleccione un procedimiento del TUPA.");
+      return;
+    }
+    if (asunto.trim().length < 10) {
+      setErrorEnvio("El asunto debe tener al menos 10 caracteres.");
+      return;
+    }
+    const folios = Number(cantidadFolios);
+    if (!Number.isInteger(folios) || folios < 1) {
+      setErrorEnvio("Indique la cantidad de folios (mínimo 1).");
+      return;
+    }
 
-    const dniValido = /^[0-9]{8}$/.test(numeroDoc) ? numeroDoc : "74561238";
-
+    const nombreCompleto = `${nombres.trim()} ${apellidos.trim()}`;
+    setEnviando(true);
     try {
       const res = await apiClient.post<VentanillaPresencialResultado>(
         "/api/v1/tramites/ventanilla-presencial",
         {
-          dniSolicitante: dniValido,
-          datosRemitente: nombre.trim() || "Ciudadano Administrado",
-          asunto: asuntoFinal.trim() || "Solicitud de trámite presencial",
-          foliosTotales: Number(cantidadFolios) || 1,
+          dniSolicitante: numeroDoc.trim(),
+          nombres: nombres.trim(),
+          apellidos: apellidos.trim(),
+          correo: correo.trim(),
+          telefono: telefono.trim(),
+          asunto: asunto.trim(),
+          idTipoTramiteTupa: procedimientoSeleccionado.id,
+          foliosTotales: folios,
         },
       );
 
       const serverData = res.data;
       const cargoServer = serverData.cargo;
-      const fechaRecepcion = cargoServer?.fechaRecepcion || serverData.fechaRadicacion || new Date().toISOString();
-
       const nuevoCargo: CargoOficialTramite = {
-        codigoExpediente: cargoServer?.cut || serverData.cut,
-        fechaRecepcionIso: fechaRecepcion,
-        fechaIngresoFormalIso: esCorteSuperado ? proximoDiaHabil : fechaRecepcion,
-        horaRecepcion: new Date(fechaRecepcion).toLocaleTimeString("es-PE", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
-        operadorVentanillaNombre: "Operador de Mesa de Partes (Ventanilla 1)",
-        sedeInstitucional: "Sede Central - Jr. Tarapacá N° 645, Pucallpa",
+        codigoExpediente: cargoServer.cut,
+        fechaRecepcionIso: cargoServer.fechaRecepcion,
+        fechaIngresoFormalIso: serverData.fechaRadicacion,
+        horaRecepcion: cargoServer.fechaRecepcion,
+        operadorVentanillaNombre:
+          useAuthStore.getState().usuario?.nombreCompleto ?? "Operador de ventanilla",
+        sedeInstitucional: "IESTP Suiza - Pucallpa",
         solicitante: {
           tipoPersona,
           tipoDocumento: tipoDoc,
-          numeroDocumento: numeroDoc,
-          nombreOrazonSocial: nombre,
-          correoElectronico: correo,
-          telefono,
+          numeroDocumento: numeroDoc.trim(),
+          nombreOrazonSocial: cargoServer.remitente || nombreCompleto,
+          correoElectronico: correo.trim(),
+          telefono: telefono.trim(),
         },
-        asunto: asuntoFinal,
+        asunto: `${procedimientoSeleccionado.codigo} - ${procedimientoSeleccionado.denominacion}: ${cargoServer.asunto}`,
         documentoPrincipalTipo: tipoDocumento,
-        cantidadFolios: Number(cantidadFolios) || 1,
+        cantidadFolios: cargoServer.folios,
         hashSha256Recepcion: cargoServer.hashSha256,
         horaCorteAplicada: "16:30",
         radicadoDiaSiguiente: esCorteSuperado,
-        urlSeguimiento: cargoServer?.qrSeguimientoUrl || `https://sigd.iestpsuiza.edu.pe/tramite?cut=${serverData.cut}`,
+        urlSeguimiento: `${window.location.origin}${cargoServer.qrSeguimientoUrl}`,
       };
 
       setCargoGenerado(nuevoCargo);
       setModalAbierto(true);
     } catch (error) {
-      console.error("[VentanillaPresencial] Error al radicar en ventanilla:", error);
-      alert("Error al conectar con el servidor de radicación de ventanilla. Intente nuevamente.");
+      const detalle = error instanceof Error ? error.message : "";
+      setErrorEnvio(`No se pudo registrar en ventanilla. ${detalle}`.trim());
+    } finally {
+      setEnviando(false);
     }
   }
 
   function handleNuevoRegistro() {
     setNumeroDoc("");
-    setNombre("");
+    setNombres("");
+    setApellidos("");
     setCorreo("");
     setTelefono("");
     setProcedimientoTupa("");
     setRequisitosRecibidos(new Set());
     setAsunto("");
     setCantidadFolios(1);
+    setErrorEnvio("");
     setModalAbierto(false);
   }
 
@@ -251,16 +352,29 @@ export default function VentanillaPresencialPage() {
               />
             </div>
 
-            <div>
-              <label htmlFor="nombre-input" className="block text-xs font-semibold text-slate-700 mb-1">
-                {tipoPersona === "NATURAL" ? "Apellidos y Nombres *" : "Razón Social *"}
+                        <div>
+              <label htmlFor="nombres-input" className="block text-xs font-semibold text-slate-700 mb-1">
+                Nombres *
               </label>
               <input
-                id="nombre-input"
+                id="nombres-input"
                 type="text"
                 required
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                value={nombres}
+                onChange={(e) => setNombres(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label htmlFor="apellidos-input" className="block text-xs font-semibold text-slate-700 mb-1">
+                Apellidos *
+              </label>
+              <input
+                id="apellidos-input"
+                type="text"
+                required
+                value={apellidos}
+                onChange={(e) => setApellidos(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               />
             </div>
@@ -303,24 +417,23 @@ export default function VentanillaPresencialPage() {
               <label htmlFor="procedimiento-tupa-select" className="block text-xs font-semibold text-slate-700 mb-1">
                 Procedimiento TUPA 2026 *
               </label>
-              <select
+                <select
                 id="procedimiento-tupa-select"
                 required
                 value={procedimientoTupa}
-                onChange={(e) => {
-                  setProcedimientoTupa(e.target.value);
-                  setRequisitosRecibidos(new Set());
-                }}
+                onChange={(e) => setProcedimientoTupa(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               >
-                <option value="">Seleccione un procedimiento o servicio</option>
-                <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
-                {PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => (
-                  <option key={procedimiento.codigo} value={procedimiento.codigo}>
-                    {procedimiento.codigo} - {procedimiento.nombre}
+                <option value="">-- Seleccione un procedimiento --</option>
+                {tramites.map((tramite) => (
+                  <option key={tramite.id} value={tramite.id}>
+                    {tramite.codigo} - {tramite.denominacion}
                   </option>
                 ))}
               </select>
+              {errorCatalogo && (
+                <p role="alert" className="mt-1 text-xs font-medium text-red-600">{errorCatalogo}</p>
+              )}
             </div>
 
             <div>
@@ -358,85 +471,63 @@ export default function VentanillaPresencialPage() {
             </div>
           </div>
 
-          {procedimientoSeleccionado && (
-            <section
-              aria-labelledby="detalle-tupa-heading"
-              className="rounded-lg border border-blue-200 bg-blue-50/60 p-4"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-200 pb-3">
-                <div>
-                  <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
-                    TUPA {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Pasco</p>
-                </div>
-                {procedimientoSeleccionado.derechoPago && (
-                  <p className="max-w-xl text-sm font-semibold text-slate-800">
-                    Derecho de pago: {procedimientoSeleccionado.derechoPago}
-                  </p>
+                    {procedimientoSeleccionado && (
+            <section className="rounded-lg border border-blue-200 bg-blue-50/60 p-4 text-sm text-slate-700">
+              <p className="font-bold text-slate-900">
+                {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.denominacion}
+              </p>
+              {procedimientoSeleccionado.unidad_organica && (
+                <p className="mt-1 text-xs">Recibe: {procedimientoSeleccionado.unidad_organica}</p>
+              )}
+              {procedimientoSeleccionado.plazo_dias_habiles ? (
+                <p className="mt-1 text-xs">Plazo: {procedimientoSeleccionado.plazo_dias_habiles} días hábiles</p>
+              ) : null}
+              <p className="mt-2 text-xs text-slate-600">
+                Fuente: TUPA vigente del sistema.
+              </p>
+              <div className="mt-3">
+                {cargandoRequisitos ? (
+                  <p>Cargando requisitos...</p>
+                ) : errorRequisitos ? (
+                  <p role="alert">{errorRequisitos}</p>
+                ) : requisitos.length > 0 ? (
+                  <>
+                    <h2 className="font-bold text-slate-900">Requisitos documentarios</h2>
+                    <p className="mt-1 text-xs">
+                      {requisitosRecibidos.size} de {requisitos.length} verificados
+                    </p>
+                    <ul className="mt-2 space-y-2">
+                      {requisitos.map((requisito) => (
+                        <li key={requisito.orden}>
+                          <label className="flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              checked={requisitosRecibidos.has(requisito.orden)}
+                              onChange={(e) => {
+                                setRequisitosRecibidos((actuales) => {
+                                  const siguientes = new Set(actuales);
+                                  if (e.target.checked) {
+                                    siguientes.add(requisito.orden);
+                                  } else {
+                                    siguientes.delete(requisito.orden);
+                                  }
+                                  return siguientes;
+                                });
+                              }}
+                            />
+                            <span>{requisito.texto}</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p>Este procedimiento no tiene requisitos cargados en el TUPA.</p>
                 )}
               </div>
-
-              {procedimientoSeleccionado.requisitos && (
-                <div className="mt-3">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold uppercase text-slate-700">Requisitos documentarios</h4>
-                    <span className="text-xs text-slate-600">
-                      {requisitosRecibidos.size} de {procedimientoSeleccionado.requisitos.length} verificados
-                    </span>
-                  </div>
-                  <ul className="grid gap-2 sm:grid-cols-2">
-                    {procedimientoSeleccionado.requisitos.map((requisito, index) => (
-                      <li key={`${procedimientoSeleccionado.codigo}-${index}`}>
-                        <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={requisitosRecibidos.has(index)}
-                            onChange={(event) => {
-                              setRequisitosRecibidos((actuales) => {
-                                const siguientes = new Set(actuales);
-                                if (event.target.checked) siguientes.add(index);
-                                else siguientes.delete(index);
-                                return siguientes;
-                              });
-                            }}
-                            className="mt-0.5 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
-                          />
-                          <span>{requisito}</span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {procedimientoSeleccionado.detalleTarifas && (
-                <div className="mt-3">
-                  <h4 className="mb-2 text-xs font-bold uppercase text-slate-700">Servicios y tarifas</h4>
-                  <ul className="grid gap-1 text-sm text-slate-700 sm:grid-cols-2">
-                    {procedimientoSeleccionado.detalleTarifas.map((tarifa) => (
-                      <li key={tarifa}>{tarifa}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {(procedimientoSeleccionado.dependencia || procedimientoSeleccionado.autoridad || procedimientoSeleccionado.tiempoMaximo) && (
-                <dl className="mt-3 grid gap-2 border-t border-blue-200 pt-3 text-xs sm:grid-cols-3">
-                  {procedimientoSeleccionado.dependencia && (
-                    <div><dt className="font-bold text-slate-700">Dependencia</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.dependencia}</dd></div>
-                  )}
-                  {procedimientoSeleccionado.autoridad && (
-                    <div><dt className="font-bold text-slate-700">Autoridad</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.autoridad}</dd></div>
-                  )}
-                  {procedimientoSeleccionado.tiempoMaximo && (
-                    <div><dt className="font-bold text-slate-700">Tiempo máximo</dt><dd className="mt-0.5 text-slate-600">{procedimientoSeleccionado.tiempoMaximo}</dd></div>
-                  )}
-                </dl>
-              )}
-              {procedimientoSeleccionado.nota && (
-                <p className="mt-3 text-xs text-slate-600">{procedimientoSeleccionado.nota}</p>
-              )}
+              <p className="mt-2 text-xs text-slate-500">
+                La verificación es visual para el operador y no se guarda en el expediente.
+              </p>
             </section>
           )}
 
@@ -454,6 +545,9 @@ export default function VentanillaPresencialPage() {
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
             />
           </div>
+          {errorEnvio && (
+            <p role="alert" className="text-sm font-medium text-red-700">{errorEnvio}</p>
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
             <button
@@ -465,6 +559,7 @@ export default function VentanillaPresencialPage() {
             </button>
             <button
               type="submit"
+              disabled={enviando}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-800 transition"
             >
               ✓ Registrar y Emitir Cargo CUT

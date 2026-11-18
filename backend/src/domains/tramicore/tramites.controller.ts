@@ -7,7 +7,8 @@ import { RadicacionVirtualService, type ProveedorFeriados } from './radicacionVi
 import { VentanillaPresencialService } from './ventanillaPresencial.service.js';
 import { TicketTermicoUtil } from './ticketTermico.util.js';
 import { consultaPublicaParamsSchema, radicacionVirtualSchema } from './tramites.schemas.js';
-import { NotFoundError } from '../../shared/domain/errors/index.js';
+import { NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
 
 const ventanillaPresencialSchema = z.object({
   dniSolicitante: z.string().regex(/^[0-9]{8}$/, 'DNI debe contener exactamente 8 dígitos'),
@@ -39,7 +40,8 @@ export function crearRouterTramites(
   // #14 — Radicación virtual (Mesa de Partes Virtual 24x7)
   router.post('/tramites/radicacion-virtual', async (req: Request, res: Response) => {
     const datos = radicacionVirtualSchema.parse(req.body);
-    const radicacion = await radicacionService.radicar(datos);
+    const { idUsuario, idPersona } = await obtenerPersonaAutenticada(pool, req);
+    const radicacion = await radicacionService.radicar(datos, idPersona, idUsuario);
     res.status(201).json({
       expedienteId: radicacion.expedienteId,
       cut: radicacion.cut,
@@ -99,10 +101,19 @@ export function crearRouterTramites(
     const cut = String(req.params.cut).trim().toUpperCase();
 
     const query = `
-      SELECT a.numero_asiento, a.anio_fiscal, a.cut, a.remitente,
-             a.remitente_documento, a.asunto, a.folios, a.fecha_asiento
+      SELECT e.codigo_expediente AS cut,
+             COALESCE(pn.nombre_completo, pj.razon_social) AS remitente,
+             e.dni_solicitante AS remitente_documento,
+             a.asunto,
+             (SELECT SUM(f.folio_fin - f.folio_inicio + 1)
+                FROM sigd_tra.expediente_documento_folio f
+               WHERE f.expediente_id = e.expediente_id) AS folios,
+             a.fecha_ingreso AS fecha_asiento
         FROM sigd_tra.asiento_registro a
-       WHERE a.cut = $1
+        JOIN sigd_tra.expediente e ON e.expediente_id = a.expediente_id
+        LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = e.solicitante_id
+        LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = e.solicitante_id
+       WHERE e.codigo_expediente = $1 AND a.anulado = FALSE
        LIMIT 1;
     `;
 
@@ -135,6 +146,34 @@ export function crearRouterTramites(
   });
 
   return router;
+}
+
+async function obtenerPersonaAutenticada(pool: Pool, req: Request): Promise<{ idUsuario: string; idPersona: string }> {
+  const token = extraerTokenBearer(req.get('authorization'));
+  if (!token) {
+    throw new UnauthorizedError({ detail: 'Token de acceso no proporcionado.' });
+  }
+  let claims: { sub: string };
+  try {
+    claims = verificarTokenAcceso(token);
+  } catch {
+    throw new UnauthorizedError({ detail: 'Token de acceso inválido o caducado.' });
+  }
+
+  const resultado = await pool.query<{ id_persona: string; activo: boolean }>(
+    `SELECT cu.id_persona, cu.activo
+       FROM sigd_auth.cuenta_usuario cu
+      WHERE cu.id_usuario = $1`,
+    [claims.sub]
+  );
+  const cuenta = resultado.rows[0];
+  if (!cuenta) {
+    throw new UnauthorizedError({ detail: 'Cuenta de usuario no encontrada.' });
+  }
+  if (!cuenta.activo) {
+    throw new UnauthorizedError({ detail: 'La cuenta de usuario esta inactiva.', status: 403 });
+  }
+  return { idUsuario: claims.sub, idPersona: cuenta.id_persona };
 }
 
 export default crearRouterTramites;
