@@ -374,15 +374,16 @@
 
 .sigd-service-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 28px rgba(2, 80, 160, 0.12), 0 3px 8px rgba(2, 80, 160, 0.05);
-  border-color: #9cd4fb;
+  box-shadow: 0 12px 28px rgba(0, 114, 188, 0.16), 0 3px 8px rgba(230, 0, 126, 0.08);
+  border-color: #0072bc;
 }
 
-/* Top row of service card: icon + status badge */
+/* Top row of service card: icon + emblem + status badge */
 .sigd-service-top {
   width: 100%;
   display: flex;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   margin-bottom: clamp(8px, 1.0vh, 11px);
@@ -396,9 +397,9 @@
   padding: 3px 10px;
   font-size: 11px;
   font-weight: 700;
-  background: #e8f3ff;
-  color: #05498f;
-  border: 1px solid #c6e0fc;
+  background: #eff6ff;
+  color: #042454;
+  border: 1px solid #bfdbfe;
   white-space: nowrap;
 }
 

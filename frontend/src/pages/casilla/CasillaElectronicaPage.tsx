@@ -12,6 +12,7 @@ import NotificacionDetailModal from "../../components/casilla/NotificacionDetail
 import { useCasilla } from "../../hooks/useCasilla";
 import { apiClient } from "../../api/client";
 import { useAuthStore } from "../../stores/authStore";
+import { ModuleHero, CasillaIllustration } from "../../components/tramite/ModuleHero";
 
 interface PerfilCasilla {
   nombreCompleto: string;
@@ -62,66 +63,48 @@ export default function CasillaElectronicaPage() {
       {/* ==================================================================== */}
       {/* CABECERA INSTITUCIONAL DE LA CASILLA ELECTRÓNICA                     */}
       {/* ==================================================================== */}
-      <header className="border-b border-slate-200 bg-white shadow-xs">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-md bg-blue-700 px-2 py-0.5 font-mono text-[11px] font-bold text-white uppercase tracking-wider">
-                  SIGD • ENT-M01-03
-                </span>
-                <span className="text-xs font-semibold text-slate-500">
-                  IESTP "Suiza" — Pucallpa
-                </span>
-              </div>
-
-              <h1 className="mt-1.5 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-                Bandeja de Casilla Electrónica Ciudadana
-              </h1>
-
-              <p className="mt-1 text-sm text-slate-600">
-                Recepción oficial de actos administrativos, cédulas y resoluciones
-                con validez legal plena.
-              </p>
-              <div className="mt-2.5 rounded-xl border border-cyan-200/80 bg-gradient-to-br from-white/95 via-cyan-50/70 to-sky-50/50 p-2.5 text-xs text-cyan-950 flex items-start gap-2 shadow-[0_2px_8px_rgba(6,182,212,0.08)] ring-1 ring-cyan-100/60">
-                <span>🔔 <strong>Aviso legal:</strong> Las comunicaciones de esta casilla pueden corresponder a actuaciones administrativas. Revise su contenido, fecha de emisión y las indicaciones del documento.</span>
-              </div>
-            </div>
-
-            {/* Ficha del Administrado y Dirección de Casilla */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <div className="relative overflow-hidden flex items-center gap-3.5 rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white/95 via-sky-50/70 to-indigo-50/40 p-3.5 shadow-[0_4px_16px_-2px_rgba(14,165,233,0.12)] ring-1 ring-white/80 backdrop-blur-xs before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-700 font-bold text-white shadow-sm">
+      <div className="mx-auto max-w-7xl px-3.5 pt-6 sm:px-6 lg:px-8">
+        <ModuleHero
+          eyebrow="SIGD • ENT-M01-03 · Notificación Oficial"
+          title={<>Bandeja de Casilla <span className="text-[#f9e000]">Electrónica Ciudadana</span></>}
+          subtitle='Recepción oficial de actos administrativos, cédulas y resoluciones emitidas por el IESTP "Suiza" de Pucallpa con validez legal plena.'
+          illustration={<CasillaIllustration className="h-40 w-auto" />}
+          actions={
+            <div className="flex flex-wrap items-center gap-3 w-full">
+              <div className="flex items-center gap-3 rounded-2xl border border-white/25 bg-white/15 px-3.5 py-2 backdrop-blur-sm text-xs text-white">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f9e000] font-black text-[#042454] shadow-sm">
                   {perfil?.nombreCompleto?.trim().slice(0, 1).toUpperCase() ?? "—"}
                 </div>
-                <div className="text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <p className="font-bold text-slate-900">
+                <div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="font-bold text-white">
                       {cargandoPerfil ? "Cargando datos..." : errorPerfil ? "No se pudo cargar el perfil" : perfil?.nombreCompleto ?? "Mi cuenta"}
                     </p>
-                    <span className="rounded-full border border-sky-200/80 bg-gradient-to-b from-white to-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-800 shadow-[0_1px_3px_rgba(14,165,233,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)]">
+                    <span className="rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-bold text-[#fef08a]">
                       {perfil?.numeroDocumento ? `${perfil.tipoDocumento} ${perfil.numeroDocumento}` : "Documento no disponible"}
                     </span>
                   </div>
-                  <p className="font-mono text-[11px] text-blue-700 font-semibold mt-0.5">
+                  <p className="font-mono text-[11px] text-blue-100 mt-0.5">
                     {perfil?.correo ?? "Correo no disponible"}
                   </p>
-                  <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span>Dirección de Casilla no configurada.</span>
-                  </div>
                 </div>
               </div>
+
               <Link
                 to="/tramite"
-                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/30 bg-white/15 px-3.5 py-2 text-xs font-bold text-white backdrop-blur transition hover:bg-white/25"
               >
                 ← Volver
               </Link>
             </div>
-          </div>
-        </div>
-      </header>
+          }
+          footer={
+            <p className="text-[11px] sm:text-xs text-blue-100 leading-relaxed">
+              🔔 <strong className="text-[#fef08a]">Aviso legal:</strong> Las comunicaciones de esta casilla pueden corresponder a actuaciones administrativas. Revise su contenido, fecha de emisión y las indicaciones del documento.
+            </p>
+          }
+        />
+      </div>
 
       {/* ==================================================================== */}
       {/* CONTENIDO PRINCIPAL                                                  */}

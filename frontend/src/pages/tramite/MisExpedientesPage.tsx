@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { formatearFechaHoraLegible } from "../../utils/expedientePresentacion";
 import { tesoreriaService, type DtoOrdenPago, type DtoSaldosExpediente, type CausalDevolucion } from "../../services/tesoreria.service";
-import emptyExpedientesImg from "../../assets/sigd/empty-expedientes.webp";
+import { ModuleHero, MisExpedientesIllustration } from "../../components/tramite/ModuleHero";
 
 export interface SolicitudVinculacionDto {
   solicitudId: string;
@@ -307,46 +307,46 @@ export default function MisExpedientesPage() {
     <main className="min-h-screen bg-slate-50 py-6 px-3.5 sm:px-6 sm:py-8 lg:px-8 text-slate-900">
       <div className="mx-auto max-w-6xl space-y-6">
         {/* Cabecera del Portal Ciudadano */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-sky-200/80 bg-gradient-to-b from-white via-sky-50/80 to-blue-50/60 px-3 py-1 text-xs font-bold text-sky-950 shadow-[0_2px_6px_rgba(14,165,233,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)] mb-1">
-              Portal del Ciudadano
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              Mis Expedientes
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-slate-500">
-              Bienvenido(a), <span className="font-semibold text-slate-700">Mi cuenta</span>. Aquí puedes consultar y dar seguimiento a todos tus trámites registrados.
+        <ModuleHero
+          eyebrow='Portal del Ciudadano · IESTP "Suiza" — Pucallpa, Ucayali'
+          title={<>Mis <span className="text-[#f9e000]">Expedientes</span></>}
+          subtitle='Bienvenido(a) a tu portal ciudadano en el IESTP "Suiza" de Pucallpa. Aquí puedes consultar y dar seguimiento en tiempo real a todos tus trámites registrados.'
+          illustration={<MisExpedientesIllustration className="h-40 w-auto" />}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalVinculacion(true);
+                  setErrorVinculacion(null);
+                  setExitoVinculacion(null);
+                  void cargarSolicitudesVinculacion();
+                }}
+                className="inline-flex cursor-pointer items-center rounded-xl border border-white/30 bg-white/15 px-3.5 py-1.5 text-xs font-bold text-white backdrop-blur transition hover:bg-white/25"
+              >
+                🔗 Vincular Trámite Previo
+              </button>
+              <Link
+                to="/casilla"
+                className="inline-flex items-center rounded-xl border border-white bg-white px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-blue-50"
+              >
+                Casilla Electrónica
+              </Link>
+              <Link
+                to="/tramite"
+                state={{ nuevoTramite: true }}
+                className="inline-flex items-center rounded-xl border border-[#f9e000] bg-[#f9e000] px-4 py-1.5 text-xs font-black text-[#042454] shadow-sm transition hover:bg-amber-300"
+              >
+                + Nuevo Trámite
+              </Link>
+            </>
+          }
+          footer={
+            <p className="text-[11px] sm:text-xs text-blue-100 font-medium">
+              Sede Digital Ciudadana · IESTP &quot;Suiza&quot; de Pucallpa (Av. Túpac Amaru s/n, Ucayali) · Seguimiento oficial CUT
             </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setModalVinculacion(true);
-                setErrorVinculacion(null);
-                setExitoVinculacion(null);
-                void cargarSolicitudesVinculacion();
-              }}
-              className="inline-flex items-center rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs sm:text-sm font-semibold text-cyan-800 shadow-2xs hover:bg-cyan-100 transition"
-            >
-              🔗 Vincular Trámite Previo
-            </button>
-            <Link
-              to="/casilla"
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
-            >
-              Casilla Electrónica
-            </Link>
-            <Link
-              to="/tramite"
-              state={{ nuevoTramite: true }}
-              className="inline-flex items-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 transition"
-            >
-              + Nuevo Trámite
-            </Link>
-          </div>
-        </div>
+          }
+        />
 
         {/* Estados de carga y error */}
         {cargando && (
@@ -445,15 +445,7 @@ export default function MisExpedientesPage() {
             {expedientes.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 sm:p-12 text-center shadow-xs">
                 <div className="mx-auto mb-3 flex justify-center">
-                  <img
-                    src={emptyExpedientesImg}
-                    alt="Sin expedientes"
-                    width={144}
-                    height={144}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-28 sm:h-36 w-auto object-contain aspect-square"
-                  />
+                  <MisExpedientesIllustration className="h-32 w-auto" />
                 </div>
                 <h3 className="mt-3 text-base font-bold text-slate-900">
                   Aún no tienes expedientes radicados

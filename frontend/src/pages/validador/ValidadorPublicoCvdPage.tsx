@@ -25,6 +25,7 @@ import {
 } from "../../utils/cvdValidator";
 import { Button } from "../../components/ui/Button";
 import { ContextualHelp } from "../../components/ui/ContextualHelp";
+import { ModuleHero, ValidadorCvdIllustration } from "../../components/tramite/ModuleHero";
 
 const PATRON_CVD = /CVD-\d{2,4}-[A-Z]{2,6}-\d{4,6}-[A-F0-9]{4}/;
 
@@ -151,31 +152,36 @@ export default function ValidadorPublicoCvdPage() {
 
   return (
     <main className="min-h-screen bg-surface-page text-slate-900 pb-12">
-      <header className="border-b border-slate-200 bg-white shadow-2xs">
-        <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6">
-          <Link
-            to="/"
-            className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-suiza-primary transition"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Volver al inicio
-          </Link>
-
-          <div className="flex flex-wrap items-center gap-2 mb-1.5">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-              <ShieldCheck className="h-3.5 w-3.5 text-suiza-primary" />
-              Verificador público de Códigos de Verificación Digital (CVD)
-            </span>
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Verificar documento
-          </h1>
-          <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-2xl leading-relaxed">
-            Ingresa el CVD o escanea el código QR para contrastar la autenticidad, integridad y vigencia de resoluciones y actos emitidos por el IESTP &quot;Suiza&quot;.
-          </p>
-        </div>
-      </header>
+      <div className="mx-auto max-w-4xl px-4 pt-6 sm:px-6">
+        <ModuleHero
+          eyebrow='Verificador Público CVD · IESTP "Suiza" — Pucallpa, Ucayali'
+          title={<>Verificar <span className="text-[#f9e000]">documento</span></>}
+          subtitle='Ingresa el CVD o escanea el código QR para contrastar la autenticidad, integridad y vigencia de resoluciones y actos emitidos por el IESTP "Suiza" de Pucallpa.'
+          illustration={<ValidadorCvdIllustration className="h-40 w-auto" />}
+          actions={
+            <>
+              <Link
+                to="/"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/15 px-3.5 py-1.5 text-xs font-bold text-white backdrop-blur transition hover:bg-white/25"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Volver al inicio
+              </Link>
+              <Link
+                to="/consulta"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white bg-white px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-blue-50"
+              >
+                Consultar CUT
+              </Link>
+            </>
+          }
+          footer={
+            <p className="text-[11px] sm:text-xs text-blue-100 font-medium">
+              Verificación criptográfica SHA-256 · Sede Digital IESTP &quot;Suiza&quot; de Pucallpa — Av. Túpac Amaru s/n, Ucayali
+            </p>
+          }
+        />
+      </div>
 
       <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6 space-y-6">
         {/* Panel Principal de Verificación */}

@@ -20,6 +20,7 @@ import { TechnicalDetails } from '../../components/ui/TechnicalDetails';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { ContextualHelp } from '../../components/ui/ContextualHelp';
 import ConsultaCutIllustration from '../../components/tramite/ConsultaCutIllustration';
+import logoSuiza from '../../assets/sigd/logo-suiza.webp';
 
 export interface DtoDocumentoPublico {
   nombreArchivo: string;
@@ -219,25 +220,39 @@ export default function ConsultaPublicaPage() {
     <main className="min-h-screen bg-surface-page py-8 px-4 sm:px-6 lg:px-8 text-slate-900">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Cabecera Institucional */}
-        <header className="rounded-3xl border border-slate-200 bg-white shadow-md overflow-hidden">
+        <header className="rounded-3xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+          {/* Cinta tricolor institucional IESTP "Suiza" Pucallpa */}
+          <div className="h-1.5 w-full bg-gradient-to-r from-[#0072bc] via-[#e6007e] to-[#f9e000]" />
           {/* Banner institucional */}
-          <div className="relative bg-gradient-to-br from-[#0a2f6b] via-[#0b4f9e] to-[#1473d6] px-6 py-7 sm:px-9 sm:py-9 text-white">
+          <div className="relative bg-gradient-to-br from-[#042454] via-[#00559e] to-[#0072bc] px-6 py-7 sm:px-9 sm:py-8 text-white">
             <div className="pointer-events-none absolute -right-10 -top-12 h-52 w-52 rounded-full bg-white/10" />
-            <div className="pointer-events-none absolute right-24 -bottom-16 h-40 w-40 rounded-full bg-amber-300/15" />
-            <div className="pointer-events-none absolute left-0 bottom-0 h-1.5 w-full bg-gradient-to-r from-amber-300 via-amber-400 to-transparent" />
+            <div className="pointer-events-none absolute right-24 -bottom-16 h-40 w-40 rounded-full bg-[#e6007e]/15" />
+            <div className="pointer-events-none absolute left-0 bottom-0 h-1 w-full bg-gradient-to-r from-[#f9e000] via-[#e6007e] to-[#0072bc]" />
 
             <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur px-3 py-1 text-xs font-bold text-white border border-white/25 mb-3">
-                  <ShieldCheck className="h-3.5 w-3.5 text-amber-300" />
-                  Consulta Pública de Trámites y Expedientes
+                <div className="flex flex-wrap items-center gap-2.5 mb-3">
+                  <img
+                    src={logoSuiza}
+                    alt='Escudo oficial del IESTP "Suiza" de Pucallpa'
+                    width={36}
+                    height={36}
+                    className="h-9 w-9 shrink-0 rounded-full bg-white object-contain p-0.5 shadow-sm ring-2 ring-[#e6007e]/70"
+                  />
+                  <span className="inline-flex items-center rounded-full border border-[#f9e000]/40 bg-[#f9e000]/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#fef08a]">
+                    IESTP &quot;SUIZA&quot; · PUCALLPA
+                  </span>
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur px-3 py-1 text-xs font-bold text-white border border-white/25">
+                    <ShieldCheck className="h-3.5 w-3.5 text-[#f9e000]" />
+                    Consulta Pública de Trámites y Expedientes
+                  </div>
                 </div>
                 <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
-                  Consulta tu trámite <span className="text-amber-300">en línea</span>
+                  Consulta tu trámite <span className="text-[#f9e000]">en línea</span>
                 </h1>
                 <p className="text-xs sm:text-sm text-blue-100 mt-2 max-w-xl">
-                  IESTP &quot;Suiza&quot; — Sede Digital y Transparencia Documentaria
-                  <span className="block text-[11px] text-blue-200/90 mt-0.5">Ley N° 27444 · Ley N° 29733</span>
+                  IESTP &quot;Suiza&quot; de Pucallpa — Sede Digital y Transparencia Documentaria
+                  <span className="block text-[11px] text-blue-200/90 mt-0.5">Av. Túpac Amaru s/n, Ucayali · Ley N° 27444 · Ley N° 29733</span>
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">

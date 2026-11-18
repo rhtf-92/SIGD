@@ -9,6 +9,13 @@ import {
 } from "lucide-react";
 import estudiantesImg from "../assets/sigd/estudiantes-sigd.webp";
 import entradaInstitutoImg from "../assets/sigd/entrada-instituto.webp";
+import logoSuiza from "../assets/sigd/logo-suiza.webp";
+import {
+  MesaPartesIllustration,
+  CatalogoIllustration,
+  ValidadorCvdIllustration,
+} from "../components/tramite/ModuleHero";
+import ConsultaCutIllustration from "../components/tramite/ConsultaCutIllustration";
 
 export default function HomePage() {
   return (
@@ -203,8 +210,11 @@ export default function HomePage() {
           {/* Tarjeta 1: Mesa de Partes Digital */}
           <Link to="/mesa-partes" className="sigd-service-card group">
             <div className="sigd-service-top">
-              <div className="sigd-service-icon">
-                <Laptop className="sigd-icon-svg" />
+              <div className="flex items-center gap-2">
+                <div className="sigd-service-icon">
+                  <Laptop className="sigd-icon-svg" />
+                </div>
+                <MesaPartesIllustration className="h-14 w-auto drop-shadow-2xs" />
               </div>
               <span className="sigd-service-badge">Atención 24/7</span>
             </div>
@@ -245,8 +255,11 @@ export default function HomePage() {
           {/* Tarjeta 2: Consulta por CUT */}
           <Link to="/consulta" className="sigd-service-card group">
             <div className="sigd-service-top">
-              <div className="sigd-service-icon">
-                <Search className="sigd-icon-svg" />
+              <div className="flex items-center gap-2">
+                <div className="sigd-service-icon">
+                  <Search className="sigd-icon-svg" />
+                </div>
+                <ConsultaCutIllustration className="h-14 w-auto drop-shadow-2xs" />
               </div>
               <span className="sigd-service-badge">En tiempo real</span>
             </div>
@@ -287,8 +300,11 @@ export default function HomePage() {
           {/* Tarjeta 3: Catálogo TUPA */}
           <Link to="/tupa" className="sigd-service-card group">
             <div className="sigd-service-top">
-              <div className="sigd-service-icon">
-                <Layers className="sigd-icon-svg" />
+              <div className="flex items-center gap-2">
+                <div className="sigd-service-icon">
+                  <Layers className="sigd-icon-svg" />
+                </div>
+                <CatalogoIllustration className="h-14 w-auto drop-shadow-2xs" />
               </div>
               <span className="sigd-service-badge">72 Procedimientos</span>
             </div>
@@ -329,8 +345,11 @@ export default function HomePage() {
           {/* Tarjeta 4: Validador CVD */}
           <Link to="/validador-cvd" className="sigd-service-card group">
             <div className="sigd-service-top">
-              <div className="sigd-service-icon">
-                <ShieldCheck className="sigd-icon-svg" />
+              <div className="flex items-center gap-2">
+                <div className="sigd-service-icon">
+                  <ShieldCheck className="sigd-icon-svg" />
+                </div>
+                <ValidadorCvdIllustration className="h-14 w-auto drop-shadow-2xs" />
               </div>
               <span className="sigd-service-badge">Verificación QR</span>
             </div>
@@ -370,19 +389,30 @@ export default function HomePage() {
         </div>
 
         {/* Barra Institucional IESTP "Suiza" de Pucallpa */}
-        <div className="mx-auto mt-3 w-full max-w-[1580px] rounded-2xl border border-sky-200/80 bg-white/85 px-4 py-2.5 shadow-2xs backdrop-blur-xs">
-          <div className="flex flex-wrap items-center justify-center lg:justify-between gap-2.5 text-xs font-semibold text-[#062144]">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200 px-3 py-1">
+        <div className="mx-auto mt-3 w-full max-w-[1580px] overflow-hidden rounded-2xl border border-[#0072bc]/25 bg-white/95 shadow-xs backdrop-blur-xs">
+          <div className="h-1 w-full bg-gradient-to-r from-[#0072bc] via-[#e6007e] to-[#f9e000]" />
+          <div className="flex flex-wrap items-center justify-center lg:justify-between gap-2.5 px-4 py-2.5 text-xs font-semibold text-[#042454]">
+            <span className="inline-flex items-center gap-2 font-black tracking-tight text-[#042454]">
+              <img
+                src={logoSuiza}
+                alt='Escudo IESTP "Suiza" de Pucallpa'
+                width={26}
+                height={26}
+                className="h-7 w-7 rounded-full bg-white object-contain p-0.5 ring-1 ring-[#e6007e]/70"
+              />
+              <span>IESTP &quot;SUIZA&quot; — PUCALLPA, UCAYALI</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-[#0072bc]/25 px-3 py-1">
               <span>📍</span>
-              <span>Sede Central: Av. Túpac Amaru s/n, Pucallpa – Ucayali</span>
+              <span>Av. Túpac Amaru s/n (Km 4.5 CFB), Coronel Portillo</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-950 px-3 py-1">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e6007e]/5 border border-[#e6007e]/25 text-[#880e4f] px-3 py-1">
               <span>🎓</span>
-              <span>11 Carreras Profesionales Técnicas · Instituto de Excelencia</span>
+              <span>11 Carreras Profesionales Técnicas · R.D. N° 0778-2006-ED</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-950 px-3 py-1">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-300/70 text-amber-950 px-3 py-1">
               <span>🕘</span>
-              <span>Ventanilla Presencial: Lun a Vie 8:00 a.m. – 4:30 p.m. · Tel. (061) 280665</span>
+              <span>Lun–Vie 8:00 a.m. – 4:30 p.m. · Central (061) 280665</span>
             </span>
           </div>
         </div>
