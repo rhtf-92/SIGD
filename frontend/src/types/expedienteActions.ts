@@ -28,6 +28,35 @@ export interface SolicitudAcumulacion {
   readonly principal: ExpedienteAccionReferencia;
   readonly conexos: readonly ExpedienteAccionReferencia[];
   readonly motivo: string;
+  readonly actoResolutivo?: string;
+}
+
+export interface SolicitudDesacumulacion {
+  readonly principalId: string;
+  readonly accesorioId: string;
+  readonly motivo: string;
+  readonly actoDesacumulacion: string;
+}
+
+export interface SolicitudDesglose {
+  readonly expedienteId: string;
+  readonly documentoAdjuntoId: string;
+  readonly motivo: string;
+  readonly actoAutorizacion: string;
+  readonly solicitanteNombre: string;
+  readonly solicitanteDocumento: string;
+  readonly documentoSustitutorioId?: string | null;
+  readonly observaciones?: string | null;
+}
+
+export interface ResultadoDesglose {
+  readonly idDesglose: string;
+  readonly expedienteId: string;
+  readonly documentoAdjuntoId: string;
+  readonly folioInicio: number;
+  readonly folioFin: number;
+  readonly cantidadFolios: number;
+  readonly documentoSustitutorioId?: string | null;
 }
 
 /** Formas de respuesta documentadas en el plan, verificadas en tiempo de ejecución. */
@@ -57,8 +86,11 @@ export class ErrorAccionExpediente extends Error {
 export interface ServicioExpedienteActions {
   derivar?: (entrada: SolicitudDerivacion) => Promise<ResultadoDerivacion>;
   observar?: (entrada: SolicitudObservacion) => Promise<ResultadoObservacion>;
-  /** Adaptador futuro: solo resuelve cuando el servidor confirma la operación. */
   acumular?: (entrada: SolicitudAcumulacion) => Promise<void>;
+  desacumular?: (entrada: SolicitudDesacumulacion) => Promise<void>;
+  desglosar?: (entrada: SolicitudDesglose) => Promise<ResultadoDesglose>;
+  listarAcumulaciones?: (expedienteId: string) => Promise<import("./expediente").ItemAcumulacion[]>;
+  listarDesgloses?: (expedienteId: string) => Promise<import("./expediente").ItemDesglose[]>;
   recepcionar?: (entrada: SolicitudRecepcion) => Promise<ResultadoRecepcion>;
 }
 

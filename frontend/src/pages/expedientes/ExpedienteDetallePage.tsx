@@ -11,6 +11,8 @@ import DerivacionModal from "../../components/expedientes/DerivacionModal";
 import ObservacionModal from "../../components/expedientes/ObservacionModal";
 import SubsanarVentanillaModal from "../../components/expedientes/SubsanarVentanillaModal";
 import AcumulacionModal from "../../components/expedientes/AcumulacionModal";
+import DesacumulacionModal from "../../components/expedientes/DesacumulacionModal";
+import DesgloseModal from "../../components/expedientes/DesgloseModal";
 import DigitalizacionModal from "../../components/expedientes/DigitalizacionModal";
 import ExpedienteActionToast from "../../components/expedientes/ExpedienteActionToast";
 import AsignarEvaluadorModal from "../../components/expedientes/AsignarEvaluadorModal";
@@ -24,7 +26,7 @@ import { crearServicioExpedienteActions } from "../../api/expedienteActions";
 import { useAuthStore } from "../../stores/authStore";
 import { apiClient } from "../../api/client";
 import { ApiHttpError } from "../../types/api";
-import type { ClasificacionCCD, ExpedienteDetalleRutaDoc, ExpedienteSGD, VersionDocumento } from "../../types/expediente";
+import type { ClasificacionCCD, ExpedienteDetalleRutaDoc, ExpedienteSGD, VersionDocumento, ItemAcumulacion, ItemDesglose } from "../../types/expediente";
 import type { EstadoRecurso } from "../../types/ccdArchivistica";
 import type { UnidadDestino } from "../../types/expedienteActions";
 
@@ -227,15 +229,35 @@ export function VisorPdfExpediente({
               type="button"
               onClick={() => setSeleccionado(indice)}
               aria-pressed={indice === indiceActual}
-              className={`rounded border px-3 py-1 text-sm font-medium transition ${
+              className={`rounded border px-3 py-1 text-sm font-medium transition inline-flex items-center gap-1.5 ${
                 indice === indiceActual
                   ? "border-blue-600 bg-blue-50 text-blue-800"
                   : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >
-              {item.nombre}
+              <span>{item.nombre}</span>
+              {item.desglosado && (
+                <span className="rounded bg-amber-200 text-amber-900 px-1.5 py-0.2 text-[10px] font-bold">
+                  DESGLOSADO
+                </span>
+              )}
             </button>
           ))}
+        </div>
+      )}
+      {documento.desglosado && (
+        <div
+          role="note"
+          aria-label="advertencia-desglosado"
+          className="rounded-lg border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-950 flex items-center gap-2"
+        >
+          <span className="text-base">🏷️</span>
+          <div>
+            <span className="font-bold uppercase tracking-wider">PIEZA DOCUMENTAL DESGLOSADA (Art. 170 LPAG):</span>
+            <p className="mt-0.5 text-slate-700">
+              El documento original fue formalmente retirado y devuelto a solicitud del administrado. Ocupa los folios <strong>F. {documento.folioInicio} a {documento.folioFin}</strong>, los cuales se conservan inmutables en el expediente histórico conforme a la Directiva N° 001-2019-AGN/DDPA.
+            </p>
+          </div>
         </div>
       )}
       {esResolucion && !documento.tieneFirmaDigital && (
@@ -856,6 +878,73 @@ export default function ExpedienteDetallePage() {
   const puedeDigitalizar = tieneFacultad("EXPEDIENTE_ADJUNTAR");
   const puedeDerivar = tieneFacultad("EXPEDIENTE_DERIVAR");
 
+  const esGestorApoyo = useMemo(() => {
+    const roles = Array.isArray(usuarioArchivo?.roles) ? usuarioArchivo.roles : [];
+    return roles.includes("GESTOR_APOYO_AREA");
+  }, [usuarioArchivo]);
+
+  const puedeGestionarAcumulacion = Boolean(
+    puedeDerivar ||
+    tieneFacultad("EXPEDIENTE_RESOLVER") ||
+    usuarioArchivo?.roles?.some((r) => ["DIRECTOR", "COORDINADOR_AREA", "JEFE_TRAMITE", "SECRETARIA_GENERAL"].includes(r))
+  );
+
+  const puedeGestionarDesacumulacion = Boolean(
+    !esGestorApoyo &&
+    (puedeDerivar ||
+      tieneFacultad("EXPEDIENTE_RESOLVER") ||
+      usuarioArchivo?.roles?.some((r) => ["DIRECTOR", "COORDINADOR_AREA", "JEFE_TRAMITE", "SECRETARIA_GENERAL"].includes(r)))
+  );
+
+  const puedeGestionarDesglose = Boolean(
+    !esGestorApoyo &&
+    (puedeDigitalizar ||
+      puedeDerivar ||
+      tieneFacultad("EXPEDIENTE_RESOLVER") ||
+      usuarioArchivo?.roles?.some((r) => ["DIRECTOR", "COORDINADOR_AREA", "JEFE_TRAMITE", "SECRETARIA_GENERAL"].includes(r)))
+  );
+
+  const [modalDesacumular, setModalDesacumular] = useState<ItemAcumulacion | null>(null);
+  const [modalDesglose, setModalDesglose] = useState(false);
+
+  const { data: listaAcumulaciones, refetch: recargarAcumulaciones } = useQuery({
+    queryKey: ["acumulaciones", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const res = await apiClient.get<{ ok: boolean; acumulaciones: ItemAcumulacion[] }>(
+        `/api/v1/rutadoc/expedientes/${encodeURIComponent(id)}/acumulaciones`
+      );
+      return res.data.acumulaciones || [];
+    },
+    enabled: Boolean(id && expediente),
+  });
+
+  const { data: listaDesgloses, refetch: recargarDesgloses } = useQuery({
+    queryKey: ["desgloses", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const res = await apiClient.get<{ ok: boolean; desgloses: ItemDesglose[] }>(
+        `/api/v1/rutadoc/expedientes/${encodeURIComponent(id)}/desgloses`
+      );
+      return res.data.desgloses || [];
+    },
+    enabled: Boolean(id && expediente),
+  });
+
+  const handleExitoDesacumular = (msg: string) => {
+    setMensajeAlerta({ tipo: "exito", texto: msg });
+    void queryClient.invalidateQueries({ queryKey: ["acumulaciones", id] });
+    void queryClient.invalidateQueries({ queryKey: ["expediente", id] });
+    void recargarAcumulaciones();
+  };
+
+  const handleExitoDesglose = (msg: string) => {
+    setMensajeAlerta({ tipo: "exito", texto: msg });
+    void queryClient.invalidateQueries({ queryKey: ["desgloses", id] });
+    void queryClient.invalidateQueries({ queryKey: ["expediente", id] });
+    void recargarDesgloses();
+  };
+
   const [modalAsignarEvaluador, setModalAsignarEvaluador] = useState(false);
   const [mostrarHistorialEvaluadores, setMostrarHistorialEvaluadores] = useState(false);
 
@@ -1166,13 +1255,24 @@ export default function ExpedienteDetallePage() {
                     Observar / Suspender
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setModalActivo("acumulacion")}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
-                >
-                  Acumular
-                </button>
+                {puedeGestionarAcumulacion && (
+                  <button
+                    type="button"
+                    onClick={() => setModalActivo("acumulacion")}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    Acumular
+                  </button>
+                )}
+                {puedeGestionarDesglose && expediente?.documentos && expediente.documentos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setModalDesglose(true)}
+                    className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-100 transition"
+                  >
+                    Desglose (Art. 170)
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1196,6 +1296,20 @@ export default function ExpedienteDetallePage() {
           <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             El estado informado no tiene una actuacion documentada coincidente. Requiere reconciliacion institucional antes de continuar.
           </p>
+        )}
+        {expediente?.acumulacionInfo?.esAccesorio && (
+          <div
+            role="alert"
+            className="rounded-xl border border-blue-300 bg-blue-50/90 p-4 text-sm text-blue-900 shadow-xs flex items-start gap-3"
+          >
+            <span className="text-xl">📎</span>
+            <div>
+              <p className="font-bold">EXPEDIENTE ACCESORIO ACUMULADO (Art. 160 LPAG):</p>
+              <p className="mt-0.5 text-xs text-blue-800">
+                Este expediente se encuentra acumulado como <strong>ACCESORIO</strong> al expediente principal <strong>{expediente.acumulacionInfo.expedientePrincipalCodigo}</strong> mediante <em>{expediente.acumulacionInfo.actoResolutivo}</em> el {new Date(expediente.acumulacionInfo.fechaAcumulacion).toLocaleDateString("es-PE")}. La tramitación resolutiva se sustancia en el expediente matriz.
+              </p>
+            </div>
+          </div>
         )}
         {cargandoExpediente && (
           <p className="text-sm text-slate-500">Cargando expediente…</p>
@@ -1386,6 +1500,174 @@ export default function ExpedienteDetallePage() {
               />
             </section>
 
+            {/* Sección de Acumulaciones y Conexidad Procesal (Art. 160 LPAG) */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 mb-4">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Acumulación y Conexidad Procesal (Art. 160 LPAG)
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Tramitación acumulada de expedientes con identidad o íntima conexión sustantiva.
+                  </p>
+                </div>
+                {puedeGestionarAcumulacion && (
+                  <button
+                    type="button"
+                    onClick={() => setModalActivo("acumulacion")}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition"
+                  >
+                    + Acumular Expediente Conexo
+                  </button>
+                )}
+              </div>
+
+              {(!listaAcumulaciones || listaAcumulaciones.length === 0) ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
+                  <p className="text-xs text-slate-500">
+                    Este expediente no cuenta actualmente con expedientes acumulados ni vinculaciones conexas.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Rol</th>
+                        <th className="px-3 py-2 text-left">Exp. Principal (Matriz)</th>
+                        <th className="px-3 py-2 text-left">Exp. Accesorio</th>
+                        <th className="px-3 py-2 text-left">Acto Resolutivo</th>
+                        <th className="px-3 py-2 text-left">Fecha Acumulación</th>
+                        <th className="px-3 py-2 text-left">Estado</th>
+                        {puedeGestionarDesacumulacion && <th className="px-3 py-2 text-right">Acción</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white">
+                      {listaAcumulaciones.map((ac) => (
+                        <tr key={ac.id_acumulacion} className="hover:bg-slate-50/60 transition">
+                          <td className="px-3 py-2 font-medium">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              ac.rol_en_acumulacion === "PRINCIPAL"
+                                ? "bg-purple-100 text-purple-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}>
+                              {ac.rol_en_acumulacion}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 font-mono font-semibold text-slate-900">{ac.principal_codigo}</td>
+                          <td className="px-3 py-2 font-mono font-semibold text-slate-900">{ac.accesorio_codigo}</td>
+                          <td className="px-3 py-2 text-slate-700">{ac.acto_resolutivo || "—"}</td>
+                          <td className="px-3 py-2 text-slate-500">{new Date(ac.fecha_acumulacion).toLocaleString("es-PE")}</td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              ac.estado === "ACUMULADO"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-100 text-slate-600"
+                            }`}>
+                              {ac.estado}
+                            </span>
+                            {ac.estado === "DESACUMULADO" && ac.fecha_desacumulacion && (
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                Desacumulado: {new Date(ac.fecha_desacumulacion).toLocaleDateString("es-PE")} ({ac.motivo_desacumulacion})
+                              </p>
+                            )}
+                          </td>
+                          {puedeGestionarDesacumulacion && (
+                            <td className="px-3 py-2 text-right">
+                              {ac.estado === "ACUMULADO" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setModalDesacumular(ac)}
+                                  className="rounded border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition"
+                                >
+                                  Desacumular
+                                </button>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/* Sección de Desgloses Documentales y Retiros Archivísticos (Art. 170 LPAG) */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 mb-4">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Desgloses Documentales y Retiros Archivísticos (Art. 170 LPAG)
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Registro WORM de piezas documentales originales retiradas con preservación inmutable de la foliación continua.
+                  </p>
+                </div>
+                {puedeGestionarDesglose && expediente.documentos && expediente.documentos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setModalDesglose(true)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800 shadow-xs hover:bg-indigo-100 transition"
+                  >
+                    ✂️ Registrar Desglose Documental
+                  </button>
+                )}
+              </div>
+
+              {(!listaDesgloses || listaDesgloses.length === 0) ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
+                  <p className="text-xs text-slate-500">
+                    No se registran desgloses documentales en este expediente. Toda la documentación original se mantiene íntegra en custodia.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Documento Original</th>
+                        <th className="px-3 py-2 text-left">Foliación Conservada</th>
+                        <th className="px-3 py-2 text-left">Solicitante Receptor</th>
+                        <th className="px-3 py-2 text-left">Acto Autorización</th>
+                        <th className="px-3 py-2 text-left">Motivo Desglose</th>
+                        <th className="px-3 py-2 text-left">Copia Sustitutoria</th>
+                        <th className="px-3 py-2 text-left">Fecha Desglose</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white">
+                      {listaDesgloses.map((dg) => (
+                        <tr key={dg.id_desglose} className="hover:bg-slate-50/60 transition">
+                          <td className="px-3 py-2 font-medium text-slate-900">
+                            <span>{dg.documento_nombre}</span>
+                            <span className="ml-1.5 rounded bg-amber-100 text-amber-800 px-1.5 py-0.2 text-[10px] font-bold">
+                              RETIRADO
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 font-mono font-semibold text-indigo-700">
+                            F. {dg.folio_inicio} - {dg.folio_fin} ({dg.cantidad_folios} foja{dg.cantidad_folios > 1 ? "s" : ""})
+                          </td>
+                          <td className="px-3 py-2 text-slate-800">
+                            {dg.solicitante_nombre} <span className="text-slate-400">({dg.solicitante_documento})</span>
+                          </td>
+                          <td className="px-3 py-2 text-slate-700">{dg.acto_autorizacion}</td>
+                          <td className="px-3 py-2 text-slate-600 italic">{dg.motivo_desglose}</td>
+                          <td className="px-3 py-2 text-slate-700">
+                            {dg.sustitutorio_nombre ? (
+                              <span className="font-medium text-emerald-700">✓ {dg.sustitutorio_nombre}</span>
+                            ) : (
+                              <span className="text-slate-400">Constancia física</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-slate-500">{new Date(dg.fecha_desglose).toLocaleString("es-PE")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
             <SeccionVersionesDocumentales expediente={expediente} />
 
             {errorTimeline ? (
@@ -1451,6 +1733,26 @@ export default function ExpedienteDetallePage() {
               expediente={expedienteParaAccion}
               accion={acciones.acumulacion}
             />
+
+            {modalDesacumular && (
+              <DesacumulacionModal
+                open={Boolean(modalDesacumular)}
+                onClose={() => setModalDesacumular(null)}
+                acumulacion={modalDesacumular}
+                onExito={handleExitoDesacumular}
+              />
+            )}
+
+            {modalDesglose && (
+              <DesgloseModal
+                open={modalDesglose}
+                onClose={() => setModalDesglose(false)}
+                expedienteId={id!}
+                codigoCut={expediente.cut}
+                documentos={expediente.documentos || []}
+                onExito={handleExitoDesglose}
+              />
+            )}
 
             {modalDigitalizar && (
               <DigitalizacionModal

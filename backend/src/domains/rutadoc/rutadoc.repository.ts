@@ -236,6 +236,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       };
       const adjuntos = await this.pool.query<{
         id_documento: string; nombre: string; mime_type: string; folio_inicio: number; folio_fin: number; tiene_firma_digital: boolean;
+        desglosado: boolean;
       }>(`
         SELECT f.id_documento::text, a.nombre_archivo AS nombre, a.mime_type,
                f.folio_inicio, f.folio_fin,
@@ -243,7 +244,8 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
                  SELECT 1 FROM sigd_doc.firma_digital_documento fd
                   WHERE fd.documento_id = a.documento_adjunto_id
                     AND fd.estado = 'FIRMADO_DIGITALMENTE'
-               ) AS tiene_firma_digital
+               ) AS tiene_firma_digital,
+               COALESCE(a.desglosado, FALSE) AS desglosado
           FROM sigd_tra.expediente_documento_folio f
           JOIN sigd_doc.documento_adjunto a
             ON a.documento_adjunto_id = f.id_documento AND a.expediente_id = f.expediente_id
@@ -253,8 +255,49 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
         idDocumento: adjunto.id_documento, nombre: adjunto.nombre,
         mimeType: adjunto.mime_type, folioInicio: adjunto.folio_inicio, folioFin: adjunto.folio_fin,
         tieneFirmaDigital: Boolean(adjunto.tiene_firma_digital),
+        desglosado: Boolean(adjunto.desglosado),
       }));
     }
+
+    const infoAcumulacion = await this.pool.query<{
+      id_acumulacion: string;
+      expediente_principal_id: string;
+      principal_codigo: string;
+      expediente_accesorio_id: string;
+      accesorio_codigo: string;
+      acto_resolutivo: string;
+      fecha_acumulacion: Date;
+      rol: 'PRINCIPAL' | 'ACCESORIO';
+    }>(`
+      SELECT a.id_acumulacion::text,
+             a.expediente_principal::text AS expediente_principal_id,
+             ep.codigo_expediente AS principal_codigo,
+             a.expediente_accesorio::text AS expediente_accesorio_id,
+             ea.codigo_expediente AS accesorio_codigo,
+             a.acto_resolutivo,
+             a.fecha_acumulacion,
+             CASE WHEN a.expediente_principal = $1::uuid THEN 'PRINCIPAL' ELSE 'ACCESORIO' END AS rol
+        FROM sigd_tra.expediente_acumulacion a
+        JOIN sigd_tra.expediente ep ON ep.expediente_id = a.expediente_principal
+        JOIN sigd_tra.expediente ea ON ea.expediente_id = a.expediente_accesorio
+       WHERE (a.expediente_principal = $1::uuid OR a.expediente_accesorio = $1::uuid)
+         AND a.estado = 'ACUMULADO'
+       ORDER BY a.fecha_acumulacion DESC
+       LIMIT 1`, [idExpediente]);
+
+    const acumulacionFila = infoAcumulacion.rows[0];
+    const acumulacionInfo = acumulacionFila ? {
+      idAcumulacion: acumulacionFila.id_acumulacion,
+      esAccesorio: acumulacionFila.rol === 'ACCESORIO',
+      esPrincipal: acumulacionFila.rol === 'PRINCIPAL',
+      expedientePrincipalId: acumulacionFila.expediente_principal_id,
+      expedientePrincipalCodigo: acumulacionFila.principal_codigo,
+      expedienteAccesorioId: acumulacionFila.expediente_accesorio_id,
+      expedienteAccesorioCodigo: acumulacionFila.accesorio_codigo,
+      actoResolutivo: acumulacionFila.acto_resolutivo,
+      fechaAcumulacion: acumulacionFila.fecha_acumulacion.toISOString(),
+    } : null;
+
     const ultimoMovimiento: UltimoMovimiento | null = dato.id_movimiento && dato.evento && dato.fecha_hora && dato.usuario_operador_id
       ? { idMovimiento: dato.id_movimiento, evento: dato.evento,
           estadoNuevo: dato.estado_actual, fechaHora: dato.fecha_hora.toISOString(),
@@ -262,7 +305,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       : null;
     return {
       ...mapearResumen(dato), solicitanteId: dato.solicitante_id,
-      resumenDocumentos, documentos, ultimoMovimiento, sla: null,
+      resumenDocumentos, documentos, acumulacionInfo, ultimoMovimiento, sla: null,
     };
   }
 }

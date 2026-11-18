@@ -176,10 +176,66 @@ export interface ExpedienteResumenRutaDoc {
   estadoActual: string;
   areaActualId: string | null;
 }
+export interface DocumentoAdjuntoRutaDoc {
+  idDocumento: string;
+  nombre: string;
+  mimeType: string;
+  folioInicio: number;
+  folioFin: number;
+  tieneFirmaDigital?: boolean;
+  desglosado?: boolean;
+}
+
+export interface AcumulacionInfoRutaDoc {
+  idAcumulacion: string;
+  esAccesorio: boolean;
+  esPrincipal: boolean;
+  expedientePrincipalId: string;
+  expedientePrincipalCodigo: string;
+  expedienteAccesorioId: string;
+  expedienteAccesorioCodigo: string;
+  actoResolutivo: string;
+  fechaAcumulacion: string;
+}
+
+export interface ItemAcumulacion {
+  id_acumulacion: string;
+  expediente_principal_id: string;
+  principal_codigo: string;
+  expediente_accesorio_id: string;
+  accesorio_codigo: string;
+  acto_resolutivo: string;
+  estado: 'ACUMULADO' | 'DESACUMULADO';
+  fecha_acumulacion: string;
+  fecha_desacumulacion?: string | null;
+  motivo_desacumulacion?: string | null;
+  acto_desacumulacion?: string | null;
+  rol_en_acumulacion: 'PRINCIPAL' | 'ACCESORIO';
+}
+
+export interface ItemDesglose {
+  id_desglose: string;
+  expediente_id: string;
+  documento_adjunto_id: string;
+  documento_nombre: string;
+  folio_inicio: number;
+  folio_fin: number;
+  cantidad_folios: number;
+  acto_autorizacion: string;
+  motivo_desglose: string;
+  solicitante_nombre: string;
+  solicitante_documento: string;
+  documento_sustitutorio_id?: string | null;
+  sustitutorio_nombre?: string | null;
+  fecha_desglose: string;
+  observaciones?: string | null;
+}
+
 export interface ExpedienteDetalleRutaDoc extends ExpedienteResumenRutaDoc {
   solicitanteId: string | null;
   resumenDocumentos: { cantidadDocumentos: number; totalFolios: number } | null;
-  documentos?: { idDocumento: string; nombre: string; mimeType: string; folioInicio: number; folioFin: number; tieneFirmaDigital?: boolean }[];
+  documentos?: DocumentoAdjuntoRutaDoc[];
+  acumulacionInfo?: AcumulacionInfoRutaDoc | null;
   ultimoMovimiento: { idMovimiento: string; evento: string; estadoNuevo: string;
     fechaHora: string; usuarioOperadorId: string } | null;
   sla: null;

@@ -53,7 +53,26 @@ export interface ExpedienteDetalle extends ExpedienteResumen {
   solicitanteId: string | null;
   resumenDocumentos: { cantidadDocumentos: number; totalFolios: number } | null;
   /** Documentos foliados consultables mediante Storage; nunca incluye claves S3. */
-  documentos?: { idDocumento: string; nombre: string; mimeType: string; folioInicio: number; folioFin: number; tieneFirmaDigital?: boolean }[];
+  documentos?: {
+    idDocumento: string;
+    nombre: string;
+    mimeType: string;
+    folioInicio: number;
+    folioFin: number;
+    tieneFirmaDigital?: boolean;
+    desglosado?: boolean;
+  }[];
+  acumulacionInfo?: {
+    idAcumulacion: string;
+    esAccesorio: boolean;
+    esPrincipal: boolean;
+    expedientePrincipalId: string;
+    expedientePrincipalCodigo: string;
+    expedienteAccesorioId: string;
+    expedienteAccesorioCodigo: string;
+    actoResolutivo: string;
+    fechaAcumulacion: string;
+  } | null;
   ultimoMovimiento: UltimoMovimiento | null;
   /** El cálculo SLA corresponde a otro entregable. */
   sla: null;
