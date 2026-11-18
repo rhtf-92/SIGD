@@ -42,6 +42,7 @@ import { crearRouterReportes } from './domains/corelink/reportes.router.js';
 import { crearRouterAdminMaestras } from './domains/organicore/adminMaestras.routes.js';
 import { OrganigramaService } from './domains/organicore/organigrama.service.js';
 import { crearControladorOrganigrama } from './domains/organicore/organigrama.controller.js';
+import { exigirRoles } from './core/auth/exigirRol.js';
 
 // Módulos DocuCore Router y Validador CVD
 import { crearRouterDocuCore } from './domains/docucore/docucore.router.js';
@@ -273,7 +274,7 @@ export function construirApp(
   /*
    * OrganiCore / CoreLink - Auditoría Bitácora WORM (#46), Roles RBAC (#45) y Maestras
    */
-  app.get('/api/v1/admin/auditoria/bitacora', async (req, res, next) => {
+  app.get('/api/v1/admin/auditoria/bitacora', exigirRoles('ADMINISTRADOR', 'DIRECTOR'), async (req, res, next) => {
     try {
       const limite = Math.min(Number(req.query.limite ?? 50), 100);
       const offset = Number(req.query.offset ?? 0);
@@ -290,7 +291,7 @@ export function construirApp(
     }
   });
 
-  app.get('/api/v1/admin/roles-permisos', async (_req, res, next) => {
+  app.get('/api/v1/admin/roles-permisos', exigirRoles('ADMINISTRADOR', 'DIRECTOR'), async (_req, res, next) => {
     try {
       const { rows: roles } = await pool.query(
         `SELECT r.rol_id AS id, r.codigo, r.nombre, r.descripcion,
@@ -308,11 +309,11 @@ export function construirApp(
   });
 
   /* Sedes: el esquema no tiene tabla de sedes. Se devuelve lista vacia (sin datos inventados). */
-  app.get('/api/v1/admin/maestras/sede', (_req, res) => {
+  app.get('/api/v1/admin/maestras/sede', exigirRoles('ADMINISTRADOR', 'DIRECTOR'), (_req, res) => {
     res.json({ sedes: [] });
   });
 
-    app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
+    app.get('/api/v1/admin/maestras/tipo-documento', exigirRoles('ADMINISTRADOR', 'DIRECTOR'), async (_req, res, next) => {
     try {
       const { rows } = await pool.query(
         `SELECT tipo_documental_id AS id, codigo, nombre, extension, mime_type,
