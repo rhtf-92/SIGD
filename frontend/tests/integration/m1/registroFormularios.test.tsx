@@ -3,7 +3,8 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { apiClient } from "../../../src/api/client";
 
 import RegistroCiudadanoPage from "../../../src/pages/registro/RegistroCiudadanoPage";
 import PersonaNaturalForm from "../../../src/components/registro/PersonaNaturalForm";
@@ -13,6 +14,11 @@ import { ConsentimientoLey29733Modal } from "../../../src/components/registro/Co
 import { consentimientoLey29733Schema } from "../../../src/schemas/consentimiento.schema";
 
 describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / ENT-M01-04 / ENT-M01-05)", () => {
+  beforeEach(() => {
+    // Solo dobles HTTP: nunca registrar personas ni consultar servicios reales.
+    vi.spyOn(apiClient, "get").mockRejectedValue(new Error("Usar catálogo local existente"));
+  });
+  afterEach(() => vi.restoreAllMocks());
   it("a) RegistroCiudadanoPage: el conmutador role=\"tablist\" alterna entre Persona Natural y Persona Jurídica sin recargar, y cambia los campos visibles", async () => {
     const user = userEvent.setup();
     render(
@@ -259,8 +265,12 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     expect(invalido.success).toBe(false);
   });
 
-  it("h) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Natural y muestra la casilla creada", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  it.each(["confirmado", "rechazado", "sin identidad", "sin confirmar", "sin contraseña"])("h) RegistroCiudadanoPage: registro natural %s sin falsos éxitos ni pérdida del formulario", async (caso) => {
+    const post = vi.spyOn(apiClient, "post");
+    const confirmacion = { status: 201, data: { idPersona: "11111111-1111-4111-8111-111111111111", mensaje: "Registro exitoso" } };
+    if (caso === "rechazado") post.mockRejectedValueOnce(new Error("Servicio no disponible"));
+    else post.mockResolvedValueOnce(caso === "sin identidad" ? { status: 201, data: {} }
+      : caso === "sin confirmar" ? { ...confirmacion, status: 202 } : confirmacion);
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -268,6 +278,9 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       </MemoryRouter>,
     );
 
+    if (caso !== "sin contraseña") {
+      await user.type(screen.getByLabelText(/Contraseña para su cuenta/i), "PasswordValida123!");
+    }
     // Llenar campos de Persona Natural
     await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
     await user.type(screen.getByLabelText(/Nombres \*/i), "Sergio");
@@ -304,39 +317,49 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     });
     await user.click(botonSubmit);
 
+    if (caso !== "confirmado") {
+      expect(await screen.findByRole("alert")).toHaveTextContent(caso === "sin contraseña" ? /Ingrese una contraseña/ : /No se pudo confirmar el registro/);
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/Correo Electrónico \*/i)).toHaveValue("sergio@example.com");
+      expect(screen.getByLabelText(/Dirección Exacta/i)).toHaveValue("Jr. Tarapacá N° 645");
+      expect(botonSubmit).toBeEnabled();
+      if (caso === "sin contraseña") {
+        expect(post).not.toHaveBeenCalled();
+        await user.type(screen.getByLabelText(/Contraseña para su cuenta/i), "PasswordValida123!");
+      }
+      post.mockResolvedValueOnce(confirmacion);
+      await user.click(botonSubmit);
+    }
+
     // Mensaje de éxito tras registro
     const mensajeExito = await screen.findByRole(
       "status",
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "74561238@casilla.iestpsuiza.edu.pe",
-    );
+    expect(mensajeExito).toHaveTextContent("Registro completado. Ya puede iniciar sesión con su cuenta.");
+    expect(mensajeExito).not.toHaveTextContent("@casilla");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
-    // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
+    // La llamada HTTP conserva dirección y ubigeo, sin depender del console.log.
+    expect(post).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-ciudadano",
       expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
+        direccion: "Jr. Tarapacá N° 645",
+        ubigeoDistrito: "250101",
+        password: "PasswordValida123!",
       }),
     );
 
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
+    const postCall = post.mock.calls.find(
+      (call) => call[0] === "/api/v1/auth/registro-ciudadano",
     );
     expect(postCall).toBeDefined();
     if (!postCall) {
       throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
     }
     const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
-
-    consoleSpy.mockRestore();
-
+    expect(payload).toMatchObject({ direccion: "Jr. Tarapacá N° 645" });
     // Cerrar mensaje de éxito
     const botonCerrarExito = screen.getByLabelText(/Cerrar mensaje de éxito/i);
     await user.click(botonCerrarExito);
@@ -345,8 +368,12 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     // bajo carga de suite completa supera el timeout de 5 s de Vitest.
   }, 30_000);
 
-  it("i) RegistroCiudadanoPage: completa el flujo exitoso de registro para Persona Jurídica y muestra la casilla creada", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  it.each(["confirmado", "rechazado", "sin identidad", "sin confirmar", "sin contraseña"])("i) RegistroCiudadanoPage: registro jurídico %s sin falsos éxitos ni pérdida del formulario", async (caso) => {
+    const post = vi.spyOn(apiClient, "post");
+    const confirmacion = { status: 201, data: { idPersona: "11111111-1111-4111-8111-111111111111", mensaje: "Registro exitoso" } };
+    if (caso === "rechazado") post.mockRejectedValueOnce(new Error("Servicio no disponible"));
+    else post.mockResolvedValueOnce(caso === "sin identidad" ? { status: 201, data: {} }
+      : caso === "sin confirmar" ? { ...confirmacion, status: 202 } : confirmacion);
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -354,6 +381,9 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       </MemoryRouter>,
     );
 
+    if (caso !== "sin contraseña") {
+      await user.type(screen.getByLabelText(/Contraseña para su cuenta/i), "PasswordValida123!");
+    }
     // Cambiar a Persona Jurídica
     await user.click(screen.getByRole("tab", { name: /Persona Jurídica/i }));
 
@@ -402,38 +432,50 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     });
     await user.click(botonSubmit);
 
+    if (caso !== "confirmado") {
+      expect(await screen.findByRole("alert")).toHaveTextContent(caso === "sin contraseña" ? /Ingrese una contraseña/ : /No se pudo confirmar el registro/);
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/Correo Corporativo \*/i)).toHaveValue("contacto@amazonassoft.pe");
+      expect(screen.getByLabelText(/Dirección Exacta/i)).toHaveValue("Jr. Tarapacá N° 645");
+      expect(botonSubmit).toBeEnabled();
+      if (caso === "sin contraseña") {
+        expect(post).not.toHaveBeenCalled();
+        await user.type(screen.getByLabelText(/Contraseña para su cuenta/i), "PasswordValida123!");
+      }
+      post.mockResolvedValueOnce(confirmacion);
+      await user.click(botonSubmit);
+    }
+
     // Mensaje de éxito tras registro
     const mensajeExito = await screen.findByRole(
       "status",
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent(
-      "20131312955@casilla.iestpsuiza.edu.pe",
-    );
+    expect(mensajeExito).toHaveTextContent("Registro completado. Ya puede iniciar sesión con su cuenta.");
+    expect(mensajeExito).not.toHaveTextContent("@casilla");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
-    // Aserción de que el payload capturado en el mock de POST contiene domicilio.direccionExacta con ese valor exacto (no vacío)
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "POST /api/v1/auth/registro-ciudadano",
+    // La llamada HTTP conserva dirección y ubigeo, sin depender del console.log.
+    expect(post).toHaveBeenCalledWith(
+      "/api/v1/auth/registro-persona-juridica",
       expect.objectContaining({
-        domicilio: expect.objectContaining({
-          direccionExacta: "Jr. Tarapacá N° 645",
-        }),
+        direccion: "Jr. Tarapacá N° 645",
+        ubigeoDistrito: "250101",
+        password: "PasswordValida123!",
       }),
     );
 
-    const postCall = consoleSpy.mock.calls.find(
-      (call) => call[0] === "POST /api/v1/auth/registro-ciudadano",
+    const postCall = post.mock.calls.find(
+      (call) => call[0] === "/api/v1/auth/registro-persona-juridica",
     );
     expect(postCall).toBeDefined();
     if (!postCall) {
       throw new Error("No se encontró la llamada POST a registro-ciudadano en el mock");
     }
     const payload = postCall[1];
-    expect(payload.domicilio.direccionExacta).toBe("Jr. Tarapacá N° 645");
-    expect(payload.domicilio.direccionExacta).not.toBe("");
+    expect(payload).toMatchObject({ direccion: "Jr. Tarapacá N° 645" });
 
-    consoleSpy.mockRestore();
     // FIX estabilidad (F_ADRIANO): idem test h) — flujo largo de user-event.
   }, 30_000);
 });

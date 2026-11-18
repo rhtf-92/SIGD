@@ -1,5 +1,12 @@
 # TUPA 2026
 
+> **Referencia histórica de Pasco; no es el catálogo vigente del SIGD Suiza.**
+> Se conserva el contenido para trazabilidad, sin establecer equivalencias con procedimientos Suiza.
+> El catálogo informativo Suiza se encuentra en `src/data/tupaSuiza2026.ts` (75 conceptos).
+> Los procedimientos radicables se consultan en los endpoints existentes `/api/v1/tramites/tipos`
+> y `/api/v1/tramites/tupa`, cuya fuente es `sigd_doc.tipo_tramite_tupa` con `vigente = TRUE`.
+> Esta documentación no debe utilizarse para cargar requisitos, tarifas ni plazos de Suiza.
+
 ## Instituto de Educación Superior Tecnológico Público Pasco
 
 **Institución:** IESTP PASCO  

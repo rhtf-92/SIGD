@@ -330,6 +330,11 @@ export function usePresignedUpload(
               { signal: controller.signal },
             );
             presigned = response.data;
+            if (!presigned || typeof presigned.uploadUrl !== 'string' ||
+                typeof presigned.s3Key !== 'string' ||
+                !/^expedientes\/\d{4}\/[0-9a-f-]+\.pdf$/i.test(presigned.s3Key)) {
+              throw new Error('El almacenamiento no devolvió una referencia válida para el archivo.');
+            }
           } catch (cause) {
             if (controller.signal.aborted) {
               throw new UploadError("La subida del archivo fue cancelada.", "cancelled");

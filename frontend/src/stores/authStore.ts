@@ -2,6 +2,8 @@ import { useSyncExternalStore } from "react";
 import { apiClient } from "../api/client";
 import { permisosIniciales } from "../hooks/useRbacConfig";
 
+export const AUTH_RETURN_TO_STORAGE_KEY = "SIGD_AUTH_RETURN_TO";
+
 export interface UsuarioPerfil {
   id: string;
   nombreCompleto: string;

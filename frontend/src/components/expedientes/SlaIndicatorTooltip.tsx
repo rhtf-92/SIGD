@@ -6,6 +6,7 @@ interface SlaIndicatorTooltipProps {
   diasRestantes: number;
   plazoMaximo: number;
   fechaVencimiento: string;
+  esReferencial?: boolean;
   children: ReactNode;
 }
 
@@ -15,6 +16,7 @@ export default function SlaIndicatorTooltip({
   diasRestantes,
   plazoMaximo,
   fechaVencimiento,
+  esReferencial = false,
   children,
 }: SlaIndicatorTooltipProps) {
   return (
@@ -45,7 +47,7 @@ export default function SlaIndicatorTooltip({
               {Math.abs(diasRestantes)}
             </span>
           </p>
-          <p className="text-[10px] text-slate-400 mt-0.5">Vencimiento legal: {fechaVencimiento}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">{esReferencial ? "Fecha calculada (referencial):" : "Vencimiento legal:"} {fechaVencimiento}</p>
         </div>
       </div>
     </div>

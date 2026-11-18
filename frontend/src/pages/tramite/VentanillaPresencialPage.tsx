@@ -1,10 +1,18 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
-import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
+import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaSuiza2026";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
+import { ApiHttpError } from "../../types/api";
+
+interface TipoDocumental {
+  tipo_documental_id: string;
+  codigo: string;
+  nombre: string;
+  vigente: boolean;
+}
 
 interface VentanillaPresencialResultado {
   expedienteId: string;
@@ -30,49 +38,127 @@ export default function VentanillaPresencialPage() {
   const enJornada = !requiresProjection;
   const proximoDiaHabil = legalDate;
 
-  const [tipoPersona, setTipoPersona] = useState<"NATURAL" | "JURIDICA">("NATURAL");
-  const [tipoDoc, setTipoDoc] = useState<"DNI" | "RUC" | "CE">("DNI");
+  const tipoPersona = "NATURAL";
+  const tipoDoc = "DNI";
   const [numeroDoc, setNumeroDoc] = useState("");
-  const [nombre, setNombre] = useState("");
+  const [nombres, setNombres] = useState("");
+  const [apellidos, setApellidos] = useState("");
   const [correo, setCorreo] = useState("");
   const [telefono, setTelefono] = useState("");
   const [procedimientoTupa, setProcedimientoTupa] = useState("");
   const [requisitosRecibidos, setRequisitosRecibidos] = useState<Set<number>>(new Set());
-  const [tipoDocumento, setTipoDocumento] = useState("SOLICITUD");
+  const [tiposDocumentales, setTiposDocumentales] = useState<TipoDocumental[]>([]);
+  const [tipoDocumentalId, setTipoDocumentalId] = useState("");
+  const [cargandoTiposDocumentales, setCargandoTiposDocumentales] = useState(true);
+  const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null);
   const [asunto, setAsunto] = useState("");
   const [cantidadFolios, setCantidadFolios] = useState(1);
   const [cargoGenerado, setCargoGenerado] = useState<CargoOficialTramite | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [errorRegistro, setErrorRegistro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const envioEnCurso = useRef(false);
   const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_2026.find(
     (procedimiento) => procedimiento.codigo === procedimientoTupa,
   );
+  const tipoDocumentalSeleccionado = tiposDocumentales.find(
+    (tipo) => tipo.tipo_documental_id === tipoDocumentalId,
+  );
+
+  useEffect(() => {
+    let activo = true;
+    const controller = new AbortController();
+    apiClient.get<TipoDocumental[]>("/api/v1/admin/maestras/tipo-documento", { signal: controller.signal })
+      .then((res) => {
+        if (!activo) return;
+        if (res.status !== 200 || !Array.isArray(res.data) || res.data.some((tipo) => (
+          !tipo || typeof tipo.tipo_documental_id !== "string" ||
+          !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(tipo.tipo_documental_id) ||
+          typeof tipo.codigo !== "string" || !tipo.codigo.trim() ||
+          typeof tipo.nombre !== "string" || !tipo.nombre.trim() || tipo.vigente !== true
+        ))) {
+          throw new Error("Respuesta del catálogo documental inválida.");
+        }
+        setTiposDocumentales(res.data);
+      })
+      .catch(() => {
+        if (!activo) return;
+        setTiposDocumentales([]);
+        setErrorCatalogo("No se pudo cargar el catálogo documental. El registro está deshabilitado. Vuelva a cargar la página.");
+      })
+      .finally(() => {
+        if (activo) setCargandoTiposDocumentales(false);
+      });
+    return () => {
+      activo = false;
+      controller.abort();
+    };
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (envioEnCurso.current) return;
+    setErrorRegistro(null);
+    if (cargandoTiposDocumentales || errorCatalogo || tiposDocumentales.length === 0) return;
+    if (!tipoDocumentalSeleccionado) {
+      setErrorRegistro("Seleccione un tipo documental vigente del catálogo institucional.");
+      return;
+    }
+    if (!/^[0-9]{8}$/.test(numeroDoc)) {
+      setErrorRegistro("El DNI debe contener exactamente 8 dígitos.");
+      return;
+    }
+    if (!nombres.trim() || !apellidos.trim() || nombres.trim().length > 120 || apellidos.trim().length > 120) {
+      setErrorRegistro("Indique nombres y apellidos explícitos, con un máximo de 120 caracteres por campo.");
+      return;
+    }
 
     const asuntoFinal = procedimientoSeleccionado
-      ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre} - ${asunto}`
+      ? `${procedimientoSeleccionado.nombre} - ${asunto}`
       : asunto;
 
-    const dniValido = /^[0-9]{8}$/.test(numeroDoc) ? numeroDoc : "74561238";
-
+    envioEnCurso.current = true;
+    setEnviando(true);
     try {
       const res = await apiClient.post<VentanillaPresencialResultado>(
         "/api/v1/tramites/ventanilla-presencial",
         {
-          dniSolicitante: dniValido,
-          datosRemitente: nombre.trim() || "Ciudadano Administrado",
-          asunto: asuntoFinal.trim() || "Solicitud de trámite presencial",
-          foliosTotales: Number(cantidadFolios) || 1,
+          tipoPersona,
+          tipoDocumento: tipoDoc,
+          tipoDocumentalId: tipoDocumentalSeleccionado.tipo_documental_id,
+          dniSolicitante: numeroDoc,
+          nombres: nombres.trim(),
+          apellidos: apellidos.trim(),
+          correo: correo.trim(),
+          telefono: telefono.trim(),
+          asunto: asuntoFinal.trim(),
+          foliosTotales: Number(cantidadFolios),
         },
       );
 
       const serverData = res.data;
-      const cargoServer = serverData.cargo;
-      const fechaRecepcion = cargoServer?.fechaRecepcion || serverData.fechaRadicacion || new Date().toISOString();
+      const cargoServer = serverData?.cargo;
+      if (
+        res.status !== 201 ||
+        typeof serverData?.expedienteId !== "string" || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(serverData.expedienteId) ||
+        typeof serverData.cut !== "string" || !/^EXP-[0-9]{4}-[0-9]{6}$/.test(serverData.cut) ||
+        !Number.isInteger(serverData.anioFiscal) || serverData.anioFiscal !== Number(serverData.cut.slice(4, 8)) ||
+        typeof serverData.fechaRadicacion !== "string" || !Number.isFinite(Date.parse(serverData.fechaRadicacion)) ||
+        typeof serverData.ticketImpresion !== "string" || !serverData.ticketImpresion.trim() ||
+        !cargoServer || cargoServer.cut !== serverData.cut || cargoServer.dni !== numeroDoc ||
+        typeof cargoServer.remitente !== "string" || !cargoServer.remitente.trim() ||
+        typeof cargoServer.asunto !== "string" || !cargoServer.asunto.trim() ||
+        typeof cargoServer.fechaRecepcion !== "string" || !Number.isFinite(Date.parse(cargoServer.fechaRecepcion)) ||
+        cargoServer.folios !== Number(cantidadFolios) ||
+        typeof cargoServer.hashSha256 !== "string" || !/^[0-9a-f]{64}$/i.test(cargoServer.hashSha256) ||
+        typeof cargoServer.qrSeguimientoUrl !== "string" || !cargoServer.qrSeguimientoUrl.trim()
+      ) {
+        throw new Error("Respuesta de registro incompleta.");
+      }
+      const fechaRecepcion = cargoServer.fechaRecepcion;
 
       const nuevoCargo: CargoOficialTramite = {
-        codigoExpediente: cargoServer?.cut || serverData.cut,
+        codigoExpediente: serverData.cut,
         fechaRecepcionIso: fechaRecepcion,
         fechaIngresoFormalIso: esCorteSuperado ? proximoDiaHabil : fechaRecepcion,
         horaRecepcion: new Date(fechaRecepcion).toLocaleTimeString("es-PE", {
@@ -86,33 +172,42 @@ export default function VentanillaPresencialPage() {
           tipoPersona,
           tipoDocumento: tipoDoc,
           numeroDocumento: numeroDoc,
-          nombreOrazonSocial: nombre,
+          nombreOrazonSocial: cargoServer.remitente,
           correoElectronico: correo,
           telefono,
         },
         asunto: asuntoFinal,
-        documentoPrincipalTipo: tipoDocumento,
-        cantidadFolios: Number(cantidadFolios) || 1,
+        documentoPrincipalTipo: tipoDocumentalSeleccionado.nombre,
+        cantidadFolios: cargoServer.folios,
         hashSha256Recepcion: cargoServer.hashSha256,
         horaCorteAplicada: "16:30",
         radicadoDiaSiguiente: esCorteSuperado,
-        urlSeguimiento: cargoServer?.qrSeguimientoUrl || `https://sigd.iestpsuiza.edu.pe/tramite?cut=${serverData.cut}`,
+        urlSeguimiento: cargoServer.qrSeguimientoUrl,
       };
 
       setCargoGenerado(nuevoCargo);
       setModalAbierto(true);
     } catch (error) {
-      console.error("[VentanillaPresencial] Error al radicar en ventanilla:", error);
-      alert("Error al conectar con el servidor de radicación de ventanilla. Intente nuevamente.");
+      setCargoGenerado(null);
+      setModalAbierto(false);
+      setErrorRegistro(error instanceof ApiHttpError
+        ? [error.problemDetails.detail, ...(error.problemDetails.invalidParams ?? []).map((campo) => `${campo.name}: ${campo.reason}`)].join(" ")
+        : "No se pudo confirmar el registro del trámite. No se emitió un cargo válido.");
+    } finally {
+      envioEnCurso.current = false;
+      setEnviando(false);
     }
   }
 
   function handleNuevoRegistro() {
     setNumeroDoc("");
-    setNombre("");
+    setNombres("");
+    setApellidos("");
+    setErrorRegistro(null);
     setCorreo("");
     setTelefono("");
     setProcedimientoTupa("");
+    setTipoDocumentalId("");
     setRequisitosRecibidos(new Set());
     setAsunto("");
     setCantidadFolios(1);
@@ -190,11 +285,8 @@ export default function VentanillaPresencialPage() {
               <input
                 type="radio"
                 name="tipoPersona"
-                checked={tipoPersona === "NATURAL"}
-                onChange={() => {
-                  setTipoPersona("NATURAL");
-                  setTipoDoc("DNI");
-                }}
+                checked
+                readOnly
                 className="text-blue-600 focus:ring-blue-500"
               />
               Persona Natural
@@ -203,14 +295,11 @@ export default function VentanillaPresencialPage() {
               <input
                 type="radio"
                 name="tipoPersona"
-                checked={tipoPersona === "JURIDICA"}
-                onChange={() => {
-                  setTipoPersona("JURIDICA");
-                  setTipoDoc("RUC");
-                }}
+                checked={false}
+                disabled
                 className="text-blue-600 focus:ring-blue-500"
               />
-              Persona Jurídica
+              Persona Jurídica — pendiente
             </label>
           </div>
 
@@ -222,17 +311,12 @@ export default function VentanillaPresencialPage() {
               <select
                 id="tipo-doc-select"
                 value={tipoDoc}
-                onChange={(e) => setTipoDoc(e.target.value as "DNI" | "RUC" | "CE")}
+                disabled
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               >
-                {tipoPersona === "NATURAL" ? (
-                  <>
-                    <option value="DNI">DNI (8 dígitos)</option>
-                    <option value="CE">Carné Extranjería (CE)</option>
-                  </>
-                ) : (
-                  <option value="RUC">RUC (11 dígitos)</option>
-                )}
+                <option value="DNI">DNI (8 dígitos)</option>
+                <option value="CE" disabled>Carné Extranjería (CE) — pendiente</option>
+                <option value="RUC" disabled>RUC — pendiente</option>
               </select>
             </div>
 
@@ -245,6 +329,9 @@ export default function VentanillaPresencialPage() {
                 type="text"
                 required
                 value={numeroDoc}
+                pattern="[0-9]{8}"
+                maxLength={8}
+                inputMode="numeric"
                 onChange={(e) => setNumeroDoc(e.target.value)}
                 placeholder={tipoDoc === "DNI" ? "8 dígitos" : "11 dígitos"}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 font-mono focus:border-blue-600 focus:outline-none"
@@ -253,16 +340,21 @@ export default function VentanillaPresencialPage() {
 
             <div>
               <label htmlFor="nombre-input" className="block text-xs font-semibold text-slate-700 mb-1">
-                {tipoPersona === "NATURAL" ? "Apellidos y Nombres *" : "Razón Social *"}
+                Nombres *
               </label>
               <input
                 id="nombre-input"
                 type="text"
                 required
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                maxLength={120}
+                value={nombres}
+                onChange={(e) => setNombres(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               />
+            </div>
+            <div>
+              <label htmlFor="apellidos-input" className="block text-xs font-semibold text-slate-700 mb-1">Apellidos *</label>
+              <input id="apellidos-input" type="text" required maxLength={120} value={apellidos} onChange={(e) => setApellidos(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none" />
             </div>
           </div>
 
@@ -274,6 +366,7 @@ export default function VentanillaPresencialPage() {
               <input
                 id="correo-input"
                 type="email"
+                maxLength={160}
                 required
                 value={correo}
                 onChange={(e) => setCorreo(e.target.value)}
@@ -289,6 +382,7 @@ export default function VentanillaPresencialPage() {
               <input
                 id="tel-input"
                 type="tel"
+                maxLength={20}
                 required
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
@@ -317,7 +411,7 @@ export default function VentanillaPresencialPage() {
                 <option value="NO_TUPA">Trámite no TUPA / documentación general</option>
                 {PROCEDIMIENTOS_TUPA_2026.map((procedimiento) => (
                   <option key={procedimiento.codigo} value={procedimiento.codigo}>
-                    {procedimiento.codigo} - {procedimiento.nombre}
+                    {procedimiento.nombre}
                   </option>
                 ))}
               </select>
@@ -329,16 +423,26 @@ export default function VentanillaPresencialPage() {
               </label>
               <select
                 id="tipo-documento-select"
-                value={tipoDocumento}
-                onChange={(e) => setTipoDocumento(e.target.value)}
+                required
+                value={tipoDocumentalId}
+                disabled={enviando || cargandoTiposDocumentales || !!errorCatalogo || tiposDocumentales.length === 0}
+                onChange={(e) => setTipoDocumentalId(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
               >
-                <option value="SOLICITUD">Solicitud Simple / Formato Único</option>
-                <option value="OFICIO">Oficio Institucional</option>
-                <option value="CARTA">Carta / Carta Notarial</option>
-                <option value="EXPEDIENTE_EXTERNO">Expediente Externo</option>
-                <option value="INFORME">Informe Técnico</option>
+                <option value="">Seleccione un tipo documental</option>
+                {tiposDocumentales.map((tipo) => (
+                  <option key={tipo.tipo_documental_id} value={tipo.tipo_documental_id}>
+                    {tipo.nombre}
+                  </option>
+                ))}
               </select>
+              {cargandoTiposDocumentales && <p role="status" className="mt-2 text-sm text-slate-600">Cargando tipos documentales…</p>}
+              {errorCatalogo && <p role="alert" className="mt-2 text-sm text-red-700">{errorCatalogo}</p>}
+              {!cargandoTiposDocumentales && !errorCatalogo && tiposDocumentales.length === 0 && (
+                <p role="status" className="mt-2 text-sm text-amber-800">
+                  No hay tipos documentales vigentes disponibles. No se puede registrar el trámite hasta que se configure el catálogo institucional.
+                </p>
+              )}
             </div>
 
             <div>
@@ -366,9 +470,9 @@ export default function VentanillaPresencialPage() {
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-200 pb-3">
                 <div>
                   <h3 id="detalle-tupa-heading" className="text-sm font-bold text-slate-900">
-                    TUPA {procedimientoSeleccionado.codigo}: {procedimientoSeleccionado.nombre}
+                    TUPA 2026 — IESTP Suiza
                   </h3>
-                  <p className="mt-1 text-xs text-slate-600">Fuente: TUPA 2026 del IESTP Pasco</p>
+                  <p className="mt-1 text-xs text-slate-600">Concepto seleccionado: {procedimientoSeleccionado.nombre}</p>
                 </div>
                 {procedimientoSeleccionado.derechoPago && (
                   <p className="max-w-xl text-sm font-semibold text-slate-800">
@@ -458,6 +562,7 @@ export default function VentanillaPresencialPage() {
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
+              disabled={enviando}
               onClick={handleNuevoRegistro}
               className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
             >
@@ -465,11 +570,13 @@ export default function VentanillaPresencialPage() {
             </button>
             <button
               type="submit"
+              disabled={enviando || cargandoTiposDocumentales || !!errorCatalogo || !tipoDocumentalSeleccionado}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-800 transition"
             >
-              ✓ Registrar y Emitir Cargo CUT
+              {enviando ? "Registrando…" : "✓ Registrar y Emitir Cargo CUT"}
             </button>
           </div>
+          {errorRegistro && <p role="alert" className="text-sm text-red-700">{errorRegistro}</p>}
         </form>
       </div>
 

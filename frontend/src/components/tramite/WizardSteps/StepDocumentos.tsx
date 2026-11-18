@@ -20,7 +20,7 @@
  * ==============================================================================
  */
 
-import React, { useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type {
   DocumentosData,
   ArchivoTramite,
@@ -312,7 +312,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     }
 
     return errs;
-  }, [data]);
+  }, [data, cargandoCatalogo, errorCatalogo, tiposFormales]);
 
   const isValid = Object.keys(errors).length === 0 && !isUploading;
 
@@ -334,6 +334,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
 
   // Carga flexible de archivos institucionales (.pdf, .doc, .docx, .png, .jpg)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (cargandoArchivo) return;
     setFileError(null);
     clearUploadHookError();
     const file = e.target.files?.[0];
@@ -438,7 +439,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       archivos: true,
     });
 
-    if (isValid && !isSubmitting) {
+    if (isValid && !isSubmitting && !cargandoArchivo) {
       onNext();
     }
   };
@@ -608,7 +609,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             name="numeroFolios"
             type="number"
             min={1}
-            max={500}
+            max={5000}
             required
             aria-required="true"
             aria-invalid={touched.numeroFolios && Boolean(errors.numeroFolios)}
@@ -619,7 +620,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             }
             value={data.numeroFolios}
             onChange={(e) =>
-              handleFieldChange('numeroFolios', parseInt(e.target.value, 10) || 1)
+              handleFieldChange('numeroFolios', Number(e.target.value))
             }
             onBlur={() => markTouched('numeroFolios')}
             disabled={isSubmitting || isUploading}

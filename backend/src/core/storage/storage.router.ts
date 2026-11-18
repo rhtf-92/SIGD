@@ -107,7 +107,27 @@ export function crearRouterStorage(pool?: Pool): Router {
     const extension = datos.nombreArchivo.split('.').pop()?.toLowerCase() ?? 'pdf';
     const s3Key = `expedientes/${new Date().getFullYear()}/${uuid}.${extension}`;
 
-    const uploadUrl = generarUrlPresigned(s3Key, config, {
+    // En el Compose local, MinIO usa "minio" dentro de la red Docker, mientras
+    // que el navegador del host accede al mismo puerto publicado por loopback.
+    // La firma se genera para el host que hará el PUT; el backend conserva su
+    // endpoint interno para verificar el objeto durante la radicación.
+    const endpointParaCliente = new URL(config.endpoint);
+    const origen = req.get('origin');
+    if (endpointParaCliente.hostname === 'minio' && origen) {
+      try {
+        const urlOrigen = new URL(origen);
+        if (urlOrigen.hostname === 'localhost' || urlOrigen.hostname === '127.0.0.1') {
+          endpointParaCliente.hostname = urlOrigen.hostname;
+        }
+      } catch {
+        // Un Origin inválido no altera el endpoint S3 configurado.
+      }
+    }
+
+    const uploadUrl = generarUrlPresigned(s3Key, {
+      ...config,
+      endpoint: endpointParaCliente.origin,
+    }, {
       metodo: 'PUT',
       contentType: datos.mimeType,
       expiraSegundos: config.presignExpirationSegundos,
@@ -168,7 +188,7 @@ export function crearRouterStorage(pool?: Pool): Router {
     }
 
     res.status(201).json({
-      idDocumentoAdjunto: idAdjunto,
+      idDocumentoAdjunto: idPersistido,
       s3Key: datos.s3Key,
       magicBytesHex: verificacionS3.magicBytesHex,
       confirmado: true,
@@ -188,7 +208,19 @@ export function crearRouterStorage(pool?: Pool): Router {
       });
     }
 
-    const configBucket = { ...config, bucket };
+    const endpointParaCliente = new URL(config.endpoint);
+    const origen = req.get('origin');
+    if (endpointParaCliente.hostname === 'minio' && origen) {
+      try {
+        const urlOrigen = new URL(origen);
+        if (urlOrigen.hostname === 'localhost' || urlOrigen.hostname === '127.0.0.1') {
+          endpointParaCliente.hostname = urlOrigen.hostname;
+        }
+      } catch {
+        // Un Origin inválido no altera el endpoint S3 configurado.
+      }
+    }
+    const configBucket = { ...config, bucket, endpoint: endpointParaCliente.origin };
     const downloadUrl = generarUrlPresigned(key, configBucket, {
       metodo: 'GET',
       expiraSegundos: 900,

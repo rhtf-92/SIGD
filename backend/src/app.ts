@@ -316,20 +316,14 @@ export function construirApp(
   app.get('/api/v1/admin/maestras/tipo-documento', async (_req, res, next) => {
     try {
       const { rows } = await pool.query(
-        `SELECT id, codigo, nombre, descripcion, dias_atencion_legal, vigente
+        `SELECT tipo_documental_id, codigo, nombre, vigente
          FROM sigd_doc.tipo_documento
          WHERE vigente = TRUE
          ORDER BY nombre ASC`,
       );
       res.json(rows);
-    } catch {
-      res.json([
-        { codigo: 'SOLICITUD', nombre: 'Solicitud' },
-        { codigo: 'OFICIO', nombre: 'Oficio' },
-        { codigo: 'MEMORANDO', nombre: 'Memorando' },
-        { codigo: 'INFORME', nombre: 'Informe Técnico' },
-        { codigo: 'RESOLUCION', nombre: 'Resolución Directoral' },
-      ]);
+    } catch (error) {
+      next(error);
     }
   });
 

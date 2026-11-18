@@ -4,19 +4,32 @@ import type { Pool } from 'pg';
 import { z } from 'zod';
 import { ConsultaPublicaService } from './consultaPublica.service.js';
 import { RadicacionVirtualService, type ProveedorFeriados } from './radicacionVirtual.service.js';
-import { VentanillaPresencialService } from './ventanillaPresencial.service.js';
+import { VentanillaPresencialService, identidadNaturalVentanillaSchema } from './ventanillaPresencial.service.js';
 import { TicketTermicoUtil } from './ticketTermico.util.js';
 import { consultaPublicaParamsSchema, radicacionVirtualSchema } from './tramites.schemas.js';
-import { NotFoundError } from '../../shared/domain/errors/index.js';
+import { ForbiddenError, NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
 
-const ventanillaPresencialSchema = z.object({
-  dniSolicitante: z.string().regex(/^[0-9]{8}$/, 'DNI debe contener exactamente 8 dígitos'),
-  datosRemitente: z.string().min(3),
+export const ventanillaPresencialSchema = z.object({
+  ...identidadNaturalVentanillaSchema.shape,
   asunto: z.string().min(5).max(500),
   foliosTotales: z.coerce.number().int().positive(),
   areaDestinoId: z.string().uuid().optional(),
   tipoDocumentalId: z.string().uuid().optional(),
-});
+}).strict();
+
+export function exigirIdUsuarioAutenticado(authorization: string | undefined): string {
+  const token = extraerTokenBearer(authorization);
+  if (!token) {
+    throw new UnauthorizedError({ detail: 'Debe iniciar sesión para radicar una solicitud virtual.' });
+  }
+  const identidad = verificarTokenAcceso(token);
+  const idUsuario = z.string().uuid().safeParse(identidad.sub);
+  if (!idUsuario.success) {
+    throw new UnauthorizedError({ detail: 'La sesión no contiene una identidad de usuario válida.' });
+  }
+  return idUsuario.data;
+}
 
 /**
  * Endpoints del dominio TramiCore (Grupo 2 - OE2)
@@ -38,8 +51,9 @@ export function crearRouterTramites(
 
   // #14 — Radicación virtual (Mesa de Partes Virtual 24x7)
   router.post('/tramites/radicacion-virtual', async (req: Request, res: Response) => {
+    const idUsuario = exigirIdUsuarioAutenticado(req.get('authorization'));
     const datos = radicacionVirtualSchema.parse(req.body);
-    const radicacion = await radicacionService.radicar(datos);
+    const radicacion = await radicacionService.radicar(datos, idUsuario);
     res.status(201).json({
       expedienteId: radicacion.expedienteId,
       cut: radicacion.cut,
@@ -56,6 +70,15 @@ export function crearRouterTramites(
 
   // #15 — Radicación física en Ventanilla Presencial
   router.post('/tramites/ventanilla-presencial', async (req: Request, res: Response) => {
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) {
+      throw new UnauthorizedError({ detail: 'Debe autenticarse con Authorization: Bearer <jwt>.' });
+    }
+    const identidad = verificarTokenAcceso(token);
+    if (!identidad.roles.includes('MESA_PARTES')) {
+      throw new ForbiddenError({ detail: 'El registro presencial requiere el rol MESA_PARTES.' });
+    }
+
     const datos = ventanillaPresencialSchema.parse(req.body);
     const resultado = await ventanillaService.registrarExpedienteVentanilla(datos);
     res.status(201).json(resultado);
@@ -96,6 +119,15 @@ export function crearRouterTramites(
 
   // #20 — Cargo de recepción física para impresión térmica
   router.get('/tramites/ventanilla/cargo/:cut', async (req: Request, res: Response) => {
+    const token = extraerTokenBearer(req.get('authorization'));
+    if (!token) {
+      throw new UnauthorizedError({ detail: 'Debe autenticarse con Authorization: Bearer <jwt>.' });
+    }
+    const identidad = verificarTokenAcceso(token);
+    if (!identidad.roles.includes('MESA_PARTES')) {
+      throw new ForbiddenError({ detail: 'La recuperación del cargo requiere el rol MESA_PARTES.' });
+    }
+
     const cut = String(req.params.cut).trim().toUpperCase();
 
     const query = `

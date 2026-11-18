@@ -1,18 +1,15 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { permisosIniciales } from "../hooks/useRbacConfig";
+import { useRef, useState, type FormEvent } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { AUTH_RETURN_TO_STORAGE_KEY, useAuthStore } from "../stores/authStore";
+import { ApiHttpError } from "../types/api";
 
-const CLAVE_TOKEN = "sigd_token";
-const CLAVE_ROL = "sigd_rol";
-const CLAVE_PERMISOS = "sigd_permisos";
-
-export const ROLES_CANONICOS = [
-  { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", destino: "/administracion" },
-  { id: "DIRECTOR", label: "DIRECTOR — Director General", destino: "/administracion" },
-  { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", destino: "/flujos/titulacion" },
-  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", destino: "/tramite/ventanilla-presencial" },
-  { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", destino: "/casilla" },
-];
+const DESTINOS_POR_ROL: Record<string, string> = {
+  SUPER_ADMIN: "/administracion",
+  DIRECTOR: "/administracion",
+  DOCENTE: "/flujos/titulacion",
+  MESA_PARTES: "/tramite/ventanilla-presencial",
+  ESTUDIANTE: "/casilla",
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -58,7 +55,7 @@ export default function LoginPage() {
         <p className="text-sm font-bold text-blue-700">SIGD IESTP "SUIZA"</p>
         <h1 className="mt-1 text-2xl font-bold">Iniciar sesión</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Acceso por roles institucionales canónicos para control de acceso (RBAC).
+          Acceda con sus credenciales institucionales.
         </p>
 
         {error && (

@@ -1,4 +1,4 @@
-import { useAuthStore } from "../stores/authStore";
+import { AUTH_RETURN_TO_STORAGE_KEY, useAuthStore } from "../stores/authStore";
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
 import { env } from "../config/env";
@@ -71,14 +71,33 @@ function procesarCola(error: unknown, token: string | null) {
   pendingQueue = [];
 }
 
+function guardarRutaDeRetorno(): void {
+  try {
+    if (typeof window === "undefined" || window.location.pathname === "/login") return;
+    const ruta = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (ruta.startsWith("/") && !ruta.startsWith("//")) {
+      window.sessionStorage.setItem(AUTH_RETURN_TO_STORAGE_KEY, ruta);
+    }
+  } catch {
+  }
+}
+
 // Interceptor de Respuesta: Tratamiento centralizado y tipado RFC 7807 (Problem Details)
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: unknown) => {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const isLoginRequest = axios.isAxiosError(error) &&
+      /\/auth\/login\/?$/.test((error.config?.url ?? "").split(/[?#]/)[0]);
 
-      if (!(originalRequest.url?.includes("/auth/refresh") || originalRequest._retry)) {
+    // Las credenciales rechazadas se muestran en el formulario, sin renovar ni cerrar sesión.
+    if (axios.isAxiosError(error) && error.response?.status === 401 && !isLoginRequest) {
+      const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+      const authorization = originalRequest.headers?.get?.("Authorization") ??
+        originalRequest.headers?.Authorization;
+      const tieneBearer = typeof authorization === "string" && /^Bearer\s+\S+/i.test(authorization);
+      const esRefreshRequest = originalRequest.url?.includes("/auth/refresh") ?? false;
+
+      if (tieneBearer && !esRefreshRequest && !originalRequest._retry) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             pendingQueue.push({
@@ -94,20 +113,28 @@ apiClient.interceptors.response.use(
         originalRequest._retry = true;
         isRefreshing = true;
 
-        try {
-          const refreshToken = useAuthStore.getState().refreshToken;
-          const { data } = await apiClient.post("/api/v1/auth/refresh", { refreshToken });
-          useAuthStore.getState().setToken(data.accessToken, data.refreshToken);
-          procesarCola(null, data.accessToken);
-          originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
-          isRefreshing = false;
-          return apiClient(originalRequest);
-        } catch (refreshError) {
-          procesarCola(refreshError, null);
+        const refreshToken = useAuthStore.getState().refreshToken;
+        if (!refreshToken) {
+          guardarRutaDeRetorno();
           useAuthStore.getState().logout();
           isRefreshing = false;
+        } else {
+          try {
+            const { data } = await apiClient.post("/api/v1/auth/refresh", { refreshToken });
+            useAuthStore.getState().setToken(data.accessToken, data.refreshToken);
+            procesarCola(null, data.accessToken);
+            originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+            isRefreshing = false;
+            return apiClient(originalRequest);
+          } catch (refreshError) {
+            procesarCola(refreshError, null);
+            guardarRutaDeRetorno();
+            useAuthStore.getState().logout();
+            isRefreshing = false;
+          }
         }
-      } else {
+      } else if (tieneBearer && !esRefreshRequest && originalRequest._retry) {
+        guardarRutaDeRetorno();
         useAuthStore.getState().logout();
       }
     }
