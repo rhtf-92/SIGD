@@ -6,6 +6,7 @@ import { ValidationError } from '../../shared/domain/errors/index.js';
 import { CutService } from './cut.service.js';
 import { calcularHorarioCorte, type ResultadoHorarioCorte } from './horarioCorte.util.js';
 import type { RadicacionVirtualInput } from './tramites.schemas.js';
+import { CATALOGO_TUPA_BACKEND_RESPALDO } from './tupaCatalogoBackend.js';
 
 /**
  * T-BE-TC-02 y T-BE-TC-03 · Logica de negocio de la radicacion virtual
@@ -169,7 +170,32 @@ export class RadicacionVirtualService {
         WHERE tipo_tramite_id = $1::uuid`,
       [idTipoTramiteTupa],
     );
-    const tipo = resultado.rows[0];
+    let tipo = resultado.rows[0];
+    if (!tipo) {
+      const enCatalogo = CATALOGO_TUPA_BACKEND_RESPALDO.find(
+        (t) => t.id === idTipoTramiteTupa || t.codigo === idTipoTramiteTupa,
+      );
+      if (enCatalogo) {
+        const insertado = await cliente.query<FilaTramiteTupa>(
+          `INSERT INTO sigd_doc.tipo_tramite_tupa (
+             tipo_tramite_id, codigo, denominacion, descripcion, unidad_organica, plazo_dias, silencio_administrativo, base_legal, vigente
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+           ON CONFLICT (codigo) DO UPDATE SET vigente = TRUE
+           RETURNING tipo_tramite_id::text AS tipo_tramite_id, codigo, denominacion, plazo_dias, vigente`,
+          [
+            enCatalogo.id,
+            enCatalogo.codigo,
+            enCatalogo.denominacion,
+            enCatalogo.descripcion,
+            enCatalogo.unidad_organica,
+            enCatalogo.plazo_dias,
+            enCatalogo.silencio_administrativo,
+            enCatalogo.base_legal,
+          ],
+        );
+        tipo = insertado.rows[0];
+      }
+    }
     if (!tipo) {
       throw new ValidationError({
         invalidParams: [

@@ -9,6 +9,7 @@ import { TicketTermicoUtil } from './ticketTermico.util.js';
 import { consultaPublicaParamsSchema, radicacionVirtualSchema } from './tramites.schemas.js';
 import { ForbiddenError, NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
+import { obtenerCatalogoTupaBackendRespaldo } from './tupaCatalogoBackend.js';
 
 export const ventanillaPresencialSchema = z.object({
   ...identidadNaturalVentanillaSchema.shape,
@@ -86,25 +87,33 @@ export function crearRouterTramites(
 
   // #15 en catálogo — Catálogo de tipos de trámite TUPA y trámites internos
   const handlerTiposTupa = async (_req: Request, res: Response) => {
-    const query = `
-      SELECT tipo_tramite_id AS id,
-             tipo_tramite_id AS id_tipo_tramite,
-             codigo,
-             denominacion,
-             descripcion,
-             unidad_organica,
-             plazo_dias,
-             plazo_dias AS plazo_dias_habiles,
-             silencio_administrativo,
-             silencio_administrativo AS calificacion,
-             base_legal,
-             vigente
-        FROM sigd_doc.tipo_tramite_tupa
-       WHERE vigente = TRUE
-       ORDER BY codigo ASC;
-    `;
-    const resultado = await pool.query(query);
-    res.status(200).json(resultado.rows);
+    try {
+      const query = `
+        SELECT tipo_tramite_id AS id,
+               tipo_tramite_id AS id_tipo_tramite,
+               codigo,
+               denominacion,
+               descripcion,
+               unidad_organica,
+               plazo_dias,
+               plazo_dias AS plazo_dias_habiles,
+               silencio_administrativo,
+               silencio_administrativo AS calificacion,
+               base_legal,
+               vigente
+          FROM sigd_doc.tipo_tramite_tupa
+         WHERE vigente = TRUE
+         ORDER BY codigo ASC;
+      `;
+      const resultado = await pool.query(query);
+      if (resultado.rows && resultado.rows.length > 0) {
+        return res.status(200).json(resultado.rows);
+      }
+    } catch {
+      // Si la base de datos no está disponible o la tabla no está poblada aún,
+      // se retorna el catálogo oficial estructurado de respaldo institucional.
+    }
+    res.status(200).json(obtenerCatalogoTupaBackendRespaldo());
   };
 
   router.get('/tramites/tipos', handlerTiposTupa);

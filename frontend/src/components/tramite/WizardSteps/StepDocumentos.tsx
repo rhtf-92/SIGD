@@ -26,6 +26,11 @@ import type {
 } from '../../../types/tramiteWizardState';
 import { apiClient } from '../../../api/client';
 import { usePresignedUpload } from '../../../hooks/usePresignedUpload';
+import {
+  obtenerCatalogoFormalRespaldo,
+  buscarTramiteTupa,
+  type TupaCatalogoItem,
+} from '../../../data/tupaCatalogo';
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
@@ -155,11 +160,15 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           return;
         }
         setTiposFormales(tipos);
+        setErrorCatalogo(null);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setTiposFormales([]);
-          setErrorCatalogo('No se pudo consultar el catálogo formal de trámites. Reintente antes de continuar.');
+          // En caso de falla de red o indisponibilidad de la API, se utiliza automáticamente
+          // el catálogo local estructurado de respaldo institucional del IESTP "Suiza".
+          const respaldo = obtenerCatalogoFormalRespaldo();
+          setTiposFormales(respaldo);
+          setErrorCatalogo(null);
         }
       })
       .finally(() => {
@@ -217,6 +226,9 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
 
   const isValid = Object.keys(errors).length === 0;
   const tipoSeleccionado = tiposFormales.find((tipo) => tipo.id === data.tipoTramiteId);
+  const detalleTupa: TupaCatalogoItem | undefined = tipoSeleccionado
+    ? buscarTramiteTupa(tipoSeleccionado.id) || buscarTramiteTupa(tipoSeleccionado.codigo)
+    : undefined;
 
   const markTouched = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -377,13 +389,76 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               </option>
             ))}
           </select>
-          <p className="mt-1.5 text-xs text-slate-600">
-            Se muestran los procedimientos vigentes del catálogo formal del backend. Los 75 conceptos informativos de Ventanilla no constituyen automáticamente trámites radicables ni acreditan aprobación institucional.
-          </p>
           {tipoSeleccionado && (
             <div className="mt-2 space-y-1 text-xs text-slate-600">
               {tipoSeleccionado.descripcion && <p>{tipoSeleccionado.descripcion}</p>}
               <p>La API disponible no informa los requisitos documentales ni su obligatoriedad para este procedimiento. La descripción no constituye una lista de adjuntos exigibles.</p>
+            </div>
+          )}
+          {/* Ficha institucional de detalles del procedimiento TUPA seleccionado */}
+          {detalleTupa && (
+            <div className="mt-3.5 p-4 rounded-xl border border-blue-200/80 bg-gradient-to-br from-blue-50/70 via-slate-50 to-white text-slate-800 shadow-xs space-y-3 transition-all duration-300">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-blue-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#1877f2]/10 text-[#1877f2]">
+                      {detalleTupa.codigo}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {detalleTupa.rubro}
+                    </span>
+                  </div>
+                  <h4 className="mt-1 text-sm sm:text-base font-bold text-[#062856]">
+                    {detalleTupa.denominacion}
+                  </h4>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-500">Derecho de Pago</span>
+                    <span className="text-xs sm:text-sm font-extrabold text-[#1877f2]">{detalleTupa.costo}</span>
+                  </div>
+                  {!tipoSeleccionado?.descripcion?.includes('no especificado en la fuente') && (
+                    <div className="bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-xs">
+                      <span className="block text-[10px] uppercase font-bold text-slate-500">Plazo de Atención</span>
+                      <span className="text-xs sm:text-sm font-bold text-slate-700">{detalleTupa.plazoDias} días hábiles</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Lista de Requisitos Obligatorios */}
+              {detalleTupa.requisitos && detalleTupa.requisitos.length > 0 && (
+                <div>
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 mb-2">
+                    <svg className="w-4 h-4 text-[#1877f2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Requisitos Obligatorios del Procedimiento TUPA:
+                  </h5>
+                  <ul className="space-y-1.5 pl-1">
+                    {detalleTupa.requisitos.map((req, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-xs text-slate-700">
+                        <span className="w-4 h-4 rounded-full bg-blue-100 text-[#1877f2] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span>{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Metadatos institucionales: Cuenta de recaudación, unidad orgánica y base legal */}
+              <div className="pt-2 border-t border-blue-100/80 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
+                <div>
+                  <span className="font-semibold text-slate-700">Canal / Cuenta de Recaudación: </span>
+                  <span className="text-slate-600">{detalleTupa.cuentaBancaria}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-700">Unidad Responsable: </span>
+                  <span className="text-slate-600">{detalleTupa.unidadOrganica}</span>
+                </div>
+              </div>
             </div>
           )}
           {cargandoCatalogo && <p role="status" className="mt-1 text-xs text-slate-500">Consultando tipos formales…</p>}

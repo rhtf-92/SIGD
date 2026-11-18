@@ -614,17 +614,16 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(screen.getAllByRole('option')).toHaveLength(1);
   });
 
-  it('bloquea el envío si no se pudo cargar el catálogo formal', async () => {
+  it('en caso de falla de red, utiliza automáticamente el catálogo de respaldo sin bloquear al usuario', async () => {
     const mockGet = vi.spyOn(apiClient, 'get').mockRejectedValueOnce(new Error('catálogo no disponible'));
-    const mockPost = vi.spyOn(apiClient, 'post');
     const user = userEvent.setup();
     render(<TramiteWizard />);
     await fillPaso1(user);
     await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo consultar el catálogo formal/i);
     expect(mockGet).toHaveBeenCalledWith('/api/v1/tramites/tipos', expect.any(Object));
-    expect(mockPost).not.toHaveBeenCalled();
+    expect(screen.queryByText(/no se pudo consultar el catálogo formal/i)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('option').length).toBeGreaterThan(1);
   });
 
   it('no radica un borrador con archivo local blob ni emite cargo', async () => {

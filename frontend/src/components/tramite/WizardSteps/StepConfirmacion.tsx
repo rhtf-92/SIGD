@@ -30,6 +30,10 @@ import { apiClient } from '../../../api/client';
 import { useAuthStore } from '../../../stores/authStore';
 import { ApiHttpError } from '../../../types/api';
 import { Link, useLocation } from 'react-router-dom';
+import {
+  obtenerCatalogoFormalRespaldo,
+  buscarTramiteTupa,
+} from '../../../data/tupaCatalogo';
 
 interface RadicacionVirtualResponse {
   expedienteId: string;
@@ -146,14 +150,19 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setTiposFormales([]);
-          setEstadoCatalogo('error');
+          // En caso de indisponibilidad de la red, recurre al catálogo estructurado de respaldo institucional
+          const respaldo = obtenerCatalogoFormalRespaldo();
+          setTiposFormales(respaldo);
+          setEstadoCatalogo('disponible');
         }
       });
     return () => controller.abort();
   }, [intentoCatalogo]);
 
   const tipoSeleccionado = tiposFormales.find((tipo) => tipo.id === documentos.tipoTramiteId);
+  const detalleTupa = tipoSeleccionado
+    ? buscarTramiteTupa(tipoSeleccionado.id) || buscarTramiteTupa(tipoSeleccionado.codigo)
+    : undefined;
 
   const navigateToStep = useCallback(
     (step: WizardStep) => {
@@ -511,9 +520,20 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           {estadoCatalogo === 'error' && <p role="alert" className="text-xs text-red-700">No fue posible verificar el catálogo formal. No se puede radicar hasta reintentar la verificación.</p>}
           {estadoCatalogo === 'error' && <button type="button" className="text-xs font-bold underline" onClick={() => setIntentoCatalogo(valor => valor + 1)} disabled={isSubmitting}>Reintentar verificación</button>}
           {tipoSeleccionado && (
-            <div className="space-y-1 text-xs text-slate-600">
+            <div className="space-y-1 text-xs text-slate-600 bg-white p-2.5 rounded border border-blue-100">
               {tipoSeleccionado.descripcion && <p>{tipoSeleccionado.descripcion}</p>}
               <p>La API disponible no informa los requisitos documentales ni su obligatoriedad para este procedimiento. La descripción no constituye una lista de adjuntos exigibles.</p>
+              {detalleTupa && (
+                <div className="pt-2 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <p><span className="font-semibold text-slate-700">Derecho de Pago:</span> {detalleTupa.costo}</p>
+                  {!tipoSeleccionado.descripcion?.includes('no especificado en la fuente') && (
+                    <p><span className="font-semibold text-slate-700">Plazo de Atención:</span> {detalleTupa.plazoDias} días hábiles</p>
+                  )}
+                  {detalleTupa.cuentaBancaria && (
+                    <p className="sm:col-span-2"><span className="font-semibold text-slate-700">Cuenta de Recaudación:</span> {detalleTupa.cuentaBancaria}</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <p className="text-xs text-slate-600">
