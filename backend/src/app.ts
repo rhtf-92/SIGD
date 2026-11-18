@@ -187,7 +187,10 @@ export function construirApp(
   app.use('/api', routerAuth);
   app.use(routerAuth);
   app.use('/api/v1', crearRouterCasilla(pool));
-  app.use('/api/v1', crearRouterStorage(pool));
+  const routerStorage = crearRouterStorage(pool);
+  app.use('/api/v1', routerStorage);
+  app.use('/api', routerStorage);
+  app.use(routerStorage);
   app.use('/api/v1', crearRouterTramites(pool));
   app.use(
     '/api/v1',

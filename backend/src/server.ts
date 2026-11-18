@@ -70,6 +70,30 @@ if (process.env.MIGRATE_ON_BOOT !== 'false') {
   await ejecutarMigraciones(pool);
 }
 
+// Asegurar bucket S3 en MinIO si el servicio de almacenamiento está disponible
+try {
+  const { S3Client, CreateBucketCommand, HeadBucketCommand } = await import('@aws-sdk/client-s3');
+  const { obtenerConfiguracionS3 } = await import('./config/s3.config.js');
+  const s3Config = obtenerConfiguracionS3();
+  const s3 = new S3Client({
+    endpoint: s3Config.endpoint,
+    region: s3Config.region,
+    credentials: {
+      accessKeyId: s3Config.accessKey,
+      secretAccessKey: s3Config.secretKey,
+    },
+    forcePathStyle: s3Config.forcePathStyle,
+  });
+  try {
+    await s3.send(new HeadBucketCommand({ Bucket: s3Config.bucket }));
+  } catch {
+    await s3.send(new CreateBucketCommand({ Bucket: s3Config.bucket }));
+    console.log(`[STORAGE] Bucket "${s3Config.bucket}" asegurado en MinIO S3.`);
+  }
+} catch {
+  // MinIO opcional o en inicio tardío; el almacenamiento local responderá a las peticiones
+}
+
 const app = construirApp(pool, busSse);
 const anunciarInicio = (): void => {
   console.log(`SIGD Backend escuchando en http://localhost:${port}`);

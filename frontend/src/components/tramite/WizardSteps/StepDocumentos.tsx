@@ -289,7 +289,14 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       const archivoSubido = await subida.upload(file);
       if (!archivoSubido) {
         const err = subida.getLastError() ?? subida.error;
-        console.error('[StepDocumentos] Error al subir archivo adjunto:', err);
+        console.error('[StepDocumentos] Error al subir archivo adjunto:', {
+          mensaje: err?.message,
+          etapa: err?.kind,
+          codigoHttp: err?.statusCode,
+          codigoServidor: err?.serverCode,
+          detallesTecnicos: err?.technicalDetails,
+          errorOriginal: err,
+        });
         setFileError(
           err?.message ?? 'No pudimos guardar tu archivo debido a un problema temporal de comunicación.'
         );

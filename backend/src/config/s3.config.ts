@@ -5,7 +5,7 @@ const esquema = z.object({
   S3_REGION: z.string().min(2).default('us-east-1'),
   S3_BUCKET: z.string().min(3).default('sigd-expedientes'),
   S3_ACCESS_KEY: z.string().min(1).default('minioadmin'),
-  S3_SECRET_KEY: z.string().min(1).default('minioadmin'),
+  S3_SECRET_KEY: z.string().min(1).default('minioadminpassword'),
   S3_FORCE_PATH_STYLE: z
     .enum(['true', 'false'])
     .default('true')

@@ -105,6 +105,7 @@ export function crearRouterStorage(pool?: Pool): Router {
 
   // Endpoint de subida real directa en Express con Multer (Mesa de Partes Virtual y módulos SIGD)
   router.post('/storage/upload', middlewareSubidaPdf);
+  router.post('/upload', middlewareSubidaPdf);
 
   // #18 — POST /storage/presigned-url
   router.post('/storage/presigned-url', (req: Request, res: Response) => {

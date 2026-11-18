@@ -217,6 +217,11 @@ export async function uploadToPresignedUrl(
   onProgress: (progress: number) => void,
   sha256?: string,
 ): Promise<{ s3Key?: string } | void> {
+  if (!url) {
+    // Si la URL está vacía o diferida, el archivo ya fue persistido por el fallback multipart directo
+    return;
+  }
+
   const config: AxiosRequestConfig<Blob> = {
     headers,
     signal,
@@ -231,39 +236,34 @@ export async function uploadToPresignedUrl(
   try {
     await axios.put(url, file, config);
   } catch (putErr) {
-    // Si la subida directa a la URL (ej. MinIO local en :9000 o localhost) falla por firma (403),
-    // falta de servicio, error de red, timeout o HTTP 4xx/5xx, recurre automáticamente
-    // al endpoint de subida Express con Multer (/api/v1/storage/upload)
-    const esMinioLocal = url.includes(':9000') || url.includes('localhost') || url.includes('127.0.0.1');
-    if (esMinioLocal) {
-      console.warn(
-        '[usePresignedUpload] Subida directa PUT no completada en MinIO local. Recurriendo a subida multipart Multer (/api/v1/storage/upload):',
-        putErr,
-      );
-      const formData = new FormData();
-      formData.append('archivo', file);
-      if (sha256) {
-        formData.append('checksumSha256', sha256);
-      }
-
-      const resMulter = await apiClient.post<{ s3Key?: string; ruta?: string; storageUrl?: string }>(
-        '/api/v1/storage/upload',
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          signal,
-          timeout: 30000,
-          onUploadProgress: (event) => {
-            if (event.total) {
-              onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
-            }
-          },
-        },
-      );
-      const serverKey = resMulter.data?.s3Key ?? resMulter.data?.ruta ?? resMulter.data?.storageUrl;
-      return { s3Key: serverKey };
+    // Si la subida directa por PUT falla (ej. CORS S3, 403 firma, bucket inaccesible o red),
+    // recurre inmediatamente al endpoint multipart de Express (/api/v1/storage/upload)
+    console.warn(
+      '[usePresignedUpload] Subida directa PUT a S3 no completada. Recurriendo a subida multipart Express (/api/v1/storage/upload):',
+      putErr,
+    );
+    const formData = new FormData();
+    formData.append('archivo', file);
+    if (sha256) {
+      formData.append('checksumSha256', sha256);
     }
-    throw putErr;
+
+    const resMulter = await apiClient.post<{ s3Key?: string; ruta?: string; storageUrl?: string }>(
+      '/api/v1/storage/upload',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        signal,
+        timeout: 30000,
+        onUploadProgress: (event) => {
+          if (event.total) {
+            onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+          }
+        },
+      },
+    );
+    const serverKey = resMulter.data?.s3Key ?? resMulter.data?.ruta ?? resMulter.data?.storageUrl;
+    return { s3Key: serverKey };
   }
 }
 
@@ -379,7 +379,42 @@ export function usePresignedUpload(
             if (controller.signal.aborted) {
               throw new UploadError("La subida del archivo fue cancelada.", "cancelled");
             }
-            throw extractDetailedUploadError(cause, "presigned-url");
+            // Si la emisión de URL prefirmada falla (ej. S3 no configurado o error en endpoint),
+            // intenta inmediatamente la subida directa multipart en Express (/api/v1/storage/upload)
+            console.warn('[usePresignedUpload] Fallo en presigned-url. Recurriendo a subida directa multipart:', cause);
+            try {
+              const formData = new FormData();
+              formData.append('archivo', file);
+              formData.append('checksumSha256', sha256);
+              const resMulter = await apiClient.post<{ s3Key?: string; ruta?: string; storageUrl?: string }>(
+                '/api/v1/storage/upload',
+                formData,
+                {
+                  headers: { 'Content-Type': 'multipart/form-data' },
+                  signal: controller.signal,
+                  timeout: 30000,
+                  onUploadProgress: (event) => {
+                    if (event.total) {
+                      setProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+                    }
+                  },
+                },
+              );
+              const serverKey = resMulter.data?.s3Key ?? resMulter.data?.ruta ?? resMulter.data?.storageUrl;
+              if (serverKey && /^expedientes\/\d{4}\/[0-9a-f-]+\.pdf$/i.test(serverKey)) {
+                presigned = {
+                  uploadUrl: '',
+                  s3Key: serverKey,
+                };
+              } else {
+                throw cause;
+              }
+            } catch (errDirect) {
+              if (controller.signal.aborted) {
+                throw new UploadError("La subida del archivo fue cancelada.", "cancelled");
+              }
+              throw extractDetailedUploadError(errDirect || cause, "presigned-url");
+            }
           }
         }
 
