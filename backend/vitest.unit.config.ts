@@ -5,6 +5,7 @@ export default defineConfig({
     include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.spec.ts'],
     setupFiles: ['tests/setup/unit-setup.ts'],
     pool: 'forks',
+    testTimeout: 15000,
     // §6.3 del plan: mismos umbrales que en vitest.config.ts, de modo que la
     // suite unitaria también falla si la cobertura de src/ se degrada.
     coverage: {

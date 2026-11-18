@@ -1,0 +1,1346 @@
+/* ==============================================================================
+   SIGD • IESTP "Suiza" — Maqueta Oficial Aprobada
+   Traslado exacto de reglas CSS y media queries desde Desktop/Icos_Img/index.html
+   ============================================================================== */
+
+:root {
+  --sigd-navy: #07366e;
+  --sigd-deep: #052755;
+  --sigd-blue: #086ac2;
+  --sigd-electric: #047bdc;
+  --sigd-ice: #ecf8ff;
+  --sigd-sky: #d8f0ff;
+  --sigd-ink: #0d2b5f;
+  --sigd-muted: #406287;
+  --sigd-line: #d6e8f6;
+  --sigd-pill: #d7ecff;
+  --sigd-shadow: 0 7px 17px rgba(1, 74, 146, 0.16);
+}
+
+/* TOP CONTACT BAR */
+.sigd-top-contact {
+  height: clamp(28px, 3.4vh, 32px);
+  background: linear-gradient(90deg, #022b5e 0%, #033979 40%, #025cae 70%, #0280d9 90%, #006ec8 100%);
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 0 clamp(16px, 3.5vw, 56px);
+  font-size: clamp(12.5px, 0.88vw, 13.5px);
+  font-weight: 600;
+  letter-spacing: 0.15px;
+}
+
+.sigd-top-contact:after {
+  content: "";
+  position: absolute;
+  right: 12%;
+  top: -10px;
+  width: 80px;
+  height: 60px;
+  transform: skewX(-42deg);
+  background: linear-gradient(90deg, #1b9af0 0 38%, #8bd2ff 38% 74%, transparent 74%);
+  opacity: 0.87;
+  pointer-events: none;
+}
+
+.sigd-contacts {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  position: relative;
+  z-index: 1;
+}
+
+.sigd-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 18, 45, 0.45);
+}
+
+.sigd-contact svg {
+  font-size: 15px;
+  color: #7dd3fc;
+  filter: drop-shadow(0 1px 2px rgba(0, 20, 60, 0.35));
+}
+
+.sigd-separator {
+  height: 16px;
+  width: 1px;
+  background: #d9ecff;
+  opacity: 0.65;
+}
+
+/* BOTON INGRESAR HEADER */
+.sigd-btn-ingresar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  min-height: 40px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(180deg, #075bb3 0%, #034892 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 2px 6px rgba(2, 60, 130, 0.22);
+  transition: all 0.18s ease-in-out;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sigd-btn-ingresar:hover {
+  background: linear-gradient(180deg, #0a68cc 0%, #0452a3 100%);
+  box-shadow: 0 4px 10px rgba(2, 60, 130, 0.30);
+  transform: translateY(-0.5px);
+}
+
+.sigd-btn-ingresar:active {
+  transform: translateY(0.5px);
+  box-shadow: 0 1px 3px rgba(2, 60, 130, 0.25);
+}
+
+/* HERO */
+.sigd-hero {
+  height: clamp(308px, 42vh, 465px);
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(90deg, #063974 0%, #0752a1 35%, #0861b8 70%, #0a6bc7 100%);
+  overflow: hidden;
+}
+
+.sigd-hero-environment,
+.sigd-hero-building,
+.sigd-hero-shade,
+.sigd-hero-students,
+.sigd-hero-waves {
+  position: absolute;
+  pointer-events: none;
+}
+
+.sigd-hero-environment {
+  display: none;
+}
+
+.sigd-hero-building {
+  right: 0;
+  top: 0;
+  width: clamp(56%, 60vw, 65%);
+  height: 100%;
+  z-index: 1;
+  overflow: hidden;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.04) 14%,
+    rgba(0, 0, 0, 0.20) 28%,
+    rgba(0, 0, 0, 0.55) 46%,
+    rgba(0, 0, 0, 0.88) 64%,
+    #000000 78%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.04) 14%,
+    rgba(0, 0, 0, 0.20) 28%,
+    rgba(0, 0, 0, 0.55) 46%,
+    rgba(0, 0, 0, 0.88) 64%,
+    #000000 78%
+  );
+}
+
+.sigd-hero-building img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 70% center;
+  transform: translate(28px, -40px) scale(1.22);
+  transform-origin: 70% center;
+  transition: transform 0.3s ease;
+}
+
+.sigd-hero-shade {
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    #063974 0%,
+    #074f9d 26%,
+    rgba(7, 79, 157, 0.94) 42%,
+    rgba(7, 79, 157, 0.65) 58%,
+    rgba(7, 79, 157, 0.18) 74%,
+    transparent 88%
+  );
+  z-index: 2;
+  pointer-events: none;
+}
+
+.sigd-hero-ribbons {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 48%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.sigd-hero-diagonal {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 350px;
+  height: 110px;
+  opacity: 0.31;
+  background: linear-gradient(132deg, transparent 0 34%, #4eb8f8 34% 52%, transparent 52% 64%, #a3ddff 64% 77%, transparent 77%);
+  clip-path: polygon(0 0, 100% 0, 52% 100%, 0 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sigd-hero-students {
+  height: auto;
+  width: clamp(320px, 26vw, 470px);
+  max-height: 98%;
+  left: clamp(-35px, -2vw, -15px);
+  bottom: -1px;
+  z-index: 3;
+  filter: drop-shadow(0 4px 7px rgba(1, 36, 81, 0.18));
+}
+
+.sigd-hero-copy {
+  position: absolute;
+  z-index: 4;
+  left: clamp(345px, 28vw, 495px);
+  top: clamp(44px, 6.8vh, 72px);
+  max-width: clamp(450px, 35vw, 530px);
+  width: 33%;
+  color: #fff;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+  transition: all 0.25s ease;
+}
+
+.sigd-hero-copy::after {
+  display: none;
+}
+
+.sigd-hero-copy h1 {
+  margin: 0 0 12px;
+  font-size: clamp(30px, 2.25vw, 36px);
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+  font-weight: 800;
+  max-width: 500px;
+  position: relative;
+  text-shadow: 0 2px 4px rgba(0, 20, 60, 0.4);
+}
+
+.sigd-hero-copy h1:before {
+  content: "";
+  position: absolute;
+  left: -18px;
+  top: 4px;
+  width: 4.5px;
+  height: clamp(56px, 7.0vh, 68px);
+  background: #00d2ff;
+  border-radius: 4px;
+  box-shadow: 0 0 12px rgba(0, 210, 255, 0.7);
+}
+
+.sigd-hero-copy p {
+  font-size: clamp(14.5px, 1.02vw, 16.5px);
+  line-height: 1.48;
+  margin: 10px 0 0;
+  max-width: 460px;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 3px rgba(0, 20, 50, 0.35);
+}
+
+.sigd-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: clamp(16px, 2.2vh, 22px);
+}
+
+.sigd-cta {
+  height: clamp(44px, 5.0vh, 48px);
+  padding: 0 clamp(20px, 1.5vw, 26px);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-size: clamp(14px, 1vw, 15.5px);
+  transition: transform 0.18s, box-shadow 0.18s;
+  text-decoration: none;
+}
+
+.sigd-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 25, 73, 0.2);
+}
+
+.sigd-cta svg {
+  font-size: 19px;
+}
+
+.sigd-cta-light {
+  background: #ffffff;
+  color: #05509e;
+  box-shadow: 0 4px 10px rgba(0, 28, 58, 0.12);
+}
+
+.sigd-cta-light:hover {
+  background: #f0f9ff;
+  box-shadow: 0 8px 18px rgba(0, 28, 58, 0.20);
+}
+
+.sigd-cta-outline {
+  border: 2px solid rgba(255, 255, 255, 0.94);
+  color: #ffffff;
+  background: rgba(5, 62, 124, 0.20);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.sigd-cta-outline:hover {
+  background: rgba(5, 62, 124, 0.40);
+  border-color: #ffffff;
+  box-shadow: 0 0 14px rgba(125, 211, 252, 0.35);
+}
+
+.sigd-hero-waves {
+  left: 0;
+  bottom: -1px;
+  width: 100%;
+  height: clamp(58px, 6.8vh, 76px);
+  z-index: 5;
+  display: block;
+}
+
+/* SERVICES */
+.sigd-services {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: linear-gradient(180deg, #e1f2fd 0%, #edf8ff 36%, #f6fbff 100%);
+  padding: clamp(6px, 1.2vh, 16px) clamp(16px, 3.0vw, 48px);
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.sigd-services-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 1.3vw, 20px);
+  max-width: 1580px;
+  margin: auto;
+  width: 100%;
+}
+
+.sigd-service-card {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #ffffff 0%, #ffffff 52%, #f4faff 100%);
+  border-radius: clamp(18px, 1.4vw, 22px);
+  min-height: clamp(142px, 17.0vh, 176px);
+  padding: clamp(13px, 1.6vh, 18px) clamp(15px, 1.3vw, 20px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  box-shadow: 0 4px 18px rgba(2, 60, 120, 0.06), 0 1px 4px rgba(2, 60, 120, 0.03);
+  border: 1.5px solid #d4ebf9;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  text-decoration: none;
+}
+
+.sigd-service-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(2, 80, 160, 0.12), 0 3px 8px rgba(2, 80, 160, 0.05);
+  border-color: #9cd4fb;
+}
+
+/* Icon box top-left */
+.sigd-service-icon {
+  height: clamp(42px, 4.8vh, 48px);
+  width: clamp(42px, 4.8vh, 48px);
+  border-radius: clamp(12px, 1.1vw, 15px);
+  background: #e0f2fe;
+  border: 1px solid #cbe4fd;
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: #004b93;
+  box-shadow: 0 2px 5px rgba(0, 75, 147, 0.05);
+  margin-bottom: clamp(8px, 1.0vh, 11px);
+}
+
+.sigd-icon-svg {
+  width: clamp(21px, 2.5vh, 24px);
+  height: clamp(21px, 2.5vh, 24px);
+  stroke-width: 2.2;
+}
+
+/* Content block in middle */
+.sigd-service-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  width: 100%;
+  z-index: 1;
+}
+
+.sigd-service-title {
+  font-size: clamp(16.5px, 1.22vw, 18.5px);
+  line-height: 1.24;
+  letter-spacing: -0.25px;
+  font-weight: 800;
+  margin: 0 0 clamp(4px, 0.5vh, 6px);
+  color: #062144;
+  display: block;
+}
+
+.sigd-service-desc {
+  font-size: clamp(13px, 0.95vw, 14.5px);
+  line-height: 1.45;
+  font-weight: 500;
+  color: #2c4b72;
+  margin: 0 0 clamp(8px, 1.1vh, 13px);
+  display: block;
+}
+
+/* Action row at bottom */
+.sigd-service-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  z-index: 1;
+}
+
+.sigd-service-arrow {
+  width: clamp(32px, 3.8vh, 36px);
+  height: clamp(32px, 3.8vh, 36px);
+  border-radius: 50%;
+  background: #004b93;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-shadow: 0 2px 6px rgba(0, 40, 95, 0.28);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.sigd-arrow-svg {
+  width: clamp(14px, 1.7vh, 17px);
+  height: clamp(14px, 1.7vh, 17px);
+  stroke-width: 2.4;
+}
+
+.sigd-service-card:hover .sigd-service-arrow {
+  transform: translateX(3px);
+  background: #0259b8;
+}
+
+/* Corner decorative wave in bottom-right */
+.sigd-card-corner {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: clamp(76px, 6.2vw, 98px);
+  height: clamp(50px, 4.2vw, 66px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* FOOTER */
+.sigd-footer {
+  background: linear-gradient(145deg, #07366e 0%, #052a5c 55%, #031e45 100%);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sigd-footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #00d2ff 0%, #0077b6 40%, #0ea5e9 70%, #38bdf8 100%);
+  opacity: 0.85;
+}
+
+.sigd-footer-row {
+  min-height: clamp(66px, 8.5vh, 84px);
+  display: grid;
+  grid-template-columns: 1.35fr 1.05fr 1.05fr 1.1fr 1.15fr;
+  align-items: center;
+  gap: 0;
+  padding: clamp(6px, 1.0vh, 12px) clamp(16px, 3.2vw, 52px);
+  max-width: 1640px;
+  margin: 0 auto;
+}
+
+.sigd-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding-right: 16px;
+}
+
+.sigd-footer-brand img {
+  height: clamp(46px, 5.5vh, 58px);
+  width: clamp(46px, 5.5vh, 58px);
+  object-fit: contain;
+  filter: brightness(1.1);
+}
+
+.sigd-footer-brand strong {
+  font-size: clamp(16px, 1.2vw, 19px);
+  font-weight: 800;
+  display: block;
+  white-space: nowrap;
+}
+
+.sigd-footer-brand small {
+  font-size: clamp(11.5px, 0.85vw, 13px);
+  line-height: 1.35;
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.sigd-footer-column {
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
+  padding-left: clamp(14px, 1.5vw, 24px);
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.sigd-footer-column h2 {
+  font-size: clamp(13.5px, 1.0vw, 15px);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 4px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.sigd-footer-column h2 svg {
+  width: clamp(15px, 1.1vw, 17px);
+  height: clamp(15px, 1.1vw, 17px);
+  font-size: clamp(15px, 1.1vw, 17px);
+  color: #7dd3fc;
+}
+
+.sigd-footer-column a,
+.sigd-footer-column span {
+  font-size: clamp(12px, 0.9vw, 13.5px);
+  display: block;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.sigd-footer-column a:hover {
+  text-decoration: underline;
+  color: #ffffff;
+}
+
+.sigd-footer-column a:before {
+  content: '›';
+  margin-right: 6px;
+  font-weight: bold;
+  color: #7dd3fc;
+}
+
+.sigd-footer-column.contact-footer span {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.sigd-footer-column.contact-footer a {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.sigd-footer-column.contact-footer a:before {
+  display: none;
+}
+
+.sigd-footer-column.contact-footer svg {
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+  color: #7dd3fc;
+}
+
+.sigd-copyright {
+  height: clamp(28px, 3.2vh, 32px);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  display: grid;
+  place-items: center;
+  font-size: clamp(12px, 0.84vw, 13px);
+  font-weight: 600;
+  letter-spacing: 0.25px;
+  background: #031a3b;
+  text-align: center;
+  padding: 0 10px;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 15, 40, 0.5);
+}
+
+/* MEDIA QUERIES */
+
+@media (min-width: 1200px) and (max-width: 1570px) {
+  .sigd-hero-shade {
+    background: linear-gradient(
+      90deg,
+      #063974 0%,
+      #074f9d 26%,
+      rgba(7, 79, 157, 0.94) 42%,
+      rgba(7, 79, 157, 0.65) 58%,
+      rgba(7, 79, 157, 0.18) 74%,
+      transparent 88%
+    );
+  }
+  .sigd-top-contact {
+    height: 28px;
+    font-size: 12.5px;
+  }
+  .sigd-top-contact .contact svg {
+    font-size: 13.5px;
+  }
+  .sigd-separator {
+    height: 14px;
+  }
+  .sigd-contacts {
+    gap: 16px;
+  }
+
+  .sigd-hero {
+    height: clamp(252px, 35.5vh, 328px);
+  }
+  .sigd-hero-building {
+    width: clamp(56%, 60vw, 65%);
+  }
+  .sigd-hero-building img {
+    object-position: 70% center;
+    transform: translate(28px, -40px) scale(1.22);
+    transform-origin: 70% center;
+  }
+  .sigd-hero-students {
+    height: 100%;
+    max-height: 360px;
+    width: auto;
+    max-width: 420px;
+    left: -20px;
+    bottom: -1px;
+  }
+  .sigd-hero-copy {
+    left: clamp(315px, 26.5vw, 440px);
+    top: clamp(26px, 4.2vh, 42px);
+    width: 34%;
+    max-width: 450px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0;
+  }
+  .sigd-hero-copy h1 {
+    font-size: clamp(26px, 1.95vw, 31px);
+    margin-bottom: 7px;
+    line-height: 1.15;
+  }
+  .sigd-hero-copy h1:before {
+    height: 50px;
+    left: -14px;
+    width: 3.5px;
+  }
+  .sigd-hero-copy p {
+    font-size: clamp(13.5px, 0.95vw, 15px);
+    max-width: 420px;
+    line-height: 1.4;
+    margin-top: 6px;
+  }
+  .sigd-hero-actions {
+    margin-top: 12px;
+    gap: 10px;
+  }
+  .sigd-cta {
+    height: 42px;
+    padding: 0 17px;
+    font-size: 13.5px;
+    border-radius: 12px;
+    gap: 8px;
+  }
+  .sigd-cta svg {
+    font-size: 18px;
+  }
+  .sigd-hero-waves {
+    height: clamp(48px, 5.6vh, 64px);
+    bottom: -1px;
+  }
+
+  .sigd-services {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(4px, 0.8vh, 10px) 2.5%;
+    min-height: 0;
+  }
+  .sigd-services-grid {
+    gap: clamp(10px, 1.0vw, 15px);
+  }
+  .sigd-service-card {
+    min-height: clamp(134px, 16.5vh, 156px);
+    padding: clamp(11px, 1.4vh, 15px) clamp(13px, 1.1vw, 17px);
+    border-radius: 20px;
+  }
+  .sigd-service-icon {
+    height: clamp(38px, 4.6vh, 44px);
+    width: clamp(38px, 4.6vh, 44px);
+    border-radius: 12px;
+    margin-bottom: clamp(6px, 0.8vh, 9px);
+  }
+  .sigd-icon-svg {
+    width: clamp(20px, 2.4vh, 23px);
+    height: clamp(20px, 2.4vh, 23px);
+  }
+  .sigd-service-title {
+    font-size: clamp(16px, 1.18vw, 17.5px);
+    font-weight: 800;
+    line-height: 1.24;
+    letter-spacing: -0.2px;
+    margin-bottom: 4px;
+    color: #062144;
+  }
+  .sigd-service-desc {
+    font-size: clamp(12.8px, 0.92vw, 13.8px);
+    line-height: 1.42;
+    font-weight: 500;
+    color: #2c4b72;
+    margin-bottom: clamp(6px, 0.9vh, 10px);
+  }
+  .sigd-service-arrow {
+    height: clamp(28px, 3.5vh, 33px);
+    width: clamp(28px, 3.5vh, 33px);
+  }
+  .sigd-arrow-svg {
+    width: 14px;
+    height: 14px;
+  }
+  .sigd-card-corner {
+    width: clamp(65px, 5.2vw, 82px);
+    height: clamp(44px, 3.6vw, 56px);
+  }
+
+  .sigd-footer-row {
+    min-height: clamp(62px, 7.6vh, 74px);
+    padding: 4px 2.5%;
+  }
+  .sigd-footer-brand {
+    gap: 10px;
+  }
+  .sigd-footer-brand img {
+    height: 48px;
+    width: 48px;
+  }
+  .sigd-footer-brand strong {
+    font-size: 16.5px;
+  }
+  .sigd-footer-brand small {
+    font-size: 11.5px;
+  }
+  .sigd-footer-column {
+    padding-left: 14px;
+    min-height: 46px;
+  }
+  .sigd-footer-column h2 {
+    font-size: 13.5px;
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+  .sigd-footer-column h2 svg {
+    width: 15px;
+    height: 15px;
+    font-size: 15px;
+  }
+  .sigd-footer-column a,
+  .sigd-footer-column span {
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+  .sigd-copyright {
+    height: 28px;
+    font-size: 11.5px;
+    padding: 0;
+  }
+}
+
+@media (min-width: 700px) and (max-width: 1199px) {
+  .sigd-top-contact {
+    height: auto;
+    min-height: 32px;
+    padding: 6px clamp(16px, 3vw, 32px);
+    font-size: 12px;
+  }
+  .sigd-contacts {
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .sigd-contact {
+    gap: 6px;
+  }
+  .sigd-separator {
+    height: 14px;
+  }
+
+  /* Sub-rango A: 960px - 1199px (Desktop compacto / Antigravity panel lateral moderado) */
+  @media (min-width: 960px) {
+    .sigd-hero {
+      height: clamp(310px, 38vh, 360px);
+      position: relative;
+      background: linear-gradient(90deg, #063974 0%, #0752a1 35%, #0861b8 70%, #0a6bc7 100%);
+      overflow: hidden;
+    }
+    .sigd-hero-building {
+      width: 58%;
+      right: 0;
+      top: 0;
+      height: 100%;
+    }
+    .sigd-hero-building img {
+      object-position: 70% center;
+      transform: translate(20px, -28px) scale(1.22);
+      transform-origin: 70% center;
+    }
+    .sigd-hero-shade {
+      background: linear-gradient(
+        90deg,
+        #063974 0%,
+        #074f9d 28%,
+        rgba(7, 79, 157, 0.95) 46%,
+        rgba(7, 79, 157, 0.70) 65%,
+        rgba(7, 79, 157, 0.20) 84%,
+        transparent 100%
+      );
+    }
+    .sigd-hero-students {
+      position: absolute;
+      left: -15px;
+      bottom: -1px;
+      height: 100%;
+      max-height: 350px;
+      width: auto;
+      max-width: 310px;
+      z-index: 3;
+    }
+    .sigd-hero-copy {
+      position: absolute;
+      left: 295px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: calc(100% - 315px - 20px);
+      max-width: 480px;
+      z-index: 4;
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    .sigd-hero-copy h1 {
+      font-size: 26px;
+      line-height: 1.18;
+      margin-bottom: 8px;
+    }
+    .sigd-hero-copy h1:before {
+      height: 52px;
+      left: -14px;
+      width: 3.5px;
+    }
+    .sigd-hero-copy p {
+      font-size: 14.5px;
+      line-height: 1.42;
+      margin-top: 8px;
+      max-width: 440px;
+    }
+    .sigd-hero-actions {
+      margin-top: 16px;
+      gap: 10px;
+    }
+    .sigd-cta {
+      height: 44px;
+      padding: 0 18px;
+      font-size: 14px;
+    }
+    .sigd-hero-waves {
+      height: 54px;
+      bottom: -1px;
+    }
+  }
+
+  /* Sub-rango B: 700px - 959px (Tablet / Panel lateral estrecho) */
+  @media (max-width: 959px) {
+    .sigd-hero {
+      height: auto;
+      min-height: 440px;
+      position: relative;
+      background: #063974;
+      padding-bottom: 50px;
+      overflow: hidden;
+    }
+    .sigd-hero-building {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 75%;
+      height: 250px;
+      z-index: 1;
+      mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.85) 60%, transparent 100%), linear-gradient(to right, transparent 0%, #000 30%);
+      -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.85) 60%, transparent 100%), linear-gradient(to right, transparent 0%, #000 30%);
+      mask-composite: intersect;
+      -webkit-mask-composite: source-in;
+    }
+    .sigd-hero-building img {
+      object-position: 70% center;
+      transform: scale(1.05);
+    }
+    .sigd-hero-shade {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        180deg,
+        rgba(6, 57, 116, 0.15) 0%,
+        rgba(6, 57, 116, 0.70) 35%,
+        #063974 52%,
+        #063974 100%
+      );
+      z-index: 2;
+    }
+    .sigd-hero-students {
+      position: absolute;
+      top: 20px;
+      left: -15px;
+      width: 240px;
+      height: auto;
+      z-index: 3;
+    }
+    .sigd-hero-copy {
+      position: relative;
+      left: auto;
+      top: auto;
+      transform: none;
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 215px 24px 0;
+      z-index: 4;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    .sigd-hero-copy h1 {
+      font-size: 26px;
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+    .sigd-hero-copy h1:before {
+      height: 56px;
+      left: -14px;
+      width: 4px;
+    }
+    .sigd-hero-copy p {
+      font-size: 15px;
+      line-height: 1.45;
+      max-width: 540px;
+    }
+    .sigd-hero-actions {
+      margin-top: 18px;
+      gap: 12px;
+    }
+    .sigd-cta {
+      height: 44px;
+      font-size: 14px;
+      padding: 0 18px;
+    }
+    .sigd-hero-waves {
+      height: 52px;
+      bottom: -1px;
+    }
+  }
+
+  /* Tarjetas de Servicios en Ventana Intermedia: 2 COLUMNAS, 2 FILAS */
+  .sigd-services {
+    flex: none;
+    min-height: auto;
+    padding: 24px clamp(16px, 3vw, 36px);
+    overflow: visible;
+  }
+  .sigd-services-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(14px, 1.8vw, 18px);
+    max-width: 1040px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .sigd-service-card {
+    min-height: 154px;
+    padding: 16px 20px;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .sigd-service-icon {
+    height: 44px;
+    width: 44px;
+    border-radius: 13px;
+    margin-bottom: 10px;
+  }
+  .sigd-icon-svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 2.2;
+  }
+  .sigd-service-title {
+    font-size: 17.5px;
+    font-weight: 800;
+    margin-bottom: 5px;
+    line-height: 1.25;
+    letter-spacing: -0.2px;
+    color: #062144;
+  }
+  .sigd-service-desc {
+    font-size: 13.8px;
+    line-height: 1.45;
+    font-weight: 500;
+    color: #2c4b72;
+    margin-bottom: 12px;
+  }
+  .sigd-service-arrow {
+    height: 34px;
+    width: 34px;
+  }
+  .sigd-arrow-svg {
+    width: 15px;
+    height: 15px;
+  }
+  .sigd-card-corner {
+    width: 80px;
+    height: 54px;
+  }
+
+  /* Footer en Ventana Intermedia: Marca arriba y 4 columnas en 2 filas */
+  .sigd-footer-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px 24px;
+    padding: 24px clamp(20px, 3.5vw, 36px);
+    max-width: 1040px;
+    margin: 0 auto;
+    min-height: auto;
+  }
+  .sigd-footer-brand {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+    padding-bottom: 16px;
+    margin-bottom: 4px;
+    gap: 14px;
+  }
+  .sigd-footer-brand img {
+    height: 48px;
+    width: 48px;
+  }
+  .sigd-footer-brand strong {
+    font-size: 17px;
+  }
+  .sigd-footer-brand small {
+    font-size: 12px;
+  }
+  .sigd-footer-column {
+    border-left: 0;
+    padding-left: 0;
+    min-height: auto;
+  }
+  .sigd-footer-column h2 {
+    font-size: 14.5px;
+    margin-bottom: 6px;
+  }
+  .sigd-footer-column a,
+  .sigd-footer-column span {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .sigd-copyright {
+    font-size: 12px;
+    min-height: 40px;
+    padding: 10px 16px;
+  }
+}
+
+/* 3. MÓVIL (< 700px) */
+@media (max-width: 699px) {
+  .sigd-top-contact {
+    height: auto;
+    min-height: 32px;
+    padding: 6px 14px;
+    font-size: 11px;
+  }
+  .sigd-contacts {
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 11px;
+  }
+  .sigd-contact:nth-of-type(3) {
+    display: none;
+  }
+  .sigd-separator:nth-of-type(4) {
+    display: none;
+  }
+  .sigd-top-contact:after {
+    display: none;
+  }
+
+  .sigd-hero {
+    height: auto;
+    min-height: 440px;
+    padding-bottom: 44px;
+    background: #063974;
+    position: relative;
+    overflow: hidden;
+  }
+  .sigd-hero-building {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 85%;
+    height: 210px;
+    z-index: 1;
+    mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.8) 55%, transparent 100%), linear-gradient(to right, transparent 0%, #000 25%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.8) 55%, transparent 100%), linear-gradient(to right, transparent 0%, #000 25%);
+    mask-composite: intersect;
+    -webkit-mask-composite: source-in;
+  }
+  .sigd-hero-building img {
+    object-position: 70% center;
+    transform: scale(1.05);
+  }
+  .sigd-hero-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(6, 57, 116, 0.15) 0%, rgba(6, 57, 116, 0.70) 30%, #063974 46%, #063974 100%);
+    z-index: 2;
+  }
+  .sigd-hero-students {
+    position: absolute;
+    top: 15px;
+    left: -12px;
+    width: 195px;
+    height: auto;
+    z-index: 3;
+  }
+  .sigd-hero-copy {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: 100%;
+    padding: 175px 16px 0;
+    z-index: 4;
+    margin: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .sigd-hero-copy h1 {
+    font-size: clamp(23px, 5.8vw, 27px);
+    line-height: 1.18;
+    letter-spacing: -0.4px;
+    margin-bottom: 8px;
+  }
+  .sigd-hero-copy h1:before {
+    height: 50px;
+    left: -11px;
+    width: 3.5px;
+  }
+  .sigd-hero-copy p {
+    font-size: 13.5px;
+    line-height: 1.45;
+    margin-top: 6px;
+  }
+  .sigd-hero-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .sigd-cta {
+    flex: 1 1 140px;
+    min-width: 130px;
+    height: 44px;
+    font-size: 13.5px;
+    padding: 0 12px;
+    border-radius: 12px;
+  }
+  .sigd-cta svg {
+    font-size: 18px;
+  }
+  .sigd-hero-waves {
+    height: 44px;
+    bottom: -1px;
+  }
+
+  /* Tarjetas Móvil: 1 COLUMNA */
+  .sigd-services {
+    flex: none;
+    min-height: auto;
+    padding: 18px 16px 26px;
+    overflow: visible;
+  }
+  .sigd-services-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    max-width: 440px;
+    margin: 0 auto;
+  }
+  .sigd-service-card {
+    min-height: 146px;
+    padding: 16px 18px;
+    border-radius: 18px;
+  }
+  .sigd-service-icon {
+    height: 42px;
+    width: 42px;
+    border-radius: 12px;
+    margin-bottom: 9px;
+  }
+  .sigd-icon-svg {
+    width: 21px;
+    height: 21px;
+    stroke-width: 2.2;
+  }
+  .sigd-service-title {
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -0.2px;
+    margin-bottom: 4px;
+    color: #062144;
+  }
+  .sigd-service-desc {
+    font-size: 13.5px;
+    line-height: 1.45;
+    font-weight: 500;
+    color: #2c4b72;
+    margin-bottom: 11px;
+  }
+  .sigd-service-arrow {
+    height: 32px;
+    width: 32px;
+  }
+  .sigd-arrow-svg {
+    width: 14px;
+    height: 14px;
+  }
+  .sigd-card-corner {
+    width: 72px;
+    height: 48px;
+  }
+  .sigd-card-corner {
+    width: 60px;
+    height: 42px;
+  }
+
+  /* Footer Móvil: 1 COLUMNA */
+  .sigd-footer-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 22px 18px;
+  }
+  .sigd-footer-brand {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+    padding-bottom: 14px;
+    margin-bottom: 0;
+  }
+  .sigd-footer-brand img {
+    height: 44px;
+    width: 44px;
+  }
+  .sigd-footer-brand strong {
+    font-size: 16px;
+  }
+  .sigd-footer-brand small {
+    font-size: 11.5px;
+  }
+  .sigd-footer-column {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .sigd-footer-column h2 {
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .sigd-footer-column a,
+  .sigd-footer-column span {
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+  .sigd-copyright {
+    font-size: 11px;
+    min-height: 38px;
+    padding: 8px 12px;
+  }
+}
+
+/* 4. ADAPTACIÓN SEGÚN ALTURA (Pantallas de muy baja altura o zoom extremo) */
+@media (max-height: 520px) {
+  .sigd-services {
+    flex: none;
+    min-height: auto;
+    padding: 14px 20px;
+    overflow: visible;
+  }
+}

@@ -31,7 +31,7 @@ export interface RegistroMigracion {
 export const SIGD_MIGRATION_ADVISORY_LOCK_ID = 987654321;
 
 const PERFIL_BASELINE = 'BASELINE_2026_V1';
-const MANIFIESTO_BASELINE = [
+export const MANIFIESTO_BASELINE = [
   '01_sigd_audit.sql', '02_sigd_auth.sql', '03_sigd_org.sql',
   '04_sigd_doc.sql', '05_sigd_tra.sql', 'BASELINE_2026_V1.sql',
   '08_sigd_tupa_acoplamiento.sql', '09_sigd_seguridad_remediacion.sql',
@@ -45,6 +45,38 @@ const MANIFIESTO_BASELINE = [
   '17_sigd_tupa_documento_oficial.sql',
   '18_sigd_indices_optimizacion.sql',
   '19_sigd_tupa_documento_inmutable.sql',
+  '20_sigd_tesoreria_orden_pago.sql',
+  '21_sigd_orden_pago_activa_unica.sql',
+  '22_sigd_tesoreria_taypi_sandbox.sql',
+  '23_sigd_orden_pago_metodo_qr_longitud.sql',
+  '24_sigd_tupa_requisitos_documentales.sql',
+  '25_sigd_vinculacion_historica.sql',
+  '26_sigd_devoluciones_y_pagos_adicionales.sql',
+  '27_sigd_causal_pago_duplicado.sql',
+  '28_sigd_tupa_versionado_organizacional.sql',
+  '29_sigd_tupa_datos_oficiales.sql',
+  '30_sigd_devolucion_monto_autorizado_check.sql',
+  '31_sigd_vinculos_institucionales.sql',
+  '32_sigd_vinculos_indice_anulado_por.sql',
+  '33_sigd_organizacion_responsabilidades.sql',
+  '34_sigd_autorizacion_perfiles_operativos.sql',
+  '35_sigd_autorizador_devolucion_perfil.sql',
+  '36_sigd_tupa_versionamiento_operativo.sql',
+  '37_sigd_tupa_ajustes_operativos.sql',
+  '38_sigd_tupa_ajustes_operativos_complementarios.sql',
+  '39_sigd_tupa_pendientes_no_determinados.sql',
+  '40_sigd_gobierno_identidades_ciclo_laboral.sql',
+  '41_sigd_tupa_requisitos_anexos_evidencias.sql',
+  '42_sigd_tupa_proveniencia_y_homologacion_requisitos.sql',
+  '43_sigd_workflow_custodia_asignacion_observaciones.sql',
+  '44_sigd_evidencia_firma_digital_dnie.sql',
+  '45_sigd_casillero_notificaciones_trazabilidad.sql',
+  '46_sigd_tupa_destinos_funcionales.sql',
+  '47_sigd_superadministrador_gobierno.sql',
+  '48_sigd_pre_enrutamiento_responsables.sql',
+  '49_sigd_tupa_homologacion_tecnica_72.sql',
+  '50_sigd_workflow_tupa_circuitos.sql',
+  '51_sigd_limpieza_textos_tupa_requisitos.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }

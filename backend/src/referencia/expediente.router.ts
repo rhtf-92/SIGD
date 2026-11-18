@@ -9,6 +9,8 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '../shared/domain/errors/index.js';
+import { derivarExpediente } from '../domains/rutadoc/derivaciones.service.js';
+import type { ActorProviderRutaDoc } from '../domains/rutadoc/rutadoc.actor-provider.js';
 
 const esquemaRadicacion = z.object({
   numero: z.string().min(1, 'El campo es obligatorio.'),
@@ -20,7 +22,7 @@ const esquemaRadicacion = z.object({
   area_destino_id: z.string().uuid(),
 });
 
-export function crearRouterReferencia(pool: Pool): Router {
+export function crearRouterReferencia(pool: Pool, actorProvider?: ActorProviderRutaDoc): Router {
   const router = Router();
 
   router.use((req, _res, next) => {
@@ -128,34 +130,100 @@ export function crearRouterReferencia(pool: Pool): Router {
     const esquema = z.object({
       expediente_id: z.string().uuid(),
       area_destino_id: z.string().uuid(),
+      proveido: z.string().trim().min(1),
     });
     const datos = esquema.parse(req.body);
+    const actor = await actorProvider?.obtenerActor(req);
+    if (!actor) {
+      throw new UnauthorizedError({ detail: 'Autenticación requerida para derivar el expediente.' });
+    }
+
+    const rolesPermitidos = new Set([
+      'ADMINISTRADOR',
+      'DIRECTOR',
+      'MESA_PARTES',
+      'ESPECIALISTA',
+      'SECRETARIO',
+    ]);
+    if (!actor.roles.some((rol) => rolesPermitidos.has(rol))) {
+      throw new ForbiddenError({ detail: 'No cuenta con un rol habilitado para derivar expedientes.' });
+    }
+    if (!actor.puedeVerExpediente || !await actor.puedeVerExpediente(datos.expediente_id)) {
+      throw new ForbiddenError({ detail: 'No tiene autorización sobre este expediente.' });
+    }
+
+    setUsuarioId(actor.id);
     const cliente = await pool.connect();
     try {
       await cliente.query('BEGIN');
+      const contexto = await cliente.query<{
+        estado_actual: string;
+        area_actual_id: string;
+      }>(
+        `SELECT COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual,
+                COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_actual_id
+           FROM sigd_tra.expediente e
+           LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
+          WHERE e.expediente_id = $1::uuid
+          FOR UPDATE OF e`,
+        [datos.expediente_id],
+      );
+      if (contexto.rowCount !== 1) {
+        throw new NotFoundError({ detail: 'El expediente no existe.' });
+      }
+
+      const esAdminInstitucional = actor.roles.some((rol) =>
+        ['ADMINISTRADOR', 'DIRECTOR'].includes(rol),
+      );
+      if (!esAdminInstitucional && actor.unidadOrganicaId !== contexto.rows[0].area_actual_id) {
+        throw new ForbiddenError({ detail: 'No tiene custodia del área actual del expediente.' });
+      }
+
       const area = await cliente.query(
-        `SELECT area_id FROM sigd_org.area WHERE area_id = $1 AND vigente = true`,
+        `SELECT area_id FROM sigd_org.area WHERE area_id = $1::uuid AND vigente = true`,
         [datos.area_destino_id],
       );
-      if (!area.rowCount || area.rowCount === 0) {
+      if (area.rowCount !== 1) {
         throw new NotFoundError({ detail: 'El área de destino no existe.' });
       }
 
-      await cliente.query(
-        `INSERT INTO sigd_rut.movimiento_tramite (expediente_id, area_destino_id, fecha_movimiento)
-         VALUES ($1, $2, now())`,
+      await derivarExpediente(cliente, datos.expediente_id, {
+        destinos: [{ area_destino_id: datos.area_destino_id, es_copia: false }],
+        proveido: datos.proveido,
+      });
+
+      const expedienteActualizado = await cliente.query(
+        `UPDATE sigd_tra.expediente
+            SET estado = 'DERIVADO', area_destino_id = $2::uuid
+          WHERE expediente_id = $1::uuid
+            AND estado IN ('REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION', 'SUBSANADO')`,
         [datos.expediente_id, datos.area_destino_id],
       );
+      if (expedienteActualizado.rowCount !== 1) {
+        throw new ForbiddenError({ detail: 'El estado actual no permite derivar este expediente.' });
+      }
 
       await registrarMutacion(cliente, {
         esquema: 'sigd_rut',
         tabla: 'movimiento_tramite',
         operacion: 'INSERT',
-        datos_despues: { expediente_id: datos.expediente_id, area_destino_id: datos.area_destino_id },
+        datos_despues: {
+          expediente_id: datos.expediente_id,
+          estado_anterior: contexto.rows[0].estado_actual,
+          evento: 'DERIVACION',
+          estado_nuevo: 'DERIVADO',
+          area_origen_id: contexto.rows[0].area_actual_id,
+          area_destino_id: datos.area_destino_id,
+        },
       });
 
       await cliente.query('COMMIT');
-      res.status(200).json({ ok: true, expediente_id: datos.expediente_id });
+      res.status(200).json({
+        ok: true,
+        expediente_id: datos.expediente_id,
+        estado: 'DERIVADO',
+        area_destino_id: datos.area_destino_id,
+      });
     } catch (error) {
       await cliente.query('ROLLBACK');
       throw error;

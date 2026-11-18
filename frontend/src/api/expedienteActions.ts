@@ -1,5 +1,23 @@
 import { ErrorAccionExpediente } from "../types/expedienteActions";
-import type { ResultadoDerivacion, ResultadoObservacion, ResultadoSubsanacion, ServicioExpedienteActions, SolicitudDerivacion, SolicitudObservacion, SolicitudSubsanacion } from "../types/expedienteActions";
+import type {
+  ResultadoDerivacion,
+  ResultadoRecepcion,
+  ResultadoAtencion,
+  ResultadoArchivado,
+  ResultadoObservacion,
+  ResultadoSubsanacion,
+  ResultadoEnviarAFirma,
+  ResultadoResolver,
+  ServicioExpedienteActions,
+  SolicitudDerivacion,
+  SolicitudRecepcion,
+  SolicitudAtencion,
+  SolicitudArchivado,
+  SolicitudObservacion,
+  SolicitudSubsanacion,
+  SolicitudEnviarAFirma,
+  SolicitudResolver
+} from "../types/expedienteActions";
 
 /** Implementar únicamente después de verificar el DTO real y sus consumidores. */
 export interface AdaptadorPayload<Entrada> {
@@ -8,6 +26,11 @@ export interface AdaptadorPayload<Entrada> {
 
 export interface ContratosExpedienteActions {
   derivacion?: AdaptadorPayload<SolicitudDerivacion>;
+  recepcion?: AdaptadorPayload<SolicitudRecepcion>;
+  atencion?: AdaptadorPayload<SolicitudAtencion>;
+  enviarAFirma?: AdaptadorPayload<SolicitudEnviarAFirma>;
+  resolver?: AdaptadorPayload<SolicitudResolver>;
+  archivado?: AdaptadorPayload<SolicitudArchivado>;
   observacion?: AdaptadorPayload<SolicitudObservacion>;
   subsanacion?: AdaptadorPayload<SolicitudSubsanacion>;
   acumulacion?: ServicioExpedienteActions["acumular"];
@@ -21,7 +44,7 @@ function respuestaNoConfirmada(): never {
   throw new ErrorAccionExpediente("El servidor devolvió una respuesta no reconocida. Compruebe el expediente antes de repetir la acción.", "respuesta");
 }
 
-function urlMovimiento(id: string, accion: "derivar" | "observar" | "subsanar", baseURL: string | undefined): string {
+function urlMovimiento(id: string, accion: "derivar" | "recepcionar" | "atender" | "archivar" | "observar" | "subsanar", baseURL: string | undefined): string {
   // Ruta absoluta: evita duplicar el prefijo si el baseURL ya incluye /api o /api/v1.
   const base = new URL(baseURL ?? "/", window.location.origin);
   return new URL(`/api/v1/expedientes/${encodeURIComponent(id)}/movimientos/${accion}`, base).href;
@@ -30,25 +53,80 @@ function urlMovimiento(id: string, accion: "derivar" | "observar" | "subsanar", 
 /** Rutas documentadas; no se habilitan sin un adaptador del DTO canónico. */
 export function crearServicioExpedienteActions(contratos: ContratosExpedienteActions = {}): ServicioExpedienteActions {
   const servicio: ServicioExpedienteActions = {};
-  const { derivacion, observacion, subsanacion, acumulacion } = contratos;
-  if (derivacion) servicio.derivar = async (entrada): Promise<ResultadoDerivacion> => {
+  const { derivacion, recepcion, atencion, enviarAFirma, resolver, archivado, observacion, subsanacion, acumulacion } = contratos;
+  if (derivacion) servicio.derivar = async (entrada: SolicitudDerivacion): Promise<ResultadoDerivacion> => {
     const { apiClient } = await import("./client");
-    const { data } = await apiClient.post<unknown>(urlMovimiento(entrada.expediente.id, "derivar", apiClient.defaults.baseURL), derivacion.construirPayload(entrada));
+    const { data } = await apiClient.post<unknown>(
+      urlMovimiento(entrada.expediente.id, "derivar", apiClient.defaults.baseURL),
+      derivacion.construirPayload(entrada)
+    );
     if (!esObjeto(data) || typeof data.derivacionId !== "string" || !data.derivacionId.trim() || typeof data.nuevoEstado !== "string" || !data.nuevoEstado.trim()) respuestaNoConfirmada();
     return { derivacionId: data.derivacionId, nuevoEstado: data.nuevoEstado };
   };
-  if (observacion) servicio.observar = async (entrada): Promise<ResultadoObservacion> => {
+  if (recepcion) servicio.recepcionar = async (entrada: SolicitudRecepcion): Promise<ResultadoRecepcion> => {
     const { apiClient } = await import("./client");
-    const { data } = await apiClient.post<unknown>(urlMovimiento(entrada.expediente.id, "observar", apiClient.defaults.baseURL), observacion.construirPayload(entrada));
+    const { data } = await apiClient.post<unknown>(
+      urlMovimiento(entrada.expediente.id, "recepcionar", apiClient.defaults.baseURL),
+      recepcion.construirPayload(entrada)
+    );
+    if (!esObjeto(data) || data.ok !== true) respuestaNoConfirmada();
+    return { ok: true, expedienteId: entrada.expediente.id, nuevoEstado: (data.nuevoEstado as string) || "EN_REVISION" };
+  };
+  if (atencion) servicio.atender = async (entrada: SolicitudAtencion): Promise<ResultadoAtencion> => {
+    const { apiClient } = await import("./client");
+    const { data } = await apiClient.post<unknown>(
+      urlMovimiento(entrada.expediente.id, "atender", apiClient.defaults.baseURL),
+      atencion.construirPayload(entrada)
+    );
+    if (!esObjeto(data) || data.ok !== true) respuestaNoConfirmada();
+    return { ok: true, expedienteId: entrada.expediente.id, nuevoEstado: (data.nuevoEstado as string) || "RESUELTO" };
+  };
+  if (enviarAFirma) servicio.enviarAFirma = async (entrada: SolicitudEnviarAFirma): Promise<ResultadoEnviarAFirma> => {
+    const { apiClient } = await import("./client");
+    const base = new URL(apiClient.defaults.baseURL ?? "/", window.location.origin);
+    const url = new URL(`/api/v1/expedientes/${encodeURIComponent(entrada.expediente.id)}/enviar-a-firma`, base).href;
+    const { data } = await apiClient.post<unknown>(
+      url,
+      enviarAFirma.construirPayload(entrada)
+    );
+    if (!esObjeto(data) || data.ok !== true) respuestaNoConfirmada();
+    return { ok: true, expedienteId: entrada.expediente.id, nuevoEstado: (data.nuevoEstado as string) || "EN_FIRMA" };
+  };
+  if (resolver) servicio.resolver = async (entrada: SolicitudResolver): Promise<ResultadoResolver> => {
+    const { apiClient } = await import("./client");
+    const base = new URL(apiClient.defaults.baseURL ?? "/", window.location.origin);
+    const url = new URL(`/api/v1/expedientes/${encodeURIComponent(entrada.expediente.id)}/resolver`, base).href;
+    const { data } = await apiClient.post<unknown>(
+      url,
+      resolver.construirPayload(entrada)
+    );
+    if (!esObjeto(data) || data.ok !== true) respuestaNoConfirmada();
+    return { ok: true, expedienteId: entrada.expediente.id, nuevoEstado: (data.nuevoEstado as string) || "RESUELTO" };
+  };
+  if (archivado) servicio.archivar = async (entrada: SolicitudArchivado): Promise<ResultadoArchivado> => {
+    const { apiClient } = await import("./client");
+    const { data } = await apiClient.post<unknown>(
+      urlMovimiento(entrada.expediente.id, "archivar", apiClient.defaults.baseURL),
+      archivado.construirPayload(entrada)
+    );
+    if (!esObjeto(data) || data.ok !== true) respuestaNoConfirmada();
+    return { ok: true, expedienteId: entrada.expediente.id, nuevoEstado: (data.nuevoEstado as string) || "ARCHIVADO" };
+  };
+  if (observacion) servicio.observar = async (entrada: SolicitudObservacion): Promise<ResultadoObservacion> => {
+    const { apiClient } = await import("./client");
+    const { data } = await apiClient.post<unknown>(
+      urlMovimiento(entrada.expediente.id, "observar", apiClient.defaults.baseURL),
+      observacion.construirPayload(entrada)
+    );
     if (!esObjeto(data) || data.estado !== "OBSERVADO" || data.slaPaused !== true) respuestaNoConfirmada();
     return { estado: "OBSERVADO", slaPaused: true };
   };
-  if (subsanacion) servicio.subsanar = async (entrada): Promise<ResultadoSubsanacion> => {
+  if (subsanacion) servicio.subsanar = async (entrada: SolicitudSubsanacion): Promise<ResultadoSubsanacion> => {
     const { apiClient } = await import("./client");
     const { data } = await apiClient.post<unknown>(urlMovimiento(entrada.expediente.id, "subsanar", apiClient.defaults.baseURL), subsanacion.construirPayload(entrada));
-    if (!esObjeto(data) || data.ok !== true || (data.estado !== "EN_REVISION" && data.estado !== "EN_TRAMITE") || data.expedienteId !== entrada.expediente.id || typeof data.motivo !== "string") respuestaNoConfirmada();
+    if (!esObjeto(data) || data.ok !== true || (data.estado !== "EN_REVISION" && data.estado !== "EN_TRAMITE" && data.estado !== "SUBSANADO") || data.expedienteId !== entrada.expediente.id || typeof data.motivo !== "string") respuestaNoConfirmada();
     return {
-      estado: data.estado as "EN_REVISION" | "EN_TRAMITE",
+      estado: data.estado as "EN_REVISION" | "EN_TRAMITE" | "SUBSANADO",
       expedienteId: data.expedienteId,
       motivo: data.motivo,
       estadoRutaDoc: typeof data.estadoRutaDoc === "string" ? data.estadoRutaDoc : undefined,
@@ -64,7 +142,7 @@ export function crearServicioExpedienteActions(contratos: ContratosExpedienteAct
  */
 export const contratosRealesExpedienteActions: ContratosExpedienteActions = {
   derivacion: {
-    construirPayload: (entrada) => ({
+    construirPayload: (entrada: SolicitudDerivacion) => ({
       destinos: [
         {
           area_destino_id: entrada.unidadDestinoId,
@@ -74,14 +152,46 @@ export const contratosRealesExpedienteActions: ContratosExpedienteActions = {
       proveido: entrada.proveido,
     }),
   },
+  recepcion: {
+    construirPayload: () => ({}),
+  },
+  atencion: {
+    construirPayload: (entrada: SolicitudAtencion) => ({
+      resultado_resumen: entrada.resultado_resumen,
+      observacion_interna: entrada.observacion_interna || undefined,
+      documento_respuesta_id: entrada.documento_respuesta_id || undefined,
+      nombre_archivo: entrada.nombre_archivo || undefined,
+      mime_type: entrada.mime_type || undefined,
+    }),
+  },
+  enviarAFirma: {
+    construirPayload: (entrada: SolicitudEnviarAFirma) => ({
+      motivo: entrada.motivo || undefined,
+    }),
+  },
+  resolver: {
+    construirPayload: (entrada: SolicitudResolver) => ({
+      resultado_resumen: entrada.resultado_resumen,
+      observacion_interna: entrada.observacion_interna || undefined,
+      documento_respuesta_id: entrada.documento_respuesta_id || undefined,
+    }),
+  },
+  archivado: {
+    construirPayload: (entrada: SolicitudArchivado) => ({
+      estante: entrada.estante,
+      balda: entrada.balda,
+      caja: entrada.caja,
+      observaciones: entrada.observaciones || undefined,
+    }),
+  },
   observacion: {
-    construirPayload: (entrada) => ({
+    construirPayload: (entrada: SolicitudObservacion) => ({
       motivo: entrada.motivo,
       observacion: entrada.motivo,
     }),
   },
   subsanacion: {
-    construirPayload: (entrada) => ({ motivo: entrada.motivo }),
+    construirPayload: (entrada: SolicitudSubsanacion) => ({ motivo: entrada.motivo }),
   },
   acumulacion: async (entrada) => {
     const { apiClient } = await import("./client");

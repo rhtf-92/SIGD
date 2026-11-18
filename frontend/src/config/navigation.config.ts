@@ -1,10 +1,12 @@
 export type RolCanonica =
+  | 'SUPERADMINISTRADOR'
   | 'ADMINISTRADOR'
   | 'CIUDADANO'
   | 'DIRECTOR'
   | 'ESPECIALISTA'
   | 'MESA_PARTES'
-  | 'SECRETARIO';
+  | 'SECRETARIO'
+  | 'TESORERIA';
 
 export interface NavItem {
   etiqueta: string;
@@ -15,24 +17,29 @@ export interface NavItem {
  * Destino canónico tras autenticación exitosa por rol.
  */
 export const DESTINO_POR_ROL: Record<RolCanonica, string> = {
-  CIUDADANO: '/tramite',
+  SUPERADMINISTRADOR: '/administracion',
+  CIUDADANO: '/mesa-partes',
   MESA_PARTES: '/tramite/ventanilla-presencial',
   ESPECIALISTA: '/expedientes',
   SECRETARIO: '/expedientes',
   DIRECTOR: '/reportes/dashboard',
   ADMINISTRADOR: '/administracion',
+  TESORERIA: '/tesoreria',
 };
 
 export const ROLES_INSTITUCIONALES: readonly RolCanonica[] = [
-  'MESA_PARTES', 'ESPECIALISTA', 'SECRETARIO', 'DIRECTOR', 'ADMINISTRADOR',
+  'SUPERADMINISTRADOR', 'MESA_PARTES', 'ESPECIALISTA', 'SECRETARIO', 'DIRECTOR', 'ADMINISTRADOR', 'TESORERIA',
 ];
 
 export const ROLES_VENTANILLA: readonly RolCanonica[] = ROLES_INSTITUCIONALES;
-export const ROLES_REPORTES: readonly RolCanonica[] = ['DIRECTOR', 'ADMINISTRADOR'];
-export const ROLES_ADMIN: readonly RolCanonica[] = ['ADMINISTRADOR'];
+export const ROLES_REPORTES: readonly RolCanonica[] = ['DIRECTOR', 'ADMINISTRADOR', 'SUPERADMINISTRADOR'];
+export const ROLES_ADMIN: readonly RolCanonica[] = ['ADMINISTRADOR', 'SUPERADMINISTRADOR'];
+export const ROLES_SUPERADMIN: readonly RolCanonica[] = ['SUPERADMINISTRADOR'];
 export const ROLES_CIUDADANO: readonly RolCanonica[] = ['CIUDADANO'];
+export const ROLES_TESORERIA: readonly RolCanonica[] = ['TESORERIA'];
 
 export const RUTAS_PERSONALES_CIUDADANO = [
+  '/mi-perfil',
   '/mis-expedientes',
   '/casilla',
   '/casilla-electronica',
@@ -48,6 +55,7 @@ export function normalizarRuta(pathname: string): string {
 export function esRutaPersonalCiudadano(pathname: string): boolean {
   const ruta = normalizarRuta(pathname);
   return (
+    ruta === '/mi-perfil' ||
     ruta === '/mis-expedientes' || ruta.startsWith('/mis-expedientes/') ||
     ruta === '/casilla' || ruta.startsWith('/casilla/') ||
     ruta === '/casilla-electronica' || ruta.startsWith('/casilla-electronica/')
@@ -61,13 +69,13 @@ export function rolesPermitidosParaRuta(pathname: string): readonly RolCanonica[
   if (
     esRutaPersonalCiudadano(ruta) ||
     ruta === '/tramite' ||
-    ruta === '/tramite/mesa-partes-virtual' ||
-    ruta === '/tramite/mesa-partes' ||
-    ruta === '/mesa-partes'
+    ruta === '/tramite/nuevo' ||
+    ruta === '/tramite/mesa-partes-virtual'
   ) {
     return ROLES_CIUDADANO;
   }
   if (ruta === '/expedientes' || ruta.startsWith('/expedientes/')) return ROLES_INSTITUCIONALES;
+  if (ruta === '/tesoreria' || ruta.startsWith('/tesoreria/')) return ROLES_TESORERIA;
   if (ruta === '/reportes' || ruta.startsWith('/reportes/')) return ROLES_REPORTES;
   if (
     ruta === '/administracion' ||
@@ -81,48 +89,139 @@ export function rolesPermitidosParaRuta(pathname: string): readonly RolCanonica[
   return null;
 }
 
-export function canAccessRoute(rol: RolCanonica, pathname: string): boolean {
+export type ContextoOperativo = 'PERSONAL' | 'INSTITUCIONAL';
+
+export interface AccesoRouteOptions {
+  contexto?: ContextoOperativo;
+  perfiles?: string[];
+  permisos?: string[];
+}
+
+export function canAccessRoute(
+  rol: RolCanonica,
+  pathname: string,
+  contextoOrOptions?: ContextoOperativo | AccesoRouteOptions,
+  perfilesLegacy?: string[]
+): boolean {
   const ruta = normalizarRuta(pathname);
 
-  // 1. Aislamiento estricto de vistas personales ciudadanas (mis expedientes, casilla electrónica)
+  const options: AccesoRouteOptions =
+    typeof contextoOrOptions === 'object' && contextoOrOptions !== null
+      ? contextoOrOptions
+      : {
+          contexto: contextoOrOptions,
+          perfiles: perfilesLegacy,
+        };
+
+  const { contexto, perfiles } = options;
+
+  // 1. Si se evalúa explícitamente bajo contexto PERSONAL (Regla 8 y 9 Fase 5H)
+  if (contexto === 'PERSONAL') {
+    // Permite rutas públicas y personales ciudadanas
+    if (
+      esRutaPersonalCiudadano(ruta) ||
+      ruta === '/tramite' ||
+      ruta === '/tramite/nuevo' ||
+      ruta === '/tramite/mesa-partes-virtual' ||
+      ruta === '/mesa-partes' ||
+      ruta === '/' ||
+      ruta === '/tupa' ||
+      ruta === '/consulta' ||
+      ruta.startsWith('/consulta/') ||
+      ruta === '/validador-cvd' ||
+      ruta === '/flujo-validez-legal' ||
+      ruta === '/solicitud-acceso-tupa' ||
+      ruta === '/login' ||
+      ruta === '/registro' ||
+      ruta === '/acceso-denegado'
+    ) {
+      return true;
+    }
+    // Bloqueo estricto de cualquier módulo institucional en contexto PERSONAL
+    return false;
+  }
+
+  // 2. Si se evalúa explícitamente bajo contexto INSTITUCIONAL (Regla 10 Fase 5H)
+  if (contexto === 'INSTITUCIONAL') {
+    // Excluido de la creación ciudadana en /tramite
+    if (ruta === '/tramite' || ruta === '/tramite/nuevo' || ruta === '/tramite/mesa-partes-virtual') {
+      return false;
+    }
+    // Aislamiento estricto de vistas personales ciudadanas (debe cambiar a PERSONAL)
+    if (esRutaPersonalCiudadano(ruta)) {
+      return false;
+    }
+
+    // Regla PM-5H-21 / PM-5H-22: Módulo de Tesorería requiere capacidad explícita
+    if (ruta === '/tesoreria' || ruta.startsWith('/tesoreria/')) {
+      if (perfiles?.includes('GESTOR_TESORERIA')) return true;
+      return rol === 'TESORERIA';
+    }
+
+    if (rol === 'ADMINISTRADOR' || rol === 'SUPERADMINISTRADOR') {
+      return true;
+    }
+    const permitidos = rolesPermitidosParaRuta(ruta);
+    if (permitidos === null) return true;
+    return permitidos.includes(rol);
+  }
+
+  // 3. Fallback canónico sin contexto explícito (compatibilidad total)
+  // Aislamiento estricto de vistas personales ciudadanas
   if (esRutaPersonalCiudadano(ruta)) {
     return rol === 'CIUDADANO';
   }
 
-  // 2. ADMINISTRADOR: rol institucional superior. Acceso irrestricto a todos los módulos institucionales y públicos.
-  // Queda excluido de la creación ciudadana en /tramite (el administrador utiliza Ventanilla Presencial).
-  if (rol === 'ADMINISTRADOR') {
-    if (ruta === '/tramite' || ruta === '/tramite/mesa-partes-virtual' || ruta === '/tramite/mesa-partes' || ruta === '/mesa-partes') {
+  // Módulo de Tesorería en fallback: requiere GESTOR_TESORERIA o rol TESORERIA
+  if (ruta === '/tesoreria' || ruta.startsWith('/tesoreria/')) {
+    if (perfiles?.includes('GESTOR_TESORERIA')) return true;
+    return rol === 'TESORERIA';
+  }
+
+  // ADMINISTRADOR / SUPERADMINISTRADOR: roles institucionales superiores técnicos
+  if (rol === 'ADMINISTRADOR' || rol === 'SUPERADMINISTRADOR') {
+    if (ruta === '/tramite' || ruta === '/tramite/nuevo' || ruta === '/tramite/mesa-partes-virtual') {
       return false;
     }
     return true;
   }
 
-  // 3. Demás roles: verificar lista canónica de permitidos
+  // Demás roles: verificar lista canónica de permitidos
   const permitidos = rolesPermitidosParaRuta(ruta);
   if (permitidos === null) return true;
   return permitidos.includes(rol);
 }
 
 /**
- * Menú de navegación pública para usuarios no autenticados.
+ * Menú de navegación pública para usuarios no autenticados (Diseño Aprobado SIGD).
  */
 export const NAV_ITEMS_PUBLICOS: readonly NavItem[] = [
   { etiqueta: 'Inicio', ruta: '/' },
-  { etiqueta: 'Consulta CUT', ruta: '/consulta' },
-  { etiqueta: 'Validador CVD', ruta: '/validador-cvd' },
-  { etiqueta: 'Flujo Validez Legal', ruta: '/flujo-validez-legal' },
-  { etiqueta: 'Registro', ruta: '/registro' },
-  { etiqueta: 'Iniciar Sesión', ruta: '/login' },
+  { etiqueta: 'Trámites', ruta: '/mesa-partes' },
+  { etiqueta: 'Consultar CUT', ruta: '/consulta' },
+  { etiqueta: 'Ayuda', ruta: '/transparencia/normativa' },
+  { etiqueta: 'Ingresar', ruta: '/login' },
 ];
 
 /**
  * Menú de navegación segmentado por cada rol canónico autenticado.
  */
 export const NAV_ITEMS_POR_ROL: Record<RolCanonica, readonly NavItem[]> = {
+  SUPERADMINISTRADOR: [
+    { etiqueta: 'Inicio', ruta: '/' },
+    { etiqueta: 'Panel de Administración', ruta: '/administracion' },
+    { etiqueta: 'Directorio de Usuarios', ruta: '/administracion/usuarios' },
+    { etiqueta: 'Roles y Permisos', ruta: '/administracion/roles-permisos' },
+    { etiqueta: 'Auditoría Técnica', ruta: '/administracion/auditoria' },
+    { etiqueta: 'Gestión TUPA', ruta: '/administracion/tupa' },
+    { etiqueta: 'Tablas Maestras', ruta: '/administracion/tablas-maestras' },
+    { etiqueta: 'Calendario Laboral', ruta: '/calendarizacion-institucional' },
+    { etiqueta: 'Reportes Directivos', ruta: '/reportes/dashboard' },
+    { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
+  ],
   CIUDADANO: [
     { etiqueta: 'Inicio', ruta: '/' },
-    { etiqueta: 'Nuevo Trámite', ruta: '/solicitud-acceso-tupa' },
+    { etiqueta: 'Nuevo Trámite', ruta: '/mesa-partes' },
     { etiqueta: 'Mis Expedientes', ruta: '/mis-expedientes' },
     { etiqueta: 'Casilla Electrónica', ruta: '/casilla' },
     { etiqueta: 'Consulta CUT', ruta: '/consulta' },
@@ -162,6 +261,12 @@ export const NAV_ITEMS_POR_ROL: Record<RolCanonica, readonly NavItem[]> = {
     { etiqueta: 'Calendario Laboral', ruta: '/calendarizacion-institucional' },
     { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
   ],
+  TESORERIA: [
+    { etiqueta: 'Inicio', ruta: '/' },
+    { etiqueta: 'Módulo Tesorería', ruta: '/tesoreria' },
+    { etiqueta: 'Catálogo TUPA', ruta: '/tupa' },
+    { etiqueta: 'Consulta CUT', ruta: '/consulta' },
+  ],
 };
 
 /**
@@ -200,7 +305,7 @@ export const MODULOS_HOME_PUBLICOS: readonly ModuloHomeItem[] = [
   {
     id: 'registro-ciudadano',
     titulo: 'Registro Ciudadano',
-    subtitulo: 'ENT-M01-01 / ENT-M01-02',
+    subtitulo: 'Registro de Usuario Externo',
     descripcion:
       'Registro de personas naturales y jurídicas con validación RENIEC / SUNAT y Ubigeo Ucayali.',
     ruta: '/registro',
@@ -211,7 +316,7 @@ export const MODULOS_HOME_PUBLICOS: readonly ModuloHomeItem[] = [
   {
     id: 'validador-cvd',
     titulo: 'Validador CVD',
-    subtitulo: 'MOD-04 / Verificación',
+    subtitulo: 'Verificación de Autenticidad',
     descripcion:
       'Valida la autenticidad e integridad de documentos firmados digitalmente mediante el Código de Verificación.',
     ruta: '/validador-cvd',
@@ -222,7 +327,7 @@ export const MODULOS_HOME_PUBLICOS: readonly ModuloHomeItem[] = [
   {
     id: 'flujo-validez-legal',
     titulo: 'Flujo y Validez Legal',
-    subtitulo: 'MOD-04 / Firma Digital',
+    subtitulo: 'Firma Digital e Integridad',
     descripcion:
       'Demostración técnica del flujo de firma digital e integridad criptográfica.',
     ruta: '/flujo-validez-legal',
@@ -335,7 +440,7 @@ export const MODULOS_HOME_INSTITUCIONAL: readonly ModuloHomeItem[] = [
     badge: 'Requiere rol institucional',
     ctaPublico: 'Acceso con rol asignado',
     ctaAutenticado: 'Ingresar a administración',
-    rolesPermitidos: ['ADMINISTRADOR'],
+    rolesPermitidos: ['ADMINISTRADOR', 'SUPERADMINISTRADOR'],
   },
   {
     id: 'reportes-tableros',
@@ -348,6 +453,6 @@ export const MODULOS_HOME_INSTITUCIONAL: readonly ModuloHomeItem[] = [
     badge: 'Requiere rol institucional',
     ctaPublico: 'Acceso con rol asignado',
     ctaAutenticado: 'Ver tablero directivo',
-    rolesPermitidos: ['DIRECTOR', 'ADMINISTRADOR'],
+    rolesPermitidos: ['DIRECTOR', 'ADMINISTRADOR', 'SUPERADMINISTRADOR'],
   },
 ];

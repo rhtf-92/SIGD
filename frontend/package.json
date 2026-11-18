@@ -23,6 +23,7 @@
     "@tanstack/react-query": "^5.83.0",
     "axios": "^1.11.0",
     "lucide-react": "^1.46.0",
+    "pdf-lib": "^1.17.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useAuthStore } from "../stores/authStore";
 
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
@@ -15,6 +16,7 @@ import {
   ROLES_CIUDADANO,
   ROLES_INSTITUCIONALES,
   ROLES_REPORTES,
+  ROLES_TESORERIA,
   ROLES_VENTANILLA,
 } from "../config/navigation.config";
 
@@ -31,14 +33,34 @@ const CasillaElectronicaPage = lazy(() => import("../pages/casilla/CasillaElectr
 const BandejaExpedientesPage = lazy(() => import("../pages/expedientes/BandejaExpedientesPage"));
 const ExpedienteDetallePage = lazy(() => import("../pages/expedientes/ExpedienteDetallePage"));
 const VentanillaPresencialPage = lazy(() => import("../pages/tramite/VentanillaPresencialPage"));
-const TramitePage = lazy(() => import("../pages/tramite/TramitePage"));
 const MisExpedientesPage = lazy(() => import("../pages/tramite/MisExpedientesPage"));
+const MiPerfilPage = lazy(() => import("../pages/tramite/MiPerfilPage"));
+const TesoreriaPage = lazy(() => import("../pages/tesoreria/TesoreriaPage"));
+const MesaPartesDigitalPage = lazy(() => import("../pages/tramite/MesaPartesDigitalPage"));
 
 const withSuspense = (Component: React.ComponentType) => (
   <Suspense fallback={<RouteLoadingFallback />}>
     <Component />
   </Suspense>
 );
+
+function RutaTramiteCompatible() {
+  const location = useLocation();
+  const usuario = useAuthStore((s) => s.usuario);
+  const contextoActivo = useAuthStore((s) => s.contextoActivo);
+
+  // Aislamiento estricto de contextos: si está autenticado en contexto institucional, denegar acceso a trámites personales
+  if (
+    usuario &&
+    (usuario.contexto === 'INSTITUCIONAL' ||
+      contextoActivo === 'INSTITUCIONAL' ||
+      (usuario.rol && usuario.rol !== 'CIUDADANO' && usuario.contexto !== 'PERSONAL'))
+  ) {
+    return <Navigate to="/acceso-denegado" replace />;
+  }
+
+  return <Navigate to={`/mesa-partes${location.search}`} replace state={location.state} />;
+}
 
 export default function AppRouter() {
   return (
@@ -53,32 +75,18 @@ export default function AppRouter() {
         <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
         <Route path="/validador-cvd" element={withSuspense(ValidadorPublicoCvdPage)} />
         <Route path="/flujo-validez-legal" element={withSuspense(FlujoValidezLegalPage)} />
-        <Route path="/transparencia" element={withSuspense(TransparenciaLegalPage)} />
+        <Route path="/transparencia" element={<Navigate to="/transparencia/normativa" replace />} />
         <Route path="/transparencia/:seccion" element={withSuspense(TransparenciaLegalPage)} />
         <Route path="/solicitud-acceso-tupa" element={withSuspense(SolicitudAccesoTupaPage)} />
         <Route path="/tupa" element={<CatalogoTupaPage />} />
+        <Route path="/mesa-partes" element={withSuspense(MesaPartesDigitalPage)} />
+        <Route path="/mesa-partes-digital" element={<Navigate to="/mesa-partes" replace />} />
 
-        {/* 2. Módulos del Ciudadano Autenticado */}
-        <Route
-          path="/tramite"
-          element={
-            <ProtectedRoute requiredRoles={ROLES_CIUDADANO}>
-              {withSuspense(TramitePage)}
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tramite/mesa-partes-virtual"
-          element={<Navigate to="/tramite" replace />}
-        />
-        <Route
-          path="/tramite/mesa-partes"
-          element={<Navigate to="/tramite" replace />}
-        />
-        <Route
-          path="/mesa-partes"
-          element={<Navigate to="/tramite" replace />}
-        />
+        {/* 2. Rutas Compatibles de Radicación Digital y Módulos Ciudadanos */}
+        <Route path="/tramite" element={<RutaTramiteCompatible />} />
+        <Route path="/tramite/nuevo" element={<RutaTramiteCompatible />} />
+        <Route path="/tramite/mesa-partes-virtual" element={<RutaTramiteCompatible />} />
+        <Route path="/tramite/mesa-partes" element={<RutaTramiteCompatible />} />
 
         <Route
           path="/mis-expedientes"
@@ -88,6 +96,10 @@ export default function AppRouter() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/mi-perfil" element={
+          <ProtectedRoute requiredRoles={ROLES_CIUDADANO}>{withSuspense(MiPerfilPage)}</ProtectedRoute>
+        } />
 
         <Route
           path="/casilla"
@@ -130,6 +142,16 @@ export default function AppRouter() {
           element={
             <ProtectedRoute requiredRoles={ROLES_INSTITUCIONALES}>
               {withSuspense(ExpedienteDetallePage)}
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 4.1 Módulo de Tesorería */}
+        <Route
+          path="/tesoreria"
+          element={
+            <ProtectedRoute requiredRoles={ROLES_TESORERIA}>
+              {withSuspense(TesoreriaPage)}
             </ProtectedRoute>
           }
         />

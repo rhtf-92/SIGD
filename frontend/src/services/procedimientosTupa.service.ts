@@ -240,3 +240,58 @@ function normalizarTextoParaBusqueda(txt: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+export type TipoRequisitoTupa = 'DOCUMENTAL' | 'FINANCIERO' | 'DECLARATIVO' | 'INTERNO' | 'AMBIGUO';
+
+export interface DtoAnexoTupa {
+  idAnexo: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+  version?: string;
+  nombreArchivo?: string;
+  mimeType?: string;
+  tamanoBytes?: number;
+  esDescargable?: boolean;
+  activo?: boolean;
+}
+
+export interface DtoRequisitoTupa {
+  idRequisito: string;
+  idProcedimiento: string;
+  registroVersionId: string | null;
+  nombre: string;
+  descripcion: string | null;
+  tipoRequisito: TipoRequisitoTupa;
+  esAnexoDigital: boolean;
+  obligatorio: boolean;
+  orden: number;
+  formatosPermitidos: string;
+  activo: boolean;
+  fuenteOriginal: string;
+  idAnexo?: string | null;
+  anexo?: DtoAnexoTupa | null;
+}
+
+export interface DtoRequisitosProcedimiento {
+  procedimientoId: string;
+  codigoRef: string;
+  denominacion: string;
+  generaExpediente: boolean;
+  totalRequisitos: number;
+  totalAnexosDigitales: number;
+  totalAnexosObligatorios: number;
+  requisitos: DtoRequisitoTupa[];
+  anexosDigitales: DtoRequisitoTupa[];
+}
+
+export async function obtenerRequisitosProcedimiento(
+  identificador: string,
+  signal?: AbortSignal,
+): Promise<DtoRequisitosProcedimiento> {
+  const respuesta = await apiClient.get<DtoRequisitosProcedimiento>(
+    `/api/v1/tramites/tupa/procedimientos/${encodeURIComponent(identificador)}/requisitos`,
+    { signal },
+  );
+  return respuesta.data;
+}

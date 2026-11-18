@@ -17,6 +17,7 @@ export type Natural = {
   fechaNacimiento: string; // validar edad >= 16 años (calculada dinámicamente)
   correo: string; // formato RFC 5322 válido
   celular: string; // exactamente 9 dígitos empezando en 9
+  username: string;
   password: string;
   confirmarPassword: string;
   domicilio: Address;
@@ -43,6 +44,7 @@ export type Juridical = {
   partidaSunarp: string;
   correoCorporativo: string; // formato RFC 5322 válido
   celularContacto: string; // exactamente 9 dígitos empezando en 9
+  username: string;
   password: string;
   confirmarPassword: string;
   domicilio: Address;

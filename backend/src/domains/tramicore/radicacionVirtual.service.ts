@@ -1,0 +1,608 @@
+import { createHash, randomUUID } from 'node:crypto';
+import type { Pool, PoolClient } from 'pg';
+import { ConflictError, NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
+import { CutService } from './cut.service.js';
+import { calcularHorarioCorte, type ResultadoHorarioCorte } from './horarioCorte.util.js';
+import type { RadicacionVirtualInput } from './tramites.schemas.js';
+import type { DtoContextoTupa } from './tupaVersionado.service.js';
+import { TesoreriaRepository } from '../tesoreria/tesoreria.repository.js';
+import { calcularVencimientoOrdenPago } from '../tesoreria/tesoreria.service.js';
+import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
+import { TupaRequisitosService } from './tupaRequisitos.service.js';
+import { TupaVersionRepository } from './tupaVersion.repository.js';
+import { WorkflowService } from '../rutadoc/workflow.service.js';
+
+/**
+ * T-BE-TC-02 y T-BE-TC-03 — Logica de negocio de la radicacion virtual
+ * (Mesa de Partes Virtual 24x7, endpoint #14), adaptada al DDL ejecutable
+ * 05_sigd_tra.sql y a la migracion TUPA 08_sigd_tupa_acoplamiento.sql.
+ *
+ * Garantias que ofrece este servicio:
+ *   * La asignacion del CUT ocurre DENTRO de la misma transaccion que la
+ *     escritura del expediente. Si algo posterior falla, el ROLLBACK libera el
+ *     correlativo y no se quema un numero que el ciudadano nunca vio.
+ *   * `fecha_envio_real` (metadato pericial) y `fecha_radicacion_legal` (inicio
+ *     del computo de plazos, Art. 138 LPAG) se calculan en `horarioCorte.util.ts`.
+ *     La fecha legal se persiste en `sigd_tra.expediente.fecha_radicacion` y la
+ *     fecha de envio real en `sigd_tra.asiento_registro.fecha_ingreso`; ambos
+ *     timestamps fisicos permiten reconstruir `fuera_de_horario`.
+ *   * Cabecera, tramite, asiento y vinculo TUPA se escriben en UNA sola
+ *     transaccion: cualquier fallo produce ROLLBACK total y no deja expediente
+ *     huerfano ni escrituras parciales.
+ *   * El vinculo TUPA solo se crea con una version APROBADA de
+ *     sigd_doc.tupa_registro_version; el trigger de la base revalida la regla.
+ *   * Flujo libre: si registroVersionId es nulo o ausente, la radicación procede
+ *     normalmente sin crear fila en sigd_doc.expediente_tupa_vinculo.
+ */
+
+export interface ResultadoRadicacion {
+  expedienteId: string;
+  tipoDocumentalId: string;
+  cut: string;
+  anio: number;
+  fechaEnvioReal: string;
+  fechaRadicacionLegal: string;
+  fueraDeHorario: boolean;
+  mensajeLegal: string;
+  totalFolios: number;
+  registroVersionId?: string | null;
+  cargoDigital: {
+    codigo: string;
+    hashSha256: string;
+    qrContenido: string;
+  };
+}
+
+export interface DtoDetalleExpediente {
+  expedienteId: string;
+  cut: string;
+  codigoExpediente: string;
+  numero: string;
+  asunto: string;
+  dniSolicitante: string | null;
+  solicitanteId: string;
+  tipoDocumentalId: string;
+  areaDestinoId: string | null;
+  estado: string;
+  fechaRadicacion: string;
+  canalIngreso: string | null;
+  tupa: DtoContextoTupa | null;
+}
+
+interface FilaExpediente {
+  expediente_id: string;
+}
+
+interface FilaTramiteTupa {
+  vigente: boolean;
+}
+
+interface FilaTipoDocumental {
+  vigente: boolean;
+}
+
+interface FilaPersona {
+  id_persona: string;
+  id_documento: string;
+}
+
+interface FilaVersionTupa {
+  registro_version_id: string;
+  estado_validacion: string;
+  vigencia_desde: Date | string | null;
+  vigencia_hasta: Date | string | null;
+}
+
+const REGEX_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Origen del calendario de feriados. Inyectable para poder testear sin BD. */
+export type ProveedorFeriados = () => Promise<string[]>;
+
+export class RadicacionVirtualService {
+  private readonly cutService: CutService;
+  private readonly tesoreriaRepository = new TesoreriaRepository();
+  private readonly tupaRequisitosService: TupaRequisitosService;
+  private readonly tupaVersionRepository: TupaVersionRepository;
+  private readonly workflowService: WorkflowService;
+  private readonly obtenerFeriados: ProveedorFeriados;
+
+  constructor(private readonly pool: Pool, obtenerFeriados?: ProveedorFeriados) {
+    this.cutService = new CutService(pool);
+    this.obtenerFeriados = obtenerFeriados ?? crearProveedorFeriados(pool);
+    this.tupaRequisitosService = new TupaRequisitosService(pool);
+    this.tupaVersionRepository = new TupaVersionRepository(pool);
+    this.workflowService = new WorkflowService(pool);
+  }
+
+  async radicar(datos: RadicacionVirtualInput, now: Date = new Date()): Promise<ResultadoRadicacion> {
+    const cliente = await this.pool.connect();
+    let transaccionAbierta = false;
+
+    try {
+      await cliente.query('BEGIN');
+      transaccionAbierta = true;
+
+      if (datos.idTipoTramiteTupa) {
+        await this.verificarTipoTramite(cliente, datos.idTipoTramiteTupa);
+      }
+
+      let tipoDocId = datos.tipoDocumentalId;
+      if (!tipoDocId) {
+        const defaultDoc = await cliente.query<{ tipo_documental_id: string }>(
+          `SELECT tipo_documental_id FROM sigd_doc.tipo_documento WHERE vigente = TRUE ORDER BY codigo ASC LIMIT 1`,
+        );
+        if (!defaultDoc.rows[0]) {
+          throw new ValidationError({
+            invalidParams: [
+              { name: 'tipoDocumentalId', reason: 'TIPO_DOCUMENTAL_REQUERIDO: la radicacion exige un tipo documental vigente.' },
+            ],
+          });
+        }
+        tipoDocId = defaultDoc.rows[0].tipo_documental_id;
+      } else {
+        await this.verificarTipoDocumental(cliente, tipoDocId);
+      }
+
+      const persona = await this.verificarAdministrado(cliente, datos.idPersona);
+
+      if (datos.registroVersionId) {
+        await this.verificarVersionTupa(cliente, datos.registroVersionId, now);
+        await this.tupaRequisitosService.validarRequisitosObligatorios(
+          datos.registroVersionId,
+          (datos.documentos ?? []).map((d) => ({
+            idRequisito: d.idRequisito ?? undefined,
+            nombreArchivo: d.nombreArchivo,
+          })),
+          cliente,
+        );
+      }
+
+      const [{ cut, anio }, horario] = await Promise.all([
+        this.cutService.generar(anioDeRecepcion(now), cliente),
+        this.evaluarHorario(now),
+      ]);
+
+      const expediente = await this.insertarExpediente(
+        cliente, datos, persona, tipoDocId, cut, horario,
+      );
+      await this.insertarTramite(cliente, expediente.expediente_id, datos.asunto);
+      await this.insertarAsiento(cliente, expediente.expediente_id, persona, datos.asunto, horario, datos.canalIngreso ?? 'MESA_VIRTUAL');
+
+      let ordenPagoCreadaId: string | undefined;
+      if (datos.registroVersionId) {
+        await this.insertarVinculoTupa(cliente, expediente.expediente_id, datos.registroVersionId);
+        await this.workflowService.vincularInstanciaExpediente(expediente.expediente_id, datos.registroVersionId, cliente);
+        const contextoPago = await this.tesoreriaRepository.obtenerContextoExpedienteParaPago(cliente, expediente.expediente_id);
+        if (!contextoPago) throw new Error('No se pudo resolver el costo TUPA del expediente radicado.');
+        if (contextoPago.costoOficial > 0) {
+          const codigoPago = await this.tesoreriaRepository.obtenerSiguienteCodigoPago(cliente, now.getFullYear());
+          const orden = await this.tesoreriaRepository.insertarOrdenPago(cliente, {
+            codigoPago,
+            expedienteId: expediente.expediente_id,
+            registroVersionId: contextoPago.registroVersionId,
+            solicitanteId: contextoPago.solicitanteId,
+            concepto: contextoPago.concepto,
+            codigoTupa: contextoPago.codigoTupa,
+            monto: contextoPago.costoOficial,
+            moneda: 'PEN',
+            fechaVencimiento: calcularVencimientoOrdenPago(now),
+          });
+          ordenPagoCreadaId = orden.orden_pago_id;
+          await cliente.query(
+            `UPDATE sigd_tra.expediente SET estado = 'PENDIENTE_PAGO'
+              WHERE expediente_id = $1::uuid AND estado = 'REGISTRADO'`,
+            [expediente.expediente_id],
+          );
+          await registrarMutacion(cliente, {
+            esquema: 'sigd_tra', tabla: 'orden_pago', operacion: 'INSERT',
+            datos_despues: { ordenPagoId: orden.orden_pago_id, codigoPago, expedienteId: expediente.expediente_id,
+              monto: contextoPago.costoOficial, fechaVencimiento: orden.fecha_vencimiento },
+          });
+        }
+
+        // Registrar evidencias documentales asociadas a requisitos (Fase 5F)
+        if (datos.documentos && datos.documentos.length > 0) {
+          let maxFolioAcc = 0;
+          for (const doc of datos.documentos) {
+            if (doc.idRequisito) {
+              const resAdj = await cliente.query<{ documento_adjunto_id: string }>(
+                `INSERT INTO sigd_doc.documento_adjunto (
+                   documento_adjunto_id, expediente_tra_id, tipo_documental_id, nombre_archivo,
+                   s3_bucket, s3_key, sha256, tamano_bytes, mime_type, magic_bytes, subido_por, id_requisito, creado_en
+                 ) VALUES (
+                   gen_random_uuid(), $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10::uuid, $11::uuid, $12
+                 ) RETURNING documento_adjunto_id;`,
+                [
+                  expediente.expediente_id,
+                  tipoDocId,
+                  doc.nombreArchivo,
+                  'sigd-expedientes',
+                  doc.storagePath ?? `presentados/${expediente.expediente_id}/${doc.nombreArchivo}`,
+                  doc.hashSha256 ?? '0000000000000000000000000000000000000000000000000000000000000000',
+                  doc.tamanoBytes ?? 1024,
+                  doc.contentType ?? 'application/pdf',
+                  '25504446',
+                  persona.id_persona,
+                  doc.idRequisito,
+                  horario.radicacionLegal,
+                ],
+              );
+              const idDocAdjunto = resAdj.rows[0]?.documento_adjunto_id;
+
+              if (idDocAdjunto) {
+                const numPaginasDoc = Math.max(1, datos.totalFolios && datos.documentos.length === 1 ? datos.totalFolios : 1);
+                const folioInicio = maxFolioAcc + 1;
+                const folioFin = folioInicio + numPaginasDoc - 1;
+                maxFolioAcc = folioFin;
+
+                await cliente.query(
+                  `INSERT INTO sigd_tra.expediente_documento_folio (
+                     id_folio, expediente_id, id_documento, folio_inicio, folio_fin, asignado_por, creado_en
+                   ) VALUES (
+                     gen_random_uuid(), $1::uuid, $2::uuid, $3, $4, $5::uuid, $6
+                   );`,
+                  [expediente.expediente_id, idDocAdjunto, folioInicio, folioFin, persona.id_persona, horario.radicacionLegal],
+                );
+              }
+
+              await this.tupaRequisitosService.registrarEvidencia(
+                {
+                  expedienteId: expediente.expediente_id,
+                  idRequisito: doc.idRequisito,
+                  tipoEvidencia: 'DOCUMENTO',
+                  documentoAdjuntoId: idDocAdjunto,
+                  idPersona: persona.id_persona,
+                  idUsuario: datos.idUsuarioCreador ?? null,
+                  canal: 'VIRTUAL',
+                  estadoValidacion: 'PRESENTADO',
+                },
+                cliente,
+              );
+            }
+          }
+        }
+
+        // Si se generó orden de pago, asociar automáticamente al requisito FINANCIERO del procedimiento (Fase 5F)
+        if (ordenPagoCreadaId) {
+          const reqFinanciero = await cliente.query<{ id_requisito: string }>(
+            `SELECT id_requisito FROM sigd_doc.tupa_requisito_documental
+              WHERE (id_procedimiento = $1::uuid OR registro_version_id = $1::uuid)
+                AND tipo_requisito = 'FINANCIERO'
+                AND activo = true
+              LIMIT 1`,
+            [datos.registroVersionId],
+          );
+          if (reqFinanciero.rows[0]) {
+            await this.tupaRequisitosService.registrarEvidencia(
+              {
+                expedienteId: expediente.expediente_id,
+                idRequisito: reqFinanciero.rows[0].id_requisito,
+                tipoEvidencia: 'PAGO',
+                ordenPagoId: ordenPagoCreadaId,
+                idPersona: persona.id_persona,
+                idUsuario: datos.idUsuarioCreador ?? null,
+                canal: 'VIRTUAL',
+                estadoValidacion: 'PENDIENTE',
+              },
+              cliente,
+            );
+          }
+        }
+      }
+      const cargo = this.emitirCargoDigital(expediente.expediente_id, datos, now);
+
+      await cliente.query('COMMIT');
+      transaccionAbierta = false;
+
+      return {
+        expedienteId: expediente.expediente_id,
+        tipoDocumentalId: tipoDocId,
+        cut,
+        anio,
+        fechaEnvioReal: horario.envioReal.toISOString(),
+        fechaRadicacionLegal: horario.radicacionLegal.toISOString(),
+        fueraDeHorario: horario.requiereProyeccion,
+        mensajeLegal: redactarMensajeLegal(horario),
+        totalFolios: datos.totalFolios,
+        registroVersionId: datos.registroVersionId ?? null,
+        cargoDigital: cargo,
+      };
+    } catch (error) {
+      if (transaccionAbierta) await cliente.query('ROLLBACK');
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  async obtenerDetalleExpediente(expedienteId: string): Promise<DtoDetalleExpediente> {
+    if (!expedienteId || !REGEX_UUID.test(expedienteId)) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'expedienteId', reason: 'El identificador del expediente debe ser un UUID valido.' }],
+      });
+    }
+
+    const cliente = await this.pool.connect();
+    try {
+      const expRes = await cliente.query<{
+        expediente_id: string;
+        codigo_expediente: string;
+        numero: string;
+        dni_solicitante: string | null;
+        tipo_documental_id: string;
+        solicitante_id: string;
+        area_destino_id: string | null;
+        estado: string;
+        fecha_radicacion: Date;
+        asunto: string | null;
+        canal_ingreso: string | null;
+      }>(
+        `SELECT e.expediente_id, e.codigo_expediente, e.numero, e.dni_solicitante,
+                e.tipo_documental_id, e.solicitante_id, e.area_destino_id,
+                e.estado, e.fecha_radicacion,
+                t.asunto,
+                ar.canal_ingreso
+           FROM sigd_tra.expediente e
+           LEFT JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
+           LEFT JOIN sigd_tra.asiento_registro ar ON ar.expediente_id = e.expediente_id
+          WHERE e.expediente_id = $1::uuid
+          LIMIT 1`,
+        [expedienteId],
+      );
+
+      const exp = expRes.rows[0];
+      if (!exp) {
+        throw new NotFoundError({
+          detail: `No existe un expediente con el identificador ${expedienteId}.`,
+        });
+      }
+
+      const vinculoRes = await cliente.query<{
+        registro_version_id: string;
+        codigo_externo: string | null;
+        denominacion_original: string;
+        monto_original: string | null;
+        requisitos_original: unknown | null;
+        fuente_nombre: string;
+        pagina: number;
+        revision: number;
+        version_fuente: string | null;
+        estado_validacion: string;
+        vinculado_en: Date;
+      }>(
+        `SELECT rv.registro_version_id, rv.codigo_externo, rv.denominacion_original,
+                rv.monto_original, rv.requisitos_original, rv.fuente_nombre,
+                rv.pagina, rv.revision, rv.version_fuente, rv.estado_validacion,
+                v.vinculado_en
+           FROM sigd_doc.expediente_tupa_vinculo v
+           JOIN sigd_doc.tupa_registro_version rv ON rv.registro_version_id = v.registro_version_id
+          WHERE v.expediente_id = $1::uuid
+            AND v.reemplaza_vinculo_id IS NULL
+          ORDER BY v.vinculado_en DESC, v.vinculo_id DESC
+          LIMIT 1`,
+        [expedienteId],
+      );
+
+      const v = vinculoRes.rows[0];
+      const tupa: DtoContextoTupa | null = v
+        ? {
+            registroVersionId: v.registro_version_id,
+            codigoExterno: v.codigo_externo,
+            codigo: v.codigo_externo,
+            denominacion: v.denominacion_original,
+            monto: v.monto_original,
+            requisitos: Array.isArray(v.requisitos_original) ? (v.requisitos_original as unknown[]) : null,
+            fuente: v.fuente_nombre,
+            pagina: v.pagina,
+            revision: v.revision,
+            version: v.version_fuente,
+            estadoValidacion: v.estado_validacion,
+            vinculadoEn: v.vinculado_en.toISOString(),
+          }
+        : null;
+
+      return {
+        expedienteId: exp.expediente_id,
+        cut: exp.codigo_expediente,
+        codigoExpediente: exp.codigo_expediente,
+        numero: exp.numero,
+        asunto: exp.asunto ?? '',
+        dniSolicitante: exp.dni_solicitante,
+        solicitanteId: exp.solicitante_id,
+        tipoDocumentalId: exp.tipo_documental_id,
+        areaDestinoId: exp.area_destino_id,
+        estado: exp.estado,
+        fechaRadicacion: exp.fecha_radicacion.toISOString(),
+        canalIngreso: exp.canal_ingreso,
+        tupa,
+      };
+    } finally {
+      cliente.release();
+    }
+  }
+
+  private async evaluarHorario(now: Date): Promise<ResultadoHorarioCorte> {
+    const feriados = await this.obtenerFeriados();
+    return calcularHorarioCorte(now, feriados);
+  }
+
+  private async verificarTipoTramite(cliente: PoolClient, idTipoTramiteTupa: string): Promise<void> {
+    const resultado = await cliente.query<FilaTramiteTupa>(
+      `SELECT vigente
+         FROM sigd_doc.tipo_tramite_tupa
+        WHERE tipo_tramite_id = $1::uuid`,
+      [idTipoTramiteTupa],
+    );
+    const tipo = resultado.rows[0];
+    if (!tipo) {
+      throw new ValidationError({
+        invalidParams: [
+          { name: 'idTipoTramiteTupa', reason: 'TIPO_TRAMITE_DESCONOCIDO: el tramite no existe en el catalogo TUPA.' },
+        ],
+      });
+    }
+    if (!tipo.vigente) {
+      throw new ValidationError({
+        invalidParams: [
+          { name: 'idTipoTramiteTupa', reason: 'TIPO_TRAMITE_INACTIVO: el tramite ya no admite nuevas radicaciones.' },
+        ],
+      });
+    }
+  }
+
+  private async verificarTipoDocumental(cliente: PoolClient, tipoDocumentalId: string): Promise<void> {
+    const resultado = await cliente.query<FilaTipoDocumental>(
+      `SELECT vigente
+         FROM sigd_doc.tipo_documento
+        WHERE tipo_documental_id = $1::uuid`,
+      [tipoDocumentalId],
+    );
+    const tipo = resultado.rows[0];
+    if (!tipo || !tipo.vigente) {
+      throw new ValidationError({
+        invalidParams: [
+          { name: 'tipoDocumentalId', reason: 'TIPO_DOCUMENTAL_INVALIDO: no existe o no esta vigente en sigd_doc.tipo_documento.' },
+        ],
+      });
+    }
+  }
+
+  private async verificarAdministrado(cliente: PoolClient, idPersona: string): Promise<FilaPersona> {
+    const resultado = await cliente.query<FilaPersona>(
+      `SELECT id_persona::text AS id_persona, id_documento
+         FROM sigd_auth.persona
+        WHERE id_persona = $1::uuid`,
+      [idPersona],
+    );
+    const persona = resultado.rows[0];
+    if (!persona) {
+      throw new ValidationError({
+        invalidParams: [
+          { name: 'idPersona', reason: 'ADMINISTRADO_NO_REGISTRADO: el UUID no corresponde a una persona del padron.' },
+        ],
+      });
+    }
+    return persona;
+  }
+
+  private async verificarVersionTupa(cliente: PoolClient, registroVersionId: string, now: Date): Promise<void> {
+    await this.tupaVersionRepository.validarElegibilidadRadicacion(registroVersionId, now, cliente);
+  }
+
+  private async insertarExpediente(
+    cliente: PoolClient,
+    datos: RadicacionVirtualInput,
+    persona: FilaPersona,
+    tipoDocumentalId: string,
+    cut: string,
+    horario: ResultadoHorarioCorte,
+  ): Promise<FilaExpediente> {
+    const resultado = await cliente.query<FilaExpediente>(
+      `INSERT INTO sigd_tra.expediente
+         (codigo_expediente, numero, dni_solicitante, tipo_documental_id,
+          solicitante_id, area_destino_id, estado, fecha_radicacion, id_usuario_creador)
+       VALUES ($1, $1, $2, $3::uuid, $4::uuid, NULL, 'REGISTRADO', $5, $6::uuid)
+       RETURNING expediente_id`,
+      [
+        cut,
+        /^[0-9]{8}$/.test(persona.id_documento) ? persona.id_documento : null,
+        tipoDocumentalId,
+        persona.id_persona,
+        horario.radicacionLegal,
+        datos.idUsuarioCreador ?? null,
+      ],
+    );
+    const expediente = resultado.rows[0];
+    if (!expediente) {
+      throw new Error('La insercion del expediente no devolvio fila.');
+    }
+    return expediente;
+  }
+
+  private async insertarTramite(cliente: PoolClient, expedienteId: string, asunto: string): Promise<void> {
+    await cliente.query(
+      `INSERT INTO sigd_tra.tramite (expediente_id, asunto, estado)
+       VALUES ($1::uuid, $2, 'REGISTRADO')`,
+      [expedienteId, asunto],
+    );
+  }
+
+  private async insertarAsiento(
+    cliente: PoolClient,
+    expedienteId: string,
+    persona: FilaPersona,
+    asunto: string,
+    horario: ResultadoHorarioCorte,
+    canalIngreso: string = 'MESA_VIRTUAL',
+  ): Promise<void> {
+    await cliente.query(
+      `INSERT INTO sigd_tra.asiento_registro
+         (expediente_id, fecha_ingreso, canal_ingreso, asunto, remitente_id)
+       VALUES ($1::uuid, $2, $3, $4, $5::uuid)`,
+      [expedienteId, horario.envioReal, canalIngreso, asunto, persona.id_persona],
+    );
+  }
+
+  private async insertarVinculoTupa(
+    cliente: PoolClient,
+    expedienteId: string,
+    registroVersionId: string,
+  ): Promise<void> {
+    await this.tupaVersionRepository.crearVinculoConSnapshot(
+      expedienteId,
+      registroVersionId,
+      {},
+      cliente,
+    );
+  }
+
+  private emitirCargoDigital(
+    expedienteId: string,
+    datos: RadicacionVirtualInput,
+    now: Date,
+  ): ResultadoRadicacion['cargoDigital'] {
+    const codigo = `CARGO-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const contenido = JSON.stringify({
+      codigo,
+      expedienteId,
+      totalFolios: datos.totalFolios,
+      emitidoEn: now.toISOString(),
+    });
+    const hashSha256 = createHash('sha256').update(contenido).digest('hex');
+    const qrContenido = `SIGD://cargo/${codigo}?h=${hashSha256.slice(0, 16)}`;
+
+    return { codigo, hashSha256, qrContenido };
+  }
+}
+
+function anioDeRecepcion(now: Date): number {
+  return CutService.anioFiscalCorriente(now);
+}
+
+function redactarMensajeLegal(horario: ResultadoHorarioCorte): string {
+  if (!horario.requiereProyeccion) {
+    return 'Radicacion dentro del horario de atencion. El computo de plazos comienza de inmediato.';
+  }
+  if (horario.diaNoHabil) {
+    return `Recibido en dia no habil. Por Art. 138 de la LPAG el computo de plazos comienza el ${horario.fechaLegal} a las 08:00.`;
+  }
+  return `Recibido despues del corte de las 16:30. Por Art. 138 de la LPAG el computo de plazos comienza el ${horario.fechaLegal} a las 08:00.`;
+}
+
+export function crearProveedorFeriados(pool: Pool): ProveedorFeriados {
+  return async function obtenerFeriados(): Promise<string[]> {
+    const cliente = await pool.connect();
+    try {
+      const resultado = await cliente.query<{ fecha: string }>(
+        `SELECT to_char(fecha, 'YYYY-MM-DD') AS fecha
+           FROM sigd_org.calendario_laboral
+          WHERE es_feriado = TRUE`,
+      );
+      return resultado.rows.map((fila) => fila.fecha);
+    } catch {
+      return [];
+    } finally {
+      cliente.release();
+    }
+  };
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { obtenerPool, cerrarPool } from '../helpers/database.helper.js';
+import { obtenerPool, cerrarPool, restaurarBaseE2E } from '../helpers/database.helper.js';
 import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
 
@@ -31,6 +31,7 @@ describe('Concurrencia · OutboxWorker', () => {
   let pool: Pool;
 
   beforeAll(async () => {
+    await restaurarBaseE2E();
     pool = obtenerPool();
     await pool.query('DELETE FROM sigd_audit.evento_outbox');
   });

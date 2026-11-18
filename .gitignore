@@ -64,7 +64,11 @@ coverage/
 test-results/
 .vitest/
 
-# --- IDEs, Editores y Entornos de Desarrollo ---
+# --- Backups Locales de Base de Datos ---
+backups/
+*.dump
+*.sql.bak
+
 .idea/
 *.sublime-project
 *.sublime-workspace
@@ -137,3 +141,13 @@ backend\docs\PLAN_DE_TRABAJO_BACKEND_100_CONFORMIDAD.md
 backend\docs\INFORME_AUDITORIA_CONFORMIDAD_100_BACKEND.md
 # Cache local de npm
 frontend/.npm-cache/
+
+
+# --- Carpetas y Scripts Temporales de Diagnóstico y Pruebas ---
+scratch/
+tmp-*.mjs
+tmp-*.cjs
+tmp-*.ts
+diag_*.ts
+inspect_*.ts
+SIGD_prompts_equipo_acoplamiento_TUPA.pdf

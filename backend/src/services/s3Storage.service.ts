@@ -15,7 +15,7 @@ export class S3StorageService {
         secretAccessKey: process.env.MINIO_SECRET_KEY || ""
       }
     });
-    this.bucketName = process.env.MINIO_BUCKET_NAME || "sigd-documentos";
+    this.bucketName = process.env.S3_BUCKET || process.env.MINIO_BUCKET_NAME || "sigd-expedientes";
   }
 
   public async generarPresignedUrlSubida(nombreArchivo: string): Promise<string> {

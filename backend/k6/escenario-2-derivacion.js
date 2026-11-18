@@ -2,10 +2,15 @@
 // Umbrales (sección 6.1 del entregable 03):
 //   Latencia P95   < 200 ms
 //   Tasa de errores < 0.1 % (rate < 0.001)
-// Ejecutar: k6 run k6/escenario-2-derivacion.js
+// Ejecutar: k6 run -e DERIVATION_TOKEN=<token-institucional> k6/escenario-2-derivacion.js
 
 import http from 'k6/http';
 import { check } from 'k6';
+
+const DERIVATION_TOKEN = __ENV.DERIVATION_TOKEN;
+if (!DERIVATION_TOKEN) {
+  throw new Error('DERIVATION_TOKEN debe contener un token institucional vigente.');
+}
 
 export const options = {
   scenarios: {
@@ -56,8 +61,17 @@ export default function () {
 
   const deriva = http.post(
     `${BASE_URL}/api/expedientes/derivar`,
-    JSON.stringify({ expediente_id: expedienteId, area_destino_id: areaDestino }),
-    { headers: { 'Content-Type': 'application/json' } },
+    JSON.stringify({
+      expediente_id: expedienteId,
+      area_destino_id: areaDestino,
+      proveido: 'Derivación de carga a área de destino',
+    }),
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${DERIVATION_TOKEN}`,
+      },
+    },
   );
   check(deriva, { 'derivación 200': (r) => r.status === 200 });
 }

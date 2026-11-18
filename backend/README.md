@@ -468,7 +468,8 @@ Ubicadas en `backend/k6/`:
 2. **Escenario 2: Operación Simultánea de Derivación (`k6/escenario-2-derivacion.js`)**
    - **Objetivo:** Evaluar la contención de bloqueos relacionales en traslados inter-áreas.
    - **Carga:** Concurrencia sostenida (`constant-vus`): 50 VUs continuas durante 1 minuto 30 segundos.
-   - **Flujo por iteración:** `POST /api/areas` $\rightarrow$ `POST /api/expedientes` $\rightarrow$ `POST /api/expedientes/derivar`.
+   - **Flujo por iteración:** `POST /api/areas` $\rightarrow$ `POST /api/expedientes` $\rightarrow$ `POST /api/expedientes/derivar`. La derivación requiere un JWT institucional vigente mediante `DERIVATION_TOKEN`.
+   - **Ejecución:** `k6 run -e DERIVATION_TOKEN=<token-institucional> k6/escenario-2-derivacion.js`.
    - **SLA Crítico:** Percentil P95 < 200 ms y tasa de error < 0.1%.
 
 ---
@@ -587,6 +588,10 @@ El servidor expone sus rutas bajo `/health`, `/ready` y el prefijo `/api/v1` (co
 * **`POST /api/v1/tramites/ventanilla/registrar`**: Ventanilla presencial física con emisión de ticket térmico descargable e imprimible para impresoras ESC/POS de 80mm y 58mm.
 * **`POST /api/v1/tramites/acumular`**: Acumulación de expedientes conexos bajo el Artículo 160 del TUO de la Ley N° 27444 con prevención algorítmica de grafos cíclicos.
 * **`GET /api/v1/tramites/procedimientos-tupa`**: Consulta pública de requisitos, plazos legales y tasas de procedimientos TUPA.
+* **`GET /api/v1/tramites/tupa/procedimientos/:id/tarifas`**: Consulta las variantes tarifarias del procedimiento vigente.
+* **`POST /api/v1/admin/tupa/procedimientos/:idProcedimiento/tarifas`**: Registra una variante tarifaria únicamente en una versión TUPA en borrador; requiere rol `ADMINISTRADOR`.
+* **`GET /api/v1/admin/tupa/procedimientos/:idProcedimiento/procedencia`** y **`POST`** sobre la misma ruta: Consulta y registra procedencia por campo; requieren rol `ADMINISTRADOR` y escritura solo en versiones en borrador.
+* Las radicaciones con vínculo TUPA guardan un snapshot de versión, procedimiento, unidades orgánicas y fuente documental dentro de la misma transacción del expediente.
 
 ---
 

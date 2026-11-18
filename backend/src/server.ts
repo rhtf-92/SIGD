@@ -1,7 +1,11 @@
-import 'dotenv/config';
-import { spawn } from 'node:child_process';
+import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+dotenv.config();
+dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env') });
+
+import { spawn } from 'node:child_process';
 import { crearPool } from './database.js';
 import { construirApp } from './app.js';
 import { API_PREFIX } from './config/rutas.js';

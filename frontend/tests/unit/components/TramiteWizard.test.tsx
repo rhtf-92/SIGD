@@ -1,0 +1,835 @@
+/**
+ * ==============================================================================
+ * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
+ * MÓDULO 2: Registro Documentario - Mesa de Partes Virtual
+ * TAREA: T-FE-MPV-17 — Pruebas de integración de componentes con React Testing Library
+ * ARCHIVO: tests/unit/components/TramiteWizard.test.tsx
+ * ==============================================================================
+ * DESCRIPCIÓN:
+ * 10 Pruebas de Integración exhaustivas para el componente orquestador TramiteWizard.
+ * Cubre:
+ * - Test 1: Renderizado inicial en Paso 1 con foco en el primer campo.
+ * - Test 2: Validación bloqueante de DNI (rechazar letras o menos de 8 dígitos) impidiendo avanzar.
+ * - Test 3: Avance exitoso al Paso 2 con datos de identificación completos.
+ * - Test 4: Validación de selección de trámite TUPA y asunto en Paso 2.
+ * - Test 5: Persistencia de datos (State Lifting / Reducer) al retroceder del Paso 2 al Paso 1 con botón 'Anterior'.
+ * - Test 6: Validación de consentimiento obligatorio de términos y LPAG en Paso 3.
+ * - Test 7: Verificación del resumen consolidado en Paso 4 con los datos provistos en pasos previos.
+ * - Test 8: Sincronización y persistencia defensiva con sessionStorage.
+ * - Test 9: Disparo y bloqueo del botón 'Radicar Trámite' mostrando estado de carga.
+ * - Test 10: Renderizado y apertura de CargoDigitalModal con CUT visible ante respuesta HTTP 201 Created simulada.
+ *
+ * Cumplimiento técnico:
+ * - Queries accesibles (getByRole, findByRole, getByLabelText).
+ * - Cero 'any', 100% tipado estricto con TypeScript.
+ * - Limpieza de mocks y sessionStorage en cada beforeEach.
+ * ==============================================================================
+ */
+
+import '@testing-library/jest-dom/vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { TramiteWizard } from '@/components/tramite/TramiteWizard';
+import { TRAMITE_WIZARD_STORAGE_KEY } from '@/hooks/useTramiteWizardReducer';
+import { apiClient } from '@/api/client';
+import { createHash } from 'node:crypto';
+
+const mockUpload = vi.hoisted(() => vi.fn());
+vi.mock('@/hooks/usePresignedUpload', () => ({
+  usePresignedUpload: () => ({ upload: mockUpload, status: 'idle', progress: 0 }),
+}));
+
+/**
+ * Catálogo TUPA simulado que reemplaza al hardcode legado en el flujo activo.
+ * Los `registroVersionId` son el único identificador técnico válido.
+ */
+const REGISTRO_VERSION_CERTIFICADO = '11111111-1111-4111-8111-111111111111';
+const REGISTRO_VERSION_CONVALIDACION = '22222222-2222-4222-8222-222222222222';
+const ID_PERSONA = '33333333-3333-4333-8333-333333333333';
+
+async function cargarPdf(user: ReturnType<typeof userEvent.setup>) {
+  const bytes = new TextEncoder().encode('%PDF-1.4\n%%EOF\n');
+  const archivo = new File([bytes], 'solicitud.pdf', { type: 'application/pdf' });
+  Object.defineProperty(archivo, 'arrayBuffer', { value: async () => bytes.buffer });
+  vi.spyOn(crypto.subtle, 'digest').mockResolvedValueOnce(
+    Uint8Array.from(Buffer.from(createHash('sha256').update(bytes).digest('hex'), 'hex')).buffer,
+  );
+  await user.upload(document.querySelector('input[type="file"]') as HTMLInputElement, archivo);
+}
+
+const metadatos = (pagina: number, referenciaFila: string) => ({
+  fuente: {
+    nombre: 'TUPA_2026_IESTP_Suiza.pdf',
+    documentoSha256: '377DD8E14B8806F2030B5374120AB9B4FE17640BB98086E10C1A9A4431A33622',
+    pagina,
+    referenciaFila,
+  },
+  pagina,
+  revision: 1,
+  vigencia: { desde: null, hasta: null },
+  vigenciaDesde: null,
+  vigenciaHasta: null,
+  version: {
+    etiqueta: 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1',
+    revision: 1,
+    vigenciaDesde: null,
+    vigenciaHasta: null,
+  },
+  estadoValidacion: 'APROBADO',
+  estado: 'APROBADO',
+  referenciaAprobacion: 'VALIDACION_PROTOTIPO_SIGD:TUPA-SUIZA-2026:V1',
+});
+
+const CATALOGO_TUPA_API = [
+  {
+    registroVersionId: REGISTRO_VERSION_CERTIFICADO,
+    codigoExterno: '01',
+    codigo: '01',
+    denominacion: 'Certificado de estudios',
+    requisitos: ['Solicitud FUT', 'Constancia de No Adeudar'],
+    monto: 'S/. 11.00 por semestre',
+    id: REGISTRO_VERSION_CERTIFICADO,
+    ...metadatos(5, 'p5-fila-20'),
+  },
+  {
+    registroVersionId: REGISTRO_VERSION_CONVALIDACION,
+    codigoExterno: null,
+    codigo: null,
+    denominacion: 'Convalidación de estudios',
+    requisitos: [],
+    monto: 'S/. 25.00',
+    id: REGISTRO_VERSION_CONVALIDACION,
+    ...metadatos(4, 'p4-fila-10'),
+  },
+];
+
+describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    sessionStorage.setItem(
+      TRAMITE_WIZARD_STORAGE_KEY,
+      JSON.stringify({ identificacion: { idPersona: ID_PERSONA } }),
+    );
+    vi.restoreAllMocks();
+    mockUpload.mockReset().mockImplementation(async (file: File) => ({
+      file,
+      sha256: createHash('sha256').update('%PDF-1.4\n%%EOF\n').digest('hex'),
+      s3Key: 'expedientes/2026/archivo-confirmado.pdf',
+    }));
+    vi.spyOn(apiClient, 'get').mockResolvedValue({ data: CATALOGO_TUPA_API } as never);
+  });
+
+  it('si falla la confirmación Storage, no muestra cargo y reintenta sobre el mismo expediente', async () => {
+    const user = userEvent.setup();
+    const post = vi.spyOn(apiClient, 'post').mockResolvedValue({
+      status: 201,
+      data: {
+        expedienteId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        tipoDocumentalId: 'a373f0c7-8d3e-4328-aec1-78409b539131',
+        cut: 'EXP-2026-778899',
+        fechaRadicacionLegal: '2026-10-24T12:00:00Z',
+        fechaEnvioReal: '2026-10-24T12:00:00Z',
+        qrSeguimientoUrl: '/consulta/EXP-2026-778899',
+        cargoDigital: { hashSha256: 'a'.repeat(64) },
+      },
+    } as never);
+    mockUpload.mockRejectedValueOnce(new Error('MinIO no confirmó el PDF'));
+    render(<TramiteWizard />);
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso2(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    const button = await screen.findByRole('button', { name: /Radicar Trámite/i });
+    await user.click(button);
+    expect(await screen.findByText(/Se creó el expediente.*carga documental no terminó/i)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(button);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(mockUpload).toHaveBeenCalledTimes(2);
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Helper para completar los campos del Paso 1 (Identificación)
+   */
+  const fillPaso1 = async (
+    user: ReturnType<typeof userEvent.setup>,
+    overrides?: {
+      tipoDoc?: string;
+      numDoc?: string;
+      nombres?: string;
+      apellidos?: string;
+      correo?: string;
+      telefono?: string;
+    }
+  ) => {
+    const data = {
+      tipoDoc: 'DNI',
+      numDoc: '74123456',
+      nombres: 'María Elena',
+      apellidos: 'Vargas Paredes',
+      correo: 'maria.vargas@iestpsuiza.edu.pe',
+      telefono: '961987654',
+      ...overrides,
+    };
+
+    if (data.tipoDoc !== 'DNI') {
+      await user.selectOptions(
+        screen.getByLabelText(/Tipo de Documento Oficial/i),
+        data.tipoDoc
+      );
+    }
+    await user.type(screen.getByLabelText(/Número de Documento \*/i), data.numDoc);
+    await user.type(screen.getByLabelText(/Nombres Completos \*/i), data.nombres);
+    await user.type(screen.getByLabelText(/Apellidos Completos \*/i), data.apellidos);
+    await user.type(
+      screen.getByLabelText(/Correo Electrónico Notificable \*/i),
+      data.correo
+    );
+    await user.type(screen.getByLabelText(/Teléfono Celular o Fijo \*/i), data.telefono);
+  };
+
+  /**
+   * Helper para completar los campos del Paso 2 (Documentos del Trámite)
+   */
+  const fillPaso2 = async (
+    user: ReturnType<typeof userEvent.setup>,
+    overrides?: {
+      tipoTramiteId?: string;
+      asunto?: string;
+      folios?: string;
+    }
+  ) => {
+    const data = {
+      tipoTramiteId: REGISTRO_VERSION_CERTIFICADO,
+      asunto: 'Solicitud formal de certificado oficial de estudios concluidos',
+      folios: '4',
+      ...overrides,
+    };
+
+    // Espera a que el catálogo TUPA (API simulada) cargue las opciones reales
+    await screen.findByRole('option', { name: /^Certificado de estudios$/i });
+    await user.selectOptions(
+      screen.getByLabelText(/Procedimiento Institucional/i),
+      data.tipoTramiteId
+    );
+    await user.type(screen.getByLabelText(/Asunto o Petitorio Sucinto \*/i), data.asunto);
+    const inputFolios = screen.getByLabelText(/Folios/i);
+    await user.clear(inputFolios);
+    await user.type(inputFolios, data.folios);
+
+    // Cargar archivo PDF de prueba requerido para validación
+    await cargarPdf(user);
+  };
+
+  /**
+   * Helper para aceptar declaraciones en el Paso 3 (Declaración Jurada)
+   */
+  const fillPaso3 = async (user: ReturnType<typeof userEvent.setup>) => {
+    const checkVeracidad = screen.getByLabelText(
+      /Declaración Jurada de Veracidad \(Art\. 51 LPAG\)/i
+    );
+    const checkTerminos = screen.getByLabelText(
+      /Aceptación de Términos y Condiciones de Uso/i
+    );
+    await user.click(checkVeracidad);
+    await user.click(checkTerminos);
+  };
+
+  // ===========================================================================
+  // TEST 1
+  // ===========================================================================
+  it('Test 1: Renderizado inicial en Paso 1 con foco en el primer campo', () => {
+    render(<TramiteWizard />);
+
+    // Verifica que el asistente renderiza el encabezado del Paso 1
+    expect(
+      screen.getByRole('heading', { name: /Identificación del Solicitante/i })
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/Paso 1 de 4/i).length).toBeGreaterThanOrEqual(1);
+
+    // Verifica que el primer campo (Tipo de Documento) tiene el foco inicial accesible
+    const firstField = screen.getByLabelText(/Tipo de Documento Oficial/i);
+    expect(firstField).toBeInTheDocument();
+    expect(firstField).toHaveFocus();
+  });
+
+  // ===========================================================================
+  // TEST 2
+  // ===========================================================================
+  it('Test 2: Validación bloqueante de DNI (rechazar letras o menos de 8 dígitos) impidiendo avanzar', async () => {
+    const user = userEvent.setup();
+    render(<TramiteWizard />);
+
+    const inputDoc = screen.getByLabelText(/Número de Documento \*/i);
+    const btnSiguiente = screen.getByRole('button', { name: /^Siguiente/i });
+
+    // 1. DNI con menos de 8 dígitos
+    await user.type(inputDoc, '12345');
+    await user.tab(); // trigger blur
+
+    expect(btnSiguiente).toBeDisabled();
+    expect(
+      screen.getByText(/El DNI debe contener exactamente 8 dígitos numéricos/i)
+    ).toBeInTheDocument();
+
+    // 2. Completar los demás campos requeridos
+    await user.type(screen.getByLabelText(/Nombres Completos \*/i), 'Carlos');
+    await user.type(screen.getByLabelText(/Apellidos Completos \*/i), 'López');
+    await user.type(
+      screen.getByLabelText(/Correo Electrónico Notificable \*/i),
+      'carlos@iestpsuiza.edu.pe'
+    );
+    await user.type(screen.getByLabelText(/Teléfono Celular o Fijo \*/i), '961123456');
+
+    // Debe seguir deshabilitado por el DNI inválido
+    expect(btnSiguiente).toBeDisabled();
+
+    // Un click forzado no debe navegar al Paso 2
+    fireEvent.click(btnSiguiente);
+    expect(
+      screen.getByRole('heading', { name: /Identificación del Solicitante/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /Documentos del Trámite/i })
+    ).not.toBeInTheDocument();
+
+    // 3. DNI con letras
+    await user.clear(inputDoc);
+    await user.type(inputDoc, '1234ABCD');
+    await user.tab();
+
+    expect(btnSiguiente).toBeDisabled();
+    expect(
+      screen.getByText(/El DNI debe contener exactamente 8 dígitos numéricos/i)
+    ).toBeInTheDocument();
+  });
+
+  // ===========================================================================
+  // TEST 3
+  // ===========================================================================
+  it('Test 3: Avance exitoso al Paso 2 con datos de identificación completos', async () => {
+    const user = userEvent.setup();
+    render(<TramiteWizard />);
+
+    await fillPaso1(user);
+
+    const btnSiguiente = screen.getByRole('button', { name: /^Siguiente/i });
+    expect(btnSiguiente).not.toBeDisabled();
+
+    await user.click(btnSiguiente);
+
+    // Verifica que se visualiza el encabezado del Paso 2
+    expect(
+      await screen.findByRole('heading', { name: /Documentos del Trámite/i })
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/Paso 2 de 4/i).length).toBeGreaterThanOrEqual(1);
+  });
+
+  // ===========================================================================
+  // TEST 4
+  // ===========================================================================
+  it('Test 4: Validación de selección de trámite TUPA y asunto en Paso 2', async () => {
+    const user = userEvent.setup();
+    render(<TramiteWizard />);
+
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    expect(
+      await screen.findByRole('heading', { name: /Documentos del Trámite/i })
+    ).toBeInTheDocument();
+
+    const btnSiguiente = screen.getByRole('button', { name: /^Siguiente/i });
+    // Inicialmente deshabilitado: falta seleccionar TUPA y escribir asunto
+    expect(btnSiguiente).toBeDisabled();
+
+    // Seleccionar TUPA pero sin asunto
+    const selectTupa = screen.getByLabelText(/Procedimiento Institucional/i);
+    await screen.findByRole('option', { name: /^Certificado de estudios$/i });
+    await user.selectOptions(selectTupa, REGISTRO_VERSION_CERTIFICADO);
+    expect(btnSiguiente).toBeDisabled();
+
+    // Asunto muy corto (menos de 10 caracteres)
+    const inputAsunto = screen.getByLabelText(/Asunto o Petitorio Sucinto \*/i);
+    await user.type(inputAsunto, 'Certif');
+    await user.tab();
+
+    expect(
+      screen.getByText(/El asunto debe contener al menos 10 caracteres/i)
+    ).toBeInTheDocument();
+    expect(btnSiguiente).toBeDisabled();
+
+    // Asunto válido con longitud adecuada
+    await user.clear(inputAsunto);
+    await user.type(inputAsunto, 'Solicito emisión formal de certificado de estudios');
+
+    // Todavía deshabilitado por requerir archivo probatorio PDF
+    expect(btnSiguiente).toBeDisabled();
+
+    // Cargar archivo probatorio PDF
+    await cargarPdf(user);
+
+    expect(btnSiguiente).not.toBeDisabled();
+  });
+
+  // ===========================================================================
+  // TEST 5
+  // ===========================================================================
+  it('Test 5: Persistencia de datos (State Lifting / Reducer) al retroceder del Paso 2 al Paso 1 con botón "Anterior"', async () => {
+    const user = userEvent.setup();
+    render(<TramiteWizard />);
+
+    await fillPaso1(user, {
+      numDoc: '78945612',
+      nombres: 'Beatriz',
+      apellidos: 'Mendoza Ruiz',
+      correo: 'beatriz.mendoza@iestpsuiza.edu.pe',
+      telefono: '987654321',
+    });
+
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    expect(
+      await screen.findByRole('heading', { name: /Documentos del Trámite/i })
+    ).toBeInTheDocument();
+
+    // Retroceder al Paso 1
+    const btnAnterior = screen.getByRole('button', { name: /← Anterior/i });
+    await user.click(btnAnterior);
+
+    // Verificar que los datos en el Paso 1 se mantienen intactos
+    expect(
+      screen.getByRole('heading', { name: /Identificación del Solicitante/i })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Número de Documento \*/i)).toHaveValue('78945612');
+    expect(screen.getByLabelText(/Nombres Completos \*/i)).toHaveValue('Beatriz');
+    expect(screen.getByLabelText(/Apellidos Completos \*/i)).toHaveValue('Mendoza Ruiz');
+    expect(screen.getByLabelText(/Correo Electrónico Notificable \*/i)).toHaveValue(
+      'beatriz.mendoza@iestpsuiza.edu.pe'
+    );
+    expect(screen.getByLabelText(/Teléfono Celular o Fijo \*/i)).toHaveValue('987654321');
+  });
+
+  // ===========================================================================
+  // TEST 6
+  // ===========================================================================
+  it('Test 6: Validación de consentimiento obligatorio de términos y LPAG en Paso 3', async () => {
+    const user = userEvent.setup();
+    render(<TramiteWizard />);
+
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    await fillPaso2(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /Declaración Jurada/i,
+      })
+    ).toBeInTheDocument();
+
+    const btnSiguiente = screen.getByRole('button', { name: /^Siguiente/i });
+    expect(btnSiguiente).toBeDisabled();
+
+    const checkVeracidad = screen.getByLabelText(
+      /Declaración Jurada de Veracidad \(Art\. 51 LPAG\)/i
+    );
+    const checkTerminos = screen.getByLabelText(
+      /Aceptación de Términos y Condiciones de Uso/i
+    );
+
+    // Marcar solo veracidad -> botón continúa deshabilitado
+    await user.click(checkVeracidad);
+    expect(btnSiguiente).toBeDisabled();
+
+    // Marcar también términos y condiciones -> botón habilitado
+    await user.click(checkTerminos);
+    expect(btnSiguiente).not.toBeDisabled();
+
+    // Avanzar al Paso 4
+    await user.click(btnSiguiente);
+    expect(
+      await screen.findByRole('heading', { name: /Confirmación y Emisión de Cargo/i })
+    ).toBeInTheDocument();
+  });
+
+  // ===========================================================================
+  // TEST 7
+  // ===========================================================================
+  it('Test 7: Verificación del resumen consolidado en Paso 4 con los datos provistos en pasos previos', async () => {
+    const user = userEvent.setup();
+    render(<TramiteWizard />);
+
+    await fillPaso1(user, {
+      numDoc: '76543210',
+      nombres: 'Valeria',
+      apellidos: 'Ríos Saldaña',
+      correo: 'valeria.rios@iestpsuiza.edu.pe',
+      telefono: '942123456',
+    });
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    await fillPaso2(user, {
+      tipoTramiteId: REGISTRO_VERSION_CONVALIDACION,
+      asunto: 'Expedición de constancia de convalidación de estudios',
+      folios: '5',
+    });
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    // Verificación de datos consolidados en Paso 4
+    expect(
+      await screen.findByRole('heading', { name: /Confirmación y Emisión de Cargo/i })
+    ).toBeInTheDocument();
+
+    // 1. Resumen Solicitante
+    expect(screen.getByText(/Valeria Ríos Saldaña/i)).toBeInTheDocument();
+    expect(screen.getByText('76543210')).toBeInTheDocument();
+    expect(screen.getByText(/valeria\.rios@iestpsuiza\.edu\.pe/i)).toBeInTheDocument();
+    expect(screen.getByText('942123456')).toBeInTheDocument();
+
+    // 2. Resumen Procedimiento (se muestra el código y la denominación del catálogo real;
+    //    el identificador técnico enviado es el registroVersionId, no el código)
+    expect(screen.getByText(/^Convalidación de estudios$/i)).toBeInTheDocument();
+    expect(screen.queryByText(/TUPA-2026-/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Folios:/i)).toBeInTheDocument();
+
+    // 3. Resumen Conformidad Legal
+    expect(screen.getByText(/Veracidad Jurada \(Art\. 51 LPAG\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Términos y Condiciones MPV/i)).toBeInTheDocument();
+
+    // Botón oficial de radicación visible
+    expect(screen.getByRole('button', { name: /Radicar Trámite/i })).toBeInTheDocument();
+  });
+
+  // ===========================================================================
+  // TEST 8
+  // ===========================================================================
+  it('Test 8: Sincronización y persistencia defensiva con sessionStorage', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<TramiteWizard />);
+
+    await fillPaso1(user, {
+      numDoc: '71122334',
+      nombres: 'Fernando',
+      apellidos: 'Torres Mori',
+    });
+
+    // Validar serialización en sessionStorage
+    const storageRaw = sessionStorage.getItem(TRAMITE_WIZARD_STORAGE_KEY);
+    expect(storageRaw).not.toBeNull();
+    const parsed = JSON.parse(storageRaw!);
+    expect(parsed.identificacion.numeroDocumento).toBe('71122334');
+    expect(parsed.identificacion.nombres).toBe('Fernando');
+    expect(parsed.identificacion.apellidos).toBe('Torres Mori');
+
+    // Desmontar el componente
+    unmount();
+
+    // Volver a montar: Lazy initialization debe restaurar los datos del borrador
+    render(<TramiteWizard />);
+
+    expect(screen.getByLabelText(/Número de Documento \*/i)).toHaveValue('71122334');
+    expect(screen.getByLabelText(/Nombres Completos \*/i)).toHaveValue('Fernando');
+    expect(screen.getByLabelText(/Apellidos Completos \*/i)).toHaveValue('Torres Mori');
+  });
+
+  // ===========================================================================
+  // TEST 9
+  // ===========================================================================
+  it('Test 9: Disparo y bloqueo del botón "Radicar Trámite" mostrando estado de carga', async () => {
+    const user = userEvent.setup();
+
+    // Mock de apiClient.post pendiente para verificar estado transitorio de carga
+    let resolverPromesa: ((value: any) => void) | null = null;
+    const mockPostPromise = new Promise((resolve) => {
+      resolverPromesa = resolve;
+    });
+    vi.spyOn(apiClient, 'post').mockImplementation(() => mockPostPromise as any);
+
+    render(<TramiteWizard />);
+
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    await fillPaso2(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    const btnRadicar = await screen.findByRole('button', { name: /Radicar Trámite/i });
+    expect(btnRadicar).not.toBeDisabled();
+
+    // Disparar radicación
+    await user.click(btnRadicar);
+
+    // Verificar estado visual de carga y bloqueo de botones
+    expect(screen.getByText(/Radicando Trámite\.\.\./i)).toBeInTheDocument();
+    expect(btnRadicar).toBeDisabled();
+    expect(screen.getByRole('button', { name: /← Anterior/i })).toBeDisabled();
+
+    // Resolver la promesa pendiente para evitar timers colgados
+    resolverPromesa!({
+      data: {
+        expedienteId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        cut: 'EXP-2026-999888',
+        anioFiscal: 2026,
+        fechaRadicacionLegal: '25/09/2026, 16:30',
+        fechaEnvioReal: '25/09/2026, 16:30',
+        diferidoPorCorte: false,
+        totalFolios: 1,
+        qrSeguimientoUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-999888',
+        cargoDigital: {
+          codigo: 'EXP-2026-999888',
+          hashSha256:
+            '7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
+          qrContenido: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-999888',
+        },
+        mensajeLegal: 'Trámite radicado conforme a LPAG Ley N° 27444.',
+      },
+      status: 201,
+    });
+  });
+
+  // ===========================================================================
+  // TEST 10
+  // ===========================================================================
+  it('Test 10: Renderizado y apertura de CargoDigitalModal con CUT visible ante respuesta HTTP 201 Created simulada', async () => {
+    const user = userEvent.setup();
+
+    // Mock de API REST con código HTTP 201 Created
+    vi.spyOn(apiClient, 'post').mockResolvedValue({
+      data: {
+        expedienteId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        tipoDocumentalId: 'a373f0c7-8d3e-4328-aec1-78409b539131',
+        cut: 'EXP-2026-778899',
+        anioFiscal: 2026,
+        fechaRadicacionLegal: '25 de Septiembre de 2026, 16:30 hrs',
+        fechaEnvioReal: '25 de Septiembre de 2026, 16:30 hrs',
+        diferidoPorCorte: false,
+        totalFolios: 1,
+        qrSeguimientoUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-778899',
+        cargoDigital: {
+          codigo: 'EXP-2026-778899',
+          hashSha256:
+            'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          qrContenido: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-778899',
+        },
+        mensajeLegal: 'Trámite radicado formalmente.',
+      },
+      status: 201,
+    } as any);
+
+    render(<TramiteWizard />);
+
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    await fillPaso2(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    const btnRadicar = await screen.findByRole('button', { name: /Radicar Trámite/i });
+    await user.click(btnRadicar);
+
+    // Apertura y renderizado accesible de CargoDigitalModal
+    const modalDialog = await screen.findByRole('dialog');
+    expect(modalDialog).toBeInTheDocument();
+    expect(modalDialog).toHaveAttribute('aria-modal', 'true');
+
+    // CUT visible dentro del modal
+    const cutElements = within(modalDialog).getAllByText('EXP-2026-778899');
+    expect(cutElements.length).toBeGreaterThan(0);
+    expect(mockUpload).toHaveBeenCalledWith(expect.any(File), expect.objectContaining({
+      idExpediente: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      origenExpediente: 'TRA',
+    }), true);
+
+    // Verificación de contenido institucional
+    expect(
+      within(modalDialog).getByText(/Cargo de Recepción Digital/i)
+    ).toBeInTheDocument();
+    expect(
+      within(modalDialog).getByText(/María Elena Vargas Paredes/i)
+    ).toBeInTheDocument();
+
+    // Verificación de botones de acción legal
+    expect(
+      within(modalDialog).getByRole('button', { name: /Copiar CUT/i })
+    ).toBeInTheDocument();
+    expect(
+      within(modalDialog).getByRole('button', {
+        name: /Descargar Cargo Digital \(PDF\)/i,
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(modalDialog).getByRole('button', {
+        name: /Acceder a Casilla Electrónica/i,
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(modalDialog).getByRole('button', { name: /Finalizar y Cerrar/i })
+    ).toBeInTheDocument();
+  });
+
+  // ===========================================================================
+  // TEST 11 — Caso 6 (TUPA): envío del registroVersionId real
+  // ===========================================================================
+  it('Test 11: Radicación envía el registroVersionId del catálogo real como identificador técnico', async () => {
+    const user = userEvent.setup();
+    const mockPost = vi.spyOn(apiClient, 'post').mockResolvedValue({
+      data: {
+        expedienteId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        cut: 'EXP-2026-556677',
+        anioFiscal: 2026,
+        fechaRadicacionLegal: '25 de Septiembre de 2026, 16:30 hrs',
+        fechaEnvioReal: '25 de Septiembre de 2026, 16:30 hrs',
+        diferidoPorCorte: false,
+        totalFolios: 4,
+        qrSeguimientoUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-556677',
+        cargoDigital: {
+          codigo: 'EXP-2026-556677',
+          hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          qrContenido: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-556677',
+        },
+        mensajeLegal: 'Trámite radicado formalmente.',
+      },
+      status: 201,
+    } as never);
+
+    render(<TramiteWizard />);
+
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso2(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    const btnRadicar = await screen.findByRole('button', { name: /Radicar Trámite/i });
+    await user.click(btnRadicar);
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/tramites/radicacion-virtual',
+      expect.objectContaining({
+        registroVersionId: REGISTRO_VERSION_CERTIFICADO,
+      })
+    );
+    expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('idPersona');
+    expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('idTipoTramiteTupa');
+  });
+
+  it('Radicación libre deja la identidad al backend y omite registroVersionId', async () => {
+    const user = userEvent.setup();
+    const mockPost = vi.spyOn(apiClient, 'post').mockResolvedValue({
+      data: {
+        cut: 'EXP-2026-556678',
+        fechaRadicacionLegal: '2026-10-20T12:00:00Z',
+        fechaEnvioReal: '2026-10-20T12:00:00Z',
+        qrSeguimientoUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-556678',
+        cargoDigital: { hashSha256: 'a'.repeat(64) },
+      },
+      status: 201,
+    } as never);
+
+    render(<TramiteWizard />);
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso2(user, { tipoTramiteId: 'NO_TUPA' });
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+    await user.click(await screen.findByRole('button', { name: /Radicar Trámite/i }));
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/tramites/radicacion-virtual',
+      expect.any(Object),
+    );
+    expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('idPersona');
+    expect(mockPost.mock.calls[0]?.[1]).not.toHaveProperty('registroVersionId');
+  });
+
+  // ===========================================================================
+  // TEST 12 — Caso 7 (TUPA): NO existe fallback al UUID fijo legado
+  // ===========================================================================
+  it('Test 12: Rechaza la radicación cuando el identificador no es UUID (sin fallback)', async () => {
+    const user = userEvent.setup();
+    const mockPost = vi.spyOn(apiClient, 'post');
+
+    // Borrador con un identificador técnico inválido (UUID legado prohibido)
+    sessionStorage.setItem(
+      TRAMITE_WIZARD_STORAGE_KEY,
+      JSON.stringify({
+        currentStep: 4,
+        identificacion: {
+          tipoDocumento: 'DNI',
+          numeroDocumento: '74123456',
+          nombres: 'María Elena',
+          apellidos: 'Vargas Paredes',
+          correo: 'maria.vargas@iestpsuiza.edu.pe',
+          telefono: '961987654',
+          direccion: '',
+        },
+        documentos: {
+          tipoTramiteId: 'TUPA-2026-01',
+          asunto: 'Solicitud de certificado de estudios concluidos',
+          numeroFolios: 4,
+          archivos: [],
+        },
+        declaracionJurada: {
+          aceptaTerminos: true,
+          declaraVeracidad: true,
+          autorizaNotificacionCasilla: true,
+        },
+        cargoEmitido: null,
+      })
+    );
+
+    render(<TramiteWizard />);
+
+    const btnRadicar = await screen.findByRole('button', { name: /Radicar Trámite/i });
+    await user.click(btnRadicar);
+
+    expect(
+      await screen.findByText(/Debe seleccionar un procedimiento TUPA válido/i)
+    ).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('no radica tras recargar si solo persiste metadata y falta el File real', async () => {
+    const user = userEvent.setup();
+    const mockPost = vi.spyOn(apiClient, 'post');
+    sessionStorage.setItem(TRAMITE_WIZARD_STORAGE_KEY, JSON.stringify({
+      currentStep: 4,
+      identificacion: {
+        idPersona: ID_PERSONA, tipoDocumento: 'DNI', numeroDocumento: '74123456',
+        nombres: 'María Elena', apellidos: 'Vargas Paredes',
+        correo: 'maria.vargas@iestpsuiza.edu.pe', telefono: '961987654',
+      },
+      documentos: {
+        tipoTramiteId: 'NO_TUPA', asunto: 'Solicitud de documentación general', numeroFolios: 1,
+        archivos: [{ nombre: 'solicitud.pdf', peso: 21, hashSha256: 'a'.repeat(64) }],
+      },
+      declaracionJurada: { aceptaTerminos: true, declaracionVeracidad: true, autorizaNotificacionCasilla: true },
+      cargoEmitido: null,
+    }));
+    render(<TramiteWizard />);
+    await user.click(await screen.findByRole('button', { name: /Radicar Trámite/i }));
+    expect(await screen.findByText(/Vuelva a seleccionar el PDF/i)).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+});

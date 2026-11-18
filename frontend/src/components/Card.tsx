@@ -1,13 +1,5 @@
-import type { HTMLAttributes, ReactNode } from "react";
-
-interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  children: ReactNode;
-}
-
-export default function Card({ children, className = "", ...rest }: CardProps) {
-  return (
-    <div className={`card-sigd ${className}`} {...rest}>
-      {children}
-    </div>
-  );
-}
+/**
+ * Card — Contenedor unificado de tarjeta institucional.
+ * Re-exporta el componente canónico de UI manteniendo compatibilidad hacia atrás.
+ */
+export { Card as default, Card, type CardProps, type CardPadding } from "./ui/Card";

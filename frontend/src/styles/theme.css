@@ -1,333 +1,195 @@
-/*
-  Sistema de componentes visuales del SIGD.
-  Todas las clases son consumidas por JSX existente: NO se renombran.
-  Los valores se apoyan en los tokens declarados en src/index.css (@theme).
-*/
+/* ==============================================================================
+   SIGD • IESTP "Suiza" — Sistema de Gestión Documentaria
+   Tokens Semánticos y Estilos Componentes Globales
+   ============================================================================== */
 
-@layer components {
-  /* ── Foco accesible unificado ───────────────────────────────────────── */
-  .focus-ring:focus-visible {
-    outline: 2px solid var(--color-sigd-blue);
-    outline-offset: 2px;
-  }
+.header-bar {
+  display: block;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, #006ec7 0%, #e6007e 50%, #f9e000 100%);
+}
 
-  /* ── Enlace "saltar al contenido" (accesibilidad teclado) ───────────── */
-  .skip-link {
-    position: absolute;
-    left: 0.75rem;
-    top: -3rem;
-    z-index: 100;
-    border-radius: var(--radius-control);
-    background: var(--color-sigd-blue-dark);
-    color: #ffffff;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    box-shadow: var(--shadow-card-hover);
-    transition: top 0.15s ease;
-  }
+.header-sigd {
+  background: #ffffff;
+  color: var(--text-primary, #0f172a);
+  border-bottom: 1px solid var(--border-default, #e2e8f0);
+}
 
-  .skip-link:focus {
-    top: 0.75rem;
-    outline: 2px solid #ffffff;
-    outline-offset: 2px;
-  }
+.card-sigd {
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-default, #e2e8f0);
+  background: var(--surface-card, #ffffff);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
 
-  /* ── Cabecera institucional ─────────────────────────────────────────── */
-  .header-sigd {
-    background: linear-gradient(
-      120deg,
-      var(--color-sigd-navy) 0%,
-      var(--color-sigd-blue-deep) 100%
-    );
-    color: #ffffff;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset,
-      0 2px 10px rgba(10, 37, 64, 0.18);
-  }
+.section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--suiza-primary, #006ec7);
+}
 
-  /* Barra de acento superior (usada como franja decorativa en tarjetas) */
-  .header-bar {
-    display: block;
-    width: 100%;
-    height: 4px;
-    background: var(--color-sigd-blue);
-  }
-
-  /* ── Tarjetas ───────────────────────────────────────────────────────── */
-  .card-sigd {
-    border-radius: var(--radius-card);
-    border: 1px solid var(--color-sigd-line);
-    background: #ffffff;
-    box-shadow: var(--shadow-card);
-  }
-
-  /* ── Títulos de sección (mantenido por compatibilidad) ──────────────── */
+@media (min-width: 640px) {
   .section-title {
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-sigd-blue);
+    font-size: 1.125rem;
+  }
+}
+
+.input-sigd {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  color: var(--text-primary, #0f172a);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-sigd::placeholder {
+  color: var(--text-muted, #64748B);
+}
+
+.input-sigd:focus {
+  border-color: var(--suiza-primary, #006ec7);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.15);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: var(--suiza-primary, #006ec7);
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #ffffff;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: #005ca2;
+}
+
+.btn-primary:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.25);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-default, #e2e8f0);
+  background: #ffffff;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: var(--text-primary, #0f172a);
+}
+
+.table-sigd {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-default, #e2e8f0);
+  background: #ffffff;
+}
+
+.badge-sigd {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 110, 199, 0.2);
+  background: #eff6ff;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--suiza-primary, #006ec7);
+}
+
+/* ==============================================================================
+   Impresión Institucional y Comprobantes (Print Voucher Support)
+   ============================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 15mm;
   }
 
-  /* ── Entradas de texto ──────────────────────────────────────────────── */
-  .input-sigd {
-    display: block;
-    width: 100%;
-    min-height: 2.5rem;
-    border-radius: var(--radius-control);
-    border: 1px solid var(--color-sigd-line-strong);
-    background: #ffffff;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    color: var(--color-sigd-text);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  /* Ocultar elementos de navegación y fondos globales */
+  header, footer, nav, .header-sigd, .sigd-footer, .header-bar, .print\:hidden {
+    display: none !important;
   }
 
-  .input-sigd:hover:not(:disabled) {
-    border-color: #94a3b8;
+  /* Cuando un comprobante/voucher esté presente, aislar únicamente el comprobante */
+  body:has([data-print-target="recibo-voucher"]) {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  .input-sigd:focus {
-    border-color: var(--color-sigd-blue);
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(0, 110, 199, 0.18);
+  body:has([data-print-target="recibo-voucher"]) *:not([data-print-target="recibo-voucher"]):not(:has([data-print-target="recibo-voucher"])):not([data-print-target="recibo-voucher"] *) {
+    display: none !important;
   }
 
-  .input-sigd:disabled {
-    cursor: not-allowed;
-    background: var(--color-sigd-surface-muted);
-    color: #94a3b8;
+  body:has([data-print-target="recibo-voucher"]) :has([data-print-target="recibo-voucher"]) {
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
-  /* ── Botones ────────────────────────────────────────────────────────── */
-  .btn-primary,
-  .btn-secondary,
-  .btn-accent {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    min-height: 2.5rem;
-    border-radius: var(--radius-control);
-    border: 1px solid transparent;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    line-height: 1.25rem;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease,
-      color 0.15s ease, box-shadow 0.15s ease;
+  [data-print-target="recibo-voucher"] {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    display: block !important;
+    overflow: visible !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
-  .btn-primary {
-    background: var(--color-sigd-blue);
-    color: #ffffff;
+  [data-print-target="recibo-voucher"] .print\:hidden {
+    display: none !important;
   }
 
-  .btn-primary:hover:not(:disabled) {
-    background: var(--color-sigd-blue-dark);
-  }
-
-  .btn-secondary {
-    border-color: var(--color-sigd-line-strong);
-    background: #ffffff;
-    color: #334155;
-  }
-
-  .btn-secondary:hover:not(:disabled) {
-    border-color: var(--color-sigd-blue);
-    color: var(--color-sigd-blue-dark);
-    background: #f8fafc;
-  }
-
-  /* Acción destacada (acento amarillo institucional, texto oscuro) */
-  .btn-accent {
-    background: var(--color-sigd-yellow-deep);
-    color: var(--color-sigd-navy);
-  }
-
-  .btn-accent:hover:not(:disabled) {
-    background: #e6b800;
-  }
-
-  .btn-primary:focus-visible,
-  .btn-secondary:focus-visible,
-  .btn-accent:focus-visible {
-    outline: 2px solid var(--color-sigd-blue);
-    outline-offset: 2px;
-  }
-
-  .btn-primary:disabled,
-  .btn-secondary:disabled,
-  .btn-accent:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  /* ── Tablas ─────────────────────────────────────────────────────────── */
-  .table-sigd {
-    width: 100%;
-    overflow: hidden;
-    border-radius: var(--radius-control);
-    border: 1px solid var(--color-sigd-line);
-    background: #ffffff;
-    box-shadow: var(--shadow-card);
-  }
-
-  /* ── Insignias ──────────────────────────────────────────────────────── */
-  .badge-sigd {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    border-radius: 9999px;
-    border: 1px solid #bae6fd;
-    background: #f0f9ff;
-    padding: 0.25rem 0.6rem;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-sigd-blue-dark);
-  }
-
-  /* ── Acentos discretos por categoría ────────────────────────────────── */
-  .cat-doc {
-    --accent: var(--color-sigd-cat-doc);
-  }
-
-  .cat-legal {
-    --accent: var(--color-sigd-cat-legal);
-  }
-
-  .cat-admin {
-    --accent: var(--color-sigd-cat-admin);
-  }
-
-  /* Encabezado de categoría */
-  .group-dot {
-    display: inline-block;
-    height: 0.5rem;
-    width: 0.5rem;
-    border-radius: 9999px;
-    background: var(--accent);
-  }
-
-  /* ── Tarjeta de módulo (catálogo) ───────────────────────────────────── */
-  .module-card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--color-sigd-line);
-    background: #ffffff;
-    padding: 1.5rem;
-    box-shadow: var(--shadow-card);
-    transition: transform 0.2s ease, box-shadow 0.2s ease,
-      border-color 0.2s ease;
-  }
-
-  .module-card::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 4px;
-    background: linear-gradient(
-      90deg,
-      var(--accent) 0%,
-      color-mix(in srgb, var(--accent) 30%, transparent) 100%
-    );
-  }
-
-  .module-card:hover {
-    transform: translateY(-4px);
-    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-    box-shadow: 0 22px 45px -18px color-mix(in srgb, var(--accent) 65%, transparent);
-  }
-
-  .module-card:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-
-  .module-icon {
-    display: inline-flex;
-    height: 3rem;
-    width: 3rem;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.9rem;
-    background: color-mix(in srgb, var(--accent) 12%, #ffffff);
-    color: var(--accent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
-    transition: background-color 0.2s ease, color 0.2s ease,
-      transform 0.2s ease;
-  }
-
-  .module-card:hover .module-icon {
-    background: var(--accent);
-    color: #ffffff;
-    transform: scale(1.06);
-  }
-
-  .module-code {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-sigd-muted);
-  }
-
-  .module-code::before {
-    content: "";
-    height: 0.375rem;
-    width: 0.375rem;
-    border-radius: 9999px;
-    background: var(--accent);
-  }
-
-  .module-cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: var(--accent);
-  }
-
-  /* ── Tarjeta clicable genérica ──────────────────────────────────────── */
-  .card-interactive {
-    transition: transform 0.18s ease, box-shadow 0.18s ease,
-      border-color 0.18s ease;
-  }
-
-  .card-interactive:hover {
-    transform: translateY(-2px);
-    border-color: var(--color-sigd-line-strong);
-    box-shadow: var(--shadow-card-hover);
-  }
-
-  .card-interactive:focus-visible {
-    outline: 2px solid var(--color-sigd-blue);
-    outline-offset: 2px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .module-card,
-    .module-icon,
-    .card-interactive,
-    .skip-link {
-      transition: none;
-    }
-
-    .module-card:hover,
-    .card-interactive:hover {
-      transform: none;
-    }
+  [data-print-target="recibo-card"] {
+    width: 100% !important;
+    max-width: 135mm !important;
+    margin: 0 auto !important;
+    padding: 16px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px dashed #64748b !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }

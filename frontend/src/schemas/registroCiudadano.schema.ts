@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const usernameSchema = z.string().trim().toLowerCase().min(4, 'Ingrese al menos 4 caracteres')
+  .max(30, 'Use como máximo 30 caracteres')
+  .regex(/^[a-z0-9._-]+$/, 'Use solo letras, números, punto, guion o guion bajo, sin espacios');
+
 /* --- Persona Natural --- */
 
 /* Schema persona natural */
@@ -35,6 +39,7 @@ export const naturalSchema = z
         { message: "La persona debe tener al menos 16 años" }
       ),
     correo: z.string().email({ message: "Formato de correo RFC 5322 inválido" }),
+    username: usernameSchema,
     celular: z
       .string()
       .regex(/^9[0-9]{8}$/, {
@@ -71,10 +76,13 @@ export const naturalSchema = z
     }),
   }).refine((data) => data.password === data.confirmarPassword, {
     path: ['confirmarPassword'], message: 'Las contraseñas no coinciden',
-  }).refine((data) => data.tipoDocumento === 'DNI'
-    ? /^[0-9]{8}$/.test(data.numeroDocumento)
-    : /^[A-Z0-9]{9,12}$/.test(data.numeroDocumento), {
-    path: ['numeroDocumento'], message: 'DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos',
+  }).refine((data) => {
+    if (data.tipoDocumento === 'DNI') return /^[0-9]{8}$/.test(data.numeroDocumento);
+    if (data.tipoDocumento === 'CE') return /^[A-Z0-9]{8,12}$/.test(data.numeroDocumento);
+    return false;
+  }, {
+    path: ['numeroDocumento'],
+    message: 'Documento inválido: DNI requiere 8 dígitos; Carné de Extranjería requiere entre 8 y 12 caracteres alfanuméricos',
   });
 
 /* --- Persona Jurídica --- */
@@ -117,10 +125,13 @@ const juridicalDocumentSchema = z
       .string()
       .min(2, "Cargo debe tener mínimo 2 caracteres")
       .max(100, "Cargo debe tener máximo 100 caracteres"),
-  }).refine((data) => data.tipoDocumento === 'DNI'
-    ? /^[0-9]{8}$/.test(data.numeroDocumento)
-    : /^[A-Z0-9]{9,12}$/.test(data.numeroDocumento), {
-    path: ['numeroDocumento'], message: 'DNI debe tener exactamente 8 dígitos o CE de 9-12 caracteres alfanuméricos',
+  }).refine((data) => {
+    if (data.tipoDocumento === 'DNI') return /^[0-9]{8}$/.test(data.numeroDocumento);
+    if (data.tipoDocumento === 'CE') return /^[A-Z0-9]{8,12}$/.test(data.numeroDocumento);
+    return false;
+  }, {
+    path: ['numeroDocumento'],
+    message: 'Documento inválido: DNI requiere 8 dígitos; Carné de Extranjería requiere entre 8 y 12 caracteres alfanuméricos',
   });
 
 /* Schema persona jurídica */
@@ -143,6 +154,7 @@ export const juridicalSchema = z
     representanteLegal: juridicalDocumentSchema,
     partidaSunarp: z.string(),
     correoCorporativo: z.string().email({ message: "Formato de correo RFC 5322 inválido" }),
+    username: usernameSchema,
     celularContacto: z
       .string()
       .regex(/^9[0-9]{8}$/, {
