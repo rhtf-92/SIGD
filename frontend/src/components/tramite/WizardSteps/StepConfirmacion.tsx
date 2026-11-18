@@ -27,8 +27,9 @@ import type {
 } from '../../../types/tramiteWizardState';
 import QrCodeView from '../../common/QrCodeView';
 import { apiClient } from '../../../api/client';
-import { buildGenuinePdfBlob } from '../../../services/pdfReportExporter';
-import { downloadReportBlob } from '../../../services/reportDownload';
+import { useAuthStore } from '../../../stores/authStore';
+import { ApiHttpError } from '../../../types/api';
+import { Link, useLocation } from 'react-router-dom';
 
 interface RadicacionVirtualResponse {
   expedienteId: string;
@@ -181,41 +182,6 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
     window.print();
   };
 
-  const handleDescargarCargoPdf = () => {
-    if (!state.cargoEmitido) return;
-
-    const cargo = state.cargoEmitido;
-    const archivoPrincipal = state.documentos.archivos[0];
-
-    const metadatos = [
-      { etiqueta: 'CÓDIGO ÚNICO DE TRÁMITE (CUT)', valor: cargo.cut },
-      { etiqueta: 'ADMINISTRADO / REMITENTE', valor: cargo.remitente },
-      { etiqueta: 'DOCUMENTO DE IDENTIDAD', valor: `${state.identificacion.tipoDocumento}: ${state.identificacion.numeroDocumento}` },
-      { etiqueta: 'PROCEDIMIENTO / TRÁMITE', valor: state.documentos.tipoTramiteId },
-      { etiqueta: 'ASUNTO DEL PETITORIO', valor: state.documentos.asunto },
-      { etiqueta: 'FECHA Y HORA DE INGRESO', valor: cargo.fechaRadicacion },
-      { etiqueta: 'FECHA JURÍDICA DE RECEPCIÓN', valor: cargo.fechaRecepcionOficial },
-      { etiqueta: 'FOLIOS DECLARADOS', valor: String(state.documentos.numeroFolios) },
-      { etiqueta: 'DOCUMENTO ADJUNTO', valor: archivoPrincipal ? `${archivoPrincipal.nombre} (${(archivoPrincipal.peso / 1024).toFixed(1)} KB)` : 'Sin adjuntos' },
-      { etiqueta: 'HASH SHA-256 DEL DOCUMENTO', valor: archivoPrincipal ? archivoPrincipal.hashSha256 : 'N/A' },
-      { etiqueta: 'FIRMA CRIPTOGRÁFICA / TX', valor: cargo.hashTransaccion },
-    ];
-
-    const blob = buildGenuinePdfBlob({
-      reportName: 'CARGO FORMAL DE RECEPCIÓN DOCUMENTARIA',
-      format: 'pdf',
-      generatedAt: cargo.fechaRecepcionOficial || cargo.fechaRadicacion,
-      filters: {
-        periodo: 'SISTEMA INTEGRADO DE GESTIÓN DOCUMENTAL — IESTP SUIZA',
-      },
-      records: metadatos.map((item) => ({
-        CAMPO: item.etiqueta,
-        VALOR: item.valor,
-      })),
-    });
-    void downloadReportBlob(blob, `Cargo_Recepcion_${cargo.cut}.pdf`);
-  };
-
   const handleRadicar = async () => {
     if (isSubmitting) return;
     if (!useAuthStore.getState().accessToken) {
@@ -267,77 +233,13 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
       const idTipoTramite = tipoSeleccionado.id;
 
-      let idTipoTramite = documentos.tipoTramiteId;
-      if (
-        !idTipoTramite ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite) ||
-        idTipoTramite === '00000000-0000-0000-0000-000000000001'
-      ) {
-        try {
-          const respTipos = await apiClient.get<Array<{ id: string; codigo?: string; id_tipo_tramite?: string }>>(
-            '/api/v1/tramites/tipos',
-          );
-          if (Array.isArray(respTipos?.data) && respTipos.data.length > 0) {
-            const encontrado = respTipos.data.find(
-              (t) => t.codigo === documentos.tipoTramiteId || t.id === documentos.tipoTramiteId,
-            );
-            const resId = (encontrado ? (encontrado.id || encontrado.id_tipo_tramite) : (respTipos.data[0].id || respTipos.data[0].id_tipo_tramite));
-            if (resId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resId)) {
-              idTipoTramite = resId;
-            }
-          }
-        } catch {
-          // Fallback defensivo si el endpoint no está disponible en entorno aislado
-        }
-      }
-      if (!idTipoTramite || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idTipoTramite)) {
-        idTipoTramite = '00000000-0000-0000-0000-000000000001';
-      }
-
-      let idPersonaNum = Number(identificacion.numeroDocumento.slice(0, 6)) || 1;
-      try {
-        if (identificacion.numeroDocumento) {
-          const respPersona = await apiClient.get<{ persona?: { id: number | string } }>(
-            `/api/v1/auth/validar-documento?tipoDocumento=${encodeURIComponent(identificacion.tipoDocumento)}&numeroDocumento=${encodeURIComponent(identificacion.numeroDocumento)}`
-          );
-          if (respPersona?.data?.persona?.id) {
-            idPersonaNum = Number(respPersona.data.persona.id);
-          }
-        }
-      } catch {
-        // Fallback defensivo
-      }
-
-      const inferMimeByFileName = (name: string): string => {
-        const lower = name.toLowerCase();
-        if (lower.endsWith('.png')) return 'image/png';
-        if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
-        if (lower.endsWith('.doc')) return 'application/msword';
-        if (lower.endsWith('.docx'))
-          return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-        return 'application/pdf';
-      };
-
-      const archivosPayload =
-        documentos.archivos.length > 0
-          ? documentos.archivos.map((a) => ({
+      const archivosPayload = documentos.archivos.map((a) => ({
               nombreArchivo: a.nombre,
-              contentType: inferMimeByFileName(a.nombre),
-              tamanoBytes: Number(a.peso) || 1024,
-              hashSha256:
-                a.hashSha256 && /^[0-9a-f]{64}$/i.test(a.hashSha256)
-                  ? a.hashSha256.toLowerCase()
-                  : 'a'.repeat(64),
-              ...(a.s3Key || a.storageUrl ? { storagePath: a.s3Key ?? a.storageUrl } : {}),
-            }))
-          : [
-              {
-                nombreArchivo: 'documento_principal.pdf',
-                contentType: 'application/pdf',
-                tamanoBytes: 2048,
-                hashSha256: 'a'.repeat(64),
-              },
-            ];
+              contentType: 'application/pdf',
+              tamanoBytes: a.peso,
+              hashSha256: a.hashSha256.toLowerCase(),
+              storagePath: a.storageUrl,
+            }));
 
       const payload = {
         asunto: asuntoFinal,
@@ -394,10 +296,6 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
   const handleIniciarNuevoTramite = () => {
     dispatch({ type: 'RESET' });
-  };
-
-  const handleLimpiarTodo = () => {
-    dispatch({ type: 'RESET_WIZARD' });
   };
 
   // ===========================================================================
@@ -497,14 +395,6 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
           {/* Botonera Posterior */}
           <div className="mt-7 flex flex-wrap justify-center gap-3">
-            <button
-              type="button"
-              onClick={handleDescargarCargoPdf}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#006EC7] hover:bg-[#005ba3] text-white text-xs font-bold shadow-xs transition cursor-pointer"
-            >
-              <span>📥</span>
-              <span>Descargar Cargo Oficial (PDF)</span>
-            </button>
             <button
               type="button"
               onClick={handleImprimir}
@@ -722,49 +612,16 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         </div>
       </div>
 
-      {/* BOTONERA DE NAVEGACIÓN ACCESIBLE */}
-      <footer className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200/80 pt-6">
-        {/* Botón Izquierdo: Anterior */}
+      {/* BOTONERA INFERIOR */}
+      <footer className="mt-8 flex items-center justify-between border-t border-slate-200 pt-5">
         <button
           type="button"
           onClick={onBack}
           disabled={isSubmitting}
-          className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition-all duration-200 hover:bg-slate-50 hover:border-slate-400 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 cursor-pointer"
         >
-          <span className="transition-transform duration-200 group-hover:-translate-x-1 group-active:-translate-x-1.5">
-            ←
-          </span>
-          <span>Anterior</span>
+          ← Anterior
         </button>
-
-        {/* Grupo Derecho: Limpiar datos + Radicar Trámite */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          <button
-            type="button"
-            onClick={handleLimpiarTodo}
-            disabled={isSubmitting}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-xs transition-all duration-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 active:scale-[0.98] cursor-pointer"
-          >
-            <span aria-hidden="true">🗑️</span>
-            <span>Limpiar datos</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleRadicar}
-            disabled={isSubmitting}
-            className={`group w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-xl px-7 py-2.5 text-xs font-bold text-white transition-all duration-200 ${
-              !isSubmitting
-                ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 active:scale-[0.98] cursor-pointer'
-                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-            }`}
-          >
-            <span>{isSubmitting ? 'Radicando...' : 'Radicar Trámite'}</span>
-            <span className="transition-transform duration-200 group-hover:translate-x-1 group-active:translate-x-1.5">
-              →
-            </span>
-          </button>
-        </div>
       </footer>
     </div>
   );

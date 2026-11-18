@@ -7,15 +7,13 @@
  * ==============================================================================
  * DESCRIPCIÓN:
  * Subvista desacoplada para la selección de trámite TUPA institucional, registro
- * del asunto o petitorio sucinto, conteo de folios y carga probatoria de documentos
- * institucionales (PDF, Word .doc/.docx e imágenes .png/.jpg) con cálculo de
- * huella criptográfica SHA-256 y subida a almacenamiento institucional.
+ * del asunto o petitorio sucinto, conteo de folios y carga probatoria de PDFs
+ * con cálculo de huella criptográfica SHA-256.
  *
  * Características:
- * - Aceptación flexible de formatos comunes (.pdf, .doc, .docx, .png, .jpg/.jpeg).
- * - Validación de tamaño máximo de archivo (límite 25 MB según directiva LPAG).
- * - Mensajes de orientación claros, empáticos y en lenguaje ciudadano accesible.
- * - Accesibilidad WCAG 2.1 AA con contraste reforzado.
+ * - Validación reactiva de obligatoriedad, longitud mínima de asunto y archivos PDF.
+ * - Validación de tamaño máximo de archivo (20 MiB según el contrato de radicación).
+ * - Accesibilidad WCAG 2.1 AA con contraste reforzado y alertas de error en rojo.
  * - Cero 'any', 100% tipado estricto con contratos de tramiteWizardState.ts.
  * ==============================================================================
  */
@@ -26,18 +24,8 @@ import type {
   ArchivoTramite,
   WizardAction,
 } from '../../../types/tramiteWizardState';
-import { PROCEDIMIENTOS_TUPA_2026 } from '../../../data/tupaPasco2026';
-import { SearchableSelect } from '../../common/SearchableSelect';
-import type { SelectOption } from '../../common/SearchableSelect';
-import {
-  getFileExtension,
-  validateInstitutionalFile,
-} from '../../../utils/fileValidation';
-import {
-  extractDetailedUploadError,
-  usePresignedUpload,
-  type UploadErrorKind,
-} from '../../../hooks/usePresignedUpload';
+import { apiClient } from '../../../api/client';
+import { usePresignedUpload } from '../../../hooks/usePresignedUpload';
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
@@ -52,126 +40,32 @@ export interface StepDocumentosProps {
   isSubmitting?: boolean;
 }
 
-interface FriendlyFileErrorState {
-  title: string;
-  message: string;
-}
-
+// Referencias heredadas solo para rotular borradores antiguos; no se ofrecen para nuevas selecciones.
 const CATALOGO_TUPA_INSTITUCIONAL = [
   {
     id: 'TUPA-01',
-    nombre: 'Expedición de Título Profesional Técnico',
-    unidad: 'Dirección General',
+    nombre: 'Certificado Oficial de Estudios (Por Semestre o Ciclo Completo)',
+    unidad: 'Secretaría Académica',
   },
   {
     id: 'TUPA-02',
-    nombre: 'Certificado de Estudios Superiores (6 Semestres)',
-    unidad: 'Secretaría Académica',
+    nombre: 'Constancia de Matrícula, Egresado y No Adeudo',
+    unidad: 'Dirección de Asuntos Académicos',
   },
   {
     id: 'TUPA-03',
-    nombre: 'Visación de Certificado de Estudios Superiores',
-    unidad: 'Secretaría Académica',
+    nombre: 'Expedición de Título Profesional Técnico a Nombre de la Nación',
+    unidad: 'Área de Titulación y Grados',
   },
   {
     id: 'TUPA-04',
-    nombre: 'Constancia de No Adeudar (Para Fines de Titulación)',
-    unidad: 'Unidad Administrativa',
+    nombre: 'Rectificación de Matrícula o Reserva de Vacante Temporal',
+    unidad: 'Jefatura de Unidad Académica',
   },
   {
     id: 'TUPA-05',
-    nombre: 'Constancia de Egresado',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-06',
-    nombre: 'Constancias Varias (Título, Estudios o Matrícula)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-07',
-    nombre: 'Certificado Modular (I, II, III y IV)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-08',
-    nombre: 'Certificado de Bachillerato',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-09',
-    nombre: 'Derecho de Duplicado de Título',
-    unidad: 'Dirección General',
-  },
-  {
-    id: 'TUPA-10',
-    nombre: 'Modificación de Datos del Título',
-    unidad: 'Dirección General',
-  },
-  {
-    id: 'TUPA-11',
-    nombre: 'Convalidación entre Planes de Estudios',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-12',
-    nombre: 'Convalidación por Unidades de Competencia',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-13',
-    nombre: 'Traslado Interno',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-14',
-    nombre: 'Traslado Externo',
-    unidad: 'Dirección General',
-  },
-  {
-    id: 'TUPA-15',
-    nombre: 'Reserva de Matrícula - Ingresantes',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-16',
-    nombre: 'Licencia de Estudios - Estudiantes Antiguos',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-17',
-    nombre: 'Derecho de Reincorporación (Reingreso)',
-    unidad: 'Secretaría Académica',
-  },
-  {
-    id: 'TUPA-18',
-    nombre: 'Examen de Recuperación / Subsanación con Jurado',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-19',
-    nombre: 'Evaluación Extraordinaria',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-20',
-    nombre: 'Prueba de Suficiencia Académica',
-    unidad: 'Jefatura de Unidad Académica',
-  },
-  {
-    id: 'TUPA-21',
-    nombre: 'Devolución de Expediente',
-    unidad: 'Mesa de Partes',
-  },
-  {
-    id: 'TUPA-22',
-    nombre: 'Acceso a la Información Pública',
-    unidad: 'Dirección General',
-  },
-  {
-    id: 'TUPA-23',
-    nombre: 'Búsqueda y Duplicados de Boletas / Sílabos',
-    unidad: 'Secretaría Académica',
+    nombre: 'Convalidación y Homologación de Unidades Didácticas (Módulos)',
+    unidad: 'Coordinación de Programas de Estudio',
   },
   {
     id: 'LIBRE-01',
@@ -180,37 +74,51 @@ const CATALOGO_TUPA_INSTITUCIONAL = [
   },
 ] as const;
 
-function getFriendlyTitleByKind(kind: UploadErrorKind): string {
-  switch (kind) {
-    case 'invalid-file':
-    case 'invalid-magic-bytes':
-      return 'Revisa el archivo seleccionado';
-    case 'hash':
-      return 'No pudimos procesar el archivo';
-    case 'presigned-url':
-    case 'upload':
-    case 'confirm':
-      return 'Inconveniente temporal al adjuntar tu documento';
-    case 'cancelled':
-      return 'Subida cancelada';
-  }
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // Límite del contrato de radicación.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+interface TipoTramiteFormal {
+  id: string;
+  codigo: string;
+  denominacion: string;
+  unidad_organica: string | null;
+  descripcion?: string | null;
+  vigente: true;
 }
 
-function getFileFormatBadge(fileName: string): { label: string; classes: string } {
-  const ext = getFileExtension(fileName);
-  switch (ext) {
-    case '.pdf':
-      return { label: 'PDF', classes: 'bg-red-100 text-red-700' };
-    case '.doc':
-    case '.docx':
-      return { label: 'WORD', classes: 'bg-blue-100 text-blue-700' };
-    case '.png':
-    case '.jpg':
-    case '.jpeg':
-      return { label: 'IMG', classes: 'bg-emerald-100 text-emerald-700' };
-    default:
-      return { label: 'DOC', classes: 'bg-slate-100 text-slate-700' };
+function validarTiposFormales(data: unknown): TipoTramiteFormal[] | null {
+  if (!Array.isArray(data)) return null;
+  const tipos: TipoTramiteFormal[] = [];
+  const ids = new Set<string>();
+  const codigos = new Set<string>();
+
+  for (const item of data) {
+    if (
+      typeof item !== 'object' || item === null ||
+      !('id' in item) || typeof item.id !== 'string' || !UUID_RE.test(item.id) ||
+      !('codigo' in item) || typeof item.codigo !== 'string' || !item.codigo.trim() ||
+      !('denominacion' in item) || typeof item.denominacion !== 'string' || !item.denominacion.trim() ||
+      !('vigente' in item) || item.vigente !== true ||
+      !('unidad_organica' in item) ||
+      (item.unidad_organica !== null && typeof item.unidad_organica !== 'string') ||
+      ('descripcion' in item && item.descripcion !== null && typeof item.descripcion !== 'string')
+    ) return null;
+
+    const id = item.id.toLowerCase();
+    const codigo = item.codigo.trim();
+    if (ids.has(id) || codigos.has(codigo)) return null;
+    ids.add(id);
+    codigos.add(codigo);
+    tipos.push({
+      id: item.id,
+      codigo,
+      denominacion: item.denominacion.trim(),
+      unidad_organica: item.unidad_organica,
+      descripcion: 'descripcion' in item ? item.descripcion as string | null : undefined,
+      vigente: true,
+    });
   }
+  return tipos;
 }
 
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
@@ -223,62 +131,43 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   const formId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [fileError, setFileError] = useState<FriendlyFileErrorState | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const subida = usePresignedUpload({ diferirRegistroAdjunto: true });
+  const cargandoArchivo = !['idle', 'success', 'cancelled', 'error'].includes(subida.status);
+  useEffect(() => () => subida.cancel(), [subida.cancel]);
+  const [tiposFormales, setTiposFormales] = useState<TipoTramiteFormal[]>([]);
+  const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
+  const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null);
+  const [intentoCatalogo, setIntentoCatalogo] = useState(0);
 
-  const {
-    upload: uploadToMinio,
-    cancel: cancelUpload,
-    clearError: clearUploadHookError,
-    getLastError,
-    status: uploadStatus,
-    progress: uploadProgress,
-    error: uploadHookError,
-  } = usePresignedUpload({ categoria: 'EXPEDIENTE_INGRESO' });
+  useEffect(() => {
+    const controller = new AbortController();
+    setCargandoCatalogo(true);
+    setErrorCatalogo(null);
 
-  const isUploading =
-    uploadStatus === 'validating' ||
-    uploadStatus === 'hashing' ||
-    uploadStatus === 'requesting-url' ||
-    uploadStatus === 'uploading';
+    apiClient.get<unknown>('/api/v1/tramites/tipos', { signal: controller.signal })
+      .then((respuesta) => {
+        if (controller.signal.aborted) return;
+        const tipos = validarTiposFormales(respuesta.data);
+        if (!tipos) {
+          setTiposFormales([]);
+          setErrorCatalogo('El catálogo formal devolvió datos incompletos o ambiguos. No se puede seleccionar un procedimiento para radicar.');
+          return;
+        }
+        setTiposFormales(tipos);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setTiposFormales([]);
+          setErrorCatalogo('No se pudo consultar el catálogo formal de trámites. Reintente antes de continuar.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCargandoCatalogo(false);
+      });
 
-  const tupaOptions: SelectOption[] = useMemo(() => {
-    return CATALOGO_TUPA_INSTITUCIONAL.map((item) => ({
-      value: item.id,
-      label: `${item.id} — ${item.nombre}`,
-      description: item.unidad ? `Área: ${item.unidad}` : undefined,
-    }));
-  }, []);
-
-  const infoTupaSeleccionado = useMemo(() => {
-    if (!data.tipoTramiteId) return null;
-    if (data.tipoTramiteId === 'LIBRE-01') {
-      return {
-        esLibre: true,
-        nombre: 'Solicitud Formal General / Trámite Libre Institucional',
-        dependencia: 'Mesa de Partes General',
-        plazo: '30 días hábiles (TUO Ley N° 27444)',
-        costo: 'Gratuito',
-        requisitos: [
-          'FUT o solicitud formal firmada dirigida a la institución',
-          'Documentos sustentatorios que fundamenten el petitorio (PDF, Word o imagen legible)',
-        ],
-      };
-    }
-    const cod = data.tipoTramiteId.replace('TUPA-', '');
-    const proc = PROCEDIMIENTOS_TUPA_2026.find((p) => p.codigo === cod);
-    if (!proc) return null;
-    return {
-      esLibre: false,
-      nombre: proc.nombre,
-      dependencia: proc.dependencia || 'Secretaría Académica / Dirección',
-      plazo: proc.tiempoMaximo || '30 días hábiles',
-      costo: proc.derechoPago || 'Gratuito',
-      requisitos:
-        proc.requisitos && proc.requisitos.length > 0
-          ? proc.requisitos
-          : ['FUT debidamente llenado y firmado'],
-    };
-  }, [data.tipoTramiteId]);
+    return () => controller.abort();
+  }, [intentoCatalogo]);
 
   // ===========================================================================
   // VALIDACIÓN REACTIVA EN TIEMPO REAL
@@ -287,34 +176,47 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     const errs: Record<string, string> = {};
 
     // 1. Procedimiento Institucional
-    if (!data.tipoTramiteId.trim()) {
-      errs.tipoTramiteId = 'Por favor, selecciona un procedimiento o trámite de la lista.';
+    if (cargandoCatalogo || errorCatalogo) {
+      errs.tipoTramiteId = 'Debe verificarse el catálogo formal antes de continuar.';
+    } else if (!data.tipoTramiteId.trim()) {
+      errs.tipoTramiteId = 'Debe seleccionar un procedimiento institucional o trámite TUPA.';
+    } else if (!tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId)) {
+      errs.tipoTramiteId = 'La selección guardada no pertenece al catálogo formal vigente. Seleccione nuevamente un tipo disponible.';
     }
 
     // 2. Asunto / Petitorio sucinto
     const asuntoTrim = data.asunto.trim();
     if (!asuntoTrim) {
-      errs.asunto = 'El asunto o motivo de tu solicitud es obligatorio.';
+      errs.asunto = 'El asunto o petitorio sucinto es obligatorio.';
     } else if (asuntoTrim.length < 10) {
-      errs.asunto = `Describe un poco más tu solicitud (mínimo 10 caracteres, actual: ${asuntoTrim.length}).`;
+      errs.asunto = `El asunto debe contener al menos 10 caracteres (actual: ${asuntoTrim.length}).`;
+    } else if (asuntoTrim.length > 500) {
+      errs.asunto = 'El asunto no puede superar los 500 caracteres.';
     }
 
     // 3. Cantidad de Folios
-    if (!data.numeroFolios || data.numeroFolios < 1) {
-      errs.numeroFolios = 'Indica al menos 1 folio o página útil.';
-    } else if (data.numeroFolios > 500) {
-      errs.numeroFolios = 'La cantidad máxima permitida por trámite es de 500 folios.';
+    if (!Number.isInteger(data.numeroFolios) || data.numeroFolios < 1) {
+      errs.numeroFolios = 'La cantidad de folios debe ser al menos 1 folio útil.';
+    } else if (data.numeroFolios > 5000) {
+      errs.numeroFolios = 'La cantidad máxima por expediente es de 5000 folios.';
     }
 
     // 4. Archivos adjuntos obligatorios
     if (data.archivos.length === 0) {
-      errs.archivos = 'Debes adjuntar al menos un documento sustentatorio (PDF, Word o imagen).';
+      errs.archivos = 'El contrato de envío requiere al menos un archivo PDF.';
+    } else if (data.archivos.some((archivo) =>
+      !archivo.storageUrl || !/^expedientes\/\d{4}\/[0-9a-f-]+\.pdf$/i.test(archivo.storageUrl) ||
+      !/^[0-9a-f]{64}$/i.test(archivo.hashSha256) ||
+      !Number.isInteger(archivo.peso) || archivo.peso <= 0 || archivo.peso > MAX_FILE_SIZE_BYTES
+    )) {
+      errs.archivos = 'Hay archivos sin una referencia de almacenamiento válida. Retire los archivos locales o de demostración y cargue el documento antes de continuar.';
     }
 
     return errs;
   }, [data, cargandoCatalogo, errorCatalogo, tiposFormales]);
 
-  const isValid = Object.keys(errors).length === 0 && !isUploading;
+  const isValid = Object.keys(errors).length === 0;
+  const tipoSeleccionado = tiposFormales.find((tipo) => tipo.id === data.tipoTramiteId);
 
   const markTouched = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -327,70 +229,41 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     });
   };
 
-  const handleDismissError = () => {
-    setFileError(null);
-    clearUploadHookError();
-  };
-
-  // Carga flexible de archivos institucionales (.pdf, .doc, .docx, .png, .jpg)
+  // Carga y validación binaria de archivos PDF con SHA-256
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (cargandoArchivo) return;
     setFileError(null);
-    clearUploadHookError();
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 1. Validación flexible de formato, tamaño (máximo 25 MB) e integridad básica
-    const validation = await validateInstitutionalFile(file);
-    if (!validation.valid) {
-      setFileError({
-        title: 'Revisa el archivo seleccionado',
-        message: validation.reason,
-      });
+    // Validación de tipo de archivo
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      setFileError('Solo se permiten archivos en formato PDF (Estándar PDF/A).');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    // 2. Evitar archivos con el mismo nombre en el mismo expediente
-    const yaExisteNombre = data.archivos.some(
-      (a) => a.nombre.toLowerCase() === file.name.toLowerCase(),
-    );
-    if (yaExisteNombre) {
-      setFileError({
-        title: 'Documento ya adjuntado',
-        message: `El archivo "${file.name}" ya se encuentra en la lista de documentos de tu solicitud.`,
-      });
+    // Validación de tamaño máximo del endpoint de radicación (20 MiB).
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setFileError(
+        `El archivo excede el tamaño máximo permitido de 20 MB (tamaño actual: ${(
+          file.size /
+          (1024 * 1024)
+        ).toFixed(2)} MB).`
+      );
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
     try {
-      const resultadoS3 = await uploadToMinio(file);
-
-      if (!resultadoS3) {
-        const detailedErr = getLastError() ?? uploadHookError;
-        if (detailedErr && detailedErr.kind !== 'cancelled') {
-          setFileError({
-            title: getFriendlyTitleByKind(detailedErr.kind),
-            message: detailedErr.message,
-          });
-        } else if (!detailedErr) {
-          setFileError({
-            title: 'Inconveniente temporal al adjuntar tu documento',
-            message:
-              'No pudimos guardar tu archivo debido a un problema temporal de comunicación. Por favor, inténtalo de nuevo en unos segundos.',
-          });
-        }
-        return;
-      }
+      const archivoSubido = await subida.upload(file);
+      if (!archivoSubido) return;
 
       const nuevoArchivo: ArchivoTramite = {
         nombre: file.name,
         peso: file.size,
-        hashSha256: resultadoS3.sha256,
-        s3Key: resultadoS3.s3Key,
-        storageUrl: resultadoS3.s3Key,
-        idDocumentoAdjunto: resultadoS3.idDocumentoAdjunto,
+        hashSha256: archivoSubido.sha256,
+        storageUrl: archivoSubido.s3Key,
       };
 
       dispatch({
@@ -399,12 +272,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           archivos: [...data.archivos, nuevoArchivo],
         },
       });
-    } catch (err: unknown) {
-      const parsedError = extractDetailedUploadError(err, 'upload');
-      setFileError({
-        title: getFriendlyTitleByKind(parsedError.kind),
-        message: parsedError.message,
-      });
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : 'No se pudo completar la carga del archivo seleccionado. Reintente antes de continuar.');
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -420,14 +289,17 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     });
   };
 
-  const handleLimpiarTodo = () => {
-    if (isUploading) {
-      cancelUpload();
-    }
-    dispatch({ type: 'RESET_WIZARD' });
-    setTouched({});
+  const handleSimularArchivoPrueba = () => {
+    const dummy: ArchivoTramite = {
+      nombre: 'solicitud_firmada_estudios_2026.pdf',
+      peso: 154230,
+      hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    };
+    dispatch({
+      type: 'UPDATE_DOCUMENTOS',
+      payload: { archivos: [...data.archivos, dummy] },
+    });
     setFileError(null);
-    clearUploadHookError();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -444,32 +316,6 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     }
   };
 
-  const statusLabel = useMemo(() => {
-    switch (uploadStatus) {
-      case 'validating':
-        return 'Verificando tu documento...';
-      case 'hashing':
-        return 'Generando código de seguridad del archivo...';
-      case 'requesting-url':
-        return 'Preparando envío seguro...';
-      case 'uploading':
-        return `Subiendo tu documento (${uploadProgress}%)...`;
-      default:
-        return '';
-    }
-  }, [uploadStatus, uploadProgress]);
-
-  const activeErrorDetails: FriendlyFileErrorState | null = useMemo(() => {
-    if (fileError) return fileError;
-    if (uploadHookError && uploadHookError.kind !== 'cancelled') {
-      return {
-        title: getFriendlyTitleByKind(uploadHookError.kind),
-        message: uploadHookError.message,
-      };
-    }
-    return null;
-  }, [fileError, uploadHookError]);
-
   return (
     <form
       id={`${formId}-form`}
@@ -485,64 +331,83 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           Documentos del Trámite
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Selecciona el procedimiento TUPA, describe brevemente tu solicitud y adjunta tus documentos sustentatorios.
+          Seleccione el procedimiento TUPA formal, describa el petitorio y adjunte los documentos probatorios escaneados en PDF.
         </p>
       </header>
 
       <div className="space-y-5">
-        {/* 1. Tipo de Procedimiento / Trámite TUPA */}
-        <div onBlur={() => markTouched('tipoTramiteId')}>
-          <SearchableSelect
+        {/* 1. Selección de Procedimiento TUPA */}
+        <div>
+          <label
+            htmlFor={`${formId}-tipoTramiteId`}
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
+          >
+            Procedimiento Institucional o Trámite TUPA <span className="text-red-600">*</span>
+          </label>
+          <select
             id={`${formId}-tipoTramiteId`}
-            label="Tipo de Procedimiento / Trámite TUPA *"
-            placeholder="Buscar por código, trámite o área responsable..."
-            options={tupaOptions}
+            name="tipoTramiteId"
+            required
+            aria-required="true"
+            aria-invalid={touched.tipoTramiteId && Boolean(errors.tipoTramiteId)}
+            aria-describedby={
+              touched.tipoTramiteId && errors.tipoTramiteId
+                ? `${formId}-tipoTramiteId-error`
+                : undefined
+            }
             value={data.tipoTramiteId}
-            onChange={(val) => {
-              handleFieldChange('tipoTramiteId', val);
-              markTouched('tipoTramiteId');
-            }}
-            error={touched.tipoTramiteId ? errors.tipoTramiteId : undefined}
-            helperText="Selecciona el trámite específico o elige Solicitud Formal General para otros trámites."
-            clearable={false}
-            disabled={isSubmitting || isUploading}
-          />
+            onChange={(e) => handleFieldChange('tipoTramiteId', e.target.value)}
+            onBlur={() => markTouched('tipoTramiteId')}
+            disabled={isSubmitting}
+            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer ${
+              touched.tipoTramiteId && errors.tipoTramiteId
+                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
+                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
+            } disabled:bg-slate-100`}
+          >
+            <option value="">{cargandoCatalogo ? 'Cargando tipos formales…' : '-- Seleccione un tipo disponible --'}</option>
+            {data.tipoTramiteId && !tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId) && (
+              <option value={data.tipoTramiteId} disabled>
+                Selección guardada pendiente de revalidación: {CATALOGO_TUPA_INSTITUCIONAL.find((tipo) => tipo.id === data.tipoTramiteId)?.nombre ?? data.tipoTramiteId}
+              </option>
+            )}
+            {tiposFormales.map((tipo) => (
+              <option key={tipo.id} value={tipo.id}>
+                {tipo.codigo} — {tipo.denominacion}{tipo.unidad_organica ? ` (${tipo.unidad_organica})` : ''}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-slate-600">
+            Se muestran los procedimientos vigentes del catálogo formal del backend. Los 75 conceptos informativos de Ventanilla no constituyen automáticamente trámites radicables ni acreditan aprobación institucional.
+          </p>
+          {tipoSeleccionado && (
+            <div className="mt-2 space-y-1 text-xs text-slate-600">
+              {tipoSeleccionado.descripcion && <p>{tipoSeleccionado.descripcion}</p>}
+              <p>La API disponible no informa los requisitos documentales ni su obligatoriedad para este procedimiento. La descripción no constituye una lista de adjuntos exigibles.</p>
+            </div>
+          )}
+          {cargandoCatalogo && <p role="status" className="mt-1 text-xs text-slate-500">Consultando tipos formales…</p>}
+          {!cargandoCatalogo && !errorCatalogo && tiposFormales.length === 0 && (
+            <p role="status" className="mt-1 text-xs text-slate-600">El backend no informa tipos formales vigentes disponibles.</p>
+          )}
+          {errorCatalogo && (
+            <div role="alert" className="mt-1.5 text-xs text-red-700">
+              <p>{errorCatalogo}</p>
+              <button type="button" className="mt-1 font-bold underline" onClick={() => setIntentoCatalogo((valor) => valor + 1)} disabled={cargandoCatalogo}>
+                Reintentar consulta
+              </button>
+            </div>
+          )}
+          {touched.tipoTramiteId && errors.tipoTramiteId && (
+            <p
+              id={`${formId}-tipoTramiteId-error`}
+              role="alert"
+              className="mt-1.5 text-xs text-red-600 font-medium"
+            >
+              {errors.tipoTramiteId}
+            </p>
+          )}
         </div>
-
-        {infoTupaSeleccionado && (
-          <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs transition-all animate-fadeIn">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 mb-2">
-              <span className="font-semibold text-slate-800 flex items-center gap-1.5">
-                📋 Ficha Oficial del Trámite ({data.tipoTramiteId})
-              </span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-100 text-blue-800">
-                {infoTupaSeleccionado.costo}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-slate-600 mb-2.5">
-              <div>
-                <span className="font-medium text-slate-700">Área Responsable: </span>
-                {infoTupaSeleccionado.dependencia}
-              </div>
-              <div>
-                <span className="font-medium text-slate-700">Plazo Estimado: </span>
-                {infoTupaSeleccionado.plazo}
-              </div>
-            </div>
-
-            <div>
-              <span className="font-medium text-slate-700 block mb-1">
-                Requisitos documentarios sugeridos:
-              </span>
-              <ul className="list-disc list-inside space-y-0.5 text-slate-600 pl-1">
-                {infoTupaSeleccionado.requisitos.map((req, idx) => (
-                  <li key={idx}>{req}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
 
         {/* 2. Asunto / Petitorio Sucinto */}
         <div>
@@ -574,11 +439,11 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             aria-describedby={
               touched.asunto && errors.asunto ? `${formId}-asunto-error` : undefined
             }
-            placeholder="Describe claramente tu solicitud dirigida a la Dirección del Instituto de Educación Superior Tecnológico Público Suiza..."
+            placeholder="Describa claramente su solicitud dirigida a la Dirección del Instituto de Educación Superior Tecnológico Público Suiza..."
             value={data.asunto}
             onChange={(e) => handleFieldChange('asunto', e.target.value)}
             onBlur={() => markTouched('asunto')}
-            disabled={isSubmitting || isUploading}
+            disabled={isSubmitting}
             className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition ${
               touched.asunto && errors.asunto
                 ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
@@ -623,7 +488,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               handleFieldChange('numeroFolios', Number(e.target.value))
             }
             onBlur={() => markTouched('numeroFolios')}
-            disabled={isSubmitting || isUploading}
+            disabled={isSubmitting}
             className={`w-full rounded-lg border px-3.5 py-2.5 text-sm font-mono shadow-xs focus:outline-none focus:ring-2 transition ${
               touched.numeroFolios && errors.numeroFolios
                 ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
@@ -640,32 +505,36 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             </p>
           ) : (
             <p className="mt-1 text-[11px] text-slate-500">
-              Número de páginas o caras útiles que componen tu documentación.
+              Número de caras numeradas o páginas útiles que componen el expediente.
             </p>
           )}
         </div>
 
-        {/* 4. Carga Documentaria Flexible (PDF, Word, Imágenes) */}
+        {/* 4. Carga Documentaria con cálculo de SHA-256 */}
         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Documentación Sustentatoria <span className="text-red-600">*</span>
+                Archivos adjuntos en PDF <span className="text-red-600">*</span>
               </h3>
               <p className="text-xs text-slate-500">
-                Adjunta tu solicitud o anexos en formato PDF, Word (.doc, .docx) o imagen (.png, .jpg) de hasta 25 MB.
+                El envío requiere al menos un archivo PDF (máximo 20 MB por archivo). Esta exigencia técnica no determina qué documentos son requisitos institucionales del procedimiento.
               </p>
             </div>
+            <button
+              type="button"
+              onClick={handleSimularArchivoPrueba}
+              disabled={isSubmitting || cargandoArchivo}
+              className="text-xs font-bold text-[#006EC7] hover:underline self-start sm:self-auto cursor-pointer"
+            >
+              + Cargar PDF de prueba
+            </button>
           </div>
 
           {/* Zona de Drop / Carga de Archivo */}
           <label
             htmlFor={`${formId}-file-upload`}
-            className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-5 text-center transition ${
-              isUploading || isSubmitting
-                ? 'border-blue-300 bg-blue-50/30 cursor-wait'
-                : 'border-slate-300 bg-white cursor-pointer hover:border-[#006EC7] hover:bg-blue-50/20'
-            }`}
+            className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white p-5 text-center cursor-pointer hover:border-[#006EC7] hover:bg-blue-50/20 transition"
           >
             <svg
               className="h-8 w-8 text-slate-400 mb-1.5"
@@ -682,76 +551,32 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               />
             </svg>
             <span className="text-sm font-semibold text-[#006EC7]">
-              {isUploading
-                ? statusLabel
-                : 'Haz clic aquí para seleccionar tu documento o imagen'}
+              Haga clic aquí para seleccionar su archivo PDF
             </span>
             <span className="text-xs text-slate-400 mt-0.5">
-              Formatos admitidos: PDF, Word (.doc, .docx), PNG y JPG (máx. 25 MB)
+              Cálculo de integridad criptográfica SHA-256 en navegador
             </span>
             <input
               id={`${formId}-file-upload`}
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".pdf,application/pdf"
               className="sr-only"
               onChange={handleFileChange}
-              disabled={isSubmitting || isUploading}
+              disabled={isSubmitting || cargandoArchivo}
             />
           </label>
 
-          {/* Barra de progreso de subida */}
-          {isUploading && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-blue-800">{statusLabel}</span>
-                <button
-                  type="button"
-                  onClick={cancelUpload}
-                  className="text-red-600 hover:underline font-bold cursor-pointer"
-                >
-                  Cancelar
-                </button>
-              </div>
-              <div className="w-full h-2 rounded-full bg-blue-100 overflow-hidden">
-                <div
-                  className="h-full bg-[#006EC7] transition-all duration-150"
-                  style={{ width: `${Math.max(10, uploadProgress)}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Panel amigable de orientación al ciudadano en caso de error */}
-          {activeErrorDetails && (
-            <div
-              role="alert"
-              aria-live="assertive"
-              className="rounded-xl border border-amber-300 bg-amber-50/95 p-4 text-xs text-amber-950 shadow-xs space-y-1.5"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="font-bold text-amber-900 flex items-center gap-1.5 text-sm">
-                  <span aria-hidden="true">ℹ️</span>
-                  <span>{activeErrorDetails.title}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={handleDismissError}
-                  className="text-amber-700 hover:text-amber-950 font-bold px-1.5 py-0.5 rounded hover:bg-amber-100 cursor-pointer"
-                  aria-label="Cerrar aviso"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <p className="text-xs leading-relaxed text-amber-900">
-                {activeErrorDetails.message}
-              </p>
-            </div>
+          {/* Error de archivo */}
+          {cargandoArchivo && <p role="status">Subiendo archivo: {subida.progress}%</p>}
+          {(fileError || subida.error) && (
+            <p role="alert" className="text-xs font-semibold text-red-600">
+              ⚠️ {fileError ?? subida.error?.message}
+            </p>
           )}
 
           {/* Alerta si no hay archivos y el paso fue tocado */}
-          {touched.archivos && errors.archivos && !activeErrorDetails && (
+          {(touched.archivos || data.archivos.length > 0) && errors.archivos && (
             <p role="alert" className="text-xs font-semibold text-red-600">
               ⚠️ {errors.archivos}
             </p>
@@ -761,108 +586,64 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           {data.archivos.length > 0 && (
             <div className="space-y-2 pt-2">
               <p className="text-xs font-bold text-slate-700">
-                Documentos adjuntados a tu solicitud ({data.archivos.length}):
+                Archivos adjuntados al expediente ({data.archivos.length}):
               </p>
-              {data.archivos.map((archivo, index) => {
-                const badge = getFileFormatBadge(archivo.nombre);
-                return (
-                  <div
-                    key={`${archivo.nombre}-${index}`}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xs"
-                  >
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <span
-                        className={`shrink-0 rounded px-2 py-0.5 font-bold ${badge.classes}`}
-                      >
-                        {badge.label}
-                      </span>
-                      <div className="truncate">
-                        <p className="font-semibold text-slate-900 truncate">
-                          {archivo.nombre}{' '}
-                          <span className="text-slate-400 font-normal">
-                            ({(archivo.peso / 1024).toFixed(1)} KB)
-                          </span>
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-700 border border-slate-200"
-                            title={archivo.hashSha256}
-                          >
-                            <span className="text-emerald-600 font-bold">🔒 Código SHA-256:</span>
-                            <span>
-                              {archivo.hashSha256.substring(0, 14)}...
-                              {archivo.hashSha256.substring(archivo.hashSha256.length - 6)}
-                            </span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => navigator.clipboard.writeText(archivo.hashSha256)}
-                            className="text-[10px] text-[#006EC7] hover:text-[#005ba3] font-semibold underline cursor-pointer"
-                            title="Copiar código de integridad SHA-256"
-                          >
-                            Copiar código
-                          </button>
-                        </div>
-                      </div>
+              {data.archivos.map((archivo, index) => (
+                <div
+                  key={`${archivo.nombre}-${index}`}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xs"
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <span className="shrink-0 rounded bg-red-100 px-2 py-0.5 font-bold text-red-700">
+                      PDF
+                    </span>
+                    <div className="truncate">
+                      <p className="font-semibold text-slate-900 truncate">
+                        {archivo.nombre}
+                      </p>
+                      <p className="text-slate-400 font-mono text-[10px] truncate">
+                        SHA-256: {archivo.hashSha256.substring(0, 24)}... •{' '}
+                        {(archivo.peso / 1024).toFixed(1)} KB
+                      </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveArchivo(index)}
-                      disabled={isSubmitting || isUploading}
-                      className="ml-3 shrink-0 rounded px-2 py-1 font-bold text-red-600 hover:bg-red-50 cursor-pointer"
-                    >
-                      Quitar
-                    </button>
                   </div>
-                );
-              })}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveArchivo(index)}
+                    disabled={isSubmitting}
+                    className="ml-3 shrink-0 rounded px-2 py-1 font-bold text-red-600 hover:bg-red-50 cursor-pointer"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
 
       {/* BOTONERA DE NAVEGACIÓN ACCESIBLE */}
-      <footer className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200/80 pt-6">
-        {/* Botón Izquierdo: Anterior */}
+      <footer className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-5">
         <button
           type="button"
           onClick={onBack}
-          disabled={isSubmitting || isUploading}
-          className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition-all duration-200 hover:bg-slate-50 hover:border-slate-400 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+          disabled={isSubmitting || cargandoArchivo}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 cursor-pointer"
         >
-          <span className="transition-transform duration-200 group-hover:-translate-x-1 group-active:-translate-x-1.5">
-            ←
-          </span>
-          <span>Anterior</span>
+          ← Anterior
         </button>
 
-        {/* Grupo Derecho: Limpiar datos + Siguiente */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          <button
-            type="button"
-            onClick={handleLimpiarTodo}
-            disabled={isSubmitting}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-xs transition-all duration-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 active:scale-[0.98] cursor-pointer"
-          >
-            <span aria-hidden="true">🗑️</span>
-            <span>Limpiar datos</span>
-          </button>
-
-          <button
-            type="submit"
-            disabled={!isValid || isSubmitting}
-            className={`group w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-xl px-7 py-2.5 text-xs font-bold text-white transition-all duration-200 ${
-              isValid && !isSubmitting
-                ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 active:scale-[0.98] cursor-pointer'
-                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-            }`}
-          >
-            <span>Siguiente</span>
-            <span className="transition-transform duration-200 group-hover:translate-x-1 group-active:translate-x-1.5">
-              →
-            </span>
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={!isValid || isSubmitting || cargandoArchivo}
+          className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold text-white shadow-xs transition ${
+            isValid && !isSubmitting
+              ? 'bg-[#006EC7] hover:bg-[#005ba3] cursor-pointer'
+              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+          }`}
+        >
+          Siguiente →
+        </button>
       </footer>
     </form>
   );

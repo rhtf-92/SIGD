@@ -36,9 +36,6 @@ export interface StepIdentificacionProps {
   isSubmitting?: boolean;
 }
 
-const BASE_INPUT_CLASSES =
-  'w-full rounded-xl border border-slate-200 bg-slate-50/40 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 transition-all duration-150 hover:bg-white hover:border-slate-300 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 focus:outline-hidden';
-
 export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
   data,
   dispatch,
@@ -48,8 +45,6 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
 }) => {
   const formId = useId();
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [isConsulting, setIsConsulting] = useState(false);
-  const [consultMessage, setConsultMessage] = useState<{ tipo: 'success' | 'info' | 'error'; texto: string } | null>(null);
   const firstFieldRef = useRef<HTMLSelectElement>(null);
 
   // Foco accesible inicial en el primer campo interactivo del formulario
@@ -152,50 +147,6 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
     });
   };
 
-  const handleConsultarIdentidad = async () => {
-    const doc = data.numeroDocumento.trim();
-    if (!doc || errors.numeroDocumento) return;
-
-    setIsConsulting(true);
-    setConsultMessage(null);
-
-    // Simulación de latencia de red (400ms)
-    await new Promise((res) => setTimeout(res, 400));
-
-    // Padrón institucional demostrativo / institucional base
-    const padronPruebas: Record<string, { nombres: string; apellidos: string }> = {
-      '70123456': { nombres: 'JUAN CARLOS', apellidos: 'QUISPE MORALES' },
-      '45891234': { nombres: 'MARÍA ELENA', apellidos: 'RODRÍGUEZ SÁNCHEZ' },
-      '09876543': { nombres: 'ANLLELY', apellidos: 'MELGAREJO VARGAS' },
-      '20123456789': { nombres: 'INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA', apellidos: '' },
-      '10701234561': { nombres: 'JUAN CARLOS QUISPE MORALES', apellidos: '' }
-    };
-
-    const match = padronPruebas[doc];
-
-    if (match) {
-      dispatch({
-        type: 'UPDATE_IDENTIFICACION',
-        payload: {
-          nombres: match.nombres,
-          apellidos: data.tipoDocumento === 'RUC' ? '' : match.apellidos
-        }
-      });
-      setConsultMessage({
-        tipo: 'success',
-        texto: 'Datos validados y autocompletados correctamente desde el padrón institucional.'
-      });
-    } else {
-      // Si no está en el mock, se orienta al administrado a consignar sus datos manualmente
-      setConsultMessage({
-        tipo: 'info',
-        texto: 'Documento no registrado en padrón automático. Por favor, consigne sus nombres y apellidos manualmente.'
-      });
-    }
-
-    setIsConsulting(false);
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Marcar todos como tocados para revelar errores si los hubiera
@@ -212,18 +163,6 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
     }
   };
 
-  const handleLimpiarTodoElTramite = () => {
-    // 1. Restablecer todo el trámite (identificación, documentos, declaración jurada y paso activo)
-    dispatch({ type: 'RESET_WIZARD' });
-
-    // 2. Limpiar mensajes de consulta previa y validaciones tocadas
-    setConsultMessage(null);
-    setTouched({});
-
-    // 3. Devolver el foco al primer elemento para accesibilidad
-    firstFieldRef.current?.focus();
-  };
-
   return (
     <form
       id={`${formId}-form`}
@@ -231,33 +170,16 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
       noValidate
       className="space-y-6"
     >
-      <header>
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide bg-blue-50 text-blue-700 border border-blue-200/60 shadow-xs mb-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-          PASO 1 DE 4
+      <header className="border-b border-slate-200 pb-4">
+        <span className="text-xs font-bold uppercase tracking-wider text-[#006EC7]">
+          Paso 1 de 4
         </span>
-        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+        <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
           Identificación del Solicitante
         </h2>
-        <div className="mt-3 mb-6 p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 flex items-start gap-2.5 text-xs text-slate-600 leading-relaxed">
-          <svg
-            aria-hidden="true"
-            className="h-4 w-4 text-[#006EC7] shrink-0 mt-0.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-            />
-          </svg>
-          <span>
-            Consigne sus datos de identidad oficial y contacto formal. Sus datos están protegidos conforme a la Ley N° 29733 y el TUO de la Ley N° 27444.
-          </span>
-        </div>
+        <p className="mt-1 text-sm text-slate-500">
+          Consigne sus datos de identidad oficial y contacto formal. Sus datos están protegidos conforme a la Ley N° 29733 y el TUO de la Ley N° 27444.
+        </p>
       </header>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -265,24 +187,9 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
         <div>
           <label
             htmlFor={`${formId}-tipoDocumento`}
-            className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1 mb-1.5"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
           >
-            <svg
-              aria-hidden="true"
-              className="h-3.5 w-3.5 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"
-              />
-            </svg>
-            <span>Tipo de Documento Oficial</span>
-            <span className="text-red-500 font-bold">*</span>
+            Tipo de Documento Oficial <span className="text-red-600">*</span>
           </label>
           <select
             ref={firstFieldRef}
@@ -292,7 +199,7 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
             value={data.tipoDocumento}
             onChange={handleTipoDocChange}
             disabled={isSubmitting}
-            className={`${BASE_INPUT_CLASSES} disabled:bg-slate-100 cursor-pointer`}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs focus:border-[#006EC7] focus:outline-none focus:ring-2 focus:ring-[#006EC7]/20 disabled:bg-slate-100 cursor-pointer"
           >
             <option value="DNI">DNI — Documento Nacional de Identidad</option>
             <option value="CE">CE — Carné de Extranjería</option>
@@ -304,112 +211,47 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
         <div>
           <label
             htmlFor={`${formId}-numeroDocumento`}
-            className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1 mb-1.5"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
           >
-            <svg
-              aria-hidden="true"
-              className="h-3.5 w-3.5 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
-              />
-            </svg>
-            <span>Número de Documento</span>
-            <span className="text-red-500 font-bold">*</span>
+            Número de Documento <span className="text-red-600">*</span>
           </label>
-          <div className="flex items-start gap-2">
-            <input
-              id={`${formId}-numeroDocumento`}
-              name="numeroDocumento"
-              type="text"
-              required
-              aria-required="true"
-              aria-invalid={touched.numeroDocumento && Boolean(errors.numeroDocumento)}
-              aria-describedby={
-                touched.numeroDocumento && errors.numeroDocumento
-                  ? `${formId}-numeroDocumento-error`
-                  : undefined
-              }
-              maxLength={data.tipoDocumento === 'DNI' ? 8 : data.tipoDocumento === 'RUC' ? 11 : 12}
-              placeholder={
-                data.tipoDocumento === 'DNI'
-                  ? '8 dígitos numéricos'
-                  : data.tipoDocumento === 'RUC'
-                  ? '11 dígitos (inicia con 10, 15, 17 o 20)'
-                  : '6 a 12 caracteres alfanuméricos'
-              }
-              value={data.numeroDocumento}
-              onChange={(e) => handleFieldChange('numeroDocumento', e.target.value.trim())}
-              onBlur={() => markTouched('numeroDocumento')}
-              disabled={isSubmitting}
-              className={`${BASE_INPUT_CLASSES} flex-1 font-mono ${
-                touched.numeroDocumento && errors.numeroDocumento
-                  ? 'border-red-400 bg-red-50/40 text-red-900 focus:border-red-500 focus:ring-red-500/10'
-                  : ''
-              } disabled:bg-slate-100`}
-            />
-            <button
-              type="button"
-              onClick={handleConsultarIdentidad}
-              disabled={isSubmitting || isConsulting || Boolean(errors.numeroDocumento) || !data.numeroDocumento.trim()}
-              className="h-[42px] px-4 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs hover:shadow-blue-500/20 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-              title="Consultar datos de identidad"
-            >
-              {isConsulting ? (
-                <>
-                  <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Validando...</span>
-                </>
-              ) : (
-                <>
-                  <svg
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 21l-4.35-4.35M16.65 10.825a5.825 5.825 0 11-11.65 0 5.825 5.825 0 0111.65 0z"
-                    />
-                  </svg>
-                  <span>Consultar</span>
-                </>
-              )}
-            </button>
-          </div>
+          <input
+            id={`${formId}-numeroDocumento`}
+            name="numeroDocumento"
+            type="text"
+            required
+            aria-required="true"
+            aria-invalid={touched.numeroDocumento && Boolean(errors.numeroDocumento)}
+            aria-describedby={
+              touched.numeroDocumento && errors.numeroDocumento
+                ? `${formId}-numeroDocumento-error`
+                : undefined
+            }
+            maxLength={data.tipoDocumento === 'DNI' ? 8 : data.tipoDocumento === 'RUC' ? 11 : 12}
+            placeholder={
+              data.tipoDocumento === 'DNI'
+                ? '8 dígitos numéricos'
+                : data.tipoDocumento === 'RUC'
+                ? '11 dígitos (inicia con 10, 15, 17 o 20)'
+                : '6 a 12 caracteres alfanuméricos'
+            }
+            value={data.numeroDocumento}
+            onChange={(e) => handleFieldChange('numeroDocumento', e.target.value.trim())}
+            onBlur={() => markTouched('numeroDocumento')}
+            disabled={isSubmitting}
+            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm font-mono shadow-xs focus:outline-none focus:ring-2 transition ${
+              touched.numeroDocumento && errors.numeroDocumento
+                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
+                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
+            } disabled:bg-slate-100`}
+          />
           {touched.numeroDocumento && errors.numeroDocumento && (
             <p
               id={`${formId}-numeroDocumento-error`}
               role="alert"
-              className="text-xs font-medium text-red-600 mt-1 flex items-center gap-1"
+              className="mt-1.5 text-xs text-red-600 font-medium"
             >
-              <svg aria-hidden="true" className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-              <span>{errors.numeroDocumento}</span>
-            </p>
-          )}
-          {consultMessage && (
-            <p
-              className={`mt-1.5 text-xs font-medium flex items-center gap-1 ${
-                consultMessage.tipo === 'success'
-                  ? 'text-emerald-700'
-                  : consultMessage.tipo === 'error'
-                  ? 'text-red-600'
-                  : 'text-blue-700'
-              }`}
-            >
-              <span>{consultMessage.texto}</span>
+              {errors.numeroDocumento}
             </p>
           )}
         </div>
@@ -418,24 +260,10 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
         <div>
           <label
             htmlFor={`${formId}-nombres`}
-            className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1 mb-1.5"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
           >
-            <svg
-              aria-hidden="true"
-              className="h-3.5 w-3.5 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
-            <span>{data.tipoDocumento === 'RUC' ? 'Razón Social / Denominación' : 'Nombres Completos'}</span>
-            <span className="text-red-500 font-bold">*</span>
+            {data.tipoDocumento === 'RUC' ? 'Razón Social / Denominación' : 'Nombres Completos'}{' '}
+            <span className="text-red-600">*</span>
           </label>
           <input
             id={`${formId}-nombres`}
@@ -456,22 +284,19 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
             onChange={(e) => handleFieldChange('nombres', e.target.value)}
             onBlur={() => markTouched('nombres')}
             disabled={isSubmitting}
-            className={`${BASE_INPUT_CLASSES} ${
+            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition ${
               touched.nombres && errors.nombres
-                ? 'border-red-400 bg-red-50/40 text-red-900 focus:border-red-500 focus:ring-red-500/10'
-                : ''
+                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
+                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
             } disabled:bg-slate-100`}
           />
           {touched.nombres && errors.nombres && (
             <p
               id={`${formId}-nombres-error`}
               role="alert"
-              className="text-xs font-medium text-red-600 mt-1 flex items-center gap-1"
+              className="mt-1.5 text-xs text-red-600 font-medium"
             >
-              <svg aria-hidden="true" className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-              <span>{errors.nombres}</span>
+              {errors.nombres}
             </p>
           )}
         </div>
@@ -480,27 +305,13 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
         <div>
           <label
             htmlFor={`${formId}-apellidos`}
-            className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1 mb-1.5"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
           >
-            <svg
-              aria-hidden="true"
-              className="h-3.5 w-3.5 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            <span>Apellidos Completos</span>
+            Apellidos Completos{' '}
             {data.tipoDocumento === 'RUC' ? (
               <span className="text-slate-400 font-normal lowercase">(opcional)</span>
             ) : (
-              <span className="text-red-500 font-bold">*</span>
+              <span className="text-red-600">*</span>
             )}
           </label>
           <input
@@ -518,22 +329,19 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
             onChange={(e) => handleFieldChange('apellidos', e.target.value)}
             onBlur={() => markTouched('apellidos')}
             disabled={isSubmitting || data.tipoDocumento === 'RUC'}
-            className={`${BASE_INPUT_CLASSES} ${
+            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition ${
               touched.apellidos && errors.apellidos
-                ? 'border-red-400 bg-red-50/40 text-red-900 focus:border-red-500 focus:ring-red-500/10'
-                : ''
+                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
+                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
             } disabled:bg-slate-100 disabled:text-slate-400`}
           />
           {touched.apellidos && errors.apellidos && (
             <p
               id={`${formId}-apellidos-error`}
               role="alert"
-              className="text-xs font-medium text-red-600 mt-1 flex items-center gap-1"
+              className="mt-1.5 text-xs text-red-600 font-medium"
             >
-              <svg aria-hidden="true" className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-              <span>{errors.apellidos}</span>
+              {errors.apellidos}
             </p>
           )}
         </div>
@@ -542,24 +350,9 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
         <div>
           <label
             htmlFor={`${formId}-correo`}
-            className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1 mb-1.5"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
           >
-            <svg
-              aria-hidden="true"
-              className="h-3.5 w-3.5 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
-            <span>Correo Electrónico Notificable</span>
-            <span className="text-red-500 font-bold">*</span>
+            Correo Electrónico Notificable <span className="text-red-600">*</span>
           </label>
           <input
             id={`${formId}-correo`}
@@ -576,29 +369,23 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
             onChange={(e) => handleFieldChange('correo', e.target.value.trim())}
             onBlur={() => markTouched('correo')}
             disabled={isSubmitting}
-            className={`${BASE_INPUT_CLASSES} ${
+            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition ${
               touched.correo && errors.correo
-                ? 'border-red-400 bg-red-50/40 text-red-900 focus:border-red-500 focus:ring-red-500/10'
-                : ''
+                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
+                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
             } disabled:bg-slate-100`}
           />
           {touched.correo && errors.correo ? (
             <p
               id={`${formId}-correo-error`}
               role="alert"
-              className="text-xs font-medium text-red-600 mt-1 flex items-center gap-1"
+              className="mt-1.5 text-xs text-red-600 font-medium"
             >
-              <svg aria-hidden="true" className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-              <span>{errors.correo}</span>
+              {errors.correo}
             </p>
           ) : (
-            <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-              <svg aria-hidden="true" className="h-3 w-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>A esta dirección se enviará el acuse de recibo y decretos resolutivos oficiales.</span>
+            <p className="mt-1 text-[11px] text-slate-500">
+              A esta dirección se enviará el acuse de recibo y decretos resolutivos oficiales.
             </p>
           )}
         </div>
@@ -607,24 +394,9 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
         <div>
           <label
             htmlFor={`${formId}-telefono`}
-            className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1 mb-1.5"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
           >
-            <svg
-              aria-hidden="true"
-              className="h-3.5 w-3.5 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-              />
-            </svg>
-            <span>Teléfono Celular o Fijo</span>
-            <span className="text-red-500 font-bold">*</span>
+            Teléfono Celular o Fijo <span className="text-red-600">*</span>
           </label>
           <input
             id={`${formId}-telefono`}
@@ -642,29 +414,23 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
             onChange={(e) => handleFieldChange('telefono', e.target.value.trim())}
             onBlur={() => markTouched('telefono')}
             disabled={isSubmitting}
-            className={`${BASE_INPUT_CLASSES} font-mono ${
+            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm font-mono shadow-xs focus:outline-none focus:ring-2 transition ${
               touched.telefono && errors.telefono
-                ? 'border-red-400 bg-red-50/40 text-red-900 focus:border-red-500 focus:ring-red-500/10'
-                : ''
+                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
+                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
             } disabled:bg-slate-100`}
           />
           {touched.telefono && errors.telefono ? (
             <p
               id={`${formId}-telefono-error`}
               role="alert"
-              className="text-xs font-medium text-red-600 mt-1 flex items-center gap-1"
+              className="mt-1.5 text-xs text-red-600 font-medium"
             >
-              <svg aria-hidden="true" className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-              <span>{errors.telefono}</span>
+              {errors.telefono}
             </p>
           ) : (
-            <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-              <svg aria-hidden="true" className="h-3 w-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>Para notificaciones urgentes y verificación procesal del IESTP &ldquo;Suiza&rdquo;.</span>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Para notificaciones urgentes y verificación procesal del IESTP &ldquo;Suiza&rdquo;.
             </p>
           )}
         </div>
@@ -673,28 +439,9 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
         <div className="sm:col-span-2">
           <label
             htmlFor={`${formId}-direccion`}
-            className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1 mb-1.5"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
           >
-            <svg
-              aria-hidden="true"
-              className="h-3.5 w-3.5 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            <span>Dirección Domiciliaria o Sede Legal</span>
+            Dirección Domiciliaria o Sede Legal{' '}
             <span className="text-slate-400 font-normal lowercase">(opcional)</span>
           </label>
           <input
@@ -705,46 +452,33 @@ export const StepIdentificacion: React.FC<StepIdentificacionProps> = ({
             value={data.direccion ?? ''}
             onChange={(e) => handleFieldChange('direccion', e.target.value)}
             disabled={isSubmitting}
-            className={`${BASE_INPUT_CLASSES} disabled:bg-slate-100`}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs focus:border-[#006EC7] focus:outline-none focus:ring-2 focus:ring-[#006EC7]/20 disabled:bg-slate-100"
           />
         </div>
       </div>
 
       {/* BOTONERA DE NAVEGACIÓN ACCESIBLE */}
-      <footer className="flex items-center justify-between pt-6 border-t border-slate-200/80 mt-8">
-        {/* Botón Anterior */}
+      <footer className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-5">
         <button
           type="button"
           onClick={onBack}
           disabled={!onBack || isSubmitting}
-          className="group relative px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold shadow-xs transition-all duration-150 ease-out hover:bg-slate-50 hover:border-slate-400 hover:shadow-md active:scale-95 active:bg-slate-100 active:ring-2 active:ring-slate-300/60 inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:pointer-events-none select-none"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 disabled:cursor-not-allowed cursor-pointer"
         >
-          <span className="transition-transform duration-150 group-hover:-translate-x-1 group-active:-translate-x-1.5">←</span>
-          <span>Anterior</span>
+          ← Anterior
         </button>
 
-        {/* Agrupación derecha: Limpiar datos + Siguiente */}
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={handleLimpiarTodoElTramite}
-            disabled={isSubmitting}
-            className="group relative px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold shadow-xs transition-all duration-150 ease-out hover:bg-red-50/80 hover:text-red-600 hover:border-red-200 hover:shadow-red-500/10 active:scale-95 active:bg-red-100 active:border-red-400 active:text-red-700 active:ring-2 active:ring-red-400/30 inline-flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none select-none"
-            title="Borrar todos los datos y reiniciar el trámite"
-          >
-            <span className="transition-transform duration-200 group-hover:scale-110 group-active:-rotate-12">🗑️</span>
-            <span>Limpiar datos</span>
-          </button>
-
-          <button
-            type="submit"
-            disabled={!isValid || isSubmitting}
-            className="group relative px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white text-sm font-bold shadow-md shadow-blue-600/25 transition-all duration-150 ease-out hover:shadow-lg hover:shadow-blue-600/35 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 active:ring-4 active:ring-blue-400/40 inline-flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none select-none"
-          >
-            <span>Siguiente</span>
-            <span className="transition-transform duration-150 group-hover:translate-x-1 group-active:translate-x-1.5">→</span>
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={!isValid || isSubmitting}
+          className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold text-white shadow-xs transition ${
+            isValid && !isSubmitting
+              ? 'bg-[#006EC7] hover:bg-[#005ba3] cursor-pointer'
+              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+          }`}
+        >
+          Siguiente →
+        </button>
       </footer>
     </form>
   );

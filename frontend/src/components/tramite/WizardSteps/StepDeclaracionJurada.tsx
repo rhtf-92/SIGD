@@ -94,11 +94,6 @@ export const StepDeclaracionJurada: React.FC<StepDeclaracionJuradaProps> = ({
     }
   };
 
-  const handleLimpiarTodo = () => {
-    dispatch({ type: 'RESET_WIZARD' });
-    setTouched({});
-  };
-
   return (
     <form
       id={`${formId}-form`}
@@ -278,40 +273,27 @@ export const StepDeclaracionJurada: React.FC<StepDeclaracionJuradaProps> = ({
       </div>
 
       {/* BOTONERA DE NAVEGACIÓN ACCESIBLE */}
-      <footer className="flex items-center justify-between pt-6 border-t border-slate-200/80 mt-8">
-        {/* Botón Anterior */}
+      <footer className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-5">
         <button
           type="button"
           onClick={onBack}
           disabled={isSubmitting}
-          className="group relative px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold shadow-xs transition-all duration-150 ease-out hover:bg-slate-50 hover:border-slate-400 hover:shadow-md active:scale-95 active:bg-slate-100 active:ring-2 active:ring-slate-300/60 inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:pointer-events-none select-none"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 cursor-pointer"
         >
-          <span className="transition-transform duration-150 group-hover:-translate-x-1 group-active:-translate-x-1.5">←</span>
-          <span>Anterior</span>
+          ← Anterior
         </button>
 
-        {/* Agrupación derecha: Limpiar datos + Siguiente */}
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={handleLimpiarTodo}
-            disabled={isSubmitting}
-            className="group relative px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold shadow-xs transition-all duration-150 ease-out hover:bg-red-50/80 hover:text-red-600 hover:border-red-200 hover:shadow-red-500/10 active:scale-95 active:bg-red-100 active:border-red-400 active:text-red-700 active:ring-2 active:ring-red-400/30 inline-flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none select-none"
-            title="Borrar todos los datos y reiniciar el trámite"
-          >
-            <span className="transition-transform duration-200 group-hover:scale-110 group-active:-rotate-12">🗑️</span>
-            <span>Limpiar datos</span>
-          </button>
-
-          <button
-            type="submit"
-            disabled={!isValid || isSubmitting}
-            className="group relative px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white text-sm font-bold shadow-md shadow-blue-600/25 transition-all duration-150 ease-out hover:shadow-lg hover:shadow-blue-600/35 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 active:ring-4 active:ring-blue-400/40 inline-flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none select-none"
-          >
-            <span>Siguiente</span>
-            <span className="transition-transform duration-150 group-hover:translate-x-1 group-active:translate-x-1.5">→</span>
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={!isValid || isSubmitting}
+          className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold text-white shadow-xs transition ${
+            isValid && !isSubmitting
+              ? 'bg-[#006EC7] hover:bg-[#005ba3] cursor-pointer'
+              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+          }`}
+        >
+          Siguiente →
+        </button>
       </footer>
     </form>
   );
