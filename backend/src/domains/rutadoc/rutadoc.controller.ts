@@ -17,6 +17,7 @@ import type { ServicioSlaRutaDoc } from './sla.service.js';
 import {
   evaluarElegibilidadDerivacion,
   consultarEstadoEtapaTecnicaTupa,
+  evaluarCapacidadesExpediente,
 } from './derivaciones.service.js';
 
 /** El proveedor debe derivar el actor de una sesión/token verificado, nunca de headers libres. */
@@ -299,9 +300,11 @@ export function crearControladorRutaDoc(
       }
 
       let flujoAtencion = null;
+      let etapaTecnicaPrecalculada = null;
       if (opciones.pool) {
         try {
           const etapa = await consultarEstadoEtapaTecnicaTupa(opciones.pool, id);
+          etapaTecnicaPrecalculada = etapa;
           if (etapa.areaResponsableId || etapa.areaResolutivaId) {
             flujoAtencion = {
               requiereAtencionTecnica: etapa.requiereEvaluacionTecnica,
@@ -314,6 +317,34 @@ export function crearControladorRutaDoc(
           }
         } catch {
           flujoAtencion = null;
+        }
+      }
+
+      let accionesPermitidas = null;
+      if (opciones.pool) {
+        try {
+          const rawContexto = req.headers['x-contexto-operacion'];
+          const contextoOperacion: 'INSTITUCIONAL' | 'PERSONAL' =
+            (typeof rawContexto === 'string' && rawContexto.trim().toUpperCase() === 'PERSONAL') ||
+            (actor as any).contextoOperacion === 'PERSONAL'
+              ? 'PERSONAL'
+              : 'INSTITUCIONAL';
+
+          accionesPermitidas = await evaluarCapacidadesExpediente(
+            opciones.pool,
+            id,
+            actor,
+            contextoOperacion,
+            {
+              estadoActual: expediente.estadoActual,
+              areaActualId: expediente.areaActualId,
+              solicitanteId: expediente.solicitanteId,
+              elegibilidad: elegibilidadDerivacion,
+              etapaTecnica: etapaTecnicaPrecalculada,
+            },
+          );
+        } catch {
+          accionesPermitidas = null;
         }
       }
 
@@ -363,6 +394,7 @@ export function crearControladorRutaDoc(
         pago: pagoResumen,
         elegibilidadDerivacion,
         flujoAtencion,
+        ...(accionesPermitidas ? { accionesPermitidas } : {}),
       });
     },
     revertir: async (req, res) => {

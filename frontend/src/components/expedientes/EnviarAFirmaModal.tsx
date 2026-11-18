@@ -66,6 +66,18 @@ function FormularioEnviarAFirma({ expediente, accion, onClose }: EnviarAFirmaMod
           />
         </div>
 
+        {!accion.disponible && (
+          <p role="alert" className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
+            Esta acción no está disponible actualmente para su rol, custodia o estado del expediente.
+          </p>
+        )}
+
+        {formulario.error && (
+          <p role="alert" className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-xs font-medium text-rose-800">
+            {formulario.error}
+          </p>
+        )}
+
         <div className="flex items-center justify-end gap-3 pt-2">
           <button
             type="button"
@@ -77,8 +89,8 @@ function FormularioEnviarAFirma({ expediente, accion, onClose }: EnviarAFirmaMod
           </button>
           <button
             type="submit"
-            disabled={formulario.pending}
-            className="rounded-lg bg-violet-700 px-4 py-2 text-xs font-bold text-white hover:bg-violet-800 transition shadow-xs disabled:opacity-50"
+            disabled={formulario.pending || !accion.disponible}
+            className="rounded-lg bg-violet-700 px-4 py-2 text-xs font-bold text-white hover:bg-violet-800 transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {formulario.pending ? "Enviando a firma..." : "Confirmar Envío a Firma"}
           </button>

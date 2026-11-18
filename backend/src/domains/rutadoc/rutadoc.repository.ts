@@ -56,30 +56,32 @@ const FILTROS = `
 export const SQL_LISTAR_RUTADOC = `
   SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut,
          COALESCE(t.asunto, '') AS asunto, e.fecha_radicacion,
-         COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
+         COALESCE(ultimo.estado_nuevo, NULLIF(btrim(e.estado), ''), 'REGISTRADO') AS estado_actual,
          COALESCE(ultimo.area_actual_id, e.area_destino_id::text) AS area_actual_id,
          a.nombre AS area_actual_nombre,
          a.codigo AS area_actual_codigo,
          ultimo.persona_asignada_id::text AS persona_asignada_id,
          ultimo.usuario_asignado_id::text AS usuario_asignado_id
   ${BASE} ${FILTROS}
-    AND COALESCE(ultimo.estado_nuevo, 'REGISTRADO') = ANY($5::text[])
+    AND COALESCE(ultimo.estado_nuevo, NULLIF(btrim(e.estado), ''), 'REGISTRADO') = ANY($5::text[])
     AND ($6::timestamptz IS NULL OR
          (e.fecha_radicacion, e.expediente_id) < ($6::timestamptz, $7::uuid))
   ORDER BY e.fecha_radicacion DESC, e.expediente_id DESC
   LIMIT $8`;
 
+const ESTADO_CANONICO_EXPEDIENTE = "COALESCE(ultimo.estado_nuevo, NULLIF(btrim(e.estado), ''), 'REGISTRADO')";
+
 const COLUMNAS_CONTEO = `
-  count(*) FILTER (WHERE ultimo.estado_nuevo IS NULL OR ultimo.estado_nuevo = 'REGISTRADO')::integer AS "REGISTRADO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'RECEPCIONADO')::integer AS "RECEPCIONADO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'EN_CALIFICACION')::integer AS "EN_CALIFICACION",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'DERIVADO')::integer AS "DERIVADO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'EN_REVISION')::integer AS "EN_REVISION",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'OBSERVADO')::integer AS "OBSERVADO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'SUBSANADO')::integer AS "SUBSANADO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'EN_FIRMA')::integer AS "EN_FIRMA",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'RESUELTO')::integer AS "RESUELTO",
-  count(*) FILTER (WHERE ultimo.estado_nuevo = 'ARCHIVADO')::integer AS "ARCHIVADO"`;
+  count(*) FILTER (WHERE ${ESTADO_CANONICO_EXPEDIENTE} = 'REGISTRADO')::integer AS "REGISTRADO",
+  count(*) FILTER (WHERE ${ESTADO_CANONICO_EXPEDIENTE} = 'RECEPCIONADO')::integer AS "RECEPCIONADO",
+  count(*) FILTER (WHERE ${ESTADO_CANONICO_EXPEDIENTE} = 'EN_CALIFICACION')::integer AS "EN_CALIFICACION",
+  count(*) FILTER (WHERE ${ESTADO_CANONICO_EXPEDIENTE} = 'DERIVADO')::integer AS "DERIVADO",
+  count(*) FILTER (WHERE ${ESTADO_CANONICO_EXPEDIENTE} = 'EN_REVISION')::integer AS "EN_REVISION",
+  count(*) FILTER (WHERE ${ESTADO_CANONICO_EXPEDIENTE} = 'OBSERVADO')::integer AS "OBSERVADO",
+  count(*) FILTER (WHERE ${ESTADO_CANONICO_EXPEDIENTE} = 'SUBSANADO')::integer AS "SUBSANADO",
+  count(*) FILTER (WHERE ${ESTADO_CANONICO_EXPEDIENTE} = 'EN_FIRMA')::integer AS "EN_FIRMA",
+  count(*) FILTER (WHERE ${ESTADO_CANONICO_EXPEDIENTE} = 'RESUELTO')::integer AS "RESUELTO",
+  count(*) FILTER (WHERE ${ESTADO_CANONICO_EXPEDIENTE} = 'ARCHIVADO')::integer AS "ARCHIVADO"`;
 
 export const SQL_CONTADORES_RUTADOC = `SELECT ${COLUMNAS_CONTEO} ${BASE} ${FILTROS}`;
 
@@ -180,7 +182,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
     const fila = await this.pool.query<FilaDetalle>(`
       SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut,
              COALESCE(t.asunto, '') AS asunto, e.fecha_radicacion,
-             COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
+             COALESCE(ultimo.estado_nuevo, NULLIF(btrim(e.estado), ''), 'REGISTRADO') AS estado_actual,
              COALESCE(ultimo.area_actual_id, e.area_destino_id::text) AS area_actual_id,
              a.nombre AS area_actual_nombre,
              a.codigo AS area_actual_codigo,

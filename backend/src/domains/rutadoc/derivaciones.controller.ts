@@ -15,6 +15,7 @@ import {
   iniciarRevisionExpediente,
   evaluarElegibilidadDerivacion,
   verificarEvidenciaEtapaTecnica,
+  verificarFacultadDerivacion,
 } from './derivaciones.service.js';
 import {
   ConflictError,
@@ -133,19 +134,24 @@ export function crearRouterDerivaciones(
     poolOrClient: Pool | PoolClient,
     idUsuario: string,
     areaId: string,
+    idPersona?: string | null,
   ): Promise<boolean> {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!areaId || !uuidRegex.test(areaId) || !uuidRegex.test(idUsuario)) {
+      return false;
+    }
     try {
       const res = await poolOrClient.query(
         `SELECT 1
            FROM sigd_org.responsabilidad_temporal rt
-          WHERE rt.id_usuario = $1::uuid
+          WHERE (rt.id_usuario = $1::uuid OR ($3::uuid IS NOT NULL AND rt.id_persona = $3::uuid))
             AND rt.area_id = $2::uuid
             AND rt.estado = 'ACTIVO'
-            AND rt.tipo IN ('ENCARGATURA', 'DELEGACION', 'SUPLENCIA', 'DESIGNACION_ESPECIFICA')
+            AND rt.tipo_responsabilidad IN ('ENCARGATURA', 'DELEGACION', 'SUPLENCIA', 'DESIGNACION_ESPECIFICA')
             AND rt.vigente_desde <= now()
             AND (rt.vigente_hasta IS NULL OR rt.vigente_hasta > now())
           LIMIT 1`,
-        [idUsuario, areaId],
+        [idUsuario, areaId, idPersona && uuidRegex.test(idPersona) ? idPersona : null],
       );
       return (res.rowCount ?? 0) > 0;
     } catch {
@@ -162,6 +168,105 @@ export function crearRouterDerivaciones(
       return 'PERSONAL';
     }
     return 'INSTITUCIONAL';
+  }
+
+  const AREA_DIR_CANONICA = 'a0000000-0000-0000-0000-000000000002';
+  const ROLES_NEGOCIO_DOCUMENTAL = ['DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES'];
+
+  function validarActorNoAdministradoNiPersonal(
+    req: Request,
+    actor: ActorRutaDoc,
+    mensajePersonal: string,
+    mensajeAdministrado: string,
+    codigoAdministrado?: string,
+  ): void {
+    const contextoOperacion = resolverContextoOperacion(req, actor);
+    if (contextoOperacion === 'PERSONAL') {
+      throw new ForbiddenError({
+        code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
+        detail: mensajePersonal,
+      });
+    }
+
+    const esAdministrado = actor.roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r));
+    if (esAdministrado) {
+      throw new ForbiddenError({
+        ...(codigoAdministrado ? { code: codigoAdministrado } : {}),
+        detail: mensajeAdministrado,
+      });
+    }
+  }
+
+  function asegurarSinSoloPoderTecnicoNiFinanciero(
+    actor: ActorRutaDoc,
+    codigoTesoreria: string = 'ROL_FINANCIERO_SIN_FACULTAD_DOCUMENTAL',
+    detailTesoreria: string = 'El rol TESORERIA únicamente gestiona cobros y recibos, sin facultades de tramitación documental.',
+  ): void {
+    const tieneRolNegocio = actor.roles.some((r) => ROLES_NEGOCIO_DOCUMENTAL.includes(r));
+    const esSoloAdminTecnico =
+      actor.roles.some((r) => ['ADMINISTRADOR', 'SUPERADMINISTRADOR', 'SUPER_ADMIN'].includes(r)) &&
+      !tieneRolNegocio;
+    if (esSoloAdminTecnico) {
+      throw new ForbiddenError({
+        code: 'PODER_TECNICO_SIN_AUTORIDAD_NEGOCIO',
+        detail: 'El perfil técnico administra la plataforma y no confiere autoridad sustantiva sobre expedientes.',
+      });
+    }
+
+    const esSoloTesoreria = actor.roles.includes('TESORERIA') && !tieneRolNegocio;
+    if (esSoloTesoreria) {
+      throw new ForbiddenError({
+        code: codigoTesoreria,
+        detail: detailTesoreria,
+      });
+    }
+  }
+
+  function asegurarNoAutoatencion(
+    actor: ActorRutaDoc,
+    idPersonaActor: string | null,
+    solicitanteId: string | null | undefined,
+    detail: string,
+  ): void {
+    if (
+      solicitanteId &&
+      ((idPersonaActor && idPersonaActor === solicitanteId) || actor.id === solicitanteId)
+    ) {
+      throw new ForbiddenError({
+        code: 'CONFLICTO_INTERES_EXPEDIENTE_PROPIO',
+        detail,
+      });
+    }
+  }
+
+  async function tieneCustodiaEfectiva(
+    poolOrClient: Pool | PoolClient,
+    actor: ActorRutaDoc,
+    areaActualId: string | null | undefined,
+    opcionesCustodia?: { permitirMesaEnAreaInicial?: boolean; idPersonaActor?: string | null },
+  ): Promise<boolean> {
+    if (actor.unidadOrganicaId && areaActualId && actor.unidadOrganicaId === areaActualId) {
+      return true;
+    }
+    if (
+      opcionesCustodia?.permitirMesaEnAreaInicial &&
+      actor.roles.includes('MESA_PARTES') &&
+      (!areaActualId ||
+        areaActualId === AREA_DIR_CANONICA ||
+        areaActualId === 'DIR' ||
+        areaActualId === 'Mesa de Partes')
+    ) {
+      return true;
+    }
+    if (areaActualId) {
+      return await verificarEncargaturaDespacho(
+        poolOrClient,
+        actor.id,
+        areaActualId,
+        opcionesCustodia?.idPersonaActor,
+      );
+    }
+    return false;
   }
 
   // ===========================================================================
@@ -201,27 +306,21 @@ export function crearRouterDerivaciones(
         await cliente.query('BEGIN');
         await bloquearExpedienteRutaDoc(cliente, expedienteId);
 
-        // 1. Validación de Actor y Contexto de Operación
+        // 1. Validación de Actor, Contexto de Operación y Autorización base sin consultas previas
         const actor = await resolverActor(req);
         if (!actor) {
           throw new UnauthorizedError({ detail: 'Autenticación requerida para derivar el expediente.' });
         }
 
-        const contextoOperacion = resolverContextoOperacion(req, actor);
-        if (contextoOperacion === 'PERSONAL') {
-          throw new ForbiddenError({
-            code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
-            detail: 'En contexto personal el usuario no dispone de facultades para derivar expedientes institucionales.',
-          });
-        }
-
-        const esAdministrado = actor.roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r));
-        if (esAdministrado) {
-          throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para derivar expedientes.' });
-        }
+        validarActorNoAdministradoNiPersonal(
+          req,
+          actor,
+          'En contexto personal el usuario no dispone de facultades para derivar expedientes institucionales.',
+          'Los administrados no tienen autorización para derivar expedientes.',
+        );
 
         const esTesoreria = actor.roles.includes('TESORERIA') &&
-          !actor.roles.some((r) => ['DIRECTOR', 'SECRETARIO', 'MESA_PARTES'].includes(r));
+          !actor.roles.some((r) => ['DIRECTOR', 'SECRETARIO', 'MESA_PARTES', 'ESPECIALISTA'].includes(r));
         if (esTesoreria) {
           throw new ForbiddenError({
             code: 'ROL_FINANCIERO_SIN_FACULTAD_DERIVAR',
@@ -247,30 +346,45 @@ export function crearRouterDerivaciones(
         }
 
         const contextoExp = await consultarContextoExpediente(expedienteId);
+        asegurarSinSoloPoderTecnicoNiFinanciero(
+          actor,
+          'ROL_FINANCIERO_SIN_FACULTAD_DERIVAR',
+          'El rol TESORERIA no posee facultades para derivar expedientes documentarios.',
+        );
+
+        if (!actor.roles.some((r) => ROLES_NEGOCIO_DOCUMENTAL.includes(r))) {
+          throw new ForbiddenError({ detail: 'No cuenta con rol operativo habilitado para derivar expedientes.' });
+        }
+
         const idPersonaActor = await resolverIdPersonaActor(actor);
 
-        // Regla de Autoatención
-        if (
-          (idPersonaActor && idPersonaActor === contextoExp.solicitanteId) ||
-          actor.id === contextoExp.solicitanteId
-        ) {
+        // Facultad explícita de derivación (ESPECIALISTA requiere perfil EXPEDIENTE_DERIVAR o DELEGACION:DERIVACION)
+        const tieneFacultadDerivacion = await verificarFacultadDerivacion(
+          cliente,
+          actor,
+          contextoExp.areaActualId,
+          idPersonaActor,
+        );
+        if (!tieneFacultadDerivacion) {
           throw new ForbiddenError({
-            code: 'CONFLICTO_INTERES_EXPEDIENTE_PROPIO',
-            detail: 'AUTOATENCION_PROHIBIDA: El solicitante no puede derivar su propio expediente o solicitud personal.',
+            code: 'SIN_FACULTAD_DERIVACION',
+            detail: 'No posee facultad explícita ni delegación vigente para derivar este expediente.',
           });
         }
 
-        // Verificación de tenencia de custodia en el área
-        let tieneCustodia = false;
+        // Regla de Autoatención
+        asegurarNoAutoatencion(
+          actor,
+          idPersonaActor,
+          contextoExp.solicitanteId,
+          'AUTOATENCION_PROHIBIDA: El solicitante no puede derivar su propio expediente o solicitud personal.',
+        );
 
-        if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
-          tieneCustodia = true;
-        } else if (
-          actor.roles.includes('MESA_PARTES') &&
-          ['REGISTRADO'].includes(contextoExp.estadoActual)
-        ) {
-          tieneCustodia = true;
-        }
+        // Verificación fail-closed de custodia en el área (o Mesa de Partes en REGISTRADO, o encargatura vigente)
+        const tieneCustodia = await tieneCustodiaEfectiva(cliente, actor, contextoExp.areaActualId, {
+          permitirMesaEnAreaInicial: contextoExp.estadoActual === 'REGISTRADO',
+          idPersonaActor,
+        });
 
         if (!tieneCustodia) {
           throw new ForbiddenError({
@@ -540,38 +654,33 @@ export function crearRouterDerivaciones(
         throw new UnauthorizedError({ detail: 'Autenticación requerida para recepcionar el expediente.' });
       }
 
-      const contextoOperacion = resolverContextoOperacion(req, actor);
-      if (contextoOperacion === 'PERSONAL') {
-        throw new ForbiddenError({
-          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
-          detail: 'En contexto personal el usuario no dispone de facultades para recepcionar expedientes.',
-        });
-      }
-
-      const esAdministrado = actor.roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r));
-      if (esAdministrado) {
-        throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para recepcionar expedientes.' });
-      }
+      validarActorNoAdministradoNiPersonal(
+        req,
+        actor,
+        'En contexto personal el usuario no dispone de facultades para recepcionar expedientes.',
+        'Los administrados no tienen autorización para recepcionar expedientes.',
+      );
 
       const contextoExp = await consultarContextoExpediente(expedienteId);
+      asegurarSinSoloPoderTecnicoNiFinanciero(actor);
+      if (!actor.roles.some((r) => ROLES_NEGOCIO_DOCUMENTAL.includes(r))) {
+        throw new ForbiddenError({ detail: 'No cuenta con rol operativo habilitado para recepcionar expedientes.' });
+      }
+
       const idPersonaActor = await resolverIdPersonaActor(actor);
 
       // Autoatención
-      if (
-        (idPersonaActor && idPersonaActor === contextoExp.solicitanteId) ||
-        actor.id === contextoExp.solicitanteId
-      ) {
-        throw new ForbiddenError({
-          code: 'CONFLICTO_INTERES_EXPEDIENTE_PROPIO',
-          detail: 'AUTOATENCION_PROHIBIDA: El solicitante no puede recepcionar su propio expediente personal.',
-        });
-      }
+      asegurarNoAutoatencion(
+        actor,
+        idPersonaActor,
+        contextoExp.solicitanteId,
+        'AUTOATENCION_PROHIBIDA: El solicitante no puede recepcionar su propio expediente personal.',
+      );
 
-      // BOLA: Verificar pertenencia al área de destino
-      let tieneCustodia = false;
-      if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
-        tieneCustodia = true;
-      }
+      // BOLA: Verificar pertenencia al área de destino o encargatura vigente
+      const tieneCustodia = await tieneCustodiaEfectiva(pool, actor, contextoExp.areaActualId, {
+        idPersonaActor,
+      });
       if (!tieneCustodia) {
         throw new ForbiddenError({
           code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
@@ -652,7 +761,7 @@ export function crearRouterDerivaciones(
 
       // Poder técnico ≠ Autoridad de negocio
       const esSoloAdminTecnico =
-        actor.roles.some((r) => ['ADMINISTRADOR', 'SUPERADMINISTRADOR'].includes(r)) &&
+        actor.roles.some((r) => ['ADMINISTRADOR', 'SUPERADMINISTRADOR', 'SUPER_ADMIN'].includes(r)) &&
         !actor.roles.some((r) => ['DIRECTOR', 'SECRETARIO', 'ESPECIALISTA'].includes(r));
 
       if (esSoloAdminTecnico) {
@@ -664,15 +773,18 @@ export function crearRouterDerivaciones(
 
       const esRolNoAtencion = actor.roles.some((r) => ['TESORERIA', 'MESA_PARTES'].includes(r)) &&
         !actor.roles.some((r) => ['DIRECTOR', 'SECRETARIO', 'ESPECIALISTA'].includes(r));
-      if (esRolNoAtencion) {
+      if (esRolNoAtencion || !actor.roles.some((r) => ['DIRECTOR', 'SECRETARIO', 'ESPECIALISTA'].includes(r))) {
         throw new ForbiddenError({
           code: 'ROL_SIN_FACULTAD_ATENCION',
           detail: 'El rol no dispone de facultades para registrar atención técnica o dictamen.',
         });
       }
 
-      // BOLA: Verificar pertenencia al área de custodia
-      if (!actor.unidadOrganicaId || actor.unidadOrganicaId !== contextoExp.areaActualId) {
+      // BOLA: Verificar pertenencia al área de custodia o encargatura vigente
+      const tieneCustodiaAtencion = await tieneCustodiaEfectiva(pool, actor, contextoExp.areaActualId, {
+        idPersonaActor,
+      });
+      if (!tieneCustodiaAtencion) {
         throw new ForbiddenError({
           code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
           detail: 'No cuenta con facultades en el área para atender el expediente.',
@@ -782,18 +894,14 @@ export function crearRouterDerivaciones(
         throw new UnauthorizedError({ detail: 'Autenticación requerida para enviar a firma.' });
       }
 
-      const contextoOperacion = resolverContextoOperacion(req, actor);
-      if (contextoOperacion === 'PERSONAL') {
-        throw new ForbiddenError({
-          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
-          detail: 'En contexto personal el usuario no dispone de facultades institucionales.',
-        });
-      }
+      validarActorNoAdministradoNiPersonal(
+        req,
+        actor,
+        'En contexto personal el usuario no dispone de facultades institucionales.',
+        'Los administrados no tienen autorización para remitir a firma.',
+      );
 
-      const esAdministrado = actor.roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r));
-      if (esAdministrado) {
-        throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para remitir a firma.' });
-      }
+      asegurarSinSoloPoderTecnicoNiFinanciero(actor);
 
       const tieneFacultadDespacho = actor.roles.some((r) =>
         ['SECRETARIO', 'DIRECTOR'].includes(r),
@@ -822,6 +930,9 @@ export function crearRouterDerivaciones(
           observacion_interna: req.body.observacion_interna,
           actor_unidad_organica_id: actor.unidadOrganicaId,
           actor_roles: actor.roles,
+          exigir_custodia: true,
+          actor_id: actor.id,
+          actor_id_persona: actor.idPersona ?? null,
         });
 
         // Avanzar workflow a paso firma si existe
@@ -876,27 +987,46 @@ export function crearRouterDerivaciones(
         throw new UnauthorizedError({ detail: 'Autenticación requerida para resolver el expediente.' });
       }
 
-      const contextoOperacion = resolverContextoOperacion(req, actor);
-      if (contextoOperacion === 'PERSONAL') {
-        throw new ForbiddenError({
-          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
-          detail: 'En contexto personal el usuario no dispone de facultades resolutivas.',
-        });
-      }
+      validarActorNoAdministradoNiPersonal(
+        req,
+        actor,
+        'En contexto personal el usuario no dispone de facultades resolutivas.',
+        'Los administrados no tienen facultades resolutivas.',
+      );
 
-      const esAdministrado = actor.roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r));
-      if (esAdministrado) {
-        throw new ForbiddenError({ detail: 'Los administrados no tienen facultades resolutivas.' });
-      }
+      const contextoExp = await consultarContextoExpediente(expedienteId);
 
-      // REGLA CANÓNICA: Autoridad resolutiva reservada a DIRECTOR con facultad de firma
-      const rolesNoFirmantes = actor.roles.filter((r) => r !== 'ADMINISTRADOR' && r !== 'SUPERADMINISTRADOR');
+      // REGLA CANÓNICA: Autoridad resolutiva reservada a DIRECTOR / firmante con facultad de firma
+      const rolesNoFirmantes = actor.roles.filter(
+        (r) => !['ADMINISTRADOR', 'SUPERADMINISTRADOR', 'SUPER_ADMIN'].includes(r),
+      );
       const facultad = await verificarFacultadFirma(pool, actor.id, rolesNoFirmantes);
       if (!facultad.puedeFirmar) {
         throw new ForbiddenError({
           code: 'SIN_FACULTAD_RESOLUTIVA',
           message: 'Acceso denegado: Se requiere cargo o facultad directiva (DIRECTOR) para emitir la resolución del expediente.',
           detail: facultad.motivo ?? 'El rol administrativo o técnico no confiere facultades de resolución institucional.',
+        });
+      }
+
+      asegurarSinSoloPoderTecnicoNiFinanciero(actor);
+
+      const idPersonaActor = await resolverIdPersonaActor(actor);
+      asegurarNoAutoatencion(
+        actor,
+        idPersonaActor,
+        contextoExp.solicitanteId,
+        'AUTOATENCION_PROHIBIDA: El solicitante no puede emitir resolución sobre su propio expediente personal.',
+      );
+
+      // Custodia fail-closed del área resolutiva
+      const tieneCustodiaResol = await tieneCustodiaEfectiva(pool, actor, contextoExp.areaActualId, {
+        idPersonaActor,
+      });
+      if (!tieneCustodiaResol) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No pertenece al área de custodia resolutiva del expediente para emitir la resolución.',
         });
       }
 
@@ -960,22 +1090,45 @@ export function crearRouterDerivaciones(
         throw new UnauthorizedError({ detail: 'Autenticación requerida para archivar el expediente.' });
       }
 
-      const contextoOperacion = resolverContextoOperacion(req, actor);
-      if (contextoOperacion === 'PERSONAL') {
+      validarActorNoAdministradoNiPersonal(
+        req,
+        actor,
+        'En contexto personal el usuario no dispone de facultades para archivar expedientes.',
+        'Los administrados no tienen autorización para archivar expedientes.',
+      );
+
+      const contextoExp = await consultarContextoExpediente(expedienteId);
+      asegurarSinSoloPoderTecnicoNiFinanciero(actor);
+
+      const tienePermisoArchivo = actor.roles.some((r) =>
+        ['DIRECTOR', 'SECRETARIO', 'MESA_PARTES'].includes(r),
+      );
+      if (!tienePermisoArchivo) {
         throw new ForbiddenError({
-          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
-          detail: 'En contexto personal el usuario no dispone de facultades para archivar expedientes.',
+          code: 'SIN_FACULTAD_ARCHIVO',
+          detail: 'No cuenta con rol habilitado para el archivado físico del expediente.',
         });
       }
 
-      const tienePermisoArchivo = actor.roles.some((r) =>
-        ['ADMINISTRADOR', 'DIRECTOR', 'SECRETARIO', 'MESA_PARTES', 'SUPER_ADMIN'].includes(r),
+      const idPersonaActor = await resolverIdPersonaActor(actor);
+      asegurarNoAutoatencion(
+        actor,
+        idPersonaActor,
+        contextoExp.solicitanteId,
+        'AUTOATENCION_PROHIBIDA: El solicitante no puede archivar su propio expediente personal.',
       );
-      if (!tienePermisoArchivo) {
-        throw new ForbiddenError({ detail: 'No cuenta con rol habilitado para el archivado físico del expediente.' });
+
+      const tieneCustodiaArchivo = await tieneCustodiaEfectiva(pool, actor, contextoExp.areaActualId, {
+        permitirMesaEnAreaInicial: true,
+        idPersonaActor,
+      });
+      if (!tieneCustodiaArchivo) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No tiene custodia en el área actual del expediente para archivarlo.',
+        });
       }
 
-      const contextoExp = await consultarContextoExpediente(expedienteId);
       if (contextoExp.estadoActual !== 'RESUELTO') {
         throw new DomainError({
           code: 'ESTADO_INVALIDO',
@@ -1048,7 +1201,11 @@ export function crearRouterDerivaciones(
       }
 
       const actor = await resolverActor(req);
-      if (actor?.puedeVerExpediente) {
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para acumular expedientes.' });
+      }
+
+      if (actor.puedeVerExpediente) {
         const [puedePrincipal, puedeAccesorio] = await Promise.all([
           actor.puedeVerExpediente(expedientePrincipalId),
           actor.puedeVerExpediente(accesorioId),
@@ -1060,6 +1217,60 @@ export function crearRouterDerivaciones(
               : `No tiene autorización sobre el expediente accesorio ${accesorioId}.`,
           });
         }
+      }
+
+      validarActorNoAdministradoNiPersonal(
+        req,
+        actor,
+        'En contexto personal el usuario no dispone de facultades para acumular expedientes.',
+        'Los administrados no tienen autorización para acumular expedientes.',
+      );
+
+      const [contextoPrincipal, contextoAccesorio] = await Promise.all([
+        consultarContextoExpediente(expedientePrincipalId),
+        consultarContextoExpediente(accesorioId),
+      ]);
+
+      asegurarSinSoloPoderTecnicoNiFinanciero(actor);
+      if (!actor.roles.some((r) => ROLES_NEGOCIO_DOCUMENTAL.includes(r))) {
+        throw new ForbiddenError({
+          code: 'SIN_FACULTAD_ACUMULACION',
+          detail: 'No cuenta con rol operativo autorizado para acumular expedientes.',
+        });
+      }
+
+      const idPersonaActor = await resolverIdPersonaActor(actor);
+      asegurarNoAutoatencion(
+        actor,
+        idPersonaActor,
+        contextoPrincipal.solicitanteId,
+        'AUTOATENCION_PROHIBIDA: El solicitante no puede acumular su propio expediente personal.',
+      );
+      asegurarNoAutoatencion(
+        actor,
+        idPersonaActor,
+        contextoAccesorio.solicitanteId,
+        'AUTOATENCION_PROHIBIDA: El solicitante no puede acumular su propio expediente personal.',
+      );
+
+      const tieneCustodiaPrincipal = await tieneCustodiaEfectiva(
+        pool,
+        actor,
+        contextoPrincipal.areaActualId,
+        { permitirMesaEnAreaInicial: true, idPersonaActor },
+      );
+      if (!tieneCustodiaPrincipal) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No pertenece al área de custodia del expediente principal para acumular expedientes.',
+        });
+      }
+
+      if (contextoPrincipal.estadoActual === 'ARCHIVADO' || contextoAccesorio.estadoActual === 'ARCHIVADO') {
+        throw new DomainError({
+          code: 'ESTADO_INVALIDO',
+          message: 'No se pueden acumular expedientes que ya se encuentran en estado ARCHIVADO.',
+        });
       }
 
       const cliente = await pool.connect();
@@ -1122,53 +1333,40 @@ export function crearRouterDerivaciones(
         throw new UnauthorizedError({ detail: 'Autenticación requerida para observar el expediente.' });
       }
 
-      const contextoOperacion = resolverContextoOperacion(req, actor);
-      if (contextoOperacion === 'PERSONAL') {
-        throw new ForbiddenError({
-          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
-          detail: 'En contexto personal el usuario no dispone de facultades para registrar observaciones institucionales.',
-        });
-      }
-
-      const esAdministrado = actor.roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r));
-      if (esAdministrado) {
-        throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para observar expedientes.' });
-      }
+      validarActorNoAdministradoNiPersonal(
+        req,
+        actor,
+        'En contexto personal el usuario no dispone de facultades para registrar observaciones institucionales.',
+        'Los administrados no tienen autorización para observar expedientes.',
+      );
 
       const contextoExp = await consultarContextoExpediente(expedienteId);
+      asegurarSinSoloPoderTecnicoNiFinanciero(actor);
+      if (!actor.roles.some((r) => ROLES_NEGOCIO_DOCUMENTAL.includes(r))) {
+        throw new ForbiddenError({ detail: 'No cuenta con rol operativo habilitado para observar expedientes.' });
+      }
+
       const idPersonaActor = await resolverIdPersonaActor(actor);
 
       // Autoatención
-      if (
-        (idPersonaActor && idPersonaActor === contextoExp.solicitanteId) ||
-        actor.id === contextoExp.solicitanteId
-      ) {
-        throw new ForbiddenError({
-          code: 'CONFLICTO_INTERES_EXPEDIENTE_PROPIO',
-          detail: 'AUTOATENCION_PROHIBIDA: El solicitante no puede auto-observar su propio expediente.',
-        });
-      }
-
-      // Custodia
-      const esAdminOInstitucional = actor.roles.some((r) =>
-        ['ADMINISTRADOR', 'DIRECTOR'].includes(r),
+      asegurarNoAutoatencion(
+        actor,
+        idPersonaActor,
+        contextoExp.solicitanteId,
+        'AUTOATENCION_PROHIBIDA: El solicitante no puede auto-observar su propio expediente.',
       );
 
-      if (!esAdminOInstitucional) {
-        let tieneCustodia = false;
-        if (actor.roles.includes('MESA_PARTES')) {
-          if (contextoExp.estadoActual === 'EN_CALIFICACION') {
-            tieneCustodia = true;
-          } else if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
-            tieneCustodia = true;
-          }
-        } else if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
-          tieneCustodia = true;
-        }
+      // Custodia fail-closed por área (incluye Mesa de Partes en EN_CALIFICACION o encargatura vigente)
+      const tieneCustodiaObs = await tieneCustodiaEfectiva(pool, actor, contextoExp.areaActualId, {
+        permitirMesaEnAreaInicial: contextoExp.estadoActual === 'EN_CALIFICACION',
+        idPersonaActor,
+      });
 
-        if (!tieneCustodia) {
-          throw new ForbiddenError({ detail: 'No tiene custodia sobre el expediente para registrar observaciones.' });
-        }
+      if (!tieneCustodiaObs) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No tiene custodia sobre el expediente para registrar observaciones.',
+        });
       }
 
       // Validación FSM canónica: únicamente EN_CALIFICACION y EN_REVISION
@@ -1239,18 +1437,34 @@ export function crearRouterDerivaciones(
       const contextoExp = await consultarContextoExpediente(expedienteId);
       const idPersonaActor = await resolverIdPersonaActor(actor);
 
-      // Titular o Mesa de Partes
-      const esAdminOInstitucional = actor.roles.some((r) =>
-        ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES'].includes(r),
+      // Solo titular del expediente o personal de Mesa de Partes en contexto institucional con custodia en ventanilla/área
+      const esTitular = Boolean(
+        contextoExp.solicitanteId &&
+          ((idPersonaActor && idPersonaActor === contextoExp.solicitanteId) ||
+            actor.id === contextoExp.solicitanteId),
       );
 
-      if (!esAdminOInstitucional) {
-        const esTitular = Boolean(
-          (idPersonaActor && idPersonaActor === contextoExp.solicitanteId) ||
-          actor.id === contextoExp.solicitanteId
-        );
-        if (!esTitular) {
-          throw new ForbiddenError({ detail: 'Solo el titular administrado o personal de Mesa de Partes puede subsanar el expediente.' });
+      if (!esTitular) {
+        const contextoOperacion = resolverContextoOperacion(req, actor);
+        if (contextoOperacion === 'PERSONAL') {
+          throw new ForbiddenError({
+            code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
+            detail: 'Solo el titular administrado o personal de Mesa de Partes en contexto institucional puede subsanar el expediente.',
+          });
+        }
+        asegurarSinSoloPoderTecnicoNiFinanciero(actor);
+
+        const esMesaConCustodia =
+          actor.roles.includes('MESA_PARTES') &&
+          (await tieneCustodiaEfectiva(pool, actor, contextoExp.areaActualId, {
+            permitirMesaEnAreaInicial: true,
+            idPersonaActor,
+          }));
+        if (!esMesaConCustodia) {
+          throw new ForbiddenError({
+            code: 'SIN_FACULTAD_SUBSANACION',
+            detail: 'Solo el titular administrado o personal de Mesa de Partes puede subsanar el expediente.',
+          });
         }
       }
 
@@ -1310,35 +1524,29 @@ export function crearRouterDerivaciones(
         throw new UnauthorizedError({ detail: 'Autenticación requerida para iniciar revisión.' });
       }
 
-      const contextoOperacion = resolverContextoOperacion(req, actor);
-      if (contextoOperacion === 'PERSONAL') {
-        throw new ForbiddenError({
-          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
-          detail: 'En contexto personal el usuario no dispone de facultades para iniciar revisión de expedientes.',
-        });
-      }
-
-      const esAdministrado = actor.roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r));
-      if (esAdministrado) {
-        throw new ForbiddenError({
-          code: 'ADMINISTRADO_NO_AUTORIZADO',
-          detail: 'Los administrados no tienen autorización para iniciar revisión de expedientes.',
-        });
-      }
+      validarActorNoAdministradoNiPersonal(
+        req,
+        actor,
+        'En contexto personal el usuario no dispone de facultades para iniciar revisión de expedientes.',
+        'Los administrados no tienen autorización para iniciar revisión de expedientes.',
+        'ADMINISTRADO_NO_AUTORIZADO',
+      );
 
       const contextoExp = await consultarContextoExpediente(expedienteId);
+      asegurarSinSoloPoderTecnicoNiFinanciero(actor);
+      if (!actor.roles.some((r) => ROLES_NEGOCIO_DOCUMENTAL.includes(r))) {
+        throw new ForbiddenError({ detail: 'No cuenta con rol operativo habilitado para iniciar revisión.' });
+      }
+
       const idPersonaActor = await resolverIdPersonaActor(actor);
 
       // Autoatención prohibida
-      if (
-        (idPersonaActor && idPersonaActor === contextoExp.solicitanteId) ||
-        actor.id === contextoExp.solicitanteId
-      ) {
-        throw new ForbiddenError({
-          code: 'CONFLICTO_INTERES_EXPEDIENTE_PROPIO',
-          detail: 'AUTOATENCION_PROHIBIDA: El solicitante no puede iniciar revisión de su propio expediente personal.',
-        });
-      }
+      asegurarNoAutoatencion(
+        actor,
+        idPersonaActor,
+        contextoExp.solicitanteId,
+        'AUTOATENCION_PROHIBIDA: El solicitante no puede iniciar revisión de su propio expediente personal.',
+      );
 
       // Validar estado actual FSM
       if (contextoExp.estadoActual !== 'SUBSANADO') {
@@ -1348,21 +1556,16 @@ export function crearRouterDerivaciones(
         });
       }
 
-      // BOLA / Custodia: Mesa de Partes, especialista/secretario del área, o admin/director
-      const esDirectorOAdmin = actor.roles.some((r) => ['DIRECTOR', 'ADMINISTRADOR'].includes(r));
-      if (!esDirectorOAdmin) {
-        let tieneCustodia = false;
-        if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
-          tieneCustodia = true;
-        } else if (actor.roles.includes('MESA_PARTES') && (contextoExp.areaActualId === 'DIR' || !contextoExp.areaActualId)) {
-          tieneCustodia = true;
-        }
-        if (!tieneCustodia) {
-          throw new ForbiddenError({
-            code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
-            detail: 'No pertenece al área responsable ni cuenta con custodia del expediente para iniciar la revisión.',
-          });
-        }
+      // BOLA / Custodia fail-closed sin bypass de DIRECTOR ni ADMINISTRADOR
+      const tieneCustodiaInicioRev = await tieneCustodiaEfectiva(pool, actor, contextoExp.areaActualId, {
+        permitirMesaEnAreaInicial: true,
+        idPersonaActor,
+      });
+      if (!tieneCustodiaInicioRev) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No pertenece al área responsable ni cuenta con custodia del expediente para iniciar la revisión.',
+        });
       }
 
       const cliente = await pool.connect();
@@ -1412,22 +1615,41 @@ export function crearRouterDerivaciones(
         throw new UnauthorizedError({ detail: 'Autenticación requerida para calificar requisitos.' });
       }
 
-      const contextoOperacion = resolverContextoOperacion(req, actor);
-      if (contextoOperacion === 'PERSONAL') {
-        throw new ForbiddenError({
-          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
-          detail: 'En contexto personal el usuario no dispone de facultades para calificar requisitos.',
-        });
-      }
-
-      const esAdministrado = actor.roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r));
-      if (esAdministrado) {
-        throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para calificar requisitos.' });
-      }
+      validarActorNoAdministradoNiPersonal(
+        req,
+        actor,
+        'En contexto personal el usuario no dispone de facultades para calificar requisitos.',
+        'Los administrados no tienen autorización para calificar requisitos.',
+      );
 
       if (!['VALIDADO', 'OBSERVADO'].includes(estadoValidacion)) {
         throw new ValidationError({
           invalidParams: [{ name: 'estadoValidacion', reason: 'Debe ser VALIDADO u OBSERVADO.' }],
+        });
+      }
+
+      const contextoExp = await consultarContextoExpediente(expedienteId);
+      asegurarSinSoloPoderTecnicoNiFinanciero(actor);
+      if (!actor.roles.some((r) => ROLES_NEGOCIO_DOCUMENTAL.includes(r))) {
+        throw new ForbiddenError({ detail: 'No cuenta con rol operativo habilitado para calificar requisitos.' });
+      }
+
+      const idPersonaActor = await resolverIdPersonaActor(actor);
+      asegurarNoAutoatencion(
+        actor,
+        idPersonaActor,
+        contextoExp.solicitanteId,
+        'AUTOATENCION_PROHIBIDA: El solicitante no puede calificar requisitos de su propio expediente personal.',
+      );
+
+      const tieneCustodiaCalif = await tieneCustodiaEfectiva(pool, actor, contextoExp.areaActualId, {
+        permitirMesaEnAreaInicial: true,
+        idPersonaActor,
+      });
+      if (!tieneCustodiaCalif) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No pertenece al área de custodia del expediente para calificar requisitos.',
         });
       }
 
@@ -1521,20 +1743,21 @@ export function crearRouterDerivaciones(
         throw new UnauthorizedError({ detail: 'Autenticación requerida para asignar expediente.' });
       }
 
-      const contextoOperacion = resolverContextoOperacion(req, actor);
-      if (contextoOperacion === 'PERSONAL') {
-        throw new ForbiddenError({
-          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
-          detail: 'En contexto personal no se pueden asignar expedientes a funcionarios.',
-        });
-      }
+      validarActorNoAdministradoNiPersonal(
+        req,
+        actor,
+        'En contexto personal no se pueden asignar expedientes a funcionarios.',
+        'Los administrados no tienen autorización para asignar expedientes.',
+      );
 
       const contextoExp = await consultarContextoExpediente(expedienteId);
+      const idPersonaActor = await resolverIdPersonaActor(actor);
+
       const esSecretario = actor.roles.includes('SECRETARIO');
       const esDirector = actor.roles.includes('DIRECTOR');
       let tieneEncargatura = false;
       if (esDirector) {
-        tieneEncargatura = await verificarEncargaturaDespacho(pool, actor.id, contextoExp.areaActualId);
+        tieneEncargatura = await verificarEncargaturaDespacho(pool, actor.id, contextoExp.areaActualId, idPersonaActor);
       }
 
       if (!esSecretario && !tieneEncargatura) {
@@ -1545,6 +1768,14 @@ export function crearRouterDerivaciones(
             : 'Solo el Secretario del área con custodia o funcionario con encargatura/delegación vigente posee facultades para asignar expedientes.',
         });
       }
+
+      asegurarSinSoloPoderTecnicoNiFinanciero(actor);
+      asegurarNoAutoatencion(
+        actor,
+        idPersonaActor,
+        contextoExp.solicitanteId,
+        'AUTOATENCION_PROHIBIDA: El solicitante no puede gestionar asignaciones de su propio expediente personal.',
+      );
 
       if (!tieneEncargatura && (!actor.unidadOrganicaId || actor.unidadOrganicaId !== contextoExp.areaActualId)) {
         throw new ForbiddenError({
@@ -1616,20 +1847,28 @@ export function crearRouterDerivaciones(
         throw new UnauthorizedError({ detail: 'Autenticación requerida para desasignar expediente.' });
       }
 
-      const contextoOperacion = resolverContextoOperacion(req, actor);
-      if (contextoOperacion === 'PERSONAL') {
-        throw new ForbiddenError({
-          code: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
-          detail: 'En contexto personal no se pueden desasignar expedientes.',
-        });
-      }
+      validarActorNoAdministradoNiPersonal(
+        req,
+        actor,
+        'En contexto personal no se pueden desasignar expedientes.',
+        'Los administrados no tienen autorización para desasignar expedientes.',
+      );
 
       const contextoExp = await consultarContextoExpediente(expedienteId);
+      asegurarSinSoloPoderTecnicoNiFinanciero(actor);
+      const idPersonaActor = await resolverIdPersonaActor(actor);
+      asegurarNoAutoatencion(
+        actor,
+        idPersonaActor,
+        contextoExp.solicitanteId,
+        'AUTOATENCION_PROHIBIDA: El solicitante no puede gestionar asignaciones de su propio expediente personal.',
+      );
+
       const esSecretario = actor.roles.includes('SECRETARIO');
       const esDirector = actor.roles.includes('DIRECTOR');
       let tieneEncargatura = false;
       if (esDirector) {
-        tieneEncargatura = await verificarEncargaturaDespacho(pool, actor.id, contextoExp.areaActualId);
+        tieneEncargatura = await verificarEncargaturaDespacho(pool, actor.id, contextoExp.areaActualId, idPersonaActor);
       }
 
       if (!esSecretario && !tieneEncargatura) {
@@ -1674,9 +1913,45 @@ export function crearRouterDerivaciones(
   router.get('/:id/asignacion', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const expedienteId = String(req.params.id);
-      const activa = await asignacionSvc.obtenerAsignacionActiva(expedienteId);
-      const historial = await asignacionSvc.listarHistorialAsignaciones(expedienteId);
-      const candidatos = await asignacionSvc.listarCandidatosAsignacion(expedienteId);
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para consultar asignaciones.' });
+      }
+      if (actor.puedeVerExpediente) {
+        const autorizado = await actor.puedeVerExpediente(expedienteId);
+        if (!autorizado) {
+          throw new ForbiddenError({
+            detail: `No tiene autorización para ver la asignación del expediente ${expedienteId}.`,
+          });
+        }
+      }
+      const activaRaw = await asignacionSvc.obtenerAsignacionActiva(expedienteId);
+      const historialRaw = await asignacionSvc.listarHistorialAsignaciones(expedienteId);
+      const contextoOperacion = resolverContextoOperacion(req, actor);
+      const idPersonaActor = await resolverIdPersonaActor(actor);
+      const contextoExp = await consultarContextoExpediente(expedienteId);
+      const esTitularPropio = Boolean(
+        (idPersonaActor && idPersonaActor === contextoExp.solicitanteId) ||
+          actor.id === contextoExp.solicitanteId,
+      );
+      const puedeVerNombreAsignado =
+        contextoOperacion === 'INSTITUCIONAL' &&
+        !esTitularPropio &&
+        actor.roles.some((r) =>
+          ['DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES', 'TESORERIA', 'ADMINISTRADOR', 'SUPERADMINISTRADOR'].includes(r),
+        );
+
+      const sanitizarAsignacion = <T extends Record<string, any> | null>(item: T): T => {
+        if (!item || puedeVerNombreAsignado) return item;
+        const { nombreCompleto: _nc, personaNombre: _pn, usuario: _u, ...rest } = item;
+        return rest as T;
+      };
+
+      const activa = sanitizarAsignacion(activaRaw);
+      const historial = historialRaw.map((h) => sanitizarAsignacion(h));
+      const candidatos = puedeVerNombreAsignado
+        ? await asignacionSvc.listarCandidatosAsignacion(expedienteId)
+        : [];
       res.status(200).json({
         ok: true,
         activa,
@@ -1694,6 +1969,18 @@ export function crearRouterDerivaciones(
   router.get('/:id/observaciones', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const expedienteId = String(req.params.id);
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para consultar observaciones.' });
+      }
+      if (actor.puedeVerExpediente) {
+        const autorizado = await actor.puedeVerExpediente(expedienteId);
+        if (!autorizado) {
+          throw new ForbiddenError({
+            detail: `No tiene autorización para ver las observaciones del expediente ${expedienteId}.`,
+          });
+        }
+      }
       const observaciones = await observacionSvc.listarObservacionesPorExpediente(expedienteId);
       res.status(200).json({
         ok: true,
@@ -1711,6 +1998,18 @@ export function crearRouterDerivaciones(
   router.get('/:id/workflow', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const expedienteId = String(req.params.id);
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para consultar workflow.' });
+      }
+      if (actor.puedeVerExpediente) {
+        const autorizado = await actor.puedeVerExpediente(expedienteId);
+        if (!autorizado) {
+          throw new ForbiddenError({
+            detail: `No tiene autorización para ver el workflow del expediente ${expedienteId}.`,
+          });
+        }
+      }
       const instancia = await workflowSvc.obtenerInstanciaPorExpediente(expedienteId);
       res.status(200).json({
         ok: true,

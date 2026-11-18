@@ -220,30 +220,29 @@ describe('SEC-01 / BOLA & FSM: Control de Acceso, Roles Reales y FSM Canónica e
     });
   });
 
-  describe('2. ROLES REALES AUTORIZADOS EN OBSERVAR EXPEDIENTE', () => {
-    it('permite con 200 OK al rol real ADMINISTRADOR institucional', async () => {
+  describe('2. ROLES REALES AUTORIZADOS Y RESTRICCIONES EN OBSERVAR EXPEDIENTE', () => {
+    it('deniega con 403 al rol ADMINISTRADOR técnico sin rol sustantivo ni custodia', async () => {
       estadoExpediente = 'EN_CALIFICACION';
       const res = await request(app)
         .post(`/api/v1/expedientes/${ID_EXPEDIENTE}/observar`)
         .set('Authorization', `Bearer ${tokenAdministrador}`)
-        .send({ motivo: 'Observación institucional por administrador' });
+        .send({ motivo: 'Intento de observación por administrador técnico' });
 
-      expect(res.status).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(res.body.estado).toBe('OBSERVADO');
-      expect(tracker.beginCount).toBe(1);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('PODER_TECNICO_SIN_AUTORIDAD_NEGOCIO');
+      expect(tracker.beginCount).toBe(0);
     });
 
-    it('permite con 200 OK al rol real DIRECTOR institucional', async () => {
+    it('deniega con 403 al rol DIRECTOR cuando pertenece a un área distinta sin custodia', async () => {
       estadoExpediente = 'EN_CALIFICACION';
       const res = await request(app)
         .post(`/api/v1/expedientes/${ID_EXPEDIENTE}/observar`)
         .set('Authorization', `Bearer ${tokenDirector}`)
-        .send({ motivo: 'Observación dictada por dirección' });
+        .send({ motivo: 'Intento de observación desde área sin custodia' });
 
-      expect(res.status).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(res.body.estado).toBe('OBSERVADO');
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('BOLA_VIOLATION_CUSTODIA_AJENA');
+      expect(tracker.beginCount).toBe(0);
     });
 
     it('permite con 200 OK a ESPECIALISTA custodio de la unidad orgánica', async () => {
@@ -288,7 +287,7 @@ describe('SEC-01 / BOLA & FSM: Control de Acceso, Roles Reales y FSM Canónica e
       estadoExpediente = 'EN_CALIFICACION';
       const res = await request(app)
         .post(`/api/v1/expedientes/${ID_EXPEDIENTE}/observar`)
-        .set('Authorization', `Bearer ${tokenDirector}`)
+        .set('Authorization', `Bearer ${tokenSecretarioCustodio}`)
         .send({ motivo: 'Observación en calificación' });
 
       expect(res.status).toBe(200);
@@ -298,7 +297,7 @@ describe('SEC-01 / BOLA & FSM: Control de Acceso, Roles Reales y FSM Canónica e
       estadoExpediente = 'EN_REVISION';
       const res = await request(app)
         .post(`/api/v1/expedientes/${ID_EXPEDIENTE}/observar`)
-        .set('Authorization', `Bearer ${tokenDirector}`)
+        .set('Authorization', `Bearer ${tokenSecretarioCustodio}`)
         .send({ motivo: 'Observación en revisión' });
 
       expect(res.status).toBe(200);
@@ -320,7 +319,7 @@ describe('SEC-01 / BOLA & FSM: Control de Acceso, Roles Reales y FSM Canónica e
         estadoExpediente = estadoInvalido;
         const res = await request(app)
           .post(`/api/v1/expedientes/${ID_EXPEDIENTE}/observar`)
-          .set('Authorization', `Bearer ${tokenDirector}`)
+          .set('Authorization', `Bearer ${tokenSecretarioCustodio}`)
           .send({ motivo: `Intento de observar desde ${estadoInvalido}` });
 
         expect(res.status).toBe(422);
@@ -391,16 +390,16 @@ describe('SEC-01 / BOLA & FSM: Control de Acceso, Roles Reales y FSM Canónica e
       expect(tracker.beginCount).toBe(0);
     });
 
-    it('permite con 200 OK al rol ADMINISTRADOR institucional para ventanilla presencial', async () => {
+    it('deniega con 403 al rol ADMINISTRADOR técnico sin rol MESA_PARTES ni titularidad', async () => {
       estadoExpediente = 'OBSERVADO';
       const res = await request(app)
         .post(`/api/v1/expedientes/${ID_EXPEDIENTE}/subsanar`)
         .set('Authorization', `Bearer ${tokenAdministrador}`)
-        .send({ motivo: 'Recepción presencial de subsanación' });
+        .send({ motivo: 'Intento de subsanación por administrador técnico' });
 
-      expect(res.status).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(res.body.estado).toBe('SUBSANADO');
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('PODER_TECNICO_SIN_AUTORIDAD_NEGOCIO');
+      expect(tracker.beginCount).toBe(0);
     });
 
     it('permite con 200 OK a MESA_PARTES para ventanilla presencial', async () => {

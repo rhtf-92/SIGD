@@ -113,18 +113,54 @@ export function crearRouterAuth(pool: Pool): Router {
       [usuario.id_usuario]
     );
 
-    // Descubrimiento de perfiles operativos asignados vigentes
-    const { rows: perfilesRows } = await pool.query<{ codigo: string; area_id: string | null; scope: string }>(
-      `SELECT p.codigo, ap.area_id, ap.scope
+    // Descubrimiento de perfiles operativos y permisos asignados vigentes
+    const { rows: perfilesRows } = await pool.query<{
+      codigo: string;
+      area_id: string | null;
+      scope: string;
+      permisos: string[];
+    }>(
+      `SELECT p.codigo,
+              ap.area_id,
+              ap.scope,
+              COALESCE(
+                array_agg(ps.codigo) FILTER (WHERE ps.codigo IS NOT NULL),
+                '{}'::text[]
+              ) AS permisos
          FROM sigd_org.asignacion_perfil_operativo ap
          JOIN sigd_org.perfil_operativo p ON p.perfil_id = ap.perfil_id
+         LEFT JOIN sigd_org.perfil_permiso pp ON pp.perfil_id = p.perfil_id
+         LEFT JOIN sigd_org.permiso_sistema ps ON ps.permiso_id = pp.permiso_id
         WHERE ap.id_usuario = $1::uuid
           AND ap.estado = 'ACTIVO'
           AND p.vigente = TRUE
           AND ap.vigente_desde <= now()
-          AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())`,
+          AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
+        GROUP BY ap.id_asignacion_perfil, p.codigo, ap.area_id, ap.scope`,
       [usuario.id_usuario]
     );
+
+    const permisosSet = new Set<string>(perfilesRows.flatMap((p) => p.permisos ?? []));
+    const { rows: delegRows } = await pool.query<{ tipo_actuacion: string | null }>(
+      `SELECT UPPER(COALESCE(rt.alcance->>'tipoActuacion', '')) AS tipo_actuacion
+         FROM sigd_org.responsabilidad_temporal rt
+        WHERE (rt.id_usuario = $1::uuid OR ($2::uuid IS NOT NULL AND rt.id_persona = $2::uuid))
+          AND rt.estado = 'ACTIVO'
+          AND rt.tipo_responsabilidad = 'DELEGACION'
+          AND rt.vigente_desde <= now()
+          AND (rt.vigente_hasta IS NULL OR rt.vigente_hasta > now())`,
+      [usuario.id_usuario, usuario.id_persona],
+    ).catch(() => ({ rows: [] as Array<{ tipo_actuacion: string | null }> }));
+    for (const del of delegRows) {
+      if (del.tipo_actuacion === 'DERIVACION' || del.tipo_actuacion === 'TODAS') {
+        permisosSet.add('EXPEDIENTE_DERIVAR');
+      }
+      if (del.tipo_actuacion === 'FIRMA' || del.tipo_actuacion === 'TODAS') {
+        permisosSet.add('FIRMA_FIRMAR');
+      }
+    }
+    const perfilesInstitucionales = perfilesRows.map((p) => p.codigo);
+    const permisosInstitucionales = Array.from(permisosSet);
 
     // Descubrimiento de asignaciones ordinarias y responsabilidades
     const { rows: asigRows } = await pool.query<{ area_id: string }>(
@@ -249,6 +285,8 @@ export function crearRouterAuth(pool: Pool): Router {
         rol: rolEfectivo,
         contexto: contextoEfectivo,
         areaId: areaIdEfectivo,
+        perfiles: contextoEfectivo === 'INSTITUCIONAL' ? perfilesInstitucionales : [],
+        permisos: contextoEfectivo === 'INSTITUCIONAL' ? permisosInstitucionales : [],
       },
     });
   });
@@ -326,15 +364,23 @@ export function crearRouterAuth(pool: Pool): Router {
       [user.id_usuario]
     );
 
-    const { rows: apRows } = await pool.query<{ codigo: string; area_id: string | null }>(
-      `SELECT p.codigo, ap.area_id
+    const { rows: apRows } = await pool.query<{ codigo: string; area_id: string | null; permisos: string[] }>(
+      `SELECT p.codigo,
+              ap.area_id,
+              COALESCE(
+                array_agg(ps.codigo) FILTER (WHERE ps.codigo IS NOT NULL),
+                '{}'::text[]
+              ) AS permisos
          FROM sigd_org.asignacion_perfil_operativo ap
          JOIN sigd_org.perfil_operativo p ON p.perfil_id = ap.perfil_id
+         LEFT JOIN sigd_org.perfil_permiso pp ON pp.perfil_id = p.perfil_id
+         LEFT JOIN sigd_org.permiso_sistema ps ON ps.permiso_id = pp.permiso_id
         WHERE ap.id_usuario = $1::uuid
           AND ap.estado = 'ACTIVO'
           AND p.vigente = TRUE
           AND ap.vigente_desde <= now()
-          AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())`,
+          AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
+        GROUP BY ap.id_asignacion_perfil, p.codigo, ap.area_id`,
       [user.id_usuario]
     );
 
@@ -348,6 +394,7 @@ export function crearRouterAuth(pool: Pool): Router {
 
     const rolInst = rRows.find((r) => r.codigo !== 'CIUDADANO')?.codigo ?? 'ESPECIALISTA';
     const areaInst = rRows.find((r) => r.codigo !== 'CIUDADANO')?.area_id ?? apRows[0]?.area_id;
+    const permisosCtx = new Set<string>(apRows.flatMap((p) => p.permisos ?? []));
 
     const nuevoToken = firmarTokenAcceso({
       sub: user.id_usuario,
@@ -366,6 +413,8 @@ export function crearRouterAuth(pool: Pool): Router {
         rol: rolInst,
         contexto: 'INSTITUCIONAL',
         areaId: areaInst ?? undefined,
+        perfiles: apRows.map((p) => p.codigo),
+        permisos: Array.from(permisosCtx),
       },
     });
   });

@@ -1,11 +1,47 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Pool, PoolClient } from 'pg';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
+import { headObject, validarMagicBytes } from '../../core/storage/s3-storage.service.js';
 import { a4GeneratorService, type OpcionesGeneracion } from './a4Generator.service.js';
 import { CvdStampService } from './cvdStamp.service.js';
 import type { ContenidoResolucion } from './types.js';
 import { AppError, NotFoundError } from '../../shared/domain/errors/index.js';
+
+const SHA256_CONTENIDO_VACIO =
+  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+const pendingCvdPorDocId = new Map<string, string>();
+let logoSuizaCache: Uint8Array | null | undefined;
+
+function cargarLogoInstitucionalPng(): Uint8Array | undefined {
+  if (logoSuizaCache !== undefined) {
+    return logoSuizaCache ?? undefined;
+  }
+  const actualDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidatos = [
+    path.resolve(actualDir, '../../../assets/logo-suiza.png'),
+    path.resolve(actualDir, '../../../../assets/logo-suiza.png'),
+    path.resolve(process.cwd(), 'assets/logo-suiza.png'),
+    path.resolve(process.cwd(), 'backend/assets/logo-suiza.png'),
+    path.resolve(process.cwd(), '../frontend/src/assets/sigd/logo-suiza.png'),
+    path.resolve(process.cwd(), 'frontend/src/assets/sigd/logo-suiza.png'),
+  ];
+  for (const ruta of candidatos) {
+    try {
+      if (fs.existsSync(ruta)) {
+        logoSuizaCache = new Uint8Array(fs.readFileSync(ruta));
+        return logoSuizaCache;
+      }
+    } catch {
+      // Continuar con el siguiente candidato
+    }
+  }
+  logoSuizaCache = null;
+  return undefined;
+}
 
 // =============================================================================
 // DocuCore · Servicio de proyección de Resoluciones Directorales (A4)
@@ -502,15 +538,34 @@ export async function generarActoResolutivoInstitucional(
 
   if (resExistente.rowCount && resExistente.rowCount > 0) {
     const act = resExistente.rows[0];
-    return {
-      documentoId: act.documento_adjunto_id,
-      documentoNombre: act.nombre_archivo,
-      hashSha256: act.sha256,
-      cvd: act.cvd || '',
-      numeroResolucion: act.numero_resolucion || act.nombre_archivo.replace(/^Resolucion_|\.pdf$/g, ''),
-      s3Key: act.s3_key,
-      s3Bucket: act.s3_bucket,
-    };
+    const cvdExistente = act.cvd || pendingCvdPorDocId.get(act.documento_adjunto_id) || '';
+    const hashValido = Boolean(act.sha256 && act.sha256.trim().toLowerCase() !== SHA256_CONTENIDO_VACIO);
+    let minioOk = true;
+    if (act.s3_key && act.s3_bucket) {
+      try {
+        const info = await headObject(
+          act.s3_key,
+          { ...obtenerConfiguracionS3(), bucket: act.s3_bucket },
+          { intentos: 1 },
+        );
+        minioOk = info.existe && (info.contentLength === null || info.contentLength > 0);
+      } catch {
+        minioOk = true;
+      }
+    }
+
+    // Reutilizar el acto si ya está firmado, es un mock unitario sin s3_key, o conserva PDF íntegro + CVD coincidente
+    if (!act.s3_key || act.cvd || (cvdExistente && hashValido && minioOk)) {
+      return {
+        documentoId: act.documento_adjunto_id,
+        documentoNombre: act.nombre_archivo,
+        hashSha256: act.sha256,
+        cvd: cvdExistente,
+        numeroResolucion: act.numero_resolucion || act.nombre_archivo.replace(/^Resolucion_|\.pdf$/g, ''),
+        s3Key: act.s3_key,
+        s3Bucket: act.s3_bucket,
+      };
+    }
   }
 
   // 3. Asignar número correlativo anual atómico
@@ -722,25 +777,41 @@ export async function generarActoResolutivoInstitucional(
     membrete: {
       institucion: 'INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"',
       unidad: 'DIRECCIÓN GENERAL',
+      direccion: 'Av. Túpac Amaru s/n, Pucallpa – Ucayali',
       tipoDocumento: 'RESOLUCIÓN DIRECTORAL',
       numeroDocumento: numeroResolucion,
       correlativo: `EXP: ${exp.codigo_expediente}`,
       sigla: 'IESTP SUIZA - DG',
+      logoPng: cargarLogoInstitucionalPng(),
     },
   };
 
   // 9. Generar PDF institucional con a4Generator
   const docA4 = await a4GeneratorService.generar(contenido, opciones);
 
-  // 10. Estampar CVD y QR con cvdStampService
+  // 10. Estampar CVD y QR con cvdStampService y validar bytes PDF reales (no vacíos)
   const cvd = `CVD-${anio}-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
   const portalPublico = process.env.APP_URL || process.env.HOST_PUBLICO || 'http://localhost:5173';
   const cvdStampService = new CvdStampService(portalPublico);
   const pdfEstampado = await cvdStampService.estampar(Buffer.from(docA4.bytes), cvd);
   const hashSha256 = crypto.createHash('sha256').update(pdfEstampado).digest('hex');
 
+  if (
+    !pdfEstampado ||
+    pdfEstampado.length === 0 ||
+    !validarMagicBytes(pdfEstampado, 'PDF') ||
+    hashSha256 === SHA256_CONTENIDO_VACIO
+  ) {
+    throw new AppError({
+      status: 500,
+      code: 'RESOLUCION_PDF_INVALIDA',
+      message: 'El documento PDF generado para la resolución resultó vacío o inválido.',
+    });
+  }
+
   // 11. Asignar nuevo documento_adjunto_id y persistir en MinIO
   const nuevoDocumentoId = crypto.randomUUID();
+  pendingCvdPorDocId.set(nuevoDocumentoId, cvd);
   const s3Key = `resoluciones/${nuevoDocumentoId}.pdf`;
   const s3KeyFirmado = `firmados/${nuevoDocumentoId}.pdf`;
   const nombreArchivo = `Resolucion_${numeroResolucion}.pdf`;

@@ -105,6 +105,54 @@ export function adaptarErrorAccion(error: unknown): ErrorAccionExpediente {
     if (code === "SIN_FACULTAD_CORRECCION_DERIVACION") {
       return new ErrorAccionExpediente("Solo la Secretaría del área o jefatura autorizada puede ejecutar una derivación correctiva.", "http", 403);
     }
+    if (code === "CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES") {
+      return new ErrorAccionExpediente("Cambie al contexto Institucional para operar este expediente. En contexto Personal no dispone de facultades.", "http", 403);
+    }
+    if (code === "CONFLICTO_INTERES_EXPEDIENTE_PROPIO") {
+      return new ErrorAccionExpediente("Autoatención no permitida: no puede operar ni resolver su propio expediente personal.", "http", 403);
+    }
+    if (code === "PODER_TECNICO_SIN_AUTORIDAD_NEGOCIO") {
+      return new ErrorAccionExpediente("El perfil técnico administra la plataforma y no otorga facultades sustantivas sobre expedientes.", "http", 403);
+    }
+    if (code === "ROL_FINANCIERO_SIN_FACULTAD_DERIVAR" || code === "ROL_FINANCIERO_SIN_FACULTAD_DOCUMENTAL") {
+      return new ErrorAccionExpediente("El rol Tesorería únicamente gestiona cobros y recibos, sin facultades de tramitación documental.", "http", 403);
+    }
+    if (code === "ROL_SIN_FACULTAD_ATENCION") {
+      return new ErrorAccionExpediente("Su rol no dispone de facultades para registrar dictámenes o atención técnica.", "http", 403);
+    }
+    if (code === "BOLA_VIOLATION_CUSTODIA_AJENA") {
+      return new ErrorAccionExpediente("El expediente se encuentra en custodia de otra unidad orgánica; no pertenece al área actual para ejecutar esta acción.", "http", 403);
+    }
+    if (code === "EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA") {
+      return new ErrorAccionExpediente("El expediente no se encuentra asignado formalmente a usted para su atención técnica.", "http", 403);
+    }
+    if (code === "DIRECTOR_SIN_FACULTAD_DICTAMEN") {
+      return new ErrorAccionExpediente("El rol Dirección no emite dictámenes técnicos ordinarios sin asignación formal en el área responsable.", "http", 403);
+    }
+    if (code === "ESPECIALISTA_NO_PUEDE_ELEVAR_A_FIRMA" || code === "SIN_FACULTAD_DESPACHO_FIRMA") {
+      return new ErrorAccionExpediente("Solo Secretaría o Dirección del área con custodia posee facultad de despacho para elevar a firma.", "http", 403);
+    }
+    if (code === "SIN_FACULTAD_RESOLUTIVA") {
+      return new ErrorAccionExpediente("Acceso denegado: se requiere cargo o facultad directiva vigente de firma para emitir la resolución.", "http", 403);
+    }
+    if (code === "SIN_FACULTAD_DERIVACION") {
+      return new ErrorAccionExpediente("El especialista no posee facultad explícita ni delegación vigente para derivar este expediente.", "http", 403);
+    }
+    if (code === "SIN_FACULTAD_ASIGNACION") {
+      return new ErrorAccionExpediente("Solo Secretaría del área con custodia o jefatura con encargatura vigente puede gestionar asignaciones.", "http", 403);
+    }
+    if (code === "SIN_FACULTAD_ARCHIVO" || code === "SIN_FACULTAD_SUBSANACION" || code === "SIN_FACULTAD_ACUMULACION") {
+      return new ErrorAccionExpediente("No posee facultades institucionales suficientes para ejecutar esta operación.", "http", 403);
+    }
+    if (code === "FLUJO_RESOLUTIVO_REQUIERE_FIRMA") {
+      return new ErrorAccionExpediente("Este procedimiento no requiere dictamen técnico intermedio; eleve a firma y resuelva desde Dirección.", "http", status || 422);
+    }
+    if (code === "ESTADO_INVALIDO") {
+      return new ErrorAccionExpediente("El estado actual del expediente no permite realizar esta operación. Actualice la ficha del expediente.", "http", status || 422);
+    }
+    if (code === "ASIGNACION_NO_VIGENTE") {
+      return new ErrorAccionExpediente("La asignación activa del expediente cambió o dejó de estar vigente. Actualice antes de continuar.", "http", status || 409);
+    }
   }
   if (status === 409 && esObjeto(problema)) {
     const code = String(problema.code || problema.error || problema.codigo || problema.title || "");
@@ -117,7 +165,7 @@ export function adaptarErrorAccion(error: unknown): ErrorAccionExpediente {
     if (code === "EVIDENCIA_FIRMA_REQUERIDA") {
       return new ErrorAccionExpediente("El expediente todavía no cuenta con una firma válida.", "http", 409);
     }
-    if (code === "CONFLICTO_CONCURRENCIA") {
+    if (code === "CONFLICTO_CONCURRENCIA" || code === "CONCURRENCY_CONFLICT_EXPEDIENTE_MUTATION") {
       return new ErrorAccionExpediente("El expediente cambió mientras trabajabas. Actualiza la información.", "concurrencia", 409);
     }
   }

@@ -55,6 +55,23 @@ export interface ControladorReportes {
   refrescar: RequestHandler;
 }
 
+/** Etiquetas de mes para serie de tendencias del dashboard ejecutivo. */
+const NOMBRES_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'] as const;
+
+function resolverPeriodoConsulta(filtros: {
+  periodo?: string;
+  anio?: number;
+  mes?: string;
+}): string | null {
+  if (filtros.periodo && /^\d{4}-(0[1-9]|1[0-2])$/.test(filtros.periodo)) {
+    return `${filtros.periodo}-01`;
+  }
+  if (filtros.periodo === 'mensual' && filtros.anio && filtros.mes) {
+    return `${filtros.anio}-${filtros.mes}-01`;
+  }
+  return null;
+}
+
 export function crearControladorReportes(
   actorProvider: ActorProviderRutaDoc,
   servicio: ServicioMgdAnalytics,
@@ -78,19 +95,81 @@ export function crearControladorReportes(
   return {
     resumen: async (req, res) => {
       await autorizado(req);
-      const { periodo } = filtrosResumenSchema.parse(req.query ?? {});
-      const resumen = await servicio.resumen(periodo ?? null);
-      // `periodo` y `actualizadoEn` son metadatos de la lectura; el contrato de
-      // §4.7 define los seis campos de primer nivel, pero sin ellos el frontend no
-      // puede distinguir "0 %" de "sin datos" ni saber de cuándo es el dato.
-      res.json({ ...resumen });
+      const filtros = filtrosResumenSchema.parse(req.query ?? {});
+      const periodoConsulta = resolverPeriodoConsulta(filtros);
+      const anioConsulta = filtros.anio ?? anioEnLima();
+      const limiteDias = filtros.diasLimite ?? 5;
+
+      const [resumen, serieTendencias, nombres] = await Promise.all([
+        servicio.resumen(periodoConsulta),
+        servicio.tendencias(anioConsulta).catch(() => []),
+        repositorio.obtenerNombresUnidades().catch(() => new Map()),
+      ]);
+      const cuellos = await servicio
+        .cuellosBotella(periodoConsulta, limiteDias, nombres)
+        .catch(() => []);
+
+      const tendencia = serieTendencias.map((punto) => ({
+        fechaLabel: NOMBRES_MESES[punto.mes - 1] ?? `M${punto.mes}`,
+        radicados: punto.radicados,
+        resueltos: punto.atendidos,
+        observados: punto.observados,
+      }));
+      const cuellosBotella = cuellos.map((c) => ({
+        area: c.areaNombre,
+        expedienteCount: c.expedientesEstancados,
+        diasPromedio: c.diasRetencion,
+        severity: c.riesgo === 'alto' ? 'high' : c.riesgo === 'medio' ? 'medium' : 'low',
+      }));
+      const unidades = Array.from(nombres.entries()).map(([id, info]) => ({
+        id,
+        nombre: info.nombre,
+      }));
+
+      const totalRad = resumen.contadores.nRadicados;
+      const pct = (n: number) =>
+        totalRad > 0 ? Math.round((n / totalRad) * 1000) / 10 : 0;
+      const nResueltosSinArchivar = resumen.contadores.nAtendidos;
+      const nArchivados = resumen.contadores.nArchivados;
+      const nObservados = resumen.contadores.nObservados;
+      const nEnRevision = Math.max(0, resumen.contadores.nEnTramite - nObservados);
+      const nPendientesInicio = Math.max(
+        0,
+        totalRad - nResueltosSinArchivar - nArchivados - resumen.contadores.nEnTramite,
+      );
+      const estados =
+        totalRad > 0
+          ? [
+              { estado: 'Resuelto', porcentaje: pct(nResueltosSinArchivar), color: '#059669' },
+              { estado: 'Archivado', porcentaje: pct(nArchivados), color: '#475569' },
+              { estado: 'En revisión', porcentaje: pct(nEnRevision), color: '#1d4ed8' },
+              { estado: 'Observado', porcentaje: pct(nObservados), color: '#d97706' },
+              { estado: 'Pendiente / Derivado', porcentaje: pct(nPendientesInicio), color: '#0284c7' },
+            ].filter((item) => item.porcentaje > 0)
+          : [];
+
+      // `periodo` y `actualizadoEn` son metadatos de la lectura; se preservan los KPIs
+      // MGD oficiales y se añaden las series y llaves esperadas por el tablero ejecutivo.
+      res.json({
+        ...resumen,
+        totalProcesados: resumen.contadores.nRadicados,
+        tasaResolucionOportuna: resumen.tro.valor,
+        tasaCompletitud: resumen.vtep.valor,
+        atrasadosCriticos: resumen.contadores.nObservados,
+        saludMesasPartes: resumen.teo.cumple ? 'Operativa' : 'En observación',
+        tendencia,
+        estados,
+        cuellosBotella,
+        unidades,
+      });
     },
 
     cuellosBotella: async (req, res) => {
       await autorizado(req);
       const { periodo, diasLimite } = filtrosCuellosBotellaSchema.parse(req.query ?? {});
+      const periodoConsulta = periodo ? `${periodo}-01` : null;
       const nombres = await repositorio.obtenerNombresUnidades();
-      res.json(await servicio.cuellosBotella(periodo ?? null, diasLimite, nombres));
+      res.json(await servicio.cuellosBotella(periodoConsulta, diasLimite, nombres));
     },
 
     tendencias: async (req, res) => {

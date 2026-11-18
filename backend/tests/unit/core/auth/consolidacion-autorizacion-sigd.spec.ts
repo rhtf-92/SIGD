@@ -112,7 +112,7 @@ describe('CONSOLIDACIÓN 100% AUTORIZACIÓN FUNCIONAL SIGD — PRUEBAS NEGATIVAS
             solicitante_id: 'sol-externo-uuid',
             estado_actual_id: estadoExpedienteSimulado,
             estado: estadoExpedienteSimulado,
-            area_contexto_id: ID_AREA_SDA,
+            area_contexto_id: estadoExpedienteSimulado === 'EN_FIRMA' ? ID_AREA_DIR : ID_AREA_SDA,
             codigo_expediente: 'EXP-2026-000001',
           }],
           rowCount: 1,

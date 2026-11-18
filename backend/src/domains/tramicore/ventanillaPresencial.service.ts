@@ -218,8 +218,12 @@ export class VentanillaPresencialService {
       }
 
       // Validar registroVersionId y requisitos obligatorios si fue provisto
+      let areaDestinoPorDefecto: string | null = datos.areaDestinoId ?? null;
       if (datos.registroVersionId) {
-        await this.verificarVersionTupa(cliente, datos.registroVersionId);
+        const elegibilidad = await this.verificarVersionTupa(cliente, datos.registroVersionId);
+        if (!areaDestinoPorDefecto && elegibilidad?.unidadReceptoraId) {
+          areaDestinoPorDefecto = elegibilidad.unidadReceptoraId;
+        }
         if (typeof this.pool?.query === 'function') {
           await this.tupaRequisitosService.validarRequisitosObligatorios(
             datos.registroVersionId,
@@ -407,7 +411,7 @@ export class VentanillaPresencialService {
           dniExpediente,
           tipoDocId,
           solicitanteId,
-          datos.areaDestinoId ?? null,
+          areaDestinoPorDefecto,
           fechaRadicacion,
         ],
       );
@@ -501,6 +505,37 @@ export class VentanillaPresencialService {
             concepto: contextoPago.concepto,
             fechaVencimiento: vencimiento.toISOString(),
           };
+
+          if (typeof this.pool?.query === 'function') {
+            await cliente.query(
+              `UPDATE sigd_tra.expediente SET estado = 'PENDIENTE_PAGO' WHERE expediente_id = $1::uuid;`,
+              [expedienteId],
+            );
+
+            const reqFinanciero = await cliente.query<{ id_requisito: string }>(
+              `SELECT id_requisito FROM sigd_doc.tupa_requisito_documental
+                WHERE (id_procedimiento = $1::uuid OR registro_version_id = $1::uuid)
+                  AND tipo_requisito = 'FINANCIERO'
+                  AND activo = true
+                LIMIT 1`,
+              [datos.registroVersionId],
+            );
+            if (reqFinanciero.rows[0]) {
+              await this.tupaRequisitosService.registrarEvidencia(
+                {
+                  expedienteId,
+                  idRequisito: reqFinanciero.rows[0].id_requisito,
+                  tipoEvidencia: 'PAGO',
+                  ordenPagoId: orden.orden_pago_id,
+                  idPersona: solicitanteId,
+                  idUsuario: datos.idOperadorVentanilla ?? null,
+                  canal: 'PRESENCIAL',
+                  estadoValidacion: 'PENDIENTE',
+                },
+                cliente,
+              );
+            }
+          }
         }
       }
 
@@ -769,6 +804,28 @@ export class VentanillaPresencialService {
 
       const totalFoliosExpediente = totalPaginasFoliadas > 0 ? totalPaginasFoliadas : datos.foliosTotales;
 
+      if (typeof this.pool?.query === 'function') {
+        await cliente.query(
+          `INSERT INTO sigd_rut.estado_actual_expediente (
+             expediente_id, secuencia, estado_nuevo, evento, area_actual_id, id_movimiento, fecha_hora, usuario_operador_id
+           ) VALUES (
+             $1::uuid, 1, 'REGISTRADO', 'RADICACION_PRESENCIAL', $2, gen_random_uuid(), $3, 0
+           ) ON CONFLICT (expediente_id) DO UPDATE
+           SET estado_nuevo = EXCLUDED.estado_nuevo,
+               fecha_hora = EXCLUDED.fecha_hora,
+               area_actual_id = COALESCE(EXCLUDED.area_actual_id, sigd_rut.estado_actual_expediente.area_actual_id);`,
+          [expedienteId, areaDestinoPorDefecto, fechaRadicacion],
+        );
+
+        await cliente.query(
+          `INSERT INTO sigd_rut.movimiento_secuencia (expediente_id, ultima_secuencia)
+           VALUES ($1::uuid, 1)
+           ON CONFLICT (expediente_id) DO UPDATE
+           SET ultima_secuencia = GREATEST(sigd_rut.movimiento_secuencia.ultima_secuencia, 1);`,
+          [expedienteId],
+        );
+      }
+
       if (debeManejarTx) {
         await cliente.query('COMMIT');
         dbCommitted = true;
@@ -832,7 +889,7 @@ export class VentanillaPresencialService {
     }
   }
 
-  private async verificarVersionTupa(cliente: PoolClient, registroVersionId: string): Promise<void> {
+  private async verificarVersionTupa(cliente: PoolClient, registroVersionId: string) {
     const elegibilidad = await this.tupaVersionRepository.validarElegibilidadRadicacion(registroVersionId, new Date(), cliente);
     if (elegibilidad.categoria === 'ACTUACION_INTERNA') {
       throw new ConflictError({
@@ -841,6 +898,7 @@ export class VentanillaPresencialService {
         detail: `La actuación interna "${elegibilidad.denominacion}" (${elegibilidad.codigoRef}) no admite radicación documentaria externa en ventanilla.`,
       });
     }
+    return elegibilidad;
   }
 
   /**

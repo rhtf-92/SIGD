@@ -27,6 +27,11 @@ export interface ValidacionCVDResult {
     firmante: string | null;
     hashSha256: string;
     fechaSelloTsa: string | null;
+    naturalezaFirma?: 'FIRMA_LABORATORIO' | 'FIRMA_DIGITAL_OFICIAL' | 'EVIDENCIA_INCOMPLETA';
+    esFirmaLaboratorio?: boolean;
+    proveedorFirma?: string | null;
+    algoritmoFirma?: string | null;
+    integridadArchivo?: 'VERIFICADA' | 'ARTEFACTO_INEXISTENTE_O_VACIO';
   };
 }
 

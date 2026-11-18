@@ -15,6 +15,7 @@ import { OutboxWorker } from './audit/outbox-worker.js';
 import { crearDespachadorPorDefecto } from './audit/despachador-notificaciones.js';
 import { BridgeNotificacion } from './core/realtime/bridge-notificacion.js';
 import { RedisFirmaSessionStore } from './domains/docucore/firmaSession.store.js';
+import { RepositorioMgdAnalytics } from './domains/corelink/mgdAnalytics.repository.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
@@ -70,6 +71,11 @@ const outboxWorker = new OutboxWorker(
 );
 const cicloOutbox = outboxWorker.iniciar();
 cicloOutbox.catch((error: unknown) => console.error('[OUTBOX] El poller terminó con error:', error));
+
+// Refresco inicial no bloqueante de las vistas materializadas MGD si existen datos nuevos
+void new RepositorioMgdAnalytics(pool)
+  .refrescarVistasMgd()
+  .catch((err: unknown) => console.warn('[MGD] Refresco inicial de vistas omitido:', err));
 
 const apagar = (senal: string): void => {
   console.log(`[SERVER] Señal ${senal} recibida; cerrando conexiones SSE.`);

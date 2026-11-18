@@ -40,19 +40,30 @@ export class CvdStampService {
 
     for (const pagina of pdf.getPages()) {
       const { width, height } = pagina.getSize();
-      const margenDerecho = 76;
+      // Franja estrictamente a la derecha del margen util (595.28 - 70.87 = 524.41 pt)
+      // para nunca superponerse con la fecha alineada a la derecha ni con el pie de pagina.
+      const xInicioFranja = width - 64;
 
       pagina.drawRectangle({
-        x: width - margenDerecho,
-        y: 12,
-        width: margenDerecho - 6,
-        height: height - 24,
+        x: xInicioFranja,
+        y: height - 68,
+        width: 58,
+        height: 58,
         color: rgb(1, 1, 1),
-        opacity: 0.92,
+        opacity: 0.96,
+      });
+
+      pagina.drawRectangle({
+        x: width - 24,
+        y: 12,
+        width: 18,
+        height: Math.max(40, height - 84),
+        color: rgb(1, 1, 1),
+        opacity: 0.96,
       });
 
       pagina.drawText(`DOCUMENTO FIRMADO DIGITALMENTE | CVD: ${cvd}`, {
-        x: width - 22,
+        x: width - 14,
         y: 20,
         size: 6.5,
         font: fuente,
@@ -61,10 +72,10 @@ export class CvdStampService {
       });
 
       pagina.drawImage(qr, {
-        x: width - margenDerecho + 6,
-        y: height - 70,
-        width: 58,
-        height: 58,
+        x: xInicioFranja + 3,
+        y: height - 65,
+        width: 52,
+        height: 52,
       });
     }
 

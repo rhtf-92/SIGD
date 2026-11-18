@@ -10,6 +10,8 @@ import { documentoStorageService } from '../../core/storage/documento-storage.se
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { ExpedienteAsignacionService } from './expedienteAsignacion.service.js';
 import { ExpedienteObservacionService } from './expedienteObservacion.service.js';
+import { verificarFacultadFirma } from '../../core/auth/auth.guard.js';
+import type { ActorRutaDoc } from './rutadoc.types.js';
 
 export function resolverOperadorBigInt(id: string | number | undefined | null): string {
   if (!id) return '1';
@@ -445,6 +447,9 @@ export async function enviarAFirmaExpediente(
     observacion_interna?: string | null;
     actor_unidad_organica_id?: string | null;
     actor_roles?: readonly string[] | string[];
+    exigir_custodia?: boolean;
+    actor_id?: string | null;
+    actor_id_persona?: string | null;
   },
 ): Promise<{ movimiento_id: string; estado: 'EN_FIRMA' }> {
   const contexto = getRequestContext();
@@ -484,13 +489,61 @@ export async function enviarAFirmaExpediente(
   const {
     estado_actual_id: estadoActual,
     area_contexto_id: areaActual,
+    solicitante_id: solicitanteId,
     unidad_responsable_id: areaResponsable,
     unidad_resolutiva_id: areaResolutivaRaw,
   } = resEstadoActual.rows[0];
   const operadorId = resolverOperadorBigInt(usuarioActorId);
   const areaResolutiva = areaResolutivaRaw || 'a0000000-0000-0000-0000-000000000002';
 
-  if (datos.actor_unidad_organica_id) {
+  if (datos.exigir_custodia) {
+    if (
+      solicitanteId &&
+      ((datos.actor_id_persona && datos.actor_id_persona === solicitanteId) ||
+        (datos.actor_id && datos.actor_id === solicitanteId) ||
+        usuarioActorId === solicitanteId)
+    ) {
+      throw new ForbiddenError({
+        code: 'CONFLICTO_INTERES_EXPEDIENTE_PROPIO',
+        detail: 'AUTOATENCION_PROHIBIDA: El solicitante no puede elevar a firma su propio expediente.',
+      });
+    }
+
+    const enAreaCustodia = Boolean(
+      datos.actor_unidad_organica_id && areaActual && datos.actor_unidad_organica_id === areaActual,
+    );
+    if (!enAreaCustodia) {
+      let tieneEncargatura = false;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (areaActual && uuidRegex.test(areaActual) && datos.actor_id && uuidRegex.test(datos.actor_id)) {
+        const resEnc = await cliente
+          .query(
+            `SELECT 1
+               FROM sigd_org.responsabilidad_temporal rt
+              WHERE (rt.id_usuario = $1::uuid OR ($3::uuid IS NOT NULL AND rt.id_persona = $3::uuid))
+                AND rt.area_id = $2::uuid
+                AND rt.estado = 'ACTIVO'
+                AND rt.tipo_responsabilidad IN ('ENCARGATURA', 'DELEGACION', 'SUPLENCIA', 'DESIGNACION_ESPECIFICA')
+                AND rt.vigente_desde <= now()
+                AND (rt.vigente_hasta IS NULL OR rt.vigente_hasta > now())
+              LIMIT 1`,
+            [
+              datos.actor_id,
+              areaActual,
+              datos.actor_id_persona && uuidRegex.test(datos.actor_id_persona) ? datos.actor_id_persona : null,
+            ],
+          )
+          .catch(() => ({ rowCount: 0 }));
+        tieneEncargatura = (resEnc.rowCount ?? 0) > 0;
+      }
+      if (!tieneEncargatura) {
+        throw new ForbiddenError({
+          code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
+          detail: 'No pertenece al área de custodia del expediente para remitirlo a despacho de firma.',
+        });
+      }
+    }
+  } else if (datos.actor_unidad_organica_id) {
     if (areaActual && datos.actor_unidad_organica_id !== areaActual) {
       throw new ForbiddenError({
         code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
@@ -1788,5 +1841,452 @@ export async function evaluarElegibilidadDerivacion(
     totalRequisitosDocumentalesConformes: totalConformes,
     montoRequerido: montoEfectivo,
     pagoRegistrado,
+  };
+}
+
+export interface CapacidadAccionDto {
+  visible: boolean;
+  habilitado: boolean;
+  codigo?: string;
+  motivo?: string;
+}
+
+export interface CapacidadesExpedienteDto {
+  derivar: CapacidadAccionDto;
+  recepcionar: CapacidadAccionDto;
+  observar: CapacidadAccionDto;
+  subsanar: CapacidadAccionDto;
+  iniciarRevision: CapacidadAccionDto;
+  asignar: CapacidadAccionDto;
+  atender: CapacidadAccionDto;
+  enviarAFirma: CapacidadAccionDto;
+  resolver: CapacidadAccionDto;
+  archivar: CapacidadAccionDto;
+  acumular: CapacidadAccionDto;
+}
+
+const AREA_DIR_CANONICA = 'a0000000-0000-0000-0000-000000000002';
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Verifica si el actor posee facultad explícita de derivación para el área dada.
+ * DIRECTOR, SECRETARIO y MESA_PARTES poseen facultad por rol de despacho/recepción.
+ * ESPECIALISTA requiere perfil operativo con EXPEDIENTE_DERIVAR o DELEGACION vigente
+ * de tipo DERIVACION/TODAS; pertenecer al área NO otorga facultad de derivación por sí solo.
+ */
+export async function verificarFacultadDerivacion(
+  db: Pool | PoolClient,
+  actor: ActorRutaDoc,
+  areaActualId: string | null | undefined,
+  idPersonaActor?: string | null,
+): Promise<boolean> {
+  const roles = actor.roles ?? [];
+  if (roles.some((r) => ['DIRECTOR', 'SECRETARIO', 'MESA_PARTES'].includes(r))) {
+    return true;
+  }
+  if (!roles.includes('ESPECIALISTA')) {
+    return false;
+  }
+  if (!UUID_REGEX.test(actor.id)) {
+    return false;
+  }
+
+  const areaParam = areaActualId && UUID_REGEX.test(areaActualId) ? areaActualId : null;
+  const personaParam = idPersonaActor && UUID_REGEX.test(idPersonaActor) ? idPersonaActor : null;
+
+  try {
+    const resPerfil = await db.query(
+      `SELECT 1
+         FROM sigd_org.asignacion_perfil_operativo ap
+         JOIN sigd_org.perfil_operativo p ON p.perfil_id = ap.perfil_id
+         JOIN sigd_org.perfil_permiso pp ON pp.perfil_id = p.perfil_id
+         JOIN sigd_org.permiso_sistema ps ON ps.permiso_id = pp.permiso_id
+        WHERE ap.id_usuario = $1::uuid
+          AND ap.estado = 'ACTIVO'
+          AND p.vigente = TRUE
+          AND ap.vigente_desde <= now()
+          AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
+          AND ps.codigo = 'EXPEDIENTE_DERIVAR'
+          AND (ap.scope = 'INSTITUCIONAL' OR $2::uuid IS NULL OR ap.area_id = $2::uuid)
+        LIMIT 1`,
+      [actor.id, areaParam],
+    );
+    if ((resPerfil.rowCount ?? 0) > 0) {
+      return true;
+    }
+
+    const resDelegacion = await db.query(
+      `SELECT 1
+         FROM sigd_org.responsabilidad_temporal rt
+        WHERE (rt.id_usuario = $1::uuid OR ($3::uuid IS NOT NULL AND rt.id_persona = $3::uuid))
+          AND rt.estado = 'ACTIVO'
+          AND rt.tipo_responsabilidad = 'DELEGACION'
+          AND rt.vigente_desde <= now()
+          AND (rt.vigente_hasta IS NULL OR rt.vigente_hasta > now())
+          AND UPPER(COALESCE(rt.alcance->>'tipoActuacion', '')) IN ('DERIVACION', 'TODAS')
+          AND ($2::uuid IS NULL OR rt.area_id = $2::uuid)
+        LIMIT 1`,
+      [actor.id, areaParam, personaParam],
+    );
+    return (resDelegacion.rowCount ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function evaluarCapacidadesExpediente(
+  db: Pool | PoolClient,
+  expedienteId: string,
+  actor: ActorRutaDoc,
+  contextoOperacion: 'INSTITUCIONAL' | 'PERSONAL',
+  precalculados?: {
+    estadoActual?: string;
+    areaActualId?: string | null;
+    solicitanteId?: string | null;
+    elegibilidad?: Awaited<ReturnType<typeof evaluarElegibilidadDerivacion>> | null;
+    etapaTecnica?: EstadoEtapaTecnicaExpediente | null;
+  },
+): Promise<CapacidadesExpedienteDto> {
+  const resExp = await db.query<{
+    solicitante_id: string | null;
+    estado_actual: string;
+    area_actual_id: string | null;
+  }>(
+    `SELECT e.solicitante_id::text AS solicitante_id,
+            COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual,
+            COALESCE(u.area_actual_id, e.area_destino_id::text) AS area_actual_id
+       FROM sigd_tra.expediente e
+       LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
+      WHERE e.expediente_id = $1::uuid`,
+    [expedienteId],
+  );
+
+  const rowExp = resExp.rows?.[0];
+  const estadoActual = rowExp?.estado_actual ?? precalculados?.estadoActual ?? 'REGISTRADO';
+  const areaActualId = rowExp?.area_actual_id ?? precalculados?.areaActualId ?? null;
+  const solicitanteId = rowExp?.solicitante_id ?? precalculados?.solicitanteId ?? null;
+
+  let idPersonaActor = actor.idPersona ?? null;
+  if (!idPersonaActor) {
+    const resPer = await db
+      .query<{ id_persona: string | null }>(
+        'SELECT id_persona::text AS id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1::uuid',
+        [actor.id],
+      )
+      .catch(() => ({ rows: [] as Array<{ id_persona: string | null }> }));
+    idPersonaActor = resPer.rows[0]?.id_persona ?? null;
+  }
+
+  const elegibilidad =
+    precalculados?.elegibilidad ??
+    (await evaluarElegibilidadDerivacion(db, expedienteId).catch(() => null));
+  const etapa =
+    precalculados?.etapaTecnica ??
+    (await consultarEstadoEtapaTecnicaTupa(db, expedienteId).catch(() => null));
+
+  const resAsig = await db
+    .query<{ id_usuario: string | null; id_persona: string | null }>(
+      `SELECT id_usuario::text AS id_usuario, id_persona::text AS id_persona
+         FROM sigd_rut.expediente_asignacion
+        WHERE expediente_id = $1::uuid AND activo = true
+        ORDER BY asignado_en DESC
+        LIMIT 1`,
+      [expedienteId],
+    )
+    .catch(() => ({ rows: [] as Array<{ id_usuario: string | null; id_persona: string | null }> }));
+  const asignacionActiva = resAsig.rows[0] ?? null;
+
+  let tieneEncargaturaArea = false;
+  const uuidRegexCap = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (areaActualId && uuidRegexCap.test(areaActualId) && uuidRegexCap.test(actor.id)) {
+    const resEnc = await db
+      .query(
+        `SELECT 1
+           FROM sigd_org.responsabilidad_temporal rt
+          WHERE (rt.id_usuario = $1::uuid OR ($3::uuid IS NOT NULL AND rt.id_persona = $3::uuid))
+            AND rt.area_id = $2::uuid
+            AND rt.estado = 'ACTIVO'
+            AND rt.tipo_responsabilidad IN ('ENCARGATURA', 'DELEGACION', 'SUPLENCIA', 'DESIGNACION_ESPECIFICA')
+            AND rt.vigente_desde <= now()
+            AND (rt.vigente_hasta IS NULL OR rt.vigente_hasta > now())
+          LIMIT 1`,
+        [actor.id, areaActualId, idPersonaActor && uuidRegexCap.test(idPersonaActor) ? idPersonaActor : null],
+      )
+      .catch(() => ({ rowCount: 0 }));
+    tieneEncargaturaArea = (resEnc.rowCount ?? 0) > 0;
+  }
+
+  const roles = actor.roles ?? [];
+  const rolesNoAdmin = roles.filter((r) => r !== 'ADMINISTRADOR' && r !== 'SUPERADMINISTRADOR');
+  const facultadFirma = await verificarFacultadFirma(db as Pool, actor.id, rolesNoAdmin).catch(() => ({
+    puedeFirmar: rolesNoAdmin.includes('DIRECTOR'),
+    roles: rolesNoAdmin,
+    facultadGlobal: rolesNoAdmin.includes('DIRECTOR'),
+    tiposAutorizados: [] as string[],
+    motivo: null as string | null,
+  }));
+
+  const rolesNegocio = ['DIRECTOR', 'SECRETARIO', 'ESPECIALISTA', 'MESA_PARTES'];
+  const esContextoPersonal =
+    contextoOperacion === 'PERSONAL' ||
+    (roles.some((r) => ['CIUDADANO', 'ESTUDIANTE'].includes(r)) &&
+      !roles.some((r) => [...rolesNegocio, 'ADMINISTRADOR', 'SUPERADMINISTRADOR', 'TESORERIA'].includes(r)));
+  const esTitular = Boolean(
+    solicitanteId &&
+      ((idPersonaActor && idPersonaActor === solicitanteId) || actor.id === solicitanteId),
+  );
+  const esSoloAdminTecnico =
+    roles.some((r) => ['ADMINISTRADOR', 'SUPERADMINISTRADOR'].includes(r)) &&
+    !roles.some((r) => rolesNegocio.includes(r));
+  const esSoloTesoreria =
+    roles.includes('TESORERIA') && !roles.some((r) => rolesNegocio.includes(r));
+
+  const tieneCustodiaArea = Boolean(
+    (actor.unidadOrganicaId && areaActualId && actor.unidadOrganicaId === areaActualId) ||
+      tieneEncargaturaArea,
+  );
+  const enAreaMesaODir = Boolean(
+    !areaActualId || areaActualId === AREA_DIR_CANONICA || areaActualId === 'DIR' || areaActualId === 'Mesa de Partes',
+  );
+  const tieneCustodiaMesaIntake = roles.includes('MESA_PARTES') && enAreaMesaODir;
+
+  const requiereEvaluacionTecnica = Boolean(etapa?.requiereEvaluacionTecnica);
+  const atencionTecnicaYaCompletada = Boolean(etapa?.requiereEvaluacionTecnica && etapa.completada);
+  const estaEnAreaTecnica = Boolean(
+    requiereEvaluacionTecnica && areaActualId && etapa?.areaResponsableId && areaActualId === etapa.areaResponsableId,
+  );
+  const esUsuarioAsignado = Boolean(
+    asignacionActiva &&
+      ((asignacionActiva.id_usuario && asignacionActiva.id_usuario === actor.id) ||
+        (idPersonaActor && asignacionActiva.id_persona && asignacionActiva.id_persona === idPersonaActor)),
+  );
+
+  const requisitosConformes = elegibilidad ? elegibilidad.requisitosConformes : true;
+  const pagoConforme = elegibilidad ? elegibilidad.pagoConforme : true;
+
+  const motivoNoOperativo = (permisoFallback: string): { codigo: string; motivo: string } => {
+    if (esTitular) {
+      return {
+        codigo: 'CONFLICTO_INTERES_EXPEDIENTE_PROPIO',
+        motivo: 'Autoatención no permitida en expedientes propios. No cuenta con permisos para operar este expediente.',
+      };
+    }
+    if (esContextoPersonal) {
+      return {
+        codigo: 'CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES',
+        motivo: 'Cambie al contexto Institucional para operar este expediente. No cuenta con permisos en este contexto.',
+      };
+    }
+    if (esSoloAdminTecnico) {
+      return {
+        codigo: 'PODER_TECNICO_SIN_AUTORIDAD_NEGOCIO',
+        motivo: 'El perfil técnico administra la plataforma y no otorga facultades sustantivas de tramitación.',
+      };
+    }
+    if (esSoloTesoreria) {
+      return {
+        codigo: 'ROL_FINANCIERO_SIN_FACULTAD_DOCUMENTAL',
+        motivo: 'El rol TESORERIA únicamente gestiona cobros y recibos, sin custodia documental.',
+      };
+    }
+    return { codigo: 'SIN_FACULTAD', motivo: permisoFallback };
+  };
+
+  const puedeBaseInstitucional = !esContextoPersonal && !esTitular && !esSoloAdminTecnico && !esSoloTesoreria;
+  const tieneRolOperativo = roles.some((r) => rolesNegocio.includes(r));
+
+  // 1. DERIVAR
+  const facultadDerivar = puedeBaseInstitucional && tieneRolOperativo;
+  const tieneFacultadDerivacion =
+    facultadDerivar &&
+    (await verificarFacultadDerivacion(db, actor, areaActualId, idPersonaActor));
+  const custodiaDerivar =
+    tieneCustodiaArea || (estadoActual === 'REGISTRADO' && tieneCustodiaMesaIntake);
+  const estadoDerivarOk = ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO', 'EN_REVISION'].includes(estadoActual);
+  const derivar: CapacidadAccionDto = !facultadDerivar
+    ? { visible: esContextoPersonal || esTitular, habilitado: false, ...motivoNoOperativo('No cuenta con permisos para derivar este expediente.') }
+    : !tieneFacultadDerivacion
+      ? {
+          visible: false,
+          habilitado: false,
+          codigo: 'SIN_FACULTAD_DERIVACION',
+          motivo: 'El rol ESPECIALISTA no posee facultad explícita ni delegación vigente para derivar este expediente.',
+        }
+      : !custodiaDerivar
+        ? { visible: true, habilitado: false, codigo: 'BOLA_VIOLATION_CUSTODIA_AJENA', motivo: 'No pertenece al área de custodia actual para derivar este expediente.' }
+        : !estadoDerivarOk
+        ? {
+            visible: true,
+            habilitado: false,
+            codigo: 'ESTADO_INVALIDO',
+            motivo:
+              estadoActual === 'SUBSANADO'
+                ? 'El expediente se encuentra subsanado. Debe iniciar formalmente la revisión antes de poder derivarlo.'
+                : `No es posible derivar un expediente en estado ${estadoActual}.`,
+          }
+        : !requisitosConformes
+          ? { visible: true, habilitado: false, codigo: 'REQUISITOS_DOCUMENTALES_PENDIENTES', motivo: 'Faltan requisitos documentales obligatorios por validar o conformar.' }
+          : !pagoConforme
+            ? { visible: true, habilitado: false, codigo: 'PAGO_PENDIENTE', motivo: 'El expediente requiere pago confirmado en Tesorería antes de continuar.' }
+            : { visible: true, habilitado: true, motivo: 'Derivar el expediente hacia otra unidad orgánica para su atención.' };
+
+  // 2. RECEPCIONAR
+  const recepcionar: CapacidadAccionDto = !facultadDerivar
+    ? { visible: false, habilitado: false, ...motivoNoOperativo('No cuenta con permisos para recepcionar este expediente.') }
+    : !tieneCustodiaArea
+      ? { visible: true, habilitado: false, codigo: 'BOLA_VIOLATION_CUSTODIA_AJENA', motivo: 'Solo personal del área de custodia puede recepcionar el expediente.' }
+      : estadoActual !== 'DERIVADO'
+        ? { visible: true, habilitado: false, codigo: 'ESTADO_INVALIDO', motivo: 'Solo se pueden recepcionar expedientes en estado DERIVADO.' }
+        : { visible: true, habilitado: true, motivo: 'Confirmar recepción formal en el área.' };
+
+  // 3. OBSERVAR
+  const custodiaObservar = tieneCustodiaArea || (estadoActual === 'EN_CALIFICACION' && tieneCustodiaMesaIntake);
+  const observar: CapacidadAccionDto = !facultadDerivar
+    ? { visible: esContextoPersonal || esTitular, habilitado: false, ...motivoNoOperativo('No cuenta con permisos para observar este expediente.') }
+    : !custodiaObservar
+      ? { visible: true, habilitado: false, codigo: 'BOLA_VIOLATION_CUSTODIA_AJENA', motivo: 'No tiene custodia activa en el área para registrar observaciones.' }
+      : !['EN_CALIFICACION', 'EN_REVISION'].includes(estadoActual)
+        ? { visible: true, habilitado: false, codigo: 'ESTADO_INVALIDO', motivo: 'Solo se pueden observar expedientes en estado EN_CALIFICACION o EN_REVISION.' }
+        : { visible: true, habilitado: true, motivo: 'Registrar pliego de observaciones formales para el administrado.' };
+
+  // 4. SUBSANAR
+  const facultadSubsanar =
+    esTitular || (!esContextoPersonal && roles.includes('MESA_PARTES') && tieneCustodiaMesaIntake);
+  const subsanar: CapacidadAccionDto = !facultadSubsanar
+    ? { visible: false, habilitado: false, codigo: 'SIN_FACULTAD_SUBSANACION', motivo: 'Solo el titular administrado o personal de Mesa de Partes puede subsanar el expediente.' }
+    : estadoActual !== 'OBSERVADO'
+      ? { visible: true, habilitado: false, codigo: 'ESTADO_INVALIDO', motivo: 'Solo se pueden subsanar expedientes en estado OBSERVADO.' }
+      : { visible: true, habilitado: true, motivo: 'Registrar la corrección y subsanación de las observaciones.' };
+
+  // 5. INICIAR REVISIÓN
+  const custodiaIniciarRev = tieneCustodiaArea || tieneCustodiaMesaIntake;
+  const iniciarRevision: CapacidadAccionDto = !facultadDerivar
+    ? { visible: false, habilitado: false, ...motivoNoOperativo('No cuenta con permisos para iniciar revisión.') }
+    : !custodiaIniciarRev
+      ? { visible: true, habilitado: false, codigo: 'BOLA_VIOLATION_CUSTODIA_AJENA', motivo: 'No cuenta con custodia en el área para iniciar revisión.' }
+      : estadoActual !== 'SUBSANADO'
+        ? { visible: true, habilitado: false, codigo: 'ESTADO_INVALIDO', motivo: 'Solo se puede iniciar revisión cuando el expediente está SUBSANADO.' }
+        : { visible: true, habilitado: true, motivo: 'Iniciar revisión formal tras subsanación.' };
+
+  // 6. ASIGNAR
+  const facultadAsignarRol =
+    roles.includes('SECRETARIO') || (roles.includes('DIRECTOR') && tieneEncargaturaArea);
+  const puedeAsignarBase = puedeBaseInstitucional && facultadAsignarRol;
+  const asignar: CapacidadAccionDto = !facultadAsignarRol
+    ? { visible: false, habilitado: false, codigo: 'SIN_FACULTAD_ASIGNACION', motivo: 'Solo el Secretario del área con custodia o funcionario con encargatura vigente posee facultades para asignar especialistas.' }
+    : !puedeAsignarBase
+      ? { visible: false, habilitado: false, ...motivoNoOperativo('No cuenta con permisos para asignar especialistas.') }
+      : !tieneCustodiaArea
+        ? { visible: true, habilitado: false, codigo: 'BOLA_VIOLATION_CUSTODIA_AJENA', motivo: 'El expediente está en custodia de otra área.' }
+        : estadoActual !== 'EN_REVISION'
+          ? { visible: true, habilitado: false, codigo: 'ESTADO_INVALIDO', motivo: 'Solo se pueden asignar especialistas en estado EN_REVISION.' }
+          : requiereEvaluacionTecnica && !estaEnAreaTecnica
+            ? { visible: true, habilitado: false, codigo: 'AREA_TECNICA_REQUERIDA', motivo: 'La asignación corresponde al área responsable una vez derivado el expediente.' }
+            : { visible: true, habilitado: true, motivo: 'Asignar expediente a un especialista o responsable técnico del área.' };
+
+  // 7. ATENDER (Dictamen técnico en etapa intermedia)
+  const rolAtencionTecnica = requiereEvaluacionTecnica && roles.includes('ESPECIALISTA');
+  const puedeAtenderBase = puedeBaseInstitucional && rolAtencionTecnica;
+  const atender: CapacidadAccionDto = !rolAtencionTecnica
+    ? {
+        visible: false,
+        habilitado: false,
+        codigo: roles.includes('DIRECTOR') ? 'DIRECTOR_SIN_FACULTAD_DICTAMEN' : 'ROL_SIN_FACULTAD_ATENCION',
+        motivo: !requiereEvaluacionTecnica
+          ? 'Este procedimiento no requiere dictamen técnico intermedio; eleve directamente a Dirección con Enviar a Firma.'
+          : 'El dictamen técnico corresponde al especialista asignado del área técnica.',
+      }
+    : !puedeAtenderBase
+      ? { visible: false, habilitado: false, ...motivoNoOperativo('No cuenta con permisos para atender este expediente.') }
+      : !tieneCustodiaArea
+        ? { visible: true, habilitado: false, codigo: 'BOLA_VIOLATION_CUSTODIA_AJENA', motivo: 'No cuenta con custodia en el área actual para atender el expediente.' }
+        : estadoActual !== 'EN_REVISION'
+          ? { visible: true, habilitado: false, codigo: 'ESTADO_INVALIDO', motivo: 'Solo se puede registrar dictamen técnico cuando el expediente se encuentra EN_REVISION.' }
+          : !estaEnAreaTecnica
+            ? { visible: true, habilitado: false, codigo: 'AREA_TECNICA_REQUERIDA', motivo: 'El dictamen técnico debe registrarse en la unidad técnica responsable.' }
+            : atencionTecnicaYaCompletada
+              ? { visible: true, habilitado: false, codigo: 'ETAPA_COMPLETADA', motivo: 'El dictamen de atención técnica ya fue registrado; proceda con Enviar a Firma.' }
+              : !esUsuarioAsignado
+                ? {
+                    visible: true,
+                    habilitado: false,
+                    codigo: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
+                    motivo: asignacionActiva
+                      ? 'El expediente se encuentra asignado a otro especialista.'
+                      : 'El expediente aún no ha sido asignado formalmente para su atención técnica.',
+                  }
+                : { visible: true, habilitado: true, motivo: 'Registrar dictamen e informe de atención técnica del expediente.' };
+
+  // 8. ENVIAR A FIRMA
+  const facultadDespachoRol = roles.some((r) => ['SECRETARIO', 'DIRECTOR'].includes(r));
+  const puedeDespachoBase = puedeBaseInstitucional && facultadDespachoRol;
+  const enviarAFirma: CapacidadAccionDto = !facultadDespachoRol
+    ? {
+        visible: false,
+        habilitado: false,
+        codigo: roles.includes('ESPECIALISTA') ? 'ESPECIALISTA_NO_PUEDE_ELEVAR_A_FIRMA' : 'SIN_FACULTAD_DESPACHO_FIRMA',
+        motivo: 'Solo Secretaría o Dirección del área con custodia posee facultad de despacho para elevar a firma.',
+      }
+    : !puedeDespachoBase
+      ? { visible: false, habilitado: false, ...motivoNoOperativo('No cuenta con facultades de despacho para elevar a firma.') }
+      : !tieneCustodiaArea
+        ? { visible: true, habilitado: false, codigo: 'BOLA_VIOLATION_CUSTODIA_AJENA', motivo: 'No pertenece al área de custodia para elevar este expediente a firma.' }
+        : estadoActual !== 'EN_REVISION'
+          ? { visible: true, habilitado: false, codigo: 'ESTADO_INVALIDO', motivo: 'Solo se puede enviar a firma cuando el expediente se encuentra EN_REVISION.' }
+          : requiereEvaluacionTecnica && !atencionTecnicaYaCompletada
+            ? { visible: true, habilitado: false, codigo: 'ATENCION_TECNICA_REQUERIDA', motivo: 'Requiere asignación formal y dictamen técnico previo antes de elevar a Dirección.' }
+            : { visible: true, habilitado: true, motivo: 'Elevar expediente evaluado a Despacho de Dirección para suscripción formal.' };
+
+  // 9. RESOLVER CON FIRMA
+  const facultadResolverRol = facultadFirma.puedeFirmar;
+  const puedeResolverBase = puedeBaseInstitucional && facultadResolverRol;
+  const resolver: CapacidadAccionDto = !facultadResolverRol
+    ? { visible: false, habilitado: false, codigo: 'SIN_FACULTAD_RESOLUTIVA', motivo: 'Acceso reservado a autoridad directiva con facultad de firma.' }
+    : !puedeResolverBase
+      ? { visible: false, habilitado: false, ...motivoNoOperativo('No cuenta con facultades resolutivas institucionales.') }
+      : !tieneCustodiaArea
+        ? { visible: true, habilitado: false, codigo: 'BOLA_VIOLATION_CUSTODIA_AJENA', motivo: 'La resolución requiere custodia activa del área resolutiva.' }
+        : requiereEvaluacionTecnica && !atencionTecnicaYaCompletada
+          ? { visible: true, habilitado: false, codigo: 'ATENCION_TECNICA_REQUERIDA', motivo: 'Falta asignación formal y dictamen técnico de la unidad responsable antes de resolver.' }
+          : estadoActual !== 'EN_FIRMA'
+            ? { visible: true, habilitado: false, codigo: 'ESTADO_INVALIDO', motivo: 'Solo se pueden resolver expedientes en estado EN_FIRMA.' }
+            : { visible: true, habilitado: true, motivo: 'Emitir acto resolutivo formal suscrito y notificar a Casilla Electrónica.' };
+
+  // 10. ARCHIVAR
+  const facultadArchivarRol = roles.some((r) => ['DIRECTOR', 'SECRETARIO', 'MESA_PARTES'].includes(r));
+  const puedeArchivarBase = puedeBaseInstitucional && facultadArchivarRol;
+  const custodiaArchivar = tieneCustodiaArea || tieneCustodiaMesaIntake;
+  const archivar: CapacidadAccionDto = !facultadArchivarRol
+    ? { visible: false, habilitado: false, codigo: 'SIN_FACULTAD_ARCHIVO', motivo: 'El rol activo no posee facultades para el archivado formal.' }
+    : !puedeArchivarBase
+      ? { visible: false, habilitado: false, ...motivoNoOperativo('No cuenta con facultades para archivar el expediente.') }
+      : !custodiaArchivar
+        ? { visible: true, habilitado: false, codigo: 'BOLA_VIOLATION_CUSTODIA_AJENA', motivo: 'No tiene custodia sobre el área actual del expediente para archivarlo.' }
+        : estadoActual !== 'RESUELTO'
+          ? { visible: true, habilitado: false, codigo: 'ESTADO_INVALIDO', motivo: 'Solo se pueden archivar expedientes en estado RESUELTO.' }
+          : { visible: true, habilitado: true, motivo: 'Registrar ubicación de inventario físico y archivar expediente.' };
+
+  // 11. ACUMULAR
+  const custodiaAcumular = tieneCustodiaArea || tieneCustodiaMesaIntake;
+  const acumular: CapacidadAccionDto = !facultadDerivar
+    ? { visible: esContextoPersonal || esTitular, habilitado: false, ...motivoNoOperativo('No cuenta con permisos para acumular este expediente.') }
+    : !custodiaAcumular
+      ? { visible: true, habilitado: false, codigo: 'BOLA_VIOLATION_CUSTODIA_AJENA', motivo: 'No pertenece al área de custodia para acumular este expediente.' }
+      : estadoActual === 'ARCHIVADO'
+        ? { visible: true, habilitado: false, codigo: 'ESTADO_INVALIDO', motivo: 'No se pueden acumular expedientes en estado ARCHIVADO.' }
+        : { visible: true, habilitado: true, motivo: 'Acumular expedientes conexos bajo este expediente principal (Art. 160 LPAG).' };
+
+  return {
+    derivar,
+    recepcionar,
+    observar,
+    subsanar,
+    iniciarRevision,
+    asignar,
+    atender,
+    enviarAFirma,
+    resolver,
+    archivar,
+    acumular,
   };
 }

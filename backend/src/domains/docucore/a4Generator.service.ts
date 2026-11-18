@@ -29,6 +29,7 @@ import {
   StandardFonts,
   rgb,
   type PDFFont,
+  type PDFImage,
   type PDFPage,
   type RGB,
 } from "pdf-lib";
@@ -564,11 +565,16 @@ export class A4GeneratorService {
     const unidades = this.compilar(contenido, opciones, medir);
     const compositor = this.componer(unidades, membrete);
 
+    const logoImagen =
+      membrete.logoPng && membrete.logoPng.byteLength > 0
+        ? await documento.embedPng(membrete.logoPng).catch(() => undefined)
+        : undefined;
+
     const paginas = compositor.finalizar();
     for (const [indice, paginaCompuesta] of paginas.entries()) {
       const hoja = documento.addPage([A4_PUNTOS.ancho, A4_PUNTOS.alto]);
       if (indice === 0) {
-        this.pintarMembrete(hoja, fuentes, membrete);
+        this.pintarMembrete(hoja, fuentes, membrete, logoImagen);
       } else {
         this.pintarEncabezadoContinuacion(hoja, fuentes, membrete);
       }
@@ -1196,7 +1202,10 @@ export class A4GeneratorService {
   // -------------------------------------------------------------------------
 
   private altoMembrete(membrete: MembreteInstitucional): number {
-    let alto = 3 * 12 + 16;
+    let alto = 3 * 12 + 22;
+    if (membrete.direccion !== undefined) {
+      alto += 10;
+    }
     if (membrete.tipoDocumento !== undefined) {
       alto += 2 * 16;
     }
@@ -1207,8 +1216,43 @@ export class A4GeneratorService {
     hoja: PDFPage,
     fuentes: Record<EstiloFuente, PDFFont>,
     membrete: MembreteInstitucional,
+    logoImagen?: PDFImage,
   ): void {
-    let y = A4_PUNTOS.alto - MARGEN_PUNTOS;
+    const ySuperior = A4_PUNTOS.alto - MARGEN_PUNTOS;
+    let y = ySuperior;
+
+    const altoLogo = logoImagen ? 34 : 0;
+    const anchoLogo = logoImagen
+      ? altoLogo * (logoImagen.width / Math.max(1, logoImagen.height))
+      : 0;
+    if (logoImagen) {
+      hoja.drawImage(logoImagen, {
+        x: MARGEN_PUNTOS,
+        y: ySuperior - altoLogo + 10,
+        width: anchoLogo,
+        height: altoLogo,
+      });
+    }
+
+    const xTextoMin = MARGEN_PUNTOS + (anchoLogo > 0 ? anchoLogo + 8 : 0);
+    const anchoDisponibleCabecera = Math.max(180, A4_PUNTOS.ancho - MARGEN_PUNTOS - xTextoMin);
+
+    const centrarCabecera = (texto: string, estilo: EstiloFuente, cuerpoBase: number, color: RGB): void => {
+      let cuerpo = cuerpoBase;
+      let ancho = fuentes[estilo].widthOfTextAtSize(texto, cuerpo);
+      if (ancho > anchoDisponibleCabecera) {
+        cuerpo = Math.max(7.5, cuerpoBase * (anchoDisponibleCabecera / ancho));
+        ancho = fuentes[estilo].widthOfTextAtSize(texto, cuerpo);
+      }
+      hoja.drawText(texto, {
+        x: xTextoMin + (anchoDisponibleCabecera - ancho) / 2,
+        y,
+        size: cuerpo,
+        font: fuentes[estilo],
+        color,
+      });
+      y -= cuerpo * 1.35;
+    };
 
     const centrar = (texto: string, estilo: EstiloFuente, cuerpo: number, color: RGB): void => {
       const ancho = fuentes[estilo].widthOfTextAtSize(texto, cuerpo);
@@ -1222,14 +1266,17 @@ export class A4GeneratorService {
       y -= cuerpo * 1.35;
     };
 
-    centrar(membrete.institucion, "negrita", 11, COLOR_TEXTO);
+    centrarCabecera(membrete.institucion, "negrita", 10.5, COLOR_TEXTO);
     if (membrete.unidad !== undefined) {
-      centrar(membrete.unidad, "normal", 9.5, COLOR_TEXTO);
+      centrarCabecera(membrete.unidad, "normal", 9.5, COLOR_TEXTO);
     }
     if (membrete.direccion !== undefined) {
-      centrar(membrete.direccion, "normal", 8.5, COLOR_SECUNDARIO);
+      centrarCabecera(membrete.direccion, "normal", 8.5, COLOR_SECUNDARIO);
     }
 
+    if (logoImagen) {
+      y = Math.min(y, ySuperior - altoLogo + 6);
+    }
     y -= 6;
     this.regla(hoja, MARGEN_PUNTOS, A4_PUNTOS.ancho - MARGEN_PUNTOS, y, 1.4, COLOR_REGLA);
     this.regla(hoja, MARGEN_PUNTOS, A4_PUNTOS.ancho - MARGEN_PUNTOS, y - 3, 0.5, COLOR_REGLA);
@@ -1382,7 +1429,7 @@ export class A4GeneratorService {
       color: COLOR_SECUNDARIO,
     });
 
-    const textoDerecha = `Pagina ${pagina} de ${total}`;
+    const textoDerecha = `Página ${pagina} de ${total}`;
     const anchoDerecha = fuentes["negrita"].widthOfTextAtSize(textoDerecha, 8);
     hoja.drawText(textoDerecha, {
       x: A4_PUNTOS.ancho - MARGEN_PUNTOS - anchoDerecha,

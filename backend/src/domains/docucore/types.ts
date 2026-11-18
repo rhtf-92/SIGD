@@ -121,6 +121,8 @@ export interface MembreteInstitucional {
   correlativo?: string;
   /** Texto breve que se repite en las hojas de continuacion. */
   sigla?: string;
+  /** Escudo/logotipo institucional autentico en formato PNG para la cabecera. */
+  logoPng?: Uint8Array;
 }
 
 /** Contenido completo de una resolucion directional. */

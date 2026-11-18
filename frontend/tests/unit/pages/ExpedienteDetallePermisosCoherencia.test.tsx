@@ -3,8 +3,10 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ExpedienteDetallePage from "@/pages/expedientes/ExpedienteDetallePage";
+import EnviarAFirmaModal from "@/components/expedientes/EnviarAFirmaModal";
 import { apiClient } from "@/api/client";
 import { useAuthStore } from "@/stores/authStore";
+import { ErrorAccionExpediente } from "@/types/expedienteActions";
 
 const EXP_ID = "11111111-2222-4333-8444-555555555599";
 const AREA_SDA = "a0000000-0000-0000-0000-000000000001";
@@ -280,10 +282,10 @@ describe("ExpedienteDetallePage — Coherencia de permisos e impresión de recib
     renderDetalle();
     expect(await screen.findByText("EXP-2026-000999")).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: "Atender" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Enviar a Firma" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Resolver con Firma" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Asignar" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Atender" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Enviar a Firma" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Resolver con Firma" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Asignar" })).not.toBeInTheDocument();
 
     // Abrir recibo oficial y verificar atributos de impresión A4 limpia
     const btnVerRecibo = screen.getByRole("button", { name: "Ver Recibo Oficial" });
@@ -328,7 +330,7 @@ describe("ExpedienteDetallePage — Coherencia de permisos e impresión de recib
     expect(screen.queryByText(/Evaluar expediente y emitir documento de resolución/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Atender y Emitir Resolución/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Derivar a SDA/i })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Atender" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Atender" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Enviar a Firma" })).toBeDisabled();
     vista1.unmount();
     queryClient.clear();
@@ -390,7 +392,7 @@ describe("ExpedienteDetallePage — Coherencia de permisos e impresión de recib
     const vista3 = renderDetalle();
     expect(await screen.findByText(/Registrar dictamen técnico \(Especialista asignado\)/i)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "Atender" })).toBeEnabled());
-    expect(screen.getByRole("button", { name: "Enviar a Firma" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Enviar a Firma" })).not.toBeInTheDocument();
     vista3.unmount();
     queryClient.clear();
 
@@ -440,5 +442,196 @@ describe("ExpedienteDetallePage — Coherencia de permisos e impresión de recib
     renderDetalle();
     expect(await screen.findByText(/Firmar y resolver/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Resolver con Firma" })).toBeEnabled();
+  });
+
+  it("prioriza accionesPermitidas del backend e invalida acciones cuando cambia el área de custodia", async () => {
+    useAuthStore.setState({
+      accessToken: "jwt-esp-sda",
+      refreshToken: null,
+      isAuthenticated: true,
+      contextoActivo: "INSTITUCIONAL",
+      contextosDisponibles: [
+        { tipo: "INSTITUCIONAL", descripcion: "Institucional", rol: "ESPECIALISTA", areaId: AREA_SDA },
+      ],
+      usuario: {
+        id: "u-esp-sda",
+        idPersona: "p-esp-sda",
+        nombreCompleto: "Especialista SDA",
+        correo: "esp@iestp-suiza.edu.pe",
+        rol: "ESPECIALISTA",
+        areaId: AREA_SDA,
+      },
+    });
+
+    const resumenConCustodia = {
+      ...crearResumenBase({
+        estadoActual: "EN_REVISION",
+        areaActualId: AREA_SDA,
+        pagoEstado: "CONFIRMADO",
+      }),
+      accionesPermitidas: {
+        derivar: { visible: true, habilitado: true, motivo: "Derivar" },
+        recepcionar: { visible: false, habilitado: false },
+        observar: { visible: true, habilitado: true, motivo: "Observar" },
+        subsanar: { visible: false, habilitado: false },
+        iniciarRevision: { visible: false, habilitado: false },
+        asignar: { visible: false, habilitado: false },
+        atender: { visible: true, habilitado: false, codigo: "EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA", motivo: "Requiere asignación previa del Secretario." },
+        enviarAFirma: { visible: false, habilitado: false },
+        resolver: { visible: false, habilitado: false },
+        archivar: { visible: false, habilitado: false },
+        acumular: { visible: true, habilitado: true, motivo: "Acumular" },
+      },
+    };
+
+    let fase = 1;
+    vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
+      if (url.includes("/resumen")) {
+        if (fase === 1) return { data: resumenConCustodia } as any;
+        return {
+          data: {
+            ...crearResumenBase({
+              estadoActual: "DERIVADO",
+              areaActualId: AREA_DIR,
+              pagoEstado: "CONFIRMADO",
+            }),
+            accionesPermitidas: {
+              ...resumenConCustodia.accionesPermitidas,
+              derivar: { visible: true, habilitado: false, codigo: "BOLA_VIOLATION_CUSTODIA_AJENA", motivo: "Custodia transferida a Dirección." },
+              observar: { visible: true, habilitado: false, codigo: "BOLA_VIOLATION_CUSTODIA_AJENA", motivo: "Custodia ajena." },
+              acumular: { visible: true, habilitado: false, codigo: "BOLA_VIOLATION_CUSTODIA_AJENA", motivo: "Custodia ajena." },
+            },
+          },
+        } as any;
+      }
+      if (url.includes("/asignacion")) return { data: { ok: true, activa: null, historial: [], candidatos: [] } } as any;
+      return { data: [] } as any;
+    });
+
+    const vista = renderDetalle();
+    expect(await screen.findByText("EXP-2026-000999")).toBeInTheDocument();
+
+    const btnAtender = screen.getByRole("button", { name: "Atender" });
+    expect(btnAtender).toBeDisabled();
+    expect(btnAtender).toHaveAccessibleDescription(/Requiere asignación previa del Secretario/i);
+    fireEvent.click(btnAtender);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Derivar" })).toBeEnabled();
+
+    // Cambio de custodia -> invalidar cache y verificar bloqueo
+    fase = 2;
+    vista.unmount();
+    queryClient.clear();
+    renderDetalle();
+    expect(await screen.findByText("EXP-2026-000999")).toBeInTheDocument();
+    const btnDerivarBloqueado = screen.getByRole("button", { name: "Derivar" });
+    expect(btnDerivarBloqueado).toBeDisabled();
+    expect(btnDerivarBloqueado).toHaveAccessibleDescription(/Custodia transferida a Dirección/i);
+    fireEvent.click(btnDerivarBloqueado);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("muestra alerta de error HTTP 403/409 en EnviarAFirmaModal y deshabilita confirmación cuando no está disponible", () => {
+    render(
+      <EnviarAFirmaModal
+        open={true}
+        onClose={vi.fn()}
+        expediente={{ id: EXP_ID, codigo: "EXP-2026-000999" }}
+        accion={{
+          disponible: false,
+          pending: false,
+          estado: "error",
+          error: new ErrorAccionExpediente("Solo Secretaría o Dirección del área con custodia posee facultad de despacho para elevar a firma.", "http", 403),
+          resultado: undefined,
+          ejecutar: vi.fn(),
+          restablecer: vi.fn(),
+        }}
+      />
+    );
+
+    const alertas = screen.getAllByRole("alert");
+    expect(alertas.some((a) => /no está disponible actualmente/i.test(a.textContent ?? ""))).toBe(true);
+    expect(alertas.some((a) => /Solo Secretaría o Dirección/i.test(a.textContent ?? ""))).toBe(true);
+    expect(screen.getByRole("button", { name: /Confirmar Envío a Firma/i })).toBeDisabled();
+  });
+
+  it("oculta Derivar al ESPECIALISTA sin permiso EXPEDIENTE_DERIVAR y lo habilita cuando posee facultad explícita", async () => {
+    useAuthStore.setState({
+      accessToken: "jwt-esp-sin-derivar",
+      refreshToken: null,
+      isAuthenticated: true,
+      contextoActivo: "INSTITUCIONAL",
+      contextosDisponibles: [
+        { tipo: "INSTITUCIONAL", descripcion: "Institucional", rol: "ESPECIALISTA", areaId: AREA_SDA, perfiles: [] },
+      ],
+      usuario: {
+        id: "u-esp-sda",
+        idPersona: "p-esp-sda",
+        nombreCompleto: "Especialista Demo",
+        correo: "esp@iestp-suiza.edu.pe",
+        rol: "ESPECIALISTA",
+        areaId: AREA_SDA,
+        perfiles: [],
+        permisos: [],
+      },
+    });
+
+    vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
+      if (url.includes("/resumen")) {
+        return {
+          data: {
+            ...crearResumenBase({ estadoActual: "EN_REVISION", areaActualId: AREA_SDA, pagoEstado: "CONFIRMADO" }),
+            accionesPermitidas: {
+              derivar: { visible: false, habilitado: false, codigo: "SIN_FACULTAD_DERIVACION", motivo: "El rol ESPECIALISTA no posee facultad explícita ni delegación vigente para derivar este expediente." },
+              recepcionar: { visible: false, habilitado: false },
+              observar: { visible: true, habilitado: true, motivo: "Observar" },
+              subsanar: { visible: false, habilitado: false },
+              iniciarRevision: { visible: false, habilitado: false },
+              asignar: { visible: false, habilitado: false },
+              atender: { visible: false, habilitado: false },
+              enviarAFirma: { visible: false, habilitado: false },
+              resolver: { visible: false, habilitado: false },
+              archivar: { visible: false, habilitado: false },
+              acumular: { visible: true, habilitado: true, motivo: "Acumular" },
+            },
+          },
+        } as any;
+      }
+      if (url.includes("/asignacion")) return { data: { ok: true, activa: null, historial: [], candidatos: [] } } as any;
+      return { data: [] } as any;
+    });
+
+    const vistaSin = renderDetalle();
+    expect(await screen.findByText("EXP-2026-000999")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Derivar" })).not.toBeInTheDocument();
+    vistaSin.unmount();
+    queryClient.clear();
+
+    // Con facultad explícita (EXPEDIENTE_DERIVAR / GESTOR_AREA_ACADEMICA)
+    useAuthStore.setState({
+      usuario: {
+        id: "u-resp-ing",
+        idPersona: "p-resp-ing",
+        nombreCompleto: "Responsable Inglés",
+        correo: "ing@iestp-suiza.edu.pe",
+        rol: "ESPECIALISTA",
+        areaId: AREA_SDA,
+        perfiles: ["GESTOR_AREA_ACADEMICA"],
+        permisos: ["EXPEDIENTE_DERIVAR"],
+      },
+    });
+    vi.spyOn(apiClient, "get").mockImplementation(async (url: string) => {
+      if (url.includes("/resumen")) {
+        return {
+          data: crearResumenBase({ estadoActual: "EN_REVISION", areaActualId: AREA_SDA, pagoEstado: "CONFIRMADO" }),
+        } as any;
+      }
+      if (url.includes("/asignacion")) return { data: { ok: true, activa: null, historial: [], candidatos: [] } } as any;
+      return { data: [] } as any;
+    });
+
+    renderDetalle();
+    expect(await screen.findByText("EXP-2026-000999")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Derivar" })).toBeEnabled();
   });
 });

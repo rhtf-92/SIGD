@@ -65,6 +65,19 @@ export const rutaDoc = {
         areaResponsableId: string | null;
         areaResolutivaId: string | null;
       } | null;
+      accionesPermitidas?: {
+        derivar: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+        recepcionar: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+        observar: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+        subsanar: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+        iniciarRevision: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+        asignar: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+        atender: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+        enviarAFirma: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+        resolver: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+        archivar: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+        acumular: { visible: boolean; habilitado: boolean; codigo?: string; motivo?: string };
+      } | null;
     };
   },
   obtenerUrlArchivo: async (idExpediente: string, idDocumento: string, signal?: AbortSignal) => {

@@ -93,4 +93,14 @@ describe('tesoreriaService — Cliente API de Tesorería', () => {
     expect(res.exito).toBe(true);
   });
 
+  it('obtenerConfiguracionDemoQr consulta el endpoint canónico /api/v1/tesoreria/demo-qr/config', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { configured: false, sandbox: true, publicUrl: null },
+    });
+
+    const res = await tesoreriaService.obtenerConfiguracionDemoQr();
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/tesoreria/demo-qr/config', { signal: undefined });
+    expect(res.sandbox).toBe(true);
+  });
+
 });

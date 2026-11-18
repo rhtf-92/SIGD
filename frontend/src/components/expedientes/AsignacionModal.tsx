@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
 import AccionModal from "./AccionModal";
+import { adaptarErrorAccion } from "../../utils/expedienteActions";
 import type { ExpedienteAccionReferencia } from "../../types/expedienteActions";
 
 export interface CandidatoAsignacion {
@@ -100,11 +101,8 @@ function FormularioAsignacion({ expediente, onClose, onAsignado }: AsignacionMod
       onClose();
     } catch (err: any) {
       console.error("Error al asignar expediente:", err);
-      setErrorEnvio(
-        err.response?.data?.message ||
-        err.response?.data?.detail ||
-        "No se pudo completar la asignación del expediente."
-      );
+      const adaptado = adaptarErrorAccion(err);
+      setErrorEnvio(adaptado.message || "No se pudo completar la asignación del expediente.");
     } finally {
       setEnviando(false);
     }

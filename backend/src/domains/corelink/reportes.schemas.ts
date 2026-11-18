@@ -15,6 +15,10 @@ const periodo = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, {
   message: 'El período debe tener formato YYYY-MM.',
 });
 
+const fechaIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
+  message: 'La fecha debe tener formato YYYY-MM-DD.',
+});
+
 /**
  * Rango de años admitidos.
  *
@@ -23,6 +27,9 @@ const periodo = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, {
  * abrir la puerta a `make_date` con un año de cinco dígitos.
  */
 const anio = z.coerce.number().int().min(2000).max(2100);
+const mesSchema = z.string().regex(/^(0[1-9]|1[0-2])$/, {
+  message: 'El mes debe tener formato MM (01-12).',
+});
 
 /**
  * `diasLimite` es el umbral de estancamiento EN DÍAS HÁBILES.
@@ -34,9 +41,15 @@ const anio = z.coerce.number().int().min(2000).max(2100);
  */
 const diasLimite = z.coerce.number().int().min(0).max(365).default(5);
 
-/** Filtros del tablero consolidado (#50). */
+/** Filtros del tablero consolidado (#50): admite modo mensual YYYY-MM o filtros del dashboard ejecutivo. */
 export const filtrosResumenSchema = z.object({
-  periodo: periodo.optional(),
+  periodo: z.union([periodo, z.enum(['anual', 'mensual', 'personalizado'])]).optional(),
+  fechaInicio: fechaIso.optional(),
+  fechaFin: fechaIso.optional(),
+  diasLimite: diasLimite.optional(),
+  anio: anio.optional(),
+  mes: mesSchema.optional(),
+  unidadOrganicaId: z.string().uuid().optional(),
 }).strict();
 
 /** Filtros del ranking de cuellos de botella (#51). */

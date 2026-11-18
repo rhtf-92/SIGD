@@ -486,11 +486,12 @@ export class ServicioMgdAnalytics {
       const porPeriodo = new Map<string, PuntoTendencia>();
       for (const fila of await this.repositorio.obtenerTendencias(anio)) {
         const mes = Number(fila.periodo.slice(5, 7));
+        const previo = porPeriodo.get(fila.periodo) ?? { mes, radicados: 0, atendidos: 0, observados: 0 };
         porPeriodo.set(fila.periodo, {
           mes,
-          radicados: fila.contadores.nRadicados,
-          atendidos: fila.contadores.nAtendidos + fila.contadores.nArchivados,
-          observados: fila.contadores.nObservados,
+          radicados: previo.radicados + fila.contadores.nRadicados,
+          atendidos: previo.atendidos + fila.contadores.nAtendidos + fila.contadores.nArchivados,
+          observados: previo.observados + fila.contadores.nObservados,
         });
       }
       return Array.from({ length: 12 }, (_, indice) => {

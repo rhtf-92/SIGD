@@ -242,11 +242,11 @@ describe('Fase 5J: Casillero Electrónico, CUT, Documentos Finales y Notificacio
           rows: [
             {
               cvd: 'CVD-2026-RES-000100-A1B2',
-              sha256_firmado: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+              sha256_firmado: 'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3',
               firmante: 'DIRECTOR GENERAL IESTP SUIZA',
               fecha_sello_tsa: new Date('2026-03-01T10:05:00Z'),
               estado: 'FIRMADO_DIGITALMENTE',
-              s3_bucket: 'sigd-expedientes',
+              s3_bucket: 'sigd-unit-mock',
               s3_key: 'resoluciones/2026/RD-045-2026.pdf',
             },
           ],

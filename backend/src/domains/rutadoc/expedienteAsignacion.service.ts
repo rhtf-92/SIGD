@@ -15,7 +15,9 @@ export interface DtoExpedienteAsignacion {
   desasignadoEn: string | null;
   desasignadoPor: string | null;
   motivoDesasignacion: string | null;
-  personaNombre?: string;
+  personaNombre?: string | null;
+  nombreCompleto?: string | null;
+  usuario?: string | null;
   areaNombre?: string;
 }
 
@@ -303,15 +305,17 @@ export class ExpedienteAsignacionService {
       asignado_por: string;
       motivo: string;
       activo: boolean;
-      asignado_en: Date;
-      desasignado_en: Date | null;
+      asignado_en: Date | string;
+      desasignado_en: Date | string | null;
       desasignado_por: string | null;
       motivo_desasignacion: string | null;
       area_nombre: string;
+      nombre_completo?: string | null;
     }>(
-      `SELECT a.*, ar.nombre AS area_nombre
+      `SELECT a.*, ar.nombre AS area_nombre, pn.nombre_completo
          FROM sigd_rut.expediente_asignacion a
          JOIN sigd_org.area ar ON ar.area_id = a.id_area
+         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = a.id_persona
         WHERE a.expediente_id = $1::uuid
           AND a.activo = true
         LIMIT 1`,
@@ -329,11 +333,23 @@ export class ExpedienteAsignacionService {
       asignadoPor: r.asignado_por,
       motivo: r.motivo,
       activo: r.activo,
-      asignadoEn: r.asignado_en.toISOString(),
-      desasignadoEn: r.desasignado_en ? r.desasignado_en.toISOString() : null,
+      asignadoEn:
+        r.asignado_en instanceof Date
+          ? r.asignado_en.toISOString()
+          : r.asignado_en
+            ? String(r.asignado_en)
+            : new Date().toISOString(),
+      desasignadoEn:
+        r.desasignado_en instanceof Date
+          ? r.desasignado_en.toISOString()
+          : r.desasignado_en
+            ? String(r.desasignado_en)
+            : null,
       desasignadoPor: r.desasignado_por,
       motivoDesasignacion: r.motivo_desasignacion,
       areaNombre: r.area_nombre,
+      personaNombre: r.nombre_completo ?? null,
+      nombreCompleto: r.nombre_completo ?? null,
     };
   }
 
@@ -351,15 +367,17 @@ export class ExpedienteAsignacionService {
       asignado_por: string;
       motivo: string;
       activo: boolean;
-      asignado_en: Date;
-      desasignado_en: Date | null;
+      asignado_en: Date | string;
+      desasignado_en: Date | string | null;
       desasignado_por: string | null;
       motivo_desasignacion: string | null;
       area_nombre: string;
+      nombre_completo?: string | null;
     }>(
-      `SELECT a.*, ar.nombre AS area_nombre
+      `SELECT a.*, ar.nombre AS area_nombre, pn.nombre_completo
          FROM sigd_rut.expediente_asignacion a
          JOIN sigd_org.area ar ON ar.area_id = a.id_area
+         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = a.id_persona
         WHERE a.expediente_id = $1::uuid
         ORDER BY a.asignado_en ASC`,
       [expedienteId],
@@ -374,11 +392,23 @@ export class ExpedienteAsignacionService {
       asignadoPor: r.asignado_por,
       motivo: r.motivo,
       activo: r.activo,
-      asignadoEn: r.asignado_en.toISOString(),
-      desasignadoEn: r.desasignado_en ? r.desasignado_en.toISOString() : null,
+      asignadoEn:
+        r.asignado_en instanceof Date
+          ? r.asignado_en.toISOString()
+          : r.asignado_en
+            ? String(r.asignado_en)
+            : new Date().toISOString(),
+      desasignadoEn:
+        r.desasignado_en instanceof Date
+          ? r.desasignado_en.toISOString()
+          : r.desasignado_en
+            ? String(r.desasignado_en)
+            : null,
       desasignadoPor: r.desasignado_por,
       motivoDesasignacion: r.motivo_desasignacion,
       areaNombre: r.area_nombre,
+      personaNombre: r.nombre_completo ?? null,
+      nombreCompleto: r.nombre_completo ?? null,
     }));
   }
 

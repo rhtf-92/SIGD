@@ -80,9 +80,12 @@ function EscudoSuiza() {
 }
 
 export default function CvdIntegrityReport({ resultado }: CvdIntegrityReportProps) {
-  const { documento } = resultado;
+  const { documento, evidencia } = resultado;
+  const esFirmaLab =
+    evidencia?.esFirmaLaboratorio === true ||
+    evidencia?.naturalezaFirma === "FIRMA_LABORATORIO";
 
-  if (!resultado.esValido || !documento) {
+  if (!resultado.esValido || (!documento && !evidencia)) {
     return (
       <section
         role="alert"
@@ -101,16 +104,124 @@ export default function CvdIntegrityReport({ resultado }: CvdIntegrityReportProp
             </p>
           </div>
         </header>
-        <div className="p-6">
+        <div className="p-6 space-y-3">
           <p className="text-sm leading-6 text-slate-700">{resultado.mensajeSeguridad}</p>
-          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            Posible documento apócrifo o alterado tras su emisión. Apersónese a la Secretaría
+          {evidencia?.hashSha256 && (
+            <p className="font-mono text-xs text-slate-600 break-all">
+              SHA-256 registrado: {evidencia.hashSha256}
+            </p>
+          )}
+          <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Posible documento apócrifo, artefacto vacío o alterado tras su emisión. Apersónese a la Secretaría
             Académica del instituto en Pucallpa con el ejemplar físico para el cotejo manual.
           </p>
         </div>
       </section>
     );
   }
+
+  if (!documento && evidencia) {
+    return (
+      <section
+        aria-live="polite"
+        aria-label={`Dictamen de autenticidad del CVD ${resultado.cvd}`}
+        className={`overflow-hidden rounded-xl border-2 bg-white shadow-sm ${
+          esFirmaLab ? "border-amber-600" : "border-emerald-700"
+        }`}
+      >
+        <header
+          className={`flex flex-wrap items-center gap-4 p-5 text-white ${
+            esFirmaLab ? "bg-amber-700" : "bg-emerald-800"
+          }`}
+        >
+          <EscudoSuiza />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-widest opacity-80">
+              IESTP Suiza · Verificación de registro CVD
+            </p>
+            <h2 className="text-xl font-black">
+              {esFirmaLab
+                ? "Firma de laboratorio verificada (pruebas / demo)"
+                : "Firma digital oficial verificada"}
+            </h2>
+            <p className="font-mono text-sm opacity-90">CVD {resultado.cvd}</p>
+          </div>
+          <span
+            className={`rounded-full bg-white px-3 py-1 text-xs font-black ${
+              esFirmaLab ? "text-amber-800" : "text-emerald-800"
+            }`}
+          >
+            {esFirmaLab ? "FIRMA DE LABORATORIO (PRUEBAS / DEMO)" : "✓ FIRMA DIGITAL OFICIAL"}
+          </span>
+        </header>
+
+        <div className="p-6 space-y-4">
+          {esFirmaLab && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-900">
+              Certificado emitido en entorno de laboratorio / demostración académica. No constituye firma digital oficial con valor legal ante RENIEC/INDECOPI.
+            </p>
+          )}
+          <dl className="grid gap-4 sm:grid-cols-2 text-sm">
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                Naturaleza de firma
+              </dt>
+              <dd className="mt-1 font-bold text-slate-800">
+                {esFirmaLab ? "Firma de laboratorio (pruebas / demo)" : "Firma digital oficial"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                Firmante registrado
+              </dt>
+              <dd className="mt-1 font-bold text-slate-800">
+                {evidencia.firmante ?? "Autoridad institucional"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                Sellado de tiempo TSA
+              </dt>
+              <dd className="mt-1 text-slate-700">
+                {formatoFechaHora(evidencia.fechaSelloTsa ?? resultado.selloTiempoTsa)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                Integridad de archivo en almacén
+              </dt>
+              <dd className="mt-1 text-slate-700">
+                {evidencia.integridadArchivo === "VERIFICADA" ? "Verificada (PDF no vacío)" : evidencia.integridadArchivo ?? "Verificada"}
+              </dd>
+            </div>
+          </dl>
+          <TechnicalDetails title="Detalles criptográficos de integridad">
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Hash SHA-256 (documento firmado)
+              </dt>
+              <dd className="mt-1 break-all font-mono text-xs text-slate-600">
+                {evidencia.hashSha256}
+              </dd>
+            </div>
+            {evidencia.proveedorFirma && (
+              <div className="mt-2">
+                <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Proveedor / algoritmo
+                </dt>
+                <dd className="mt-1 font-mono text-xs text-slate-600">
+                  {evidencia.proveedorFirma} {evidencia.algoritmoFirma ? `· ${evidencia.algoritmoFirma}` : ""}
+                </dd>
+              </div>
+            )}
+          </TechnicalDetails>
+          <p className="text-sm text-slate-700">{resultado.mensajeSeguridad}</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (!documento) return null;
 
   return (
     <section

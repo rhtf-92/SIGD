@@ -575,10 +575,10 @@ export function crearRouterCasilla(pool: Pool): Router {
     const usuarioId = obtenerUsuarioId(req);
 
     const resultado = await pool.query<{ no_leidas: string; total: string }>(
-      `SELECT COUNT(*) FILTER (WHERE estado = 'NO_LEIDO')::text AS no_leidas,
+      `SELECT COUNT(*) FILTER (WHERE estado IN ('NO_LEIDO', 'PUESTA_A_DISPOSICION', 'PENDIENTE'))::text AS no_leidas,
               COUNT(*)::text AS total
          FROM sigd_auth.notificacion_casilla
-        WHERE usuario_id = $1::uuid`,
+        WHERE (usuario_id = $1::uuid OR (usuario_id IS NULL AND cut IS NOT NULL AND cut IN (SELECT e.codigo_expediente FROM sigd_tra.solicitud_vinculacion_expediente sv JOIN sigd_tra.expediente e ON e.expediente_id = sv.expediente_id WHERE sv.id_usuario = $1::uuid AND sv.estado = 'APROBADA')))`,
       [usuarioId],
     );
 

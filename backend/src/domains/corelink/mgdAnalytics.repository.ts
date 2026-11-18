@@ -273,7 +273,19 @@ export class RepositorioMgdAnalytics {
         nombres.set(fila.id, { nombre: fila.nombre, sigla: fila.sigla });
       }
     } catch {
-      // Degradación documentada: sin OrganiCore se conserva el identificador.
+      // Fallback al esquema orgánico vigente (sigd_org.area)
+      try {
+        const { rows } = await this.pool.query<{ id: string; sigla: string | null; nombre: string }>(
+          `SELECT area_id::text AS id, codigo AS sigla, nombre
+             FROM sigd_org.area
+            WHERE vigente = true`,
+        );
+        for (const fila of rows) {
+          nombres.set(fila.id, { nombre: fila.nombre, sigla: fila.sigla });
+        }
+      } catch {
+        // Degradación documentada: sin OrganiCore se conserva el identificador.
+      }
     }
     return nombres;
   }

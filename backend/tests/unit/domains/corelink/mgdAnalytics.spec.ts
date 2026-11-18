@@ -21,6 +21,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import express from 'express';
+import request from 'supertest';
+import { errorMiddleware } from '../../../../src/middleware/error-middleware.js';
+import { crearControladorReportes } from '../../../../src/domains/corelink/reportes.controller.js';
 import {
   alinearUmboloATramo,
   calcularIndicadoresMgd,
@@ -46,6 +50,7 @@ import {
 import {
   anioEnLima,
   filtrosCuellosBotellaSchema,
+  filtrosResumenSchema,
 } from '../../../../src/domains/corelink/reportes.schemas.js';
 import { obtenerPartesLima } from '../../../../src/domains/tramicore/horarioCorte.util.js';
 import { calcularSla } from '../../../../src/domains/rutadoc/sla.service.js';
@@ -548,5 +553,93 @@ describe('Servicio: agregación y degradación sin caché', () => {
     };
     const servicio = new ServicioMgdAnalytics(repositorioFalso as never, { cache });
     await expect(servicio.resumen(null)).resolves.toBeDefined();
+  });
+
+  it('35 dashboard/resumen acepta filtros anuales del frontend para DIRECTOR y mantiene 403/400', async () => {
+    const servicio = new ServicioMgdAnalytics(repositorioFalso as never);
+    let actorActual: { id: string; roles: string[] } = { id: 'dir-1', roles: ['DIRECTOR'] };
+    const controlador = crearControladorReportes(
+      { obtenerActor: async () => actorActual },
+      servicio,
+      { obtenerNombresUnidades: async () => new Map([['UA', { nombre: 'Unidad A', sigla: 'UA' }]]) } as never,
+    );
+    const app = express();
+    app.get('/api/v1/reportes/dashboard/resumen', controlador.resumen);
+    app.use(errorMiddleware);
+
+    // DIRECTOR institucional con filtros del DashboardEjecutivoPage -> 200 OK
+    const rOk = await request(app)
+      .get('/api/v1/reportes/dashboard/resumen?fechaInicio=2026-01-01&fechaFin=2026-12-31&periodo=anual&diasLimite=5&anio=2026');
+    expect(rOk.status).toBe(200);
+    expect(rOk.body.vtep.valor).toBe(95);
+    expect(Array.isArray(rOk.body.tendencia)).toBe(true);
+    expect(rOk.body.tendencia).toHaveLength(12);
+    expect(Array.isArray(rOk.body.cuellosBotella)).toBe(true);
+
+    // Parámetro desconocido (typo) sigue rechazándose con 400
+    expect(
+      () => filtrosResumenSchema.parse({ diaslimite: 5 }),
+    ).toThrow();
+    const rBad = await request(app).get('/api/v1/reportes/dashboard/resumen?diaslimite=5');
+    expect(rBad.status).toBe(400);
+
+    // Rol no autorizado (ej. ESPECIALISTA / CIUDADANO) sigue bloqueado con 403
+    actorActual = { id: 'esp-1', roles: ['ESPECIALISTA'] };
+    const rDeny = await request(app).get('/api/v1/reportes/dashboard/resumen?periodo=anual&anio=2026');
+    expect(rDeny.status).toBe(403);
+  });
+
+  it('36 suma tendencias multiárea del mismo mes y expone estados reales en dashboard/resumen', async () => {
+    const repoMultiArea = {
+      ...repositorioFalso,
+      obtenerTendencias: async () => [
+        {
+          periodo: '2026-11',
+          actualizadoEn: null,
+          contadores: { ...CONTADORES_VACIOS, nRadicados: 102, nAtendidos: 12, nArchivados: 6, nObservados: 3 },
+        },
+        {
+          periodo: '2026-11',
+          actualizadoEn: null,
+          contadores: { ...CONTADORES_VACIOS, nRadicados: 254, nAtendidos: 0, nArchivados: 0, nObservados: 5 },
+        },
+      ],
+    };
+
+    const servicio = new ServicioMgdAnalytics(repoMultiArea as never);
+    const serie = await servicio.tendencias(2026);
+    expect(serie[10]).toEqual({
+      mes: 11,
+      radicados: 356,
+      atendidos: 18,
+      observados: 8,
+    });
+
+    const controlador = crearControladorReportes(
+      { obtenerActor: async () => ({ id: 'dir-1', roles: ['DIRECTOR'] }) },
+      servicio,
+      { obtenerNombresUnidades: async () => new Map([['UA', { nombre: 'Unidad A', sigla: 'UA' }]]) } as never,
+    );
+    const app = express();
+    app.get('/api/v1/reportes/dashboard/resumen', controlador.resumen);
+    app.use(errorMiddleware);
+
+    const rOk = await request(app).get('/api/v1/reportes/dashboard/resumen?periodo=anual&anio=2026');
+    expect(rOk.status).toBe(200);
+    expect(rOk.body.tendencia[10]).toEqual({
+      fechaLabel: 'Nov',
+      radicados: 356,
+      resueltos: 18,
+      observados: 8,
+    });
+    expect(Array.isArray(rOk.body.estados)).toBe(true);
+    expect(rOk.body.estados).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ estado: 'Resuelto', porcentaje: 90 }),
+        expect.objectContaining({ estado: 'Archivado', porcentaje: 5 }),
+        expect.objectContaining({ estado: 'En revisión', porcentaje: 9 }),
+        expect.objectContaining({ estado: 'Observado', porcentaje: 1 }),
+      ]),
+    );
   });
 });

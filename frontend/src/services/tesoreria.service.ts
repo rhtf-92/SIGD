@@ -317,7 +317,7 @@ export const tesoreriaService = {
   },
 
   async obtenerConfiguracionDemoQr(signal?: AbortSignal): Promise<DtoConfiguracionDemoQr> {
-    const res = await apiClient.get<DtoConfiguracionDemoQr>('/api/v1/tesoreria/configuracion-demo-qr', { signal });
+    const res = await apiClient.get<DtoConfiguracionDemoQr>('/api/v1/tesoreria/demo-qr/config', { signal });
     return res.data;
   },
 

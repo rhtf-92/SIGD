@@ -26,7 +26,7 @@ import {
 import { Button } from "../../components/ui/Button";
 import { ContextualHelp } from "../../components/ui/ContextualHelp";
 
-const PATRON_CVD = /CVD-\d{2,4}-[A-Z]{2,6}-\d{4,6}-[A-F0-9]{4}/;
+const PATRON_CVD = /CVD-(?:19|20)\d{2}-(?:[A-Z]{2,6}-\d{6}-[A-F0-9]{4}|[A-Z0-9]{2,16}(?:-[A-Z0-9]{2,16})*)/;
 
 export default function ValidadorPublicoCvdPage() {
   const [codigo, setCodigo] = useState("");
@@ -213,7 +213,7 @@ export default function ValidadorPublicoCvdPage() {
                 placeholder="CVD-2026-RD-000412-892F"
                 spellCheck={false}
                 autoComplete="off"
-                maxLength={26}
+                maxLength={42}
                 aria-describedby="ayuda-cvd"
                 aria-invalid={mensaje ? true : undefined}
                 className="h-11 min-h-[44px] min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3.5 font-mono text-sm uppercase placeholder:font-sans placeholder:normal-case placeholder:text-slate-400 focus:border-suiza-primary focus:ring-2 focus:ring-suiza-primary/20 focus:outline-none transition"

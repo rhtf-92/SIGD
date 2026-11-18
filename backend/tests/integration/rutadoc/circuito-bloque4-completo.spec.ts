@@ -18,9 +18,50 @@ import { DestinoCasilla } from '../../../src/audit/despachador-notificaciones.js
 import { ConflictError, DomainError, NotFoundError } from '../../../src/shared/domain/errors/index.js';
 
 describe('SIGD — Bloque 4: Circuito Completo de Notificación, Casilla Electrónica y Archivado', () => {
+  let realPool: Pool;
+  let txClient: PoolClient;
   let pool: Pool;
-  let client: PoolClient;
   let app: any;
+  let savepointCounter = 0;
+  let queryChain: Promise<unknown> = Promise.resolve();
+
+  function runSerialized<T>(fn: () => Promise<T>): Promise<T> {
+    const next = queryChain.then(fn, fn);
+    queryChain = next.catch(() => {});
+    return next;
+  }
+
+  function createIsolatedPool(client: PoolClient): Pool {
+    return {
+      query: (text: any, params?: any) => runSerialized(() => client.query(text, params)),
+      connect: async () => {
+        const activeSavepoints: string[] = [];
+        return {
+          query: (text: any, params?: any) =>
+            runSerialized(async () => {
+              const sql = typeof text === 'string' ? text.trim().toUpperCase() : '';
+              if (sql === 'BEGIN') {
+                savepointCounter += 1;
+                const sp = `sp_b4_${savepointCounter}`;
+                activeSavepoints.push(sp);
+                return client.query(`SAVEPOINT ${sp}`);
+              }
+              if (sql === 'COMMIT') {
+                const sp = activeSavepoints.pop();
+                return sp ? client.query(`RELEASE SAVEPOINT ${sp}`) : { rows: [], rowCount: 0 };
+              }
+              if (sql === 'ROLLBACK') {
+                const sp = activeSavepoints.pop();
+                return sp ? client.query(`ROLLBACK TO SAVEPOINT ${sp}`) : { rows: [], rowCount: 0 };
+              }
+              return client.query(text, params);
+            }),
+          release: () => {},
+        } as unknown as PoolClient;
+      },
+      on: () => {},
+    } as unknown as Pool;
+  }
 
   const JWT_SECRET = process.env.AUTH_JWT_SECRET || 'nKqasrFsaaDNEEQoEZ7_9MUcxDisFemA219Yp4mO94UuE-ausA7Eztrpy8P3eMoZKC3Z7-D5_4nM6h8SHfrL2g';
 
@@ -71,31 +112,13 @@ describe('SIGD — Bloque 4: Circuito Completo de Notificación, Casilla Electr�
   const tokenDirector = () => firmarTokenAcceso({ sub: USER_DIRECTOR_DIR, roles: ['DIRECTOR'], secreto: JWT_SECRET });
 
   beforeAll(async () => {
-    pool = new Pool({
+    realPool = new Pool({
       connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres_password@172.20.157.19:5432/sigd_prueba',
     });
-    client = await pool.connect();
+    txClient = await realPool.connect();
+    await txClient.query('BEGIN');
+    pool = createIsolatedPool(txClient);
     app = construirApp(pool);
-
-    // Limpieza defensiva previa con orden estricto de dependencias
-    await pool.query(`
-      DELETE FROM sigd_auth.notificacion_trazabilidad_evento WHERE notificacion_id IN (
-        SELECT id FROM sigd_auth.notificacion_casilla WHERE usuario_id IN (
-          SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE correo LIKE '%@iestp-suiza.edu.pe' OR correo LIKE '%@correo.com'
-        ) OR cut LIKE 'EXP-2026-8%' OR cut LIKE 'EXP-2026-7%'
-      )
-    `).catch(() => {});
-    await pool.query(`
-      DELETE FROM sigd_auth.notificacion_casilla WHERE usuario_id IN (
-        SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE correo LIKE '%@iestp-suiza.edu.pe' OR correo LIKE '%@correo.com'
-      ) OR cut LIKE 'EXP-2026-8%' OR cut LIKE 'EXP-2026-7%'
-    `).catch(() => {});
-    await pool.query(`
-      DELETE FROM sigd_auth.cuenta_usuario WHERE correo LIKE 'titular_%@iestp-suiza.edu.pe' OR correo LIKE 'ajeno_%@iestp-suiza.edu.pe' OR correo LIKE 'presencial_%@correo.com'
-    `).catch(() => {});
-    await pool.query(`
-      DELETE FROM sigd_auth.persona_natural WHERE correo LIKE 'titular_%@iestp-suiza.edu.pe' OR correo LIKE 'ajeno_%@iestp-suiza.edu.pe' OR correo LIKE 'presencial_%@correo.com'
-    `).catch(() => {});
 
     // 1. Obtener tipo documental para resoluciones
     const tdRes = await pool.query<{ tipo_documental_id: string }>(
@@ -205,31 +228,15 @@ describe('SIGD — Bloque 4: Circuito Completo de Notificación, Casilla Electr�
   });
 
   afterAll(async () => {
-    // Limpieza estricta de registros de prueba generados
     try {
-      await pool.query(`DELETE FROM sigd_auth.notificacion_trazabilidad_evento WHERE notificacion_id IN (
-        SELECT id FROM sigd_auth.notificacion_casilla WHERE cut IN ($1, $2)
-      )`, [testCutTitular, testCutSinCuenta]);
-      await pool.query(`DELETE FROM sigd_auth.notificacion_casilla WHERE cut IN ($1, $2)`, [testCutTitular, testCutSinCuenta]);
-      await pool.query(`DELETE FROM sigd_doc.firma_digital_documento WHERE documento_id IN (
-        SELECT documento_adjunto_id FROM sigd_doc.documento_adjunto WHERE expediente_tra_id IN ($1, $2)
-      )`, [testExpedienteTitularId, testExpedienteSinCuentaId]);
-      await pool.query(`DELETE FROM sigd_doc.resolucion WHERE expediente_tra_id IN ($1, $2)`, [testExpedienteTitularId, testExpedienteSinCuentaId]);
-      await pool.query(`DELETE FROM sigd_doc.documento_adjunto WHERE expediente_tra_id IN ($1, $2)`, [testExpedienteTitularId, testExpedienteSinCuentaId]);
-      await pool.query(`DELETE FROM sigd_rut.movimiento_tramite WHERE expediente_id IN ($1, $2)`, [testExpedienteTitularId, testExpedienteSinCuentaId]);
-      await pool.query(`DELETE FROM sigd_rut.estado_actual_expediente WHERE expediente_id IN ($1, $2)`, [testExpedienteTitularId, testExpedienteSinCuentaId]);
-      await pool.query(`DELETE FROM sigd_rut.movimiento_secuencia WHERE expediente_id IN ($1, $2)`, [testExpedienteTitularId, testExpedienteSinCuentaId]);
-      await pool.query(`DELETE FROM sigd_tra.tramite WHERE expediente_id IN ($1, $2)`, [testExpedienteTitularId, testExpedienteSinCuentaId]);
-      await pool.query(`DELETE FROM sigd_tra.solicitud_vinculacion_expediente WHERE expediente_id IN ($1, $2)`, [testExpedienteTitularId, testExpedienteSinCuentaId]);
-      await pool.query(`DELETE FROM sigd_tra.expediente WHERE expediente_id IN ($1, $2)`, [testExpedienteTitularId, testExpedienteSinCuentaId]);
-      await pool.query(`DELETE FROM sigd_auth.cuenta_usuario WHERE id_usuario IN ($1, $2, $3)`, [userCiudadanoTitular, userCiudadanoAjeno, userCiudadanoSinCuenta]);
-      await pool.query(`DELETE FROM sigd_auth.persona_natural WHERE id_persona IN ($1, $2, $3)`, [personaTitularId, personaAjenaId, personaSinCuentaId]);
-      await pool.query(`DELETE FROM sigd_auth.persona WHERE id_persona IN ($1, $2, $3)`, [personaTitularId, personaAjenaId, personaSinCuentaId]);
-    } catch (e) {
-      // Ignorar errores de cleanup
+      if (txClient) {
+        await txClient.query('ROLLBACK');
+        txClient.release();
+      }
     } finally {
-      if (client) client.release();
-      await pool.end();
+      if (realPool) {
+        await realPool.end();
+      }
     }
   });
 

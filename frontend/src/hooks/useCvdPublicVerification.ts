@@ -4,7 +4,7 @@ import axios from "axios";
 
 import { apiClient } from "../api/client";
 import { env } from "../config/env";
-import type { ApiProblemDetails } from "../types/api";
+import { ApiHttpError, type ApiProblemDetails } from "../types/api";
 import type { ErrorValidacionCvd, ValidacionCVDResult } from "../types/validadorCvd";
 import { normalizarCvd, validarCvd } from "../utils/cvdValidator";
 
@@ -28,6 +28,18 @@ export class CvdError extends Error implements ErrorValidacionCvd {
 
 function convertirError(origen: unknown): CvdError {
   if (origen instanceof CvdError) return origen;
+
+  if (origen instanceof ApiHttpError) {
+    const titulo =
+      origen.status === 404
+        ? "CVD no encontrado"
+        : origen.problemDetails.title || "Error de validación";
+    return new CvdError(
+      titulo,
+      origen.problemDetails.detail || origen.message,
+      origen.status,
+    );
+  }
 
   if (axios.isAxiosError<ApiProblemDetails>(origen)) {
     const problema = origen.response?.data;
@@ -117,6 +129,11 @@ async function consultarApi(codigoCvd: string): Promise<ValidacionCVDResult> {
     fecha_sello_tsa?: string | null;
     sha256_firmado?: string;
     firmante?: string | null;
+    naturalezaFirma?: 'FIRMA_LABORATORIO' | 'FIRMA_DIGITAL_OFICIAL' | 'EVIDENCIA_INCOMPLETA';
+    esFirmaLaboratorio?: boolean;
+    proveedorFirma?: string | null;
+    algoritmoFirma?: string | null;
+    integridadArchivo?: 'VERIFICADA' | 'ARTEFACTO_INEXISTENTE_O_VACIO';
     mensajeSeguridad?: string;
   }>(
     `/api/v1/validador/cvd/${encodeURIComponent(normalizado)}`,
@@ -131,8 +148,17 @@ async function consultarApi(codigoCvd: string): Promise<ValidacionCVDResult> {
     cvd: data.cvd ?? normalizado,
     documento: data.documento ?? null,
     selloTiempoTsa,
-    evidencia: esValido && data.sha256_firmado
-      ? { firmante: data.firmante ?? null, hashSha256: data.sha256_firmado, fechaSelloTsa: selloTiempoTsa }
+    evidencia: data.sha256_firmado
+      ? {
+          firmante: data.firmante ?? null,
+          hashSha256: data.sha256_firmado,
+          fechaSelloTsa: selloTiempoTsa,
+          naturalezaFirma: data.naturalezaFirma,
+          esFirmaLaboratorio: data.esFirmaLaboratorio,
+          proveedorFirma: data.proveedorFirma ?? null,
+          algoritmoFirma: data.algoritmoFirma ?? null,
+          integridadArchivo: data.integridadArchivo,
+        }
       : undefined,
     mensajeSeguridad:
       data.mensajeSeguridad ??

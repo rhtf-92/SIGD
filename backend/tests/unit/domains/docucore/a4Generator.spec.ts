@@ -339,4 +339,39 @@ describe("A4GeneratorService — membrete institucional", () => {
 
     assert.equal(resultado.paginas, 1);
   });
+
+  it("incrusta el escudo PNG institucional en el membrete sin afectar la validez del PDF", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const rutaLogo = path.resolve(process.cwd(), "assets/logo-suiza.png");
+    const logoPng = new Uint8Array(fs.readFileSync(rutaLogo));
+
+    const resultado = await a4GeneratorService.generar(contenidoSimple(), {
+      membrete: {
+        institucion: 'INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"',
+        unidad: "DIRECCIÓN GENERAL",
+        direccion: "Av. Túpac Amaru s/n, Pucallpa – Ucayali",
+        tipoDocumento: "RESOLUCIÓN DIRECTORAL",
+        numeroDocumento: "RD-2026-000999",
+        correlativo: "EXP: EXP-2026-TEST",
+        logoPng,
+      },
+    });
+
+    const sinLogo = await a4GeneratorService.generar(contenidoSimple(), {
+      membrete: {
+        institucion: 'INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"',
+        unidad: "DIRECCIÓN GENERAL",
+        direccion: "Av. Túpac Amaru s/n, Pucallpa – Ucayali",
+        tipoDocumento: "RESOLUCIÓN DIRECTORAL",
+        numeroDocumento: "RD-2026-000999",
+        correlativo: "EXP: EXP-2026-TEST",
+      },
+    });
+
+    const documento = await PDFDocument.load(resultado.bytes);
+    assert.equal(documento.getPageCount(), 1);
+    assert.ok(resultado.bytes.byteLength > sinLogo.bytes.byteLength);
+    assert.match(resultado.sha256, /^[0-9a-f]{64}$/);
+  });
 });

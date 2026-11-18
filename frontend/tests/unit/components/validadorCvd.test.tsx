@@ -114,4 +114,37 @@ describe("Validador público CVD — ENT-M04-05 (F_ADRIANO)", () => {
     expect(alerta.textContent).toMatch(/adulterado/i);
     expect(screen.getByText(/Documento no reconocido o adulterado/i)).toBeInTheDocument();
   });
+
+  it("9. acepta y conserva intactos CVDs reales de resolución (16 hex y formato MOD)", () => {
+    expect(aplicarMascaraCvd("CVD-2026-E6EB33D4D4BC92EC")).toBe("CVD-2026-E6EB33D4D4BC92EC");
+    expect(aplicarMascaraCvd("CVD-2026-MOD-806593")).toBe("CVD-2026-MOD-806593");
+    expect(validarCvd("CVD-2026-E6EB33D4D4BC92EC").valido).toBe(true);
+    expect(validarCvd("CVD-2026-MOD-806593").valido).toBe(true);
+  });
+
+  it("10. muestra dictamen válido de firma de laboratorio cuando el backend devuelve evidencia sin objeto documento", () => {
+    render(
+      <CvdIntegrityReport
+        resultado={{
+          esValido: true,
+          cvd: "CVD-2026-E6EB33D4D4BC92EC",
+          documento: null,
+          selloTiempoTsa: "2026-11-17T10:00:00Z",
+          evidencia: {
+            firmante: "CARLOS ALBERTO SANCHEZ",
+            hashSha256: "f1167f2485090891ad572e5efdf12de01a4a9614de29f4e49c66b92997ad0ee6",
+            fechaSelloTsa: "2026-11-17T10:00:00Z",
+            naturalezaFirma: "FIRMA_LABORATORIO",
+            esFirmaLaboratorio: true,
+            proveedorFirma: "MOCK_TEST",
+            algoritmoFirma: "SHA256withRSA",
+            integridadArchivo: "VERIFICADA",
+          },
+          mensajeSeguridad: "Documento firmado en entorno de laboratorio.",
+        }}
+      />,
+    );
+    expect(screen.getByText(/Firma de laboratorio verificada \(pruebas \/ demo\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/CARLOS ALBERTO SANCHEZ/i)).toBeInTheDocument();
+  });
 });

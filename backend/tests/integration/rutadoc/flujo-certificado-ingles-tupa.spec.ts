@@ -233,14 +233,29 @@ describe('SIGD — Circuito Completo Certificado de Inglés (TUPA p1-fila-06) y 
   });
 
   it('2. Rechaza derivación prematura SDA -> DIR sin asignación/dictamen y rechaza dictamen sin asignación', async () => {
-    const appEsp = crearAppConActor({
+    const appEspSinDerivar = crearAppConActor({
       id: USER_OTRO_ESPECIALISTA,
       roles: ['ESPECIALISTA'],
       unidadOrganicaId: AREA_SDA_ID,
     });
+    const appEspConPerfil = crearAppConActor({
+      id: USER_RESPONSABLE_INGLES,
+      roles: ['ESPECIALISTA'],
+      unidadOrganicaId: AREA_SDA_ID,
+    });
 
-    // Derivación ordinaria SDA -> DIR bloqueada
-    const resPrematura = await request(appEsp)
+    // Especialista sin perfil ni delegación explícita es rechazado con 403 SIN_FACULTAD_DERIVACION
+    const resSinFacultad = await request(appEspSinDerivar)
+      .post(`/api/v1/expedientes/${expId}/derivar`)
+      .send({
+        destinos: [{ area_destino_id: AREA_DIR_ID, es_copia: false }],
+        proveido: 'Intento de derivación por especialista sin facultad',
+      });
+    expect(resSinFacultad.status).toBe(403);
+    expect(resSinFacultad.body.code).toBe('SIN_FACULTAD_DERIVACION');
+
+    // Derivación ordinaria SDA -> DIR por especialista con perfil operativo bloqueada por etapa técnica pendiente
+    const resPrematura = await request(appEspConPerfil)
       .post(`/api/v1/expedientes/${expId}/derivar`)
       .send({
         destinos: [{ area_destino_id: AREA_DIR_ID, es_copia: false }],
@@ -250,7 +265,7 @@ describe('SIGD — Circuito Completo Certificado de Inglés (TUPA p1-fila-06) y 
     expect(resPrematura.body.code).toBe('DERIVACION_PREMATURA_EVALUACION_PENDIENTE');
 
     // Especialista sin asignación no puede emitir dictamen
-    const resAtenderSinAsig = await request(appEsp)
+    const resAtenderSinAsig = await request(appEspSinDerivar)
       .post(`/api/v1/expedientes/${expId}/atender`)
       .send({ resultado_resumen: 'Dictamen sin asignación formal previa' });
     expect(resAtenderSinAsig.status).toBe(403);
@@ -400,7 +415,7 @@ describe('SIGD — Circuito Completo Certificado de Inglés (TUPA p1-fila-06) y 
       unidadOrganicaId: AREA_SDA_ID,
     });
     const appEsp = crearAppConActor({
-      id: USER_OTRO_ESPECIALISTA,
+      id: USER_RESPONSABLE_INGLES,
       roles: ['ESPECIALISTA'],
       unidadOrganicaId: AREA_SDA_ID,
     });

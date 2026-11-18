@@ -6,7 +6,7 @@
  */
 
 export const CVD_PATTERN =
-  /^CVD-(19|20)\d{2}-[A-Z]{2,6}-\d{6}-[A-F0-9]{4}$/;
+  /^CVD-(19|20)\d{2}-(?:[A-Z]{2,6}-\d{6}-[A-F0-9]{4}|[A-F0-9]{8,24}|[A-Z0-9]{2,12}(?:-[A-Z0-9]{2,16})+)$/;
 
 export const CVD_INPUT_MASK_HINT = "CVD-YYYY-RD-XXXXXX-XXXX";
 
@@ -16,17 +16,26 @@ export interface CvdValidation {
   motivo?: string;
 }
 
-/** Normaliza el ingreso del usuario (mayúsculas + trim + colapsa espacios/guiones dobles). */
+/** Normaliza el ingreso del usuario (mayúsculas + trim + colapsa espacios). */
 export function normalizarCvd(raw: string): string {
   return raw.trim().toUpperCase().replace(/\s+/g, "");
 }
 
 /**
- * Aplica máscara de entrada guiada mientras el usuario escribe.
- * Mantiene prefijo CVD-, año 4 dígitos, tipo acto, correlativo y sufijo hex.
+ * Normaliza/aplica máscara de entrada guiada sin mutilar CVDs reales pegados o escritos con guiones
+ * (ej. CVD-2026-E6EB33D4D4BC92EC, CVD-2026-MOD-806593 o CVD-2026-RD-000412-892F).
  */
 export function aplicarMascaraCvd(raw: string): string {
-  const limpio = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const normalizado = raw
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, "")
+    .replace(/-{2,}/g, "-");
+
+  if (normalizado.includes("-") && normalizado.startsWith("CVD-")) {
+    return normalizado.slice(0, 42);
+  }
+
+  const limpio = normalizado.replace(/[^A-Z0-9]/g, "");
   // Quita el prefijo CVD si el usuario lo tecleó para reconstruirlo
   const sinPrefijo = limpio.startsWith("CVD") ? limpio.slice(3) : limpio;
   const anio = sinPrefijo.slice(0, 4).replace(/[^0-9]/g, "");
@@ -51,7 +60,7 @@ export function aplicarMascaraCvd(raw: string): string {
 export function extraerCvdDeTexto(texto: string): string | null {
   const match = texto
     .toUpperCase()
-    .match(/CVD-(?:19|20)\d{2}-[A-Z]{2,6}-\d{6}-[A-F0-9]{4}/);
+    .match(/CVD-(?:19|20)\d{2}-(?:[A-Z]{2,6}-\d{6}-[A-F0-9]{4}|[A-Z0-9]{2,16}(?:-[A-Z0-9]{2,16})*)/);
   return match ? match[0] : null;
 }
 

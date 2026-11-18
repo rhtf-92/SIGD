@@ -195,7 +195,7 @@ export default function DashboardEjecutivoPage() {
                 aria-label="Distribución porcentual por estado"
               >
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-center text-sm font-bold text-slate-900">
-                  {estados.reduce((sum, item) => sum + item.value, 0)}%
+                  {Math.round(estados.reduce((sum, item) => sum + item.value, 0) * 10) / 10}%
                 </div>
               </div>
 

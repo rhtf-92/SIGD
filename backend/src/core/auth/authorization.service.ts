@@ -473,12 +473,37 @@ export class AuthorizationService {
       }
     }
 
-    // ESPECIALISTA / SECRETARIO: gestión de expedientes de su área
-    if (roles.includes('ESPECIALISTA') || roles.includes('SECRETARIO')) {
-      const accionesEspecialista: AccionPermiso[] = [
+    // SECRETARIO: gestión integral de despacho y derivación en su área
+    if (roles.includes('SECRETARIO')) {
+      const accionesSecretario: AccionPermiso[] = [
         'EXPEDIENTE_VER',
         'EXPEDIENTE_RECIBIR',
         'EXPEDIENTE_DERIVAR',
+        'EXPEDIENTE_OBSERVAR',
+        'EXPEDIENTE_ATENDER',
+      ];
+      if (accionesSecretario.includes(accion)) {
+        if (recurso?.areaId) {
+          const tieneArea =
+            contexto.asignaciones.some((a) => a.areaId === recurso.areaId) ||
+            contexto.responsabilidadesTemporales.some((r) => r.areaId === recurso.areaId);
+          if (!tieneArea) {
+            return {
+              autorizado: false,
+              codigoDenegacion: 'AREA_NO_COINCIDENTE',
+              motivoInterno: 'El operador no pertenece a la unidad del expediente.',
+            };
+          }
+        }
+        return { autorizado: true, perfilAplicado: 'RBAC_BRIDGE:SECRETARIO', scopeAplicado: 'AREA' };
+      }
+    }
+
+    // ESPECIALISTA: evaluación técnica y atención en su área (derivar requiere perfil operativo o delegación vigente)
+    if (roles.includes('ESPECIALISTA')) {
+      const accionesEspecialista: AccionPermiso[] = [
+        'EXPEDIENTE_VER',
+        'EXPEDIENTE_RECIBIR',
         'EXPEDIENTE_OBSERVAR',
         'EXPEDIENTE_ATENDER',
       ];
