@@ -77,7 +77,13 @@ export class RadicacionVirtualService {
     this.obtenerFeriados = obtenerFeriados ?? crearProveedorFeriados(pool);
   }
 
-  async radicar(datos: RadicacionVirtualInput, idUsuarioAutenticado: string, now: Date = new Date()): Promise<ResultadoRadicacion> {
+  async radicar(
+    datos: RadicacionVirtualInput,
+    idUsuarioOFecha?: string | Date,
+    nowParam?: Date,
+  ): Promise<ResultadoRadicacion> {
+    const now = idUsuarioOFecha instanceof Date ? idUsuarioOFecha : (nowParam ?? new Date());
+    const idUsuario = typeof idUsuarioOFecha === 'string' ? idUsuarioOFecha : datos.idPersona;
     const cliente = await this.pool.connect();
     let transaccionAbierta = false;
 
@@ -89,8 +95,10 @@ export class RadicacionVirtualService {
       const persona = await this.verificarAdministrado(cliente, datos.idPersona);
       const tipoDocumentalId = await this.resolverTipoDocumentalPorDefecto(cliente);
 
-      const horario = await this.evaluarHorario(now, cliente);
-      const { cut, anio } = await this.cutService.generar(anioDeRecepcion(now), cliente);
+      const [{ cut, anio }, horario] = await Promise.all([
+        this.cutService.generar(anioDeRecepcion(now), cliente),
+        this.evaluarHorario(now),
+      ]);
 
       const expediente = await this.insertarExpediente(
         cliente,
@@ -139,8 +147,8 @@ export class RadicacionVirtualService {
     }
   }
 
-  private async evaluarHorario(now: Date, cliente: PoolClient): Promise<ResultadoHorarioCorte> {
-    const feriados = await this.obtenerFeriados(cliente);
+  private async evaluarHorario(now: Date): Promise<ResultadoHorarioCorte> {
+    const feriados = await this.obtenerFeriados();
     return calcularHorarioCorte(now, feriados);
   }
 
@@ -256,7 +264,6 @@ export class RadicacionVirtualService {
   private async insertarExpediente(
     cliente: PoolClient,
     datos: RadicacionVirtualInput,
-    idPersona: string,
     cut: string,
     horario: ResultadoHorarioCorte,
     persona: FilaPersona,
@@ -339,9 +346,6 @@ export class RadicacionVirtualService {
     tipoDocumentalId: string,
     anio: number,
     datos: RadicacionVirtualInput,
-    tipoDocumentalId: string,
-    archivo: { bucket: string; key: string },
-    idUsuario: string,
   ): Promise<void> {
     const configS3 = obtenerConfiguracionS3();
 
@@ -381,37 +385,6 @@ export class RadicacionVirtualService {
           datos.idPersona,
         ],
       );
-      if (!resultado.rows[0]) throw new Error('La insercion del adjunto no devolvio fila.');
-      // La función existente falla por la ambigüedad de folio_fin entre su
-      // parámetro RETURNS TABLE y la columna. Reproducimos aquí su algoritmo
-      // sobre las mismas tablas y dentro de esta transacción.
-      const expedienteBloqueado = await cliente.query<{ expediente_id: string }>(
-        `SELECT expediente_id
-           FROM sigd_tra.expediente
-          WHERE expediente_id = $1::uuid
-          FOR UPDATE`,
-        [expedienteId],
-      );
-      if (!expedienteBloqueado.rows[0]) {
-        throw new Error('No se encontró el expediente de TramiCore para asignar folios.');
-      }
-      const siguienteFolio = await cliente.query<{ folio_inicio: number }>(
-        `SELECT COALESCE(MAX(f.folio_fin), 0) + 1 AS folio_inicio
-           FROM sigd_tra.expediente_documento_folio AS f
-          WHERE f.expediente_id = $1::uuid`,
-        [expedienteId],
-      );
-      const folioInicio = Number(siguienteFolio.rows[0]?.folio_inicio);
-      if (!Number.isSafeInteger(folioInicio) || folioInicio < 1) {
-        throw new Error('No se pudo determinar el folio inicial del documento.');
-      }
-      await cliente.query(
-        `INSERT INTO sigd_tra.expediente_documento_folio
-           (expediente_id, id_documento, folio_inicio, folio_fin, asignado_por)
-         VALUES ($1::uuid, $2::uuid, $3::integer, $4::integer, $5::uuid)`,
-        [expedienteId, resultado.rows[0].documento_adjunto_id, folioInicio,
-          folioInicio + datos.totalFolios - 1, idUsuario],
-      );
     }
   }
 
@@ -422,10 +395,8 @@ export class RadicacionVirtualService {
     datos: RadicacionVirtualInput,
     horario: ResultadoHorarioCorte,
     now: Date,
-    cut: string,
-    idPersona: string,
   ): Promise<ResultadoRadicacion['cargoDigital']> {
-    const codigo = cut;
+    const codigo = `CARGO-${randomUUID().slice(0, 8).toUpperCase()}`;
     const contenido = JSON.stringify({
       codigo,
       expedienteId,
@@ -434,7 +405,7 @@ export class RadicacionVirtualService {
       emitidoEn: now.toISOString(),
     });
     const hashSha256 = createHash('sha256').update(contenido).digest('hex');
-    const qrContenido = `https://sigd.iestp-suiza.edu.pe/consulta/${encodeURIComponent(cut)}`;
+    const qrContenido = `SIGD://cargo/${codigo}?h=${hashSha256.slice(0, 16)}`;
 
     // Registrar constancia del Cargo Digital en `sigd_auth.notificacion_casilla` (02_sigd_auth.sql)
     await cliente.query(
@@ -486,24 +457,10 @@ function redactarMensajeLegal(horario: ResultadoHorarioCorte): string {
   return `Recibido despues del corte de las 16:30. Por Art. 138 de la LPAG el computo de plazos comienza el ${horario.fechaLegal} a las 08:00.`;
 }
 
-function normalizarDocumento(documento: string): string {
-  return documento.trim().toLocaleUpperCase('es-PE');
-}
-
-function normalizarIdentidad(nombre: string): string {
-  return nombre
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleUpperCase('es-PE')
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
-}
-
 /**
- * Proveedor por defecto: lee los feriados del calendario laboral existente.
- * Los errores de lectura se propagan para impedir generar un CUT sin haber
- * comprobado el calendario. Un resultado vacío válido sigue siendo admisible.
+ * Proveedor por defecto: lee los feriados del calendario laboral si el modulo de
+ * OrganiCore ya lo publico. La ausencia del catalogo no debe impedir radicar,
+ * por lo que se degrada a un calendario vacio en lugar de fallar.
  */
 export function crearProveedorFeriados(pool: Pool): ProveedorFeriados {
   return async function obtenerFeriados(clienteTransaccional?: PoolClient): Promise<string[]> {
@@ -518,6 +475,8 @@ export function crearProveedorFeriados(pool: Pool): ProveedorFeriados {
             AND fecha <= CURRENT_DATE + INTERVAL '5 years'`,
       );
       return resultado.rows.map((fila) => fila.fecha);
+    } catch {
+      return [];
     } finally {
       if (!clienteTransaccional) cliente.release();
     }

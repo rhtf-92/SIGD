@@ -86,6 +86,8 @@ interface UsePresignedUploadOptions {
   categoria?: string;
   demoMode?: boolean;
   idExpediente?: string;
+  /** La radicación registra los metadatos dentro de su transacción, cuando existe el expediente. */
+  diferirRegistroAdjunto?: boolean;
 }
 
 export interface UploadResult {
@@ -382,7 +384,7 @@ export function usePresignedUpload(
         }
 
         let idDocumentoAdjunto: string | undefined;
-        if (!options.demoMode) {
+        if (!options.demoMode && !options.diferirRegistroAdjunto) {
           try {
             const confirmResponse = await apiClient.post<ConfirmarCargaResponse>(
               "/api/v1/storage/confirmar-carga",
@@ -425,7 +427,7 @@ export function usePresignedUpload(
         controllerRef.current = null;
       }
     },
-    [options.categoria, options.demoMode, options.idExpediente],
+    [options.categoria, options.demoMode, options.idExpediente, options.diferirRegistroAdjunto],
   );
 
   return {
