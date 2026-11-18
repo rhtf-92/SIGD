@@ -231,11 +231,30 @@ export interface ItemDesglose {
   observaciones?: string | null;
 }
 
+export interface ResolucionInfoRutaDoc {
+  resolucionId: string;
+  expedienteId: string;
+  numeroBorrador: string;
+  numeroResolucion?: string | null;
+  tipoResolucion: string;
+  asunto: string;
+  estado: string;
+  fechaProyeccion: string;
+  firmadoPor?: string | null;
+  firmanteNombre?: string | null;
+  firmadoEn?: string | null;
+  cvd?: string | null;
+  hashPades?: string | null;
+  documentoAdjuntoId?: string | null;
+  s3Key?: string | null;
+}
+
 export interface ExpedienteDetalleRutaDoc extends ExpedienteResumenRutaDoc {
   solicitanteId: string | null;
   resumenDocumentos: { cantidadDocumentos: number; totalFolios: number } | null;
   documentos?: DocumentoAdjuntoRutaDoc[];
   acumulacionInfo?: AcumulacionInfoRutaDoc | null;
+  resolucionInfo?: ResolucionInfoRutaDoc | null;
   ultimoMovimiento: { idMovimiento: string; evento: string; estadoNuevo: string;
     fechaHora: string; usuarioOperadorId: string } | null;
   sla: null;

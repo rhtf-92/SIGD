@@ -14,7 +14,10 @@ export type EstadoResolucion =
   | "BORRADOR"
   | "EN_REVISION"
   | "APROBADO_PARA_FIRMA"
-  | "FIRMADO_DIGITALMENTE";
+  | "FIRMADO_DIGITALMENTE"
+  | "EN_FIRMA"
+  | "FIRMADA"
+  | "BORRADOR_PENDIENTE_FIRMA";
 
 export interface ArticuloResolucion {
   id: string;

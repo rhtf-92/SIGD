@@ -48,6 +48,24 @@ export interface UltimoMovimiento {
   usuarioOperadorId: string;
 }
 
+export interface ResolucionInfoRutaDoc {
+  resolucionId: string;
+  expedienteId: string;
+  numeroBorrador: string;
+  numeroResolucion?: string | null;
+  tipoResolucion: string;
+  asunto: string;
+  estado: string;
+  fechaProyeccion: string;
+  firmadoPor?: string | null;
+  firmanteNombre?: string | null;
+  firmadoEn?: string | null;
+  cvd?: string | null;
+  hashPades?: string | null;
+  documentoAdjuntoId?: string | null;
+  s3Key?: string | null;
+}
+
 export interface ExpedienteDetalle extends ExpedienteResumen {
   /** UUID de sigd_tra.expediente.solicitante_id; el nombre requiere IdentiCore. */
   solicitanteId: string | null;
@@ -73,6 +91,7 @@ export interface ExpedienteDetalle extends ExpedienteResumen {
     actoResolutivo: string;
     fechaAcumulacion: string;
   } | null;
+  resolucionInfo?: ResolucionInfoRutaDoc | null;
   ultimoMovimiento: UltimoMovimiento | null;
   /** El cálculo SLA corresponde a otro entregable. */
   sla: null;

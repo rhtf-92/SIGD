@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import type { EstadoRutaDoc } from './rutadoc.fsm.js';
-import type { AlcanceBandejaRutaDoc, ContadoresRutaDoc, ExpedienteDetalle, ExpedienteResumen, FiltrosRutaDoc, PosicionCursor, UltimoMovimiento } from './rutadoc.types.js';
+import type { AlcanceBandejaRutaDoc, ContadoresRutaDoc, ExpedienteDetalle, ExpedienteResumen, FiltrosRutaDoc, PosicionCursor, ResolucionInfoRutaDoc, UltimoMovimiento } from './rutadoc.types.js';
 
 interface FilaBandeja {
   id_expediente: string;
@@ -298,6 +298,78 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       fechaAcumulacion: acumulacionFila.fecha_acumulacion.toISOString(),
     } : null;
 
+    let resolucionInfo: ResolucionInfoRutaDoc | null = null;
+    const existeResolucion = await this.pool.query<{ existe: string | null }>(
+      "SELECT to_regclass('sigd_doc.resolucion')::text AS existe",
+    );
+    if (existeResolucion.rows[0]?.existe) {
+      const resResolucion = await this.pool.query<{
+        resolucion_id: string;
+        expediente_id: string;
+        numero_borrador: string;
+        numero_resolucion: string | null;
+        tipo_resolucion: string;
+        asunto: string;
+        estado: string;
+        fecha_proyeccion: string;
+        firmado_por: string | null;
+        firmante_nombre: string | null;
+        firmado_en: Date | null;
+        cvd: string | null;
+        hash_pades: string | null;
+        documento_adjunto_id: string | null;
+        s3_key: string | null;
+      }>(`
+        SELECT r.resolucion_id::text,
+               r.expediente_id::text,
+               r.numero_borrador,
+               r.numero_resolucion,
+               r.tipo_resolucion,
+               r.asunto,
+               r.estado,
+               r.fecha_proyeccion::text,
+               r.firmado_por::text,
+               COALESCE(pn.nombre_completo, TRIM(pn.nombres || ' ' || pn.apellidos), cu.usuario, fd.firmante) AS firmante_nombre,
+               r.firmado_en,
+               fd.cvd,
+               COALESCE(r.hash_pades, fd.sha256_firmado) AS hash_pades,
+               adj.documento_adjunto_id::text,
+               adj.s3_key
+          FROM sigd_doc.resolucion r
+          LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = r.firmado_por
+          LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = cu.id_persona
+          LEFT JOIN sigd_doc.documento_adjunto adj
+            ON adj.expediente_id = r.expediente_id
+           AND (adj.s3_key = ('resoluciones/' || r.numero_borrador || '.pdf') OR adj.mime_type = 'application/pdf')
+          LEFT JOIN sigd_doc.firma_digital_documento fd
+            ON fd.documento_id = adj.documento_adjunto_id
+           AND fd.estado = 'FIRMADO_DIGITALMENTE'
+         WHERE r.expediente_id = $1::uuid
+         ORDER BY r.creado_en DESC
+         LIMIT 1`, [idExpediente]);
+
+      if (resResolucion.rows.length > 0) {
+        const row = resResolucion.rows[0];
+        resolucionInfo = {
+          resolucionId: row.resolucion_id,
+          expedienteId: row.expediente_id,
+          numeroBorrador: row.numero_borrador,
+          numeroResolucion: row.numero_resolucion,
+          tipoResolucion: row.tipo_resolucion,
+          asunto: row.asunto,
+          estado: row.estado,
+          fechaProyeccion: row.fecha_proyeccion,
+          firmadoPor: row.firmado_por,
+          firmanteNombre: row.firmante_nombre,
+          firmadoEn: row.firmado_en ? row.firmado_en.toISOString() : null,
+          cvd: row.cvd,
+          hashPades: row.hash_pades,
+          documentoAdjuntoId: row.documento_adjunto_id,
+          s3Key: row.s3_key,
+        };
+      }
+    }
+
     const ultimoMovimiento: UltimoMovimiento | null = dato.id_movimiento && dato.evento && dato.fecha_hora && dato.usuario_operador_id
       ? { idMovimiento: dato.id_movimiento, evento: dato.evento,
           estadoNuevo: dato.estado_actual, fechaHora: dato.fecha_hora.toISOString(),
@@ -305,7 +377,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       : null;
     return {
       ...mapearResumen(dato), solicitanteId: dato.solicitante_id,
-      resumenDocumentos, documentos, acumulacionInfo, ultimoMovimiento, sla: null,
+      resumenDocumentos, documentos, acumulacionInfo, resolucionInfo, ultimoMovimiento, sla: null,
     };
   }
 }

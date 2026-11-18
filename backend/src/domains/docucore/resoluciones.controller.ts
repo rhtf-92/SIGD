@@ -334,6 +334,138 @@ export function crearRouterResoluciones(pool: Pool): Router {
     });
   }
 
+  async function obtenerResolucionPorExpediente(req: Request, res: Response): Promise<void> {
+    const { expedienteId } = z.object({ expedienteId: z.string().uuid() }).parse(req.params);
+    const identidad = resolverIdentidad(req);
+    if (!z.string().uuid().safeParse(identidad.idUsuario).success) {
+      throw new UnauthorizedError({ detail: 'Identificador de usuario inválido.' });
+    }
+
+    const autorizacion = await obtenerAutorizacionCuenta(pool, identidad.idUsuario, identidad.contextoId);
+    if (!autorizacion) {
+      throw new ForbiddenError({ detail: 'Cuenta institucional inactiva o no autorizada.' });
+    }
+
+    const esAdminODirector =
+      autorizacion.roles.some((r) => r === 'ADMINISTRADOR' || r === 'DIRECTOR') ||
+      autorizacion.permisos.some(
+        (p) => (p.codigo === 'ADMIN_USUARIOS' || p.codigo === 'FIRMA_FIRMAR' || p.codigo === 'EXPEDIENTE_LEER') && p.ambito === 'GLOBAL' && p.areaId === null,
+      );
+
+    if (!esAdminODirector) {
+      const acceso = await pool.query<{ autorizado: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1 FROM sigd_auth.cuenta_usuario cu
+           JOIN sigd_tra.expediente e ON e.expediente_id = $2::uuid
+           LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
+           WHERE cu.id_usuario = $1::uuid AND cu.activo = TRUE
+             AND (
+               e.solicitante_id = cu.id_persona
+               OR EXISTS (
+                 SELECT 1 FROM sigd_org.usuario_rol ur
+                 JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id AND r.vigente = TRUE
+                 JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
+                 JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+                 WHERE ur.id_usuario = cu.id_usuario
+                   AND ur.vigente_desde <= now()
+                   AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+                   AND p.codigo IN ('EXPEDIENTE_LEER', 'EXPEDIENTE_RESOLVER', 'EXPEDIENTE_DERIVAR')
+                   AND (
+                     (p.ambito = 'GLOBAL' AND ur.area_id IS NULL)
+                     OR (ur.area_id IS NOT NULL AND ur.area_id::text = NULLIF(ultimo.area_actual_id, ''))
+                   )
+               )
+             )
+        ) AS autorizado`,
+        [identidad.idUsuario, expedienteId],
+      );
+      if (acceso.rows[0]?.autorizado !== true) {
+        throw new ForbiddenError({ detail: 'No autorizado para consultar la resolución de este expediente.' });
+      }
+    }
+
+    const resultado = await pool.query<{
+      resolucion_id: string;
+      expediente_id: string;
+      numero_borrador: string;
+      numero_resolucion: string | null;
+      tipo_resolucion: string;
+      asunto: string;
+      estado: string;
+      fecha_proyeccion: string;
+      firmado_por: string | null;
+      firmante_nombre: string | null;
+      firmado_en: Date | null;
+      cvd: string | null;
+      hash_pades: string | null;
+      documento_adjunto_id: string | null;
+      s3_key: string | null;
+    }>(
+      `SELECT r.resolucion_id::text,
+              r.expediente_id::text,
+              r.numero_borrador,
+              r.numero_resolucion,
+              r.tipo_resolucion,
+              r.asunto,
+              r.estado,
+              r.fecha_proyeccion::text,
+              r.firmado_por::text,
+              COALESCE(pn.nombre_completo, TRIM(pn.nombres || ' ' || pn.apellidos), cu.usuario, fd.firmante) AS firmante_nombre,
+              r.firmado_en,
+              fd.cvd,
+              COALESCE(r.hash_pades, fd.sha256_firmado) AS hash_pades,
+              adj.documento_adjunto_id::text,
+              adj.s3_key
+         FROM sigd_doc.resolucion r
+         LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = r.firmado_por
+         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = cu.id_persona
+         LEFT JOIN sigd_doc.documento_adjunto adj
+           ON adj.expediente_id = r.expediente_id
+          AND (adj.s3_key = ('resoluciones/' || r.numero_borrador || '.pdf') OR adj.mime_type = 'application/pdf')
+         LEFT JOIN sigd_doc.firma_digital_documento fd
+           ON fd.documento_id = adj.documento_adjunto_id
+          AND fd.estado = 'FIRMADO_DIGITALMENTE'
+        WHERE r.expediente_id = $1::uuid
+        ORDER BY r.creado_en DESC
+        LIMIT 1`,
+      [expedienteId],
+    );
+
+    const contexto = getRequestContext();
+    if (resultado.rows.length === 0) {
+      res.status(200).json({
+        ok: true,
+        resolucion: null,
+        correlation_id: contexto?.correlation_id,
+      });
+      return;
+    }
+
+    const row = resultado.rows[0];
+    res.status(200).json({
+      ok: true,
+      resolucion: {
+        resolucionId: row.resolucion_id,
+        expedienteId: row.expediente_id,
+        numero: row.numero_resolucion || row.numero_borrador,
+        numeroBorrador: row.numero_borrador,
+        numeroResolucion: row.numero_resolucion,
+        tipoResolucion: row.tipo_resolucion,
+        asunto: row.asunto,
+        estado: row.estado,
+        fechaProyeccion: row.fecha_proyeccion,
+        firmadoPor: row.firmado_por,
+        firmanteNombre: row.firmante_nombre,
+        firmadoEn: row.firmado_en ? row.firmado_en.toISOString() : null,
+        cvd: row.cvd,
+        hashPades: row.hash_pades,
+        documentoAdjuntoId: row.documento_adjunto_id,
+        s3Key: row.s3_key,
+      },
+      correlation_id: contexto?.correlation_id,
+    });
+  }
+
   // Se registran primero las rutas específicas para no colisionar con /:id.
   router.get('/', (req, res, next) => {
     listarResoluciones(req, res).catch(next);
@@ -343,6 +475,9 @@ export function crearRouterResoluciones(pool: Pool): Router {
   });
   router.get('/proyectos/:id', (req, res, next) => {
     obtenerProyecto(req, res).catch(next);
+  });
+  router.get('/expediente/:expedienteId', (req, res, next) => {
+    obtenerResolucionPorExpediente(req, res).catch(next);
   });
 
   // Rutas alias (interop frontend y ruta canónica #33 del plan).

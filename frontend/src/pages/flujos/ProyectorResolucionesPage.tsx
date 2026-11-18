@@ -96,7 +96,7 @@ export default function ProyectorResolucionesPage() {
         creadoEn: string;
       }>(`/api/v1/resoluciones/${encodeURIComponent(idParam)}`)
       .then((res) => {
-        if (!activo) return;
+        if (!activo || !res) return;
         const d = res.data;
         let tipoFront: TipoResolucion = "TITULACION";
         if (d.tipoResolucion === "DIRECTORAL_CONVALIDACION") tipoFront = "CONVALIDACION";
@@ -125,7 +125,7 @@ export default function ProyectorResolucionesPage() {
             : [],
           firmanteCargo: "Director General",
           firmanteNombre: "Lic. Julio César Mori Paredes",
-          estado: "BORRADOR",
+          estado: (d.estado === "FIRMADA" ? "FIRMADA" : d.estado === "EN_FIRMA" ? "EN_FIRMA" : "BORRADOR") as any,
         });
       })
       .catch((err) => {
@@ -154,13 +154,23 @@ export default function ProyectorResolucionesPage() {
     setCargandoResolucion(true);
 
     apiClient
-      .get<{
-        idExpediente: string;
-        cut: string;
-        asunto: string;
-      }>(`/api/v1/expedientes/${encodeURIComponent(expParam)}`)
+      .get<{ ok: boolean; resolucion: { resolucionId: string; estado: string; numero: string } | null }>(
+        `/api/v1/resoluciones/expediente/${encodeURIComponent(expParam)}`
+      )
+      .then((resExp) => {
+        if (!activo) return null;
+        if (resExp.data?.resolucion?.resolucionId) {
+          setSearchParams({ id: resExp.data.resolucion.resolucionId, expedienteId: expParam }, { replace: true });
+          return null;
+        }
+        return apiClient.get<{
+          idExpediente: string;
+          cut: string;
+          asunto: string;
+        }>(`/api/v1/expedientes/${encodeURIComponent(expParam)}`);
+      })
       .then((res) => {
-        if (!activo) return;
+        if (!activo || !res || !res.data) return;
         const d = res.data;
         setResolucionCargada({
           id: `RD-TMP-${d.cut || "2026"}`,
@@ -212,6 +222,13 @@ export default function ProyectorResolucionesPage() {
   const resolucionActiva = resolucionCargada || borradorLocal;
 
   async function handleGuardarBorrador(resolucion: ResolucionDirectoral) {
+    if ((resolucionCargada?.estado as string) === "EN_FIRMA" || (resolucionCargada?.estado as string) === "FIRMADA") {
+      setAlerta({
+        tipo: "error",
+        mensaje: "No es posible modificar una resolución en estado " + (resolucionCargada?.estado || "bloqueado") + ".",
+      });
+      return;
+    }
     try {
       // 1. Guardar localmente como resguardo inmediato
       const clave = obtenerClaveBorrador(usuarioId, resolucion.id);
@@ -310,6 +327,13 @@ export default function ProyectorResolucionesPage() {
 
   async function handleProcederFirma(resolucion: ResolucionDirectoral) {
     if (elevandoAFirma) return;
+    if ((resolucionCargada?.estado as string) === "EN_FIRMA" || (resolucionCargada?.estado as string) === "FIRMADA") {
+      setAlerta({
+        tipo: "error",
+        mensaje: "La resolución ya ha sido elevada a Despacho o firmada.",
+      });
+      return;
+    }
 
     const esUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const resolucionPersistidaId = searchParams.get("id") || (esUuid.test(resolucion.id) ? resolucion.id : undefined);

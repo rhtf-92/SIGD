@@ -117,3 +117,25 @@ export function crearServicioExpedienteActions(contratos: ContratosExpedienteAct
   };
   return servicio;
 }
+
+export async function obtenerResolucionPorExpediente(expedienteId: string): Promise<import("../types/expediente").ResolucionInfoRutaDoc | null> {
+  const { apiClient } = await import("./client");
+  const { data } = await apiClient.get<{ ok: boolean; resolucion: import("../types/expediente").ResolucionInfoRutaDoc | null }>(
+    `/api/v1/resoluciones/expediente/${encodeURIComponent(expedienteId)}`
+  );
+  return data?.resolucion ?? null;
+}
+
+export async function elevarExpedienteAFirma(
+  expedienteId: string,
+  resumen?: string
+): Promise<{ ok: boolean; mensaje: string; expediente_id: string }> {
+  const { apiClient } = await import("./client");
+  const { data } = await apiClient.post<{ ok: boolean; mensaje: string; expediente_id: string }>(
+    `/api/v1/expedientes/${encodeURIComponent(expedienteId)}/atender`,
+    {
+      resultado_resumen: resumen || "Proyecto de Resolución Directoral elevado a Despacho de Dirección General para firma digital.",
+    }
+  );
+  return data;
+}

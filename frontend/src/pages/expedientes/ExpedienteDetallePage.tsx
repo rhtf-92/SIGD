@@ -16,6 +16,8 @@ import DesgloseModal from "../../components/expedientes/DesgloseModal";
 import DigitalizacionModal from "../../components/expedientes/DigitalizacionModal";
 import ExpedienteActionToast from "../../components/expedientes/ExpedienteActionToast";
 import AsignarEvaluadorModal from "../../components/expedientes/AsignarEvaluadorModal";
+import { DespachoResolutivoSeccion } from "../../components/expedientes/DespachoResolutivoSeccion";
+import { elevarExpedienteAFirma } from "../../api/expedienteActions";
 import { obtenerEvaluadorActivo, listarHistorialEvaluadores } from "../../api/evaluadoresApi";
 
 import { useExpedienteDetalle, mensajeErrorExpediente } from "../../hooks/useBandejaExpedientes";
@@ -896,6 +898,46 @@ export default function ExpedienteDetallePage() {
       usuarioArchivo?.roles?.some((r) => ["DIRECTOR", "COORDINADOR_AREA", "JEFE_TRAMITE", "SECRETARIA_GENERAL"].includes(r)))
   );
 
+  const puedeResolver = Boolean(
+    !esGestorApoyo &&
+    (tieneFacultad("EXPEDIENTE_RESOLVER") ||
+      puedeDerivar ||
+      usuarioArchivo?.roles?.some((r) => ["DIRECTOR", "ADMINISTRADOR", "COORDINADOR_AREA", "SECRETARIO", "SECRETARIA_GENERAL"].includes(r)))
+  );
+
+  const esFirmanteAutorizado = Boolean(
+    usuarioArchivo?.roles?.some((r) => ["DIRECTOR", "ADMINISTRADOR"].includes(r)) ||
+    tieneFacultad("FIRMA_FIRMAR")
+  );
+
+  const [elevandoAFirma, setElevandoAFirma] = useState(false);
+  const handleElevarAFirma = async (resumen?: string) => {
+    if (!expediente || elevandoAFirma) return;
+    setElevandoAFirma(true);
+    try {
+      await elevarExpedienteAFirma(expediente.idExpediente, resumen);
+      setMensajeAlerta({
+        tipo: "exito",
+        texto: "Expediente elevado a Despacho para firma digital con éxito. El expediente pasa a estado EN_FIRMA.",
+      });
+      void queryClient.invalidateQueries({ queryKey: ["expediente", id] });
+      void queryClient.invalidateQueries({ queryKey: ["expedientes"] });
+      void queryClient.invalidateQueries({ queryKey: ["trazabilidad", id] });
+    } catch (err: unknown) {
+      let msg = "No fue posible elevar el expediente a Despacho para firma.";
+      if (err && typeof err === "object") {
+        const errorAxios = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
+        msg = errorAxios.response?.data?.detail || errorAxios.response?.data?.message || errorAxios.message || msg;
+      }
+      setMensajeAlerta({
+        tipo: "error",
+        texto: msg,
+      });
+    } finally {
+      setElevandoAFirma(false);
+    }
+  };
+
   const puedeGestionarDesglose = Boolean(
     !esGestorApoyo &&
     (puedeDigitalizar ||
@@ -1487,6 +1529,15 @@ export default function ExpedienteDetallePage() {
               </div>
             </section>
             <SeccionClasificacionCCD expediente={expediente} />
+
+            {/* Sección de Despacho Resolutivo y Validez Legal (TSK-DEV-05.1) */}
+            <DespachoResolutivoSeccion
+              expediente={expediente}
+              puedeResolver={puedeResolver}
+              esFirmanteAutorizado={esFirmanteAutorizado}
+              onElevarAFirma={handleElevarAFirma}
+              cargandoAccion={elevandoAFirma}
+            />
 
             {/* Visor Oficial de Foliado AGN (ENT-M03-04) */}
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
