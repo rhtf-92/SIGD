@@ -156,6 +156,11 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
     const isObservar = req.path.endsWith('/observar');
     const isSubsanar = req.path.endsWith('/subsanar');
     const isObservacionesList = req.path.endsWith('/observaciones');
+    const isAcumular = req.path.endsWith('/acumular');
+    const isDesacumular = req.path.endsWith('/desacumular');
+    const isAcumulacionesList = req.path.endsWith('/acumulaciones');
+    const isDesglose = req.path.endsWith('/desglose');
+    const isDesglosesList = req.path.endsWith('/desgloses');
 
     const codigos = isRecepcionar
       ? ['EXPEDIENTE_RECEPCIONAR']
@@ -167,10 +172,20 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
       ? ['EXPEDIENTE_SUBSANAR']
       : isObservacionesList
       ? ['EXPEDIENTE_LEER', 'EXPEDIENTE_OBSERVAR', 'EXPEDIENTE_SUBSANAR', 'EXPEDIENTE_EVALUAR']
+      : isAcumular
+      ? ['EXPEDIENTE_DERIVAR', 'EXPEDIENTE_RESOLVER', 'EXPEDIENTE_CALIFICAR']
+      : isDesacumular
+      ? ['EXPEDIENTE_DERIVAR', 'EXPEDIENTE_RESOLVER']
+      : isAcumulacionesList
+      ? ['EXPEDIENTE_LEER', 'EXPEDIENTE_DERIVAR', 'EXPEDIENTE_RESOLVER', 'EXPEDIENTE_CALIFICAR', 'EXPEDIENTE_RECEPCIONAR']
+      : isDesglose
+      ? ['EXPEDIENTE_ADJUNTAR', 'EXPEDIENTE_DERIVAR', 'EXPEDIENTE_RESOLVER']
+      : isDesglosesList
+      ? ['EXPEDIENTE_LEER', 'EXPEDIENTE_ADJUNTAR', 'EXPEDIENTE_DERIVAR', 'EXPEDIENTE_RESOLVER']
       : ['EXPEDIENTE_RESOLVER'];
     const permisos = actor.permisos.filter(p => codigos.includes(p.codigo));
     let autorizado = permisos.some(p => p.ambito === 'GLOBAL' && p.areaId === null);
-    if (!autorizado && (isSubsanar || isObservacionesList) && (actor.roles?.includes('MESA_PARTES') || actor.roles?.includes('ESTUDIANTE') || actor.roles?.includes('CIUDADANO') || actor.roles?.includes('DOCENTE'))) {
+    if (!autorizado && (isSubsanar || isObservacionesList || isAcumulacionesList || isDesglosesList) && (actor.roles?.includes('MESA_PARTES') || actor.roles?.includes('ESTUDIANTE') || actor.roles?.includes('CIUDADANO') || actor.roles?.includes('DOCENTE'))) {
       autorizado = true;
     }
     if (!autorizado && permisos.some(p => p.ambito === 'AREA' && p.areaId !== null)) {

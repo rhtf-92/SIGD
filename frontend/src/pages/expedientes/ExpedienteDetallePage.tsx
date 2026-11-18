@@ -931,8 +931,10 @@ export default function ExpedienteDetallePage() {
         acumulacion: async (entrada) => {
           const { apiClient } = await import("../../api/client");
           await apiClient.post(`/api/v1/expedientes/${entrada.principal.id}/acumular`, {
+            expedienteAccesorioId: entrada.conexos[0]?.id,
             expedientesConexos: entrada.conexos.map((c) => c.id),
             motivo: entrada.motivo,
+            actoResolutivo: entrada.motivo,
           });
         },
       }),
