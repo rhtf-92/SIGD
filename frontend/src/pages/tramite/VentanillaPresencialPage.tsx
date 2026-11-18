@@ -4,6 +4,7 @@ import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
+import { ModuleHero, VentanillaIllustration } from "../../components/tramite/ModuleHero";
 import {
   obtenerCatalogoTupaCompleto,
   obtenerRequisitosProcedimiento,
@@ -606,45 +607,34 @@ export default function VentanillaPresencialPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
-          <nav className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <Link to="/" className="hover:text-blue-700">Inicio</Link>
-            <span>/</span>
-            <Link to="/tramite" className="hover:text-blue-700">Trámite Documentario</Link>
-            <span>/</span>
-            <span className="text-slate-800">Ventanilla Presencial</span>
-          </nav>
-
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
-                Módulo 02 · Mesa de Partes y Registro Documentario
-              </p>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Ventanilla Presencial de Atención al Ciudadano
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Digitación de mesa de partes física, asignación de CUT y emisión de ticket con QR (ENT-M02-05).
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
-                  enJornada && !esCorteSuperado
-                    ? "border border-emerald-200/80 bg-gradient-to-b from-white/95 via-emerald-50/80 to-teal-50/60 text-emerald-950 shadow-[0_2px_6px_rgba(16,185,129,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)]"
-                    : "border border-amber-200/80 bg-gradient-to-b from-white/95 via-amber-50/80 to-orange-50/60 text-amber-950 shadow-[0_2px_6px_rgba(245,158,11,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)]"
-                }`}
-              >
-                <span className="h-2 w-2 rounded-full bg-current" />
-                {enJornada && !esCorteSuperado
-                  ? "Atención Ordinaria LPAG (< 16:30 hrs)"
-                  : "Horario Posterior al Corte (Art. 138 LPAG)"}
-              </span>
-            </div>
-          </div>
-        </div>
+      <header className="mx-auto max-w-5xl px-4 pt-5 sm:px-6">
+        <nav className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <Link to="/" className="hover:text-blue-700">Inicio</Link>
+          <span>/</span>
+          <Link to="/tramite" className="hover:text-blue-700">Trámite Documentario</Link>
+          <span>/</span>
+          <span className="text-slate-800">Ventanilla Presencial</span>
+        </nav>
+        <ModuleHero
+          eyebrow="Módulo 02 · Mesa de Partes y Registro Documentario"
+          title="Ventanilla Presencial de Atención al Ciudadano"
+          subtitle="Digitación de mesa de partes física, asignación de CUT y emisión de ticket con QR (ENT-M02-05)."
+          illustration={<VentanillaIllustration className="h-44 w-auto" />}
+          footer={
+            <span
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
+                enJornada && !esCorteSuperado
+                  ? "bg-emerald-400/20 text-emerald-100 border border-emerald-300/40"
+                  : "bg-amber-400/20 text-amber-100 border border-amber-300/40"
+              }`}
+            >
+              <span className="h-2 w-2 animate-pulse rounded-full bg-current" />
+              {enJornada && !esCorteSuperado
+                ? "Atención Ordinaria LPAG (< 16:30 hrs)"
+                : "Horario Posterior al Corte (Art. 138 LPAG)"}
+            </span>
+          }
+        />
       </header>
 
       <div className="mx-auto max-w-5xl px-3.5 py-6 sm:px-6 sm:py-8">

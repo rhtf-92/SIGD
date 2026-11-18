@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search,
-  CheckCircle2,
   Lock,
   ArrowRight,
   Database,
@@ -22,8 +21,8 @@ import {
 import type { CategoriaTupa } from '../../data/tupaSuiza2026CatalogoCompleto';
 import type { TupaFormDefinition } from '../../types/tupaFormulario.types';
 import TupaDynamicFormModal from '../../components/tramite/TupaDynamicFormModal';
+import { ModuleHero, CatalogoIllustration } from '../../components/tramite/ModuleHero';
 import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { TechnicalDetails } from '../../components/ui/TechnicalDetails';
@@ -327,58 +326,53 @@ export default function CatalogoTupaPage() {
     <main className="w-full bg-surface-page py-4 sm:py-6 px-4 sm:px-6 lg:px-8 text-slate-900">
       <div className="max-w-7xl mx-auto space-y-4">
         {/* Cabecera del Catálogo TUPA Oficial */}
-        <header className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xs space-y-3">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <Badge variant="success">
-                  <CheckCircle2 className="h-3 w-3 mr-1" /> Catálogo Público ({catalogoBase.length} Entradas)
-                </Badge>
-                {esInstitucional && <Badge variant="info">Rol: {usuario?.rol}</Badge>}
-                {origenDatos === 'BASE_DE_DATOS' && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
-                    <Database className="h-3 w-3" /> Datos en vivo (DB)
-                  </span>
-                )}
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Catálogo de Procedimientos y Servicios {versionActiva ? versionActiva.codigo : 'TUPA 2026'} — IESTP &quot;Suiza&quot;
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-600 max-w-3xl mt-1 leading-relaxed">
-                Consulte requisitos, costos oficiales, plazos de atención y radicación documentaria para todos los procedimientos del instituto.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full sm:w-auto">
+        <ModuleHero
+          eyebrow={`Catálogo ${versionActiva ? versionActiva.codigo : 'TUPA 2026'} · ${catalogoBase.length} entradas`}
+          title={<>Procedimientos y Servicios <span className="text-amber-300">IESTP &quot;Suiza&quot;</span></>}
+          subtitle="Consulte requisitos, costos oficiales, plazos de atención y radicación documentaria para todos los procedimientos del instituto."
+          illustration={<CatalogoIllustration className="h-40 w-auto" />}
+          actions={
+            <>
               {tieneAccesoPdfOficial ? (
                 <a
                   href="/api/v1/tramites/tupa/documento-oficial/descargar"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full sm:w-auto"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white bg-white px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-blue-50"
                 >
-                  <Button variant="secondary" size="sm" className="w-full">
-                    <FileText className="h-3.5 w-3.5 mr-1" /> Descargar PDF Oficial
-                  </Button>
+                  <FileText className="h-3.5 w-3.5" /> Descargar PDF Oficial
                 </a>
               ) : (
-                <Link to="/solicitud-acceso-tupa" className="w-full sm:w-auto">
-                  <Button variant="secondary" size="sm" className="w-full">
-                    <Lock className="h-3.5 w-3.5 mr-1" /> Solicitar Copia Escaneada (PDF)
-                  </Button>
+                <Link
+                  to="/solicitud-acceso-tupa"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white bg-white px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-blue-50"
+                >
+                  <Lock className="h-3.5 w-3.5" /> Solicitar Copia Escaneada (PDF)
                 </Link>
               )}
-              <Link to="/mesa-partes" className="w-full sm:w-auto">
-                <Button variant="primary" size="sm" className="w-full">
-                  Mesa de Partes Digital <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                </Button>
+              <Link
+                to="/mesa-partes"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-300 px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-amber-200"
+              >
+                Mesa de Partes Digital <ArrowRight className="h-3.5 w-3.5" />
               </Link>
-              <Link to="/" className="w-full sm:w-auto">
-                <Button variant="ghost" size="sm" className="w-full">
-                  ← Volver al inicio
-                </Button>
+              <Link
+                to="/"
+                className="rounded-xl border border-white/30 bg-white/15 px-3.5 py-1.5 text-xs font-bold text-white backdrop-blur transition hover:bg-white/25"
+              >
+                ← Volver al inicio
               </Link>
-            </div>
-          </div>
+              {esInstitucional && <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white border border-white/25">Rol: {usuario?.rol}</span>}
+              {origenDatos === 'BASE_DE_DATOS' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/20 px-2.5 py-1 text-[11px] font-bold text-emerald-100 border border-emerald-300/40">
+                  <Database className="h-3 w-3" /> Datos en vivo
+                </span>
+              )}
+            </>
+          }
+        />
+
+        <header className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xs space-y-3">
 
           {/* Filtros dinámicos estructurados */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 border-t border-slate-100">

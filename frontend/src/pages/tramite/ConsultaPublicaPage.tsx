@@ -20,7 +20,6 @@ import { TechnicalDetails } from '../../components/ui/TechnicalDetails';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { ContextualHelp } from '../../components/ui/ContextualHelp';
 import ConsultaCutIllustration from '../../components/tramite/ConsultaCutIllustration';
-import consultaCutImg from '../../assets/sigd/consulta-cut.webp';
 
 export interface DtoDocumentoPublico {
   nombreArchivo: string;
@@ -333,7 +332,7 @@ export default function ConsultaPublicaPage() {
               </div>
             </form>
 
-            <div className="hidden lg:flex lg:col-span-4 justify-center items-center p-2 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-amber-50/60 border border-blue-100 shadow-2xs">
+            <div className="flex lg:col-span-4 justify-center items-center p-2 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-amber-50/60 border border-blue-100 shadow-2xs">
               <ConsultaCutIllustration className="h-56 w-auto" />
             </div>
           </div>
@@ -341,7 +340,6 @@ export default function ConsultaPublicaPage() {
           {error && (
             <div className="mt-4">
               <EmptyState
-                imageSrc={consultaCutImg}
                 title="No encontramos un trámite con esos datos"
                 description={error}
               />

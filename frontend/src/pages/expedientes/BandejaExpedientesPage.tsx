@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { apiClient } from "../../api/client";
 import { useNavigate } from "react-router-dom";
 import BandejaTabFilter from "../../components/expedientes/BandejaTabFilter";
+import { ModuleHero, BandejaIllustration } from "../../components/tramite/ModuleHero";
 import ExpedienteTable from "../../components/expedientes/ExpedienteTable";
 import { useBandejaExpedientes } from "../../hooks/useBandejaExpedientes";
 import { useAuthStore } from "../../stores/authStore";
@@ -210,48 +211,46 @@ export default function BandejaExpedientesPage() {
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <button
-          type="button"
-          className="rounded px-2 py-1 text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
-          onClick={handleVolver}
-        >
-          ← Volver
-        </button>
-        <div className="flex items-center gap-2">
-          {(rol === 'MESA_PARTES' || rol === 'ADMINISTRADOR') && (
-            <button type="button" onClick={() => { setMostrarDevoluciones(true); void cargarDevoluciones(estadoDevoluciones, 1, buscarDevoluciones); }} className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">
-              Solicitudes de devolución
-            </button>
-          )}
-          {(rol === 'MESA_PARTES' || rol === 'ADMINISTRADOR') && (
+      <ModuleHero
+        eyebrow={infoRol.badge}
+        title={infoRol.titulo}
+        subtitle={infoRol.subtitulo}
+        illustration={<BandejaIllustration className="h-40 w-auto" />}
+        actions={
+          <>
             <button
               type="button"
-              onClick={() => {
-                setModalVinculacionesOpen(true);
-                setMensajeVinculacion(null);
-                void cargarSolicitudesPendientes();
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800 shadow-2xs hover:bg-cyan-100 transition cursor-pointer"
+              className="rounded-xl border border-white/30 bg-white/15 px-3.5 py-1.5 text-xs font-bold text-white backdrop-blur transition hover:bg-white/25"
+              onClick={handleVolver}
             >
-              <span>🔗 Solicitudes de Vinculación</span>
-              {solicitudesPendientes.length > 0 && (
-                <span className="rounded-full bg-cyan-700 text-white px-1.5 py-0.2 text-[10px] font-bold">
-                  {solicitudesPendientes.length}
-                </span>
-              )}
+              ← Volver
             </button>
-          )}
-          <span className={`inline-block rounded px-2.5 py-1 text-xs font-bold border uppercase tracking-wide ${infoRol.badgeClase}`}>
-            {infoRol.badge}
-          </span>
-        </div>
-      </div>
-
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-slate-900">{infoRol.titulo}</h1>
-        <p className="text-sm text-slate-600">{infoRol.subtitulo}</p>
-      </header>
+            {(rol === 'MESA_PARTES' || rol === 'ADMINISTRADOR') && (
+              <button type="button" onClick={() => { setMostrarDevoluciones(true); void cargarDevoluciones(estadoDevoluciones, 1, buscarDevoluciones); }} className="rounded-xl border border-white bg-white px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-blue-50">
+                Solicitudes de devolución
+              </button>
+            )}
+            {(rol === 'MESA_PARTES' || rol === 'ADMINISTRADOR') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setModalVinculacionesOpen(true);
+                  setMensajeVinculacion(null);
+                  void cargarSolicitudesPendientes();
+                }}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-300 px-3.5 py-1.5 text-xs font-bold text-blue-950 shadow-sm transition hover:bg-amber-200"
+              >
+                <span>🔗 Solicitudes de Vinculación</span>
+                {solicitudesPendientes.length > 0 && (
+                  <span className="rounded-full bg-blue-950 px-1.5 text-[10px] font-bold text-white">
+                    {solicitudesPendientes.length}
+                  </span>
+                )}
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* Selector de Bandeja de Área vs Mi Bandeja (Regla 22 y 23 Fase 5H) */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
