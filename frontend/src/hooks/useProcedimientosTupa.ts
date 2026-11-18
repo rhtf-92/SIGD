@@ -3,7 +3,7 @@
  * PROYECTO: SIGD (Sistema Integral de Gestión Documentaria) - IESTP "Suiza"
  * ARCHIVO: src/hooks/useProcedimientosTupa.ts
  * ==============================================================================
- * ESTADO: PROVISIONAL / BLOCKED
+ * ESTADO: CONTRATO VERSIONADO INTEGRADO
  *
  * Hook único (reutilizado por /tramite y /ventanilla) para cargar el catálogo
  * TUPA del backend, exponiendo los estados UX exigidos:

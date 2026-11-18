@@ -1,0 +1,933 @@
+diff --git a/frontend/src/components/expedientes/BandejaTabFilter.tsx b/frontend/src/components/expedientes/BandejaTabFilter.tsx
+index 5bad541..158b05c 100644
+--- a/frontend/src/components/expedientes/BandejaTabFilter.tsx
++++ b/frontend/src/components/expedientes/BandejaTabFilter.tsx
+@@ -1,54 +1,10 @@
+-import {
+-  ETIQUETAS_ESTADO_FLUJO,
+-  ORDEN_PESTANAS_BANDEJA,
+-  type EstadoFlujoExpediente,
+-} from "../../types/expediente";
+-
+-interface BandejaTabFilterProps {
+-  estadoActivo: EstadoFlujoExpediente;
+-  onCambiarEstado: (estado: EstadoFlujoExpediente) => void;
+-  /** Conteo de expedientes por estado, para mostrar el badge numérico de cada pestaña. */
+-  conteos: Record<EstadoFlujoExpediente, number>;
+-}
+-
+-export default function BandejaTabFilter({
+-  estadoActivo,
+-  onCambiarEstado,
+-  conteos,
+-}: BandejaTabFilterProps) {
+-  return (
+-    <div
+-      role="tablist"
+-      aria-label="Pestañas de la Bandeja Operativa de Expedientes"
+-      className="flex flex-wrap gap-2 border-b border-slate-200 pb-3"
+-    >
+-      {ORDEN_PESTANAS_BANDEJA.map((estado) => {
+-        const activo = estado === estadoActivo;
+-
+-        return (
+-          <button
+-            key={estado}
+-            type="button"
+-            role="tab"
+-            aria-selected={activo}
+-            onClick={() => onCambiarEstado(estado)}
+-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+-              activo
+-                ? "bg-blue-700 text-white shadow-sm"
+-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+-            }`}
+-          >
+-            {ETIQUETAS_ESTADO_FLUJO[estado]}
+-            <span
+-              className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+-                activo ? "bg-white/20 text-white" : "bg-white text-slate-600"
+-              }`}
+-            >
+-              {conteos[estado] ?? 0}
+-            </span>
+-          </button>
+-        );
+-      })}
+-    </div>
+-  );
++import { ETIQUETAS, PESTANAS, type Bandeja, type Pestana } from "../../pages/expedientes/rutadoc/rutadoc.dto";
++export default function BandejaTabFilter({ estadoActivo, onCambiarEstado, conteos }: {
++  estadoActivo: Pestana; onCambiarEstado: (estado: Pestana) => void; conteos?: Bandeja["contadores"];
++}) {
++  return <div role="tablist" aria-label="Pestañas de expedientes" className="flex flex-wrap gap-2">
++    {PESTANAS.map(p => <button type="button" role="tab" key={p}
++      aria-selected={p === estadoActivo} onClick={() => onCambiarEstado(p)}
++      className="rounded border px-3 py-2">{ETIQUETAS[p]} ({conteos?.[p] ?? "—"})</button>)}
++  </div>;
+ }
+diff --git a/frontend/src/components/expedientes/ExpedienteTable.tsx b/frontend/src/components/expedientes/ExpedienteTable.tsx
+index 4c4dc0d..0c16e0e 100644
+--- a/frontend/src/components/expedientes/ExpedienteTable.tsx
++++ b/frontend/src/components/expedientes/ExpedienteTable.tsx
+@@ -1,86 +1,14 @@
+-import type { ExpedienteSGD } from "../../types/expediente";
+-import SlaBadge from "./SlaBadge";
+-
+-interface ExpedienteTableProps {
+-  expedientes: ExpedienteSGD[];
+-  onVerExpediente: (expediente: ExpedienteSGD) => void;
+-}
+-
+-const formateadorFecha = new Intl.DateTimeFormat("es-PE", {
+-  year: "numeric",
+-  month: "2-digit",
+-  day: "2-digit",
+-});
+-
+-export default function ExpedienteTable({
+-  expedientes,
+-  onVerExpediente,
+-}: ExpedienteTableProps) {
+-  if (expedientes.length === 0) {
+-    return (
+-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
+-        No hay expedientes en esta pestaña con los filtros aplicados.
+-      </div>
+-    );
+-  }
+-
+-  return (
+-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+-      <table className="min-w-full divide-y divide-slate-200 text-sm">
+-        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+-          <tr>
+-            <th className="px-4 py-3">CUT</th>
+-            <th className="px-4 py-3">Asunto</th>
+-            <th className="px-4 py-3">Solicitante</th>
+-            <th className="px-4 py-3">Serie CCD</th>
+-            <th className="px-4 py-3 text-center">Folios</th>
+-            <th className="px-4 py-3">Fecha Ingreso</th>
+-            <th className="px-4 py-3">Plazo Restante</th>
+-            <th className="px-4 py-3 text-right">Acciones</th>
+-          </tr>
+-        </thead>
+-        <tbody className="divide-y divide-slate-100">
+-          {expedientes.map((expediente) => {
+-            return (
+-              <tr key={expediente.id} className="hover:bg-slate-50">
+-                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold text-blue-700">
+-                  {expediente.codigoExpediente}
+-                </td>
+-                <td className="max-w-xs px-4 py-3 text-slate-800">
+-                  {expediente.asunto}
+-                </td>
+-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+-                  {expediente.solicitante.nombreOrazonSocial}
+-                </td>
+-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+-                  {expediente.clasificacionCCD.serieDocumental}
+-                </td>
+-                <td className="px-4 py-3 text-center text-slate-600">
+-                  {expediente.cantidadFolios}
+-                </td>
+-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+-                  {formateadorFecha.format(new Date(expediente.fechaIngreso))}
+-                </td>
+-                <td className="whitespace-nowrap px-4 py-3">
+-                  <SlaBadge
+-                    fechaIngreso={expediente.fechaIngreso}
+-                    fechaLimiteAtencion={expediente.fechaLimiteAtencion}
+-                  />
+-                </td>
+-                <td className="whitespace-nowrap px-4 py-3 text-right">
+-                  <button
+-                    type="button"
+-                    onClick={() => onVerExpediente(expediente)}
+-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+-                  >
+-                    Ver
+-                  </button>
+-                </td>
+-              </tr>
+-            );
+-          })}
+-        </tbody>
+-      </table>
+-    </div>
+-  );
++import type { Resumen } from "../../pages/expedientes/rutadoc/rutadoc.dto";
++export default function ExpedienteTable({ expedientes, onVerExpediente }: {
++  expedientes: Resumen[]; onVerExpediente: (expediente: Resumen) => void;
++}) {
++  if (!expedientes.length) return <p>No hay expedientes con los filtros aplicados.</p>;
++  return <div className="overflow-x-auto"><table className="w-full text-left">
++    <thead><tr>{["CUT", "Asunto", "Estado", "Área actual", "Radicación", "Detalle"].map(t => <th key={t}>{t}</th>)}</tr></thead>
++    <tbody>{expedientes.map(e => <tr key={e.idExpediente}>
++      <td>{e.cut}</td><td>{e.asunto}</td><td>{e.estadoActual}</td>
++      <td>{e.areaActualId ?? "No disponible"}</td><td>{e.fechaRadicacion}</td>
++      <td><button type="button" onClick={() => onVerExpediente(e)} aria-label={`Ver ${e.cut}`}>Ver</button></td>
++    </tr>)}</tbody>
++  </table></div>;
+ }
+diff --git a/frontend/src/hooks/useBandejaExpedientes.ts b/frontend/src/hooks/useBandejaExpedientes.ts
+index bc7078f..26081e0 100644
+--- a/frontend/src/hooks/useBandejaExpedientes.ts
++++ b/frontend/src/hooks/useBandejaExpedientes.ts
+@@ -1,74 +1,8 @@
+ import { useQuery } from "@tanstack/react-query";
++import { rutaDoc } from "../pages/expedientes/rutadoc/rutadoc.service";
++import type { Filtros } from "../pages/expedientes/rutadoc/rutadoc.dto";
+ 
+-import { apiClient } from "../api/client";
+-import { EXPEDIENTES_FIXTURE } from "../data/expedientesFixtures";
+-import type { EstadoFlujoExpediente, ExpedienteSGD } from "../types/expediente";
+-
+-/** Retardo de red simulado en modo mock, conforme al estándar de la arquitectura (300 ms). */
+-const RETARDO_MOCK_MS = 300;
+-
+-const usarMocks = import.meta.env.VITE_ENABLE_MOCKS === "true";
+-
+-export interface FiltrosBandejaExpedientes {
+-  /** Pestaña activa. `undefined` trae todos los expedientes (usado para calcular contadores). */
+-  estado?: EstadoFlujoExpediente;
+-  /** Búsqueda libre por CUT, solicitante o asunto. */
+-  busqueda?: string;
+-}
+-
+-async function obtenerExpedientesMock(): Promise<ExpedienteSGD[]> {
+-  await new Promise((resolve) => setTimeout(resolve, RETARDO_MOCK_MS));
+-  return EXPEDIENTES_FIXTURE;
+-}
+-
+-async function obtenerExpedientesApi(): Promise<ExpedienteSGD[]> {
+-  const { data } = await apiClient.get<ExpedienteSGD[]>("/api/v1/expedientes");
+-  return data;
+-}
+-
+-function aplicarFiltros(
+-  expedientes: ExpedienteSGD[],
+-  filtros: FiltrosBandejaExpedientes,
+-): ExpedienteSGD[] {
+-  let resultado = expedientes;
+-
+-  if (filtros.estado) {
+-    resultado = resultado.filter((exp) => exp.estadoFlujo === filtros.estado);
+-  }
+-
+-  if (filtros.busqueda && filtros.busqueda.trim().length > 0) {
+-    const termino = filtros.busqueda.trim().toLowerCase();
+-    resultado = resultado.filter(
+-      (exp) =>
+-        exp.codigoExpediente.toLowerCase().includes(termino) ||
+-        exp.asunto.toLowerCase().includes(termino) ||
+-        exp.solicitante.nombreOrazonSocial.toLowerCase().includes(termino),
+-    );
+-  }
+-
+-  return resultado;
+-}
+-
+-/**
+- * Trae la lista completa de expedientes (sin filtrar) para poder calcular los
+- * contadores de las 6 pestañas de la Bandeja Operativa en un único fetch.
+- */
+-export function useExpedientesBase() {
+-  return useQuery({
+-    queryKey: ["expedientes", "base"],
+-    queryFn: usarMocks ? obtenerExpedientesMock : obtenerExpedientesApi,
+-    staleTime: 30_000,
+-  });
+-}
+-
+-/**
+- * Hook principal de la Bandeja Operativa (ENT-M03-01).
+- * Aplica los filtros de pestaña y búsqueda sobre los datos ya cacheados por TanStack Query.
+- */
+-export function useBandejaExpedientes(filtros: FiltrosBandejaExpedientes) {
+-  const { data, ...resto } = useExpedientesBase();
+-
+-  const expedientesFiltrados = data ? aplicarFiltros(data, filtros) : undefined;
+-
+-  return { data: expedientesFiltrados, ...resto };
++export function useBandejaExpedientes(filtros: Filtros) {
++  return useQuery({ queryKey: ["rutadoc", "bandeja", filtros],
++    queryFn: ({ signal }) => rutaDoc.bandeja(filtros, signal), retry: false });
+ }
+diff --git a/frontend/src/hooks/useExpedienteTimeline.ts b/frontend/src/hooks/useExpedienteTimeline.ts
+index 8341ce4..7577b4e 100644
+--- a/frontend/src/hooks/useExpedienteTimeline.ts
++++ b/frontend/src/hooks/useExpedienteTimeline.ts
+@@ -1,47 +1,7 @@
+ import { useQuery } from "@tanstack/react-query";
++import { rutaDoc } from "../pages/expedientes/rutadoc/rutadoc.service";
+ 
+-import { apiClient } from "../api/client";
+-import { BITACORA_FIXTURE } from "../data/expedientesFixtures";
+-import type { BitacoraEventoExpediente } from "../types/trazabilidadExpediente";
+-
+-const RETARDO_MOCK_MS = 300;
+-
+-const usarMocks = import.meta.env.VITE_ENABLE_MOCKS === "true";
+-
+-async function obtenerTimelineMock(
+-  expedienteId: string,
+-): Promise<BitacoraEventoExpediente[]> {
+-  await new Promise((resolve) => setTimeout(resolve, RETARDO_MOCK_MS));
+-  return BITACORA_FIXTURE[expedienteId] ?? [];
+-}
+-
+-async function obtenerTimelineApi(
+-  expedienteId: string,
+-): Promise<BitacoraEventoExpediente[]> {
+-  const { data } = await apiClient.get<BitacoraEventoExpediente[]>(
+-    `/api/v1/expedientes/${expedienteId}/trazabilidad`,
+-  );
+-  return data;
+-}
+-
+-/**
+- * Trae la bitácora inmutable (Timeline) de un expediente específico, ordenada
+- * cronológicamente. Modo de solo lectura: no expone ninguna mutación.
+- */
+-export function useExpedienteTimeline(expedienteId: string | undefined) {
+-  return useQuery({
+-    queryKey: ["expedientes", expedienteId, "timeline"],
+-    queryFn: () =>
+-      expedienteId
+-        ? usarMocks
+-          ? obtenerTimelineMock(expedienteId)
+-          : obtenerTimelineApi(expedienteId)
+-        : Promise.resolve([]),
+-    enabled: Boolean(expedienteId),
+-    staleTime: 30_000,
+-    select: (eventos) =>
+-      [...eventos].sort(
+-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+-      ),
+-  });
++export function useExpedienteTimeline(id: string | undefined) {
++  return useQuery({ queryKey: ["rutadoc", id, "trazabilidad"],
++    queryFn: ({ signal }) => rutaDoc.trazabilidad(id!, signal), enabled: Boolean(id), retry: false });
+ }
+diff --git a/frontend/src/pages/expedientes/BandejaExpedientesPage.tsx b/frontend/src/pages/expedientes/BandejaExpedientesPage.tsx
+index 04cab15..698d877 100644
+--- a/frontend/src/pages/expedientes/BandejaExpedientesPage.tsx
++++ b/frontend/src/pages/expedientes/BandejaExpedientesPage.tsx
+@@ -1,261 +1,54 @@
+-import { useEffect, useMemo, useState } from "react";
++import { useState, type FormEvent } from "react";
+ import { useNavigate } from "react-router-dom";
+-
+ import BandejaTabFilter from "../../components/expedientes/BandejaTabFilter";
+ import ExpedienteTable from "../../components/expedientes/ExpedienteTable";
+-import CcdTreeSelector from "../../components/expedientes/CcdTreeSelector";
+-import { useBandejaExpedientes, useExpedientesBase } from "../../hooks/useBandejaExpedientes";
+-import {
+-  ORDEN_PESTANAS_BANDEJA,
+-  type EstadoFlujoExpediente,
+-  type ExpedienteSGD,
+-} from "../../types/expediente";
+-import type {
+-  FondoDocumental,
+-  RutaCcdSeleccionada,
+-} from "../../types/ccdArchivistica";
+-
+-const FONDOS_CCD_INSTITUCIONALES: readonly FondoDocumental[] = [
+-  {
+-    tipo: "fondo",
+-    id: "fondo-iestp",
+-    nombre: "IESTP_SUIZA",
+-    secciones: [
+-      {
+-        tipo: "seccion",
+-        id: "sec-sa",
+-        nombre: "Secretaría Académica",
+-        series: [
+-          {
+-            tipo: "serie",
+-            id: "ser-tit",
+-            nombre: "Expedientes de Titulación Profesional",
+-            codigo: "CCD-SA-TIT",
+-          },
+-          {
+-            tipo: "serie",
+-            id: "ser-act",
+-            nombre: "Actas de Evaluación y Certificados",
+-            codigo: "CCD-SA-ACTA",
+-          },
+-        ],
+-      },
+-      {
+-        tipo: "seccion",
+-        id: "sec-dg",
+-        nombre: "Dirección General",
+-        series: [
+-          {
+-            tipo: "serie",
+-            id: "ser-res",
+-            nombre: "Resoluciones Directorales",
+-            codigo: "CCD-DG-RES",
+-          },
+-        ],
+-      },
+-    ],
+-  },
+-];
+-
+-function calcularConteosPorEstado(
+-  expedientes: ExpedienteSGD[] | undefined,
+-): Record<EstadoFlujoExpediente, number> {
+-  const conteos = ORDEN_PESTANAS_BANDEJA.reduce(
+-    (acc, estado) => ({ ...acc, [estado]: 0 }),
+-    {} as Record<EstadoFlujoExpediente, number>,
+-  );
+-
+-  if (!expedientes) {
+-    return conteos;
+-  }
+-
+-  for (const expediente of expedientes) {
+-    conteos[expediente.estadoFlujo] += 1;
+-  }
+-
+-  return conteos;
+-}
++import { useBandejaExpedientes } from "../../hooks/useBandejaExpedientes";
++import type { Filtros } from "./rutadoc/rutadoc.dto";
++import RutaDocEstado from "./rutadoc/RutaDocEstado";
+ 
+ export default function BandejaExpedientesPage() {
+   const navigate = useNavigate();
+-  const [estadoActivo, setEstadoActivo] = useState<EstadoFlujoExpediente>("PENDIENTE");
+-  const [busqueda, setBusqueda] = useState("");
+-  const [filtroCcd, setFiltroCcd] = useState<RutaCcdSeleccionada | null>(null);
+-  const [mostrarFiltroCcd, setMostrarFiltroCcd] = useState(false);
+-  const [ahora, setAhora] = useState(() => Date.now());
+-
+-  useEffect(() => {
+-    const interval = window.setInterval(() => setAhora(Date.now()), 60_000);
+-    return () => window.clearInterval(interval);
+-  }, []);
+-
+-  const { data: expedientesBase } = useExpedientesBase();
+-  const { data: expedientesFiltradosApi, isLoading, isError } =
+-    useBandejaExpedientes({ estado: estadoActivo, busqueda });
+-
+-  // Filtrado compuesto local por serie CCD seleccionada
+-  const expedientesVisibles = useMemo(() => {
+-    if (!expedientesFiltradosApi) return [];
+-    if (!filtroCcd) return expedientesFiltradosApi;
+-
+-    return expedientesFiltradosApi.filter(
+-      (exp) =>
+-        exp.clasificacionCCD.codigoSerie === filtroCcd.serie.codigo ||
+-        exp.clasificacionCCD.serieDocumental.toLowerCase().includes(filtroCcd.serie.nombre.toLowerCase()),
+-    );
+-  }, [expedientesFiltradosApi, filtroCcd]);
+-
+-  const conteos = useMemo(
+-    () => calcularConteosPorEstado(expedientesBase),
+-    [expedientesBase],
+-  );
+-
+-  const volumenActivo = expedientesBase?.length ?? 0;
+-  const urgentes =
+-    expedientesBase?.filter(
+-      (exp) => exp.prioridad === "URGENTE" || exp.prioridad === "MUY_URGENTE",
+-    ).length ?? 0;
+-  const proximosAVencer =
+-    expedientesBase?.filter((exp) => {
+-      const diasRestantes = Math.ceil(
+-        (new Date(exp.fechaLimiteAtencion).getTime() - ahora) /
+-          (1000 * 60 * 60 * 24),
+-      );
+-      return diasRestantes >= 0 && diasRestantes <= 2;
+-    }).length ?? 0;
+-
+-  return (
+-    <main className="min-h-screen bg-slate-100 text-slate-900">
+-      <header className="border-b border-slate-200 bg-white">
+-        <div className="mx-auto max-w-7xl px-6 py-5">
+-          <button
+-            type="button"
+-            onClick={() => navigate("/")}
+-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+-          >
+-            ← Volver al inicio
+-          </button>
+-
+-          <p className="text-sm font-bold text-blue-700">SIGD · IESTP "Suiza"</p>
+-          <h1 className="text-2xl font-bold">Bandeja de Trabajo Diario</h1>
+-          <p className="mt-1 text-sm text-slate-500">
+-            Gestión operativa de expedientes, semáforo SLA de 30 días LPAG y taxonomía archivística CCD.
+-          </p>
+-        </div>
+-      </header>
+-
+-      <section className="mx-auto max-w-7xl px-6 py-8">
+-        {/* Panel de KPIs */}
+-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
+-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+-            <p className="text-3xl font-bold text-blue-700">{volumenActivo}</p>
+-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+-              Volumen Activo
+-            </p>
+-          </div>
+-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+-            <p className="text-3xl font-bold text-amber-600">{urgentes}</p>
+-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+-              Trámites Urgentes
+-            </p>
+-          </div>
+-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+-            <p className="text-3xl font-bold text-red-600">{proximosAVencer}</p>
+-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+-              Próximos a Vencer (LPAG)
+-            </p>
+-          </div>
+-        </div>
+-
+-        {/* Barra de Búsqueda y Filtro CCD */}
+-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+-          <div className="flex-1 max-w-md">
+-            <input
+-              type="search"
+-              value={busqueda}
+-              onChange={(e) => setBusqueda(e.target.value)}
+-              placeholder="Buscar por CUT, solicitante o asunto…"
+-              className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+-            />
+-          </div>
+-
+-          <div className="flex items-center gap-2">
+-            <button
+-              type="button"
+-              onClick={() => setMostrarFiltroCcd(!mostrarFiltroCcd)}
+-              className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+-                filtroCcd
+-                  ? "border-blue-600 bg-blue-50 text-blue-700"
+-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+-              }`}
+-            >
+-              📂 Taxonomía CCD {filtroCcd ? `(${filtroCcd.serie.codigo})` : ""}
+-            </button>
+-            {filtroCcd && (
+-              <button
+-                type="button"
+-                onClick={() => setFiltroCcd(null)}
+-                className="text-xs text-red-600 hover:underline"
+-              >
+-                Limpiar filtro CCD
+-              </button>
+-            )}
+-          </div>
+-        </div>
+-
+-        {/* Panel Desplegable de Árbol CCD (ENT-M03-04) */}
+-        {mostrarFiltroCcd && (
+-          <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+-            <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+-                Seleccionar Serie Documental Archivística (Cuadro CCD)
+-              </h3>
+-              <button
+-                type="button"
+-                onClick={() => setMostrarFiltroCcd(false)}
+-                className="text-xs text-slate-400 hover:text-slate-600"
+-              >
+-                ✕ Cerrar
+-              </button>
+-            </div>
+-            <CcdTreeSelector
+-              recurso={{ estado: "listo", datos: FONDOS_CCD_INSTITUCIONALES }}
+-              seleccion={filtroCcd}
+-              onSeleccionar={(ruta) => {
+-                setFiltroCcd(ruta);
+-                setMostrarFiltroCcd(false);
+-              }}
+-            />
+-          </div>
+-        )}
+-
+-        {/* Pestañas de la FSM de 6 Estados */}
+-        <div className="mb-4">
+-          <BandejaTabFilter
+-            estadoActivo={estadoActivo}
+-            onCambiarEstado={setEstadoActivo}
+-            conteos={conteos}
+-          />
+-        </div>
+-
+-        {/* Tabla Operativa con Semáforo SLA integrado */}
+-        {isLoading && (
+-          <p className="p-6 text-sm text-slate-500">Cargando expedientes…</p>
+-        )}
+-        {isError && (
+-          <p className="p-6 text-sm text-red-600">
+-            Ocurrió un error al cargar los expedientes. Intenta nuevamente.
+-          </p>
+-        )}
+-        {!isLoading && !isError && (
+-          <ExpedienteTable
+-            expedientes={expedientesVisibles}
+-            onVerExpediente={(expediente) =>
+-              navigate(`/expedientes/${expediente.id}`)
+-            }
+-          />
+-        )}
+-      </section>
+-    </main>
+-  );
++  const [filtros, setFiltros] = useState<Filtros>({ pestana: "PENDIENTES", limite: 20 });
++  const [anteriores, setAnteriores] = useState<(string | undefined)[]>([]);
++  const consulta = useBandejaExpedientes(filtros);
++  function filtrar(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault();
++    const datos = new FormData(event.currentTarget);
++    const texto = (nombre: string) => String(datos.get(nombre) ?? "").trim() || undefined;
++    setAnteriores([]);
++    setFiltros({ pestana: filtros.pestana, limite: Number(datos.get("limite")),
++      terminoBusqueda: texto("terminoBusqueda"), areaId: texto("areaId"),
++      fechaDesde: texto("fechaDesde"), fechaHasta: texto("fechaHasta") });
++  }
++  return <main className="mx-auto max-w-7xl space-y-6 p-6">
++    <button type="button" onClick={() => navigate("/")}>Volver al inicio</button>
++    <h1 className="text-2xl font-bold">Bandeja de expedientes</h1>
++    <form onSubmit={filtrar} className="flex flex-wrap gap-3">
++      <label>Buscar CUT o asunto<input name="terminoBusqueda" maxLength={100} type="search" /></label>
++      <label>Área UUID<input name="areaId" /></label>
++      <label>Desde<input name="fechaDesde" type="date" /></label>
++      <label>Hasta<input name="fechaHasta" type="date" /></label>
++      <label>Por página<select name="limite" defaultValue="20"><option>1</option><option>20</option><option>50</option><option>100</option></select></label>
++      <button type="submit">Aplicar filtros</button>
++    </form>
++    <BandejaTabFilter estadoActivo={filtros.pestana} conteos={consulta.data?.contadores}
++      onCambiarEstado={pestana => { setAnteriores([]); setFiltros(f => ({ ...f, pestana, cursor: undefined })); }} />
++    <RutaDocEstado pendiente={consulta.isPending} error={consulta.error} reintentar={() => { void consulta.refetch(); }}>
++      {consulta.data && <>
++        <ExpedienteTable expedientes={consulta.data.elementos}
++          onVerExpediente={e => navigate(`/expedientes/${encodeURIComponent(e.idExpediente)}`)} />
++        <nav aria-label="Paginación" className="flex gap-4">
++          <button type="button" disabled={!anteriores.length} onClick={() => {
++            const copia = [...anteriores]; const cursor = copia.pop();
++            setAnteriores(copia); setFiltros(f => ({ ...f, cursor }));
++          }}>Anterior</button>
++          <button type="button" disabled={!consulta.data.tieneMas || consulta.isFetching} onClick={() => {
++            const cursor = consulta.data?.siguienteCursor;
++            if (!cursor) return;
++            setAnteriores(a => [...a, filtros.cursor]); setFiltros(f => ({ ...f, cursor }));
++          }}>Siguiente</button>
++        </nav>
++      </>}
++    </RutaDocEstado>
++  </main>;
+ }
+diff --git a/frontend/src/pages/expedientes/ExpedienteDetallePage.tsx b/frontend/src/pages/expedientes/ExpedienteDetallePage.tsx
+index 5ab84a4..21db5a2 100644
+--- a/frontend/src/pages/expedientes/ExpedienteDetallePage.tsx
++++ b/frontend/src/pages/expedientes/ExpedienteDetallePage.tsx
+@@ -1,240 +1,70 @@
+-import { useMemo, useState } from "react";
+-import { useNavigate, useParams } from "react-router-dom";
+-
+-import ExpedienteTimeline from "../../components/expedientes/ExpedienteTimeline";
+-import ExpedienteClasificacion from "../../components/expedientes/ExpedienteClasificacion";
+-import ExpedienteMetadatos from "../../components/expedientes/ExpedienteMetadatos";
+-import ExpedienteVersiones from "../../components/expedientes/ExpedienteVersiones";
+-import FoliadoDocumentoViewer from "../../components/expedientes/FoliadoDocumentoViewer";
+-import DerivacionModal from "../../components/expedientes/DerivacionModal";
+-import ObservacionModal from "../../components/expedientes/ObservacionModal";
+-import AcumulacionModal from "../../components/expedientes/AcumulacionModal";
+-import ExpedienteActionToast from "../../components/expedientes/ExpedienteActionToast";
+-import SlaBadge from "../../components/expedientes/SlaBadge";
+-import { useExpedientesBase } from "../../hooks/useBandejaExpedientes";
++import { useId } from "react";
++import { Link, useParams } from "react-router-dom";
+ import { useExpedienteTimeline } from "../../hooks/useExpedienteTimeline";
+-import { useExpedienteActions } from "../../hooks/useExpedienteActions";
+-import { crearServicioExpedienteActions } from "../../api/expedienteActions";
+-import type { DocumentoExpediente } from "../../types/ccdArchivistica";
++import { useRutaDocDetalle } from "./rutadoc/useRutaDocDetalle";
++import RutaDocEstado from "./rutadoc/RutaDocEstado";
++import RutaDocTimeline from "./rutadoc/RutaDocTimeline";
++import RutaDocFoliacion from "./rutadoc/RutaDocFoliacion";
++import RutaDocSla from "./rutadoc/RutaDocSla";
+ 
+ export default function ExpedienteDetallePage() {
++  const disponibilidadId = useId();
+   const { id } = useParams<{ id: string }>();
+-  const navigate = useNavigate();
+-
+-  const [modalActivo, setModalActivo] = useState<"derivacion" | "observacion" | "acumulacion" | null>(null);
+-
+-  const { data: expedientes, isLoading: cargandoExpediente, isError: errorExpediente } =
+-    useExpedientesBase();
+-  const expediente = expedientes?.find((exp) => exp.id === id);
+-
+-  const { data: eventos, isLoading: cargandoTimeline, isError: errorTimeline } =
+-    useExpedienteTimeline(id);
+-
+-  const servicioExpediente = useMemo(
+-    () =>
+-      crearServicioExpedienteActions({
+-        derivacion: {
+-          construirPayload: (entrada) => ({
+-            destinos: [{ area_destino_id: entrada.unidadDestinoId, es_copia: false }],
+-            proveido: entrada.proveido || "Derivación de expediente",
+-          }),
+-        },
+-        observacion: {
+-          construirPayload: (entrada) => ({
+-            motivo: entrada.motivo,
+-            observacion: entrada.motivo,
+-          }),
+-        },
+-        acumulacion: async (entrada) => {
+-          const { apiClient } = await import("../../api/client");
+-          await apiClient.post(`/api/v1/expedientes/${entrada.principal.id}/acumular`, {
+-            expedientesConexos: entrada.conexos.map((c) => c.id),
+-            motivo: entrada.motivo,
+-          });
+-        },
+-      }),
+-    [],
+-  );
+-
+-  const acciones = useExpedienteActions({
+-    servicio: servicioExpediente,
+-    obtenerClavesAfectadas: () => [["expedientes"], ["expediente", id]],
+-  });
+-
+-  const expedienteParaAccion = useMemo(() => {
+-    if (!expediente) return { id: "", codigo: "", unidadOrigenId: "" };
+-    return {
+-      id: expediente.id,
+-      codigo: expediente.codigoExpediente,
+-      unidadOrigenId: expediente.areaOrigen,
+-    };
+-  }, [expediente]);
+-
+-  const unidadesDestino = useMemo(() => [
+-    { id: "area-dg", nombre: "Dirección General", habilitada: true },
+-    { id: "area-sa", nombre: "Secretaría Académica", habilitada: true },
+-    { id: "area-inf", nombre: "Coordinación de Informática", habilitada: true },
+-    { id: "area-mp", nombre: "Mesa de Partes", habilitada: true },
+-  ], []);
+-
+-  const documentosFoliados: DocumentoExpediente[] = useMemo(() => {
+-    if (!expediente || expediente.versionesDocumentos.length === 0) {
+-      return [
+-        {
+-          id: "doc-folio-1",
+-          nombre: "Expediente_Principal_Foliado.pdf",
+-          folios: [
+-            { numero: 1, pagina: 1, urlImagen: "/src/dev/folio-ejemplo.svg" },
+-            { numero: 2, pagina: 2, urlImagen: "/src/dev/folio-ejemplo.svg" },
+-          ],
+-        },
+-      ];
+-    }
+-    return expediente.versionesDocumentos.map((ver, idx) => ({
+-      id: ver.versionId,
+-      nombre: ver.nombreArchivo,
+-      folios: [
+-        {
+-          numero: idx + 1,
+-          pagina: 1,
+-          urlImagen: "/src/dev/folio-ejemplo.svg",
+-        },
+-      ],
+-    }));
+-  }, [expediente]);
+-
+-  return (
+-    <main className="min-h-screen bg-slate-100 text-slate-900">
+-      <header className="border-b border-slate-200 bg-white">
+-        <div className="mx-auto max-w-5xl px-6 py-5">
+-          <div className="flex items-center justify-between">
+-            <button
+-              type="button"
+-              onClick={() => navigate("/expedientes")}
+-              className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+-            >
+-              ← Volver a la Bandeja
++  const { detalle, foliacion, sla } = useRutaDocDetalle(id);
++  const timeline = useExpedienteTimeline(id);
++  return <main className="mx-auto max-w-5xl space-y-6 p-6">
++    <Link to="/expedientes">Volver a la bandeja</Link>
++    <h1 className="text-2xl font-bold">Detalle de expediente</h1>
++    <RutaDocEstado pendiente={detalle.isPending} error={detalle.error} reintentar={() => { void detalle.refetch(); }}>
++      {detalle.data && <>
++        <h2>{detalle.data.cut}</h2><p>{detalle.data.asunto}</p>
++        <dl><dt>UUID</dt><dd>{detalle.data.idExpediente}</dd>
++          <dt>Estado</dt><dd>{detalle.data.estadoActual}</dd>
++          <dt>Radicación</dt><dd>{detalle.data.fechaRadicacion}</dd>
++          <dt>Área actual</dt><dd>{detalle.data.areaActualId ?? "No disponible"}</dd>
++          <dt>Solicitante UUID</dt><dd>{detalle.data.solicitanteId ?? "No disponible"}</dd>
++          <dt>Resumen documental</dt><dd>{detalle.data.resumenDocumentos
++            ? `${detalle.data.resumenDocumentos.cantidadDocumentos} documentos, ${detalle.data.resumenDocumentos.totalFolios} folios`
++            : "No disponible"}</dd></dl>
++      </>}
++    </RutaDocEstado>
++    {detalle.isSuccess && <>
++      <section aria-label="Acciones del expediente" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
++        <h2 className="text-lg font-bold">Acciones del expediente</h2>
++        <div className="mt-4 grid gap-4 sm:grid-cols-3">
++          {[
++            { nombre: "Derivar", ayuda: "El envío del expediente a otra área no está disponible por el momento." },
++            { nombre: "Observar", ayuda: "El registro de observaciones no está disponible por el momento." },
++            { nombre: "Acumular", ayuda: "La acumulación de expedientes no está disponible por el momento." },
++          ].map((accion, indice) => <div key={accion.nombre}>
++            <button type="button" disabled aria-describedby={`${disponibilidadId}-${indice}`}
++              className="rounded-lg border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-500 disabled:cursor-not-allowed">
++              {accion.nombre}
+             </button>
+-            {expediente && (
+-              <SlaBadge
+-                fechaIngreso={expediente.fechaIngreso}
+-                fechaLimiteAtencion={expediente.fechaLimiteAtencion}
+-              />
+-            )}
+-          </div>
+-
+-          <p className="text-sm font-bold text-blue-700">SIGD · IESTP "Suiza"</p>
+-          <div className="flex flex-wrap items-center justify-between gap-4">
+-            <div>
+-              <h1 className="break-words text-2xl font-bold">
+-                {expediente ? expediente.codigoExpediente : "Detalle de Expediente"}
+-              </h1>
+-              {expediente && (
+-                <p className="mt-1 text-sm text-slate-500">{expediente.asunto}</p>
+-              )}
+-            </div>
+-
+-            {expediente && (
+-              <div className="flex items-center gap-2">
+-                <button
+-                  type="button"
+-                  onClick={() => setModalActivo("derivacion")}
+-                  className="rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-800 transition"
+-                >
+-                  Derivar Expediente
+-                </button>
+-                <button
+-                  type="button"
+-                  onClick={() => setModalActivo("observacion")}
+-                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition"
+-                >
+-                  Observar / Suspender
+-                </button>
+-                <button
+-                  type="button"
+-                  onClick={() => setModalActivo("acumulacion")}
+-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+-                >
+-                  Acumular
+-                </button>
+-              </div>
+-            )}
+-          </div>
++            <p id={`${disponibilidadId}-${indice}`} className="mt-2 text-sm text-slate-600">{accion.ayuda}</p>
++          </div>)}
+         </div>
+-      </header>
+-
+-      <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+-        {cargandoExpediente && (
+-          <p className="text-sm text-slate-500">Cargando expediente…</p>
+-        )}
+-
+-        {errorExpediente && (
+-          <p role="alert" className="rounded-xl border border-red-200 bg-white p-6 text-sm text-red-800">
+-            No se pudo cargar el expediente. Vuelve a la bandeja e inténtalo nuevamente.
+-          </p>
+-        )}
+-
+-        {!cargandoExpediente && !errorExpediente && !expediente && (
+-          <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+-            No se encontró el expediente solicitado.
+-          </p>
+-        )}
+-
+-        {expediente && (
+-          <>
+-            <ExpedienteMetadatos expediente={expediente} />
+-            <ExpedienteClasificacion clasificacion={expediente.clasificacionCCD} />
+-
+-            {/* Visor Oficial de Foliado AGN (ENT-M03-04) */}
+-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+-              <h2 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-3 mb-4">
+-                Visor de Foliado Continuo Oficial (F. 1 a N) — Directivas AGN
+-              </h2>
+-              <FoliadoDocumentoViewer
+-                recurso={{ estado: "listo", datos: documentosFoliados }}
+-              />
+-            </section>
+-
+-            <ExpedienteVersiones versiones={expediente.versionesDocumentos} />
+-
+-            {errorTimeline ? (
+-              <p role="alert" className="rounded-xl border border-red-200 bg-white p-6 text-sm text-red-800">
+-                No se pudo cargar la Hoja de Ruta y Trazabilidad.
+-              </p>
+-            ) : (
+-              <ExpedienteTimeline eventos={eventos ?? []} cargando={cargandoTimeline} />
+-            )}
+-
+-            {/* Modales de Acciones Procesales */}
+-            <DerivacionModal
+-              open={modalActivo === "derivacion"}
+-              onClose={() => setModalActivo(null)}
+-              expediente={expedienteParaAccion}
+-              unidades={{ estado: "listo", datos: unidadesDestino }}
+-              accion={acciones.derivacion}
+-            />
+-
+-            <ObservacionModal
+-              open={modalActivo === "observacion"}
+-              onClose={() => setModalActivo(null)}
+-              expediente={expedienteParaAccion}
+-              accion={acciones.observacion}
+-            />
+-
+-            <AcumulacionModal
+-              open={modalActivo === "acumulacion"}
+-              onClose={() => setModalActivo(null)}
+-              expediente={expedienteParaAccion}
+-              accion={acciones.acumulacion}
+-            />
+-
+-            <ExpedienteActionToast
+-              notificacion={acciones.notificacion}
+-              onClose={acciones.limpiarNotificacion}
+-            />
+-          </>
+-        )}
+-      </div>
+-    </main>
+-  );
++      </section>
++      <section aria-label="Clasificación CCD" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
++        <h2 className="text-lg font-bold">Clasificación CCD</h2>
++        <p className="mt-2 text-sm text-slate-600">La consulta de clasificación documental no está disponible por el momento.</p>
++      </section>
++      <section aria-label="Versiones documentales" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
++        <h2 className="text-lg font-bold">Versiones documentales</h2>
++        <p className="mt-2 text-sm text-slate-600">La consulta del historial de versiones documentales no está disponible por el momento.</p>
++      </section>
++      <section aria-label="Trazabilidad"><h2>Trazabilidad</h2>
++        <RutaDocEstado pendiente={timeline.isPending} error={timeline.error} reintentar={() => { void timeline.refetch(); }}>
++          {timeline.data && <RutaDocTimeline datos={timeline.data} />}
++        </RutaDocEstado></section>
++      <section aria-label="Foliación"><h2>Foliación</h2>
++        <RutaDocEstado pendiente={foliacion.isPending} error={foliacion.error} reintentar={() => { void foliacion.refetch(); }}>
++          {foliacion.data && <RutaDocFoliacion datos={foliacion.data} />}
++        </RutaDocEstado></section>
++      <section aria-label="SLA"><h2>SLA</h2>
++        <RutaDocEstado pendiente={sla.isPending} error={sla.error} reintentar={() => { void sla.refetch(); }}>
++          {sla.data && <RutaDocSla datos={sla.data} />}
++        </RutaDocEstado></section>
++    </>}
++  </main>;
+ }

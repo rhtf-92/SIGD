@@ -10,6 +10,7 @@ import { ejecutarMigraciones } from './db/migrate.js';
 import { OutboxWorker } from './audit/outbox-worker.js';
 import { crearDespachadorPorDefecto } from './audit/despachador-notificaciones.js';
 import { BridgeNotificacion } from './core/realtime/bridge-notificacion.js';
+import { RedisFirmaSessionStore } from './domains/docucore/firmaSession.store.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
@@ -20,6 +21,20 @@ const busSse = new BusSse();
 
 if (process.env.MIGRATE_ON_BOOT !== 'false') {
   await ejecutarMigraciones(pool);
+}
+
+// DOC-01: Verificación estricta fail-fast de conectividad con Redis en producción
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.REDIS_URL) {
+    throw new Error('REDIS_REQUIRED_IN_PRODUCTION: REDIS_URL es obligatoria en entorno de producción para sesiones distribuidas (DOC-01).');
+  }
+  try {
+    const store = RedisFirmaSessionStore.desdeEntorno(process.env.REDIS_URL);
+    await store.ping();
+    console.log('[REDIS] Conexión verificada exitosamente en entorno de producción (DOC-01).');
+  } catch (err: any) {
+    throw new Error(`REDIS_REQUIRED_IN_PRODUCTION: Falló la verificación de conexión con Redis (${process.env.REDIS_URL}): ${err?.message ?? err}`);
+  }
 }
 
 const app = construirApp(pool, busSse);

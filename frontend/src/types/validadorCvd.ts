@@ -23,6 +23,11 @@ export interface ValidacionCVDResult {
   documento: DocumentoValidacionCvd | null;
   selloTiempoTsa: string | null;
   mensajeSeguridad: string;
+  evidencia?: {
+    firmante: string | null;
+    hashSha256: string;
+    fechaSelloTsa: string | null;
+  };
 }
 
 export interface ErrorValidacionCvd {

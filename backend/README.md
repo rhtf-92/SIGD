@@ -1,4 +1,18 @@
 # SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA (SIGD) — BACKEND
+
+## Perfil obligatorio de migraciones para SIGD 2026
+
+El perfil canónico es `BASELINE_2026_V1`: aplica `01 → 02 → 03 → 04 → 05 → BASELINE_2026_V1 → 08`. Los archivos `06_sigd_rut.sql` y `07_sigd_reportes.sql` son históricos y quedan excluidos. Docker Compose ya configura `SIGD_MIGRATION_PROFILE=BASELINE_2026_V1` para el backend.
+
+Para invocar el runner directamente desde PowerShell, configure el perfil en la misma sesión antes de ejecutar el comando:
+
+```powershell
+$env:SIGD_MIGRATION_PROFILE = 'BASELINE_2026_V1'
+npm.cmd run migrate
+```
+
+**Protección operativa:** no ejecute `npm run migrate` sin esa variable. El modo sin perfil se conserva por compatibilidad con las pruebas históricas y escanea también `06/07`; no es el perfil de despliegue SIGD 2026. Verifique el destino de `DATABASE_URL` antes de ejecutar cualquier migración.
+
 ## Instituto de Educación Superior Tecnológico Público "Suiza" (Pucallpa, Ucayali, Perú)
 **Programa de Estudios:** Desarrollo de Sistemas de Información (PE DSI) — Semestre Académico 2026-2  
 **Unidad Didáctica:** Taller de Programación Web / Proyecto Integrador Transversal  

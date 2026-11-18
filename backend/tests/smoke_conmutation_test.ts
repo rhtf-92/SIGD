@@ -46,7 +46,7 @@ async function runSmokeTests() {
   console.log('======================================================================\n');
 
   // Ensure JWT secret is present for authentication tests
-  process.env.AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET || 'sigd_super_secret_jwt_key_iestp_suiza_2026_min_32_chars';
+  process.env.AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET || 'unit-test-secret-not-for-production-min32chars';
 
   const fakePool = {
     query: async (sql: string, params?: unknown[]) => {

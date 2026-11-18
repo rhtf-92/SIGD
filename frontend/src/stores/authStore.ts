@@ -1,12 +1,12 @@
 import { useSyncExternalStore } from "react";
 import { apiClient } from "../api/client";
-import { permisosIniciales } from "../hooks/useRbacConfig";
 
 export interface UsuarioPerfil {
   id: string;
+  idPersona?: string | null;
   nombreCompleto: string;
   correo: string;
-  rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE';
+  rol: 'ADMINISTRADOR' | 'DIRECTOR' | 'SECRETARIO' | 'ESPECIALISTA' | 'MESA_PARTES' | 'CIUDADANO';
   areaId?: string;
 }
 
@@ -102,9 +102,6 @@ function createStore() {
           window.localStorage.setItem("token", data.accessToken);
           if (data.usuario?.rol) {
             window.localStorage.setItem("sigd_rol", data.usuario.rol);
-          }
-          if (!window.localStorage.getItem("sigd_permisos")) {
-            window.localStorage.setItem("sigd_permisos", JSON.stringify(permisosIniciales));
           }
         }
       } catch {

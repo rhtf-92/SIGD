@@ -1,12 +1,6 @@
 // Servicio REST de administración de usuarios institucionales (ENT-M05-02 / T-FE-ADM-03)
 // Sustituye el mock en memoria `usuariosIniciales` por la ruta canónica
-// `GET /api/v1/usuarios` y centraliza el estado servidor con TanStack Query v5.
-//
-// Problema que resuelve: la vista de usuarios carecía de sincronización de caché
-// entre las pantallas de administración y los selectores de usuario de las
-// derivaciones. Las mutaciones se gestionan con `useMutation` e invalidación
-// selectiva de `['admin', 'usuarios']`, de modo que la lista se refresca
-// instantáneamente tras guardar, sin recargar la página.
+// `GET /api/v1/admin/usuarios` y centraliza el estado servidor con TanStack Query v5.
 import {
   useMutation,
   useQuery,
@@ -30,7 +24,7 @@ const RUTA_CANONICA_USUARIOS = "/api/v1/admin/usuarios";
 export const usuariosAdminKeys = {
   todos: ["admin", "usuarios"] as const,
   lista: (filtros: FiltrosUsuarios) => ["admin", "usuarios", filtros] as const,
-  detalle: (id: number) => ["admin", "usuarios", "detalle", id] as const,
+  detalle: (id: string | number) => ["admin", "usuarios", "detalle", String(id)] as const,
 };
 
 function toStringValue(value: unknown, porDefecto = ""): string {
@@ -47,17 +41,16 @@ function toEstadoUsuario(value: unknown): EstadoUsuario {
 }
 
 /**
- * Normaliza el elemento recibido del backend. El servidor puede serializar en
- * `camelCase` o en `snake_case` (convención de PostgreSQL / Express), por lo que
- * ambos se aceptan sin perder información.
+ * Normaliza el elemento recibido del backend.
+ * Soporta identificadores UUID string y serialización camelCase/snake_case.
  */
 function normalizarUsuario(valor: unknown): Usuario | null {
   if (typeof valor !== "object" || valor === null) return null;
   const registro = valor as Record<string, unknown>;
 
   const idCrudo = registro.id ?? registro.idUsuario ?? registro.id_usuario;
-  const id = typeof idCrudo === "number" ? idCrudo : Number(idCrudo);
-  if (!Number.isFinite(id)) return null;
+  if (idCrudo === undefined || idCrudo === null || idCrudo === "") return null;
+  const id = String(idCrudo);
 
   const nombre = toStringValue(registro.nombre ?? registro.nombreCompleto ?? registro.nombre_completo);
   if (nombre === "") return null;
@@ -76,11 +69,12 @@ function normalizarUsuario(valor: unknown): Usuario | null {
   };
 }
 
-/** Extrae el arreglo de usuarios tanto de una respuesta plana como envuelta en `data`. */
+/** Extrae el arreglo de usuarios desde el wrapper canónico `datos` o fallback `data`/`usuarios`/`items`. */
 function extraerUsuarios(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
   if (typeof payload === "object" && payload !== null) {
     const envuelto = payload as Record<string, unknown>;
+    if (Array.isArray(envuelto.datos)) return envuelto.datos;
     if (Array.isArray(envuelto.data)) return envuelto.data;
     if (Array.isArray(envuelto.usuarios)) return envuelto.usuarios;
     if (Array.isArray(envuelto.items)) return envuelto.items;
@@ -95,9 +89,8 @@ export async function listarUsuarios(
   const response = await apiClient.get(RUTA_CANONICA_USUARIOS, {
     params: {
       busqueda: filtros.busqueda || undefined,
-      area: filtros.area || undefined,
-      sede: filtros.sede || undefined,
-      rol: filtros.rol || undefined,
+      areaId: filtros.areaId || undefined,
+      rolId: filtros.rolId || undefined,
       estado: filtros.estado === "Todos" ? undefined : filtros.estado,
     },
     signal,
@@ -109,7 +102,7 @@ export async function listarUsuarios(
 }
 
 export async function actualizarUsuario(
-  id: number,
+  id: string | number,
   cambios: UpdateUsuarioDTO,
 ): Promise<Usuario> {
   const response = await apiClient.put(`${RUTA_CANONICA_USUARIOS}/${id}`, cambios);
@@ -133,7 +126,7 @@ export async function actualizarUsuario(
 }
 
 export async function conmutarEstadoUsuario(
-  id: number,
+  id: string | number,
   cambios: UpdateEstadoDTO,
 ): Promise<Usuario> {
   const estadoBackend = cambios.estado.toUpperCase();
@@ -141,16 +134,16 @@ export async function conmutarEstadoUsuario(
     `${RUTA_CANONICA_USUARIOS}/${id}`,
     { estado: estadoBackend },
   );
-  const normalizado = normalizarUsuario(response.data);
 
+  const normalizado = normalizarUsuario(response.data);
   if (!normalizado) {
     throw new ApiHttpError({
       type: "about:blank",
       title: "Respuesta incompleta del servidor",
       status: 502,
-      detail: "El servidor no devolvió el detalle del usuario con el nuevo estado.",
+      detail: "El servidor no devolvió el detalle del usuario actualizado.",
       instance: `${RUTA_CANONICA_USUARIOS}/${id}`,
-      code: "ERR_USUARIO_ESTADO",
+      code: "ERR_USUARIO_INVALIDO",
       category: "System",
       correlationId: "",
       retryable: true,
@@ -172,10 +165,8 @@ export function useUsuariosQuery(
   });
 }
 
-type VariablesActualizacion = { id: number; cambios: UpdateUsuarioDTO };
+type VariablesActualizacion = { id: string | number; cambios: UpdateUsuarioDTO };
 
-// El snapshot guarda cada lista por su propia clave: la tabla vive en varias
-// claves (una por combinación de filtros) y revertir exige restaurarlas todas.
 type ContextoActualizacion = {
   instantanea: Array<[readonly unknown[], Usuario[] | undefined]>;
 };
@@ -192,20 +183,17 @@ export function useActualizarUsuarioMutation(): UseMutationResult<
     mutationFn: ({ id, cambios }: VariablesActualizacion) =>
       actualizarUsuario(id, cambios),
     onMutate: async ({ id, cambios }: VariablesActualizacion) => {
-      // 1. Cancelar consultas salientes para evitar sobrescrituras de la caché
       await queryClient.cancelQueries({ queryKey: usuariosAdminKeys.todos });
 
-      // 2. Snapshot del estado previo para poder revertir
       const instantanea = queryClient.getQueriesData<Usuario[]>({
         queryKey: usuariosAdminKeys.todos,
       });
 
-      // 3. Actualización optimista de la caché con los cambios aún no confirmados
       queryClient.setQueriesData<Usuario[]>(
         { queryKey: usuariosAdminKeys.todos },
         (actuales) =>
           actuales?.map((usuario) =>
-            usuario.id === id ? { ...usuario, ...cambios } : usuario,
+            String(usuario.id) === String(id) ? { ...usuario, ...cambios } : usuario,
           ),
       );
 
@@ -216,13 +204,11 @@ export function useActualizarUsuarioMutation(): UseMutationResult<
       _variables: VariablesActualizacion,
       contexto: ContextoActualizacion | undefined,
     ) => {
-      // 4. Reversión ante fallo: se restaura cada lista a su valor previo
       contexto?.instantanea.forEach(([clave, datos]) => {
         queryClient.setQueryData(clave, datos);
       });
     },
     onSettled: () => {
-      // 5. Invalidación y refresco con el estado real del servidor
       queryClient.invalidateQueries({ queryKey: usuariosAdminKeys.todos });
     },
   });
@@ -231,7 +217,7 @@ export function useActualizarUsuarioMutation(): UseMutationResult<
 export function useConmutarEstadoMutation(): UseMutationResult<
   Usuario,
   ApiHttpError,
-  { id: number; estado: EstadoUsuario }
+  { id: string | number; estado: EstadoUsuario }
 > {
   const queryClient = useQueryClient();
 
@@ -256,4 +242,79 @@ export function extraerInvalidParams(error: unknown): InvalidParamDetail[] {
     return error.problemDetails.invalidParams ?? [];
   }
   return [];
+}
+
+// Catálogos reales del servidor (H-05 / Codex)
+export interface RolCatalogo {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
+  permisos?: string[];
+}
+
+export interface AreaCatalogo {
+  id: string;
+  sigla: string;
+  nombre: string;
+  padre_id?: string | null;
+  path?: string;
+  estado?: boolean;
+}
+
+export async function listarRolesPermisos(signal?: AbortSignal): Promise<RolCatalogo[]> {
+  const res = await apiClient.get<{ roles?: RolCatalogo[] }>("/api/v1/admin/roles-permisos", { signal });
+  if (Array.isArray(res.data?.roles)) {
+    return res.data.roles;
+  }
+  if (Array.isArray(res.data)) {
+    return res.data as unknown as RolCatalogo[];
+  }
+  return [];
+}
+
+function aplanarOrganigrama(nodos: any[]): AreaCatalogo[] {
+  const resultado: AreaCatalogo[] = [];
+  function recorrer(nodo: any) {
+    if (!nodo) return;
+    const id = String(nodo.id ?? nodo.area_id ?? nodo.areaId ?? "");
+    const nombre = String(nodo.nombre ?? "");
+    const sigla = String(nodo.sigla ?? nodo.codigo ?? "");
+    if (id && nombre) {
+      resultado.push({ id, sigla, nombre });
+    }
+    if (Array.isArray(nodo.children)) {
+      for (const hijo of nodo.children) {
+        recorrer(hijo);
+      }
+    }
+  }
+  for (const n of nodos) {
+    recorrer(n);
+  }
+  return resultado;
+}
+
+export async function listarOrganigramaAreas(signal?: AbortSignal): Promise<AreaCatalogo[]> {
+  const res = await apiClient.get<any[]>("/api/v1/admin/organigrama", { signal });
+  if (Array.isArray(res.data)) {
+    return aplanarOrganigrama(res.data);
+  }
+  return [];
+}
+
+export function useRolesPermisosQuery() {
+  return useQuery({
+    queryKey: ["admin", "roles-permisos"],
+    queryFn: ({ signal }) => listarRolesPermisos(signal),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useOrganigramaAreasQuery() {
+  return useQuery({
+    queryKey: ["admin", "organigrama-areas"],
+    queryFn: ({ signal }) => listarOrganigramaAreas(signal),
+    staleTime: 5 * 60 * 1000,
+  });
 }

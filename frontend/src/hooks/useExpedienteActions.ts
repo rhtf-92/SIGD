@@ -3,13 +3,14 @@ import { QueryClient, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { crearServicioExpedienteActions } from "../api/expedienteActions";
 import { ErrorAccionExpediente } from "../types/expedienteActions";
-import type { AccionExpediente, NotificacionExpediente, SolicitudAcumulacion, SolicitudDerivacion, SolicitudObservacion, UseExpedienteActionsOptions } from "../types/expedienteActions";
+import type { AccionExpediente, NotificacionExpediente, SolicitudAcumulacion, SolicitudDerivacion, SolicitudObservacion, SolicitudSubsanacion, UseExpedienteActionsOptions } from "../types/expedienteActions";
 import { adaptarErrorAccion } from "../utils/expedienteActions";
 
 const servicioSinContratos = crearServicioExpedienteActions();
 const bloqueos = new WeakMap<QueryClient, Set<string>>();
 const idsDerivacion = (entrada: SolicitudDerivacion) => [entrada.expediente.id];
 const idsObservacion = (entrada: SolicitudObservacion) => [entrada.expediente.id];
+const idsSubsanacion = (entrada: SolicitudSubsanacion) => [entrada.expediente.id];
 const idsAcumulacion = (entrada: SolicitudAcumulacion) => [entrada.principal.id, ...entrada.conexos.map((item) => item.id)];
 
 function useAccion<Entrada, Salida>(
@@ -64,6 +65,7 @@ export function useExpedienteActions(opciones: UseExpedienteActionsOptions) {
   }
   const derivacion = useAccion(servicio.derivar, idsDerivacion, "La derivación fue registrada correctamente.", opciones, notificar);
   const observacion = useAccion(servicio.observar, idsObservacion, "La observación fue registrada. El servidor confirmó la suspensión temporal del SLA.", opciones, notificar);
+  const subsanacion = useAccion(servicio.subsanar, idsSubsanacion, "La subsanación fue registrada correctamente.", opciones, notificar);
   const acumulacion = useAccion(servicio.acumular, idsAcumulacion, "La acumulación fue registrada correctamente.", opciones, notificar);
-  return { derivacion, observacion, acumulacion, notificacion, limpiarNotificacion: () => setNotificacion(null) };
+  return { derivacion, observacion, subsanacion, acumulacion, notificacion, limpiarNotificacion: () => setNotificacion(null) };
 }

@@ -75,7 +75,8 @@ function procesarCola(error: unknown, token: string | null) {
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: unknown) => {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
+    if (axios.isAxiosError(error) && error.response?.status === 401 &&
+        !/\/auth\/(login|registro-ciudadano|registro-persona-juridica)(?:\?|$)/.test(error.config?.url ?? "")) {
       const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
       if (!(originalRequest.url?.includes("/auth/refresh") || originalRequest._retry)) {

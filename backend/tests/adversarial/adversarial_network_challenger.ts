@@ -36,7 +36,7 @@ async function runAdversarialChallenger() {
   console.log('CHALLENGER 1: EMPIRICAL ADVERSARIAL NETWORK & HTTP HARNESS');
   console.log('======================================================================\n');
 
-  const JWT_SECRET = 'sigd_super_secret_jwt_key_iestp_suiza_2026_min_32_chars';
+  const JWT_SECRET = process.env.AUTH_JWT_SECRET || 'unit-test-secret-not-for-production-min32chars';
   process.env.AUTH_JWT_SECRET = JWT_SECRET;
 
   const fakePool = {
