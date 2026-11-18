@@ -19,6 +19,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { TechnicalDetails } from '../../components/ui/TechnicalDetails';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { ContextualHelp } from '../../components/ui/ContextualHelp';
+import ConsultaCutIllustration from '../../components/tramite/ConsultaCutIllustration';
 import consultaCutImg from '../../assets/sigd/consulta-cut.webp';
 
 export interface DtoDocumentoPublico {
@@ -219,34 +220,61 @@ export default function ConsultaPublicaPage() {
     <main className="min-h-screen bg-surface-page py-8 px-4 sm:px-6 lg:px-8 text-slate-900">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Cabecera Institucional */}
-        <header className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-            <div>
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900 border border-blue-200 mb-2.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-blue-800" />
-                Consulta Pública de Trámites y Expedientes
+        <header className="rounded-3xl border border-slate-200 bg-white shadow-md overflow-hidden">
+          {/* Banner institucional */}
+          <div className="relative bg-gradient-to-br from-[#0a2f6b] via-[#0b4f9e] to-[#1473d6] px-6 py-7 sm:px-9 sm:py-9 text-white">
+            <div className="pointer-events-none absolute -right-10 -top-12 h-52 w-52 rounded-full bg-white/10" />
+            <div className="pointer-events-none absolute right-24 -bottom-16 h-40 w-40 rounded-full bg-amber-300/15" />
+            <div className="pointer-events-none absolute left-0 bottom-0 h-1.5 w-full bg-gradient-to-r from-amber-300 via-amber-400 to-transparent" />
+
+            <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur px-3 py-1 text-xs font-bold text-white border border-white/25 mb-3">
+                  <ShieldCheck className="h-3.5 w-3.5 text-amber-300" />
+                  Consulta Pública de Trámites y Expedientes
+                </div>
+                <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
+                  Consulta tu trámite <span className="text-amber-300">en línea</span>
+                </h1>
+                <p className="text-xs sm:text-sm text-blue-100 mt-2 max-w-xl">
+                  IESTP &quot;Suiza&quot; — Sede Digital y Transparencia Documentaria
+                  <span className="block text-[11px] text-blue-200/90 mt-0.5">Ley N° 27444 · Ley N° 29733</span>
+                </p>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Consulta tu trámite en línea
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                IESTP &quot;Suiza&quot; — Sede Digital y Transparencia Documentaria (Ley N° 27444 / Ley N° 29733)
-              </p>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link to="/mesa-partes">
+                  <Button variant="secondary" size="sm" className="bg-white text-blue-950 border-white hover:bg-blue-50 font-bold shadow-sm">
+                    Mesa de Partes
+                  </Button>
+                </Link>
+                <Link to="/">
+                  <Button variant="ghost" size="sm" className="text-white hover:bg-white/15">
+                    <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+                    Inicio
+                  </Button>
+                </Link>
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Link to="/mesa-partes">
-                <Button variant="secondary" size="sm" className="border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold">
-                  Mesa de Partes
-                </Button>
-              </Link>
-              <Link to="/">
-                <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
-                  <ArrowLeft className="h-3.5 w-3.5 mr-1" />
-                  Inicio
-                </Button>
-              </Link>
-            </div>
+
+            {/* Pasos guiados */}
+            <ol className="relative mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              {[
+                ['1', 'Ingresa tu CUT', 'Lo encuentras en tu cargo de recepción'],
+                ['2', 'Valida tu documento', 'DNI, CE o RUC del titular'],
+                ['3', 'Revisa el avance', 'Estado, área y pago en tiempo real'],
+              ].map(([n, t, d]) => (
+                <li key={n} className="flex items-center gap-3 rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 backdrop-blur-sm">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-300 text-blue-950 font-black">{n}</span>
+                  <span>
+                    <strong className="block text-white">{t}</strong>
+                    <span className="text-blue-100">{d}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
           </div>
+
+          <div className="p-6 sm:p-8 space-y-6">
 
           {/* Formulario de Búsqueda Seguro (CUT + Documento) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
@@ -305,16 +333,8 @@ export default function ConsultaPublicaPage() {
               </div>
             </form>
 
-            <div className="hidden lg:flex lg:col-span-4 justify-center items-center p-3 rounded-2xl bg-gradient-to-br from-blue-50/50 to-slate-50 border border-blue-100">
-              <img
-                src={consultaCutImg}
-                alt="Consulta CUT SIGD"
-                width={176}
-                height={176}
-                loading="lazy"
-                decoding="async"
-                className="h-44 w-auto object-contain drop-shadow-xs aspect-square"
-              />
+            <div className="hidden lg:flex lg:col-span-4 justify-center items-center p-2 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-amber-50/60 border border-blue-100 shadow-2xs">
+              <ConsultaCutIllustration className="h-56 w-auto" />
             </div>
           </div>
 
@@ -327,6 +347,7 @@ export default function ConsultaPublicaPage() {
               />
             </div>
           )}
+          </div>
         </header>
 
         {/* Loading skeleton */}
