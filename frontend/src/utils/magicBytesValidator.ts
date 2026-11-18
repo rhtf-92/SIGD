@@ -1,0 +1,1 @@
+export { validatePdfMagicBytes } from "./fileValidation";

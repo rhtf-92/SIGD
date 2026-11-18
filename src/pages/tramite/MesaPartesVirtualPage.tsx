@@ -18,6 +18,7 @@ function formatStatus(status: UploadStatus): string {
   const labels: Record<UploadStatus, string> = {
     idle: "Pendiente de archivo",
     validating: "Validando archivo",
+    hashing: "Calculando SHA-256 local",
     "requesting-url": "Solicitando URL prefirmada",
     uploading: "Subiendo a almacenamiento",
     success: "Carga validada y completada",
@@ -77,15 +78,15 @@ export default function MesaPartesVirtualPage() {
               ← Volver al inicio
             </Link>
             <span className="rounded-full border border-amber-300/50 bg-amber-300/10 px-3 py-2 text-xs font-semibold text-amber-200">
-              DEMO CONTROLADA · BACKEND NO DISPONIBLE
+              API DE PRESIGNED URL REQUERIDA
             </span>
           </div>
         </header>
 
         <section className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-          La URL prefirmada y la transferencia MinIO/S3 se simulan localmente
-          para la demostración. Las validaciones Magic Bytes, SHA-256,
-          cancelación y cálculo horario se ejecutan realmente en el navegador.
+          Magic Bytes y SHA-256 se calculan en el navegador. La carga solicita
+          POST /v1/storage/presigned-url al backend y transfiere el PDF
+          directamente a la URL firmada devuelta por el servicio.
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -131,7 +132,6 @@ export default function MesaPartesVirtualPage() {
             </div>
             <FileUploadDropzone
               categoria="EXPEDIENTE_INGRESO"
-              demoMode
               onUploaded={setUploaded}
               onStatusChange={handleUploadStatus}
             />
@@ -235,9 +235,9 @@ export default function MesaPartesVirtualPage() {
           </div>
           {uploaded && (
             <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-              <strong>Demostración completada:</strong> el archivo{" "}
+              <strong>Documento cargado:</strong> el archivo{" "}
               <code>{uploaded.file.name}</code> pasó Magic Bytes, generó
-              SHA-256 y obtuvo una clave simulada{" "}
+              SHA-256 y obtuvo una clave del almacenamiento{" "}
               <code>{uploaded.s3Key}</code>.
             </div>
           )}
@@ -245,7 +245,7 @@ export default function MesaPartesVirtualPage() {
 
         <footer className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
           <strong>Evidencia / estado de pruebas:</strong> suite M2 disponible
-          en <code>src/tests/m2</code>. Ejecuta <code>npm test</code> para
+          en <code>tests/unit</code> y <code>tests/integration/m2</code>. Ejecuta <code>npm test</code> para
           verificar Magic Bytes, SHA-256, cancelación y casos 16:29, 16:30,
           posterior y día inhábil.
         </footer>

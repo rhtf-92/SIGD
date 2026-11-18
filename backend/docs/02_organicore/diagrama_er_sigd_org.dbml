@@ -1,0 +1,90 @@
+// Diagrama DBML Refactorizado - OrganiCore (sigd_org)
+
+Table sigd_org_area {
+  id_area uuid [pk, default: `gen_random_uuid()`]
+  nombre varchar(150) [not null]
+  sigla varchar(20) [not null, unique]
+  parent_id uuid [ref: > sigd_org_area.id_area]
+  path ltree [not null]
+  nivel_organizacional int [not null]
+  activo boolean [not null, default: true]
+  creado_en timestamptz [not null, default: `now()`]
+  actualizado_en timestamptz [not null, default: `now()`]
+}
+
+Table sigd_org_cargo {
+  cargo_id uuid [pk, default: `gen_random_uuid()`]
+  nombre varchar(100) [not null, unique]
+  descripcion text
+  activo boolean [not null, default: true]
+  creado_en timestamptz [not null, default: `now()`]
+}
+
+Table sigd_org_asignacion_personal {
+  asignacion_id uuid [pk, default: `gen_random_uuid()`]
+  cuenta_id uuid [not null]
+  id_area uuid [ref: > sigd_org_area.id_area, not null]
+  cargo_id uuid [ref: > sigd_org_cargo.cargo_id, not null]
+  es_titular boolean [not null, default: true]
+  vigencia tstzrange [not null]
+  activo boolean [not null, default: true]
+}
+
+Table sigd_org_facultad_despacho {
+  facultad_id uuid [pk, default: `gen_random_uuid()`]
+  codigo varchar(60) [not null, unique]
+  nombre varchar(150) [not null]
+  cargo_id uuid [ref: > sigd_org_cargo.cargo_id, not null]
+  puede_firmar boolean [not null, default: false]
+  vigente_desde date [not null]
+  vigente_hasta date
+  activo boolean [not null, default: true]
+}
+
+Table sigd_org_encargatura_despacho {
+  encargatura_id uuid [pk, default: `gen_random_uuid()`]
+  id_area uuid [ref: > sigd_org_area.id_area, not null]
+  cargo_id uuid [ref: > sigd_org_cargo.cargo_id, not null]
+  facultad_despacho_id uuid [ref: > sigd_org_facultad_despacho.facultad_id, not null]
+  usuario_titular_id uuid [not null]
+  usuario_suplente_id uuid [not null]
+  tipo_delegacion varchar(40) [not null]
+  resolucion_ref varchar(120) [not null]
+  periodo_vigencia tstzrange [not null]
+  activo boolean [not null, default: true]
+}
+
+Table sigd_org_rol_sistema {
+  rol_id uuid [pk, default: `gen_random_uuid()`]
+  codigo varchar(50) [not null, unique]
+  nombre varchar(100) [not null]
+  descripcion text
+  activo boolean [not null, default: true]
+}
+
+Table sigd_org_permiso_sistema {
+  permiso_id uuid [pk, default: `gen_random_uuid()`]
+  codigo varchar(80) [not null, unique]
+  descripcion text
+  alcance_predeterminado varchar(20) [not null, default: 'AREA']
+  activo boolean [not null, default: true]
+}
+
+Table sigd_org_rol_permiso {
+  rol_id uuid [ref: > sigd_org_rol_sistema.rol_id, not null]
+  permiso_id uuid [ref: > sigd_org_permiso_sistema.permiso_id, not null]
+
+  indexes {
+    (rol_id, permiso_id) [pk]
+  }
+}
+
+Table sigd_org_usuario_rol {
+  cuenta_id uuid [not null]
+  rol_id uuid [ref: > sigd_org_rol_sistema.rol_id, not null]
+  vigencia tstzrange [not null]
+
+  indexes {
+    (cuenta_id, rol_id) [pk]
+  }
+}

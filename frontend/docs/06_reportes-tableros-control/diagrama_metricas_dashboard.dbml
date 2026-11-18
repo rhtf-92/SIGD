@@ -1,0 +1,37 @@
+// Diagrama de Estructura de Datos para Indicadores y Reportes
+// Proyecto: SIGD - Módulo Reportes y Tableros de Control
+
+Table kpi_resumen {
+  id int [pk, increment]
+  codigo_kpi varchar(20) [not null, unique]
+  nombre varchar(100) [not null]
+  valor_actual decimal(10,2) [not null]
+  meta decimal(10,2)
+  unidad_medida varchar(20) // %, Horas, Cantidad
+  fecha_calculo timestamp [default: `now()`]
+}
+
+Table registros_reportes {
+  id int [pk, increment]
+  codigo_documento varchar(50) [not null]
+  estado varchar(30) [not null] // COMPLETADO, EN_PROCESO, PENDIENTE
+  categoria_id int [not null]
+  fecha_creacion timestamp [not null]
+  fecha_cierre timestamp
+  tiempo_atencion_horas decimal(8,2)
+}
+
+Table historico_metricas_diarias {
+  id int [pk, increment]
+  fecha date [not null]
+  total_procesados int [default: 0]
+  total_pendientes int [default: 0]
+  promedio_tiempo_horas decimal(5,2)
+}
+
+Table categorias {
+  id int [pk, increment]
+  nombre_categoria varchar(50) [not null]
+}
+
+Ref: registros_reportes.categoria_id > categorias.id

@@ -4,7 +4,7 @@ export default function HeaderInstitucional() {
   const navigate = useNavigate();
 
   return (
-    <header className="header-sigd bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-md">
+    <header className="header-sigd bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-md print:hidden">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
         <div
           className="flex cursor-pointer items-center gap-3"

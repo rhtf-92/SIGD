@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 
 export const LIMA_TIME_ZONE = "America/Lima";
 export const CORTE_MINUTES = 16 * 60 + 30;
+export const INICIO_ATENCION_MINUTES = 8 * 60;
+export const INICIO_ULTIMOS_MINUTOS = 16 * 60 + 15;
+const SERVER_CLOCK_SYNC_INTERVAL_MS = 60_000;
+const CLOCK_TICK_INTERVAL_MS = 1_000;
+
+export type ServerTimeProvider = () => Promise<Date | null>;
 
 export interface HorarioCorteResult {
   technicalTimestamp: string;
@@ -10,12 +16,18 @@ export interface HorarioCorteResult {
   isAfterCutoff: boolean;
   requiresProjection: boolean;
   legalDate: string;
+  isHorarioHabil: boolean;
+  isUltimosMinutos: boolean;
+  isExtemporaneo: boolean;
+  fechaJuridicaRecepcion: string;
+  serverTime: Date;
 }
 
 interface LimaParts {
   date: string;
   hour: number;
   minute: number;
+  second: number;
   weekday: number;
 }
 
@@ -26,6 +38,7 @@ const limaFormatter = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
+  second: "2-digit",
   hourCycle: "h23",
   weekday: "short",
 });
@@ -42,6 +55,7 @@ function getLimaParts(date: Date): LimaParts {
     date: `${parts.year}-${parts.month}-${parts.day}`,
     hour: Number(parts.hour),
     minute: Number(parts.minute),
+    second: Number(parts.second),
     weekday,
   };
 }
@@ -76,36 +90,115 @@ export function calculateHorarioCorte(
   const holidaySet = new Set(holidays);
   const isNonBusinessDay =
     parts.weekday === 0 || parts.weekday === 6 || holidaySet.has(parts.date);
-  const isAfterCutoff =
-    parts.hour * 60 + parts.minute >= CORTE_MINUTES;
+  const minutesOfDay = parts.hour * 60 + parts.minute;
+  const secondsOfDay = minutesOfDay * 60 + parts.second;
+  const isAfterCutoff = minutesOfDay >= CORTE_MINUTES;
   const requiresProjection = isNonBusinessDay || isAfterCutoff;
   const legalDate = requiresProjection
     ? getNextBusinessDate(parts.date, holidaySet)
     : parts.date;
+  const isHorarioHabil =
+    !isNonBusinessDay &&
+    minutesOfDay >= INICIO_ATENCION_MINUTES &&
+    minutesOfDay < CORTE_MINUTES;
+  const isUltimosMinutos =
+    isHorarioHabil &&
+    secondsOfDay >= INICIO_ULTIMOS_MINUTOS * 60 &&
+    secondsOfDay < CORTE_MINUTES * 60;
+  const legalTimestamp = `${legalDate}T08:00:00-05:00`;
 
   return {
     technicalTimestamp: now.toISOString(),
-    legalTimestamp: `${legalDate}T08:00:00-05:00`,
+    legalTimestamp,
     isNonBusinessDay,
     isAfterCutoff,
     requiresProjection,
     legalDate,
+    isHorarioHabil,
+    isUltimosMinutos,
+    isExtemporaneo: requiresProjection,
+    fechaJuridicaRecepcion: legalTimestamp,
+    serverTime: now,
   };
 }
 
+export function formatFechaJuridicaRecepcion(timestamp: string): string {
+  return new Intl.DateTimeFormat("es-PE", {
+    timeZone: LIMA_TIME_ZONE,
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(new Date(timestamp));
+}
+
+async function fetchServerTime(): Promise<Date | null> {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  if (!apiBaseUrl || typeof fetch === "undefined") return null;
+
+  const response = await fetch(apiBaseUrl, { method: "HEAD", cache: "no-store" });
+  const dateHeader = response.headers.get("Date");
+  if (!dateHeader) return null;
+
+  const serverTime = new Date(dateHeader);
+  return Number.isNaN(serverTime.getTime()) ? null : serverTime;
+}
+
 export function useHorarioCorte(
-  now: Date = new Date(),
+  now?: Date,
   holidays: readonly string[] = [],
+  serverTimeProvider: ServerTimeProvider = fetchServerTime,
 ) {
-  const [currentTime, setCurrentTime] = useState(now);
+  const [clientTime, setClientTime] = useState(() => now ?? new Date());
+  const [serverOffsetMs, setServerOffsetMs] = useState<number | null>(null);
+  const [clockSyncFailed, setClockSyncFailed] = useState(false);
 
   useEffect(() => {
-    const interval = window.setInterval(() => setCurrentTime(new Date()), 30_000);
-    return () => window.clearInterval(interval);
-  }, []);
+    let isMounted = true;
+
+    const synchronizeClock = async () => {
+      const requestStartedAt = Date.now();
+      try {
+        const timestamp = await serverTimeProvider();
+        const responseReceivedAt = Date.now();
+        if (isMounted && timestamp) {
+          const requestMidpoint = (requestStartedAt + responseReceivedAt) / 2;
+          setServerOffsetMs(timestamp.getTime() - requestMidpoint);
+          setClockSyncFailed(false);
+        } else if (isMounted) {
+          setClockSyncFailed(true);
+        }
+      } catch {
+        if (isMounted) setClockSyncFailed(true);
+      }
+    };
+
+    void synchronizeClock();
+    const clockInterval = window.setInterval(
+      () => setClientTime(new Date()),
+      CLOCK_TICK_INTERVAL_MS,
+    );
+    const syncInterval = window.setInterval(
+      () => void synchronizeClock(),
+      SERVER_CLOCK_SYNC_INTERVAL_MS,
+    );
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(clockInterval);
+      window.clearInterval(syncInterval);
+    };
+  }, [serverTimeProvider]);
+
+  const serverTime = useMemo(
+    () => new Date(clientTime.getTime() + (serverOffsetMs ?? 0)),
+    [clientTime, serverOffsetMs],
+  );
 
   return useMemo(
-    () => calculateHorarioCorte(currentTime, holidays),
-    [currentTime, holidays],
+    () => ({
+      ...calculateHorarioCorte(serverTime, holidays),
+      isClockSynchronized: serverOffsetMs !== null || now !== undefined,
+      isClockSyncUnavailable: clockSyncFailed && serverOffsetMs === null && now === undefined,
+    }),
+    [serverTime, holidays, serverOffsetMs, clockSyncFailed, now],
   );
 }

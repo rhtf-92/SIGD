@@ -18,10 +18,9 @@
     "skipLibCheck": true,
     "noEmit": true,
     "ignoreDeprecations": "5.0",
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx", "vite.config.ts", "vitest.config.ts"]
 }

@@ -108,8 +108,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         searchInputRef.current?.focus();
       }, 50);
       return () => clearTimeout(timer);
-    } else {
-      setSearchTerm("");
     }
   }, [isOpen]);
 
@@ -188,7 +186,10 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           error ? errorId : helperText ? helperId : undefined
         }
         disabled={disabled}
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => {
+          setSearchTerm("");
+          setIsOpen((prev) => !prev);
+        }}
         className={`flex w-full items-center justify-between rounded-lg border bg-white px-3.5 py-2 text-left text-sm transition-colors cursor-pointer
           focus:outline-none focus:ring-2 focus:ring-offset-1
           disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400

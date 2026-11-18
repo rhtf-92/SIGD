@@ -12,10 +12,19 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     globals: true,
-    setupFiles: "./src/tests/setup.ts",
+    setupFiles: "./tests/setup.ts",
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

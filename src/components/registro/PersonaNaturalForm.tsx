@@ -81,20 +81,15 @@ export default function PersonaNaturalForm({
       className="space-y-6"
       noValidate
     >
+      <h2 className="reg-sec">Datos del solicitante</h2>
+
       {/* Tipo de Documento y Número de Documento */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="tipoDocumento"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Tipo de Documento *
+          <label htmlFor="tipoDocumento" className="block mb-1">
+            Tipo de Documento <span className="reg-req">*</span>
           </label>
-          <select
-            id="tipoDocumento"
-            {...register("tipoDocumento")}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] focus:border-[#006EC7] outline-none"
-          >
+          <select id="tipoDocumento" {...register("tipoDocumento")}>
             <option value="DNI">DNI</option>
             <option value="CE">CE</option>
           </select>
@@ -106,19 +101,14 @@ export default function PersonaNaturalForm({
         </div>
 
         <div>
-          <label
-            htmlFor="numeroDocumento"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Número de Documento *
+          <label htmlFor="numeroDocumento" className="block mb-1">
+            Número de Documento <span className="reg-req">*</span>
           </label>
           <input
             id="numeroDocumento"
             type="text"
             {...register("numeroDocumento")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.numeroDocumento ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.numeroDocumento ? "is-bad" : ""}
             placeholder="DNI: 8 dígitos o CE: 9-12 caracteres"
           />
           {errors.numeroDocumento && (
@@ -132,19 +122,14 @@ export default function PersonaNaturalForm({
       {/* Nombres y Apellidos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="nombres"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Nombres *
+          <label htmlFor="nombres" className="block mb-1">
+            Nombres <span className="reg-req">*</span>
           </label>
           <input
             id="nombres"
             type="text"
             {...register("nombres")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.nombres ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.nombres ? "is-bad" : ""}
           />
           {errors.nombres && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -154,19 +139,14 @@ export default function PersonaNaturalForm({
         </div>
 
         <div>
-          <label
-            htmlFor="apellidos"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Apellidos *
+          <label htmlFor="apellidos" className="block mb-1">
+            Apellidos <span className="reg-req">*</span>
           </label>
           <input
             id="apellidos"
             type="text"
             {...register("apellidos")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.apellidos ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.apellidos ? "is-bad" : ""}
           />
           {errors.apellidos && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -179,19 +159,14 @@ export default function PersonaNaturalForm({
       {/* Fecha de Nacimiento y Correo */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="fechaNacimiento"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Fecha de Nacimiento *
+          <label htmlFor="fechaNacimiento" className="block mb-1">
+            Fecha de Nacimiento <span className="reg-req">*</span>
           </label>
           <input
             id="fechaNacimiento"
             type="date"
             {...register("fechaNacimiento")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.fechaNacimiento ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.fechaNacimiento ? "is-bad" : ""}
           />
           {errors.fechaNacimiento && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -201,19 +176,14 @@ export default function PersonaNaturalForm({
         </div>
 
         <div>
-          <label
-            htmlFor="correo"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Correo Electrónico *
+          <label htmlFor="correo" className="block mb-1">
+            Correo Electrónico <span className="reg-req">*</span>
           </label>
           <input
             id="correo"
             type="email"
             {...register("correo")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.correo ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.correo ? "is-bad" : ""}
           />
           {errors.correo && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -225,19 +195,14 @@ export default function PersonaNaturalForm({
 
       {/* Celular */}
       <div>
-        <label
-          htmlFor="celular"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          Celular *
+        <label htmlFor="celular" className="block mb-1">
+          Celular <span className="reg-req">*</span>
         </label>
         <input
           id="celular"
           type="tel"
           {...register("celular")}
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-            errors.celular ? "border-red-500" : "border-gray-300"
-          }`}
+          className={errors.celular ? "is-bad" : ""}
           placeholder="987654321"
         />
         {errors.celular && (
@@ -246,6 +211,8 @@ export default function PersonaNaturalForm({
           </p>
         )}
       </div>
+
+      <h2 className="reg-sec">Ubicación y domicilio</h2>
 
       {/* Sección de Domicilio */}
       <UbigeoSelector
@@ -256,19 +223,14 @@ export default function PersonaNaturalForm({
 
       {/* Dirección Exacta */}
       <div>
-        <label
-          htmlFor="direccionExacta"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          Dirección Exacta *
+        <label htmlFor="direccionExacta" className="block mb-1">
+          Dirección Exacta <span className="reg-req">*</span>
         </label>
         <input
           id="direccionExacta"
           type="text"
           {...register("domicilio.direccionExacta")}
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-            errors.domicilio?.direccionExacta ? "border-red-500" : "border-gray-300"
-          }`}
+          className={errors.domicilio?.direccionExacta ? "is-bad" : ""}
           placeholder="Ej. Jr. Tarapacá N° 645"
         />
         {errors.domicilio?.direccionExacta && (
@@ -280,22 +242,20 @@ export default function PersonaNaturalForm({
 
       {/* Referencia */}
       <div>
-        <label
-          htmlFor="referencia"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
+        <label htmlFor="referencia" className="block mb-1">
           Referencia
         </label>
         <input
           id="referencia"
           type="text"
           {...register("domicilio.referencia")}
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none"
         />
       </div>
 
+      <h2 className="reg-sec">Declaraciones</h2>
+
       {/* Checkboxes */}
-      <div className="space-y-4">
+      <div className="reg-legal">
         <DeclaracionJuradaCheckbox
           checked={declaracionJuradaAceptada}
           onChange={(checked) =>
@@ -313,7 +273,6 @@ export default function PersonaNaturalForm({
               type="checkbox"
               checked={consentimientoLey29733}
               onChange={(e) => handleConsentimientoChange(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-[#006EC7] focus:ring-[#006EC7]"
             />
             <span className="text-sm text-gray-700">
               He leído y acepto el consentimiento de tratamiento de datos
@@ -323,7 +282,7 @@ export default function PersonaNaturalForm({
           <button
             type="button"
             onClick={() => setIsConsentimientoModalOpen(true)}
-            className="text-sm text-[#006EC7] underline text-left ml-7"
+            className="reg-link"
           >
             Ver política de tratamiento de datos personales
           </button>
@@ -348,13 +307,6 @@ export default function PersonaNaturalForm({
           !consentimientoLey29733 ||
           isSubmitting
         }
-        className={`w-full py-3 px-4 text-sm font-semibold text-white rounded-md transition-colors ${
-          !declaracionJuradaAceptada ||
-          !consentimientoLey29733 ||
-          isSubmitting
-            ? "bg-gray-400 cursor-not-allowed"
-            : "bg-[#006EC7] hover:bg-[#005ba8]"
-        }`}
       >
         Registrar y Crear Casilla
       </button>

@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
 import UserEditModal from "../../components/administracion/UserEditModal";
 import {
@@ -6,6 +8,7 @@ import {
   CATALOGO_SEDES,
   useUsuariosAdmin,
 } from "../../hooks/useUsuariosAdmin";
+import type { ApiHttpError } from "../../types/api";
 import type { EstadoUsuario } from "../../types/usuarioAdmin";
 
 function estiloEstado(estado: EstadoUsuario) {
@@ -15,20 +18,59 @@ function estiloEstado(estado: EstadoUsuario) {
 }
 
 export default function UsuariosPage() {
+  const [mensaje, setMensaje] = useState("");
+  const [errorServidor, setErrorServidor] = useState("");
+
   const {
     usuarios,
     totalUsuarios,
     busqueda,
     setBusqueda,
+    area,
+    setArea,
+    sede,
+    setSede,
+    rol,
+    setRol,
     estado,
     setEstado,
     usuarioEditando,
     setUsuarioEditando,
     actualizarUsuario,
     conmutarEstado,
-    mensaje,
-    setMensaje,
+    isLoading,
+    isFetching,
+    error,
+    guardarPendiente,
   } = useUsuariosAdmin();
+
+  async function guardar(usuarioActualizado: Parameters<typeof actualizarUsuario>[0]) {
+    setErrorServidor("");
+    try {
+      await actualizarUsuario(usuarioActualizado);
+      setUsuarioEditando(null);
+      setMensaje("Los cambios fueron registrados correctamente.");
+    } catch (error) {
+      // El error se propaga para que el modal mapee los `invalidParams` de
+      // RFC 7807 al campo infractor; aquí solo se informa el fallo global.
+      setMensaje("");
+      setErrorServidor(
+        "No se pudo guardar la modificación. Revise los campos marcados e intente nuevamente.",
+      );
+      throw error;
+    }
+  }
+
+  async function alternarEstado(id: number) {
+    setErrorServidor("");
+    try {
+      await conmutarEstado(id);
+      setMensaje("El estado operativo fue actualizado.");
+    } catch {
+      setMensaje("");
+      setErrorServidor("No se pudo conmutar el estado del usuario.");
+    }
+  }
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -43,19 +85,49 @@ export default function UsuariosPage() {
             Directorio institucional de {totalUsuarios} cuentas registradas.
             Búsqueda en tiempo real y filtro por estado operativo.
           </p>
-          <span className="rounded-lg bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700">
-            Datos de demostración hasta integrar GET /api/v1/usuarios
-          </span>
+          {isFetching && !isLoading && (
+            <span
+              role="status"
+              aria-live="polite"
+              className="rounded-lg bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700"
+            >
+              Consultando directorio institucional...
+            </span>
+          )}
         </div>
 
         {mensaje && (
-          <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+          >
             {mensaje}
           </div>
         )}
 
+        {errorServidor && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {errorServidor}
+          </div>
+        )}
+
+        {error && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            No fue posible consultar el directorio institucional. Intente nuevamente.
+          </div>
+        )}
+
         <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <div>
               <label htmlFor="busqueda" className="mb-2 block text-sm font-semibold">
                 Buscar usuario
@@ -67,6 +139,63 @@ export default function UsuariosPage() {
                 placeholder="Nombre, DNI, correo o área"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600"
               />
+            </div>
+
+            <div>
+              <label htmlFor="area" className="mb-2 block text-sm font-semibold">
+                Unidad orgánica
+              </label>
+              <select
+                id="area"
+                value={area}
+                onChange={(event) => setArea(event.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              >
+                <option value="">Todas</option>
+                {CATALOGO_AREAS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="sede" className="mb-2 block text-sm font-semibold">
+                Sede
+              </label>
+              <select
+                id="sede"
+                value={sede}
+                onChange={(event) => setSede(event.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              >
+                <option value="">Todas</option>
+                {CATALOGO_SEDES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="rol" className="mb-2 block text-sm font-semibold">
+                Rol asignado
+              </label>
+              <select
+                id="rol"
+                value={rol}
+                onChange={(event) => setRol(event.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              >
+                <option value="">Todos</option>
+                {CATALOGO_ROLES_USUARIOS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -114,58 +243,95 @@ export default function UsuariosPage() {
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-100">
-                {usuarios.map((usuario) => (
-                  <tr key={usuario.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-semibold">{usuario.nombre}</p>
-                      <p className="text-xs text-slate-500">{usuario.correo}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm">{usuario.dni}</td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium">{usuario.area}</p>
-                      <p className="text-xs text-slate-500">{usuario.sede}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      {usuario.cargo}
-                    </td>
-                    <td className="px-6 py-4 text-sm">{usuario.rol}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${estiloEstado(
-                          usuario.estado,
-                        )}`}
-                      >
-                        {usuario.estado}
+              <tbody className="divide-y divide-slate-100" aria-busy={isLoading}>
+                {isLoading && (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-10 text-center">
+                      <span className="sr-only">
+                        Cargando directorio institucional de usuarios...
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      {usuario.ultimoAcceso}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMensaje("");
-                            setUsuarioEditando({ ...usuario });
-                          }}
-                          className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                        >
-                          Administrar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => conmutarEstado(usuario.id)}
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                          title="Conmutar estado (Activo → Inactivo → Bloqueado)"
-                        >
-                          Conmutar estado
-                        </button>
+                      <div className="mx-auto w-full max-w-md space-y-2" aria-hidden="true">
+                        {[0, 1, 2].map((fila) => (
+                          <div
+                            key={fila}
+                            className="h-10 animate-pulse rounded-lg bg-slate-200"
+                          />
+                        ))}
                       </div>
                     </td>
                   </tr>
-                ))}
+                )}
+
+                {!isLoading && usuarios.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-10 text-center">
+                      <div className="rounded-lg bg-blue-50 px-6 py-8 text-blue-600">
+                        <p className="font-semibold">
+                          No se registran usuarios institucionales
+                        </p>
+                        <p className="mt-1 text-sm">
+                          Ajuste los filtros o consulte nuevamente para obtener
+                          resultados.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading &&
+                  usuarios.map((usuario) => (
+                    <tr key={usuario.id} className="hover:bg-slate-50">
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-semibold">{usuario.nombre}</p>
+                        <p className="text-xs text-slate-500">{usuario.correo}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm">{usuario.dni}</td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium">{usuario.area}</p>
+                        <p className="text-xs text-slate-500">{usuario.sede}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {usuario.cargo}
+                      </td>
+                      <td className="px-6 py-4 text-sm">{usuario.rol}</td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${estiloEstado(
+                            usuario.estado,
+                          )}`}
+                        >
+                          {usuario.estado}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {usuario.ultimoAcceso}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMensaje("");
+                              setErrorServidor("");
+                              setUsuarioEditando({ ...usuario });
+                            }}
+                            className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                          >
+                            Administrar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void alternarEstado(usuario.id)}
+                            disabled={guardarPendiente}
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+                            title="Conmutar estado (Activo → Inactivo → Bloqueado)"
+                          >
+                            Conmutar estado
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -182,7 +348,14 @@ export default function UsuariosPage() {
             setMensaje("");
             setUsuarioEditando(null);
           }}
-          onSave={actualizarUsuario}
+          onSave={guardar}
+          onServerError={(err: ApiHttpError) => {
+            if (err?.correlationId) {
+              setErrorServidor(
+                `Operación rechazada por el servidor. Código de correlación: ${err.correlationId}.`,
+              );
+            }
+          }}
         />
       )}
     </main>

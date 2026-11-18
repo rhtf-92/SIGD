@@ -1,0 +1,30 @@
+
+> sigd-corelink@1.1.0 test:e2e
+> vitest run
+
+
+ RUN  v3.2.7 <SIGD>/backend/docs/implementacion
+
+[MIGRACION] Usando PostgreSQL existente: postgres://postgres:postgres@localhost:5432/sigd_prueba
+[MIGRACION] Aplicando DDL real de auditoría (ON_ERROR_STOP=1): ..\integracion\06_sigd_audit_esquema_ddl.sql
+[MIGRACION] Aplicando FIXTURES PROVISIONALES (5 esquemas de módulos; sigd_audit NO está aquí): tests\fixtures\01_schema_fixtures_test.sql
+[MIGRACION] Entorno preparado: sigd_audit del DDL real de integracion/ + stubs provisionales de los 5 módulos.
+[MIGRACION] ALCANCE: la suite valida SOLO el prototipo CoreLink (sigd_audit real + stubs provisionales). No se ejecutan las migraciones reales de los 6 módulos; la conformidad intermodular queda PARCIAL/PENDIENTE en los docs de integracion/.
+ ✓ tests/e2e/e2e-12-concurrencia-worker.test.ts (3 tests) 2906ms
+   ✓ Concurrencia · OutboxWorker > reserva transaccional: despacho lento no libera lock para otro worker  331ms
+ ✓ tests/e2e/e2e-01-radicacion.test.ts (1 test) 483ms
+ ✓ tests/e2e/e2e-07-atomicidad-outbox.test.ts (3 tests) 415ms
+ ✓ tests/e2e/e2e-08-sin-token.test.ts (1 test) 273ms
+ ✓ tests/e2e/e2e-10-falla-critica.test.ts (1 test) 347ms
+ ✓ tests/e2e/e2e-04-derivar-area-inexistente.test.ts (1 test) 354ms
+ ✓ tests/e2e/e2e-02-validacion.test.ts (1 test) 303ms
+ ✓ tests/e2e/e2e-05-transicion-estado.test.ts (2 tests) 355ms
+ ✓ tests/e2e/e2e-03-duplicado.test.ts (1 test) 353ms
+ ✓ tests/e2e/e2e-06-contexto-auditoria.test.ts (1 test) 402ms
+ ✓ tests/e2e/e2e-09-privilegios.test.ts (1 test) 279ms
+ ✓ tests/e2e/e2e-11-concurrencia-async-local-storage.test.ts (7 tests) 120ms
+
+ Test Files  12 passed (12)
+      Tests  23 passed (23)
+   Start at  20:47:45
+   Duration  34.21s (transform 798ms, setup 0ms, collect 7.51s, tests 6.59s, environment 3ms, prepare 2.76s)

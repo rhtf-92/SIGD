@@ -1,5 +1,6 @@
 // Hook del Calendario Laboral y Jornada LPAG (ENT-M05-06)
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { apiClient } from "../api/client";
 
 export interface DiaLaboral {
   nombre: string;
@@ -67,6 +68,40 @@ export function useCalendarioLaboral() {
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [mensaje, setMensaje] = useState("");
 
+  useEffect(() => {
+    let montado = true;
+    apiClient
+      .get<
+        | {
+            feriados?: Array<{
+              id?: number | string;
+              fecha: string;
+              nombre?: string;
+              descripcion?: string;
+            }>;
+          }
+        | Array<{ id?: number | string; fecha: string; nombre?: string; descripcion?: string }>
+      >("/api/v1/admin/calendario-laboral")
+      .then((res) => {
+        if (!montado || !res.data) return;
+        const lista = Array.isArray(res.data) ? res.data : (res.data.feriados ?? []);
+        if (lista.length === 0) return;
+        const mapped: Feriado[] = lista.map((f, idx) => ({
+          id: typeof f.id === "number" ? f.id : idx + 1,
+          fecha: f.fecha,
+          nombre: f.nombre ?? f.descripcion ?? "Feriado Institucional",
+        }));
+        setFeriados(mapped);
+      })
+      .catch(() => {
+        // Fallback al catálogo oficial
+      });
+
+    return () => {
+      montado = false;
+    };
+  }, []);
+
   function alternarDia(indice: number) {
     setMensaje("");
     setDias((actuales) =>
@@ -79,17 +114,25 @@ export function useCalendarioLaboral() {
   function agregarFeriado() {
     if (!fechaNueva || !nombreNuevo.trim()) return;
 
-    setFeriados((actuales) => [
-      ...actuales,
-      {
-        id: Math.max(0, ...actuales.map((feriado) => feriado.id)) + 1,
+    const nuevoFeriado: Feriado = {
+      id: Math.max(0, ...feriados.map((feriado) => feriado.id)) + 1,
+      fecha: fechaNueva,
+      nombre: nombreNuevo.trim(),
+    };
+
+    setFeriados((actuales) => [...actuales, nuevoFeriado]);
+
+    apiClient
+      .post("/api/v1/admin/calendario-laboral/feriado-excepcional", {
         fecha: fechaNueva,
-        nombre: nombreNuevo.trim(),
-      },
-    ]);
+        motivo: nombreNuevo.trim(),
+        descripcion: nombreNuevo.trim(),
+      })
+      .catch(() => {});
+
     setFechaNueva("");
     setNombreNuevo("");
-    setMensaje("");
+    setMensaje("Feriado registrado en el calendario.");
   }
 
   function quitarFeriado(id: number) {

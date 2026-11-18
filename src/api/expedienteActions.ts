@@ -1,5 +1,19 @@
 import { ErrorAccionExpediente } from "../types/expedienteActions";
 import type { ResultadoDerivacion, ResultadoObservacion, ServicioExpedienteActions, SolicitudDerivacion, SolicitudObservacion } from "../types/expedienteActions";
+import type { MovimientoExpediente, MovimientoExpedienteDTO } from "../types/trazabilidadExpediente";
+
+/**
+ * Mapeador seguro para garantizar la compatibilidad entre el contrato Backend (BIGINT / nulls)
+ * y la capa Frontend React (string / 0% any).
+ */
+export const mapearMovimiento = (dto: MovimientoExpedienteDTO): MovimientoExpediente => ({
+  id: String(dto.id),
+  expedienteId: String(dto.expedienteId),
+  unidadOrigenId: dto.unidadOrigenId,
+  unidadDestinoId: dto.unidadDestinoId,
+  observaciones: dto.observaciones ?? "",
+  fechaMovimiento: dto.fechaMovimiento,
+});
 
 /** Implementar únicamente después de verificar el DTO real y sus consumidores. */
 export interface AdaptadorPayload<Entrada> {
@@ -21,7 +35,7 @@ function respuestaNoConfirmada(): never {
 }
 
 function urlMovimiento(id: string, accion: "derivar" | "observar", baseURL: string | undefined): string {
-  // El cliente de ejemplo termina en /api. Una URL absoluta evita /api/api/v1.
+  // Ruta absoluta: evita duplicar el prefijo si el baseURL ya incluye /api o /api/v1.
   const base = new URL(baseURL ?? "/", window.location.origin);
   return new URL(`/api/v1/expedientes/${encodeURIComponent(id)}/movimientos/${accion}`, base).href;
 }

@@ -14,6 +14,7 @@ import SlaBadge from "../../components/expedientes/SlaBadge";
 import { useExpedientesBase } from "../../hooks/useBandejaExpedientes";
 import { useExpedienteTimeline } from "../../hooks/useExpedienteTimeline";
 import { useExpedienteActions } from "../../hooks/useExpedienteActions";
+import { crearServicioExpedienteActions } from "../../api/expedienteActions";
 import type { DocumentoExpediente } from "../../types/ccdArchivistica";
 
 export default function ExpedienteDetallePage() {
@@ -29,7 +30,34 @@ export default function ExpedienteDetallePage() {
   const { data: eventos, isLoading: cargandoTimeline, isError: errorTimeline } =
     useExpedienteTimeline(id);
 
+  const servicioExpediente = useMemo(
+    () =>
+      crearServicioExpedienteActions({
+        derivacion: {
+          construirPayload: (entrada) => ({
+            destinos: [{ area_destino_id: entrada.unidadDestinoId, es_copia: false }],
+            proveido: entrada.proveido || "Derivación de expediente",
+          }),
+        },
+        observacion: {
+          construirPayload: (entrada) => ({
+            motivo: entrada.motivo,
+            observacion: entrada.motivo,
+          }),
+        },
+        acumulacion: async (entrada) => {
+          const { apiClient } = await import("../../api/client");
+          await apiClient.post(`/api/v1/expedientes/${entrada.principal.id}/acumular`, {
+            expedientesConexos: entrada.conexos.map((c) => c.id),
+            motivo: entrada.motivo,
+          });
+        },
+      }),
+    [],
+  );
+
   const acciones = useExpedienteActions({
+    servicio: servicioExpediente,
     obtenerClavesAfectadas: () => [["expedientes"], ["expediente", id]],
   });
 

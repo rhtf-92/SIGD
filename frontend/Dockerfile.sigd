@@ -1,0 +1,12 @@
+FROM node:24.19.0-bookworm-slim
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+EXPOSE 5173
+
+CMD ["npm", "exec", "--", "vite", "--host", "0.0.0.0"]

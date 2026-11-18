@@ -22,7 +22,7 @@ async function obtenerExpedientesMock(): Promise<ExpedienteSGD[]> {
 }
 
 async function obtenerExpedientesApi(): Promise<ExpedienteSGD[]> {
-  const { data } = await apiClient.get<ExpedienteSGD[]>("/v1/expedientes");
+  const { data } = await apiClient.get<ExpedienteSGD[]>("/api/v1/expedientes");
   return data;
 }
 

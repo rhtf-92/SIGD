@@ -1,16 +1,27 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { permisosIniciales } from "../hooks/useRbacConfig";
+import { useRegistroEffects } from "../hooks/useRegistroEffects";
+import InsigniaGiratoria from "../components/common/InsigniaGiratoria";
+import {
+  Mail,
+  FileUp,
+  FolderKanban,
+  ShieldCheck,
+  FileSignature,
+  UserCheck,
+} from "lucide-react";
+import "../styles/login.css";
 
 const CLAVE_TOKEN = "sigd_token";
 const CLAVE_ROL = "sigd_rol";
 const CLAVE_PERMISOS = "sigd_permisos";
 
-export const ROLES_CANONICOS = [
+const ROLES_CANONICOS = [
   { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", destino: "/administracion" },
   { id: "DIRECTOR", label: "DIRECTOR — Director General", destino: "/administracion" },
   { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", destino: "/flujos/titulacion" },
-  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", destino: "/tramite/ventanilla-presencial" },
+  { id: "MESA_PARTES", label: "MESA_DE_PARTES — Mesa de Partes / Ventanilla", destino: "/tramite/ventanilla-presencial" },
   { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", destino: "/casilla" },
 ];
 
@@ -18,7 +29,12 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [rol, setRol] = useState("SUPER_ADMIN");
 
-  function iniciarSesionDemo() {
+  // Solo diseño: efectos visuales (chispas del mouse y ondas en botones)
+  const pageRef = useRef<HTMLElement>(null);
+  useRegistroEffects(pageRef);
+
+  function iniciarSesionDemo(e: React.FormEvent) {
+    e.preventDefault();
     window.localStorage.setItem(CLAVE_TOKEN, "demo-jwt-" + Date.now());
     window.localStorage.setItem(CLAVE_ROL, rol);
     window.localStorage.setItem(CLAVE_PERMISOS, JSON.stringify(permisosIniciales));
@@ -28,46 +44,103 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-900">
-      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <Link
-          to="/"
-          className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-        >
-          ← Volver al inicio
-        </Link>
-        <p className="text-sm font-bold text-blue-700">SIGD IESTP "SUIZA"</p>
-        <h1 className="mt-1 text-2xl font-bold">Iniciar sesión</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Acceso por roles institucionales canónicos para control de acceso (RBAC).
-        </p>
+    <main className="lg-page" ref={pageRef}>
+      <div className="lg-photo" aria-hidden="true" />
 
-        <div className="mt-6">
-          <label htmlFor="rol" className="mb-2 block text-sm font-semibold">
-            Rol institucional canónico
-          </label>
-          <select
-            id="rol"
-            value={rol}
-            onChange={(event) => setRol(event.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium"
-          >
-            {ROLES_CANONICOS.map((opcion) => (
-              <option key={opcion.id} value={opcion.id}>
-                {opcion.label}
-              </option>
-            ))}
-          </select>
+      {/* PANEL IZQUIERDO: IDENTIDAD INSTITUCIONAL Y SERVICIOS */}
+      <section className="lg-left">
+        <span className="lg-chip">Gobernanza Digital MGD-PCM</span>
+
+        <div className="lg-brand">
+          <InsigniaGiratoria size={92} />
+          <div>
+            <span className="lg-lic">Licenciado por el MINEDU</span>
+            <span>
+              Instituto de Educación Superior Tecnológico Público “Suiza” — Pucallpa
+            </span>
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={iniciarSesionDemo}
-          className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition"
-        >
-          Ingresar al sistema
-        </button>
+        <p className="lg-hello">Bienvenido a</p>
+        <h1 className="lg-big">
+          SIGD
+          <br />
+          SUIZA
+        </h1>
+
+        <p className="lg-sub">
+          Plataforma oficial del Sistema Integral de Gestión Documentaria. Gestión
+          automatizada de trámites, expedientes digitales y Casilla Electrónica con
+          validez legal.
+        </p>
+
+        {/* SERVICIOS REALES DEL SISTEMA */}
+        <div className="lg-feat">
+          <div>
+            <FileUp aria-hidden="true" />
+            Mesa de Partes Virtual
+          </div>
+          <div>
+            <Mail aria-hidden="true" />
+            Casilla Electrónica
+          </div>
+          <div>
+            <FolderKanban aria-hidden="true" />
+            Bandeja de Expedientes
+          </div>
+          <div>
+            <ShieldCheck aria-hidden="true" />
+            Validador CVD
+          </div>
+          <div>
+            <FileSignature aria-hidden="true" />
+            Flujo y Validez Legal
+          </div>
+        </div>
       </section>
+
+      {/* PANEL DERECHO: FORMULARIO DE ACCESO */}
+      <section className="lg-card">
+        <Link to="/" className="lg-back">
+          ← Volver al inicio
+        </Link>
+
+        <span className="lg-kick">Autenticación Segura</span>
+        <h2 className="lg-title">Iniciar sesión</h2>
+        <p className="lg-lead">
+          Seleccione su rol institucional canónico para acceder al control de acceso
+          basado en roles (RBAC).
+        </p>
+
+        <form onSubmit={iniciarSesionDemo}>
+          <label htmlFor="rol">Rol institucional canónico</label>
+          <div className="lg-sel">
+            <UserCheck aria-hidden="true" />
+            <select
+              id="rol"
+              value={rol}
+              onChange={(event) => setRol(event.target.value)}
+            >
+              {ROLES_CANONICOS.map((opcion) => (
+                <option key={opcion.id} value={opcion.id}>
+                  {opcion.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button type="submit">Ingresar al sistema</button>
+
+          <p className="lg-links">
+            ¿Eres usuario externo? <a href="#registro">Regístrate aquí</a>
+          </p>
+        </form>
+      </section>
+
+      <div className="lg-foot">
+        <span>Programa de Estudios de Desarrollo de Sistemas de Información (PE DSI)</span>
+        <span>© 2026</span>
+      </div>
     </main>
   );
 }

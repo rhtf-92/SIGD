@@ -120,7 +120,7 @@ export function countBusinessDays(
   }
 
   const isReverse = end.getTime() < start.getTime();
-  let [from, to] = isReverse ? [end, start] : [start, end];
+  const [from, to] = isReverse ? [end, start] : [start, end];
 
   let count = 0;
   const cursor = new Date(from);

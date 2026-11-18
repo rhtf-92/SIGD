@@ -30,7 +30,7 @@ export default function DocumentoCvdViewer({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-0">
       {/* Barra de herramientas */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:hidden">
         <div>
@@ -57,8 +57,8 @@ export default function DocumentoCvdViewer({
         </div>
       </div>
 
-      {/* Contenedor Hoja A4 con Estampa Marginal */}
-      <div className="mx-auto max-w-4xl rounded-2xl border border-slate-300 bg-white shadow-lg overflow-hidden">
+      {/* Contenedor Hoja A4 con Estampa Marginal — en impresión sale solo el documento */}
+      <div className="mx-auto max-w-4xl rounded-2xl border border-slate-300 bg-white shadow-lg overflow-hidden print:mx-0 print:max-w-none print:rounded-none print:border-0 print:shadow-none">
         <div className="flex min-h-[750px]">
           {/* Cuerpo principal del documento */}
           <article className="flex-1 p-8 sm:p-12 space-y-6 text-slate-900 font-serif text-xs leading-relaxed">

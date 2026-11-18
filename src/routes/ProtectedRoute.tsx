@@ -47,12 +47,6 @@ export default function ProtectedRoute({
   const token = window.localStorage.getItem(CLAVE_TOKEN);
   const rol = window.localStorage.getItem(CLAVE_ROL);
 
-  // Entorno de desarrollo sin módulo de autenticación aún implementado:
-  // la navegación demo no se bloquea hasta integrar el backend de login.
-  if (!token && import.meta.env.DEV) {
-    return <>{children ?? <Outlet />}</>;
-  }
-
   if (!token) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }

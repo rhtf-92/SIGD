@@ -1,0 +1,91 @@
+/* ===== Diseño del módulo Inicio de Sesión (solo estilos) — misma identidad del Registro ===== */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+.lg-page{--navy:#0A3A82;--blue:#0A7CFF;--cy:#00C2FF;--sun:#FF2D95;--line:#CFE2F6;--soft:#E4F2FF;--ink:#17324A;--muted:#5F7A8F;
+position:relative;overflow:hidden;min-height:100vh;display:grid;grid-template-columns:1.2fr 1fr;align-items:center;gap:40px;padding:40px 6vw 84px;color:var(--ink);
+font:400 15px/1.5 'Plus Jakarta Sans',system-ui,sans-serif;
+background:radial-gradient(rgba(10,124,255,.12) 1px,transparent 1.6px) 0 0/28px 28px,radial-gradient(900px 520px at 92% -10%,rgba(0,194,255,.38),transparent 60%),radial-gradient(700px 440px at 0% 100%,rgba(255,45,149,.16),transparent 60%),linear-gradient(160deg,#DCEBFD 0%,#C3DAF8 55%,#AFCDF4 100%)}
+.lg-page *,.lg-page *::before,.lg-page *::after{box-sizing:border-box}
+/* Foto de alumnos (opcional): public/fondo-alumnos.jpg, se mezcla con el celeste */
+.lg-photo{position:absolute;inset:0;background:url(/fondo-alumnos.jpg) center/cover no-repeat;opacity:.2;mix-blend-mode:multiply;pointer-events:none}
+/* Engranajes del emblema */
+.lg-page::before,.lg-page::after{content:"";position:absolute;pointer-events:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none' stroke='%230A7CFF' stroke-width='1.6' stroke-linejoin='round'%3E%3Cpath d='M175.4 90.6 L191.8 94.2 L191.8 105.8 L175.4 109.4 L172.0 124.3 L185.2 134.6 L180.2 145.0 L163.9 141.2 L154.3 153.1 L161.8 168.2 L152.7 175.4 L139.7 164.8 L125.9 171.4 L126.1 188.2 L114.8 190.8 L107.7 175.6 L92.3 175.6 L85.2 190.8 L73.9 188.2 L74.1 171.4 L60.3 164.8 L47.3 175.4 L38.2 168.2 L45.7 153.1 L36.1 141.2 L19.8 145.0 L14.8 134.6 L28.0 124.3 L24.6 109.4 L8.2 105.8 L8.2 94.2 L24.6 90.6 L28.0 75.7 L14.8 65.4 L19.8 55.0 L36.1 58.8 L45.7 46.9 L38.2 31.8 L47.3 24.6 L60.3 35.2 L74.1 28.6 L73.9 11.8 L85.2 9.2 L92.3 24.4 L107.7 24.4 L114.8 9.2 L126.1 11.8 L125.9 28.6 L139.7 35.2 L152.7 24.6 L161.8 31.8 L154.3 46.9 L163.9 58.8 L180.2 55.0 L185.2 65.4 L172.0 75.7 Z'/%3E%3Ccircle cx='100' cy='100' r='58'/%3E%3Ccircle cx='100' cy='100' r='30'/%3E%3Ccircle cx='100' cy='100' r='6' fill='%230A7CFF'/%3E%3C/svg%3E") center/contain no-repeat;opacity:.11}
+.lg-page::before{width:440px;height:440px;left:-150px;bottom:-130px;animation:lg-gear 90s linear infinite}
+.lg-page::after{width:340px;height:340px;right:-110px;top:-90px;animation:lg-gear 70s linear infinite reverse}
+@keyframes lg-gear{to{transform:rotate(360deg)}}
+.lg-left,.lg-card{position:relative;z-index:1}
+
+/* Lado izquierdo */
+.lg-brand{display:flex;align-items:center;gap:18px;margin-bottom:40px}
+.lg-brand span{font-size:.9rem;font-weight:600;color:var(--navy);line-height:1.35;max-width:270px}
+.lg-hello{margin:0;font-size:clamp(1.6rem,3vw,2.5rem);font-weight:500;letter-spacing:-.02em;color:var(--muted)}
+.lg-big{margin:2px 0 0;font-size:clamp(3.2rem,7.5vw,6rem);font-weight:800;line-height:.95;letter-spacing:-.04em;color:var(--navy)}
+.lg-big::after{content:"";display:block;width:92px;height:6px;border-radius:3px;margin-top:20px;background:linear-gradient(90deg,var(--blue),var(--sun))}
+.lg-sub{margin:22px 0 34px;max-width:520px;font-size:1.05rem;color:var(--muted)}
+.lg-feat{display:flex;flex-wrap:wrap;gap:12px;max-width:660px}
+.lg-feat div{width:120px;padding:14px 8px;text-align:center;font-size:.76rem;font-weight:700;line-height:1.3;color:var(--navy);background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 22px -16px rgba(10,58,130,.45);transition:transform .2s,border-color .2s,box-shadow .2s}
+.lg-feat div:hover{transform:translateY(-3px);border-color:var(--blue);box-shadow:0 14px 28px -16px rgba(10,124,255,.6)}
+.lg-feat svg{display:block;width:32px;height:32px;margin:0 auto 8px;stroke:var(--blue);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* Tarjeta de acceso (igual que la del registro) */
+.lg-card{width:100%;max-width:480px;justify-self:center;overflow:hidden;padding:40px 38px 34px;border-radius:18px;
+background:linear-gradient(180deg,#EEF7FF 0,#fff 190px);border:1px solid rgba(10,124,255,.1);
+box-shadow:0 1px 2px rgba(15,42,92,.06),0 16px 40px -16px rgba(15,42,92,.25);
+animation:lg-rise .7s cubic-bezier(.2,.7,.2,1) both,lg-float 6s ease-in-out .8s infinite}
+.lg-card::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--cy),var(--blue),var(--sun))}
+@keyframes lg-rise{from{opacity:0;transform:translateY(18px)}}
+@keyframes lg-float{50%{transform:translateY(-5px);box-shadow:0 1px 2px rgba(15,42,92,.06),0 34px 54px -20px rgba(10,124,255,.38)}}
+.lg-back{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:.85rem;color:var(--muted);text-decoration:none;background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 14px;transition:color .15s,border-color .15s,transform .1s}
+.lg-back:hover{color:var(--navy);border-color:var(--blue)}.lg-back:active{transform:scale(.96)}
+.lg-kick{display:block;margin:26px 0 4px;font-weight:700;font-size:.8rem;letter-spacing:.08em;color:var(--blue)}
+.lg-title{margin:0;font-size:2.05rem;font-weight:800;letter-spacing:-.03em;color:var(--navy);line-height:1.15}
+.lg-title::after{content:"";display:block;width:64px;height:5px;border-radius:3px;margin-top:8px;background:linear-gradient(90deg,var(--blue),var(--sun))}
+.lg-lead{margin:12px 0 24px;color:var(--muted)}
+
+/* Campos (por etiqueta, no hay que tocar tu formulario) */
+.lg-card label{display:block;margin-bottom:6px;font-weight:600;font-size:.84rem;color:var(--ink)}
+.lg-card select,.lg-card input:not([type=checkbox]):not([type=radio]){width:100%;min-height:46px;padding:0 14px;border:1.5px solid var(--line);border-radius:11px;background-color:#F6FAFF;color:var(--ink);font:inherit;transition:border-color .15s,box-shadow .15s,background-color .15s}
+.lg-card select{appearance:none;-webkit-appearance:none;padding-right:40px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230A7CFF' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;background-size:16px}
+.lg-card select:hover,.lg-card input:hover:not(:focus){border-color:#A9D3EA}
+.lg-card select:focus,.lg-card input:focus{outline:none;border-color:var(--blue);background-color:#fff;box-shadow:0 0 0 4px rgba(10,124,255,.18)}
+.lg-card input::placeholder{color:#9AA7BA}
+
+/* Botón principal */
+.lg-go,.lg-card button[type=submit]{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;width:100%;height:54px;margin-top:22px;border:0;border-radius:12px;color:#fff;font:700 1.05rem 'Plus Jakarta Sans',sans-serif;cursor:pointer;background:linear-gradient(135deg,#00C2FF,#0A7CFF);transition:transform .1s,box-shadow .2s;animation:lg-ready 2.6s ease-in-out infinite}
+.lg-go::after,.lg-card button[type=submit]::after{content:"\2192";margin-left:10px;transition:transform .2s}
+.lg-go:hover::after,.lg-card button[type=submit]:hover::after{transform:translateX(5px)}
+.lg-go::before,.lg-card button[type=submit]::before{content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-20deg);opacity:0}
+.lg-go:hover::before,.lg-card button[type=submit]:hover::before{animation:lg-shine .8s}
+.lg-go:active,.lg-card button[type=submit]:active{transform:scale(.99)}
+.lg-go:disabled,.lg-card button[type=submit]:disabled{background:#B9CFE6;cursor:not-allowed;animation:none}
+.lg-go:focus-visible,.lg-card button[type=submit]:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+@keyframes lg-shine{from{left:-60%;opacity:1}to{left:130%;opacity:1}}
+@keyframes lg-ready{50%{box-shadow:0 0 0 7px rgba(10,124,255,.14)}}
+.lg-links{margin:20px 0 0;text-align:center;font-size:.88rem;color:var(--muted)}
+.lg-links a{color:var(--blue);font-weight:700;text-decoration:none;border-bottom:1.5px solid transparent;transition:border-color .15s}.lg-links a:hover{border-color:var(--blue)}
+.lg-foot{position:absolute;z-index:1;left:6vw;right:6vw;bottom:22px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:.76rem;color:var(--muted)}
+
+/* ===== Compartido con el Registro (insignia y efectos del mouse) ===== */
+.reg-coin{perspective:500px;flex:none}
+.reg-coin__spin{position:relative;width:100%;height:100%;transform-style:preserve-3d;animation:reg-spin 8s linear infinite}
+.reg-coin:hover .reg-coin__spin{animation-play-state:paused}
+.reg-coin img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;backface-visibility:hidden}
+.reg-coin img.edge{backface-visibility:visible;filter:brightness(.5) saturate(.7)}
+@keyframes reg-spin{from{transform:rotateY(0)}to{transform:rotateY(360deg)}}
+.reg-fx{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
+.reg-fx i{position:absolute;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,currentColor 60%);box-shadow:0 0 10px 3px currentColor;animation:reg-sp .9s ease-out forwards}
+@keyframes reg-sp{0%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(0);opacity:0}}
+.reg-rip{position:absolute;border-radius:50%;pointer-events:none;background:rgba(10,124,255,.26);transform:scale(0);animation:reg-rp .6s ease-out forwards}
+.lg-go .reg-rip,.lg-card button[type=submit] .reg-rip{background:rgba(255,255,255,.45)}
+@keyframes reg-rp{to{transform:scale(1);opacity:0}}
+
+@media(max-width:940px){.lg-page{grid-template-columns:1fr;padding:28px 16px 80px}.lg-feat,.lg-sub{display:none}.lg-brand{margin-bottom:22px}.lg-big{font-size:3rem}.lg-card{padding:32px 22px 26px}}
+@media(prefers-reduced-motion:reduce){.lg-card,.lg-page::before,.lg-page::after,.reg-coin__spin,.lg-go,.lg-card button[type=submit]{animation:none!important}.reg-fx,.reg-rip{display:none}}
+
+/* ===== Ajustes para el LoginPage real ===== */
+.lg-chip{display:inline-flex;margin-bottom:26px;padding:8px 14px;border-radius:99px;background:rgba(255,255,255,.75);border:1px solid var(--line);font:700 .72rem ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+.lg-brand .lg-lic{display:block;margin-bottom:4px;font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+.lg-sel{position:relative}
+.lg-sel>svg{position:absolute;left:14px;top:14px;width:18px;height:18px;color:var(--blue);pointer-events:none}
+.lg-card .lg-sel select{padding-left:44px}
+.lg-feat svg{width:30px;height:30px}

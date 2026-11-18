@@ -1,3 +1,4 @@
+import { useAuthStore } from "../stores/authStore";
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
 import { env } from "../config/env";
@@ -59,9 +60,58 @@ apiClient.interceptors.request.use(
 );
 
 // Interceptor de Respuesta: Tratamiento centralizado y tipado RFC 7807 (Problem Details)
+let isRefreshing = false;
+let pendingQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+
+function procesarCola(error: unknown, token: string | null) {
+  pendingQueue.forEach(({ resolve, reject }) => {
+    if (error) reject(error);
+    else resolve(token as string);
+  });
+  pendingQueue = [];
+}
+
+// Interceptor de Respuesta: Tratamiento centralizado y tipado RFC 7807 (Problem Details)
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
-  (error: unknown) => {
+  async (error: unknown) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+      if (!(originalRequest.url?.includes("/auth/refresh") || originalRequest._retry)) {
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            pendingQueue.push({
+              resolve: (token: string) => {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+                resolve(apiClient(originalRequest));
+              },
+              reject,
+            });
+          });
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        try {
+          const refreshToken = useAuthStore.getState().refreshToken;
+          const { data } = await apiClient.post("/api/v1/auth/refresh", { refreshToken });
+          useAuthStore.getState().setToken(data.accessToken, data.refreshToken);
+          procesarCola(null, data.accessToken);
+          originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+          isRefreshing = false;
+          return apiClient(originalRequest);
+        } catch (refreshError) {
+          procesarCola(refreshError, null);
+          useAuthStore.getState().logout();
+          isRefreshing = false;
+        }
+      } else {
+        useAuthStore.getState().logout();
+      }
+    }
+
     if (axios.isAxiosError(error)) {
       const status = error.response?.status ?? 500;
       const responseData = error.response?.data as Record<string, unknown> | undefined;

@@ -19,7 +19,7 @@ async function obtenerTimelineApi(
   expedienteId: string,
 ): Promise<BitacoraEventoExpediente[]> {
   const { data } = await apiClient.get<BitacoraEventoExpediente[]>(
-    `/v1/expedientes/${expedienteId}/bitacora`,
+    `/api/v1/expedientes/${expedienteId}/trazabilidad`,
   );
   return data;
 }

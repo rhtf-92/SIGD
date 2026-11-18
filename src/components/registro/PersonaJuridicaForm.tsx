@@ -86,22 +86,19 @@ export default function PersonaJuridicaForm({
       className="space-y-6"
       noValidate
     >
+      <h2 className="reg-sec">Datos de la empresa</h2>
+
       {/* RUC y Razón Social */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="ruc"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            RUC *
+          <label htmlFor="ruc" className="block mb-1">
+            RUC <span className="reg-req">*</span>
           </label>
           <input
             id="ruc"
             type="text"
             {...register("ruc")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.ruc ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.ruc ? "is-bad" : ""}
             placeholder="10XXXXXXXXX o 20XXXXXXXXX"
             maxLength={11}
           />
@@ -113,19 +110,14 @@ export default function PersonaJuridicaForm({
         </div>
 
         <div>
-          <label
-            htmlFor="razonSocial"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Razón Social *
+          <label htmlFor="razonSocial" className="block mb-1">
+            Razón Social <span className="reg-req">*</span>
           </label>
           <input
             id="razonSocial"
             type="text"
             {...register("razonSocial")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.razonSocial ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.razonSocial ? "is-bad" : ""}
           />
           {errors.razonSocial && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -135,19 +127,35 @@ export default function PersonaJuridicaForm({
         </div>
       </div>
 
+      {/* Partida SUNARP */}
+      <div>
+        <label htmlFor="partidaSunarp" className="block mb-1">
+          Partida SUNARP
+        </label>
+        <input
+          id="partidaSunarp"
+          type="text"
+          {...register("partidaSunarp")}
+          className={errors.partidaSunarp ? "is-bad" : ""}
+        />
+        {errors.partidaSunarp && (
+          <p className="mt-1 text-xs text-red-600 font-medium">
+            {errors.partidaSunarp.message}
+          </p>
+        )}
+      </div>
+
+      <h2 className="reg-sec">Representante legal</h2>
+
       {/* Sección Representante Legal */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="representanteTipoDocumento"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Tipo de Documento *
+          <label htmlFor="representanteTipoDocumento" className="block mb-1">
+            Tipo de Documento <span className="reg-req">*</span>
           </label>
           <select
             id="representanteTipoDocumento"
             {...register("representanteLegal.tipoDocumento")}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] focus:border-[#006EC7] outline-none"
           >
             <option value="DNI">DNI</option>
             <option value="CE">CE</option>
@@ -160,19 +168,14 @@ export default function PersonaJuridicaForm({
         </div>
 
         <div>
-          <label
-            htmlFor="representanteNumeroDocumento"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Número de Documento *
+          <label htmlFor="representanteNumeroDocumento" className="block mb-1">
+            Número de Documento <span className="reg-req">*</span>
           </label>
           <input
             id="representanteNumeroDocumento"
             type="text"
             {...register("representanteLegal.numeroDocumento")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.representanteLegal?.numeroDocumento ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.representanteLegal?.numeroDocumento ? "is-bad" : ""}
             placeholder="DNI: 8 dígitos o CE: 9-12 caracteres"
           />
           {errors.representanteLegal?.numeroDocumento && (
@@ -185,19 +188,14 @@ export default function PersonaJuridicaForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="representanteNombres"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Nombres *
+          <label htmlFor="representanteNombres" className="block mb-1">
+            Nombres <span className="reg-req">*</span>
           </label>
           <input
             id="representanteNombres"
             type="text"
             {...register("representanteLegal.nombres")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.representanteLegal?.nombres ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.representanteLegal?.nombres ? "is-bad" : ""}
           />
           {errors.representanteLegal?.nombres && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -207,19 +205,14 @@ export default function PersonaJuridicaForm({
         </div>
 
         <div>
-          <label
-            htmlFor="representanteApellidos"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Apellidos *
+          <label htmlFor="representanteApellidos" className="block mb-1">
+            Apellidos <span className="reg-req">*</span>
           </label>
           <input
             id="representanteApellidos"
             type="text"
             {...register("representanteLegal.apellidos")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.representanteLegal?.apellidos ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.representanteLegal?.apellidos ? "is-bad" : ""}
           />
           {errors.representanteLegal?.apellidos && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -230,19 +223,14 @@ export default function PersonaJuridicaForm({
       </div>
 
       <div>
-        <label
-          htmlFor="cargo"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          Cargo *
+        <label htmlFor="cargo" className="block mb-1">
+          Cargo <span className="reg-req">*</span>
         </label>
         <input
           id="cargo"
           type="text"
           {...register("representanteLegal.cargo")}
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-            errors.representanteLegal?.cargo ? "border-red-500" : "border-gray-300"
-          }`}
+          className={errors.representanteLegal?.cargo ? "is-bad" : ""}
           placeholder="Ej. Gerente General"
         />
         {errors.representanteLegal?.cargo && (
@@ -252,45 +240,19 @@ export default function PersonaJuridicaForm({
         )}
       </div>
 
-      {/* Partida SUNARP */}
-      <div>
-        <label
-          htmlFor="partidaSunarp"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          Partida SUNARP
-        </label>
-        <input
-          id="partidaSunarp"
-          type="text"
-          {...register("partidaSunarp")}
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-            errors.partidaSunarp ? "border-red-500" : "border-gray-300"
-          }`}
-        />
-        {errors.partidaSunarp && (
-          <p className="mt-1 text-xs text-red-600 font-medium">
-            {errors.partidaSunarp.message}
-          </p>
-        )}
-      </div>
+      <h2 className="reg-sec">Contacto</h2>
 
       {/* Correo Corporativo y Celular */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="correoCorporativo"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Correo Corporativo *
+          <label htmlFor="correoCorporativo" className="block mb-1">
+            Correo Corporativo <span className="reg-req">*</span>
           </label>
           <input
             id="correoCorporativo"
             type="email"
             {...register("correoCorporativo")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.correoCorporativo ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.correoCorporativo ? "is-bad" : ""}
           />
           {errors.correoCorporativo && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -300,19 +262,14 @@ export default function PersonaJuridicaForm({
         </div>
 
         <div>
-          <label
-            htmlFor="celularContacto"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Celular de Contacto *
+          <label htmlFor="celularContacto" className="block mb-1">
+            Celular de Contacto <span className="reg-req">*</span>
           </label>
           <input
             id="celularContacto"
             type="tel"
             {...register("celularContacto")}
-            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-              errors.celularContacto ? "border-red-500" : "border-gray-300"
-            }`}
+            className={errors.celularContacto ? "is-bad" : ""}
             placeholder="987654321"
           />
           {errors.celularContacto && (
@@ -323,6 +280,8 @@ export default function PersonaJuridicaForm({
         </div>
       </div>
 
+      <h2 className="reg-sec">Ubicación y domicilio</h2>
+
       {/* Sección de Domicilio */}
       <UbigeoSelector
         initialProvinciaId={domicilioValue.provinciaCodigo}
@@ -332,19 +291,14 @@ export default function PersonaJuridicaForm({
 
       {/* Dirección Exacta */}
       <div>
-        <label
-          htmlFor="direccionExacta"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          Dirección Exacta *
+        <label htmlFor="direccionExacta" className="block mb-1">
+          Dirección Exacta <span className="reg-req">*</span>
         </label>
         <input
           id="direccionExacta"
           type="text"
           {...register("domicilio.direccionExacta")}
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
-            errors.domicilio?.direccionExacta ? "border-red-500" : "border-gray-300"
-          }`}
+          className={errors.domicilio?.direccionExacta ? "is-bad" : ""}
           placeholder="Ej. Jr. Tarapacá N° 645"
         />
         {errors.domicilio?.direccionExacta && (
@@ -356,22 +310,20 @@ export default function PersonaJuridicaForm({
 
       {/* Referencia */}
       <div>
-        <label
-          htmlFor="referencia"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
+        <label htmlFor="referencia" className="block mb-1">
           Referencia
         </label>
         <input
           id="referencia"
           type="text"
           {...register("domicilio.referencia")}
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none"
         />
       </div>
 
+      <h2 className="reg-sec">Declaraciones</h2>
+
       {/* Checkboxes */}
-      <div className="space-y-4">
+      <div className="reg-legal">
         <DeclaracionJuradaCheckbox
           checked={declaracionJuradaAceptada}
           onChange={(checked) =>
@@ -389,7 +341,6 @@ export default function PersonaJuridicaForm({
               type="checkbox"
               checked={consentimientoLey29733}
               onChange={(e) => handleConsentimientoChange(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-[#006EC7] focus:ring-[#006EC7]"
             />
             <span className="text-sm text-gray-700">
               He leído y acepto el consentimiento de tratamiento de datos
@@ -399,7 +350,7 @@ export default function PersonaJuridicaForm({
           <button
             type="button"
             onClick={() => setIsConsentimientoModalOpen(true)}
-            className="text-sm text-[#006EC7] underline text-left ml-7"
+            className="reg-link"
           >
             Ver política de tratamiento de datos personales
           </button>
@@ -424,13 +375,6 @@ export default function PersonaJuridicaForm({
           !consentimientoLey29733 ||
           isSubmitting
         }
-        className={`w-full py-3 px-4 text-sm font-semibold text-white rounded-md transition-colors ${
-          !declaracionJuradaAceptada ||
-          !consentimientoLey29733 ||
-          isSubmitting
-            ? "bg-gray-400 cursor-not-allowed"
-            : "bg-[#006EC7] hover:bg-[#005ba8]"
-        }`}
       >
         Registrar Empresa y Crear Casilla
       </button>

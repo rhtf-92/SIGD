@@ -1,0 +1,39 @@
+%%{init: {'theme': 'default', 'themeVariables': { 'fontSize': '18px', 'lineColor': '#000000'}}}%%
+flowchart TD
+    %% Nodos de inicio y retorno
+    S[Expediente registrado] --> R[Recepción inicial]
+    R --> REV[Revisión en área responsable]
+    BACK[Retorno a revisión] -- "Reinicia el ciclo" --> REV
+
+    %% Flujo principal
+    REV --> COMP{¿Info. completa? PROPUESTO}
+
+    COMP -- No --> OBS[Observación]
+    OBS --> CORR[Corrección o nuevo adjunto]
+    CORR --> BACK
+
+    COMP -- Sí --> DEV_DEC{¿Corresponde devolución? PROPUESTO}
+
+    DEV_DEC -- Sí --> DEV[Devolución o corrección]
+    DEV --> BACK
+
+    DEV_DEC -- No --> AREA{¿Puede atenderlo? PROPUESTO}
+
+    AREA -- Sí --> ATF[Atención final]
+    ATF --> RESP[Respuesta disponible]
+
+    AREA -- No --> DER[Derivar]
+    DER --> PEND[Pendiente de recepción]
+    PEND --> RD[Confirmar recepción]
+    RD --> BACK
+
+    RESP --> CLOSE{¿Cierre permitido? PROPUESTO}
+
+    CLOSE -- Sí --> CERR[Cierre propuesto]
+    CERR --> REOPEN{¿Reapertura autorizada? PROPUESTO}
+
+    CLOSE -- No --> AT_S_C[Atendido sin cierre]
+    AT_S_C --> FIN([Fin del flujo])
+
+    REOPEN -- Sí --> BACK
+    REOPEN -- No --> FIN
