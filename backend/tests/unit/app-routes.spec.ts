@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { construirApp } from '../../src/app.js';
+import { firmarTokenAcceso } from '../../src/core/auth/jwt.service.js';
 
 describe('App Routing & Health Verification', () => {
   const fakePool = {
@@ -13,6 +14,10 @@ describe('App Routing & Health Verification', () => {
   } as unknown as Pool;
 
   const app = construirApp(fakePool);
+  const tokenAdministrador = firmarTokenAcceso({
+    sub: '11111111-1111-1111-1111-111111111111',
+    roles: ['ADMINISTRADOR'],
+  });
 
   it('GET /health responde 200 con estado UP', async () => {
     const res = await request(app).get('/health');
@@ -56,19 +61,25 @@ describe('App Routing & Health Verification', () => {
   });
 
   it('GET /api/v1/admin/roles-permisos responde con roles y permisos', async () => {
-    const res = await request(app).get('/api/v1/admin/roles-permisos');
+    const res = await request(app)
+      .get('/api/v1/admin/roles-permisos')
+      .set('Authorization', `Bearer ${tokenAdministrador}`);
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('roles');
   });
 
   it('GET /api/v1/admin/maestras/sede responde con sedes institucionales', async () => {
-    const res = await request(app).get('/api/v1/admin/maestras/sede');
+    const res = await request(app)
+      .get('/api/v1/admin/maestras/sede')
+      .set('Authorization', `Bearer ${tokenAdministrador}`);
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('sedes');
   });
 
   it('GET /api/v1/admin/maestras/tipo-documento responde con tipos documentales', async () => {
-    const res = await request(app).get('/api/v1/admin/maestras/tipo-documento');
+    const res = await request(app)
+      .get('/api/v1/admin/maestras/tipo-documento')
+      .set('Authorization', `Bearer ${tokenAdministrador}`);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
