@@ -1,7 +1,33 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../stores/authStore";
 
 export default function HeaderInstitucional() {
   const navigate = useNavigate();
+  const { isAuthenticated, usuario, cerrarSesion, logout } = useAuthStore();
+  const [cerrando, setCerrando] = useState(false);
+  const [errorCierre, setErrorCierre] = useState("");
+
+  async function handleLogout() {
+    if (cerrando) return;
+    setCerrando(true);
+    setErrorCierre("");
+    try {
+      if (typeof cerrarSesion === "function") {
+        await cerrarSesion();
+      } else if (typeof logout === "function") {
+        logout();
+      }
+    } catch (error) {
+      setErrorCierre(
+        error instanceof Error
+          ? error.message
+          : "No se pudo cerrar la sesión. Intente nuevamente."
+      );
+    } finally {
+      setCerrando(false);
+    }
+  }
 
   return (
     <header className="w-full bg-[#05224a] border-b-2 border-sky-400 text-white shadow-md print:hidden">
@@ -29,7 +55,7 @@ export default function HeaderInstitucional() {
           </div>
         </div>
 
-        {/* Derecha: Dos botones redondeados semitransparentes (Inicio e Iniciar Sesión) */}
+        {/* Derecha: Botones institucionales */}
         <nav className="flex items-center gap-2.5 sm:gap-3 text-xs font-semibold">
           <button
             type="button"
@@ -41,18 +67,46 @@ export default function HeaderInstitucional() {
             </svg>
             <span>Inicio</span>
           </button>
-          <button
-            type="button"
-            onClick={() => navigate("/login")}
-            className="flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 px-3.5 py-2 text-white transition cursor-pointer backdrop-blur-xs"
-          >
-            <svg className="w-4 h-4 text-sky-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <span>Iniciar Sesión</span>
-          </button>
+
+          {!isAuthenticated ? (
+            <button
+              type="button"
+              onClick={() => navigate("/login")}
+              className="flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 px-3.5 py-2 text-white transition cursor-pointer backdrop-blur-xs"
+            >
+              <svg className="w-4 h-4 text-sky-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>Iniciar Sesión</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              {usuario && (
+                <span className="hidden sm:inline-block rounded-xl bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-sky-200">
+                  {usuario.nombreCompleto || usuario.correo}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={cerrando}
+                className="flex items-center gap-1.5 rounded-xl bg-red-600/80 hover:bg-red-600 border border-red-500/30 px-3.5 py-2 text-white transition cursor-pointer backdrop-blur-xs disabled:opacity-50"
+              >
+                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>{cerrando ? "Cerrando sesión…" : "Cerrar sesión"}</span>
+              </button>
+            </div>
+          )}
         </nav>
       </div>
+
+      {errorCierre && (
+        <p role="alert" className="mx-auto max-w-7xl px-4 pb-2 text-xs text-red-300">
+          {errorCierre}
+        </p>
+      )}
     </header>
   );
 }
