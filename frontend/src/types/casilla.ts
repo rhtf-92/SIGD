@@ -27,25 +27,25 @@ export interface FirmanteDocumento {
 
 export interface ActoAdministrativo {
   tipoActo: string; // ej. "Resolución Directoral", "Oficio Múltiple"
-  numeroDocumento: string; // ej. "RD N.° 0412-2026-DG-IESTP-SUIZA"
+  numeroDocumento: string | null;
   anio: number;
   asunto: string;
-  resumenLegal: string;
+  resumenLegal: string | null;
   textoCompleto?: string;
-  nombreArchivoPdf: string;
-  tamanoArchivo: string;
+  nombreArchivoPdf: string | null;
+  tamanoArchivo: string | null;
   urlDescargaPdf?: string;
-  hashIntegridadSha256: string; // SHA-256 del acto administrativo
-  cvd: string; // Código de Verificación Digital (CVD-YYYY-TIP-XXXXXX-HASH)
+  hashIntegridadSha256: string | null;
+  cvd: string | null;
   firmantes: FirmanteDocumento[];
 }
 
 export interface DestinatarioCasilla {
   idPersona?: number;
-  nombresCompletos: string;
-  numeroDocumento: string; // DNI o RUC
-  tipoDocumento: "DNI" | "RUC" | "CE";
-  direccionCasilla: string; // ej. "74561238@casilla.iestpsuiza.edu.pe"
+  nombresCompletos: string | null;
+  numeroDocumento: string | null;
+  tipoDocumento: "DNI" | "RUC" | "CE" | null;
+  direccionCasilla: string | null;
   telefonoContacto?: string;
   correoPersonal?: string;
 }
@@ -53,34 +53,36 @@ export interface DestinatarioCasilla {
 export interface AcuseNotificacion {
   idAcuse: string; // ej. "ACU-2026-000412"
   idNotificacion: string;
-  numeroExpediente: string;
+  numeroExpediente: string | null;
   destinatario: DestinatarioCasilla;
-  timestampGeneracionIso: string; // Timestamp ISO-8601 devuelto por backend
-  hashSha256Acuse: string; // Hash SHA-256 devuelto por backend
-  cvdAcuse: string; // CVD del Acuse oficial
-  entidadEmisora: string; // "IESTP Suiza"
-  unidadEmisora: string; // ej. "Secretaría Académica"
-  fechaEfectoLegal: string; // Fecha en que surte efecto jurídico (Art. 20 Ley 27444)
-  plazoImpugnacionDiasHabiles: number; // ej. 15 días hábiles
+  documentoUrl?: string | null;
+  timestampGeneracionIso: string | null;
+  hashSha256Acuse: string | null;
+  cvdAcuse: string | null;
+  entidadEmisora: string | null;
+  unidadEmisora: string | null;
+  fechaEfectoLegal: string | null;
+  plazoImpugnacionDiasHabiles: number | null;
   fechaLimiteImpugnacion?: string;
   ipRegistro?: string;
-  validezLegalMensaje: string;
+  validezLegalMensaje: string | null;
 }
 
 export interface Notificacion {
   id: string;
-  numeroNotificacion: string; // ej. "NOT-2026-000184"
-  numeroExpediente: string; // ej. "EXP-2026-000104"
+  numeroNotificacion: string;
+  numeroExpediente: string | null;
   asunto: string;
   tipo: TipoNotificacion;
   estado: EstadoNotificacion;
-  prioridad: PrioridadNotificacion;
-  unidadEmisora: string; // ej. "Secretaría Académica", "Dirección General"
+  prioridad: PrioridadNotificacion | null;
+  unidadEmisora: string | null;
   responsableEmision?: string;
   fechaDepositoIso: string; // Timestamp ISO-8601 de depósito en buzón
   fechaLecturaIso?: string | null; // Primer acceso
   fechaNotificadoIso?: string | null; // Perfeccionamiento con acuse
   requiereAcuse: boolean;
+  documentoUrl?: string | null;
   actoAdministrativo: ActoAdministrativo;
   acuse?: AcuseNotificacion | null;
 }

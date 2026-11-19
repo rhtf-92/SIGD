@@ -8,8 +8,11 @@ export class ServicioTrazabilidadRutaDoc {
   async obtener(idExpediente: string, actor: ActorRutaDoc): Promise<{
     expedienteId: string; actuaciones: readonly ActuacionTrazabilidad[];
   }> {
-    if (!await this.repositorio.existeExpediente(idExpediente)) throw new NotFoundError({ detail: 'El expediente no existe.' });
     if (!actor.puedeVerExpediente || !await actor.puedeVerExpediente(idExpediente)) throw new ForbiddenError();
+    // Autorizar antes de consultar existencia evita distinguir un expediente
+    // ajeno de un identificador inexistente. Los errores del repositorio se
+    // propagan sin convertirlos en una denegación de acceso.
+    if (!await this.repositorio.existeExpediente(idExpediente)) throw new NotFoundError({ detail: 'El expediente no existe.' });
     const historial = await this.repositorio.listar(idExpediente);
     const actuaciones = historial.map((actuacion, indice) => {
       const siguiente = historial[indice + 1];

@@ -15,13 +15,11 @@ export default function AdminRoutes() {
   return (
     <>
       <Route index element={<AdministracionPage />} />
-      {/* DoD ENT-M05-02: el directorio de personal solo es accesible para
-          SUPER_ADMIN y DIRECTOR mediante guarda de ruta activa. */}
+      {/* El directorio utiliza la facultad institucional devuelta por IdentiCore. */}
       <Route
         path="usuarios"
         element={
           <ProtectedRoute
-            requiredRoles={["SUPER_ADMIN", "DIRECTOR"]}
             requiredModule="Administración"
             requiredAction="editar"
           >

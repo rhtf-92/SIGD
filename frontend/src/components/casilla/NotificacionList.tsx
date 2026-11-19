@@ -496,7 +496,7 @@ export default function NotificationList({
                   }}
                   tabIndex={0}
                   role="button"
-                  aria-label={`Notificación ${notif.numeroNotificacion}, expediente ${notif.numeroExpediente}, ${notif.asunto}`}
+                  aria-label={`Notificación ${notif.numeroNotificacion}, expediente ${notif.numeroExpediente ?? "sin CUT registrado"}, ${notif.asunto}`}
                   className={`group relative cursor-pointer rounded-2xl border bg-white p-5 shadow-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-600 ${
                     isNoLeido
                       ? "border-amber-300 ring-1 ring-amber-100 bg-gradient-to-r from-amber-50/40 via-white to-white"
@@ -514,7 +514,7 @@ export default function NotificationList({
                       </span>
                       <span className="text-slate-300">•</span>
                       <span className="text-xs font-semibold text-blue-700">
-                        Expediente: {notif.numeroExpediente}
+                        Expediente: {notif.numeroExpediente ?? "CUT no registrado"}
                       </span>
                       {notif.prioridad === "URGENTE" && (
                         <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-red-700">
@@ -538,8 +538,8 @@ export default function NotificationList({
                       <span className="font-semibold text-slate-700">
                         {notif.actoAdministrativo.tipoActo}:{" "}
                       </span>
-                      {notif.actoAdministrativo.numeroDocumento} —{" "}
-                      {notif.actoAdministrativo.resumenLegal}
+                      {notif.actoAdministrativo.numeroDocumento ?? "Número no registrado"} —{" "}
+                      {notif.actoAdministrativo.resumenLegal ?? "Sin resumen registrado"}
                     </p>
                   </div>
 
@@ -560,7 +560,7 @@ export default function NotificationList({
                         />
                       </svg>
                       <span className="font-medium text-slate-700">
-                        {notif.unidadEmisora}
+                        {notif.unidadEmisora ?? "Unidad no registrada"}
                       </span>
                     </div>
 

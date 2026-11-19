@@ -71,6 +71,25 @@ describe('Reversión administrativa RutaDoc', () => {
     expect(repo.conBloqueo).not.toHaveBeenCalled();
   });
 
+  it('acepta actor con identificador UUID canonico institucional', async () => {
+    const { repo, servicio } = preparar();
+    const actorUuid: ActorRutaDoc = {
+      id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+      roles: ['ADMINISTRADOR'],
+      puedeVerExpediente: () => true,
+    };
+    const res = await servicio.revertir('42', comando, actorUuid, 'corr-1');
+    expect(res).toHaveProperty('expedienteId', '42');
+    expect(repo.conBloqueo).toHaveBeenCalledOnce();
+  });
+
+  it('rechaza actor con identificador malformado no UUID ni numerico', async () => {
+    const { repo, servicio } = preparar();
+    await expect(servicio.revertir('42', comando, { ...actor, id: 'invalido!' }, 'corr-1'))
+      .rejects.toMatchObject({ status: 401 });
+    expect(repo.conBloqueo).not.toHaveBeenCalled();
+  });
+
   it('deniega permiso después de leer existencia bajo el lock', async () => {
     const { repo, politica, servicio } = preparar();
     politica.mockResolvedValue(false);

@@ -113,10 +113,11 @@ export const casillaService = {
    * Marca una notificación como LEÍDA tras su apertura en el modal
    */
   async marcarComoLeido(id: string): Promise<Notificacion> {
-    const response = await apiClient.patch<Notificacion>(
+    await apiClient.patch(
       CASILLA_ENDPOINTS.MARCAR_LEIDO(id),
     );
-    return response.data;
+    // El PATCH devuelve un comprobante de lectura, no el DTO del modal.
+    return casillaService.getNotificacionById(id);
   },
 
   /**
@@ -153,70 +154,54 @@ export const casillaService = {
     return response.data;
   },
 
-  /**
-   * Simula la descarga o apertura del acto administrativo PDF
-   */
-  descargarDocumento(notificacion: Notificacion): void {
-    const filename =
-      notificacion.actoAdministrativo.nombreArchivoPdf || "acto_notificado.pdf";
-    // Generar un blob simulado con texto representativo o abrir enlace
-    const contenido = `--- INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA ---
-CÉDULA DE NOTIFICACIÓN OFICIAL / ACTO ADMINISTRATIVO
-Expediente: ${notificacion.numeroExpediente}
-Documento: ${notificacion.actoAdministrativo.numeroDocumento}
-Asunto: ${notificacion.asunto}
-Hash SHA-256: ${notificacion.actoAdministrativo.hashIntegridadSha256}
-CVD: ${notificacion.actoAdministrativo.cvd}
-Fecha Emisión: ${notificacion.fechaDepositoIso}
-
-${notificacion.actoAdministrativo.resumenLegal}
-
-${notificacion.actoAdministrativo.textoCompleto || ""}
-`;
-    const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+  /** Descarga el PDF autorizado por el backend, sin generar un documento sustituto. */
+  async descargarDocumento(notificacion: Notificacion): Promise<void> {
+    await descargarPdf(
+      CASILLA_ENDPOINTS.DESCARGAR_DOCUMENTO(notificacion.id),
+      notificacion.actoAdministrativo.nombreArchivoPdf || "acto_notificado.pdf",
+    );
   },
 
-  /**
-   * Simula la descarga oficial de la Cédula de Acuse Digital Legal
-   */
-  descargarAcuse(acuse: AcuseNotificacion): void {
-    const filename = `ACUSE_LEGAL_${acuse.idAcuse}.txt`;
-    const contenido = `================================================================================
-INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO SUIZA (IESTP SUIZA)
-CONSTANCIA Y CÉDULA DE ACUSE DE NOTIFICACIÓN ELECTRÓNICA INSTITUCIONAL
-Conforme al Artículo 20 del TUO de la Ley N° 27444 y Ley N° 29733
-================================================================================
-
-IDENTIFICADOR DE ACUSE : ${acuse.idAcuse}
-EXPEDIENTE              : ${acuse.numeroExpediente}
-UNIDAD EMISORA          : ${acuse.unidadEmisora}
-DESTINATARIO            : ${acuse.destinatario.nombresCompletos}
-DOCUMENTO IDENTIDAD     : ${acuse.destinatario.tipoDocumento} ${acuse.destinatario.numeroDocumento}
-CASILLA ELECTRÓNICA     : ${acuse.destinatario.direccionCasilla}
-
-FECHA Y HORA UTC (ISO)  : ${acuse.timestampGeneracionIso}
-HASH CRIPTOGRÁFICO SHA256: ${acuse.hashSha256Acuse}
-CÓDIGO VERIFICACIÓN (CVD): ${acuse.cvdAcuse}
-SURTIMIENTO DE EFECTO   : ${acuse.fechaEfectoLegal}
-PLAZO LEGAL DE IMPUGN.  : ${acuse.plazoImpugnacionDiasHabiles} días hábiles
-
-VALIDEZ LEGAL:
-${acuse.validezLegalMensaje}
-
-Este documento digital cuenta con valor probatorio inmutable en sede administrativa.
-================================================================================`;
-    const blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+  async descargarAcuse(acuse: AcuseNotificacion): Promise<void> {
+    await descargarPdf(
+      CASILLA_ENDPOINTS.DESCARGAR_ACUSE(acuse.idNotificacion),
+      `ACUSE_LEGAL_${acuse.idAcuse}.pdf`,
+    );
   },
 };
+
+async function descargarPdf(endpoint: string, nombreArchivo: string): Promise<void> {
+  const respuesta = await apiClient.get<{ downloadUrl: string }>(endpoint);
+  let downloadUrl = respuesta.data?.downloadUrl;
+  // Las rutas de Casilla pueden remitir al endpoint protegido de Storage.
+  // Sólo esa ruta recibe el JWT del cliente HTTP; nunca se envía a S3.
+  if (typeof downloadUrl === "string" && downloadUrl.startsWith("/api/v1/storage/download/")) {
+    const descarga = await apiClient.get<{ downloadUrl: string }>(downloadUrl);
+    downloadUrl = descarga.data?.downloadUrl;
+  }
+  let url: URL;
+  try {
+    url = new URL(downloadUrl);
+  } catch {
+    throw new Error("El servidor no proporcionó una URL de descarga válida.");
+  }
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+    throw new Error("El servidor no proporcionó una URL de descarga válida.");
+  }
+  const archivo = await fetch(url.href, { credentials: "omit" });
+  if (!archivo.ok) throw new Error("No se pudo obtener el archivo del almacenamiento.");
+  const bytes = await archivo.arrayBuffer();
+  const firmaPdf = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 5));
+  if (String.fromCharCode(...firmaPdf) !== "%PDF-") {
+    throw new Error("El almacenamiento no devolvió un documento PDF.");
+  }
+  const blobUrl = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  try {
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = nombreArchivo;
+    link.click();
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}

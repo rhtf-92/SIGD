@@ -104,14 +104,14 @@ describe("Validador público CVD — ENT-M04-05 (F_ADRIANO)", () => {
     expect(screen.getByText("Lic. Julio César Mori Paredes")).toBeInTheDocument();
     expect(screen.getByText(/RENIEC \/ IOFE INDECOPI/)).toBeInTheDocument();
     expect(screen.getByText(/Sellado de tiempo TSA/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Descargar dictamen cotejado/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Abrir documento original/i })).toHaveAttribute("href", RESULTADO_VALIDO.documento!.urlDescargaAutentica);
   });
 
   it("8. el dictamen apócrifo despliega alerta roja de no reconocido o adulterado", () => {
     render(<CvdIntegrityReport resultado={RESULTADO_ADULTERADO} />);
     const alerta = screen.getByRole("alert");
     expect(alerta).toBeInTheDocument();
-    expect(alerta.textContent).toMatch(/adulterado/i);
-    expect(screen.getByText(/Documento no reconocido o adulterado/i)).toBeInTheDocument();
+    expect(alerta).toHaveTextContent(RESULTADO_ADULTERADO.mensajeSeguridad);
+    expect(screen.getByText(/Documento no verificable/i)).toBeInTheDocument();
   });
 });

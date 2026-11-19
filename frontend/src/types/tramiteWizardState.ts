@@ -109,6 +109,13 @@ export interface ArchivoTramite {
   storageUrl?: string;
   s3Key?: string;
   idDocumentoAdjunto?: string;
+  clasificacion?: 'EXPEDIENTE' | 'ANEXO';
+  requisitoId?: string;
+  tipoDocumentalId?: string;
+  tipoDocumentalCodigo?: string;
+  paginas?: number;
+  folioInicio?: number;
+  folioFin?: number;
 }
 
 /**
@@ -136,6 +143,7 @@ export interface DeclaracionJuradaData {
  * Contiene el Código Único de Trámite (CUT) inmutable y trazabilidad.
  */
 export interface CargoDigitalResponse {
+  mensajeLegal?: string;
   cut: string;
   fechaRadicacion: string;
   fechaRecepcionOficial: string;

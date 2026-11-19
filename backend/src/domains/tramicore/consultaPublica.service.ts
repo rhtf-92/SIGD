@@ -28,6 +28,15 @@ export interface DtoProveidoPublico {
   resumen: string;
 }
 
+export interface DtoOrdenPagoPublica {
+  codigo: string;
+  importe: string;
+  moneda: string;
+  fechaEmision: string;
+  indicaciones: string;
+  estado: string;
+}
+
 export interface DtoConsultaPublica {
   cut: string;
   anioFiscal: number;
@@ -47,6 +56,8 @@ export interface DtoConsultaPublica {
   documentos: DtoDocumentoPublico[];
   proveidos: DtoProveidoPublico[];
   mensajeLegal: string;
+  condicionEconomica?: 'PENDIENTE DE PAGO' | 'PAGO VERIFICADO' | 'GRATUITO' | null;
+  ordenPago?: DtoOrdenPagoPublica | null;
 }
 
 interface FilaConsulta {
@@ -65,6 +76,14 @@ interface FilaConsulta {
   nombres: string | null;
   apellido_paterno: string | null;
   apellido_materno: string | null;
+  orden_id?: string | null;
+  orden_codigo?: string | null;
+  orden_importe?: string | null;
+  orden_moneda?: string | null;
+  orden_fecha?: Date | null;
+  pago_verificado?: boolean | null;
+  estado_pago?: string | null;
+  tarifa_importe?: number | null;
 }
 
 interface FilaDocumento {
@@ -99,6 +118,31 @@ export class ConsultaPublicaService {
         this.leerDocumentos(cliente, params.cut),
         this.leerProveidosPublicos(cliente, params.cut),
       ]);
+
+      let condicionEconomica: 'PENDIENTE DE PAGO' | 'PAGO VERIFICADO' | 'GRATUITO' | null = null;
+      let ordenPago: DtoOrdenPagoPublica | null = null;
+
+      if (expediente.orden_id) {
+        if (expediente.pago_verificado) {
+          condicionEconomica = 'PAGO VERIFICADO';
+        } else {
+          condicionEconomica = 'PENDIENTE DE PAGO';
+        }
+        ordenPago = {
+          codigo: expediente.orden_codigo ?? '',
+          importe: expediente.orden_importe ?? '0.00',
+          moneda: expediente.orden_moneda ?? 'PEN',
+          fechaEmision: expediente.orden_fecha ? (expediente.orden_fecha instanceof Date ? expediente.orden_fecha.toISOString() : String(expediente.orden_fecha)) : new Date().toISOString(),
+          indicaciones: 'Pague en efectivo en la caja de Tesorería del Instituto indicando su CUT o código de orden. La orden no acredita pago hasta su recepción en caja.',
+          estado: expediente.pago_verificado ? 'VERIFICADO' : (expediente.estado_pago ?? 'PENDIENTE'),
+        };
+      } else if (expediente.tarifa_importe !== undefined && expediente.tarifa_importe !== null) {
+        if (Number(expediente.tarifa_importe) === 0) {
+          condicionEconomica = 'GRATUITO';
+        } else {
+          condicionEconomica = 'PENDIENTE DE PAGO';
+        }
+      }
 
       return {
         cut: expediente.cut,
@@ -167,7 +211,7 @@ export class ConsultaPublicaService {
          LEFT JOIN sigd_tra.asiento_registro ar
                 ON ar.expediente_id = e.expediente_id AND ar.anulado = FALSE
          LEFT JOIN sigd_auth.persona p
-                ON p.id_persona = e.solicitante_id
+                ON p.id_persona = COALESCE(te.solicitante_id, e.solicitante_id)
          LEFT JOIN sigd_auth.persona_natural pn
                 ON pn.id_persona = p.id_persona
          LEFT JOIN sigd_auth.persona_juridica pj

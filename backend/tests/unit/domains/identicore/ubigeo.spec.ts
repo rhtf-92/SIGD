@@ -36,7 +36,7 @@ function construirCatalogo(): string {
 }
 
 describe('UbigeoService', () => {
-  it('lee el catálogo normalizado una vez, publica en Redis y reutiliza la caché local', async () => {
+  it('lee el catálogo normalizado una vez desde PostgreSQL, publica en Redis y reutiliza la caché local', async () => {
     const query = vi.fn().mockResolvedValue({ rows: filas });
     const pool = { query } as unknown as Pool;
     const get = vi.fn().mockResolvedValue(null);

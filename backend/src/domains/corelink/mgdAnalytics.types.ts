@@ -132,4 +132,6 @@ export interface ResultadoRefrescoMgd {
   duracionMs: number;
   /** Cierto si otra petición ya tenía el lock y este refresco se omitió. */
   refrescoYaEnCurso: boolean;
+  vistasDisponibles?: boolean;
+  mensaje?: string;
 }

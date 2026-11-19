@@ -10,7 +10,7 @@ import { z } from "zod";
  * - T-BE-OC-07: Validación de correo institucional
  */
 
-const DOMINIO_INSTITUCIONAL = "@iestpsuiza.edu.pe";
+const DOMINIOS_INSTITUCIONALES = ["@iestpsuiza.edu.pe", "@iestp-suiza.edu.pe"];
 
 /**
  * Estados funcionales del usuario.
@@ -37,10 +37,10 @@ export const correoInstitucionalSchema = z
   .email("El correo electrónico no tiene un formato válido")
   .refine(
     (correo: string) =>
-      correo.toLowerCase().endsWith(DOMINIO_INSTITUCIONAL),
+      DOMINIOS_INSTITUCIONALES.some((dom) => correo.toLowerCase().endsWith(dom)),
     {
       message:
-        "El correo debe pertenecer al dominio institucional @iestpsuiza.edu.pe",
+        "El correo debe pertenecer al dominio institucional (@iestpsuiza.edu.pe o @iestp-suiza.edu.pe)",
     },
   );
 
@@ -72,6 +72,7 @@ export const listarUsuariosQuerySchema = z.object({
     .optional(),
 
   estado: estadoUsuarioSchema.optional(),
+  motivo: z.string().trim().max(500, 'El motivo no puede superar los 500 caracteres').optional(),
 
   pagina: z.coerce
     .number()
@@ -85,7 +86,7 @@ export const listarUsuariosQuerySchema = z.object({
     .min(1, "El límite mínimo es 1")
     .max(100, "El límite máximo es 100")
     .default(20),
-});
+}).strict();
 
 /**
  * POST /api/v1/admin/usuarios
@@ -96,7 +97,7 @@ export const crearUsuarioAdminSchema = z.object({
   tipoDocumentoId: z.coerce
     .number()
     .int()
-    .positive("El tipo de documento es obligatorio"),
+    .positive("El tipo de documento es obligatorio").max(32767),
 
   numeroDocumento: z
     .string()
@@ -149,17 +150,37 @@ export const crearUsuarioAdminSchema = z.object({
 
   puestoLaboralId: z
     .string()
-    .uuid("El ID del puesto laboral no es válido"),
+    .uuid("El ID del puesto laboral no es válido").optional(),
+  cargoId: z.string().uuid().optional(),
+  areaId: z.string().uuid().optional(),
 
   rolId: z
     .string()
-    .uuid("El ID del rol no es válido"),
+    .uuid("El ID del rol no es válido")
+    .optional(),
+  estado: z.enum(["ACTIVO", "INACTIVO"]).default("INACTIVO"),
+}).strict().superRefine((datos, ctx) => {
+  if (!datos.puestoLaboralId && (!datos.cargoId || !datos.areaId)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['cargoId'], message: 'Seleccione cargo y área existentes.' });
+  }
+  if ([datos.apellidoPaterno, datos.apellidoMaterno].filter(Boolean).join(' ').length > 120) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['apellidoPaterno'], message: 'Los apellidos completos no pueden superar 120 caracteres.' });
+  }
 });
+
+export const restablecerCredencialesAdminSchema = z.object({
+  passwordInicial: z.string().min(12, "La contraseña temporal debe tener al menos 12 caracteres.").max(128),
+}).strict();
 
 /**
  * Schema base para actualización.
  */
 const actualizarUsuarioAdminBaseSchema = z.object({
+  apellidos: z.string().trim().min(2).max(120).optional(),
+  cargoId: z.string().uuid().optional(),
+  areaId: z.string().uuid().optional(),
+  asignacionId: z.string().uuid().optional(),
+  usuarioRolId: z.string().uuid().optional(),
   nombres: z
     .string()
     .trim()
@@ -201,7 +222,7 @@ const actualizarUsuarioAdminBaseSchema = z.object({
     .optional(),
 
   estado: estadoUsuarioSchema.optional(),
-});
+}).strict();
 
 /**
  * PUT /api/v1/admin/usuarios/:id
@@ -221,17 +242,34 @@ export const actualizarUsuarioAdminSchema =
 /**
  * Parámetro :id del usuario.
  *
- * Actualmente:
- * sigd_auth.cuenta_usuario.id = BIGSERIAL
- *
- * Por eso el identificador se valida como entero positivo.
+ * Clave original: sigd_auth.cuenta_usuario.id_usuario UUID.
  */
 export const usuarioIdParamSchema = z.object({
-  id: z.coerce
-    .number()
-    .int("El ID del usuario debe ser un número entero")
-    .positive("El ID del usuario debe ser mayor que cero"),
+  id: z.string().uuid("El ID del usuario debe ser un UUID válido"),
 });
+
+export const asignarRolUsuarioSchema = z.object({
+  rolId: z.string().uuid("El ID del rol debe ser un UUID válido"),
+}).strict();
+
+export const revocarRolParamSchema = z.object({
+  id: z.string().uuid("El ID del usuario debe ser un UUID válido"),
+  usuarioRolId: z.string().uuid("El ID de asignación debe ser un UUID válido"),
+}).strict();
+
+export const asignarCapacidadUsuarioSchema = z.object({
+  capacidadCodigo: z.string().min(3).max(64),
+  areaId: z.string().uuid("El ID del área debe ser un UUID válido"),
+  justificacion: z.string().min(10).max(500).optional(),
+}).strict();
+
+export const revocarCapacidadParamSchema = z.object({
+  id: z.string().uuid("El ID del usuario debe ser un UUID válido"),
+  usuarioCapacidadId: z.string().uuid("El ID de capacidad debe ser un UUID válido"),
+}).strict();
+
+export type AsignarRolUsuarioDTO = z.infer<typeof asignarRolUsuarioSchema>;
+export type AsignarCapacidadUsuarioDTO = z.infer<typeof asignarCapacidadUsuarioSchema>;
 
 /* =========================================================
  * TIPOS TYPESCRIPT

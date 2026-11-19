@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+// Account creation does not require domicile when the deployed profile cannot store it.
+export const domicilioNoSolicitadoSchema = z.object({
+  departamentoCodigo: z.string(), provinciaCodigo: z.string(), distritoCodigo: z.string(),
+  direccionExacta: z.string(), referencia: z.string().optional(),
+});
+
 /* --- Persona Natural --- */
 
 /* Schema persona natural */
@@ -8,12 +14,12 @@ export const naturalSchema = z
     tipoPersona: z.literal("NATURAL"),
     nombres: z
       .string()
-      .regex(/^[A-Za-zÁÉÍÓÚáéíóúñÑ\s]{2,80}$/, {
+      .regex(/^[A-Za-zÁÉÍÓÚáéíóúüÜñÑ\s]{2,80}$/, {
         message: "Nombres deben tener 2-80 caracteres alfabéticos con tildes y espacios",
       }),
     apellidos: z
       .string()
-      .regex(/^[A-Za-zÁÉÍÓÚáéíóúñÑ\s]{2,80}$/, {
+      .regex(/^[A-Za-zÁÉÍÓÚáéíóúüÜñÑ\s]{2,80}$/, {
         message: "Apellidos deben tener 2-80 caracteres alfabéticos con tildes y espacios",
       }),
     fechaNacimiento: z
@@ -113,12 +119,12 @@ const juridicalDocumentSchema = z
       ),
     nombres: z
       .string()
-      .regex(/^[A-Za-zÁÉÍÓÚáéíóúñÑ\s]{2,80}$/, {
+      .regex(/^[A-Za-zÁÉÍÓÚáéíóúüÜñÑ\s]{2,80}$/, {
         message: "Nombres deben tener 2-80 caracteres alfabéticos con tildes y espacios",
       }),
     apellidos: z
       .string()
-      .regex(/^[A-Za-zÁÉÍÓÚáéíóúñÑ\s]{2,80}$/, {
+      .regex(/^[A-Za-zÁÉÍÓÚáéíóúüÜñÑ\s]{2,80}$/, {
         message: "Apellidos deben tener 2-80 caracteres alfabéticos con tildes y espacios",
       }),
     cargo: z

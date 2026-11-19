@@ -23,7 +23,7 @@ import { BridgeNotificacion } from '../../core/realtime/bridge-notificacion.js';
  */
 
 const databaseUrl =
-  process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
+  process.env.DATABASE_URL ?? 'postgres://postgres:postgres_password@127.0.0.1:5433/sigd_jacobo_demo';
 
 const pool = crearPool(databaseUrl);
 const busSse = new BusSse();

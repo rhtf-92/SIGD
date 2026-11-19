@@ -1,124 +1,76 @@
-// Hook de administración del Directorio de Usuarios (ENT-M05-02 / T-FE-ADM-01)
-// Desacoplado del mock `usuariosIniciales`: delega la carga en
-// `adminUsuariosService` (TanStack Query) y aplica debounce de 300 ms al
-// buscador para evitar peticiones redundantes al servidor.
 import { useEffect, useMemo, useState } from "react";
-
 import {
+  consultarUsuario,
   useActualizarUsuarioMutation,
   useConmutarEstadoMutation,
+  useCrearUsuarioMutation,
+  useRestablecerCredencialesMutation,
   useUsuariosQuery,
+  useAsignarRolMutation,
+  useRevocarRolMutation,
 } from "../services/adminUsuariosService";
+import { useAuthStore } from "../stores/authStore";
 import {
   DEBOUNCE_BUSQUEDA_MS,
   FILTROS_USUARIOS_INICIALES,
   type EstadoUsuario,
   type FiltrosUsuarios,
   type Usuario,
+  type UpdateUsuarioDTO,
 } from "../types/usuarioAdmin";
 
-export const CATALOGO_ROLES_USUARIOS = [
-  "Administrador",
-  "Responsable de Área",
-  "Operador",
-  "Consulta",
-];
-
-export const CATALOGO_AREAS = [
-  "Dirección General",
-  "Secretaría Académica",
-  "Mesa de Partes",
-  "Administración",
-  "Archivo Central",
-  "Coordinación DSI",
-];
-
-export const CATALOGO_SEDES = ["Sede Principal"];
-
-function siguienteEstado(estado: EstadoUsuario): EstadoUsuario {
-  if (estado === "Activo") return "Inactivo";
-  if (estado === "Inactivo") return "Bloqueado";
-  return "Activo";
-}
-
 export function useUsuariosAdmin() {
-  const [busqueda, setBusqueda] = useState(FILTROS_USUARIOS_INICIALES.busqueda);
-  const [busquedaAplicada, setBusquedaAplicada] = useState(
-    FILTROS_USUARIOS_INICIALES.busqueda,
-  );
-  const [area, setArea] = useState(FILTROS_USUARIOS_INICIALES.area);
-  const [sede, setSede] = useState(FILTROS_USUARIOS_INICIALES.sede);
-  const [rol, setRol] = useState(FILTROS_USUARIOS_INICIALES.rol);
-  const [estado, setEstado] = useState<EstadoUsuario | "Todos">(
-    FILTROS_USUARIOS_INICIALES.estado,
-  );
+  const [busqueda, setBusqueda] = useState("");
+  const [busquedaAplicada, setBusquedaAplicada] = useState("");
+  const [area, cambiarArea] = useState("");
+  const [sede, cambiarSede] = useState("");
+  const [rol, cambiarRol] = useState("");
+  const [estado, cambiarEstado] = useState<EstadoUsuario | "Todos">("Todos");
+  const [pagina, setPagina] = useState(1);
   const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
-
-  // Debounce de 300 ms: el texto tecleado no dispara peticiones hasta 300 ms
-  // después de la última pulsación, reduciendo el tráfico hacia el backend.
+  const cuenta = useAuthStore(s => s.usuario?.id ?? null);
+  useEffect(() => { setUsuarioEditando(null); }, [cuenta]);
   useEffect(() => {
     if (busqueda === busquedaAplicada) return;
-    const temporizador = setTimeout(() => {
-      setBusquedaAplicada(busqueda);
-    }, DEBOUNCE_BUSQUEDA_MS);
-
+    const temporizador = setTimeout(() => { setBusquedaAplicada(busqueda); setPagina(1); }, DEBOUNCE_BUSQUEDA_MS);
     return () => clearTimeout(temporizador);
   }, [busqueda, busquedaAplicada]);
-
-  const filtros = useMemo<FiltrosUsuarios>(
-    () => ({ busqueda: busquedaAplicada, area, sede, rol, estado }),
-    [busquedaAplicada, area, sede, rol, estado],
-  );
-
+  const filtros = useMemo<FiltrosUsuarios>(() => ({ ...FILTROS_USUARIOS_INICIALES,
+    busqueda: busquedaAplicada, area, sede, rol, estado, pagina }), [busquedaAplicada, area, sede, rol, estado, pagina]);
   const consulta = useUsuariosQuery(filtros);
+  useEffect(() => { if (consulta.isError) setUsuarioEditando(null); }, [consulta.isError]);
   const mutacionActualizacion = useActualizarUsuarioMutation();
+  const mutacionCreacion = useCrearUsuarioMutation();
+  const mutacionCredenciales = useRestablecerCredencialesMutation();
   const mutacionEstado = useConmutarEstadoMutation();
+  const mutacionAsignarRol = useAsignarRolMutation();
+  const mutacionRevocarRol = useRevocarRolMutation();
 
-  const usuarios = useMemo(() => consulta.data ?? [], [consulta.data]);
-
-  function actualizarUsuario(usuarioActualizado: Usuario) {
-    return mutacionActualizacion.mutateAsync({
-      id: usuarioActualizado.id,
-      cambios: {
-        area: usuarioActualizado.area,
-        sede: usuarioActualizado.sede,
-        cargo: usuarioActualizado.cargo,
-        rol: usuarioActualizado.rol,
-      },
-    });
-  }
-
-  function conmutarEstado(id: number) {
-    const usuario = usuarios.find((item) => item.id === id);
-    if (!usuario) return undefined;
-
-    return mutacionEstado.mutateAsync({
-      id,
-      estado: siguienteEstado(usuario.estado),
-    });
+  const usuarios = consulta.isError ? [] : consulta.data?.datos ?? [];
+  async function conmutarEstado(id: string) {
+    const usuario = usuarios.find(item => item.id === id);
+    if (!usuario) throw new Error("El usuario seleccionado ya no está disponible.");
+    return mutacionEstado.mutateAsync({ id, estado: usuario.estado === "Activo" ? "Inactivo" : "Activo" });
   }
 
   return {
-    usuarios,
-    totalUsuarios: usuarios.length,
-    busqueda,
-    setBusqueda,
-    area,
-    setArea,
-    sede,
-    setSede,
-    rol,
-    setRol,
-    estado,
-    setEstado,
-    usuarioEditando,
-    setUsuarioEditando,
-    actualizarUsuario,
-    conmutarEstado,
-    isLoading: consulta.isLoading,
-    isFetching: consulta.isFetching,
-    error: consulta.error,
-    guardarPendiente: mutacionActualizacion.isPending,
-    estadoPendiente: mutacionEstado.isPending,
+    usuarios, totalUsuarios: consulta.isError ? 0 : consulta.data?.paginacion.total ?? 0,
+    paginacion: consulta.isError ? undefined : consulta.data?.paginacion, pagina, setPagina,
+    catalogos: (!consulta.isError && consulta.data?.catalogos) || { areas: [], cargos: [], roles: [], tiposDocumento: [] },
+    busqueda, setBusqueda, area, setArea: (v: string) => { cambiarArea(v); setPagina(1); },
+    sede, setSede: (v: string) => { cambiarSede(v); setPagina(1); },
+    rol, setRol: (v: string) => { cambiarRol(v); setPagina(1); },
+    estado, setEstado: (v: EstadoUsuario | "Todos") => { cambiarEstado(v); setPagina(1); },
+    usuarioEditando, setUsuarioEditando,
+    actualizarUsuario: (id: string, cambios: UpdateUsuarioDTO) => mutacionActualizacion.mutateAsync({ id, cambios }),
+    crearUsuario: (cambios: Parameters<typeof mutacionCreacion.mutateAsync>[0]) => mutacionCreacion.mutateAsync(cambios),
+    restablecerCredenciales: (id: string, passwordInicial: string) => mutacionCredenciales.mutateAsync({ id, passwordInicial }),
+    asignarRol: (id: string, rolId: string) => mutacionAsignarRol.mutateAsync({ id, rolId }),
+    revocarRol: (id: string, usuarioRolId: string) => mutacionRevocarRol.mutateAsync({ id, usuarioRolId }),
+    consultarUsuario,
+    conmutarEstado, isLoading: consulta.isLoading, isFetching: consulta.isFetching, error: consulta.error,
+    guardarPendiente: mutacionActualizacion.isPending, crearPendiente: mutacionCreacion.isPending,
+    credencialesPendiente: mutacionCredenciales.isPending, estadoPendiente: mutacionEstado.isPending,
+    asignarRolPendiente: mutacionAsignarRol.isPending, revocarRolPendiente: mutacionRevocarRol.isPending,
   };
 }

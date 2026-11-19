@@ -4,7 +4,8 @@ import { ConflictError } from '../../shared/domain/errors/conflict-error.js';
 import { ForbiddenError } from '../../shared/domain/errors/forbidden-error.js';
 import { NotFoundError } from '../../shared/domain/errors/not-found-error.js';
 import { UnauthorizedError } from '../../shared/domain/errors/unauthorized-error.js';
-import { esIdExpediente } from './rutadoc.cursor.js';
+import { z } from 'zod';
+import { esIdNumericoPositivo } from './rutadoc.reversion.schemas.js';
 import { RepositorioReversionRutaDoc, type FilaCompensacion } from './rutadoc.reversion.repository.js';
 import type {
   ComandoReversion, CompensacionFolios, FolioCompensationPort, PoliticaReversionRutaDoc,
@@ -14,6 +15,12 @@ import type { ActorRutaDoc } from './rutadoc.types.js';
 import { FolioCompensationPostgres, prepararCompensacionPendiente } from './rutadoc.folio-compensation.js';
 
 export { prepararCompensacionPendiente };
+
+export function esIdentificadorActorValido(id: unknown): boolean {
+  if (typeof id !== 'string') return false;
+  if (z.string().uuid().safeParse(id).success) return true;
+  return esIdNumericoPositivo(id);
+}
 
 function huellaComando(expedienteId: string, comando: ComandoReversion): string {
   return createHash('sha256').update(JSON.stringify({
@@ -47,7 +54,7 @@ export class ServicioReversionRutaDoc {
 
   async revertir(expedienteId: string, comando: ComandoReversion,
     actor: ActorRutaDoc, correlationId: string): Promise<ResultadoReversion> {
-    if (!esIdExpediente(actor.id)) throw new UnauthorizedError();
+    if (!esIdentificadorActorValido(actor.id)) throw new UnauthorizedError();
     const huella = huellaComando(expedienteId, comando);
     return this.repositorio.conBloqueo(expedienteId, async (cliente) => {
       if (!await this.repositorio.existeExpediente(cliente, expedienteId)) {

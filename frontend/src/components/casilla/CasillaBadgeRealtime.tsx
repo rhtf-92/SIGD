@@ -28,7 +28,12 @@ export function CasillaBadgeRealtime() {
       : "No tiene notificaciones pendientes en su casilla electrónica";
 
   return (
-    <div className="relative inline-flex items-center" role="status" aria-live="polite">
+    <div
+      className="relative inline-flex items-center gap-1.5"
+      role="status"
+      aria-live="polite"
+      title={sseConectado ? "Conectado en tiempo real (SSE CoreLink)" : "Actualizando periódicamente"}
+    >
       <span aria-hidden="true" className={`text-2xl ${pulsando ? "animate-pulse" : ""}`}>
         🔔
       </span>
@@ -41,6 +46,12 @@ export function CasillaBadgeRealtime() {
           {noLeidas > 99 ? "99+" : noLeidas}
         </span>
       )}
+      <span
+        className={`inline-block h-2 w-2 rounded-full ${
+          sseConectado ? "bg-emerald-500 shadow-xs shadow-emerald-400" : "bg-slate-400"
+        }`}
+        title={sseConectado ? "SSE en línea" : "SSE reconectando"}
+      />
       <span className="sr-only">
         {mensajeAccesible}
         {!sseConectado && " (actualizando periódicamente)"}

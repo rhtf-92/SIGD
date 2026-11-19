@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { juridicalSchema } from "../../schemas/registroCiudadano.schema";
+import { juridicalSchema, domicilioNoSolicitadoSchema } from "../../schemas/registroCiudadano.schema";
 import type { Juridical } from "../../types/registroCiudadano";
 import { UbigeoSelector } from "../common/UbigeoSelector";
-import type { UbigeoDTO } from "../../data/ucayali";
+import type { UbigeoDTO } from "../../hooks/useUbigeoCascade";
 import { DeclaracionJuradaCheckbox } from "./DeclaracionJuradaCheckbox";
 import { ConsentimientoLey29733Modal } from "./ConsentimientoLey29733Modal";
 
 interface PersonaJuridicaFormProps {
+  solicitarDomicilio?: boolean;
   onSubmit: (data: Juridical) => void | Promise<void>;
 }
 
 export default function PersonaJuridicaForm({
+  solicitarDomicilio = true,
   onSubmit,
 }: PersonaJuridicaFormProps) {
   const [isConsentimientoModalOpen, setIsConsentimientoModalOpen] =
@@ -25,7 +27,7 @@ export default function PersonaJuridicaForm({
     watch,
     formState: { errors, isSubmitting },
   } = useForm<Juridical>({
-    resolver: zodResolver(juridicalSchema),
+    resolver: zodResolver(solicitarDomicilio ? juridicalSchema : juridicalSchema.extend({ domicilio: domicilioNoSolicitadoSchema })),
     defaultValues: {
       tipoPersona: "JURIDICA",
       ruc: "",
@@ -41,7 +43,7 @@ export default function PersonaJuridicaForm({
       correoCorporativo: "",
       celularContacto: "",
       domicilio: {
-        departamentoCodigo: "",
+        departamentoCodigo: "25",
         provinciaCodigo: "",
         distritoCodigo: "",
         direccionExacta: "",
@@ -61,7 +63,7 @@ export default function PersonaJuridicaForm({
   const handleUbigeoChange = (_ubigeoCod: string, dto: UbigeoDTO) => {
     const updatedDomicilio = {
       ...domicilioValue,
-      departamentoCodigo: dto.departamento.id,
+      departamentoCodigo: dto.departamento?.id || "",
       provinciaCodigo: dto.provincia?.id || "",
       distritoCodigo: dto.distrito?.id || "",
       // Mantener dirección exacta y referencia existentes
@@ -98,7 +100,13 @@ export default function PersonaJuridicaForm({
           <input
             id="ruc"
             type="text"
-            {...register("ruc")}
+            inputMode="numeric"
+            {...register("ruc", {
+              onChange: (e) => {
+                e.target.value = e.target.value.replace(/\D/g, "").slice(0, 11);
+                setValue("ruc", e.target.value, { shouldValidate: true });
+              },
+            })}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
               errors.ruc ? "border-red-500" : "border-gray-300"
             }`}
@@ -169,11 +177,20 @@ export default function PersonaJuridicaForm({
           <input
             id="representanteNumeroDocumento"
             type="text"
-            {...register("representanteLegal.numeroDocumento")}
+            inputMode={watch("representanteLegal.tipoDocumento") === "DNI" ? "numeric" : "text"}
+            maxLength={watch("representanteLegal.tipoDocumento") === "DNI" ? 8 : 12}
+            {...register("representanteLegal.numeroDocumento", {
+              onChange: (e) => {
+                if (watch("representanteLegal.tipoDocumento") === "DNI") {
+                  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 8);
+                  setValue("representanteLegal.numeroDocumento", e.target.value, { shouldValidate: true });
+                }
+              },
+            })}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
               errors.representanteLegal?.numeroDocumento ? "border-red-500" : "border-gray-300"
             }`}
-            placeholder="DNI: 8 dígitos o CE: 9-12 caracteres"
+            placeholder={watch("representanteLegal.tipoDocumento") === "DNI" ? "DNI: 8 dígitos" : "CE: 9-12 caracteres"}
           />
           {errors.representanteLegal?.numeroDocumento && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -194,7 +211,12 @@ export default function PersonaJuridicaForm({
           <input
             id="representanteNombres"
             type="text"
-            {...register("representanteLegal.nombres")}
+            {...register("representanteLegal.nombres", {
+              onChange: (e) => {
+                e.target.value = e.target.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúüÜñÑ\s]/g, "");
+                setValue("representanteLegal.nombres", e.target.value, { shouldValidate: true });
+              },
+            })}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
               errors.representanteLegal?.nombres ? "border-red-500" : "border-gray-300"
             }`}
@@ -216,7 +238,12 @@ export default function PersonaJuridicaForm({
           <input
             id="representanteApellidos"
             type="text"
-            {...register("representanteLegal.apellidos")}
+            {...register("representanteLegal.apellidos", {
+              onChange: (e) => {
+                e.target.value = e.target.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúüÜñÑ\s]/g, "");
+                setValue("representanteLegal.apellidos", e.target.value, { shouldValidate: true });
+              },
+            })}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
               errors.representanteLegal?.apellidos ? "border-red-500" : "border-gray-300"
             }`}
@@ -309,7 +336,14 @@ export default function PersonaJuridicaForm({
           <input
             id="celularContacto"
             type="tel"
-            {...register("celularContacto")}
+            inputMode="numeric"
+            maxLength={9}
+            {...register("celularContacto", {
+              onChange: (e) => {
+                e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9);
+                setValue("celularContacto", e.target.value, { shouldValidate: true });
+              },
+            })}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
               errors.celularContacto ? "border-red-500" : "border-gray-300"
             }`}
@@ -324,7 +358,10 @@ export default function PersonaJuridicaForm({
       </div>
 
       {/* Sección de Domicilio */}
+      {solicitarDomicilio && <>
       <UbigeoSelector
+        soloUcayali={false}
+        initialDepartamentoId={domicilioValue.departamentoCodigo}
         initialProvinciaId={domicilioValue.provinciaCodigo}
         initialDistritoId={domicilioValue.distritoCodigo}
         onChange={handleUbigeoChange}
@@ -371,6 +408,7 @@ export default function PersonaJuridicaForm({
       </div>
 
       {/* Checkboxes */}
+      </>}
       <div className="space-y-4">
         <DeclaracionJuradaCheckbox
           checked={declaracionJuradaAceptada}

@@ -50,12 +50,14 @@ describe('rutas HTTP de validación IdentiCore', () => {
         razon_social: 'Entidad de prueba',
         dni_representante: '12345678',
         nombre_representante: 'Ana Perez Rojas',
+        cargo_representante: 'Gerente',
         correo: 'ana@example.com',
         celular: '912345678',
         ubigeo_distrito: '250101',
         direccion: 'Jr. Lima 123',
         password: 'secreto123',
         consentimiento_datos: true,
+        declaracion_jurada_aceptada: true,
       });
 
     expect(respuesta.status).toBe(400);

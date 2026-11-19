@@ -82,9 +82,11 @@ export class UploadError extends Error {
   }
 }
 
-interface UsePresignedUploadOptions {
+export interface UsePresignedUploadOptions {
   categoria?: string;
   demoMode?: boolean;
+  publicMode?: boolean;
+  publicProcedureId?: string;
   idExpediente?: string;
   /** La radicación registra los metadatos dentro de su transacción, cuando existe el expediente. */
   diferirRegistroAdjunto?: boolean;

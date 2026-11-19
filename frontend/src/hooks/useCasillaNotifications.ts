@@ -11,20 +11,34 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CASILLA_QUERY_KEYS } from "./useCasilla";
 import { env } from "../config/env";
+import { useAuthStore } from "../stores/authStore";
 
-const NOMBRES_EVENTO_NOTIFICACION = ["casilla_notificacion", "NOTIFICACION_DEPOSITADA"] as const;
+const NOMBRES_EVENTO_NOTIFICACION = [
+  "casilla_notificacion",
+  "expediente_observado",
+  "expediente_resuelto",
+  "resolucion_emitida",
+  "NOTIFICACION_DEPOSITADA",
+] as const;
 
 export function useCasillaNotifications() {
   const queryClient = useQueryClient();
+  const authAccessToken = useAuthStore((state) => state.accessToken);
   const [sseConectado, setSseConectado] = useState(false);
   const [notificacionesRecibidas, setNotificacionesRecibidas] = useState(0);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     const token =
+      authAccessToken ||
       (typeof localStorage !== "undefined" &&
         (localStorage.getItem("sigd_token") || localStorage.getItem("token"))) ||
       undefined;
+
+    if (!token || typeof EventSource === "undefined") {
+      setSseConectado(false);
+      return;
+    }
 
     const baseUrl = env.apiBaseUrl.replace(/\/+$/, '');
     const rutaStream = baseUrl.endsWith('/v1')
@@ -35,9 +49,7 @@ export function useCasillaNotifications() {
       typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
     );
     streamUrl.searchParams.set("canales", "casilla");
-    if (token) {
-      streamUrl.searchParams.set("token", token);
-    }
+    streamUrl.searchParams.set("token", token);
 
     const eventSource = new EventSource(streamUrl.toString());
     eventSourceRef.current = eventSource;
@@ -61,7 +73,7 @@ export function useCasillaNotifications() {
       eventSource.close();
       eventSourceRef.current = null;
     };
-  }, [queryClient]);
+  }, [queryClient, authAccessToken]);
 
   return {
     sseConectado,

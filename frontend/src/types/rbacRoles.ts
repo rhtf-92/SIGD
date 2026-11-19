@@ -1,12 +1,29 @@
-// Modelos RBAC de los 5 roles canónicos institucionales y la matriz de permisos (ENT-M05-03)
-// Conforme a SIGD-DOC-ADMIN-SEGURIDAD-AUDITORIA-03
+// Modelos RBAC de los roles canónicos institucionales y la matriz de permisos (ENT-M05-03)
+// Conforme a sigd_org.rol_sistema y especificación institucional IESTP Suiza
 
 export type RolCanonicoId =
-  | "SUPER_ADMIN"
+  // 10 Roles Canónicos Vigentes Aprobados (Migración 22)
+  | "ADMINISTRADOR"
   | "DIRECTOR"
-  | "DOCENTE"
+  | "JEFE_UNIDAD_ACADEMICA"
+  | "COORDINADOR_AREA"
+  | "SECRETARIO"
   | "MESA_PARTES"
-  | "ESTUDIANTE";
+  | "DOCENTE"
+  | "TESORERO"
+  | "ESTUDIANTE"
+  | "CIUDADANO"
+  // Rol transversal de plataforma SaaS (Migración 25)
+  | "SUPER_ADMIN";
+
+// Capacidad operativa delegada institucional (Secretaría de Apoyo de Área)
+export type CapacidadOperativaId =
+  | "GESTOR_APOYO_AREA";
+
+// Distinción formal de contexto de autorización
+export type TipoContextoInstitucional =
+  | "ROL"
+  | "CAPACIDAD";
 
 export interface Rol {
   id: string;

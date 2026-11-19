@@ -4,10 +4,11 @@
  * apertura de modal de detalle y mutaciones seguras de Acuse Legal.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { casillaService } from "../services/casillaService";
+import { useAuthStore } from "../stores/authStore";
 import type {
   EstadoNotificacion,
   FiltrosCasilla,
@@ -34,6 +35,7 @@ const FILTROS_INICIALES: FiltrosCasilla = {
 
 export function useCasilla() {
   const queryClient = useQueryClient();
+  const cuentaId = useAuthStore((state) => state.usuario?.id ?? null);
 
   // Estado de filtros y paginación
   const [filtros, setFiltros] = useState<FiltrosCasilla>(FILTROS_INICIALES);
@@ -42,16 +44,19 @@ export function useCasilla() {
   const [selectedNotificacion, setSelectedNotificacion] =
     useState<Notificacion | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState(false);
+  const openRequest = useRef(0);
 
   // Query: Listado paginado de notificaciones
   const notificacionesQuery = useQuery({
-    queryKey: CASILLA_QUERY_KEYS.list(filtros),
+    queryKey: [...CASILLA_QUERY_KEYS.list(filtros), cuentaId],
     queryFn: () => casillaService.getNotificaciones(filtros),
   });
 
   // Query: Estadísticas y contadores
   const statsQuery = useQuery({
-    queryKey: CASILLA_QUERY_KEYS.stats,
+    queryKey: [...CASILLA_QUERY_KEYS.stats, cuentaId],
     queryFn: () => casillaService.getEstadisticas(),
   });
 
@@ -77,7 +82,11 @@ export function useCasilla() {
       casillaService.generarAcuseLegal(notificacionId),
     onSuccess: (resultado) => {
       // Actualizar la notificación activa con el acuse generado
-      setSelectedNotificacion(resultado.notificacionActualizada);
+      setSelectedNotificacion((actual) =>
+        actual?.id === resultado.notificacionActualizada.id
+          ? resultado.notificacionActualizada
+          : actual,
+      );
 
       // Sincronizar listas y contadores en caché
       queryClient.invalidateQueries({ queryKey: CASILLA_QUERY_KEYS.all });
@@ -119,21 +128,42 @@ export function useCasilla() {
 
   // Abrir modal de detalle
   const handleOpenDetalle = useCallback(
-    (notificacion: Notificacion) => {
+    async (notificacion: Notificacion) => {
+      const request = ++openRequest.current;
       setSelectedNotificacion(notificacion);
       setIsModalOpen(true);
+      setIsLoadingDetail(true);
+      setDetailError(false);
 
-      // Si la notificación aún no ha sido leída, marcarla automáticamente
-      if (notificacion.estado === "NO_LEIDO") {
-        marcarLeidoMutation.mutate(notificacion.id);
+      try {
+        // La bandeja no contiene el DTO completo: obtenerlo desde el endpoint original.
+        let detalle = await casillaService.getNotificacionById(notificacion.id);
+        if (request !== openRequest.current) return;
+        setSelectedNotificacion(detalle);
+
+        if (detalle.estado === "NO_LEIDO") {
+          detalle = await marcarLeidoMutation.mutateAsync(notificacion.id);
+          if (request !== openRequest.current) return;
+          setSelectedNotificacion(detalle);
+        }
+      } catch {
+        if (request === openRequest.current) setDetailError(true);
+      } finally {
+        if (request === openRequest.current) setIsLoadingDetail(false);
       }
     },
     [marcarLeidoMutation],
   );
 
+  const handleRetryDetalle = useCallback(() => {
+    if (selectedNotificacion) void handleOpenDetalle(selectedNotificacion);
+  }, [handleOpenDetalle, selectedNotificacion]);
+
   // Cerrar modal de detalle
   const handleCloseDetalle = useCallback(() => {
+    openRequest.current += 1;
     setIsModalOpen(false);
+    setIsLoadingDetail(false);
   }, []);
 
   // Determinar si hay filtros activos diferentes a los valores iniciales
@@ -184,11 +214,15 @@ export function useCasilla() {
       urgentes: 0,
     },
     isLoadingStats: statsQuery.isLoading,
+    isErrorStats: statsQuery.isError,
 
     // Modal de Detalle
     isModalOpen,
     selectedNotificacion,
+    isLoadingDetail,
+    detailError,
     openDetalle: handleOpenDetalle,
+    retryDetalle: handleRetryDetalle,
     closeDetalle: handleCloseDetalle,
 
     // Mutación de Acuse Legal

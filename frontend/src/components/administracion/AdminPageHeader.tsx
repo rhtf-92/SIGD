@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import AdminBreadcrumbs from "./AdminBreadcrumbs";
 
@@ -12,6 +12,16 @@ export default function AdminPageHeader({
   description,
 }: AdminPageHeaderProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const esPanelPrincipal = location.pathname === "/administracion";
+
+  function volver() {
+    if (esPanelPrincipal) {
+      navigate("/", { state: { mostrarPortadaAdministrador: true } });
+      return;
+    }
+    navigate("/administracion");
+  }
 
   return (
     <header className="border-b border-slate-200 bg-white">
@@ -20,7 +30,7 @@ export default function AdminPageHeader({
 
         <button
           type="button"
-          onClick={() => navigate("/")}
+          onClick={volver}
           className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
         >
           ← Volver al inicio

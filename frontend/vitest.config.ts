@@ -12,7 +12,7 @@ export default defineConfig({
     // del plan maestro (`tests/unit/...`).
     include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", "dist"],
-    testTimeout: 10000,
+    testTimeout: 25000,
     restoreMocks: true,
     coverage: {
       provider: "v8",

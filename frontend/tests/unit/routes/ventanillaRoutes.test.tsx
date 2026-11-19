@@ -13,7 +13,7 @@ vi.mock("../../../src/pages/tramite/VentanillaPresencialPage", () => ({
 vi.mock("../../../src/pages/LoginPage", () => ({ default: () => <p>Login institucional</p> }));
 vi.mock("../../../src/pages/AccesoDenegadoPage", () => ({ default: () => <p>Acceso denegado</p> }));
 vi.mock("../../../src/pages/HomePage", () => ({ default: () => <p>Inicio público</p> }));
-vi.mock("../../../src/pages/tramite/MesaPartesVirtualPage", () => ({ default: () => <p>Mesa de partes virtual</p> }));
+vi.mock("../../../src/pages/tramite/TramitePage", () => ({ default: () => <p>Mesa de partes virtual</p> }));
 vi.mock("../../../src/pages/tramite/ConsultaPublicaPage", () => ({ default: () => <p>Consulta pública</p> }));
 vi.mock("../../../src/pages/casilla/CasillaElectronicaPage", () => ({ default: () => <p>Casilla electrónica</p> }));
 

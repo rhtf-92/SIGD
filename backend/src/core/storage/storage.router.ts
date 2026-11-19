@@ -19,7 +19,7 @@ import {
   verificarMagicBytesPdfEnS3,
 } from './s3-storage.service.js';
 import { middlewareSubidaPdf, EXPEDIENTES_DIR, UPLOADS_ROOT_DIR } from './upload.middleware.js';
-import { ValidationError } from '../../shared/domain/errors/index.js';
+import { AppError, ValidationError } from '../../shared/domain/errors/index.js';
 
 const MAX_FILE_BYTES_25MB = 25 * 1024 * 1024; // 26,214,400 bytes
 
@@ -98,6 +98,29 @@ const confirmarInputSchema = z.object({
   tamanoBytes: z.number().int().positive().max(MAX_FILE_BYTES_25MB).optional(),
   mimeType: z.string().trim().min(1).max(120).optional(),
 });
+
+/** El llamador debe haber autorizado el documento mediante PostgreSQL o un CVD válido. */
+export function generarDescargaAutorizada(bucket: string, key: string, req: Request): string {
+  const config = obtenerConfiguracionS3();
+  if (!bucket || !key || /[\\/]/.test(bucket) || key.split('/').some(p => !p || p === '.' || p === '..')) {
+    throw new AppError({ status: 503, code: 'STORAGE_REFERENCE_UNAVAILABLE', message: 'La referencia del documento no está disponible.' });
+  }
+  const endpointParaCliente = new URL(config.endpoint);
+  const origen = req.get('origin');
+  if (endpointParaCliente.hostname === 'minio' && origen) {
+    try {
+      const urlOrigen = new URL(origen);
+      if (urlOrigen.hostname === 'localhost' || urlOrigen.hostname === '127.0.0.1') {
+        endpointParaCliente.hostname = urlOrigen.hostname;
+      }
+    } catch {
+      // Un Origin inválido no altera el endpoint S3 configurado.
+    }
+  }
+  return generarUrlPresigned(key, { ...config, bucket, endpoint: endpointParaCliente.origin }, {
+    metodo: 'GET', expiraSegundos: 900,
+  });
+}
 
 export function crearRouterStorage(pool?: Pool): Router {
   const router = Router();

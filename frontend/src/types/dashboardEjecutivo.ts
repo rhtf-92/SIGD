@@ -13,6 +13,8 @@ export type DashboardAlertLevel =
   | string;
 
 export interface DashboardKpiMetric {
+  available?: boolean;
+  deltaAvailable?: boolean;
   id: string;
   title: string;
   value: number;

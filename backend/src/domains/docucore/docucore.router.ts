@@ -3,8 +3,15 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import {
+  AppError,
+  ForbiddenError,
+  UnauthorizedError,
   ValidationError,
 } from '../../shared/domain/errors/index.js';
+import {
+  obtenerAutorizacionCuenta,
+  resolverIdentidad,
+} from '../../core/auth/auth.guard.js';
 
 import {
   asignarFoliacionContinua,
@@ -58,6 +65,82 @@ export function crearRouterDocuCore(pool: Pool): Router {
 
         const datos = foliacionSchema.parse(req.body);
 
+        const identidad = resolverIdentidad(req);
+        if (!z.string().uuid().safeParse(identidad.idUsuario).success) {
+          throw new UnauthorizedError({ detail: 'Identificador de usuario no válido.' });
+        }
+
+        const autorizacion = await obtenerAutorizacionCuenta(pool, identidad.idUsuario, identidad.contextoId);
+        if (!autorizacion) {
+          throw new ForbiddenError({ detail: 'Cuenta institucional inactiva o no autorizada.' });
+        }
+        if (identidad.contextoId && autorizacion.contextoRevocado) {
+          throw new AppError({
+            status: 403,
+            code: 'CONTEXT_REVOKED',
+            message: 'El contexto activo ha sido revocado o no se encuentra vigente. Debe seleccionar un contexto vigente.',
+          });
+        }
+
+        const esAdminODirector =
+          autorizacion.roles.some((r) => r === 'ADMINISTRADOR' || r === 'DIRECTOR') ||
+          autorizacion.permisos.some(
+            (p) => (p.codigo === 'ADMIN_USUARIOS' || p.codigo === 'FIRMA_FIRMAR') && p.ambito === 'GLOBAL',
+          );
+
+        if (!esAdminODirector) {
+          const permisosFoliar = autorizacion.permisos.filter(
+            (p) => p.codigo === 'EXPEDIENTE_DERIVAR' || p.codigo === 'EXPEDIENTE_RESOLVER',
+          );
+          const rolesOperativos = autorizacion.roles.some((r) =>
+            ['SECRETARIO', 'MESA_PARTES'].includes(r),
+          );
+
+          if (autorizacion.roles.includes('CIUDADANO') || (!rolesOperativos && permisosFoliar.length === 0)) {
+            throw new ForbiddenError({
+              detail: 'El usuario no dispone de facultades para foliar documentos en este expediente.',
+            });
+          }
+
+          const tieneGlobal = permisosFoliar.some((p) => p.ambito === 'GLOBAL' || p.areaId === null);
+          if (!tieneGlobal && z.string().uuid().safeParse(idParam.trim()).success) {
+            const areasUsuario = permisosFoliar
+              .filter((p) => p.ambito === 'AREA' && p.areaId !== null)
+              .map((p) => p.areaId);
+
+            if (autorizacion.unidadOrganicaId) {
+              areasUsuario.push(autorizacion.unidadOrganicaId);
+            }
+
+            if (areasUsuario.length > 0) {
+              const acceso = await pool.query<{ autorizado: boolean }>(
+                `SELECT EXISTS (
+                   SELECT 1 FROM sigd_tra.expediente e
+                   LEFT JOIN sigd_rut.estado_actual_expediente a USING (expediente_id)
+                   LEFT JOIN (
+                     SELECT DISTINCT ON (expediente_id)
+                            expediente_id, canal_ingreso, anulado
+                       FROM sigd_tra.asiento_registro
+                      WHERE anulado = FALSE
+                      ORDER BY expediente_id, numero_registro ASC
+                   ) ar ON ar.expediente_id = e.expediente_id
+                  WHERE e.expediente_id = $1::uuid
+                    AND (
+                      a.area_actual_id = ANY($2::text[])
+                      OR ar.canal_ingreso = 'VIRTUAL'
+                    )
+                 ) AS autorizado`,
+                [idParam.trim(), areasUsuario],
+              );
+              if (!acceso.rows[0]?.autorizado) {
+                throw new ForbiddenError({
+                  detail: 'El usuario no tiene competencia en el área del expediente para foliar.',
+                });
+              }
+            }
+          }
+        }
+
         const cliente = await pool.connect();
         try {
           await cliente.query('BEGIN');
@@ -104,10 +187,18 @@ export function crearRouterDocuCore(pool: Pool): Router {
           });
         }
 
+        const secretoWebhook = process.env.REFIRMA_WEBHOOK_SECRET;
+        if (!secretoWebhook || secretoWebhook.trim() === '') {
+          throw new ForbiddenError({
+            detail: 'El servicio de firma no está configurado para recibir callbacks (falta REFIRMA_WEBHOOK_SECRET).',
+          });
+        }
+
         verificarFirmaWebhook(
           rawReq.rawBody,
           req.get('x-refirma-signature') ?? undefined,
-          process.env.REFIRMA_WEBHOOK_SECRET ?? '',
+          secretoWebhook,
+          req.get('x-refirma-timestamp') ?? undefined,
         );
 
         const datos = callbackSchema.parse(req.body);

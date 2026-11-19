@@ -47,3 +47,22 @@ export const ETIQUETAS_TIPO_EVENTO: Record<TipoEventoBitacora, string> = {
   ARCHIVADO: "Archivo definitivo",
   DESARCHIVADO: "Desarchivo motivado",
 };
+
+export interface ActuacionRutaDoc {
+  movimientoId: string;
+  secuencia: string;
+  fechaHora: string;
+  estadoAnterior: string;
+  evento: string;
+  estadoNuevo: string;
+  usuarioOperadorId: string;
+  areaAnteriorId: string | null;
+  areaDestinoId: string | null;
+  remitente: string | null;
+  destinatario: string | null;
+  proveido: unknown | null;
+  datosAsociados: Record<string, unknown>;
+  duracionMs: number | null;
+  duracionMinutos: number | null;
+  tipoActuacion: "NORMAL" | "COMPENSATORIA";
+}

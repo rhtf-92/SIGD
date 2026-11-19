@@ -57,3 +57,7 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction):
 
   next();
 }
+
+export function origenPermitido(origin: string | undefined): boolean {
+  return esOrigenPermitido(origin, parsearOrigenesPermitidos());
+}

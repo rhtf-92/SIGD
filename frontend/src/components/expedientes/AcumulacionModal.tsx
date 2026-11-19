@@ -21,6 +21,7 @@ function FormularioAcumulacion({ expediente, accion, onClose, busqueda }: Acumul
   const [resultado, setResultado] = useState<{ texto: string; recurso: EstadoRecurso<readonly ExpedienteAccionReferencia[]> } | null>(null);
   const [seleccionados, setSeleccionados] = useState<readonly ExpedienteAccionReferencia[]>([]);
   const [motivo, setMotivo] = useState("");
+  const [actoResolutivo, setActoResolutivo] = useState("");
   const [revisando, setRevisando] = useState(false);
   const [errores, setErrores] = useState({ conexos: "", motivo: "" });
   const busquedaRef = useRef<HTMLInputElement>(null);
@@ -63,7 +64,7 @@ function FormularioAcumulacion({ expediente, accion, onClose, busqueda }: Acumul
     if (validacion.conexos) { busquedaRef.current?.focus(); return; }
     if (validacion.motivo) { motivoRef.current?.focus(); return; }
     if (!revisando) { setRevisando(true); return; }
-    void formulario.enviar({ principal: expediente, conexos: seleccionados, motivo: normalizarMotivo(motivo) }, () => { setSeleccionados([]); setMotivo(""); setRevisando(false); onClose(); });
+    void formulario.enviar({ principal: expediente, conexos: seleccionados, motivo: normalizarMotivo(motivo), actoResolutivo: actoResolutivo.trim() || undefined }, () => { setSeleccionados([]); setMotivo(""); setActoResolutivo(""); setRevisando(false); onClose(); });
   }
   return <AccionModal titulo="Acumular expedientes" descripcion={`Expediente principal / CUT matriz: ${expediente.codigo}. Los expedientes conexos se vincularán bajo este principal.`} pending={formulario.pending} onClose={cerrar}>
     <p className="m03-notice">La acumulación requiere conexión entre los asuntos y una justificación motivada, conforme al alcance del Art. 160 de la Ley 27444 indicado en el plan docente.</p>
@@ -88,6 +89,7 @@ function FormularioAcumulacion({ expediente, accion, onClose, busqueda }: Acumul
         <h3 id={`${id}-resumen`} ref={resumenRef} tabIndex={-1} className="m03-heading">Resumen de acumulación</h3>
         <p><strong>CUT matriz:</strong> {expediente.codigo}</p>
         <p><strong>Expedientes conexos:</strong></p><ul>{seleccionados.map((item) => <li key={item.id}>{item.codigo}</li>)}</ul>
+        <p><strong>Acto resolutivo:</strong> {actoResolutivo.trim() || "Por proveído de instrucción"}</p>
         <p className="whitespace-pre-wrap"><strong>Justificación:</strong> {normalizarMotivo(motivo)}</p>
         <p className="m03-help">Revise el principal y los conexos antes de confirmar.</p>
       </section>}

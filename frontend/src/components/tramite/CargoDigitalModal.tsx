@@ -9,12 +9,22 @@ export interface CargoDigitalModalProps {
   isOpen: boolean;
   onClose: () => void;
   cargo: CargoModalPayload;
+  modoVentanilla?: boolean;
+  modoPublico?: boolean;
+  onIrBandeja?: () => void;
+  onConsultarSeguimiento?: (cut: string) => void;
+  onNuevoRegistro?: () => void;
 }
 
 export default function CargoDigitalModal({
   isOpen,
   onClose,
   cargo,
+  modoVentanilla = false,
+  modoPublico = false,
+  onIrBandeja,
+  onConsultarSeguimiento,
+  onNuevoRegistro,
 }: CargoDigitalModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [copiado, setCopiado] = useState(false);
@@ -109,6 +119,14 @@ export default function CargoDigitalModal({
     window.location.href = "/casilla";
   }
 
+  function handleSeguimiento() {
+    if (onConsultarSeguimiento) {
+      onConsultarSeguimiento(codigoCut);
+    } else {
+      window.location.href = `/consulta/${codigoCut}`;
+    }
+  }
+
   return (
     <div
       role="dialog"
@@ -121,21 +139,31 @@ export default function CargoDigitalModal({
         className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden print:m-0 print:p-0 print:shadow-none print:w-full print:max-w-none"
       >
         {/* Cabecera del Modal (Oculta en Impresión) */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4 print:hidden">
-          <div>
-            <h3 id="titulo-cargo-modal" className="text-sm font-bold text-slate-900">
-              Cargo de Recepción Digital (CUT)
-            </h3>
-            <p className="text-xs text-slate-500">Mesa de Partes / Ventanilla Presencial</p>
+        <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 print:hidden">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold" aria-hidden="true">✓</span>
+                <h3 id="titulo-cargo-modal" className="text-base font-bold text-slate-900">
+                  ¡Trámite registrado exitosamente!
+                </h3>
+              </div>
+              <p className="mt-1 text-xs text-slate-600 leading-snug">
+                Su solicitud se registró correctamente. Conserve el código de expediente y el cargo digital para realizar el seguimiento.
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate-500 font-medium">
+                Cargo de Recepción Digital (CUT) · {modoVentanilla ? "Ventanilla Presencial" : "Mesa de Partes Virtual"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition cursor-pointer"
+              aria-label="Cerrar ventana de cargo"
+            >
+              ✕
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition"
-            aria-label="Cerrar ventana de cargo"
-          >
-            ✕
-          </button>
         </div>
 
         {/* TICKET TÉRMICO IMPRIMIBLE (80mm / 58mm / A4) */}
@@ -149,11 +177,18 @@ export default function CargoDigitalModal({
           </div>
 
           {/* Código CUT Destacado */}
+          {isDigitalResponse && cargo.mensajeLegal?.includes('RADICACIÓN DEMOSTRATIVA') &&
+            <p className="rounded border border-amber-300 bg-amber-50 p-2 text-[10px] text-amber-950">{cargo.mensajeLegal}</p>}
           <div className="text-center py-2 bg-slate-50 rounded border border-slate-200 print:bg-transparent print:border-black">
             <p className="text-[10px] font-sans font-semibold text-slate-500">CÓDIGO ÚNICO DE TRÁMITE</p>
             <p className="text-lg font-black text-blue-700 print:text-black tracking-wider font-mono">
               {codigoCut}
             </p>
+            <div className="mt-1">
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 print:border-black">
+                ESTADO INICIAL: REGISTRADO
+              </span>
+            </div>
           </div>
 
           {/* Código QR Centrado */}
@@ -236,13 +271,37 @@ export default function CargoDigitalModal({
           >
             Descargar Cargo Digital (PDF)
           </button>
-          <button
-            type="button"
-            onClick={handleAccederCasilla}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-          >
-            Acceder a Casilla Electrónica
-          </button>
+          {modoVentanilla ? (
+            <>
+              {onIrBandeja && (
+                <button
+                  type="button"
+                  onClick={onIrBandeja}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Ir a Bandeja de Expedientes
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleSeguimiento}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Consultar Seguimiento
+              </button>
+            </>
+          ) : modoPublico ? (
+            <button type="button" onClick={handleSeguimiento} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">Consultar mi solicitud</button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleAccederCasilla}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+            >
+              Acceder a Casilla Electrónica
+            </button>
+          )}
+          {modoPublico && <p className="text-xs text-slate-600">Conserve esta constancia de forma privada. Su QR permite consultar esta solicitud.</p>}
           <button
             type="button"
             onClick={handleImprimirTicket}
@@ -252,10 +311,10 @@ export default function CargoDigitalModal({
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={onNuevoRegistro ?? onClose}
             className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
           >
-            Finalizar y Cerrar
+            {modoVentanilla ? "Registrar Nuevo Trámite" : "Finalizar y Cerrar"}
           </button>
         </div>
       </div>

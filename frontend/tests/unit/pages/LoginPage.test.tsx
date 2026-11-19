@@ -51,6 +51,21 @@ async function enviarCredenciales() {
 }
 
 describe("LoginPage con autenticación existente", () => {
+  it("permite crear una cuenta sin credenciales mediante la ruta pública existente", async () => {
+    renderLogin();
+    expect(screen.getByText("¿No tienes una cuenta?")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: "Crear cuenta" }));
+    expect(screen.getByTestId("destino")).toHaveTextContent("/registro");
+  });
+  it('una cuenta sin asignaciones elimina el rol residual de una sesión anterior', async () => {
+    localStorage.setItem('sigd_rol', 'SUPER_ADMIN');
+    const data = respuestaLogin('');
+    apiClient.defaults.adapter = async config => response(config, { ...data, usuario: { ...data.usuario, roles: [], permisos: [] } });
+    await useAuthStore.getState().login({ identificador: 'cuenta-del-doble', password: 'solo-doble' });
+    expect(localStorage.getItem('sigd_rol')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('sigd_roles')!)).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('sigd_facultades')!)).toEqual([]);
+  });
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
@@ -85,7 +100,8 @@ describe("LoginPage con autenticación existente", () => {
     expect(localStorage.getItem("sigd_token")).toBe(data.accessToken);
     expect(localStorage.getItem("token")).toBe(data.accessToken);
     expect(localStorage.getItem("sigd_rol")).toBe("MESA_PARTES");
-    expect(localStorage.getItem("sigd_permisos")).not.toBeNull();
+    expect(localStorage.getItem("sigd_permisos")).toBeNull();
+    expect(JSON.parse(localStorage.getItem("sigd_facultades")!)).toEqual([]);
     await apiClient.get("/api/v1/tramites/ventanilla/cargo/CUT-DEL-DOBLE");
     expect(requests[1].headers.Authorization).toBe(`Bearer ${data.accessToken}`);
     expect(logout).not.toHaveBeenCalled();
@@ -104,6 +120,23 @@ describe("LoginPage con autenticación existente", () => {
     expect(await screen.findByTestId("destino")).toHaveTextContent(destino);
     expect(useAuthStore.getState().usuario?.rol).toBe(rol);
     expect(localStorage.getItem("sigd_rol")).toBe(rol);
+  });
+
+  it("prioriza /administracion para ADMINISTRADOR aunque hubiera una ruta de retorno previa", async () => {
+    apiClient.defaults.adapter = async (config) => response(config, {
+      ...respuestaLogin("MESA_PARTES"),
+      usuario: {
+        ...respuestaLogin("MESA_PARTES").usuario,
+        roles: ["MESA_PARTES"],
+        permisos: [{ codigo: "ADMIN_USUARIOS", ambito: "GLOBAL", areaId: null }],
+      },
+    });
+    renderLogin({
+      pathname: "/login",
+      state: { from: { pathname: "/expedientes" } },
+    });
+    await enviarCredenciales();
+    expect(await screen.findByTestId("destino")).toHaveTextContent("/administracion");
   });
 
   it("retorna al Wizard despues de login conservando la ruta interna", async () => {

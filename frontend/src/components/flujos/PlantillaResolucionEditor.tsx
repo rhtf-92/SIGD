@@ -9,6 +9,7 @@ interface PlantillaResolucionEditorProps {
   resolucionInicial?: ResolucionDirectoral;
   onGuardarBorrador: (resolucion: ResolucionDirectoral) => void;
   onProcederFirma: (resolucion: ResolucionDirectoral) => void;
+  deshabilitarPaseFirma?: boolean;
   modoEdicion?: boolean;
 }
 
@@ -61,6 +62,7 @@ export default function PlantillaResolucionEditor({
   resolucionInicial = PLANTILLA_TITULACION_DEFAULT,
   onGuardarBorrador,
   onProcederFirma,
+  deshabilitarPaseFirma = false,
 }: PlantillaResolucionEditorProps) {
   const [resolucion, setResolucion] = useState<ResolucionDirectoral>(resolucionInicial);
   const [vistaPrevia, setVistaPrevia] = useState(true);
@@ -139,11 +141,11 @@ export default function PlantillaResolucionEditor({
       {/* Barra de control superior */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <span className="rounded-lg bg-blue-50 px-3 py-1 font-mono text-xs font-bold text-blue-700">
-            {resolucion.numeroResolucion}
+          <span className="rounded-lg bg-amber-50 px-3 py-1 font-mono text-xs font-bold text-amber-800 border border-amber-200">
+            {resolucion.numeroResolucion} (Borrador Local)
           </span>
           <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-            Estado: {resolucion.estado}
+            Estado: Borrador Local (No emitido en PostgreSQL)
           </span>
         </div>
 
@@ -164,10 +166,15 @@ export default function PlantillaResolucionEditor({
           </button>
           <button
             type="button"
+            disabled={deshabilitarPaseFirma}
             onClick={() => onProcederFirma(resolucion)}
-            className="rounded-lg bg-blue-700 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800"
+            className={`rounded-lg px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition ${
+              deshabilitarPaseFirma
+                ? "bg-slate-400 cursor-not-allowed opacity-75"
+                : "bg-blue-700 hover:bg-blue-800"
+            }`}
           >
-            Aprobar y Pasar a Firma Digital →
+            {deshabilitarPaseFirma ? "Elevando a Firma Digital..." : "Aprobar y Pasar a Firma Digital →"}
           </button>
         </div>
       </div>

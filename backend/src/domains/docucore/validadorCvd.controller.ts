@@ -1,12 +1,20 @@
 import type { Request, Response } from 'express';
 import type { Pool } from 'pg';
+import { Readable } from 'node:stream';
+import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
+import { generarUrlPresigned, validarMagicBytes } from '../../core/storage/s3-storage.service.js';
+import { HashIntegrityService } from './hashIntegrity.service.js';
+import { validarFirmaPades, type ResultadoValidacionPades } from './verificadorPades.service.js';
+import { generarDescargaAutorizada } from '../../core/storage/storage.router.js';
 import {
   NotFoundError,
   ValidationError,
+  AppError,
 } from '../../shared/domain/errors/index.js';
 
 export interface GeneradorUrlDescarga {
   generarUrlDescarga(bucket: string, key: string): Promise<string>;
+  obtenerContenidoDocumento?(bucket: string, key: string): Promise<Buffer | null>;
 }
 
 interface DocumentoFirmado {
@@ -19,15 +27,9 @@ interface DocumentoFirmado {
   s3_key: string;
 }
 
-const defaultStorage: GeneradorUrlDescarga = {
-  async generarUrlDescarga(bucket: string, key: string) {
-    return `/api/v1/storage/download/${encodeURIComponent(bucket)}/${encodeURIComponent(key)}`;
-  },
-};
-
 export function crearVerificadorCvd(
   pool: Pool,
-  storage: GeneradorUrlDescarga = defaultStorage,
+  storage?: GeneradorUrlDescarga,
 ) {
   return async (req: Request, res: Response): Promise<void> => {
     const cvd = String(req.params.cvd ?? '').trim().toUpperCase();
@@ -64,33 +66,72 @@ export function crearVerificadorCvd(
     }
 
     const documento = resultado.rows[0];
-    const cvdStr = documento?.cvd ?? cvd;
-    const numeroDocSuffix = cvdStr ? cvdStr.slice(-6) : '000001';
+    const fecha = documento.fecha_sello_tsa ? new Date(documento.fecha_sello_tsa) : null;
+    const fechaEmision = fecha && Number.isFinite(fecha.getTime()) ? fecha.toISOString() : null;
+    let resultadoPades: ResultadoValidacionPades | null = null;
+    let esValido = documento.estado === 'FIRMADO_DIGITALMENTE'
+      && /^[a-f0-9]{64}$/i.test(documento.sha256_firmado ?? '')
+      && Boolean(documento.firmante?.trim()) && fechaEmision !== null;
+    // La excepción pública parte del CVD consultado y de la referencia persistida,
+    // no de un bucket o una clave elegidos por quien solicita la descarga privada.
+    let descarga_copia_certificada = esValido
+      ? storage
+        ? await storage.generarUrlDescarga(documento.s3_bucket, documento.s3_key)
+        : generarDescargaAutorizada(documento.s3_bucket, documento.s3_key, req)
+      : '';
+    if (esValido) {
+      const config = obtenerConfiguracionS3();
+      const url = generarUrlPresigned(documento.s3_key, { ...config, bucket: documento.s3_bucket }, {
+        metodo: 'GET', expiraSegundos: 60,
+      });
+      try {
+        let contenido: Buffer | null = null;
+        if (storage?.obtenerContenidoDocumento) {
+          contenido = await storage.obtenerContenidoDocumento(documento.s3_bucket, documento.s3_key);
+          if (!contenido) {
+            throw new Error('Objeto no disponible');
+          }
+        } else {
+          const respuesta = await fetch(url, { signal: AbortSignal.timeout(10000), redirect: 'error' });
+          if (!respuesta.ok || !respuesta.body) {
+            throw new Error(`Objeto no disponible (HTTP ${respuesta.status})`);
+          } else {
+            const partes: Buffer[] = [];
+            let tamano = 0;
+            for await (const parte of Readable.fromWeb(respuesta.body as never)) {
+              const bytes = Buffer.from(parte);
+              tamano += bytes.length;
+              if (tamano > 26_214_400) throw new Error('Documento demasiado grande');
+              partes.push(bytes);
+            }
+            contenido = Buffer.concat(partes);
+          }
+        }
 
-    const s3Bucket = documento?.s3_bucket || 'sigd-docs';
-    const s3Key = documento?.s3_key || `resoluciones/${cvdStr}.pdf`;
-    const descarga_copia_certificada =
-      await storage.generarUrlDescarga(
-        s3Bucket,
-        s3Key,
-      );
-
-    const esValido = documento?.estado === 'FIRMADO_DIGITALMENTE';
-    const fechaEmision = documento?.fecha_sello_tsa
-      ? (typeof documento.fecha_sello_tsa === 'string' ? documento.fecha_sello_tsa : documento.fecha_sello_tsa.toISOString())
-      : new Date().toISOString();
+        if (contenido) {
+          esValido = validarMagicBytes(contenido, 'PDF')
+            && new HashIntegrityService().calculateFromBuffer(contenido).sha256 === documento.sha256_firmado.toLowerCase();
+          resultadoPades = await validarFirmaPades(contenido);
+          esValido = esValido && resultadoPades.valido && resultadoPades.validacionCriptografica;
+        }
+        if (!esValido) descarga_copia_certificada = '';
+      } catch (err: unknown) {
+        if (err instanceof AppError) throw err;
+        throw new AppError({ status: 503, code: 'CVD_DOCUMENT_UNAVAILABLE', message: 'No se pudo cotejar el documento almacenado. Intente nuevamente.' });
+      }
+    }
 
     const docMetadata = {
-      numeroDocumento: `RD N.° ${numeroDocSuffix}-2026-DG-IESTP-SUIZA`,
-      tipo: 'RD',
-      asunto: 'Documento Oficial con Firma Digital Verificada - IESTP Suiza',
+      numeroDocumento: null,
+      tipo: null,
+      asunto: null,
       fechaEmision,
       firmantes: [
         {
-          nombre: documento?.firmante || 'Dirección General IESTP Suiza',
-          cargo: 'Director General',
+          nombre: documento.firmante,
+          cargo: null,
           fechaFirma: fechaEmision,
-          entidadCertificadora: 'RENIEC / PKI Estado Peruano',
+          entidadCertificadora: null,
         },
       ],
       hashIntegridadSha256: documento?.sha256_firmado || '',
@@ -104,13 +145,16 @@ export function crearVerificadorCvd(
       sha256_firmado: documento.sha256_firmado,
       firmante: documento.firmante,
       fecha_sello_tsa: documento.fecha_sello_tsa,
-      selloTiempoTsa: fechaEmision,
+      selloTiempoTsa: resultadoPades?.detalles.selloTiempoTsa?.valido ? resultadoPades.detalles.selloTiempoTsa.fechaSelloTsa : null,
       estado: documento.estado,
       descarga_copia_certificada,
       documento: esValido ? docMetadata : null,
+      tipoFirma: resultadoPades ? resultadoPades.tipoFirma : 'SIN_FIRMA',
+      validacionCriptografica: resultadoPades ? resultadoPades.validacionCriptografica : false,
+      integridadBytesProtegidos: resultadoPades ? resultadoPades.integridadBytesProtegidos : false,
       mensajeSeguridad: esValido
-        ? 'Documento íntegro y verificado conforme al marco legal D.S. N° 070-2013-PCM.'
-        : 'El documento no cuenta con certificación digital vigente.',
+        ? 'El CVD tiene un registro de firma y el PDF almacenado coincide con su SHA-256. Esta consulta no comprueba la vigencia del certificado ni sustituye la validación criptográfica de la firma.'
+        : 'No se pudo acreditar la integridad del documento con la evidencia de firma disponible.',
     });
   };
 }

@@ -76,6 +76,18 @@ const modulos = [
       </>
     ),
   },
+  {
+    titulo: "Tesorería",
+    descripcion:
+      "Supervisa órdenes, pagos, comprobantes, caja, devoluciones y reportes financieros.",
+    ruta: "/tesoreria",
+    icono: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 10h18M7 15h3m5 0h2" />
+      </>
+    ),
+  },
 ];
 
 export default function AdministracionPage() {
@@ -125,6 +137,7 @@ export default function AdministracionPage() {
               <button
                 type="button"
                 onClick={() => navigate(modulo.ruta)}
+                aria-label={`Administrar ${modulo.titulo}`}
                 className="mt-5 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
               >
                 Administrar

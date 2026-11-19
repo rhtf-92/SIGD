@@ -44,7 +44,7 @@ import {
   type TramoRetencion,
 } from './mgdAnalytics.types.js';
 import type { CacheDistribuida } from '../identicore/ubigeo.service.js';
-import type { RepositorioMgdAnalytics } from './mgdAnalytics.repository.js';
+import type { RepositorioMgdAnalytics, FiltrosLecturaMgd } from './mgdAnalytics.repository.js';
 import {
   MINUTOS_APERTURA,
   MINUTOS_CORTE,
@@ -455,9 +455,10 @@ export class ServicioMgdAnalytics {
    * disponible. Los KPIs se recalculan desde los contadores crudos, nunca se suman
    * los porcentajes por área.
    */
-  async resumen(periodo: string | null): Promise<ResumenKpisMgd> {
-    return this.deCache(CACHE_RESUMEN(periodo), async () => {
-      const filas = await this.repositorio.obtenerContadores(periodo);
+  async resumen(periodo: string | null, filtros: FiltrosLecturaMgd = {}): Promise<ResumenKpisMgd> {
+    return this.deCache(CACHE_RESUMEN(periodo) + JSON.stringify(filtros), async () => {
+      const filas = Object.keys(filtros).length ? await this.repositorio.obtenerContadores(periodo, filtros)
+        : await this.repositorio.obtenerContadores(periodo);
       const contadores = sumarContadores(...filas.map((fila) => fila.contadores));
       const base = calcularIndicadoresMgd(contadores);
       const actualizaciones = filas
@@ -481,16 +482,19 @@ export class ServicioMgdAnalytics {
    *idimensionalidad: una serie con huecos hace que el frontend dibuje meses
    * intermedios como cero, cuando en realidad son "sin datos".
    */
-  async tendencias(anio: number): Promise<PuntoTendencia[]> {
-    return this.deCache(CACHE_TENDENCIAS(anio), async () => {
+  async tendencias(anio: number, filtros: FiltrosLecturaMgd = {}): Promise<PuntoTendencia[]> {
+    return this.deCache(CACHE_TENDENCIAS(anio) + JSON.stringify(filtros), async () => {
       const porPeriodo = new Map<string, PuntoTendencia>();
-      for (const fila of await this.repositorio.obtenerTendencias(anio)) {
+      const filas = Object.keys(filtros).length ? await this.repositorio.obtenerTendencias(anio, filtros)
+        : await this.repositorio.obtenerTendencias(anio);
+      for (const fila of filas) {
         const mes = Number(fila.periodo.slice(5, 7));
+        const previo = porPeriodo.get(fila.periodo);
         porPeriodo.set(fila.periodo, {
           mes,
-          radicados: fila.contadores.nRadicados,
-          atendidos: fila.contadores.nAtendidos + fila.contadores.nArchivados,
-          observados: fila.contadores.nObservados,
+          radicados: (previo?.radicados ?? 0) + fila.contadores.nRadicados,
+          atendidos: (previo?.atendidos ?? 0) + fila.contadores.nAtendidos + fila.contadores.nArchivados,
+          observados: (previo?.observados ?? 0) + fila.contadores.nObservados,
         });
       }
       return Array.from({ length: 12 }, (_, indice) => {
@@ -514,11 +518,14 @@ export class ServicioMgdAnalytics {
     periodo: string | null,
     diasLimite: number,
     nombres: ReadonlyMap<string, { nombre: string; sigla: string | null }>,
+    filtros: FiltrosLecturaMgd = {},
   ): Promise<CuelloBotellaArea[]> {
     const limiteAplicado = alinearUmboloATramo(diasLimite);
-    return this.deCache(CACHE_CUELLOS(periodo, diasLimite), async () => {
+    return this.deCache(CACHE_CUELLOS(periodo, diasLimite) + JSON.stringify(filtros), async () => {
       const porArea = new Map<string, TramoAcumulado>();
-      for (const tramo of await this.repositorio.obtenerRetencion(periodo)) {
+      const filas = Object.keys(filtros).length ? await this.repositorio.obtenerRetencion(periodo, filtros)
+        : await this.repositorio.obtenerRetencion(periodo);
+      for (const tramo of filas) {
         const id = tramo.unidadOrganicaId;
         const acumulado = porArea.get(id) ?? {
           nExpedientes: 0,
@@ -576,9 +583,11 @@ export class ServicioMgdAnalytics {
   }
 
   /** Distribución por tramo de una unidad, para el mapa de calor del frontend. */
-  async distribucionRetencion(periodo: string | null): Promise<Map<string, TramoRetencion[]>> {
+  async distribucionRetencion(periodo: string | null, filtros: FiltrosLecturaMgd = {}): Promise<Map<string, TramoRetencion[]>> {
     const porArea = new Map<string, TramoRetencion[]>();
-    for (const tramo of await this.repositorio.obtenerRetencion(periodo)) {
+    const filas = Object.keys(filtros).length ? await this.repositorio.obtenerRetencion(periodo, filtros)
+      : await this.repositorio.obtenerRetencion(periodo);
+    for (const tramo of filas) {
       const lista = porArea.get(tramo.unidadOrganicaId) ?? [];
       lista.push({
         tramo: tramo.tramo,

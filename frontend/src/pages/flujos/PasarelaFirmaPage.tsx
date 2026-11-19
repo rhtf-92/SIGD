@@ -9,62 +9,6 @@ import type {
 } from "../../types/firmaDigital";
 import { apiClient } from "../../api/client";
 
-const DOCUMENTOS_INICIALES: DocumentoOficial[] = [
-  {
-    idDocumento: 1,
-    idTramite: 412,
-    tipoActo: "RD",
-    numeroCorrelativo: "RD N.° 0412-2026-DG-IESTP-SUIZA",
-    anio: 2026,
-    asunto:
-      "Confiere Título Profesional Técnico en Desarrollo de Sistemas de Información al administrado Carlos Mendoza Ríos.",
-    urlPdfOriginal: "/pdfs/rd-0412-2026.pdf",
-    hashSha256:
-      "a3f2c1e9b8d74f6a0c5e8b2d91f7a4c3e6b0d5f2a8c1e7b4d9f6a3c0e5b8d2f7",
-    estadoFirma: "PENDIENTE",
-    fechaGeneracion: "2026-09-05T11:42:15-05:00",
-  },
-  {
-    idDocumento: 2,
-    idTramite: 413,
-    tipoActo: "ACTA",
-    numeroCorrelativo: "ACT-DSI-2026-2-007",
-    anio: 2026,
-    asunto: "Acta consolidada de evaluación semestral 2026-2 de la Unidad Didáctica Taller de Programación Web.",
-    urlPdfOriginal: "/pdfs/act-dsi-2026-2-007.pdf",
-    hashSha256:
-      "7d1b4c9e2a8f6d3b5c0e7a4f9b2d1c8e6f3a5d7b0c2e9f4a1b8d6c3e5f0a7b9d",
-    estadoFirma: "PENDIENTE",
-    fechaGeneracion: "2026-09-05T12:10:00-05:00",
-  },
-  {
-    idDocumento: 3,
-    idTramite: 414,
-    tipoActo: "ACTA",
-    numeroCorrelativo: "ACT-DSI-2026-2-008",
-    anio: 2026,
-    asunto: "Acta consolidada de evaluación semestral 2026-2 de la Unidad Didáctica Base de Datos.",
-    urlPdfOriginal: "/pdfs/act-dsi-2026-2-008.pdf",
-    hashSha256:
-      "9f0e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8",
-    estadoFirma: "PENDIENTE",
-    fechaGeneracion: "2026-09-05T12:11:00-05:00",
-  },
-  {
-    idDocumento: 4,
-    idTramite: 415,
-    tipoActo: "CERTIFICADO",
-    numeroCorrelativo: "CER-2026-000318",
-    anio: 2026,
-    asunto: "Certificado oficial de estudios modulares del egresado Luis Alberto Sánchez Tello.",
-    urlPdfOriginal: "/pdfs/cer-2026-000318.pdf",
-    hashSha256:
-      "2b6a8c4e0f3d7b1a9c5e8d6f4a2b0c1e7f9d3a5b8c0e2f4a6b8d0c2e4f6a8b0d",
-    estadoFirma: "PENDIENTE",
-    fechaGeneracion: "2026-09-05T13:05:00-05:00",
-  },
-];
-
 const INSIGNIA_ESTADO: Record<DocumentoOficial["estadoFirma"], string> = {
   PENDIENTE: "border-amber-200 bg-amber-50 text-amber-700",
   FIRMADO: "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -73,60 +17,170 @@ const INSIGNIA_ESTADO: Record<DocumentoOficial["estadoFirma"], string> = {
 
 const ETIQUETA_ESTADO: Record<DocumentoOficial["estadoFirma"], string> = {
   PENDIENTE: "Pendiente de firma",
-  FIRMADO: "Firmado digitalmente",
+  FIRMADO: "Firma registrada",
   OBSERVADO: "Observado",
 };
 
+interface DocumentoFila extends DocumentoOficial {
+  keyFila: string;
+  estadoDesconocido?: boolean;
+  estadoOriginal?: string;
+}
+
 export default function PasarelaFirmaPage() {
-  const [documentos, setDocumentos] = useState<DocumentoOficial[]>(
-    DOCUMENTOS_INICIALES,
-  );
+  const [documentos, setDocumentos] = useState<DocumentoFila[]>([]);
+  const [errorCola, setErrorCola] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [consulta, setConsulta] = useState(0);
   const [modalAbierto, setModalAbierto] = useState(false);
-  const [documentoActivo, setDocumentoActivo] = useState<DocumentoOficial | null>(
-    null,
-  );
+  const [documentoActivo, setDocumentoActivo] = useState<DocumentoFila | null>(null);
   const [drawerAbierto, setDrawerAbierto] = useState(false);
 
   useEffect(() => {
     let activo = true;
+    setCargando(true);
+    setErrorCola(null);
     apiClient
       .get<{ documentos: Array<Record<string, unknown>> }>("/api/v1/firmas/cola-firmantes")
       .then((res) => {
         if (!activo) return;
         const docs = res.data?.documentos;
-        if (Array.isArray(docs) && docs.length > 0) {
-          const mapeados: DocumentoOficial[] = docs.map((d, i) => ({
-            idDocumento: i + 1,
-            idTramite: 400 + i,
-            tipoActo: (String(d.tipoResolucion ?? "").includes("TITULACION") ? "RD" : "ACTA") as "RD" | "ACTA",
-            numeroCorrelativo: String(d.numeroBorrador ?? `RD N.° 0${400 + i}-2026-DG`),
-            anio: 2026,
-            asunto: String(d.asunto ?? "Documento en cola de firma"),
-            urlPdfOriginal: String(d.s3PreviewUrl ?? `/pdfs/doc-${i + 1}.pdf`),
-            hashSha256: String(d.resolucionId ?? "").replace(/-/g, "").padEnd(64, "0"),
-            estadoFirma: "PENDIENTE" as const,
-            fechaGeneracion: String(d.fechaProyeccion ?? new Date().toISOString()),
-          }));
-          setDocumentos(mapeados);
-        }
+        if (!Array.isArray(docs)) throw new Error("Respuesta de la cola de firma inválida.");
+        setDocumentos(docs.map((d, index) => {
+          const tieneDocumentoId = typeof d.documentoId === "string" && d.documentoId.trim().length > 0;
+          const hashValido = typeof d.hashSha256 === "string" && /^[a-f0-9]{64}$/i.test(d.hashSha256.trim());
+          const tienePdfPreview = typeof d.s3PreviewUrl === "string" && d.s3PreviewUrl.trim().length > 0;
+          const esCompleto = tieneDocumentoId && hashValido && tienePdfPreview;
+
+          let puedeFirmar = esCompleto && d.puedeFirmar === true;
+          let motivoNoHabilitado = "";
+
+          if (!tieneDocumentoId) {
+            puedeFirmar = false;
+            motivoNoHabilitado = "Documento sin archivo adjunto asociado.";
+          } else if (!hashValido) {
+            puedeFirmar = false;
+            motivoNoHabilitado = "Hash SHA-256 no disponible o formato inválido.";
+          } else if (!tienePdfPreview) {
+            puedeFirmar = false;
+            motivoNoHabilitado = "Vista previa del documento PDF no disponible en almacenamiento.";
+          } else if (d.puedeFirmar !== true) {
+            puedeFirmar = false;
+            motivoNoHabilitado = String(d.motivoNoHabilitado ?? "El funcionario no tiene facultad de despacho activa.");
+          }
+
+          let estadoFirma: DocumentoOficial["estadoFirma"] = "PENDIENTE";
+          let estadoDesconocido = false;
+          let estadoOriginal: string | undefined = undefined;
+
+          if (d.estadoFirma === undefined) {
+            // Contrato DocumentoPendienteFirma: propiedad omitida indica borrador pendiente de firma
+            estadoFirma = "PENDIENTE";
+          } else if (typeof d.estadoFirma === "string") {
+            const raw = d.estadoFirma.trim();
+            const upper = raw.toUpperCase();
+            if (upper === "FIRMADO_DIGITALMENTE" || upper === "FIRMADO") {
+              estadoFirma = "FIRMADO";
+            } else if (upper === "OBSERVADO") {
+              estadoFirma = "OBSERVADO";
+              puedeFirmar = false;
+              motivoNoHabilitado = motivoNoHabilitado || "Documento con observaciones pendientes de subsanación.";
+            } else if (upper === "PENDIENTE" || upper === "BORRADOR_PENDIENTE_FIRMA") {
+              estadoFirma = "PENDIENTE";
+            } else if (raw === "") {
+              estadoDesconocido = true;
+              estadoOriginal = "SIN_ESTADO";
+              estadoFirma = "OBSERVADO";
+              puedeFirmar = false;
+              motivoNoHabilitado = motivoNoHabilitado || "Estado documental no especificado o vacío.";
+            } else {
+              estadoDesconocido = true;
+              estadoOriginal = raw;
+              estadoFirma = "OBSERVADO";
+              puedeFirmar = false;
+              motivoNoHabilitado = motivoNoHabilitado || `Estado no habilitado para firma (${raw}).`;
+            }
+          } else {
+            estadoDesconocido = true;
+            estadoOriginal = "NO_DEFINIDO";
+            estadoFirma = "OBSERVADO";
+            puedeFirmar = false;
+            motivoNoHabilitado = motivoNoHabilitado || "Estado documental no disponible.";
+          }
+
+          const fechaRaw = typeof d.fechaProyeccion === "string" ? d.fechaProyeccion.trim() : "";
+          const fechaParsed = fechaRaw ? Date.parse(fechaRaw) : NaN;
+          const tieneFechaValida = Number.isFinite(fechaParsed);
+          const anio = tieneFechaValida ? new Date(fechaParsed).getFullYear() : 0;
+          const fechaGeneracion = tieneFechaValida ? new Date(fechaParsed).toISOString() : "";
+
+          const keyFila = tieneDocumentoId
+            ? `doc-${String(d.documentoId).trim()}`
+            : `draft-${String(d.resolucionId ?? d.expedienteId ?? "fila")}-${index}`;
+
+          return {
+            keyFila,
+            idDocumento: tieneDocumentoId ? String(d.documentoId).trim() : "",
+            idTramite: String(d.expedienteId ?? d.cut ?? ""),
+            tipoActo: "RD",
+            numeroCorrelativo: String(d.numeroBorrador ?? d.cut ?? "S/N"),
+            anio,
+            asunto: String(d.asunto ?? "Sin asunto"),
+            urlPdfOriginal: String(d.s3PreviewUrl ?? ""),
+            hashSha256: hashValido ? String(d.hashSha256).trim() : "",
+            estadoFirma,
+            estadoDesconocido,
+            estadoOriginal,
+            fechaGeneracion,
+            puedeFirmar,
+            motivoNoHabilitado,
+          };
+        }));
       })
-      .catch(() => {
-        // Preserva datos iniciales si la cola no tiene registros activos
-      });
+      .catch((error: unknown) => {
+        if (activo) {
+          setDocumentos([]);
+          setErrorCola(error instanceof Error ? error.message : "No se pudo consultar la cola de firma.");
+        }
+      }).finally(() => { if (activo) setCargando(false); });
     return () => {
       activo = false;
     };
-  }, []);
+  }, [consulta]);
 
-  const abrirFirmaUnica = (documento: DocumentoOficial) => {
+  const abrirFirmaUnica = (documento: DocumentoFila) => {
+    if (!documento || !documento.idDocumento) return;
+
+    if (documento.estadoFirma === "FIRMADO") {
+      setDocumentoActivo(documento);
+      setModalAbierto(true);
+      return;
+    }
+
+    if (documento.estadoFirma !== "PENDIENTE" || documento.estadoDesconocido) {
+      return;
+    }
+
+    if (
+      documento.puedeFirmar !== true ||
+      !documento.urlPdfOriginal ||
+      !documento.hashSha256 ||
+      !/^[a-f0-9]{64}$/i.test(documento.hashSha256)
+    ) {
+      return;
+    }
+
     setDocumentoActivo(documento);
     setModalAbierto(true);
   };
 
   const manejarFirmado = (resultado: RefirmaRespuestaDTO) => {
+    if (!documentoActivo?.idDocumento) return;
+    const docIdActivo = String(documentoActivo.idDocumento).trim();
+
     setDocumentos((actuales) =>
       actuales.map((documento) =>
-        documento.idDocumento === documentoActivo?.idDocumento
+        documento.idDocumento && String(documento.idDocumento).trim() === docIdActivo
           ? {
               ...documento,
               estadoFirma: "FIRMADO",
@@ -162,8 +216,8 @@ export default function PasarelaFirmaPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             Invocación del agente local mediante el protocolo{" "}
-            <code>refirma://sign?token=&hash=&callback=</code> · Firma PAdES-BES
-            con sellado de tiempo TSA (RFC 3161).
+            <code>refirma://</code>. El resultado requiere evidencia persistida
+            del servicio de firma.
           </p>
         </div>
       </header>
@@ -179,6 +233,7 @@ export default function PasarelaFirmaPage() {
 
           <button
             type="button"
+            disabled={cargando || documentos.filter((d) => d.estadoFirma === "PENDIENTE" && !d.estadoDesconocido && d.puedeFirmar === true && Boolean(d.idDocumento) && Boolean(d.urlPdfOriginal) && Boolean(d.hashSha256) && /^[a-f0-9]{64}$/i.test(d.hashSha256)).length === 0}
             onClick={() => setDrawerAbierto(true)}
             className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
           >
@@ -186,6 +241,9 @@ export default function PasarelaFirmaPage() {
           </button>
         </div>
 
+        {cargando && <p role="status">Consultando documentos pendientes…</p>}
+        {errorCola && <div role="alert">{errorCola} <button type="button" disabled={cargando} onClick={() => setConsulta(v => v + 1)}>Reintentar consulta</button></div>}
+        {!cargando && !errorCola && documentos.length === 0 && <p role="status">No hay documentos pendientes de firma.</p>}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left">
@@ -207,14 +265,26 @@ export default function PasarelaFirmaPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {documentos.map((documento) => (
-                  <tr key={documento.idDocumento}>
+                  <tr key={documento.keyFila}>
                     <td className="px-5 py-4">
                       <p className="text-sm font-bold text-slate-800">
                         {documento.tipoActo} · {documento.numeroCorrelativo}
                       </p>
                       <p className="text-xs text-slate-500">
-                        HASH: {documento.hashSha256.slice(0, 12)}…
+                        {documento.hashSha256
+                          ? `HASH: ${documento.hashSha256.slice(0, 12)}…`
+                          : "HASH: No disponible"}
                       </p>
+                      <p className="text-[11px] text-slate-500">
+                        {documento.fechaGeneracion
+                          ? `Fecha: ${documento.fechaGeneracion.slice(0, 10)}`
+                          : "Fecha no disponible"}
+                      </p>
+                      {documento.motivoNoHabilitado && !documento.puedeFirmar && (
+                        <p className="mt-0.5 text-[11px] text-amber-700">
+                          {documento.motivoNoHabilitado}
+                        </p>
+                      )}
                     </td>
                     <td className="max-w-xs px-4 py-4 text-sm text-slate-600">
                       {documento.asunto}
@@ -225,25 +295,38 @@ export default function PasarelaFirmaPage() {
                       )}
                     </td>
                     <td className="px-4 py-4">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-1 text-[0.65rem] font-bold ${INSIGNIA_ESTADO[documento.estadoFirma]}`}
-                      >
-                        {ETIQUETA_ESTADO[documento.estadoFirma]}
-                      </span>
+                      {documento.estadoDesconocido ? (
+                        <span className="inline-flex rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[0.65rem] font-bold text-slate-700">
+                          {documento.estadoOriginal && documento.estadoOriginal !== "SIN_ESTADO" && documento.estadoOriginal !== "NO_DEFINIDO" ? `Estado: ${documento.estadoOriginal}` : "Estado no disponible"}
+                        </span>
+                      ) : (
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-[0.65rem] font-bold ${INSIGNIA_ESTADO[documento.estadoFirma]}`}
+                        >
+                          {ETIQUETA_ESTADO[documento.estadoFirma]}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-4 text-right">
-                      {documento.estadoFirma === "PENDIENTE" && (
+                      {!documento.estadoDesconocido && documento.estadoFirma === "PENDIENTE" && (
                         <button
                           type="button"
+                          disabled={!documento.puedeFirmar}
+                          title={documento.motivoNoHabilitado}
                           onClick={() => abrirFirmaUnica(documento)}
                           className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
                         >
                           Firmar
                         </button>
                       )}
-                      {documento.estadoFirma === "FIRMADO" && (
-                        <span className="text-xs font-bold text-emerald-700">
-                          ✓ Suscrito
+                      {!documento.estadoDesconocido && documento.estadoFirma === "FIRMADO" && (
+                        <button type="button" onClick={() => abrirFirmaUnica(documento)} className="text-xs font-bold text-emerald-700">
+                          Consultar firma
+                        </button>
+                      )}
+                      {(documento.estadoDesconocido || documento.estadoFirma === "OBSERVADO") && (
+                        <span className="text-xs font-medium text-slate-400">
+                          No habilitado
                         </span>
                       )}
                     </td>
@@ -257,16 +340,16 @@ export default function PasarelaFirmaPage() {
         <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-xs leading-5 text-slate-500">
           La pasarela nunca solicita, intercepta ni almacena la clave privada o
           el PIN del firmante: la operación criptográfica ocurre en el
-          dispositivo seguro (DNIe / Token). El backend valida la vigencia del
-          certificado contra CRL / OCSP y el hash SHA-256 del archivo firmado
-          coincide con la vista previa antes de emitir la resolución.
+          dispositivo seguro (DNIe / Token). Invocar el agente no acredita por
+          sí solo la firma, la vigencia del certificado ni un sello de tiempo.
         </div>
       </section>
 
       <RefirmaConnectorModal
         abierto={modalAbierto}
         documento={documentoActivo}
-        firmanteDni="40601034"
+        soloConsulta={documentoActivo?.estadoFirma === "FIRMADO"}
+        firmanteDni=""
         onCerrar={() => setModalAbierto(false)}
         onFirmado={manejarFirmado}
       />
@@ -274,7 +357,14 @@ export default function PasarelaFirmaPage() {
       <FirmaBatchDrawer
         abierto={drawerAbierto}
         documentos={documentos.filter(
-          (documento) => documento.estadoFirma === "PENDIENTE",
+          (documento) =>
+            documento.estadoFirma === "PENDIENTE" &&
+            !documento.estadoDesconocido &&
+            documento.puedeFirmar === true &&
+            Boolean(documento.idDocumento) &&
+            Boolean(documento.urlPdfOriginal) &&
+            Boolean(documento.hashSha256) &&
+            /^[a-f0-9]{64}$/i.test(documento.hashSha256),
         )}
         onCerrar={() => setDrawerAbierto(false)}
       />

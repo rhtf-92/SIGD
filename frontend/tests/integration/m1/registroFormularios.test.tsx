@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { apiClient } from "../../../src/api/client";
+import { ApiHttpError } from "../../../src/types/api";
 
 import RegistroCiudadanoPage from "../../../src/pages/registro/RegistroCiudadanoPage";
 import PersonaNaturalForm from "../../../src/components/registro/PersonaNaturalForm";
@@ -13,10 +14,45 @@ import { DeclaracionJuradaCheckbox } from "../../../src/components/registro/Decl
 import { ConsentimientoLey29733Modal } from "../../../src/components/registro/ConsentimientoLey29733Modal";
 import { consentimientoLey29733Schema } from "../../../src/schemas/consentimiento.schema";
 
+import { clearUbigeoCache } from "../../../src/services/ubigeoService";
+
 describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / ENT-M01-04 / ENT-M01-05)", () => {
   beforeEach(() => {
+    clearUbigeoCache();
     // Solo dobles HTTP: nunca registrar personas ni consultar servicios reales.
-    vi.spyOn(apiClient, "get").mockRejectedValue(new Error("Usar catálogo local existente"));
+    vi.spyOn(apiClient, "get").mockImplementation(async (url) => {
+      const urlStr = String(url);
+      if (urlStr.endsWith('/registro-capacidades')) return { data: { domicilio: true, verificacionContacto: true } } as never;
+      if (urlStr.includes('/api/v1/ubigeo/departamentos')) {
+        return {
+          data: [{ codigo: '25', nombre: 'UCAYALI' }],
+        } as never;
+      }
+      if (urlStr.includes('/api/v1/ubigeo/provincias')) {
+        return {
+          data: [
+            { codigo: '2501', nombre: 'CORONEL PORTILLO', departamentoCodigo: '25' },
+            { codigo: '2502', nombre: 'ATALAYA', departamentoCodigo: '25' },
+            { codigo: '2503', nombre: 'PADRE ABAD', departamentoCodigo: '25' },
+            { codigo: '2504', nombre: 'PURUS', departamentoCodigo: '25' },
+          ],
+        } as never;
+      }
+      if (urlStr.includes('/api/v1/ubigeo/distritos')) {
+        return {
+          data: [
+            { codigo: '250101', nombre: 'CALLERIA', provinciaCodigo: '2501' },
+            { codigo: '250102', nombre: 'CAMPOVERDE', provinciaCodigo: '2501' },
+            { codigo: '250103', nombre: 'IPARIA', provinciaCodigo: '2501' },
+            { codigo: '250104', nombre: 'MASISEA', provinciaCodigo: '2501' },
+            { codigo: '250105', nombre: 'YARINACOCHA', provinciaCodigo: '2501' },
+            { codigo: '250106', nombre: 'NUEVA REQUENA', provinciaCodigo: '2501' },
+            { codigo: '250107', nombre: 'MANANTAY', provinciaCodigo: '2501' },
+          ],
+        } as never;
+      }
+      throw new Error('Catalogo local de prueba');
+    });
   });
   afterEach(() => vi.restoreAllMocks());
   it("a) RegistroCiudadanoPage: el conmutador role=\"tablist\" alterna entre Persona Natural y Persona Jurídica sin recargar, y cambia los campos visibles", async () => {
@@ -30,6 +66,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     // Verificar existencia del conmutador con role="tablist"
     const tablist = screen.getByRole("tablist", { name: /Tipo de persona/i });
     expect(tablist).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Volver al inicio/i })).toHaveAttribute("href", "/");
+    expect(screen.queryByRole("link", { name: /Iniciar sesión/i })).not.toBeInTheDocument();
 
     const tabNatural = screen.getByRole("tab", { name: /Persona Natural/i });
     const tabJuridica = screen.getByRole("tab", { name: /Persona Jurídica/i });
@@ -265,10 +303,15 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     expect(invalido.success).toBe(false);
   });
 
-  it.each(["confirmado", "rechazado", "sin identidad", "sin confirmar", "sin contraseña"])("h) RegistroCiudadanoPage: registro natural %s sin falsos éxitos ni pérdida del formulario", async (caso) => {
+  it.each(["confirmado", "CE confirmado", "rechazado", "sin identidad", "sin confirmar", "sin contraseña", "modelo incompatible"])("h) RegistroCiudadanoPage: registro natural %s sin falsos éxitos ni pérdida del formulario", async (caso) => {
     const post = vi.spyOn(apiClient, "post");
     const confirmacion = { status: 201, data: { idPersona: "11111111-1111-4111-8111-111111111111", mensaje: "Registro exitoso" } };
     if (caso === "rechazado") post.mockRejectedValueOnce(new Error("Servicio no disponible"));
+    else if (caso === "modelo incompatible") post.mockRejectedValueOnce(new ApiHttpError({
+      type: "about:blank", title: "Servicio no disponible", status: 503,
+      detail: "El esquema no permite persistir el domicilio requerido.", instance: "/api/v1/auth/registro-ciudadano",
+      code: "REGISTRO_MODELO_NO_COMPATIBLE", category: "System", correlationId: "test", retryable: false,
+    }));
     else post.mockResolvedValueOnce(caso === "sin identidad" ? { status: 201, data: {} }
       : caso === "sin confirmar" ? { ...confirmacion, status: 202 } : confirmacion);
     const user = userEvent.setup();
@@ -282,7 +325,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       await user.type(screen.getByLabelText(/Contraseña para su cuenta/i), "PasswordValida123!");
     }
     // Llenar campos de Persona Natural
-    await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
+    if (caso === "CE confirmado") await user.selectOptions(screen.getByLabelText(/Tipo de Documento/i), "CE");
+    await user.type(screen.getByLabelText(/Número de Documento \*/i), caso === "CE confirmado" ? "CE1234567" : "74561238");
     await user.type(screen.getByLabelText(/Nombres \*/i), "Sergio");
     await user.type(screen.getByLabelText(/Apellidos \*/i), "Serruche Panduro");
     await user.type(screen.getByLabelText(/Fecha de Nacimiento \*/i), "1998-05-15");
@@ -290,10 +334,12 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     await user.type(screen.getByLabelText(/Celular \*/i), "961234567");
 
     // Seleccionar Ubigeo
+    await screen.findByRole("option", { name: /CORONEL PORTILLO/i });
     await user.selectOptions(
       screen.getByLabelText(/Seleccionar Provincia de Ucayali/i),
       "2501",
     );
+    await screen.findByRole("option", { name: /CALLERIA/i });
     await user.selectOptions(screen.getByLabelText(/Seleccionar Distrito/i), "250101");
 
     // Llenar dirección exacta
@@ -317,7 +363,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     });
     await user.click(botonSubmit);
 
-    if (caso !== "confirmado") {
+    if (caso !== "confirmado" && caso !== "CE confirmado") {
       expect(await screen.findByRole("alert")).toHaveTextContent(caso === "sin contraseña" ? /Ingrese una contraseña/ : /No se pudo confirmar el registro/);
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
       expect(screen.getByLabelText(/Correo Electrónico \*/i)).toHaveValue("sergio@example.com");
@@ -326,6 +372,11 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       if (caso === "sin contraseña") {
         expect(post).not.toHaveBeenCalled();
         await user.type(screen.getByLabelText(/Contraseña para su cuenta/i), "PasswordValida123!");
+      }
+      if (caso === "modelo incompatible") {
+        expect(post).toHaveBeenCalledTimes(1);
+        expect(botonSubmit).toBeEnabled();
+        return;
       }
       post.mockResolvedValueOnce(confirmacion);
       await user.click(botonSubmit);
@@ -348,6 +399,10 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
         direccion: "Jr. Tarapacá N° 645",
         ubigeoDistrito: "250101",
         password: "PasswordValida123!",
+        aceptaNotificaciones: false,
+        tipoDocumento: caso === "CE confirmado" ? "CE" : "DNI",
+        numeroDocumento: caso === "CE confirmado" ? "CE1234567" : "74561238",
+        declaracionJuradaAceptada: true,
       }),
     );
 
@@ -360,6 +415,7 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     }
     const payload = postCall[1];
     expect(payload).toMatchObject({ direccion: "Jr. Tarapacá N° 645" });
+    if (caso === "CE confirmado") expect(payload).toHaveProperty("dni", undefined);
     // Cerrar mensaje de éxito
     const botonCerrarExito = screen.getByLabelText(/Cerrar mensaje de éxito/i);
     await user.click(botonCerrarExito);
@@ -405,10 +461,12 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     await user.type(screen.getByLabelText(/Celular de Contacto \*/i), "961234567");
 
     // Seleccionar Ubigeo
+    await screen.findByRole("option", { name: /CORONEL PORTILLO/i });
     await user.selectOptions(
       screen.getByLabelText(/Seleccionar Provincia de Ucayali/i),
       "2501",
     );
+    await screen.findByRole("option", { name: /CALLERIA/i });
     await user.selectOptions(screen.getByLabelText(/Seleccionar Distrito/i), "250101");
 
     // Llenar dirección exacta
@@ -463,6 +521,8 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
         direccion: "Jr. Tarapacá N° 645",
         ubigeoDistrito: "250101",
         password: "PasswordValida123!",
+        declaracionJuradaAceptada: true,
+        cargoRepresentante: expect.any(String),
       }),
     );
 

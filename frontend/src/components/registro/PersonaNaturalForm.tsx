@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { naturalSchema } from "../../schemas/registroCiudadano.schema";
+import { naturalSchema, domicilioNoSolicitadoSchema } from "../../schemas/registroCiudadano.schema";
 import type { Natural } from "../../types/registroCiudadano";
 import { UbigeoSelector } from "../common/UbigeoSelector";
-import type { UbigeoDTO } from "../../data/ucayali";
+import type { UbigeoDTO } from "../../hooks/useUbigeoCascade";
 import { DeclaracionJuradaCheckbox } from "./DeclaracionJuradaCheckbox";
 import { ConsentimientoLey29733Modal } from "./ConsentimientoLey29733Modal";
 
 interface PersonaNaturalFormProps {
+  solicitarDomicilio?: boolean;
   onSubmit: (data: Natural) => void | Promise<void>;
 }
 
 export default function PersonaNaturalForm({
+  solicitarDomicilio = true,
   onSubmit,
 }: PersonaNaturalFormProps) {
   const [isConsentimientoModalOpen, setIsConsentimientoModalOpen] =
@@ -25,7 +27,7 @@ export default function PersonaNaturalForm({
     watch,
     formState: { errors, isSubmitting },
   } = useForm<Natural>({
-    resolver: zodResolver(naturalSchema),
+    resolver: zodResolver(solicitarDomicilio ? naturalSchema : naturalSchema.extend({ domicilio: domicilioNoSolicitadoSchema })),
     defaultValues: {
       tipoPersona: "NATURAL",
       nombres: "",
@@ -56,7 +58,7 @@ export default function PersonaNaturalForm({
   const handleUbigeoChange = (_ubigeoCod: string, dto: UbigeoDTO) => {
     const updatedDomicilio = {
       ...domicilioValue,
-      departamentoCodigo: dto.departamento.id,
+      departamentoCodigo: dto.departamento?.id || "",
       provinciaCodigo: dto.provincia?.id || "",
       distritoCodigo: dto.distrito?.id || "",
       // Mantener dirección exacta y referencia existentes
@@ -115,11 +117,20 @@ export default function PersonaNaturalForm({
           <input
             id="numeroDocumento"
             type="text"
-            {...register("numeroDocumento")}
+            inputMode={watch("tipoDocumento") === "DNI" ? "numeric" : "text"}
+            maxLength={watch("tipoDocumento") === "DNI" ? 8 : 12}
+            {...register("numeroDocumento", {
+              onChange: (e) => {
+                if (watch("tipoDocumento") === "DNI") {
+                  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 8);
+                  setValue("numeroDocumento", e.target.value, { shouldValidate: true });
+                }
+              },
+            })}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
               errors.numeroDocumento ? "border-red-500" : "border-gray-300"
             }`}
-            placeholder="DNI: 8 dígitos o CE: 9-12 caracteres"
+            placeholder={watch("tipoDocumento") === "DNI" ? "DNI: 8 dígitos" : "CE: 9-12 caracteres"}
           />
           {errors.numeroDocumento && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -141,7 +152,12 @@ export default function PersonaNaturalForm({
           <input
             id="nombres"
             type="text"
-            {...register("nombres")}
+            {...register("nombres", {
+              onChange: (e) => {
+                e.target.value = e.target.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúüÜñÑ\s]/g, "");
+                setValue("nombres", e.target.value, { shouldValidate: true });
+              },
+            })}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
               errors.nombres ? "border-red-500" : "border-gray-300"
             }`}
@@ -163,7 +179,12 @@ export default function PersonaNaturalForm({
           <input
             id="apellidos"
             type="text"
-            {...register("apellidos")}
+            {...register("apellidos", {
+              onChange: (e) => {
+                e.target.value = e.target.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúüÜñÑ\s]/g, "");
+                setValue("apellidos", e.target.value, { shouldValidate: true });
+              },
+            })}
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
               errors.apellidos ? "border-red-500" : "border-gray-300"
             }`}
@@ -234,7 +255,14 @@ export default function PersonaNaturalForm({
         <input
           id="celular"
           type="tel"
-          {...register("celular")}
+          inputMode="numeric"
+          maxLength={9}
+          {...register("celular", {
+            onChange: (e) => {
+              e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9);
+              setValue("celular", e.target.value, { shouldValidate: true });
+            },
+          })}
           className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
             errors.celular ? "border-red-500" : "border-gray-300"
           }`}
@@ -248,7 +276,10 @@ export default function PersonaNaturalForm({
       </div>
 
       {/* Sección de Domicilio */}
+      {solicitarDomicilio && <>
       <UbigeoSelector
+        soloUcayali={false}
+        initialDepartamentoId={domicilioValue.departamentoCodigo}
         initialProvinciaId={domicilioValue.provinciaCodigo}
         initialDistritoId={domicilioValue.distritoCodigo}
         onChange={handleUbigeoChange}
@@ -295,6 +326,7 @@ export default function PersonaNaturalForm({
       </div>
 
       {/* Checkboxes */}
+      </>}
       <div className="space-y-4">
         <DeclaracionJuradaCheckbox
           checked={declaracionJuradaAceptada}

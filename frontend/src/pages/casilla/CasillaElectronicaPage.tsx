@@ -9,8 +9,11 @@ import { Link } from "react-router-dom";
 import NotificationList from "../../components/casilla/NotificacionList";
 import NotificacionDetailModal from "../../components/casilla/NotificacionDetailModal";
 import { useCasilla } from "../../hooks/useCasilla";
+import { useAuthStore } from "../../stores/authStore";
+import { CasillaBadgeRealtime } from "../../components/casilla/CasillaBadgeRealtime";
 
 export default function CasillaElectronicaPage() {
+  const nombreUsuario = useAuthStore((state) => state.usuario?.nombreCompleto);
   const {
     filtros,
     hasActiveFilters,
@@ -29,12 +32,17 @@ export default function CasillaElectronicaPage() {
     refetch,
     stats,
     isLoadingStats,
+    isErrorStats,
     isModalOpen,
     selectedNotificacion,
+    isLoadingDetail,
+    detailError,
     openDetalle,
+    retryDetalle,
     closeDetalle,
     generarAcuse,
     isGenerandoAcuse,
+    generarAcuseError,
   } = useCasilla();
 
   return (
@@ -60,32 +68,26 @@ export default function CasillaElectronicaPage() {
               </h1>
 
               <p className="mt-1 text-sm text-slate-600">
-                Recepción oficial de actos administrativos, cédulas y resoluciones
-                con validez legal plena.
+                Consulte las notificaciones depositadas en su casilla.
               </p>
             </div>
 
             {/* Ficha del Administrado y Dirección de Casilla */}
             <div className="flex items-center gap-3.5">
+              <CasillaBadgeRealtime />
               <div className="flex items-center gap-3.5 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-3.5 shadow-xs">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-700 font-bold text-white shadow-sm">
-                  SP
+                  {nombreUsuario?.trim().charAt(0).toUpperCase() || "C"}
                 </div>
                 <div className="text-xs">
                   <div className="flex items-center gap-1.5">
                     <p className="font-bold text-slate-900">
-                      Sergio Serruche Panduro
+                      {nombreUsuario || "Cuenta autenticada"}
                     </p>
-                    <span className="rounded bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-blue-800">
-                      DNI 74561238
-                    </span>
                   </div>
-                  <p className="font-mono text-[11px] text-blue-700 font-semibold mt-0.5">
-                    74561238@casilla.iestpsuiza.edu.pe
-                  </p>
                   <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span>Casilla vinculada y homologada (Ley N° 29733)</span>
+                    <span>Casilla de la cuenta autenticada</span>
                   </div>
                 </div>
               </div>
@@ -104,7 +106,7 @@ export default function CasillaElectronicaPage() {
       {/* CONTENIDO PRINCIPAL                                                  */}
       {/* ==================================================================== */}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-7">
-        {/* Banner Legal Normativo (Ley N° 27444) */}
+        {/* Información de la casilla */}
         <section className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-blue-50/40 p-4.5 shadow-xs text-xs sm:text-sm text-slate-700">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-blue-700 text-white font-bold text-xs">
@@ -112,18 +114,22 @@ export default function CasillaElectronicaPage() {
             </div>
             <div className="space-y-1">
               <p className="font-bold text-blue-950">
-                Marco Legal de la Notificación Electrónica — TUO de la Ley N° 27444 (Art. 20)
+                Notificaciones electrónicas
               </p>
               <p className="text-slate-600 leading-relaxed text-xs">
-                La notificación dirigida a su Casilla Electrónica surte plenos
-                efectos legales el <strong>día de su depósito formal</strong> en
-                horario hábil (hasta las 16:30 hrs). Los depósitos efectuados
-                con posterioridad o en días no laborables se entienden surtidos al{" "}
-                <strong>primer día hábil siguiente</strong> a las 08:00 hrs.
+                Consulte el detalle, la fecha de depósito y los documentos disponibles
+                de cada notificación. La descarga del acuse requiere una referencia
+                documental registrada.
               </p>
             </div>
           </div>
         </section>
+
+        {isErrorStats && (
+          <p role="alert" className="text-sm text-red-800">
+            No se pudieron consultar los contadores de la Casilla Electrónica.
+          </p>
+        )}
 
         {/* Métricas y Contadores de la Casilla */}
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -138,7 +144,7 @@ export default function CasillaElectronicaPage() {
               </span>
             </div>
             <p className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">
-              {isLoadingStats ? "..." : stats.total}
+              {isLoadingStats ? "..." : isErrorStats ? "No disponible" : stats.total}
             </p>
             <p className="mt-1 text-[11px] text-slate-500">
               Registros en su buzón oficial
@@ -164,7 +170,7 @@ export default function CasillaElectronicaPage() {
               </span>
             </div>
             <p className="mt-2 text-2xl font-black text-amber-900 sm:text-3xl">
-              {isLoadingStats ? "..." : stats.noLeidos}
+              {isLoadingStats ? "..." : isErrorStats ? "No disponible" : stats.noLeidos}
             </p>
             <p className="mt-1 text-[11px] text-amber-700 font-semibold">
               Requieren su lectura y revisión
@@ -202,7 +208,7 @@ export default function CasillaElectronicaPage() {
               </svg>
             </div>
             <p className="mt-2 text-2xl font-black text-slate-800 sm:text-3xl">
-              {isLoadingStats ? "..." : stats.leidos}
+              {isLoadingStats ? "..." : isErrorStats ? "No disponible" : stats.leidos}
             </p>
             <p className="mt-1 text-[11px] text-slate-500">
               Consultados sin acuse emitido
@@ -218,7 +224,7 @@ export default function CasillaElectronicaPage() {
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-                Con Acuse Legal
+                Con confirmación
               </span>
               <svg
                 className="h-4 w-4 text-emerald-600"
@@ -235,10 +241,10 @@ export default function CasillaElectronicaPage() {
               </svg>
             </div>
             <p className="mt-2 text-2xl font-black text-emerald-900 sm:text-3xl">
-              {isLoadingStats ? "..." : stats.notificados}
+              {isLoadingStats ? "..." : isErrorStats ? "No disponible" : stats.notificados}
             </p>
             <p className="mt-1 text-[11px] text-emerald-700 font-semibold">
-              Con fecha cierta y hash SHA-256
+              Con fecha y hash registrados
             </p>
           </div>
         </section>
@@ -269,8 +275,12 @@ export default function CasillaElectronicaPage() {
         isOpen={isModalOpen}
         notificacion={selectedNotificacion}
         isGenerandoAcuse={isGenerandoAcuse}
+        isLoadingDetail={isLoadingDetail}
+        detailError={detailError}
+        acuseError={Boolean(generarAcuseError)}
         onClose={closeDetalle}
         onGenerarAcuse={generarAcuse}
+        onRetryDetail={retryDetalle}
       />
     </main>
   );

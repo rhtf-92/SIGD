@@ -1,14 +1,14 @@
 /**
  * Validador de Código de Verificación Digital (CVD) — F_ADRIANO / ENT-M04-05.
- * Formato canónico: CVD-YYYY-RD-XXXXXX-XXXX
+ * Admite el CVD-YYYY-<16 hex> generado por PostgreSQL y el formato documental existente.
  * Ejemplo válido: CVD-2026-RD-000412-892F
  * Marco: D.S. N° 070-2013-PCM (representación impresa de documento electrónico).
  */
 
-export const CVD_PATTERN =
-  /^CVD-(19|20)\d{2}-[A-Z]{2,6}-\d{6}-[A-F0-9]{4}$/;
+const CUERPO_CVD = 'CVD-(?:19|20)\\d{2}-(?:[A-F0-9]{16}|[A-Z]{2,6}-\\d{6}-[A-F0-9]{4})';
+export const CVD_PATTERN = new RegExp(`^${CUERPO_CVD}$`);
 
-export const CVD_INPUT_MASK_HINT = "CVD-YYYY-RD-XXXXXX-XXXX";
+export const CVD_INPUT_MASK_HINT = "CVD-YYYY-XXXXXXXXXXXXXXXX o CVD-YYYY-RD-XXXXXX-XXXX";
 
 export interface CvdValidation {
   valido: boolean;
@@ -26,6 +26,14 @@ export function normalizarCvd(raw: string): string {
  * Mantiene prefijo CVD-, año 4 dígitos, tipo acto, correlativo y sufijo hex.
  */
 export function aplicarMascaraCvd(raw: string): string {
+  const normalizado = normalizarCvd(raw).replace(/[^A-Z0-9-]/g, '');
+  // No reconstruir los segmentos de un código ya separado: eso cambia o
+  // trunca el identificador hexadecimal que emite firma_digital_documento.
+  if (normalizado.includes('-') || /^C(?:V(?:D)?)?$/.test(normalizado)) {
+    return normalizado.slice(0, 40);
+  }
+  const compacto = normalizado.match(/^(?:CVD)?((?:19|20)\d{2})([A-F0-9]{16})$/);
+  if (compacto) return `CVD-${compacto[1]}-${compacto[2]}`;
   const limpio = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
   // Quita el prefijo CVD si el usuario lo tecleó para reconstruirlo
   const sinPrefijo = limpio.startsWith("CVD") ? limpio.slice(3) : limpio;
@@ -51,8 +59,8 @@ export function aplicarMascaraCvd(raw: string): string {
 export function extraerCvdDeTexto(texto: string): string | null {
   const match = texto
     .toUpperCase()
-    .match(/CVD-(?:19|20)\d{2}-[A-Z]{2,6}-\d{6}-[A-F0-9]{4}/);
-  return match ? match[0] : null;
+    .match(new RegExp(`(?:^|[^A-Z0-9-])(${CUERPO_CVD})(?![A-Z0-9-])`));
+  return match ? match[1] : null;
 }
 
 export function validarCvd(raw: string): CvdValidation {

@@ -35,20 +35,37 @@ const anio = z.coerce.number().int().min(2000).max(2100);
 const diasLimite = z.coerce.number().int().min(0).max(365).default(5);
 
 /** Filtros del tablero consolidado (#50). */
+const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(valor => {
+  const d = new Date(valor + 'T00:00:00Z');
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === valor;
+}, 'Fecha calendario inválida.');
+const camposRango = {
+  fechaInicio: fecha.optional(), fechaFin: fecha.optional(), unidadOrganicaId: z.string().uuid().optional(),
+};
+function validarRango(datos: { fechaInicio?: string; fechaFin?: string; periodo?: string }, ctx: z.RefinementCtx) {
+  if (Boolean(datos.fechaInicio) !== Boolean(datos.fechaFin) ||
+      (datos.fechaInicio && datos.fechaFin && datos.fechaInicio > datos.fechaFin) ||
+      (datos.periodo && datos.fechaInicio)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fechaInicio'], message: 'Use un período mensual o un rango completo y ordenado.' });
+  }
+}
 export const filtrosResumenSchema = z.object({
+  ...camposRango,
   periodo: periodo.optional(),
-}).strict();
+}).strict().superRefine(validarRango);
 
 /** Filtros del ranking de cuellos de botella (#51). */
 export const filtrosCuellosBotellaSchema = z.object({
+  ...camposRango,
   periodo: periodo.optional(),
   diasLimite,
-}).strict();
+}).strict().superRefine(validarRango);
 
 /** Filtros de la serie mensual de tendencias (#52). */
 export const filtrosTendenciasSchema = z.object({
+  ...camposRango,
   anio: anio.optional(),
-}).strict();
+}).strict().superRefine(validarRango);
 
 export type FiltrosResumen = z.infer<typeof filtrosResumenSchema>;
 export type FiltrosCuellosBotella = z.infer<typeof filtrosCuellosBotellaSchema>;

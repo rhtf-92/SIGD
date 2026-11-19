@@ -43,6 +43,7 @@ import {
   filtrosTendenciasSchema,
 } from './reportes.schemas.js';
 import type { CacheDistribuida } from '../identicore/ubigeo.service.js';
+import { tienePermisoGlobal } from '../../core/auth/auth.guard.js';
 
 /** Roles autorizados por §4.7 para la analítica ejecutiva. */
 const ROLES_ANALITICA = new Set(['DIRECTOR', 'SUPER_ADMIN']);
@@ -71,32 +72,41 @@ export function crearControladorReportes(
   const autorizado = async (req: Request): Promise<ActorRutaDoc> => {
     const actor = await actorProvider.obtenerActor(req);
     if (!actor) throw new UnauthorizedError();
-    if (!actor.roles.some((rol) => ROLES_ANALITICA.has(rol))) throw new ForbiddenError();
+    // Precedencia contractual y autorización institucional:
+    // El acceso a reportes ejecutivos exige estrictamente el permiso persistido REPORTE_LEER.
+    // La ausencia de permisos institucionales en el RBAC no se suple con roles afirmados en el token.
+    const permitido = Boolean(actor.permisos && tienePermisoGlobal(actor.permisos, 'REPORTE_LEER'));
+    if (!permitido) throw new ForbiddenError();
     return actor;
   };
 
   return {
     resumen: async (req, res) => {
       await autorizado(req);
-      const { periodo } = filtrosResumenSchema.parse(req.query ?? {});
-      const resumen = await servicio.resumen(periodo ?? null);
+      const { periodo, ...filtros } = filtrosResumenSchema.parse(req.query ?? {});
+      const resumen = await servicio.resumen(periodo ?? null, filtros);
       // `periodo` y `actualizadoEn` son metadatos de la lectura; el contrato de
       // §4.7 define los seis campos de primer nivel, pero sin ellos el frontend no
       // puede distinguir "0 %" de "sin datos" ni saber de cuándo es el dato.
-      res.json({ ...resumen });
+      res.json({ ...resumen, filtros, disponibilidad: {
+        vtep: resumen.contadores.nRadicados > 0,
+        tprHorasHabiles: resumen.contadores.nResueltos > 0,
+        tro: resumen.contadores.nResueltos > 0,
+        teo: resumen.contadores.nEnTramite > 0,
+      } });
     },
 
     cuellosBotella: async (req, res) => {
       await autorizado(req);
-      const { periodo, diasLimite } = filtrosCuellosBotellaSchema.parse(req.query ?? {});
+      const { periodo, diasLimite, ...filtros } = filtrosCuellosBotellaSchema.parse(req.query ?? {});
       const nombres = await repositorio.obtenerNombresUnidades();
-      res.json(await servicio.cuellosBotella(periodo ?? null, diasLimite, nombres));
+      res.json(await servicio.cuellosBotella(periodo ?? null, diasLimite, nombres, filtros));
     },
 
     tendencias: async (req, res) => {
       await autorizado(req);
-      const { anio } = filtrosTendenciasSchema.parse(req.query ?? {});
-      res.json(await servicio.tendencias(anio ?? anioEnLima()));
+      const { anio, ...filtros } = filtrosTendenciasSchema.parse(req.query ?? {});
+      res.json(await servicio.tendencias(anio ?? anioEnLima(), filtros));
     },
 
     /**
@@ -108,8 +118,8 @@ export function crearControladorReportes(
      */
     tiemposAtencion: async (req, res) => {
       await autorizado(req);
-      const { periodo } = filtrosResumenSchema.parse(req.query ?? {});
-      const distribucion = await servicio.distribucionRetencion(periodo ?? null);
+      const { periodo, ...filtros } = filtrosResumenSchema.parse(req.query ?? {});
+      const distribucion = await servicio.distribucionRetencion(periodo ?? null, filtros);
       const nombres = await repositorio.obtenerNombresUnidades();
       res.json(Array.from(distribucion.entries()).map(([areaId, tramos]) => ({
         areaId,
@@ -130,12 +140,17 @@ export function crearControladorReportes(
     refrescar: async (req, res) => {
       const actor = await actorProvider.obtenerActor(req);
       if (!actor) throw new UnauthorizedError();
-      if (!actor.roles.includes('SUPER_ADMIN')) throw new ForbiddenError();
+      const permitido = actor.permisos !== undefined
+        ? tienePermisoGlobal(actor.permisos, 'ADMIN_USUARIOS')
+        : actor.roles.includes('SUPER_ADMIN');
+      if (!permitido) throw new ForbiddenError();
       const resultado = await servicio.refrescar();
       res.json({
         vistas: resultado.vistas,
         duracionMs: resultado.duracionMs,
         refrescoYaEnCurso: resultado.refrescoYaEnCurso,
+        vistasDisponibles: resultado.vistasDisponibles,
+        mensaje: resultado.mensaje,
       });
     },
   };

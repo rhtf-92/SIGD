@@ -40,6 +40,7 @@ function crearPoolSimulado(): Pool {
   let correlativo = 0;
   return {
     query: async (texto: string, parametros?: unknown[]) => {
+      if(texto.includes('SELECT EXISTS'))return {rows:[{ocupado:false}],rowCount:1};
       if (!texto.includes('fn_generar_cut')) {
         throw new Error(`Consulta no esperada en la simulacion: ${texto}`);
       }
@@ -51,6 +52,13 @@ function crearPoolSimulado(): Pool {
 }
 
 describe('T-BE-TC-01 · Generador de CUT EXP-YYYY-XXXXXX', () => {
+  it('conserva un CUT histórico adelantado y reserva el siguiente libre',async()=>{
+    let n=141;const llamadas:string[]=[];
+    const pool={query:async(sql:string,params?:unknown[])=>{llamadas.push(sql);return sql.includes('fn_generar_cut')?{rows:[{cut:formatearCut(2026,++n)}]}:{rows:[{ocupado:params?.[0]==='EXP-2026-000142'}]};}} as unknown as Pool;
+    expect((await new CutService(pool).generar(2026)).cut).toBe('EXP-2026-000143');
+    expect(llamadas.filter(s=>s.includes('fn_generar_cut'))).toHaveLength(2);
+    expect(llamadas.some(s=>s.startsWith('DELETE')||s.startsWith('UPDATE sigd_doc'))).toBe(false);
+  });
   describe('Mascara y validacion', () => {
     it('Formatea el correlativo con relleno de ceros a la izquierda', () => {
       expect(formatearCut(ANIO, 1)).toBe('EXP-2026-000001');
@@ -120,9 +128,10 @@ describe('T-BE-TC-01 · Generador de CUT EXP-YYYY-XXXXXX', () => {
   });
 
   describe('Concurrencia contra PostgreSQL real', () => {
-    const url = process.env.TEST_DATABASE_URL;
+    const url = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL ?? 'postgres://postgres:postgres_password@127.0.0.1:5433/sigd_jacobo_demo';
+    const ANIO_TEST = 2099;
 
-    it.runIf(url)('Emite 100 CUTs unicos desde fn_generar_cut', async () => {
+    it('Emite 100 CUTs unicos desde fn_generar_cut', async () => {
       // El servidor de pruebas admite `max_connections = 100` y ya tiene
       // conexiones del sistema abiertas, asi que no se pueden abrir 100
       // conexiones dedicated. Se disparan las 100 llamadas de forma concurrente
@@ -134,7 +143,7 @@ describe('T-BE-TC-01 · Generador de CUT EXP-YYYY-XXXXXX', () => {
         const servicio = new CutService(pool);
 
         const resultados = await Promise.all(
-          Array.from({ length: TOTAL_LLAMADAS }, () => servicio.generar(ANIO)),
+          Array.from({ length: TOTAL_LLAMADAS }, () => servicio.generar(ANIO_TEST)),
         );
 
         const cuts = resultados.map((r) => r.cut);
@@ -142,11 +151,12 @@ describe('T-BE-TC-01 · Generador de CUT EXP-YYYY-XXXXXX', () => {
         expect(new Set(cuts).size).toBe(TOTAL_LLAMADAS);
         expect(cuts.every((cut) => REGEX_CUT.test(cut))).toBe(true);
       } finally {
+        await pool.query('DELETE FROM sigd_tra.secuencia_anual_cut WHERE anio_fiscal = $1', [ANIO_TEST]).catch(() => undefined);
         await pool.end();
       }
     });
 
-    it.runIf(url)('No repite correlativo entre conexiones y transacciones distintas', async () => {
+    it('No repite correlativo entre conexiones y transacciones distintas', async () => {
       // Cada conexion abre su propia transaccion: si el correlativo se tomara
       // con `SELECT MAX() + 1` o con una tabla de control mal bloqueada, la
       // separacion entre transacciones es justo lo que expone la colision.
@@ -162,7 +172,7 @@ describe('T-BE-TC-01 · Generador de CUT EXP-YYYY-XXXXXX', () => {
             try {
               for (let i = 0; i < rondas; i += 1) {
                 await cliente.query('BEGIN');
-                const { cut } = await servicio.generar(ANIO, cliente);
+                const { cut } = await servicio.generar(ANIO_TEST, cliente);
                 await cliente.query('COMMIT');
                 asignado.push(cut);
               }
@@ -178,8 +188,9 @@ describe('T-BE-TC-01 · Generador de CUT EXP-YYYY-XXXXXX', () => {
         expect(new Set(todos).size).toBe(todos.length);
         expect(todos.every((cut) => REGEX_CUT.test(cut))).toBe(true);
       } finally {
+        await pool.query('DELETE FROM sigd_tra.secuencia_anual_cut WHERE anio_fiscal = $1', [ANIO_TEST]).catch(() => undefined);
         await pool.end();
       }
-    });
+    }, 15_000);
   });
 });

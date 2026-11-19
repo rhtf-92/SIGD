@@ -1,0 +1,15 @@
+{
+  "name": "sigd-local",
+  "private": true,
+  "description": "Arranque local seguro del SIGD Suiza",
+  "engines": {
+    "node": ">=24.19.0 <25"
+  },
+  "scripts": {
+    "dev": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/iniciar-sigd-local.ps1",
+    "start": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/iniciar-sigd-local.ps1",
+    "status": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/estado-demo.ps1",
+    "stop": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/detener-demo.ps1",
+    "restart": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/reiniciar-demo.ps1"
+  }
+}

@@ -80,6 +80,13 @@ export const adjuntoRadicacionSchema = z
     s3Key: s3KeyMetadataSchema.optional(),
     s3Bucket: z.string().trim().min(3).max(120).optional(),
     idDocumentoAdjunto: z.string().trim().uuid().optional(),
+    tipoDocumentalId: z.string().uuid().optional(),
+    tipoDocumentalCodigo: z.string().trim().optional(),
+    clasificacion: z.enum(['EXPEDIENTE', 'ANEXO']).optional(),
+    requisitoId: z.string().trim().min(1).max(128).optional(),
+    paginas: z.number().int().positive().optional(),
+    folioInicio: z.number().int().positive().optional(),
+    folioFin: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -127,6 +134,7 @@ export const radicacionVirtualSchema = z
       .email('El correo electronico no tiene un formato valido.')
       .max(150, 'El correo electronico no puede superar los 150 caracteres.'),
     totalFolios: z.number().int().min(1).max(5000),
+    ordenPagoId: z.string().uuid().optional(),
     documentos: z
       .array(adjuntoRadicacionSchema)
       .min(1, 'La radicacion exige al menos un archivo cargado.')

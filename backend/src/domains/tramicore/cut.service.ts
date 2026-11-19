@@ -88,6 +88,7 @@ export class CutService {
    */
   async generar(anio: number, cliente?: PoolClient): Promise<ResultadoCut> {
     const ejecutor = cliente ?? this.pool;
+    for (;;) {
     const resultado = await ejecutor.query<FilaCut>(
       'SELECT sigd_tra.fn_generar_cut($1::INT) AS cut',
       [anio],
@@ -99,7 +100,14 @@ export class CutService {
     if (!esCutValido(cut)) {
       throw new Error(`CUT_CON_MASCARA_INVALIDA: la base de datos devolvio "${cut}"`);
     }
+    // El correlativo transaccional puede ir por detrás de expedientes importados.
+    // No reasignar ni borrar CUT históricos: reservar el siguiente libre con el mismo lock.
+    const existente=await ejecutor.query<{ocupado:boolean}>(`SELECT EXISTS(
+      SELECT 1 FROM sigd_doc.expediente WHERE codigo_expediente=$1
+      UNION ALL SELECT 1 FROM sigd_tra.expediente WHERE codigo_expediente=$1) ocupado`,[cut]);
+    if(existente.rows[0]?.ocupado===true)continue;
     return { cut, anio };
+    }
   }
 
   /** CUT del ejercicio corriente. Azucar sintactico sobre `generar`. */
