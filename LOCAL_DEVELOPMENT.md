@@ -4,38 +4,42 @@ Estado certificado: **2026-10-09**. El entorno reproducible usa Docker Compose,
 Node.js 24.19, PostgreSQL 18, Redis 7 y almacenamiento S3 compatible SeaweedFS
 4.17. Los cinco contenedores disponen de sondas de salud reales.
 
-## Arranque recomendado
+## Arranque completo con un comando
 
-Desde PowerShell, en la raíz del repositorio:
+Desde PowerShell, en la raíz del repositorio, ejecute:
 
 ```powershell
-docker compose config --quiet
-docker compose up -d --build
-docker compose ps
-Invoke-RestMethod http://localhost:3000/ready
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Start-SigdAcademico.ps1
 ```
 
-Todos los servicios deben quedar `healthy`:
+El script verifica las huellas del snapshot, crea `.env.academico` con secretos
+aleatorios si no existe y ejecuta Docker Compose para restaurar/inicializar la
+copia académica y levantar los cinco servicios. `-ExecutionPolicy Bypass` se
+aplica únicamente al proceso de PowerShell que ejecuta el script; no cambia la
+política del equipo. En ejecuciones posteriores se conserva la base existente.
 
-- Frontend: http://127.0.0.1:5173/login
-- Backend/API: http://localhost:3000/api/v1
-- Readiness: http://localhost:3000/ready
-- PostgreSQL 18: `localhost:5432`, base `sigd_prueba`
-- Redis 7: `localhost:6379`
-- S3: http://localhost:9000
-- Consola SeaweedFS: http://localhost:8888
+URLs y puertos predeterminados:
 
-El backend arranca sin aplicar migraciones. El CLI requiere `--apply` y una
-`MIGRATOR_DATABASE_URL` separada, según la sección «Migraciones manuales». No se
-debe usar `docker compose down -v`, porque esa opción elimina los volúmenes
-persistentes de PostgreSQL, Redis y S3.
+- Frontend: http://localhost:5174/login
+- Backend/API: http://localhost:3001/api/v1
+- Readiness: http://localhost:3001/ready
+- PostgreSQL 18: `localhost:5434`, base `sigd_prueba`
+- Redis 7: `localhost:6380`
+- S3: http://localhost:9001
+- Consola SeaweedFS: http://localhost:8889
+
+La cuenta de demostración es `demo.academico`; la contraseña aleatoria está en
+`ACADEMIC_DEMO_PASSWORD` dentro de `.env.academico`. No use
+`docker compose down -v`: elimina los volúmenes persistentes de PostgreSQL,
+Redis y S3. Este entorno es una copia académica con datos de demostración, no
+una instancia de producción.
 
 ## Arquitectura de endpoints S3
 
 Docker utiliza dos direcciones deliberadamente distintas:
 
 - `S3_ENDPOINT=http://s3:8333`: tráfico privado backend → S3 en la red Compose.
-- `S3_PUBLIC_ENDPOINT=http://localhost:9000`: URLs SigV4 que recibe el navegador.
+- `S3_PUBLIC_ENDPOINT=http://localhost:9001`: URLs SigV4 que recibe el navegador.
 
 No se debe sustituir una por la otra: el host forma parte de la firma SigV4.
 La sonda `/ready` usa el endpoint interno autenticado y el navegador usa el

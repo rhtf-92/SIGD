@@ -6,11 +6,10 @@ import type { Pool, PoolClient } from 'pg';
  * Mascara institucional: `EXP-YYYY-XXXXXX` (MGD-PCM, R.S. N° 001-2017-PCM/SEGDI).
  *
  * El correlativo se resuelve en PostgreSQL mediante la funcion
- * `sigd_tra.fn_generar_cut(p_anio)`, que consume la secuencia anual
- * `sigd_tra.seq_cut_<anio>` con `nextval()`. De este modo la asignacion es
- * O(1) y no depende de un `SELECT MAX() + 1` ni de una tabla de control con
- * `FOR UPDATE` por llamada, precisamente los dos patrones que bajo concurrencia
- * producían colisiones SQLSTATE 23505 y dejaban la Mesa de Partes bloqueada.
+ * `sigd_tra.fn_generar_cut(p_anio)`, que bloquea la fila del ejercicio en
+ * `sigd_tra.secuencia_anual_cut`. El incremento queda dentro de la misma
+ * transaccion que el expediente, no usa `SELECT MAX() + 1` y no puede producir
+ * dos correlativos iguales bajo concurrencia.
  *
  * Este servicio no reimplementa el correlativo: delega en la base de datos para
  * que exista una unica fuente de verdad del CUT y la garantia de unicidad quede

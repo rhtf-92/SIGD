@@ -23,7 +23,7 @@ import { SUGERENCIAS_INICIALES } from './asistente.conocimiento.js';
 
 const consultaSchema = z.object({
   mensaje: z
-    .string({ error: 'El campo "mensaje" es obligatorio.' })
+    .string({ invalid_type_error: 'El campo "mensaje" es obligatorio.' })
     .trim()
     .min(3, 'El mensaje debe tener al menos 3 caracteres.')
     .max(500, 'El mensaje no puede superar los 500 caracteres.'),

@@ -8,6 +8,7 @@ import {
 export const columnasPermisos: Array<{ clave: ClavePermiso; etiqueta: string }> =
   [
     { clave: "ver", etiqueta: "Ver" },
+    { clave: "gestionar", etiqueta: "Gestionar" },
     { clave: "crear", etiqueta: "Crear" },
     { clave: "editar", etiqueta: "Editar" },
     { clave: "derivar", etiqueta: "Derivar" },
@@ -19,11 +20,12 @@ export const columnasPermisos: Array<{ clave: ClavePermiso; etiqueta: string }> 
 interface RolePermissionMatrixProps {
   permisos: PermisoModulo[];
   onAlternar: (indice: number, clave: ClavePermiso) => void;
+  readOnly?: boolean;
 }
 
 function esLecturaInmutable(modulo: string, clave: ClavePermiso): boolean {
   return (
-    modulo === "Auditoría" &&
+        modulo === "Auditoría" &&
     ACCIONES_INMUTABLES_AUDITORIA.includes(clave)
   );
 }
@@ -35,6 +37,7 @@ function esPermisoPersistible(modulo: string, clave: ClavePermiso): boolean {
 export default function RolePermissionMatrix({
   permisos,
   onAlternar,
+  readOnly = false,
 }: RolePermissionMatrixProps) {
   return (
     <div className="overflow-x-auto">
@@ -54,13 +57,13 @@ export default function RolePermissionMatrix({
             <tr key={fila.modulo}>
               <td className="px-5 py-4 text-sm font-semibold">{fila.modulo}</td>
               {columnasPermisos.map((columna) => {
-                const bloqueado = esLecturaInmutable(fila.modulo, columna.clave) ||
+                const bloqueado = readOnly || esLecturaInmutable(fila.modulo, columna.clave) ||
                   !esPermisoPersistible(fila.modulo, columna.clave);
                 return (
                   <td key={columna.clave} className="px-4 py-4 text-center">
                     <input
                       type="checkbox"
-                      checked={fila[columna.clave]}
+                      checked={fila[columna.clave] ?? false}
                       disabled={bloqueado}
                       onChange={() => onAlternar(indice, columna.clave)}
                       className="h-4 w-4 accent-blue-700 disabled:cursor-not-allowed disabled:opacity-40"

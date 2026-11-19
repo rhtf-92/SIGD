@@ -465,8 +465,8 @@ export function construirApp(
     const cliente = await pool.connect();
     try {
       const actor = await cuentaActual(pool, req);
-      if (!actor.roles.includes('SUPER_ADMIN') && !actor.permisos.includes('ADMIN_USUARIOS')) {
-        throw new ForbiddenError({ message: 'Se requiere el permiso ADMIN_USUARIOS.' });
+      if (!actor.roles.includes('SUPER_ADMIN')) {
+        throw new ForbiddenError({ message: 'Solo SUPER_ADMIN puede modificar permisos de roles.' });
       }
       if (!Array.isArray(req.body?.permisos) ||
           req.body.permisos.some((permiso: unknown) => typeof permiso !== 'string')) {

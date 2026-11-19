@@ -2,6 +2,8 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { autorizarPermisos, PERMISOS_RBAC } from '../../core/auth/auth.guard.js';
+import { cuentaActual } from '../../core/auth/cuenta-actual.js';
+import { ForbiddenError } from '../../shared/domain/errors/index.js';
 import { crearAdminConfiguracionService } from './adminConfiguracion.service.js';
 
 const politicasSchema = z.object({
@@ -23,6 +25,10 @@ export function crearRouterAdminSeguridad(pool: Pool): Router {
     res.json({ politicas: await service.obtenerPoliticas() });
   });
   router.put('/politicas', autorizarPermisos(pool, PERMISOS_RBAC.ADMIN_ACCESO), async (req, res) => {
+    const actor = await cuentaActual(pool, req);
+    if (!actor.roles.includes('SUPER_ADMIN')) {
+      throw new ForbiddenError({ message: 'Solo SUPER_ADMIN puede modificar las políticas de seguridad.' });
+    }
     const usuarioId = req.cuentaActual?.idUsuario;
     if (!usuarioId) throw new Error('La identidad autenticada es requerida.');
     res.json(await service.guardarPoliticas(politicasSchema.parse(req.body), usuarioId));

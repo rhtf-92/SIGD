@@ -8,11 +8,75 @@ import { Link } from "react-router-dom";
 
 import NotificationList from "../../components/casilla/NotificacionList";
 import NotificacionDetailModal from "../../components/casilla/NotificacionDetailModal";
+import ConsultaExpedientePublico from "../../components/tramite/ConsultaExpedientePublico";
 import { useCasilla } from "../../hooks/useCasilla";
-import { useAuthStore } from "../../stores/authStore";
+import { useAuthStore, type UsuarioPerfil } from "../../stores/authStore";
+import "../../styles/consulta-publica.css";
 
-export default function CasillaElectronicaPage() {
-  const usuario = useAuthStore((state) => state.usuario);
+function CasillaConsultaPublica() {
+  return (
+    <main className="sigd-public-page">
+      <div className="sigd-public-shell">
+        <header className="sigd-public-banner">
+          <div className="sigd-public-banner-inner">
+            <div>
+              <div className="sigd-public-badges">
+                <span className="sigd-public-kicker">
+                  SIGD • ENT-M01-03 · Consulta sin cuenta
+                </span>
+                <span className="sigd-public-entity">
+                  IESTP &ldquo;Suiza&rdquo; — Pucallpa
+                </span>
+              </div>
+
+              <h1>Casilla Electrónica — Consulta Pública</h1>
+
+              <p className="sigd-public-banner-desc">
+                Consulta el estado y avance de tu documentación usando tu código CUT sin necesidad de tener cuenta.
+              </p>
+            </div>
+
+            <Link to="/" className="sigd-public-back-btn">
+              ← Volver al inicio
+            </Link>
+          </div>
+        </header>
+
+        <ConsultaExpedientePublico
+          syncUrl={false}
+          titulo="Consulta cómo va tu trámite"
+          subtitulo="Ingresa tu Código Único de Trámite (CUT) para ver el estado actual, documentos adjuntos y actuaciones públicas."
+          mostrarEnlacePortal={false}
+        />
+
+        <section className="sigd-public-cta">
+          <div className="sigd-public-cta-copy">
+            <h2>
+              ¿Deseas revisar notificaciones privadas o emitir acuses digitales?
+            </h2>
+            <p>
+              Las notificaciones legales dirigidas personalmente a un usuario y la emisión de acuses digitales (Ley N° 27444) requieren iniciar sesión para proteger tu identidad.
+            </p>
+          </div>
+          <div className="sigd-public-cta-actions">
+            <Link to="/login" className="sigd-public-btn-primary">
+              Iniciar sesión en mi Casilla
+            </Link>
+            <Link to="/registro" className="sigd-public-btn-secondary">
+              Crear cuenta ciudadana
+            </Link>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function CasillaAutenticada({
+  usuario,
+}: {
+  usuario: Pick<UsuarioPerfil, "nombreCompleto" | "correo">;
+}) {
   const {
     filtros,
     hasActiveFilters,
@@ -269,4 +333,14 @@ export default function CasillaElectronicaPage() {
       />
     </main>
   );
+}
+
+export default function CasillaElectronicaPage() {
+  const usuario = useAuthStore((state) => state.usuario);
+
+  if (!usuario) {
+    return <CasillaConsultaPublica />;
+  }
+
+  return <CasillaAutenticada usuario={usuario} />;
 }

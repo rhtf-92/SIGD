@@ -72,17 +72,17 @@ export default function AppRouter() {
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
 
-      <Route path="/casilla" element={<ProtectedRoute><CasillaElectronicaPage /></ProtectedRoute>} />
+      <Route path="/casilla" element={<CasillaElectronicaPage />} />
       <Route
         path="/casilla-electronica"
-        element={<ProtectedRoute><CasillaElectronicaPage /></ProtectedRoute>}
+        element={<CasillaElectronicaPage />}
       />
       <Route path="/registro" element={<RegistroCiudadanoPage />} />
 
       <Route path="/tramite" element={<TramitePage />} />
       <Route
         path="/tramite/mesa-partes-virtual"
-        element={<MesaPartesVirtualPage />}
+        element={<ProtectedRoute><MesaPartesVirtualPage /></ProtectedRoute>}
       />
       <Route
         path="/tramite/mesa-partes"
@@ -90,15 +90,15 @@ export default function AppRouter() {
       />
       <Route
         path="/mesa-partes"
-        element={<MesaPartesVirtualPage />}
+        element={<ProtectedRoute><MesaPartesVirtualPage /></ProtectedRoute>}
       />
       <Route
         path="/tramite/ventanilla-presencial"
-        element={<VentanillaPresencialPage />}
+        element={<ProtectedRoute><VentanillaPresencialPage /></ProtectedRoute>}
       />
       <Route
         path="/ventanilla"
-        element={<VentanillaPresencialPage />}
+        element={<ProtectedRoute><VentanillaPresencialPage /></ProtectedRoute>}
       />
       <Route path="/flujo-validez-legal" element={
         <ProtectedRoute requiredAnyPermissions={["EXPEDIENTE_LEER", "FIRMA_FIRMAR"]}>

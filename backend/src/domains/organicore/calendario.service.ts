@@ -449,11 +449,11 @@ export const esquemaAnio = z.coerce
   .max(2999, 'El año es fuera del rango admitido.');
 
 export const esquemaTipoFeriado = z.enum(TIPOS_FERIADO, {
-  error: 'El tipo de feriado no es válido.',
+  errorMap: () => ({ message: 'El tipo de feriado no es válido.' }),
 });
 
 export const esquemaUnidadTerritorial = z.enum(UNIDADES_TERRITORIALES, {
-  error: 'La unidad territorial no es válida.',
+  errorMap: () => ({ message: 'La unidad territorial no es válida.' }),
 });
 
 /**

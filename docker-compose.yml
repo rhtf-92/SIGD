@@ -60,13 +60,10 @@ services:
       target: development
     container_name: sigd_backend
     working_dir: /app
-    volumes:
-      - ./backend:/app
-      - backend_node_modules:/app/node_modules
     environment:
       PORT: 3000
       NODE_ENV: development
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL debe usar el rol de aplicación}
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER es obligatorio}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB es obligatorio}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET es obligatorio}
       CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
       S3_ENDPOINT: http://s3:8333
@@ -104,11 +101,9 @@ services:
       target: development
     container_name: sigd_frontend
     working_dir: /app
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
     environment:
       VITE_API_BASE_URL: http://localhost:3000/api/v1
+      VITE_PROXY_TARGET: http://backend:3000
       VITE_ENABLE_MOCKS: "false"
     command: ["npm", "exec", "--", "vite", "--host", "0.0.0.0", "--port", "5173", "--strictPort"]
     ports:
@@ -129,5 +124,3 @@ volumes:
   redisdata:
   s3data:
   miniodata:
-  backend_node_modules:
-  frontend_node_modules:

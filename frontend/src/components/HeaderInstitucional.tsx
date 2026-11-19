@@ -8,20 +8,23 @@ import {
   LogIn,
   LogOut,
   Menu,
+  Search,
   Settings,
   X,
 } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import sigdLogo from "../assets/LOGO 3.png";
 import { useAuthStore } from "../stores/authStore";
+import { PERMISOS, tienePermiso } from "../auth/permissions";
 
 const NAVEGACION = [
   { etiqueta: "Inicio", ruta: "/", icono: Home, exacta: true },
+  { etiqueta: "Consulta", ruta: "/consulta", icono: Search, exacta: false },
   { etiqueta: "Trámites", ruta: "/tramite", icono: FileInput, exacta: false },
   { etiqueta: "Expedientes", ruta: "/expedientes", icono: Archive, exacta: false, permiso: "EXPEDIENTE_LEER" },
   { etiqueta: "Casilla", ruta: "/casilla", icono: Inbox, exacta: false },
   { etiqueta: "Reportes", ruta: "/reportes/dashboard", icono: BarChart3, exacta: false, permiso: "REPORTE_LEER" },
-  { etiqueta: "Administración", ruta: "/administracion", icono: Settings, exacta: false, permiso: "ADMIN_USUARIOS" },
+  { etiqueta: "Administración", ruta: "/administracion", icono: Settings, exacta: false, permiso: PERMISOS.ADMIN_ACCESO },
 ] as const;
 
 export default function HeaderInstitucional() {
@@ -30,7 +33,7 @@ export default function HeaderInstitucional() {
   const logout = useAuthStore((state) => state.logout);
   const permisosUsuario = useAuthStore((state) => state.usuario?.permisos) ?? [];
   const navegacionVisible = NAVEGACION.filter((elemento) =>
-    !("permiso" in elemento) || permisosUsuario.includes(elemento.permiso),
+    !("permiso" in elemento) || tienePermiso(permisosUsuario, elemento.permiso),
   );
 
   return (

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { apiClient } from "../api/client";
+import { useAuthStore } from "../stores/authStore";
 
 import type {
   ClavePermiso,
@@ -10,12 +11,18 @@ import type {
   Rol,
   RoleRBACPayload,
 } from "../types/rbacRoles";
+import { PERMISOS, esSuperAdmin } from "../auth/permissions";
 
 export const MODULOS_SISTEMA = [
   "Expedientes",
   "Documentos",
   "Administración",
   "Auditoría",
+  "Usuarios",
+  "Roles y Permisos",
+  "Organigrama",
+  "Tablas Maestras",
+  "Calendario Laboral",
 ] as const;
 
 export const CLAVE_STORAGE_PERMISOS = "sigd_permisos";
@@ -25,10 +32,17 @@ export const CODIGO_PERMISO_BACKEND: Partial<Record<string, string>> = {
   "Expedientes.derivar": "EXPEDIENTE_DERIVAR",
   "Expedientes.editar": "EXPEDIENTE_RESOLVER",
   "Documentos.editar": "FIRMA_FIRMAR",
-  "Administración.ver": "ADMIN_USUARIOS",
-  "Administración.editar": "ADMIN_USUARIOS",
-  "Auditoría.ver": "REPORTE_LEER",
-  "Auditoría.exportar": "REPORTE_LEER",
+  "Administración.ver": PERMISOS.ADMIN_ACCESO,
+  "Auditoría.ver": PERMISOS.AUDITORIA_LEER,
+  "Usuarios.ver": PERMISOS.USUARIOS_LEER,
+  "Usuarios.gestionar": PERMISOS.USUARIOS_GESTIONAR,
+  "Roles y Permisos.ver": PERMISOS.ROLES_LEER,
+  "Organigrama.ver": PERMISOS.ORGANIGRAMA_LEER,
+  "Organigrama.gestionar": PERMISOS.ORGANIGRAMA_GESTIONAR,
+  "Tablas Maestras.ver": PERMISOS.MAESTRAS_LEER,
+  "Tablas Maestras.gestionar": PERMISOS.MAESTRAS_GESTIONAR,
+  "Calendario Laboral.ver": PERMISOS.CALENDARIO_LEER,
+  "Calendario Laboral.gestionar": PERMISOS.CALENDARIO_GESTIONAR,
 };
 
 const ROLES_BACKEND: Record<string, string[]> = {
@@ -140,9 +154,29 @@ export const permisosIniciales: MatrizPermisos = {
   ],
 };
 
+const MODULOS_RBAC_NUEVOS = MODULOS_SISTEMA.filter(
+  (modulo) => !["Expedientes", "Documentos", "Administración", "Auditoría"].includes(modulo),
+);
+for (const filas of Object.values(permisosIniciales)) {
+  for (const modulo of MODULOS_RBAC_NUEVOS) {
+    filas.push({
+      modulo,
+      ver: false,
+      gestionar: false,
+      crear: false,
+      editar: false,
+      derivar: false,
+      archivar: false,
+      eliminar: false,
+      exportar: false,
+    });
+  }
+}
+
 // Invariante WORM: el módulo Auditoría jamás admite mutaciones, ni para admin
 export const ACCIONES_INMUTABLES_AUDITORIA: ClavePermiso[] = [
   "crear",
+  "gestionar",
   "editar",
   "derivar",
   "archivar",
@@ -157,11 +191,15 @@ export function useRbacConfig() {
   const [mensaje, setMensaje] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [codigosPorRol, setCodigosPorRol] = useState<Record<string, string[]>>({});
+  const rolUsuario = useAuthStore((state) => state.usuario?.rol);
 
   const recargar = useCallback(async () => {
     if (!window.localStorage.getItem("sigd_token") && !window.localStorage.getItem("token")) return;
     setIsLoading(true);
     setIsError(false);
+    setIsLoaded(false);
     try {
         const { data } = await apiClient.get<{ roles: RolBackend[] }>("/api/v1/admin/roles-permisos");
         setRoles((actuales) => actuales.map((rol) => {
@@ -172,12 +210,13 @@ export function useRbacConfig() {
         const sincronizados: MatrizPermisos = Object.fromEntries(
           Object.entries(permisosIniciales).map(([rol, filas]) => [rol, filas.map((fila) => ({ ...fila }))]),
         );
+        const codigosPorRolActual: Record<string, string[]> = {};
         for (const [rolCanonico, codigos] of Object.entries(ROLES_BACKEND)) {
-          const permisosRol = new Set(
-            data.roles.filter((rol) => codigos.includes(rol.codigo)).flatMap((rol) => rol.permisos),
-          );
+          const permisosBrutos = data.roles.filter((rol) => codigos.includes(rol.codigo)).flatMap((rol) => rol.permisos);
+          codigosPorRolActual[rolCanonico] = [...new Set(permisosBrutos)];
+          const permisosRol = new Set(permisosBrutos);
           sincronizados[rolCanonico] = MODULOS_SISTEMA.map((modulo) => {
-            const fila = { modulo, ver: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false };
+            const fila = { modulo, ver: false, gestionar: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false };
             for (const clave of Object.keys(fila) as Array<keyof typeof fila>) {
               if (clave === "modulo") continue;
               const codigo = CODIGO_PERMISO_BACKEND[`${modulo}.${clave}`];
@@ -186,10 +225,13 @@ export function useRbacConfig() {
             return fila;
           });
         }
+        setCodigosPorRol(codigosPorRolActual);
         setPermisos(sincronizados);
         setPermisosPersistidos(sincronizados);
+        setIsLoaded(true);
     } catch {
       setIsError(true);
+      setIsLoaded(false);
       setMensaje("No fue posible cargar la matriz RBAC desde PostgreSQL.");
     } finally { setIsLoading(false); }
   }, []);
@@ -227,6 +269,13 @@ export function useRbacConfig() {
   }
 
   async function guardarPermisos() {
+    if (!esSuperAdmin(rolUsuario) || !isLoaded) {
+      setIsError(true);
+      setMensaje(!esSuperAdmin(rolUsuario)
+        ? "Solo SUPER_ADMIN puede modificar permisos de roles."
+        : "Carga la matriz desde el servidor antes de guardar cambios.");
+      return;
+    }
     const payload = construirPayload();
     const codigos = Object.values(payload.permissions).flatMap((fila) =>
       (Object.keys(fila) as Array<keyof PermisoModulo>)
@@ -234,10 +283,16 @@ export function useRbacConfig() {
         .map((clave) => CODIGO_PERMISO_BACKEND[`${fila.modulo}.${String(clave)}`])
         .filter((codigo): codigo is string => Boolean(codigo)),
     );
+    const codigosRepresentados = new Set(Object.values(CODIGO_PERMISO_BACKEND));
+    const codigosNoRepresentados = (codigosPorRol[payload.roleId] ?? []).filter(
+      (codigo) => !codigosRepresentados.has(codigo),
+    );
+    const permisosGuardar = [...new Set([...codigosNoRepresentados, ...codigos])];
     try {
       await apiClient.put(`/api/v1/admin/roles/${payload.roleId}/permisos`, {
-        permisos: [...new Set(codigos)],
+        permisos: permisosGuardar,
       });
+      setCodigosPorRol((actual) => ({ ...actual, [payload.roleId]: permisosGuardar }));
       setPermisosPersistidos((actual) => ({
         ...actual,
         [payload.roleId]: (permisos[payload.roleId] ?? []).map((fila) => ({ ...fila })),
@@ -262,6 +317,8 @@ export function useRbacConfig() {
     setMensaje,
     isLoading,
     isError,
+    isLoaded,
+    canEdit: esSuperAdmin(rolUsuario),
     recargar,
   };
 }

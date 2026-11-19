@@ -7,10 +7,12 @@ import {
   FileInput,
   Fingerprint,
   LogIn,
+  Search,
   ShieldCheck,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
+import { PERMISOS, tienePermiso } from "../auth/permissions";
 
 const secciones = [
   {
@@ -23,9 +25,17 @@ const secciones = [
     permisos: ["EXPEDIENTE_LEER", "FIRMA_FIRMAR"],
   },
   {
+    titulo: "Consulta de Trámites",
+    subtitulo: "ENT-M02 / Consulta Pública",
+    descripcion: "Consulta el estado y avance de tu documentación con tu código CUT, sin necesidad de cuenta.",
+    ruta: "/consulta",
+    icono: Search,
+    destacado: true,
+  },
+  {
     titulo: "Casilla Electrónica",
     subtitulo: "ENT-M01-03",
-    descripcion: "Consulta y recepción de notificaciones institucionales con plena validez legal.",
+    descripcion: "Consulta el estado de tu trámite sin cuenta o inicia sesión para revisar notificaciones y acuses.",
     ruta: "/casilla",
     icono: BellRing,
     destacado: true,
@@ -33,7 +43,7 @@ const secciones = [
   {
     titulo: "Mesa de Partes Virtual",
     subtitulo: "ENT-M02 / TUPA",
-    descripcion: "Presentación y radicación de trámites digitales, requisitos TUPA y anexos.",
+    descripcion: "Consulta trámites y catálogo TUPA sin cuenta, o inicia sesión para radicar expedientes digitales.",
     ruta: "/tramite",
     icono: FileInput,
     destacado: true,
@@ -70,7 +80,7 @@ const secciones = [
     ruta: "/administracion",
     icono: Boxes,
     destacado: false,
-    permisos: ["ADMIN_USUARIOS"],
+    permisos: [PERMISOS.ADMIN_ACCESO],
   },
   {
     titulo: "Reportes y Tableros",
@@ -122,7 +132,7 @@ export default function HomePage() {
 
         <div className="sigd-module-grid">
           {secciones
-            .filter((seccion) => !("permisos" in seccion) || seccion.permisos.some((permiso) => permisosUsuario.includes(permiso)))
+            .filter((seccion) => !("permisos" in seccion) || seccion.permisos.some((permiso) => tienePermiso(permisosUsuario, permiso)))
             .map(({ titulo, subtitulo, descripcion, ruta, icono: Icono, destacado }) => (
               <Link
                 key={ruta}

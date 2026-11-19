@@ -38,7 +38,7 @@ const ESTRELLAS = [
 
 const DESTINO_POR_ROL: Record<UsuarioPerfil['rol'], string> = {
   SUPER_ADMIN: '/administracion',
-  DIRECTOR: '/reportes/dashboard',
+  DIRECTOR: '/',
   DOCENTE: '/expedientes',
   MESA_PARTES: '/tramite/ventanilla-presencial',
   ESTUDIANTE: '/casilla',

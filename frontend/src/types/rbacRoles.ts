@@ -23,6 +23,7 @@ export interface Rol {
 export interface PermisoModulo {
   modulo: string;
   ver: boolean;
+  gestionar?: boolean;
   crear: boolean;
   editar: boolean;
   derivar: boolean;

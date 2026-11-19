@@ -379,31 +379,33 @@ c:\Users\SAITAMA\Desktop\py_SIGD\SIGD\
 
 ---
 
-### Opción A: Despliegue con un Solo Comando (Docker Compose)
+### Opción A: Despliegue completo con un comando (Docker Compose)
 
-El repositorio incluye un archivo [`docker-compose.yml`](./docker-compose.yml) configurado con los 5 servicios interconectados en la red interna:
+Con Docker Desktop y PowerShell disponibles, ejecute desde la raíz del
+repositorio:
 
-1. **Clonar el repositorio:**
-   ```bash
-   git clone https://github.com/rhtf-92/SIGD.git
-   cd SIGD
-   ```
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Start-SigdAcademico.ps1
+```
 
-2. **Iniciar la infraestructura completa:**
-   ```bash
-   docker compose up -d
-   ```
+El script verifica el snapshot, genera secretos locales en `.env.academico`
+(excluido de Git) si aún no existe y levanta PostgreSQL con la base académica,
+Redis, almacenamiento S3, backend y frontend. La ejecución puede tardar la
+primera vez mientras Docker descarga imágenes y construye las aplicaciones.
+Al repetir el comando, la base existente se conserva y no se restaura encima.
 
-3. **Verificar el estado de los contenedores:**
-   ```bash
-   docker compose ps
-   ```
-   Los 5 contenedores iniciarán con sus respectivos chequeos de salud:
-   - `sigd_postgres`: PostgreSQL 18 en puerto `5432` con base `sigd_prueba`.
-   - `sigd_minio`: API S3 en puerto `9000` y consola web en puerto `9001`.
-   - `sigd_redis`: Almacén en memoria en puerto `6379`.
-   - `sigd_backend`: Servidor Express 5 en puerto `3000`.
-   - `sigd_frontend`: Cliente SPA en puerto `5173`.
+- Aplicación: http://localhost:5174/login
+- API: http://localhost:3001/api/v1
+- Readiness del backend: http://localhost:3001/ready
+- PostgreSQL: `localhost:5434`; Redis: `localhost:6380`
+- S3: http://localhost:9001; consola SeaweedFS: http://localhost:8889
+- Usuario de demostración: `demo.academico`; su contraseña aleatoria está en
+  `.env.academico` (`ACADEMIC_DEMO_PASSWORD`).
+
+Este arranque usa una copia académica aislada y datos de demostración; no es una
+restauración de datos transaccionales ni un entorno de producción. Para detener
+los servicios sin borrar sus datos, ejecute
+`docker compose --env-file .env.academico -f docker-compose.academico.yml down`.
 
 ---
 

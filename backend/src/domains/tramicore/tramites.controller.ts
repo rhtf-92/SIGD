@@ -74,22 +74,18 @@ export function crearRouterTramites(
   // #15 en catálogo — Catálogo de tipos de trámite TUPA y trámites internos
   const handlerTiposTupa = async (_req: Request, res: Response) => {
     const query = `
-      SELECT id_tipo_tramite_tupa AS id,
-             id_tipo_tramite_tupa AS id_tipo_tramite,
-             codigo_tupa AS codigo,
+      SELECT tipo_tramite_id AS id,
+             tipo_tramite_id AS id_tipo_tramite,
+             codigo,
              denominacion,
-             es_tupa,
-             calificacion_administrativa,
-             calificacion_administrativa AS calificacion,
-             plazo_max_dias_habiles,
-             plazo_max_dias_habiles AS plazo_dias,
-             costo,
-             unidad_organica_responsable AS unidad_organica,
+             unidad_organica,
+             plazo_dias,
+             silencio_administrativo,
              base_legal,
-             activo AS vigente
-        FROM sigd_doc.tipo_tramite_tupa
-       WHERE activo = TRUE
-       ORDER BY codigo_tupa ASC;
+             vigente
+      FROM sigd_doc.tipo_tramite_tupa
+      WHERE vigente = TRUE
+      ORDER BY codigo ASC;
     `;
     const resultado = await pool.query(query);
     res.status(200).json(resultado.rows);
@@ -110,15 +106,16 @@ export function crearRouterTramites(
     const cut = String(req.params.cut).trim().toUpperCase();
 
     const query = `
-      SELECT e.cut,
+      SELECT e.codigo_expediente AS cut,
              e.nombre_solicitante,
-             e.asunto,
+             t.asunto,
              e.total_folios,
              e.fecha_envio_real,
-             p.numero_documento
+             p.id_documento AS numero_documento
         FROM sigd_tra.expediente e
-        LEFT JOIN sigd_auth.persona p ON p.id = e.id_persona
-       WHERE e.cut = $1
+        JOIN sigd_tra.tramite t USING (expediente_id)
+        LEFT JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
+       WHERE e.codigo_expediente = $1
        LIMIT 1;
     `;
 

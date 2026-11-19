@@ -17,6 +17,9 @@ const CalendarioLaboralPage = lazy(
 const RolesPermisosPage = lazy(
   () => import("../pages/administracion/RolesPermisosPage"),
 );
+const OrganigramaPage = lazy(
+  () => import("../pages/administracion/OrganigramaPage"),
+);
 const SeguridadPage = lazy(
   () => import("../pages/administracion/SeguridadPage"),
 );
@@ -36,11 +39,7 @@ export default function AdminRoutes() {
       <Route
         path="usuarios"
         element={
-          <ProtectedRoute
-            requiredRoles={["ADMINISTRADOR", "SUPER_ADMIN", "DIRECTOR"]}
-            requiredModule="Administración"
-            requiredAction="editar"
-          >
+          <ProtectedRoute requiredModule="Usuarios">
             <UsuariosPage />
           </ProtectedRoute>
         }
@@ -48,8 +47,9 @@ export default function AdminRoutes() {
       <Route path="roles-permisos" element={<ProtectedRoute requiredModule="Roles y Permisos"><RolesPermisosPage /></ProtectedRoute>} />
       <Route path="auditoria" element={<ProtectedRoute requiredModule="Auditoría"><AuditoriaPage /></ProtectedRoute>} />
       <Route path="tablas-maestras" element={<ProtectedRoute requiredModule="Tablas Maestras"><TablasMaestrasPage /></ProtectedRoute>} />
+      <Route path="organigrama" element={<ProtectedRoute requiredModule="Organigrama"><OrganigramaPage /></ProtectedRoute>} />
       <Route path="calendario-laboral" element={<ProtectedRoute requiredModule="Calendario Laboral"><CalendarioLaboralPage /></ProtectedRoute>} />
-      <Route path="seguridad" element={<ProtectedRoute requiredModule="Seguridad"><SeguridadPage /></ProtectedRoute>} />
+      <Route path="seguridad" element={<ProtectedRoute requiredRoles={["SUPER_ADMIN"]}><SeguridadPage /></ProtectedRoute>} />
     </>
   );
 }

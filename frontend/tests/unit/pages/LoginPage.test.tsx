@@ -9,7 +9,7 @@ const estadoReal = useAuthStore.getState();
 function renderLogin() {
   return render(<MemoryRouter initialEntries={['/login']}><Routes>
     <Route path="/login" element={<LoginPage />} />
-    <Route path="/reportes/dashboard" element={<h1>Panel de dirección</h1>} />
+    <Route path="/" element={<h1>Panel de dirección</h1>} />
     <Route path="/expedientes" element={<h1>Expedientes</h1>} />
   </Routes></MemoryRouter>);
 }

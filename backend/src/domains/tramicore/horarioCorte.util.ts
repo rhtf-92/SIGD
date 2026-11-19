@@ -172,7 +172,7 @@ export function calcularHorarioCorte(
 
   return {
     envioReal,
-    radicacionLegal: aperturaEnLima(fechaLegal),
+    radicacionLegal: requiereProyeccion ? aperturaEnLima(fechaLegal) : envioReal,
     fechaLegal,
     dentroDeHorario: !requiereProyeccion,
     diaNoHabil,

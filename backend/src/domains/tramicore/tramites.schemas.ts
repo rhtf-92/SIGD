@@ -1,47 +1,61 @@
+
 import { z } from 'zod';
 import { REGEX_CUT } from './cut.service.js';
 
 /**
- * T-BE-TC-02 · Contratos de entrada de Tramites.
+ * T-BE-TC-02 - Contratos de entrada de Tramites.
  *
- * El esquema es deliberadamente estricto (`.strict()`): el problema que se
- * corrige son las insertions parciales que dejaban expedientes "zombie" sin
- * administrado asociado ni documento adjunto. Un campo obligatorio ausente, un
- * correo invalido o un adjunto sin hash deben fallar ANTES de abrir la
- * transaccion, no después de haber escrito la cabecera.
+ * El esquema es deliberadamente estricto (.strict()):
+ * un campo obligatorio ausente, un correo invalido o
+ * un adjunto sin hash deben fallar ANTES de abrir la
+ * transaccion, evitando expedientes incompletos.
  */
 
 /** Tipos MIME aceptados para la radicacion virtual. */
 export const TIPOS_ARCHIVO_ACEPTADOS = ['application/pdf'] as const;
 
-/** Tope por archivo: 20 MiB. El limite lo aplica el gateway S3 (B_RIQUELMER). */
+/** Tope por archivo: 20 MiB. */
 export const TAMANO_MAXIMO_BYTES = 20 * 1024 * 1024;
 
-/** Longitudes de la mascara de un hash SHA-256 en hexadecimal. */
+/** Longitud de una huella SHA-256 hexadecimal. */
 const LONGITUD_HASH = 64;
 
 const hashSha256 = z
   .string()
   .trim()
-  .regex(/^[0-9a-f]{64}$/i, 'El hash debe ser SHA-256 en 64 digitos hexadecimales.');
+  .regex(
+    new RegExp(`^[0-9a-f]{${LONGITUD_HASH}}$`, 'i'),
+    'El hash debe ser SHA-256 en 64 digitos hexadecimales.',
+  );
 
 /**
- * Evita homoglifos y rutas: solo se admiten extension y nombre de archivo sin
- * separadores de ruta, para que el nombre persistido no pueda usarse para
- * escribir fuera del bucket.
+ * Evita nombres con rutas y valida la extension del archivo.
  */
 const nombreArchivo = z
   .string()
   .trim()
   .min(3)
   .max(255)
-  .refine((valor) => !/[\\/]/.test(valor), 'El nombre del archivo no puede contener rutas.')
-  .refine((valor) => !valor.includes('..'), 'El nombre del archivo no puede contener "..".')
-  .refine((valor) => /\.[A-Za-z0-9]{1,10}$/.test(valor), 'El archivo debe tener extension.');
+  .refine(
+    (valor) => !/[\\/]/.test(valor),
+    'El nombre del archivo no puede contener rutas.',
+  )
+  .refine(
+    (valor) => !valor.includes('..'),
+    'El nombre del archivo no puede contener "..".',
+  )
+  .refine(
+    (valor) => /\.[A-Za-z0-9]{1,10}$/.test(valor),
+    'El archivo debe tener extension.',
+  );
 
+/**
+ * Documento adjunto validado antes de radicar.
+ */
 export const adjuntoRadicacionSchema = z
   .object({
     nombreArchivo,
+
     contentType: z
       .string()
       .trim()
@@ -54,90 +68,185 @@ export const adjuntoRadicacionSchema = z
           message: `Tipo de archivo no admitido. Se aceptan: ${TIPOS_ARCHIVO_ACEPTADOS.join(', ')}.`,
         },
       ),
-    tamanoBytes: z.number().int().positive().max(TAMANO_MAXIMO_BYTES, {
-      message: 'El archivo supera el maximo permitido de 20 MiB.',
-    }),
+
+    tamanoBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(TAMANO_MAXIMO_BYTES, {
+        message: 'El archivo supera el maximo permitido de 20 MiB.',
+      }),
+
     hashSha256,
-    storagePath: z.string().trim().min(3).max(512),
+
+    storagePath: z
+      .string()
+      .trim()
+      .min(3)
+      .max(512),
   })
   .strict();
 
+/**
+ * Radicacion virtual.
+ *
+ * Correccion:
+ * El catalogo TUPA academico utiliza identificadores
+ * como 00000000-0000-0000-0000-000000000001.
+ *
+ * La validacion z.uuid() los rechazaba porque comprueba
+ * tambien la version y variante del UUID.
+ *
+ * Esta validacion mantiene la estructura hexadecimal
+ * de 36 caracteres y rechaza el identificador nulo.
+ *
+ * El Backend verifica posteriormente que el tramite
+ * exista y este vigente en PostgreSQL.
+ */
 export const radicacionVirtualSchema = z
   .object({
     asunto: z
       .string()
       .trim()
-      .min(10, 'El asunto debe tener al menos 10 caracteres.')
-      .max(500, 'El asunto no puede superar los 500 caracteres.')
-      .refine((valor) => valor.trim().length >= 10, 'El asunto no puede estar compuesto solo de espacios.'),
+      .min(
+        10,
+        'El asunto debe tener al menos 10 caracteres.',
+      )
+      .max(
+        500,
+        'El asunto no puede superar los 500 caracteres.',
+      )
+      .refine(
+        (valor) => valor.trim().length >= 10,
+        'El asunto no puede estar compuesto solo de espacios.',
+      ),
+
     idTipoTramiteTupa: z
       .string()
       .trim()
-      .uuid('El tipo de tramite TUPA debe ser un UUID valido.')
+      .regex(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        'El tipo de tramite TUPA debe tener formato UUID.',
+      )
       .refine(
-        (valor) => valor !== '00000000-0000-0000-0000-000000000000',
+        (valor) =>
+          valor.toLowerCase() !==
+          '00000000-0000-0000-0000-000000000000',
         'El tipo de tramite no puede ser el UUID nulo.',
       ),
-    // Identidad UUID del padron autentificado.
-    idPersona: z.string().uuid(),
-    // T-BE-TC-02 exige certificar los datos completos del solicitante y
-    // rechazar los correos invalidos. Se capturan en el acto de la radicacion
-    // porque el cargo digital y las notificaciones de seguimiento se dirigen a
-    // esta direccion; no se toma del padron porque el ciudadano puede radicar
-    // con un correo de contacto distinto al registrado.
+
+    // Identidad UUID del padron autenticado.
+    idPersona: z
+      .string()
+      .uuid(),
+
     nombreSolicitante: z
       .string()
       .trim()
-      .min(2, 'El nombre del solicitante debe tener al menos 2 caracteres.')
-      .max(120, 'El nombre del solicitante no puede superar los 120 caracteres.')
+      .min(
+        2,
+        'El nombre del solicitante debe tener al menos 2 caracteres.',
+      )
+      .max(
+        120,
+        'El nombre del solicitante no puede superar los 120 caracteres.',
+      )
       .refine(
         (valor) => valor.trim().length >= 2,
         'El nombre del solicitante no puede estar compuesto solo de espacios.',
       ),
+
     correo: z
       .string()
       .trim()
       .toLowerCase()
-      .email('El correo electronico no tiene un formato valido.')
-      .max(150, 'El correo electronico no puede superar los 150 caracteres.'),
-    totalFolios: z.number().int().min(1).max(5000),
+      .email(
+        'El correo electronico no tiene un formato valido.',
+      )
+      .max(
+        150,
+        'El correo electronico no puede superar los 150 caracteres.',
+      ),
+
+    totalFolios: z
+      .number()
+      .int()
+      .min(1)
+      .max(5000),
+
     documentos: z
       .array(adjuntoRadicacionSchema)
-      .min(1, 'La radicacion exige al menos un archivo cargado.')
-      .max(30, 'Se admiten hasta 30 archivos por radicacion.'),
+      .min(
+        1,
+        'La radicacion exige al menos un archivo cargado.',
+      )
+      .max(
+        30,
+        'Se admiten hasta 30 archivos por radicacion.',
+      ),
   })
   .strict()
   .superRefine((valor, ctx) => {
-    const nombres = new Set(valor.documentos.map((doc) => doc.nombreArchivo.toLowerCase()));
+    const nombres = new Set(
+      valor.documentos.map((doc) =>
+        doc.nombreArchivo.toLowerCase(),
+      ),
+    );
+
     if (nombres.size !== valor.documentos.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['documentos'],
-        message: 'No se admiten archivos con nombres duplicados en la misma radicacion.',
+        message:
+          'No se admiten archivos con nombres duplicados en la misma radicacion.',
       });
     }
-    const hashes = new Set(valor.documentos.map((doc) => doc.hashSha256.toLowerCase()));
+
+    const hashes = new Set(
+      valor.documentos.map((doc) =>
+        doc.hashSha256.toLowerCase(),
+      ),
+    );
+
     if (hashes.size !== valor.documentos.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['documentos'],
-        message: 'No se admiten archivos con el mismo hash SHA-256 en la misma radicacion.',
+        message:
+          'No se admiten archivos con el mismo hash SHA-256 en la misma radicacion.',
       });
     }
   });
 
+/**
+ * Consulta publica de expedientes mediante CUT.
+ */
 export const consultaPublicaParamsSchema = z
   .object({
     cut: z
       .string()
       .trim()
-      .transform((valor) => valor.toUpperCase())
-      .refine((valor) => REGEX_CUT.test(valor), {
-        message: 'El CUT debe cumplir la mascara EXP-YYYY-XXXXXX.',
-      }),
+      .transform((valor) =>
+        valor.toUpperCase(),
+      )
+      .refine(
+        (valor) => REGEX_CUT.test(valor),
+        {
+          message:
+            'El CUT debe cumplir la mascara EXP-YYYY-XXXXXX.',
+        },
+      ),
   })
   .strict();
 
-export type AdjuntoRadicacionInput = z.infer<typeof adjuntoRadicacionSchema>;
-export type RadicacionVirtualInput = z.infer<typeof radicacionVirtualSchema>;
-export type ConsultaPublicaParams = z.infer<typeof consultaPublicaParamsSchema>;
+/**
+ * Tipos TypeScript derivados de los esquemas.
+ */
+export type AdjuntoRadicacionInput =
+  z.infer<typeof adjuntoRadicacionSchema>;
+
+export type RadicacionVirtualInput =
+  z.infer<typeof radicacionVirtualSchema>;
+
+export type ConsultaPublicaParams =
+  z.infer<typeof consultaPublicaParamsSchema>;

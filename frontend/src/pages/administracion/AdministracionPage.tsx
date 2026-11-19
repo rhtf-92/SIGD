@@ -1,6 +1,8 @@
 import { useNavigate } from "react-router-dom";
 
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
+import { PERMISOS, esSuperAdmin, tienePermiso } from "../../auth/permissions";
+import { useAuthStore } from "../../stores/authStore";
 
 const modulos = [
   {
@@ -8,6 +10,7 @@ const modulos = [
     descripcion:
       "Administra cuentas existentes, estado, área, cargo y rol asignado.",
     ruta: "/administracion/usuarios",
+    permiso: PERMISOS.USUARIOS_LEER,
     icono: (
       <>
         <circle cx="9" cy="8" r="3" />
@@ -20,6 +23,7 @@ const modulos = [
     descripcion:
       "Define qué puede ver y hacer cada rol dentro de los módulos del SIGD.",
     ruta: "/administracion/roles-permisos",
+    permiso: PERMISOS.ROLES_LEER,
     icono: (
       <>
         <path d="m12 3-9 4v5c0 5 9 10 9 10s9-5 9-10V7l-9-4Z" />
@@ -32,6 +36,7 @@ const modulos = [
     descripcion:
       "Consulta acciones de usuarios, accesos y eventos relevantes del sistema.",
     ruta: "/administracion/auditoria",
+    permiso: PERMISOS.AUDITORIA_LEER,
     icono: (
       <>
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h5M14 2v6h6l-6-6ZM20 8v3M8 7h2M8 11h3" />
@@ -45,6 +50,7 @@ const modulos = [
     descripcion:
       "Configura sedes, áreas, organigrama y tipos documentales institucionales.",
     ruta: "/administracion/tablas-maestras",
+    permiso: PERMISOS.MAESTRAS_LEER,
     icono: (
       <>
         <ellipse cx="12" cy="5" rx="8" ry="3" />
@@ -57,6 +63,7 @@ const modulos = [
     descripcion:
       "Configura días hábiles, horario, corte LPAG y feriados de Ucayali.",
     ruta: "/administracion/calendario-laboral",
+    permiso: PERMISOS.CALENDARIO_LEER,
     icono: (
       <>
         <rect x="3" y="5" width="18" height="16" rx="2" />
@@ -65,10 +72,25 @@ const modulos = [
     ),
   },
   {
+    titulo: "Organigrama",
+    descripcion: "Consulta la estructura orgánica institucional y sus dependencias.",
+    ruta: "/administracion/organigrama",
+    permiso: PERMISOS.ORGANIGRAMA_LEER,
+    icono: (
+      <>
+        <circle cx="12" cy="5" r="2" />
+        <circle cx="6" cy="19" r="2" />
+        <circle cx="18" cy="19" r="2" />
+        <path d="M12 7v5m0 0H6v5m6-5h6v5" />
+      </>
+    ),
+  },
+  {
     titulo: "Seguridad",
     descripcion:
       "Gestiona bloqueos, intentos fallidos y políticas básicas de acceso.",
     ruta: "/administracion/seguridad",
+    soloSuperAdmin: true,
     icono: (
       <>
         <rect x="4" y="10" width="16" height="11" rx="2" />
@@ -80,6 +102,13 @@ const modulos = [
 
 export default function AdministracionPage() {
   const navigate = useNavigate();
+  const usuario = useAuthStore((state) => state.usuario);
+  const permisos = usuario?.permisos ?? [];
+  const modulosVisibles = modulos.filter((modulo) => {
+    if ("soloSuperAdmin" in modulo && modulo.soloSuperAdmin) return esSuperAdmin(usuario?.rol);
+    if (!("permiso" in modulo)) return false;
+    return typeof modulo.permiso === "string" && tienePermiso(permisos, modulo.permiso);
+  });
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -94,7 +123,7 @@ export default function AdministracionPage() {
         </p>
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {modulos.map((modulo) => (
+          {modulosVisibles.map((modulo) => (
             <article
               key={modulo.titulo}
               className="group rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition duration-200 ease-out hover:shadow-md motion-safe:hover:-translate-y-1 motion-reduce:transition-none"

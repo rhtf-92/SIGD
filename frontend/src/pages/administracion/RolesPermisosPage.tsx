@@ -15,6 +15,8 @@ export default function RolesPermisosPage() {
     setMensaje,
     isLoading,
     isError,
+    isLoaded,
+    canEdit,
     recargar,
   } = useRbacConfig();
 
@@ -91,26 +93,35 @@ export default function RolesPermisosPage() {
               <div className="border-b border-slate-200 px-6 py-4">
                 <h3 className="font-bold">Matriz de permisos</h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Los controles habilitados corresponden a permisos canónicos
-                  aplicados por el backend y persistidos en PostgreSQL.
+                  Los controles corresponden a permisos canónicos aplicados por
+                  el backend. Las demás acciones quedan bloqueadas.
                 </p>
               </div>
 
               <RolePermissionMatrix
                 permisos={permisosRolActual}
                 onAlternar={alternarPermiso}
+                readOnly={!canEdit || !isLoaded}
               />
 
-              <div className="flex justify-end p-5">
-                <button
-                  type="button"
-                  onClick={() => void guardarPermisos()}
-                  disabled={isLoading}
-                  className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
-                >
-                  Guardar permisos
-                </button>
-              </div>
+              {canEdit && isLoaded ? (
+                <div className="flex justify-end p-5">
+                  <button
+                    type="button"
+                    onClick={() => void guardarPermisos()}
+                    disabled={isLoading || !isLoaded}
+                    className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+                  >
+                    Guardar permisos
+                  </button>
+                </div>
+              ) : (
+                <p className="border-t border-slate-200 px-6 py-4 text-sm text-slate-600">
+                  {!isLoaded
+                    ? "La matriz solo se puede modificar después de cargar los permisos vigentes del servidor."
+                    : "Vista de solo lectura. Solo SUPER_ADMIN puede guardar cambios en roles."}
+                </p>
+              )}
             </section>
           </div>
         </div>

@@ -6,6 +6,7 @@ const raiz = fileURLToPath(new URL('../../..', import.meta.url));
 const compose = readFileSync(`${raiz}/docker-compose.yml`, 'utf8');
 const server = readFileSync(`${raiz}/backend/src/server.ts`, 'utf8');
 const backendDockerfile = readFileSync(`${raiz}/backend/Dockerfile`, 'utf8');
+const frontendDockerfile = readFileSync(`${raiz}/frontend/Dockerfile`, 'utf8');
 const envExample = () => readFileSync(`${raiz}/.env.example`, 'utf8');
 
 describe('contrato de arranque con Docker Compose', () => {
@@ -40,7 +41,25 @@ describe('contrato de arranque con Docker Compose', () => {
     expect(server).toContain("process.env.START_VITE_WITH_BACKEND === 'true'");
   });
 
-  it('mantiene las dependencias del frontend en un volumen Linux', () => {
-    expect(compose).toContain('frontend_node_modules:/app/node_modules');
+  it('ejecuta el código y las dependencias empacados desde el contexto reconstruido', () => {
+    expect(compose).toContain('context: ./backend');
+    expect(compose).toContain('context: ./frontend');
+    expect(compose).not.toContain('./backend:/app');
+    expect(compose).not.toContain('./frontend:/app');
+    expect(compose).not.toContain('_node_modules:/app/node_modules');
+  });
+
+  it('conecta el backend a PostgreSQL por la red interna sin depender de otra .env', () => {
+    expect(compose).toContain('@postgres:5432/${POSTGRES_DB:?POSTGRES_DB es obligatorio}');
+    expect(compose).not.toContain('DATABASE_URL: ${DATABASE_URL:');
+  });
+
+  it('dirige el proxy de Vite al servicio backend dentro de Docker', () => {
+    expect(compose).toContain('VITE_PROXY_TARGET: http://backend:3000');
+  });
+
+  it('instala dependencias reproducibles dentro de las imágenes de desarrollo', () => {
+    expect(backendDockerfile).toContain('RUN npm ci');
+    expect(frontendDockerfile).toContain('RUN npm ci');
   });
 });

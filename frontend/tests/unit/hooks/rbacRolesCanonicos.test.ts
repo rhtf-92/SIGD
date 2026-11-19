@@ -2,6 +2,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useRbacConfig } from "../../../src/hooks/useRbacConfig";
 import { apiClient } from "../../../src/api/client";
+import { useAuthStore } from "../../../src/stores/authStore";
 
 describe("Suite de Pruebas de Gobernanza RBAC y 5 Roles Canónicos Institucionales (BR-08 / ENT-M05-03)", () => {
   beforeEach(() => {
@@ -87,18 +88,25 @@ describe("Suite de Pruebas de Gobernanza RBAC y 5 Roles Canónicos Institucional
 
   it("restaura la matriz previa si el servidor rechaza el guardado", async () => {
     localStorage.setItem("sigd_token", "token-test");
+    useAuthStore.setState({
+      accessToken: "token-test",
+      isAuthenticated: true,
+      usuario: { id: "admin-1", nombreCompleto: "Admin", correo: "admin@example.test", rol: "SUPER_ADMIN" },
+    });
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: { roles: [
-      { codigo: "ADMINISTRADOR", permisos: ["ADMIN_USUARIOS"], usuarios: 1 },
+      { codigo: "ADMINISTRADOR", permisos: ["admin:acceso", "usuarios:leer", "usuarios:gestionar"], usuarios: 1 },
     ] } } as never);
     vi.spyOn(apiClient, "put").mockRejectedValue(new Error("El servidor rechazó la matriz"));
     const { result } = renderHook(() => useRbacConfig());
-    await waitFor(() => expect(result.current.permisosRolActual.find((item) => item.modulo === "Administración")?.editar).toBe(true));
-    act(() => result.current.alternarPermiso(2, "editar"));
-    expect(result.current.permisosRolActual[2].editar).toBe(false);
+    await waitFor(() => expect(result.current.permisosRolActual.find((item) => item.modulo === "Usuarios")?.gestionar).toBe(true));
+    const usuariosIndex = result.current.permisosRolActual.findIndex((item) => item.modulo === "Usuarios");
+    act(() => result.current.alternarPermiso(usuariosIndex, "gestionar"));
+    expect(result.current.permisosRolActual[usuariosIndex]?.gestionar).toBe(false);
     await act(async () => { await result.current.guardarPermisos(); });
-    expect(result.current.permisosRolActual[2].editar).toBe(true);
+    expect(result.current.permisosRolActual[usuariosIndex]?.gestionar).toBe(true);
     expect(result.current.mensaje).toMatch(/no fue posible guardar/i);
     vi.restoreAllMocks();
+    useAuthStore.setState({ accessToken: null, usuario: null, isAuthenticated: false });
   });
 
   it("expone error de carga y permite reintentar la sincronización desde PostgreSQL", async () => {
