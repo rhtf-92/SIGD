@@ -15,6 +15,7 @@ import {
 export interface GeneradorUrlDescarga {
   generarUrlDescarga(bucket: string, key: string): Promise<string>;
   obtenerContenidoDocumento?(bucket: string, key: string): Promise<Buffer | null>;
+  validarPades?(buffer: Buffer): Promise<ResultadoValidacionPades>;
 }
 
 interface DocumentoFirmado {
@@ -111,7 +112,9 @@ export function crearVerificadorCvd(
         if (contenido) {
           esValido = validarMagicBytes(contenido, 'PDF')
             && new HashIntegrityService().calculateFromBuffer(contenido).sha256 === documento.sha256_firmado.toLowerCase();
-          resultadoPades = await validarFirmaPades(contenido);
+          resultadoPades = storage?.validarPades
+            ? await storage.validarPades(contenido)
+            : await validarFirmaPades(contenido);
           esValido = esValido && resultadoPades.valido && resultadoPades.validacionCriptografica;
         }
         if (!esValido) descarga_copia_certificada = '';

@@ -144,7 +144,9 @@ export class ServicioSlaRutaDoc {
     const hasta = new Date(validarFecha(fechaInicio) + 150 * MS_DIA).toISOString().slice(0, 10);
     const noLaborablesArray = await this.calendario.obtenerDiasNoLaborables(fechaInicio, hasta);
     const noLaborables = new Set(noLaborablesArray);
-    const intervalosSuspension = await this.repositorio.obtenerIntervalosSuspension(idExpediente);
+    const intervalosSuspension = typeof this.repositorio?.obtenerIntervalosSuspension === 'function'
+      ? await this.repositorio.obtenerIntervalosSuspension(idExpediente)
+      : [];
 
     return calcularSla({
       fechaInicio,

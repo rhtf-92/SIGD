@@ -41,17 +41,5 @@ export function serializeError(error: unknown): ErrorSerializado {
     return { ...mapeo, invalidParams: [] };
   }
 
-  if (error instanceof Error) {
-    return {
-      status: 500,
-      code: 'INTERNAL_ERROR',
-      detail:
-        process.env.NODE_ENV === 'production'
-          ? 'Ocurrió un error interno en el servidor.'
-          : error.message || 'Ocurrió un error interno en el servidor.',
-      invalidParams: [],
-    };
-  }
-
   return INTERNO;
 }

@@ -24,6 +24,7 @@ import {
 
 import {
   crearVerificadorCvd,
+  type GeneradorUrlDescarga,
 } from './validadorCvd.controller.js';
 
 type RequestConRawBody = Request & {
@@ -44,7 +45,7 @@ const callbackSchema = z.object({
   s3_key: z.string().trim().min(1),
 });
 
-export function crearRouterDocuCore(pool: Pool): Router {
+export function crearRouterDocuCore(pool: Pool, storage?: GeneradorUrlDescarga): Router {
   const router = Router();
 
   router.post(
@@ -229,7 +230,7 @@ export function crearRouterDocuCore(pool: Pool): Router {
 
   router.get(
     '/v1/validador-cvd/verificar/:cvd',
-    crearVerificadorCvd(pool),
+    crearVerificadorCvd(pool, storage),
   );
 
   return router;

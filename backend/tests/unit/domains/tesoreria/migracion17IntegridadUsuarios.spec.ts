@@ -60,7 +60,7 @@ describe('Auditoría Integral de Migración 17 e Integridad de Usuarios (SIGD B_
     });
 
     it('5. El hash SHA-256 es reproducible y verificable', () => {
-      const sha256 = crypto.createHash('sha256').update(contenidoMigracion17).digest('hex');
+      const sha256 = crypto.createHash('sha256').update(contenidoMigracion17.replace(/\r\n/g, '\n')).digest('hex');
       expect(sha256).toBe('8ea2d4beed4a7131600724af8126c2d344e658d4da214c5353858d4eec51c6f0');
     });
   });

@@ -141,8 +141,15 @@ export class RedisFirmaSessionStore implements FirmaSessionStore {
         "Falta la variable de entorno REDIS_URL para el almacen de sesiones de firma.",
       );
     }
-    const opciones: RedisOptions = { maxRetriesPerRequest: 2, enableReadyCheck: true };
-    return new RedisFirmaSessionStore(new Redis(url, opciones) as ClienteRedisMinimo);
+    const opciones: RedisOptions = {
+      maxRetriesPerRequest: 1,
+      lazyConnect: true,
+      enableReadyCheck: false,
+      retryStrategy: () => null,
+    };
+    const cliente = new Redis(url, opciones);
+    cliente.on('error', () => {});
+    return new RedisFirmaSessionStore(cliente as ClienteRedisMinimo);
   }
 
   async crear(sesion: SesionFirma, ttlSegundos = TTL_SESION_FIRMA_SEGUNDOS): Promise<boolean> {

@@ -10,7 +10,7 @@ function fixture(inconsistente:boolean,autorizado=true){
   throw Error('Consulta inesperada');
  });
  const connect=vi.fn(async()=>({query:vi.fn(async()=>({rowCount:0,rows:[]})),release:vi.fn()}));
- const app=construirApp({query,connect} as unknown as Pool,{actorProviderRutaDoc:{obtenerActor:()=>({id:'11111111-1111-4111-8111-111111111111',roles:[],permisos:autorizado?[{codigo:'EXPEDIENTE_DERIVAR',ambito:'GLOBAL' as const,areaId:null},{codigo:'EXPEDIENTE_RESOLVER',ambito:'GLOBAL' as const,areaId:null}]:[]})}});
+ const app=construirApp({query,connect} as unknown as Pool,{actorProviderRutaDoc:{obtenerActor:()=>({id:'11111111-1111-4111-8111-111111111111',roles:[],permisos:autorizado?[{codigo:'EXPEDIENTE_DERIVAR',ambito:'GLOBAL' as const,areaId:null},{codigo:'EXPEDIENTE_RESOLVER',ambito:'GLOBAL' as const,areaId:null},{codigo:'EXPEDIENTE_RECEPCIONAR',ambito:'GLOBAL' as const,areaId:null},{codigo:'EXPEDIENTE_OBSERVAR',ambito:'GLOBAL' as const,areaId:null},{codigo:'EXPEDIENTE_SUBSANAR',ambito:'GLOBAL' as const,areaId:null}]:[]})}});
  return {app,query,connect};
 }
 describe('Integridad de la proyeccion de RutaDoc antes de escribir (HTTP con mocks)',()=>{

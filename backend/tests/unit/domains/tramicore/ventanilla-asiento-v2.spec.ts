@@ -57,7 +57,7 @@ describe('Ventanilla activa · asiento de registro PostgreSQL V2', () => {
     const doble = prepararDoble();
     const resultado = await doble.servicio.registrarExpedienteVentanilla(doble.datos);
     const [sql, parametros] = obtenerAsiento(doble);
-    const ddl = readFileSync(new URL('../../../../migraciones_v2/05_sigd_tra.sql', import.meta.url), 'utf8');
+    const ddl = readFileSync(new URL('../../../../migraciones/05_sigd_tra.sql', import.meta.url), 'utf8');
     const definicion = ddl.match(/CREATE TABLE IF NOT EXISTS sigd_tra\.asiento_registro \(([\s\S]*?)\r?\n\);/)?.[1];
     expect(definicion).toBeDefined();
     const columnasExistentes = Array.from(definicion!.matchAll(/^\s*(\w+)\s+(?:UUID|BIGINT|TIMESTAMPTZ|VARCHAR|BOOLEAN|TEXT)\b/gm), ([, columna]) => columna);

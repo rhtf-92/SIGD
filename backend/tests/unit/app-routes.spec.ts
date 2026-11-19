@@ -72,7 +72,8 @@ describe('RutaDoc: autorización real del proveedor JWT con PostgreSQL simulado'
         return { rows: [{ fecha_inicio: hoy }], rowCount: 1 };
       }
       if (sql.includes('to_regclass')) return { rows: [{ existe: null }], rowCount: 1 };
-      if (sql.includes('WITH historial AS') || sql.includes('SELECT id_documento::text')) {
+      if (sql.includes('WITH historial AS') || sql.includes('SELECT id_documento::text')
+          || sql.includes('sigd_tra.expediente_acumulacion') || sql.includes('sigd_rut.expediente_observacion')) {
         return { rows: [], rowCount: 0 };
       }
       if (sql.includes('e.solicitante_id::text')) return { rows: [{

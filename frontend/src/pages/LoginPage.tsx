@@ -57,29 +57,50 @@ export default function LoginPage() {
         const mensajeServidor =
           errorLogin.problemDetails?.detail ||
           errorLogin.problemDetails?.title ||
-          errorLogin.message;
+          errorLogin.message ||
+          "";
+        const status = errorLogin.status;
+        const code = errorLogin.problemDetails?.code ?? "";
 
-        if (errorLogin.status === 401) {
-          if (mensajeServidor && mensajeServidor.toLowerCase().includes("inválid")) {
-            setError("Credenciales incorrectas. Verifique su usuario o contraseña institucional.");
+        if (status === 401) {
+          setError("Credenciales incorrectas. Verifique su usuario o contraseña institucional.");
+        } else if (status === 403) {
+          if (code === "ACCOUNT_DISABLED" || mensajeServidor.toLowerCase().includes("deshabilitada") || mensajeServidor.toLowerCase().includes("suspendida")) {
+            setError("Su cuenta institucional se encuentra suspendida o deshabilitada.");
+          } else if (code === "ACCOUNT_WITHOUT_ROLES" || mensajeServidor.toLowerCase().includes("sin roles")) {
+            setError("Su cuenta institucional no tiene roles activos asignados en el sistema.");
           } else {
-            setError(mensajeServidor || "Credenciales incorrectas. Verifique su usuario y contraseña.");
+            setError(mensajeServidor || "Acceso denegado a la plataforma institucional.");
           }
-        } else if (errorLogin.status === 403) {
-          setError(mensajeServidor || "Su cuenta se encuentra suspendida o deshabilitada.");
-        } else if (errorLogin.status < 500) {
-          setError(mensajeServidor);
-        } else {
+        } else if (status === 503 || code === "DATABASE_UNAVAILABLE") {
           setError(
-            mensajeServidor && !mensajeServidor.toLowerCase().includes("interno") && !mensajeServidor.toLowerCase().includes("network")
+            mensajeServidor && !mensajeServidor.toLowerCase().includes("network")
               ? mensajeServidor
-              : "No se pudo iniciar sesión. Compruebe la conexión e inténtelo nuevamente."
+              : "El servicio de base de datos no está disponible. Compruebe que PostgreSQL esté iniciado."
           );
+        } else if (status === 500) {
+          if (mensajeServidor.toLowerCase().includes("base de datos") || mensajeServidor.toLowerCase().includes("econnrefused")) {
+            setError("No se pudo conectar con la base de datos PostgreSQL. Compruebe el servicio.");
+          } else {
+            setError("Error interno en el servidor. Por favor, intente nuevamente más tarde.");
+          }
+        } else if (status < 500) {
+          setError(mensajeServidor || "Solicitud de inicio de sesión no válida.");
+        } else {
+          setError("No se pudo conectar con el servidor backend (http://localhost:3000). Compruebe que el servicio esté iniciado.");
         }
-      } else if (errorLogin instanceof Error && errorLogin.message && !errorLogin.message.toLowerCase().includes("network")) {
-        setError(errorLogin.message);
+      } else if (errorLogin instanceof Error) {
+        if (
+          errorLogin.message.toLowerCase().includes("network") ||
+          errorLogin.message.toLowerCase().includes("econnrefused") ||
+          errorLogin.message.toLowerCase().includes("failed to fetch")
+        ) {
+          setError("No se pudo conectar con el servidor backend (http://localhost:3000). Compruebe que el servicio esté iniciado.");
+        } else {
+          setError(errorLogin.message);
+        }
       } else {
-        setError("No se pudo iniciar sesión. Compruebe la conexión e inténtelo nuevamente.");
+        setError("No se pudo conectar con el servidor backend (http://localhost:3000). Compruebe que el servicio esté iniciado.");
       }
     } finally {
       enviando.current = false;

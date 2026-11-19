@@ -46,7 +46,7 @@ import { crearControladorOrganigrama } from './domains/organicore/organigrama.co
 
 // Módulos DocuCore Router y Validador CVD
 import { crearRouterDocuCore } from './domains/docucore/docucore.router.js';
-import { crearVerificadorCvd } from './domains/docucore/validadorCvd.controller.js';
+import { crearVerificadorCvd, type GeneradorUrlDescarga } from './domains/docucore/validadorCvd.controller.js';
 
 // Streaming SSE CoreLink
 import { BusSse } from './modules/corelink/sseStream.service.js';
@@ -88,6 +88,7 @@ export interface AppOptions {
   porcentajeAmarilloSlaRutaDocDesde?: number;
   /** Proveedor de identidad de la analítica ejecutiva; sin él, falla cerrado. */
   actorProviderReportes?: ActorProviderRutaDoc;
+  storageDocuCore?: GeneradorUrlDescarga;
 }
 
 export function construirApp(
@@ -118,7 +119,15 @@ export function construirApp(
   app.use(corsMiddleware);
   app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
   app.use('/sigd-expedientes', express.static(path.resolve(process.cwd(), 'uploads')));
-  app.use(express.json());
+  app.use(express.json({
+    verify: (req, _res, bytes) => {
+      // El callback HMAC debe verificar los bytes originales, no JSON serializado
+      // de nuevo. El resto de rutas conserva el parser y sus límites originales.
+      if (req.url?.split('?')[0]?.replace(/\/$/, '') === '/api/v1/firma/callback-refirma') {
+        (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(bytes);
+      }
+    },
+  }));
   app.use(contextMiddleware);
 
   app.get('/health', (_req, res) => {
@@ -346,16 +355,19 @@ export function construirApp(
     opts.actorProviderReportes ?? opts.actorProviderRutaDoc ?? jwtActorProvider;
 
   app.use('/api', crearRouterReferencia(pool));
-  app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache));
+  app.use('/api/v1', crearRouterIdenticore(pool, opts.ubigeoCache, { entrega: opts.entregaOtp, almacen: opts.almacenOtp }));
   const routerAuth = crearRouterAuth(pool);
   app.use('/api/v1', routerAuth);
   app.use('/api', routerAuth);
   app.use(routerAuth);
   app.use('/api/v1', crearRouterCasilla(pool));
+  app.use('/api/v1/tramites/publico', crearRouterRadicacionPublica(pool));
   const routerStorage = crearRouterStorage(pool);
   app.use('/api/v1', routerStorage);
   app.use('/api', routerStorage);
   app.use(routerStorage);
+  app.use('/api/v1', crearRouterPlataforma(pool));
+  app.use('/api/v1/tesoreria', crearRouterTesoreria(pool));
   app.use('/api/v1', crearRouterTramites(pool));
   app.use(
     '/api/v1',
@@ -411,8 +423,9 @@ export function construirApp(
   /*
    * DocuCore - Foliación continua AGN, Callback Refirma y Validador CVD/QR (#31, #35, #36)
    */
-  app.use('/api', crearRouterDocuCore(pool));
-  const verificadorCvd = crearVerificadorCvd(pool);
+  const storageDocuCore = (opciones as AppOptions)?.storageDocuCore;
+  app.use('/api', crearRouterDocuCore(pool, storageDocuCore));
+  const verificadorCvd = crearVerificadorCvd(pool, storageDocuCore);
   app.get('/api/v1/validador/cvd/:codigo', (req, res, next) => {
     (req.params as Record<string, string>).cvd = req.params.codigo;
     verificadorCvd(req, res).catch(next);

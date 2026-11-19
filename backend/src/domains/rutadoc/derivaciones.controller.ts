@@ -628,30 +628,68 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
     try {
       const expedienteId = String(req.params.id);
       const motivo = req.body.motivo || req.body.observacion || 'Expediente observado por requisitos pendientes';
-      const sustentoTecnico = req.body.sustentoTecnico || null;
-      const plazoDias = Number.isInteger(req.body.plazoDias) ? Number(req.body.plazoDias) : 5;
-      const tipoObservacion = req.body.tipoObservacion === 'TECNICA' ? 'TECNICA' : 'ADMINISTRATIVA';
-      const requisitos = Array.isArray(req.body.requisitos) ? req.body.requisitos : [];
-      const justificacionExcepcionPreclusion = req.body.justificacionExcepcionPreclusion || null;
-
-      const actor = await resolverActor(req);
 
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
+        const actual = await cliente.query<{ estado: string }>(
+          `SELECT estado FROM sigd_tra.expediente WHERE expediente_id = $1::uuid FOR UPDATE`,
+          [expedienteId],
+        );
+        if (actual.rows.length !== 1) throw new NotFoundError({ detail: 'El expediente no existe.' });
+        const siguienteEstado = obtenerSiguienteEstado(actual.rows[0].estado, 'OBSERVACION');
+        const resultado = await cliente.query<{ expediente_id: string; codigo_expediente: string; solicitante_id: string }>(
+          `UPDATE sigd_tra.expediente SET estado = $2
+            WHERE expediente_id = $1::uuid
+            RETURNING expediente_id::text, codigo_expediente, solicitante_id::text`,
+          [expedienteId, siguienteEstado],
+        );
 
-        const resultado = await servicioObservacionesRutaDoc.crearObservacion(cliente, expedienteId, actor, {
-          motivo,
-          sustentoTecnico,
-          plazoDias,
-          tipoObservacion,
-          requisitos,
-          justificacionExcepcionPreclusion,
+        if (resultado.rowCount === 0) {
+          throw new NotFoundError({ detail: `El expediente con ID ${expedienteId} no existe.` });
+        }
+
+        const expediente = resultado.rows[0];
+        const destinatarios = await cliente.query<{ usuario_id: string; asunto: string }>(
+          `SELECT c.id_usuario::text AS usuario_id, t.asunto
+             FROM sigd_tra.expediente e
+             JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
+             JOIN sigd_auth.cuenta_usuario c
+               ON c.id_persona = e.solicitante_id AND c.activo = TRUE
+            WHERE e.expediente_id = $1::uuid`,
+          [expedienteId],
+        );
+
+        if (destinatarios.rows.length !== 1) {
+          throw new ConflictError({
+            detail: 'El expediente debe tener exactamente una cuenta titular activa en casilla.',
+          });
+        }
+
+        const destinatario = destinatarios.rows[0];
+        await insertarEvento(cliente, {
+          agregado: 'Expediente',
+          tipo_evento: 'expediente_observado',
+          payload: {
+            usuario_id: destinatario.usuario_id,
+            expediente_id: expediente.expediente_id,
+            cut: expediente.codigo_expediente,
+            asunto: destinatario.asunto,
+            tipo_acto: 'Observación de expediente',
+            cuerpo: { contenido: motivo },
+          },
         });
 
         await cliente.query('COMMIT');
 
-        res.status(200).json(resultado);
+        res.status(200).json({
+          ok: true,
+          mensaje: 'Observación registrada exitosamente.',
+          expedienteId,
+          motivo,
+          estado: 'OBSERVADO',
+          slaPaused: true,
+        });
       } catch (error) {
         await cliente.query('ROLLBACK').catch(() => {});
         throw error;

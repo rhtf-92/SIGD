@@ -12,6 +12,7 @@ function app(actor: ActorRutaDoc | null) {
   const pool = { query: async (sql: string) => {
     if (sql.includes('AS inconsistente')) return { rows: [{ inconsistente: false }] };
     if (sql.includes('fecha_radicacion AT TIME ZONE')) return { rows: [{ fecha_inicio: hoy }] };
+    if (sql.includes('sigd_rut.expediente_observacion')) return { rows: [] };
     throw new Error('No se esperaba acceso a PostgreSQL');
   }, connect: async () => ({
     query: async () => ({ rowCount: 0, rows: [] }),
@@ -82,7 +83,14 @@ describe('endpoints de lectura RutaDoc', () => {
     const sinActor = await request(app(null)).post(path).set('x-usuario-id', 'no-verificado').send(body);
     expect(sinActor.status).toBe(401);
 
-    const conActor = await request(app({ id: '7', roles: ['SUPER_ADMIN'] })).post(path).send(body);
+    const conActor = await request(app({
+      id: '7',
+      roles: ['SUPER_ADMIN'],
+      permisos: [
+        { codigo: 'EXPEDIENTE_DERIVAR', ambito: 'GLOBAL', areaId: null },
+        { codigo: 'EXPEDIENTE_RESOLVER', ambito: 'GLOBAL', areaId: null },
+      ],
+    })).post(path).send(body);
     // La ruta autenticó al actor y consultó el expediente; la base de prueba indica que no existe.
     expect(conActor.status).toBe(404);
   });

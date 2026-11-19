@@ -12,10 +12,12 @@
  */
 
 import http from 'node:http';
+import crypto from 'node:crypto';
 import type { Pool } from 'pg';
 import { construirApp } from '../src/app.js';
 import { BusSse } from '../src/modules/corelink/sseStream.service.js';
 import { firmarTokenAcceso } from '../src/core/auth/jwt.service.js';
+import type { GeneradorUrlDescarga } from '../src/domains/docucore/validadorCvd.controller.js';
 
 interface TestAssertion {
   name: string;
@@ -48,6 +50,10 @@ async function runSmokeTests() {
   // Ensure JWT secret is present for authentication tests
   process.env.AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET || 'sigd_super_secret_jwt_key_iestp_suiza_2026_min_32_chars';
 
+  // Prepare deterministic PDF mock for DocuCore CVD verification
+  const mockPdfBuffer = Buffer.from('%PDF-1.7\nSmoke test CVD document\n%%EOF');
+  const mockSha256 = crypto.createHash('sha256').update(mockPdfBuffer).digest('hex');
+
   const fakePool = {
     query: async (sql: string, params?: unknown[]) => {
       // Return realistic structure if querying firma_digital_documento
@@ -56,7 +62,7 @@ async function runSmokeTests() {
           rows: [
             {
               cvd: (params?.[0] as string) || 'CVD-TEST01',
-              sha256_firmado: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+              sha256_firmado: mockSha256,
               firmante: 'Director General IESTP Suiza',
               fecha_sello_tsa: new Date().toISOString(),
               estado: 'FIRMADO_DIGITALMENTE',
@@ -75,8 +81,20 @@ async function runSmokeTests() {
     }),
   } as unknown as Pool;
 
+  const mockStorage: GeneradorUrlDescarga = {
+    generarUrlDescarga: async () => 'http://localhost:9000/sigd-docs/resoluciones/rd-001.pdf',
+    obtenerContenidoDocumento: async () => mockPdfBuffer,
+    validarPades: async () => ({
+      valido: true,
+      tipoFirma: 'FIRMA_PADES_VALIDA',
+      validacionCriptografica: true,
+      integridadBytesProtegidos: true,
+      detalles: { tieneFirmaCms: true },
+    }),
+  };
+
   const busSse = new BusSse();
-  const app = construirApp(fakePool, { busSse });
+  const app = construirApp(fakePool, { busSse, storageDocuCore: mockStorage });
 
   const server = http.createServer(app);
   await new Promise<void>((resolve) => {

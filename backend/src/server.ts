@@ -67,7 +67,11 @@ const pool = crearPool(databaseUrl);
 const busSse = new BusSse();
 
 if (process.env.MIGRATE_ON_BOOT !== 'false') {
-  await ejecutarMigraciones(pool);
+  try {
+    await ejecutarMigraciones(pool);
+  } catch (error) {
+    console.warn('[DB] No se pudieron aplicar las migraciones de inicio (PostgreSQL desconectado o en inicio tardío):', (error as Error).message);
+  }
 }
 
 // Asegurar bucket S3 en MinIO si el servicio de almacenamiento está disponible
@@ -113,7 +117,11 @@ intervaloHeartbeat.unref?.();
 // Reparto de eventos entre réplicas: cada instancia suscribe su propio listener
 // de NOTIFY y publica los eventos que su Outbox despacha.
 const bridge = new BridgeNotificacion(databaseUrl, busSse);
-await bridge.iniciar();
+try {
+  await bridge.iniciar();
+} catch (error) {
+  console.warn('[BRIDGE] Notificaciones SSE en réplicas desactivadas temporalmente (esperando base de datos):', (error as Error).message);
+}
 
 let outboxWorker: OutboxWorker | null = null;
 if (!modoSeguro) {
