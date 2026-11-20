@@ -41,4 +41,22 @@ describe('Dashboard con contrato mensual real',()=>{
   await userEvent.setup().click(screen.getByRole('button',{name:'Reintentar'}));
   expect(await screen.findByText('5')).toBeInTheDocument();
  });
+ it('carga unidades orgánicas reales y envía unidadOrganicaId al filtrar',async()=>{
+  vi.mocked(apiClient.get).mockImplementation(async(url,config)=>{
+   const params=(config?.params as {periodo?:string;unidadOrganicaId?:string}|undefined);
+   if(String(url).includes('/unidades'))return {data:[{id:'UA-DIR',nombre:'Dirección General',sigla:'DIR'}]} as never;
+   if(String(url).includes('/tendencias'))return {data:[{mes:1,radicados:params?.unidadOrganicaId==='UA-DIR'?12:120,atendidos:params?.unidadOrganicaId==='UA-DIR'?9:90}]} as never;
+   if(String(url).includes('/cuellos-botella'))return {data:[]} as never;
+   const n=params?.periodo==='2026-01'?(params?.unidadOrganicaId==='UA-DIR'?12:120):0;
+   return {data:{contadores:{nRadicados:n,nAtendidos:n,nArchivados:0,nResueltos:n,nEnTramite:0,nObservados:0,nResueltosDentroPlazo:n,horasHabilesSuma:n}}} as never;
+  });
+  const user=userEvent.setup();
+  renderDashboard();
+  await screen.findByText('120');
+  const selectUnidad=screen.getByLabelText(/Unidad org/);
+  expect(within(selectUnidad).getAllByRole('option')).toHaveLength(2);
+  await user.selectOptions(selectUnidad,'UA-DIR');
+  await waitFor(()=>expect(apiClient.get).toHaveBeenCalledWith('/api/v1/reportes/dashboard/resumen',{params:{periodo:'2026-01',unidadOrganicaId:'UA-DIR'}}));
+  expect(await screen.findByText('12')).toBeInTheDocument();
+ });
 });

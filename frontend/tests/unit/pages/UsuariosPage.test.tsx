@@ -273,4 +273,38 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     ).toBeInTheDocument();
     expect(put).not.toHaveBeenCalled();
   });
+
+  it("permite seleccionar rol institucional al registrar un nuevo usuario y lo envía en POST /api/v1/admin/usuarios", async () => {
+    const usuario = userEvent.setup();
+    montarConProvider();
+    await screen.findByText("Juan Carlos Pérez");
+
+    await usuario.click(screen.getByRole("button", { name: "Registrar usuario" }));
+    const dialogo = await screen.findByRole("dialog");
+
+    await usuario.type(within(dialogo).getByLabelText("Documento"), "78901234");
+    await usuario.type(within(dialogo).getByLabelText("Nombres"), "Carlos");
+    await usuario.type(within(dialogo).getByLabelText("Apellidos"), "Mendoza Ruiz");
+    await usuario.type(within(dialogo).getByLabelText("Correo institucional"), "cmendoza@iestpsuiza.edu.pe");
+    await usuario.type(within(dialogo).getByLabelText("Contraseña inicial"), "ClaveSegura2026!");
+    await usuario.selectOptions(within(dialogo).getByLabelText("Área"), AREA_ID);
+    await usuario.selectOptions(within(dialogo).getByLabelText("Cargo"), CARGO_ID);
+    await usuario.selectOptions(within(dialogo).getByLabelText("Rol institucional"), ROL_ID);
+
+    await usuario.click(within(dialogo).getByRole("button", { name: "Registrar usuario" }));
+
+    await waitFor(() => {
+      expect(post).toHaveBeenCalledWith(
+        "/api/v1/admin/usuarios",
+        expect.objectContaining({
+          numeroDocumento: "78901234",
+          correo: "cmendoza@iestpsuiza.edu.pe",
+          rolId: ROL_ID,
+        }),
+      );
+    });
+    expect(
+      await screen.findByText("El usuario fue registrado correctamente y ya puede iniciar sesión."),
+    ).toBeInTheDocument();
+  });
 });

@@ -556,4 +556,22 @@ describe('Servicio: agregación y degradación sin caché', () => {
     const servicio = new ServicioMgdAnalytics(repositorioFalso as never, { cache });
     await expect(servicio.resumen(null)).resolves.toBeDefined();
   });
+
+  it('35 consolida tendencias de múltiples áreas en el mismo mes sin sobrescribir', async () => {
+    let unidadCapturada: string | null | undefined;
+    const repoMultiArea = {
+      ...repositorioFalso,
+      obtenerTendencias: async (_anio: number, unidadOrganicaId?: string | null) => {
+        unidadCapturada = unidadOrganicaId;
+        return [
+          { periodo: '2026-05', contadores: { ...CONTADORES_VACIOS, nRadicados: 4, nAtendidos: 2, nArchivados: 1, nObservados: 1 } },
+          { periodo: '2026-05', contadores: { ...CONTADORES_VACIOS, nRadicados: 6, nAtendidos: 3, nArchivados: 0, nObservados: 2 } },
+        ];
+      },
+    };
+    const servicio = new ServicioMgdAnalytics(repoMultiArea as never);
+    const serie = await servicio.tendencias(2026, 'UA-DIR');
+    expect(unidadCapturada).toBe('UA-DIR');
+    expect(serie[4]).toEqual({ mes: 5, radicados: 10, atendidos: 6, observados: 3 });
+  });
 });

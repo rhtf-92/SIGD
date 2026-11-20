@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 
 import {
   actualizarUsuarioAdminSchema,
+  crearUsuarioAdminSchema,
   listarUsuariosQuerySchema,
   usuarioIdParamSchema,
 } from '../../../../src/domains/organicore/dto/usuarioAdmin.dto.js';
@@ -186,5 +187,32 @@ describe('UsuariosAdminService · actualización transaccional', () => {
     ).rejects.toThrow('fallo controlado');
 
     expect(consultas.at(-1)?.sql).toBe('ROLLBACK');
+  });
+
+  it('acepta rolId y rolIds en creación y busca también por nombre de área', async () => {
+    const validado = crearUsuarioAdminSchema.parse({
+      tipo: 'NATURAL',
+      numeroDocumento: '71234567',
+      nombres: 'Ana',
+      apellidos: 'Torres',
+      correo: 'ana.torres@iestpsuiza.edu.pe',
+      passwordInicial: 'ClaveSegura2026!',
+      areaId: AREA_ID,
+      cargoId: CARGO_ID,
+      rolId: ROL_ID,
+    });
+    expect(validado.rolId).toBe(ROL_ID);
+
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [usuario], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ total: 1 }], rowCount: 1 });
+    await crearUsuariosAdminService({ query } as unknown as Pool).listarUsuarios({
+      busqueda: 'Mesa de Partes',
+      pagina: 1,
+      limite: 20,
+    });
+    const sql = String(query.mock.calls[0][0]);
+    expect(sql).toContain('a.nombre ILIKE');
+    expect(sql).toContain('cu.correo ILIKE');
   });
 });

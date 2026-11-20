@@ -39,9 +39,9 @@ describe('OrganiCore y Administración con PostgreSQL real', () => {
       tipo: 'NATURAL', numeroDocumento: '99166123', nombres: 'Prueba', apellidos: 'Multirrol',
       correo: 'prueba.pr166@iestpsuiza.edu.pe', passwordInicial: 'ClaveSegura166!',
       areaId: area.id, cargoId: cargo.rows[0].cargo_id,
+      rolIds: roles.rows.map((rol) => rol.rol_id),
     });
-    expect(creado.roles).toHaveLength(0);
-    await usuarios.actualizarUsuario(creado.id, { rolesAgregar: roles.rows.map((rol) => rol.rol_id) });
+    expect(creado.roles).toHaveLength(2);
 
     const app = construirApp(pool);
     const login = await request(app).post('/api/v1/auth/login').send({
