@@ -129,7 +129,7 @@ export default function DashboardEjecutivoPage() {
         Tablero ejecutivo cargado correctamente.
       </div>
       <div className="mx-auto max-w-7xl space-y-6">
-        <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-end md:justify-between">
+        <header className="relative z-30 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-end md:justify-between">
           <div>
             <Link
               to="/"
@@ -143,12 +143,32 @@ export default function DashboardEjecutivoPage() {
           <ReportExportModal
             reportName="dashboard-ejecutivo"
             filters={filters}
-            records={summaryMetrics.map((metric) => ({
-              indicador: metric.title,
-              valor: metric.value,
-              unidad: metric.unit,
-              delta: metric.delta,
-            }))}
+            records={[
+              ...summaryMetrics.map((metric) => ({
+                indicador: metric.title,
+                valor: metric.value,
+                unidad: metric.unit,
+                detalle: metric.description || "Indicador MGD-PCM",
+              })),
+              {
+                indicador: "Conformidad institucional",
+                valor: executive.conformity,
+                unidad: "%",
+                detalle: "Resoluciones dentro del plazo legal (30 d.h.)",
+              },
+              {
+                indicador: "Crecimiento vs. mes anterior",
+                valor: executive.growth,
+                unidad: "%",
+                detalle: "Variación porcentual de expedientes radicados",
+              },
+              {
+                indicador: "Mesas de partes",
+                valor: executive.desksHealth,
+                unidad: "estado",
+                detalle: unitId ? (units.find((u) => u.id === unitId)?.name ?? unitId) : "Todas las unidades",
+              },
+            ]}
           />
         </header>
 
@@ -178,6 +198,12 @@ export default function DashboardEjecutivoPage() {
               ))}
             </svg>
 
+            {trend.every((point) => point.radicados === 0 && point.resueltos === 0) && (
+              <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                No se registran movimientos en los periodos seleccionados.
+              </p>
+            )}
+
             <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
               <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-700" />Radicados</span>
               <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Resueltos</span>
@@ -187,21 +213,27 @@ export default function DashboardEjecutivoPage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="estado-title">
             <h2 id="estado-title" className="mb-4 text-lg font-semibold text-slate-900">Distribución por estado</h2>
             <div className="flex flex-col gap-4">
-              <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full border-[14px] border-slate-200 bg-white"
-                style={{
-                  background: `conic-gradient(${estados
+              {(() => {
+                const totalEstados = Math.round(estados.reduce((sum, item) => sum + item.value, 0));
+                const fondo = totalEstados > 0
+                  ? `conic-gradient(${estados
                     .map((state, index) => {
                       const previous = estados.slice(0, index).reduce((sum, current) => sum + current.value, 0);
                       return `${state.color} ${previous}% ${previous + state.value}%`;
                     })
-                    .join(", ")})`,
-                }}
-                aria-label="Distribución porcentual por estado"
-              >
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-center text-sm font-bold text-slate-900">
-                  {estados.reduce((sum, item) => sum + item.value, 0)}%
-                </div>
-              </div>
+                    .join(", ")})`
+                  : "#e2e8f0";
+                return (
+                  <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full border-[14px] border-slate-200 bg-white"
+                    style={{ background: fondo }}
+                    aria-label="Distribución porcentual por estado"
+                  >
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-center text-sm font-bold text-slate-900">
+                      {totalEstados}%
+                    </div>
+                  </div>
+                );
+              })()}
 
               <ul className="space-y-2">
                 {estados.map((state) => (

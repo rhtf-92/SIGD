@@ -39,10 +39,12 @@ import { ServicioMgdAnalytics } from './mgdAnalytics.service.js';
 import {
   anioEnLima,
   filtrosCuellosBotellaSchema,
+  filtrosExportacionSchema,
   filtrosResumenSchema,
   filtrosTendenciasSchema,
 } from './reportes.schemas.js';
-import type { CacheDistribuida } from '../identicore/ubigeo.service.js';
+import { generarSpreadsheetMl } from '../../modules/reportes/excel.service.js';
+import { generarPdfInforme } from '../../modules/reportes/pdf-minimo.service.js';
 
 /** Roles autorizados por §4.7 para la analítica ejecutiva. */
 const ROLES_ANALITICA = new Set(['DIRECTOR', 'SUPER_ADMIN']);
@@ -52,6 +54,9 @@ export interface ControladorReportes {
   cuellosBotella: RequestHandler;
   tendencias: RequestHandler;
   tiemposAtencion: RequestHandler;
+  unidades: RequestHandler;
+  exportarExcel: RequestHandler;
+  exportarPdf: RequestHandler;
   refrescar: RequestHandler;
 }
 
@@ -60,14 +65,6 @@ export function crearControladorReportes(
   servicio: ServicioMgdAnalytics,
   repositorio: RepositorioMgdAnalytics,
 ): ControladorReportes {
-  /**
-   * Autorización fail-closed de la analítica ejecutiva.
-   *
-   * La ausencia de actor es 401 y la falta de rol es 403: son dos casos distintos
-   * de diagnóstico para el usuario. Un rol no reconocido NO es un acceso denegado con
-   * mensaje genérico sino exactamente igual: cualquier rol fuera del conjunto
-   * produce 403, sin revelar qué roles sí pasan.
-   */
   const autorizado = async (req: Request): Promise<ActorRutaDoc> => {
     const actor = await actorProvider.obtenerActor(req);
     if (!actor) throw new UnauthorizedError();
@@ -78,38 +75,28 @@ export function crearControladorReportes(
   return {
     resumen: async (req, res) => {
       await autorizado(req);
-      const { periodo } = filtrosResumenSchema.parse(req.query ?? {});
-      const resumen = await servicio.resumen(periodo ?? null);
-      // `periodo` y `actualizadoEn` son metadatos de la lectura; el contrato de
-      // §4.7 define los seis campos de primer nivel, pero sin ellos el frontend no
-      // puede distinguir "0 %" de "sin datos" ni saber de cuándo es el dato.
+      const { periodo, unidadOrganicaId } = filtrosResumenSchema.parse(req.query ?? {});
+      const resumen = await servicio.resumen(periodo ?? null, unidadOrganicaId ?? null);
       res.json({ ...resumen });
     },
 
     cuellosBotella: async (req, res) => {
       await autorizado(req);
-      const { periodo, diasLimite } = filtrosCuellosBotellaSchema.parse(req.query ?? {});
+      const { periodo, diasLimite, unidadOrganicaId } = filtrosCuellosBotellaSchema.parse(req.query ?? {});
       const nombres = await repositorio.obtenerNombresUnidades();
-      res.json(await servicio.cuellosBotella(periodo ?? null, diasLimite, nombres));
+      res.json(await servicio.cuellosBotella(periodo ?? null, diasLimite, nombres, unidadOrganicaId ?? null));
     },
 
     tendencias: async (req, res) => {
       await autorizado(req);
-      const { anio } = filtrosTendenciasSchema.parse(req.query ?? {});
-      res.json(await servicio.tendencias(anio ?? anioEnLima()));
+      const { anio, unidadOrganicaId } = filtrosTendenciasSchema.parse(req.query ?? {});
+      res.json(await servicio.tendencias(anio ?? anioEnLima(), unidadOrganicaId ?? null));
     },
 
-    /**
-     * Distribución de permanencia por área (#52 según §20, `tiempos-atencion`).
-     *
-     * Devuelve los tramos anidados en cada área, que es lo que consume el mapa de
-     * calor `BottleNeckHeatmap.tsx` del frontend. Comparte la lectura con el ranking
-     * pero devuelve el detalle completo, en vez del resumen por área.
-     */
     tiemposAtencion: async (req, res) => {
       await autorizado(req);
-      const { periodo } = filtrosResumenSchema.parse(req.query ?? {});
-      const distribucion = await servicio.distribucionRetencion(periodo ?? null);
+      const { periodo, unidadOrganicaId } = filtrosResumenSchema.parse(req.query ?? {});
+      const distribucion = await servicio.distribucionRetencion(periodo ?? null, unidadOrganicaId ?? null);
       const nombres = await repositorio.obtenerNombresUnidades();
       res.json(Array.from(distribucion.entries()).map(([areaId, tramos]) => ({
         areaId,
@@ -119,14 +106,96 @@ export function crearControladorReportes(
       })));
     },
 
-    /**
-     * Refresco concurrente de las vistas materializadas (#51 según §20).
-     *
-     * Es una operación de plataforma, no de consulta: además de los dos roles del
-     * tablero exige `SUPER_ADMIN`. Permitir que un `DIRECTOR` dispare un refresco que
-     * compite con el refresco programado del planificador sólo introduce
-     * contención; el director consulta el dato, el administrador lo materializa.
-     */
+    unidades: async (req, res) => {
+      await autorizado(req);
+      res.json(await repositorio.obtenerUnidadesDisponibles());
+    },
+
+    exportarExcel: async (req, res) => {
+      await autorizado(req);
+      const { anio, periodo, unidadOrganicaId, diasLimite } = filtrosExportacionSchema.parse(req.query ?? {});
+      const anioEfectivo = periodo ? Number(periodo.slice(0, 4)) : (anio ?? anioEnLima());
+      const [resumen, tendencias, nombres] = await Promise.all([
+        servicio.resumen(periodo ?? null, unidadOrganicaId ?? null),
+        servicio.tendencias(anioEfectivo, unidadOrganicaId ?? null),
+        repositorio.obtenerNombresUnidades(),
+      ]);
+      const cuellos = await servicio.cuellosBotella(periodo ?? null, diasLimite, nombres, unidadOrganicaId ?? null);
+      const etiquetaPeriodo = periodo ?? String(anioEfectivo);
+      const { contenido, contentType } = generarSpreadsheetMl([
+        {
+          nombre: 'Indicadores MGD',
+          columnas: ['Indicador', 'Valor', 'Meta', 'Cumple'],
+          filas: [
+            ['Expedientes registrados', resumen.contadores.nRadicados, '-', 'N/A'],
+            ['VTEP (%)', resumen.vtep.valor, `>= ${resumen.vtep.meta}%`, resumen.vtep.cumple ? 'SI' : 'NO'],
+            ['TPR (horas habiles)', resumen.tprHorasHabiles.valor, `<= ${resumen.tprHorasHabiles.meta} h`, resumen.tprHorasHabiles.cumple ? 'SI' : 'NO'],
+            ['TRO (%)', resumen.tro.valor, `>= ${resumen.tro.meta}%`, resumen.tro.cumple ? 'SI' : 'NO'],
+            ['TEO (%)', resumen.teo.valor, `<= ${resumen.teo.meta}%`, resumen.teo.cumple ? 'SI' : 'NO'],
+            ['En tramite', resumen.totalExpedientesEnTramite, '-', 'N/A'],
+            ['Atendidos y archivados', resumen.totalExpedientesAtendidos, '-', 'N/A'],
+          ],
+        },
+        {
+          nombre: `Tendencia ${anioEfectivo}`,
+          columnas: ['Mes', 'Radicados', 'Atendidos', 'Observados'],
+          filas: tendencias.map((p) => [`${anioEfectivo}-${String(p.mes).padStart(2, '0')}`, p.radicados, p.atendidos, p.observados]),
+        },
+        {
+          nombre: 'Cuellos de botella',
+          columnas: ['Unidad Organica', 'Expedientes', 'Estancados', 'Dias Promedio', 'Riesgo'],
+          filas: cuellos.map((c) => [c.areaNombre, c.expedientes, c.expedientesEstancados, c.diasRetencion, c.riesgo.toUpperCase()]),
+        },
+      ]);
+      res.status(200)
+        .set({
+          'Content-Type': contentType,
+          'Content-Length': String(contenido.length),
+          'Content-Disposition': `attachment; filename="tablero-ejecutivo-${etiquetaPeriodo}.xls"`,
+        })
+        .end(contenido);
+    },
+
+    exportarPdf: async (req, res) => {
+      await autorizado(req);
+      const { anio, periodo, unidadOrganicaId, diasLimite } = filtrosExportacionSchema.parse(req.query ?? {});
+      const anioEfectivo = periodo ? Number(periodo.slice(0, 4)) : (anio ?? anioEnLima());
+      const [resumen, nombres] = await Promise.all([
+        servicio.resumen(periodo ?? null, unidadOrganicaId ?? null),
+        repositorio.obtenerNombresUnidades(),
+      ]);
+      const cuellos = await servicio.cuellosBotella(periodo ?? null, diasLimite, nombres, unidadOrganicaId ?? null);
+      const etiquetaPeriodo = periodo ?? `Anio ${anioEfectivo}`;
+      const unidadNombre = unidadOrganicaId
+        ? (nombres.get(unidadOrganicaId)?.nombre ?? (unidadOrganicaId === 'SIN_AREA' ? 'Sin unidad asignada' : unidadOrganicaId))
+        : 'Todas las unidades';
+      const binario = generarPdfInforme((doc) => {
+        doc.agregarTitulo('Tablero Directivo Ejecutivo - SIGD SUIZA');
+        doc.agregarSubtitulo(`Periodo: ${etiquetaPeriodo} | Unidad: ${unidadNombre}`);
+        doc.agregarSeccion('Indicadores MGD-PCM');
+        doc.agregarFila(['Indicador', 'Valor', 'Meta', 'Cumple'], { negrita: true, separador: true });
+        doc.agregarFila(['Expedientes registrados', String(resumen.contadores.nRadicados), '-', '-']);
+        doc.agregarFila(['VTEP', `${resumen.vtep.valor}%`, `>= ${resumen.vtep.meta}%`, resumen.vtep.cumple ? 'SI' : 'NO']);
+        doc.agregarFila(['TPR (horas habiles)', `${resumen.tprHorasHabiles.valor} h`, `<= ${resumen.tprHorasHabiles.meta} h`, resumen.tprHorasHabiles.cumple ? 'SI' : 'NO']);
+        doc.agregarFila(['TRO', `${resumen.tro.valor}%`, `>= ${resumen.tro.meta}%`, resumen.tro.cumple ? 'SI' : 'NO']);
+        doc.agregarFila(['TEO', `${resumen.teo.valor}%`, `<= ${resumen.teo.meta}%`, resumen.teo.cumple ? 'SI' : 'NO']);
+        if (cuellos.length > 0) {
+          doc.agregarSeccion('Cuellos de botella por unidad');
+          doc.agregarFila(['Unidad', 'Total', 'Estancados', 'Dias prom.', 'Riesgo'], { negrita: true, separador: true });
+          for (const c of cuellos) {
+            doc.agregarFila([c.areaNombre, String(c.expedientes), String(c.expedientesEstancados), String(c.diasRetencion), c.riesgo.toUpperCase()]);
+          }
+        }
+      }, 'Tablero Directivo Ejecutivo SIGD');
+      res.status(200)
+        .set({
+          'Content-Type': 'application/pdf',
+          'Content-Length': String(binario.length),
+          'Content-Disposition': `attachment; filename="tablero-ejecutivo-${periodo ?? anioEfectivo}.pdf"`,
+        })
+        .end(binario);
+    },
+
     refrescar: async (req, res) => {
       const actor = await actorProvider.obtenerActor(req);
       if (!actor) throw new UnauthorizedError();

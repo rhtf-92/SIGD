@@ -395,10 +395,12 @@ export function riesgoPorPermanencia(diasHabilesPromedio: number): RiesgoCuelloB
  * y por el cambio de clave. Un refresco de la vista materializada queda visible a
  * lo sumo en un TTL, que es la ventana aceptable para un tablero ejecutivo.
  */
-const CACHE_RESUMEN = (periodo: string | null) => `cache:mgd:resumen:${periodo ?? 'todo'}`;
-const CACHE_CUELLOS = (periodo: string | null, diasLimite: number) =>
-  `cache:mgd:cuellos:${periodo ?? 'todo'}:${diasLimite}`;
-const CACHE_TENDENCIAS = (anio: number) => `cache:mgd:tendencias:${anio}`;
+const CACHE_RESUMEN = (periodo: string | null, unidadOrganicaId: string | null) =>
+  `cache:mgd:resumen:${periodo ?? 'todo'}:${unidadOrganicaId ?? 'todas'}`;
+const CACHE_CUELLOS = (periodo: string | null, diasLimite: number, unidadOrganicaId: string | null) =>
+  `cache:mgd:cuellos:${periodo ?? 'todo'}:${diasLimite}:${unidadOrganicaId ?? 'todas'}`;
+const CACHE_TENDENCIAS = (anio: number, unidadOrganicaId: string | null) =>
+  `cache:mgd:tendencias:${anio}:${unidadOrganicaId ?? 'todas'}`;
 
 /** TTL corto: el dato es de un refresco programado, no de un catálogo estático. */
 const TTL_SEGUNDOS = 300;
@@ -451,9 +453,12 @@ export class ServicioMgdAnalytics {
    * disponible. Los KPIs se recalculan desde los contadores crudos, nunca se suman
    * los porcentajes por área.
    */
-  async resumen(periodo: string | null): Promise<ResumenKpisMgd> {
-    return this.deCache(CACHE_RESUMEN(periodo), async () => {
-      const filas = await this.repositorio.obtenerContadores(periodo);
+  async resumen(
+    periodo: string | null,
+    unidadOrganicaId: string | null = null,
+  ): Promise<ResumenKpisMgd> {
+    return this.deCache(CACHE_RESUMEN(periodo, unidadOrganicaId), async () => {
+      const filas = await this.repositorio.obtenerContadores(periodo, unidadOrganicaId);
       const contadores = sumarContadores(...filas.map((fila) => fila.contadores));
       const base = calcularIndicadoresMgd(contadores);
       const actualizaciones = filas
@@ -474,19 +479,22 @@ export class ServicioMgdAnalytics {
    * Series mensual de radicados vs. atendidos (#52).
    *
    * Se devuelven los doce meses del año, incluidos los que no tienen
-   *idimensionalidad: una serie con huecos hace que el frontend dibuje meses
-   * intermedios como cero, cuando en realidad son "sin datos".
+   * actividad, acumulando múltiples áreas del mismo período sin sobrescritura.
    */
-  async tendencias(anio: number): Promise<PuntoTendencia[]> {
-    return this.deCache(CACHE_TENDENCIAS(anio), async () => {
+  async tendencias(
+    anio: number,
+    unidadOrganicaId: string | null = null,
+  ): Promise<PuntoTendencia[]> {
+    return this.deCache(CACHE_TENDENCIAS(anio, unidadOrganicaId), async () => {
       const porPeriodo = new Map<string, PuntoTendencia>();
-      for (const fila of await this.repositorio.obtenerTendencias(anio)) {
+      for (const fila of await this.repositorio.obtenerTendencias(anio, unidadOrganicaId)) {
         const mes = Number(fila.periodo.slice(5, 7));
+        const previo = porPeriodo.get(fila.periodo) ?? { mes, radicados: 0, atendidos: 0, observados: 0 };
         porPeriodo.set(fila.periodo, {
           mes,
-          radicados: fila.contadores.nRadicados,
-          atendidos: fila.contadores.nAtendidos + fila.contadores.nArchivados,
-          observados: fila.contadores.nObservados,
+          radicados: previo.radicados + fila.contadores.nRadicados,
+          atendidos: previo.atendidos + fila.contadores.nAtendidos + fila.contadores.nArchivados,
+          observados: previo.observados + fila.contadores.nObservados,
         });
       }
       return Array.from({ length: 12 }, (_, indice) => {
@@ -496,25 +504,16 @@ export class ServicioMgdAnalytics {
     });
   }
 
-  /**
-   * Ranking de cuellos de botella (#51) y distribución de permanencia (#52 según
-   * §20).
-   *
-   * La permanencia promedio del área es la media de las medias de cada tramo
-   * pesada por `n_expedientes`. Es exactamente la media del área — la media de
-   * medias sólo Sesga cuando los grupos tienen pesos distintos, y aquí el peso es
-   * precisamente el tamaño del grupo — y evita releer la tabla de expedientes en
-   * un endpoint del tablero.
-   */
   async cuellosBotella(
     periodo: string | null,
     diasLimite: number,
     nombres: ReadonlyMap<string, { nombre: string; sigla: string | null }>,
+    unidadOrganicaId: string | null = null,
   ): Promise<CuelloBotellaArea[]> {
     const limiteAplicado = alinearUmboloATramo(diasLimite);
-    return this.deCache(CACHE_CUELLOS(periodo, diasLimite), async () => {
+    return this.deCache(CACHE_CUELLOS(periodo, diasLimite, unidadOrganicaId), async () => {
       const porArea = new Map<string, TramoAcumulado>();
-      for (const tramo of await this.repositorio.obtenerRetencion(periodo)) {
+      for (const tramo of await this.repositorio.obtenerRetencion(periodo, unidadOrganicaId)) {
         const id = tramo.unidadOrganicaId;
         const acumulado = porArea.get(id) ?? {
           nExpedientes: 0,
@@ -561,10 +560,6 @@ export class ServicioMgdAnalytics {
         } satisfies CuelloBotellaArea;
       });
 
-      // Orden de cuello de botella: primero el mayor volumen estancado y, a igual
-      // volumen, la mayor permanencia promedio. El desempate por nombre mantiene
-      // el ranking estable entre refrescos, que si no haría parpadear el tablero
-      // sin que haya cambiado ningún dato.
       return areas.sort((a, b) => b.expedientesEstancados - a.expedientesEstancados
         || b.diasRetencion - a.diasRetencion
         || a.areaNombre.localeCompare(b.areaNombre, 'es'));
@@ -572,9 +567,12 @@ export class ServicioMgdAnalytics {
   }
 
   /** Distribución por tramo de una unidad, para el mapa de calor del frontend. */
-  async distribucionRetencion(periodo: string | null): Promise<Map<string, TramoRetencion[]>> {
+  async distribucionRetencion(
+    periodo: string | null,
+    unidadOrganicaId: string | null = null,
+  ): Promise<Map<string, TramoRetencion[]>> {
     const porArea = new Map<string, TramoRetencion[]>();
-    for (const tramo of await this.repositorio.obtenerRetencion(periodo)) {
+    for (const tramo of await this.repositorio.obtenerRetencion(periodo, unidadOrganicaId)) {
       const lista = porArea.get(tramo.unidadOrganicaId) ?? [];
       lista.push({
         tramo: tramo.tramo,

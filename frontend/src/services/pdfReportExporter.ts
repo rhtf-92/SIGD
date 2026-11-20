@@ -122,21 +122,21 @@ function makeTablePage(
   const commands = [
     textCommand(request.reportName, 42, 48, 14, "F2"),
     textCommand(`Detalle | Pagina ${pageNumber}`, 42, 68, 8),
-    "0.08 0.25 0.39 rg 42 700 511 28 re f",
+    `0.08 0.25 0.39 rg 42 ${(PAGE_HEIGHT - 120).toFixed(2)} 511 28 re f`,
   ];
   headers.forEach((header, index) => {
     commands.push("1 1 1 rg");
-    commands.push(textCommand(header.slice(0, 28), 47 + index * columnWidth, 718, 8, "F2"));
+    commands.push(textCommand(header.slice(0, 28), 47 + index * columnWidth, 110, 8, "F2"));
   });
   commands.push("0 0 0 rg 0.75 w");
   records.forEach((record, rowIndex) => {
-    const y = 132 + rowIndex * 22;
+    const y = 128 + rowIndex * 22;
     commands.push(lineCommand(42, y, 553, y));
     headers.forEach((header, columnIndex) => {
       commands.push(textCommand(record[header], 47 + columnIndex * columnWidth, y + 15, 7));
     });
   });
-  commands.push(lineCommand(42, 132 + records.length * 22, 553, 132 + records.length * 22));
+  commands.push(lineCommand(42, 128 + records.length * 22, 553, 128 + records.length * 22));
   commands.push(textCommand(`Total de registros: ${request.records.length}`, 42, 795, 8));
   return commands.join("\n");
 }

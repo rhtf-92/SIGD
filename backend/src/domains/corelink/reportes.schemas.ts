@@ -33,26 +33,39 @@ const anio = z.coerce.number().int().min(2000).max(2100);
  * `Infinity` silencioso.
  */
 const diasLimite = z.coerce.number().int().min(0).max(365).default(5);
+const unidadOrganicaId = z.string().trim().min(1).max(64);
 
 /** Filtros del tablero consolidado (#50). */
 export const filtrosResumenSchema = z.object({
   periodo: periodo.optional(),
+  unidadOrganicaId: unidadOrganicaId.optional(),
 }).strict();
 
 /** Filtros del ranking de cuellos de botella (#51). */
 export const filtrosCuellosBotellaSchema = z.object({
   periodo: periodo.optional(),
   diasLimite,
+  unidadOrganicaId: unidadOrganicaId.optional(),
 }).strict();
 
 /** Filtros de la serie mensual de tendencias (#52). */
 export const filtrosTendenciasSchema = z.object({
   anio: anio.optional(),
+  unidadOrganicaId: unidadOrganicaId.optional(),
+}).strict();
+
+/** Filtros de exportación oficial (#53 / #54). */
+export const filtrosExportacionSchema = z.object({
+  anio: anio.optional(),
+  periodo: periodo.optional(),
+  unidadOrganicaId: unidadOrganicaId.optional(),
+  diasLimite,
 }).strict();
 
 export type FiltrosResumen = z.infer<typeof filtrosResumenSchema>;
 export type FiltrosCuellosBotella = z.infer<typeof filtrosCuellosBotellaSchema>;
 export type FiltrosTendencias = z.infer<typeof filtrosTendenciasSchema>;
+export type FiltrosExportacion = z.infer<typeof filtrosExportacionSchema>;
 
 /**
  * Año consultable por defecto: el año en curso según `America/Lima`.

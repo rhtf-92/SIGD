@@ -152,7 +152,10 @@ export class RepositorioMgdAnalytics {
    * consolidada cuando no lo hay. El servicio decide cuándo sumar varias filas, de
    * modo que la agregación vive en un único lugar y es testeable sin base de datos.
    */
-  async obtenerContadores(periodo: string | null): Promise<ContadoresPeriodo[]> {
+  async obtenerContadores(
+    periodo: string | null,
+    unidadOrganicaId: string | null = null,
+  ): Promise<ContadoresPeriodo[]> {
     const sql = periodo === null
       ? `SELECT to_char(MIN(periodo), 'YYYY-MM')     AS periodo,
                 MAX(actualizado_en)                 AS actualizado_en,
@@ -164,11 +167,13 @@ export class RepositorioMgdAnalytics {
                 SUM(n_observados)                   AS n_observados,
                 SUM(n_resueltos_dentro_plazo)       AS n_resueltos_dentro_plazo,
                 SUM(horas_habiles_suma)             AS horas_habiles_suma
-           FROM sigd_tra.mv_kpis_mgd_mensual_v2`
+           FROM sigd_tra.mv_kpis_mgd_mensual_v2
+          WHERE ($1::text IS NULL OR unidad_organica_id = $1)`
       : `${PROYECCION_CONTADORES}
-          WHERE periodo = $1::date`;
+          WHERE periodo = $1::date
+            AND ($2::text IS NULL OR unidad_organica_id = $2)`;
 
-    const valores = periodo === null ? [] : [periodo + '-01'];
+    const valores = periodo === null ? [unidadOrganicaId] : [periodo + '-01', unidadOrganicaId];
     const { rows } = await this.pool.query<FilaContadores>(sql, valores);
     if (rows.length === 0) return [];
     return rows.map((fila) => ({
@@ -189,14 +194,29 @@ export class RepositorioMgdAnalytics {
     }));
   }
 
-  /** Contadores crudos de los doce meses de un año, para la serie de tendencias. */
-  async obtenerTendencias(anio: number): Promise<ContadoresMes[]> {
+  /** Contadores crudos de los doce meses de un año, agrupados por periodo para evitar sobrescritura multiárea. */
+  async obtenerTendencias(
+    anio: number,
+    unidadOrganicaId: string | null = null,
+  ): Promise<ContadoresMes[]> {
     const { rows } = await this.pool.query<FilaContadores>(
-      `${PROYECCION_CONTADORES}
+      `SELECT to_char(periodo, 'YYYY-MM')           AS periodo,
+              MAX(actualizado_en)                   AS actualizado_en,
+              SUM(n_radicados)                      AS n_radicados,
+              SUM(n_atendidos)                      AS n_atendidos,
+              SUM(n_archivados)                     AS n_archivados,
+              SUM(n_resueltos)                      AS n_resueltos,
+              SUM(n_en_tramite)                     AS n_en_tramite,
+              SUM(n_observados)                     AS n_observados,
+              SUM(n_resueltos_dentro_plazo)         AS n_resueltos_dentro_plazo,
+              SUM(horas_habiles_suma)               AS horas_habiles_suma
+         FROM sigd_tra.mv_kpis_mgd_mensual_v2
         WHERE periodo >= make_date($1, 1, 1)::date
           AND periodo <  (make_date($1, 1, 1) + INTERVAL '1 year')::date
+          AND ($2::text IS NULL OR unidad_organica_id = $2)
+        GROUP BY periodo
         ORDER BY periodo`,
-      [anio],
+      [anio, unidadOrganicaId],
     );
     return rows.flatMap((fila): ContadoresMes[] => {
       const periodo = aTextoPeriodo(fila.periodo);
@@ -224,7 +244,10 @@ export class RepositorioMgdAnalytics {
   }
 
   /** Distribución de permanencia por (período, área, tramo). */
-  async obtenerRetencion(periodo: string | null): Promise<TramoRetencionFila[]> {
+  async obtenerRetencion(
+    periodo: string | null,
+    unidadOrganicaId: string | null = null,
+  ): Promise<TramoRetencionFila[]> {
     const { rows } = await this.pool.query<FilaRetencion>(
       `SELECT unidad_organica_id,
               tramo_permanencia_dias_habiles,
@@ -233,9 +256,10 @@ export class RepositorioMgdAnalytics {
               promedio_horas_habiles,
               porcentaje_del_area
          FROM sigd_tra.mv_tiempos_retencion_area_v2
-        WHERE $1::date IS NULL OR periodo = $1::date
+        WHERE ($1::date IS NULL OR periodo = $1::date)
+          AND ($2::text IS NULL OR unidad_organica_id = $2)
         ORDER BY unidad_organica_id, tramo_permanencia_dias_habiles`,
-      [periodo === null ? null : periodo + '-01'],
+      [periodo === null ? null : periodo + '-01', unidadOrganicaId],
     );
     return rows.map((fila) => {
       const tramo = fila.tramo_permanencia_dias_habiles;
@@ -251,6 +275,41 @@ export class RepositorioMgdAnalytics {
         porcentajeDelArea: aNumero(fila.porcentaje_del_area),
       };
     });
+  }
+
+  /** Catálogo real de unidades orgánicas consultables en el tablero directivo. */
+  async obtenerUnidadesDisponibles(): Promise<Array<{ id: string; nombre: string; sigla: string | null }>> {
+    const unidades = new Map<string, { id: string; nombre: string; sigla: string | null }>();
+    try {
+      const { rows } = await this.pool.query<{ id: string; nombre: string; sigla: string | null }>(
+        `SELECT area_id::text AS id, nombre, codigo AS sigla
+           FROM sigd_org.area
+          WHERE vigente = TRUE
+          ORDER BY nombre ASC`,
+      );
+      for (const fila of rows) {
+        unidades.set(fila.id, fila);
+      }
+    } catch {
+      // Degradación documentada si OrganiCore no está instalado.
+    }
+    try {
+      const { rows } = await this.pool.query<{ unidad_organica_id: string }>(
+        'SELECT DISTINCT unidad_organica_id FROM sigd_tra.mv_kpis_mgd_mensual_v2 ORDER BY unidad_organica_id',
+      );
+      for (const fila of rows) {
+        if (!unidades.has(fila.unidad_organica_id)) {
+          unidades.set(fila.unidad_organica_id, {
+            id: fila.unidad_organica_id,
+            nombre: fila.unidad_organica_id === 'SIN_AREA' ? 'Sin unidad asignada' : fila.unidad_organica_id,
+            sigla: fila.unidad_organica_id === 'SIN_AREA' ? 'SIN_AREA' : null,
+          });
+        }
+      }
+    } catch {
+      // Si la vista no existe en un entorno mínimo, se devuelven las áreas vigentes.
+    }
+    return Array.from(unidades.values());
   }
 
   /**

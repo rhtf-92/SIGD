@@ -171,6 +171,27 @@ function normalizeDashboard(value: unknown): DashboardEjecutivoData & {
 
 export function useDashboardMetrics(params: DashboardMetricsQuery) {
   const usuarioId = useAuthStore(s => s.usuario?.id);
+  const unitsQuery = useQuery({
+    queryKey: ["dashboard-ejecutivo-unidades", usuarioId],
+    queryFn: async (): Promise<DashboardUnitOption[]> => {
+      try {
+        const { data } = await apiClient.get<unknown>("/api/v1/reportes/dashboard/unidades");
+        if (!Array.isArray(data)) return [];
+        return data.flatMap((value) => {
+          const unit = asRecord(value);
+          const id = unit.id ?? unit.unidadOrganicaId ?? unit.areaId;
+          const name = unit.nombre ?? unit.nombreArea ?? unit.descripcion;
+          return id !== undefined && name !== undefined ? [{ id: String(id), name: String(name) }] : [];
+        });
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 300_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   const query = useQuery({
     queryKey: ["dashboard-ejecutivo", usuarioId, params],
     queryFn: async () => {
@@ -180,10 +201,11 @@ export function useDashboardMetrics(params: DashboardMetricsQuery) {
       while(cursor.toISOString().slice(0,7)<=last && periods.length<120){
         periods.push(cursor.toISOString().slice(0,7));cursor.setUTCMonth(cursor.getUTCMonth()+1);
       }
+      const unidadParam = params.unidadOrganicaId ? { unidadOrganicaId: params.unidadOrganicaId } : {};
       const [summaries,trend,bottlenecks]=await Promise.all([
-        Promise.all(periods.map(periodo=>apiClient.get('/api/v1/reportes/dashboard/resumen',{params:{periodo}}))),
-        apiClient.get('/api/v1/reportes/dashboard/tendencias',{params:{anio:params.anio??Number(first.slice(0,4))}}),
-        Promise.all(periods.map(periodo=>apiClient.get('/api/v1/reportes/dashboard/cuellos-botella',{params:{periodo,diasLimite:params.diasLimite??5}}))),
+        Promise.all(periods.map(periodo=>apiClient.get('/api/v1/reportes/dashboard/resumen',{params:{periodo,...unidadParam}}))),
+        apiClient.get('/api/v1/reportes/dashboard/tendencias',{params:{anio:params.anio??Number(first.slice(0,4)),...unidadParam}}),
+        Promise.all(periods.map(periodo=>apiClient.get('/api/v1/reportes/dashboard/cuellos-botella',{params:{periodo,diasLimite:params.diasLimite??5,...unidadParam}}))),
       ]);
       const counts:Record<string,number>={};
       for(const result of summaries)for(const [key,value] of Object.entries(getMgdCounters(asRecord(result.data).contadores)))counts[key]=(counts[key]??0)+value;
@@ -193,7 +215,7 @@ export function useDashboardMetrics(params: DashboardMetricsQuery) {
         const id=String(raw.areaId),old=areas.get(id),n=asNumber(raw.expedientes),prior=asNumber(old?.expedientes);
         const stalled=asNumber(raw.expedientesEstancados)+asNumber(old?.expedientesEstancados);
         areas.set(id,{...raw,expedientes:n+prior,expedientesEstancados:stalled,
-          diasRetencion:(asNumber(raw.diasRetencion)*n+asNumber(old?.diasRetencion)*prior)/(n+prior||1),
+          diasRetencion:Math.round(((asNumber(raw.diasRetencion)*n+asNumber(old?.diasRetencion)*prior)/(n+prior||1))*100)/100,
           riesgo:ratio(stalled,n+prior)>=50?'alto':ratio(stalled,n+prior)>=20?'medio':'bajo'});
       }
       const stateCounts=[['Pendientes',Math.max(0,(counts.nRadicados??0)-(counts.nEnTramite??0)-(counts.nAtendidos??0)-(counts.nArchivados??0))],
@@ -201,18 +223,49 @@ export function useDashboardMetrics(params: DashboardMetricsQuery) {
       const tro = counts.nResueltos > 0
         ? ratio(counts.nResueltosDentroPlazo ?? 0, counts.nResueltos)
         : 100;
+      const anioSerie = params.anio ?? Number(first.slice(0, 4));
+      const serieAnual = Array.isArray(trend.data) ? (trend.data as Record<string, unknown>[]) : [];
+      const tendenciaFiltrada = serieAnual
+        .filter((p) => {
+          const month = `${anioSerie}-${String(p.mes).padStart(2, "0")}`;
+          return month >= first && month <= last;
+        })
+        .map((p) => ({ ...p, fechaLabel: String(p.mes).padStart(2, "0"), resueltos: p.atendidos }));
+      // Crecimiento real respecto al mes anterior basado en la serie mensual de radicados.
+      let deltaMensual = 0;
+      const mesFinal = Number(last.slice(5, 7));
+      const puntoActual = serieAnual.find((p) => Number(p.mes) === mesFinal);
+      const puntoAnterior = serieAnual.find((p) => Number(p.mes) === mesFinal - 1);
+      if (params.periodo === "mensual" && puntoActual && puntoAnterior) {
+        const curr = asNumber(puntoActual.radicados);
+        const prev = asNumber(puntoAnterior.radicados);
+        deltaMensual = prev > 0 ? Math.round(((curr - prev) / prev) * 1000) / 10 : curr > 0 ? 100 : 0;
+      } else {
+        const conActividad = serieAnual
+          .filter((p) => {
+            const m = `${anioSerie}-${String(p.mes).padStart(2, "0")}`;
+            return m >= first && m <= last;
+          })
+          .sort((a, b) => Number(a.mes) - Number(b.mes));
+        const ultimoConDatosIdx = [...conActividad].reverse().findIndex((p) => asNumber(p.radicados) > 0);
+        if (ultimoConDatosIdx >= 0) {
+          const idxReal = conActividad.length - 1 - ultimoConDatosIdx;
+          const actual = asNumber(conActividad[idxReal]?.radicados);
+          const anterior = idxReal > 0 ? asNumber(conActividad[idxReal - 1]?.radicados) : 0;
+          deltaMensual = anterior > 0 ? Math.round(((actual - anterior) / anterior) * 1000) / 10 : actual > 0 ? 100 : 0;
+        }
+      }
       return normalizeDashboard({contadores:counts,
         vtep:{valor:ratio((counts.nAtendidos??0)+(counts.nArchivados??0),counts.nRadicados??0)},
-        tprHorasHabiles:{valor:counts.nResueltos?counts.horasHabilesSuma/counts.nResueltos:0},
+        tprHorasHabiles:{valor:counts.nResueltos?Math.round((counts.horasHabilesSuma/counts.nResueltos)*100)/100:0},
         tro:{valor:tro},
         teo:{valor:ratio(counts.nObservados??0,counts.nRadicados??0)},
-        tendencia:(trend.data as Record<string,unknown>[]).filter(p=>{
-          const month=String(params.anio??Number(first.slice(0,4)))+'-'+String(p.mes).padStart(2,'0');return month>=first&&month<=last;
-        }).map(p=>({...p,fechaLabel:String(p.mes).padStart(2,'0'),resueltos:p.atendidos})),
+        tendencia:tendenciaFiltrada,
         cuellosBotella:Array.from(areas.values()),
         estados:stateCounts.map(([estado,n])=>({estado,porcentaje:ratio(n,counts.nRadicados??0)})),
         conformidadGlobal:ratio(counts.nResueltosDentroPlazo??0,counts.nResueltos??0),
-        saludMesasPartes:areas.size?'Con actividad registrada':'Sin actividad registrada',
+        deltaMensual,
+        saludMesasPartes:(counts.nRadicados??0)>0 || areas.size?'Operativa · Con actividad registrada':'Sin actividad registrada',
       });
     },
     staleTime: 60_000,
@@ -227,7 +280,7 @@ export function useDashboardMetrics(params: DashboardMetricsQuery) {
     estados: query.data?.estados ?? [],
     cuellosBotella: query.data?.cuellosBotella ?? [],
     executive: query.data?.executive ?? { conformity: 0, growth: 0, desksHealth: "Sin datos" },
-    units: query.data?.units ?? [],
+    units: unitsQuery.data ?? query.data?.units ?? [],
     isLoading: query.isPending,
     isFetching: query.isFetching,
     isError: query.isError,

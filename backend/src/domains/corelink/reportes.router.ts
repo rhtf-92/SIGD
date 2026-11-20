@@ -37,12 +37,16 @@ export function crearRouterReportes(
   router.get('/reportes/dashboard/resumen', controlador.resumen);
   router.get('/reportes/dashboard/cuellos-botella', controlador.cuellosBotella);
   router.get('/reportes/dashboard/tendencias', controlador.tendencias);
+  router.get('/reportes/dashboard/unidades', controlador.unidades);
 
   // Alias de §20 y del §4.7. Mismo controlador, misma respuesta.
   router.get('/reportes/dashboard/kpis', controlador.resumen);
   router.get('/reportes/dashboard-ejecutivo', controlador.resumen);
   router.get('/reportes/tiempos-atencion', controlador.tiemposAtencion);
   router.get('/reportes/vistas-materializadas/refresh', controlador.refrescar);
+  router.post('/reportes/vistas-materializadas/refresh', controlador.refrescar);
+  router.get('/reportes/exportar-excel', controlador.exportarExcel);
+  router.get('/reportes/exportar-pdf', controlador.exportarPdf);
 
   return router;
 }

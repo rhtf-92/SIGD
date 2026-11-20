@@ -58,7 +58,7 @@ export default function ReportExportModal({ reportName, filters, records }: Repo
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+        <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
           <p className="mb-2 text-sm font-semibold text-slate-800">Formato</p>
           <div className="flex flex-col gap-2">
             <button
