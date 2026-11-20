@@ -71,7 +71,8 @@ import { extraerTokenBearer, verificarTokenAcceso } from './core/auth/jwt.servic
 import { verificarSesionActiva } from './core/auth/sesion-activa.js';
 import { crearRouterSalud } from './controllers/health.controller.js';
 import { crearRouterWorkflowAcademico } from './domains/docucore/workflowAcademico.router.js';
-import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from './shared/domain/errors/index.js';
+import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from './shared/domain/errors/index.js';
+import { registrarMutacion } from './audit/bitacora-auditoria.repository.js';
 import { autenticarJwt, autorizarPermisos, PERMISOS_RBAC } from './core/auth/auth.guard.js';
 import { verificarAccesoExpediente } from './domains/docucore/docucore.security.js';
 
@@ -406,30 +407,77 @@ export function construirApp(
           valores.push(valor);
           condiciones.push(fragmento.replace('?', `$${valores.length}`));
         };
-        if (filtro.esquema) agregar('esquema = ?', filtro.esquema);
-        if (filtro.tabla) agregar('tabla = ?', filtro.tabla);
-        if (filtro.operacion) agregar('operacion = ?', filtro.operacion);
-        if (filtro.usuarioId) agregar('usuario_id = ?::uuid', filtro.usuarioId);
-        if (filtro.desde) agregar('fecha_hora >= ?::date', filtro.desde);
-        if (filtro.hasta) agregar("fecha_hora < (?::date + interval '1 day')", filtro.hasta);
-        if (filtro.q) agregar(`concat_ws(' ', id_auditoria::text, correlation_id::text, COALESCE(usuario_id::text,''), esquema, tabla, operacion, datos_despues::text) ILIKE ?`, `%${filtro.q}%`);
-        if (filtro.resultado === 'DENEGADO') condiciones.push("datos_despues->>'evento' IN ('FALLIDO','BLOQUEADO')");
-        else if (filtro.resultado) agregar("datos_despues->>'evento' = ?", filtro.resultado);
+        if (filtro.esquema) agregar('b.esquema = ?', filtro.esquema);
+        if (filtro.tabla) agregar('b.tabla = ?', filtro.tabla);
+        if (filtro.operacion) agregar('b.operacion = ?', filtro.operacion);
+        if (filtro.usuarioId) agregar('b.usuario_id = ?::uuid', filtro.usuarioId);
+        if (filtro.desde) agregar('b.fecha_hora >= ?::date', filtro.desde);
+        if (filtro.hasta) agregar("b.fecha_hora < (?::date + interval '1 day')", filtro.hasta);
+        if (filtro.q) {
+          agregar(
+            `concat_ws(' ', b.id_auditoria::text, b.correlation_id::text, COALESCE(b.usuario_id::text,''), COALESCE(cu.usuario,''), COALESCE(cu.correo,''), COALESCE(pn.nombre_completo,''), b.esquema, b.tabla, b.operacion, b.datos_despues::text) ILIKE ?`,
+            `%${filtro.q}%`,
+          );
+        }
+        if (filtro.resultado === 'DENEGADO') condiciones.push("b.datos_despues->>'evento' IN ('FALLIDO','BLOQUEADO')");
+        else if (filtro.resultado === 'CORRECTO') condiciones.push("(b.datos_despues->>'evento' = 'CORRECTO' OR b.datos_despues->>'evento' IS NULL)");
+        else if (filtro.resultado) agregar("b.datos_despues->>'evento' = ?", filtro.resultado);
         const where = condiciones.length ? ` WHERE ${condiciones.join(' AND ')}` : '';
-        const { rows: totalRows } = await pool.query<{ total: number }>(
-          `SELECT count(*)::int AS total FROM sigd_audit.bitacora_auditoria${where}`, valores,
+        const joins = `
+          LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = b.usuario_id
+          LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = cu.id_persona
+          LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = cu.id_persona
+          LEFT JOIN LATERAL (
+            SELECT a.nombre AS area_nombre
+              FROM sigd_org.asignacion_personal ap
+              JOIN sigd_org.area a ON a.area_id = ap.area_id
+             WHERE ap.id_usuario = b.usuario_id
+               AND ap.vigente_desde <= now()
+               AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
+             ORDER BY ap.vigente_desde DESC
+             LIMIT 1
+          ) area_act ON TRUE
+          LEFT JOIN LATERAL (
+            SELECT string_agg(DISTINCT r.nombre, ', ' ORDER BY r.nombre) AS rol_nombre
+              FROM sigd_org.usuario_rol ur
+              JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+             WHERE ur.id_usuario = b.usuario_id
+               AND ur.vigente_desde <= now()
+               AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+          ) rol_act ON TRUE`;
+        const { rows: totalRows } = await pool.query<{ total: number; exitosos: number; denegados: number; errores: number }>(
+          `SELECT count(*)::int AS total,
+                  count(*) FILTER (WHERE b.datos_despues->>'evento' = 'CORRECTO' OR b.datos_despues->>'evento' IS NULL)::int AS exitosos,
+                  count(*) FILTER (WHERE b.datos_despues->>'evento' IN ('FALLIDO','BLOQUEADO'))::int AS denegados,
+                  count(*) FILTER (WHERE b.datos_despues->>'evento' = 'ERROR')::int AS errores
+             FROM sigd_audit.bitacora_auditoria b${joins}${where}`,
+          valores,
         );
         const { rows } = await pool.query(
-          `SELECT id_auditoria, correlation_id, usuario_id, ip_origen, esquema, tabla, operacion,
-                  fecha_hora AS creado_en, datos_antes, datos_despues, count(*) OVER()::int AS total
-             FROM sigd_audit.bitacora_auditoria${where}
-            ORDER BY fecha_hora DESC LIMIT $${valores.length + 1} OFFSET $${valores.length + 2}`,
+          `SELECT id_auditoria, b.correlation_id, b.usuario_id, b.ip_origen, b.esquema, b.tabla, b.operacion,
+                  b.fecha_hora AS creado_en, b.datos_antes, b.datos_despues,
+                  COALESCE(pn.nombre_completo, pj.razon_social, cu.usuario) AS usuario_nombre,
+                  cu.usuario AS usuario_login,
+                  rol_act.rol_nombre,
+                  area_act.area_nombre,
+                  count(*) OVER()::int AS total
+             FROM sigd_audit.bitacora_auditoria b${joins}${where}
+            ORDER BY b.fecha_hora DESC LIMIT $${valores.length + 1} OFFSET $${valores.length + 2}`,
           [...valores, filtro.limite, filtro.offset],
         );
         const { rows: modulos } = await pool.query<{ esquema: string }>(
           'SELECT DISTINCT esquema FROM sigd_audit.bitacora_auditoria ORDER BY esquema',
         );
-        res.json({ total: Number(totalRows[0]?.total ?? 0), modulos: modulos.map((row) => row.esquema), registros: rows.map(({ total: _total, ...row }) => row) });
+        res.json({
+          total: Number(totalRows[0]?.total ?? 0),
+          resumen: {
+            exitosos: Number(totalRows[0]?.exitosos ?? 0),
+            denegados: Number(totalRows[0]?.denegados ?? 0),
+            errores: Number(totalRows[0]?.errores ?? 0),
+          },
+          modulos: modulos.map((row) => row.esquema),
+          registros: rows.map(({ total: _total, ...row }) => row),
+        });
       } catch (error) {
         next(error);
       }
@@ -439,20 +487,22 @@ export function construirApp(
   app.get(
     '/api/v1/admin/roles-permisos',
     autorizarPermisos(pool, PERMISOS_RBAC.ROLES_LEER),
-    async (_req, res, next) => {
+    async (req, res, next) => {
       try {
+        const incluirInactivos = req.query.incluirInactivos === 'true';
         const { rows: roles } = await pool.query(
-          `SELECT r.rol_id AS id, r.codigo, r.nombre, r.descripcion,
+          `SELECT r.rol_id AS id, r.codigo, r.nombre, r.descripcion, r.vigente,
                   count(DISTINCT ur.id_usuario)::int AS usuarios,
-                  COALESCE(json_agg(p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
+                  COALESCE(json_agg(DISTINCT p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '[]') as permisos
            FROM sigd_org.rol_sistema r
            LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
            LEFT JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
            LEFT JOIN sigd_org.usuario_rol ur ON ur.rol_id = r.rol_id
              AND ur.vigente_desde <= now() AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
-           WHERE r.vigente = TRUE
-           GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion
+           WHERE ($1::boolean = TRUE OR r.vigente = TRUE)
+           GROUP BY r.rol_id, r.codigo, r.nombre, r.descripcion, r.vigente
            ORDER BY r.codigo`,
+          [incluirInactivos],
         );
         res.json({ roles });
       } catch (error) {
@@ -460,6 +510,151 @@ export function construirApp(
       }
     },
   );
+
+  app.post('/api/v1/admin/roles', async (req, res, next) => {
+    const cliente = await pool.connect();
+    try {
+      const actor = await cuentaActual(pool, req);
+      if (!actor.roles.includes('SUPER_ADMIN')) {
+        throw new ForbiddenError({ message: 'Solo SUPER_ADMIN puede crear roles del sistema.' });
+      }
+      const datos = z.object({
+        codigo: z.string().trim().toUpperCase().regex(/^[A-Z][A-Z0-9_]{1,29}$/, 'Use mayúsculas, números o guion bajo (2-30 caracteres).'),
+        nombre: z.string().trim().min(2).max(120),
+        descripcion: z.string().trim().max(500).optional().nullable(),
+        permisos: z.array(z.string().trim().min(1)).optional().default([]),
+      }).strict().parse(req.body);
+      const permisosUnicos = [...new Set(datos.permisos)];
+      await cliente.query('BEGIN');
+      const encontrados = permisosUnicos.length === 0
+        ? { rows: [] as Array<{ permiso_id: string; codigo: string }> }
+        : await cliente.query<{ permiso_id: string; codigo: string }>(
+            'SELECT permiso_id, codigo FROM sigd_org.permiso_sistema WHERE codigo = ANY($1::text[])',
+            [permisosUnicos],
+          );
+      if (encontrados.rows.length !== permisosUnicos.length) {
+        throw new ValidationError({
+          invalidParams: [{ name: 'permisos', reason: 'Contiene uno o más códigos de permiso inexistentes.' }],
+        });
+      }
+      const creado = await cliente.query<{ id: string; codigo: string; nombre: string; descripcion: string | null; vigente: boolean }>(
+        `INSERT INTO sigd_org.rol_sistema (codigo, nombre, descripcion)
+         VALUES ($1, $2, $3)
+         RETURNING rol_id AS id, codigo, nombre, descripcion, vigente`,
+        [datos.codigo, datos.nombre, datos.descripcion ?? null],
+      );
+      const rol = creado.rows[0];
+      for (const permiso of encontrados.rows) {
+        await cliente.query('INSERT INTO sigd_org.rol_permiso (rol_id, permiso_id) VALUES ($1, $2)', [rol.id, permiso.permiso_id]);
+      }
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_org',
+        tabla: 'rol_sistema',
+        operacion: 'INSERT',
+        datos_antes: null,
+        datos_despues: { evento: 'CORRECTO', accion: 'ROL_CREADO', ...rol, permisos: permisosUnicos },
+      });
+      await cliente.query('COMMIT');
+      res.status(201).json({ rol: { ...rol, usuarios: 0, permisos: permisosUnicos } });
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+        return next(new ConflictError({ code: 'ROL_DUPLICADO', message: 'Ya existe un rol con el mismo código.' }));
+      }
+      next(error);
+    } finally { cliente.release(); }
+  });
+
+  app.put('/api/v1/admin/roles/:codigo', async (req, res, next) => {
+    const cliente = await pool.connect();
+    try {
+      const actor = await cuentaActual(pool, req);
+      if (!actor.roles.includes('SUPER_ADMIN')) {
+        throw new ForbiddenError({ message: 'Solo SUPER_ADMIN puede editar roles del sistema.' });
+      }
+      const datos = z.object({
+        nombre: z.string().trim().min(2).max(120),
+        descripcion: z.string().trim().max(500).optional().nullable(),
+      }).strict().parse(req.body);
+      const codigo = String(req.params.codigo).trim().toUpperCase();
+      const codigoDb = codigo === 'SUPER_ADMIN' ? 'ADMINISTRADOR' : codigo === 'ESTUDIANTE' ? 'CIUDADANO' : codigo;
+      await cliente.query('BEGIN');
+      const previo = await cliente.query<{ rol_id: string; codigo: string; nombre: string; descripcion: string | null }>(
+        'SELECT rol_id, codigo, nombre, descripcion FROM sigd_org.rol_sistema WHERE codigo = $1 FOR UPDATE',
+        [codigoDb],
+      );
+      if (!previo.rows[0]) throw new NotFoundError({ message: `Rol ${codigo} no encontrado.` });
+      const actualizado = await cliente.query<{ id: string; codigo: string; nombre: string; descripcion: string | null; vigente: boolean }>(
+        `UPDATE sigd_org.rol_sistema SET nombre = $2, descripcion = $3
+          WHERE rol_id = $1
+         RETURNING rol_id AS id, codigo, nombre, descripcion, vigente`,
+        [previo.rows[0].rol_id, datos.nombre, datos.descripcion ?? null],
+      );
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_org',
+        tabla: 'rol_sistema',
+        operacion: 'UPDATE',
+        datos_antes: previo.rows[0],
+        datos_despues: { evento: 'CORRECTO', accion: 'ROL_ACTUALIZADO', ...actualizado.rows[0] },
+      });
+      await cliente.query('COMMIT');
+      res.json({ rol: actualizado.rows[0] });
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      next(error);
+    } finally { cliente.release(); }
+  });
+
+  app.patch('/api/v1/admin/roles/:codigo/vigencia', async (req, res, next) => {
+    const cliente = await pool.connect();
+    try {
+      const actor = await cuentaActual(pool, req);
+      if (!actor.roles.includes('SUPER_ADMIN')) {
+        throw new ForbiddenError({ message: 'Solo SUPER_ADMIN puede cambiar la vigencia de roles.' });
+      }
+      const { vigente } = z.object({ vigente: z.boolean() }).strict().parse(req.body);
+      const codigo = String(req.params.codigo).trim().toUpperCase();
+      const codigoDb = codigo === 'SUPER_ADMIN' ? 'ADMINISTRADOR' : codigo === 'ESTUDIANTE' ? 'CIUDADANO' : codigo;
+      if (!vigente && codigoDb === 'ADMINISTRADOR') {
+        throw new ConflictError({ code: 'ROL_PROTEGIDO', message: 'No se puede desactivar el rol principal de Superadministrador.' });
+      }
+      await cliente.query('BEGIN');
+      const previo = await cliente.query<{ rol_id: string; codigo: string; vigente: boolean }>(
+        'SELECT rol_id, codigo, vigente FROM sigd_org.rol_sistema WHERE codigo = $1 FOR UPDATE',
+        [codigoDb],
+      );
+      if (!previo.rows[0]) throw new NotFoundError({ message: `Rol ${codigo} no encontrado.` });
+      if (!vigente) {
+        const activos = await cliente.query<{ total: number }>(
+          `SELECT count(*)::int AS total FROM sigd_org.usuario_rol
+            WHERE rol_id = $1 AND vigente_desde <= now() AND (vigente_hasta IS NULL OR vigente_hasta > now())`,
+          [previo.rows[0].rol_id],
+        );
+        if ((activos.rows[0]?.total ?? 0) > 0) {
+          throw new ConflictError({
+            code: 'ROL_CON_USUARIOS_ACTIVOS',
+            message: 'No se puede desactivar un rol con usuarios activos asignados.',
+          });
+        }
+      }
+      const actualizado = await cliente.query<{ id: string; codigo: string; nombre: string; vigente: boolean }>(
+        'UPDATE sigd_org.rol_sistema SET vigente = $2 WHERE rol_id = $1 RETURNING rol_id AS id, codigo, nombre, vigente',
+        [previo.rows[0].rol_id, vigente],
+      );
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_org',
+        tabla: 'rol_sistema',
+        operacion: 'UPDATE',
+        datos_antes: previo.rows[0],
+        datos_despues: { evento: 'CORRECTO', accion: vigente ? 'ROL_ACTIVADO' : 'ROL_DESACTIVADO', ...actualizado.rows[0] },
+      });
+      await cliente.query('COMMIT');
+      res.json({ rol: actualizado.rows[0] });
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      next(error);
+    } finally { cliente.release(); }
+  });
 
   app.put('/api/v1/admin/roles/:codigo/permisos', async (req, res, next) => {
     const cliente = await pool.connect();
@@ -499,6 +694,14 @@ export function construirApp(
         });
       }
       const idsRol = roles.rows.map((rol) => rol.rol_id);
+      const previos = await cliente.query<{ codigo: string }>(
+        `SELECT DISTINCT p.codigo
+           FROM sigd_org.rol_permiso rp
+           JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+          WHERE rp.rol_id = ANY($1::uuid[])
+          ORDER BY p.codigo`,
+        [idsRol],
+      );
       await cliente.query('DELETE FROM sigd_org.rol_permiso WHERE rol_id = ANY($1::uuid[])', [idsRol]);
       for (const rolId of idsRol) {
         for (const permiso of encontrados.rows) {
@@ -508,6 +711,13 @@ export function construirApp(
           );
         }
       }
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_org',
+        tabla: 'rol_permiso',
+        operacion: 'UPDATE',
+        datos_antes: { codigo: String(req.params.codigo), roles: roles.rows.map((r) => r.codigo), permisos: previos.rows.map((p) => p.codigo) },
+        datos_despues: { evento: 'CORRECTO', accion: 'PERMISOS_ROL_ACTUALIZADOS', codigo: String(req.params.codigo), roles: roles.rows.map((r) => r.codigo), permisos },
+      });
       await cliente.query('COMMIT');
       res.json({ codigo: String(req.params.codigo), rolesActualizados: roles.rows.map((rol) => rol.codigo), permisos });
     } catch (error) {
@@ -515,16 +725,132 @@ export function construirApp(
       next(error);
     } finally { cliente.release(); }
   });
+
   app.get(
     '/api/v1/admin/maestras/sede',
     autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_LEER),
-    (_req, res) => {
-      res.json({
-        sedes: [
-          { id: '1', codigo: 'SEDE_CENTRAL', nombre: 'Sede Central Pucallpa - Av. Túpac Amaru Km. 4.5' },
-          { id: '2', codigo: 'SEDE_FILIAL', nombre: 'Filial Yarinacocha' },
-        ],
-      });
+    async (req, res, next) => {
+      try {
+        const incluirInactivos = req.query.solo_activos === 'false';
+        const { rows } = await pool.query<{ id: string; codigo: string; nombre: string; direccion: string | null; vigente: boolean }>(
+          `SELECT sede_id AS id, codigo, nombre, direccion, vigente
+             FROM sigd_org.sede
+            WHERE ($1::boolean = TRUE OR vigente = TRUE)
+            ORDER BY nombre ASC`,
+          [incluirInactivos],
+        );
+        res.json({ sedes: rows });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    '/api/v1/admin/maestras/sede',
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_GESTIONAR),
+    async (req, res, next) => {
+      const cliente = await pool.connect();
+      try {
+        const datos = z.object({
+          codigo: z.string().trim().min(1).max(30).regex(/^[A-Za-z0-9._-]+$/),
+          nombre: z.string().trim().min(1).max(160),
+          direccion: z.string().trim().max(255).optional().nullable(),
+        }).strict().parse(req.body);
+        await cliente.query('BEGIN');
+        const { rows } = await cliente.query<{ id: string; codigo: string; nombre: string; direccion: string | null; vigente: boolean }>(
+          `INSERT INTO sigd_org.sede (codigo, nombre, direccion)
+           VALUES ($1, $2, $3)
+           RETURNING sede_id AS id, codigo, nombre, direccion, vigente`,
+          [datos.codigo.toUpperCase(), datos.nombre, datos.direccion ?? null],
+        );
+        await registrarMutacion(cliente, {
+          esquema: 'sigd_org',
+          tabla: 'sede',
+          operacion: 'INSERT',
+          datos_antes: null,
+          datos_despues: { evento: 'CORRECTO', ...rows[0] },
+        });
+        await cliente.query('COMMIT');
+        res.status(201).json({ sede: rows[0], guardado: true });
+      } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => undefined);
+        if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+          return next(new ConflictError({ code: 'CODIGO_MAESTRO_DUPLICADO', message: 'El código de sede ya existe.' }));
+        }
+        next(error);
+      } finally { cliente.release(); }
+    },
+  );
+
+  app.put(
+    '/api/v1/admin/maestras/sede/:id',
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_GESTIONAR),
+    async (req, res, next) => {
+      const cliente = await pool.connect();
+      try {
+        const id = z.string().uuid().parse(req.params.id);
+        const datos = z.object({
+          codigo: z.string().trim().min(1).max(30).regex(/^[A-Za-z0-9._-]+$/),
+          nombre: z.string().trim().min(1).max(160),
+          direccion: z.string().trim().max(255).optional().nullable(),
+        }).strict().parse(req.body);
+        await cliente.query('BEGIN');
+        const previo = await cliente.query('SELECT sede_id AS id, codigo, nombre, direccion, vigente FROM sigd_org.sede WHERE sede_id = $1 FOR UPDATE', [id]);
+        if (!previo.rows[0]) throw new NotFoundError({ message: 'La sede indicada no existe.' });
+        const { rows } = await cliente.query(
+          `UPDATE sigd_org.sede SET codigo = $2, nombre = $3, direccion = $4
+            WHERE sede_id = $1
+           RETURNING sede_id AS id, codigo, nombre, direccion, vigente`,
+          [id, datos.codigo.toUpperCase(), datos.nombre, datos.direccion ?? null],
+        );
+        await registrarMutacion(cliente, {
+          esquema: 'sigd_org',
+          tabla: 'sede',
+          operacion: 'UPDATE',
+          datos_antes: previo.rows[0],
+          datos_despues: { evento: 'CORRECTO', ...rows[0] },
+        });
+        await cliente.query('COMMIT');
+        res.json({ sede: rows[0], guardado: true });
+      } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => undefined);
+        if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+          return next(new ConflictError({ code: 'CODIGO_MAESTRO_DUPLICADO', message: 'El código de sede ya existe.' }));
+        }
+        next(error);
+      } finally { cliente.release(); }
+    },
+  );
+
+  app.patch(
+    '/api/v1/admin/maestras/sede/:id/vigencia',
+    autorizarPermisos(pool, PERMISOS_RBAC.MAESTRAS_GESTIONAR),
+    async (req, res, next) => {
+      const cliente = await pool.connect();
+      try {
+        const id = z.string().uuid().parse(req.params.id);
+        const { vigente } = z.object({ vigente: z.boolean() }).strict().parse(req.body);
+        await cliente.query('BEGIN');
+        const previo = await cliente.query('SELECT sede_id AS id, codigo, vigente FROM sigd_org.sede WHERE sede_id = $1 FOR UPDATE', [id]);
+        if (!previo.rows[0]) throw new NotFoundError({ message: 'La sede indicada no existe.' });
+        const { rows } = await cliente.query(
+          'UPDATE sigd_org.sede SET vigente = $2 WHERE sede_id = $1 RETURNING sede_id AS id, codigo, nombre, direccion, vigente',
+          [id, vigente],
+        );
+        await registrarMutacion(cliente, {
+          esquema: 'sigd_org',
+          tabla: 'sede',
+          operacion: 'UPDATE',
+          datos_antes: previo.rows[0],
+          datos_despues: { evento: 'CORRECTO', ...rows[0] },
+        });
+        await cliente.query('COMMIT');
+        res.json({ sede: rows[0], guardado: true, vigente });
+      } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => undefined);
+        next(error);
+      } finally { cliente.release(); }
     },
   );
 
@@ -534,7 +860,7 @@ export function construirApp(
     async (_req, res, next) => {
       try {
         const { rows } = await pool.query(
-          `SELECT id, codigo, nombre, descripcion, dias_atencion_legal, vigente
+          `SELECT tipo_documental_id AS id, codigo, nombre, extension, mime_type, tamano_maximo_mb, exige_firma, vigente
            FROM sigd_doc.tipo_documento
            WHERE vigente = TRUE
            ORDER BY nombre ASC`,

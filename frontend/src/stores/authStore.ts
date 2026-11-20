@@ -169,6 +169,10 @@ function createStore() {
       aplicarSesion(data);
     },
     logout: () => {
+      const tokenARevocar = state.refreshToken;
+      if (tokenARevocar && tokenARevocar.length >= 20) {
+        void apiClient.post('/api/v1/auth/logout', { refreshToken: tokenARevocar }).catch(() => undefined);
+      }
       set({
         accessToken: null,
         refreshToken: null,

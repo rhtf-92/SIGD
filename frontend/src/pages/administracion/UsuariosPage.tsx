@@ -353,16 +353,17 @@ export default function UsuariosPage() {
         />
       )}
       {creando && (
-        <UserCreateModal areas={catalogos.areas} cargos={catalogos.cargos}
+        <UserCreateModal areas={catalogos.areas} cargos={catalogos.cargos} roles={catalogos.roles}
           onClose={() => setCreando(false)} onSave={async (datos) => {
             setErrorServidor("");
             try {
               await crearUsuario(datos);
               setCreando(false);
-              setMensaje("El usuario fue registrado correctamente.");
+              setMensaje("El usuario fue registrado correctamente y ya puede iniciar sesión.");
             } catch (error) {
               setMensaje("");
-              setErrorServidor("No se pudo registrar el usuario. Verifique duplicados y datos obligatorios.");
+              const detalle = (error as ApiHttpError)?.problemDetails?.detail || (error instanceof Error ? error.message : "");
+              setErrorServidor(detalle || "No se pudo registrar el usuario. Verifique duplicados y datos obligatorios.");
               throw error;
             }
           }} />

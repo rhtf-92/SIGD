@@ -75,8 +75,8 @@ async function registrarIntentoAcceso(
       [cuenta.id_usuario, politica.max_intentos_fallidos, politica.minutos_bloqueo]);
       estadoCuenta = rows[0] ?? null;
     } else if (cuenta && evento === 'CORRECTO') {
-      await client.query(`UPDATE sigd_auth.cuenta_usuario SET intentos_fallidos=0
-        WHERE id_usuario=$1 AND intentos_fallidos<>0`, [cuenta.id_usuario]);
+      await client.query(`UPDATE sigd_auth.cuenta_usuario SET intentos_fallidos=0, ultimo_acceso=now()
+        WHERE id_usuario=$1`, [cuenta.id_usuario]);
     }
     const contexto = getRequestContext();
     await client.query(`INSERT INTO sigd_audit.bitacora_auditoria
@@ -124,11 +124,20 @@ async function obtenerCuentaActiva(pool: Pool | PoolClient, idUsuario: string): 
   const { rows } = await pool.query<CuentaAuth>(
     `SELECT c.id_usuario, c.id_persona, c.usuario, c.correo, c.activo, c.bloqueado_hasta,
             COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
-            p.area_id
+            COALESCE(p.area_id, ap.area_id) AS area_id
        FROM sigd_auth.cuenta_usuario c
        LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
        LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
        LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
+       LEFT JOIN LATERAL (
+         SELECT asignacion.area_id
+           FROM sigd_org.asignacion_personal asignacion
+          WHERE asignacion.id_usuario = c.id_usuario
+            AND asignacion.vigente_desde <= now()
+            AND (asignacion.vigente_hasta IS NULL OR asignacion.vigente_hasta > now())
+          ORDER BY asignacion.vigente_desde DESC
+          LIMIT 1
+       ) ap ON TRUE
       WHERE c.id_usuario = $1`,
     [idUsuario],
   );
@@ -200,13 +209,25 @@ export function crearRouterAuth(pool: Pool): Router {
     const { rows } = await pool.query<CuentaAuth>(
       `SELECT c.id_usuario, c.id_persona, c.usuario, c.correo, c.password_hash, c.activo, c.bloqueado_hasta,
               COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
-              p.area_id
+              COALESCE(p.area_id, ap.area_id) AS area_id
          FROM sigd_auth.cuenta_usuario c
+         LEFT JOIN sigd_auth.persona per ON per.id_persona = c.id_persona
          LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
          LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
          LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
-        WHERE c.usuario = $1 OR lower(c.correo) = lower($1)
-        ORDER BY (lower(c.correo) = lower($1)) DESC
+         LEFT JOIN LATERAL (
+           SELECT asignacion.area_id
+             FROM sigd_org.asignacion_personal asignacion
+            WHERE asignacion.id_usuario = c.id_usuario
+              AND asignacion.vigente_desde <= now()
+              AND (asignacion.vigente_hasta IS NULL OR asignacion.vigente_hasta > now())
+            ORDER BY asignacion.vigente_desde DESC
+            LIMIT 1
+         ) ap ON TRUE
+        WHERE lower(c.usuario) = lower($1)
+           OR lower(c.correo) = lower($1)
+           OR per.id_documento = $1
+        ORDER BY (lower(c.correo) = lower($1)) DESC, (lower(c.usuario) = lower($1)) DESC
         LIMIT 1`,
       [datos.identificador],
     );
@@ -286,11 +307,28 @@ export function crearRouterAuth(pool: Pool): Router {
 
   router.post('/auth/logout', async (req: Request, res: Response) => {
     const { refreshToken } = refreshSchema.parse(req.body);
-    await pool.query(
+    const revocada = await pool.query<{ id_usuario: string }>(
       `UPDATE sigd_auth.sesion_usuario SET revocado_en = now()
-        WHERE refresh_token IN ($1, $2) AND revocado_en IS NULL`,
+        WHERE refresh_token IN ($1, $2) AND revocado_en IS NULL
+        RETURNING id_usuario`,
       [huellaRefreshToken(refreshToken), refreshToken],
     );
+    const idUsuario = revocada.rows[0]?.id_usuario ?? null;
+    if (idUsuario) {
+      const contexto = getRequestContext();
+      await pool.query(
+        `INSERT INTO sigd_audit.bitacora_auditoria
+           (correlation_id, usuario_id, ip_origen, user_agent, esquema, tabla, operacion, datos_despues)
+         VALUES ($1, $2, $3, $4, 'sigd_auth', 'sesion_usuario', 'UPDATE', $5::jsonb)`,
+        [
+          contexto?.correlation_id ?? randomUUID(),
+          idUsuario,
+          req.ip ?? null,
+          req.get('user-agent') ?? null,
+          JSON.stringify({ evento: 'CORRECTO', accion: 'CIERRE_SESION' }),
+        ],
+      ).catch(() => undefined);
+    }
     res.status(200).json({ ok: true, mensaje: 'Sesión cerrada correctamente' });
   });
 

@@ -6,6 +6,9 @@ export interface Usuario {
   id: string;
   idPersona: string;
   nombre: string;
+  nombres?: string;
+  apellidos?: string;
+  telefono?: string | null;
   documento: string;
   correo: string;
   areaId: string | null;
@@ -21,6 +24,9 @@ export interface Usuario {
 }
 
 export interface UpdateUsuarioDTO {
+  nombres?: string;
+  apellidos?: string;
+  telefono?: string | null;
   correo?: string;
   areaId?: string;
   cargoId?: string;
@@ -40,6 +46,8 @@ export interface CrearUsuarioDTO {
   passwordInicial: string;
   areaId: string;
   cargoId: string;
+  rolId?: string;
+  rolIds?: string[];
 }
 
 export interface UpdateEstadoDTO { estado: EstadoUsuario }

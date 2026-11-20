@@ -90,6 +90,17 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
     if (!usuarioId) throw new Error('La identidad autenticada es requerida.');
     res.json(await configuracion.guardarJornada(entrada, usuarioId));
   });
+  router.get(
+    '/calendario-laboral/calcular-plazo',
+    autorizarPermisos(pool, PERMISOS_RBAC.CALENDARIO_LEER),
+    async (req, res) => {
+      const consulta = z.object({
+        desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        diasHabiles: z.coerce.number().int().min(1).max(365).default(30),
+      }).strict().parse(req.query);
+      res.json(await deps.calendario.calcularPlazo(consulta.desde, consulta.diasHabiles));
+    },
+  );
   router.post(
     '/calendario-laboral/feriado-excepcional',
     autorizarPermisos(pool, PERMISOS_RBAC.CALENDARIO_GESTIONAR),

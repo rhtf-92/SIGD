@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import type { Pool, QueryResultRow } from 'pg';
 
 import { AppError, ConflictError, NotFoundError } from '../../shared/domain/errors/index.js';
+import { getRequestContext } from '../../shared/request-context/request-context.js';
 import { CacheMemoria } from './calendario.service.js';
 
 export const TTL_TABLAS_MAESTRAS_MS = 24 * 60 * 60 * 1000;
@@ -151,20 +153,28 @@ export class TablasMaestrasService {
 
   public async crear(clave: ClaveCatalogo, datos: GuardarItemCatalogo): Promise<void> {
     try {
-      const base = [datos.codigo.trim().toUpperCase(), datos.nombre.trim()];
+      const codigo = datos.codigo.trim().toUpperCase();
+      const nombre = datos.nombre.trim();
+      const base = [codigo, nombre];
       const valores = clave === 'areas'
         ? [...base, datos.padreId ?? null]
         : clave === 'tipos_documentales'
           ? base
           : [...base, datos.descripcion?.trim() || null];
       await this.pool.query(CATALOGOS[clave].insertar, valores);
+      await this.registrarAuditoria(clave, 'INSERT', null, { codigo, nombre, padreId: datos.padreId ?? null, descripcion: datos.descripcion ?? null });
       this.invalidarCache();
     } catch (error) { traducirError(error); }
   }
 
   public async actualizar(clave: ClaveCatalogo, id: string, datos: GuardarItemCatalogo): Promise<void> {
     try {
-      const base = [id, datos.codigo.trim().toUpperCase(), datos.nombre.trim()];
+      const codigo = datos.codigo.trim().toUpperCase();
+      const nombre = datos.nombre.trim();
+      if (clave === 'areas' && datos.padreId === id) {
+        throw new ConflictError({ code: 'JERARQUIA_CICLO_INVALIDO', message: 'Un área no puede depender de sí misma.' });
+      }
+      const base = [id, codigo, nombre];
       const valores = clave === 'areas'
         ? [...base, datos.padreId ?? null]
         : clave === 'tipos_documentales'
@@ -172,16 +182,96 @@ export class TablasMaestrasService {
           : [...base, datos.descripcion?.trim() || null];
       const resultado = await this.pool.query(CATALOGOS[clave].actualizar, valores);
       if (!resultado.rowCount) throw new NotFoundError({ message: 'El registro maestro indicado no existe.' });
+      await this.registrarAuditoria(clave, 'UPDATE', { id }, { id, codigo, nombre, padreId: datos.padreId ?? null, descripcion: datos.descripcion ?? null });
       this.invalidarCache();
     } catch (error) { traducirError(error); }
   }
 
   public async cambiarVigencia(clave: ClaveCatalogo, id: string, vigente: boolean): Promise<void> {
-    const resultado = await this.pool.query(
-      `UPDATE ${tableName(clave)} SET vigente = $2 WHERE ${idColumn(clave)} = $1`, [id, vigente],
+    const filtroEnUso: Record<ClaveCatalogo, string> = {
+      areas: `(
+        EXISTS (SELECT 1 FROM sigd_org.area WHERE area_padre_id = $1 AND vigente = TRUE)
+        OR EXISTS (
+          SELECT 1 FROM sigd_org.asignacion_personal
+           WHERE area_id = $1 AND vigente_desde <= now()
+             AND (vigente_hasta IS NULL OR vigente_hasta > now())
+        )
+      )`,
+      cargos: `EXISTS (
+        SELECT 1 FROM sigd_org.asignacion_personal
+         WHERE cargo_id = $1 AND vigente_desde <= now()
+           AND (vigente_hasta IS NULL OR vigente_hasta > now())
+      )`,
+      roles: `(
+        EXISTS (SELECT 1 FROM sigd_org.rol_sistema WHERE rol_id = $1 AND codigo = 'ADMINISTRADOR')
+        OR EXISTS (
+          SELECT 1 FROM sigd_org.usuario_rol
+           WHERE rol_id = $1 AND vigente_desde <= now()
+             AND (vigente_hasta IS NULL OR vigente_hasta > now())
+        )
+      )`,
+      tipos_documentales: 'FALSE',
+    };
+    const resultado = await this.pool.query<{ existe: boolean; en_uso: boolean; actualizado: boolean }>(
+      `WITH objetivo AS (
+         SELECT ${idColumn(clave)} AS id FROM ${tableName(clave)} WHERE ${idColumn(clave)} = $1
+       ),
+       en_uso AS (
+         SELECT ${filtroEnUso[clave]} AS activo
+       ),
+       actualizado AS (
+         UPDATE ${tableName(clave)}
+            SET vigente = $2
+          WHERE ${idColumn(clave)} = $1
+            AND ($2 = TRUE OR NOT (SELECT activo FROM en_uso))
+         RETURNING ${idColumn(clave)}
+       )
+       SELECT EXISTS (SELECT 1 FROM objetivo) AS existe,
+              (SELECT activo FROM en_uso) AS en_uso,
+              EXISTS (SELECT 1 FROM actualizado) AS actualizado`,
+      [id, vigente],
     );
-    if (!resultado.rowCount) throw new NotFoundError({ message: 'El registro maestro indicado no existe.' });
+    const estado = resultado.rows[0];
+    if (estado) {
+      if (!estado.existe) throw new NotFoundError({ message: 'El registro maestro indicado no existe.' });
+      if (!vigente && estado.en_uso) {
+        throw new ConflictError({
+          code: 'REGISTRO_CON_RELACIONES_ACTIVAS',
+          message: 'No se puede inactivar este registro porque tiene relaciones institucionales activas o está protegido.',
+        });
+      }
+    } else if (!resultado.rowCount) {
+      throw new NotFoundError({ message: 'El registro maestro indicado no existe.' });
+    }
+    await this.registrarAuditoria(clave, 'UPDATE', { id, vigente: !vigente }, { id, vigente });
     this.invalidarCache();
+  }
+
+  private async registrarAuditoria(
+    clave: ClaveCatalogo,
+    operacion: 'INSERT' | 'UPDATE',
+    datosAntes: unknown,
+    datosDespues: Record<string, unknown>,
+  ): Promise<void> {
+    if (typeof this.pool.connect !== 'function') return;
+    const [esquema, tabla] = tableName(clave).split('.');
+    const contexto = getRequestContext();
+    await this.pool.query(
+      `INSERT INTO sigd_audit.bitacora_auditoria
+         (correlation_id, usuario_id, ip_origen, user_agent, esquema, tabla, operacion, datos_antes, datos_despues)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb)`,
+      [
+        contexto?.correlation_id ?? randomUUID(),
+        contexto?.usuario_id ?? null,
+        contexto?.ip_origen ?? null,
+        contexto?.user_agent ?? null,
+        esquema,
+        tabla,
+        operacion,
+        JSON.stringify(datosAntes),
+        JSON.stringify({ evento: 'CORRECTO', catalogo: clave, ...datosDespues }),
+      ],
+    ).catch(() => undefined);
   }
 
   public invalidarCache(): void { this.cache.invalidar(); }

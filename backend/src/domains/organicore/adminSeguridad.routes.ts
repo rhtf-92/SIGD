@@ -47,5 +47,20 @@ export function crearRouterAdminSeguridad(pool: Pool): Router {
     const { justificacion } = desbloqueoSchema.parse(req.body);
     res.json(await service.desbloquearCuenta(id, justificacion, usuarioId));
   });
+  router.get('/sesiones', autorizarPermisos(pool, PERMISOS_RBAC.USUARIOS_LEER), async (req, res) => {
+    const page = pagingSchema.parse(req.query);
+    res.json(await service.listarSesionesActivas(page.limite, page.offset));
+  });
+  router.post('/sesiones/:id/revocar', autorizarPermisos(pool, PERMISOS_RBAC.USUARIOS_GESTIONAR), async (req, res) => {
+    const actor = await cuentaActual(pool, req);
+    if (!actor.roles.includes('SUPER_ADMIN')) {
+      throw new ForbiddenError({ message: 'Solo SUPER_ADMIN puede revocar sesiones activas.' });
+    }
+    const usuarioId = req.cuentaActual?.idUsuario;
+    if (!usuarioId) throw new Error('La identidad autenticada es requerida.');
+    const id = idSchema.parse(req.params.id);
+    const { justificacion } = desbloqueoSchema.parse(req.body);
+    res.json(await service.revocarSesion(id, justificacion, usuarioId));
+  });
   return router;
 }

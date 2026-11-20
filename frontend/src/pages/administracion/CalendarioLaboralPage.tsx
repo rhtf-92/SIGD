@@ -1,11 +1,16 @@
+import { useState } from "react";
+
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
 import {
   HORA_CORTE_LPAG,
   useCalendarioLaboral,
+  type TipoFeriado,
 } from "../../hooks/useCalendarioLaboral";
 
 export default function CalendarioLaboralPage() {
   const {
+    anio,
+    setAnio,
     dias,
     alternarDia,
     horaInicio,
@@ -22,6 +27,13 @@ export default function CalendarioLaboralPage() {
     setFechaNueva,
     nombreNuevo,
     setNombreNuevo,
+    tipoFeriadoNuevo,
+    setTipoFeriadoNuevo,
+    baseLegalNueva,
+    setBaseLegalNueva,
+    resultadoPlazo,
+    calculandoPlazo,
+    consultarPlazo,
     guardarConfiguracion,
     mensaje,
     error,
@@ -29,6 +41,10 @@ export default function CalendarioLaboralPage() {
     isSaving,
     recargar,
   } = useCalendarioLaboral();
+
+  const [fechaConsulta, setFechaConsulta] = useState(() => new Date().toISOString().slice(0, 10));
+  const [diasPlazo, setDiasPlazo] = useState(30);
+  const aniosSelector = Array.from({ length: 5 }, (_, idx) => new Date().getFullYear() - 1 + idx);
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -142,36 +158,74 @@ export default function CalendarioLaboralPage() {
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold">Feriados y días no laborables</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Feriados nacionales (D. Leg. N° 713) y regionales de Ucayali.
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold">Feriados y días no laborables</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Feriados nacionales (D. Leg. N° 713) y regionales de Ucayali.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-sm font-semibold">
+                Año
+                <select
+                  value={anio}
+                  onChange={(event) => setAnio(Number(event.target.value))}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-normal"
+                >
+                  {aniosSelector.map((valor) => (
+                    <option key={valor} value={valor}>{valor}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-[170px_1fr_auto]">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <input
                 type="date"
+                aria-label="Fecha del feriado"
                 value={fechaNueva}
                 onChange={(event) => setFechaNueva(event.target.value)}
                 className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               />
+              <select
+                aria-label="Tipo de feriado"
+                value={tipoFeriadoNuevo}
+                onChange={(event) => setTipoFeriadoNuevo(event.target.value as TipoFeriado)}
+                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              >
+                <option value="INSTITUCIONAL">Feriado Institucional</option>
+                <option value="NACIONAL">Feriado Nacional</option>
+                <option value="REGIONAL_UCAYALI">Feriado Regional Ucayali</option>
+                <option value="DUELO_NACIONAL">Duelo Nacional</option>
+              </select>
               <input
+                aria-label="Descripción del feriado"
                 value={nombreNuevo}
                 onChange={(event) => setNombreNuevo(event.target.value)}
-                placeholder="Descripción"
+                placeholder="Descripción (mínimo 5 caracteres)"
                 className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               />
-              <button
-                type="button"
-                onClick={agregarFeriado}
-                disabled={isSaving}
-                className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
-              >
-                Agregar
-              </button>
+              <input
+                aria-label="Base legal"
+                value={baseLegalNueva}
+                onChange={(event) => setBaseLegalNueva(event.target.value)}
+                placeholder="Base legal (opcional, ej. R.D. N° 015)"
+                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              />
+              <div className="sm:col-span-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => void agregarFeriado()}
+                  disabled={isSaving}
+                  className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
+                >
+                  Agregar
+                </button>
+              </div>
             </div>
 
             <div className="mt-5 max-h-96 space-y-3 overflow-y-auto pr-1">
-              {!isLoading && feriados.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">No hay feriados activos registrados.</p>}
+              {!isLoading && feriados.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">No hay feriados activos registrados para {anio}.</p>}
               {feriados.map((feriado) => (
                 <div
                   key={feriado.id}
@@ -179,11 +233,15 @@ export default function CalendarioLaboralPage() {
                 >
                   <div>
                     <p className="text-sm font-semibold">{feriado.nombre}</p>
-                    <p className="text-xs text-slate-500">{feriado.fecha}</p>
+                    <p className="text-xs text-slate-500">
+                      {feriado.fecha}
+                      {feriado.tipoFeriado ? ` · ${feriado.tipoFeriado}` : ""}
+                      {feriado.baseLegal ? ` · ${feriado.baseLegal}` : ""}
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => quitarFeriado(feriado.id)}
+                    onClick={() => void quitarFeriado(feriado.id)}
                     disabled={isSaving}
                     className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
                   >
@@ -195,10 +253,69 @@ export default function CalendarioLaboralPage() {
           </section>
         </div>
 
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold">Consulta de fecha y cálculo de plazos (Art. 143 LPAG)</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Calcula la fecha de vencimiento descontando fines de semana y feriados activos registrados en PostgreSQL.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-[200px_180px_auto] sm:items-end">
+            <div>
+              <label htmlFor="plazo-desde" className="mb-1 block text-sm font-semibold">Fecha de inicio</label>
+              <input
+                id="plazo-desde"
+                type="date"
+                value={fechaConsulta}
+                onChange={(event) => setFechaConsulta(event.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="plazo-dias" className="mb-1 block text-sm font-semibold">Plazo (días hábiles)</label>
+              <input
+                id="plazo-dias"
+                type="number"
+                min={1}
+                max={365}
+                value={diasPlazo}
+                onChange={(event) => setDiasPlazo(Number(event.target.value))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={calculandoPlazo}
+              onClick={() => void consultarPlazo(fechaConsulta, diasPlazo)}
+              className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
+            >
+              {calculandoPlazo ? "Calculando…" : "Calcular plazo hábil"}
+            </button>
+          </div>
+          {resultadoPlazo && (
+            <div className="mt-4 grid gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 sm:grid-cols-4">
+              <div>
+                <p className="text-xs font-semibold uppercase text-blue-700">Inicio laborable</p>
+                <p className="mt-1 font-bold">{resultadoPlazo.es_dia_laborable_inicio ? "Sí (día hábil)" : `No · Próximo: ${resultadoPlazo.primer_dia_habil}`}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-blue-700">Vencimiento ({resultadoPlazo.dias_habiles} d.h.)</p>
+                <p className="mt-1 font-bold">{resultadoPlazo.fecha_vencimiento}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-blue-700">Días inhábiles en rango</p>
+                <p className="mt-1 font-bold">{resultadoPlazo.dias_no_laborables.length}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-blue-700">Corte normativo LPAG</p>
+                <p className="mt-1 font-bold">{resultadoPlazo.corte_lpag} hrs</p>
+              </div>
+            </div>
+          )}
+        </section>
+
         <div className="mt-6 flex justify-end">
           <button
             type="button"
-            onClick={guardarConfiguracion}
+            onClick={() => void guardarConfiguracion()}
             disabled={isSaving || isLoading}
             className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
           >

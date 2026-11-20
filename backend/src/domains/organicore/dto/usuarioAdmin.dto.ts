@@ -25,8 +25,8 @@ export const listarUsuariosQuerySchema = z
   })
   .strict();
 
-// El acceso se identifica por documento y los roles se asignan después desde
-// la administración de la cuenta.
+// El acceso se identifica por documento, usuario o correo y los roles pueden
+// asignarse directamente en el alta para habilitar el inicio de sesión inmediato.
 export const crearUsuarioAdminSchema = z
   .object({
     tipo: z.enum(['NATURAL', 'JURIDICA']).default('NATURAL'),
@@ -38,6 +38,8 @@ export const crearUsuarioAdminSchema = z
     passwordInicial: z.string().min(8).max(128),
     areaId: uuid('El ID del área no es válido'),
     cargoId: uuid('El ID del cargo no es válido'),
+    rolId: uuid('El ID del rol no es válido').optional(),
+    rolIds: listaRolesSchema.optional(),
   })
   .strict();
 

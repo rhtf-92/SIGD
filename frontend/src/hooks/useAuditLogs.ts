@@ -7,6 +7,10 @@ interface AuditDto {
   id_auditoria: string | number;
   correlation_id?: string | null;
   usuario_id?: string | null;
+  usuario_nombre?: string | null;
+  usuario_login?: string | null;
+  rol_nombre?: string | null;
+  area_nombre?: string | null;
   ip_origen?: string | null;
   esquema?: string | null;
   tabla?: string | null;
@@ -28,15 +32,22 @@ function mapearRegistro(row: AuditDto): RegistroAuditoria {
   const tabla = row.tabla ?? "";
   const detalle = row.datos_despues ?? {};
   const evento = String(detalle.evento ?? "");
+  const accion = String(detalle.accion ?? (evento || row.operacion || "Evento registrado"));
   const resultado: ResultadoAuditoria = evento === "CORRECTO" ? "Exitoso"
     : evento === "FALLIDO" || evento === "BLOQUEADO" ? "Denegado"
       : evento === "ERROR" ? "Error" : "Registrado";
   return {
-    id: String(row.id_auditoria), fecha: new Date(row.creado_en).toLocaleString("es-PE"),
-    usuario: String(detalle.identificador ?? row.usuario_id ?? "No disponible"),
-    rol: "No disponible", area: "No disponible", accion: evento || row.operacion || "Evento registrado",
-    modulo: esquema || "Sistema", registro: [esquema, tabla].filter(Boolean).join("."), resultado,
-    ip: row.ip_origen ?? "No disponible", correlationId: row.correlation_id ?? undefined,
+    id: String(row.id_auditoria),
+    fecha: new Date(row.creado_en).toLocaleString("es-PE"),
+    usuario: String(row.usuario_nombre ?? detalle.identificador ?? row.usuario_login ?? row.usuario_id ?? "Sistema"),
+    rol: row.rol_nombre ?? "No asignado",
+    area: row.area_nombre ?? "Sin área",
+    accion,
+    modulo: esquema || "Sistema",
+    registro: [esquema, tabla].filter(Boolean).join("."),
+    resultado,
+    ip: row.ip_origen ?? "No disponible",
+    correlationId: row.correlation_id ?? undefined,
     detallesTecnicos: { anterior: row.datos_antes ?? null, nuevo: detalle, esquema, tabla, operacion: row.operacion },
   };
 }
@@ -44,6 +55,7 @@ function mapearRegistro(row: AuditDto): RegistroAuditoria {
 export function useAuditLogs() {
   const [busqueda, setBusqueda] = useState("");
   const [modulo, setModulo] = useState("Todos");
+  const [operacion, setOperacion] = useState<"Todas" | "INSERT" | "UPDATE" | "DELETE">("Todas");
   const [resultado, setResultado] = useState<ResultadoAuditoria | "Todos">("Todos");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -53,6 +65,7 @@ export function useAuditLogs() {
   const filtrosServidor = {
     ...(busqueda.trim() ? { q: busqueda.trim() } : {}),
     ...(modulo !== "Todos" ? { esquema: modulo } : {}),
+    ...(operacion !== "Todas" ? { operacion } : {}),
     ...(desde ? { desde } : {}),
     ...(hasta ? { hasta } : {}),
     ...(resultado === "Exitoso" ? { resultado: "CORRECTO" }
@@ -62,22 +75,32 @@ export function useAuditLogs() {
   const query = useQuery({
     queryKey: ["admin-audit-log", pagina, filtrosServidor],
     queryFn: async () => {
-      const { data } = await apiClient.get<{ total: number; modulos?: string[]; registros: AuditDto[] }>(
+      const { data } = await apiClient.get<{
+        total: number;
+        resumen?: { exitosos: number; denegados: number; errores: number };
+        modulos?: string[];
+        registros: AuditDto[];
+      }>(
         "/api/v1/admin/auditoria/bitacora",
         { params: { ...filtrosServidor, limite: PAGE_SIZE, offset: pagina * PAGE_SIZE } },
       );
       const registros = (data.registros ?? []).map(mapearRegistro);
-      return { total: data.total ?? registros.length, modulos: data.modulos ?? [], registros };
+      return {
+        total: data.total ?? registros.length,
+        resumen: data.resumen,
+        modulos: data.modulos ?? [],
+        registros,
+      };
     },
   });
 
   const filtrados = useMemo(() => query.data?.registros ?? [], [query.data?.registros]);
 
-  const resumen = useMemo(() => ({
+  const resumen = useMemo(() => query.data?.resumen ?? ({
     exitosos: filtrados.filter((row) => row.resultado === "Exitoso").length,
     denegados: filtrados.filter((row) => row.resultado === "Denegado").length,
     errores: filtrados.filter((row) => row.resultado === "Error").length,
-  }), [filtrados]);
+  }), [query.data?.resumen, filtrados]);
   const modulos = useMemo(() => Array.from(new Set([...(query.data?.modulos ?? []), ...(query.data?.registros ?? []).map((row) => row.modulo)])).sort(), [query.data]);
 
   async function exportarCsv() {
@@ -108,7 +131,7 @@ export function useAuditLogs() {
   }
 
   return {
-    filtrados, resumen, busqueda, setBusqueda, modulo, setModulo, resultado, setResultado, desde, setDesde, hasta, setHasta,
+    filtrados, resumen, busqueda, setBusqueda, modulo, setModulo, operacion, setOperacion, resultado, setResultado, desde, setDesde, hasta, setHasta,
     seleccionado, setSeleccionado, exportarCsv,
     total: query.data?.total ?? 0, pagina, setPagina, pageSize: PAGE_SIZE,
     modulos, exportError,

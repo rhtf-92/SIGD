@@ -13,6 +13,8 @@ export default function SeguridadPage() {
     setMinutosSesion,
     cuentasBloqueadas,
     desbloquearCuenta,
+    sesionesActivas,
+    revocarSesion,
     intentosFallidos,
     intentosIniciales,
     guardarPoliticas,
@@ -28,6 +30,9 @@ export default function SeguridadPage() {
   const [cuentaEnDesbloqueo, setCuentaEnDesbloqueo] = useState<string | null>(
     null,
   );
+  const [sesionEnRevocacion, setSesionEnRevocacion] = useState<string | null>(
+    null,
+  );
   const [justificacion, setJustificacion] = useState("");
 
   return (
@@ -38,10 +43,14 @@ export default function SeguridadPage() {
       />
 
       <section className="mx-auto max-w-7xl px-6 py-8">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Cuentas bloqueadas</p>
             <p className="mt-2 text-3xl font-bold">{cuentasBloqueadas.length}</p>
+          </article>
+          <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-slate-500">Sesiones activas</p>
+            <p className="mt-2 text-3xl font-bold">{sesionesActivas.length}</p>
           </article>
           <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Intentos fallidos visibles</p>
@@ -175,6 +184,61 @@ export default function SeguridadPage() {
 
         <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-6 py-4">
+            <h2 className="font-bold">Control de sesiones activas</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Sesiones vigentes en base de datos. Al revocar una sesión, el token queda invalidado de inmediato.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px] text-left">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-6 py-3">Usuario</th>
+                  <th className="px-6 py-3">IP</th>
+                  <th className="px-6 py-3">Inicio</th>
+                  <th className="px-6 py-3">Expira</th>
+                  <th className="px-6 py-3">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sesionesActivas.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-6 text-center text-sm text-slate-500">
+                      No hay sesiones activas registradas.
+                    </td>
+                  </tr>
+                )}
+                {sesionesActivas.map((sesion) => (
+                  <tr key={sesion.id}>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-semibold">{sesion.usuario}</p>
+                      <p className="text-xs text-slate-500">{sesion.correo}</p>
+                    </td>
+                    <td className="px-6 py-4 font-mono text-xs">{sesion.ip}</td>
+                    <td className="px-6 py-4 text-sm">{sesion.emitidoEn}</td>
+                    <td className="px-6 py-4 text-sm">{sesion.expiraEn}</td>
+                    <td className="px-6 py-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMensaje("");
+                          setJustificacion("");
+                          setSesionEnRevocacion(sesion.id);
+                        }}
+                        className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                      >
+                        Revocar sesión
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-6 py-4">
             <h2 className="font-bold">Últimos intentos de acceso</h2>
           </div>
 
@@ -216,18 +280,20 @@ export default function SeguridadPage() {
         </section>
       </section>
 
-      {cuentaEnDesbloqueo !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+      {(cuentaEnDesbloqueo !== null || sesionEnRevocacion !== null) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-xl font-bold">Desbloqueo supervisado</h3>
+            <h3 className="text-xl font-bold">
+              {cuentaEnDesbloqueo !== null ? "Desbloqueo supervisado" : "Revocación de sesión"}
+            </h3>
             <p className="mt-1 text-sm text-slate-500">
-              Registra la justificación forense obligatoria de esta acción.
+              Registra la justificación forense obligatoria de esta acción (mínimo 10 caracteres).
             </p>
 
             <textarea
               value={justificacion}
               onChange={(event) => setJustificacion(event.target.value)}
-              placeholder="Motivo del desbloqueo (será registrado en auditoría WORM)"
+              placeholder="Motivo de la acción (será registrado en auditoría WORM)"
               rows={4}
               className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600"
             />
@@ -235,7 +301,10 @@ export default function SeguridadPage() {
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setCuentaEnDesbloqueo(null)}
+                onClick={() => {
+                  setCuentaEnDesbloqueo(null);
+                  setSesionEnRevocacion(null);
+                }}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
               >
                 Cancelar
@@ -244,11 +313,15 @@ export default function SeguridadPage() {
                 type="button"
                 disabled={isSaving || justificacion.trim().length < 10}
                 onClick={() => {
-                  void desbloquearCuenta(cuentaEnDesbloqueo, justificacion).then((ok) => { if (ok) setCuentaEnDesbloqueo(null); });
+                  if (cuentaEnDesbloqueo !== null) {
+                    void desbloquearCuenta(cuentaEnDesbloqueo, justificacion).then((ok) => { if (ok) setCuentaEnDesbloqueo(null); });
+                  } else if (sesionEnRevocacion !== null) {
+                    void revocarSesion(sesionEnRevocacion, justificacion).then((ok) => { if (ok) setSesionEnRevocacion(null); });
+                  }
                 }}
                 className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Confirmar desbloqueo
+                {cuentaEnDesbloqueo !== null ? "Confirmar desbloqueo" : "Confirmar revocación"}
               </button>
             </div>
           </div>

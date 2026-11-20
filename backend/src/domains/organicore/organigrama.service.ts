@@ -1,5 +1,6 @@
 import type { Pool, QueryResultRow } from 'pg';
 
+import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
 import { ConflictError, DomainError, NotFoundError } from '../../shared/domain/errors/index.js';
 
 export interface AreaOrganica extends QueryResultRow {
@@ -88,6 +89,30 @@ export class OrganigramaService {
         }
       }
 
+      if (dto.vigente === false) {
+        const hijos = await cliente.query<{ total: number }>(
+          'SELECT COUNT(*)::int AS total FROM sigd_org.area WHERE area_padre_id = $1 AND vigente = TRUE',
+          [id],
+        );
+        if ((hijos.rows[0]?.total ?? 0) > 0) {
+          throw new ConflictError({
+            code: 'AREA_CON_SUBUNIDADES_ACTIVAS',
+            message: 'No se puede inactivar un área con subunidades activas.',
+          });
+        }
+        const personal = await cliente.query<{ total: number }>(
+          `SELECT COUNT(*)::int AS total FROM sigd_org.asignacion_personal
+            WHERE area_id = $1 AND vigente_desde <= now() AND (vigente_hasta IS NULL OR vigente_hasta > now())`,
+          [id],
+        );
+        if ((personal.rows[0]?.total ?? 0) > 0) {
+          throw new ConflictError({
+            code: 'AREA_CON_PERSONAL_ACTIVO',
+            message: 'No se puede inactivar un área con personal asignado activo.',
+          });
+        }
+      }
+
       const valores: unknown[] = [];
       const cambios: string[] = [];
       const agregar = (valor: unknown): string => { valores.push(valor); return `$${valores.length}`; };
@@ -115,6 +140,13 @@ export class OrganigramaService {
           [actual.rows[0].path, area.path, id],
         );
       }
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_org',
+        tabla: 'area',
+        operacion: 'UPDATE',
+        datos_antes: { id, path: actual.rows[0].path },
+        datos_despues: { evento: 'CORRECTO', ...area },
+      });
       await cliente.query('COMMIT');
       return area;
     } catch (error) {

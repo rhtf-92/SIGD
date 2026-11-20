@@ -18,6 +18,8 @@ export interface Rol {
   descripcion: string;
   alcance: string;
   usuarios: number | null;
+  vigente?: boolean;
+  personalizado?: boolean;
 }
 
 export interface PermisoModulo {

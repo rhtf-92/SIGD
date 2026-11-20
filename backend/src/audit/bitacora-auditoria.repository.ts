@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { OperacionBitacora } from '../shared/types/index.js';
 import { getRequestContext } from '../shared/request-context/request-context.js';
@@ -22,7 +23,7 @@ export async function registrarMutacion(
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id_auditoria`,
     [
-      contexto?.correlation_id ?? null,
+      contexto?.correlation_id ?? randomUUID(),
       contexto?.usuario_id ?? null,
       contexto?.ip_origen ?? null,
       contexto?.user_agent ?? null,
@@ -34,5 +35,5 @@ export async function registrarMutacion(
     ],
   );
 
-  return resultado.rows[0].id_auditoria;
+  return resultado.rows[0]?.id_auditoria ?? '';
 }

@@ -17,6 +17,8 @@ export default function AuditoriaPage() {
     setBusqueda,
     modulo,
     setModulo,
+    operacion,
+    setOperacion,
     resultado,
     setResultado,
     seleccionado,
@@ -80,7 +82,7 @@ export default function AuditoriaPage() {
         </div>
 
         <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 lg:grid-cols-3 xl:grid-cols-[1fr_160px_160px_150px_150px_auto]">
+          <div className="grid gap-4 lg:grid-cols-3 xl:grid-cols-[1fr_140px_130px_140px_140px_140px_auto]">
             <div>
               <label className="mb-2 block text-sm font-semibold">Buscar</label>
               <input
@@ -100,6 +102,24 @@ export default function AuditoriaPage() {
               >
                 <option>Todos</option>
                 {modulos.map((valor) => <option key={valor} value={valor}>{valor}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold" htmlFor="audit-op">Evento</label>
+              <select
+                id="audit-op"
+                value={operacion}
+                onChange={(event) => {
+                  setPagina(0);
+                  setOperacion(event.target.value as "Todas" | "INSERT" | "UPDATE" | "DELETE");
+                }}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              >
+                <option value="Todas">Todos</option>
+                <option value="INSERT">INSERT</option>
+                <option value="UPDATE">UPDATE</option>
+                <option value="DELETE">DELETE</option>
               </select>
             </div>
 

@@ -1,4 +1,6 @@
 // Drawer de detalle forense con diff JSON (ENT-M05-04)
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { RegistroAuditoria } from "../../types/auditoriaForense";
 import { serializar } from "../../hooks/useAuditLogs";
 
@@ -11,11 +13,11 @@ function BloqueJson({ titulo, valor }: { titulo: string; valor: unknown }) {
   if (valor === undefined || valor === null) return null;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50">
-      <p className="border-b border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-500">
+    <div className="rounded-lg border border-slate-700 bg-slate-900/90">
+      <p className="border-b border-slate-700 bg-slate-800/90 px-3 py-2 text-xs font-bold uppercase text-sky-300">
         {titulo}
       </p>
-      <pre className="overflow-x-auto p-3 text-xs leading-5 text-slate-700">
+      <pre className="overflow-x-auto p-3 text-xs leading-5 text-slate-100">
         {JSON.stringify(valor, null, 2)}
       </pre>
     </div>
@@ -26,6 +28,15 @@ export default function AuditDetailDrawer({
   registro,
   onClose,
 }: AuditDetailDrawerProps) {
+  useEffect(() => {
+    if (!registro) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [registro, onClose]);
+
   if (!registro) return null;
 
   const detalles = serializar(registro.detallesTecnicos);
@@ -35,28 +46,33 @@ export default function AuditDetailDrawer({
     ([clave]) => clave !== "anterior" && clave !== "nuevo",
   );
 
-  return (
+  const contenido = (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-slate-950/30"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Detalle del registro ${registro.id}`}
+      className="fixed inset-0 z-[100] flex justify-end bg-slate-950/65 backdrop-blur-xs"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
-      <div className="flex h-full w-full max-w-xl flex-col overflow-y-auto bg-white shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-6">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Detalle del registro ${registro.id}`}
+        className="flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-sky-400/20 bg-slate-950 text-slate-100 shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-6">
           <div>
-            <p className="text-xs font-bold uppercase text-blue-700">
+            <p className="text-xs font-bold uppercase text-sky-400">
               Registro {registro.id}
             </p>
-            <h3 className="mt-1 text-xl font-bold">{registro.accion}</h3>
-            <p className="mt-1 text-sm text-slate-500">
+            <h3 className="mt-1 text-xl font-bold text-white">{registro.accion}</h3>
+            <p className="mt-1 text-sm text-slate-400">
               {registro.fecha} · {registro.modulo}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-500 hover:bg-slate-100"
+            className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-semibold text-slate-200 hover:bg-slate-800"
           >
             Cerrar
           </button>
@@ -65,37 +81,37 @@ export default function AuditDetailDrawer({
         <div className="space-y-5 p-6">
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-500">
+              <dt className="text-xs font-semibold uppercase text-slate-400">
                 Usuario
               </dt>
-              <dd className="mt-1 font-semibold">{registro.usuario}</dd>
+              <dd className="mt-1 font-semibold text-white">{registro.usuario}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-500">
+              <dt className="text-xs font-semibold uppercase text-slate-400">
                 Rol / Área
               </dt>
-              <dd className="mt-1">
+              <dd className="mt-1 text-slate-200">
                 {registro.rol} · {registro.area}
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-500">
+              <dt className="text-xs font-semibold uppercase text-slate-400">
                 Recurso
               </dt>
-              <dd className="mt-1">{registro.registro}</dd>
+              <dd className="mt-1 text-slate-200">{registro.registro}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-500">
+              <dt className="text-xs font-semibold uppercase text-slate-400">
                 Resultado
               </dt>
               <dd className="mt-1">
                 <span
                   className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                     registro.resultado === "Exitoso"
-                      ? "bg-emerald-100 text-emerald-700"
+                      ? "bg-emerald-900/70 text-emerald-200"
                       : registro.resultado === "Denegado"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-red-100 text-red-700"
+                        ? "bg-amber-900/70 text-amber-200"
+                        : "bg-red-900/70 text-red-200"
                   }`}
                 >
                   {registro.resultado}
@@ -103,16 +119,16 @@ export default function AuditDetailDrawer({
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-500">
+              <dt className="text-xs font-semibold uppercase text-slate-400">
                 IP de origen
               </dt>
-              <dd className="mt-1 font-mono">{registro.ip}</dd>
+              <dd className="mt-1 font-mono text-slate-200">{registro.ip}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase text-slate-500">
+              <dt className="text-xs font-semibold uppercase text-slate-400">
                 X-Correlation-ID
               </dt>
-              <dd className="mt-1 break-all font-mono text-xs text-slate-600">
+              <dd className="mt-1 break-all font-mono text-xs text-slate-300">
                 {registro.correlationId ?? "—"}
               </dd>
             </div>
@@ -120,7 +136,7 @@ export default function AuditDetailDrawer({
 
           {(anterior !== undefined || nuevo !== undefined) && (
             <section>
-              <h4 className="mb-3 text-sm font-bold uppercase text-slate-500">
+              <h4 className="mb-3 text-sm font-bold uppercase text-slate-400">
                 Diferencias JSON (antes / después)
               </h4>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -132,7 +148,7 @@ export default function AuditDetailDrawer({
 
           {resto.length > 0 && (
             <section>
-              <h4 className="mb-3 text-sm font-bold uppercase text-slate-500">
+              <h4 className="mb-3 text-sm font-bold uppercase text-slate-400">
                 Detalles técnicos (RFC 7807)
               </h4>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -146,4 +162,6 @@ export default function AuditDetailDrawer({
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(contenido, document.body) : contenido;
 }

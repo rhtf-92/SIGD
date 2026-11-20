@@ -6,11 +6,12 @@ import type { CrearUsuarioDTO, OpcionCatalogo } from "../../types/usuarioAdmin";
 interface Props {
   areas: OpcionCatalogo[];
   cargos: OpcionCatalogo[];
+  roles: OpcionCatalogo[];
   onClose: () => void;
   onSave: (datos: CrearUsuarioDTO) => Promise<unknown>;
 }
 
-export default function UserCreateModal({ areas, cargos, onClose, onSave }: Props) {
+export default function UserCreateModal({ areas, cargos, roles, onClose, onSave }: Props) {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CrearUsuarioDTO>({
     defaultValues: { tipo: "NATURAL" },
   });
@@ -19,19 +20,27 @@ export default function UserCreateModal({ areas, cargos, onClose, onSave }: Prop
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-label="Registrar usuario">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-5 flex items-start justify-between">
-          <div><h2 className="text-xl font-bold">Registrar usuario</h2><p className="text-sm text-slate-500">Alta institucional persistente</p></div>
+          <div><h2 className="text-xl font-bold">Registrar usuario</h2><p className="text-sm text-slate-500">Alta institucional persistente con credenciales activas</p></div>
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-1 text-slate-500 hover:bg-slate-100">Cerrar</button>
         </div>
         <form onSubmit={handleSubmit(onSave)} className="grid gap-4 md:grid-cols-2 [&_.campo]:mt-1.5 [&_.campo]:w-full [&_.campo]:rounded-lg [&_.campo]:border [&_.campo]:border-slate-300 [&_.campo]:px-3 [&_.campo]:py-2.5 [&_.campo]:font-normal">
           <Campo label="Documento" error={errors.numeroDocumento?.message}><input {...register("numeroDocumento", { required: "El documento es obligatorio.", minLength: { value: 8, message: "Mínimo 8 caracteres." } })} className="campo" /></Campo>
-          <Campo label="Nombres" error={errors.nombres?.message}><input {...register("nombres", { required: "Los nombres son obligatorios." })} className="campo" /></Campo>
-          <Campo label="Apellidos" error={errors.apellidos?.message}><input {...register("apellidos", { required: "Los apellidos son obligatorios." })} className="campo" /></Campo>
+          <Campo label="Nombres" error={errors.nombres?.message}><input {...register("nombres", { required: "Los nombres son obligatorios.", minLength: { value: 2, message: "Mínimo 2 caracteres." } })} className="campo" /></Campo>
+          <Campo label="Apellidos" error={errors.apellidos?.message}><input {...register("apellidos", { required: "Los apellidos son obligatorios.", minLength: { value: 2, message: "Mínimo 2 caracteres." } })} className="campo" /></Campo>
           <Campo label="Correo institucional" error={errors.correo?.message}><input type="email" {...register("correo", { required: "El correo es obligatorio.", validate: (v) => v.toLowerCase().endsWith("@iestpsuiza.edu.pe") || "Use el dominio @iestpsuiza.edu.pe." })} className="campo" /></Campo>
           <Campo label="Teléfono" error={errors.telefono?.message}><input {...register("telefono")} className="campo" /></Campo>
           <Campo label="Contraseña inicial" error={errors.passwordInicial?.message}><input type="password" {...register("passwordInicial", { required: "La contraseña es obligatoria.", minLength: { value: 8, message: "Mínimo 8 caracteres." } })} className="campo" /></Campo>
           <Campo label="Área" error={errors.areaId?.message}><select {...register("areaId", { required: "Seleccione un área." })} className="campo"><option value="">Seleccione</option>{areas.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select></Campo>
           <Campo label="Cargo" error={errors.cargoId?.message}><select {...register("cargoId", { required: "Seleccione un cargo." })} className="campo"><option value="">Seleccione</option>{cargos.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select></Campo>
-          <p className="text-xs text-slate-500 md:col-span-2">El usuario de acceso se genera con el número de documento. Los permisos se asignan después desde “Administrar usuario”; hasta entonces, la cuenta no podrá iniciar sesión.</p>
+          <div className="md:col-span-2">
+            <Campo label="Rol institucional" error={errors.rolId?.message}>
+              <select {...register("rolId", { required: "Seleccione un rol institucional." })} className="campo">
+                <option value="">Seleccione un rol</option>
+                {roles.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+              </select>
+            </Campo>
+          </div>
+          <p className="text-xs text-slate-500 md:col-span-2">El usuario podrá iniciar sesión inmediatamente con su número de documento o correo institucional y la contraseña inicial configurada.</p>
           <div className="flex justify-end gap-3 md:col-span-2">
             <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Cancelar</button>
             <button type="submit" disabled={isSubmitting} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isSubmitting ? "Guardando..." : "Registrar usuario"}</button>

@@ -15,6 +15,9 @@ interface Props {
 }
 
 interface Formulario {
+  nombres: string;
+  apellidos: string;
+  telefono: string;
   correo: string;
   areaId: string;
   cargoId: string;
@@ -27,6 +30,9 @@ const DOMINIO = "iestpsuiza.edu.pe";
 export default function UserEditModal({ usuario, areas, cargos, roles, onClose, onSave, onServerError }: Props) {
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<Formulario>({
     defaultValues: {
+      nombres: usuario.nombres ?? "",
+      apellidos: usuario.apellidos ?? "",
+      telefono: usuario.telefono ?? "",
       correo: usuario.correo,
       areaId: usuario.areaId ?? "",
       cargoId: usuario.cargoId ?? "",
@@ -40,6 +46,9 @@ export default function UserEditModal({ usuario, areas, cargos, roles, onClose, 
     try {
       await onSave({
         ...usuario,
+        ...(valores.nombres.trim() ? { nombres: valores.nombres.trim() } : {}),
+        ...(valores.apellidos.trim() ? { apellidos: valores.apellidos.trim() } : {}),
+        telefono: valores.telefono.trim() || null,
         correo: valores.correo.trim().toLowerCase(),
         areaId: valores.areaId,
         area: nombre(areas, valores.areaId),
@@ -80,6 +89,14 @@ export default function UserEditModal({ usuario, areas, cargos, roles, onClose, 
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-1 text-slate-500 hover:bg-slate-100">Cerrar</button>
         </div>
         <form onSubmit={handleSubmit(enviar)} className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label htmlFor="usuario-nombres" className="mb-1.5 block text-sm font-semibold">Nombres</label>
+            <input id="usuario-nombres" {...register("nombres")} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+          </div>
+          <div>
+            <label htmlFor="usuario-apellidos" className="mb-1.5 block text-sm font-semibold">Apellidos</label>
+            <input id="usuario-apellidos" {...register("apellidos")} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+          </div>
           {selector("areaId", "Área", areas)}
           {selector("cargoId", "Cargo", cargos)}
           <fieldset className="rounded-lg border border-slate-200 p-3 md:col-span-2">
@@ -103,12 +120,19 @@ export default function UserEditModal({ usuario, areas, cargos, roles, onClose, 
               <option value="Activo">Activo</option><option value="Inactivo">Inactivo</option><option value="Bloqueado">Bloqueado</option>
             </select>
           </div>
+          <div>
+            <label htmlFor="usuario-telefono" className="mb-1.5 block text-sm font-semibold">Teléfono</label>
+            <input id="usuario-telefono" {...register("telefono")} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+          </div>
           <div className="md:col-span-2">
             <label htmlFor="usuario-correo" className="mb-1.5 block text-sm font-semibold">Correo institucional</label>
             <input id="usuario-correo" aria-invalid={errors.correo ? "true" : "false"} {...register("correo", {
               required: "El correo es obligatorio.",
               pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Formato de correo inválido." },
-              validate: (valor) => valor.toLowerCase().endsWith(`@${DOMINIO}`) || `El correo debe pertenecer al dominio @${DOMINIO}.`,
+              validate: (valor) =>
+                valor.trim().toLowerCase() === usuario.correo.trim().toLowerCase() ||
+                valor.toLowerCase().endsWith(`@${DOMINIO}`) ||
+                `El correo debe pertenecer al dominio @${DOMINIO}.`,
             })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
             {errors.correo && <p className="mt-1 text-xs text-red-700">{errors.correo.message}</p>}
           </div>

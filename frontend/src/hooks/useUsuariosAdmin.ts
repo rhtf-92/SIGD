@@ -70,10 +70,14 @@ export function useUsuariosAdmin() {
     const anterior = usuarios.find((item) => item.id === usuario.id);
     const rolesPrevios = new Set(anterior?.rolIds ?? []);
     const rolesNuevos = new Set(usuario.rolIds);
+    const correoCambio = !anterior || anterior.correo.toLowerCase() !== usuario.correo.toLowerCase();
     return mutacionActualizacion.mutateAsync({
       id: usuario.id,
       cambios: {
-        correo: usuario.correo,
+        ...(usuario.nombres ? { nombres: usuario.nombres } : {}),
+        ...(usuario.apellidos ? { apellidos: usuario.apellidos } : {}),
+        ...(usuario.telefono !== undefined ? { telefono: usuario.telefono } : {}),
+        ...(correoCambio || usuario.correo.toLowerCase().endsWith("@iestpsuiza.edu.pe") ? { correo: usuario.correo } : {}),
         areaId: usuario.areaId,
         cargoId: usuario.cargoId,
         rolesAgregar: usuario.rolIds.filter((id) => !rolesPrevios.has(id)),

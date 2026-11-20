@@ -19,6 +19,8 @@ export default function TablasMaestrasPage() {
     setNombre,
     detalle,
     setDetalle,
+    padreId,
+    setPadreId,
     mensaje,
     setMensaje,
     crearRegistro,
@@ -130,15 +132,38 @@ export default function TablasMaestrasPage() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 />
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold">Detalle</label>
-                <input
-                  value={detalle}
-                  onChange={(event) => setDetalle(event.target.value)}
-                  placeholder="Dependencia, descripción, etc."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                />
-              </div>
+              {tipoActivo === "Áreas" ? (
+                <div>
+                  <label htmlFor="maestra-padre" className="mb-1.5 block text-sm font-semibold">Unidad padre</label>
+                  <select
+                    id="maestra-padre"
+                    value={padreId}
+                    onChange={(event) => setPadreId(event.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                  >
+                    <option value="">Nivel raíz (sin padre)</option>
+                    {areasOrganicas
+                      .filter((area) => area.id !== registroEditando && area.estado === "Activo")
+                      .map((area) => (
+                        <option key={area.id} value={area.id}>
+                          {area.codigo} — {area.nombre}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold">
+                    {tipoActivo === "Sedes" ? "Dirección" : "Detalle"}
+                  </label>
+                  <input
+                    value={detalle}
+                    onChange={(event) => setDetalle(event.target.value)}
+                    placeholder={tipoActivo === "Sedes" ? "Dirección física de la sede" : "Dependencia, descripción, etc."}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                  />
+                </div>
+              )}
 
               <div className="flex gap-3 md:col-span-3 md:justify-end">
                 <button

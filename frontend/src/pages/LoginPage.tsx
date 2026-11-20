@@ -144,7 +144,7 @@ export default function LoginPage() {
 
     setFaseValidacion('autorizado');
     await esperar(movimientoReducido ? 150 : 1050);
-    navigate(DESTINO_POR_ROL[usuarioAutenticado.rol], { replace: true });
+    navigate(DESTINO_POR_ROL[usuarioAutenticado.rol] ?? '/', { replace: true });
   }
 
   async function activarPerfil(rol: RolInstitucional) {
@@ -159,7 +159,7 @@ export default function LoginPage() {
       setFaseValidacion('autorizado');
       const movimientoReducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
       await esperar(movimientoReducido ? 150 : 1050);
-      navigate(DESTINO_POR_ROL[usuarioAutenticado.rol], { replace: true });
+      navigate(DESTINO_POR_ROL[usuarioAutenticado.rol] ?? '/', { replace: true });
     } catch (selectionError) {
       setError(mensajeDeError(selectionError));
       setFaseValidacion('rechazado');
@@ -274,7 +274,7 @@ export default function LoginPage() {
                       autoComplete="username"
                       value={identificador}
                       onChange={(event) => setIdentificador(event.target.value)}
-                      placeholder="Usuario institucional"
+                      placeholder="DNI, usuario o correo institucional"
                       disabled={busy}
                     />
                   </span>
@@ -333,7 +333,7 @@ export default function LoginPage() {
               {rolesDisponibles.map((rol) => (
                 <button key={rol} type="button" onClick={() => void activarPerfil(rol)} disabled={busy}>
                   <ShieldCheck aria-hidden="true" size={20} />
-                  <span><strong>{NOMBRE_ROL[rol]}</strong><small>Continuar con este perfil autorizado</small></span>
+                  <span><strong>{NOMBRE_ROL[rol] ?? rol}</strong><small>Continuar con este perfil autorizado</small></span>
                   <ArrowRight aria-hidden="true" size={18} />
                 </button>
               ))}

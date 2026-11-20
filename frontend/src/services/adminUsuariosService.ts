@@ -53,6 +53,16 @@ function referencia(value: unknown): { id: string | null; nombre: string } {
   return { id: toStringValue(item.id) || null, nombre: toStringValue(item.nombre, "—") };
 }
 
+function formatearFechaAcceso(valor: unknown): string {
+  const texto = toStringValue(valor);
+  if (!texto || texto === "—") return "—";
+  if (/^\d{4}-\d{2}-\d{2}T/.test(texto)) {
+    const fecha = new Date(texto);
+    if (!Number.isNaN(fecha.getTime())) return fecha.toLocaleString("es-PE");
+  }
+  return texto;
+}
+
 /**
  * Normaliza el elemento recibido del backend. El servidor puede serializar en
  * `camelCase` o en `snake_case` (convención de PostgreSQL / Express), por lo que
@@ -85,6 +95,9 @@ function normalizarUsuario(valor: unknown): Usuario | null {
     id,
     idPersona: toStringValue(registro.idPersona ?? registro.id_persona),
     nombre,
+    nombres: toStringValue(registro.nombres) || undefined,
+    apellidos: toStringValue(registro.apellidos) || undefined,
+    telefono: registro.telefono == null ? null : toStringValue(registro.telefono),
     documento: toStringValue(registro.documento ?? registro.dni),
     correo: toStringValue(registro.correo ?? registro.correoInstitucional ?? registro.correo_institucional),
     areaId: area.id,
@@ -96,7 +109,7 @@ function normalizarUsuario(valor: unknown): Usuario | null {
     rolIds: roles.map((item) => item.id),
     roles,
     estado: toEstadoUsuario(registro.estado),
-    ultimoAcceso: toStringValue(registro.ultimoAcceso ?? registro.ultimo_acceso, "—"),
+    ultimoAcceso: formatearFechaAcceso(registro.ultimoAcceso ?? registro.ultimo_acceso),
   };
 }
 

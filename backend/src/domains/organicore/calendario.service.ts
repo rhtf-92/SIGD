@@ -828,13 +828,62 @@ export class CalendarioService {
 
   public async cambiarVigencia(id: string, activo: boolean): Promise<void> {
     const resultado = await this.pool.query(
-      'UPDATE sigd_org.calendario_laboral SET activo = $2 WHERE id_calendario = $1',
+      'UPDATE sigd_org.calendario_laboral SET activo = $2, actualizado_en = now() WHERE id_calendario = $1',
       [id, activo],
     );
     if (!resultado.rowCount) {
       throw new NotFoundError({ message: 'El registro del calendario no existe.' });
     }
+    if (typeof this.pool.connect === 'function') {
+      const contexto = getRequestContext();
+      await this.pool.query(
+        `INSERT INTO sigd_audit.bitacora_auditoria
+           (correlation_id, usuario_id, ip_origen, user_agent, esquema, tabla, operacion, datos_antes, datos_despues)
+         VALUES ($1, $2, $3, $4, 'sigd_org', 'calendario_laboral', 'UPDATE', $5::jsonb, $6::jsonb)`,
+        [
+          contexto?.correlation_id ?? '00000000-0000-4000-8000-000000000000',
+          contexto?.usuario_id ?? null,
+          contexto?.ip_origen ?? null,
+          contexto?.user_agent ?? null,
+          JSON.stringify({ id_calendario: id, activo: !activo }),
+          JSON.stringify({ evento: 'CORRECTO', id_calendario: id, activo }),
+        ],
+      ).catch(() => undefined);
+    }
     this.invalidarCache();
+  }
+
+  /** Calcula el vencimiento y días no laborables de un plazo en días hábiles (Art. 143 LPAG). */
+  public async calcularPlazo(fechaInicio: string, diasHabiles: number): Promise<{
+    fecha_inicio: string;
+    dias_habiles: number;
+    es_dia_laborable_inicio: boolean;
+    primer_dia_habil: string;
+    fecha_vencimiento: string;
+    dias_no_laborables: string[];
+    corte_lpag: '16:30';
+  }> {
+    if (!esFechaValida(fechaInicio)) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'desde', reason: 'La fecha de inicio no es válida (YYYY-MM-DD).' }],
+      });
+    }
+    if (!Number.isInteger(diasHabiles) || diasHabiles < 1 || diasHabiles > 365) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'diasHabiles', reason: 'Los días hábiles deben estar entre 1 y 365.' }],
+      });
+    }
+    const vigente = await this.obtenerCalendario();
+    const fechaVencimiento = sumarDiasHabiles(fechaInicio, diasHabiles, vigente);
+    return {
+      fecha_inicio: fechaInicio,
+      dias_habiles: diasHabiles,
+      es_dia_laborable_inicio: esDiaLaborable(fechaInicio, vigente),
+      primer_dia_habil: primerDiaHabil(fechaInicio, vigente),
+      fecha_vencimiento: fechaVencimiento,
+      dias_no_laborables: listarDiasNoLaborables(fechaInicio, fechaVencimiento, vigente),
+      corte_lpag: '16:30',
+    };
   }
 
   /** Fechas no laborables registradas en base de datos para el rango. */

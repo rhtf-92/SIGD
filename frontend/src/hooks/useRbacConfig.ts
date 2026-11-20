@@ -16,6 +16,7 @@ import { PERMISOS, esSuperAdmin } from "../auth/permissions";
 export const MODULOS_SISTEMA = [
   "Expedientes",
   "Documentos",
+  "Reportes",
   "Administración",
   "Auditoría",
   "Usuarios",
@@ -32,6 +33,7 @@ export const CODIGO_PERMISO_BACKEND: Partial<Record<string, string>> = {
   "Expedientes.derivar": "EXPEDIENTE_DERIVAR",
   "Expedientes.editar": "EXPEDIENTE_RESOLVER",
   "Documentos.editar": "FIRMA_FIRMAR",
+  "Reportes.ver": "REPORTE_LEER",
   "Administración.ver": PERMISOS.ADMIN_ACCESO,
   "Auditoría.ver": PERMISOS.AUDITORIA_LEER,
   "Usuarios.ver": PERMISOS.USUARIOS_LEER,
@@ -53,8 +55,13 @@ const ROLES_BACKEND: Record<string, string[]> = {
   ESTUDIANTE: ["CIUDADANO"],
 };
 
+const CODIGOS_CANONICOS_DB = new Set(Object.values(ROLES_BACKEND).flat());
+
 interface RolBackend {
   codigo: string;
+  nombre?: string;
+  descripcion?: string | null;
+  vigente?: boolean;
   permisos: string[];
   usuarios?: number;
 }
@@ -201,21 +208,41 @@ export function useRbacConfig() {
     setIsError(false);
     setIsLoaded(false);
     try {
-        const { data } = await apiClient.get<{ roles: RolBackend[] }>("/api/v1/admin/roles-permisos");
-        setRoles((actuales) => actuales.map((rol) => {
+        const { data } = await apiClient.get<{ roles: RolBackend[] }>("/api/v1/admin/roles-permisos", {
+          params: { incluirInactivos: true },
+        });
+        const rolesBackend = data.roles ?? [];
+        const rolesBaseActualizados: Rol[] = rolesIniciales.map((rol) => {
           const codigos = ROLES_BACKEND[rol.id] ?? [rol.id];
-          const asociados = data.roles.filter((item) => codigos.includes(item.codigo));
-          return { ...rol, usuarios: asociados.reduce((total, item) => total + Number(item.usuarios ?? 0), 0) };
-        }));
+          const asociados = rolesBackend.filter((item) => codigos.includes(item.codigo));
+          const principal = asociados[0];
+          return {
+            ...rol,
+            nombre: principal?.nombre && codigos.length === 1 ? principal.nombre : rol.nombre,
+            descripcion: principal?.descripcion && codigos.length === 1 ? principal.descripcion : rol.descripcion,
+            vigente: asociados.length > 0 ? asociados.some((item) => item.vigente !== false) : true,
+            usuarios: asociados.reduce((total, item) => total + Number(item.usuarios ?? 0), 0),
+          };
+        });
+        const rolesPersonalizados: Rol[] = rolesBackend
+          .filter((item) => !CODIGOS_CANONICOS_DB.has(item.codigo))
+          .map((item) => ({
+            id: item.codigo,
+            nombre: item.nombre ?? item.codigo,
+            descripcion: item.descripcion ?? "Rol institucional personalizado.",
+            alcance: "Configurado por administración",
+            usuarios: Number(item.usuarios ?? 0),
+            vigente: item.vigente !== false,
+            personalizado: true,
+          }));
+        setRoles([...rolesBaseActualizados, ...rolesPersonalizados]);
+
         const sincronizados: MatrizPermisos = Object.fromEntries(
           Object.entries(permisosIniciales).map(([rol, filas]) => [rol, filas.map((fila) => ({ ...fila }))]),
         );
         const codigosPorRolActual: Record<string, string[]> = {};
-        for (const [rolCanonico, codigos] of Object.entries(ROLES_BACKEND)) {
-          const permisosBrutos = data.roles.filter((rol) => codigos.includes(rol.codigo)).flatMap((rol) => rol.permisos);
-          codigosPorRolActual[rolCanonico] = [...new Set(permisosBrutos)];
-          const permisosRol = new Set(permisosBrutos);
-          sincronizados[rolCanonico] = MODULOS_SISTEMA.map((modulo) => {
+        const construirFilas = (permisosRol: Set<string>) =>
+          MODULOS_SISTEMA.map((modulo) => {
             const fila = { modulo, ver: false, gestionar: false, crear: false, editar: false, derivar: false, archivar: false, eliminar: false, exportar: false };
             for (const clave of Object.keys(fila) as Array<keyof typeof fila>) {
               if (clave === "modulo") continue;
@@ -224,6 +251,16 @@ export function useRbacConfig() {
             }
             return fila;
           });
+        for (const [rolCanonico, codigos] of Object.entries(ROLES_BACKEND)) {
+          const permisosBrutos = rolesBackend.filter((rol) => codigos.includes(rol.codigo)).flatMap((rol) => rol.permisos);
+          codigosPorRolActual[rolCanonico] = [...new Set(permisosBrutos)];
+          sincronizados[rolCanonico] = construirFilas(new Set(permisosBrutos));
+        }
+        for (const extra of rolesPersonalizados) {
+          const fuente = rolesBackend.find((item) => item.codigo === extra.id);
+          const permisosBrutos = fuente?.permisos ?? [];
+          codigosPorRolActual[extra.id] = [...new Set(permisosBrutos)];
+          sincronizados[extra.id] = construirFilas(new Set(permisosBrutos));
         }
         setCodigosPorRol(codigosPorRolActual);
         setPermisos(sincronizados);
@@ -297,11 +334,80 @@ export function useRbacConfig() {
         ...actual,
         [payload.roleId]: (permisos[payload.roleId] ?? []).map((fila) => ({ ...fila })),
       }));
+      setIsError(false);
       setMensaje(`Matriz guardada en PostgreSQL para ${rolActual.nombre}.`);
     } catch {
       const restaurar = permisosPersistidos[payload.roleId];
       if (restaurar) setPermisos((actual) => ({ ...actual, [payload.roleId]: restaurar.map((fila) => ({ ...fila })) }));
+      setIsError(true);
       setMensaje(`No fue posible guardar la matriz de ${rolActual.nombre}.`);
+    }
+  }
+
+  async function crearRol(datos: { codigo: string; nombre: string; descripcion?: string }): Promise<boolean> {
+    if (!esSuperAdmin(rolUsuario)) {
+      setIsError(true);
+      setMensaje("Solo SUPER_ADMIN puede crear roles.");
+      return false;
+    }
+    try {
+      const codigo = datos.codigo.trim().toUpperCase();
+      await apiClient.post("/api/v1/admin/roles", {
+        codigo,
+        nombre: datos.nombre.trim(),
+        descripcion: datos.descripcion?.trim() || null,
+        permisos: [],
+      });
+      await recargar();
+      setRolSeleccionado(codigo);
+      setIsError(false);
+      setMensaje(`Rol ${codigo} creado correctamente.`);
+      return true;
+    } catch (error) {
+      setIsError(true);
+      setMensaje(error instanceof Error ? error.message : "No fue posible crear el rol.");
+      return false;
+    }
+  }
+
+  async function editarRol(codigo: string, datos: { nombre: string; descripcion?: string }): Promise<boolean> {
+    if (!esSuperAdmin(rolUsuario)) {
+      setIsError(true);
+      setMensaje("Solo SUPER_ADMIN puede editar roles.");
+      return false;
+    }
+    try {
+      await apiClient.put(`/api/v1/admin/roles/${codigo}`, {
+        nombre: datos.nombre.trim(),
+        descripcion: datos.descripcion?.trim() || null,
+      });
+      await recargar();
+      setIsError(false);
+      setMensaje(`Rol ${datos.nombre.trim()} actualizado correctamente.`);
+      return true;
+    } catch (error) {
+      setIsError(true);
+      setMensaje(error instanceof Error ? error.message : "No fue posible actualizar el rol.");
+      return false;
+    }
+  }
+
+  async function cambiarVigenciaRol(codigo: string, vigente: boolean): Promise<boolean> {
+    if (!esSuperAdmin(rolUsuario)) {
+      setIsError(true);
+      setMensaje("Solo SUPER_ADMIN puede cambiar la vigencia de roles.");
+      return false;
+    }
+    try {
+      await apiClient.patch(`/api/v1/admin/roles/${codigo}/vigencia`, { vigente });
+      await recargar();
+      setIsError(false);
+      setMensaje(`Rol ${codigo} ${vigente ? "activado" : "desactivado"} correctamente.`);
+      return true;
+    } catch (error) {
+      setIsError(true);
+      setMensaje(error instanceof Error ? error.message : "No fue posible cambiar el estado del rol.");
+      return false;
     }
   }
 
@@ -313,6 +419,9 @@ export function useRbacConfig() {
     permisosRolActual,
     alternarPermiso,
     guardarPermisos,
+    crearRol,
+    editarRol,
+    cambiarVigenciaRol,
     mensaje,
     setMensaje,
     isLoading,

@@ -1,4 +1,4 @@
-export type TipoTabla = "Áreas" | "Cargos" | "Roles" | "Tipos documentales";
+export type TipoTabla = "Sedes" | "Áreas" | "Cargos" | "Roles" | "Tipos documentales";
 export type EstadoRegistro = "Activo" | "Inactivo";
 
 export interface RegistroMaestro {
@@ -7,6 +7,7 @@ export interface RegistroMaestro {
   codigo: string;
   nombre: string;
   detalle: string;
+  padreId?: string | null;
   estado: EstadoRegistro;
 }
 
@@ -15,6 +16,7 @@ export interface AreaOrganica {
   codigo: string;
   nombre: string;
   ruta: string;
+  padreId?: string | null;
   detalle: string;
   estado: EstadoRegistro;
 }

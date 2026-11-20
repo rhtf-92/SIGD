@@ -8,6 +8,9 @@ export interface CuentaBloqueada {
 export interface IntentoAcceso {
   id: string; fecha: string; usuario: string; ip: string; resultado: "Correcto" | "Fallido" | "Bloqueado";
 }
+export interface SesionActiva {
+  id: string; idUsuario: string; usuario: string; correo: string; ip: string; emitidoEn: string; expiraEn: string;
+}
 export interface PoliticasSeguridad {
   maxIntentosFallidos: number; minutosBloqueo: number; minutosSesion: number;
 }
@@ -18,6 +21,10 @@ export const MINUTOS_SESION_DEFECTO = 30;
 interface PoliticasDto { max_intentos_fallidos: number; minutos_bloqueo: number; minutos_sesion: number }
 interface BloqueoDto { id_usuario: string; nombre_completo: string; correo: string; intentos_fallidos: number; bloqueado_hasta: string }
 interface IntentoDto { id_auditoria: string; fecha_hora: string; ip_origen?: string | null; datos_despues: Record<string, unknown> }
+interface SesionDto {
+  id_sesion: string; id_usuario: string; nombre_completo?: string; usuario?: string;
+  correo?: string; ip_origen?: string | null; emitido_en: string; expira_en: string;
+}
 
 function formatoFecha(valor: string): string {
   const fecha = new Date(valor);
@@ -43,6 +50,10 @@ export function useSeguridadPolicies() {
     queryKey: ["admin-access-attempts"],
     queryFn: async () => (await apiClient.get<{ intentos: IntentoDto[] }>("/api/v1/admin/seguridad/intentos", { params: { limite: 50, offset: 0 } })).data.intentos,
   });
+  const sessionsQuery = useQuery({
+    queryKey: ["admin-active-sessions"],
+    queryFn: async () => (await apiClient.get<{ sesiones?: SesionDto[] }>("/api/v1/admin/seguridad/sesiones", { params: { limite: 50, offset: 0 } })).data?.sesiones ?? [],
+  });
 
   const maxIntentos = borrador.max_intentos_fallidos ?? politicasQuery.data?.max_intentos_fallidos ?? MAX_INTENTOS_DEFECTO;
   const minutosBloqueo = borrador.minutos_bloqueo ?? politicasQuery.data?.minutos_bloqueo ?? MINUTOS_BLOQUEO_DEFECTO;
@@ -64,6 +75,15 @@ export function useSeguridadPolicies() {
       resultado: evento === "CORRECTO" ? "Correcto" : evento === "BLOQUEADO" ? "Bloqueado" : "Fallido",
     };
   });
+  const sesionesActivas: SesionActiva[] = (sessionsQuery.data ?? []).map((row) => ({
+    id: row.id_sesion,
+    idUsuario: row.id_usuario,
+    usuario: row.nombre_completo ?? row.usuario ?? row.id_usuario,
+    correo: row.correo ?? "",
+    ip: row.ip_origen ?? "No disponible",
+    emitidoEn: formatoFecha(row.emitido_en),
+    expiraEn: formatoFecha(row.expira_en),
+  }));
   const intentosFallidos = intentosIniciales.filter((item) => item.resultado === "Fallido").length;
 
   async function guardarPoliticas(): Promise<boolean> {
@@ -75,6 +95,7 @@ export function useSeguridadPolicies() {
     setIsSaving(true);
     try {
       await apiClient.put("/api/v1/admin/seguridad/politicas", { maxIntentosFallidos: maxIntentos, minutosBloqueo, minutosSesion });
+      setBorrador({});
       await queryClient.invalidateQueries({ queryKey: ["admin-security-policies"] });
       setMensaje("Políticas de acceso guardadas en el servidor.");
       return true;
@@ -105,13 +126,31 @@ export function useSeguridadPolicies() {
     } finally { setIsSaving(false); }
   }
 
+  async function revocarSesion(idSesion: string, justificacion: string): Promise<boolean> {
+    setError(null); setMensaje("");
+    if (justificacion.trim().length < 10) {
+      setError(new Error("La justificación forense debe tener al menos 10 caracteres."));
+      return false;
+    }
+    setIsSaving(true);
+    try {
+      await apiClient.post(`/api/v1/admin/seguridad/sesiones/${idSesion}/revocar`, { justificacion: justificacion.trim() });
+      await queryClient.invalidateQueries({ queryKey: ["admin-active-sessions"] });
+      setMensaje("Sesión revocada y acción registrada en la bitácora.");
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error("No se pudo revocar la sesión."));
+      return false;
+    } finally { setIsSaving(false); }
+  }
+
   async function recargar() {
-    await Promise.all([politicasQuery.refetch(), blockedQuery.refetch(), attemptsQuery.refetch()]);
+    await Promise.all([politicasQuery.refetch(), blockedQuery.refetch(), attemptsQuery.refetch(), sessionsQuery.refetch()]);
   }
 
   return {
     maxIntentos, setMaxIntentos, minutosBloqueo, setMinutosBloqueo, minutosSesion, setMinutosSesion,
-    cuentasBloqueadas, desbloquearCuenta, intentosFallidos, intentosIniciales,
+    cuentasBloqueadas, desbloquearCuenta, sesionesActivas, revocarSesion, intentosFallidos, intentosIniciales,
     guardarPoliticas, mensaje, setMensaje, error: error ?? politicasQuery.error ?? blockedQuery.error ?? attemptsQuery.error ?? null,
     isLoading: politicasQuery.isPending || blockedQuery.isPending || attemptsQuery.isPending,
     isSaving, isError: politicasQuery.isError || blockedQuery.isError || attemptsQuery.isError,

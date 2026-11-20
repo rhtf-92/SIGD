@@ -1,8 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "../api/client";
+import type { ApiHttpError } from "../types/api";
 
 export interface DiaLaboral { nombre: string; activo: boolean }
-export interface Feriado { id: string; fecha: string; nombre: string }
+export type TipoFeriado = "NACIONAL" | "REGIONAL_UCAYALI" | "INSTITUCIONAL" | "DUELO_NACIONAL";
+export interface Feriado {
+  id: string;
+  fecha: string;
+  nombre: string;
+  tipoFeriado?: string | null;
+  baseLegal?: string | null;
+}
+export interface ResultadoPlazoLpag {
+  fecha_inicio: string;
+  dias_habiles: number;
+  es_dia_laborable_inicio: boolean;
+  primer_dia_habil: string;
+  fecha_vencimiento: string;
+  dias_no_laborables: string[];
+  corte_lpag: string;
+}
 export interface ConfiguracionJornada {
   horaInicio: string; horaFin: string; horaCorteRecepcion: string; zonaHoraria: string;
   diasLaborales: DiaLaboral[]; feriados: Feriado[];
@@ -16,14 +33,30 @@ const diasIniciales: DiaLaboral[] = [
   "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo",
 ].map((nombre, indice) => ({ nombre, activo: indice < 5 }));
 
-interface DiaApi { id_calendario: string; fecha: string; descripcion: string }
+interface DiaApi {
+  id_calendario: string;
+  fecha: string;
+  descripcion: string;
+  tipo_feriado?: string | null;
+  base_legal?: string | null;
+}
 
-async function obtenerFeriados(): Promise<Feriado[]> {
+function errorDesdeCausa(causa: unknown, porDefecto: string): Error {
+  const http = causa as ApiHttpError | undefined;
+  const detalle = http?.problemDetails?.detail || (causa instanceof Error ? causa.message : "");
+  return new Error(detalle || porDefecto);
+}
+
+async function obtenerFeriados(anio?: number): Promise<Feriado[]> {
   const { data } = await apiClient.get<{ calendario: DiaApi[] }>("/api/v1/admin/calendario-laboral", {
-    params: { estado: "ACTIVO" },
+    params: { estado: "ACTIVO", ...(anio ? { anio } : {}) },
   });
   return (data.calendario ?? []).map((dia) => ({
-    id: dia.id_calendario, fecha: dia.fecha, nombre: dia.descripcion,
+    id: dia.id_calendario,
+    fecha: dia.fecha,
+    nombre: dia.descripcion,
+    tipoFeriado: dia.tipo_feriado ?? null,
+    baseLegal: dia.base_legal ?? null,
   }));
 }
 
@@ -37,6 +70,7 @@ async function obtenerJornada(): Promise<JornadaApi> {
 }
 
 export function useCalendarioLaboral() {
+  const [anio, setAnio] = useState<number>(() => new Date().getFullYear());
   const [dias, setDias] = useState(diasIniciales);
   const [horaInicio, setHoraInicio] = useState(HORA_INICIO_REFERENCIA);
   const [horaFin, setHoraFin] = useState(HORA_FIN_REFERENCIA);
@@ -45,15 +79,19 @@ export function useCalendarioLaboral() {
   const [feriados, setFeriados] = useState<Feriado[]>([]);
   const [fechaNueva, setFechaNueva] = useState("");
   const [nombreNuevo, setNombreNuevo] = useState("");
+  const [tipoFeriadoNuevo, setTipoFeriadoNuevo] = useState<TipoFeriado>("INSTITUCIONAL");
+  const [baseLegalNueva, setBaseLegalNueva] = useState("");
+  const [resultadoPlazo, setResultadoPlazo] = useState<ResultadoPlazoLpag | null>(null);
+  const [calculandoPlazo, setCalculandoPlazo] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async (anioObjetivo = anio) => {
     setIsLoading(true); setError(null);
     try {
-      const [diasFeriado, jornada] = await Promise.all([obtenerFeriados(), obtenerJornada()]);
+      const [diasFeriado, jornada] = await Promise.all([obtenerFeriados(anioObjetivo), obtenerJornada()]);
       setFeriados(diasFeriado);
       setHoraInicio(jornada.hora_inicio);
       setHoraFin(jornada.hora_fin);
@@ -61,13 +99,13 @@ export function useCalendarioLaboral() {
       setZonaHoraria(jornada.zona_horaria);
       setDias((actuales) => actuales.map((dia, indice) => ({ ...dia, activo: jornada.dias_laborales.includes(indice + 1) })));
     } catch (causa) {
-      setError(causa instanceof Error ? causa : new Error("No se pudo cargar el calendario."));
+      setError(errorDesdeCausa(causa, "No se pudo cargar el calendario."));
     } finally { setIsLoading(false); }
-  }, []);
+  }, [anio]);
 
   useEffect(() => {
     let activo = true;
-    void Promise.all([obtenerFeriados(), obtenerJornada()])
+    void Promise.all([obtenerFeriados(anio), obtenerJornada()])
       .then(([resultado, jornada]) => {
         if (!activo) return;
         setFeriados(resultado);
@@ -78,27 +116,43 @@ export function useCalendarioLaboral() {
         setDias((actuales) => actuales.map((dia, indice) => ({ ...dia, activo: jornada.dias_laborales.includes(indice + 1) })));
       })
       .catch((causa) => {
-        if (activo) setError(causa instanceof Error ? causa : new Error("No se pudo cargar el calendario."));
+        if (activo) setError(errorDesdeCausa(causa, "No se pudo cargar el calendario."));
       })
       .finally(() => { if (activo) setIsLoading(false); });
     return () => { activo = false; };
-  }, []);
+  }, [anio]);
 
   function alternarDia(indice: number) {
     setDias((actuales) => actuales.map((dia, posicion) => posicion === indice ? { ...dia, activo: !dia.activo } : dia));
   }
 
   async function agregarFeriado() {
-    if (!fechaNueva || nombreNuevo.trim().length < 5) return;
+    if (!fechaNueva) {
+      setError(new Error("Seleccione la fecha del feriado."));
+      return;
+    }
+    if (nombreNuevo.trim().length < 5) {
+      setError(new Error("La descripción del feriado debe tener al menos 5 caracteres."));
+      return;
+    }
     setIsSaving(true); setError(null); setMensaje("");
     try {
+      const anioFecha = Number(fechaNueva.slice(0, 4));
       await apiClient.post("/api/v1/admin/calendario-laboral/feriado-excepcional", {
-        fecha: fechaNueva, descripcion: nombreNuevo.trim(), tipo_feriado: "INSTITUCIONAL",
+        fecha: fechaNueva,
+        descripcion: nombreNuevo.trim(),
+        tipo_feriado: tipoFeriadoNuevo,
+        ...(baseLegalNueva.trim() ? { base_legal: baseLegalNueva.trim() } : {}),
       });
-      await cargar();
-      setFechaNueva(""); setNombreNuevo(""); setMensaje("Feriado guardado en PostgreSQL.");
+      if (Number.isInteger(anioFecha) && anioFecha !== anio) {
+        setAnio(anioFecha);
+      } else {
+        await cargar(anio);
+      }
+      setFechaNueva(""); setNombreNuevo(""); setBaseLegalNueva("");
+      setMensaje("Feriado guardado en PostgreSQL.");
     } catch (causa) {
-      setError(causa instanceof Error ? causa : new Error("No se pudo guardar el feriado."));
+      setError(errorDesdeCausa(causa, "No se pudo guardar el feriado."));
     } finally { setIsSaving(false); }
   }
 
@@ -106,10 +160,10 @@ export function useCalendarioLaboral() {
     setIsSaving(true); setError(null); setMensaje("");
     try {
       await apiClient.patch(`/api/v1/admin/calendario-laboral/${id}/vigencia`, { vigente: false });
-      await cargar();
+      await cargar(anio);
       setMensaje("Feriado inactivado; se conservó su trazabilidad.");
     } catch (causa) {
-      setError(causa instanceof Error ? causa : new Error("No se pudo inactivar el feriado."));
+      setError(errorDesdeCausa(causa, "No se pudo inactivar el feriado."));
     } finally { setIsSaving(false); }
   }
 
@@ -125,20 +179,40 @@ export function useCalendarioLaboral() {
         horaInicio, horaFin, horaCorte: HORA_CORTE_LPAG, zonaHoraria,
         diasLaborales: dias.flatMap((dia, indice) => dia.activo ? [indice + 1] : []),
       });
-      await cargar();
+      await cargar(anio);
       setMensaje("La jornada laboral quedó guardada en el servidor.");
       return true;
     } catch (causa) {
-      setError(causa instanceof Error ? causa : new Error("No se pudo guardar la jornada laboral."));
+      setError(errorDesdeCausa(causa, "No se pudo guardar la jornada laboral."));
       return false;
     } finally { setIsSaving(false); }
   }
 
+  async function consultarPlazo(desde: string, diasHabiles: number): Promise<void> {
+    if (!desde) {
+      setError(new Error("Seleccione una fecha de inicio para calcular el plazo."));
+      return;
+    }
+    setCalculandoPlazo(true); setError(null);
+    try {
+      const { data } = await apiClient.get<ResultadoPlazoLpag>("/api/v1/admin/calendario-laboral/calcular-plazo", {
+        params: { desde, diasHabiles },
+      });
+      setResultadoPlazo(data);
+    } catch (causa) {
+      setError(errorDesdeCausa(causa, "No se pudo calcular el plazo hábil."));
+    } finally { setCalculandoPlazo(false); }
+  }
+
   return {
+    anio, setAnio,
     dias, alternarDia, horaInicio, setHoraInicio, horaFin, setHoraFin,
     horaCorteRecepcion, setHoraCorteRecepcion, zonaHoraria, setZonaHoraria,
     feriados, agregarFeriado, quitarFeriado, fechaNueva, setFechaNueva,
-    nombreNuevo, setNombreNuevo, guardarConfiguracion, mensaje, setMensaje,
-    error, isLoading, isSaving, recargar: cargar,
+    nombreNuevo, setNombreNuevo, tipoFeriadoNuevo, setTipoFeriadoNuevo,
+    baseLegalNueva, setBaseLegalNueva,
+    resultadoPlazo, calculandoPlazo, consultarPlazo,
+    guardarConfiguracion, mensaje, setMensaje,
+    error, isLoading, isSaving, recargar: () => cargar(anio),
   };
 }

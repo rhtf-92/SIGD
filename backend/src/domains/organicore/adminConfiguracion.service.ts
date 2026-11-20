@@ -110,5 +110,71 @@ export function crearAdminConfiguracionService(pool: Pool) {
     finally { client.release(); }
   }
 
-  return { obtenerJornada, guardarJornada, obtenerPoliticas, guardarPoliticas, listarIntentos, listarCuentasBloqueadas, desbloquearCuenta };
+  async function listarSesionesActivas(limite = 50, offset = 0) {
+    const { rows } = await pool.query<Row>(
+      `SELECT s.id_sesion, s.id_usuario, c.usuario, c.correo,
+              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
+              s.ip_origen, s.user_agent, s.emitido_en, s.expira_en,
+              count(*) OVER()::int AS total
+         FROM sigd_auth.sesion_usuario s
+         JOIN sigd_auth.cuenta_usuario c ON c.id_usuario = s.id_usuario
+         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
+         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
+        WHERE s.revocado_en IS NULL
+          AND s.expira_en > now()
+        ORDER BY s.emitido_en DESC
+        LIMIT $1 OFFSET $2`,
+      [limite, offset],
+    );
+    return {
+      total: Number(rows[0]?.total ?? 0),
+      sesiones: rows.map(({ total: _total, ...row }) => row),
+    };
+  }
+
+  async function revocarSesion(idSesion: string, justificacion: string, actorId: string) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const before = (await client.query<Row>(
+        `SELECT id_sesion, id_usuario, ip_origen, emitido_en, expira_en, revocado_en
+           FROM sigd_auth.sesion_usuario
+          WHERE id_sesion = $1
+          FOR UPDATE`,
+        [idSesion],
+      )).rows[0];
+      if (!before) throw new NotFoundError({ message: 'No existe la sesión indicada.' });
+      if (before.revocado_en) {
+        throw new ConflictError({ code: 'SESION_YA_REVOCADA', message: 'La sesión ya fue revocada previamente.' });
+      }
+      const updated = await client.query<Row>(
+        `UPDATE sigd_auth.sesion_usuario
+            SET revocado_en = now()
+          WHERE id_sesion = $1
+          RETURNING id_sesion, id_usuario, revocado_en`,
+        [idSesion],
+      );
+      const after = updated.rows[0];
+      await registrarMutacion(client, {
+        esquema: 'sigd_auth',
+        tabla: 'sesion_usuario',
+        operacion: 'UPDATE',
+        datos_antes: { id_sesion: before.id_sesion, id_usuario: before.id_usuario, revocado_en: before.revocado_en },
+        datos_despues: { evento: 'CORRECTO', accion: 'SESION_REVOCADA', id_sesion: after.id_sesion, id_usuario: after.id_usuario, revocado_en: after.revocado_en, justificacion, revocado_por: actorId },
+      });
+      await cerrar(client, true);
+      return { sesion: after, revocada: true };
+    } catch (error) {
+      await cerrar(client, false).catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  return {
+    obtenerJornada, guardarJornada, obtenerPoliticas, guardarPoliticas,
+    listarIntentos, listarCuentasBloqueadas, desbloquearCuenta,
+    listarSesionesActivas, revocarSesion,
+  };
 }
