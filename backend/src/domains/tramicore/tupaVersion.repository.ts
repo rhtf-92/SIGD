@@ -1373,6 +1373,10 @@ export class TupaVersionRepository {
          LEFT JOIN sigd_org.area responsable ON responsable.area_id = p.unidad_responsable_id
          LEFT JOIN sigd_org.area resolutiva ON resolutiva.area_id = p.unidad_resolutiva_id
         WHERE rv.registro_version_id = $2::uuid
+           OR rv.registro_version_id = (
+             SELECT registro_version_id FROM sigd_doc.tupa_procedimiento WHERE id_procedimiento = $2::uuid LIMIT 1
+           )
+        LIMIT 1
         RETURNING *`,
       [
         expedienteId,

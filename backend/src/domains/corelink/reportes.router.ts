@@ -37,6 +37,8 @@ export function crearRouterReportes(
   router.get('/reportes/dashboard/resumen', controlador.resumen);
   router.get('/reportes/dashboard/cuellos-botella', controlador.cuellosBotella);
   router.get('/reportes/dashboard/tendencias', controlador.tendencias);
+  router.get('/reportes/dashboard/tendencia', controlador.tendencias);
+  router.get('/reportes/dashboard/estados', controlador.resumen);
 
   // Alias de §20 y del §4.7. Mismo controlador, misma respuesta.
   router.get('/reportes/dashboard/kpis', controlador.resumen);

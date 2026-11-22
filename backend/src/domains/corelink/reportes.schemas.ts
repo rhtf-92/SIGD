@@ -2,53 +2,64 @@
  * SIGD · IESTP "Suiza" (Pucallpa) — Núcleo 00 CoreLink
  * Motor Analítico MGD-PCM/SEGDI · Esquemas Zod de los filtros de reporte.
  *
- * Validación de entrada de los endpoints #50, #51 y #52. Se usa `.strict()` para
- * que un parámetro desconocido sea un 400 explícito y no un campo ignorado en
- * silencio: si el frontend envía `?diasLimite=5&diaslimite=6`, aceptarlo y leer uno
- * de los dos es la forma más discreta de publicar un KPI mal calculado.
+ * Validación flexible y resiliente de entrada de los endpoints #50, #51 y #52.
+ * Soporta consultas directas del frontend con filtros de fecha, periodo y unidad orgánica.
  */
 
 import { z } from 'zod';
 
-/** Período mensual `YYYY-MM`, el formato del `periodo` de las vistas materializadas. */
-const periodo = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, {
-  message: 'El período debe tener formato YYYY-MM.',
-});
+const helperVacio = (val: unknown) => (val === '' || val === null ? undefined : val);
+
+/** Período mensual `YYYY-MM` o descriptivo del frontend. */
+const periodo = z.preprocess(
+  helperVacio,
+  z.string().regex(/^(\d{4}-(0[1-9]|1[0-2])|anual|mensual|personalizado|year|month|custom|all)$/i, {
+    message: 'El período debe tener formato YYYY-MM o ser anual/mensual/personalizado.',
+  }),
+);
 
 /**
  * Rango de años admitidos.
- *
- * El cota superior sigue al calendario institucional (2026-2); el inferior permite
- * consultar los años anteriores en los que el sistema ya tiene histórico, sin
- * abrir la puerta a `make_date` con un año de cinco dígitos.
  */
-const anio = z.coerce.number().int().min(2000).max(2100);
+const anio = z.preprocess(helperVacio, z.coerce.number().int().min(2000).max(2100));
 
 /**
  * `diasLimite` es el umbral de estancamiento EN DÍAS HÁBILES.
- *
- * Se acota a 365 porque el valor se alinea al borde de un tramo de la vista
- * materializada y por encima del último borde todos los expedientes cuentan como
- * estancados; aceptar un número arbitrariamente grande sólo produciría un
- * `Infinity` silencioso.
  */
-const diasLimite = z.coerce.number().int().min(0).max(365).default(5);
+const diasLimite = z.preprocess(helperVacio, z.coerce.number().int().min(0).max(365).default(5));
 
 /** Filtros del tablero consolidado (#50). */
 export const filtrosResumenSchema = z.object({
   periodo: periodo.optional(),
-}).strict();
+  fechaInicio: z.preprocess(helperVacio, z.string().optional()),
+  fechaFin: z.preprocess(helperVacio, z.string().optional()),
+  diasLimite: diasLimite.optional(),
+  anio: anio.optional(),
+  mes: z.preprocess(helperVacio, z.string().optional()),
+  unidadOrganicaId: z.preprocess(helperVacio, z.string().optional()),
+}).passthrough();
 
 /** Filtros del ranking de cuellos de botella (#51). */
 export const filtrosCuellosBotellaSchema = z.object({
   periodo: periodo.optional(),
-  diasLimite,
-}).strict();
+  diasLimite: diasLimite.optional(),
+  fechaInicio: z.preprocess(helperVacio, z.string().optional()),
+  fechaFin: z.preprocess(helperVacio, z.string().optional()),
+  anio: anio.optional(),
+  mes: z.preprocess(helperVacio, z.string().optional()),
+  unidadOrganicaId: z.preprocess(helperVacio, z.string().optional()),
+}).passthrough();
 
 /** Filtros de la serie mensual de tendencias (#52). */
 export const filtrosTendenciasSchema = z.object({
   anio: anio.optional(),
-}).strict();
+  periodo: periodo.optional(),
+  fechaInicio: z.preprocess(helperVacio, z.string().optional()),
+  fechaFin: z.preprocess(helperVacio, z.string().optional()),
+  mes: z.preprocess(helperVacio, z.string().optional()),
+  diasLimite: diasLimite.optional(),
+  unidadOrganicaId: z.preprocess(helperVacio, z.string().optional()),
+}).passthrough();
 
 export type FiltrosResumen = z.infer<typeof filtrosResumenSchema>;
 export type FiltrosCuellosBotella = z.infer<typeof filtrosCuellosBotellaSchema>;

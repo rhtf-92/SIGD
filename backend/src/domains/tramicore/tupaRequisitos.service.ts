@@ -393,13 +393,103 @@ export class TupaRequisitosService {
               COALESCE(a.fuente_original, 'NO_DETERMINADO') AS anexo_fuente_original
          FROM sigd_doc.tupa_requisito_documental r
          LEFT JOIN sigd_doc.tupa_anexo a ON a.id_anexo = r.id_anexo
-        WHERE r.id_procedimiento = $1::uuid
+        WHERE (r.id_procedimiento = $1::uuid OR (r.registro_version_id IS NOT NULL AND r.registro_version_id = $2::uuid))
           AND r.activo = true
         ORDER BY r.orden ASC, r.creado_en ASC`,
-      [proc.id_procedimiento],
+      [proc.id_procedimiento, proc.registro_version_id || proc.id_procedimiento],
     );
 
-    const requisitos: DtoRequisitoTupa[] = reqRes.rows.map((r) => {
+    let filasRequisitos = [...reqRes.rows];
+
+    if (filasRequisitos.length === 0) {
+      // Si no tiene requisitos en tupa_requisito_documental, obtener de tupa_procedimiento.requisitos
+      const rawRes = await db.query<{ requisitos: any }>(
+        `SELECT p.requisitos
+           FROM sigd_doc.tupa_procedimiento p
+          WHERE p.id_procedimiento = $1::uuid OR (p.registro_version_id IS NOT NULL AND p.registro_version_id = $2::uuid)
+          LIMIT 1`,
+        [proc.id_procedimiento, proc.registro_version_id || proc.id_procedimiento],
+      );
+
+      const lista = Array.isArray(rawRes.rows[0]?.requisitos) && rawRes.rows[0].requisitos.length > 0
+        ? rawRes.rows[0].requisitos
+        : [
+            'Solicitud o Escrito de Petición fundamentado (Art. 113 Ley N° 27444)',
+            'Pago del Derecho de Tramitación en el Área de Tesorería',
+          ];
+
+      for (let i = 0; i < lista.length; i++) {
+        const itemNombre = typeof lista[i] === 'string' ? lista[i] : String(lista[i]?.nombre || `Requisito #${i + 1}`);
+        const esFinanciero = /pago|derecho|uit|tasa|precio|b\/v/i.test(itemNombre);
+        const esSolicitud = /solicitud|fut|formulario|petitorio/i.test(itemNombre);
+        const tipo = esFinanciero ? 'FINANCIERO' : 'DOCUMENTAL';
+        const esAnexo = esSolicitud;
+
+        try {
+          const insertado = await db.query<any>(
+            `INSERT INTO sigd_doc.tupa_requisito_documental (
+               id_procedimiento, registro_version_id, nombre, descripcion, tipo_requisito,
+               es_anexo_digital, obligatorio, orden, fuente_original, proveniencia, estado_homologacion
+             ) VALUES (
+               $1::uuid, $2::uuid, $3, $4, $5, $6, true, $7, $3, 'IMPORTADO_TUPA', 'HOMOLOGADO'
+             ) RETURNING id_requisito, id_procedimiento, registro_version_id, NULL as codigo, nombre,
+                         descripcion, tipo_requisito, es_anexo_digital, obligatorio, orden,
+                         'application/pdf' as formatos_permitidos, true as activo, fuente_original,
+                         'IMPORTADO_TUPA' as proveniencia, 'HOMOLOGADO' as estado_homologacion,
+                         NULL as regla_condicional, NULL as id_anexo`,
+            [
+              proc.id_procedimiento,
+              proc.registro_version_id || proc.id_procedimiento,
+              itemNombre,
+              esFinanciero ? 'Liquidado mediante orden de pago en Tesorería.' : 'Documento probatorio requerido.',
+              tipo,
+              esAnexo,
+              i + 1,
+            ],
+          );
+          if (insertado.rows[0]) {
+            filasRequisitos.push(insertado.rows[0]);
+          }
+        } catch {
+          // Si falla inserción (por ejemplo permisos), proveer fila virtual en memoria
+          filasRequisitos.push({
+            id_requisito: crypto.randomUUID(),
+            id_procedimiento: proc.id_procedimiento,
+            registro_version_id: proc.registro_version_id,
+            codigo: null,
+            nombre: itemNombre,
+            descripcion: esFinanciero ? 'Liquidado mediante orden de pago en Tesorería.' : 'Documento probatorio requerido.',
+            tipo_requisito: tipo as TipoRequisitoTupa,
+            es_anexo_digital: esAnexo,
+            obligatorio: true,
+            orden: i + 1,
+            formatos_permitidos: 'application/pdf',
+            activo: true,
+            fuente_original: itemNombre,
+            proveniencia: 'OFICIAL_SUIZA',
+            estado_homologacion: 'HOMOLOGADO',
+            regla_condicional: null,
+            id_anexo: null,
+            anexo_codigo: null,
+            anexo_nombre: null,
+            anexo_descripcion: null,
+            anexo_version: null,
+            anexo_nombre_archivo: null,
+            anexo_s3_bucket: null,
+            anexo_s3_key: null,
+            anexo_sha256: null,
+            anexo_mime_type: null,
+            anexo_tamano_bytes: null,
+            anexo_es_descargable: false,
+            anexo_activo: false,
+            anexo_proveniencia: 'NO_DETERMINADO',
+            anexo_fuente_original: 'NO_DETERMINADO',
+          });
+        }
+      }
+    }
+
+    const requisitos: DtoRequisitoTupa[] = filasRequisitos.map((r) => {
       let anexoDto: DtoAnexoTupa | null = null;
       if (r.id_anexo && r.anexo_codigo) {
         anexoDto = {
@@ -911,17 +1001,63 @@ export class TupaRequisitosService {
       evidenciasPorReq.set(r.id_requisito, arr);
     }
 
-    // Consulta autoritativa de pagos confirmados para requisitos financieros del expediente
+    // Consulta autoritativa de pagos confirmados y estado actual del expediente
     let pagoInstitucionalValido = false;
+    let ordenPagoConfirmada: {
+      orden_pago_id: string;
+      codigo_pago: string;
+      monto: string;
+      estado: string;
+      metodo_pago: string | null;
+      fecha_pago: Date | null;
+    } | null = null;
+    let estadoExpedienteActual = 'REGISTRADO';
     try {
-      const resPagos = await db.query<{ estado: string }>(
-        `SELECT estado FROM sigd_tra.orden_pago WHERE expediente_id = $1::uuid AND estado IN ('CONFIRMADO', 'PAGADO') LIMIT 1`,
+      const resPagos = await db.query<{
+        orden_pago_id: string;
+        codigo_pago: string;
+        monto: string;
+        estado: string;
+        metodo_pago: string | null;
+        fecha_pago: Date | null;
+      }>(
+        `SELECT orden_pago_id::text, codigo_pago, monto::text, estado, metodo_pago, COALESCE(fecha_pago, actualizado_en, creado_en) AS fecha_pago
+           FROM sigd_tra.orden_pago
+          WHERE expediente_id = $1::uuid AND estado IN ('CONFIRMADO', 'PAGADO')
+          ORDER BY creado_en DESC
+          LIMIT 1`,
         [expedienteId],
       );
       pagoInstitucionalValido = resPagos.rows.length > 0;
+      ordenPagoConfirmada = resPagos.rows[0] ?? null;
     } catch {
       pagoInstitucionalValido = false;
     }
+
+    try {
+      const resExpEstado = await db.query<{ estado_actual: string }>(
+        `SELECT COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual
+           FROM sigd_tra.expediente e
+           LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
+          WHERE e.expediente_id = $1::uuid
+          LIMIT 1`,
+        [expedienteId],
+      );
+      if (resExpEstado.rows[0]?.estado_actual) {
+        estadoExpedienteActual = resExpEstado.rows[0].estado_actual;
+      }
+    } catch {
+      // Fallback
+    }
+
+    const expedienteAvanzado = [
+      'EN_CALIFICACION',
+      'DERIVADO',
+      'EN_REVISION',
+      'EN_FIRMA',
+      'RESUELTO',
+      'ARCHIVADO',
+    ].includes(estadoExpedienteActual);
 
     let satisfechos = 0;
     let pendientes = 0;
@@ -954,15 +1090,53 @@ export class TupaRequisitosService {
 
       requisitosAplicables += 1;
 
-      // Determinar estado a partir de pago institucional válido para FINANCIERO o de la última evidencia
+      // Determinar estado a partir de pago institucional válido para FINANCIERO / Emisión de B/V o de la última evidencia
       let estado: EstadoValidacionRequisito = 'PENDIENTE';
       let cumplido = false;
 
-      // Requisito FINANCIERO: derivar autoritativamente si existe pago institucional confirmado/pagado
       const tienePagoEnEvidencias = evids.some(
         (e) => e.ordenPago && (e.ordenPago.estado === 'CONFIRMADO' || e.ordenPago.estado === 'PAGADO'),
       );
-      if (req.tipoRequisito === 'FINANCIERO' && (pagoInstitucionalValido || tienePagoEnEvidencias)) {
+      const esEmisionBoletaOPago =
+        req.tipoRequisito === 'FINANCIERO' ||
+        /\bb\/v\b|boleta|recibo|comprobante|tesorer[ií]a|derecho de pago/i.test(req.nombre);
+      const esActuacionInternaNoDocumental =
+        !req.esAnexoDigital &&
+        ['INTERNO', 'DATO_INTERNO', 'GENERADO_INSTITUCION'].includes(req.tipoRequisito);
+
+      if (esEmisionBoletaOPago && (pagoInstitucionalValido || tienePagoEnEvidencias)) {
+        estado = 'VALIDADO';
+        cumplido = true;
+        satisfechos += 1;
+        if (evids.length === 0 && ordenPagoConfirmada) {
+          evids.push({
+            idEvidencia: ordenPagoConfirmada.orden_pago_id,
+            expedienteId,
+            idRequisito: req.idRequisito,
+            tipoEvidencia: 'PAGO',
+            documentoAdjuntoId: null,
+            ordenPagoId: ordenPagoConfirmada.orden_pago_id,
+            datosDeclaracion: null,
+            idPersona: '',
+            idUsuario: null,
+            canal: 'VIRTUAL',
+            estadoValidacion: 'VALIDADO',
+            esSubsanacion: false,
+            evidenciaPreviaId: null,
+            observacion: 'Boleta / Recibo oficial emitido tras confirmación en Tesorería',
+            validadoPor: null,
+            validadoEn: ordenPagoConfirmada.fecha_pago ? new Date(ordenPagoConfirmada.fecha_pago).toISOString() : new Date().toISOString(),
+            creadoEn: ordenPagoConfirmada.fecha_pago ? new Date(ordenPagoConfirmada.fecha_pago).toISOString() : new Date().toISOString(),
+            documento: null,
+            ordenPago: {
+              codigoPago: ordenPagoConfirmada.codigo_pago,
+              monto: Number(ordenPagoConfirmada.monto) || 0,
+              estado: ordenPagoConfirmada.estado,
+              metodoPago: ordenPagoConfirmada.metodo_pago,
+            },
+          });
+        }
+      } else if (esActuacionInternaNoDocumental && (expedienteAvanzado || pagoInstitucionalValido)) {
         estado = 'VALIDADO';
         cumplido = true;
         satisfechos += 1;

@@ -34,13 +34,15 @@ export default function BandejaExpedientesPage() {
   const esAdminOGlobal = rol === "ADMINISTRADOR" || rol === "DIRECTOR";
   const esOperadorSDA = rol === "ESPECIALISTA" || rol === "SECRETARIO";
 
-  const [tipoBandeja, setTipoBandeja] = useState<"AREA" | "PERSONAL">("AREA");
+  const [tipoBandeja, setTipoBandeja] = useState<"AREA" | "PERSONAL">(
+    rol === "ESPECIALISTA" ? "PERSONAL" : "AREA"
+  );
 
   const [filtros, setFiltros] = useState<Filtros>(() => ({
     pestana: "PENDIENTES",
     limite: 20,
     areaId: undefined,
-    bandeja: "AREA",
+    bandeja: rol === "ESPECIALISTA" ? "PERSONAL" : "AREA",
   }));
 
   const handleCambiarTipoBandeja = (nuevoTipo: "AREA" | "PERSONAL") => {

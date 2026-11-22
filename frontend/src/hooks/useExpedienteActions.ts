@@ -49,7 +49,7 @@ function useAccion<Entrada, Salida>(
       // Un fallo de revalidación no convierte una escritura confirmada en fallo de envío.
       try {
         const claves = opciones.obtenerClavesAfectadas(ids(entrada));
-        await Promise.all(claves.filter((clave) => clave.length > 0).map((queryKey) => cliente.invalidateQueries({ queryKey, exact: true }, { throwOnError: true })));
+        await Promise.all(claves.filter((clave) => clave.length > 0).map((queryKey) => cliente.invalidateQueries({ queryKey })));
         notificar({ tipo: "success", mensaje: mensajeExito });
       } catch {
         notificar({ tipo: "aviso", mensaje: `${mensajeExito} No se pudieron actualizar todas las vistas. Actualice los datos sin repetir la operación.` });

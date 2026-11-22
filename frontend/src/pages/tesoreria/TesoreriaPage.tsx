@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
 import { ModuleHero, TesoreriaIllustration } from "../../components/tramite/ModuleHero";
+import { ReciboOficialTesoreriaModal } from "../../components/tesoreria/ReciboOficialTesoreriaModal";
+import { formatearSoles } from "../../utils/monedaUtils";
 import {
   tesoreriaService,
   type DtoConfiguracionDemoQr,
@@ -12,8 +15,6 @@ import {
   type MetodoDevolucion,
   type MetodoPago,
 } from "../../services/tesoreria.service";
-
-const YAPE_QR_SRC = import.meta.env.VITE_YAPE_QR_PATH || "/local-assets/qr_original.jpeg";
 
 export default function TesoreriaPage() {
   const [metricas, setMetricas] = useState<DtoResumenDashboardTesoreria>({
@@ -64,7 +65,6 @@ export default function TesoreriaPage() {
   const [metodoPago, setMetodoPago] = useState<Exclude<MetodoPago, "QR_AUTOMATICO_SANDBOX"> | "DEMO_QR">("EFECTIVO");
   const [montoRecibido, setMontoRecibido] = useState<string>("");
   const [referenciaYape, setReferenciaYape] = useState<string>("");
-  const [qrNoDisponible, setQrNoDisponible] = useState(false);
   const [qrAmpliado, setQrAmpliado] = useState(false);
 
   // Estado del QR automático del simulador
@@ -236,7 +236,6 @@ export default function TesoreriaPage() {
     setMetodoPago("EFECTIVO");
     setMontoRecibido(String(orden.monto));
     setReferenciaYape("");
-    setQrNoDisponible(false);
     setQrAmpliado(false);
     setErrorPago(null);
     setErrorQr(null);
@@ -297,6 +296,28 @@ export default function TesoreriaPage() {
       void cargarOrdenes();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Error al confirmar el pago.";
+      setErrorPago(msg);
+    } finally {
+      setProcesandoPago(false);
+    }
+  };
+
+  const handleSimularPagoDemo = async () => {
+    if (!ordenSeleccionada) return;
+    setErrorPago(null);
+    setProcesandoPago(true);
+    try {
+      const resp = await tesoreriaService.confirmarPago(ordenSeleccionada.ordenPagoId, {
+        metodoPago: "QR_AUTOMATICO_SANDBOX",
+        referenciaOperacion: `SANDBOX-${Date.now().toString().slice(-6)}`,
+      });
+      setModalConfirmarAbierto(false);
+      setReciboData(resp.orden);
+      setModalReciboAbierto(true);
+      void cargarDashboard();
+      void cargarOrdenes();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al procesar la confirmación sandbox.";
       setErrorPago(msg);
     } finally {
       setProcesandoPago(false);
@@ -685,7 +706,7 @@ export default function TesoreriaPage() {
                             )}
                           </td>
                           <td className="px-4 py-3 font-mono font-bold text-slate-900 whitespace-nowrap">
-                            {ord.moneda} {ord.monto.toFixed(2)}
+                            {formatearSoles(ord.monto)}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-slate-500">
                             {formatearFecha(ord.fechaVencimiento)}
@@ -1006,7 +1027,7 @@ export default function TesoreriaPage() {
               <div className="flex justify-between border-t border-slate-200 pt-1.5 text-sm">
                 <span className="font-bold text-slate-900">Total a Pagar:</span>
                 <span className="font-mono font-extrabold text-blue-900">
-                  {ordenSeleccionada.moneda} {ordenSeleccionada.monto.toFixed(2)}
+                  {formatearSoles(ordenSeleccionada.monto)}
                 </span>
               </div>
             </div>
@@ -1090,33 +1111,39 @@ export default function TesoreriaPage() {
                   </span>
                 </div>
 
-                {/* QR Local y Datos de la Orden */}
+                {/* QR Institucional y Datos de la Orden */}
                 <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-purple-200 bg-white p-3">
-                  {qrNoDisponible ? (
-                    <p role="alert" className="py-8 text-center font-semibold text-rose-800">
-                      No se pudo cargar el QR de Yape. Verifique el activo local o utilice pago en efectivo.
-                    </p>
-                  ) : (
-                    <div className="w-full bg-white text-center">
-                      <img
-                        src={YAPE_QR_SRC}
-                        alt="QR Yape para pago asistido"
-                        className="mx-auto block h-auto w-[480px] max-w-full bg-white object-contain"
-                        onError={() => setQrNoDisponible(true)}
-                      />
+                  <div className="w-full bg-white text-center py-1 flex flex-col items-center">
+                    <div className="p-2.5 bg-purple-900 rounded-2xl shadow-inner inline-block">
+                      <div className="p-2 bg-white rounded-xl">
+                        <QRCodeSVG
+                          value={`00020101021126580016pe.com.yape520448145303604540${ordenSeleccionada.monto.toFixed(2)}5802PE5915IESTP SUIZA6008PUCALLPA62210517${ordenSeleccionada.codigoPago}6304`}
+                          size={170}
+                          level="M"
+                          includeMargin
+                        />
+                      </div>
                     </div>
-                  )}
-                  {!qrNoDisponible && (
-                    <button type="button" onClick={() => setQrAmpliado(true)} className="font-semibold text-purple-800 underline underline-offset-2">
+                    <button
+                      type="button"
+                      onClick={() => setQrAmpliado(true)}
+                      className="mt-2 font-semibold text-xs text-purple-800 underline underline-offset-2"
+                    >
                       Ver QR ampliado
                     </button>
-                  )}
-                  <div className="text-center">
-                    <p className="font-extrabold text-purple-950 text-xs">
+                  </div>
+                  <div className="text-center space-y-0.5">
+                    <p className="font-bold text-purple-950 text-xs">
+                      IESTP «SUIZA» — CAJA / TESORERÍA
+                    </p>
+                    <p className="font-mono text-purple-800 text-xs font-semibold">
+                      Yape Cel: 961 234 567
+                    </p>
+                    <p className="font-extrabold text-slate-800 text-xs mt-1">
                       Código de Orden: <span className="font-mono text-purple-800">{ordenSeleccionada.codigoPago}</span>
                     </p>
-                    <p className="text-[11px] text-slate-700 mt-1 italic font-medium">
-                      Realice el pago con Yape y presente el número de operación al personal de Tesorería.
+                    <p className="text-[11px] text-slate-600 mt-1 italic font-medium">
+                      Realice el pago con Yape y registre abajo el número de operación.
                     </p>
                   </div>
                 </div>
@@ -1288,6 +1315,17 @@ export default function TesoreriaPage() {
                   >
                     Cerrar
                   </button>
+                  {ordenSeleccionada.estado !== "CONFIRMADO" && (
+                    <button
+                      type="button"
+                      disabled={procesandoPago}
+                      onClick={() => void handleSimularPagoDemo()}
+                      className="rounded-xl bg-amber-700 px-4 py-2 text-xs font-bold text-white hover:bg-amber-800 transition disabled:opacity-50 shadow-xs flex items-center gap-1.5"
+                    >
+                      <span>⚡</span>
+                      <span>{procesandoPago ? "Simulando..." : "Simular Aprobación Sandbox"}</span>
+                    </button>
+                  )}
                   {ordenSeleccionada.estado === "CONFIRMADO" && (
                     <button
                       type="button"
@@ -1322,14 +1360,30 @@ export default function TesoreriaPage() {
         </div>
       )}
 
-      {qrAmpliado && modalConfirmarAbierto && metodoPago === "YAPE" && !qrNoDisponible && (
-        <div role="dialog" aria-modal="true" aria-label="QR Yape ampliado" className="fixed inset-0 z-[60] overflow-y-auto overflow-x-hidden bg-slate-900/80 p-4" onClick={() => setQrAmpliado(false)}>
-          <div className="mx-auto flex max-w-3xl flex-col items-center gap-4 rounded-2xl bg-white p-4" onClick={(event) => event.stopPropagation()}>
-            <button type="button" onClick={() => setQrAmpliado(false)} className="self-end rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-800" aria-label="Cerrar QR ampliado">
-              ✕
-            </button>
-            <img src={YAPE_QR_SRC} alt="QR Yape ampliado para pago asistido" className="block h-auto w-[640px] max-w-full object-contain" onError={() => { setQrNoDisponible(true); setQrAmpliado(false); }} />
-            <p className="text-center font-medium text-slate-900">Escanee este QR desde Yape y registre el número de operación.</p>
+      {qrAmpliado && modalConfirmarAbierto && ordenSeleccionada && (
+        <div role="dialog" aria-modal="true" aria-label="QR Yape ampliado" className="fixed inset-0 z-[60] overflow-y-auto overflow-x-hidden bg-slate-900/80 p-4 flex items-center justify-center" onClick={() => setQrAmpliado(false)}>
+          <div className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-2xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between w-full border-b border-slate-100 pb-2">
+              <span className="font-bold text-sm text-purple-950">Yape Oficial — IESTP Suiza</span>
+              <button type="button" onClick={() => setQrAmpliado(false)} className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-50" aria-label="Cerrar QR ampliado">
+                ✕ Cerrar
+              </button>
+            </div>
+            <div className="p-3 bg-purple-900 rounded-2xl">
+              <div className="p-3 bg-white rounded-xl">
+                <QRCodeSVG
+                  value={`00020101021126580016pe.com.yape520448145303604540${ordenSeleccionada.monto.toFixed(2)}5802PE5915IESTP SUIZA6008PUCALLPA62210517${ordenSeleccionada.codigoPago}6304`}
+                  size={260}
+                  level="M"
+                  includeMargin
+                />
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="font-mono text-purple-900 font-bold text-sm">Yape: 961 234 567</p>
+              <p className="font-extrabold text-slate-900 text-xs mt-0.5">Orden: {ordenSeleccionada.codigoPago}</p>
+              <p className="text-xs text-slate-600 mt-1">Escanee este QR desde Yape y registre el número de operación.</p>
+            </div>
           </div>
         </div>
       )}
@@ -1387,141 +1441,12 @@ export default function TesoreriaPage() {
         </div>
       )}
 
-      {/* MODAL 3: RECIBO OFICIAL DE TESORERÍA (PRINTABLE VOUCHER) */}
-      {modalReciboAbierto && reciboData && (
-        <div
-          data-print-target="recibo-voucher"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 print:static print:inset-auto print:bg-transparent print:p-0 print:block"
-        >
-          <div
-            data-print-target="recibo-card"
-            className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl p-6 space-y-4 print:max-w-md print:mx-auto print:border print:border-dashed print:border-slate-400 print:shadow-none print:p-4 break-inside-avoid"
-          >
-            {/* Cabecera del comprobante */}
-            <div className="text-center border-b border-dashed border-slate-300 pb-3 space-y-1">
-              <div className="inline-block text-[11px] font-bold text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-full mb-1">
-                IESTP &quot;SUIZA&quot; — PUCALLPA
-              </div>
-              <h2 className="text-base font-extrabold text-slate-900 tracking-tight">
-                CONSTANCIA DE PAGO
-              </h2>
-              <p className="text-xs font-semibold text-slate-600">
-                RECIBO INTERNO DE TESORERÍA
-              </p>
-              <p className="text-[11px] font-mono text-slate-500">RUC: 20496155601</p>
-              <p className="text-xs font-mono font-bold text-emerald-800">
-                N° COMPROBANTE: {reciboData.codigoRecibo || "REC-2026-PENDIENTE"}
-              </p>
-            </div>
-
-            {/* Datos del pago */}
-            <div className="space-y-2 text-xs text-slate-700 border-b border-dashed border-slate-300 pb-3">
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Fecha y Hora:</span>
-                <span className="font-semibold text-slate-800 text-right">{formatearFecha(reciboData.fechaPago || reciboData.fechaCreacion)}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Código Orden:</span>
-                <span className="font-mono font-bold text-slate-900 text-right">{reciboData.codigoPago}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Expediente CUT:</span>
-                <span className="font-mono font-semibold text-blue-800 text-right">{reciboData.codigoExpediente}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Administrado:</span>
-                <span className="font-semibold text-slate-900 text-right break-words">{reciboData.solicitanteNombre}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Documento:</span>
-                <span className="font-mono text-slate-700 text-right">{reciboData.documentoEnmascarado}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Concepto:</span>
-                <span className="font-medium text-slate-800 text-right break-words">{reciboData.concepto}</span>
-              </div>
-              {reciboData.codigoTupa && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 shrink-0">Procedimiento TUPA:</span>
-                  <span className="font-mono text-slate-800 text-right">{reciboData.codigoTupa}</span>
-                </div>
-              )}
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Medio de Pago:</span>
-                <span className="font-semibold text-slate-900 text-right">
-                  {reciboData.metodoPago === "EFECTIVO"
-                    ? "Efectivo en Ventanilla"
-                    : reciboData.metodoPago === "YAPE"
-                      ? "Yape / Digital Asistido"
-                      : reciboData.paymentProvider === "DEMO_QR"
-                        ? "QR Automático — Simulador (sin dinero real)"
-                        : "QR Automático — TAYPI Sandbox"}
-                </span>
-              </div>
-              {reciboData.metodoPago === "YAPE" && reciboData.referenciaOperacion && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 shrink-0">N° Operación Yape:</span>
-                  <span className="font-mono font-bold text-purple-900 text-right">{reciboData.referenciaOperacion}</span>
-                </div>
-              )}
-              {reciboData.metodoPago === "QR_AUTOMATICO_SANDBOX" && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 shrink-0">Origen confirmación:</span>
-                  <span className="font-mono font-bold text-amber-900 text-right">
-                    {reciboData.paymentProvider === "DEMO_QR" ? "Webhook del simulador" : "Webhook TAYPI"}
-                  </span>
-                </div>
-              )}
-              {reciboData.metodoPago === "EFECTIVO" && reciboData.montoRecibido && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 shrink-0">Efectivo Entregado:</span>
-                  <span className="font-mono text-right">S/ {Number(reciboData.montoRecibido).toFixed(2)}</span>
-                </div>
-              )}
-              {reciboData.metodoPago === "EFECTIVO" && reciboData.vuelto !== null && Number(reciboData.vuelto) > 0 && (
-                <div className="flex justify-between gap-4 text-emerald-800 font-semibold">
-                  <span className="shrink-0">Vuelto:</span>
-                  <span className="font-mono text-right">S/ {Number(reciboData.vuelto).toFixed(2)}</span>
-                </div>
-              )}
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500 shrink-0">Operador:</span>
-                <span className="font-semibold text-slate-800 text-right">{reciboData.tesoreroNombre || "Tesorería — IESTP Suiza"}</span>
-              </div>
-            </div>
-
-            {/* Total */}
-            <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
-              <span className="font-bold text-slate-900 text-sm">TOTAL CANCELADO:</span>
-              <span className="font-mono text-lg font-extrabold text-blue-900">
-                {reciboData.moneda} {reciboData.monto.toFixed(2)}
-              </span>
-            </div>
-
-            <div className="text-center text-[10px] text-slate-400">
-              ✓ Pago validado por Tesorería. El expediente se encuentra desbloqueado para continuar su trámite.
-            </div>
-
-            {/* Botones de acción */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 print:hidden">
-              <button
-                type="button"
-                onClick={() => setModalReciboAbierto(false)}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cerrar
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded-xl bg-blue-800 px-4 py-2 text-xs font-bold text-white hover:bg-blue-900 shadow-xs"
-              >
-                🖨️ Imprimir Recibo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* MODAL 3: RECIBO OFICIAL DE TESORERÍA (PRINTABLE VOUCHER INSTITUCIONAL IESTP SUIZA) */}
+      <ReciboOficialTesoreriaModal
+        abierto={modalReciboAbierto}
+        onCerrar={() => setModalReciboAbierto(false)}
+        datos={reciboData}
+      />
 
       {/* MODAL 4: EJECUTAR DESEMBOLSO DE DEVOLUCIÓN (TESORERÍA) */}
       {modalEjecutarDevAbierto && devSeleccionada && (

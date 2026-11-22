@@ -77,6 +77,10 @@ export const MANIFIESTO_BASELINE = [
   '49_sigd_tupa_homologacion_tecnica_72.sql',
   '50_sigd_workflow_tupa_circuitos.sql',
   '51_sigd_limpieza_textos_tupa_requisitos.sql',
+  '52_sigd_flujo_certificado_ingles_y_excepciones.sql',
+  '53_sigd_seed_tipos_documentales_oficiales.sql',
+  '54_sigd_centro_idiomas_area_y_circuito.sql',
+  '55_sigd_sincronizar_estado_resuelto_proyeccion.sql',
 ] as const;
 
 interface ScriptMigracion { nombre: string; contenido: string; checksum: string }

@@ -2522,7 +2522,7 @@ export function crearRouterTramites(
       timestamp: new Date(asiento.fecha_asiento),
       folios: Number(asiento.folios),
       hashSha256: crypto.createHash('sha256').update(asiento.cut).digest('hex'),
-      qrUrlSeguimiento: `https://sigd.iestp-suiza.edu.pe/consulta/${encodeURIComponent(asiento.cut)}`,
+      qrUrlSeguimiento: `${(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '')}/consulta/${encodeURIComponent(asiento.cut)}`,
     });
 
     res.status(200).json({

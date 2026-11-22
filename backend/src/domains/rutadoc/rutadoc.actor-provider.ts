@@ -28,11 +28,16 @@ export const actorProviderNoConfigurado: ActorProviderRutaDoc = Object.freeze({
 export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
   return {
     async obtenerActor(req: Request): Promise<ActorRutaDoc | null> {
+      let token: string | undefined;
       const auth = req.headers.authorization;
-      if (!auth || !auth.startsWith('Bearer ')) {
+      if (auth && auth.startsWith('Bearer ')) {
+        token = auth.slice(7).trim();
+      } else if (typeof req.query.token === 'string' && req.query.token.trim()) {
+        token = req.query.token.trim();
+      }
+      if (!token) {
         return null;
       }
-      const token = auth.slice(7).trim();
       let claims: ClaimsJwt;
       try {
         claims = verificarTokenAcceso(token);
@@ -98,12 +103,19 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
             solicitante_id: string | null;
             area_destino_id: string | null;
             estado: string;
+            area_actual_id: string | null;
+            usuario_asignado_id: string | null;
+            persona_asignada_id: string | null;
           }>(
-            `SELECT solicitante_id::text AS solicitante_id,
-                    area_destino_id::text AS area_destino_id,
-                    estado
-               FROM sigd_tra.expediente
-              WHERE expediente_id = $1::uuid`,
+            `SELECT e.solicitante_id::text AS solicitante_id,
+                    e.area_destino_id::text AS area_destino_id,
+                    COALESCE(u.estado_nuevo, e.estado) AS estado,
+                    COALESCE(u.area_actual_id, e.area_destino_id::text) AS area_actual_id,
+                    u.usuario_asignado_id::text AS usuario_asignado_id,
+                    u.persona_asignada_id::text AS persona_asignada_id
+               FROM sigd_tra.expediente e
+               LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
+              WHERE e.expediente_id = $1::uuid`,
             [idExpediente],
           );
 
@@ -119,7 +131,10 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
           }
 
           // Si es rol exclusivo de administrado y no es el solicitante -> denegar acceso
-          if (roles.includes('CIUDADANO')) {
+          const tieneRolOperador = roles.some((r) =>
+            ['ESPECIALISTA', 'SECRETARIO', 'DIRECTOR', 'ADMINISTRADOR', 'MESA_PARTES', 'TESORERIA'].includes(r),
+          );
+          if (roles.includes('CIUDADANO') && !tieneRolOperador) {
             return false;
           }
 
@@ -128,17 +143,69 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
             if (['REGISTRADO', 'PENDIENTE_PAGO', 'RECEPCIONADO', 'EN_CALIFICACION'].includes(exp.estado)) {
               return true;
             }
-            if (areaId && exp.area_destino_id === areaId) {
+            if (areaId && (exp.area_destino_id === areaId || exp.area_actual_id === areaId)) {
               return true;
             }
           }
 
-          // 3. Operador asignado al área destino actual
-          if (areaId && exp.area_destino_id === areaId) {
+          // 3. Operadores de Tesorería (gestión de pagos y aranceles)
+          if (roles.includes('TESORERIA')) {
             return true;
           }
 
-          // 4. Operador de área que intervino en el flujo histórico de movimientos (esquema físico real)
+          // 4. Especialista formalmente asignado (proyección o historial activo)
+          if (
+            exp.usuario_asignado_id === usuarioId ||
+            (idPersona && exp.persona_asignada_id === idPersona)
+          ) {
+            return true;
+          }
+
+          const resAsig = await pool.query(
+            `SELECT 1 FROM sigd_rut.expediente_asignacion
+              WHERE expediente_id = $1::uuid
+                AND (id_usuario = $2::uuid OR ($3::uuid IS NOT NULL AND id_persona = $3::uuid))
+                AND activo = true
+              LIMIT 1`,
+            [idExpediente, usuarioId, idPersona],
+          );
+          if (resAsig.rows && resAsig.rows.length > 0) {
+            return true;
+          }
+
+          // 5. Pertenencia al área de destino o área actual de custodia
+          if (areaId) {
+            if (exp.area_destino_id === areaId || exp.area_actual_id === areaId) {
+              return true;
+            }
+
+            // Jerarquía de unidades (Centro de Idiomas <-> Subdirección Académica u otras áreas hijas/padres)
+            const resJerarquia = await pool.query(
+              `SELECT 1 FROM sigd_org.area
+                WHERE (
+                  (area_id = $1::uuid AND (area_padre_id = $2::uuid OR area_padre_id = $3::uuid))
+                  OR (area_padre_id = $1::uuid AND (area_id = $2::uuid OR area_id = $3::uuid))
+                )
+                LIMIT 1`,
+              [areaId, exp.area_actual_id, exp.area_destino_id],
+            );
+            if (resJerarquia.rows && resJerarquia.rows.length > 0) {
+              return true;
+            }
+
+            // Equivalencia académica institucional SDA <-> Centro de Idiomas
+            const sdaAreaId = 'a0000000-0000-0000-0000-000000000001';
+            const ciAreaId = 'a0000000-0000-0000-0000-000000000003';
+            if (
+              [sdaAreaId, ciAreaId].includes(areaId) &&
+              ([sdaAreaId, ciAreaId].includes(exp.area_actual_id ?? '') ||
+                [sdaAreaId, ciAreaId].includes(exp.area_destino_id ?? ''))
+            ) {
+              return true;
+            }
+          }
+
+          // 6. Operador de área que intervino o recibió derivación en el flujo histórico de movimientos
           if (areaId) {
             const resMov = await pool.query(
               `SELECT 1 FROM sigd_rut.movimiento_tramite
@@ -148,6 +215,16 @@ export function crearJwtActorProvider(pool: Pool): ActorProviderRutaDoc {
                     datos->>'areaOrigenId' = $2::text OR
                     datos->>'area_destino_id' = $2::text OR
                     datos->>'area_origen_id' = $2::text OR
+                    datos->>'areaId' IN (
+                      SELECT a1.area_id::text FROM sigd_org.area a1 WHERE a1.area_padre_id::text = $2::text
+                      UNION
+                      SELECT a2.area_padre_id::text FROM sigd_org.area a2 WHERE a2.area_id::text = $2::text AND a2.area_padre_id IS NOT NULL
+                    ) OR
+                    datos->>'areaOrigenId' IN (
+                      SELECT a1.area_id::text FROM sigd_org.area a1 WHERE a1.area_padre_id::text = $2::text
+                      UNION
+                      SELECT a2.area_padre_id::text FROM sigd_org.area a2 WHERE a2.area_id::text = $2::text AND a2.area_padre_id IS NOT NULL
+                    ) OR
                     usuario_operador_id = $3::bigint
                   )
                 LIMIT 1`,

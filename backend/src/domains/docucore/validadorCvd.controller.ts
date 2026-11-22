@@ -78,7 +78,7 @@ export function crearVerificadorCvd(
       fecha_sello_tsa: documento.fecha_sello_tsa,
       selloTiempoTsa: fechaSello,
       estado: documento.estado,
-      descarga_copia_certificada: null,
+      descarga_copia_certificada: esValido ? `/api/v1/validador/cvd/${encodeURIComponent(documento.cvd)}/pdf` : null,
       documento: null,
       mensajeSeguridad: esValido
         ? 'Existe un registro de firma digital vigente para este CVD en SIGD.'

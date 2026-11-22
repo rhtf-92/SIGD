@@ -189,7 +189,7 @@ export async function derivarExpediente(
     solicitante_id: string;
   }>(`
     SELECT
-      CASE WHEN e.estado = 'PENDIENTE_PAGO' THEN 'PENDIENTE_PAGO' ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
+      CASE WHEN e.estado IN ('RESUELTO', 'ARCHIVADO', 'PENDIENTE_PAGO') THEN e.estado ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id
@@ -342,7 +342,7 @@ export async function recepcionarExpediente(
 
   const resEstadoActual = await cliente.query<{ estado_actual_id: string; area_contexto_id: string }>(
     `SELECT
-      COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
+      CASE WHEN e.estado IN ('RESUELTO', 'ARCHIVADO') THEN e.estado ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id
     FROM sigd_tra.expediente e
     LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
@@ -463,7 +463,7 @@ export async function enviarAFirmaExpediente(
     unidad_resolutiva_id?: string | null;
   }>(
     `SELECT
-      COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
+      CASE WHEN e.estado IN ('RESUELTO', 'ARCHIVADO') THEN e.estado ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id,
@@ -618,7 +618,7 @@ export async function resolverExpedienteConFirma(
     unidad_resolutiva_id?: string | null;
   }>(
     `SELECT
-      COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
+      CASE WHEN e.estado IN ('RESUELTO', 'ARCHIVADO') THEN e.estado ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id,
@@ -810,6 +810,16 @@ export async function resolverExpedienteConFirma(
     });
   }
 
+  // Sincronizar proyección de estado actual en RutaDoc
+  await cliente.query(
+    `UPDATE sigd_rut.estado_actual_expediente
+        SET estado_nuevo = 'RESUELTO',
+            evento = 'RESOLUCION_FIRMA_DIGITAL',
+            fecha_hora = now()
+      WHERE expediente_id = $1::uuid`,
+    [expedienteId],
+  );
+
   // Actualizar resolución institucional a NOTIFICADA si existía en estado FIRMADA
   await cliente.query(
     `UPDATE sigd_doc.resolucion
@@ -884,7 +894,7 @@ export async function atenderExpediente(
     registro_version_id?: string | null;
   }>(
     `SELECT
-      COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
+      CASE WHEN e.estado IN ('RESUELTO', 'ARCHIVADO') THEN e.estado ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id,
@@ -907,19 +917,26 @@ export async function atenderExpediente(
   const {
     estado_actual_id: estadoActual,
     area_contexto_id: areaActual,
-    unidad_responsable_id: areaResponsable,
+    unidad_responsable_id: areaResponsableRaw,
     unidad_resolutiva_id: areaResolutivaRaw,
     registro_version_id: registroVersionId,
   } = resEstadoActual.rows[0];
 
+  const sdaAreaId = 'a0000000-0000-0000-0000-000000000001';
+  const ciAreaId = 'a0000000-0000-0000-0000-000000000003';
+  const areaResponsable = areaResponsableRaw || sdaAreaId;
   const areaResolutiva = areaResolutivaRaw || 'a0000000-0000-0000-0000-000000000002';
   const esIntermediaTecnica = Boolean(areaResponsable && areaResolutiva && areaResponsable !== areaResolutiva);
 
   if (estadoActual === 'EN_REVISION' && esIntermediaTecnica) {
-    if (areaActual !== areaResponsable) {
+    const sonAreasCompatibles =
+      areaActual === areaResponsable ||
+      ([sdaAreaId, ciAreaId].includes(areaActual) && [sdaAreaId, ciAreaId].includes(areaResponsable));
+
+    if (!sonAreasCompatibles) {
       throw new DomainError({
         code: 'AREA_TECNICA_REQUERIDA',
-        message: 'El dictamen técnico de este procedimiento debe registrarse en la unidad responsable asignada (SDA), no en Dirección General.',
+        message: 'El dictamen técnico de este procedimiento debe registrarse en la unidad responsable asignada (SDA / Centro de Idiomas), no en Dirección General.',
       });
     }
 
@@ -932,17 +949,75 @@ export async function atenderExpediente(
       [expedienteId],
     );
     const asignacionActiva = resAsignacion.rows[0];
+
+    const resRolAutorizado = await cliente.query<{ codigo: string }>(
+      `SELECT rs.codigo
+         FROM sigd_org.usuario_rol ur
+         JOIN sigd_org.rol_sistema rs ON rs.rol_id = ur.rol_id
+        WHERE ur.id_usuario = $1::uuid
+          AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+          AND rs.codigo IN ('SECRETARIO', 'DIRECTOR', 'ADMINISTRADOR', 'ESPECIALISTA')
+       UNION
+       SELECT po.codigo
+         FROM sigd_org.asignacion_perfil_operativo apo
+         JOIN sigd_org.perfil_operativo po ON po.perfil_id = apo.perfil_id
+        WHERE apo.id_usuario = $1::uuid
+          AND apo.estado = 'ACTIVO'
+          AND (apo.vigente_hasta IS NULL OR apo.vigente_hasta > now())
+          AND po.codigo IN ('GESTOR_AREA_ACADEMICA', 'APROBADOR_DIRECCION')`,
+      [usuarioActorId],
+    );
+    const esAutorizado = resRolAutorizado.rows.length > 0;
+
     if (!asignacionActiva) {
-      throw new ForbiddenError({
-        code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
-        message: 'El expediente no cuenta con asignación formal vigente para registrar dictamen técnico.',
-      });
-    }
-    if (asignacionActiva.id_usuario !== usuarioActorId) {
-      throw new ForbiddenError({
-        code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
-        message: 'Solo el especialista formalmente asignado al expediente puede emitir el dictamen técnico.',
-      });
+      if (!esAutorizado) {
+        throw new ForbiddenError({
+          code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
+          message: 'Solo el personal técnico o especialista facultado puede registrar el dictamen técnico.',
+        });
+      }
+      // Auto-asignación formal para garantizar trazabilidad sin bloquear la operación
+      const resPersonaActor = await cliente.query<{ id_persona: string }>(
+        `SELECT id_persona FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1::uuid`,
+        [usuarioActorId],
+      );
+      const idPersona = resPersonaActor.rows[0]?.id_persona;
+      await cliente.query(
+        `INSERT INTO sigd_rut.expediente_asignacion (
+           expediente_id, id_persona, id_usuario, id_area, asignado_por, motivo, activo, asignado_en
+         ) VALUES (
+           $1::uuid,
+           $2::uuid,
+           $3::uuid,
+           COALESCE($4::uuid, 'a0000000-0000-0000-0000-000000000001'::uuid),
+           $3::uuid,
+           'Asignación operativa de dictamen técnico',
+           true,
+           now()
+         )`,
+        [expedienteId, idPersona, usuarioActorId, areaActual || areaResponsable],
+      );
+      await cliente.query(
+        `UPDATE sigd_rut.estado_actual_expediente
+            SET persona_asignada_id = $2::uuid,
+                usuario_asignado_id = $3::uuid
+          WHERE expediente_id = $1::uuid`,
+        [expedienteId, idPersona, usuarioActorId],
+      );
+    } else if (asignacionActiva.id_usuario !== usuarioActorId) {
+      const esJerarquia = resRolAutorizado.rows.some((r) =>
+        ['SECRETARIO', 'DIRECTOR', 'ADMINISTRADOR', 'APROBADOR_DIRECCION'].includes(r.codigo),
+      );
+      const esEspecialistaOArea = resRolAutorizado.rows.some(
+        (r) => ['ESPECIALISTA', 'GESTOR_AREA_ACADEMICA'].includes(r.codigo),
+      );
+
+      if (!esJerarquia && !esEspecialistaOArea) {
+        throw new ForbiddenError({
+          code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
+          message: 'Solo el especialista formalmente asignado al expediente o la secretaría académica responsable pueden emitir el dictamen técnico.',
+        });
+      }
     }
 
     // 1. Asegurar que existe instancia de workflow inicializada
@@ -1044,6 +1119,25 @@ export async function atenderExpediente(
       }
     }
 
+    // 2.2 En caso de inasistencia (NSP), el trámite se cierra formalmente como RESUELTO (desestimado)
+    const esInasistencia = /no se present[oó]|nsp|inasistencia/i.test(datos.resultado_resumen || '') ||
+                           /no se present[oó]|nsp|inasistencia/i.test(datos.observacion_interna || '');
+    if (esInasistencia) {
+      await cliente.query(
+        `UPDATE sigd_rut.estado_actual_expediente
+            SET estado_nuevo = 'RESUELTO',
+                fecha_hora = now()
+          WHERE expediente_id = $1::uuid`,
+        [expedienteId],
+      );
+      await cliente.query(
+        `UPDATE sigd_tra.expediente
+            SET estado = 'RESUELTO'
+          WHERE expediente_id = $1::uuid`,
+        [expedienteId],
+      );
+    }
+
     // 3. Emitir evento outbox
     await insertarEvento(cliente, {
       agregado: 'Expediente',
@@ -1094,7 +1188,7 @@ export async function archivarExpediente(
     codigo_expediente: string;
   }>(
     `SELECT
-      COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
+      CASE WHEN e.estado IN ('RESUELTO', 'ARCHIVADO') THEN e.estado ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente
     FROM sigd_tra.expediente e
@@ -1217,7 +1311,7 @@ export async function observarExpediente(
     solicitante_id: string;
   }>(`
     SELECT
-      CASE WHEN e.estado = 'PENDIENTE_PAGO' THEN 'PENDIENTE_PAGO' ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
+      CASE WHEN e.estado IN ('RESUELTO', 'ARCHIVADO', 'PENDIENTE_PAGO') THEN e.estado ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id
@@ -1421,7 +1515,7 @@ export async function subsanarExpediente(
     solicitante_id: string;
   }>(`
     SELECT
-      CASE WHEN e.estado = 'PENDIENTE_PAGO' THEN 'PENDIENTE_PAGO' ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
+      CASE WHEN e.estado IN ('RESUELTO', 'ARCHIVADO', 'PENDIENTE_PAGO') THEN e.estado ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id
@@ -1545,7 +1639,7 @@ export async function iniciarRevisionExpediente(
     solicitante_id: string;
   }>(`
     SELECT
-      CASE WHEN e.estado = 'PENDIENTE_PAGO' THEN 'PENDIENTE_PAGO' ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
+      CASE WHEN e.estado IN ('RESUELTO', 'ARCHIVADO', 'PENDIENTE_PAGO') THEN e.estado ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') END AS estado_actual_id,
       COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id,
       e.codigo_expediente,
       e.solicitante_id::text AS solicitante_id

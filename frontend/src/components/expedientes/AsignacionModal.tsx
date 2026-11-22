@@ -73,7 +73,10 @@ function FormularioAsignacion({ expediente, onClose, onAsignado }: AsignacionMod
   // Auto-seleccionar el candidato prioritario si no hay selección
   useEffect(() => {
     if (!selectedUsuarioId && candidatos.length > 0) {
-      const prioritario = candidatos.find((c) => c.esPrioritario) ?? candidatos[0];
+      const prioritario =
+        candidatos.find((c) => c.esPrioritario) ??
+        candidatos.find((c) => c.rolCodigo === "ESPECIALISTA") ??
+        candidatos[0];
       setSelectedUsuarioId(prioritario.idUsuario);
     }
   }, [candidatos, selectedUsuarioId]);

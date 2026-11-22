@@ -49,7 +49,16 @@ const BASE = `
 
 const FILTROS = `
   WHERE ($1::text IS NULL OR position(lower($1::text) in lower(e.codigo_expediente || ' ' || COALESCE(t.asunto, ''))) > 0)
-    AND ($2::text IS NULL OR COALESCE(ultimo.area_actual_id, e.area_destino_id::text) = $2::text)
+    AND (
+      $2::text IS NULL
+      OR COALESCE(ultimo.area_actual_id, e.area_destino_id::text) = $2::text
+      OR COALESCE(ultimo.area_actual_id, e.area_destino_id::text) IN (
+        SELECT a_sub.area_id::text FROM sigd_org.area a_sub WHERE a_sub.area_padre_id::text = $2::text
+      )
+      OR COALESCE(ultimo.area_actual_id, e.area_destino_id::text) IN (
+        SELECT a_pad.area_padre_id::text FROM sigd_org.area a_pad WHERE a_pad.area_id::text = $2::text AND a_pad.area_padre_id IS NOT NULL
+      )
+    )
     AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
     AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
 
@@ -89,7 +98,16 @@ export const SQL_CONTADORES_SIN_TERMINO_RUTADOC = `
   FROM sigd_tra.expediente e
   LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
   WHERE $1::text IS NULL
-    AND ($2::text IS NULL OR COALESCE(ultimo.area_actual_id, e.area_destino_id::text) = $2::text)
+    AND (
+      $2::text IS NULL
+      OR COALESCE(ultimo.area_actual_id, e.area_destino_id::text) = $2::text
+      OR COALESCE(ultimo.area_actual_id, e.area_destino_id::text) IN (
+        SELECT a_sub.area_id::text FROM sigd_org.area a_sub WHERE a_sub.area_padre_id::text = $2::text
+      )
+      OR COALESCE(ultimo.area_actual_id, e.area_destino_id::text) IN (
+        SELECT a_pad.area_padre_id::text FROM sigd_org.area a_pad WHERE a_pad.area_id::text = $2::text AND a_pad.area_padre_id IS NOT NULL
+      )
+    )
     AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
     AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
 
@@ -180,7 +198,10 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
     const fila = await this.pool.query<FilaDetalle>(`
       SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut,
              COALESCE(t.asunto, '') AS asunto, e.fecha_radicacion,
-             COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
+             CASE
+               WHEN e.estado IN ('RESUELTO', 'ARCHIVADO') THEN e.estado
+               ELSE COALESCE(ultimo.estado_nuevo, e.estado, 'REGISTRADO')
+             END AS estado_actual,
              COALESCE(ultimo.area_actual_id, e.area_destino_id::text) AS area_actual_id,
              a.nombre AS area_actual_nombre,
              a.codigo AS area_actual_codigo,

@@ -482,7 +482,7 @@ export default function MesaPartesDigitalPage() {
       asunto: asunto.trim(),
       registroVersionId: procedimientoSeleccionado.registroVersionId,
       documentos: adjuntos.map((a) => ({
-        idRequisito: a.idRequisito,
+        idRequisito: a.idRequisito && a.idRequisito.trim() !== '' ? a.idRequisito.trim() : undefined,
         nombreArchivo: a.nombreArchivo,
         mimeType: 'application/pdf',
         base64Content: a.base64,
@@ -497,8 +497,8 @@ export default function MesaPartesDigitalPage() {
       );
       setResultado(res.data);
     } catch (err: any) {
-      const resp = err?.response?.data;
-      let mensaje = resp?.message || resp?.detail;
+      const resp = err?.problemDetails || err?.response?.data;
+      let mensaje = resp?.detail || resp?.message || err?.message;
       if (resp?.invalidParams && Array.isArray(resp.invalidParams) && resp.invalidParams.length > 0) {
         const detalles = resp.invalidParams.map((p: any) => p.reason || p.message || p.name).join('. ');
         mensaje = detalles;
@@ -640,6 +640,16 @@ export default function MesaPartesDigitalPage() {
                   <div className="text-sm font-semibold text-slate-700">
                     {correo}
                   </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 p-3.5 text-xs text-emerald-900 flex items-start gap-2.5 shadow-xs">
+                <span className="text-base shrink-0">📧</span>
+                <div className="space-y-0.5">
+                  <p className="font-bold text-emerald-950">Confirmación despachada a su correo electrónico</p>
+                  <p className="text-[11px] text-emerald-800">
+                    Se remitió el comprobante de radicación al correo <strong>{correo}</strong> con el CUT <strong>{resultado.cut}</strong> y el enlace de seguimiento en vivo.
+                  </p>
                 </div>
               </div>
 
@@ -953,14 +963,10 @@ export default function MesaPartesDigitalPage() {
                         <input
                           type="text"
                           required
-                          readOnly={identidadBloqueada}
                           value={nombres}
-                          onChange={(e) => {
-                            if (!identidadBloqueada) setNombres(e.target.value);
-                          }}
-                          className={`w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500 ${
-                            identidadBloqueada ? 'bg-slate-50 cursor-not-allowed text-slate-700' : ''
-                          }`}
+                          onChange={(e) => setNombres(e.target.value)}
+                          placeholder="Ej. Rick"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500 bg-white"
                         />
                       </div>
                       <div>
@@ -968,29 +974,20 @@ export default function MesaPartesDigitalPage() {
                         <input
                           type="text"
                           required
-                          readOnly={identidadBloqueada}
                           value={apellidoPaterno}
-                          onChange={(e) => {
-                            if (!identidadBloqueada) setApellidoPaterno(e.target.value);
-                          }}
-                          className={`w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500 ${
-                            identidadBloqueada ? 'bg-slate-50 cursor-not-allowed text-slate-700' : ''
-                          }`}
+                          onChange={(e) => setApellidoPaterno(e.target.value)}
+                          placeholder="Ej. Grimes"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500 bg-white"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">Apellido Materno *</label>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Apellido Materno</label>
                         <input
                           type="text"
-                          required
-                          readOnly={identidadBloqueada}
                           value={apellidoMaterno}
-                          onChange={(e) => {
-                            if (!identidadBloqueada) setApellidoMaterno(e.target.value);
-                          }}
-                          className={`w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500 ${
-                            identidadBloqueada ? 'bg-slate-50 cursor-not-allowed text-slate-700' : ''
-                          }`}
+                          onChange={(e) => setApellidoMaterno(e.target.value)}
+                          placeholder="Ej. Villa"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500 bg-white"
                         />
                       </div>
                     </>

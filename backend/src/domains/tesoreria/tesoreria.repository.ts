@@ -128,14 +128,14 @@ export class TesoreriaRepository {
              v.registro_version_id,
              COALESCE(rv.codigo_externo, tp.codigo_ref) AS codigo_tupa,
              COALESCE(tp.denominacion, rv.denominacion_original, 'Trámite Administrativo') AS concepto_tupa,
-             COALESCE(tp.monto, NULLIF(regexp_replace(COALESCE(rv.monto_original, ''), '[^0-9.]', '', 'g'), '')::numeric, 0.00)::numeric AS costo_oficial
+             COALESCE(v.monto_efectivo, tp.monto, NULLIF(regexp_replace(COALESCE(rv.monto_original, ''), '[^0-9.]', '', 'g'), '')::numeric, 0.00)::numeric AS costo_oficial
         FROM sigd_tra.expediente e
-        JOIN sigd_auth.persona pers ON pers.id_persona = e.solicitante_id
+        LEFT JOIN sigd_auth.persona pers ON pers.id_persona = e.solicitante_id
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = pers.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = pers.id_persona
         LEFT JOIN sigd_doc.expediente_tupa_vinculo v ON v.expediente_id = e.expediente_id AND v.reemplaza_vinculo_id IS NULL
         LEFT JOIN sigd_doc.tupa_registro_version rv ON rv.registro_version_id = v.registro_version_id
-        LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = v.registro_version_id
+        LEFT JOIN sigd_doc.tupa_procedimiento tp ON (tp.registro_version_id = v.registro_version_id OR tp.id_procedimiento = v.registro_version_id)
        WHERE e.expediente_id = $1::uuid
        LIMIT 1
     `;
@@ -557,7 +557,7 @@ export class TesoreriaRepository {
       SELECT COUNT(*)::int AS total
         FROM sigd_tra.orden_pago op
         JOIN sigd_tra.expediente e ON e.expediente_id = op.expediente_id
-        JOIN sigd_auth.persona pers ON pers.id_persona = op.solicitante_id
+        LEFT JOIN sigd_auth.persona pers ON pers.id_persona = COALESCE(op.solicitante_id, e.solicitante_id)
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = pers.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = pers.id_persona
        ${whereClause}
@@ -575,10 +575,10 @@ export class TesoreriaRepository {
                WHEN pers.id_documento ~ '^[0-9]{8}$' THEN 'DNI'
                ELSE 'CE'
              END AS tipo_documento_solicitante,
-             COALESCE(pn.nombre_completo, pj.razon_social, 'Administrado') AS nombre_solicitante
+             COALESCE(pn.nombre_completo, pj.razon_social, e.dni_solicitante, 'Administrado') AS nombre_solicitante
         FROM sigd_tra.orden_pago op
         JOIN sigd_tra.expediente e ON e.expediente_id = op.expediente_id
-        JOIN sigd_auth.persona pers ON pers.id_persona = op.solicitante_id
+        LEFT JOIN sigd_auth.persona pers ON pers.id_persona = COALESCE(op.solicitante_id, e.solicitante_id)
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = pers.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = pers.id_persona
        ${whereClause}

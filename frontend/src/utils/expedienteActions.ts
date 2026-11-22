@@ -105,6 +105,26 @@ export function adaptarErrorAccion(error: unknown): ErrorAccionExpediente {
     if (code === "SIN_FACULTAD_CORRECCION_DERIVACION") {
       return new ErrorAccionExpediente("Solo la Secretaría del área o jefatura autorizada puede ejecutar una derivación correctiva.", "http", 403);
     }
+    if (code === "EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA") {
+      return new ErrorAccionExpediente(
+        String(problema.detail || problema.message || problema.mensaje || "El expediente requiere asignación operativa o ser atendido por el especialista o coordinador del área."),
+        "http",
+        403
+      );
+    }
+    if (code === "BOLA_VIOLATION_CUSTODIA_AJENA") {
+      return new ErrorAccionExpediente(
+        "No cuenta con custodia en el área actual para realizar esta acción. Asegúrese de ingresar con un usuario del área responsable.",
+        "http",
+        403
+      );
+    }
+    if (code === "CONFLICTO_INTERES_EXPEDIENTE_PROPIO") {
+      return new ErrorAccionExpediente("No puede calificar, atender ni resolver su propio expediente personal.", "http", 403);
+    }
+    if (code === "CONTEXTO_PERSONAL_SIN_FACULTADES_INSTITUCIONALES") {
+      return new ErrorAccionExpediente("Debe cambiar al contexto Institucional para operar este expediente.", "http", 403);
+    }
   }
   if (status === 409 && esObjeto(problema)) {
     const code = String(problema.code || problema.error || problema.codigo || problema.title || "");
@@ -120,6 +140,12 @@ export function adaptarErrorAccion(error: unknown): ErrorAccionExpediente {
     if (code === "CONFLICTO_CONCURRENCIA") {
       return new ErrorAccionExpediente("El expediente cambió mientras trabajabas. Actualiza la información.", "concurrencia", 409);
     }
+  }
+  const detalleServidor = esObjeto(problema)
+    ? String(problema.detail || problema.message || problema.mensaje || problema.error || "").trim()
+    : "";
+  if (detalleServidor) {
+    return new ErrorAccionExpediente(detalleServidor, "http", status);
   }
   const mensajes: Readonly<Record<number, string>> = {
     400: "Revise los datos ingresados. La solicitud no es válida.",

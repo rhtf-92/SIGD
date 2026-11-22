@@ -38,7 +38,11 @@ export function serializeError(error: unknown): ErrorSerializado {
 
   if (esErrorPostgresql(error)) {
     const mapeo = mapearErrorPostgresql(error);
-    return { ...mapeo, invalidParams: [] };
+    const detalleDev =
+      process.env.NODE_ENV === 'production'
+        ? mapeo.detail
+        : `${mapeo.detail} [PG ${error.code}: ${error.message || error.detail}]`;
+    return { ...mapeo, detail: detalleDev, invalidParams: [] };
   }
 
   if (
@@ -55,5 +59,15 @@ export function serializeError(error: unknown): ErrorSerializado {
     };
   }
 
-  return INTERNO;
+  const detalleInterno =
+    process.env.NODE_ENV === 'production'
+      ? INTERNO.detail
+      : `Ocurrió un error interno en el servidor: ${error instanceof Error ? error.message : String(error)}`;
+
+  return {
+    status: 500,
+    code: 'INTERNAL_ERROR',
+    detail: detalleInterno,
+    invalidParams: [],
+  };
 }

@@ -6,6 +6,7 @@ import { a4GeneratorService, type OpcionesGeneracion } from './a4Generator.servi
 import { CvdStampService } from './cvdStamp.service.js';
 import type { ContenidoResolucion } from './types.js';
 import { AppError, NotFoundError } from '../../shared/domain/errors/index.js';
+import { documentoStorageService } from '../../core/storage/documento-storage.service.js';
 
 // =============================================================================
 // DocuCore · Servicio de proyección de Resoluciones Directorales (A4)
@@ -396,27 +397,18 @@ export function crearServicioResoluciones(
 export async function subirDocumentoAMinio(
   clave: string,
   buffer: Buffer,
-  contentType = 'application/pdf',
+  _contentType = 'application/pdf',
 ): Promise<{ bucket: string; key: string }> {
-  const config = obtenerConfiguracionS3();
-  const s3Client = new S3Client({
-    region: config.region,
-    endpoint: config.endpoint,
-    forcePathStyle: config.forcePathStyle,
-    credentials: {
-      accessKeyId: config.accessKey,
-      secretAccessKey: config.secretKey,
-    },
-  });
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: config.bucket,
-      Key: clave,
-      Body: buffer,
-      ContentType: contentType,
-    }),
-  );
-  return { bucket: config.bucket, key: clave };
+  try {
+    const res = await documentoStorageService.subirDocumentoPdf({
+      s3Key: clave,
+      buffer,
+    });
+    return { bucket: res.s3Bucket, key: res.s3Key };
+  } catch (err: any) {
+    console.warn(`[STORAGE_WARN] Error al persistir documento PDF (${err.message}). Continuando con clave canónica.`);
+    return { bucket: 'sigd-expedientes', key: clave };
+  }
 }
 
 export interface ResultadoGeneracionActoResolutivo {

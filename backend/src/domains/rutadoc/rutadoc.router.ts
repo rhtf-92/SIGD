@@ -75,6 +75,7 @@ export function crearRouterRutaDoc(
   router.get('/expedientes/:id/sla-status', controladorLecturas.sla);
   router.get('/expedientes/:id', controlador.obtener);
   router.get('/expedientes/:id/documentos/:documentoId/url-archivo', controlador.obtenerUrlArchivo);
+  router.get('/expedientes/:id/documentos/:documentoId/archivo', controlador.descargarArchivo);
   router.post('/expedientes/:id/revertir-actuacion', controlador.revertir);
 
   const derivaciones = Router();

@@ -15,16 +15,17 @@ export class ServicioRutaDoc {
     const filtrosEfectivos: FiltrosRutaDoc = { ...filtros };
 
     // Si el actor es operador de área (Especialista o Secretario) y no tiene rol de supervisión global,
-    // acotar forzosamente a su unidad orgánica. Si no tiene unidad asignada o intenta consultar otra,
-    // aplicar Fail-Closed con ForbiddenError para mitigar bypass de confinamiento (BOLA).
+    // acotar forzosamente a su unidad orgánica cuando consulta la bandeja de área.
     if (!esSupervisionGlobal && actor.roles.some((r) => ['ESPECIALISTA', 'SECRETARIO'].includes(r))) {
       if (!actor.unidadOrganicaId) {
         throw new ForbiddenError({ detail: 'Operador sin unidad orgánica asignada.' });
       }
-      if (filtrosEfectivos.areaId && filtrosEfectivos.areaId !== actor.unidadOrganicaId) {
-        throw new ForbiddenError({ detail: 'No autorizado para consultar bandejas de otras unidades orgánicas.' });
+      if (filtrosEfectivos.bandeja === 'AREA') {
+        if (filtrosEfectivos.areaId && filtrosEfectivos.areaId !== actor.unidadOrganicaId) {
+          throw new ForbiddenError({ detail: 'No autorizado para consultar bandejas de otras unidades orgánicas.' });
+        }
+        filtrosEfectivos.areaId = actor.unidadOrganicaId;
       }
-      filtrosEfectivos.areaId = actor.unidadOrganicaId;
     }
 
     if (filtrosEfectivos.bandeja === 'PERSONAL') {
@@ -32,6 +33,8 @@ export class ServicioRutaDoc {
       if (actor.idPersona) {
         filtrosEfectivos.personaAsignadaId = actor.idPersona;
       }
+      // En la bandeja personal se listan todos los expedientes asignados al operador sin filtrar por área física
+      filtrosEfectivos.areaId = undefined;
     }
 
     const posicion = filtrosEfectivos.cursor ? decodificarCursor(filtrosEfectivos.cursor, filtrosEfectivos) : null;
@@ -64,7 +67,7 @@ export class ServicioRutaDoc {
 
   async obtener(idExpediente: string, actor: ActorRutaDoc) {
     if (!actor.puedeVerExpediente || !await actor.puedeVerExpediente(idExpediente)) {
-      throw new ForbiddenError();
+      throw new ForbiddenError({ detail: 'No cuenta con facultades de acceso sobre este expediente.' });
     }
     const expediente = await this.repositorio.obtener(idExpediente);
     if (!expediente) throw new NotFoundError({ detail: 'El expediente no existe.' });

@@ -17,6 +17,8 @@ export interface DtoExpedienteAsignacion {
   motivoDesasignacion: string | null;
   personaNombre?: string;
   areaNombre?: string;
+  usuario?: string;
+  nombreCompleto?: string;
 }
 
 export interface AsignarExpedienteInput {
@@ -120,34 +122,51 @@ export class ExpedienteAsignacionService {
       });
     }
 
-    // 5. Validar que el funcionario pertenezca o tenga perfil/responsabilidad en el área actual del expediente
+    // 5. Validar que el funcionario pertenezca o tenga perfil/responsabilidad en el área actual del expediente (o área jerárquica padre/hija)
     const resPertenenciaArea = await db.query<{ valida: boolean }>(
       `SELECT (
         EXISTS (
           SELECT 1 FROM sigd_org.asignacion_personal ap
            WHERE ap.id_persona = $1::uuid
-             AND ap.area_id = $2::uuid
+             AND (
+               ap.area_id = $2::uuid
+               OR ap.area_id IN (SELECT area_id FROM sigd_org.area WHERE area_padre_id = $2::uuid)
+               OR ap.area_id IN (SELECT area_padre_id FROM sigd_org.area WHERE area_id = $2::uuid AND area_padre_id IS NOT NULL)
+             )
              AND ap.estado = 'ACTIVO'
              AND ap.vigente_desde <= now()
              AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())
         ) OR EXISTS (
           SELECT 1 FROM sigd_org.asignacion_perfil_operativo apo
            WHERE apo.id_usuario = $3::uuid
-             AND (apo.area_id = $2::uuid OR apo.scope = 'INSTITUCIONAL')
+             AND (
+               apo.area_id = $2::uuid
+               OR apo.area_id IN (SELECT area_id FROM sigd_org.area WHERE area_padre_id = $2::uuid)
+               OR apo.area_id IN (SELECT area_padre_id FROM sigd_org.area WHERE area_id = $2::uuid AND area_padre_id IS NOT NULL)
+               OR apo.scope = 'INSTITUCIONAL'
+             )
              AND apo.estado = 'ACTIVO'
              AND apo.vigente_desde <= now()
              AND (apo.vigente_hasta IS NULL OR apo.vigente_hasta > now())
         ) OR EXISTS (
           SELECT 1 FROM sigd_org.responsabilidad_temporal rt
            WHERE (rt.id_persona = $1::uuid OR rt.id_usuario = $3::uuid)
-             AND rt.area_id = $2::uuid
+             AND (
+               rt.area_id = $2::uuid
+               OR rt.area_id IN (SELECT area_id FROM sigd_org.area WHERE area_padre_id = $2::uuid)
+               OR rt.area_id IN (SELECT area_padre_id FROM sigd_org.area WHERE area_id = $2::uuid AND area_padre_id IS NOT NULL)
+             )
              AND rt.estado = 'ACTIVO'
              AND rt.vigente_desde <= now()
              AND (rt.vigente_hasta IS NULL OR rt.vigente_hasta > now())
         ) OR EXISTS (
           SELECT 1 FROM sigd_org.usuario_rol ur
            WHERE ur.id_usuario = $3::uuid
-             AND ur.area_id = $2::uuid
+             AND (
+               ur.area_id = $2::uuid
+               OR ur.area_id IN (SELECT area_id FROM sigd_org.area WHERE area_padre_id = $2::uuid)
+               OR ur.area_id IN (SELECT area_padre_id FROM sigd_org.area WHERE area_id = $2::uuid AND area_padre_id IS NOT NULL)
+             )
              AND ur.vigente_desde <= now()
              AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         )
@@ -308,10 +327,17 @@ export class ExpedienteAsignacionService {
       desasignado_por: string | null;
       motivo_desasignacion: string | null;
       area_nombre: string;
+      usuario: string;
+      nombre_completo: string;
     }>(
-      `SELECT a.*, ar.nombre AS area_nombre
+      `SELECT a.*,
+              ar.nombre AS area_nombre,
+              cu.usuario,
+              pn.nombre_completo
          FROM sigd_rut.expediente_asignacion a
          JOIN sigd_org.area ar ON ar.area_id = a.id_area
+         LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = a.id_usuario
+         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = a.id_persona
         WHERE a.expediente_id = $1::uuid
           AND a.activo = true
         LIMIT 1`,
@@ -334,6 +360,8 @@ export class ExpedienteAsignacionService {
       desasignadoPor: r.desasignado_por,
       motivoDesasignacion: r.motivo_desasignacion,
       areaNombre: r.area_nombre,
+      usuario: r.usuario,
+      nombreCompleto: r.nombre_completo,
     };
   }
 
@@ -356,10 +384,17 @@ export class ExpedienteAsignacionService {
       desasignado_por: string | null;
       motivo_desasignacion: string | null;
       area_nombre: string;
+      usuario: string;
+      nombre_completo: string;
     }>(
-      `SELECT a.*, ar.nombre AS area_nombre
+      `SELECT a.*,
+              ar.nombre AS area_nombre,
+              cu.usuario,
+              pn.nombre_completo
          FROM sigd_rut.expediente_asignacion a
          JOIN sigd_org.area ar ON ar.area_id = a.id_area
+         LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = a.id_usuario
+         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = a.id_persona
         WHERE a.expediente_id = $1::uuid
         ORDER BY a.asignado_en ASC`,
       [expedienteId],
@@ -379,6 +414,8 @@ export class ExpedienteAsignacionService {
       desasignadoPor: r.desasignado_por,
       motivoDesasignacion: r.motivo_desasignacion,
       areaNombre: r.area_nombre,
+      usuario: r.usuario,
+      nombreCompleto: r.nombre_completo,
     }));
   }
 
@@ -445,10 +482,18 @@ export class ExpedienteAsignacionService {
          AND (
            ur.area_id = $1::uuid
            OR apo.area_id = $1::uuid
+           OR ur.area_id IN (SELECT area_id FROM sigd_org.area WHERE area_padre_id = $1::uuid)
+           OR ur.area_id IN (SELECT area_padre_id FROM sigd_org.area WHERE area_id = $1::uuid AND area_padre_id IS NOT NULL)
+           OR apo.area_id IN (SELECT area_id FROM sigd_org.area WHERE area_padre_id = $1::uuid)
+           OR apo.area_id IN (SELECT area_padre_id FROM sigd_org.area WHERE area_id = $1::uuid AND area_padre_id IS NOT NULL)
            OR EXISTS (
              SELECT 1 FROM sigd_org.asignacion_personal ap
               WHERE ap.id_persona = cu.id_persona
-                AND ap.area_id = $1::uuid
+                AND (
+                  ap.area_id = $1::uuid
+                  OR ap.area_id IN (SELECT area_id FROM sigd_org.area WHERE area_padre_id = $1::uuid)
+                  OR ap.area_id IN (SELECT area_padre_id FROM sigd_org.area WHERE area_id = $1::uuid AND area_padre_id IS NOT NULL)
+                )
                 AND ap.estado = 'ACTIVO'
                 AND ap.vigente_desde <= now()
                 AND (ap.vigente_hasta IS NULL OR ap.vigente_hasta > now())

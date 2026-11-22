@@ -25,7 +25,8 @@
     "migrate": "tsx src/db/migrate-cli.ts",
     "smoke:conmutation": "tsx tests/smoke_conmutation_test.ts",
     "seed:lab": "tsx src/tools/seed-lab.ts",
-    "db:reset-demo": "tsx src/tools/reset-demo-dev.ts"
+    "db:reset-demo": "tsx src/tools/reset-demo-dev.ts",
+    "db:clean-old": "tsx src/tools/limpiar-anteriores.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1143.0",

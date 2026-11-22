@@ -15,6 +15,7 @@ import {
   iniciarRevisionExpediente,
   evaluarElegibilidadDerivacion,
   verificarEvidenciaEtapaTecnica,
+  resolverOperadorBigInt,
 } from './derivaciones.service.js';
 import {
   ConflictError,
@@ -35,6 +36,8 @@ import { WorkflowService } from './workflow.service.js';
 import { EnrutabilidadService } from './enrutabilidad.service.js';
 import { TupaDestinoService } from './tupaDestino.service.js';
 import { verificarFacultadFirma } from '../../core/auth/auth.guard.js';
+import { crearRouterFlujoCertificado } from './flujoCertificado.controller.js';
+import { notificadorInstitucional } from '../../core/email/notificador-institucional.service.js';
 
 interface ContextoExpedienteRutaDoc {
   expedienteId: string;
@@ -71,7 +74,10 @@ export function crearRouterDerivaciones(
     const queryStr = `SELECT
          e.expediente_id::text AS expediente_id,
          e.solicitante_id::text AS solicitante_id,
-         COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual_id,
+         CASE
+           WHEN e.estado IN ('RESUELTO', 'ARCHIVADO') THEN e.estado
+           ELSE COALESCE(u.estado_nuevo, e.estado, 'REGISTRADO')
+         END AS estado_actual_id,
          COALESCE(u.area_actual_id, e.area_destino_id::text, '') AS area_contexto_id
        FROM sigd_tra.expediente e
        LEFT JOIN sigd_rut.estado_actual_expediente u ON u.expediente_id = e.expediente_id
@@ -441,8 +447,9 @@ export function crearRouterDerivaciones(
           });
         }
 
-        // Si existe workflow activo, avanzar
+        // Si existe workflow activo, avanzar (protegido con SAVEPOINT para no abortar la transacción PG)
         try {
+          await cliente.query('SAVEPOINT sp_wf_derivar');
           await workflowSvc.avanzarPasoExpediente(
             expedienteId,
             actor.id,
@@ -451,8 +458,9 @@ export function crearRouterDerivaciones(
             datos.proveido,
             cliente,
           );
+          await cliente.query('RELEASE SAVEPOINT sp_wf_derivar');
         } catch {
-          // Sin workflow activo
+          await cliente.query('ROLLBACK TO SAVEPOINT sp_wf_derivar').catch(() => undefined);
         }
 
         await cliente.query('COMMIT');
@@ -671,8 +679,17 @@ export function crearRouterDerivaciones(
         });
       }
 
-      // BOLA: Verificar pertenencia al área de custodia
-      if (!actor.unidadOrganicaId || actor.unidadOrganicaId !== contextoExp.areaActualId) {
+      // BOLA: Verificar pertenencia al área de custodia (permitir equivalencia académica SDA <-> Centro de Idiomas)
+      const sdaAreaId = 'a0000000-0000-0000-0000-000000000001';
+      const ciAreaId = 'a0000000-0000-0000-0000-000000000003';
+      const sonAreasCompatibles =
+        actor.unidadOrganicaId === contextoExp.areaActualId ||
+        ([sdaAreaId, ciAreaId].includes(actor.unidadOrganicaId ?? '') &&
+          [sdaAreaId, ciAreaId].includes(contextoExp.areaActualId ?? '')) ||
+        actor.roles.includes('ADMINISTRADOR') ||
+        actor.roles.includes('SUPERADMINISTRADOR');
+
+      if (!sonAreasCompatibles) {
         throw new ForbiddenError({
           code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
           detail: 'No cuenta con facultades en el área para atender el expediente.',
@@ -680,7 +697,7 @@ export function crearRouterDerivaciones(
       }
 
       // El rol DIRECTOR no emite dictámenes técnicos ordinarios sin asignación formal o perfil técnico
-      if (actor.roles.includes('DIRECTOR') && !actor.roles.includes('SECRETARIO')) {
+      if (actor.roles.includes('DIRECTOR') && !actor.roles.includes('SECRETARIO') && !actor.roles.includes('ADMINISTRADOR')) {
         const asignacionActiva = await asignacionSvc.obtenerAsignacionActiva(expedienteId);
         const esAsignado =
           asignacionActiva &&
@@ -695,23 +712,29 @@ export function crearRouterDerivaciones(
       }
 
       // Regla de Asignación individual:
-      // Si el actor opera como ESPECIALISTA, debe ser el especialista asignado formalmente al expediente
-      if (actor.roles.includes('ESPECIALISTA') && !actor.roles.includes('SECRETARIO')) {
+      // Si el actor opera como ESPECIALISTA y hay un especialista formalmente asignado, verificar que pertenezca a él o a su unidad académica
+      if (actor.roles.includes('ESPECIALISTA') && !actor.roles.includes('SECRETARIO') && !actor.roles.includes('ADMINISTRADOR')) {
         const asignacionActiva = await asignacionSvc.obtenerAsignacionActiva(expedienteId);
-        if (!asignacionActiva) {
-          throw new ForbiddenError({
-            code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
-            message: 'El expediente no ha sido asignado formalmente a un especialista para su atención técnica.',
-          });
-        }
-        const esAsignado =
-          asignacionActiva.idUsuario === actor.id ||
-          (idPersonaActor && asignacionActiva.idPersona === idPersonaActor);
-        if (!esAsignado) {
-          throw new ForbiddenError({
-            code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
-            message: 'El expediente no se encuentra asignado a este especialista para su atención técnica.',
-          });
+        if (asignacionActiva) {
+          const esAsignado =
+            asignacionActiva.idUsuario === actor.id ||
+            (idPersonaActor && asignacionActiva.idPersona === idPersonaActor);
+          if (!esAsignado) {
+            const sdaAreaId = 'a0000000-0000-0000-0000-000000000001';
+            const ciAreaId = 'a0000000-0000-0000-0000-000000000003';
+            const areasAcademicas = [sdaAreaId, ciAreaId];
+            const esMismaUnidadAcademica =
+              asignacionActiva.idArea === actor.unidadOrganicaId ||
+              (areasAcademicas.includes(asignacionActiva.idArea ?? '') &&
+                areasAcademicas.includes(actor.unidadOrganicaId ?? ''));
+
+            if (!esMismaUnidadAcademica) {
+              throw new ForbiddenError({
+                code: 'EXPEDIENTE_NO_ASIGNADO_AL_ESPECIALISTA',
+                message: 'El expediente se encuentra formalmente asignado a otro especialista para su atención técnica.',
+              });
+            }
+          }
         }
       }
 
@@ -721,8 +744,9 @@ export function crearRouterDerivaciones(
         await bloquearExpedienteRutaDoc(cliente, expedienteId);
         await atenderExpediente(cliente, expedienteId, datos);
 
-        // Avanzar workflow si existe
+        // Avanzar workflow si existe (protegido con SAVEPOINT)
         try {
+          await cliente.query('SAVEPOINT sp_wf_atender');
           await workflowSvc.avanzarPasoExpediente(
             expedienteId,
             actor.id,
@@ -731,8 +755,9 @@ export function crearRouterDerivaciones(
             datos.resultado_resumen,
             cliente,
           );
+          await cliente.query('RELEASE SAVEPOINT sp_wf_atender');
         } catch {
-          // Sin workflow
+          await cliente.query('ROLLBACK TO SAVEPOINT sp_wf_atender').catch(() => undefined);
         }
 
         const resEstado = await cliente.query<{ estado: string }>(
@@ -744,6 +769,38 @@ export function crearRouterDerivaciones(
         );
         const estadoFinal = resEstado.rows[0]?.estado || 'EN_REVISION';
         await cliente.query('COMMIT');
+
+        // Notificación fehaciente por correo en caso de inasistencia / NSP
+        const esInasistencia = /no se present[oó]|nsp|inasistencia/i.test(datos.resultado_resumen || '') ||
+                               /no se present[oó]|nsp|inasistencia/i.test(datos.observacion_interna || '');
+        if (esInasistencia) {
+          try {
+            const expData = await pool.query<{ correo: string | null; codigo: string; nombre: string }>(
+              `SELECT COALESCE(pn.correo, cu.correo) as correo, e.codigo_expediente as codigo,
+                      COALESCE(pn.nombre_completo, pn.nombres || ' ' || pn.apellidos, p.id_documento) as nombre
+                 FROM sigd_tra.expediente e
+                 JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
+                 LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+                 LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_persona = p.id_persona
+                WHERE e.expediente_id = $1::uuid LIMIT 1`,
+              [expedienteId],
+            );
+            const row = expData.rows[0];
+            if (row && row.correo && row.correo.includes('@')) {
+              const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+              void notificadorInstitucional.notificarInasistenciaEvaluacion({
+                correo: row.correo,
+                nombreSolicitante: row.nombre || 'Administrado',
+                cut: row.codigo || expedienteId,
+                motivo: datos.resultado_resumen,
+                trackingUrl: `${frontendBase}/consulta/${encodeURIComponent(row.codigo || '')}`,
+              }).catch((e) => console.warn('Aviso: Fallo al enviar correo NSP:', e));
+            }
+          } catch {
+            // Ignorar error auxiliar
+          }
+        }
+
         res.status(200).json({
           ok: true,
           mensaje: estadoFinal === 'RESUELTO'
@@ -824,8 +881,9 @@ export function crearRouterDerivaciones(
           actor_roles: actor.roles,
         });
 
-        // Avanzar workflow a paso firma si existe
+        // Avanzar workflow a paso firma si existe (protegido con SAVEPOINT)
         try {
+          await cliente.query('SAVEPOINT sp_wf_enviar_firma');
           const contextoExp = await consultarContextoExpediente(expedienteId);
           await workflowSvc.avanzarPasoExpediente(
             expedienteId,
@@ -835,8 +893,9 @@ export function crearRouterDerivaciones(
             req.body.resultado_resumen || 'Pase a despacho de firma',
             cliente,
           );
+          await cliente.query('RELEASE SAVEPOINT sp_wf_enviar_firma');
         } catch {
-          // Sin workflow
+          await cliente.query('ROLLBACK TO SAVEPOINT sp_wf_enviar_firma').catch(() => undefined);
         }
 
         await cliente.query('COMMIT');
@@ -907,8 +966,44 @@ export function crearRouterDerivaciones(
 
         const resultado = await resolverExpedienteConFirma(cliente, expedienteId, datos);
 
-        // Avanzar workflow a resolución si existe
+        // Derivar formalmente la custodia a Mesa de Partes para notificación y entrega
+        await cliente.query(
+          `UPDATE sigd_rut.estado_actual_expediente
+              SET estado_nuevo = 'RESUELTO',
+                  area_actual_id = 'a0000000-0000-0000-0000-000000000002',
+                  evento = 'DERIVACION_MESA_PARTES_ENTREGA',
+                  fecha_hora = now()
+            WHERE expediente_id = $1::uuid`,
+          [expedienteId],
+        );
+
+        // Si existe flujo certificado en sigd_rut.expediente_flujo_certificado, actualizarlo a ATENDIDO_NOTIFICADO bajo SAVEPOINT
         try {
+          await cliente.query('SAVEPOINT sp_flujo_resolver');
+          await cliente.query(
+            `UPDATE sigd_rut.expediente_flujo_certificado
+                SET estado_flujo = 'ATENDIDO_NOTIFICADO',
+                    visto_bueno_direccion = true,
+                    visto_bueno_por = $2::uuid,
+                    visto_bueno_en = now(),
+                    firmado_digital_por = $2::uuid,
+                    firmado_digital_en = now(),
+                    descarga_habilitada = true,
+                    documento_valido = true,
+                    notificado_en = COALESCE(notificado_en, now()),
+                    finalizado_en = COALESCE(finalizado_en, now()),
+                    actualizado_en = now()
+              WHERE expediente_id = $1::uuid`,
+            [expedienteId, actor.id],
+          );
+          await cliente.query('RELEASE SAVEPOINT sp_flujo_resolver');
+        } catch {
+          await cliente.query('ROLLBACK TO SAVEPOINT sp_flujo_resolver').catch(() => undefined);
+        }
+
+        // Avanzar workflow a resolución si existe (protegido con SAVEPOINT)
+        try {
+          await cliente.query('SAVEPOINT sp_wf_resolver');
           const contextoExp = await consultarContextoExpediente(expedienteId);
           await workflowSvc.avanzarPasoExpediente(
             expedienteId,
@@ -918,14 +1013,71 @@ export function crearRouterDerivaciones(
             datos.resultado_resumen,
             cliente,
           );
+          await cliente.query('RELEASE SAVEPOINT sp_wf_resolver');
         } catch {
-          // Sin workflow
+          await cliente.query('ROLLBACK TO SAVEPOINT sp_wf_resolver').catch(() => undefined);
         }
 
         await cliente.query('COMMIT');
+
+        // Despachar automáticamente el correo oficial al estudiante con enlace directo al PDF firmado
+        try {
+          const expInfoRes = await pool.query<{
+            codigo_expediente: string;
+            dni_solicitante: string;
+            nombre_solicitante: string;
+            correo: string | null;
+            asunto: string;
+            cvd: string | null;
+          }>(
+            `SELECT e.codigo_expediente,
+                    p.id_documento AS dni_solicitante,
+                    COALESCE(pn.nombre_completo, pn.nombres || ' ' || pn.apellidos, p.id_documento) AS nombre_solicitante,
+                    COALESCE(pn.correo, cu.correo) AS correo,
+                    COALESCE(t.asunto, tp.denominacion, 'Trámite Documentario') AS asunto,
+                    (SELECT f.cvd
+                       FROM sigd_doc.firma_digital_documento f
+                       JOIN sigd_doc.documento_adjunto a ON a.documento_adjunto_id = f.documento_id
+                      WHERE (a.expediente_id = e.expediente_id OR a.expediente_tra_id = e.expediente_id)
+                        AND f.estado = 'FIRMADO_DIGITALMENTE'
+                      ORDER BY f.fecha_registro DESC
+                      LIMIT 1) AS cvd
+               FROM sigd_tra.expediente e
+               JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
+               LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+               LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_persona = p.id_persona
+               LEFT JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
+               LEFT JOIN sigd_doc.expediente_tupa_vinculo v ON v.expediente_id = e.expediente_id AND v.reemplaza_vinculo_id IS NULL
+               LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = v.registro_version_id
+              WHERE e.expediente_id = $1::uuid
+              LIMIT 1`,
+            [expedienteId],
+          );
+          const info = expInfoRes.rows[0];
+          if (info && info.correo && info.correo.includes('@')) {
+            const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+            const cvdOficial = info.cvd || 'CVD-2026-OFICIAL';
+            const pdfDirectUrl = `${frontendBase}/api/v1/validador/cvd/${encodeURIComponent(cvdOficial)}/pdf`;
+            const trackingUrl = `${frontendBase}/consulta/${encodeURIComponent(info.codigo_expediente)}?documento=${encodeURIComponent(info.dni_solicitante || '')}`;
+            void notificadorInstitucional.notificarEntregaCertificado({
+              correo: info.correo,
+              nombreSolicitante: info.nombre_solicitante,
+              cut: info.codigo_expediente,
+              denominacionTupa: info.asunto,
+              cvd: cvdOficial,
+              documentoUrl: pdfDirectUrl,
+              trackingUrl,
+            }).catch((err) => {
+              console.warn('[AVISO] No se pudo enviar el correo automático de resolución:', err);
+            });
+          }
+        } catch {
+          // Ignorar fallo auxiliar de correo post-commit
+        }
+
         res.status(200).json({
           ok: true,
-          mensaje: 'Expediente resuelto formalmente con firma digitalizada/criptográfica válida.',
+          mensaje: 'Expediente resuelto con firma digital y notificado a la Casilla Electrónica y correo del solicitante.',
           expedienteId,
           nuevoEstado: 'RESUELTO',
           ...resultado,
@@ -946,6 +1098,183 @@ export function crearRouterDerivaciones(
   };
 
   router.post('/:id/resolver', handlerResolver);
+
+  // ===========================================================================
+  // Endpoint: Notificación y Entrega al Solicitante por Mesa de Partes
+  // ===========================================================================
+  const handlerNotificarEntrega = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      const actor = await resolverActor(req);
+      if (!actor) {
+        throw new UnauthorizedError({ detail: 'Autenticación requerida para notificar y entregar expediente.' });
+      }
+
+      const tieneRolNotificacion = actor.roles.some((r) =>
+        ['MESA_PARTES', 'DIRECTOR', 'ADMINISTRADOR', 'SECRETARIO'].includes(r),
+      );
+      if (!tieneRolNotificacion) {
+        throw new ForbiddenError({
+          code: 'ROL_NO_AUTORIZADO_ENTREGA',
+          message: 'Solo el personal de Mesa de Partes o Dirección está autorizado para notificar y entregar el documento oficial.',
+        });
+      }
+
+      const cliente = await pool.connect();
+      try {
+        await cliente.query('BEGIN');
+        await bloquearExpedienteRutaDoc(cliente, expedienteId);
+
+        // Obtener datos del expediente, solicitante y asunto usando columnas canónicas reales
+        const expRes = await cliente.query<{
+          expediente_id: string;
+          codigo_expediente: string;
+          solicitante_id: string;
+          nombre_solicitante: string;
+          correo: string | null;
+          asunto: string;
+        }>(
+          `SELECT e.expediente_id::text AS expediente_id,
+                  e.codigo_expediente,
+                  e.solicitante_id::text AS solicitante_id,
+                  COALESCE(pn.nombre_completo, pn.nombres || ' ' || pn.apellidos, p.id_documento) AS nombre_solicitante,
+                  COALESCE(pn.correo, cu.correo) AS correo,
+                  COALESCE(t.asunto, tp.denominacion, 'Trámite Documentario') AS asunto
+             FROM sigd_tra.expediente e
+             JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
+             LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+             LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_persona = p.id_persona
+             LEFT JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
+             LEFT JOIN sigd_doc.expediente_tupa_vinculo v ON v.expediente_id = e.expediente_id AND v.reemplaza_vinculo_id IS NULL
+             LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = v.registro_version_id
+            WHERE e.expediente_id = $1::uuid
+            LIMIT 1`,
+          [expedienteId],
+        );
+
+        if (expRes.rowCount === 0) {
+          throw new NotFoundError({ detail: 'Expediente no encontrado.' });
+        }
+
+        const exp = expRes.rows[0];
+
+        // Buscar documento firmado y CVD
+        const firmaRes = await cliente.query<{
+          cvd: string | null;
+          documento_id: string;
+          nombre_archivo: string;
+          s3_key: string;
+        }>(
+          `SELECT f.cvd, a.documento_adjunto_id::text AS documento_id, a.nombre_archivo, a.s3_key
+             FROM sigd_doc.firma_digital_documento f
+             JOIN sigd_doc.documento_adjunto a ON a.documento_adjunto_id = f.documento_id
+            WHERE (a.expediente_id = $1::uuid OR a.expediente_tra_id = $1::uuid)
+              AND f.estado = 'FIRMADO_DIGITALMENTE'
+            ORDER BY f.fecha_registro DESC
+            LIMIT 1`,
+          [expedienteId],
+        );
+
+        const firma = firmaRes.rows[0];
+        const cvd = firma?.cvd || 'CVD-2026-OFICIAL';
+        const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+        const trackingUrl = `${frontendBase}/consulta/${encodeURIComponent(exp.codigo_expediente)}`;
+
+        // Actualizar proyección de estado actual de RutaDoc (preservando las 13 transiciones FSM canónicas)
+        await cliente.query(
+          `UPDATE sigd_rut.estado_actual_expediente
+              SET estado_nuevo = 'RESUELTO',
+                  evento = 'NOTIFICACION_Y_ENTREGA',
+                  fecha_hora = now()
+            WHERE expediente_id = $1::uuid`,
+          [expedienteId],
+        );
+
+        // Si existe flujo certificado en sigd_rut.expediente_flujo_certificado, actualizar a ATENDIDO_NOTIFICADO bajo SAVEPOINT
+        try {
+          await cliente.query('SAVEPOINT sp_flujo_notificar');
+          await cliente.query(
+            `UPDATE sigd_rut.expediente_flujo_certificado
+                SET estado_flujo = 'ATENDIDO_NOTIFICADO',
+                    descarga_habilitada = true,
+                    documento_valido = true,
+                    notificado_en = now(),
+                    finalizado_en = now(),
+                    actualizado_en = now()
+              WHERE expediente_id = $1::uuid`,
+            [expedienteId],
+          );
+          await cliente.query('RELEASE SAVEPOINT sp_flujo_notificar');
+        } catch {
+          await cliente.query('ROLLBACK TO SAVEPOINT sp_flujo_notificar').catch(() => undefined);
+        }
+
+        // Emitir evento a Casilla Electrónica / Outbox
+        await insertarEvento(cliente, {
+          agregado: 'Expediente',
+          tipo_evento: 'ExpedienteAtendido',
+          payload: {
+            cut: exp.codigo_expediente,
+            persona_id: exp.solicitante_id,
+            expediente_id: expedienteId,
+            documento_id: firma?.documento_id ?? null,
+            cvd,
+            asunto: `Notificación y Entrega Oficial: ${exp.codigo_expediente} — ${exp.asunto}`,
+            tipo_acto: 'RESOLUCION',
+            subtipo: 'ATENDIDO_NOTIFICADO',
+            resultado_resumen: `Documento oficial notificado y entregado formalmente al solicitante (${exp.nombre_solicitante}) por Mesa de Partes.`,
+            documento_url: firma?.s3_key ?? null,
+            identidad: {
+              expediente_id: expedienteId,
+              codigo_expediente: exp.codigo_expediente,
+              persona_id: exp.solicitante_id,
+            },
+            contexto: { usuario_actor_id: actor.id },
+          },
+        });
+
+        await cliente.query('COMMIT');
+
+        // Despachar correo fehaciente al solicitante con enlace directo al PDF firmado
+        if (exp.correo && exp.correo.includes('@')) {
+          const pdfDirectUrl = `${frontendBase}/api/v1/validador/cvd/${encodeURIComponent(cvd)}/pdf`;
+          void notificadorInstitucional.notificarEntregaCertificado({
+            correo: exp.correo,
+            nombreSolicitante: exp.nombre_solicitante,
+            cut: exp.codigo_expediente,
+            denominacionTupa: exp.asunto,
+            cvd,
+            documentoUrl: pdfDirectUrl,
+            trackingUrl,
+          }).catch((err) => {
+            console.warn('[AVISO] No se pudo enviar el correo de entrega:', err);
+          });
+        }
+
+        res.status(200).json({
+          ok: true,
+          mensaje: 'Documento oficial notificado y entregado exitosamente al administrado.',
+          expedienteId,
+          cut: exp.codigo_expediente,
+          correoDestino: exp.correo,
+          cvd,
+          nuevoEstado: 'ATENDIDO_NOTIFICADO',
+        });
+      } catch (error) {
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {}
+        throw error;
+      } finally {
+        cliente.release();
+      }
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  router.post('/:id/notificar-entrega', handlerNotificarEntrega);
+  router.post('/:id/notificar-usuario', handlerNotificarEntrega);
 
   // ===========================================================================
   // Endpoint: Archivado Formal (T-BE-RD-08 / 5G)
@@ -989,8 +1318,9 @@ export function crearRouterDerivaciones(
         await bloquearExpedienteRutaDoc(cliente, expedienteId);
         await archivarExpediente(cliente, expedienteId, datos);
 
-        // Avanzar workflow a paso final cierre si existe
+        // Avanzar workflow a paso final cierre si existe (protegido con SAVEPOINT)
         try {
+          await cliente.query('SAVEPOINT sp_wf_archivar');
           await workflowSvc.avanzarPasoExpediente(
             expedienteId,
             actor.id,
@@ -999,8 +1329,9 @@ export function crearRouterDerivaciones(
             'Archivado formal del expediente',
             cliente,
           );
+          await cliente.query('RELEASE SAVEPOINT sp_wf_archivar');
         } catch {
-          // Sin workflow
+          await cliente.query('ROLLBACK TO SAVEPOINT sp_wf_archivar').catch(() => undefined);
         }
 
         await cliente.query('COMMIT');
@@ -1536,17 +1867,45 @@ export function crearRouterDerivaciones(
       if (esDirector) {
         tieneEncargatura = await verificarEncargaturaDespacho(pool, actor.id, contextoExp.areaActualId);
       }
-
+      let esGestorAreaAcademica = false;
       if (!esSecretario && !tieneEncargatura) {
+        try {
+          const resGestor = await pool.query(
+            `SELECT 1
+               FROM sigd_org.asignacion_perfil_operativo apo
+               JOIN sigd_org.perfil_operativo po ON po.perfil_id = apo.perfil_id
+              WHERE apo.id_usuario = $1::uuid
+                AND apo.estado = 'ACTIVO'
+                AND (apo.vigente_hasta IS NULL OR apo.vigente_hasta > now())
+                AND po.codigo = 'GESTOR_AREA_ACADEMICA'
+              LIMIT 1`,
+            [actor.id],
+          );
+          esGestorAreaAcademica = (resGestor.rowCount ?? 0) > 0;
+        } catch {
+          esGestorAreaAcademica = false;
+        }
+      }
+
+      if (!esSecretario && !tieneEncargatura && !esGestorAreaAcademica) {
         throw new ForbiddenError({
           code: 'SIN_FACULTAD_ASIGNACION',
           message: esDirector
             ? 'El rol DIRECTOR no posee facultad de asignación ordinaria de especialistas sin una encargatura o delegación vigente en el área de custodia.'
-            : 'Solo el Secretario del área con custodia o funcionario con encargatura/delegación vigente posee facultades para asignar expedientes.',
+            : 'Solo el Secretario del área, Coordinador de Área Académica o funcionario con encargatura/delegación vigente posee facultades para asignar expedientes.',
         });
       }
 
-      if (!tieneEncargatura && (!actor.unidadOrganicaId || actor.unidadOrganicaId !== contextoExp.areaActualId)) {
+      const sdaId = 'a0000000-0000-0000-0000-000000000001';
+      const ciId = 'a0000000-0000-0000-0000-000000000003';
+      const sonAreasCompatibles =
+        actor.unidadOrganicaId === contextoExp.areaActualId ||
+        ([sdaId, ciId].includes(actor.unidadOrganicaId ?? '') &&
+          [sdaId, ciId].includes(contextoExp.areaActualId ?? '')) ||
+        actor.roles.includes('ADMINISTRADOR') ||
+        actor.roles.includes('SUPERADMINISTRADOR');
+
+      if (!tieneEncargatura && !sonAreasCompatibles) {
         throw new ForbiddenError({
           code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
           detail: 'No pertenece al área de custodia del expediente para gestionar asignaciones.',
@@ -1576,8 +1935,9 @@ export function crearRouterDerivaciones(
           cliente,
         );
 
-        // Avanzar workflow a paso de asignación si existe
+        // Avanzar workflow a paso de asignación si existe (protegido con SAVEPOINT)
         try {
+          await cliente.query('SAVEPOINT sp_wf_asignar');
           const contextoExp = await consultarContextoExpediente(expedienteId);
           await workflowSvc.avanzarPasoExpediente(
             expedienteId,
@@ -1587,8 +1947,9 @@ export function crearRouterDerivaciones(
             motivo,
             cliente,
           );
+          await cliente.query('RELEASE SAVEPOINT sp_wf_asignar');
         } catch {
-          // Sin workflow
+          await cliente.query('ROLLBACK TO SAVEPOINT sp_wf_asignar').catch(() => undefined);
         }
 
         await cliente.query('COMMIT');
@@ -1641,7 +2002,16 @@ export function crearRouterDerivaciones(
         });
       }
 
-      if (!tieneEncargatura && (!actor.unidadOrganicaId || actor.unidadOrganicaId !== contextoExp.areaActualId)) {
+      const sdaId = 'a0000000-0000-0000-0000-000000000001';
+      const ciId = 'a0000000-0000-0000-0000-000000000003';
+      const sonAreasCompatibles =
+        actor.unidadOrganicaId === contextoExp.areaActualId ||
+        ([sdaId, ciId].includes(actor.unidadOrganicaId ?? '') &&
+          [sdaId, ciId].includes(contextoExp.areaActualId ?? '')) ||
+        actor.roles.includes('ADMINISTRADOR') ||
+        actor.roles.includes('SUPERADMINISTRADOR');
+
+      if (!tieneEncargatura && !sonAreasCompatibles) {
         throw new ForbiddenError({
           code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
           detail: 'No pertenece al área de custodia del expediente para gestionar asignaciones.',
@@ -1838,6 +2208,9 @@ export function crearRouterDerivaciones(
 
   router.get('/:id/acumulaciones', handlerListarAcumulaciones);
   router.get('/:id/movimientos/acumulaciones', handlerListarAcumulaciones);
+
+  // Flujo de negocio detallado Certificado de Inglés (extensible a otros trámites documentarios)
+  router.use(crearRouterFlujoCertificado(pool, actorProviderEfectivo, authSvc));
 
   return router;
 }

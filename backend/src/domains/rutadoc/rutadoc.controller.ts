@@ -38,6 +38,7 @@ export function crearControladorRutaDoc(
   resumen: RequestHandler;
   revertir: RequestHandler;
   obtenerUrlArchivo: RequestHandler;
+  descargarArchivo: RequestHandler;
 } {
   const actorAutenticado = async (req: Request): Promise<ActorRutaDoc> => {
     const actor = await actorProvider.obtenerActor(req);
@@ -392,7 +393,9 @@ export function crearControladorRutaDoc(
         const puede = await actor.puedeVerExpediente(id);
         if (!puede) throw new ForbiddenError({ detail: 'No tiene permisos para ver documentos de este expediente.' });
       } else {
-        const tieneRol = actor.roles.some((r) => ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES'].includes(r));
+        const tieneRol = actor.roles.some((r) =>
+          ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES', 'SECRETARIO', 'ESPECIALISTA', 'TESORERIA', 'CIUDADANO'].includes(r),
+        );
         if (!tieneRol) throw new ForbiddenError({ detail: 'No tiene permisos para ver documentos de este expediente.' });
       }
 
@@ -424,36 +427,64 @@ export function crearControladorRutaDoc(
       }
 
       const doc = resDoc.rows[0];
-
-      // 3. Verificación criptográfica y existencia real en MinIO (SEC-02: sin placeholders)
-      const configS3 = obtenerConfiguracionS3();
-      const configParaArchivo = {
-        ...configS3,
-        bucket: doc.s3_bucket || configS3.bucket,
-      };
-
-      const info = await headObject(doc.s3_key, configParaArchivo);
-      if (!info.existe) {
-        throw new NotFoundError({
-          detail: 'El archivo físico no se encuentra disponible en el almacenamiento MinIO.',
-        });
-      }
-
-      // 4. URL prefirmada temporal GET (15 minutos = 900 s)
-      const url = generarUrlPresigned(doc.s3_key, configParaArchivo, {
-        metodo: 'GET',
-        expiraSegundos: 900,
-      });
+      const streamUrl = `/api/v1/expedientes/${id}/documentos/${documentoId}/archivo`;
 
       res.status(200).json({
-        url,
-        downloadUrl: url,
+        url: streamUrl,
+        downloadUrl: streamUrl,
         nombreArchivo: doc.nombre_archivo,
-        mimeType: doc.mime_type,
+        mimeType: doc.mime_type || 'application/pdf',
         tamanoBytes: Number(doc.tamano_bytes),
         sha256: doc.sha256 ? doc.sha256.trim() : null,
         expiraEnSegundos: 900,
       });
+    },
+
+    descargarArchivo: async (req: Request, res: Response) => {
+      const actor = await actorAutenticado(req);
+      const id = idSchema.parse(req.params.id);
+      const documentoId = idSchema.parse(req.params.documentoId);
+
+      if (actor.puedeVerExpediente) {
+        const puede = await actor.puedeVerExpediente(id);
+        if (!puede) throw new ForbiddenError({ detail: 'No tiene permisos para ver documentos de este expediente.' });
+      } else {
+        const tieneRol = actor.roles.some((r) =>
+          ['ADMINISTRADOR', 'DIRECTOR', 'MESA_PARTES', 'SECRETARIO', 'ESPECIALISTA', 'TESORERIA', 'CIUDADANO'].includes(r),
+        );
+        if (!tieneRol) throw new ForbiddenError({ detail: 'No tiene permisos para ver documentos de este expediente.' });
+      }
+
+      if (!opciones.pool) {
+        throw new ForbiddenError({ detail: 'Conexión a base de datos requerida para verificar el documento.' });
+      }
+
+      const resDoc = await opciones.pool.query<{
+        nombre_archivo: string;
+        s3_bucket: string;
+        s3_key: string;
+        mime_type: string;
+      }>(
+        `SELECT nombre_archivo, s3_bucket, s3_key, mime_type
+           FROM sigd_doc.documento_adjunto
+          WHERE documento_adjunto_id = $1::uuid
+            AND (expediente_tra_id = $2::uuid OR expediente_id = $2::uuid)`,
+        [documentoId, id],
+      );
+
+      if (resDoc.rows.length === 0) {
+        throw new NotFoundError({ detail: 'El documento no existe o no se encuentra asociado al expediente indicado.' });
+      }
+
+      const doc = resDoc.rows[0];
+      const storage = new DocumentoStorageService();
+      const buffer = await storage.obtenerObjetoS3(doc.s3_key, doc.s3_bucket);
+
+      const mime = doc.mime_type || 'application/pdf';
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.nombre_archivo)}"`);
+      res.setHeader('Content-Length', buffer.length);
+      res.send(buffer);
     },
   };
 }

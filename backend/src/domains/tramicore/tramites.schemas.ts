@@ -193,22 +193,22 @@ export const mesaPartesDigitalSchema = z
     tipoPersona: z.enum(['NATURAL', 'JURIDICA']),
     tipoDocumento: z.enum(['DNI', 'CE', 'RUC']),
     numeroDocumento: z.string().trim().min(8).max(20),
-    nombres: z.string().trim().optional(),
-    apellidoPaterno: z.string().trim().optional(),
-    apellidoMaterno: z.string().trim().optional(),
-    razonSocial: z.string().trim().optional(),
-    representanteLegal: z.string().trim().optional(),
-    dniRepresentante: z.string().trim().optional(),
+    nombres: z.string().trim().optional().nullable(),
+    apellidoPaterno: z.string().trim().optional().nullable(),
+    apellidoMaterno: z.string().trim().optional().nullable(),
+    razonSocial: z.string().trim().optional().nullable(),
+    representanteLegal: z.string().trim().optional().nullable(),
+    dniRepresentante: z.string().trim().optional().nullable(),
     correo: z.string().trim().toLowerCase().email('El correo electrónico no tiene un formato válido.').max(150),
-    celular: z.string().trim().optional(),
-    direccion: z.string().trim().optional(),
-    ubigeoDistrito: z.string().trim().optional(),
+    celular: z.string().trim().optional().nullable(),
+    direccion: z.string().trim().optional().nullable(),
+    ubigeoDistrito: z.string().trim().optional().nullable(),
     asunto: z.string().trim().min(5, 'El asunto debe tener al menos 5 caracteres.').max(500),
     registroVersionId: z.string().uuid('registroVersionId debe ser un UUID válido de tupa_registro_version.'),
     documentos: z
       .array(
         z.object({
-          idRequisito: z.string().uuid().optional(),
+          idRequisito: z.string().trim().uuid().optional().nullable(),
           nombreArchivo: z.string().trim().min(1, 'El nombre de archivo es obligatorio.'),
           mimeType: z.string().default('application/pdf'),
           hashSha256: z.string().optional(),
@@ -219,7 +219,7 @@ export const mesaPartesDigitalSchema = z
       )
       .min(1, 'Debe adjuntar al menos un documento o anexo.'),
   })
-  .strict();
+  .strip();
 
 export type MesaPartesDigitalInput = z.infer<typeof mesaPartesDigitalSchema>;
 

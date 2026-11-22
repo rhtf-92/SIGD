@@ -27,6 +27,30 @@ if (process.env.MIGRATE_ON_BOOT !== 'false') {
   await ejecutarMigraciones(pool);
 }
 
+// Sincronización de seguridad: alinear estado_actual_expediente para expedientes resueltos
+try {
+  await pool.query(`
+    UPDATE sigd_rut.estado_actual_expediente u
+       SET estado_nuevo = e.estado,
+           area_actual_id = CASE
+             WHEN e.estado = 'RESUELTO' AND (u.area_actual_id IS NULL OR u.area_actual_id = (SELECT area_id::text FROM sigd_org.area WHERE codigo = 'DIR'))
+             THEN 'a0000000-0000-0000-0000-000000000002'
+             ELSE u.area_actual_id
+           END,
+           evento = CASE
+             WHEN e.estado = 'RESUELTO' THEN 'RESOLUCION_FIRMA_DIGITAL'
+             ELSE u.evento
+           END,
+           fecha_hora = now()
+      FROM sigd_tra.expediente e
+     WHERE u.expediente_id = e.expediente_id
+       AND e.estado IN ('RESUELTO', 'ARCHIVADO')
+       AND (u.estado_nuevo IS NULL OR u.estado_nuevo <> e.estado);
+  `);
+} catch {
+  // Ignorar si la proyección aún no existe
+}
+
 // DOC-01: Verificación estricta fail-fast de conectividad con Redis en producción
 if (process.env.NODE_ENV === 'production') {
   if (!process.env.REDIS_URL) {

@@ -9,7 +9,7 @@ interface DemoAccountConfig {
   nombres: string;
   apellidos: string;
   rol: 'CIUDADANO' | 'MESA_PARTES' | 'ESPECIALISTA' | 'SECRETARIO' | 'DIRECTOR' | 'ADMINISTRADOR' | 'TESORERIA' | 'SUPERADMINISTRADOR';
-  areaCodigo: 'DIR' | 'SDA' | null;
+  areaCodigo: 'DIR' | 'SDA' | 'CI' | null;
   passwordEnvVar: string;
   perfilOperativoCodigo?: 'GESTOR_AREA_ACADEMICA';
   funcion?: string;
@@ -41,10 +41,11 @@ const CUENTAS_DEMO: DemoAccountConfig[] = [
     correo: 'especialista.demo@iestp-suiza.edu.pe',
     dni: '99000003',
     nombres: 'Especialista',
-    apellidos: 'Académico Demo',
+    apellidos: 'Inglés Demo',
     rol: 'ESPECIALISTA',
-    areaCodigo: 'SDA',
+    areaCodigo: 'CI',
     passwordEnvVar: 'LAB_ESPECIALISTA_PASSWORD',
+    funcion: 'ESPECIALISTA_INGLES',
   },
   {
     usuario: 'secretario_demo',
@@ -100,13 +101,24 @@ const CUENTAS_DEMO: DemoAccountConfig[] = [
     usuario: 'responsable_ingles_demo',
     correo: 'ingles.demo@iestp-suiza.edu.pe',
     dni: '99000009',
-    nombres: 'Responsable',
-    apellidos: 'Inglés Demo',
+    nombres: 'Coordinador',
+    apellidos: 'Centro de Idiomas Demo',
     rol: 'ESPECIALISTA',
-    areaCodigo: 'SDA',
+    areaCodigo: 'CI',
     passwordEnvVar: 'LAB_RESPONSABLE_INGLES_PASSWORD',
     perfilOperativoCodigo: 'GESTOR_AREA_ACADEMICA',
-    funcion: 'RESPONSABLE_IDIOMAS',
+    funcion: 'COORDINADOR_IDIOMAS',
+  },
+  {
+    usuario: 'especialista_portugues_demo',
+    correo: 'portugues.demo@iestp-suiza.edu.pe',
+    dni: '99000010',
+    nombres: 'Especialista',
+    apellidos: 'Portugués Demo',
+    rol: 'ESPECIALISTA',
+    areaCodigo: 'CI',
+    passwordEnvVar: 'LAB_ESPECIALISTA_PORTUGUES_PASSWORD',
+    funcion: 'ESPECIALISTA_PORTUGUES',
   },
 ];
 
@@ -147,6 +159,21 @@ export async function ejecutarSeedLab(poolParam?: Pool): Promise<void> {
   console.log('--- Iniciando Seed LAB SIGD 2026 ---');
 
   try {
+    // Asegurar existencia canónica del Área Centro de Idiomas (CI)
+    await pool.query(`
+      INSERT INTO sigd_org.area (area_id, codigo, nombre, area_padre_id, tipo_unidad, vigente)
+      VALUES (
+        'a0000000-0000-0000-0000-000000000003'::uuid,
+        'CI',
+        'Centro de Idiomas',
+        'a0000000-0000-0000-0000-000000000001'::uuid,
+        'AREA',
+        true
+      )
+      ON CONFLICT (codigo) DO UPDATE
+      SET nombre = 'Centro de Idiomas', vigente = true
+    `);
+
     for (const cuenta of CUENTAS_DEMO) {
       const password = process.env[cuenta.passwordEnvVar];
       if (!password || password.trim() === '') {

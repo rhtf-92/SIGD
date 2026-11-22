@@ -48,6 +48,7 @@ import { crearVerificadorCvd } from './domains/docucore/validadorCvd.controller.
 // Streaming SSE CoreLink
 import { BusSse } from './modules/corelink/sseStream.service.js';
 import { crearRouterRealtime } from './modules/corelink/realtime.routes.js';
+import { notificadorInstitucional } from './core/email/notificador-institucional.service.js';
 
 // Módulos IdentiCore Auth y Casilla
 import { crearRouterAuth } from './domains/identicore/auth.router.js';
@@ -226,6 +227,14 @@ export function construirApp(
     });
   });
 
+  app.get('/api/v1/sistema/correos-salida', (_req, res) => {
+    res.json({
+      ok: true,
+      total: notificadorInstitucional.obtenerCorreosSalida().length,
+      correos: notificadorInstitucional.obtenerCorreosSalida(),
+    });
+  });
+
   // Configuración de Pasarela y Sesiones de Firma (DocuCore - B_VALENTIN)
   const hostsPermitidos = (process.env.REFIRMA_HOSTS_PERMITIDOS ?? 'sigd.iestp-suiza.edu.pe')
     .split(',')
@@ -378,6 +387,63 @@ export function construirApp(
   app.get('/api/v1/validador/cvd/:codigo', (req, res, next) => {
     (req.params as Record<string, string>).cvd = req.params.codigo;
     verificadorCvd(req, res).catch(next);
+  });
+  app.get('/api/v1/validador/cvd/:codigo/pdf', async (req, res, next) => {
+    try {
+      const cvd = String(req.params.codigo ?? '').trim().toUpperCase();
+      const { rows } = await pool.query<{
+        documento_id: string;
+        nombre_archivo: string;
+        s3_bucket: string;
+        s3_key: string;
+        s3_key_adjunto: string;
+        mime_type: string;
+      }>(
+        `SELECT f.documento_id::text AS documento_id,
+                COALESCE(a.nombre_archivo, 'Certificado_Oficial_' || f.cvd || '.pdf') AS nombre_archivo,
+                COALESCE(a.s3_bucket, f.s3_bucket, 'sigd-local') AS s3_bucket,
+                f.s3_key,
+                a.s3_key AS s3_key_adjunto,
+                COALESCE(a.mime_type, 'application/pdf') AS mime_type
+           FROM sigd_doc.firma_digital_documento f
+           LEFT JOIN sigd_doc.documento_adjunto a ON a.documento_adjunto_id = f.documento_id
+          WHERE UPPER(f.cvd) = $1
+          LIMIT 1`,
+        [cvd],
+      );
+
+      if (rows.length === 0) {
+        res.status(404).json({ message: 'No se encontró ningún documento oficial firmado para el CVD indicado.' });
+        return;
+      }
+
+      const doc = rows[0];
+      const { DocumentoStorageService } = await import('./core/storage/documento-storage.service.js');
+      const storage = new DocumentoStorageService();
+      let buffer: Buffer | null = null;
+
+      for (const candidateKey of [doc.s3_key_adjunto, doc.s3_key, `resoluciones/${doc.documento_id}.pdf`, `firmados/${doc.documento_id}.pdf`]) {
+        if (!candidateKey) continue;
+        try {
+          buffer = await storage.obtenerObjetoS3(candidateKey, doc.s3_bucket);
+          if (buffer && buffer.length > 0) break;
+        } catch {
+          // Intentar siguiente ruta candidata
+        }
+      }
+
+      if (!buffer) {
+        res.status(404).json({ message: 'El archivo PDF firmado no se encuentra disponible en el almacenamiento.' });
+        return;
+      }
+
+      res.setHeader('Content-Type', doc.mime_type || 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.nombre_archivo)}"`);
+      res.setHeader('Content-Length', buffer.length);
+      res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
   });
 
   /*
