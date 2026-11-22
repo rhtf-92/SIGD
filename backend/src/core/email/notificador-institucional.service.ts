@@ -341,8 +341,10 @@ Av. Túpac Amaru s/n, Pucallpa - Ucayali
     cut: string;
     motivo: string;
     trackingUrl: string;
+    documentoUrl?: string;
+    cvd?: string;
   }): Promise<void> {
-    const asunto = `[SIGD IESTP SUIZA] Notificación de Inasistencia a Evaluación - EXP: ${datos.cut}`;
+    const asunto = `[SIGD IESTP SUIZA] Memorándum de Inasistencia a Evaluación (NSP) - EXP: ${datos.cut}`;
     const cuerpoTexto = `
 ESTIMADO(A) ${datos.nombreSolicitante.toUpperCase()}:
 
@@ -350,11 +352,12 @@ Le informamos que en la evaluación técnica programada para su trámite (${dato
 
 MOTIVO / DICTAMEN:
 ${datos.motivo}
+${datos.cvd ? `\nCódigo de Verificación Digital (CVD): ${datos.cvd}` : ''}
 
-ESTADO PROCESAL:
-El expediente ha sido cerrado / archivado por inasistencia conforme a las disposiciones reglamentarias del IESTP "Suiza".
+DESCARGA DEL MEMORÁNDUM DE INASISTENCIA (PDF):
+${datos.documentoUrl || datos.trackingUrl}
 
-Puede verificar los detalles y descargar el Memorándum de Inasistencia en el siguiente enlace:
+CONSULTA DEL EXPEDIENTE EN LÍNEA:
 ${datos.trackingUrl}
 
 Atentamente,
@@ -374,6 +377,7 @@ IESTP "Suiza" - Pucallpa
     .header h1 { margin: 0; font-size: 20px; }
     .body { padding: 24px; }
     .alert-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px; margin: 16px 0; color: #991b1b; font-size: 13px; }
+    .btn-pdf { display: inline-block; background: #b91c1c; color: #ffffff; text-decoration: none; padding: 12px 22px; border-radius: 8px; font-weight: bold; font-size: 14px; margin-bottom: 10px; }
     .btn { display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; font-size: 13px; }
     .footer { background: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; }
   </style>
@@ -388,15 +392,20 @@ IESTP "Suiza" - Pucallpa
       <h2 style="font-size: 16px; color: #991b1b; margin-top: 0;">Memorándum de Inasistencia</h2>
       <p style="font-size: 14px;">Estimado(a) <strong>${datos.nombreSolicitante}</strong>,</p>
       <div class="alert-box">
-        <strong>Resultado: NO SE PRESENTÓ (NSP)</strong><br>
+        <strong>Resultado: NO SE PRESENTÓ (NSP) — TRÁMITE IMPROCEDENTE</strong><br>
         ${datos.motivo}
       </div>
       <p style="font-size: 13px; color: #475569;">
         Expediente: <strong>${datos.cut}</strong><br>
-        En virtud del informe técnico emitido, su solicitud concluye por inasistencia. Si considera pertinente solicitar una nueva programación, deberá presentar una nueva solicitud conforme al TUPA.
+        ${datos.cvd ? `CVD del Memorándum: <code>${datos.cvd}</code><br>` : ''}
+        En virtud del informe técnico emitido, su solicitud concluye como improcedente por inasistencia. Si desea solicitar una nueva programación, deberá presentar una nueva solicitud conforme al TUPA.
       </p>
-      <div style="text-align: center; margin: 20px 0;">
-        <a href="${datos.trackingUrl}" class="btn">Consultar Expediente en Línea</a>
+      ${datos.documentoUrl ? `
+      <div style="text-align: center; margin: 20px 0 12px 0;">
+        <a href="${datos.documentoUrl}" class="btn-pdf">📄 Descargar Memorándum de Inasistencia (PDF)</a>
+      </div>` : ''}
+      <div style="text-align: center; margin: 12px 0 20px 0;">
+        <a href="${datos.trackingUrl}" class="btn">🔍 Consultar Expediente en Línea</a>
       </div>
     </div>
     <div class="footer">

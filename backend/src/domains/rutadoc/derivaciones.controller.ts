@@ -770,13 +770,29 @@ export function crearRouterDerivaciones(
         const estadoFinal = resEstado.rows[0]?.estado || 'EN_REVISION';
         await cliente.query('COMMIT');
 
-        // Notificación fehaciente por correo en caso de inasistencia / NSP
+        // Notificación fehaciente por correo con PDF oficial del Memorándum en caso de inasistencia / NSP
         const esInasistencia = /no se present[oó]|nsp|inasistencia/i.test(datos.resultado_resumen || '') ||
                                /no se present[oó]|nsp|inasistencia/i.test(datos.observacion_interna || '');
         if (esInasistencia) {
           try {
-            const expData = await pool.query<{ correo: string | null; codigo: string; nombre: string }>(
-              `SELECT COALESCE(pn.correo, cu.correo) as correo, e.codigo_expediente as codigo,
+            const { generarMemorandumInasistenciaInstitucional } = await import('../docucore/resoluciones.service.js');
+            let cvdMemo: string | undefined;
+            try {
+              const memoPdf = await generarMemorandumInasistenciaInstitucional(
+                pool,
+                expedienteId,
+                actor.id,
+                datos.resultado_resumen,
+              );
+              cvdMemo = memoPdf.cvd;
+            } catch (errMemo) {
+              console.warn('Aviso: No se pudo generar PDF de Memorándum NSP:', errMemo);
+            }
+
+            const expData = await pool.query<{ correo: string | null; codigo: string; dni: string; nombre: string }>(
+              `SELECT COALESCE(pn.correo, cu.correo) as correo,
+                      e.codigo_expediente as codigo,
+                      p.id_documento as dni,
                       COALESCE(pn.nombre_completo, pn.nombres || ' ' || pn.apellidos, p.id_documento) as nombre
                  FROM sigd_tra.expediente e
                  JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
@@ -788,12 +804,17 @@ export function crearRouterDerivaciones(
             const row = expData.rows[0];
             if (row && row.correo && row.correo.includes('@')) {
               const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+              const pdfUrl = cvdMemo
+                ? `${frontendBase}/api/v1/validador/cvd/${encodeURIComponent(cvdMemo)}/pdf`
+                : undefined;
               void notificadorInstitucional.notificarInasistenciaEvaluacion({
                 correo: row.correo,
                 nombreSolicitante: row.nombre || 'Administrado',
                 cut: row.codigo || expedienteId,
                 motivo: datos.resultado_resumen,
-                trackingUrl: `${frontendBase}/consulta/${encodeURIComponent(row.codigo || '')}`,
+                cvd: cvdMemo,
+                documentoUrl: pdfUrl,
+                trackingUrl: `${frontendBase}/consulta/${encodeURIComponent(row.codigo || '')}?documento=${encodeURIComponent(row.dni || '')}`,
               }).catch((e) => console.warn('Aviso: Fallo al enviar correo NSP:', e));
             }
           } catch {

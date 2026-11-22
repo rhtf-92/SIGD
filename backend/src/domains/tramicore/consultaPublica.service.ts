@@ -17,6 +17,9 @@ function resolverPasoSiguiente(estado: string): string {
     case 'RESUELTO':
     case 'ATENDIDO':
       return 'El trámite ha sido concluido favorablemente.';
+    case 'IMPROCEDENTE_NSP':
+    case 'IMPROCEDENTE':
+      return 'Trámite declarado IMPROCEDENTE por inasistencia (No se presentó - NSP) a la evaluación técnica programada. Se remitió el Memorándum de Inasistencia a su correo electrónico.';
     case 'ARCHIVADO':
       return 'Expediente formalmente archivado y finalizado.';
     default:
@@ -178,7 +181,16 @@ export class ConsultaPublicaService {
     const resultado = await cliente.query<FilaConsulta>(
       `SELECT e.codigo_expediente AS cut,
               EXTRACT(YEAR FROM e.fecha_radicacion)::int AS anio_fiscal,
-              COALESCE(rut.estado_nuevo, e.estado) AS estado_tramite,
+              CASE
+                WHEN rut.evento = 'INASISTENCIA_NSP'
+                  OR EXISTS (
+                    SELECT 1 FROM sigd_rut.workflow_instancia wi
+                     WHERE wi.expediente_id = e.expediente_id
+                       AND (wi.historial_pasos::text ILIKE '%no se present%' OR wi.historial_pasos::text ILIKE '%INASISTENCIA%')
+                  )
+                THEN 'IMPROCEDENTE_NSP'
+                ELSE COALESCE(rut.estado_nuevo, e.estado)
+              END AS estado_tramite,
               tv.denominacion_original AS tipo_tramite,
               tr.asunto,
               COALESCE(ar.fecha_ingreso, e.fecha_radicacion) AS fecha_envio_real,
@@ -190,12 +202,15 @@ export class ConsultaPublicaService {
               p.id_documento AS numero_documento,
               pn.nombres,
               split_part(pn.apellidos, ' ', 1) AS apellido_paterno,
-              NULLIF(substring(pn.apellidos FROM position(' ' IN pn.apellidos) + 1), pn.apellidos) AS apellido_materno
+              NULLIF(substring(pn.apellidos FROM position(' ' IN pn.apellidos) + 1), pn.apellidos) AS apellido_materno,
+              COALESCE(area_rut.nombre, 'Mesa de Partes') AS area_actual,
+              COALESCE((SELECT op.estado FROM sigd_tra.orden_pago op WHERE op.expediente_id = e.expediente_id ORDER BY op.creado_en DESC LIMIT 1), 'NO_APLICA') AS estado_pago
          FROM sigd_tra.expediente e
          JOIN sigd_tra.tramite tr ON tr.expediente_id = e.expediente_id
          JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
          LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
          LEFT JOIN sigd_rut.estado_actual_expediente rut ON rut.expediente_id = e.expediente_id
+         LEFT JOIN sigd_org.area area_rut ON area_rut.area_id::text = COALESCE(rut.area_actual_id, e.area_destino_id::text)
          LEFT JOIN LATERAL (
            SELECT a.fecha_ingreso, a.canal_ingreso, a.anulado
              FROM sigd_tra.asiento_registro a

@@ -208,7 +208,17 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
              ultimo.persona_asignada_id::text AS persona_asignada_id,
              ultimo.usuario_asignado_id::text AS usuario_asignado_id,
              e.solicitante_id::text,
-             ultimo.id_movimiento::text, ultimo.evento, ultimo.fecha_hora,
+             ultimo.id_movimiento::text,
+             CASE
+               WHEN ultimo.evento = 'INASISTENCIA_NSP' THEN 'INASISTENCIA_NSP'
+               WHEN EXISTS (
+                 SELECT 1 FROM sigd_rut.workflow_instancia wi
+                  WHERE wi.expediente_id = e.expediente_id
+                    AND (wi.historial_pasos::text ILIKE '%no se present%' OR wi.historial_pasos::text ILIKE '%INASISTENCIA%')
+               ) THEN 'INASISTENCIA_NSP'
+               ELSE ultimo.evento
+             END AS evento,
+             ultimo.fecha_hora,
              ultimo.usuario_operador_id::text
       ${BASE}
       WHERE e.expediente_id = $1::uuid`, [idExpediente]);

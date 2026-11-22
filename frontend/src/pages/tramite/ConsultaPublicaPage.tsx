@@ -164,6 +164,11 @@ export default function ConsultaPublicaPage() {
     const estado = (r.estadoTramite || '').toUpperCase();
     const pago = (r.estadoPago || '').toUpperCase();
     const pagoCompletado = pago === 'CONFIRMADO' || pago === 'PAGADO' || pago === 'EXONERADO' || pago === 'NO_APLICA';
+    const esInasistenciaNsp =
+      estado === 'IMPROCEDENTE_NSP' ||
+      estado === 'IMPROCEDENTE' ||
+      estado === 'DESESTIMADO' ||
+      estado === 'RECHAZADO';
 
     return [
       {
@@ -181,36 +186,37 @@ export default function ConsultaPublicaPage() {
       {
         id: '3',
         title: 'En evaluación',
-        description: 'Revisión técnica de requisitos',
-        status:
-          estado === 'RESUELTO' || estado === 'ARCHIVADO' || estado === 'ATENDIDO'
+        description: esInasistenciaNsp ? 'Inasistencia a evaluación (NSP)' : 'Revisión técnica de requisitos',
+        status: esInasistenciaNsp
+          ? 'error'
+          : estado === 'RESUELTO' || estado === 'ARCHIVADO' || estado === 'ATENDIDO'
             ? 'completed'
             : estado === 'OBSERVADO'
-            ? 'error'
-            : estado === 'EN_TRAMITE' || estado === 'ASIGNADO' || estado === 'EN_REVISION'
-            ? 'current'
-            : 'pending',
+              ? 'error'
+              : estado === 'EN_TRAMITE' || estado === 'ASIGNADO' || estado === 'EN_REVISION'
+                ? 'current'
+                : 'pending',
       },
       {
         id: '4',
         title: 'Pendiente de resolución',
-        description: 'Acto resolutivo formal',
-        status:
-          estado === 'RESUELTO' || estado === 'ARCHIVADO'
+        description: esInasistenciaNsp ? 'No aplica por inasistencia' : 'Acto resolutivo formal',
+        status: esInasistenciaNsp
+          ? 'pending'
+          : estado === 'RESUELTO' || estado === 'ARCHIVADO'
             ? 'completed'
-            : estado === 'POR_FIRMAR'
-            ? 'current'
-            : 'pending',
+            : estado === 'POR_FIRMAR' || estado === 'EN_FIRMA'
+              ? 'current'
+              : 'pending',
       },
       {
         id: '5',
         title: 'Resultado disponible',
-        description: 'Notificación oficial emitida',
-        status:
-          estado === 'RESUELTO' || estado === 'ATENDIDO'
+        description: esInasistenciaNsp ? 'Desestimado por Inasistencia (NSP)' : 'Notificación oficial emitida',
+        status: esInasistenciaNsp
+          ? 'error'
+          : estado === 'RESUELTO' || estado === 'ATENDIDO'
             ? 'completed'
-            : estado === 'RECHAZADO'
-            ? 'error'
             : 'pending',
       },
     ];

@@ -1236,9 +1236,14 @@ export default function ExpedienteDetallePage() {
     return "Operador de Mesa de Partes";
   }, [detalleData, asignacionActiva, hayAsignacionActiva]);
 
+  const esInasistenciaNsp = detalleData?.ultimoMovimiento?.evento === "INASISTENCIA_NSP";
+
   const ultimaActuacion = useMemo(() => {
     if (detalleData?.estadoActual === "ARCHIVADO") {
       return "Archivado formalmente en legajo institucional";
+    }
+    if (esInasistenciaNsp) {
+      return "Memorándum de Inasistencia (NSP) emitido y notificado al correo";
     }
     if (detalleData?.estadoActual === "RESUELTO") {
       return "Acto administrativo emitido y depositado en Casilla";
@@ -1261,11 +1266,14 @@ export default function ExpedienteDetallePage() {
       return `Orden de pago emitida (${ordenPago?.codigoPago || "Pendiente"})`;
     }
     return `Expediente radicado formalmente (${formatearFechaLarga(detalleData?.fechaRadicacion || "")})`;
-  }, [detalleData, pagoConfirmado, bloqueadoPorPago, ordenPago]);
+  }, [detalleData, esInasistenciaNsp, pagoConfirmado, bloqueadoPorPago, ordenPago]);
 
   const siguienteAccion = useMemo(() => {
     if (detalleData?.estadoActual === "ARCHIVADO") {
       return "Trámite concluido (custodia pasiva definitiva)";
+    }
+    if (esInasistenciaNsp) {
+      return "Trámite concluido por inasistencia a evaluación (NSP). Archivar legajo.";
     }
     if (detalleData?.estadoActual === "RESUELTO") {
       return "Trámite resuelto formalmente. Notificar y entregar al solicitante o archivar legajo.";
@@ -1328,6 +1336,7 @@ export default function ExpedienteDetallePage() {
     estaEnAreaTecnica,
     hayAsignacionEfectiva,
     areaResponsableTecnicaId,
+    esInasistenciaNsp,
   ]);
 
   // Regla PM-5H-23 / PM-5H-24: Solo sugerir destino si proviene de configuración explícita verificable
@@ -1336,7 +1345,13 @@ export default function ExpedienteDetallePage() {
     tupaResumen?.unidadResponsableNombre ??
     (destinoSugeridoId ? resolverNombreArea(destinoSugeridoId) : undefined);
 
-  const estadoInfo = humanizarEstado(detalleData?.estadoActual, esTitular);
+  const estadoInfo = esInasistenciaNsp
+    ? {
+        texto: "Improcedente por Inasistencia (NSP)",
+        badgeClass: "bg-rose-50 text-rose-800 border-rose-300",
+        dotClass: "bg-rose-600",
+      }
+    : humanizarEstado(detalleData?.estadoActual, esTitular);
   const cantidadDocs = foliacionResumen?.cantidadDocumentos ?? detalleData?.resumenDocumentos?.cantidadDocumentos ?? documentosAdjuntos.length ?? 0;
   const foliosAsignados = foliacionResumen?.totalFolios ?? detalleData?.resumenDocumentos?.totalFolios ?? 0;
   const esFoliadoCompleto = foliacionResumen?.cantidadFoliados ? foliacionResumen.cantidadFoliados >= cantidadDocs : foliosAsignados > 0;
@@ -1844,17 +1859,35 @@ export default function ExpedienteDetallePage() {
                 )}
 
                 {detalleData.estadoActual === "RESUELTO" && (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-4 sm:p-5 flex flex-col gap-3 shadow-xs">
+                  <div
+                    className={`rounded-2xl border p-4 sm:p-5 flex flex-col gap-3 shadow-xs ${
+                      esInasistenciaNsp
+                        ? "border-rose-300 bg-rose-50/90"
+                        : "border-emerald-200 bg-emerald-50/90"
+                    }`}
+                  >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-                          <h3 className="text-sm font-bold text-emerald-950 uppercase tracking-wide">
-                            Expediente Resuelto con Firma Digital y Notificado al Solicitante
+                          <span
+                            className={`w-2.5 h-2.5 rounded-full ${
+                              esInasistenciaNsp ? "bg-rose-600" : "bg-emerald-600"
+                            }`}
+                          ></span>
+                          <h3
+                            className={`text-sm font-bold uppercase tracking-wide ${
+                              esInasistenciaNsp ? "text-rose-950" : "text-emerald-950"
+                            }`}
+                          >
+                            {esInasistenciaNsp
+                              ? "Trámite Desestimado por Inasistencia a Evaluación (NSP)"
+                              : "Expediente Resuelto con Firma Digital y Notificado al Solicitante"}
                           </h3>
                         </div>
-                        <p className="text-xs text-emerald-900">
-                          El documento oficial ha sido suscrito con firma digital por la Dirección General y notificado automáticamente a la Casilla Electrónica y al correo del solicitante.
+                        <p className={`text-xs ${esInasistenciaNsp ? "text-rose-900" : "text-emerald-900"}`}>
+                          {esInasistenciaNsp
+                            ? "Se emitió el Memorándum Oficial de Inasistencia (PDF con código CVD y sello QR) tras registrarse que el solicitante no se presentó a la evaluación técnica programada, y fue notificado a su correo electrónico."
+                            : "El documento oficial ha sido suscrito con firma digital por la Dirección General y notificado automáticamente a la Casilla Electrónica y al correo del solicitante."}
                         </p>
                       </div>
 
@@ -2075,6 +2108,7 @@ export default function ExpedienteDetallePage() {
                   pagoConfirmado={Boolean(ordenPago && ordenPago.estado === "CONFIRMADO")}
                   areaActualNombre={nombreAreaCustodia}
                   especialistaAsignado={asignacionActiva?.nombreCompleto || null}
+                  esInasistenciaNsp={esInasistenciaNsp}
                 />
               )}
 

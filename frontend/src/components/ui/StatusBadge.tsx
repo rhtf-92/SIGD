@@ -45,6 +45,8 @@ const STATUS_DICTIONARY: Record<string, StatusConfig> = {
 
   // Danger
   RECHAZADO: { variant: "danger", label: "Rechazado" },
+  IMPROCEDENTE_NSP: { variant: "danger", label: "Improcedente (NSP)" },
+  IMPROCEDENTE: { variant: "danger", label: "Improcedente" },
   ANULADO: { variant: "danger", label: "Anulado" },
   DESESTIMADO: { variant: "danger", label: "Desestimado" },
   VENCIDO: { variant: "danger", label: "Vencido" },

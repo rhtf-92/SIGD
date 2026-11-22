@@ -834,3 +834,256 @@ export async function generarActoResolutivoInstitucional(
     s3Bucket: configS3.bucket,
   };
 }
+
+export interface ResultadoActoResolutivo {
+  documentoId: string;
+  documentoNombre: string;
+  hashSha256: string;
+  cvd: string;
+  numeroResolucion: string;
+  s3Key: string;
+  s3Bucket: string;
+}
+
+export async function generarMemorandumInasistenciaInstitucional(
+  pool: Pool | PoolClient,
+  expedienteId: string,
+  usuarioId: string,
+  motivoNsp: string,
+  clienteParam?: PoolClient,
+): Promise<ResultadoActoResolutivo> {
+  const db = clienteParam ?? pool;
+
+  const resExp = await db.query<{
+    expediente_id: string;
+    codigo_expediente: string;
+    solicitante_id: string;
+  }>(
+    `SELECT expediente_id::text, codigo_expediente, solicitante_id::text
+       FROM sigd_tra.expediente
+      WHERE expediente_id = $1::uuid`,
+    [expedienteId],
+  );
+  const exp = resExp.rows[0];
+  if (!exp) {
+    throw new NotFoundError({ message: `El expediente ${expedienteId} no existe.` });
+  }
+
+  const resCiudadano = await db.query<{
+    tipo_documento: string | null;
+    numero_documento: string | null;
+    nombre_completo: string;
+  }>(
+    `SELECT p.tipo AS tipo_documento, p.id_documento AS numero_documento,
+            COALESCE(pn.nombre_completo, TRIM(pn.nombres || ' ' || pn.apellidos), pj.razon_social, 'ADMINISTRADO') AS nombre_completo
+       FROM sigd_auth.persona p
+  LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+  LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = p.id_persona
+      WHERE p.id_persona = $1::uuid`,
+    [exp.solicitante_id],
+  );
+  const ciudadano = resCiudadano.rows[0] ?? {
+    tipo_documento: 'DNI',
+    numero_documento: '--------',
+    nombre_completo: 'ADMINISTRADO',
+  };
+
+  const resAutoridad = await db.query<{
+    numero_documento: string | null;
+    nombre_completo: string;
+  }>(
+    `SELECT p.id_documento AS numero_documento,
+            COALESCE(pn.nombre_completo, TRIM(pn.nombres || ' ' || pn.apellidos), 'ESPECIALISTA EVALUADOR') AS nombre_completo
+       FROM sigd_auth.cuenta_usuario cu
+       JOIN sigd_auth.persona p ON p.id_persona = cu.id_persona
+  LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+      WHERE cu.id_usuario = $1::uuid`,
+    [usuarioId],
+  );
+  const autoridad = resAutoridad.rows[0] ?? {
+    numero_documento: '00000000',
+    nombre_completo: 'ESPECIALISTA EVALUADOR',
+  };
+
+  const resProc = await db.query<{ procedimiento: string }>(
+    `SELECT COALESCE(v.denominacion_snapshot, tp.denominacion, t.asunto, 'Certificado de Idiomas') AS procedimiento
+       FROM sigd_tra.expediente e
+  LEFT JOIN sigd_doc.expediente_tupa_vinculo v ON v.expediente_id = e.expediente_id AND v.reemplaza_vinculo_id IS NULL
+  LEFT JOIN sigd_doc.tupa_procedimiento tp ON tp.registro_version_id = v.registro_version_id
+  LEFT JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
+      WHERE e.expediente_id = $1::uuid
+      LIMIT 1`,
+    [expedienteId],
+  );
+  const nombreProcedimiento = resProc.rows[0]?.procedimiento || 'Certificado de Idiomas';
+
+  const anio = new Date().getFullYear();
+  const correlativoNsp = `MEMO-NSP-${anio}-${exp.codigo_expediente.slice(-6)}`;
+  const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
+  const hoy = new Date();
+  const fechaTexto = `${hoy.getDate()} de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`;
+
+  const contenido: ContenidoResolucion = {
+    titulo: 'MEMORÁNDUM DE INASISTENCIA A EVALUACIÓN (NSP)',
+    subtitulo: `N° ${correlativoNsp}`,
+    bloques: [
+      {
+        tipo: 'parrafo',
+        texto: `Pucallpa, ${fechaTexto}`,
+        alineacion: 'derecha',
+        espacioAntes: 4,
+        espacioDespues: 12,
+      },
+      {
+        tipo: 'encabezado',
+        texto: '1. DATOS DEL EXPEDIENTE Y SOLICITANTE:',
+        nivel: 2,
+        espacioAntes: 8,
+        espacioDespues: 4,
+      },
+      {
+        tipo: 'parrafo',
+        texto: `Expediente CUT N° ${exp.codigo_expediente}, presentado por ${ciudadano.nombre_completo}, identificado(a) con ${ciudadano.tipo_documento ?? 'DNI'} N° ${ciudadano.numero_documento ?? ''}, correspondiente al procedimiento "${nombreProcedimiento}".`,
+        alineacion: 'justificado',
+        interlineado: 1.35,
+        espacioDespues: 10,
+      },
+      {
+        tipo: 'encabezado',
+        texto: '2. CONSTANCIA TÉCNICA DE INASISTENCIA (NO SE PRESENTÓ - NSP):',
+        nivel: 2,
+        espacioAntes: 8,
+        espacioDespues: 4,
+      },
+      {
+        tipo: 'parrafo',
+        texto: motivoNsp || 'Se deja constancia oficial de que el(la) solicitante NO SE PRESENTÓ (NSP) a la evaluación técnica programada por el Centro de Idiomas / Subdirección Académica del IESTP "Suiza".',
+        alineacion: 'justificado',
+        interlineado: 1.35,
+        espacioDespues: 10,
+      },
+      {
+        tipo: 'encabezado',
+        texto: '3. DETERMINACIÓN Y CIERRE DEL TRÁMITE:',
+        nivel: 2,
+        espacioAntes: 8,
+        espacioDespues: 6,
+      },
+      {
+        tipo: 'articulo',
+        numero: 'PRIMERO.-',
+        texto: `DECLARAR IMPROCEDENTE Y DESESTIMADO POR INASISTENCIA (NSP) el trámite recaído en el Expediente N° ${exp.codigo_expediente} formulado por ${ciudadano.nombre_completo}, al no haberse presentado a rendir la evaluación técnica obligatoria.`,
+        alineacion: 'justificado',
+        espacioDespues: 8,
+      },
+      {
+        tipo: 'articulo',
+        numero: 'SEGUNDO.-',
+        texto: `NOTIFICAR el presente Memorándum de Inasistencia al correo electrónico y Casilla Electrónica del administrado, dando por concluido el presente expediente sin emisión de certificado. En caso requiera una nueva evaluación, deberá iniciar una nueva solicitud conforme al TUPA vigente.`,
+        alineacion: 'justificado',
+        espacioDespues: 18,
+      },
+      {
+        tipo: 'firma',
+        cargo: 'CENTRO DE IDIOMAS / SUBDIRECCIÓN ACADÉMICA',
+        nombre: autoridad.nombre_completo,
+        documento: autoridad.numero_documento ? `DNI: ${autoridad.numero_documento}` : undefined,
+        alineacion: 'centro',
+        espacioAntes: 20,
+      },
+    ],
+  };
+
+  const opciones: OpcionesGeneracion = {
+    membrete: {
+      institucion: 'INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"',
+      unidad: 'CENTRO DE IDIOMAS · SUBDIRECCIÓN ACADÉMICA',
+      tipoDocumento: 'MEMORÁNDUM DE INASISTENCIA (NSP)',
+      numeroDocumento: correlativoNsp,
+      correlativo: `EXP: ${exp.codigo_expediente}`,
+      sigla: 'IESTP SUIZA - CI/SDA',
+    },
+  };
+
+  const docA4 = await a4GeneratorService.generar(contenido, opciones);
+  const cvd = `CVD-${anio}-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+  const portalPublico = process.env.APP_URL || process.env.HOST_PUBLICO || 'http://localhost:5173';
+  const cvdStampService = new CvdStampService(portalPublico);
+  const pdfEstampado = await cvdStampService.estampar(Buffer.from(docA4.bytes), cvd);
+  const hashSha256 = crypto.createHash('sha256').update(pdfEstampado).digest('hex');
+
+  const nuevoDocumentoId = crypto.randomUUID();
+  const s3Key = `resoluciones/${nuevoDocumentoId}.pdf`;
+  const s3KeyFirmado = `firmados/${nuevoDocumentoId}.pdf`;
+  const nombreArchivo = `Memorandum_Inasistencia_${exp.codigo_expediente}.pdf`;
+  const configS3 = obtenerConfiguracionS3();
+
+  await subirDocumentoAMinio(s3Key, pdfEstampado, 'application/pdf');
+  await subirDocumentoAMinio(s3KeyFirmado, pdfEstampado, 'application/pdf');
+
+  const resTipo = await db.query<{ tipo_documental_id: string }>(
+    `SELECT tipo_documental_id
+       FROM sigd_doc.tipo_documento
+      WHERE vigente = true
+      ORDER BY CASE WHEN codigo IN ('MEMORANDUM', 'INF', 'INFORME') THEN 0 ELSE 1 END, nombre ASC
+      LIMIT 1`,
+  );
+  const tipoDocumentalId = resTipo.rows[0]?.tipo_documental_id || 'a373f0c7-8d3e-4328-aec1-78409b539131';
+
+  await db.query(
+    `INSERT INTO sigd_doc.documento_adjunto (
+       documento_adjunto_id,
+       expediente_tra_id,
+       tipo_documental_id,
+       nombre_archivo,
+       s3_bucket,
+       s3_key,
+       sha256,
+       tamano_bytes,
+       mime_type,
+       subido_por,
+       id_requisito
+     ) VALUES (
+       $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, 'application/pdf', $9::uuid, NULL
+     )`,
+    [
+      nuevoDocumentoId,
+      exp.expediente_id,
+      tipoDocumentalId,
+      nombreArchivo,
+      configS3.bucket,
+      s3Key,
+      hashSha256,
+      pdfEstampado.length,
+      usuarioId,
+    ],
+  );
+
+  await db.query(
+    `INSERT INTO sigd_doc.firma_digital_documento (
+       documento_id, cvd, sha256_firmado, firmante, fecha_sello_tsa,
+       s3_bucket, s3_key, estado, cuenta_usuario_id, proveedor_firma
+     ) VALUES (
+       $1::uuid, $2, $3, $4, now(), $5, $6, 'FIRMADO_DIGITALMENTE', $7::uuid, 'SELLO_INSTITUCIONAL_NSP'
+     ) ON CONFLICT (documento_id) DO NOTHING`,
+    [
+      nuevoDocumentoId,
+      cvd,
+      hashSha256,
+      autoridad.nombre_completo,
+      configS3.bucket,
+      s3KeyFirmado,
+      usuarioId,
+    ],
+  );
+
+  return {
+    documentoId: nuevoDocumentoId,
+    documentoNombre: nombreArchivo,
+    hashSha256,
+    cvd,
+    numeroResolucion: correlativoNsp,
+    s3Key,
+    s3Bucket: configS3.bucket,
+  };
+}

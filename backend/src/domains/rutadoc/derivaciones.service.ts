@@ -1119,13 +1119,14 @@ export async function atenderExpediente(
       }
     }
 
-    // 2.2 En caso de inasistencia (NSP), el trámite se cierra formalmente como RESUELTO (desestimado)
+    // 2.2 En caso de inasistencia (NSP), el trámite se cierra formalmente como RESUELTO (desestimado con evento INASISTENCIA_NSP)
     const esInasistencia = /no se present[oó]|nsp|inasistencia/i.test(datos.resultado_resumen || '') ||
                            /no se present[oó]|nsp|inasistencia/i.test(datos.observacion_interna || '');
     if (esInasistencia) {
       await cliente.query(
         `UPDATE sigd_rut.estado_actual_expediente
             SET estado_nuevo = 'RESUELTO',
+                evento = 'INASISTENCIA_NSP',
                 fecha_hora = now()
           WHERE expediente_id = $1::uuid`,
         [expedienteId],
@@ -1136,6 +1137,27 @@ export async function atenderExpediente(
           WHERE expediente_id = $1::uuid`,
         [expedienteId],
       );
+      try {
+        await cliente.query('SAVEPOINT sp_flujo_nsp');
+        await cliente.query(
+          `UPDATE sigd_rut.expediente_flujo_certificado
+              SET estado_flujo = 'IMPROCEDENTE',
+                  asistencia_evaluacion = 'NO_SE_PRESENTO',
+                  resultado_evaluacion = 'NSP',
+                  tipo_informe = 'INASISTENCIA_NSP',
+                  documento_valido = false,
+                  descarga_habilitada = false,
+                  motivo_cierre = $2,
+                  notificado_en = now(),
+                  finalizado_en = now(),
+                  actualizado_en = now()
+            WHERE expediente_id = $1::uuid`,
+          [expedienteId, datos.resultado_resumen],
+        );
+        await cliente.query('RELEASE SAVEPOINT sp_flujo_nsp');
+      } catch {
+        await cliente.query('ROLLBACK TO SAVEPOINT sp_flujo_nsp').catch(() => undefined);
+      }
     }
 
     // 3. Emitir evento outbox

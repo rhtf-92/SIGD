@@ -6,6 +6,7 @@ export interface RecorridoTramiteStepperProps {
   pagoConfirmado: boolean;
   areaActualNombre?: string | null;
   especialistaAsignado?: string | null;
+  esInasistenciaNsp?: boolean;
 }
 
 interface PasoWorkflow {
@@ -13,7 +14,7 @@ interface PasoWorkflow {
   titulo: string;
   area: string;
   descripcion: string;
-  estadoVisual: 'COMPLETADO' | 'ACTUAL' | 'PENDIENTE';
+  estadoVisual: 'COMPLETADO' | 'ACTUAL' | 'PENDIENTE' | 'ERROR';
   responsable?: string;
 }
 
@@ -23,15 +24,17 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
   pagoConfirmado,
   areaActualNombre,
   especialistaAsignado,
+  esInasistenciaNsp = false,
 }) => {
   // Determinar en qué etapa del flujo se encuentra el expediente según la máquina de estados FSM
   const estado = estadoActual.toUpperCase();
 
   const esAtendido =
-    estado === 'RESUELTO' ||
-    estado === 'ATENDIDO_NOTIFICADO' ||
-    estado === 'FINALIZADO' ||
-    estado === 'ARCHIVADO';
+    !esInasistenciaNsp &&
+    (estado === 'RESUELTO' ||
+      estado === 'ATENDIDO_NOTIFICADO' ||
+      estado === 'FINALIZADO' ||
+      estado === 'ARCHIVADO');
 
   const esFirma =
     estado === 'EN_FIRMA' ||
@@ -56,7 +59,9 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
 
   // Asignar el número de paso activo (1 al 6) de forma estrictamente secuencial y ordenada
   let pasoActivo = 1;
-  if (esAtendido) {
+  if (esInasistenciaNsp) {
+    pasoActivo = 4; // Concluido en Paso 4 (Evaluación y Calificación) por Inasistencia NSP
+  } else if (esAtendido) {
     pasoActivo = 6;
   } else if (esFirma) {
     pasoActivo = 5;
@@ -108,24 +113,46 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
       numero: 4,
       titulo: 'Evaluación y Calificación',
       area: 'Centro de Idiomas',
-      descripcion: 'Programación de examen, calificación y emisión de informe.',
-      estadoVisual: pasoActivo > 4 ? 'COMPLETADO' : pasoActivo === 4 ? 'ACTUAL' : 'PENDIENTE',
+      descripcion: esInasistenciaNsp
+        ? 'No se presentó a la evaluación (NSP). Memorándum de Inasistencia emitido.'
+        : 'Programación de examen, calificación y emisión de informe.',
+      estadoVisual: esInasistenciaNsp
+        ? 'ERROR'
+        : pasoActivo > 4
+          ? 'COMPLETADO'
+          : pasoActivo === 4
+            ? 'ACTUAL'
+            : 'PENDIENTE',
       responsable: especialistaAsignado || 'Especialista / Docente Evaluador',
     },
     {
       numero: 5,
       titulo: 'Firma Digital y V/B',
       area: 'Dirección General',
-      descripcion: 'Visación y suscripción con Firma Digital oficial.',
-      estadoVisual: pasoActivo > 5 ? 'COMPLETADO' : pasoActivo === 5 ? 'ACTUAL' : 'PENDIENTE',
+      descripcion: esInasistenciaNsp
+        ? 'No aplica: trámite desestimado en evaluación por inasistencia (NSP).'
+        : 'Visación y suscripción con Firma Digital oficial.',
+      estadoVisual: esInasistenciaNsp
+        ? 'PENDIENTE'
+        : pasoActivo > 5
+          ? 'COMPLETADO'
+          : pasoActivo === 5
+            ? 'ACTUAL'
+            : 'PENDIENTE',
       responsable: 'Director General',
     },
     {
       numero: 6,
       titulo: 'Notificación y Entrega',
       area: 'Atención al Usuario',
-      descripcion: 'Emisión final. Descarga de certificado digital.',
-      estadoVisual: pasoActivo === 6 ? 'COMPLETADO' : 'PENDIENTE',
+      descripcion: esInasistenciaNsp
+        ? 'Memorándum de Inasistencia (NSP) remitido al correo electrónico.'
+        : 'Emisión final. Descarga de certificado digital.',
+      estadoVisual: esInasistenciaNsp
+        ? 'ERROR'
+        : pasoActivo === 6
+          ? 'COMPLETADO'
+          : 'PENDIENTE',
       responsable: 'Administrado / Interesado',
     },
   ];
@@ -138,7 +165,7 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+            <span className={`w-2.5 h-2.5 rounded-full ${esInasistenciaNsp ? 'bg-rose-600' : 'bg-blue-600 animate-pulse'}`} />
             <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide">
               Pasos del Procedimiento (Recorrido Institucional)
             </h2>
@@ -149,13 +176,19 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
         </div>
         <div
           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border self-start sm:self-auto ${
-            esAtendido
-              ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-              : 'bg-blue-50 text-blue-900 border-blue-200'
+            esInasistenciaNsp
+              ? 'bg-rose-50 text-rose-900 border-rose-300'
+              : esAtendido
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                : 'bg-blue-50 text-blue-900 border-blue-200'
           }`}
         >
           <span>
-            {esAtendido ? '✓ Paso 6 de 6 · Resuelto y Notificado' : `Paso ${pasoActivo} de 6 en curso`}
+            {esInasistenciaNsp
+              ? '⚠️ Concluido en Paso 4 · Improcedente por Inasistencia (NSP)'
+              : esAtendido
+                ? '✓ Paso 6 de 6 · Resuelto y Notificado'
+                : `Paso ${pasoActivo} de 6 en curso`}
           </span>
         </div>
       </div>
@@ -165,16 +198,19 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
         {pasos.map((p) => {
           const esActual = p.estadoVisual === 'ACTUAL';
           const esCompletado = p.estadoVisual === 'COMPLETADO';
+          const esError = p.estadoVisual === 'ERROR';
 
           return (
             <div
               key={p.numero}
               className={`rounded-xl border p-3.5 transition-all relative overflow-hidden ${
-                esActual
-                  ? 'border-blue-600 bg-blue-50/60 shadow-xs ring-1 ring-blue-500/30'
-                  : esCompletado
-                    ? 'border-emerald-200 bg-emerald-50/30'
-                    : 'border-slate-200 bg-slate-50/40 opacity-75'
+                esError
+                  ? 'border-rose-400 bg-rose-50/70 shadow-xs ring-1 ring-rose-500/20'
+                  : esActual
+                    ? 'border-blue-600 bg-blue-50/60 shadow-xs ring-1 ring-blue-500/30'
+                    : esCompletado
+                      ? 'border-emerald-200 bg-emerald-50/30'
+                      : 'border-slate-200 bg-slate-50/40 opacity-75'
               }`}
             >
               {esActual && (
@@ -182,18 +218,25 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
                   Etapa Actual
                 </div>
               )}
+              {esError && (
+                <div className="absolute top-0 right-0 bg-rose-700 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-bl-lg">
+                  Inasistencia (NSP)
+                </div>
+              )}
 
               <div className="flex items-start gap-3">
                 <div
                   className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono font-black text-xs shrink-0 ${
-                    esCompletado
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : esActual
-                        ? 'bg-blue-600 text-white shadow-xs animate-pulse'
-                        : 'bg-slate-200 text-slate-600'
+                    esError
+                      ? 'bg-rose-700 text-white shadow-2xs'
+                      : esCompletado
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : esActual
+                          ? 'bg-blue-600 text-white shadow-xs animate-pulse'
+                          : 'bg-slate-200 text-slate-600'
                   }`}
                 >
-                  {esCompletado ? '✓' : p.numero}
+                  {esError ? '✕' : esCompletado ? '✓' : p.numero}
                 </div>
 
                 <div className="space-y-1 min-w-0 flex-1">
