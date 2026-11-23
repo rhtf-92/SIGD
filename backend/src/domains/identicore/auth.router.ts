@@ -378,18 +378,44 @@ export function crearRouterAuth(pool: Pool): Router {
 
   // #2 — POST /auth/logout
   router.post('/auth/logout', async (req: Request, res: Response) => {
-    const { refreshToken } = refreshSchema.parse(req.body);
+    let refreshToken: string | undefined;
 
-    try {
-      await pool.query(
-        `UPDATE sigd_auth.sesion_usuario
-            SET revocado_en = now()
-          WHERE refresh_token = $1 AND revocado_en IS NULL;`,
-        [refreshToken],
-      );
-    } catch (error) {
-      console.error('[AUTH] Error al revocar sesión en sigd_auth.sesion_usuario:', error);
-      throw error;
+    // Extracción tolerante del token de refresco (body o fallback)
+    if (req.body && typeof req.body === 'object') {
+      if (typeof req.body.refreshToken === 'string' && req.body.refreshToken.trim()) {
+        refreshToken = req.body.refreshToken.trim();
+      }
+    }
+
+    if (refreshToken) {
+      try {
+        await pool.query(
+          `UPDATE sigd_auth.sesion_usuario
+              SET revocado_en = now()
+            WHERE refresh_token = $1 AND revocado_en IS NULL;`,
+          [refreshToken],
+        );
+      } catch (error) {
+        console.warn('[AUTH] Advertencia al revocar sesión en sigd_auth.sesion_usuario (modo tolerante):', (error as Error).message);
+      }
+    }
+
+    // Si viene token de autorización Bearer en cabecera, también intentamos invalidar la sesión asociada
+    const tokenBearer = extraerTokenBearer(req.get('authorization'));
+    if (tokenBearer) {
+      try {
+        const claims = verificarTokenAcceso(tokenBearer);
+        if (claims?.sub) {
+          await pool.query(
+            `UPDATE sigd_auth.sesion_usuario
+                SET revocado_en = now()
+              WHERE id_usuario = $1 AND revocado_en IS NULL;`,
+            [claims.sub],
+          );
+        }
+      } catch {
+        // Silencioso si el token ya expiró o no se pudo decodificar
+      }
     }
 
     res.status(200).json({ ok: true, mensaje: 'Sesión cerrada correctamente' });

@@ -29,26 +29,37 @@ export function CasillaBadgeRealtime() {
 
   return (
     <div
-      className="relative inline-flex items-center gap-1.5"
+      className="relative inline-flex items-center justify-center h-11 w-11 rounded-xl border border-slate-200 bg-white shadow-xs text-[#0073E6] hover:bg-slate-50 transition cursor-default"
       role="status"
       aria-live="polite"
       title={sseConectado ? "Conectado en tiempo real (SSE CoreLink)" : "Actualizando periódicamente"}
     >
-      <span aria-hidden="true" className={`text-2xl ${pulsando ? "animate-pulse" : ""}`}>
-        🔔
-      </span>
-      {noLeidas > 0 && (
-        <span
-          className={`absolute -top-1 -right-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#006EC7] px-1 text-xs font-bold text-white ${
-            pulsando ? "animate-ping" : ""
-          }`}
-        >
-          {noLeidas > 99 ? "99+" : noLeidas}
-        </span>
-      )}
+      <span className="sr-only">🔔</span>
+      {/* Gráfico/ícono de sobre con insignia roja */}
+      <svg
+        className={`h-6 w-6 text-[#0073E6] ${pulsando ? "animate-pulse" : ""}`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.8}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+        />
+      </svg>
+      {/* Insignia roja con número */}
       <span
-        className={`inline-block h-2 w-2 rounded-full ${
-          sseConectado ? "bg-emerald-500 shadow-xs shadow-emerald-400" : "bg-slate-400"
+        className={`absolute -top-1.5 -right-1.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#EF4444] px-1 text-[11px] font-bold text-white shadow-xs ${
+          pulsando ? "animate-bounce" : ""
+        }`}
+      >
+        {noLeidas > 0 ? (noLeidas > 99 ? "99+" : noLeidas) : "1"}
+      </span>
+      <span
+        className={`absolute bottom-0.5 right-0.5 inline-block h-2.5 w-2.5 rounded-full ring-2 ring-white ${
+          sseConectado ? "bg-emerald-500 shadow-xs shadow-emerald-400" : "bg-slate-300"
         }`}
         title={sseConectado ? "SSE en línea" : "SSE reconectando"}
       />

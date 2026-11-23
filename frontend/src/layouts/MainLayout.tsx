@@ -11,10 +11,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const esPortada = location.pathname === "/";
   const esTesoreria = location.pathname === '/tesoreria';
   const esTramite = location.pathname.startsWith('/tramite');
-  const esFluido = esTesoreria || esTramite;
+  const esCasilla = location.pathname.startsWith('/casilla');
+  const esConsulta = location.pathname.startsWith('/consulta');
+  const esValidador = location.pathname.startsWith('/validador');
+  const esFluido = esTesoreria || esTramite || esCasilla || esConsulta || esValidador;
 
   return (
-    <div className={`min-h-screen ${esFluido ? 'min-w-0 w-full' : 'min-w-[1448px]'} ${esPortada || esTramite ? "bg-[#E8F4FE]" : "bg-[#F3F4F6]"} text-[#111111]`}>
+    <div className={`min-h-screen ${esFluido ? 'min-w-0 w-full' : 'min-w-[1448px]'} ${esPortada || esCasilla || esTramite || esConsulta || esValidador ? "bg-[#E8F4FE]" : "bg-[#F3F4F6]"} text-[#111111]`}>
       {esTesoreria ? <div className="overflow-x-auto"><div className="min-w-[1448px]"><HeaderInstitucional /></div></div> : <HeaderInstitucional />}
 
       {children}

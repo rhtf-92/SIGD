@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Mail, FileText, Search, ShieldCheck, User, Menu, X } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
@@ -6,6 +6,7 @@ import SelectorContextoPill from "./auth/SelectorContextoPill";
 
 export default function HeaderInstitucional() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, usuario, cerrarSesion } = useAuthStore();
   const [cerrando, setCerrando] = useState(false);
   const [errorCierre, setErrorCierre] = useState("");
@@ -95,14 +96,16 @@ export default function HeaderInstitucional() {
     setErrorCierre("");
     try {
       await cerrarSesion();
+      setMenuMovilAbierto(false);
+      navigate("/");
     } catch (error) {
-      setErrorCierre(
-        error instanceof Error
-          ? error.message
-          : "No se pudo cerrar la sesión. Intente nuevamente."
-      );
+      console.warn("[HeaderInstitucional] Error durante cierre de sesión, forzando limpieza local:", error);
+      useAuthStore.getState().logout();
+      setMenuMovilAbierto(false);
+      navigate("/");
     } finally {
       setCerrando(false);
+      setErrorCierre("");
     }
   }
 
@@ -129,7 +132,7 @@ export default function HeaderInstitucional() {
               INSTITUTO DE EDUCACIÓN SUPERIOR
             </span>
             <span className="text-[11px] sm:text-[13px] lg:text-[14px] font-bold text-white tracking-wide uppercase font-sans">
-              TECNOLÓGICO PÚBLICO "SUIZA"
+              TECNOLÓGICO PÚBLICO “SUIZA”
             </span>
           </div>
         </div>
@@ -154,7 +157,11 @@ export default function HeaderInstitucional() {
               <button
                 type="button"
                 onClick={() => irA("/tramite")}
-                className="flex items-center gap-2 text-white hover:text-blue-200 transition cursor-pointer"
+                className={`flex items-center gap-2 transition cursor-pointer ${
+                  location.pathname.startsWith("/tramite") || location.pathname.startsWith("/mesa-partes")
+                    ? "text-white font-bold border-b-2 border-white pb-0.5"
+                    : "text-white hover:text-blue-200"
+                }`}
               >
                 <FileText className="w-5 h-5 shrink-0" aria-hidden="true" />
                 <span>Mesa de Partes</span>
@@ -166,7 +173,11 @@ export default function HeaderInstitucional() {
               <button
                 type="button"
                 onClick={() => irA("/consulta")}
-                className="flex items-center gap-2 text-white hover:text-blue-200 transition cursor-pointer"
+                className={`flex items-center gap-2 transition cursor-pointer ${
+                  location.pathname.startsWith("/consulta")
+                    ? "text-white font-bold border-b-2 border-white pb-0.5"
+                    : "text-white hover:text-blue-200"
+                }`}
               >
                 <Search className="w-5 h-5 shrink-0" aria-hidden="true" />
                 <span>Consulta de Trámite</span>
@@ -178,7 +189,11 @@ export default function HeaderInstitucional() {
               <button
                 type="button"
                 onClick={() => irA("/validador-cvd")}
-                className="flex items-center gap-2 text-white hover:text-blue-200 transition cursor-pointer"
+                className={`flex items-center gap-2 transition cursor-pointer ${
+                  location.pathname.startsWith("/validador")
+                    ? "text-white font-bold border-b-2 border-white pb-0.5"
+                    : "text-white hover:text-blue-200"
+                }`}
               >
                 <ShieldCheck className="w-5 h-5 shrink-0" aria-hidden="true" />
                 <span>Validador CVD</span>
@@ -539,9 +554,12 @@ export default function HeaderInstitucional() {
       )}
 
       {errorCierre && (
-        <p role="alert" className="mx-auto max-w-[1560px] px-4 pb-3 text-sm text-red-200">
-          {errorCierre}
-        </p>
+        <div className="bg-red-950/70 border-t border-red-500/40 px-4 py-2 text-center text-xs text-red-200">
+          <p role="alert" className="inline-flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{errorCierre}</span>
+          </p>
+        </div>
       )}
     </header>
   );

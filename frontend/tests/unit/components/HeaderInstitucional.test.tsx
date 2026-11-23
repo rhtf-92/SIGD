@@ -32,19 +32,19 @@ describe('Cierre explícito desde la cabecera institucional (transporte controla
     await act(async () => { confirmar({ status: 200, data: { ok: true } }); });
     await waitFor(() => expect(logout).toHaveBeenCalledOnce());
   });
-  it('conserva la sesión y muestra el error si el servidor no confirma el cierre', async () => {
+  it('limpia la sesión localmente y redirige de forma limpia aunque el servidor falle', async () => {
     vi.spyOn(apiClient, 'post').mockRejectedValue(new Error('Servicio no disponible'));
-    montar(); fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Servicio no disponible');
-    expect(logout).not.toHaveBeenCalled();
-    expect(useAuthStore.getState().refreshToken).toBe('refresh-del-doble');
-    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeEnabled();
+    montar();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+    await waitFor(() => expect(logout).toHaveBeenCalledOnce());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
-  it('no anuncia cierre confirmado con una respuesta incompleta', async () => {
+  it('limpia la sesión de forma limpia ante una respuesta no exitosa o incompleta del servidor', async () => {
     vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 200, data: {} });
-    montar(); fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('El servidor no confirmó');
-    expect(logout).not.toHaveBeenCalled();
+    montar();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+    await waitFor(() => expect(logout).toHaveBeenCalledOnce());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
   it('la visita pública no presenta una sesión iniciada', () => {
     useAuthStore.setState({ isAuthenticated: false }); montar();

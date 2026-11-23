@@ -178,23 +178,25 @@ export default function NotificationList({
       {/* ==================================================================== */}
       {/* PANEL DE FILTROS Y BÚSQUEDA                                          */}
       {/* ==================================================================== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-        <div className="mb-4 flex flex-col justify-between gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2">
-            <svg
-              className="h-5 w-5 text-blue-700"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-              />
-            </svg>
-            <h2 className="text-base font-bold text-slate-900">
+      <div className="rounded-2xl border border-sky-100 bg-white p-6 sm:p-7 shadow-[0_4px_25px_rgba(8,47,124,0.05)] transition hover:shadow-md">
+        <div className="mb-5 flex flex-col justify-between gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-[#0073E6]">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+            </div>
+            <h2 className="text-base sm:text-lg font-bold text-[#082F7C]">
               Filtros de Búsqueda y Criterios
             </h2>
           </div>
@@ -203,7 +205,7 @@ export default function NotificationList({
             <button
               type="button"
               onClick={onResetFiltros}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900 hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-900 transition hover:underline"
             >
               <svg
                 className="h-3.5 w-3.5"
@@ -223,14 +225,15 @@ export default function NotificationList({
           )}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Búsqueda por texto */}
-          <div className="sm:col-span-2">
+        {/* Fila principal con los 3 controles en fila + botón azul Buscar */}
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_auto] items-end">
+          {/* 1. Búsqueda por texto */}
+          <div>
             <label
               htmlFor="filtro-busqueda"
-              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600"
+              className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700"
             >
-              Buscar por Asunto, N° o Expediente
+              BUSCAR POR ASUNTO, N° O EXPEDIENTE
             </label>
             <div className="relative">
               <input
@@ -239,7 +242,7 @@ export default function NotificationList({
                 value={filtros.busqueda || ""}
                 onChange={(e) => onSetBusqueda(e.target.value)}
                 placeholder="Ej. EXP-2026-000184, Titulación, RD 0412..."
-                className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#0073E6] focus:ring-2 focus:ring-sky-100 shadow-xs"
               />
               <svg
                 className="absolute left-3 top-3 h-4 w-4 text-slate-400"
@@ -257,13 +260,13 @@ export default function NotificationList({
             </div>
           </div>
 
-          {/* Filtro por Tipo de Notificación */}
+          {/* 2. Filtro por Tipo de Notificación */}
           <div>
             <label
               htmlFor="filtro-tipo"
-              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600"
+              className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700"
             >
-              Tipo de Acto / Documento
+              TIPO DE ACTO / DOCUMENTO
             </label>
             <select
               id="filtro-tipo"
@@ -271,7 +274,7 @@ export default function NotificationList({
               onChange={(e) =>
                 onSetTipo(e.target.value as TipoNotificacion | "TODOS")
               }
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#0073E6] focus:ring-2 focus:ring-sky-100 shadow-xs"
             >
               <option value="TODOS">Todos los tipos</option>
               <option value="RESOLUCION">Resoluciones</option>
@@ -285,13 +288,13 @@ export default function NotificationList({
             </select>
           </div>
 
-          {/* Filtro por Estado */}
+          {/* 3. Filtro por Estado */}
           <div>
             <label
               htmlFor="filtro-estado"
-              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600"
+              className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700"
             >
-              Estado de Notificación
+              ESTADO DE NOTIFICACIÓN
             </label>
             <select
               id="filtro-estado"
@@ -299,7 +302,7 @@ export default function NotificationList({
               onChange={(e) =>
                 onSetEstado(e.target.value as EstadoNotificacion | "TODOS")
               }
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#0073E6] focus:ring-2 focus:ring-sky-100 shadow-xs"
             >
               <option value="TODOS">Todos los estados</option>
               <option value="NO_LEIDO">No Leído</option>
@@ -308,60 +311,64 @@ export default function NotificationList({
             </select>
           </div>
 
-          {/* Rango de Fechas: Desde */}
+          {/* Botón azul sólido redondeado Buscar */}
           <div>
-            <label
-              htmlFor="filtro-fecha-inicio"
-              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600"
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[#0073E6] hover:bg-[#005fb8] text-white font-bold px-7 py-2.5 text-sm shadow-sm transition active:scale-98 cursor-pointer"
             >
-              Fecha Depósito (Desde)
-            </label>
-            <input
-              id="filtro-fecha-inicio"
-              type="date"
-              value={filtros.fechaInicio || ""}
-              onChange={(e) => onSetFechaInicio(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-            />
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span>Buscar</span>
+            </button>
           </div>
+        </div>
 
-          {/* Rango de Fechas: Hasta */}
-          <div>
-            <label
-              htmlFor="filtro-fecha-fin"
-              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600"
-            >
-              Fecha Depósito (Hasta)
-            </label>
-            <input
-              id="filtro-fecha-fin"
-              type="date"
-              value={filtros.fechaFin || ""}
-              onChange={(e) => onSetFechaFin(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-          {/* Items por página */}
-          <div className="flex items-end">
-            <div className="w-full">
-              <label
-                htmlFor="filtro-limit"
-                className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600"
-              >
-                Por página
+        {/* Fila secundaria para rango de fecha y paginación */}
+        <div className="mt-4 pt-3.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">Rango de depósito:</span>
+            <div className="flex items-center gap-2">
+              <label htmlFor="filtro-fecha-inicio" className="text-slate-600 text-xs">
+                Fecha Depósito (Desde)
               </label>
-              <select
-                id="filtro-limit"
-                value={filtros.limit || 5}
-                onChange={(e) => onSetLimit(Number(e.target.value))}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-600"
-              >
-                <option value={5}>5 por página</option>
-                <option value={10}>10 por página</option>
-                <option value={20}>20 por página</option>
-              </select>
+              <input
+                id="filtro-fecha-inicio"
+                type="date"
+                value={filtros.fechaInicio || ""}
+                onChange={(e) => onSetFechaInicio(e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-blue-600 shadow-xs"
+              />
+              <span className="text-slate-400">al</span>
+              <label htmlFor="filtro-fecha-fin" className="text-slate-600 text-xs">
+                Fecha Depósito (Hasta)
+              </label>
+              <input
+                id="filtro-fecha-fin"
+                type="date"
+                value={filtros.fechaFin || ""}
+                onChange={(e) => onSetFechaFin(e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-blue-600 shadow-xs"
+              />
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="filtro-limit" className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">
+              Por página:
+            </label>
+            <select
+              id="filtro-limit"
+              value={filtros.limit || 5}
+              onChange={(e) => onSetLimit(Number(e.target.value))}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-blue-600 shadow-xs"
+            >
+              <option value={5}>5 por página</option>
+              <option value={10}>10 por página</option>
+              <option value={20}>20 por página</option>
+            </select>
           </div>
         </div>
       </div>

@@ -173,13 +173,19 @@ function createStore() {
       if (cierrePendiente) return cierrePendiente;
       const refreshToken = state.refreshToken;
       cierrePendiente = (async () => {
-        if (refreshToken) {
-          const respuesta = await apiClient.post('/api/v1/auth/logout', { refreshToken });
-          if (respuesta.status !== 200 || respuesta.data?.ok !== true) {
-            throw new Error('El servidor no confirmó el cierre de sesión.');
+        try {
+          if (refreshToken) {
+            const respuesta = await apiClient.post('/api/v1/auth/logout', { refreshToken });
+            if (respuesta.status !== 200 || respuesta.data?.ok !== true) {
+              console.warn('[authStore] El servidor no confirmó el cierre de sesión, procediendo con limpieza local.');
+            }
           }
+        } catch (error) {
+          console.warn('[authStore] Error al notificar al servidor sobre el cierre, procediendo con limpieza local:', error);
+        } finally {
+          // Siempre limpiar el estado local y los tokens almacenados
+          state.logout();
         }
-        state.logout();
       })().finally(() => { cierrePendiente = null; });
       return cierrePendiente;
     },
