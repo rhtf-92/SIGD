@@ -2,7 +2,7 @@ import type { EstadoRutaDoc } from './rutadoc.fsm.js';
 
 /** Mapeo operativo acordado para RD-03; las seis pestañas son exhaustivas. */
 export const ESTADOS_POR_PESTANA = Object.freeze({
-  PENDIENTES: ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION'],
+  PENDIENTES: ['REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'DERIVADO'],
   EN_TRAMITE: ['EN_REVISION', 'OBSERVADO', 'SUBSANADO'],
   DERIVADOS: ['DERIVADO'],
   POR_FIRMAR: ['EN_FIRMA'],

@@ -6,7 +6,7 @@ import { ModuleHero, BandejaIllustration } from "../../components/tramite/Module
 import ExpedienteTable from "../../components/expedientes/ExpedienteTable";
 import { useBandejaExpedientes } from "../../hooks/useBandejaExpedientes";
 import { useAuthStore } from "../../stores/authStore";
-import { AREA_ID_DIR, AREA_ID_SDA } from "../../utils/areaPresentacion";
+import { AREA_ID_DIR, AREA_ID_SDA, AREA_ID_CI, obtenerInfoArea } from "../../utils/areaPresentacion";
 import type { Filtros } from "./rutadoc/rutadoc.dto";
 import RutaDocEstado from "./rutadoc/RutaDocEstado";
 import { tesoreriaService, type DtoSolicitudDevolucion } from "../../services/tesoreria.service";
@@ -32,17 +32,25 @@ export default function BandejaExpedientesPage() {
   const rol = usuario?.rol;
 
   const esAdminOGlobal = rol === "ADMINISTRADOR" || rol === "DIRECTOR";
-  const esOperadorSDA = rol === "ESPECIALISTA" || rol === "SECRETARIO";
+  const esCoordinadorOGestor =
+    usuario?.perfiles?.includes("GESTOR_AREA_ACADEMICA") ||
+    usuario?.correo?.includes("coordinador") ||
+    rol === "SECRETARIO" ||
+    rol === "DIRECTOR" ||
+    rol === "ADMINISTRADOR" ||
+    rol === "MESA_PARTES";
+
+  const infoAreaUsuario = obtenerInfoArea(usuario?.areaId, null, rol);
 
   const [tipoBandeja, setTipoBandeja] = useState<"AREA" | "PERSONAL">(
-    rol === "ESPECIALISTA" ? "PERSONAL" : "AREA"
+    esCoordinadorOGestor ? "AREA" : (rol === "ESPECIALISTA" ? "PERSONAL" : "AREA")
   );
 
   const [filtros, setFiltros] = useState<Filtros>(() => ({
     pestana: "PENDIENTES",
     limite: 20,
     areaId: undefined,
-    bandeja: rol === "ESPECIALISTA" ? "PERSONAL" : "AREA",
+    bandeja: esCoordinadorOGestor ? "AREA" : (rol === "ESPECIALISTA" ? "PERSONAL" : "AREA"),
   }));
 
   const handleCambiarTipoBandeja = (nuevoTipo: "AREA" | "PERSONAL") => {
@@ -136,10 +144,12 @@ export default function BandejaExpedientesPage() {
     let areaIdFiltro = texto("areaId");
     if (areaIdFiltro) {
       const limpia = areaIdFiltro.trim().toUpperCase();
-      if (limpia === "SDA" || limpia.includes("SUBDIRECCIÓN ACADÉMICA")) {
+      if (limpia === "SDA" || limpia.includes("SUBDIRECCIÓN") || limpia.includes("ACADÉMICA")) {
         areaIdFiltro = AREA_ID_SDA;
-      } else if (limpia === "DIR" || limpia.includes("DIRECCIÓN GENERAL")) {
+      } else if (limpia === "DIR" || limpia.includes("DIRECCIÓN")) {
         areaIdFiltro = AREA_ID_DIR;
+      } else if (limpia === "CI" || limpia.includes("IDIOMA")) {
+        areaIdFiltro = AREA_ID_CI;
       }
     }
 
@@ -368,19 +378,22 @@ export default function BandejaExpedientesPage() {
               <option value="">Todas las áreas (Institucional Global)</option>
               <option value={AREA_ID_SDA}>Subdirección Académica (SDA)</option>
               <option value={AREA_ID_DIR}>Dirección General (DIR)</option>
+              <option value={AREA_ID_CI}>Centro de Idiomas (CI)</option>
             </select>
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">
             <label htmlFor="areaId" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Área institucional {esOperadorSDA && <span className="text-[11px] font-semibold text-sky-700">(Subdirección Académica)</span>}
+              Área institucional {infoAreaUsuario.nombre && (
+                <span className="text-[11px] font-semibold text-sky-700">({infoAreaUsuario.nombre})</span>
+              )}
             </label>
             <input
               id="areaId"
               name="areaId"
               aria-label="Área UUID"
               defaultValue={filtros.areaId ?? ""}
-              placeholder={esOperadorSDA ? "Subdirección Académica (SDA)" : "Código o identificador de área"}
+              placeholder={`${infoAreaUsuario.nombre} (${infoAreaUsuario.codigo})`}
               className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 focus:outline-none transition"
             />
           </div>

@@ -7,10 +7,12 @@ export interface InfoAreaPresentacion {
 
 export const AREA_ID_SDA = 'a0000000-0000-0000-0000-000000000001';
 export const AREA_ID_DIR = 'a0000000-0000-0000-0000-000000000002';
+export const AREA_ID_CI = 'a0000000-0000-0000-0000-000000000003';
 
 export const AREAS_INSTITUCIONALES = [
   { id: AREA_ID_SDA, codigo: 'SDA', nombre: 'Subdirección Académica' },
   { id: AREA_ID_DIR, codigo: 'DIR', nombre: 'Dirección General' },
+  { id: AREA_ID_CI, codigo: 'CI', nombre: 'Centro de Idiomas' },
 ] as const;
 
 export function obtenerInfoArea(
@@ -19,6 +21,16 @@ export function obtenerInfoArea(
   rol?: string | null,
 ): InfoAreaPresentacion {
   const normalizado = (areaId ?? '').trim().toLowerCase();
+
+  // Si coincide con Centro de Idiomas
+  if (normalizado === AREA_ID_CI || normalizado === 'ci' || areaNombre?.toLowerCase().includes('idioma')) {
+    return {
+      codigo: 'CI',
+      nombre: areaNombre?.trim() || 'Centro de Idiomas',
+      badgeClase: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+      descripcion: 'Centro de Idiomas (CI) — Evaluación de suficiencia de lenguas extranjeras y certificación.',
+    };
+  }
 
   // Si coincide con Subdirección Académica
   if (normalizado === AREA_ID_SDA || normalizado === 'sda' || areaNombre?.toLowerCase().includes('acad')) {
