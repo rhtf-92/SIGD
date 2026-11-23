@@ -1,6 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 // The economic guard has dedicated tests; this suite keeps its ordered FSM fixtures.
 vi.mock('../../../../src/domains/tramicore/demoPago.js', () => ({ exigirSinPagoDemoPendiente: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('../../../../src/domains/tramicore/computoPlazo15Dias.service.js', () => ({ exigirExpedienteHabilitadoParaRecepcion: vi.fn().mockResolvedValue(undefined) }));
 import type { PoolClient } from 'pg';
 import {
   derivarExpediente,

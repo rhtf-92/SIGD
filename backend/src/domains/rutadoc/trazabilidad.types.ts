@@ -1,12 +1,28 @@
 import type { EstadoRutaDoc } from './rutadoc.fsm.js';
 
+export type TipoActuacionTrazabilidad =
+  | 'NORMAL'
+  | 'COMPENSATORIA'
+  | 'ACUSE_DIGITAL'
+  | 'REGISTRAL'
+  | 'FINANCIERO'
+  | 'CALCULO_PLAZO'
+  | 'HABILITACION'
+  | 'EVALUACION_ACADEMICA'
+  | 'DICTAMEN'
+  | 'PROYECCION_RESOLUTIVA'
+  | 'FIRMA_DIGITAL'
+  | 'NOTIFICACION'
+  | 'CIERRE'
+  | 'CUSTODIA';
+
 export interface ActuacionTrazabilidad {
   movimientoId: string;
   secuencia: string;
   fechaHora: string;
-  estadoAnterior: EstadoRutaDoc;
+  estadoAnterior: EstadoRutaDoc | string;
   evento: string;
-  estadoNuevo: EstadoRutaDoc;
+  estadoNuevo: EstadoRutaDoc | string;
   usuarioOperadorId: string;
   areaAnteriorId: string | null;
   areaDestinoId: string | null;
@@ -16,7 +32,10 @@ export interface ActuacionTrazabilidad {
   datosAsociados: Record<string, unknown>;
   duracionMs: number | null;
   duracionMinutos: number | null;
-  tipoActuacion: 'NORMAL' | 'COMPENSATORIA';
+  tipoActuacion: TipoActuacionTrazabilidad;
+  origen?: string;
+  unidadOrganica?: string | null;
+  rol?: string | null;
 }
 
 export interface RepositorioTrazabilidadRutaDoc {

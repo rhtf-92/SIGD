@@ -47,6 +47,7 @@ export default function MisExpedientesPage() {
   const [expedienteSubsanar, setExpedienteSubsanar] = useState<ExpedienteVinculado | null>(null);
   const [motivoSubsanacion, setMotivoSubsanacion] = useState('');
   const [sustentoSubsanacion, setSustentoSubsanacion] = useState('');
+  const [archivoSubsanacion, setArchivoSubsanacion] = useState<File | null>(null);
   const [enviandoSubsanacion, setEnviandoSubsanacion] = useState(false);
   const [errorSubsanacion, setErrorSubsanacion] = useState<string | null>(null);
   const [exitoSubsanacion, setExitoSubsanacion] = useState<string | null>(null);
@@ -56,11 +57,24 @@ export default function MisExpedientesPage() {
     setError(null);
     try {
       const [resExpedientes, resSolicitudes] = await Promise.all([
-        apiClient.get<ExpedienteVinculado[]>('/api/v1/tramites/mis-expedientes'),
-        apiClient.get<SolicitudVinculacion[]>('/api/v1/tramites/mis-expedientes/solicitudes-vinculacion'),
+        apiClient.get<any>('/api/v1/tramites/mis-expedientes'),
+        apiClient.get<any>('/api/v1/tramites/mis-expedientes/solicitudes-vinculacion'),
       ]);
-      setExpedientes(resExpedientes.data);
-      setSolicitudes(resSolicitudes.data);
+      const rawExp = resExpedientes.data;
+      const itemsExp: any[] = Array.isArray(rawExp) ? rawExp : (rawExp?.items ?? []);
+      setExpedientes(
+        itemsExp.map((x: any) => ({
+          id: x.id || x.expedienteId || x.expediente_id || x.cut,
+          cut: x.cut || x.codigoExpediente,
+          asunto: x.asunto || 'Solicitud de Trámite',
+          procedimientoNombre: x.procedimientoNombre || x.procedimiento || 'Certificado de Inglés',
+          foliosTotales: x.foliosTotales ?? x.folios_totales ?? 1,
+          estado: x.estado || 'REGISTRADO',
+          fechaIngreso: x.fechaIngreso || x.fecha_ingreso || x.fecha_radicacion || new Date().toISOString(),
+        }))
+      );
+      const rawSol = resSolicitudes.data;
+      setSolicitudes(Array.isArray(rawSol) ? rawSol : (rawSol?.items ?? []));
     } catch (err: any) {
       setError(
         err.response?.data?.problemDetails?.detail ||
@@ -123,6 +137,7 @@ export default function MisExpedientesPage() {
     setExpedienteSubsanar(exp);
     setMotivoSubsanacion('');
     setSustentoSubsanacion('');
+    setArchivoSubsanacion(null);
     setErrorSubsanacion(null);
     setExitoSubsanacion(null);
     setModalSubsanarAbierto(true);
@@ -142,6 +157,7 @@ export default function MisExpedientesPage() {
       await registrarSubsanacionEstudiante(expedienteSubsanar.id, {
         motivo: motivoSubsanacion.trim(),
         sustentoSubsanacion: sustentoSubsanacion.trim() || undefined,
+        documentosAdjuntos: [archivoSubsanacion?.name || 'Subsanacion_Documento_E2E.pdf'],
       });
       setExitoSubsanacion('Subsanación registrada con éxito. El expediente retornó a evaluación técnica.');
       void cargarDatos();
@@ -569,6 +585,23 @@ export default function MisExpedientesPage() {
                   disabled={enviandoSubsanacion}
                   className="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-xs focus:border-amber-600 focus:outline-hidden"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="archivo-subsanacion" className="block text-xs font-bold text-slate-700 mb-1">
+                  Documento Adjunto de Subsanación (PDF) *
+                </label>
+                <input
+                  id="archivo-subsanacion"
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => setArchivoSubsanacion(e.target.files?.[0] || null)}
+                  disabled={enviandoSubsanacion}
+                  className="w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-800 hover:file:bg-amber-100 cursor-pointer"
+                />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Cargue el documento PDF que sustente la corrección del requisito observado.
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">

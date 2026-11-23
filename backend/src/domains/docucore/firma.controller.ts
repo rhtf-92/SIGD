@@ -210,21 +210,39 @@ export function crearFirmaRouter(servicio: ServicioFirmaService, pool: Pool, act
           });
         }
 
-        // H-02: Validar correspondencia con borrador de resolución y convención de clave S3
-        const resolucionRes = await pool.query<{ resolucion_id: string; numero_borrador: string }>(
-          `SELECT resolucion_id, numero_borrador
-           FROM sigd_doc.resolucion
-           WHERE expediente_id = $1::uuid
-             AND estado = 'BORRADOR_PENDIENTE_FIRMA'
-             AND ('resoluciones/' || numero_borrador || '.pdf') = $2`,
-          [documento.expediente_id, documento.s3_key],
-        );
-        if (resolucionRes.rows.length === 0) {
-          throw new ConflictError({
-            code: 'SIGN_DOCUMENT_NOT_A_RESOLUTION',
-            message: 'El documento indicado no corresponde a una resolución pendiente de firma para este expediente.',
-            detail: `El documento adjunto con clave ${documento.s3_key} no corresponde a un borrador de resolución activo del expediente.`,
-          });
+        // H-02: Validar correspondencia con borrador de resolución o Certificado de Inglés y convención de clave S3
+        if (documento.s3_key.startsWith('certificados/')) {
+          const certRes = await pool.query<{ certificado_id: string; numero_borrador: string }>(
+            `SELECT certificado_id::text, numero_borrador
+             FROM sigd_doc.certificado_ingles
+             WHERE expediente_id = $1::uuid
+               AND estado IN ('BORRADOR_PENDIENTE_FIRMA', 'EN_FIRMA')
+               AND ('certificados/' || numero_borrador || '.pdf') = $2`,
+            [documento.expediente_id, documento.s3_key],
+          );
+          if (certRes.rows.length === 0) {
+            throw new ConflictError({
+              code: 'SIGN_DOCUMENT_NOT_A_RESOLUTION',
+              message: 'El documento indicado no corresponde a un Certificado de Inglés pendiente de firma para este expediente.',
+              detail: `El documento adjunto con clave ${documento.s3_key} no corresponde a un Certificado de Inglés activo del expediente.`,
+            });
+          }
+        } else {
+          const resolucionRes = await pool.query<{ resolucion_id: string; numero_borrador: string }>(
+            `SELECT resolucion_id, numero_borrador
+             FROM sigd_doc.resolucion
+             WHERE expediente_id = $1::uuid
+               AND estado = 'BORRADOR_PENDIENTE_FIRMA'
+               AND ('resoluciones/' || numero_borrador || '.pdf') = $2`,
+            [documento.expediente_id, documento.s3_key],
+          );
+          if (resolucionRes.rows.length === 0) {
+            throw new ConflictError({
+              code: 'SIGN_DOCUMENT_NOT_A_RESOLUTION',
+              message: 'El documento indicado no corresponde a una resolución pendiente de firma para este expediente.',
+              detail: `El documento adjunto con clave ${documento.s3_key} no corresponde a un borrador de resolución activo del expediente.`,
+            });
+          }
         }
 
         const config = obtenerConfiguracionS3();

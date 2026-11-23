@@ -97,7 +97,24 @@ export default function ExpedienteTable<T extends ExpedienteSGD | ExpedienteResu
                   </td>
                 )}
                 <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold text-blue-700">
-                  {real ? expediente.cut : expediente.codigoExpediente}
+                  <div>{real ? expediente.cut : expediente.codigoExpediente}</div>
+                  {real && expediente.habilitacionInfo && (
+                    <div className="mt-1">
+                      {expediente.habilitacionInfo.habilitado ? (
+                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 border border-emerald-200">
+                          ✓ Habilitado
+                        </span>
+                      ) : expediente.habilitacionInfo.estadoPago === 'PENDIENTE' ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
+                          Pendiente Pago
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 border border-blue-200" title={`Espera legal de 15 días hábiles (${expediente.habilitacionInfo.diasHabilesRestantes} días restantes)`}>
+                          Espera legal ({expediente.habilitacionInfo.diasHabilesRestantes}d)
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </td>
                 <td className="max-w-xs px-4 py-3 text-slate-800">
                   {expediente.asunto}

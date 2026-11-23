@@ -30,6 +30,7 @@ export interface ConfiguracionWorker {
   backoffBaseMs?: number;
   backoffTechoMs?: number;
   intervaloPollMs?: number;
+  agregado?: string;
 }
 
 export class OutboxWorker {
@@ -40,6 +41,7 @@ export class OutboxWorker {
   private readonly backoffBaseMs: number;
   private readonly backoffTechoMs: number;
   private readonly intervaloPollMs: number;
+  private readonly agregado: string | null;
   private detenido = false;
 
   constructor(pool: Pool, despachador: DespachadorEvento, config: ConfiguracionWorker = {}) {
@@ -50,6 +52,7 @@ export class OutboxWorker {
     this.backoffBaseMs = config.backoffBaseMs ?? 1000;
     this.backoffTechoMs = config.backoffTechoMs ?? 300_000;
     this.intervaloPollMs = config.intervaloPollMs ?? 5000;
+    this.agregado = config.agregado ?? null;
   }
 
   async iniciar(): Promise<void> {
@@ -61,7 +64,10 @@ export class OutboxWorker {
           await this.esperar(this.intervaloPollMs);
         }
       } catch (error) {
-        console.error('[OUTBOX] Error en el ciclo del worker:', error);
+        console.error(
+          '[OUTBOX] Error en el ciclo del worker:',
+          error instanceof Error ? error.message : String(error),
+        );
         await this.esperar(this.intervaloPollMs);
       }
     }
@@ -98,10 +104,11 @@ export class OutboxWorker {
         `SELECT id_evento, correlation_id, agregado, tipo_evento, payload, intentos
            FROM sigd_audit.evento_outbox
           WHERE estado = 'PENDIENTE'
+            AND ($2::text IS NULL OR agregado = $2)
           ORDER BY creado_en
           LIMIT $1
             FOR UPDATE SKIP LOCKED`,
-        [this.lote],
+        [this.lote, this.agregado],
       );
 
       let procesados = 0;

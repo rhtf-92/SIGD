@@ -235,11 +235,13 @@ describe('migrador con selección segura de archivo',()=>{
     expect(detectados, `Migración ${archivo} no debe contener comandos transaccionales de nivel superior`).toEqual([]);
   }
  });
- it('las 26 migraciones activas en raíz y 2 archivadas en pendientes (total 28) se validan correctamente',()=>{
+ it('las migraciones activas en raíz y archivadas en pendientes se validan correctamente',()=>{
   const directorio = path.resolve(process.cwd(), 'migraciones');
   const archivosRaiz = fs.readdirSync(directorio).filter(f => /^\d{2}_.*\.sql$/.test(f));
-  expect(archivosRaiz.length).toBe(26);
+  expect(archivosRaiz.length).toBe(35);
   expect(archivosRaiz).toContain('28_sigd_org_eliminacion_definitiva_rol_especialista.sql');
+  expect(archivosRaiz).toContain('34_sigd_doc_suz26_006_certificado_ingles.sql');
+  expect(archivosRaiz).toContain('37_sigd_tra_computo_plazo_15_dias_y_feriados.sql');
 
   const dirPendientes = path.join(directorio, 'pendientes');
   const archivosPendientes = fs.existsSync(dirPendientes)
@@ -248,7 +250,7 @@ describe('migrador con selección segura de archivo',()=>{
   expect(archivosPendientes.length).toBe(2);
 
   const totalArchivos = [...archivosRaiz.map(f => path.join(directorio, f)), ...archivosPendientes.map(f => path.join(dirPendientes, f))];
-  expect(totalArchivos.length).toBe(28);
+  expect(totalArchivos.length).toBe(37);
 
   for (const rutaCompleta of totalArchivos) {
     const nombreArchivo = path.basename(rutaCompleta);

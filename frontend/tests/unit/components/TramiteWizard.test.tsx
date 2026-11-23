@@ -40,6 +40,7 @@ import { ApiHttpError } from '@/types/api';
 import { useAuthStore } from '@/stores/authStore';
 import { INITIAL_WIZARD_STATE } from '@/types/tramiteWizardState';
 import { consultarDocumentacion } from '@/services/documentacionTramiteService';
+import { publicAvailability } from '@/services/radicacionPublicaService';
 
 vi.mock('@/services/documentacionTramiteService', async importOriginal => ({
   ...await importOriginal<typeof import('@/services/documentacionTramiteService')>(),
@@ -802,19 +803,32 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   it('no envia al backend cuando falta la sesión y conserva la solicitud', async () => {
     const user = userEvent.setup();
     useAuthStore.setState({ accessToken: null, refreshToken: null, isAuthenticated: false });
-    const mockGet = vi.spyOn(apiClient, 'get');
-    const mockPost = vi.spyOn(apiClient, 'post');
-    const button = await llegarAConfirmacion(user, TIPOS_FORMALES[0].id, true);
-    await user.click(button);
+    vi.mocked(publicAvailability)
+      .mockResolvedValueOnce([
+        { id: TIPOS_FORMALES[0].id, habilitado: true, motivo: 'Fixture gratuita de pruebas' },
+      ])
+      .mockResolvedValue([
+        { id: TIPOS_FORMALES[0].id, habilitado: false, motivo: 'Requiere sesión institucional o ciudadana' },
+      ]);
+    try {
+      const mockGet = vi.spyOn(apiClient, 'get');
+      const mockPost = vi.spyOn(apiClient, 'post');
+      const button = await llegarAConfirmacion(user, TIPOS_FORMALES[0].id, true);
+      await user.click(button);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/inicie sesion/i);
-    expect(screen.getByRole('link', { name: /Iniciar sesion y volver/ })).toHaveAttribute('href', '/login');
-    expect(mockGet).toHaveBeenCalledWith('/api/v1/tramites/tipos', expect.any(Object));
-    expect(mockPost).not.toHaveBeenCalled();
-    const borrador = JSON.parse(sessionStorage.getItem(TRAMITE_WIZARD_STORAGE_KEY)!);
-    expect(borrador.identificacion.numeroDocumento).toBe('74123456');
-    expect(borrador.documentos.tipoTramiteId).toBe(TIPOS_FORMALES[0].id);
-    expect(borrador.cargoEmitido).toBeNull();
+      expect(await screen.findByRole('alert')).toHaveTextContent(/inicie sesion/i);
+      expect(screen.getByRole('link', { name: /Iniciar sesion y volver/ })).toHaveAttribute('href', '/login');
+      expect(mockGet).toHaveBeenCalledWith('/api/v1/tramites/tipos', expect.any(Object));
+      expect(mockPost).not.toHaveBeenCalled();
+      const borrador = JSON.parse(sessionStorage.getItem(TRAMITE_WIZARD_STORAGE_KEY)!);
+      expect(borrador.identificacion.numeroDocumento).toBe('74123456');
+      expect(borrador.documentos.tipoTramiteId).toBe(TIPOS_FORMALES[0].id);
+      expect(borrador.cargoEmitido).toBeNull();
+    } finally {
+      vi.mocked(publicAvailability).mockResolvedValue([
+        { id: '3443d0c0-ebaf-48d2-a4d0-2c32ec1fc6dd', habilitado: true, motivo: 'Fixture gratuita de pruebas' },
+      ]);
+    }
   });
 
   // ===========================================================================

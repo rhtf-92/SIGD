@@ -19,7 +19,9 @@ export interface DocumentoPendienteFirma {
   hashSha256?: string;
   /** Solo indica que existe un registro; la consulta de estado coteja el PDF. */
   estadoFirma?: 'FIRMADO_DIGITALMENTE';
+  tipoActo?: 'RD' | 'CERTIFICADO';
   resolucionId: string;
+  certificadoId?: string;
   expedienteId: string;
   cut: string;
   numeroBorrador: string;
@@ -84,6 +86,7 @@ interface FilaPendiente {
   documento_id: string | null;
   sha256: string | null;
   estado_firma: string | null;
+  tipo_acto?: 'RD' | 'CERTIFICADO';
   resolucion_id: string;
   expediente_id: string;
   cut: string;
@@ -123,14 +126,26 @@ export async function listarPendientesFirma(
       filtros.push(`(r.numero_borrador ILIKE $${valores.length} OR r.asunto ILIKE $${valores.length})`);
     }
 
+    const filtrosCert: string[] = [
+      "c.estado IN ('BORRADOR_PENDIENTE_FIRMA', 'EN_FIRMA')",
+      "rut_estado.estado_nuevo = 'EN_FIRMA'",
+    ];
+
+    if (parametros.busqueda) {
+      filtrosCert.push(`(c.numero_borrador ILIKE $${valores.indexOf(`%${parametros.busqueda}%`) + 1} OR c.asunto ILIKE $${valores.indexOf(`%${parametros.busqueda}%`) + 1})`);
+    }
+
     const OFFSET = (parametros.pagina - 1) * parametros.porPagina;
     valores.push(parametros.porPagina);
     const limite = `$${valores.length}`;
     valores.push(OFFSET);
     const desplazamiento = `$${valores.length}`;
 
-    const sql = `
+    const incluirCertificados = parametros.tipoResolucion === 'TODOS';
+
+    const sqlResoluciones = `
       SELECT
+        'RD'::text AS tipo_acto,
         r.resolucion_id,
         r.expediente_id,
         e.codigo_expediente AS cut,
@@ -149,8 +164,12 @@ export async function listarPendientesFirma(
           EXISTS (
             SELECT 1
               FROM sigd_org.facultad_despacho fd
+              JOIN sigd_org.usuario_rol ur ON ur.id_usuario = fd.usuario_id
+              JOIN sigd_org.rol_sistema rs ON rs.rol_id = ur.rol_id AND rs.codigo = 'DIRECTOR' AND rs.vigente = TRUE
              WHERE fd.usuario_id = $1
                AND fd.vigente
+               AND ur.vigente_desde <= now()
+               AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
                AND (fd.tipo_resolucion IS NULL OR fd.tipo_resolucion = r.tipo_resolucion)
           )
           OR EXISTS (
@@ -166,8 +185,12 @@ export async function listarPendientesFirma(
           (
             SELECT fd.motivo_no_habilitado
               FROM sigd_org.facultad_despacho fd
+              JOIN sigd_org.usuario_rol ur ON ur.id_usuario = fd.usuario_id
+              JOIN sigd_org.rol_sistema rs ON rs.rol_id = ur.rol_id AND rs.codigo = 'DIRECTOR' AND rs.vigente = TRUE
              WHERE fd.usuario_id = $1
                AND fd.vigente
+               AND ur.vigente_desde <= now()
+               AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
                AND (fd.tipo_resolucion IS NULL OR fd.tipo_resolucion = r.tipo_resolucion)
              ORDER BY fd.motivo_no_habilitado NULLS LAST
              LIMIT 1
@@ -181,8 +204,7 @@ export async function listarPendientesFirma(
                AND (ed.tipo_resolucion IS NULL OR ed.tipo_resolucion = r.tipo_resolucion)
              LIMIT 1
           )
-        ) AS motivo_no_habilitado,
-        COUNT(*) OVER ()::text AS total
+        ) AS motivo_no_habilitado
       FROM sigd_doc.resolucion r
       JOIN sigd_doc.expediente e
         ON e.expediente_id = r.expediente_id
@@ -209,9 +231,90 @@ export async function listarPendientesFirma(
         LIMIT 1
       ) adj ON TRUE
       LEFT JOIN sigd_doc.firma_digital_documento firma ON firma.documento_id = adj.documento_id
-      WHERE ${filtros.join(' AND ')}
-      ORDER BY fecha_limite ASC, r.numero_borrador ASC
-      LIMIT ${limite} OFFSET ${desplazamiento}
+      WHERE ${filtros.join(' AND ')}`;
+
+    const sqlCertificados = `
+      SELECT
+        'CERTIFICADO'::text AS tipo_acto,
+        c.certificado_id AS resolucion_id,
+        c.expediente_id,
+        e.codigo_expediente AS cut,
+        c.numero_borrador,
+        'DIRECTORAL_ADMINISTRATIVA'::varchar AS tipo_resolucion,
+        c.asunto,
+        COALESCE(s.nombre_completo, c.titular_nombre, 'ADMINISTRADO') AS solicitante_nombre,
+        c.fecha_proyeccion,
+        COALESCE(e.fecha_limite, c.fecha_proyeccion + 30) AS fecha_limite,
+        COALESCE(fol.folios_total, 0)::int AS folios_total,
+        adj.s3_referencia,
+        adj.documento_id,
+        adj.sha256,
+        firma.estado AS estado_firma,
+        (
+          EXISTS (
+            SELECT 1
+              FROM sigd_org.facultad_despacho fd
+              JOIN sigd_org.usuario_rol ur ON ur.id_usuario = fd.usuario_id
+              JOIN sigd_org.rol_sistema rs ON rs.rol_id = ur.rol_id AND rs.codigo = 'DIRECTOR' AND rs.vigente = TRUE
+             WHERE fd.usuario_id = $1
+               AND fd.vigente
+               AND ur.vigente_desde <= now()
+               AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+               AND fd.tipo_resolucion IS NULL
+          )
+          OR EXISTS (
+            SELECT 1
+              FROM sigd_org.encargatura_despacho ed
+             WHERE ed.usuario_id = $1
+               AND ed.vigente
+               AND ed.titular_usuario_id IS DISTINCT FROM $1
+               AND ed.tipo_resolucion IS NULL
+          )
+        ) AS puede_firmar,
+        (
+          SELECT fd.motivo_no_habilitado
+            FROM sigd_org.facultad_despacho fd
+           WHERE fd.usuario_id = $1 AND fd.vigente
+           ORDER BY fd.motivo_no_habilitado NULLS LAST
+           LIMIT 1
+        ) AS motivo_no_habilitado
+      FROM sigd_doc.certificado_ingles c
+      JOIN sigd_doc.expediente e
+        ON e.expediente_id = c.expediente_id
+      JOIN sigd_rut.estado_actual_expediente rut_estado
+        ON rut_estado.expediente_id = c.expediente_id
+      LEFT JOIN sigd_auth.persona_natural s
+        ON s.id_persona = e.solicitante_id
+      LEFT JOIN LATERAL (
+        SELECT SUM(x.folio_fin - x.folio_inicio + 1)::int AS folios_total
+        FROM sigd_tra.expediente_documento_folio x
+        WHERE x.expediente_id = c.expediente_id
+      ) fol ON TRUE
+      JOIN LATERAL (
+        SELECT 's3://' || a.s3_bucket || '/' || a.s3_key AS s3_referencia,
+               a.documento_adjunto_id AS documento_id,
+               a.sha256
+        FROM sigd_doc.documento_adjunto a
+        WHERE a.expediente_id = c.expediente_id
+          AND a.documento_adjunto_id = c.documento_adjunto_id
+          AND a.s3_key = ('certificados/' || c.numero_borrador || '.pdf')
+          AND a.mime_type = 'application/pdf'
+          AND a.sha256 IS NOT NULL
+          AND LENGTH(TRIM(a.sha256)) > 0
+        ORDER BY a.creado_en DESC
+        LIMIT 1
+      ) adj ON TRUE
+      LEFT JOIN sigd_doc.firma_digital_documento firma ON firma.documento_id = adj.documento_id
+      WHERE ${filtrosCert.join(' AND ')}`;
+
+    const sql = `
+      SELECT q.*, COUNT(*) OVER ()::text AS total
+        FROM (
+          ${sqlResoluciones}
+          ${incluirCertificados ? `UNION ALL ${sqlCertificados}` : ''}
+        ) q
+       ORDER BY q.fecha_limite ASC, q.numero_borrador ASC
+       LIMIT ${limite} OFFSET ${desplazamiento}
     `;
 
     const resultado = await cliente.query<FilaPendiente>(sql, valores);
@@ -229,6 +332,8 @@ export async function listarPendientesFirma(
           ? { estadoFirma: 'FIRMADO_DIGITALMENTE' as const } : {}),
         ...(fila.documento_id && fila.sha256
           ? { documentoId: fila.documento_id, hashSha256: fila.sha256 } : {}),
+        ...(fila.tipo_acto ? { tipoActo: fila.tipo_acto } : {}),
+        ...(fila.tipo_acto === 'CERTIFICADO' ? { certificadoId: fila.resolucion_id } : {}),
         resolucionId: fila.resolucion_id,
         expedienteId: fila.expediente_id,
         cut: fila.cut,

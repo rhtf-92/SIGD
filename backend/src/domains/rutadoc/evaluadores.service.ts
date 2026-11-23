@@ -808,7 +808,7 @@ export async function listarMisEvaluaciones(
     SELECT ee.id_asignacion,
            ee.expediente_id,
            e.codigo_expediente,
-           COALESCE(t.asunto, e.asunto, 'Sin asunto especificado') AS asunto,
+           COALESCE(doc.asunto, t.asunto, e.numero, 'Sin asunto especificado') AS asunto,
            COALESCE(ultimo.estado_nuevo, e.estado) AS estado_expediente,
            ee.estado_evaluacion,
            ee.asignado_en,
@@ -822,6 +822,7 @@ export async function listarMisEvaluaciones(
            COALESCE(pn.nombre_completo, e.solicitante_id::text) AS solicitante_nombre
       FROM sigd_rut.expediente_evaluador ee
       JOIN sigd_tra.expediente e ON e.expediente_id = ee.expediente_id
+      LEFT JOIN sigd_doc.expediente doc ON doc.expediente_id = e.expediente_id
       LEFT JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
       LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
       LEFT JOIN sigd_org.area a ON a.area_id = ee.area_id
@@ -1048,7 +1049,7 @@ export async function obtenerDetalleEvaluacion(
   }>(
     `SELECT e.expediente_id,
             e.codigo_expediente,
-            COALESCE(t.asunto, e.asunto, 'Sin asunto') AS asunto,
+            COALESCE(doc.asunto, t.asunto, e.numero, 'Sin asunto') AS asunto,
             COALESCE(ultimo.estado_nuevo, e.estado) AS estado,
             e.fecha_radicacion,
             e.solicitante_id::text,
@@ -1056,6 +1057,7 @@ export async function obtenerDetalleEvaluacion(
             pn.nombre_completo AS nombre_solicitante,
             pn.correo AS correo_solicitante
        FROM sigd_tra.expediente e
+       LEFT JOIN sigd_doc.expediente doc ON doc.expediente_id = e.expediente_id
        LEFT JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
        LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
        LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = e.solicitante_id
@@ -1422,13 +1424,32 @@ export async function registrarSubsanacionEstudiante(
 
   const { areaId, codigoExpediente, solicitanteId } = await obtenerAreaActualExpediente(cliente, expedienteId);
 
-  const personaUsuario = await cliente.query<{ id_persona: string }>(
-    `SELECT id_persona::text FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1::uuid`,
+  const personaUsuario = await cliente.query<{ id_persona: string; activo?: boolean }>(
+    `SELECT id_persona::text, activo FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1::uuid`,
     [actor.id],
   );
 
-  const personaActorId = personaUsuario.rows[0]?.id_persona ?? actor.id;
-  const esTitular = personaActorId === solicitanteId || actor.id === solicitanteId;
+  const cuentaUsuario = personaUsuario.rows?.[0];
+  if (!cuentaUsuario || cuentaUsuario.activo === false) {
+    throw new ForbiddenError({
+      message: 'La cuenta de usuario no se encuentra activa o no cuenta con identidad institucional verificada.',
+    });
+  }
+
+  const personaActorId = cuentaUsuario.id_persona ?? actor.id;
+  let esTitular = personaActorId === solicitanteId || actor.id === solicitanteId;
+
+  // Si no es titular directo y no actúa como operador de ventanilla MP, verificar vinculación formal aprobada
+  if (!esTitular && !actor.roles?.includes('MESA_PARTES')) {
+    const checkVinculacion = await cliente.query<{ aprobada: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM sigd_tra.vinculacion_expediente_cuenta
+          WHERE id_usuario = $1::uuid AND expediente_id = $2::uuid AND estado = 'APROBADA'
+       ) AS aprobada`,
+      [actor.id, expedienteId],
+    );
+    esTitular = checkVinculacion?.rows?.[0]?.aprobada === true;
+  }
 
   let canalRecepcion = 'PORTAL_ESTUDIANTE';
   if (!esTitular) {
@@ -1839,7 +1860,7 @@ export async function supervisarEvaluacionesArea(
     `SELECT ee.id_asignacion,
             ee.expediente_id,
             e.codigo_expediente,
-            COALESCE(t.asunto, e.asunto, 'Sin asunto') AS asunto,
+            COALESCE(doc.asunto, t.asunto, e.numero, 'Sin asunto') AS asunto,
             COALESCE(cu.usuario, cu.correo) AS docente_nombre,
             cu.correo AS docente_email,
             ee.estado_evaluacion,
@@ -1848,6 +1869,7 @@ export async function supervisarEvaluacionesArea(
             ee.resultado_evaluacion
        FROM sigd_rut.expediente_evaluador ee
        JOIN sigd_tra.expediente e ON e.expediente_id = ee.expediente_id
+       LEFT JOIN sigd_doc.expediente doc ON doc.expediente_id = e.expediente_id
        LEFT JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
        LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
        JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = ee.id_usuario_docente

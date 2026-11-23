@@ -6,6 +6,7 @@ import BandejaTabFilter from "../../components/expedientes/BandejaTabFilter";
 import ExpedienteTable from "../../components/expedientes/ExpedienteTable";
 import CcdTreeSelector from "../../components/expedientes/CcdTreeSelector";
 import ReasignacionMasivaModal from "../../components/expedientes/ReasignacionMasivaModal";
+import { BandejaMesaPartesPanel } from "../../components/expedientes/BandejaMesaPartesPanel";
 import { useBandejaExpedientes, mensajeErrorExpediente } from "../../hooks/useBandejaExpedientes";
 import { useAuthStore } from "../../stores/authStore";
 import type { PestanaRutaDoc } from "../../types/expediente";
@@ -66,6 +67,7 @@ export default function BandejaExpedientesPage() {
   const usuario = useAuthStore((state) => state.usuario);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [modalReasignacionMasiva, setModalReasignacionMasiva] = useState(false);
+  const [vistaMesaPartes, setVistaMesaPartes] = useState(false);
 
   const puedeReasignar = Boolean(
     usuario && (
@@ -133,7 +135,39 @@ export default function BandejaExpedientesPage() {
       </header>
 
       <section className="mx-auto max-w-7xl px-6 py-8">
-        {/* Panel de KPIs */}
+        {/* Conmutador de Vistas: Operativa General vs Mesa de Partes */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setVistaMesaPartes(false)}
+              className={`rounded-lg px-4 py-2 text-xs font-bold transition cursor-pointer ${
+                !vistaMesaPartes
+                  ? "bg-blue-700 text-white shadow-sm"
+                  : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              📁 Bandeja Operativa General
+            </button>
+            <button
+              type="button"
+              onClick={() => setVistaMesaPartes(true)}
+              className={`rounded-lg px-4 py-2 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                vistaMesaPartes
+                  ? "bg-blue-700 text-white shadow-sm"
+                  : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <span>📋 Mesa de Partes (12 Bandejas LPAG)</span>
+            </button>
+          </div>
+        </div>
+
+        {vistaMesaPartes ? (
+          <BandejaMesaPartesPanel />
+        ) : (
+          <>
+            {/* Panel de KPIs */}
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
             <p className="text-3xl font-bold text-blue-700">{volumenActivo}</p>
@@ -308,6 +342,8 @@ export default function BandejaExpedientesPage() {
               void refetch();
             }}
           />
+        )}
+          </>
         )}
       </section>
     </main>

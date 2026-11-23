@@ -134,7 +134,9 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   onSuccess,
 }) => {
   const queryClient = useQueryClient();
-  const esPublico = !useAuthStore(auth => auth.isAuthenticated);
+  const isAuthenticated = useAuthStore(auth => auth.isAuthenticated);
+  const [disponiblePublico, setDisponiblePublico] = useState(false);
+  const esPublico = !isAuthenticated && disponiblePublico;
   const esCiudadano = useAuthStore(auth => auth.usuario?.rol === 'CIUDADANO' || Boolean(auth.usuario?.roles?.includes('CIUDADANO')));
   const envioEnCurso = useRef(false);
   const [copiado, setCopiado] = useState(false);
@@ -181,10 +183,18 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
     let activo = true;
     publicAvailability().then(tipos => {
       const tipo = tipos.find(t => t.id === documentos.tipoTramiteId);
-      if (activo) setAvisoDemo(tipo?.omisionPagoDemo && !documentos.ordenPagoId ? tipo.motivo : null);
-    }).catch(() => { if (activo) setAvisoDemo(null); });
+      if (activo) {
+        setDisponiblePublico(Boolean(tipo?.habilitado));
+        setAvisoDemo(tipo?.omisionPagoDemo && !documentos.ordenPagoId ? tipo.motivo : null);
+      }
+    }).catch(() => {
+      if (activo) {
+        setDisponiblePublico(false);
+        setAvisoDemo(null);
+      }
+    });
     return () => { activo = false; };
-  }, [esPublico, documentos.tipoTramiteId, documentos.ordenPagoId]);
+  }, [isAuthenticated, documentos.tipoTramiteId, documentos.ordenPagoId]);
 
   const navigateToStep = useCallback(
     (step: WizardStep) => {
@@ -215,7 +225,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
 
   const handleRadicar = async () => {
     if (isSubmitting || envioEnCurso.current) return;
-    if (!useAuthStore.getState().accessToken) {
+    if (!esPublico && !useAuthStore.getState().accessToken) {
       dispatch({
         type: 'SET_ERROR',
         payload: 'Inicie sesion con una cuenta vinculada a una persona para radicar la solicitud.',

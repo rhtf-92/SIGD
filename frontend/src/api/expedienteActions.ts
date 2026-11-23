@@ -46,66 +46,8 @@ export function crearServicioExpedienteActions(contratos: ContratosExpedienteAct
     return { estado: "OBSERVADO", slaPaused: true };
   };
   if (acumulacion) servicio.acumular = acumulacion;
-  if (desacumulacion) {
-    servicio.desacumular = desacumulacion;
-  } else {
-    servicio.desacumular = async (entrada) => {
-      const { apiClient } = await import("./client");
-      await apiClient.post(`/api/v1/rutadoc/expedientes/${encodeURIComponent(entrada.principalId)}/desacumular`, {
-        expedienteAccesorioId: entrada.accesorioId,
-        actoDesacumulacion: entrada.actoDesacumulacion,
-        motivo: entrada.motivo,
-      });
-    };
-  }
-  if (desglose) {
-    servicio.desglosar = desglose;
-  } else {
-    servicio.desglosar = async (entrada) => {
-      const { apiClient } = await import("./client");
-      const { data } = await apiClient.post<{
-        ok: boolean;
-        idDesglose: string;
-        expedienteId: string;
-        documentoAdjuntoId: string;
-        folioInicio: number;
-        folioFin: number;
-        cantidadFolios: number;
-        documentoSustitutorioId?: string | null;
-      }>(`/api/v1/rutadoc/expedientes/${encodeURIComponent(entrada.expedienteId)}/desglose`, {
-        documentoAdjuntoId: entrada.documentoAdjuntoId,
-        actoAutorizacion: entrada.actoAutorizacion,
-        motivoDesglose: entrada.motivo,
-        solicitanteNombre: entrada.solicitanteNombre,
-        solicitanteDocumento: entrada.solicitanteDocumento,
-        documentoSustitutorioId: entrada.documentoSustitutorioId || null,
-        observaciones: entrada.observaciones || null,
-      });
-      return {
-        idDesglose: data.idDesglose,
-        expedienteId: data.expedienteId,
-        documentoAdjuntoId: data.documentoAdjuntoId,
-        folioInicio: data.folioInicio,
-        folioFin: data.folioFin,
-        cantidadFolios: data.cantidadFolios,
-        documentoSustitutorioId: data.documentoSustitutorioId,
-      };
-    };
-  }
-  servicio.listarAcumulaciones = async (expedienteId: string) => {
-    const { apiClient } = await import("./client");
-    const { data } = await apiClient.get<{ ok: boolean; acumulaciones: import("../types/expediente").ItemAcumulacion[] }>(
-      `/api/v1/rutadoc/expedientes/${encodeURIComponent(expedienteId)}/acumulaciones`
-    );
-    return data.acumulaciones ?? [];
-  };
-  servicio.listarDesgloses = async (expedienteId: string) => {
-    const { apiClient } = await import("./client");
-    const { data } = await apiClient.get<{ ok: boolean; desgloses: import("../types/expediente").ItemDesglose[] }>(
-      `/api/v1/rutadoc/expedientes/${encodeURIComponent(expedienteId)}/desgloses`
-    );
-    return data.desgloses ?? [];
-  };
+  if (desacumulacion) servicio.desacumular = desacumulacion;
+  if (desglose) servicio.desglosar = desglose;
   if (recepcion) servicio.recepcionar = async (entrada): Promise<ResultadoRecepcion> => {
     const { apiClient } = await import("./client");
     const payload = typeof recepcion === "object" && recepcion.construirPayload

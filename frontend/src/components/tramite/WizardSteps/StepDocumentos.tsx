@@ -33,7 +33,13 @@ import { DocumentacionRequisitos, type DestinoCarga } from '../DocumentacionRequ
 import { ResumenDocumental } from '../ResumenDocumental';
 import { calcularFoliacionFront } from '../../../utils/foliacion';
 import type { DocumentacionTramite, ClasificacionAdjunto } from '../../../types/documentacionTramite';
-import { consultarDocumentacion, validarAdjuntosRequisitos } from '../../../services/documentacionTramiteService';
+import {
+  consultarDocumentacion,
+  validarAdjuntosRequisitos,
+  autoAsociarArchivosRequisitos,
+  verificarIntegridadArchivo,
+  type EstadoCumplimientoRequisito,
+} from '../../../services/documentacionTramiteService';
 
 export interface StepDocumentosProps {
   /** Datos reactivos del paso de documentos */
@@ -233,7 +239,12 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     const controller = new AbortController();
     if (UUID_RE.test(data.tipoTramiteId)) {
       consultarDocumentacion(data.tipoTramiteId, controller.signal)
-        .then(detalle => { if (!controller.signal.aborted) { setDocumentacion(detalle); setErrorDocumentacion(null); } })
+        .then(detalle => {
+          if (!controller.signal.aborted) {
+            setDocumentacion(detalle);
+            setErrorDocumentacion(null);
+          }
+        })
         .catch(() => { if (!controller.signal.aborted) setErrorDocumentacion({ id: data.tipoTramiteId, mensaje: 'No se pudieron verificar los requisitos y la tarifa. Reintente antes de continuar.' }); });
     }
     return () => controller.abort();
@@ -444,7 +455,11 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           vistasPdf.current[archivoSubido.s3Key] = URL.createObjectURL(file);
           setVistas({ ...vistasPdf.current });
         }
-        archivosActuales = [...archivosActuales, nuevoArchivo];
+        let archivosActualizados = [...archivosActuales, nuevoArchivo];
+        if (documentacion) {
+          archivosActualizados = autoAsociarArchivosRequisitos(documentacion, archivosActualizados);
+        }
+        archivosActuales = archivosActualizados;
         const foliacionActual = calcularFoliacionFront(archivosActuales);
         dispatch({ type: 'UPDATE_DOCUMENTOS', payload: { archivos: foliacionActual.documentosFoliados, numeroFolios: foliacionActual.totalFolios } });
       }
@@ -456,6 +471,71 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       cargaEnCurso.current = false;
       input.value = '';
     }
+  };
+
+  const handleAsignarRequisito = (archivoIndex: number, nuevoRequisitoId: string) => {
+    const todosRequisitos = documentacion ? [...documentacion.requisitos, ...documentacion.anexos] : [];
+    const reqSeleccionado = todosRequisitos.find((r) => r.id === nuevoRequisitoId);
+
+    const actualizados = data.archivos.map((archivo, idx) => {
+      if (idx === archivoIndex) {
+        if (!reqSeleccionado) {
+          return {
+            ...archivo,
+            requisitoId: undefined,
+            tipoDocumentalId: undefined,
+            tipoDocumentalCodigo: undefined,
+          };
+        }
+        const tipo = reqSeleccionado.tipos.length === 1 ? reqSeleccionado.tipos[0] : undefined;
+        return {
+          ...archivo,
+          requisitoId: reqSeleccionado.id,
+          clasificacion: reqSeleccionado.clasificacion,
+          tipoDocumentalId: tipo?.id,
+          tipoDocumentalCodigo: tipo?.codigo,
+        };
+      }
+      // Evitar que un mismo requisito se asigne a dos archivos distintos (asociación 1 a 1)
+      if (reqSeleccionado && archivo.requisitoId === reqSeleccionado.id) {
+        return {
+          ...archivo,
+          requisitoId: undefined,
+          tipoDocumentalId: undefined,
+          tipoDocumentalCodigo: undefined,
+        };
+      }
+      return archivo;
+    });
+
+    const foliacion = calcularFoliacionFront(actualizados);
+    dispatch({
+      type: 'UPDATE_DOCUMENTOS',
+      payload: { archivos: foliacion.documentosFoliados, numeroFolios: foliacion.totalFolios },
+    });
+  };
+
+  const handleCambiarClasificacion = (archivoIndex: number, nuevaClasificacion: ClasificacionAdjunto) => {
+    const todosRequisitos = documentacion ? [...documentacion.requisitos, ...documentacion.anexos] : [];
+    const actualizados = data.archivos.map((archivo, idx) => {
+      if (idx === archivoIndex) {
+        const reqActual = todosRequisitos.find((r) => r.id === archivo.requisitoId);
+        const conservaRequisito = reqActual && reqActual.clasificacion === nuevaClasificacion;
+        return {
+          ...archivo,
+          clasificacion: nuevaClasificacion,
+          requisitoId: conservaRequisito ? archivo.requisitoId : undefined,
+          tipoDocumentalId: conservaRequisito ? archivo.tipoDocumentalId : undefined,
+          tipoDocumentalCodigo: conservaRequisito ? archivo.tipoDocumentalCodigo : undefined,
+        };
+      }
+      return archivo;
+    });
+    const foliacion = calcularFoliacionFront(actualizados);
+    dispatch({
+      type: 'UPDATE_DOCUMENTOS',
+      payload: { archivos: foliacion.documentosFoliados, numeroFolios: foliacion.totalFolios },
+    });
   };
 
   const handleRemoveArchivo = (indexToRemove: number) => {
@@ -913,65 +993,134 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
 
           {/* Listado de archivos cargados */}
           {data.archivos.length > 0 && (
-            <div className="space-y-2 pt-2">
+            <div className="space-y-3 pt-2">
               <p className="text-xs font-bold text-slate-700">
                 Archivos adjuntados al expediente ({data.archivos.length}):
               </p>
-              {data.archivos.map((archivo, index) => (
-                <div
-                  key={`${archivo.nombre}-${index}`}
-                  className="flex flex-wrap gap-2 items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xs"
-                >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <span className="shrink-0 rounded bg-red-100 px-2 py-0.5 font-bold text-red-700">
-                      PDF
-                    </span>
-                    <div className="truncate">
-                      <p className="font-semibold text-slate-900 truncate">
-                        {archivo.nombre}
-                      </p>
-                      <p className="text-slate-400 font-mono text-[10px] truncate">
-                        SHA-256: {archivo.hashSha256.substring(0, 24)}... •{' '}
-                        {(archivo.peso / 1024).toFixed(1)} KB
-                      </p>
+              {data.archivos.map((archivo, index) => {
+                const todosRequisitos = documentacion ? [...documentacion.requisitos, ...documentacion.anexos] : [];
+                const reqAsociado = todosRequisitos.find((r) => r.id === archivo.requisitoId);
+                const integridad = verificarIntegridadArchivo(archivo);
+                const estadoArchivo: EstadoCumplimientoRequisito = !integridad.valido
+                  ? 'OBSERVADO'
+                  : reqAsociado
+                  ? 'PRESENTADO'
+                  : 'PENDIENTE';
+
+                return (
+                  <div
+                    key={`${archivo.nombre}-${index}`}
+                    className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xs"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-3 overflow-hidden min-w-[200px] flex-1">
+                        <span className="shrink-0 rounded bg-red-100 px-2 py-0.5 font-bold text-red-700 text-[11px]">
+                          PDF
+                        </span>
+                        <div className="truncate">
+                          <p className="font-semibold text-slate-900 truncate">
+                            {archivo.nombre}
+                          </p>
+                          <p className="text-slate-400 font-mono text-[10px] truncate">
+                            SHA-256: {archivo.hashSha256.substring(0, 24)}... • {(archivo.peso / 1024).toFixed(1)} KB • {archivo.paginas ?? 1} pág.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {estadoArchivo === 'PRESENTADO' && (
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 px-2.5 py-0.5 font-bold text-[11px] border border-emerald-300">
+                            <svg className="w-3.5 h-3.5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                            PRESENTADO
+                          </span>
+                        )}
+                        {estadoArchivo === 'OBSERVADO' && (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-100 text-amber-900 px-2.5 py-0.5 font-bold text-[11px] border border-amber-300" title={integridad.motivo}>
+                            ⚠️ OBSERVADO
+                          </span>
+                        )}
+                        {estadoArchivo === 'PENDIENTE' && (
+                          <span className="inline-flex items-center gap-1 rounded bg-slate-100 text-slate-700 px-2 py-0.5 font-semibold text-[11px] border border-slate-300">
+                            PENDIENTE DE ASOCIACIÓN
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
+                      {/* Selector de requisito asociado */}
+                      <div className="flex-1 min-w-[240px]">
+                        <label htmlFor={`${formId}-req-${index}`} className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                          Requisito institucional asociado
+                        </label>
+                        <select
+                          id={`${formId}-req-${index}`}
+                          aria-label={`Requisito asociado a ${archivo.nombre}`}
+                          value={archivo.requisitoId ?? ''}
+                          disabled={isSubmitting || cargandoArchivo}
+                          onChange={(e) => handleAsignarRequisito(index, e.target.value)}
+                          className="w-full rounded border border-slate-300 p-1.5 text-xs bg-white text-slate-800 focus:border-[#006EC7]"
+                        >
+                          <option value="">-- Sin requisito asociado (Documento libre) --</option>
+                          {todosRequisitos.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              [{r.clasificacion}] {r.codigo} — {r.nombre.length > 55 ? `${r.nombre.substring(0, 52)}…` : r.nombre}{r.obligatorio ? ' (Obligatorio)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Clasificación */}
+                      <div className="w-32">
+                        <label htmlFor={`${formId}-clasif-${index}`} className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                          Clasificación
+                        </label>
+                        <select
+                          id={`${formId}-clasif-${index}`}
+                          aria-label={`Clasificación de ${archivo.nombre}`}
+                          value={archivo.clasificacion ?? 'EXPEDIENTE'}
+                          disabled={isSubmitting || cargandoArchivo}
+                          onChange={(e) => handleCambiarClasificacion(index, e.target.value as ClasificacionAdjunto)}
+                          className="w-full rounded border border-slate-300 p-1.5 text-xs bg-white text-slate-800"
+                        >
+                          <option value="EXPEDIENTE">EXPEDIENTE</option>
+                          <option value="ANEXO">ANEXO</option>
+                        </select>
+                      </div>
+
+                      {/* Acciones: Ver, Sustituir, Eliminar */}
+                      <div className="flex items-center gap-2 self-end pb-0.5">
+                        {archivo.storageUrl && vistas[archivo.storageUrl] && (
+                          <a href={vistas[archivo.storageUrl]} target="_blank" rel="noreferrer" className="text-blue-800 underline text-xs font-medium">
+                            Ver PDF
+                          </a>
+                        )}
+                        <label className="text-xs text-blue-800 font-medium cursor-pointer hover:underline border border-blue-200 bg-blue-50/50 rounded px-2 py-1">
+                          Sustituir
+                          <input
+                            type="file"
+                            accept="application/pdf,.pdf"
+                            aria-label={`Sustituir ${archivo.nombre}`}
+                            disabled={isSubmitting || cargandoArchivo}
+                            className="sr-only"
+                            onChange={(e) => handleFileChange(e, { clasificacion: archivo.clasificacion ?? 'EXPEDIENTE', requisitoId: archivo.requisitoId, sustituir: archivo.storageUrl })}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveArchivo(index)}
+                          disabled={isSubmitting || cargandoArchivo}
+                          className="shrink-0 rounded px-2 py-1 font-bold text-red-600 hover:bg-red-50 cursor-pointer border border-red-200"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
                   </div>
-                    <label className="ml-3 text-xs break-all">
-                      Clasificación de {archivo.nombre}
-                      <select
-                        aria-label={`Clasificación de ${archivo.nombre}`}
-                        value={archivo.clasificacion ?? 'EXPEDIENTE'}
-                        disabled={isSubmitting || cargandoArchivo}
-                        onChange={e => handleFieldChange('archivos', data.archivos.map((actual, i) => i === index
-                          ? { ...actual, clasificacion: e.target.value as ClasificacionAdjunto, requisitoId: undefined, tipoDocumentalCodigo: undefined, tipoDocumentalId: undefined }
-                          : actual))}
-                        className="block rounded border border-slate-300 p-2"
-                      >
-                        <option value="EXPEDIENTE">EXPEDIENTE</option>
-                        <option value="ANEXO">ANEXO</option>
-                      </select>
-                    </label>
-                  {!archivo.clasificacion && <button type="button" className="text-xs text-blue-800 underline" disabled={isSubmitting || cargandoArchivo}
-                    onClick={() => handleFieldChange('archivos', data.archivos.map((actual, i) => i === index
-                      ? { ...actual, clasificacion: 'EXPEDIENTE', tipoDocumentalCodigo: undefined, tipoDocumentalId: undefined } : actual))}>
-                    Confirmar clasificación EXPEDIENTE del borrador
-                  </button>}
-                  {archivo.requisitoId && <span className="text-xs text-slate-600">{[...(documentacion?.requisitos ?? []),...(documentacion?.anexos ?? [])].find(r => r.id === archivo.requisitoId)?.nombre}</span>}
-                  {archivo.storageUrl && vistas[archivo.storageUrl] && <a href={vistas[archivo.storageUrl]} target="_blank" rel="noreferrer" className="text-blue-800 underline">Ver PDF: {archivo.nombre}</a>}
-                  <label className="ml-2 text-xs text-blue-800">Sustituir
-                    <input type="file" accept="application/pdf,.pdf" aria-label={`Sustituir ${archivo.nombre}`} disabled={isSubmitting || cargandoArchivo}
-                      className="block w-32 text-xs" onChange={e => handleFileChange(e, { clasificacion: archivo.clasificacion ?? 'EXPEDIENTE', requisitoId: archivo.requisitoId, sustituir: archivo.storageUrl })} />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveArchivo(index)}
-                    disabled={isSubmitting || cargandoArchivo}
-                    className="ml-3 shrink-0 rounded px-2 py-1 font-bold text-red-600 hover:bg-red-50 cursor-pointer"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

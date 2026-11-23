@@ -10,6 +10,7 @@ import VisorCvdPage from "../pages/flujos/VisorCvdPage";
 import WorkflowAcademicoPage from "../pages/flujos/WorkflowAcademicoPage";
 import ValidadorPublicoCvdPage from "../pages/validador/ValidadorPublicoCvdPage";
 import LoginPage from "../pages/LoginPage";
+import CasillaLoginPage from "../pages/casilla/CasillaLoginPage";
 import CasillaElectronicaPage from "../pages/casilla/CasillaElectronicaPage";
 import RegistroCiudadanoPage from "../pages/registro/RegistroCiudadanoPage";
 import ActivarCuentaPage from "../pages/registro/ActivarCuentaPage";
@@ -36,12 +37,22 @@ export default function AppRouter() {
       {/* Consulta pública ciudadana (acceso libre) */}
       <Route path="/consulta" element={<ConsultaPublicaPage />} />
       <Route path="/consulta/:cut" element={<ConsultaPublicaPage />} />
+      <Route path="/tramites/consulta-publica" element={<ConsultaPublicaPage />} />
+      <Route path="/tramites/consulta-publica/:cut" element={<ConsultaPublicaPage />} />
 
-      {/* Casilla electrónica ciudadana (portal administrado, API backend protegida) */}
-      <Route path="/casilla" element={<CasillaElectronicaPage />} />
+      {/* Casilla electrónica ciudadana (portal administrado, autenticación obligatoria CIUDADANO) */}
+      <Route path="/casilla/login" element={<CasillaLoginPage />} />
+      <Route
+        path="/casilla"
+        element={
+          <ProtectedRoute requiredRoles={["CIUDADANO"]} redirectTo="/casilla/login">
+            <CasillaElectronicaPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/casilla-electronica"
-        element={<CasillaElectronicaPage />}
+        element={<Navigate to="/casilla" replace />}
       />
 
       {/* Registro ciudadano público y activación */}

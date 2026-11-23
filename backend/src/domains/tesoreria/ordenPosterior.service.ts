@@ -13,7 +13,7 @@ export async function generarOrdenPosterior(pool: Pool, expediente: string, titu
  const c=await pool.connect();
  try {
   await c.query('BEGIN');
-  await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['orden-expediente:'+expediente]);
+  await c.query('SELECT expediente_id FROM sigd_doc.expediente WHERE expediente_id=$1::uuid FOR UPDATE',[expediente]);
   const e=(await c.query(`SELECT e.expediente_id,e.codigo_expediente,e.tipo_tramite_id,e.solicitante_id,t.denominacion,t.tupa_fuente,
    r.datos_declarados FROM sigd_doc.expediente e JOIN sigd_doc.tipo_tramite_tupa t USING(tipo_tramite_id)
    LEFT JOIN sigd_tra.radicacion_publica r ON r.expediente_id=e.expediente_id

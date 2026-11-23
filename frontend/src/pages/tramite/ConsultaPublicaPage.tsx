@@ -16,6 +16,21 @@ export interface DtoProveidoPublico {
   resumen: string;
 }
 
+export interface DtoMovimientoPublico {
+  secuencia: number;
+  fechaHora: string;
+  etapa: string;
+  descripcion: string;
+  unidadOrganica: string;
+  estado: string;
+  detallesPublicos?: {
+    codigoVerificacion?: string;
+    custodiaFisica?: boolean;
+    observado?: boolean;
+    subsanado?: boolean;
+  };
+}
+
 export interface DtoConsultaPublica {
   cut: string;
   anioFiscal: number;
@@ -33,6 +48,7 @@ export interface DtoConsultaPublica {
   };
   documentos: DtoDocumentoPublico[];
   proveidos: DtoProveidoPublico[];
+  movimientos?: DtoMovimientoPublico[];
   mensajeLegal: string;
   condicionEconomica?: 'PENDIENTE DE PAGO' | 'PAGO VERIFICADO' | 'GRATUITO' | null;
   ordenPago?: {
@@ -57,7 +73,6 @@ interface DtoExpedientePropio {
 export default function ConsultaPublicaPage() {
   const cuenta = useAuthStore(state => state.isAuthenticated ? state.usuario?.id ?? 'sin-identidad' : 'publico');
   const { cut } = useParams<{ cut: string }>();
-  // Account and CUT changes create an independent state scope, including in-flight requests.
   return <ConsultaPublicaContenido key={cuenta + ':' + (cut ?? '')} />;
 }
 
@@ -79,19 +94,57 @@ function ConsultaPublicaContenido() {
   const [paginaHistorial, setPaginaHistorial] = useState(1);
   const [hayMasHistorial, setHayMasHistorial] = useState(false);
 
+  // Extracción inmediata del secreto desde el hash (#token=... o #constancia=...)
+  // y limpieza de la barra de direcciones para proteger el secreto de referrers y logs
+  const [tokenSeguimiento] = useState<string | null>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.location.hash) {
+        const hashStr = window.location.hash.slice(1);
+        const params = new URLSearchParams(hashStr);
+        const extraido = params.get('token') ?? params.get('constancia');
+        if (extraido && /^[0-9a-f]{64}$/i.test(extraido)) {
+          // Remover inmediatamente el secreto de la URL en el historial del navegador
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          return extraido;
+        }
+      }
+    } catch {
+      // Ignorar fallos de parsing de fragmento en navegadores restringidos
+    }
+    return null;
+  });
+
   useEffect(() => {
     if (!cut) return;
     let activo = true;
     const codigo = cut.trim().toUpperCase();
+
+    const headers: Record<string, string> = {};
+    if (tokenSeguimiento) {
+      headers['X-SIGD-Public-Tracking-Token'] = tokenSeguimiento;
+      headers['X-SIGD-Tracking-Token'] = tokenSeguimiento;
+    } else {
+      Object.assign(headers, publicTrackingHeaders(codigo));
+    }
+
     apiClient.get<DtoConsultaPublica>(
-      '/api/v1/tramites/consulta-publica/' + encodeURIComponent(codigo), { headers: publicTrackingHeaders(codigo) },
+      '/api/v1/tramites/consulta-publica/' + encodeURIComponent(codigo),
+      { headers }
     ).then(({ data }) => {
-      if (activo) { setResultado(data); setPropietarioResultado(contexto); }
+      if (activo) {
+        setResultado(data);
+        setPropietarioResultado(contexto);
+      }
     }).catch(() => {
-      if (activo) setError('No se encontr\u00f3 ning\u00fan expediente con el c\u00f3digo CUT ingresado o ocurri\u00f3 un error en la consulta.');
-    }).finally(() => { if (activo) setCargando(false); });
+      if (activo) {
+        setError('No se encontró ningún expediente con el código CUT ingresado o el enlace de seguimiento no es válido.');
+      }
+    }).finally(() => {
+      if (activo) setCargando(false);
+    });
+
     return () => { activo = false; };
-  }, [cut, contexto]);
+  }, [cut, contexto, tokenSeguimiento]);
 
   useEffect(() => {
     if (!isAuthenticated || !esCiudadano) return;
@@ -127,7 +180,7 @@ function ConsultaPublicaContenido() {
                 Consulta Pública de Trámites y Expedientes
               </h1>
               <p className="text-sm text-slate-500 mt-1">
-                IESTP "Suiza" — Sede Digital y Transparencia Documentaria (Ley N° 27444 / Ley N° 29733)
+                IESTP «Suiza» — Sede Digital y Transparencia Documentaria (Ley N° 27444 / Ley N° 29733)
               </p>
             </div>
             <Link
@@ -139,69 +192,82 @@ function ConsultaPublicaContenido() {
           </div>
 
           {/* Formulario de Búsqueda */}
-          {isAuthenticated && esCiudadano && <Link to="/tesoreria" className="mb-4 inline-block text-sm font-semibold text-[#006EC7] underline">Mis pagos y devoluciones</Link>}
           <form onSubmit={handleBuscar} className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
-              <label htmlFor="cut-input" className="sr-only">
-                Código Único de Trámite (CUT)
-              </label>
-              <input
-                id="cut-input"
-                type="text"
-                placeholder="Ejemplo: EXP-2026-000104"
-                value={cutInput}
-                onChange={(e) => setCutInput(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-800 placeholder-slate-400 font-mono text-base uppercase"
-              />
-            </div>
+            <input
+              type="text"
+              placeholder="Ingrese código CUT (ej. EXP-2026-000215)"
+              value={cutInput}
+              onChange={(e) => setCutInput(e.target.value)}
+              className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono text-sm"
+              required
+            />
             <button
               type="submit"
-              disabled={cargando}
-              className="px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-2.5 rounded-lg transition text-sm shadow-sm"
             >
-              {cargando ? 'Buscando...' : 'Consultar Estado'}
+              Consultar Trámite
             </button>
           </form>
 
+          {cargando && (
+            <div className="mt-4 text-center py-4 text-slate-500 text-sm animate-pulse">
+              Consultando estado procesal del expediente en la Sede Digital...
+            </div>
+          )}
+
           {error && (
-            <div className="mt-4 p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm">
+            <div className="mt-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
               {error}
             </div>
           )}
         </div>
 
+        {/* Historial de trámites del ciudadano autenticado */}
         {isAuthenticated && esCiudadano && (
-          <section aria-labelledby="mis-expedientes-title" className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 id="mis-expedientes-title" className="text-lg font-bold text-slate-900">Mis expedientes</h2>
-                <p className="text-sm text-slate-500 mt-1">Registros asociados al titular de su sesión autenticada.</p>
-              </div>
-              {cargandoMisExpedientes && <span role="status" className="text-xs text-slate-500">Cargando...</span>}
-            </div>
-            {errorMisExpedientes && <p role="alert" className="mt-4 rounded-lg bg-rose-50 border border-rose-200 p-3 text-sm text-rose-700">No fue posible cargar sus expedientes. Vuelva a intentarlo más tarde.</p>}
-            {!cargandoMisExpedientes && !errorMisExpedientes && misExpedientesOwner === usuario?.id && misExpedientes.length === 0 && <p className="mt-4 text-sm text-slate-500">No se encontraron expedientes asociados a su cuenta.</p>}
+          <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">
+              Mis Expedientes Radicados
+            </h2>
+            {cargandoMisExpedientes && (
+              <p className="text-sm text-slate-500">Cargando trámites propios...</p>
+            )}
+            {errorMisExpedientes && (
+              <p className="text-sm text-red-600">No se pudieron cargar sus expedientes.</p>
+            )}
             {misExpedientesOwner === usuario?.id && misExpedientes.length > 0 && (
-              <ul className="mt-4 divide-y divide-slate-100">
-                {misExpedientes.map((item) => (
-                  <li key={item.cut} className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-mono font-semibold text-slate-900">{item.cut}</p>
-                      <p className="text-sm text-slate-700">{item.procedimiento ?? item.codigo_procedimiento ?? 'Trámite institucional'}</p>
-                      {item.asunto && <p className="text-xs text-slate-500 truncate">{item.asunto}</p>}
-                      <p className="text-xs text-slate-500">Ingresó: {new Date(item.fecha_radicacion).toLocaleString('es-PE', { timeZone: 'America/Lima' })}</p>
+              <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+                {misExpedientes.map((exp) => (
+                  <li key={exp.cut} className="p-4 hover:bg-slate-50 transition flex items-center justify-between">
+                    <div>
+                      <Link to={`/consulta/${encodeURIComponent(exp.cut)}`} className="font-mono text-emerald-600 font-bold hover:underline">
+                        {exp.cut}
+                      </Link>
+                      <p className="text-sm text-slate-700 mt-0.5">{exp.asunto}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {exp.procedimiento ?? 'Trámite General'} — {new Date(exp.fecha_radicacion).toLocaleDateString('es-PE')}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="rounded-full bg-blue-50 text-blue-800 border border-blue-100 px-3 py-1 text-xs font-semibold">{item.estado}</span>
-                      <Link to={`/consulta/${encodeURIComponent(item.cut)}`} className="text-sm font-semibold text-[#006EC7] hover:underline">Ver seguimiento</Link>
-                    </div>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded bg-slate-100 text-slate-700 border">
+                      {exp.estado}
+                    </span>
                   </li>
                 ))}
               </ul>
             )}
-            {misExpedientesOwner === usuario?.id && hayMasHistorial && <button type="button"
-              disabled={cargandoMisExpedientes} onClick={() => { setCargandoMisExpedientes(true); setErrorMisExpedientes(false); setPaginaHistorial(p => p + 1); }}
-              className="mt-4 text-sm font-semibold text-[#006EC7] disabled:opacity-50">Cargar más expedientes</button>}
+            {misExpedientesOwner === usuario?.id && hayMasHistorial && (
+              <button
+                type="button"
+                disabled={cargandoMisExpedientes}
+                onClick={() => {
+                  setCargandoMisExpedientes(true);
+                  setErrorMisExpedientes(false);
+                  setPaginaHistorial((p) => p + 1);
+                }}
+                className="mt-4 text-sm font-semibold text-[#006EC7] disabled:opacity-50"
+              >
+                Cargar más expedientes
+              </button>
+            )}
           </section>
         )}
 
@@ -238,7 +304,7 @@ function ConsultaPublicaContenido() {
                 </div>
                 <div>
                   <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Solicitante (Protección de Datos - Ley 29733)
+                    Solicitante (Protección de Datos - Ley N° 29733)
                   </h3>
                   <p className="mt-1 text-slate-700 font-mono">
                     {resultado.administrado.nombreEnmascarado ?? 'Ciudadano Administrado'} (
@@ -276,7 +342,7 @@ function ConsultaPublicaContenido() {
                   </p>
                   <div className="mt-3 rounded border border-amber-200 bg-white/80 p-3 text-xs text-amber-900">
                     <p className="font-semibold">Indicaciones para el pago presencial en Tesorería:</p>
-                    <p className="mt-1">{resultado.ordenPago?.indicaciones ?? 'Acérquese a la caja de Tesorería del IESTP Público «Suiza» y abone en efectivo indicando su CUT o número de orden. Su expediente mantendrá los documentos ingresados y este mismo código CUT.'}</p>
+                    <p className="mt-1">{resultado.ordenPago?.indicaciones ?? 'Acérquese a la caja de Tesorería del IESTP Público «Suiza» y abone en efectivo indicando su CUT o número de orden.'}</p>
                   </div>
                 </div>
               )}
@@ -303,6 +369,86 @@ function ConsultaPublicaContenido() {
                 </div>
               )}
 
+              {/* LÍNEA DE TIEMPO INSTITUCIONAL DE MOVIMIENTOS PÚBLICOS */}
+              <div className="border-t border-slate-100 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span>Línea de Tiempo del Procedimiento Administrativo</span>
+                  </h3>
+                  <span className="text-xs text-slate-500">
+                    Trazabilidad institucional (LPAG Art. 66)
+                  </span>
+                </div>
+
+                <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200">
+                  {(resultado.movimientos && resultado.movimientos.length > 0
+                    ? resultado.movimientos
+                    : [
+                        {
+                          secuencia: 1,
+                          fechaHora: resultado.fechaRadicacionLegal,
+                          etapa: 'RADICACION',
+                          descripcion: 'Trámite presentado formalmente en Mesa de Partes Virtual',
+                          unidadOrganica: 'Mesa de Partes Virtual',
+                          estado: resultado.estadoTramite,
+                        },
+                      ]
+                  ).map((mov, idx) => (
+                    <div key={idx} className="relative group">
+                      {/* Círculo indicador */}
+                      <div className="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm"></div>
+
+                      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200/80 shadow-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                          <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider bg-emerald-100/60 px-2 py-0.5 rounded w-fit">
+                            {mov.unidadOrganica}
+                          </span>
+                          <span className="text-xs text-slate-400 font-mono">
+                            {new Date(mov.fechaHora).toLocaleString('es-PE')}
+                          </span>
+                        </div>
+
+                        <p className="text-sm font-medium text-slate-800 mt-1">
+                          {mov.descripcion}
+                        </p>
+
+                        {/* Badges de evidencias y estado */}
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="px-2 py-0.5 rounded bg-slate-200/80 text-slate-700 font-mono font-medium">
+                            Estado: {mov.estado}
+                          </span>
+
+                          {mov.detallesPublicos?.codigoVerificacion && (
+                            <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-mono font-semibold border border-blue-200 flex items-center gap-1">
+                              <span>✓ Firma PAdES CVD:</span>
+                              <span>{mov.detallesPublicos.codigoVerificacion}</span>
+                            </span>
+                          )}
+
+                          {mov.detallesPublicos?.custodiaFisica && (
+                            <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-semibold border border-purple-200">
+                              Custodia Física en Archivo Central
+                            </span>
+                          )}
+
+                          {mov.detallesPublicos?.observado && (
+                            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold border border-amber-200">
+                              Observación Formal Notificada
+                            </span>
+                          )}
+
+                          {mov.detallesPublicos?.subsanado && (
+                            <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold border border-emerald-200">
+                              Subsanación Presentada
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Documentos */}
               {resultado.documentos.length > 0 && (
                 <div className="border-t border-slate-100 pt-6">
@@ -327,11 +473,11 @@ function ConsultaPublicaContenido() {
                 </div>
               )}
 
-              {/* Proveídos */}
+              {/* Actuaciones y Proveídos */}
               {resultado.proveidos.length > 0 && (
                 <div className="border-t border-slate-100 pt-6">
                   <h3 className="text-sm font-semibold text-slate-900 mb-3">
-                    Actuaciones y Proveídos Públicos
+                    Actuaciones y Proveídos Institucionales
                   </h3>
                   <div className="space-y-3">
                     {resultado.proveidos.map((prov, idx) => (

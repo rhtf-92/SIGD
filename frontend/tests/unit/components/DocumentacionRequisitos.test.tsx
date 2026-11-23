@@ -35,7 +35,9 @@ describe('Requisitos y tarifa por procedimiento', () => {
     expect(screen.getByText(/Consulte el costo en Tesorería/)).toBeInTheDocument();
   });
   it('bloquea con el nombre exacto del obligatorio faltante', () => {
-    expect(validarAdjuntosRequisitos(detalle, [{ ...archivo, requisitoId: undefined }])).toContain(r.nombre);
+    const r2: RequisitoDocumental = { id: '33333333-3333-4333-8333-333333333333', codigo: 'DOC_EXTRA', nombre: 'Certificado Adicional Obligatorio', obligatorio: true, clasificacion: 'EXPEDIENTE', tipos: [] };
+    const detalleConDos = { ...detalle, requisitos: [r, r2] };
+    expect(validarAdjuntosRequisitos(detalleConDos, [archivo])).toContain(r2.nombre);
     expect(validarAdjuntosRequisitos(detalle, [archivo])).toBeNull();
   });
   it('no acepta asociaciones de un procedimiento anterior', () => {

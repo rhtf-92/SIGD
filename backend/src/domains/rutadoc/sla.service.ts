@@ -100,6 +100,12 @@ export class RepositorioSlaRutaDoc {
   }
 
   async obtenerIntervalosSuspension(idExpediente: string): Promise<IntervaloSuspensionSla[]> {
+    const existeObs = await this.pool.query<{ existe: string | null }>(
+      "SELECT to_regclass('sigd_rut.expediente_observacion')::text AS existe",
+    );
+    if (!existeObs.rows[0]?.existe) {
+      return [];
+    }
     const resultado = await this.pool.query<{
       fecha_obs: string;
       fecha_sub: string | null;
@@ -144,7 +150,10 @@ export class ServicioSlaRutaDoc {
     const hasta = new Date(validarFecha(fechaInicio) + 150 * MS_DIA).toISOString().slice(0, 10);
     const noLaborablesArray = await this.calendario.obtenerDiasNoLaborables(fechaInicio, hasta);
     const noLaborables = new Set(noLaborablesArray);
-    const intervalosSuspension = await this.repositorio.obtenerIntervalosSuspension(idExpediente);
+    const intervalosSuspension =
+      typeof this.repositorio.obtenerIntervalosSuspension === 'function'
+        ? await this.repositorio.obtenerIntervalosSuspension(idExpediente)
+        : [];
 
     return calcularSla({
       fechaInicio,

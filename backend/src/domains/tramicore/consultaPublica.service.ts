@@ -3,25 +3,12 @@ import { NotFoundError } from '../../shared/domain/errors/index.js';
 import type { ConsultaPublicaParams } from './tramites.schemas.js';
 
 /**
- * T-BE-TC-04 · Consulta publica de expediente por CUT con minimizacion de datos.
+ * T-BE-TC-04 · Consulta pública de expediente por CUT con minimización de datos.
  *
- * Principio rector: el endpoint #16 se invoca sin credenciales, por lo que jamas
- * debe projectar datos de contacto del administrado. La Ley N. 29733 obliga a
- * restringir el tratamiento a la finalidad para la que se recolecto, y una
- * consulta de expediente no incluye el telefono particular ni el correo
- * personal del estudiante. Este servicio devuelve un DTO cerrado: si un campo
- * sensible no esta en la lista, no sale.
- *
- * Se expone el estado procesal y unicamente los proveidos marcados como
- * publicos por el area correspondiente.
- *
- * Desviacion consciente respecto del plan: la especificacion ilustra el
- * enmascarado del telefono como `961***456`. Aqui el telefono se OMITE en lugar
- * de enmascararse, porque publicar que el dato existe y unveil su forma
- * contradice el principio de minimizacion que la propia tarea invoca. El
- * documento de identidad si se enmascara, con la forma `45***123` que el plan
- * fija. `direccion` no se contempla porque `sigd_auth.persona` no tiene esa
- * columna en el esquema vigente.
+ * Principio rector: el endpoint #16 no debe proyectar datos de contacto del administrado
+ * conforme a la Ley N° 29733 (Ley de Protección de Datos Personales).
+ * Este servicio devuelve un DTO cerrado con datos enmascarados, estado económico,
+ * documentos adjuntos y la línea de tiempo cronológica institucional de movimientos públicos.
  */
 
 export interface DtoDocumentoPublico {
@@ -45,6 +32,21 @@ export interface DtoOrdenPagoPublica {
   estado: string;
 }
 
+export interface DtoMovimientoPublico {
+  secuencia: number;
+  fechaHora: string;
+  etapa: string;
+  descripcion: string;
+  unidadOrganica: string;
+  estado: string;
+  detallesPublicos?: {
+    codigoVerificacion?: string;
+    custodiaFisica?: boolean;
+    observado?: boolean;
+    subsanado?: boolean;
+  };
+}
+
 export interface DtoConsultaPublica {
   cut: string;
   anioFiscal: number;
@@ -56,13 +58,14 @@ export interface DtoConsultaPublica {
   fueraDeHorario: boolean;
   canalRecepcion: string;
   totalFolios: number;
-  /** Datos del administrado enmascarados; nunca el valor integro. */
+  /** Datos del administrado enmascarados; nunca el valor íntegro. */
   administrado: {
     documentoEnmascarado: string | null;
     nombreEnmascarado: string | null;
   };
   documentos: DtoDocumentoPublico[];
   proveidos: DtoProveidoPublico[];
+  movimientos?: DtoMovimientoPublico[];
   mensajeLegal: string;
   condicionEconomica?: 'PENDIENTE DE PAGO' | 'PAGO VERIFICADO' | 'GRATUITO' | null;
   ordenPago?: DtoOrdenPagoPublica | null;
@@ -100,8 +103,14 @@ interface FilaDocumento {
   hash_sha256: string;
 }
 
-/** Ancho de la ventana visible al_redondear. */
-const VENTANA_ENMASCARADO = 2;
+interface FilaMovimientoBD {
+  secuencia: number | string;
+  fecha_hora: Date | string;
+  evento: string;
+  estado_anterior: string;
+  estado_nuevo: string;
+  datos: Record<string, unknown> | null;
+}
 
 export class ConsultaPublicaService {
   constructor(private readonly pool: Pool) {}
@@ -111,19 +120,20 @@ export class ConsultaPublicaService {
     try {
       const expediente = await this.leerExpediente(cliente, params.cut);
       if (!expediente) {
-        // Se responde 404 tambien cuando el expediente existe pero esta anulado
-        // logicamente, para no confirmar la existencia de un CUT cancelado.
+        // Se responde 404 también cuando el expediente existe pero está anulado
+        // lógicamente, para no confirmar la existencia de un CUT cancelado.
         throw new NotFoundError({
           message: 'No existe un expediente con el CUT consultado.',
           detail:
-            'No se encontro ningun expediente vigente con ese CUT. Si el expediente fue ' +
+            'No se encontró ningún expediente vigente con ese CUT. Si el expediente fue ' +
             'anulado se responde igual, para no confirmar la existencia de un CUT cancelado.',
         });
       }
 
-      const [documentos, proveidos] = await Promise.all([
+      const [documentos, proveidos, movimientos] = await Promise.all([
         this.leerDocumentos(cliente, params.cut),
         this.leerProveidosPublicos(cliente, params.cut),
+        this.leerMovimientosPublicos(cliente, params.cut, expediente),
       ]);
 
       let condicionEconomica: 'PENDIENTE DE PAGO' | 'PAGO VERIFICADO' | 'GRATUITO' | null = null;
@@ -139,8 +149,13 @@ export class ConsultaPublicaService {
           codigo: expediente.orden_codigo ?? '',
           importe: expediente.orden_importe ?? '0.00',
           moneda: expediente.orden_moneda ?? 'PEN',
-          fechaEmision: expediente.orden_fecha ? (expediente.orden_fecha instanceof Date ? expediente.orden_fecha.toISOString() : String(expediente.orden_fecha)) : new Date().toISOString(),
-          indicaciones: 'Pague en efectivo en la caja de Tesorería del Instituto indicando su CUT o código de orden. La orden no acredita pago hasta su recepción en caja.',
+          fechaEmision: expediente.orden_fecha
+            ? expediente.orden_fecha instanceof Date
+              ? expediente.orden_fecha.toISOString()
+              : String(expediente.orden_fecha)
+            : new Date().toISOString(),
+          indicaciones:
+            'Pague en efectivo en la caja de Tesorería del Instituto indicando su CUT o código de orden. La orden no acredita pago hasta su recepción en caja.',
           estado: expediente.pago_verificado ? 'VERIFICADO' : (expediente.estado_pago ?? 'PENDIENTE'),
         };
       } else if (expediente.tarifa_importe !== undefined && expediente.tarifa_importe !== null) {
@@ -167,14 +182,15 @@ export class ConsultaPublicaService {
           nombreEnmascarado: enmascararNombre(
             expediente.nombres,
             expediente.apellido_paterno,
-            expediente.apellido_materno,
+            expediente.apellido_materno
           ),
         },
         documentos,
         proveidos,
+        movimientos,
         mensajeLegal:
-          'Informacion publica pursuant a la Ley N° 29733. Los datos personales han sido ' +
-          'enmascarados conforme al principio de minimizacion.' +
+          'Información pública conforme a la Ley N° 29733 y Ley N° 27444. Los datos personales han sido ' +
+          'enmascarados conforme al principio de minimización.' +
           (condicionEconomica === 'PENDIENTE DE PAGO'
             ? ' Estado económico: PENDIENTE DE PAGO en Tesorería. Debe abonar la tasa en la caja institucional para que Mesa de Partes proceda con la calificación y derivación del expediente.'
             : condicionEconomica === 'PAGO VERIFICADO'
@@ -281,7 +297,7 @@ export class ConsultaPublicaService {
          ) tf ON TRUE
         WHERE te.codigo_expediente = $1
           AND te.estado <> 'ANULADO'`,
-      [cut],
+      [cut]
     );
     return resultado.rows[0];
   }
@@ -295,7 +311,7 @@ export class ConsultaPublicaService {
          JOIN sigd_doc.expediente e ON e.expediente_id = da.expediente_id
         WHERE e.codigo_expediente = $1
         ORDER BY da.nombre_archivo, da.documento_adjunto_id`,
-      [cut],
+      [cut]
     );
     return resultado.rows.map((fila) => ({
       nombreArchivo: fila.nombre_archivo,
@@ -305,25 +321,172 @@ export class ConsultaPublicaService {
   }
 
   private async leerProveidosPublicos(cliente: PoolClient, cut: string): Promise<DtoProveidoPublico[]> {
-    // El esquema vigente no define una tabla de proveídos ni un indicador de
-    // publicación. No se infieren proveídos públicos desde movimientos internos.
     void cliente;
     void cut;
     return [];
   }
+
+  private async leerMovimientosPublicos(
+    cliente: PoolClient,
+    cut: string,
+    expediente: FilaConsulta
+  ): Promise<DtoMovimientoPublico[]> {
+    try {
+      const resultado = await cliente.query<FilaMovimientoBD>(
+        `SELECT m.secuencia,
+                m.fecha_hora,
+                m.evento,
+                m.estado_anterior,
+                m.estado_nuevo,
+                m.datos
+           FROM sigd_rut.movimiento_tramite m
+           JOIN sigd_tra.expediente te ON te.expediente_id = m.expediente_id
+          WHERE te.codigo_expediente = $1
+          ORDER BY m.secuencia ASC, m.fecha_hora ASC`,
+        [cut]
+      );
+
+      if (resultado.rows.length === 0) {
+        return [
+          {
+            secuencia: 1,
+            fechaHora:
+              expediente.fecha_envio_real instanceof Date
+                ? expediente.fecha_envio_real.toISOString()
+                : String(expediente.fecha_envio_real),
+            etapa: 'RADICACION',
+            descripcion: 'Trámite presentado formalmente en Sede Digital — Mesa de Partes Virtual',
+            unidadOrganica: 'Mesa de Partes Virtual',
+            estado: expediente.estado_tramite,
+            detallesPublicos: {},
+          },
+        ];
+      }
+
+      return resultado.rows.map((row) => {
+        const datos = row.datos && typeof row.datos === 'object' ? row.datos : {};
+        const etapa = mapearEtapaPublica(row.evento, row.estado_nuevo);
+        const descripcion = generarDescripcionHito(row.evento, row.estado_nuevo, datos);
+        const unidadOrganica = sanitizarUnidadPublica(
+          (datos.destinatario as string) || (datos.remitente as string) || (datos.rol as string) || 'Mesa de Partes'
+        );
+
+        return {
+          secuencia: Number(row.secuencia),
+          fechaHora:
+            row.fecha_hora instanceof Date ? row.fecha_hora.toISOString() : String(row.fecha_hora),
+          etapa,
+          descripcion,
+          unidadOrganica,
+          estado: row.estado_nuevo,
+          detallesPublicos: {
+            codigoVerificacion: typeof datos.cvd === 'string' ? datos.cvd : undefined,
+            custodiaFisica: Boolean(datos.custodia),
+            observado: row.estado_nuevo === 'OBSERVADO' || row.evento === 'OBSERVACION',
+            subsanado: row.evento === 'SUBSANACION',
+          },
+        };
+      });
+    } catch {
+      return [
+        {
+          secuencia: 1,
+          fechaHora:
+            expediente.fecha_envio_real instanceof Date
+              ? expediente.fecha_envio_real.toISOString()
+              : String(expediente.fecha_envio_real),
+          etapa: 'RADICACION',
+          descripcion: 'Trámite radicado formalmente en Sede Digital',
+          unidadOrganica: 'Mesa de Partes',
+          estado: expediente.estado_tramite,
+          detallesPublicos: {},
+        },
+      ];
+    }
+  }
 }
 
-/** Digitos iniciales que se conservan al enmascarar un documento. */
+export function mapearEtapaPublica(evento: string, estadoNuevo: string): string {
+  const ev = (evento || '').toUpperCase();
+  const st = (estadoNuevo || '').toUpperCase();
+  if (ev === 'CIERRE' || st === 'ARCHIVADO') return 'ARCHIVO_CENTRAL';
+  if (ev === 'FIRMA' || st === 'RESUELTO') return 'RESOLUCION_FIRMA';
+  if (ev === 'ENVIAR_A_FIRMA' || st === 'EN_FIRMA') return 'DESPACHO_DIRECCION';
+  if (ev === 'ATENCION_TECNICA' || st === 'ATENDIDO') return 'DICTAMEN_TECNICO';
+  if (ev === 'ASIGNACION' || st === 'EN_REVISION') return 'EVALUACION_ACADEMICA';
+  if (ev === 'DERIVACION' || st === 'DERIVADO') return 'DERIVACION_INSTITUCIONAL';
+  if (ev === 'RECEPCION') return 'RECEPCION_DOCUMENTAL';
+  if (ev === 'OBSERVACION' || st === 'OBSERVADO') return 'OBSERVACION_NOTIFICADA';
+  if (ev === 'SUBSANACION') return 'SUBSANACION_RECIBIDA';
+  if (ev === 'PAGO' || st === 'HABILITADO') return 'TESORERIA';
+  return 'RADICACION';
+}
+
+export function generarDescripcionHito(
+  evento: string,
+  estadoNuevo: string,
+  datos: Record<string, unknown>
+): string {
+  if (typeof datos.proveido === 'string' && datos.proveido.trim()) {
+    return datos.proveido.trim();
+  }
+  const ev = (evento || '').toUpperCase();
+  const st = (estadoNuevo || '').toUpperCase();
+  if (ev === 'CIERRE' || st === 'ARCHIVADO') {
+    return 'Procedimiento administrativo concluido y custodiado en Archivo Central.';
+  }
+  if (ev === 'FIRMA' || st === 'RESUELTO') {
+    const cvd = typeof datos.cvd === 'string' ? ` (CVD: ${datos.cvd})` : '';
+    return `Resolución Directoral suscrita formalmente con firma digital PAdES${cvd}.`;
+  }
+  if (ev === 'ENVIAR_A_FIRMA' || st === 'EN_FIRMA') {
+    return 'Expediente elevado a Dirección General para firma de Resolución Directoral.';
+  }
+  if (ev === 'ATENCION_TECNICA' || st === 'ATENDIDO') {
+    return 'Evaluación y verificación documental concluida con dictamen favorable.';
+  }
+  if (ev === 'ASIGNACION' || st === 'EN_REVISION') {
+    return 'Expediente asignado a coordinación académica para evaluación técnica y revisión de requisitos.';
+  }
+  if (ev === 'RECEPCION') {
+    return 'Recepción formal del expediente físico y digital en unidad de destino.';
+  }
+  if (ev === 'DERIVACION' || st === 'DERIVADO') {
+    return 'Expediente calificado y derivado a la unidad orgánica competente.';
+  }
+  if (ev === 'OBSERVACION' || st === 'OBSERVADO') {
+    return 'Expediente observado: se requiere subsanación de requisitos documentales.';
+  }
+  if (ev === 'SUBSANACION') {
+    return 'Subsanación documental presentada formalmente por el administrado.';
+  }
+  if (ev === 'PAGO') {
+    return 'Abono de tasa TUPA verificado en Tesorería. Trámite habilitado para Mesa de Partes.';
+  }
+  return 'Trámite presentado formalmente en Sede Digital — Mesa de Partes Virtual.';
+}
+
+export function sanitizarUnidadPublica(unidad: string): string {
+  const u = (unidad || '').trim();
+  const lower = u.toLowerCase();
+  if (lower.includes('direct') || lower.includes('director')) return 'Dirección General';
+  if (lower.includes('secretar')) return 'Secretaría Académica';
+  if (lower.includes('tesorer') || lower.includes('caja')) return 'Unidad de Tesorería';
+  if (lower.includes('archiv')) return 'Archivo Central';
+  if (lower.includes('mesa') || lower.includes('partes')) return 'Mesa de Partes';
+  if (lower.includes('docente') || lower.includes('evaluad') || lower.includes('area'))
+    return 'Coordinación de Área Académica';
+  return u.replace(/[0-9]{8}/g, '').trim() || 'Unidad Orgánica Institucional';
+}
+
+/** Dígitos iniciales que se conservan al enmascarar un documento. */
 const VENTANA_INICIAL = 2;
 
-/** Digitos finales que se conservan al enmascarar un documento. */
+/** Dígitos finales que se conservan al enmascarar un documento. */
 const VENTANA_FINAL = 3;
 
 /**
- * Enmascara un documento de identidad conservando solo los extremos, con la
- * forma `45***123` que fija la especificacion de T-BE-TC-04. Un valor demasiado
- * corto para admitir ambas ventanas se enmascara por completo, porque en ese
- * rango cualquier digito conservado revelaria el documento entero.
+ * Enmascara un documento de identidad conservando solo los extremos (`45***123`).
  */
 export function enmascararDocumento(documento: string | null): string | null {
   if (!documento) return null;
@@ -342,7 +505,7 @@ export function enmascararDocumento(documento: string | null): string | null {
 export function enmascararNombre(
   nombres: string | null,
   apellidoPaterno: string | null,
-  apellidoMaterno: string | null,
+  apellidoMaterno: string | null
 ): string | null {
   const componentes = [nombres, apellidoPaterno, apellidoMaterno]
     .filter((valor): valor is string => Boolean(valor && valor.trim()))

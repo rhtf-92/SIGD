@@ -109,7 +109,7 @@ describe("LoginPage con autenticación existente", () => {
 
   it.each([
     ["SUPER_ADMIN", "/administracion"],
-    ["DIRECTOR", "/administracion"],
+    ["DIRECTOR", "/expedientes"],
     ["DOCENTE", "/flujos/titulacion"],
     ["ESTUDIANTE", "/casilla"],
     ["CIUDADANO", "/"],

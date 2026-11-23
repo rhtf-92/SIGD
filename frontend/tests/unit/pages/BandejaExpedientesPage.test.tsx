@@ -313,7 +313,19 @@ describe("Consumidores reales de RutaDoc: respuestas HTTP simuladas sin PostgreS
       if (urlStr.endsWith("/trazabilidad")) {
         return { data: { expedienteId: idApi, actuaciones: [actuacionApi] } } as AxiosResponse;
       }
-      if (urlStr.includes(`/api/v1/expedientes/${idApi}`)) {
+      if (urlStr.endsWith("/checklist")) {
+        return { data: [] } as AxiosResponse;
+      }
+      if (urlStr.endsWith("/acumulaciones")) {
+        return { data: { ok: true, acumulaciones: [] } } as AxiosResponse;
+      }
+      if (urlStr.endsWith("/desgloses")) {
+        return { data: { ok: true, desgloses: [] } } as AxiosResponse;
+      }
+      if (urlStr.endsWith("/anotaciones")) {
+        return { data: { ok: true, anotaciones: [] } } as AxiosResponse;
+      }
+      if (urlStr === `/api/v1/expedientes/${idApi}`) {
         return { data: detalleApi } as AxiosResponse;
       }
       throw new Error(`Endpoint inesperado: ${urlStr}`);
@@ -337,10 +349,13 @@ describe("Consumidores reales de RutaDoc: respuestas HTTP simuladas sin PostgreS
       `/api/v1/expedientes/${idApi}/trazabilidad`,
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
-    expect(get).toHaveBeenCalledTimes(3);
+    expect(get).toHaveBeenCalledWith(`/api/v1/expedientes/${idApi}/checklist`);
+    expect(get).toHaveBeenCalledWith(`/api/v1/rutadoc/expedientes/${idApi}/acumulaciones`);
+    expect(get).toHaveBeenCalledWith(`/api/v1/rutadoc/expedientes/${idApi}/desgloses`);
+    expect(get).toHaveBeenCalledWith(`/api/v1/expedientes/${idApi}/anotaciones-internas`);
+    expect(get).toHaveBeenCalledTimes(7);
 
-    const botonDerivar = screen.getByRole("button", { name: "Derivar Expediente" });
-    expect(botonDerivar).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Derivar Expediente" })).not.toBeInTheDocument();
   });
 
   it("extrae actuaciones, conserva fechaHora, UUID y orden de secuencia del productor", async () => {

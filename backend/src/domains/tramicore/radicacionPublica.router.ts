@@ -23,9 +23,20 @@ const TTL = 24 * 3600;
 export const publicHash = (value: string | Buffer): string => createHash('sha256').update(value).digest('hex');
 interface ArchivoPublico { s3Key: string; sha256: string; bytes: number; nombre: string; procedimiento: string; paginas?: number }
 export function presentarRadicacion(r: ResultadoRadicacion) {
-  return { expedienteId: r.expedienteId, cut: r.cut, anioFiscal: r.anio, fechaEnvioReal: r.fechaEnvioReal,
-    fechaRadicacionLegal: r.fechaRadicacionLegal, diferidoPorCorte: r.fueraDeHorario, totalFolios: r.totalFolios,
-    qrSeguimientoUrl: r.cargoDigital.qrContenido, cargoDigital: r.cargoDigital, mensajeLegal: r.mensajeLegal };
+  return {
+    expedienteId: r.expedienteId,
+    cut: r.cut,
+    anioFiscal: r.anio,
+    fechaEnvioReal: r.fechaEnvioReal,
+    fechaRadicacionLegal: r.fechaRadicacionLegal,
+    diferidoPorCorte: r.fueraDeHorario,
+    totalFolios: r.totalFolios,
+    qrSeguimientoUrl: r.cargoDigital.qrContenido,
+    cargoDigital: r.cargoDigital,
+    mensajeLegal: r.mensajeLegal,
+    tokenSeguimiento: r.tokenSeguimiento,
+    enlaceSeguro: r.enlaceSeguro,
+  };
 }
 
 export async function validarPdfPublico(bytes: Buffer): Promise<number> {

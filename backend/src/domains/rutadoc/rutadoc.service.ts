@@ -24,13 +24,17 @@ export class ServicioRutaDoc {
     }
 
     const posicion = filtros.cursor ? decodificarCursor(filtros.cursor, filtros) : null;
-    const resultado = await this.repositorio.listar(filtros, ESTADOS_POR_PESTANA[filtros.pestana], posicion, alcance);
+    const estadosBase = ESTADOS_POR_PESTANA[filtros.pestana];
+    const estadosConsulta = filtros.pestana === 'ATENDIDOS'
+      ? [...estadosBase, 'ATENDIDO' as const]
+      : estadosBase;
+    const resultado = await this.repositorio.listar(filtros, estadosConsulta, posicion, alcance);
     const tieneMas = resultado.elementos.length > filtros.limite;
     const elementos = resultado.elementos.slice(0, filtros.limite);
     const ultimo = elementos.at(-1);
     const contadores = resultado.porPestana ?? Object.fromEntries(Object.entries(ESTADOS_POR_PESTANA).map(
       ([pestana, estados]) => [pestana, estados.reduce(
-        (total, estado) => total + (resultado.porEstado[estado] ?? 0), 0)],
+        (total, estado) => total + (resultado.porEstado[estado] ?? 0), 0) + (pestana === 'ATENDIDOS' ? (resultado.porEstado['ATENDIDO'] ?? 0) : 0)],
     )) as ContadoresRutaDoc;
     return {
       elementos,

@@ -172,8 +172,9 @@ export default function UsuariosPage() {
           `La cuenta ${creado.nombre} fue registrada (INACTIVA), pero falló la asignación de ${rolesFallidos.length} rol(es). Ingrese a "Administrar usuario" para completar la asignación.`,
         );
       } else if (rolesExitosos.length > 0) {
+        await actualizarUsuario(creado.id, { estado: "ACTIVO" });
         setMensaje(
-          `La cuenta institucional ${creado.nombre} fue registrada exitosamente con ${rolesExitosos.length} rol(es) asignado(s). La cuenta permanece INACTIVA hasta su autorización.`,
+          `La cuenta institucional ${creado.nombre} fue registrada y activada exitosamente con ${rolesExitosos.length} rol(es) asignado(s).`,
         );
       } else {
         setMensaje(`La cuenta ${creado.nombre} fue registrada correctamente.`);

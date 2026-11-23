@@ -216,6 +216,7 @@ export type ProgramaEstudioCodigo =
   | "DSI"
   | "EIND"
   | "ENF"
+  | "GAD"
   | "MFOR"
   | "MAUT"
   | "PAGR";
@@ -227,20 +228,22 @@ export interface ProgramaEstudioItem {
   readonly value: ProgramaEstudioCodigo;
   readonly label: string;
   readonly description?: string;
+  readonly aliasHistorico?: string;
 }
 
 export const PROGRAMAS_ESTUDIO_CATALOGO: readonly ProgramaEstudioItem[] = [
-  { value: "ADE", label: "Administración de Empresas", description: "Gestión empresarial, finanzas y emprendimiento" },
   { value: "AOT", label: "Administración de Operaciones Turísticas", description: "Hotelería, turismo amazónico y gestión de servicios" },
   { value: "ASAD", label: "Asistencia Administrativa", description: "Gestión documental, archivo institucional y soporte ejecutivo" },
   { value: "CONT", label: "Contabilidad", description: "Tributación, auditoría y estados financieros" },
   { value: "CCIV", label: "Construcción Civil", description: "Topografía, edificaciones, obras viales y saneamiento" },
-  { value: "DSI", label: "Desarrollo de Sistemas de Información", description: "Desarrollo de software, bases de datos y redes informáticas" },
+  { value: "DSI", label: "Desarrollo de Sistemas de Información", description: "Desarrollo de software, bases de datos y redes informáticas", aliasHistorico: "Computación e Informática" },
   { value: "EIND", label: "Electricidad Industrial", description: "Sistemas electrotécnicos, automatización y mantenimiento industrial" },
   { value: "ENF", label: "Enfermería Técnica", description: "Salud pública, atención integral y cuidados comunitarios" },
+  { value: "GAD", label: "Gestión Administrativa", description: "Gestión empresarial, finanzas y emprendimiento", aliasHistorico: "Administración de Empresas" },
   { value: "MFOR", label: "Manejo Forestal", description: "Conservación ambiental, silvicultura e industrias madereras" },
-  { value: "MAUT", label: "Mecánica Automotriz", description: "Diagnóstico electrónico, motores térmicos y electromovilidad" },
+  { value: "MAUT", label: "Mecatrónica Automotriz", description: "Diagnóstico electrónico, motores térmicos y electromovilidad", aliasHistorico: "Mecánica Automotriz" },
   { value: "PAGR", label: "Producción Agropecuaria", description: "Cultivos tropicales, zootecnia y sanidad agropecuaria" },
+  { value: "ADE", label: "Administración de Empresas (Histórico)", description: "Denominación curricular anterior a Gestión Administrativa" },
 ] as const;
 
 /**

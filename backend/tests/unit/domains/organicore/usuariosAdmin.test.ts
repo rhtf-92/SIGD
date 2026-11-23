@@ -17,8 +17,8 @@ const alta={tipoDocumentoId:1,numeroDocumento:'12345678',nombres:'Persona',apell
   correo:usuario.correo,username:'cuenta_sintetica',passwordInicial:'Solo-Pruebas-Unitarias-2026!',cargoId:C,areaId:A,rolId:R,estado:'ACTIVO' as const};
 
 describe('DTO originales alineados con el modelo UUID',()=>{
- it.each(['persona@iestpsuiza.edu.pe',' PERSONA@IESTPSUIZA.EDU.PE ','admin@iestp-suiza.edu.pe',' ADMIN@IESTP-SUIZA.EDU.PE '])('acepta correo institucional %s',v=>expect(correoInstitucionalSchema.safeParse(v).success).toBe(true));
- it.each(['persona@gmail.com','persona@hotmail.com','persona@sub.iestpsuiza.edu.pe','sin-correo'])('rechaza correo %s',v=>expect(correoInstitucionalSchema.safeParse(v).success).toBe(false));
+ it.each(['persona@iestpsuiza.edu.pe',' PERSONA@IESTPSUIZA.EDU.PE ','admin@iestp-suiza.edu.pe',' ADMIN@IESTP-SUIZA.EDU.PE ','persona@gmail.com','persona@hotmail.com','usuario@yahoo.com','admin@outlook.com'])('acepta correo institucional y personal %s',v=>expect(correoInstitucionalSchema.safeParse(v).success).toBe(true));
+ it.each(['sin-correo','invalido@','@dominio.com','espacios en@correo.com'])('rechaza correo inválido %s',v=>expect(correoInstitucionalSchema.safeParse(v).success).toBe(false));
  it('aplica página y límite por defecto',()=>expect(listarUsuariosQuerySchema.parse({})).toEqual({pagina:1,limite:20}));
  it('valida filtros y convierte paginación',()=>expect(listarUsuariosQuerySchema.parse({pagina:'2',limite:'10',areaId:A,rolId:R,estado:'INACTIVO'})).toMatchObject({pagina:2,limite:10,areaId:A,rolId:R}));
  it.each([{pagina:0},{limite:101},{areaId:'3'},{estado:'INVENTADO'}])('rechaza filtros inválidos %j',v=>expect(listarUsuariosQuerySchema.safeParse(v).success).toBe(false));
@@ -26,9 +26,9 @@ describe('DTO originales alineados con el modelo UUID',()=>{
  it.each(['1','0','-5','abc'])('rechaza un identificador que no es UUID: %s',id=>expect(usuarioIdParamSchema.safeParse({id}).success).toBe(false));
  it('acepta alta por cargo y área reales',()=>expect(crearUsuarioAdminSchema.parse(alta)).toMatchObject({cargoId:C,areaId:A,rolId:R}));
  it('valida el límite real de apellidos antes de escribir',()=>expect(crearUsuarioAdminSchema.safeParse({...alta,apellidoPaterno:'A'.repeat(80),apellidoMaterno:'B'.repeat(80)}).success).toBe(false));
- it.each([{cargoId:undefined},{rolId:'1'},{correo:'persona@gmail.com'},{passwordInicial:'corta'},{numeroDocumento:'123'}])('valida el alta %j',d=>expect(crearUsuarioAdminSchema.safeParse({...alta,...d}).success).toBe(false));
+ it.each([{cargoId:undefined},{rolId:'1'},{correo:'sin-correo'},{passwordInicial:'corta'},{numeroDocumento:'123'}])('valida el alta %j',d=>expect(crearUsuarioAdminSchema.safeParse({...alta,...d}).success).toBe(false));
  it('acepta edición parcial de campos originales',()=>expect(actualizarUsuarioAdminSchema.parse({nombres:'Persona',apellidos:'Prueba',cargoId:C,areaId:A,asignacionId:S})).toHaveProperty('asignacionId',S));
- it.each([{}, {correo:'externo@gmail.com'}, {nombres:'A'}, {cargo:'Texto que el backend no persiste'}])('rechaza cambios vacíos, inválidos o desconocidos %j',v=>expect(actualizarUsuarioAdminSchema.safeParse(v).success).toBe(false));
+ it.each([{}, {correo:'sin-correo'}, {nombres:'A'}, {cargo:'Texto que el backend no persiste'}])('rechaza cambios vacíos, inválidos o desconocidos %j',v=>expect(actualizarUsuarioAdminSchema.safeParse(v).success).toBe(false));
 });
 
 describe('Directorio: consultas de lectura y resultados reales',()=>{
@@ -97,7 +97,7 @@ describe('Altas y ediciones transaccionales (PostgreSQL simulado, sin conexiones
   expect(hash).toHaveBeenCalledWith(alta.passwordInicial);
   expect(p.query.mock.calls.filter(([sql])=>sql.startsWith('INSERT INTO')).map(([sql])=>sql.split('(')[0].trim())).toEqual([
    'INSERT INTO sigd_auth.persona','INSERT INTO sigd_auth.persona_natural','INSERT INTO sigd_auth.persona_documento_historial',
-   'INSERT INTO sigd_auth.cuenta_usuario','INSERT INTO sigd_org.asignacion_personal','INSERT INTO sigd_audit.bitacora_auditoria']);
+   'INSERT INTO sigd_auth.cuenta_usuario','INSERT INTO sigd_org.asignacion_personal','INSERT INTO sigd_auth.usuario_institucion','INSERT INTO sigd_audit.bitacora_auditoria']);
   expect(p.query.mock.calls.at(-1)?.[0]).toBe('COMMIT');expect(p.release).toHaveBeenCalledOnce();hash.mockRestore();
  });
  it('no confirma una edición hasta recuperar su DTO dentro de la transacción',async()=>{
@@ -147,7 +147,7 @@ describe('Altas y ediciones transaccionales (PostgreSQL simulado, sin conexiones
  });
  it('preserva el ámbito del rol elegido y revoca las sesiones al cambiarlo',async()=>{
   const p=transaccion();await p.service.actualizarUsuario(U,{usuarioRolId:UR,rolId:OTRO});
-  expect(p.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO sigd_org.usuario_rol'),[U,OTRO,A]);
+  expect(p.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO sigd_org.usuario_rol'),[U,OTRO,A,expect.any(String)]);
   expect(p.query).toHaveBeenCalledWith(expect.stringContaining('SET revocado_en = now()'),[U]);
  });
  it.each([{asignacionId:OTRO,cargoId:C,areaId:A},{usuarioRolId:OTRO,rolId:R}])('rechaza identificadores de asignaciones ajenas %j',async d=>{

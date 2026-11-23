@@ -18,6 +18,7 @@ interface ProtectedRouteProps {
   requiredCapacidades?: readonly CapacidadOperativaId[];
   requiredModule?: string;
   requiredAction?: ClavePermiso;
+  redirectTo?: string;
 }
 
 export function tienePermisoAlmacenado(
@@ -46,6 +47,7 @@ export default function ProtectedRoute({
   requiredCapacidades = [],
   requiredModule,
   requiredAction = "ver",
+  redirectTo = "/login",
 }: ProtectedRouteProps): JSX.Element {
   const { usuario } = useAuthStore();
   const location = useLocation();
@@ -56,7 +58,7 @@ export default function ProtectedRoute({
   const rawRoles = typeof window !== "undefined" && window.localStorage ? window.localStorage.getItem(CLAVE_ROLES) : null;
 
   if (!token) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to={redirectTo} replace state={{ from: location }} />;
   }
 
   // 1. Roles institucionales activos

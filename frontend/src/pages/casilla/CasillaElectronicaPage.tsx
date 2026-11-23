@@ -4,7 +4,9 @@
  * Cumplimiento de la Ley N° 27444 (LPAG) y Ley N° 29733 (Protección de Datos Personales)
  */
 
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
 
 import NotificationList from "../../components/casilla/NotificacionList";
 import NotificacionDetailModal from "../../components/casilla/NotificacionDetailModal";
@@ -13,6 +15,20 @@ import { useAuthStore } from "../../stores/authStore";
 import { CasillaBadgeRealtime } from "../../components/casilla/CasillaBadgeRealtime";
 
 export default function CasillaElectronicaPage() {
+  const navigate = useNavigate();
+  const cerrarSesion = useAuthStore((state) => state.cerrarSesion);
+  const [cerrandoSesion, setCerrandoSesion] = useState(false);
+
+  async function handleCerrarSesion() {
+    if (cerrandoSesion) return;
+    setCerrandoSesion(true);
+    try {
+      await cerrarSesion();
+    } finally {
+      navigate("/casilla/login", { replace: true });
+    }
+  }
+
   const nombreUsuario = useAuthStore((state) => state.usuario?.nombreCompleto);
   const {
     filtros,
@@ -91,6 +107,16 @@ export default function CasillaElectronicaPage() {
                   </div>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={handleCerrarSesion}
+                disabled={cerrandoSesion}
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-200 bg-red-50/80 px-3.5 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100 hover:text-red-800 disabled:opacity-50 cursor-pointer"
+                title="Cerrar sesión de la Casilla"
+              >
+                <LogOut className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{cerrandoSesion ? "Cerrando…" : "Cerrar sesión"}</span>
+              </button>
               <Link
                 to="/"
                 className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"

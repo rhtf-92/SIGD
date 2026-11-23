@@ -155,8 +155,8 @@ describe('Subsanación H1 y H2 — Cierre Técnico Definitivo de Fase 1', () => 
 
       const usuarioConRol = await service.asignarRol(USUARIO_ID, ROL_ESPECIALISTA_ID, ADMIN_ID);
       expect(usuarioConRol).toBeDefined();
-      // Verificación H2: Para rol departamental, usuario_rol recibe el area_id del trabajador
-      expect(inserts['usuario_rol']).toEqual([USUARIO_ID, ROL_ESPECIALISTA_ID, AREA_A_ID]);
+      // Verificación H2: Para rol departamental, usuario_rol recibe el area_id del trabajador e institucion_id
+      expect(inserts['usuario_rol']).toEqual([USUARIO_ID, ROL_ESPECIALISTA_ID, AREA_A_ID, expect.any(String)]);
     });
 
     it('H2.2: Asignación de rol ADMINISTRADOR conserva area_id = NULL en usuario_rol para alcance global', async () => {
@@ -192,7 +192,7 @@ describe('Subsanación H1 y H2 — Cierre Técnico Definitivo de Fase 1', () => 
       await service.asignarRol(USUARIO_ID, ROL_ADMIN_ID, ADMIN_ID);
 
       // Para ADMINISTRADOR, area_id en usuario_rol debe ser NULL
-      expect(insertURParams).toEqual([USUARIO_ID, ROL_ADMIN_ID, null]);
+      expect(insertURParams).toEqual([USUARIO_ID, ROL_ADMIN_ID, null, expect.any(String)]);
     });
 
     it('H2.3: auth.guard mapea areaId sólo a permisos con ambito AREA, y null a permisos GLOBAL', async () => {

@@ -122,7 +122,7 @@ export default function PasarelaFirmaPage() {
             keyFila,
             idDocumento: tieneDocumentoId ? String(d.documentoId).trim() : "",
             idTramite: String(d.expedienteId ?? d.cut ?? ""),
-            tipoActo: "RD",
+            tipoActo: d.tipoActo === "CERTIFICADO" ? "CERTIFICADO" : "RD",
             numeroCorrelativo: String(d.numeroBorrador ?? d.cut ?? "S/N"),
             anio,
             asunto: String(d.asunto ?? "Sin asunto"),

@@ -25,6 +25,9 @@ interface DocumentoFirmado {
   estado: string;
   s3_bucket: string;
   s3_key: string;
+  numero_documento_acto?: string | null;
+  tipo_acto?: string | null;
+  asunto_acto?: string | null;
 }
 
 export function crearVerificadorCvd(
@@ -47,15 +50,33 @@ export function crearVerificadorCvd(
 
     const resultado = await pool.query<DocumentoFirmado>(
       `SELECT
-         cvd,
-         sha256_firmado,
-         firmante,
-         fecha_sello_tsa,
-         estado,
-         s3_bucket,
-         s3_key
-       FROM sigd_doc.firma_digital_documento
-       WHERE cvd = $1`,
+         f.cvd,
+         f.sha256_firmado,
+         f.firmante,
+         f.fecha_sello_tsa,
+         f.estado,
+         f.s3_bucket,
+         f.s3_key,
+         COALESCE(r.numero_resolucion, r.numero_borrador, c.numero_certificado, c.numero_borrador, ce.numero_certificado, ce.numero_borrador) AS numero_documento_acto,
+         CASE
+           WHEN r.resolucion_id IS NOT NULL THEN r.tipo_resolucion
+           WHEN c.certificado_id IS NOT NULL THEN 'Certificado de Idioma Inglés (TUPA SUZ26-006)'
+           WHEN ce.certificado_id IS NOT NULL THEN 'Certificado de Estudios Superiores (TUPA SUZ26-034)'
+           ELSE NULL
+         END AS tipo_acto,
+         COALESCE(r.asunto, c.asunto, ce.asunto) AS asunto_acto
+       FROM sigd_doc.firma_digital_documento f
+       LEFT JOIN sigd_doc.documento_adjunto a ON a.documento_adjunto_id = f.documento_id
+       LEFT JOIN sigd_doc.resolucion r
+         ON r.expediente_id = a.expediente_id
+        AND a.s3_key = ('resoluciones/' || r.numero_borrador || '.pdf')
+       LEFT JOIN sigd_doc.certificado_ingles c
+         ON c.documento_adjunto_id = a.documento_adjunto_id
+        AND c.estado <> 'ANULADO'
+       LEFT JOIN sigd_doc.certificado_estudios_superiores ce
+         ON ce.documento_adjunto_id = a.documento_adjunto_id
+        AND ce.estado <> 'ANULADO'
+       WHERE f.cvd = $1`,
       [cvd],
     );
 
@@ -122,9 +143,9 @@ export function crearVerificadorCvd(
     }
 
     const docMetadata = {
-      numeroDocumento: null,
-      tipo: null,
-      asunto: null,
+      numeroDocumento: documento.numero_documento_acto ?? null,
+      tipo: documento.tipo_acto ?? null,
+      asunto: documento.asunto_acto ?? null,
       fechaEmision,
       firmantes: [
         {

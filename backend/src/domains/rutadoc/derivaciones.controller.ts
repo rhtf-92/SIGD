@@ -5,7 +5,7 @@ import { DerivarExpedienteSchema } from './dto/derivarExpediente.dto.js';
 import { AtenderExpedienteSchema } from './dto/atenderExpediente.dto.js';
 import { ArchivarExpedienteSchema } from './dto/archivarExpediente.dto.js';
 import { RecepcionarExpedienteSchema } from './dto/recepcionarExpediente.dto.js';
-import { derivarExpediente, atenderExpediente, archivarExpediente, recepcionarExpediente } from './derivaciones.service.js';
+import { derivarExpediente, atenderExpediente, archivarExpediente, recepcionarExpediente, rechazarExpediente } from './derivaciones.service.js';
 import { insertarEvento } from '../../audit/evento-outbox.repository.js';
 import { obtenerSiguienteEstado } from './rutadoc.fsm.js';
 import { AppError, NotFoundError, ValidationError, UnauthorizedError, ConflictError } from '../../shared/domain/errors/index.js';
@@ -88,9 +88,15 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
           .max(100, 'El lote no puede exceder 100 expedientes.'),
         destinos: DerivarExpedienteSchema.shape.destinos,
         proveido: DerivarExpedienteSchema.shape.proveido,
+        tipo_documento_sustento: DerivarExpedienteSchema.shape.tipo_documento_sustento,
+        numero_documento_sustento: DerivarExpedienteSchema.shape.numero_documento_sustento,
+        prioridad: DerivarExpedienteSchema.shape.prioridad,
+        plazo_dias: DerivarExpedienteSchema.shape.plazo_dias,
+        instrucciones: DerivarExpedienteSchema.shape.instrucciones,
       });
 
-      const { expedienteIds, destinos, proveido } = esquemaLote.parse(req.body);
+      const datosLote = esquemaLote.parse(req.body);
+      const { expedienteIds, ...datosDerivacion } = datosLote;
       const cliente = await pool.connect();
 
       try {
@@ -98,7 +104,7 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
         const resultados: Array<{ expedienteId: string; ok: boolean }> = [];
 
         for (const expId of expedienteIds) {
-          await derivarExpediente(cliente, expId, { destinos, proveido });
+          await derivarExpediente(cliente, expId, datosDerivacion);
           resultados.push({ expedienteId: expId, ok: true });
         }
 
@@ -132,11 +138,18 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
     try {
       const expedienteId = String(req.params.id);
       const datos = RecepcionarExpedienteSchema.parse(req.body || {});
+      if (datos.generarCargo === undefined && (req.body as any)?.generarCargo !== false) {
+        datos.generarCargo = true;
+      }
 
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        const resultado = await recepcionarExpediente(cliente, expedienteId, datos);
+        const fechaHeader = req.headers['x-fecha-controlada'];
+        const fechaReferencia = typeof fechaHeader === 'string' && !isNaN(Date.parse(fechaHeader))
+          ? new Date(fechaHeader)
+          : new Date();
+        const resultado = await recepcionarExpediente(cliente, expedienteId, datos, fechaReferencia);
         await cliente.query('COMMIT');
 
         res.status(200).json({
@@ -146,6 +159,7 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
           movimientoId: resultado.movimientoId,
           nuevoEstado: resultado.nuevoEstado,
           secuencia: resultado.secuencia,
+          cargo: resultado.cargo,
         });
       } catch (error) {
         await cliente.query('ROLLBACK').catch(() => {});
@@ -160,6 +174,38 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
 
   router.post('/:id/recepcionar', handlerRecepcionar);
   router.post('/:id/movimientos/recepcionar', handlerRecepcionar);
+
+  // Endpoint Rechazo e Inadmisibilidad (LPAG Arts. 136 y 142)
+  router.post('/:id/rechazar', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      const esquemaRechazo = z.object({
+        motivo: z.string().min(10, 'El motivo del rechazo debe tener al menos 10 caracteres'),
+        baseLegal: z.string().min(5, 'La base legal debe tener al menos 5 caracteres'),
+      });
+      const datos = esquemaRechazo.parse(req.body);
+      const cliente = await pool.connect();
+      try {
+        await cliente.query('BEGIN');
+        const resultado = await rechazarExpediente(cliente, expedienteId, datos);
+        await cliente.query('COMMIT');
+        res.status(200).json({
+          ok: true,
+          mensaje: 'Expediente rechazado e inadmisibilidad declarada formalmente.',
+          expediente_id: expedienteId,
+          nuevoEstado: resultado.nuevoEstado,
+          movimientoId: resultado.movimientoId,
+        });
+      } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => {});
+        throw error;
+      } finally {
+        cliente.release();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
 
   // Endpoint #25 (T-BE-RD-07) - Atención Resolutiva
   router.post('/:id/atender', async (req: Request, res: Response, next: NextFunction) => {

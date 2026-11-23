@@ -241,8 +241,9 @@ export class VentanillaPresencialService {
       if (!areaDestinoId && procedimiento) {
         const configDoc = CATALOGO_DOCUMENTAL_POR_CODIGO.get(procedimiento.codigo);
         let codigoArea = 'MP'; // Flujo seguro por defecto: Mesa de Partes (MP)
-        // Solo derivar automáticamente si la competencia institucional está verificada documentalmente
-        if (configDoc?.unidadResponsableVerificada === true) {
+        const entraPorMesaPartes = (configDoc?.unidadRecepcion ?? '').toLowerCase().includes('mesa de partes');
+        // Solo asignar automáticamente el área responsable si la recepción no exige ingreso previo por Mesa de Partes
+        if (!entraPorMesaPartes && configDoc?.unidadResponsableVerificada === true) {
           const unidadResp = (configDoc.unidadResponsable ?? '').toLowerCase();
           if (unidadResp.includes('secretar') || unidadResp.includes('académic')) {
             codigoArea = 'SEC';

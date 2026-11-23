@@ -77,13 +77,13 @@ export function crearRouterResoluciones(pool: Pool): Router {
       });
     }
 
-    const esAdminODirector =
-      autorizacion.roles.some((r) => r === 'ADMINISTRADOR' || r === 'DIRECTOR') ||
+    const esDirectorInstitucional =
+      autorizacion.roles.includes('DIRECTOR') &&
       autorizacion.permisos.some(
-        (p) => (p.codigo === 'ADMIN_USUARIOS' || p.codigo === 'FIRMA_FIRMAR') && p.ambito === 'GLOBAL',
+        (p) => p.codigo === 'FIRMA_FIRMAR' && p.ambito === 'GLOBAL' && p.areaId === null,
       );
 
-    if (esAdminODirector) {
+    if (esDirectorInstitucional) {
       return identidad;
     }
 
@@ -189,13 +189,14 @@ export function crearRouterResoluciones(pool: Pool): Router {
 
     const proyecto = await servicio.obtenerProyectoPorId(id);
 
-    const esAdminODirector =
-      autorizacion.roles.some((r) => r === 'ADMINISTRADOR' || r === 'DIRECTOR') ||
+    const tieneLecturaGlobalODirector =
+      (autorizacion.roles.includes('DIRECTOR') &&
+        autorizacion.permisos.some((p) => p.codigo === 'FIRMA_FIRMAR' && p.ambito === 'GLOBAL' && p.areaId === null)) ||
       autorizacion.permisos.some(
-        (p) => (p.codigo === 'ADMIN_USUARIOS' || p.codigo === 'FIRMA_FIRMAR' || p.codigo === 'EXPEDIENTE_LEER') && p.ambito === 'GLOBAL' && p.areaId === null,
+        (p) => p.codigo === 'EXPEDIENTE_LEER' && p.ambito === 'GLOBAL' && p.areaId === null,
       );
 
-    if (!esAdminODirector) {
+    if (!tieneLecturaGlobalODirector) {
       const acceso = await pool.query<{ autorizado: boolean }>(
         `SELECT EXISTS (
            SELECT 1 FROM sigd_auth.cuenta_usuario cu
@@ -346,13 +347,14 @@ export function crearRouterResoluciones(pool: Pool): Router {
       throw new ForbiddenError({ detail: 'Cuenta institucional inactiva o no autorizada.' });
     }
 
-    const esAdminODirector =
-      autorizacion.roles.some((r) => r === 'ADMINISTRADOR' || r === 'DIRECTOR') ||
+    const tieneLecturaGlobalODirector =
+      (autorizacion.roles.includes('DIRECTOR') &&
+        autorizacion.permisos.some((p) => p.codigo === 'FIRMA_FIRMAR' && p.ambito === 'GLOBAL' && p.areaId === null)) ||
       autorizacion.permisos.some(
-        (p) => (p.codigo === 'ADMIN_USUARIOS' || p.codigo === 'FIRMA_FIRMAR' || p.codigo === 'EXPEDIENTE_LEER') && p.ambito === 'GLOBAL' && p.areaId === null,
+        (p) => p.codigo === 'EXPEDIENTE_LEER' && p.ambito === 'GLOBAL' && p.areaId === null,
       );
 
-    if (!esAdminODirector) {
+    if (!tieneLecturaGlobalODirector) {
       const acceso = await pool.query<{ autorizado: boolean }>(
         `SELECT EXISTS (
            SELECT 1 FROM sigd_auth.cuenta_usuario cu

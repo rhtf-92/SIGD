@@ -166,6 +166,17 @@ export const ETIQUETAS_PESTANA_RUTADOC: Record<PestanaRutaDoc, string> = {
   PENDIENTES: "Pendientes", EN_TRAMITE: "En trámite", DERIVADOS: "Derivados",
   POR_FIRMAR: "Por firmar", ATENDIDOS: "Atendidos", ARCHIVADOS: "Archivados",
 };
+export interface HabilitacionInfoRutaDoc {
+  habilitado: boolean;
+  estadoPago: string;
+  requierePago?: boolean;
+  fechaHabilitacion?: string | null;
+  fechaInicioComputo?: string | null;
+  fechaConfirmacionPago?: string | null;
+  diasHabilesRestantes: number;
+  computoRealizadoEn?: string;
+}
+
 export interface ExpedienteResumenRutaDoc {
   idExpediente: string;
   cut: string;
@@ -175,6 +186,7 @@ export interface ExpedienteResumenRutaDoc {
   fechaIngreso?: string | null;
   estadoActual: string;
   areaActualId: string | null;
+  habilitacionInfo?: HabilitacionInfoRutaDoc | null;
 }
 export interface DocumentoAdjuntoRutaDoc {
   idDocumento: string;
@@ -249,12 +261,45 @@ export interface ResolucionInfoRutaDoc {
   documentoAdjuntoId?: string | null;
 }
 
+export interface CertificadoInglesInfoRutaDoc {
+  certificadoId: string;
+  numeroBorrador: string;
+  numeroCertificado?: string | null;
+  estado: string;
+  titularNombre: string;
+  nivelEstudios: string;
+  horasAcademicas: number;
+  promedioFinal: number;
+  numeroActa: string;
+  fechaProyeccion: string;
+  firmanteNombre?: string | null;
+  firmadoEn?: string | null;
+  cvd?: string | null;
+  hashPades?: string | null;
+  documentoAdjuntoId?: string | null;
+}
+
+export interface OrdenPagoInfoRutaDoc {
+  ordenId: string;
+  numeroOrden: string;
+  importe: number;
+  estadoOrden: string;
+  tienePago: boolean;
+  pagoVerificado: boolean;
+  reciboNumero: string | null;
+  pendienteVerificacion: boolean;
+}
+
 export interface ExpedienteDetalleRutaDoc extends ExpedienteResumenRutaDoc {
+  tipoTramiteCodigo?: string | null;
+  tipoTramiteDenominacion?: string | null;
   solicitanteId: string | null;
   resumenDocumentos: { cantidadDocumentos: number; totalFolios: number } | null;
   documentos?: DocumentoAdjuntoRutaDoc[];
   acumulacionInfo?: AcumulacionInfoRutaDoc | null;
   resolucionInfo?: ResolucionInfoRutaDoc | null;
+  certificadoInglesInfo?: CertificadoInglesInfoRutaDoc | null;
+  ordenPagoInfo?: OrdenPagoInfoRutaDoc | null;
   ultimoMovimiento: { idMovimiento: string; evento: string; estadoNuevo: string;
     fechaHora: string; usuarioOperadorId: string } | null;
   sla: null;

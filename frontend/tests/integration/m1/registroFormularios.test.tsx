@@ -303,17 +303,34 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     expect(invalido.success).toBe(false);
   });
 
-  it.each(["confirmado", "CE confirmado", "rechazado", "sin identidad", "sin confirmar", "sin contraseña", "modelo incompatible"])("h) RegistroCiudadanoPage: registro natural %s sin falsos éxitos ni pérdida del formulario", async (caso) => {
+  it.each(["confirmado", "CE confirmado", "rechazado", "sin identidad", "sin confirmar", "sin casilla", "cuenta inactiva", "sin contraseña", "modelo incompatible"])("h) RegistroCiudadanoPage: registro natural %s sin falsos éxitos ni pérdida del formulario", async (caso) => {
     const post = vi.spyOn(apiClient, "post");
-    const confirmacion = { status: 201, data: { idPersona: "11111111-1111-4111-8111-111111111111", mensaje: "Registro exitoso" } };
+    const confirmacion = {
+      status: 201,
+      data: {
+        idPersona: "11111111-1111-4111-8111-111111111111",
+        idUsuario: "22222222-2222-4222-8222-222222222222",
+        idCasilla: "44444444-4444-4444-8444-444444444444",
+        cvdCasilla: "CVD-CASILLA-22222222",
+        correo: "sergio@example.com",
+        mensaje: "Registro exitoso",
+        activo: true,
+        casillaHabilitada: true,
+      },
+    };
     if (caso === "rechazado") post.mockRejectedValueOnce(new Error("Servicio no disponible"));
     else if (caso === "modelo incompatible") post.mockRejectedValueOnce(new ApiHttpError({
       type: "about:blank", title: "Servicio no disponible", status: 503,
       detail: "El esquema no permite persistir el domicilio requerido.", instance: "/api/v1/auth/registro-ciudadano",
       code: "REGISTRO_MODELO_NO_COMPATIBLE", category: "System", correlationId: "test", retryable: false,
     }));
-    else post.mockResolvedValueOnce(caso === "sin identidad" ? { status: 201, data: {} }
-      : caso === "sin confirmar" ? { ...confirmacion, status: 202 } : confirmacion);
+    else post.mockResolvedValueOnce(
+      caso === "sin identidad" ? { status: 201, data: {} }
+      : caso === "sin confirmar" ? { ...confirmacion, status: 202 }
+      : caso === "sin casilla" ? { status: 201, data: { ...confirmacion.data, casillaHabilitada: false } }
+      : caso === "cuenta inactiva" ? { status: 201, data: { ...confirmacion.data, activo: false } }
+      : confirmacion,
+    );
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -388,8 +405,16 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent("Registro completado. Ya puede iniciar sesión con su cuenta.");
+    expect(mensajeExito).toHaveTextContent("¡Registro realizado exitosamente!");
+    expect(mensajeExito).toHaveTextContent("ACTIVA");
+    expect(mensajeExito).toHaveTextContent("HABILITADA");
+    expect(mensajeExito).toHaveTextContent("Tu cuenta y tu Casilla Electrónica Institucional se han creado correctamente. Ya puedes ingresar al sistema con tu DNI y contraseña.");
     expect(mensajeExito).not.toHaveTextContent("@casilla");
+    expect(mensajeExito).not.toHaveTextContent(/Activar Mi Cuenta/i);
+    expect(mensajeExito).not.toHaveTextContent(/Hemos enviado un enlace/i);
+    expect(mensajeExito).not.toHaveTextContent(/Verificación enviada al buzón/i);
+    const linkLogin = screen.getByRole("link", { name: /INICIAR SESIÓN/i });
+    expect(linkLogin).toHaveAttribute("href", "/login");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
     // La llamada HTTP conserva dirección y ubigeo, sin depender del console.log.
@@ -416,20 +441,32 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
     const payload = postCall[1];
     expect(payload).toMatchObject({ direccion: "Jr. Tarapacá N° 645" });
     if (caso === "CE confirmado") expect(payload).toHaveProperty("dni", undefined);
-    // Cerrar mensaje de éxito
-    const botonCerrarExito = screen.getByLabelText(/Cerrar mensaje de éxito/i);
-    await user.click(botonCerrarExito);
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     // FIX estabilidad (F_ADRIANO): flujo con ~100 keystrokes de user-event;
     // bajo carga de suite completa supera el timeout de 5 s de Vitest.
   }, 30_000);
 
-  it.each(["confirmado", "rechazado", "sin identidad", "sin confirmar", "sin contraseña"])("i) RegistroCiudadanoPage: registro jurídico %s sin falsos éxitos ni pérdida del formulario", async (caso) => {
+  it.each(["confirmado", "rechazado", "sin identidad", "sin confirmar", "sin casilla", "sin contraseña"])("i) RegistroCiudadanoPage: registro jurídico %s sin falsos éxitos ni pérdida del formulario", async (caso) => {
     const post = vi.spyOn(apiClient, "post");
-    const confirmacion = { status: 201, data: { idPersona: "11111111-1111-4111-8111-111111111111", mensaje: "Registro exitoso" } };
+    const confirmacion = {
+      status: 201,
+      data: {
+        idPersona: "11111111-1111-4111-8111-111111111111",
+        idUsuario: "22222222-2222-4222-8222-222222222222",
+        idCasilla: "44444444-4444-4444-8444-444444444444",
+        cvdCasilla: "CVD-CASILLA-22222222",
+        correo: "contacto@amazonassoft.pe",
+        mensaje: "Registro exitoso",
+        activo: true,
+        casillaHabilitada: true,
+      },
+    };
     if (caso === "rechazado") post.mockRejectedValueOnce(new Error("Servicio no disponible"));
-    else post.mockResolvedValueOnce(caso === "sin identidad" ? { status: 201, data: {} }
-      : caso === "sin confirmar" ? { ...confirmacion, status: 202 } : confirmacion);
+    else post.mockResolvedValueOnce(
+      caso === "sin identidad" ? { status: 201, data: {} }
+      : caso === "sin confirmar" ? { ...confirmacion, status: 202 }
+      : caso === "sin casilla" ? { status: 201, data: { ...confirmacion.data, casillaHabilitada: false } }
+      : confirmacion,
+    );
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -510,8 +547,13 @@ describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / EN
       {},
       { timeout: 3000 },
     );
-    expect(mensajeExito).toHaveTextContent("Registro completado. Ya puede iniciar sesión con su cuenta.");
+    expect(mensajeExito).toHaveTextContent("¡Registro realizado exitosamente!");
+    expect(mensajeExito).toHaveTextContent("ACTIVA");
+    expect(mensajeExito).toHaveTextContent("HABILITADA");
     expect(mensajeExito).not.toHaveTextContent("@casilla");
+    expect(mensajeExito).not.toHaveTextContent(/Activar Mi Cuenta/i);
+    expect(mensajeExito).not.toHaveTextContent(/Hemos enviado un enlace/i);
+    expect(screen.getByRole("link", { name: /INICIAR SESIÓN/i })).toHaveAttribute("href", "/login");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
     // La llamada HTTP conserva dirección y ubigeo, sin depender del console.log.

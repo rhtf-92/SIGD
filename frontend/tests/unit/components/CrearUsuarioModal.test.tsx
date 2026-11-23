@@ -401,4 +401,78 @@ describe("CrearUsuarioModal — Asignación integrada de roles en el registro", 
       ["rol-esp"],
     );
   });
+
+  it("permite registrar usuario con correo personal (Gmail) y confirmación de contraseña", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockResolvedValue({});
+
+    render(
+      <CrearUsuarioModal
+        areas={areasMock}
+        cargos={cargosMock}
+        tiposDocumento={tiposDocMock}
+        rolesCatalogo={rolesCatalogoMock}
+        permisosCatalogo={permisosCatalogoMock}
+        pending={false}
+        onClose={vi.fn()}
+        onSave={onSave}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("DNI / documento"), "11223344");
+    await user.type(screen.getByLabelText("Nombres"), "Tesorero");
+    await user.type(screen.getByLabelText("Apellido paterno"), "Personal");
+    await user.type(screen.getByLabelText("Correo institucional"), "tesorero.demo@gmail.com");
+    await user.selectOptions(screen.getByLabelText("Unidad orgánica"), "area-1");
+    await user.selectOptions(screen.getByLabelText("Cargo"), "cargo-1");
+
+    await user.type(screen.getByLabelText("Nombre de usuario"), "tesorero.personal");
+    await user.type(screen.getByLabelText("Contraseña temporal"), "T3sorero#2026!");
+    await user.type(screen.getByLabelText("Confirmar contraseña"), "T3sorero#2026!");
+
+    await user.click(screen.getByRole("button", { name: "Crear usuario" }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correo: "tesorero.demo@gmail.com",
+        username: "tesorero.personal",
+        passwordInicial: "T3sorero#2026!",
+      }),
+      [],
+    );
+  });
+
+  it("rechaza el formulario si la confirmación de contraseña no coincide", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+
+    render(
+      <CrearUsuarioModal
+        areas={areasMock}
+        cargos={cargosMock}
+        tiposDocumento={tiposDocMock}
+        rolesCatalogo={rolesCatalogoMock}
+        permisosCatalogo={permisosCatalogoMock}
+        pending={false}
+        onClose={vi.fn()}
+        onSave={onSave}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("DNI / documento"), "11223344");
+    await user.type(screen.getByLabelText("Nombres"), "Tesorero");
+    await user.type(screen.getByLabelText("Apellido paterno"), "Personal");
+    await user.type(screen.getByLabelText("Correo institucional"), "tesorero.demo@gmail.com");
+    await user.selectOptions(screen.getByLabelText("Unidad orgánica"), "area-1");
+    await user.selectOptions(screen.getByLabelText("Cargo"), "cargo-1");
+
+    await user.type(screen.getByLabelText("Nombre de usuario"), "tesorero.personal");
+    await user.type(screen.getByLabelText("Contraseña temporal"), "T3sorero#2026!");
+    await user.type(screen.getByLabelText("Confirmar contraseña"), "Diferente#2026!");
+
+    await user.click(screen.getByRole("button", { name: "Crear usuario" }));
+
+    expect(screen.getByText("Las contraseñas no coinciden. Verifique la confirmación.")).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
 });

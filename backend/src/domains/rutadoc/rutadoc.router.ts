@@ -20,6 +20,9 @@ import { crearRouterDerivaciones } from './derivaciones.controller.js';
 import { crearRouterEvaluadores } from './evaluadores.controller.js';
 import { DigitalizacionService } from './digitalizacion.service.js';
 import { adjuntarDocumentoSchema } from './digitalizacion.schemas.js';
+import { CalificacionAdministrativaService } from './calificacion.service.js';
+import { crearControladorCalificacion } from './calificacion.controller.js';
+import { ServicioObservacionesRutaDoc } from './observaciones.service.js';
 import { setUnidadOrganicaId, setUsuarioId } from '../../shared/request-context/request-context.js';
 import { UnauthorizedError, ForbiddenError, ConflictError, ValidationError } from '../../shared/domain/errors/index.js';
 import type { CalendarioLaboralPort } from './sla.types.js';
@@ -79,6 +82,10 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
     ccd: new ServicioCcdRutaDoc(lecturas.clasificadorCcd ?? clasificadorCcdPredeterminadoRutaDoc),
   });
   const digitalizacionService = new DigitalizacionService(pool);
+  const servicioTrazabilidad = new ServicioTrazabilidadRutaDoc(repositoriosLectura.trazabilidad);
+  const servicioObservaciones = new ServicioObservacionesRutaDoc();
+  const servicioCalificacion = new CalificacionAdministrativaService(pool, servicioTrazabilidad, servicioObservaciones);
+  const controladorCalificacion = crearControladorCalificacion(servicioCalificacion, proveedorActor);
 
   router.get('/expedientes', controlador.listar);
   router.get('/expedientes/clasificador-ccd', controladorLecturas.ccd);
@@ -154,6 +161,8 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
     const isDerivar = req.path.endsWith('/derivar') || isLote;
     const isRecepcionar = req.path.endsWith('/recepcionar');
     const isObservar = req.path.endsWith('/observar');
+    const isChecklist = req.path.endsWith('/checklist');
+    const isCalificar = req.path.includes('/checklist/');
     const isSubsanar = req.path.endsWith('/subsanar');
     const isObservacionesList = req.path.endsWith('/observaciones');
     const isAcumular = req.path.endsWith('/acumular');
@@ -161,6 +170,8 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
     const isAcumulacionesList = req.path.endsWith('/acumulaciones');
     const isDesglose = req.path.endsWith('/desglose');
     const isDesglosesList = req.path.endsWith('/desgloses');
+    const isRechazar = req.path.endsWith('/rechazar');
+    const isConformidad = req.path.endsWith('/declarar-conformidad');
 
     const codigos = isRecepcionar
       ? ['EXPEDIENTE_RECEPCIONAR']
@@ -168,6 +179,14 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
       ? ['EXPEDIENTE_DERIVAR']
       : isObservar
       ? ['EXPEDIENTE_OBSERVAR']
+      : isChecklist
+      ? ['EXPEDIENTE_LEER']
+      : isCalificar
+      ? ['EXPEDIENTE_RESOLVER', 'EXPEDIENTE_OBSERVAR']
+      : isConformidad
+      ? ['EXPEDIENTE_RESOLVER', 'EXPEDIENTE_OBSERVAR', 'EXPEDIENTE_RECEPCIONAR']
+      : isRechazar
+      ? ['EXPEDIENTE_RESOLVER', 'EXPEDIENTE_OBSERVAR']
       : isSubsanar
       ? ['EXPEDIENTE_SUBSANAR']
       : isObservacionesList
@@ -185,7 +204,7 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
       : ['EXPEDIENTE_RESOLVER'];
     const permisos = actor.permisos.filter(p => codigos.includes(p.codigo));
     let autorizado = permisos.some(p => p.ambito === 'GLOBAL' && p.areaId === null);
-    if (!autorizado && (isSubsanar || isObservacionesList || isAcumulacionesList || isDesglosesList) && (actor.roles?.includes('MESA_PARTES') || actor.roles?.includes('ESTUDIANTE') || actor.roles?.includes('CIUDADANO') || actor.roles?.includes('DOCENTE'))) {
+    if (!autorizado && (isChecklist || isSubsanar || isObservacionesList || isAcumulacionesList || isDesglosesList || isConformidad || isRechazar) && (actor.roles?.includes('MESA_PARTES') || actor.roles?.includes('SECRETARIO') || actor.roles?.includes('ADMINISTRADOR') || actor.roles?.includes('ESTUDIANTE') || actor.roles?.includes('CIUDADANO') || actor.roles?.includes('DOCENTE'))) {
       autorizado = true;
     }
     if (!autorizado && permisos.some(p => p.ambito === 'AREA' && p.areaId !== null)) {
@@ -287,6 +306,10 @@ export function crearRouterRutaDoc(pool: Pool, obtenerActor?: ObtenerActorRutaDo
     next();
   });
   derivaciones.use(crearRouterDerivaciones(pool, proveedorActor));
+  derivaciones.get('/:id/checklist', controladorCalificacion.listar);
+  derivaciones.put('/:id/checklist/:reqId', controladorCalificacion.calificar);
+  derivaciones.post('/:id/observar', controladorCalificacion.observar);
+  derivaciones.post('/:id/declarar-conformidad', controladorCalificacion.declararConformidad);
   router.use('/expedientes', derivaciones);
   return router;
 }

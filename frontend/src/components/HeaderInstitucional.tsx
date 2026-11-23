@@ -135,7 +135,7 @@ export default function HeaderInstitucional() {
         </div>
 
         {/* Navegación Desktop */}
-        <nav className="flex items-center gap-3 xl:gap-5 text-[13px] xl:text-[14px] font-medium whitespace-nowrap">
+        <nav className="hidden xl:flex items-center gap-3 xl:gap-5 text-[13px] xl:text-[14px] font-medium whitespace-nowrap">
           {!isAuthenticated ? (
             <>
               {/* 1. Casilla Electrónica */}
@@ -335,12 +335,12 @@ export default function HeaderInstitucional() {
         </nav>
 
         {/* Controles para Móviles y Tablets */}
-        <div className="hidden shrink-0 items-center gap-2">
+        <div className="flex xl:hidden shrink-0 items-center gap-2">
           {!isAuthenticated ? (
             <button
               type="button"
               onClick={() => irA("/login")}
-              className="flex items-center justify-center gap-1.5 bg-[#0073E6] hover:bg-[#005fb8] text-white font-semibold rounded-full px-3.5 h-10 text-xs shadow-sm transition"
+              className="flex items-center justify-center gap-1.5 bg-[#0073E6] hover:bg-[#005fb8] text-white font-semibold rounded-full px-3.5 h-10 text-xs shadow-sm transition cursor-pointer"
             >
               <User className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>Ingresar</span>
@@ -350,7 +350,7 @@ export default function HeaderInstitucional() {
               type="button"
               onClick={() => void salir()}
               disabled={cerrando}
-              className="rounded-lg bg-white/15 px-3 py-1.5 text-white text-xs font-medium"
+              className="rounded-lg bg-white/15 px-3 py-1.5 text-white text-xs font-medium cursor-pointer"
             >
               {cerrando ? "Cerrando…" : "Salir"}
             </button>
@@ -368,7 +368,7 @@ export default function HeaderInstitucional() {
 
       {/* Menú Desplegable Móvil */}
       {menuMovilAbierto && (
-        <div className="hidden w-full bg-[#003b7a] border-t border-white/15 px-4 py-4 space-y-2 shadow-lg animate-in fade-in duration-150">
+        <div className="block xl:hidden w-full bg-[#003b7a] border-t border-white/15 px-4 py-4 space-y-2 shadow-lg animate-in fade-in duration-150">
           {!isAuthenticated ? (
             <>
               <button
