@@ -1021,10 +1021,10 @@ export class TupaRequisitosService {
         metodo_pago: string | null;
         fecha_pago: Date | null;
       }>(
-        `SELECT orden_pago_id::text, codigo_pago, monto::text, estado, metodo_pago, COALESCE(fecha_pago, actualizado_en, creado_en) AS fecha_pago
+        `SELECT orden_pago_id::text, codigo_pago, monto::text, estado, metodo_pago, COALESCE(fecha_pago, updated_at, fecha_creacion) AS fecha_pago
            FROM sigd_tra.orden_pago
           WHERE expediente_id = $1::uuid AND estado IN ('CONFIRMADO', 'PAGADO')
-          ORDER BY creado_en DESC
+          ORDER BY fecha_creacion DESC
           LIMIT 1`,
         [expedienteId],
       );

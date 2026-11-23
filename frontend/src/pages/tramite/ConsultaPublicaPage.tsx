@@ -116,11 +116,17 @@ export default function ConsultaPublicaPage() {
         }
       );
       setResultado(res.data);
-    } catch {
+    } catch (err: any) {
       setResultado(null);
-      setError(
-        'No se encontró ningún expediente con los datos provistos o los datos de identidad no coinciden.'
-      );
+      if (err.response?.status === 429) {
+        setError('Ha realizado demasiadas consultas seguidas. Por favor intente más tarde.');
+      } else {
+        setError(
+          err.response?.data?.detail ||
+          err.response?.data?.message ||
+          'No se encontró ningún expediente con los datos provistos o los datos de identidad no coinciden.'
+        );
+      }
     } finally {
       setCargando(false);
     }

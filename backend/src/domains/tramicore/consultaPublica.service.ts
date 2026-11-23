@@ -191,23 +191,23 @@ export class ConsultaPublicaService {
                 THEN 'IMPROCEDENTE_NSP'
                 ELSE COALESCE(rut.estado_nuevo, e.estado)
               END AS estado_tramite,
-              tv.denominacion_original AS tipo_tramite,
-              tr.asunto,
+              COALESCE(tv.denominacion_original, 'Trámite Institucional') AS tipo_tramite,
+              COALESCE(tr.asunto, 'Trámite Documentario') AS asunto,
               COALESCE(ar.fecha_ingreso, e.fecha_radicacion) AS fecha_envio_real,
               e.fecha_radicacion AS fecha_radicacion_legal,
               (ar.fecha_ingreso IS NOT NULL AND ar.fecha_ingreso < e.fecha_radicacion) AS fuera_de_horario,
               COALESCE(ar.canal_ingreso, 'MESA_VIRTUAL') AS canal_recepcion,
               COALESCE((SELECT MAX(f.folio_fin) FROM sigd_tra.expediente_documento_folio f
                          WHERE f.expediente_id = e.expediente_id), 0)::int AS total_folios,
-              p.id_documento AS numero_documento,
+              COALESCE(p.id_documento, e.dni_solicitante) AS numero_documento,
               pn.nombres,
               split_part(pn.apellidos, ' ', 1) AS apellido_paterno,
               NULLIF(substring(pn.apellidos FROM position(' ' IN pn.apellidos) + 1), pn.apellidos) AS apellido_materno,
               COALESCE(area_rut.nombre, 'Mesa de Partes') AS area_actual,
-              COALESCE((SELECT op.estado FROM sigd_tra.orden_pago op WHERE op.expediente_id = e.expediente_id ORDER BY op.creado_en DESC LIMIT 1), 'NO_APLICA') AS estado_pago
+              COALESCE((SELECT op.estado FROM sigd_tra.orden_pago op WHERE op.expediente_id = e.expediente_id ORDER BY op.fecha_creacion DESC LIMIT 1), 'NO_APLICA') AS estado_pago
          FROM sigd_tra.expediente e
-         JOIN sigd_tra.tramite tr ON tr.expediente_id = e.expediente_id
-         JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
+         LEFT JOIN sigd_tra.tramite tr ON tr.expediente_id = e.expediente_id
+         LEFT JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
          LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
          LEFT JOIN sigd_rut.estado_actual_expediente rut ON rut.expediente_id = e.expediente_id
          LEFT JOIN sigd_org.area area_rut ON area_rut.area_id::text = COALESCE(rut.area_actual_id, e.area_destino_id::text)
