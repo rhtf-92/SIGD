@@ -47,6 +47,7 @@ export interface ObjetoS3Verificado {
 
 export class DocumentoStorageService {
   private static inMemoryFallback = new Map<string, Buffer>();
+  private static s3OfflineHasta: number = 0;
   private readonly config: ConfiguracionS3;
   private readonly s3: S3Client;
 
@@ -62,7 +63,29 @@ export class DocumentoStorageService {
           secretAccessKey: this.config.secretKey,
         },
         forcePathStyle: this.config.forcePathStyle,
+        maxAttempts: 1,
       });
+  }
+
+  /**
+   * Determina si S3 está disponible o si debe usarse almacenamiento local inmediato
+   * para evitar retardos de timeout por red en contenedores o demos sin MinIO activo.
+   */
+  private estaS3Disponible(): boolean {
+    if (process.env.DISABLE_S3 === 'true' || process.env.STORAGE_DRIVER === 'local') {
+      return false;
+    }
+    return Date.now() >= DocumentoStorageService.s3OfflineHasta;
+  }
+
+  /**
+   * Registra una falla de conexión para activar el circuito de protección (cooldown de 60s)
+   */
+  private registrarFallaS3(err: any): void {
+    if (this.esErrorConexionS3(err)) {
+      DocumentoStorageService.s3OfflineHasta = Date.now() + 60_000;
+      console.warn(`[STORAGE] MinIO/S3 no alcanzable (${err?.code || err?.message}). Alternando a almacenamiento local persistente (.storage) sin latencia.`);
+    }
   }
 
   public get canonicalBucket(): string {
@@ -417,41 +440,49 @@ export class DocumentoStorageService {
     const tamanoBytes = buffer.length;
     const magicBytes = buffer.subarray(0, 4).toString('hex').toUpperCase();
 
-    try {
-      await this.s3.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: params.s3Key,
-          Body: buffer,
-          ContentType: 'application/pdf',
-        }),
-      );
-
-      // Validación post-subida con HEAD para garantizar consistencia
-      const head = await this.s3.send(
-        new HeadObjectCommand({
-          Bucket: bucket,
-          Key: params.s3Key,
-        }),
-      );
-
-      if (!head || head.ContentLength !== tamanoBytes) {
-        throw new Error(
-          `Error de consistencia en S3: el tamaño subido (${tamanoBytes}) difiere del confirmado (${head?.ContentLength}).`,
+    let s3Exitoso = false;
+    if (this.estaS3Disponible()) {
+      try {
+        await this.s3.send(
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: params.s3Key,
+            Body: buffer,
+            ContentType: 'application/pdf',
+          }),
         );
-      }
-    } catch (err: any) {
-      if (this.esErrorConexionS3(err)) {
-        DocumentoStorageService.inMemoryFallback.set(params.s3Key, buffer);
-        try {
-          const ruta = this.resolverRutaLocal(bucket, params.s3Key);
-          fs.mkdirSync(path.dirname(ruta), { recursive: true });
-          fs.writeFileSync(ruta, buffer);
-        } catch {
-          // Fallback en memoria ante restricciones de sistema de archivos
+
+        // Validación post-subida con HEAD para garantizar consistencia
+        const head = await this.s3.send(
+          new HeadObjectCommand({
+            Bucket: bucket,
+            Key: params.s3Key,
+          }),
+        );
+
+        if (!head || head.ContentLength !== tamanoBytes) {
+          throw new Error(
+            `Error de consistencia en S3: el tamaño subido (${tamanoBytes}) difiere del confirmado (${head?.ContentLength}).`,
+          );
         }
-      } else {
-        throw err;
+        s3Exitoso = true;
+      } catch (err: any) {
+        this.registrarFallaS3(err);
+        if (!this.esErrorConexionS3(err)) {
+          throw err;
+        }
+      }
+    }
+
+    // Si S3 está offline o la subida por red falló, persistir localmente de inmediato sin reintentos lentos
+    if (!s3Exitoso) {
+      DocumentoStorageService.inMemoryFallback.set(params.s3Key, buffer);
+      try {
+        const ruta = this.resolverRutaLocal(bucket, params.s3Key);
+        fs.mkdirSync(path.dirname(ruta), { recursive: true });
+        fs.writeFileSync(ruta, buffer);
+      } catch {
+        // Fallback en memoria ante restricciones de sistema de archivos
       }
     }
 
@@ -513,42 +544,51 @@ export class DocumentoStorageService {
     const bucketReal = this.canonicalBucket;
 
     let s3Objeto;
-    try {
-      s3Objeto = await this.s3.send(
-        new GetObjectCommand({
-          Bucket: bucketReal,
-          Key: s3Key,
-        }),
-      );
-    } catch (err: any) {
-      if (this.esErrorConexionS3(err)) {
-        let buf: Buffer | null = null;
-        if (DocumentoStorageService.inMemoryFallback.has(s3Key)) {
-          buf = DocumentoStorageService.inMemoryFallback.get(s3Key)!;
-        } else {
-          const ruta = this.resolverRutaLocal(bucketReal, s3Key);
-          if (fs.existsSync(ruta)) {
-            buf = fs.readFileSync(ruta);
+    if (this.estaS3Disponible()) {
+      try {
+        s3Objeto = await this.s3.send(
+          new GetObjectCommand({
+            Bucket: bucketReal,
+            Key: s3Key,
+          }),
+        );
+      } catch (err: any) {
+        this.registrarFallaS3(err);
+        if (!this.esErrorConexionS3(err)) {
+          if (err?.name === 'NoSuchKey' || err?.name === 'NotFound' || err?.$metadata?.httpStatusCode === 404) {
+            throw new NotFoundError({
+              detail: `El archivo ${s3Key} no existe físicamente en el almacenamiento MinIO (${bucketReal}).`,
+            });
           }
-        }
-        if (buf) {
-          const hasher = crypto.createHash('sha256').update(buf);
-          return {
-            s3Bucket: bucketReal,
-            s3Key,
-            tamanoBytes: buf.length,
-            sha256: hasher.digest('hex').toLowerCase(),
-            magicBytes: buf.subarray(0, 4).toString('hex').toUpperCase(),
-            mimeType: 'application/pdf',
-          };
+          throw err;
         }
       }
-      if (err?.name === 'NoSuchKey' || err?.name === 'NotFound' || err?.$metadata?.httpStatusCode === 404) {
-        throw new NotFoundError({
-          detail: `El archivo ${s3Key} no existe físicamente en el almacenamiento MinIO (${bucketReal}).`,
-        });
+    }
+
+    if (!s3Objeto) {
+      let buf: Buffer | null = null;
+      if (DocumentoStorageService.inMemoryFallback.has(s3Key)) {
+        buf = DocumentoStorageService.inMemoryFallback.get(s3Key)!;
+      } else {
+        const ruta = this.resolverRutaLocal(bucketReal, s3Key);
+        if (fs.existsSync(ruta)) {
+          buf = fs.readFileSync(ruta);
+        }
       }
-      throw err;
+      if (buf) {
+        const hasher = crypto.createHash('sha256').update(buf);
+        return {
+          s3Bucket: bucketReal,
+          s3Key,
+          tamanoBytes: buf.length,
+          sha256: hasher.digest('hex').toLowerCase(),
+          magicBytes: buf.subarray(0, 4).toString('hex').toUpperCase(),
+          mimeType: 'application/pdf',
+        };
+      }
+      throw new NotFoundError({
+        detail: `El archivo ${s3Key} no existe físicamente en el almacenamiento institucional.`,
+      });
     }
 
     if (!s3Objeto.Body) {
@@ -603,99 +643,106 @@ export class DocumentoStorageService {
     if (DocumentoStorageService.inMemoryFallback.has(s3Key)) {
       return DocumentoStorageService.inMemoryFallback.get(s3Key)!;
     }
-    try {
-      const command = new GetObjectCommand({
-        Bucket: this.canonicalBucket,
-        Key: s3Key,
-      });
-      const resp = await this.s3.send(command);
-      if (!resp.Body) {
-        throw new NotFoundError({ detail: `El objeto ${s3Key} no tiene contenido en S3.` });
-      }
-      const chunks: Buffer[] = [];
-      for await (const chunk of resp.Body as AsyncIterable<Uint8Array>) {
-        chunks.push(Buffer.from(chunk));
-      }
-      return Buffer.concat(chunks);
-    } catch (err: any) {
-      if (DocumentoStorageService.inMemoryFallback.has(s3Key)) {
-        return DocumentoStorageService.inMemoryFallback.get(s3Key)!;
-      }
-      const ruta = this.resolverRutaLocal(this.canonicalBucket, s3Key);
-      if (fs.existsSync(ruta)) {
-        return fs.readFileSync(ruta);
-      }
-      // Si el archivo no existe físicamente en el storage local o remoto (ej. ambiente de laboratorio/demo),
-      // generar de manera segura un documento PDF de respaldo representativo para visualización y descarga
+
+    const ruta = this.resolverRutaLocal(this.canonicalBucket, s3Key);
+
+    // 1. Si S3 está disponible, intentar obtenerlo de S3
+    if (this.estaS3Disponible()) {
       try {
-        const pdfDoc = await PDFDocument.create();
-        const page = pdfDoc.addPage([595.28, 841.89]);
-        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-        page.drawText('INSTITUTO DE EDUCACION SUPERIOR TECNOLOGICO PUBLICO "SUIZA"', {
-          x: 50,
-          y: 780,
-          size: 11,
-          font: fontBold,
-          color: rgb(0.1, 0.2, 0.4),
+        const command = new GetObjectCommand({
+          Bucket: this.canonicalBucket,
+          Key: s3Key,
         });
-        page.drawText('SISTEMA INTEGRAL DE GESTION DOCUMENTARIA - SIGD', {
-          x: 50,
-          y: 765,
-          size: 9,
-          font,
-          color: rgb(0.4, 0.4, 0.4),
-        });
-        page.drawText('DOCUMENTO OFICIAL DEL EXPEDIENTE', {
-          x: 50,
-          y: 710,
-          size: 14,
-          font: fontBold,
-          color: rgb(0.1, 0.1, 0.1),
-        });
-        const nombreArchivoLimpio = path.basename(s3Key).replace(/[^\x20-\x7E]/g, '');
-        page.drawText(`Archivo: ${nombreArchivoLimpio || 'documento.pdf'}`, {
-          x: 50,
-          y: 680,
-          size: 10,
-          font: fontBold,
-          color: rgb(0.2, 0.2, 0.2),
-        });
-        page.drawText('El documento fue radicado y foliado digitalmente en el repositorio institucional.', {
-          x: 50,
-          y: 655,
-          size: 10,
-          font,
-          color: rgb(0.3, 0.3, 0.3),
-        });
-        page.drawText('Integridad verificada con hash criptografico registrado en auditoria.', {
-          x: 50,
-          y: 635,
-          size: 9,
-          font,
-          color: rgb(0.4, 0.4, 0.4),
-        });
-        const bytes = await pdfDoc.save();
-        const resBuf = Buffer.from(bytes);
-        DocumentoStorageService.inMemoryFallback.set(s3Key, resBuf);
-        try {
-          fs.mkdirSync(path.dirname(ruta), { recursive: true });
-          fs.writeFileSync(ruta, resBuf);
-        } catch {
-          // Fallback en memoria
+        const resp = await this.s3.send(command);
+        if (resp.Body) {
+          const chunks: Buffer[] = [];
+          for await (const chunk of resp.Body as AsyncIterable<Uint8Array>) {
+            chunks.push(Buffer.from(chunk));
+          }
+          return Buffer.concat(chunks);
         }
-        return resBuf;
+      } catch (err: any) {
+        this.registrarFallaS3(err);
+      }
+    }
+
+    // 2. Si S3 está offline o falló, buscar en almacenamiento local de respaldo
+    if (DocumentoStorageService.inMemoryFallback.has(s3Key)) {
+      return DocumentoStorageService.inMemoryFallback.get(s3Key)!;
+    }
+    if (fs.existsSync(ruta)) {
+      return fs.readFileSync(ruta);
+    }
+
+    // 3. Fallback seguro para entorno demo / laboratorio
+    try {
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([595.28, 841.89]);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      page.drawText('INSTITUTO DE EDUCACION SUPERIOR TECNOLOGICO PUBLICO "SUIZA"', {
+        x: 50,
+        y: 780,
+        size: 11,
+        font: fontBold,
+        color: rgb(0.1, 0.2, 0.4),
+      });
+      page.drawText('SISTEMA INTEGRAL DE GESTION DOCUMENTARIA - SIGD', {
+        x: 50,
+        y: 765,
+        size: 9,
+        font,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      page.drawText('DOCUMENTO OFICIAL DEL EXPEDIENTE', {
+        x: 50,
+        y: 710,
+        size: 14,
+        font: fontBold,
+        color: rgb(0.1, 0.1, 0.1),
+      });
+      const nombreArchivoLimpio = path.basename(s3Key).replace(/[^\x20-\x7E]/g, '');
+      page.drawText(`Archivo: ${nombreArchivoLimpio || 'documento.pdf'}`, {
+        x: 50,
+        y: 680,
+        size: 10,
+        font: fontBold,
+        color: rgb(0.2, 0.2, 0.2),
+      });
+      page.drawText('El documento fue radicado y foliado digitalmente en el repositorio institucional.', {
+        x: 50,
+        y: 655,
+        size: 10,
+        font,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      page.drawText('Integridad verificada con hash criptografico registrado en auditoria.', {
+        x: 50,
+        y: 635,
+        size: 9,
+        font,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      const bytes = await pdfDoc.save();
+      const resBuf = Buffer.from(bytes);
+      DocumentoStorageService.inMemoryFallback.set(s3Key, resBuf);
+      try {
+        fs.mkdirSync(path.dirname(ruta), { recursive: true });
+        fs.writeFileSync(ruta, resBuf);
       } catch {
-        try {
-          const minimalDoc = await PDFDocument.create();
-          minimalDoc.addPage([595.28, 841.89]);
-          const minimalBytes = await minimalDoc.save();
-          const minimalBuf = Buffer.from(minimalBytes);
-          DocumentoStorageService.inMemoryFallback.set(s3Key, minimalBuf);
-          return minimalBuf;
-        } catch {
-          throw err;
-        }
+        // Fallback en memoria
+      }
+      return resBuf;
+    } catch {
+      try {
+        const minimalDoc = await PDFDocument.create();
+        minimalDoc.addPage([595.28, 841.89]);
+        const minimalBytes = await minimalDoc.save();
+        const minimalBuf = Buffer.from(minimalBytes);
+        DocumentoStorageService.inMemoryFallback.set(s3Key, minimalBuf);
+        return minimalBuf;
+      } catch {
+        throw new NotFoundError({ detail: `El archivo ${s3Key} no existe en el almacenamiento.` });
       }
     }
   }
@@ -712,14 +759,17 @@ export class DocumentoStorageService {
         });
       }
       this.validarClaveS3(s3Key);
-      await this.s3.send(
-        new DeleteObjectCommand({
-          Bucket: this.canonicalBucket,
-          Key: s3Key,
-        }),
-      );
+      if (this.estaS3Disponible()) {
+        await this.s3.send(
+          new DeleteObjectCommand({
+            Bucket: this.canonicalBucket,
+            Key: s3Key,
+          }),
+        );
+      }
     } catch (e: any) {
       if (e instanceof ValidationError) throw e;
+      this.registrarFallaS3(e);
       // Best-effort cleanup
     }
     DocumentoStorageService.inMemoryFallback.delete(s3Key);
